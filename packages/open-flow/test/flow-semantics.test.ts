@@ -621,13 +621,26 @@ export default () => value`,
               edges: [],
               nodes: {
                 check: {
-                  cases: [{ expressions: [{ input: 'value', operator: '>', value: 0 }], output: 'yes', relation: 'all' }],
-
-                  defaultOutput: 'no',
-                  input: { handle: 'value', jsonSchema: { type: 'number' }, nullable: false },
-                  inputs: { value: { kind: 'sources', sources: [{ input: 'text', kind: 'flow' }] } },
                   kind: 'condition',
                   name: 'Check',
+                  cases: [
+                    {
+                      output: 'yes',
+                      groups: [
+                        {
+                          expressions: [
+                            {
+                              left: { kind: 'source' as const, source: { input: 'text', kind: 'flow' } },
+                              operator: '>',
+                              right: { kind: 'value' as const, value: 0 },
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                  inputs: {},
+                  matchMode: 'first' as const,
                 },
                 number: {
                   inputs: {},
@@ -657,14 +670,14 @@ export default () => value`,
 
     await expect(validateFlow(invalid, engine)).resolves.toMatchObject({
       diagnostics: [
-        expect.objectContaining({ code: 'graph.flow-input-incompatible', path: '/document/subflows/subflow/graph/nodes/check/inputs/value' }),
+        expect.objectContaining({ code: 'condition.invalid', path: '/document/subflows/subflow/graph/nodes/check/cases/0/groups/0/expressions/0' }),
         expect.objectContaining({ code: 'graph.subflow-output-incompatible', path: '/document/subflows/subflow/outputs/result/sources' }),
       ],
       valid: false,
     })
   })
 
-  it('validates compatible Flow, Condition and Subflow output boundaries', async () => {
+  it('validates Flow input operands and Subflow data output boundaries', async () => {
     const source = revision('export default ({ input }) => ({ input })')
     const task = source.document.graph.nodes.task
     if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
@@ -694,13 +707,26 @@ export default () => value`,
               edges: [],
               nodes: {
                 check: {
-                  cases: [{ expressions: [{ input: 'text', operator: '==', value: 'hello' }], output: 'yes', relation: 'all' }],
-
-                  input: { handle: 'text', jsonSchema: { type: 'string' }, nullable: false },
-                  inputs: { text: { kind: 'sources', sources: [{ input: 'text', kind: 'flow' }] } },
                   kind: 'condition',
-                  defaultOutput: 'no',
                   name: 'Check',
+                  cases: [
+                    {
+                      output: 'yes',
+                      groups: [
+                        {
+                          expressions: [
+                            {
+                              left: { kind: 'source' as const, source: { input: 'text', kind: 'flow' } },
+                              operator: '==',
+                              right: { kind: 'value' as const, value: 'hello' },
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                  inputs: {},
+                  matchMode: 'first' as const,
                 },
               },
             },
@@ -711,10 +737,7 @@ export default () => value`,
                 handle: 'result',
                 jsonSchema: { type: 'string' },
                 nullable: false,
-                sources: [
-                  { kind: 'node', nodeId: 'check', output: 'yes' },
-                  { kind: 'node', nodeId: 'check', output: 'no' },
-                ],
+                sources: [{ kind: 'flow', input: 'text' }],
               },
             ],
           },

@@ -247,6 +247,7 @@
       "outputMissing": "“{{source}}”中找不到“{{output}}”，请重新选择。",
       "notReady": "运行到这里时，“{{source}} {{handle}}”可能还没有值。",
       "sourceConflict": "这些字段可能同时有值：{{sources}}。这里只能取一个。",
+      "incompatibleRight": "右值类型不符合此比较的要求。",
       "incompatible": "不兼容",
       "unverified": "无法验证",
       "schemaIncompatible": "数据格式不匹配。",
@@ -658,7 +659,17 @@
       },
       "condition": {
         "input-missing": "条件表达式引用了未知输入“{{input}}”。",
-        "output-duplicate": "条件输出“{{output}}”被重复声明。"
+        "output-duplicate": "条件输出“{{output}}”被重复声明。",
+        "invalid": {
+          "inputs": "Condition 不能声明节点级输入。",
+          "output": "Case 名称不能为空、重复或使用保留名称。",
+          "case": "请为 Case 添加至少一个条件组。",
+          "group": "请为条件组添加至少一条表达式。",
+          "operand": "请补全条件操作数。",
+          "schema": "操作数与声明的类型不匹配。",
+          "unary": "一元操作符不能包含右值。",
+          "type": "操作数类型与此操作符不兼容。"
+        }
       },
       "graph": {
         "binding-invalid": "绑定“{{bindingId}}”必须是 Variable。",
@@ -768,9 +779,20 @@
     "loadFailed": "无法加载草稿",
     "loadFailedDescription": "请检查部署连接，然后重试。",
     "recovery": {
-      "failed": { "title": "无法打开此工作流", "description": "草稿暂时不可用，或无法安全修复。" },
-      "repair": { "title": "工作流内容已损坏", "description": "Open Flow 可以丢弃无法读取的部分并创建修复草稿。", "action": "修复并打开" },
-      "upgrade": { "title": "此工作流需要升级", "description": "此工作流使用的是旧版本，升级后即可继续编辑。", "action": "升级并打开" },
+      "failed": {
+        "title": "无法打开此工作流",
+        "description": "草稿暂时不可用，或无法安全修复。"
+      },
+      "repair": {
+        "title": "工作流内容已损坏",
+        "description": "Open Flow 可以丢弃无法读取的部分并创建修复草稿。",
+        "action": "修复并打开"
+      },
+      "upgrade": {
+        "title": "此工作流需要升级",
+        "description": "此工作流使用的是旧版本，升级后即可继续编辑。",
+        "action": "升级并打开"
+      },
       "repairing": "正在准备草稿…"
     },
     "notChecked": "未检查",
@@ -901,26 +923,16 @@
   },
   "conditionEditor": {
     "addCondition": "添加条件",
-    "configPanelTitle": "配置",
-    "default": "默认",
-    "defaultDescription": "默认条件",
-    "defaultHelp": "当没有其他条件匹配时，执行此条件",
     "deleteCondition": "删除条件",
     "handleKeyTitle": "接口名",
-    "handleLogicalTitle": "组合逻辑",
-    "inputHelp": "匹配条件的输出接口会输出第一条输入接口的数据",
-    "label": "条件",
-    "logical": {
-      "AND": "且 (AND)",
-      "OR": "或 (OR)"
-    },
+    "label": "操作符",
     "operator": {
-      "!=": "≠",
-      "<": "<",
-      "<=": "≤",
-      "==": "=",
-      ">": ">",
-      ">=": "≥",
+      "!=": "不等于",
+      "<": "小于",
+      "<=": "小于或等于",
+      "==": "等于",
+      ">": "大于",
+      ">=": "大于或等于",
       "contains": "包含",
       "endsWith": "结尾是",
       "hasKey": "包含键",
@@ -936,8 +948,22 @@
       "notHasValue": "不包含值",
       "startsWith": "开头是"
     },
-    "title": "条件输出接口",
-    "toggleDefault": "默认条件"
+    "cases": "条件分支",
+    "addCase": "添加分支",
+    "matchMode": "匹配模式",
+    "first": "首个匹配",
+    "all": "全部匹配",
+    "firstHelp": "从上到下匹配，首个匹配生效。",
+    "allHelp": "所有匹配的分支均生效。",
+    "addAnd": "添加并且条件",
+    "addOr": "添加或者条件",
+    "groupSummary": "需满足全部条件",
+    "left": "左值",
+    "right": "右值",
+    "containsErrors": "条件中存在错误。",
+    "incomplete": "请补全条件组。",
+    "incompatibleRight": "右值类型不符合此比较的要求。",
+    "incompatible": "操作数类型与操作符不兼容。"
   },
   "nodeInput": {
     "literal": "固定值",

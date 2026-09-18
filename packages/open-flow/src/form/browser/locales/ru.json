@@ -8,6 +8,7 @@
     "invalidNumber": "Введите корректное число.",
     "fieldName": "Имя поля",
     "type": "Тип {{name}}",
+    "typeTitle": "Тип",
     "string": "Строка",
     "number": "Число",
     "boolean": "Логическое значение",

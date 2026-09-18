@@ -66,7 +66,7 @@ describe('Flow changes', () => {
           edges: [],
           nodes: {
             b: { inputs: {}, kind: 'value', name: 'Review', values: [] },
-            a: { cases: [], input: { handle: 'value', jsonSchema: {}, nullable: true }, inputs: {}, kind: 'condition', name: ' Review ' },
+            a: { kind: 'condition', name: ' Review ', cases: [], inputs: {}, matchMode: 'first' as const },
             c: { inputs: {}, kind: 'value', values: [] },
             d: { inputs: {}, kind: 'value', name: 'Review (2)', values: [] },
           },

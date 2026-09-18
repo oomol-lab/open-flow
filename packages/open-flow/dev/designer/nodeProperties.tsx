@@ -45,13 +45,18 @@ const fixtures: readonly Fixture[] = [
     node: {
       kind: 'condition',
       name: 'Review priority',
-      inputs: { score: { kind: 'value', value: 75 } },
-      input: field('score', 'number'),
       cases: [
-        { output: 'priority', relation: 'all', expressions: [{ input: 'score', operator: '>=', value: 90 }] },
-        { output: 'review', relation: 'any', expressions: [{ input: 'score', operator: '>=', value: 50 }] },
+        {
+          output: 'priority',
+          groups: [{ expressions: [{ left: { kind: 'value' as const, value: 75 }, operator: '>=', right: { kind: 'value' as const, value: 90 } }] }],
+        },
+        {
+          output: 'review',
+          groups: [{ expressions: [{ left: { kind: 'value' as const, value: 75 }, operator: '>=', right: { kind: 'value' as const, value: 50 } }] }],
+        },
       ],
-      defaultOutput: 'fallback',
+      inputs: {},
+      matchMode: 'first' as const,
     },
   },
   {

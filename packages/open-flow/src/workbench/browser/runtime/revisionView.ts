@@ -16,7 +16,8 @@ import type {
   WaitNode,
 } from './api.ts'
 
-import { checkInputSources, inputSourceCandidates, nodeOutputDescription } from '../../../flow/common/graph.ts'
+import { nodeInputMappings } from '../../../flow/common/condition.ts'
+import { checkInputSources, inputSourceCandidates, nodeOutputDescription, nodeOutputPorts } from '../../../flow/common/graph.ts'
 import { agentActions, codeActions } from '../../../flow/common/semantics.ts'
 
 export interface InputSourceQuery {
@@ -93,7 +94,7 @@ export class RevisionView {
     const cached = queries?.get(key)
     if (cached != null) return cached
     const node = graph.nodes[nodeId]!
-    const mapping = 'inputs' in node ? node.inputs[handle] : undefined
+    const mapping = 'inputs' in node ? nodeInputMappings(node)[handle] : undefined
     const sources = mapping?.kind === 'sources' ? mapping.sources.filter((source) => source.kind === 'node') : []
     let checks: InputSourcesCheck | undefined = sources.length == 0 ? { conflict: false, sources: [] } : undefined
     let candidates: ReturnType<typeof inputSourceCandidates> | undefined
@@ -104,6 +105,15 @@ export class RevisionView {
     if (queries == null) this.#inputSourcesByGraph.set(graph, (queries = new Map()))
     queries.set(key, query)
     return query
+  }
+
+  public sourceType(target: GraphTarget, source: import('../../../flow/common/change.ts').Source): string | undefined {
+    const graph = this.graph(target)
+    const node = source.kind === 'node' ? graph?.nodes[source.nodeId] : undefined
+    const schema = source.kind === 'node' && node != null ? nodeOutputPorts(this.#document, node)[source.output]?.jsonSchema : undefined
+    if (source.kind === 'binding') return 'string'
+    if (schema != null && typeof schema === 'object' && !Array.isArray(schema) && 'type' in schema && typeof schema.type === 'string') return schema.type
+    return
   }
 
   public outputDescription(target: GraphTarget, nodeId: string, output: string): string | undefined {

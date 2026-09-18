@@ -16,6 +16,7 @@ import type { InputVariables, NodeInputUpstreamSources } from './nodeInputValue.
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
+import { nodeInputMappings } from '../../../../flow/common/condition.ts'
 import { resolutionOutputPorts } from '../../../../flow/common/graph.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
@@ -75,7 +76,7 @@ function inputUpstreamSources({
   readonly handleName: string
 }): NodeInputUpstreamSources | undefined {
   const graph = revision.graph(target)!
-  const mapping = selection.node.inputs[handleName]
+  const mapping = nodeInputMappings(selection.node)[handleName]
   const sources = mapping?.kind == 'sources' ? mapping.sources.filter((source) => source.kind == 'node') : []
   return {
     current: sources.map((source) => {
@@ -851,20 +852,14 @@ export function NodeInspector({
           />
         )}
         {selection?.kind === 'trigger' && <TriggerInspectorSummary trigger={selection.trigger} catalog={triggers.catalog} />}
-        {(selection?.kind === 'condition' ||
-          selection?.kind === 'approval' ||
-          selection?.kind === 'wait' ||
-          selection?.kind === 'subflow' ||
-          selection?.kind === 'task') &&
+        {(selection?.kind === 'approval' || selection?.kind === 'wait' || selection?.kind === 'subflow' || selection?.kind === 'task') &&
           (() => {
             const definitions: (InputPort | Group)[] =
               selection.kind === 'task'
                 ? [...(selection.definition?.inputs ?? [])]
                 : selection.kind === 'subflow'
                   ? [...(selection.definition?.inputs ?? [])]
-                  : selection.kind === 'condition'
-                    ? [selection.node.input]
-                    : [...selection.node.inputDefinitions]
+                  : [...selection.node.inputDefinitions]
             const handles = new Set(definitions.flatMap((definition) => ('handle' in definition ? [definition.handle] : [])))
             for (const handle of Object.keys(selection.node.inputs)) {
               if (!handles.has(handle) && !(selection.kind === 'task' && selection.node.additionalInputs?.some((port) => port.handle === handle)))
@@ -961,6 +956,13 @@ export function NodeInspector({
             key={`condition:${selection.id}`}
             value={selection.node}
             disabled={disabled}
+            variables={variables}
+            renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle })}
+            variableName={(source) => (source.kind === 'binding' ? revision.binding(source.bindingId)?.target : undefined)}
+            sourceType={(source) => revision.sourceType(target, source)}
+            onVariable={(handle, name) => {
+              void store.setInputVariable(selection.id, handle, name)
+            }}
             onChange={(settings) => {
               void store.saveCondition(selection.id, settings)
             }}

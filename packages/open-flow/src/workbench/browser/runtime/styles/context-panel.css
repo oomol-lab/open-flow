@@ -10,6 +10,7 @@
     --value-editor-active-layer: var(--context-panel-active-layer);
     position: relative;
     isolation: isolate;
+    container: context-panel / inline-size;
     display: flex;
     min-width: 0;
     min-height: 0;
@@ -347,52 +348,6 @@
     }
   }
 
-  .condition-editor {
-    border-bottom: 1px solid var(--ui-border);
-  }
-
-  .condition-editor-content {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 12px;
-    padding: 2px 12px 16px;
-  }
-
-  .condition-branch {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 8px;
-    margin: 0;
-    padding: 8px 10px 10px;
-    border: 1px solid var(--ui-border);
-    border-radius: var(--ui-control-radius);
-  }
-
-  .condition-branch > legend {
-    padding: 0 4px;
-    color: var(--ui-muted-foreground);
-    font-size: 11px;
-    font-weight: 500;
-    line-height: 16px;
-  }
-
-  .condition-expression {
-    display: grid;
-    min-width: 0;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 8px;
-  }
-
-  .condition-expression > :not(.condition-expression-select) {
-    grid-column: 1 / -1;
-  }
-
-  .condition-expression-select {
-    min-width: 0;
-  }
-
   .inspector-field-section {
     gap: 0;
     padding: 0 12px 16px;
@@ -411,6 +366,10 @@
     > .self-start {
       width: auto;
     }
+  }
+
+  .inspector-content > .inspector-field-section:last-child {
+    border-bottom: 0;
   }
 
   .inspector-disclosure > summary {
@@ -528,6 +487,10 @@
   }
 
   .node-settings {
+    [data-slot='field-description'] {
+      margin: 0;
+    }
+
     [data-slot='field-group'] {
       gap: 12px;
     }

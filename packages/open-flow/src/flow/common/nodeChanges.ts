@@ -18,6 +18,7 @@ import type {
 
 import { dequal } from 'dequal/lite'
 import { applyFlowChanges, nextNodeName, normalizeNodeName } from './change.ts'
+import { nodeInputMappings } from './condition.ts'
 
 const codeTaskTemplate = `export default async function (inputs, context) {
   return { result: inputs.value }
@@ -213,10 +214,9 @@ export function createCondition(target: GraphTarget, nodeId: string, name: strin
     {
       kind: 'graph.node.create',
       node: {
-        cases: [{ expressions: [{ input: 'value', operator: 'isTrue' }], output: 'true', relation: 'all' }],
-        defaultOutput: 'false',
-        input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
-        inputs: { value: { kind: 'value', value: null } },
+        cases: [{ groups: [{ expressions: [{ left: { kind: 'value' }, operator: '==', right: { kind: 'value' } }] }], output: 'case' }],
+        matchMode: 'first',
+        inputs: {},
         kind: 'condition',
         name,
       },
@@ -379,7 +379,7 @@ export function setInputValues(
   if (node == null || !('inputs' in node)) return
   const operations: ChangeOperation[] = []
   for (const [handle, value] of Object.entries(values)) {
-    const before = node.inputs[handle]
+    const before = nodeInputMappings(node)[handle]
     const next: InputMapping | undefined = value === undefined ? undefined : { kind: 'value', value }
     if (dequal(before, next)) continue
     operations.push({ before, handle, kind: 'graph.node.input.set', nodeId, target, value: next })
@@ -397,7 +397,7 @@ export function setInputSources(
   const node = (target.kind == 'flow' ? content.document.graph : content.document.subflows[target.id]?.graph)?.nodes[nodeId]
   if (node == null || !('inputs' in node)) return []
   return cleanVariableBindings(content, [
-    { kind: 'graph.node.input.set', nodeId, handle, target, before: node.inputs[handle], value: { kind: 'sources', sources } },
+    { kind: 'graph.node.input.set', nodeId, handle, target, before: nodeInputMappings(node)[handle], value: { kind: 'sources', sources } },
   ])
 }
 
@@ -411,7 +411,7 @@ export function setInputVariable(
 ): readonly ChangeOperation[] | undefined {
   const node = graph(content, target)?.nodes[nodeId]
   if (node == null || !('inputs' in node)) return
-  const mapping = node.inputs[handle]
+  const mapping = nodeInputMappings(node)[handle]
   const currentId =
     mapping?.kind == 'sources' && mapping.sources.length == 1 && mapping.sources[0]?.kind == 'binding' ? mapping.sources[0].bindingId : undefined
   const current = currentId == null ? undefined : content.document.bindings[currentId]
@@ -448,7 +448,7 @@ function bindingReferences(document: RevisionContent['document']): Map<string, n
     for (const node of Object.values(currentGraph.nodes)) {
       if (node.kind == 'poll' || node.kind == 'integration') add(node.bindingId)
       if (!('inputs' in node)) continue
-      const inputs = Object.values(node.inputs)
+      const inputs = Object.values(nodeInputMappings(node))
       for (const mapping of inputs) {
         if (mapping.kind != 'sources') continue
         for (const source of mapping.sources) if (source.kind == 'binding') add(source.bindingId)

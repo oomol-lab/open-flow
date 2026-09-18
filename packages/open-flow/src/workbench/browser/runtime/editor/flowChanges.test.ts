@@ -205,11 +205,16 @@ describe('Code task port changes', () => {
         nodeId: 'sink',
         target,
         node: {
-          cases: [],
-          input: { handle: 'value', jsonSchema: {}, nullable: true },
-          inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'task', output: 'result' }] } },
           kind: 'condition',
           name: 'Sink',
+          cases: [
+            {
+              output: 'yes',
+              groups: [{ expressions: [{ left: { kind: 'source', source: { kind: 'node', nodeId: 'task', output: 'result' } }, operator: 'isNotNull' }] }],
+            },
+          ],
+          inputs: {},
+          matchMode: 'first',
         },
       },
       { edge: { source: 'task', sourceHandle: 'result', target: 'sink' }, kind: 'graph.edge.connect', target },
@@ -222,9 +227,9 @@ describe('Code task port changes', () => {
 
     expect(changed.content.document.graph.edges).toEqual([])
     expect(changed.content.document.graph.nodes.sink).toMatchObject({
-      inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'task', output: 'result' }] } },
+      cases: [{ groups: [{ expressions: [{ left: { kind: 'source', source: { kind: 'node', nodeId: 'task', output: 'result' } } }] }] }],
     })
-    expect(revisionView(changed).inputSource(target, 'sink', 'value').check()).toEqual({ conflict: false, sources: [{ kind: 'output-missing' }] })
+    expect(revisionView(changed).inputSource(target, 'sink', '0/0/0/left').check()).toEqual({ conflict: false, sources: [{ kind: 'output-missing' }] })
   })
 
   it('keeps downstream sources invalid when their node is deleted', () => {
@@ -235,11 +240,16 @@ describe('Code task port changes', () => {
         nodeId: 'sink',
         target,
         node: {
-          cases: [],
-          input: { handle: 'value', jsonSchema: {}, nullable: true },
-          inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'task', output: 'result' }] } },
           kind: 'condition',
           name: 'Sink',
+          cases: [
+            {
+              output: 'yes',
+              groups: [{ expressions: [{ left: { kind: 'source', source: { kind: 'node', nodeId: 'task', output: 'result' } }, operator: 'isNotNull' }] }],
+            },
+          ],
+          inputs: {},
+          matchMode: 'first',
         },
       },
       { edge: { source: 'task', sourceHandle: 'result', target: 'sink' }, kind: 'graph.edge.connect', target },
@@ -249,9 +259,9 @@ describe('Code task port changes', () => {
 
     expect(changed.content.document.graph.edges).toEqual([])
     expect(changed.content.document.graph.nodes.sink).toMatchObject({
-      inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'task', output: 'result' }] } },
+      cases: [{ groups: [{ expressions: [{ left: { kind: 'source', source: { kind: 'node', nodeId: 'task', output: 'result' } } }] }] }],
     })
-    expect(revisionView(changed).inputSource(target, 'sink', 'value').check()).toEqual({ conflict: false, sources: [{ kind: 'source-missing' }] })
+    expect(revisionView(changed).inputSource(target, 'sink', '0/0/0/left').check()).toEqual({ conflict: false, sources: [{ kind: 'source-missing' }] })
   })
 })
 
@@ -288,7 +298,7 @@ describe('Managed task additional input changes', () => {
 })
 
 describe('Condition changes', () => {
-  it('renames branch edges and data references together and copies execution order', () => {
+  it('renames branch edges and copies execution order', () => {
     const target = { kind: 'flow' } as const
     let current = applyFlowChanges(draft('export default () => ({})'), [
       {
@@ -297,10 +307,10 @@ describe('Condition changes', () => {
         nodeId: 'condition',
         node: {
           kind: 'condition',
-          input: { handle: 'value', jsonSchema: {}, nullable: true },
-          inputs: {},
-          cases: [{ output: 'yes', relation: 'all', expressions: [{ input: 'value', operator: 'isTrue' }] }],
           name: 'Condition',
+          cases: [{ output: 'yes', groups: [{ expressions: [{ left: { kind: 'value' as const }, operator: 'isTrue' }] }] }],
+          inputs: {},
+          matchMode: 'first' as const,
         },
       },
       { kind: 'graph.edge.connect', target, edge: { source: 'condition', sourceHandle: 'yes', target: 'task' } },
@@ -314,11 +324,14 @@ describe('Condition changes', () => {
     ])
     const node = current.content.document.graph.nodes.condition
     if (node?.kind != 'condition') throw new Error('Expected condition.')
-    const changes = updateCondition(revisionView(current), target, 'condition', { input: node.input, cases: [{ ...node.cases[0]!, output: 'matched' }] })!
+    const changes = updateCondition(revisionView(current), target, 'condition', {
+      matchMode: node.matchMode,
+      cases: [{ ...node.cases[0]!, output: 'matched' }],
+    })!
     current = applyFlowChanges(current, changes)
     expect(current.content.document.graph.edges).toEqual([{ source: 'condition', sourceHandle: 'matched', target: 'task' }])
     expect(current.content.document.graph.nodes.task).toMatchObject({
-      inputs: { value: { sources: [{ kind: 'node', nodeId: 'condition', output: 'matched' }] } },
+      inputs: { value: { sources: [{ kind: 'node', nodeId: 'condition', output: 'yes' }] } },
     })
     const clipboard = copyNodes(revisionView(current), target, ['condition', 'task'])
     let id = 0
@@ -330,17 +343,16 @@ describe('Condition changes', () => {
     expect(copyNodes(revisionView(current), target, ['task']).edges).toEqual([])
   })
 
-  it('does not emit a change when an optional default output remains absent', () => {
+  it('does not emit a change when Condition settings are unchanged', () => {
     const current = applyFlowChanges(draft('export default () => ({})\n'), [
       {
         kind: 'graph.node.create',
         node: {
-          cases: [{ expressions: [{ input: 'value', operator: 'isTrue' }], output: 'true', relation: 'all' }],
-
-          input: { handle: 'value', jsonSchema: {}, nullable: true, value: null },
-          inputs: { value: { kind: 'value', value: null } },
           kind: 'condition',
           name: 'Condition',
+          cases: [{ output: 'true', groups: [{ expressions: [{ left: { kind: 'value' as const, value: null }, operator: 'isTrue' }] }] }],
+          inputs: {},
+          matchMode: 'first' as const,
         },
         nodeId: 'condition',
         target: { kind: 'flow' },
@@ -352,7 +364,7 @@ describe('Condition changes', () => {
     expect(
       updateCondition(revisionView(current), { kind: 'flow' }, 'condition', {
         cases: condition.cases,
-        input: condition.input,
+        matchMode: condition.matchMode,
       }),
     ).toEqual([])
   })
@@ -365,11 +377,11 @@ describe('Condition changes', () => {
         nodeId: 'condition',
         target,
         node: {
-          cases: [{ expressions: [{ input: 'value', operator: 'isTrue' }], output: 'yes', relation: 'all' }],
-          input: { handle: 'value', jsonSchema: {}, nullable: true },
-          inputs: {},
           kind: 'condition',
           name: 'Condition',
+          cases: [{ output: 'yes', groups: [{ expressions: [{ left: { kind: 'value' as const }, operator: 'isTrue' }] }] }],
+          inputs: {},
+          matchMode: 'first' as const,
         },
       },
       { edge: { source: 'condition', sourceHandle: 'yes', target: 'task' }, kind: 'graph.edge.connect', target },
@@ -384,7 +396,7 @@ describe('Condition changes', () => {
     const condition = current.content.document.graph.nodes.condition
     if (condition?.kind != 'condition') throw new Error('Expected Condition fixture.')
 
-    const changes = updateCondition(revisionView(current), target, 'condition', { input: condition.input, cases: [] })!
+    const changes = updateCondition(revisionView(current), target, 'condition', { cases: [], matchMode: 'first' })!
     const changed = applyFlowChanges(current, changes)
 
     expect(changed.content.document.graph.edges).toEqual([])

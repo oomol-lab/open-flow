@@ -152,11 +152,12 @@
     "manualSummary": "点击运行，从这里开始执行。"
   },
   "condition": {
+    "emptyCase": "未配置条件",
     "addCondition": "添加条件",
     "configPanelTitle": "配置",
-    "default": "默认",
+    "default": "其他情况",
     "defaultDescription": "默认条件",
-    "defaultHelp": "当没有其他条件匹配时，执行此条件",
+    "defaultHelp": "没有分支匹配时执行。",
     "deleteCondition": "删除条件",
     "handleKeyTitle": "接口名",
     "handleLogicalTitle": "组合逻辑",

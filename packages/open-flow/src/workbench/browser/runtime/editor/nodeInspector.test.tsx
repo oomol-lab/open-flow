@@ -190,9 +190,9 @@ describe('Node input ownership', () => {
   it('resolves the selected upstream output description from the graph definition', () => {
     const input = { handle: 'message', jsonSchema: { type: 'string' }, nullable: false }
     const node = {
-      kind: 'condition',
+      kind: 'wait',
       name: 'Condition',
-      input,
+      inputDefinitions: [input],
       inputs: { message: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'upstream', output: 'title' }] } },
       cases: [],
     }
@@ -217,7 +217,7 @@ describe('Node input ownership', () => {
         inputSource: () => ({ check: vi.fn(), candidates: vi.fn() }),
         outputDescription: () => 'The complete upstream title.',
       } as never,
-      selection: { id: 'condition', kind: 'condition', node } as never,
+      selection: { id: 'condition', kind: 'wait', node } as never,
       store: { $: { flowId: { value: 'flow' } } } as never,
       target: { kind: 'flow' },
       theme: 'light',
@@ -243,9 +243,9 @@ describe('Node input ownership', () => {
   it('does not expose a deleted upstream node ID as its display name', () => {
     const input = { handle: 'message', jsonSchema: { type: 'string' }, nullable: false }
     const node = {
-      kind: 'condition',
+      kind: 'wait',
       name: 'Condition',
-      input,
+      inputDefinitions: [input],
       inputs: { message: { kind: 'sources', sources: [{ kind: 'node', nodeId: '0199b784-internal', output: 'title' }] } },
       cases: [],
     }
@@ -260,7 +260,7 @@ describe('Node input ownership', () => {
         inputSource: () => ({ check: vi.fn(), candidates: vi.fn() }),
         outputDescription: () => undefined,
       } as never,
-      selection: { id: 'condition', kind: 'condition', node } as never,
+      selection: { id: 'condition', kind: 'wait', node } as never,
       store: { $: { flowId: { value: 'flow' } } } as never,
       target: { kind: 'flow' },
       theme: 'light',
@@ -274,12 +274,12 @@ describe('Node input ownership', () => {
     expect(upstream.current[0]?.nodeName).toBeUndefined()
   })
 
-  it.each(['approval', 'condition', 'wait', 'subflow', 'task'] as const)('resolves %s variable bindings and sends edits directly to the workspace', (kind) => {
+  it.each(['approval', 'wait', 'subflow', 'task'] as const)('resolves %s variable bindings and sends edits directly to the workspace', (kind) => {
     const setInputSource = vi.fn()
     const setInputValue = vi.fn()
     const setInputVariable = vi.fn()
     const node = {
-      kind: 'condition',
+      kind: 'wait',
       name: 'Condition',
       input: { handle: 'message', jsonSchema: { type: 'string' }, nullable: false },
       inputDefinitions: [{ handle: 'message', jsonSchema: { type: 'string' }, nullable: false }],

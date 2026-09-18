@@ -1,3 +1,14 @@
 $list-inset: 3px;
 $toggle-width: 20px;
 $value-name-gap: 2px;
+
+// Shared short connector from an expanded field to its first child.
+@mixin branch {
+  content: '';
+  position: absolute;
+  width: 16px;
+  height: calc(20px + var(--branch-extension, 0px));
+  border-left: 1px solid color-mix(in srgb, var(--ui-foreground) 20%, var(--ui-background));
+  border-bottom: 1px solid color-mix(in srgb, var(--ui-foreground) 20%, var(--ui-background));
+  border-bottom-left-radius: 10px;
+}

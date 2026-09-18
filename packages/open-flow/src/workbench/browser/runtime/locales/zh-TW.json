@@ -247,6 +247,7 @@
       "outputMissing": "「{{source}}」中找不到「{{output}}」，請重新選擇。",
       "notReady": "執行到這裡時，「{{source}} {{handle}}」可能還沒有值。",
       "sourceConflict": "這些欄位可能同時有值：{{sources}}。這裡只能取一個。",
+      "incompatibleRight": "右值類型不符合此比較的要求。",
       "incompatible": "不相容",
       "unverified": "無法驗證",
       "schemaIncompatible": "資料格式不符。",
@@ -658,7 +659,17 @@
       },
       "condition": {
         "input-missing": "條件運算式參照了未知輸入「{{input}}」。",
-        "output-duplicate": "條件輸出「{{output}}」被重複宣告。"
+        "output-duplicate": "條件輸出「{{output}}」被重複宣告。",
+        "invalid": {
+          "inputs": "Condition 不能宣告節點層級輸入。",
+          "output": "Case 名稱不能為空、重複或使用保留名稱。",
+          "case": "請為 Case 新增至少一個條件群組。",
+          "group": "請為條件群組新增至少一個運算式。",
+          "operand": "請補全條件運算元。",
+          "schema": "運算元與宣告的類型不符。",
+          "unary": "一元運算子不能包含右值。",
+          "type": "運算元類型與此運算子不相容。"
+        }
       },
       "graph": {
         "binding-invalid": "繫結「{{bindingId}}」必須是 Variable。",
@@ -768,9 +779,20 @@
     "loadFailed": "無法載入草稿",
     "loadFailedDescription": "請檢查部署連線，然後再試一次。",
     "recovery": {
-      "failed": { "title": "無法開啟此工作流程", "description": "草稿暫時無法使用，或無法安全修復。" },
-      "repair": { "title": "工作流程內容已損壞", "description": "Open Flow 可以捨棄無法讀取的部分並建立修復草稿。", "action": "修復並開啟" },
-      "upgrade": { "title": "此工作流程需要升級", "description": "此工作流程使用的是舊版本，升級後即可繼續編輯。", "action": "升級並開啟" },
+      "failed": {
+        "title": "無法開啟此工作流程",
+        "description": "草稿暫時無法使用，或無法安全修復。"
+      },
+      "repair": {
+        "title": "工作流程內容已損壞",
+        "description": "Open Flow 可以捨棄無法讀取的部分並建立修復草稿。",
+        "action": "修復並開啟"
+      },
+      "upgrade": {
+        "title": "此工作流程需要升級",
+        "description": "此工作流程使用的是舊版本，升級後即可繼續編輯。",
+        "action": "升級並開啟"
+      },
       "repairing": "正在準備草稿…"
     },
     "notChecked": "尚未檢查",
@@ -901,26 +923,16 @@
   },
   "conditionEditor": {
     "addCondition": "新增條件",
-    "configPanelTitle": "設定",
-    "default": "預設",
-    "defaultDescription": "預設條件",
-    "defaultHelp": "當沒有其他條件符合時，執行這個條件",
     "deleteCondition": "刪除條件",
     "handleKeyTitle": "Handle 名稱",
-    "handleLogicalTitle": "組合邏輯",
-    "inputHelp": "第一個符合的條件會輸出第一個輸入 Handle 的資料",
-    "label": "條件",
-    "logical": {
-      "AND": "且 (AND)",
-      "OR": "或 (OR)"
-    },
+    "label": "運算子",
     "operator": {
-      "!=": "≠",
-      "<": "<",
-      "<=": "≤",
-      "==": "=",
-      ">": ">",
-      ">=": "≥",
+      "!=": "不等於",
+      "<": "小於",
+      "<=": "小於或等於",
+      "==": "等於",
+      ">": "大於",
+      ">=": "大於或等於",
       "contains": "包含",
       "endsWith": "結尾是",
       "hasKey": "包含鍵",
@@ -936,8 +948,22 @@
       "notHasValue": "不包含值",
       "startsWith": "開頭是"
     },
-    "title": "條件輸出 Handle",
-    "toggleDefault": "預設條件"
+    "cases": "條件分支",
+    "addCase": "新增分支",
+    "matchMode": "匹配模式",
+    "first": "首個匹配",
+    "all": "全部匹配",
+    "firstHelp": "從上到下匹配，首個匹配生效。",
+    "allHelp": "所有匹配的分支均生效。",
+    "addAnd": "新增並且條件",
+    "addOr": "新增或者條件",
+    "groupSummary": "需滿足全部條件",
+    "left": "左值",
+    "right": "右值",
+    "containsErrors": "條件中存在錯誤。",
+    "incomplete": "請補全條件群組。",
+    "incompatibleRight": "右值類型不符合此比較的要求。",
+    "incompatible": "運算元類型與運算子不相容。"
   },
   "nodeInput": {
     "literal": "固定值",

@@ -240,16 +240,8 @@ function nodePorts(node: ResolvedSelection): NodePorts {
   const outputs = new Map<string, Omit<FlowCanvasViewOutput, 'handle'>>()
   switch (node.kind) {
     case 'condition': {
-      const definition = {
-        defaultValue: node.node.input.value,
-        description: node.node.input.description,
-        jsonSchema: node.node.input.jsonSchema,
-        nullable: node.node.input.nullable,
-      }
-      inputs.set(node.node.input.handle, definition)
-      const output = { description: node.node.input.description, jsonSchema: node.node.input.jsonSchema, nullable: node.node.input.nullable }
-      for (const item of node.node.cases) outputs.set(item.output, output)
-      if (node.node.defaultOutput != null) outputs.set(node.node.defaultOutput, output)
+      for (const item of node.node.cases) outputs.set(item.output, {})
+      outputs.set('otherwise', {})
       break
     }
     case 'value': {
@@ -674,15 +666,33 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
         ...common,
         kind: node.kind,
         cases: node.cases.map((item) => ({
-          expressions: item.expressions.map((expression) => ({
-            input: expression.input,
-            operator: conditionOperator(expression.operator),
-            value: expression.value,
+          groups: item.groups.map((group) => ({
+            expressions: group.expressions.map((expression) => ({
+              left:
+                expression.left.kind === 'source'
+                  ? expression.left.source.kind === 'node'
+                    ? expression.left.source.output
+                    : expression.left.source.kind === 'flow'
+                      ? expression.left.source.input
+                      : 'Variable'
+                  : (JSON.stringify(expression.left.value) ?? '…'),
+              operator: conditionOperator(expression.operator),
+              right:
+                expression.right == null
+                  ? undefined
+                  : expression.right.kind === 'source'
+                    ? expression.right.source.kind === 'node'
+                      ? expression.right.source.output
+                      : expression.right.source.kind === 'flow'
+                        ? expression.right.source.input
+                        : 'Variable'
+                    : (JSON.stringify(expression.right.value) ?? '…'),
+            })),
           })),
           output: item.output,
-          relation: item.relation,
         })),
-        defaultOutput: node.defaultOutput,
+        matchMode: node.matchMode,
+        defaultOutput: 'otherwise',
       }
     case 'subflow':
       return { ...common, kind: node.kind, reference: node.subflowId }

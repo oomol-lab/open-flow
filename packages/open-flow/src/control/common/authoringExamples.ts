@@ -120,7 +120,11 @@ export function authoringExample(name: string): { version: 1; operations: readon
       )
       break
     case 'condition':
-      operations = createCondition(target, 'condition', 'Condition')
+      operations = [
+        ...createCondition(target, 'condition', 'Condition'),
+        { kind: 'graph.node.input.set', target, nodeId: 'condition', handle: '0/0/0/left', value: { kind: 'value', value: 100 } },
+        { kind: 'graph.node.input.set', target, nodeId: 'condition', handle: '0/0/0/right', value: { kind: 'value', value: 100 } },
+      ]
       break
     case 'value':
       operations = createValue(target, 'value', 'Value')

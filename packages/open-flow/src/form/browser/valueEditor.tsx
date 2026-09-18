@@ -8,6 +8,7 @@ import { useI18n, useTranslate } from 'val-i18n-react'
 import { Button } from '../../ui/browser/button.tsx'
 import { Input } from '../../ui/browser/input.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../ui/browser/popover.tsx'
+import { SelectChevron } from '../../ui/browser/select.tsx'
 import { Switch } from '../../ui/browser/switch.tsx'
 import { Textarea } from '../../ui/browser/textarea.tsx'
 import { enumIndex } from '../common/choices.ts'
@@ -39,13 +40,16 @@ export interface ValueEditorProps {
   readonly onDefinitionChange?: (schema: unknown, value: unknown) => void
   readonly label: string
   readonly invalid?: boolean
+  readonly validationError?: string
   readonly nullable?: boolean
   readonly disabled?: boolean
   readonly path: string
+  readonly onInvalidChange?: (invalid: boolean) => void
   readonly onDraftIssue: (path: string, invalid: boolean) => void
   readonly header?: ReactNode
   readonly leadingControl?: ReactNode
   readonly valueAddon?: ReactNode
+  readonly valueSuffix?: ReactNode
   readonly trailingControl?: ReactNode
   readonly description?: string
   readonly editor?: ReactNode
@@ -129,7 +133,7 @@ export function ValueControl({ addon, children }: { addon?: ReactNode; children:
 
 /** Controlled JSON value editing. It has no graph, port, persistence, or theme context. */
 export function ValueEditor(props: ValueEditorProps) {
-  const compactValue = props.compact === true || props.header != null || props.valueAddon != null
+  const compactValue = props.compact === true || props.header != null || props.valueAddon != null || props.valueSuffix != null
   const sorting = useContext(FieldSorting)
   const { schema, value, onChange, label, nullable, disabled, path, onDraftIssue, depth = 0 } = props
   const t = useTranslate()
@@ -167,7 +171,9 @@ export function ValueEditor(props: ValueEditorProps) {
   const needsValidation = !draftInvalid && presence === 'value' && props.editor === undefined
   const issues = useValueIssues(schema, value, language, needsValidation)
   const enumeration = Array.isArray(source.enum) ? source.enum : Object.hasOwn(source, 'const') ? [source.const] : undefined
-  const complex = editorComponent(schema) === 'json' || depth > 12
+  const component = editorComponent(schema)
+  const compactCollection = compactValue && props.header == null && (component === 'object' || component === 'array')
+  const complex = component === 'json' || compactCollection || depth > 12
   const choiceOptions = Array.isArray(source.enum)
     ? source.enum
     : source.uniqueItems === true && Array.isArray(objectValue(source.items)?.enum)
@@ -279,6 +285,7 @@ export function ValueEditor(props: ValueEditorProps) {
             : missing
               ? [{ instancePath: '', message: t('valueEditor.required') }]
               : (issues?.errors ?? []).map((error) => ({ instancePath: error.instancePath, message: error.message ?? t('valueEditor.schema') }))
+  if (!errors.length && props.validationError && !draftInvalid && props.editor === undefined) errors.push({ instancePath: '', message: props.validationError })
   if (!errors.length && props.invalid && !draftInvalid && props.editor === undefined) errors.push({ instancePath: '', message: t('valueEditor.schema') })
   const {
     editorInvalid: invalid,
@@ -291,6 +298,9 @@ export function ValueEditor(props: ValueEditorProps) {
     hasChildren: structured,
     draftInvalid,
   })
+  useEffect(() => {
+    props.onInvalidChange?.(invalid)
+  }, [invalid, props.onInvalidChange])
   const errorMessage = messages.length > 0 && (
     <div id={`${id}-error`} className={styles.error} role="alert">
       {messages.map((message) => (
@@ -298,7 +308,7 @@ export function ValueEditor(props: ValueEditorProps) {
       ))}
     </div>
   )
-  const inlineTools = (props.layout === 'values' || props.layout === 'ports') && props.header != null && props.valueEditable !== false && !disabled && !sorting
+  const inlineTools = (props.layout === 'values' || props.layout === 'ports') && props.valueEditable !== false && !disabled && !sorting
   const canClear = inlineTools && presence !== 'unset'
   const canToggleJson = inlineTools && expanded && !complex && !enumeration && !itemEnumeration && !showUnset && (type === 'object' || type === 'array')
   const valueSuffix =
@@ -306,7 +316,7 @@ export function ValueEditor(props: ValueEditorProps) {
       ? 26
       : type === 'boolean' && !expandable && !showUnset
         ? 30
-        : structured && type === 'array'
+        : (expandable && compactValue && props.header == null) || (structured && type === 'array')
           ? 26
           : 0
   const toggleExpanded = () => {
@@ -317,10 +327,11 @@ export function ValueEditor(props: ValueEditorProps) {
     <div
       className={styles.toolbar}
       onClick={(event) => {
-        if ((event.target as HTMLElement).closest('button') && !(event.target as HTMLElement).closest('[data-field-options]')) setOptionsOpen(false)
+        if (!inlineTools && (event.target as HTMLElement).closest('button') && !(event.target as HTMLElement).closest('[data-field-options]'))
+          setOptionsOpen(false)
       }}
     >
-      {props.valueEditable !== false && (
+      {props.valueEditable !== false && !inlineTools && (
         <>
           {canChooseType && !complex && !enumeration && (
             <FieldSelect
@@ -807,6 +818,7 @@ export function ValueEditor(props: ValueEditorProps) {
       data-collection={expandable || undefined}
       data-output={props.editor === null || undefined}
       data-value-addon={props.valueAddon != null || undefined}
+      data-value-suffix={props.valueSuffix != null || undefined}
       data-expanded={(expandable && expanded) || undefined}
       data-structured={(structured && !showUnset) || undefined}
       data-branch={(expandable && !(structured && type === 'object' && names.length === 0 && !canAddObjectField)) || undefined}
@@ -884,7 +896,7 @@ export function ValueEditor(props: ValueEditorProps) {
                       : value
                     : JSON.stringify(value)}
             </span>
-            {props.header == null && <i aria-hidden="true" className={expanded ? 'i-lucide-light:chevron-up' : 'i-lucide-light:chevron-down'} />}
+            {props.header == null && <SelectChevron className={expanded ? 'rotate-180' : undefined} />}
           </Button>
         )
       )}
@@ -912,12 +924,17 @@ export function ValueEditor(props: ValueEditorProps) {
             : undefined
         }
       />
+      {props.valueSuffix != null && (
+        <div className={styles.valueAddon} data-value-addon-control data-side="end">
+          {props.valueSuffix}
+        </div>
+      )}
       {props.trailingControl}
       {(!props.hideOptions || props.actions) && (
         <div className={styles.options}>
           {props.actions}
           {!props.hideOptions &&
-            (props.options && (props.layout === 'values' || props.layout === 'ports') ? (
+            (props.options && props.header != null && (props.layout === 'values' || props.layout === 'ports') ? (
               props.options
             ) : (
               <Popover open={optionsOpen} onOpenChange={setOptionsOpen}>

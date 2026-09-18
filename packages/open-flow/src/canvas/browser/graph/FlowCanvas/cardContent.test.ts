@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createI18n } from '../../i18n/i18n-loader.ts'
-import { conditionBranchSummary, imageSources, nodeCardContent, nodeSummary } from './cardContent.ts'
+import { conditionBranchSummary, conditionCaseSummary, imageSources, nodeCardContent, nodeSummary } from './cardContent.ts'
 
 const base = { id: 'node', title: 'Schedule', position: { x: 0, y: 0 }, inputs: [], outputs: [] }
 
@@ -52,21 +52,32 @@ describe('Canvas content', () => {
       description: 'Route qualified applications.',
       cases: [
         {
-          expressions: [
-            { input: 'score', operator: '>=' as const, value: 80 },
-            { input: 'active', operator: 'is true' as const },
-          ],
           output: 'qualified',
-          relation: 'all' as const,
+          groups: [
+            {
+              expressions: [
+                { left: 'score', operator: '>=' as const, right: String(80) },
+                { left: 'active', operator: 'is true' as const },
+              ],
+            },
+          ],
         },
       ],
-      defaultOutput: 'review',
+      inputs: [],
+      outputs: [{ handle: 'qualified' }, { handle: 'otherwise' }],
+      defaultOutput: 'otherwise' as const,
+      matchMode: 'first' as const,
     }
     const t = createI18n('en').t
     expect(nodeSummary(node)).toBe('Route qualified applications.')
     expect(conditionBranchSummary(node, 'qualified', t)).toBe('score ≥ 80 ∧ active is true')
-    expect(conditionBranchSummary(node, 'review', t)).toBe('Default')
+    expect(conditionBranchSummary(node, 'otherwise', t)).toBe('Otherwise')
     expect(conditionBranchSummary(node, 'unused', t)).toBe('')
+  })
+  it('describes cases without conditions instead of leaving the branch summary empty', () => {
+    const t = createI18n('en').t
+    expect(conditionCaseSummary({ output: 'empty', groups: [] }, t)).toBe('No conditions configured')
+    expect(conditionCaseSummary({ output: 'empty', groups: [{ expressions: [] }] }, t)).toBe('No conditions configured')
   })
   it('recognizes raster outputs and signed image URLs without treating artifact IDs as links', () => {
     expect(
@@ -106,7 +117,16 @@ describe('Collapsible card content', () => {
       { ...base, kind: 'value' as const, values: [{ handle: 'unset' }] },
       { ...base, kind: 'task' as const, reference: 'task', description: '  ', run: { status: 'success' as const } },
       { ...base, kind: 'trigger' as const, description: 'Manual trigger' },
-      { ...base, kind: 'condition' as const, cases: [], description: 'Keep all branches visible' },
+      {
+        ...base,
+        kind: 'condition' as const,
+        description: 'Keep all branches visible',
+        cases: [],
+        inputs: [],
+        outputs: [{ handle: 'otherwise' }],
+        defaultOutput: 'otherwise' as const,
+        matchMode: 'first' as const,
+      },
     ]) {
       expect(nodeCardContent({ ...node, contentHidden: true })).toMatchObject({ collapsible: false, hidden: false })
     }

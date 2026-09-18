@@ -247,6 +247,7 @@
       "outputMissing": "« {{output}} » est introuvable dans « {{source}} ». Choisissez à nouveau.",
       "notReady": "« {{source}} {{handle}} » peut ne pas avoir de valeur lors de cette étape.",
       "sourceConflict": "Ces champs peuvent avoir une valeur en même temps : {{sources}}. Un seul peut être utilisé ici.",
+      "incompatibleRight": "Le type de la valeur de droite est incompatible avec cette comparaison.",
       "incompatible": "Incompatible",
       "unverified": "Non vérifié",
       "schemaIncompatible": "Le format des données ne correspond pas.",
@@ -658,7 +659,17 @@
       },
       "condition": {
         "input-missing": "L’expression de condition référence l’entrée inconnue « {{input}} ».",
-        "output-duplicate": "La sortie de condition « {{output}} » est déclarée plusieurs fois."
+        "output-duplicate": "La sortie de condition « {{output}} » est déclarée plusieurs fois.",
+        "invalid": {
+          "inputs": "Condition ne peut pas déclarer d’entrées de nœud.",
+          "output": "Les noms de Case doivent être non vides, uniques et non réservés.",
+          "case": "Ajoutez au moins un groupe au Case.",
+          "group": "Ajoutez au moins une expression au groupe.",
+          "operand": "Complétez l’opérande de la condition.",
+          "schema": "L’opérande ne correspond pas au type déclaré.",
+          "unary": "Un opérateur unaire ne peut pas avoir d’opérande droit.",
+          "type": "Les types des opérandes sont incompatibles avec cet opérateur."
+        }
       },
       "graph": {
         "binding-invalid": "La liaison « {{bindingId}} » doit être une Variable.",
@@ -768,7 +779,10 @@
     "loadFailed": "Impossible de charger le Brouillon",
     "loadFailedDescription": "Vérifiez la connexion au déploiement, puis réessayez.",
     "recovery": {
-      "failed": { "title": "Impossible d’ouvrir ce workflow", "description": "Le brouillon est indisponible ou ne peut pas être réparé en toute sécurité." },
+      "failed": {
+        "title": "Impossible d’ouvrir ce workflow",
+        "description": "Le brouillon est indisponible ou ne peut pas être réparé en toute sécurité."
+      },
       "repair": {
         "title": "Ce workflow est endommagé",
         "description": "Open Flow peut supprimer les parties illisibles et créer un brouillon réparé.",
@@ -909,26 +923,16 @@
   },
   "conditionEditor": {
     "addCondition": "Ajouter une condition",
-    "configPanelTitle": "Configuration",
-    "default": "Par défaut",
-    "defaultDescription": "Cas par défaut",
-    "defaultHelp": "Exécuter ce cas lorsqu'aucune autre condition ne correspond",
     "deleteCondition": "Supprimer la condition",
     "handleKeyTitle": "Handle",
-    "handleLogicalTitle": "Logique",
-    "inputHelp": "La première condition satisfaite renvoie les données du premier Handle d'entrée",
-    "label": "Cas",
-    "logical": {
-      "AND": "ET (AND)",
-      "OR": "OU (OR)"
-    },
+    "label": "Opérateur",
     "operator": {
-      "!=": "≠",
-      "<": "<",
-      "<=": "≤",
-      "==": "=",
-      ">": ">",
-      ">=": "≥",
+      "!=": "Différent de",
+      "<": "Inférieur à",
+      "<=": "Inférieur ou égal à",
+      "==": "Égal à",
+      ">": "Supérieur à",
+      ">=": "Supérieur ou égal à",
       "contains": "contient",
       "endsWith": "se termine par",
       "hasKey": "possède la clé",
@@ -944,8 +948,22 @@
       "notHasValue": "ne possède pas la valeur",
       "startsWith": "commence par"
     },
-    "title": "Handles de condition",
-    "toggleDefault": "Condition par défaut"
+    "cases": "Cas",
+    "addCase": "Ajouter un cas",
+    "matchMode": "Mode de correspondance",
+    "first": "Premier résultat",
+    "all": "Tous les résultats",
+    "firstHelp": "Évaluation de haut en bas ; le premier cas correspondant est retenu.",
+    "allHelp": "Tous les cas correspondants sont retenus.",
+    "addAnd": "Ajouter une condition ET",
+    "addOr": "Ajouter une condition OU",
+    "groupSummary": "Toutes les conditions doivent être remplies",
+    "left": "Opérande gauche",
+    "right": "Opérande droit",
+    "containsErrors": "Cette condition contient des erreurs.",
+    "incomplete": "Complétez ce groupe de conditions.",
+    "incompatibleRight": "Le type de la valeur de droite est incompatible avec cette comparaison.",
+    "incompatible": "Les types des opérandes sont incompatibles avec cet opérateur."
   },
   "nodeInput": {
     "literal": "Littéral",

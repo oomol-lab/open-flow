@@ -17,6 +17,7 @@ import type { Diagnostic, SemanticClosure } from './semantics.ts'
 
 import { triggerOutputDefinitions, triggerOutputPorts } from '../../trigger/common/contract.ts'
 import { portsByHandle, validVariableName } from './change.ts'
+import { conditionInputPorts, nodeInputMappings, otherwiseOutput, unaryOperator, comparisonIssue, valueType } from './condition.ts'
 import { schemaObject, schemaList, matchesSchema, comparePorts, portsAssignable, variableInputCompatible, hasRetiredRef } from './schema.ts'
 
 export function isResolutionNode(node: GraphNode | undefined): node is Extract<GraphNode, { readonly kind: 'approval' | 'wait' }> {
@@ -87,7 +88,7 @@ function validateTrigger(triggerId: string, trigger: TriggerNode, document: Flow
 export function nodeInputPorts(document: FlowDocument, node: GraphNode): Readonly<Record<string, InputPortDefinition>> {
   switch (node.kind) {
     case 'condition':
-      return { [node.input.handle]: node.input }
+      return conditionInputPorts(node)
     case 'value':
       return {}
     case 'subflow':
@@ -145,12 +146,10 @@ export function resolutionOutputPorts(node: Extract<GraphNode, { readonly kind: 
   }
 }
 
-function nodeOutputPorts(document: FlowDocument, node: GraphNode): Readonly<Record<string, PortDefinition>> {
+export function nodeOutputPorts(document: FlowDocument, node: GraphNode): Readonly<Record<string, PortDefinition>> {
   switch (node.kind) {
-    case 'condition': {
-      const outputs = [...node.cases.map((condition) => condition.output), ...(node.defaultOutput == null ? [] : [node.defaultOutput])]
-      return Object.fromEntries(outputs.map((handle) => [handle, node.input]))
-    }
+    case 'condition':
+      return {}
     case 'value':
       return portsByHandle(node.values)
     case 'subflow':
@@ -343,7 +342,15 @@ function graphPaths(graph: Graph) {
           const next =
             edge.sourceHandle == null || (isResolutionNode(graph.nodes[edge.source]) && edge.sourceHandle == 'pending')
               ? route
-              : { ...route, [edge.source]: edge.sourceHandle }
+              : {
+                  ...route,
+                  [edge.source]:
+                    graph.nodes[edge.source]?.kind == 'condition' &&
+                    (graph.nodes[edge.source] as import('./change.ts').ConditionNode).matchMode == 'all' &&
+                    edge.sourceHandle != otherwiseOutput
+                      ? '$matched'
+                      : edge.sourceHandle,
+                }
           if (routes.some((known) => routeCovers(known, next))) continue
           for (let index = routes.length - 1; index >= 0; index--) {
             if (routeCovers(next, routes[index]!)) routes.splice(index, 1)
@@ -577,9 +584,7 @@ function validateGraph(
     if (source == null || target == null || !('inputs' in target)) {
       diagnostics.push(graphDiagnostic('graph.edge-invalid', 'Execution edges require an existing source and an executable target.', edgePath))
     } else if (source.kind == 'condition' || isResolutionNode(source)) {
-      const exits = isResolutionNode(source)
-        ? Object.keys(resolutionOutputPorts(source))
-        : [...source.cases.map((item) => item.output), ...(source.defaultOutput == null ? [] : [source.defaultOutput])]
+      const exits = isResolutionNode(source) ? Object.keys(resolutionOutputPorts(source)) : [...source.cases.map((item) => item.output), otherwiseOutput]
       if (edge.sourceHandle == null || !exits.some((exit) => exit == edge.sourceHandle)) {
         diagnostics.push(graphDiagnostic('graph.edge-invalid', 'Choose a declared execution branch.', edgePath))
       }
@@ -621,7 +626,7 @@ function validateGraph(
         }),
       )
     }
-    for (const [handle, mapping] of Object.entries(node.inputs)) {
+    for (const [handle, mapping] of Object.entries(nodeInputMappings(node))) {
       if (!mappingAvailable(graph, nodeId, mapping, analysis))
         diagnostics.push(
           graphDiagnostic(
@@ -653,7 +658,7 @@ function validateGraph(
       diagnostics.push(graphDiagnostic('graph.schema-unsupported', 'Runtime Ref schemas are not supported.', nodePath))
     }
     const inputs = new Set(Object.keys(inputPorts))
-    for (const [handle, mapping] of Object.entries(node.inputs)) {
+    for (const [handle, mapping] of Object.entries(nodeInputMappings(node))) {
       const mappingPath = `${nodePath}/inputs/${handle}`
       if (!inputs.has(handle)) {
         diagnostics.push(graphDiagnostic('graph.input-missing', `Node "${nodeId}" does not expose input "${handle}".`, mappingPath, { handle, nodeId }))
@@ -668,29 +673,46 @@ function validateGraph(
     }
     if (isResolutionNode(node)) validateResolution(nodeId, node, allowTriggers, nodePath, diagnostics)
     if (node.kind != 'condition') continue
-    const outputs = new Set<string>()
+    if (Object.keys(node.inputs).length > 0)
+      diagnostics.push(graphDiagnostic('condition.invalid', 'Condition cannot declare node inputs.', nodePath, { variant: 'inputs' }))
+    const outputs = new Set<string>([otherwiseOutput])
     for (const [index, condition] of node.cases.entries()) {
-      if (outputs.has(condition.output)) {
+      const casePath = `${nodePath}/cases/${index}`
+      if (condition.output.trim().length == 0 || condition.output == '__proto__' || outputs.has(condition.output))
         diagnostics.push(
-          graphDiagnostic(
-            'condition.output-duplicate',
-            `Condition output "${condition.output}" is declared more than once.`,
-            `${nodePath}/cases/${index}/output`,
-            { output: condition.output },
-          ),
+          graphDiagnostic('condition.invalid', 'Case output must be nonempty, unique, and not reserved.', `${casePath}/output`, { variant: 'output' }),
         )
-      }
       outputs.add(condition.output)
-      for (const [expressionIndex, expression] of condition.expressions.entries()) {
-        if (expression.input == node.input.handle) continue
-        diagnostics.push(
-          graphDiagnostic(
-            'condition.input-missing',
-            `Condition expression references unknown input "${expression.input}".`,
-            `${nodePath}/cases/${index}/expressions/${expressionIndex}/input`,
-            { input: expression.input },
-          ),
-        )
+      if (condition.groups.length == 0)
+        diagnostics.push(graphDiagnostic('condition.invalid', 'Case requires at least one group.', casePath, { variant: 'case' }))
+      for (const [g, group] of condition.groups.entries()) {
+        const groupPath = `${casePath}/groups/${g}`
+        if (group.expressions.length == 0)
+          diagnostics.push(graphDiagnostic('condition.invalid', 'Group requires at least one expression.', groupPath, { variant: 'group' }))
+        for (const [e, expression] of group.expressions.entries()) {
+          const expressionPath = `${groupPath}/expressions/${e}`
+          const type = (operand: typeof expression.left | undefined): string | undefined => {
+            if (operand == null || (operand.kind == 'value' && operand.value === undefined)) {
+              diagnostics.push(graphDiagnostic('condition.invalid', 'Condition operand is incomplete.', expressionPath, { variant: 'operand' }))
+              return
+            }
+            if (operand.kind == 'value') {
+              if (operand.jsonSchema != null && !matchesSchema(operand.value!, operand.jsonSchema))
+                diagnostics.push(graphDiagnostic('condition.invalid', 'Operand does not match its declared schema.', expressionPath, { variant: 'schema' }))
+              return valueType(operand.value!)
+            }
+            if (operand.source.kind === 'binding') return 'string'
+            const port = checkSource(operand.source, graph, document, flowInputs, undefined, expressionPath, [])
+            const raw = schemaObject(port?.jsonSchema ?? {})?.type
+            return typeof raw == 'string' ? raw : undefined
+          }
+          const left = type(expression.left)
+          const right = unaryOperator(expression.operator) ? undefined : type(expression.right)
+          if (unaryOperator(expression.operator) && expression.right != null)
+            diagnostics.push(graphDiagnostic('condition.invalid', 'Unary operators cannot have a right operand.', expressionPath, { variant: 'unary' }))
+          const issue = comparisonIssue(expression.operator, left, right)
+          if (issue != null) diagnostics.push(graphDiagnostic('condition.invalid', issue.message, expressionPath, { variant: 'type' }))
+        }
       }
     }
   }

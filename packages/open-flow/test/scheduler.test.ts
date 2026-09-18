@@ -618,7 +618,7 @@ describe('revision graph scheduler', () => {
           edges: [
             { source: 'source', target: 'branch' },
             { source: 'branch', sourceHandle: 'high', target: 'nested' },
-            { source: 'branch', sourceHandle: 'low', target: 'low' },
+            { source: 'branch', sourceHandle: 'otherwise', target: 'low' },
           ],
           nodes: {
             source: {
@@ -627,20 +627,33 @@ describe('revision graph scheduler', () => {
               task: task('source', ['value'], ['value']),
             },
             branch: {
-              cases: [{ expressions: [{ input: 'value', operator: '>', value: 5 }], output: 'high', relation: 'all' }],
-
-              defaultOutput: 'low',
-              input: { ...port, handle: 'value' },
-              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
               kind: 'condition',
+              cases: [
+                {
+                  output: 'high',
+                  groups: [
+                    {
+                      expressions: [
+                        {
+                          left: { kind: 'source' as const, source: { kind: 'node', nodeId: 'source', output: 'value' } },
+                          operator: '>',
+                          right: { kind: 'value' as const, value: 5 },
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+              inputs: {},
+              matchMode: 'first' as const,
             },
             nested: {
-              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'branch', output: 'high' }] } },
+              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
               kind: 'subflow',
               subflowId: 'double-flow',
             },
             low: {
-              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'branch', output: 'low' }] } },
+              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
               kind: 'task',
               task: task('low', ['value'], ['value']),
             },
@@ -690,7 +703,7 @@ describe('revision graph scheduler', () => {
       nodes: [{ status: 'completed', jobId: expect.any(String), outputs: { value: 14 }, nodeId: 'nested' }],
     })
     expect(events.filter((event) => event.type == 'run.started').map((event) => event.flowId)).toEqual(['main', 'double-flow'])
-    expect(events).toContainEqual(expect.objectContaining({ nodeId: 'branch', type: 'node.completed', outputs: { high: 7 } }))
+    expect(events).toContainEqual(expect.objectContaining({ nodeId: 'branch', type: 'node.completed', outputs: {} }))
     expect(events.some((event) => 'nodeId' in event && event.nodeId == 'low')).toBe(false)
   })
 
@@ -753,9 +766,6 @@ describe('revision graph scheduler', () => {
     ['isNotNull', 0, undefined, true],
     ['isTrue', true, undefined, true],
     ['isFalse', false, undefined, true],
-    ['contains', 1, 1, false],
-    ['hasKey', { present: true }, 1, false],
-    ['isNotEmpty', 1, undefined, false],
   ] satisfies readonly (readonly [ConditionOperator, JsonValue, JsonValue | undefined, boolean])[])(
     'evaluates Condition operator %s',
     async (operator, left, right, matches) => {
@@ -764,31 +774,38 @@ describe('revision graph scheduler', () => {
           bindings: {},
           graph: {
             edges: [
-              { source: 'branch', sourceHandle: 'fallback', target: 'fallback' },
+              { source: 'branch', sourceHandle: 'otherwise', target: 'fallback' },
               { source: 'branch', sourceHandle: 'matched', target: 'matched' },
             ],
             nodes: {
               branch: {
+                kind: 'condition',
                 cases: [
                   {
-                    expressions: [{ input: 'value', operator, ...(right === undefined ? {} : { value: right }) }],
                     output: 'matched',
-                    relation: 'all',
+                    groups: [
+                      {
+                        expressions: [
+                          {
+                            left: { kind: 'value' as const, value: left },
+                            operator,
+                            ...(right === undefined ? {} : { right: { kind: 'value', value: right } }),
+                          },
+                        ],
+                      },
+                    ],
                   },
                 ],
-
-                defaultOutput: 'fallback',
-                input: { ...port, handle: 'value' },
-                inputs: { value: { kind: 'value', value: left } },
-                kind: 'condition',
+                inputs: {},
+                matchMode: 'first' as const,
               },
               fallback: {
-                inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'branch', output: 'fallback' }] } },
+                inputs: {},
                 kind: 'task',
                 task: task('fallback', ['value'], []),
               },
               matched: {
-                inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'branch', output: 'matched' }] } },
+                inputs: {},
                 kind: 'task',
                 task: task('matched', ['value'], []),
               },
@@ -826,43 +843,43 @@ describe('revision graph scheduler', () => {
           ],
           nodes: {
             branch: {
+              kind: 'condition',
               cases: [
                 {
-                  expressions: [
-                    { input: 'value', operator: 'isTrue' },
-                    { input: 'value', operator: 'isFalse' },
-                  ],
                   output: 'all',
-                  relation: 'all',
+                  groups: [
+                    {
+                      expressions: [
+                        { left: { kind: 'value' as const, value: true }, operator: 'isTrue' },
+                        { left: { kind: 'value' as const, value: true }, operator: 'isFalse' },
+                      ],
+                    },
+                  ],
                 },
                 {
-                  expressions: [
-                    { input: 'value', operator: 'isFalse' },
-                    { input: 'value', operator: 'isTrue' },
-                  ],
                   output: 'any',
-                  relation: 'any',
+                  groups: [
+                    { expressions: [{ left: { kind: 'value' as const, value: true }, operator: 'isFalse' }] },
+                    { expressions: [{ left: { kind: 'value' as const, value: true }, operator: 'isTrue' }] },
+                  ],
                 },
-                { expressions: [{ input: 'value', operator: 'isTrue' }], output: 'later', relation: 'all' },
+                { output: 'later', groups: [{ expressions: [{ left: { kind: 'value' as const, value: true }, operator: 'isTrue' }] }] },
               ],
-
-              defaultOutput: 'fallback',
-              input: { ...port, handle: 'value' },
-              inputs: { value: { kind: 'value', value: true } },
-              kind: 'condition',
+              inputs: {},
+              matchMode: 'first' as const,
             },
             all: {
-              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'branch', output: 'all' }] } },
+              inputs: {},
               kind: 'task',
               task: task('all', ['value'], []),
             },
             any: {
-              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'branch', output: 'any' }] } },
+              inputs: {},
               kind: 'task',
               task: task('any', ['value'], []),
             },
             later: {
-              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'branch', output: 'later' }] } },
+              inputs: {},
               kind: 'task',
               task: task('later', ['value'], []),
             },
@@ -1287,19 +1304,27 @@ describe('port null normalization', () => {
           graph: {
             edges: [
               { source: 'choice', sourceHandle: 'yes', target: 'consumer' },
-              { source: 'choice', sourceHandle: 'no', target: 'consumer' },
+              { source: 'choice', sourceHandle: 'otherwise', target: 'skipped' },
+              { source: 'skipped', target: 'consumer' },
             ],
             nodes: {
+              skipped: { kind: 'value', inputs: {}, values: [{ handle: 'value', jsonSchema: { type: 'string' }, nullable: false, value: 'unused' }] },
               choice: {
                 kind: 'condition',
+                cases: [
+                  {
+                    output: 'yes',
+                    groups: [
+                      { expressions: [{ left: { kind: 'value' as const, value: 'yes' }, operator: '==', right: { kind: 'value' as const, value: 'yes' } }] },
+                    ],
+                  },
+                ],
                 inputs: {},
-                input: { handle: 'value', jsonSchema: { type: 'string' }, nullable: false, value: 'yes' },
-                cases: [{ output: 'yes', relation: 'all', expressions: [{ input: 'value', operator: '==', value: 'yes' }] }],
-                defaultOutput: 'no',
+                matchMode: 'first' as const,
               },
               consumer: {
                 kind: 'task',
-                inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'choice', output: 'no' }] } },
+                inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'skipped', output: 'value' }] } },
                 task: { ...task('consumer', [], []), inputs: [{ handle: 'value', jsonSchema: { type: 'string' }, nullable }] },
               },
             },
@@ -1336,16 +1361,23 @@ it.each([true, false])('normalizes absent Subflow outputs with nullable=%s', asy
           branch: {
             name: 'Branch',
             inputs: [],
-            outputs: [{ handle: 'result', jsonSchema: { type: 'string' }, nullable, sources: [{ kind: 'node', nodeId: 'choice', output: 'no' }] }],
+            outputs: [{ handle: 'result', jsonSchema: { type: 'string' }, nullable, sources: [{ kind: 'node', nodeId: 'skipped', output: 'value' }] }],
             graph: {
-              edges: [],
+              edges: [{ source: 'choice', sourceHandle: 'otherwise', target: 'skipped' }],
               nodes: {
+                skipped: { kind: 'value', inputs: {}, values: [{ handle: 'value', jsonSchema: { type: 'string' }, nullable: false, value: 'unused' }] },
                 choice: {
                   kind: 'condition',
+                  cases: [
+                    {
+                      output: 'yes',
+                      groups: [
+                        { expressions: [{ left: { kind: 'value' as const, value: 'yes' }, operator: '==', right: { kind: 'value' as const, value: 'yes' } }] },
+                      ],
+                    },
+                  ],
                   inputs: {},
-                  input: { handle: 'value', jsonSchema: { type: 'string' }, nullable: false, value: 'yes' },
-                  cases: [{ output: 'yes', relation: 'all', expressions: [{ input: 'value', operator: '==', value: 'yes' }] }],
-                  defaultOutput: 'no',
+                  matchMode: 'first' as const,
                 },
               },
             },

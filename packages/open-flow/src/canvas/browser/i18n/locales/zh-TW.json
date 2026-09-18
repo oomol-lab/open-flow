@@ -152,11 +152,12 @@
     "manualSummary": "點擊執行，從這裡開始。"
   },
   "condition": {
+    "emptyCase": "未設定條件",
     "addCondition": "新增條件",
     "configPanelTitle": "設定",
-    "default": "預設",
+    "default": "其他情況",
     "defaultDescription": "預設條件",
-    "defaultHelp": "當沒有其他條件符合時，執行這個條件",
+    "defaultHelp": "沒有分支符合時執行。",
     "deleteCondition": "刪除條件",
     "handleKeyTitle": "Handle 名稱",
     "handleLogicalTitle": "組合邏輯",

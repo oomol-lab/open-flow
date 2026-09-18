@@ -54,43 +54,49 @@ const managed = z.object({
     }),
   ]),
 })
+const operand = z.union([
+  z.object({ kind: z.literal('value'), value: json.optional(), jsonSchema: json.optional() }),
+  z.object({ kind: z.literal('source'), source }),
+])
 const condition = {
-  input,
+  matchMode: z.enum(['first', 'all']),
   cases: z.array(
     z.object({
       output: text,
-      relation: z.enum(['all', 'any']),
-      expressions: z.array(
+      groups: z.array(
         z.object({
-          input: text,
-          operator: z.enum([
-            '!=',
-            '<',
-            '<=',
-            '==',
-            '>',
-            '>=',
-            'contains',
-            'endsWith',
-            'hasKey',
-            'hasValue',
-            'isEmpty',
-            'isFalse',
-            'isNotEmpty',
-            'isNotNull',
-            'isNull',
-            'isTrue',
-            'notContains',
-            'notHasKey',
-            'notHasValue',
-            'startsWith',
-          ]),
-          value: json.optional(),
+          expressions: z.array(
+            z.object({
+              left: operand,
+              operator: z.enum([
+                '!=',
+                '<',
+                '<=',
+                '==',
+                '>',
+                '>=',
+                'contains',
+                'endsWith',
+                'hasKey',
+                'hasValue',
+                'isEmpty',
+                'isFalse',
+                'isNotEmpty',
+                'isNotNull',
+                'isNull',
+                'isTrue',
+                'notContains',
+                'notHasKey',
+                'notHasValue',
+                'startsWith',
+              ]),
+              right: operand.optional(),
+            }),
+          ),
         }),
       ),
     }),
   ),
-  defaultOutput: text.optional(),
 }
 const wait = {
   inputDefinitions: z.array(input),
@@ -136,7 +142,7 @@ const base = {
   timeoutMs: z.number().optional(),
 }
 const node = z.union([
-  z.object({ ...base, kind: z.literal('condition'), ...condition }),
+  z.object({ ...base, inputs: z.record(text, z.never()), kind: z.literal('condition'), ...condition }),
   z.object({
     ...base,
     inputs: z

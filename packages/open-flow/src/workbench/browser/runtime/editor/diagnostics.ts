@@ -88,10 +88,10 @@ function scope(path: string): DiagnosticScope {
 }
 
 function nodeSection(node: GraphNode, suffix: string): InspectorSection {
-  if (suffix.startsWith('/inputs/')) return 'inputs'
+  if (suffix.startsWith('/inputs/')) return node.kind === 'condition' ? 'condition' : 'inputs'
   if (node.kind == 'task' && suffix.startsWith('/task')) return 'task'
   if ((node.kind == 'poll' || node.kind == 'integration') && suffix.startsWith('/bindingId')) return 'account'
-  if (node.kind == 'condition' && (suffix.startsWith('/cases/') || suffix.startsWith('/input') || suffix.startsWith('/defaultOutput'))) {
+  if (node.kind == 'condition' && (suffix.startsWith('/cases/') || suffix.startsWith('/input') || suffix.startsWith('/matchMode'))) {
     return 'condition'
   }
   return 'node'

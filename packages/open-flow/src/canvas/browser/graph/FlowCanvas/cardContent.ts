@@ -3,12 +3,19 @@ import type { FlowCanvasViewConditionCase, FlowCanvasViewConditionNode } from '.
 import type { NodeContent } from './nodeContent.ts'
 
 export function conditionCaseSummary(item: FlowCanvasViewConditionCase, t: TFunction): string {
-  return item.expressions
-    .map((expression) => {
-      const operator = t(`condition.operator.${expression.operator.replace(/\s+/g, '_')}`)
-      return `${expression.input} ${operator}${expression.value === undefined ? '' : ` ${JSON.stringify(expression.value)}`}`
+  if (item.groups.length === 0) return t('condition.emptyCase')
+  return item.groups
+    .map((group) => {
+      const text = group.expressions
+        .map((expression) => {
+          const operator = t(`condition.operator.${expression.operator.replace(/\s+/g, '_')}`)
+          return `${expression.left} ${operator}${expression.right === undefined ? '' : ` ${expression.right}`}`
+        })
+        .join(' ∧ ')
+      if (!text) return t('condition.emptyCase')
+      return item.groups.length > 1 && group.expressions.length > 1 ? `(${text})` : text
     })
-    .join(item.relation == 'all' ? ' ∧ ' : ' ∨ ')
+    .join(' ∨ ')
 }
 
 export function conditionBranchSummary(node: Omit<FlowCanvasViewConditionNode, 'position'>, output: string, t: TFunction): string {

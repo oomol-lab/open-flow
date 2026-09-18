@@ -88,25 +88,24 @@ describe('Execution graph contract', () => {
     const graph: Graph = {
       edges: [
         { source: 'a', sourceHandle: 'yes', target: 'b' },
-        { source: 'a', sourceHandle: 'no', target: 'c' },
+        { source: 'a', sourceHandle: 'otherwise', target: 'c' },
         { source: 'b', target: 'd' },
         { source: 'c', target: 'd' },
       ],
       nodes: {
         a: {
-          inputs: { input: { kind: 'value', value: true } },
           kind: 'condition',
-          input: { ...port, handle: 'input' },
-          cases: [{ expressions: [{ input: 'input', operator: 'isTrue' }], output: 'yes', relation: 'all' }],
-          defaultOutput: 'no',
+          cases: [{ output: 'yes', groups: [{ expressions: [{ left: { kind: 'value' as const, value: true }, operator: 'isTrue' }] }] }],
+          inputs: {},
+          matchMode: 'first' as const,
         },
         b: value,
         c: value,
         d: task,
       },
     }
-    expect(availableOutputs(revision(graph).document, graph, 'd')).toEqual({ a: ['yes', 'no'], b: ['value'], c: ['value'] })
-    expect(availableOutputs(revision(graph).document, graph, 'b')).toEqual({ a: ['yes', 'no'] })
+    expect(availableOutputs(revision(graph).document, graph, 'd')).toEqual({ b: ['value'], c: ['value'] })
+    expect(availableOutputs(revision(graph).document, graph, 'b')).toEqual({})
     const parallel = {
       ...graph,
       edges: [
@@ -123,17 +122,16 @@ describe('Execution graph scheduling', () => {
     const graph: Graph = {
       edges: [
         { source: 'choice', sourceHandle: 'yes', target: 'yes' },
-        { source: 'choice', sourceHandle: 'no', target: 'no' },
+        { source: 'choice', sourceHandle: 'otherwise', target: 'no' },
         { source: 'yes', target: 'join' },
         { source: 'no', target: 'join' },
       ],
       nodes: {
         choice: {
           kind: 'condition',
-          inputs: { input: { kind: 'value', value: input } },
-          input: { ...port, handle: 'input' },
-          cases: [{ output: 'yes', relation: 'all', expressions: [{ input: 'input', operator: 'isTrue' }] }],
-          defaultOutput: 'no',
+          cases: [{ output: 'yes', groups: [{ expressions: [{ left: { kind: 'value' as const, value: input }, operator: 'isTrue' }] }] }],
+          inputs: {},
+          matchMode: 'first' as const,
         },
         yes: value,
         no: { ...value, values: [{ ...port, handle: 'value', value: 2 }] },
@@ -352,10 +350,9 @@ it.each([true, false])('runs with null from either an available nullable source 
         start: { kind: 'manual', name: 'Start' },
         choice: {
           kind: 'condition',
-          inputs: { input: { kind: 'value', value: takeSource } },
-          input: { ...port, handle: 'input' },
-          cases: [{ output: 'yes', relation: 'all', expressions: [{ input: 'input', operator: 'isTrue' }] }],
-          defaultOutput: 'no',
+          cases: [{ output: 'yes', groups: [{ expressions: [{ left: { kind: 'value' as const, value: takeSource }, operator: 'isTrue' }] }] }],
+          inputs: {},
+          matchMode: 'first' as const,
         },
         source: { ...value, values: [{ ...port, handle: 'value', value: null }] },
         bypass: value,
@@ -367,7 +364,7 @@ it.each([true, false])('runs with null from either an available nullable source 
       edges: [
         { source: 'start', target: 'choice' },
         { source: 'choice', sourceHandle: 'yes', target: 'source' },
-        { source: 'choice', sourceHandle: 'no', target: 'bypass' },
+        { source: 'choice', sourceHandle: 'otherwise', target: 'bypass' },
         { source: 'source', target: 'join' },
         { source: 'bypass', target: 'join' },
         { source: 'join', target: 'after' },
@@ -469,10 +466,9 @@ it.each(['notification', 'pending'])('dispatches an ordinary Condition branch na
         start: { kind: 'manual', name: 'Start' },
         condition: {
           kind: 'condition',
-          input: { handle: 'value', ...port },
-          inputs: { value: { kind: 'value', value: null } },
-          cases: [],
-          defaultOutput: branch,
+          cases: [{ output: branch, groups: [{ expressions: [{ left: { kind: 'value', value: true }, operator: 'isTrue' }] }] }],
+          inputs: {},
+          matchMode: 'first',
         },
         after: value,
       },

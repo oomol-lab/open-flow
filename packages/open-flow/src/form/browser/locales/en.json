@@ -8,6 +8,7 @@
     "invalidNumber": "Enter a valid number.",
     "fieldName": "Field name",
     "type": "{{name}} type",
+    "typeTitle": "Type",
     "string": "String",
     "number": "Number",
     "boolean": "Boolean",

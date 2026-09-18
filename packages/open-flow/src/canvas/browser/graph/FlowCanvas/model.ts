@@ -50,13 +50,14 @@ export type FlowCanvasViewConditionOperator =
   | 'starts with'
 
 export interface FlowCanvasViewConditionCase {
-  readonly expressions: readonly {
-    readonly input: string
-    readonly operator: FlowCanvasViewConditionOperator
-    readonly value?: unknown
+  readonly groups: readonly {
+    readonly expressions: readonly {
+      readonly left: string
+      readonly operator: FlowCanvasViewConditionOperator
+      readonly right?: string
+    }[]
   }[]
   readonly output: string
-  readonly relation: 'all' | 'any'
 }
 
 export interface FlowCanvasViewNodeRun {
@@ -109,8 +110,9 @@ export interface FlowCanvasViewSubflowNode extends FlowCanvasViewNodeBase {
 }
 
 export interface FlowCanvasViewConditionNode extends FlowCanvasViewNodeBase {
+  readonly matchMode: 'first' | 'all'
   readonly cases: readonly FlowCanvasViewConditionCase[]
-  readonly defaultOutput?: string
+  readonly defaultOutput: 'otherwise'
   readonly kind: 'condition'
 }
 

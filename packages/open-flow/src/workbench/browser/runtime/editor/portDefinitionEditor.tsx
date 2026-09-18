@@ -23,6 +23,7 @@ import { Popover, PopoverPanelContent } from '../../../../ui/browser/popover.tsx
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { fieldPanelAnchor } from './fieldPanelAnchor.ts'
+import { FieldSectionHeader } from './fieldSectionHeader.tsx'
 import { movePort } from './portOrder.ts'
 
 export function portType(port: InputPort): string {
@@ -690,44 +691,19 @@ export function PortDefinitionEditor(props: PortEditorProps) {
   return (
     <FieldSorting.Provider value={sortingEnabled}>
       {(props.title != null || props.layout === 'values' || !disabled) && (
-        <div ref={heading} className="inspector-section-title justify-between">
-          {props.title != null || props.layout === 'values' ? <FieldLabel>{props.title ?? t('inspector.ports.valuesTitle')}</FieldLabel> : <span />}
-          {!disabled && (
-            <div className="ml-auto flex items-center">
-              {canSort && (
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        aria-pressed={sortingEnabled}
-                        aria-label={t(sortingEnabled ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')}
-                        onClick={() => {
-                          cancelDrag()
-                          setSorting(!sortingEnabled)
-                        }}
-                      />
-                    }
-                  >
-                    <i aria-hidden="true" data-icon="inline-start" className={sortingEnabled ? 'i-lucide-light:check' : 'i-lucide-light:list-ordered'} />
-                    {t(sortingEnabled ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')}
-                  </TooltipTrigger>
-                  <TooltipContent>{t(sortingEnabled ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')}</TooltipContent>
-                </Tooltip>
-              )}
-              {
-                <Tooltip>
-                  <TooltipTrigger render={<Button type="button" variant="ghost" size="icon-sm" aria-label={t('valueEditor.addField')} onClick={addField} />}>
-                    <i aria-hidden="true" className="i-lucide-light:plus text-lg" />
-                  </TooltipTrigger>
-                  <TooltipContent>{t('valueEditor.addField')}</TooltipContent>
-                </Tooltip>
-              }
-            </div>
-          )}
-        </div>
+        <FieldSectionHeader
+          ref={heading}
+          title={props.title ?? (props.layout === 'values' ? t('inspector.ports.valuesTitle') : undefined)}
+          disabled={disabled}
+          canSort={canSort}
+          sorting={sortingEnabled}
+          onToggleSorting={() => {
+            cancelDrag()
+            setSorting(!sortingEnabled)
+          }}
+          addLabel={t('valueEditor.addField')}
+          onAdd={addField}
+        />
       )}
       {props.output && disabled && !hasFields && <p className="m-0 pr-3 pb-4 pl-7 text-left text-xs text-muted-foreground">{t('inspector.ports.noOutputs')}</p>}
       <FieldTable

@@ -8,6 +8,7 @@
     "invalidNumber": "Saisissez un nombre valide.",
     "fieldName": "Nom du champ",
     "type": "Type de {{name}}",
+    "typeTitle": "Type",
     "string": "Chaîne",
     "number": "Nombre",
     "boolean": "Booléen",

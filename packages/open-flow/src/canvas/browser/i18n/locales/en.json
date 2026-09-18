@@ -152,11 +152,12 @@
     "manualSummary": "Click Run to start execution here."
   },
   "condition": {
+    "emptyCase": "No conditions configured",
     "addCondition": "Add condition",
     "configPanelTitle": "Config",
-    "default": "Default",
+    "default": "Otherwise",
     "defaultDescription": "Default case",
-    "defaultHelp": "Execute this case when no other conditions match",
+    "defaultHelp": "Runs when no branch matches.",
     "deleteCondition": "Delete condition",
     "handleKeyTitle": "Handle",
     "handleLogicalTitle": "Logical",

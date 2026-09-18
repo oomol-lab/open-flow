@@ -132,7 +132,7 @@ checkpoint 的格式版本和状态一致性由 Scheduler decoder 校验，恢�
 
 Flow 和 Subflow graph 允许自连接和回边。连线表示执行触发，输入映射独立声明数据来源；保存或删除执行边不会隐式创建或删除输入映射。
 每条被选中的入边到达都创建一次独立节点 invocation，不等待其他前驱，也不合并多个到达。Flow Run 固定一个 Trigger 起始节点；未被该 Trigger 路径触达的节点不执行。Subflow 的无入边普通根节点由调用启动，不同到达可以并行。
-Condition 只选择首个匹配分支或 default。每次 Wait invocation 登记后释放 pending，决议后释放所选 action，同一次 invocation 的 pending 只触发一次。未选中的分支不产生到达或公开节点事件。
+Condition 的每个 Case 由 AND 表达式组组成，组间使用 OR。`first` 按保存顺序选择首个匹配 Case，`all` 选择所有匹配 Case；零匹配时选择固定 `otherwise` 路由端口。分支端口不提供数据输出，Source 选择器不列出 Condition。左右操作数独立保存固定值或公共 Source，不声明节点级统一 Input，也不支持 Source 字段路径。所有操作数 Source 在匹配前解析；缺失值、不完整配置和类型不兼容都报错，不转入 Otherwise。每次 Wait invocation 登记后释放 pending，决议后释放所选 action，同一次 invocation 的 pending 只触发一次。未选中的分支不产生到达或公开节点事件。
 
 每个可执行节点可设置正整数 `maxExecutions`，未设置时为 1000。计数按一次 Flow Run 累计，并按 graph 与 node ID 区分；同一 Subflow 中的节点跨多次调用累计。
 达到上限后，下一次到达使 Run 报错终止，不再执行该节点。每次 invocation 有独立 job/execution identity；Wait 和 Agent 的决议恢复继续原 invocation，不额外计次。暂停检查点保留累计次数、各等待 invocation 的输入路径和 Agent continuation。

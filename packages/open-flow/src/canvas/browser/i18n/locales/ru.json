@@ -152,11 +152,12 @@
     "manualSummary": "Нажмите «Запустить», чтобы начать с этого узла."
   },
   "condition": {
+    "emptyCase": "Условия не настроены",
     "addCondition": "Добавить условие",
     "configPanelTitle": "Настройки",
-    "default": "По умолчанию",
+    "default": "Иначе",
     "defaultDescription": "Ветка по умолчанию",
-    "defaultHelp": "Выполнять эту ветку, если ни одно другое условие не подошло",
+    "defaultHelp": "Выполняется, если ни одна ветка не соответствует условиям.",
     "deleteCondition": "Удалить условие",
     "handleKeyTitle": "Handle",
     "handleLogicalTitle": "Логика",

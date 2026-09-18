@@ -104,12 +104,14 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
         const tooltip =
           modelNode?.kind == 'approval' || modelNode?.kind == 'wait'
             ? t(`canvasCard.waitBranchDescription.${branch == 'pending' ? `${branch}.${modelNode.kind}` : branch}`)
-            : undefined
+            : conditionNode?.defaultOutput === branch
+              ? t('condition.defaultHelp')
+              : undefined
         return (
           <CanvasTooltip key={branch} placement="top" sideOffset={12} title={tooltip}>
             <div className={clsx(styles.executionBranch, styles.branchRow)} tabIndex={tooltip ? 0 : undefined}>
               {summary && (
-                <span className={styles.branchRule} title={conditionNode ? summary : undefined}>
+                <span className={styles.branchRule} title={conditionNode && !tooltip ? summary : undefined}>
                   {summary}
                 </span>
               )}
@@ -118,7 +120,13 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
                   →
                 </span>
               )}
-              <span className={styles.branchName}>{branch}</span>
+              <span className={styles.branchName}>
+                {conditionNode?.defaultOutput === branch
+                  ? 'default'
+                  : conditionNode?.matchMode === 'first'
+                    ? `${conditionNode.cases.findIndex((item) => item.output === branch) + 1}. ${branch}`
+                    : branch}
+              </span>
               <ExecutionHandle id={toRFHandleName(`$branch:${branch}` as HandleName)} type="output" isConnectable={editable} hintRequested={hintRequested} />
             </div>
           </CanvasTooltip>

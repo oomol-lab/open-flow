@@ -8,6 +8,7 @@
     "invalidNumber": "请输入有效的数字。",
     "fieldName": "字段名",
     "type": "{{name}} 类型",
+    "typeTitle": "类型",
     "string": "字符串",
     "number": "数字",
     "boolean": "布尔值",

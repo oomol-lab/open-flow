@@ -1,5 +1,6 @@
 import { dequal } from 'dequal/lite'
 import { currentFlowModelVersion } from './changeSchema.ts'
+import { nodeInputMappings, setConditionInput } from './condition.ts'
 
 export { changeOperationsSchema, currentFlowModelVersion, decodeChangeOperations } from './changeSchema.ts'
 
@@ -186,22 +187,30 @@ export type ConditionOperator =
   | 'notHasValue'
   | 'startsWith'
 
+export type Source = BindingSource | FlowSource | NodeSource
+
+export type ConditionOperand =
+  | { readonly kind: 'value'; readonly value?: JsonValue; readonly jsonSchema?: JsonValue }
+  | { readonly kind: 'source'; readonly source: Source }
+
 export interface ConditionExpression {
-  readonly input: string
+  readonly left: ConditionOperand
   readonly operator: ConditionOperator
-  readonly value?: JsonValue
+  readonly right?: ConditionOperand
+}
+
+export interface ConditionGroup {
+  readonly expressions: readonly ConditionExpression[]
 }
 
 export interface ConditionCase {
-  readonly expressions: readonly ConditionExpression[]
+  readonly groups: readonly ConditionGroup[]
   readonly output: string
-  readonly relation: 'all' | 'any'
 }
 
 export interface ConditionNode extends GraphNodeBase {
   readonly cases: readonly ConditionCase[]
-  readonly defaultOutput?: string
-  readonly input: InputPort
+  readonly matchMode: 'first' | 'all'
   readonly kind: 'condition'
 }
 
@@ -471,11 +480,11 @@ export type ChangeOperation =
       readonly value?: readonly InputPort[]
     }
   | {
-      readonly before: Pick<ConditionNode, 'cases' | 'defaultOutput' | 'input'>
+      readonly before: Pick<ConditionNode, 'cases' | 'matchMode'>
       readonly kind: 'graph.node.condition.set'
       readonly nodeId: string
       readonly target: GraphTarget
-      readonly value: Pick<ConditionNode, 'cases' | 'defaultOutput' | 'input'>
+      readonly value: Pick<ConditionNode, 'cases' | 'matchMode'>
     }
   | { readonly kind: 'graph.node.create'; readonly node: GraphNode; readonly nodeId: string; readonly target: GraphTarget }
   | { readonly kind: 'graph.node.delete'; readonly nodeId: string; readonly target: GraphTarget }
@@ -647,15 +656,10 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         const graph = selectedGraph(document, operation.target)
         const node = graph.nodes[operation.nodeId]
         if (node?.kind != 'condition') invalid('The Condition Node does not exist.')
-        if (
-          !dequal(node.cases, operation.before.cases) ||
-          node.defaultOutput != operation.before.defaultOutput ||
-          !dequal(node.input, operation.before.input)
-        ) {
+        if (!dequal(node.cases, operation.before.cases) || node.matchMode != operation.before.matchMode) {
           invalid('The Condition Node changed before this operation was applied.')
         }
-        const { defaultOutput: _, ...rest } = node
-        const updated: ConditionNode = operation.value.defaultOutput == null ? { ...rest, ...operation.value } : { ...node, ...operation.value }
+        const updated: ConditionNode = { ...node, ...operation.value }
         Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
         break
       }
@@ -713,11 +717,20 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         const graph = selectedGraph(document, operation.target)
         const node = graph.nodes[operation.nodeId]
         if (node == null || !('inputs' in node)) invalid('The Node does not accept inputs.')
-        if (!dequal(node.inputs[operation.handle], operation.before)) invalid('The Node input changed before this operation was applied.')
+        if (!dequal(nodeInputMappings(node)[operation.handle], operation.before)) invalid('The Node input changed before this operation was applied.')
         const inputs = { ...node.inputs }
         if (operation.value == null) delete inputs[operation.handle]
         else inputs[operation.handle] = operation.value
-        Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: { ...node, inputs } } }))
+        Object.assign(
+          document,
+          replaceGraph(document, operation.target, {
+            ...graph,
+            nodes: {
+              ...graph.nodes,
+              [operation.nodeId]: node.kind == 'condition' ? setConditionInput(node, operation.handle, operation.value) : { ...node, inputs },
+            },
+          }),
+        )
         break
       }
       case 'graph.node.task.capabilities.set': {

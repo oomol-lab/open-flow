@@ -134,25 +134,11 @@ const workflow: FlowCanvasViewModel = {
       kind: 'condition',
       title: 'Has records',
       position: workflowPositions.condition,
-      inputs: [
-        {
-          handle: 'count',
-          jsonSchema: { type: 'number' },
-          sources: [{ nodeId: 'task', output: 'count' }],
-        },
-      ],
-      outputs: [
-        { handle: 'matched', jsonSchema: { type: 'number' } },
-        { handle: 'fallback', jsonSchema: { type: 'number' } },
-      ],
-      cases: [
-        {
-          expressions: [{ input: 'count', operator: '>', value: 0 }],
-          output: 'matched',
-          relation: 'all',
-        },
-      ],
-      defaultOutput: 'fallback',
+      cases: [{ output: 'matched', groups: [{ expressions: [{ left: 'count', operator: '>', right: String(0) }] }] }],
+      inputs: [],
+      outputs: [{ handle: 'matched' }, { handle: 'otherwise' }],
+      defaultOutput: 'otherwise' as const,
+      matchMode: 'first' as const,
     },
     {
       id: 'value',

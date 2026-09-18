@@ -8,6 +8,7 @@
     "invalidNumber": "請輸入有效的數字。",
     "fieldName": "欄位名稱",
     "type": "{{name}} 類型",
+    "typeTitle": "類型",
     "string": "字串",
     "number": "數字",
     "boolean": "布林值",

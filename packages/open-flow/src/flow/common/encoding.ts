@@ -1,5 +1,6 @@
 import type {
   CodeModule,
+  ConditionOperand,
   FlowDocument,
   Graph,
   GraphEdge,
@@ -94,6 +95,16 @@ export function canonicalOutputs(value: readonly (OutputMapping & Port)[]): Json
   }))
 }
 
+function canonicalOperand(operand: ConditionOperand): JsonValue {
+  return operand.kind === 'source'
+    ? { kind: 'source', source: { ...operand.source } }
+    : {
+        kind: 'value',
+        ...(operand.value === undefined ? {} : { value: operand.value }),
+        ...(operand.jsonSchema === undefined ? {} : { jsonSchema: operand.jsonSchema }),
+      }
+}
+
 function canonicalNode(value: GraphNode): JsonValue {
   if (!('inputs' in value)) return canonicalTriggerNode(value)
   const common = {
@@ -108,17 +119,17 @@ function canonicalNode(value: GraphNode): JsonValue {
     case 'condition':
       return {
         ...common,
-        cases: value.cases.map((condition) => ({
-          expressions: condition.expressions.map((expression) => ({
-            input: expression.input,
-            operator: expression.operator,
-            ...(Object.hasOwn(expression, 'value') ? { value: expression.value! } : {}),
+        cases: value.cases.map((item) => ({
+          output: item.output,
+          groups: item.groups.map((group) => ({
+            expressions: group.expressions.map((expression) => ({
+              left: canonicalOperand(expression.left),
+              operator: expression.operator,
+              ...(expression.right == null ? {} : { right: canonicalOperand(expression.right) }),
+            })),
           })),
-          output: condition.output,
-          relation: condition.relation,
         })),
-        ...(value.defaultOutput == null ? {} : { defaultOutput: value.defaultOutput }),
-        input: { handle: value.input.handle, ...canonicalPort(value.input) },
+        matchMode: value.matchMode,
         kind: value.kind,
       }
     case 'subflow':

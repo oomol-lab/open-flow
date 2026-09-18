@@ -1,0 +1,130 @@
+@use '../../../../form/browser/fieldGeometry.scss' as geometry;
+
+.open-flow-workbench {
+  .condition-groups[hidden],
+  .condition-expressions[hidden] {
+    display: none;
+  }
+  .condition-editor {
+    border-bottom: 1px solid var(--ui-border);
+  }
+  .condition-editor-content {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 8px;
+    padding: 2px 8px 16px geometry.$list-inset;
+  }
+  .condition-case {
+    min-width: 0;
+  }
+  .condition-case-heading {
+    display: grid;
+    grid-template-columns: geometry.$toggle-width geometry.$value-name-gap minmax(0, 1fr) 2px 24px 4px 24px;
+    > :first-child {
+      grid-column: 1;
+    }
+    > div {
+      grid-column: 3;
+    }
+    > button:nth-child(3) {
+      grid-column: 5;
+    }
+    > button:nth-child(4) {
+      grid-column: 7;
+    }
+    align-items: center;
+  }
+  .condition-groups {
+    position: relative;
+    margin: 0;
+    padding: 4px 0 0 16px;
+    &::before {
+      @include geometry.branch;
+      left: calc(#{geometry.$toggle-width} / 2);
+      top: 0;
+      width: 6px;
+    }
+  }
+  .condition-group-heading {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: var(--ui-muted-foreground);
+    font-size: 12px;
+    min-height: 26px;
+  }
+  .condition-group-heading[data-invalid] .condition-group-summary {
+    color: var(--ui-destructive);
+  }
+  .condition-case-heading > button {
+    color: var(--ui-muted-foreground);
+  }
+  .condition-case-heading > button:first-child,
+  .condition-group-heading > button {
+    width: geometry.$toggle-width;
+  }
+  .condition-logic {
+    color: var(--warning-foreground);
+    font-size: 10px;
+    font-weight: 600;
+    line-height: 16px;
+  }
+  .condition-expressions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 4px 0 0 calc(#{geometry.$toggle-width} + #{geometry.$value-name-gap});
+  }
+  .condition-expression {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr) 80px minmax(0, 1fr) auto;
+    gap: 4px;
+    align-items: start;
+  }
+  .condition-expression[data-unary] {
+    grid-template-columns: minmax(0, 1fr) minmax(80px, 1fr) auto;
+  }
+  .condition-expression-actions {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    min-height: 30px;
+    color: var(--ui-muted-foreground);
+  }
+  .condition-operand {
+    min-width: 0;
+  }
+  .condition-or {
+    line-height: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    // The AND heading supplies its own vertical spacing.
+    margin: 8px 0 0 calc(#{geometry.$toggle-width} + #{geometry.$value-name-gap});
+  }
+  .condition-or::before,
+  .condition-or::after {
+    content: '';
+    height: 1px;
+    background: var(--ui-border);
+    flex: 1;
+  }
+  .condition-case:has(.condition-expression-actions) .condition-or::after {
+    // Extend through the action column without moving the label’s center.
+    flex-basis: 56px; // Two 24px buttons and two 4px gaps.
+  }
+  @container context-panel (max-width: 480px) {
+    .condition-expression {
+      grid-template-columns: minmax(0, 1fr) 80px auto;
+    }
+    .condition-expression:not([data-unary]) .condition-operand:nth-child(3) {
+      grid-column: 1 / 3;
+    }
+    .condition-expression-actions {
+      grid-column: 3;
+      grid-row: 1 / 3;
+    }
+  }
+}

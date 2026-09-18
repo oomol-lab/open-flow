@@ -1,4 +1,5 @@
 @use './fieldLayout.scss';
+@use './fieldGeometry.scss' as geometry;
 @use 'sass:selector';
 
 /* Each editor is one stacking unit. The field table raises the active unit;
@@ -13,6 +14,10 @@
   min-width: 0;
 }
 .root {
+  --field-value-column: 1;
+  --field-value-row: 1;
+  --value-addon-width: 28px;
+  --value-end-addon-width: 0px;
   --field-control-height: 30px;
   --value-editor-feedback-layer: 1;
   --value-editor-control-layer: 2;
@@ -114,7 +119,6 @@
   --error-border-width: var(--ui-danger-border-width);
   --error-inline-outset: 0px;
   --error-overlap: var(--ui-control-radius, var(--ui-radius));
-  --error-transition-duration: 160ms;
   --error-background: color-mix(in srgb, var(--ui-destructive) 92%, white);
   --error-foreground: color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background)));
   inset: 100% calc(-1 * var(--error-inline-outset)) auto;
@@ -133,9 +137,6 @@
   color: var(--error-foreground);
   opacity: 0;
   overflow-wrap: anywhere;
-  transition:
-    opacity var(--error-transition-duration) ease,
-    visibility 0s linear var(--error-transition-duration);
   visibility: hidden;
 }
 /* Only value-editor focus owns feedback. Pointer-focused disclosures and previews
@@ -154,7 +155,6 @@ $feedback-focus: ':has(#{$feedback-targets})';
 .root:has(> :is(.summary, .arrayItemType, .valueTools):hover) > .summaryError > .error,
 .summaryError:hover > .error {
   opacity: var(--error-hover-opacity, 1);
-  transition: opacity var(--error-transition-duration) ease;
   visibility: var(--error-hover-visibility, visible);
 }
 :is(.body:not([hidden]), .errorAnchor):has(:focus-visible) > .error,
@@ -162,13 +162,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
   --error-border-width: var(--ui-danger-focus-width);
   --error-inline-outset: calc(var(--ui-danger-focus-width) - var(--ui-danger-border-width));
   opacity: 1;
-  transition: opacity var(--error-transition-duration) ease;
   visibility: visible;
-}
-@media (prefers-reduced-motion: reduce) {
-  .error {
-    --error-transition-duration: 0s;
-  }
 }
 .root:not(#{$feedback-focus}):has(> :is(.body, .summary, .arrayItemType, .valueTools, .summaryError):hover) {
   z-index: var(--value-editor-hover-layer, 1);
@@ -277,7 +271,6 @@ $feedback-focus: ':has(#{$feedback-targets})';
   }
 }
 .root[data-value-addon] {
-  --value-addon-width: 28px;
   > .summary,
   > .arrayItemType,
   &:not([data-collection]) > .body {
@@ -286,6 +279,26 @@ $feedback-focus: ':has(#{$feedback-targets})';
   }
   &:has(> .summary[aria-expanded='true']) > .valueAddon {
     background: color-mix(in srgb, var(--ui-foreground) 3%, var(--ui-background));
+  }
+}
+// Suffix uses the same attached base as the Source prefix, mirrored at the right edge.
+.valueAddon[data-side='end'] {
+  justify-self: end;
+  justify-content: flex-end;
+  padding-left: 0;
+  padding-right: 2px;
+  border-right: 1px solid var(--ui-input);
+  border-left: 0;
+  border-radius: 0 var(--ui-control-radius, var(--ui-radius)) var(--ui-control-radius, var(--ui-radius)) 0;
+}
+.root[data-value-suffix] {
+  --value-end-addon-width: var(--value-addon-width);
+  > .summary,
+  > .arrayItemType,
+  &:not([data-collection]) > .body {
+    position: relative;
+    margin-right: var(--value-end-addon-width);
+    z-index: var(--value-editor-control-layer);
   }
 }
 .root[data-compact][data-collection] {
@@ -350,11 +363,12 @@ $feedback-focus: ':has(#{$feedback-targets})';
   display: flex;
   align-items: center;
   height: var(--field-control-height);
-  margin-right: calc(var(--value-suffix-width) + 3px);
+  margin-right: calc(var(--value-suffix-width) + var(--value-end-addon-width) + 3px);
   z-index: var(--value-editor-control-layer);
   color: var(--ui-muted-foreground);
 }
 .root[data-value-tools] {
+  > .summary,
   > .arrayItemType [data-slot='select-trigger'],
   &:not([data-collection]) > .body > div > :is([data-slot='select-trigger'], [aria-haspopup]) {
     position: relative;
@@ -425,15 +439,9 @@ $feedback-focus: ':has(#{$feedback-targets})';
   padding: 4px 0 0 var(--value-body-inset);
 }
 .root[data-header][data-branch] > .body::before {
-  content: '';
-  position: absolute;
+  @include geometry.branch;
   left: calc(var(--field-indent, 0px) - var(--branch-offset));
   top: calc(-1 * var(--branch-extension));
-  width: 16px;
-  height: calc(20px + var(--branch-extension));
-  border-left: 1px solid color-mix(in srgb, var(--ui-foreground) 20%, var(--ui-background));
-  border-bottom: 1px solid color-mix(in srgb, var(--ui-foreground) 20%, var(--ui-background));
-  border-bottom-left-radius: 10px;
 }
 @container value-fields (max-width: #{fieldLayout.$wrap-width}) {
   .root[data-header][data-structured]:not([data-array-child], [data-output]) > .body {
@@ -764,4 +772,11 @@ $feedback-focus: ':has(#{$feedback-targets})';
   grid-column: handle / content-end;
   grid-row: 1;
   margin-left: var(--field-indent);
+}
+
+.errorAnchor:hover {
+  z-index: var(--value-editor-hover-layer, 1);
+}
+.errorAnchor:has(:focus-visible, [data-popup-open]) {
+  z-index: var(--value-editor-active-layer, 2);
 }

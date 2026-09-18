@@ -152,11 +152,12 @@
     "manualSummary": "実行をクリックすると、ここから開始します。"
   },
   "condition": {
+    "emptyCase": "条件未設定",
     "addCondition": "条件を追加",
     "configPanelTitle": "設定",
-    "default": "デフォルト",
+    "default": "その他",
     "defaultDescription": "デフォルトの条件",
-    "defaultHelp": "他のどの条件にも一致しない場合に、この分岐を実行します",
+    "defaultHelp": "一致する分岐がない場合に実行します。",
     "deleteCondition": "条件を削除",
     "handleKeyTitle": "Handle 名",
     "handleLogicalTitle": "論理演算",

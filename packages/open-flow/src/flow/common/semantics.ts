@@ -1,4 +1,5 @@
 import { matchesTriggerOutputs } from '../../trigger/common/contract.ts'
+import { nodeInputMappings } from './condition.ts'
 export { matchesTriggerOutputs, triggerOutputDefinitions, triggerOutputPorts } from '../../trigger/common/contract.ts'
 import type { EngineContract } from '../../execution/common/engineContract.ts'
 import type { RuntimeProgram } from '../../execution/common/runtime.ts'
@@ -74,7 +75,7 @@ export function flowDependencies(content: RevisionContent, triggerId?: string): 
 
   function visitGraph(value: Graph): void {
     for (const [, node] of entries(value.nodes)) {
-      if ('inputs' in node) visitInputMappings(node.inputs)
+      if ('inputs' in node) visitInputMappings(nodeInputMappings(node))
       switch (node.kind) {
         case 'condition':
           break
@@ -190,7 +191,7 @@ export function validateFlowInputs(revision: RevisionContent, value: unknown): F
   const graph = revision.document.graph
   for (const [nodeId, candidate] of Object.entries(value)) {
     const node = graph.nodes[nodeId]
-    if (node == null || !('inputs' in node) || candidate == null || typeof candidate != 'object' || Array.isArray(candidate)) {
+    if (node == null || !('inputs' in node) || node.kind == 'condition' || candidate == null || typeof candidate != 'object' || Array.isArray(candidate)) {
       return 'invalid'
     }
     const inputs = nodeInputPorts(revision.document, node)

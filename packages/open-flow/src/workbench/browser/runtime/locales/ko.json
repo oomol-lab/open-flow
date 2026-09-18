@@ -247,6 +247,7 @@
       "outputMissing": "“{{source}}”에서 “{{output}}”을(를) 찾을 수 없습니다. 다시 선택하세요.",
       "notReady": "여기까지 실행될 때 “{{source}} {{handle}}”에 아직 값이 없을 수 있습니다.",
       "sourceConflict": "다음 필드에 값이 동시에 있을 수 있습니다: {{sources}}. 여기서는 하나만 사용할 수 있습니다.",
+      "incompatibleRight": "오른쪽 값의 형식이 이 비교와 호환되지 않습니다.",
       "incompatible": "호환되지 않음",
       "unverified": "확인되지 않음",
       "schemaIncompatible": "데이터 형식이 일치하지 않습니다.",
@@ -658,7 +659,17 @@
       },
       "condition": {
         "input-missing": "조건식이 알 수 없는 입력 ‘{{input}}’을 참조합니다.",
-        "output-duplicate": "조건 출력 ‘{{output}}’이 두 번 이상 선언되었습니다."
+        "output-duplicate": "조건 출력 ‘{{output}}’이 두 번 이상 선언되었습니다.",
+        "invalid": {
+          "inputs": "Condition에는 노드 입력을 선언할 수 없습니다.",
+          "output": "Case 이름은 비어 있거나 중복되거나 예약된 이름일 수 없습니다.",
+          "case": "Case에 조건 그룹을 하나 이상 추가하세요.",
+          "group": "그룹에 조건식을 하나 이상 추가하세요.",
+          "operand": "조건 피연산자를 완성하세요.",
+          "schema": "피연산자가 선언된 형식과 일치하지 않습니다.",
+          "unary": "단항 연산자에는 오른쪽 값을 지정할 수 없습니다.",
+          "type": "피연산자 형식이 이 연산자와 호환되지 않습니다."
+        }
       },
       "graph": {
         "binding-invalid": "바인딩 ‘{{bindingId}}’은(는) Variable이어야 합니다.",
@@ -768,7 +779,10 @@
     "loadFailed": "초안을 불러오지 못했습니다",
     "loadFailedDescription": "배포 연결을 확인한 뒤 다시 시도하세요.",
     "recovery": {
-      "failed": { "title": "이 워크플로를 열 수 없습니다", "description": "초안을 사용할 수 없거나 안전하게 복구할 수 없습니다." },
+      "failed": {
+        "title": "이 워크플로를 열 수 없습니다",
+        "description": "초안을 사용할 수 없거나 안전하게 복구할 수 없습니다."
+      },
       "repair": {
         "title": "워크플로가 손상되었습니다",
         "description": "읽을 수 없는 부분을 삭제하고 복구 초안을 만들 수 있습니다.",
@@ -909,26 +923,16 @@
   },
   "conditionEditor": {
     "addCondition": "조건 추가",
-    "configPanelTitle": "설정",
-    "default": "기본",
-    "defaultDescription": "기본 케이스",
-    "defaultHelp": "다른 조건이 하나도 일치하지 않을 때 이 케이스를 실행합니다",
     "deleteCondition": "조건 삭제",
     "handleKeyTitle": "Handle",
-    "handleLogicalTitle": "논리 연산",
-    "inputHelp": "가장 먼저 일치한 조건이 첫 번째 입력 Handle의 데이터를 출력합니다",
-    "label": "케이스",
-    "logical": {
-      "AND": "그리고 (AND)",
-      "OR": "또는 (OR)"
-    },
+    "label": "연산자",
     "operator": {
-      "!=": "≠",
-      "<": "<",
-      "<=": "≤",
-      "==": "=",
-      ">": ">",
-      ">=": "≥",
+      "!=": "같지 않음",
+      "<": "미만",
+      "<=": "이하",
+      "==": "같음",
+      ">": "초과",
+      ">=": "이상",
       "contains": "포함",
       "endsWith": "다음으로 끝남",
       "hasKey": "키 있음",
@@ -944,8 +948,22 @@
       "notHasValue": "값 없음",
       "startsWith": "다음으로 시작함"
     },
-    "title": "조건 Handle",
-    "toggleDefault": "기본 조건"
+    "cases": "분기",
+    "addCase": "분기 추가",
+    "matchMode": "일치 모드",
+    "first": "첫 번째 일치",
+    "all": "모든 일치",
+    "firstHelp": "위에서 아래로 평가하여 첫 번째 일치 분기를 선택합니다.",
+    "allHelp": "일치하는 모든 분기를 선택합니다.",
+    "addAnd": "AND 조건 추가",
+    "addOr": "OR 조건 추가",
+    "groupSummary": "모든 조건을 충족해야 함",
+    "left": "왼쪽 값",
+    "right": "오른쪽 값",
+    "containsErrors": "조건에 오류가 있습니다.",
+    "incomplete": "조건 그룹을 완성하세요.",
+    "incompatibleRight": "오른쪽 값의 형식이 이 비교와 호환되지 않습니다.",
+    "incompatible": "값 유형이 연산자와 호환되지 않습니다."
   },
   "nodeInput": {
     "literal": "고정 값",

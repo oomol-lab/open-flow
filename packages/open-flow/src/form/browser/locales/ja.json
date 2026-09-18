@@ -8,6 +8,7 @@
     "invalidNumber": "有効な数値を入力してください。",
     "fieldName": "フィールド名",
     "type": "{{name}} の型",
+    "typeTitle": "型",
     "string": "文字列",
     "number": "数値",
     "boolean": "真偽値",

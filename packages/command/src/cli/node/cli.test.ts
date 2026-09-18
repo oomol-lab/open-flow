@@ -60,7 +60,7 @@ describe('CLI', () => {
           edges: [],
           nodes: {
             a: { kind: 'value', inputs: {}, values: [{ handle: 'value', jsonSchema: {}, nullable: false, value: 42 }] },
-            b: { kind: 'condition', inputs: {}, input: { handle: 'input', jsonSchema: {}, nullable: false }, cases: [] },
+            b: { kind: 'wait', inputs: {}, inputDefinitions: [{ handle: 'input', jsonSchema: {}, nullable: false }], prompt: '' },
           },
         },
       },

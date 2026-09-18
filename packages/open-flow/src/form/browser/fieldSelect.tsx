@@ -18,8 +18,11 @@ export function FieldSelect({
   readOnly,
   danger,
   icons,
+  displayValue,
+  showTooltip,
   'aria-label': label,
   'aria-invalid': invalid,
+  'aria-describedby': describedBy,
 }: {
   'id'?: string
   'value': string | number
@@ -29,9 +32,12 @@ export function FieldSelect({
   'readOnly'?: boolean
   'danger'?: boolean
   'icons'?: Readonly<Record<string, string>>
+  'displayValue'?: ReactNode
+  'showTooltip'?: boolean
   'size'?: string
   'aria-label': string
   'aria-invalid'?: boolean
+  'aria-describedby'?: string
 }) {
   const [open, setOpen] = useState(false)
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
@@ -58,16 +64,18 @@ export function FieldSelect({
       size="field"
       aria-label={label}
       aria-invalid={invalid || danger}
+      aria-describedby={describedBy}
       data-field-prompt={danger || undefined}
       className={fieldSelectTriggerClass}
     >
       <SelectValue>
-        {icons?.[value] ? (
-          <>
-            <i aria-hidden="true" className={`${icons[value]} inline-block shrink-0 text-base`} />
-            <span className="sr-only">{selected?.label}</span>
-          </>
-        ) : undefined}
+        {displayValue ??
+          (icons?.[value] ? (
+            <>
+              <i aria-hidden="true" className={`${icons[value]} inline-block shrink-0 text-base`} />
+              <span className="sr-only">{selected?.label}</span>
+            </>
+          ) : undefined)}
       </SelectValue>
     </SelectTrigger>
   )
@@ -83,7 +91,7 @@ export function FieldSelect({
         disabled={disabled || readOnly}
         items={options}
       >
-        {icons ? (
+        {icons || showTooltip ? (
           <Tooltip>
             <TooltipTrigger render={trigger} />
             <TooltipContent container={container}>{selected?.label}</TooltipContent>
@@ -91,7 +99,12 @@ export function FieldSelect({
         ) : (
           trigger
         )}
-        <SelectContent container={container} align="start" alignItemWithTrigger={false} className={selectionMenuContentClass}>
+        <SelectContent
+          container={container}
+          align="start"
+          alignItemWithTrigger={false}
+          className={`${selectionMenuContentClass} w-max min-w-[max(9rem,var(--anchor-width))] max-w-(--available-width)`}
+        >
           {options
             .filter((option) => !option.disabled)
             .map((option) => (

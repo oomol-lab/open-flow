@@ -2,6 +2,7 @@ import type { EditorComponent } from '../common/editorComponent.ts'
 
 import { Fragment, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { MenuHeader } from '../../ui/browser/menu-header.tsx'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '../../ui/browser/select.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/browser/tooltip.tsx'
 import { editorComponent, editorGroups, schemaForEditor } from '../common/editorComponent.ts'
@@ -20,6 +21,7 @@ export function EditorComponentSelect({
   compact = true,
   showIcon = true,
   readOnlySurface = false,
+  addon = false,
   onChange,
 }: {
   schema: unknown
@@ -31,6 +33,7 @@ export function EditorComponentSelect({
   compact?: boolean
   showIcon?: boolean
   readOnlySurface?: boolean
+  addon?: boolean
   onChange: (schema: Record<string, unknown>) => void
 }) {
   const t = useTranslate()
@@ -70,11 +73,12 @@ export function EditorComponentSelect({
                 size="field"
                 aria-invalid={invalid}
                 aria-label={`${t('valueEditor.type', { name })}: ${label}`}
-                className={fieldSelectTriggerClass}
+                variant={addon ? 'addon' : 'default'}
+                className={addon ? undefined : fieldSelectTriggerClass}
               />
             }
           >
-            <SelectValue>
+            <SelectValue className={addon ? 'flex-none justify-center' : undefined}>
               {showIcon && <EditorComponentIcon component={selectedComponent} />}
               <span className={compact ? 'sr-only' : undefined}>{label}</span>
             </SelectValue>
@@ -87,19 +91,22 @@ export function EditorComponentSelect({
           alignItemWithTrigger={false}
           className={`min-w-44 [scrollbar-width:thin] ${selectionMenuContentClass}`}
         >
-          {Object.entries(editorGroups).map(([group, components], index) => (
-            <Fragment key={group}>
-              {index > 0 && <SelectSeparator className="mx-2 bg-border/50" />}
-              <SelectGroup aria-label={t(`valueEditor.componentGroups.${group}`)} className="p-0">
-                {components.map((component) => (
-                  <SelectItem key={component} value={component} className={selectionMenuItemClass}>
-                    {showIcon && <EditorComponentIcon component={component} />}
-                    {t(`valueEditor.components.${component}`)}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
-            </Fragment>
-          ))}
+          <SelectGroup className="p-0" aria-label={t('valueEditor.typeTitle')}>
+            <MenuHeader>{t('valueEditor.typeTitle')}</MenuHeader>
+            {Object.entries(editorGroups).map(([group, components], index) => (
+              <Fragment key={group}>
+                {index > 0 && <SelectSeparator className="mx-2 bg-border/50" />}
+                <SelectGroup aria-label={t(`valueEditor.componentGroups.${group}`)} className="p-0">
+                  {components.map((component) => (
+                    <SelectItem key={component} value={component} className={selectionMenuItemClass}>
+                      {showIcon && <EditorComponentIcon component={component} />}
+                      {t(`valueEditor.components.${component}`)}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </Fragment>
+            ))}
+          </SelectGroup>
         </SelectContent>
       </Select>
     </div>

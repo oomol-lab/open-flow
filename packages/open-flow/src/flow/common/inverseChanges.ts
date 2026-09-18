@@ -67,9 +67,22 @@ export function inverseFlowChanges(content: RevisionContent, operations: readonl
       case 'task.delete':
         restore.push({ kind: 'task.create', taskId: operation.taskId, task: current.document.tasks[operation.taskId]! })
         break
-      case 'graph.node.input.set':
-        restore.push({ ...operation, before: operation.value, value: operation.before })
+      case 'graph.node.input.set': {
+        const beforeGraph = operation.target.kind === 'flow' ? current.document.graph : current.document.subflows[operation.target.id]!.graph
+        const afterGraph = operation.target.kind === 'flow' ? after.document.graph : after.document.subflows[operation.target.id]!.graph
+        const beforeNode = beforeGraph.nodes[operation.nodeId]!
+        const afterNode = afterGraph.nodes[operation.nodeId]!
+        if (beforeNode.kind === 'condition' && afterNode.kind === 'condition') {
+          restore.push({
+            kind: 'graph.node.condition.set',
+            target: operation.target,
+            nodeId: operation.nodeId,
+            before: { cases: afterNode.cases, matchMode: afterNode.matchMode },
+            value: { cases: beforeNode.cases, matchMode: beforeNode.matchMode },
+          })
+        } else restore.push({ ...operation, before: operation.value, value: operation.before })
         break
+      }
       case 'binding.target.set':
         restore.push({ ...operation, before: operation.value, value: operation.before })
         break

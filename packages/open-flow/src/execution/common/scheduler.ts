@@ -12,6 +12,7 @@ import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { agentInput } from '../../flow/common/agent.ts'
 import { portsByHandle } from '../../flow/common/change.ts'
+import { conditionInputPorts, nodeInputMappings, selectConditionBranches } from '../../flow/common/condition.ts'
 import { isResolutionNode, resolutionActions, resolutionOutputPorts } from '../../flow/common/graph.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'
 import { matchesTriggerOutputs } from '../../trigger/common/contract.ts'
@@ -258,7 +259,7 @@ interface RunContext {
 function nodePorts(prepared: PreparedFlow, node: ExecutableNode): Readonly<Record<string, InputPortDefinition>> {
   switch (node.kind) {
     case 'condition':
-      return { [node.input.handle]: node.input }
+      return conditionInputPorts(node)
     case 'value':
       return {}
     case 'subflow':
@@ -424,70 +425,6 @@ function jsonEqual(left: JsonValue, right: JsonValue): boolean {
   )
 }
 
-function conditionMatches(
-  node: Extract<GraphNode, { readonly kind: 'condition' }>,
-  expression: (typeof node.cases)[number]['expressions'][number],
-  inputs: Readonly<Record<string, JsonValue>>,
-): boolean {
-  const left = Object.hasOwn(inputs, expression.input) ? inputs[expression.input]! : null
-  const right = expression.value
-  switch (expression.operator) {
-    case '==':
-      return right !== undefined && jsonEqual(left, right)
-    case '!=':
-      return right !== undefined && !jsonEqual(left, right)
-    case '>':
-      return typeof left == 'number' && typeof right == 'number' && left > right
-    case '>=':
-      return typeof left == 'number' && typeof right == 'number' && left >= right
-    case '<':
-      return typeof left == 'number' && typeof right == 'number' && left < right
-    case '<=':
-      return typeof left == 'number' && typeof right == 'number' && left <= right
-    case 'contains':
-    case 'notContains': {
-      let contains: boolean | undefined
-      if (typeof left == 'string' && typeof right == 'string') contains = left.includes(right)
-      else if (Array.isArray(left) && right !== undefined) contains = left.some((value) => jsonEqual(value, right))
-      return contains == null ? false : expression.operator == 'contains' ? contains : !contains
-    }
-    case 'startsWith':
-      return typeof left == 'string' && typeof right == 'string' && left.startsWith(right)
-    case 'endsWith':
-      return typeof left == 'string' && typeof right == 'string' && left.endsWith(right)
-    case 'hasKey':
-    case 'notHasKey': {
-      if (left == null || Array.isArray(left) || typeof left != 'object' || typeof right != 'string') return false
-      const hasKey = Object.hasOwn(left, right)
-      return expression.operator == 'hasKey' ? hasKey : !hasKey
-    }
-    case 'hasValue':
-    case 'notHasValue': {
-      if (left == null || Array.isArray(left) || typeof left != 'object' || right === undefined) return false
-      const hasValue = Object.values(left).some((value) => jsonEqual(value, right))
-      return expression.operator == 'hasValue' ? hasValue : !hasValue
-    }
-    case 'isEmpty':
-    case 'isNotEmpty': {
-      const empty =
-        left === null ||
-        (typeof left == 'string' && left.length == 0) ||
-        (Array.isArray(left) && left.length == 0) ||
-        (typeof left == 'object' && !Array.isArray(left) && Object.keys(left).length == 0)
-      const comparable = left === null || typeof left == 'string' || typeof left == 'object'
-      return comparable && (expression.operator == 'isEmpty' ? empty : !empty)
-    }
-    case 'isNull':
-      return left === null
-    case 'isNotNull':
-      return left !== null
-    case 'isTrue':
-      return left === true
-    case 'isFalse':
-      return left === false
-  }
-}
-
 function outputRecord(value: unknown, nodeId: string): Readonly<Record<string, JsonValue>> {
   if (value === undefined) return {}
   if (value == null || typeof value != 'object' || Array.isArray(value)) throw new Error(`Node "${nodeId}" must return an object.`)
@@ -546,9 +483,7 @@ function validateOutputs(prepared: PreparedFlow, nodeId: string, node: Executabl
         ? portsByHandle(prepared.subflows[node.subflowId]!.outputs)
         : node.kind == 'value'
           ? portsByHandle(node.values)
-          : Object.fromEntries(
-              [...node.cases.map((item) => item.output), ...(node.defaultOutput == null ? [] : [node.defaultOutput])].map((handle) => [handle, node.input]),
-            )
+          : {}
   const outputs = outputRecord(
     checkpointJson(
       Object.fromEntries(Object.entries(raw).map(([handle, item]) => [handle, Object.hasOwn(ports, handle) && item === undefined ? null : item])),
@@ -601,7 +536,7 @@ function validateCheckpoint(
         if (!jsonEqual(validateOutputs(prepared, id, node, outputs), outputs)) throw new Error('Checkpoint node outputs are incomplete.')
         const count = Object.keys(outputs).length
         if (
-          (node.kind == 'condition' && (count > 1 || (node.defaultOutput != null && count != 1))) ||
+          (node.kind == 'condition' && count != 0) ||
           (isResolutionNode(node) &&
             (resolutionActions(node).filter((action) => Object.hasOwn(outputs, action)).length > 1 ||
               (!resolutionActions(node).some((action) => Object.hasOwn(outputs, action)) && !(frame && Object.hasOwn(outputs, 'pending')))))
@@ -658,7 +593,7 @@ function validateCheckpoint(
 }
 
 type NodeResult =
-  | { readonly kind: 'completed'; readonly outputs: Readonly<Record<string, JsonValue>> }
+  | { readonly kind: 'completed'; readonly releasedHandles?: readonly string[]; readonly outputs: Readonly<Record<string, JsonValue>> }
   | { readonly kind: 'suspended'; readonly value: JsonValue; readonly agent: FlowRunCheckpoint['agents'][string] }
 
 function runGraph(
@@ -721,6 +656,7 @@ function runGraph(
         supplied: JsonValue | undefined,
         description: string,
         valuesByNode: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>,
+        required = false,
       ): JsonValue => {
         let value = mapping?.kind == 'value' ? mapping.value : supplied === undefined ? port.value : supplied
         if (mapping?.kind == 'sources') {
@@ -731,18 +667,20 @@ function runGraph(
             return outputs != null && Object.hasOwn(outputs, source.output) ? [outputs[source.output]!] : []
           })
           if (values.length > 1) throw new Error(`${description} has multiple available sources.`)
+          if (required && values.length == 0) throw new Error(`${description} Source has no value.`)
           value = values[0] ?? null
         }
+        if (required && value === undefined) throw new Error(`${description} is incomplete.`)
         if (value === undefined) value = null
         if (!(value === null && port.nullable) && !matchesSchema(value, port.jsonSchema)) throw new Error(`${description} does not match its declared schema.`)
         return value
       }
       const resolveInputs = (nodeId: string, node: ExecutableNode, jobId: string): Readonly<Record<string, JsonValue>> => {
-        const mappings = node.inputs
+        const mappings = nodeInputMappings(node)
         return Object.fromEntries(
           Object.entries(nodePorts(context.prepared, node)).map(([handle, port]) => [
             handle,
-            resolveInput(mappings[handle], port, launch[nodeId]?.[handle], `Node "${nodeId}" input "${handle}"`, frames[jobId]!),
+            resolveInput(mappings[handle], port, launch[nodeId]?.[handle], `Node "${nodeId}" input "${handle}"`, frames[jobId]!, node.kind == 'condition'),
           ]),
         )
       }
@@ -781,7 +719,7 @@ function runGraph(
           const title = nodeTitle(context.prepared, node)
           const projectedInputs = Object.fromEntries(
             Object.entries(nodeInputs).filter(([handle]) => {
-              const mapping = node.inputs[handle]
+              const mapping = nodeInputMappings(node)[handle]
               return mapping?.kind != 'sources' || mapping.sources.every((source) => source.kind != 'binding')
             }),
           )
@@ -798,14 +736,7 @@ function runGraph(
           let outputs: Readonly<Record<string, JsonValue>>
           switch (node.kind) {
             case 'condition': {
-              const matched = node.cases.find((condition) => {
-                if (condition.expressions.length == 0) return false
-                const matches = condition.expressions.map((expression) => conditionMatches(node, expression, nodeInputs))
-                return condition.relation == 'all' ? matches.every(Boolean) : matches.some(Boolean)
-              })
-              const handle = matched?.output ?? node.defaultOutput
-              outputs = handle == null ? {} : { [handle]: nodeInputs[node.input.handle] ?? null }
-              break
+              return { kind: 'completed' as const, outputs: {}, releasedHandles: selectConditionBranches(node, nodeInputs) }
             }
             case 'value': {
               outputs = Object.fromEntries(node.values.map((port) => [port.handle, port.value ?? null]))
@@ -910,7 +841,7 @@ function runGraph(
       const settleNode = (nodeId: string, jobId: string, result: NodeResult): Effect.Effect<void, Error> => {
         if (result.kind == 'completed') {
           delete agents[jobId]
-          return commit(nodeId, jobId, result.outputs)
+          return commit(nodeId, jobId, result.outputs, result.releasedHandles)
         }
         agents[jobId] = result.agent
         return createWait(nodeId, jobId, result.value)
@@ -961,7 +892,7 @@ function runGraph(
                 yield* context.emit({
                   inputs: Object.fromEntries(
                     Object.entries(nodeInputs).filter(([handle]) => {
-                      const mapping = node.inputs[handle]
+                      const mapping = nodeInputMappings(node)[handle]
                       return mapping?.kind != 'sources' || mapping.sources.every((source) => source.kind != 'binding')
                     }),
                   ),

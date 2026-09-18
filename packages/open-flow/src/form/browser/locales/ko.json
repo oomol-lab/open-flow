@@ -8,6 +8,7 @@
     "invalidNumber": "유효한 숫자를 입력하세요.",
     "fieldName": "필드 이름",
     "type": "{{name}} 유형",
+    "typeTitle": "유형",
     "string": "문자열",
     "number": "숫자",
     "boolean": "불리언",

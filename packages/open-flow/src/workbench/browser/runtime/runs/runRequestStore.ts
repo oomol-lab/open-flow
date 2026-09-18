@@ -59,7 +59,7 @@ const initialState: RequestState = {
 function inputPorts(node: ResolvedNode): Readonly<Record<string, InputPortDefinition>> {
   switch (node.kind) {
     case 'condition':
-      return { [node.node.input.handle]: node.node.input }
+      return {}
     case 'subflow':
       return portsByHandle(node.definition?.inputs ?? [])
     case 'task':

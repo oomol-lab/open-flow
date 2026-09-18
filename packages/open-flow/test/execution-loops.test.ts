@@ -73,10 +73,24 @@ describe('Repeated node executions', () => {
           counter,
           choose: {
             kind: 'condition',
-            inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'counter', output: 'count' }] } },
-            input: { ...port, handle: 'value' },
-            cases: [{ output: 'again', relation: 'all', expressions: [{ input: 'value', operator: '<', value: 3 }] }],
-            defaultOutput: 'done',
+            cases: [
+              {
+                output: 'again',
+                groups: [
+                  {
+                    expressions: [
+                      {
+                        left: { kind: 'source' as const, source: { kind: 'node', nodeId: 'counter', output: 'count' } },
+                        operator: '<',
+                        right: { kind: 'value' as const, value: 3 },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+            inputs: {},
+            matchMode: 'first' as const,
           },
           end: { kind: 'value', inputs: {}, values: [] },
         },
@@ -84,7 +98,7 @@ describe('Repeated node executions', () => {
           { source: 'start', target: 'counter' },
           { source: 'counter', target: 'choose' },
           { source: 'choose', sourceHandle: 'again', target: 'counter' },
-          { source: 'choose', sourceHandle: 'done', target: 'end' },
+          { source: 'choose', sourceHandle: 'otherwise', target: 'end' },
         ],
       }),
     )

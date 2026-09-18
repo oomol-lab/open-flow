@@ -152,11 +152,12 @@
     "manualSummary": "Cliquez sur Exécuter pour démarrer ici."
   },
   "condition": {
+    "emptyCase": "Aucune condition configurée",
     "addCondition": "Ajouter une condition",
     "configPanelTitle": "Configuration",
-    "default": "Par défaut",
+    "default": "Sinon",
     "defaultDescription": "Cas par défaut",
-    "defaultHelp": "Exécuter ce cas lorsqu'aucune autre condition ne correspond",
+    "defaultHelp": "Exécuté si aucune branche ne correspond.",
     "deleteCondition": "Supprimer la condition",
     "handleKeyTitle": "Handle",
     "handleLogicalTitle": "Logique",

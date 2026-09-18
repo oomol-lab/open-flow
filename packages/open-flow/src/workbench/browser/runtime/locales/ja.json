@@ -247,6 +247,7 @@
       "outputMissing": "「{{source}}」に「{{output}}」が見つかりません。選択し直してください。",
       "notReady": "ここを実行するとき、「{{source}} {{handle}}」にまだ値がない可能性があります。",
       "sourceConflict": "同時に値を持つ可能性があります：{{sources}}。ここでは 1 つだけ使用できます。",
+      "incompatibleRight": "右辺の値の型はこの比較に対応していません。",
       "incompatible": "非互換",
       "unverified": "未検証",
       "schemaIncompatible": "データ形式が一致しません。",
@@ -658,7 +659,17 @@
       },
       "condition": {
         "input-missing": "条件式が不明な入力「{{input}}」を参照しています。",
-        "output-duplicate": "条件出力「{{output}}」が複数回定義されています。"
+        "output-duplicate": "条件出力「{{output}}」が複数回定義されています。",
+        "invalid": {
+          "inputs": "Condition にノード入力は定義できません。",
+          "output": "Case 名は空欄、重複、予約名にできません。",
+          "case": "Case に条件グループを追加してください。",
+          "group": "グループに条件式を追加してください。",
+          "operand": "条件のオペランドを入力してください。",
+          "schema": "オペランドが宣言された型と一致しません。",
+          "unary": "単項演算子に右辺は指定できません。",
+          "type": "オペランドの型が演算子に対応していません。"
+        }
       },
       "graph": {
         "binding-invalid": "バインディング「{{bindingId}}」は Variable である必要があります。",
@@ -768,7 +779,10 @@
     "loadFailed": "ドラフトを読み込めませんでした",
     "loadFailedDescription": "デプロイ先への接続を確認してから、もう一度お試しください。",
     "recovery": {
-      "failed": { "title": "このワークフローを開けません", "description": "ドラフトを利用できないか、安全に修復できません。" },
+      "failed": {
+        "title": "このワークフローを開けません",
+        "description": "ドラフトを利用できないか、安全に修復できません。"
+      },
       "repair": {
         "title": "ワークフローが破損しています",
         "description": "読み取れない部分を破棄して、修復ドラフトを作成できます。",
@@ -909,26 +923,16 @@
   },
   "conditionEditor": {
     "addCondition": "条件を追加",
-    "configPanelTitle": "設定",
-    "default": "デフォルト",
-    "defaultDescription": "デフォルトの条件",
-    "defaultHelp": "他のどの条件にも一致しない場合に、この分岐を実行します",
     "deleteCondition": "条件を削除",
     "handleKeyTitle": "Handle 名",
-    "handleLogicalTitle": "論理演算",
-    "inputHelp": "最初に一致した条件の出力 Handle が、1 番目の入力 Handle のデータを出力します",
-    "label": "条件",
-    "logical": {
-      "AND": "かつ (AND)",
-      "OR": "または (OR)"
-    },
+    "label": "演算子",
     "operator": {
-      "!=": "≠",
-      "<": "<",
-      "<=": "≤",
-      "==": "=",
-      ">": ">",
-      ">=": "≥",
+      "!=": "等しくない",
+      "<": "より小さい",
+      "<=": "以下",
+      "==": "等しい",
+      ">": "より大きい",
+      ">=": "以上",
       "contains": "含む",
       "endsWith": "で終わる",
       "hasKey": "キーを含む",
@@ -944,8 +948,22 @@
       "notHasValue": "値を含まない",
       "startsWith": "で始まる"
     },
-    "title": "条件の出力 Handle",
-    "toggleDefault": "デフォルトの条件"
+    "cases": "ケース",
+    "addCase": "ケースを追加",
+    "matchMode": "一致モード",
+    "first": "最初の一致",
+    "all": "すべての一致",
+    "firstHelp": "上から順に評価し、最初に一致したケースを選択します。",
+    "allHelp": "一致するすべてのケースを選択します。",
+    "addAnd": "AND 条件を追加",
+    "addOr": "OR 条件を追加",
+    "groupSummary": "すべての条件を満たす必要があります",
+    "left": "左辺",
+    "right": "右辺",
+    "containsErrors": "条件にエラーがあります。",
+    "incomplete": "条件グループを完成させてください。",
+    "incompatibleRight": "右辺の値の型はこの比較に対応していません。",
+    "incompatible": "値の型が演算子と互換性がありません。"
   },
   "nodeInput": {
     "literal": "固定値",

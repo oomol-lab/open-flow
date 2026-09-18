@@ -20,21 +20,30 @@ const port = { jsonSchema: { type: 'number' }, nullable: false } as const
 function revision(reverse = false): RevisionContent {
   const nodes = {
     condition: {
+      kind: 'condition' as const,
       cases: [
         {
-          expressions: [
-            { input: 'value', operator: '>=' as const, value: 10 },
-            { input: 'value', operator: '<' as const, value: 20 },
-          ],
           output: 'match',
-          relation: 'all' as const,
+          groups: [
+            {
+              expressions: [
+                {
+                  left: { kind: 'source' as const, source: { kind: 'node' as const, nodeId: 'value', output: 'value' } },
+                  operator: '>=' as const,
+                  right: { kind: 'value' as const, value: 10 },
+                },
+                {
+                  left: { kind: 'source' as const, source: { kind: 'node' as const, nodeId: 'value', output: 'value' } },
+                  operator: '<' as const,
+                  right: { kind: 'value' as const, value: 20 },
+                },
+              ],
+            },
+          ],
         },
       ],
-
-      defaultOutput: 'other',
-      input: { ...port, handle: 'value' },
-      inputs: { value: { kind: 'sources' as const, sources: [{ kind: 'node' as const, nodeId: 'value', output: 'value' }] } },
-      kind: 'condition' as const,
+      inputs: {},
+      matchMode: 'first' as const,
     },
     value: { inputs: {}, kind: 'value' as const, values: [{ ...port, handle: 'value', value: 12 }] },
   }
@@ -112,7 +121,7 @@ describe('Flow Revision encoding', () => {
       modules: { helper: { imports: [] }, main: { imports: ['helper'] } },
       version: 1,
     })
-    await expect(digestBytes(first)).resolves.toBe('sha256:926a4a57dac06b5e4d13313053af1a5f9d17330d40a4b61f58be4c990b0d7833')
+    await expect(digestBytes(first)).resolves.toBe('sha256:88b7fbb83a386b5db0bbf1bb82613d578de4f2268f69ce06638784d90aae2b99')
   })
 
   it('changes the encoded Revision when workflow semantics change', () => {
@@ -336,9 +345,15 @@ describe('Revision decoding', () => {
       name: 'Webhook',
       inputsDef: [{ handle: 'value', jsonSchema: { type: 'number' }, nullable: false }],
     }
-    legacy.document.graph.nodes.condition.inputs.value = {
-      kind: 'sources',
-      sources: [{ kind: 'node', nodeId: 'hook', output: 'payload' }],
+    legacy.document.graph.nodes.consumer = {
+      kind: 'task',
+      taskId: 'managed',
+      inputs: {
+        value: {
+          kind: 'sources',
+          sources: [{ kind: 'node', nodeId: 'hook', output: 'payload' }],
+        },
+      },
     }
     legacy.document.graph.nodes.broken = { kind: 'unknown' }
     legacy.modules.broken = { name: 1 }
@@ -350,8 +365,8 @@ describe('Revision decoding', () => {
     expect(repaired.document.graph.nodes).not.toHaveProperty('broken')
     expect(repaired.modules).not.toHaveProperty('broken')
     expect(repaired.document.graph.nodes.hook).toMatchObject({ kind: 'webhook', bodyFields: [{ handle: 'value' }] })
-    const condition = repaired.document.graph.nodes.condition
-    if (condition?.kind != 'condition') throw new Error('Expected the Condition node to be preserved.')
+    const condition = repaired.document.graph.nodes.consumer
+    if (condition?.kind != 'task') throw new Error('Expected the consumer node to be preserved.')
     expect(condition.inputs.value).toEqual({
       kind: 'sources',
       sources: [{ kind: 'node', nodeId: 'hook', output: 'body' }],

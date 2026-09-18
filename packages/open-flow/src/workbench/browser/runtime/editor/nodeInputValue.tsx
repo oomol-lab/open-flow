@@ -6,7 +6,7 @@ import type { VariablePickerProps } from '../../../../ui/browser/variable-picker
 import type { InputPort, JsonValue } from '../api.ts'
 import type { InputSourceQuery } from '../revisionView.ts'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { variableInputCompatible } from '../../../../flow/common/schema.ts'
 import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../form/browser/selectionMenuStyles.ts'
@@ -26,6 +26,7 @@ import {
 } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
+import { MenuHeader } from '../../../../ui/browser/menu-header.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { LlmInputEditor, supportsLlmInput } from './llmInputEditor.tsx'
 import { schemaMismatchMessage } from './schemaMismatchMessage.ts'
@@ -78,6 +79,9 @@ function inputSourceIssue(check: InputSourceCheck | undefined, source: NodeInput
 function SelectedSourceValue({
   bound,
   connected,
+  sourceMissing,
+  onInvalidChange,
+  validationError,
   upstream,
   variableCompatible,
   variableName,
@@ -85,6 +89,9 @@ function SelectedSourceValue({
 }: {
   readonly bound: boolean
   readonly connected: boolean
+  readonly validationError?: string
+  readonly onInvalidChange?: (invalid: boolean) => void
+  readonly sourceMissing?: boolean
   readonly upstream?: NodeInputUpstreamSources
   readonly variableCompatible: boolean
   readonly variableName?: string
@@ -104,19 +111,24 @@ function SelectedSourceValue({
   const current = upstream?.query == null ? upstream?.current : upstream.current.map((source, index) => ({ ...source, check: checks?.sources[index] }))
   const missingVariable = variableName != null && (!variables.enabled || (variables.loaded && !variables.names.includes(variableName)))
   const invalidUpstream = connected ? current?.find((source) => source.check != null && source.check.kind != 'available') : undefined
-  const sourceIssue = missingVariable
-    ? !variables.enabled
-      ? t('variablePicker.variableUnavailableHelp')
-      : t('variablePicker.variableMissingHelp', { name: variableName })
-    : bound && !variableCompatible
-      ? t('variablePicker.variableIncompatibleHelp')
-      : checks?.conflict
-        ? t('inspector.sources.sourceConflict', {
-            sources: current?.map((source) => (source.nodeName == null ? source.output : `${source.nodeName} ${source.output}`)).join(', '),
-          })
-        : invalidUpstream != null
-          ? inputSourceIssue(invalidUpstream.check, invalidUpstream, t)
-          : undefined
+  const sourceIssue = sourceMissing
+    ? t('inspector.sources.sourceMissing')
+    : missingVariable
+      ? !variables.enabled
+        ? t('variablePicker.variableUnavailableHelp')
+        : t('variablePicker.variableMissingHelp', { name: variableName })
+      : bound && !variableCompatible
+        ? t('variablePicker.variableIncompatibleHelp')
+        : checks?.conflict
+          ? t('inspector.sources.sourceConflict', {
+              sources: current?.map((source) => (source.nodeName == null ? source.output : `${source.nodeName} ${source.output}`)).join(', '),
+            })
+          : invalidUpstream != null
+            ? inputSourceIssue(invalidUpstream.check, invalidUpstream, t)
+            : validationError
+  useEffect(() => {
+    onInvalidChange?.(sourceIssue != null)
+  }, [sourceIssue, onInvalidChange])
   const sourceLabel = bound
     ? variableName
     : current?.length
@@ -187,6 +199,9 @@ export function NodeInputValue({
   handleNames = [],
   value,
   connected,
+  sourceMissing,
+  onInvalidChange,
+  validationError,
   variableName,
   variables,
   disabled,
@@ -195,7 +210,17 @@ export function NodeInputValue({
 }: {
   readonly presentation?: Pick<
     ValueEditorProps,
-    'layout' | 'header' | 'leadingControl' | 'valueAddon' | 'trailingControl' | 'description' | 'options' | 'onDefinitionChange'
+    | 'layout'
+    | 'header'
+    | 'leadingControl'
+    | 'valueAddon'
+    | 'valueSuffix'
+    | 'trailingControl'
+    | 'description'
+    | 'options'
+    | 'onDefinitionChange'
+    | 'compact'
+    | 'hideOptions'
   >
   readonly upstream?: NodeInputUpstreamSources
   readonly embedded?: boolean
@@ -203,6 +228,9 @@ export function NodeInputValue({
   readonly definition: InputPort
   readonly value: JsonValue | undefined
   readonly connected: boolean
+  readonly validationError?: string
+  readonly onInvalidChange?: (invalid: boolean) => void
+  readonly sourceMissing?: boolean
   readonly variableName?: string
   readonly variables: InputVariables
   readonly disabled: boolean
@@ -265,8 +293,7 @@ export function NodeInputValue({
           <TooltipContent container={sourcePortal}>{t('inspector.sources.select')}</TooltipContent>
         </Tooltip>
         <DropdownMenuContent align="start" sideOffset={6} className={`w-44 min-w-44 ${selectionMenuContentClass}`} container={sourcePortal}>
-          <div className="px-2 py-1 text-[10px] font-medium tracking-wide text-muted-foreground uppercase">{t('inspector.sources.title')}</div>
-          <DropdownMenuSeparator className="mx-2 bg-border/50" />
+          <MenuHeader>{t('inspector.sources.title')}</MenuHeader>
           <DropdownMenuRadioGroup
             value={sourceKind === 'literal' ? literalSource : ''}
             onValueChange={() => {
@@ -430,10 +457,13 @@ export function NodeInputValue({
     </div>
   )
   const editor =
-    connected || bound ? (
+    connected || bound || sourceMissing ? (
       <SelectedSourceValue
+        validationError={validationError}
+        onInvalidChange={onInvalidChange}
         bound={bound}
         connected={connected}
+        sourceMissing={sourceMissing}
         upstream={providedUpstream}
         variableCompatible={variableCompatible}
         variableName={variableName}
@@ -447,6 +477,8 @@ export function NodeInputValue({
       {!embedded && <FieldLabel>{definition.handle}</FieldLabel>}
       <ValueEditor
         {...presentation}
+        validationError={validationError}
+        onInvalidChange={connected || bound || sourceMissing ? undefined : onInvalidChange}
         valueAddon={llm && !connected && !bound ? undefined : sourceControl}
         description={presentation?.description ?? definition.description}
         schema={definition.jsonSchema}
@@ -455,7 +487,7 @@ export function NodeInputValue({
         label={definition.handle}
         path={`/${definition.handle.replaceAll('~', '~0').replaceAll('/', '~1')}`}
         disabled={disabled}
-        valueEditable={!connected && !bound}
+        valueEditable={!connected && !bound && !sourceMissing}
         editor={editor}
         onDraftIssue={draftIssue}
         onChange={(next) => onValue(next as JsonValue | undefined)}
