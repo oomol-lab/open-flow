@@ -84,7 +84,7 @@
     "component": "组件",
     "columnName": "名称",
     "columnType": "类型",
-    "arrayOf": "的",
+    "arrayOf": "元素为",
     "columnValue": "值",
     "noOptions": "无可用选项",
     "emptyObject": "仅允许空对象",

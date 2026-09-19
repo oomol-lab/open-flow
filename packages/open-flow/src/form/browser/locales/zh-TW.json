@@ -84,7 +84,7 @@
     "component": "元件",
     "columnName": "名稱",
     "columnType": "類型",
-    "arrayOf": "的",
+    "arrayOf": "元素為",
     "columnValue": "值",
     "noOptions": "無可用選項",
     "emptyObject": "僅允許空物件",

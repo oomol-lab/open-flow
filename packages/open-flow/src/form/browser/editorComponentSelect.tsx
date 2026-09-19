@@ -52,7 +52,7 @@ export function EditorComponentSelect({
     const source = objectValue(schema) ?? {}
     return (
       <div className="flex min-w-0 items-center gap-1">
-        <div className="w-14 shrink-0">
+        <div className={`${readOnly ? 'w-8' : 'w-14'} shrink-0`}>
           <EditorComponentSelect
             schema={schema}
             name={name}
