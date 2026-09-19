@@ -901,7 +901,7 @@
     "scheduleMissing": "설정된 일정이 없습니다"
   },
   "triggerConfig": {
-    "configuration": "트리거 설정",
+    "configuration": "옵션",
     "description": "설명",
     "required": "입력 필요"
   },

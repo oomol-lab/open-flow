@@ -27,6 +27,9 @@ of the remaining sections. A feature may define the order of multiple sections w
 but must not move them across these category boundaries. Panel chrome, the node header, empty states,
 and multi-selection states are outside this sequence.
 
+Provider triggers place their Options section immediately before Outputs so provider-specific
+configuration precedes the data it produces.
+
 ## Route by task
 
 Read only the detail relevant to the change; combine references when a task crosses domains.

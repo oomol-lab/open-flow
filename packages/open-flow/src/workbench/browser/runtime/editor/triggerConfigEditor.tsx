@@ -16,6 +16,7 @@ import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { fieldPanelAnchor } from './fieldPanelAnchor.ts'
 import { InspectorSection } from './inspectorSection.tsx'
+import { TriggerConfigTitle } from './triggerConfigTitle.tsx'
 
 // Invalid text stays inside the field editor; there is no separate submit action.
 const draftIssue = () => {}
@@ -67,7 +68,7 @@ export function TriggerConfigEditor({
     .toSorted(([left], [right]) => Number(!required.includes(left)) - Number(!required.includes(right)))
   if (properties.length === 0) return null
   return (
-    <InspectorSection title={t('triggerConfig.configuration')} contentInset={false} data-inspector-section="trigger">
+    <InspectorSection title={<TriggerConfigTitle />} contentInset={false} data-inspector-section="trigger">
       <FieldTable ref={list} layout="ports" fixedTypes typeColumn={false}>
         {properties.map(([name, candidate], index) => {
           const field = objectValue(candidate)!

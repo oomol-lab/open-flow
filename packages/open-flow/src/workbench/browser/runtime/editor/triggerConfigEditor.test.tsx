@@ -26,7 +26,8 @@ describe('Trigger configuration editor', () => {
       </I18nProvider>,
     )
     expect(markup).toContain('class="inspector-section-title"')
-    expect(markup).toContain('Trigger configuration')
+    expect(markup).toContain('Options')
+    expect(markup).toContain('i-carbon:power -rotate-90')
     expect(markup).toContain('aria-invalid="true"')
     expect(markup).toContain('value="example"')
     expect(markup).toContain('value="10"')

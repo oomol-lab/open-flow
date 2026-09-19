@@ -109,7 +109,7 @@ describe('Provider account section', () => {
 })
 
 describe('Provider Trigger sections', () => {
-  it('orders Outputs and Provider configuration before Node settings', () => {
+  it('orders Provider options before Outputs and Node settings', () => {
     const trigger = {
       bindingId: 'connection',
       config: {},
@@ -148,8 +148,8 @@ describe('Provider Trigger sections', () => {
       .filter(isValidElement)
       .map((item) => (typeof item.type == 'function' ? item.type.name : item.type))
 
-    expect(sections.indexOf('TriggerSummary')).toBeLessThan(sections.indexOf('TriggerConfigEditor'))
-    expect(sections.indexOf('TriggerConfigEditor')).toBeLessThan(sections.indexOf('TriggerScheduleEditor'))
+    expect(sections.indexOf('TriggerConfigEditor')).toBeLessThan(sections.indexOf('TriggerSummary'))
+    expect(sections.indexOf('TriggerSummary')).toBeLessThan(sections.indexOf('TriggerScheduleEditor'))
   })
 })
 

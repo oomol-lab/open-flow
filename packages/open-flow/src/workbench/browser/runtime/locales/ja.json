@@ -901,7 +901,7 @@
     "scheduleMissing": "スケジュールが未設定です"
   },
   "triggerConfig": {
-    "configuration": "トリガー設定",
+    "configuration": "オプション",
     "description": "説明",
     "required": "入力が必要"
   },

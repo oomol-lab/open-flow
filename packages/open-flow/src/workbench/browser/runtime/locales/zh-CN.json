@@ -901,7 +901,7 @@
     "scheduleMissing": "尚未配置计划"
   },
   "triggerConfig": {
-    "configuration": "触发器配置",
+    "configuration": "配置",
     "description": "说明",
     "required": "需要输入"
   },

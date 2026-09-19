@@ -901,7 +901,7 @@
     "scheduleMissing": "No schedule configured"
   },
   "triggerConfig": {
-    "configuration": "Trigger configuration",
+    "configuration": "Options",
     "description": "Description",
     "required": "Input required"
   },

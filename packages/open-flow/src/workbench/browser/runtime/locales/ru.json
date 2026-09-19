@@ -901,7 +901,7 @@
     "scheduleMissing": "Расписание не настроено"
   },
   "triggerConfig": {
-    "configuration": "Настройка триггера",
+    "configuration": "Параметры",
     "description": "Описание",
     "required": "Требуется вход"
   },

@@ -901,7 +901,7 @@
     "scheduleMissing": "Aucune planification configurée"
   },
   "triggerConfig": {
-    "configuration": "Configuration du déclencheur",
+    "configuration": "Options",
     "description": "Description",
     "required": "Entrée requise"
   },

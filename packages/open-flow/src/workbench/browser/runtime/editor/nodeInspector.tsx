@@ -880,7 +880,6 @@ export function NodeInspector({
             }}
           />
         )}
-        {selection?.kind === 'trigger' && <TriggerSummary trigger={selection.trigger} />}
         {selection?.kind === 'trigger' &&
           (selection.trigger.kind === 'integration' || selection.trigger.kind === 'poll') &&
           (['feishu.on_event', 'feishu_app_bot.on_event'].includes(selection.trigger.definition.key) ? (
@@ -906,6 +905,7 @@ export function NodeInspector({
               }}
             />
           ))}
+        {selection?.kind === 'trigger' && <TriggerSummary trigger={selection.trigger} />}
         {selection?.kind === 'trigger' && selection.trigger.kind === 'webhook' && (
           <WebhookEditor
             key={`webhook:${selection.id}`}

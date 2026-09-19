@@ -901,7 +901,7 @@
     "scheduleMissing": "尚未設定排程"
   },
   "triggerConfig": {
-    "configuration": "觸發器設定",
+    "configuration": "選項",
     "description": "說明",
     "required": "需要輸入"
   },
