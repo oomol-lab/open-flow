@@ -178,6 +178,26 @@ describe('Property panel port layout', () => {
     expect(markup).not.toContain('aria-label="Remove status"')
   })
 
+  it('starts an invalid expandable value open', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <ValueEditor
+          compact
+          label="payload"
+          path="/payload"
+          schema={{ type: 'object', properties: { name: { type: 'string' } } }}
+          value={{}}
+          validationError="Invalid payload"
+          onChange={vi.fn()}
+          onDraftIssue={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    expect(markup).toContain('aria-label="payload Set value" aria-expanded="true"')
+    expect(markup).toContain('data-value-body="true"')
+  })
+
   it('does not place an empty value body over output array type controls', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>

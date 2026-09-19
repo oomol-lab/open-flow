@@ -133,7 +133,9 @@ the [property panel entry](property-panel.md) for shared scope.
 
 ## Disclosure, focus, and keyboard order
 
-- All expandable fields, including nested fields, start collapsed when the panel opens.
+- Expandable fields in Inputs, Outputs, Values, and Cases start collapsed when the panel opens,
+  except fields with validation errors, which start expanded so the controls that own those errors
+  are visible. This default must not override a later manual collapse.
 - Object, JSON, and Multiline use a compact preview in both collapsed and expanded states. The
   expanded preview retains the same shallow neutral block and standard control border. Its value
   summary and the array item-type name use muted foreground while expanded, restoring normal

@@ -158,8 +158,10 @@ export function ValueEditor(props: ValueEditorProps) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const [raw, setRaw] = useState(false)
   const focusCreatedValue = useRef(false)
-  const [expanded, setExpandedState] = useState(false)
-  const [bodyMounted, setBodyMounted] = useState(false)
+  const hasImmediateError = props.invalid === true || props.validationError != null
+  const [expanded, setExpandedState] = useState(hasImmediateError)
+  const [bodyMounted, setBodyMounted] = useState(hasImmediateError)
+  const defaultExpansionPending = useRef(!hasImmediateError)
   const setExpanded = (next: boolean) => {
     setExpandedState(next)
     // Keep drafts and editor history alive after the first expansion.
@@ -313,6 +315,11 @@ export function ValueEditor(props: ValueEditorProps) {
               : (issues?.errors ?? []).map((error) => ({ instancePath: error.instancePath, message: error.message ?? t('valueEditor.schema') }))
   if (!errors.length && props.validationError && !draftInvalid && props.editor === undefined) errors.push({ instancePath: '', message: props.validationError })
   if (!errors.length && props.invalid && !draftInvalid && props.editor === undefined) errors.push({ instancePath: '', message: t('valueEditor.schema') })
+  useEffect(() => {
+    if (!defaultExpansionPending.current || (needsValidation && issues == null)) return
+    defaultExpansionPending.current = false
+    if (expandable && errors.length > 0) setExpanded(true)
+  }, [errors.length, expandable, issues, needsValidation])
   const {
     editorInvalid: invalid,
     summaryInvalid,
@@ -346,6 +353,7 @@ export function ValueEditor(props: ValueEditorProps) {
           ? 26
           : 0
   const toggleExpanded = () => {
+    defaultExpansionPending.current = false
     setExpanded(!expanded)
     if (!expanded) setEditorFocusRequest((request) => request + 1)
   }

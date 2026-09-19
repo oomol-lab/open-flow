@@ -5,7 +5,7 @@ import type { ConditionSettings } from './flowChanges.ts'
 import type { InputVariables, NodeInputUpstreamSources } from './nodeInputValue.tsx'
 import type { PropertyDeletion } from './propertyDeletion.ts'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { operandHandle, operatorsForType, otherwiseOutput, unaryOperator, valueType, comparisonIssue } from '../../../../flow/common/condition.ts'
 import { EditorComponentSelect } from '../../../../form/browser/editorComponentSelect.tsx'
@@ -27,6 +27,26 @@ import { NodeInputValue } from './nodeInputValue.tsx'
 const emptyExpression = (): ConditionExpression => ({ left: { kind: 'value' }, operator: '==', right: { kind: 'value' } })
 const operatorSymbols: Readonly<Record<string, string>> = { '==': '=', '!=': '≠', '<': '<', '<=': '≤', '>': '>', '>=': '≥' }
 const noVariables: InputVariables = { enabled: false, loaded: true, loading: false, names: [], onOpen() {} }
+
+export function conditionCaseIssues(
+  item: ConditionSettings['cases'][number],
+  operandErrors: Readonly<Record<string, boolean>>,
+  operandType: (operand: ConditionOperand | undefined) => string | undefined,
+): { readonly case: boolean; readonly groups: readonly ('incomplete' | 'contains' | undefined)[] } {
+  const groups = item.groups.map((group, g) =>
+    group.expressions.length === 0
+      ? 'incomplete'
+      : group.expressions.some(
+            (expression, e) =>
+              comparisonIssue(expression.operator, operandType(expression.left), operandType(expression.right)) != null ||
+              operandErrors[`${item.output}/${g}/${e}/left`] ||
+              (!unaryOperator(expression.operator) && operandErrors[`${item.output}/${g}/${e}/right`]),
+          )
+        ? 'contains'
+        : undefined,
+  )
+  return { case: item.groups.length === 0 || groups.some(Boolean), groups }
+}
 
 function OutputName({
   value,
@@ -102,13 +122,28 @@ export function ConditionBranchesEditor({
 }) {
   const value: ConditionSettings = { cases: configuration.cases, matchMode: configuration.matchMode }
   const t = useTranslate()
-  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set(value.cases.map((item) => item.output)))
+  const operandType = (operand: ConditionOperand | undefined) =>
+    operand?.kind == 'source' ? sourceType?.(operand.source) : operand?.value === undefined ? undefined : valueType(operand.value)
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(
+    () => new Set(value.cases.filter((item) => !conditionCaseIssues(item, {}, operandType).case).map((item) => item.output)),
+  )
+  const manuallyToggledCases = useRef<ReadonlySet<string>>(new Set())
   const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(new Set())
   const [sorting, setSorting] = useState(false)
   const [drag, setDrag] = useState<number>()
   const [editingCase, setEditingCase] = useState<number>()
   const [menuContainer, setMenuContainer] = useState<HTMLDivElement | null>(null)
   const [operandErrors, setOperandErrors] = useState<Readonly<Record<string, boolean>>>({})
+  const caseIssues = new Map(value.cases.map((item) => [item.output, conditionCaseIssues(item, operandErrors, operandType)]))
+  const invalidCases = value.cases.filter((item) => caseIssues.get(item.output)?.case).map((item) => item.output)
+  const invalidCaseKey = invalidCases.join('\0')
+  useEffect(() => {
+    setCollapsed((previous) => {
+      const next = new Set(previous)
+      for (const output of invalidCases) if (!manuallyToggledCases.current.has(output)) next.delete(output)
+      return next.size === previous.size ? previous : next
+    })
+  }, [invalidCaseKey])
   const names = value.cases.map((item) => item.output)
   const nextName = () => {
     let name = 'case'
@@ -124,8 +159,6 @@ export function ConditionBranchesEditor({
     setEditingCase(undefined)
     onChange({ ...value, cases })
   }
-  const operandType = (operand: ConditionOperand | undefined) =>
-    operand?.kind == 'source' ? sourceType?.(operand.source) : operand?.value === undefined ? undefined : valueType(operand.value)
   const iconButton = (label: string, icon: string, click: () => void, danger = false) => (
     <Button
       type="button"
@@ -180,21 +213,15 @@ export function ConditionBranchesEditor({
             const save = (next: typeof item, deletion?: ValueEditorDeletion) => onChange({ ...value, cases: value.cases.with(c, next) }, deletion)
             const renameOutput = (output: string) => {
               setCollapsed((previous) => new Set([...previous].map((name) => (name === item.output ? output : name))))
+              manuallyToggledCases.current = new Set([...manuallyToggledCases.current].map((name) => (name === item.output ? output : name)))
               save({ ...item, output })
             }
             const open = !collapsed.has(item.output)
-            const groupErrors = item.groups.map((group, g) =>
-              group.expressions.length === 0
-                ? t('conditionEditor.incomplete')
-                : group.expressions.some(
-                      (expression, e) =>
-                        comparisonIssue(expression.operator, operandType(expression.left), operandType(expression.right)) != null ||
-                        operandErrors[`${item.output}/${g}/${e}/left`] ||
-                        (!unaryOperator(expression.operator) && operandErrors[`${item.output}/${g}/${e}/right`]),
-                    )
-                  ? t('conditionEditor.containsErrors')
-                  : undefined,
-            )
+            const groupErrors = caseIssues
+              .get(item.output)!
+              .groups.map((issue) =>
+                issue == 'incomplete' ? t('conditionEditor.incomplete') : issue == 'contains' ? t('conditionEditor.containsErrors') : undefined,
+              )
             const add = (g: number, e: number, or: boolean) =>
               save({
                 ...item,
@@ -293,7 +320,10 @@ export function ConditionBranchesEditor({
                       size="icon-xs"
                       aria-expanded={open}
                       aria-label={item.output}
-                      onClick={() => toggle(item.output, setCollapsed)}
+                      onClick={() => {
+                        manuallyToggledCases.current = new Set(manuallyToggledCases.current).add(item.output)
+                        toggle(item.output, setCollapsed)
+                      }}
                     >
                       <i aria-hidden="true" className={open ? 'i-lucide-light:chevron-down' : 'i-lucide-light:chevron-right'} />
                     </Button>
