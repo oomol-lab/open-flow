@@ -249,6 +249,8 @@
       "title": "Source d’entrée",
       "sourceMissing": "La source d’entrée d’origine n’existe plus. Choisissez-en une autre.",
       "outputMissing": "« {{output}} » est introuvable dans « {{source}} ». Choisissez à nouveau.",
+      "wholeObject": "Objet entier",
+      "fieldMissing": "Le champ {{field}} n’est plus déclaré dans « {{output}} ». Choisissez à nouveau.",
       "notReady": "« {{source}} {{handle}} » peut ne pas avoir de valeur lors de cette étape.",
       "sourceConflict": "Ces champs peuvent avoir une valeur en même temps : {{sources}}. Un seul peut être utilisé ici.",
       "incompatibleRight": "Le type de la valeur de droite est incompatible avec cette comparaison.",

@@ -32,6 +32,7 @@ const inputs: (Group | InputPort)[] = [
   { ...port('trackings', 'array'), jsonSchema: { type: 'array', items: { type: 'string' } }, description: '要注册的追踪号。' },
   port('message'),
   port('missing_source'),
+  port('missing_field'),
   { ...port('language'), nullable: true },
   { group: 'Options' },
   {
@@ -40,6 +41,7 @@ const inputs: (Group | InputPort)[] = [
     description: 'Keep the summary concise and preserve issue identifiers.',
   },
   { ...port('limit', 'integer'), value: 10 },
+  port('report_status'),
 ]
 const outputs = [
   port('summary'),
@@ -92,6 +94,11 @@ const portsContent: RevisionContent = {
           values: [
             { ...port('text'), value: 'Review the new sidebar' },
             { ...port('issue_count', 'integer'), value: 3 },
+            {
+              ...port('report', 'object'),
+              jsonSchema: { ...reportSchema, required: ['status'] },
+              value: { status: 'Ready', metrics: { count: 3, score: 0.9 }, tags: ['review'] },
+            },
           ],
         },
         summarize: {
@@ -102,6 +109,8 @@ const portsContent: RevisionContent = {
           inputs: {
             message: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'text' }] },
             missing_source: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'removed' }] },
+            missing_field: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'report', field: 'removed' }] },
+            report_status: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'report', field: 'status' }] },
             language: { kind: 'value', value: 'English' },
             instructions_for_the_summary: { kind: 'value', value: 'Use bullet points. Include issue identifiers and next steps.' },
           },
@@ -299,6 +308,6 @@ export const inspectorPortsStory: FrontendStory = {
   title: 'Ports & sources',
   standalone: true,
   description:
-    'Saved sources render before their checks. Expand the report output to edit its nested object definition. The read-only output sample covers empty and nested objects plus untyped, text, and object arrays. Select the incompatible issue_count source, then edit its upstream type to clear the input error. Reload checks saved values and ordering.',
+    'Saved sources render before their checks. Use report_status to select the whole report or a first-level field across the Outputs section; missing_field preserves a deleted field reference. Expand the report output to edit its nested object definition. The read-only output sample covers empty and nested objects plus untyped, text, and object arrays. Select the incompatible issue_count source, then edit its upstream type to clear the input error. Reload checks saved values and ordering.',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,
 }

@@ -19,6 +19,7 @@ import { triggerOutputDefinitions, triggerOutputPorts } from '../../trigger/comm
 import { portsByHandle, validVariableName } from './change.ts'
 import { conditionInputPorts, nodeInputMappings, otherwiseOutput, unaryOperator, comparisonIssue, valueType } from './condition.ts'
 import { schemaObject, schemaList, matchesSchema, comparePorts, portsAssignable, variableInputCompatible, hasRetiredRef } from './schema.ts'
+import { sourceFields, sourcePort, sourceOutputLabel } from './sourceField.ts'
 
 export function isResolutionNode(node: GraphNode | undefined): node is Extract<GraphNode, { readonly kind: 'approval' | 'wait' }> {
   return node?.kind == 'approval' || node?.kind == 'wait'
@@ -243,21 +244,35 @@ function checkSource(
             variant: 'output',
           }),
         )
-      } else if (targetInput != null) {
-        const comparison = comparePorts(output, targetInput)
+      }
+      if (output == null) return
+      const selected = sourcePort(output, source.field)
+      if (selected == null) {
+        diagnostics.push(
+          graphDiagnostic('graph.source-missing', `Output "${source.output}" does not declare field ${JSON.stringify(source.field)}.`, path, {
+            nodeId: source.nodeId,
+            output: source.output,
+            field: source.field!,
+            variant: 'field',
+          }),
+        )
+        return
+      }
+      if (targetInput != null) {
+        const comparison = comparePorts(selected, targetInput)
         if (comparison.kind != 'compatible') {
           diagnostics.push(
             graphDiagnostic(
               'graph.node-output-incompatible',
-              `Upstream node "${source.nodeId}" output "${source.output}" is not compatible with this input.`,
+              `Upstream node "${source.nodeId}" output ${JSON.stringify(sourceOutputLabel(source))} is not compatible with this input.`,
               path,
-              { nodeId: source.nodeId, output: source.output },
+              { nodeId: source.nodeId, output: source.output, ...(source.field === undefined ? {} : { field: source.field }) },
               comparison.kind == 'incompatible' ? comparison.mismatch : undefined,
             ),
           )
         }
       }
-      return output
+      return selected
     }
   }
 }
@@ -434,13 +449,22 @@ export type InputSourceCheck =
   | { readonly kind: 'available' }
   | { readonly kind: 'source-missing' }
   | { readonly kind: 'output-missing' }
+  | { readonly kind: 'field-missing' }
   | { readonly kind: 'not-ready' }
   | { readonly kind: 'schema'; readonly mismatch: SchemaMismatch }
   | { readonly kind: 'schema-error' }
 
 export type InputSourceCandidateCheck = Extract<InputSourceCheck, { readonly kind: 'available' | 'schema' | 'schema-error' }>
 
+interface InputSourceFieldCandidate {
+  readonly output: string
+  readonly field: string
+  readonly check: InputSourceCandidateCheck
+}
+
 export interface InputSourceCandidate {
+  readonly field?: string
+  readonly fields?: readonly InputSourceFieldCandidate[]
   readonly output: string
   readonly check: InputSourceCandidateCheck
 }
@@ -450,13 +474,19 @@ export interface InputSourcesCheck {
   readonly sources: readonly InputSourceCheck[]
 }
 
+function sourceCompatibility(source: PortDefinition, input: PortDefinition): InputSourceCandidateCheck {
+  const result = comparePorts(source, input)
+  if (result.kind == 'compatible') return { kind: 'available' }
+  return result.kind == 'incompatible' ? { kind: 'schema', mismatch: result.mismatch } : { kind: 'schema-error' }
+}
+
 /** Check one saved binding without enumerating candidate ports. */
 export function checkInputSource(
   document: FlowDocument,
   graph: Graph,
   target: string,
   handle: string,
-  source: { nodeId: string; output: string },
+  source: Pick<NodeSource, 'nodeId' | 'output' | 'field'>,
 ): InputSourceCheck {
   const node = graph.nodes[source.nodeId]
   const targetNode = graph.nodes[target]
@@ -469,9 +499,9 @@ export function checkInputSource(
   const analysis = graphPaths(graph)
   if (analysis.ancestors.get(target)?.has(source.nodeId) !== true) return { kind: 'not-ready' }
   if (isResolutionNode(node) && !analysis.resolutionOutputs.get(target)?.has(resolutionOutputKey(source.nodeId, source.output))) return { kind: 'not-ready' }
-  const result = comparePorts(output, input)
-  if (result.kind == 'compatible') return { kind: 'available' }
-  return result.kind == 'incompatible' ? { kind: 'schema', mismatch: result.mismatch } : { kind: 'schema-error' }
+  const selected = sourcePort(output, source.field)
+  if (selected == null) return { kind: 'field-missing' }
+  return sourceCompatibility(selected, input)
 }
 
 export function checkInputSources(
@@ -479,7 +509,7 @@ export function checkInputSources(
   graph: Graph,
   target: string,
   handle: string,
-  sources: readonly { readonly nodeId: string; readonly output: string }[],
+  sources: readonly Pick<NodeSource, 'nodeId' | 'output' | 'field'>[],
 ): InputSourcesCheck {
   const checks = sources.map((source) => checkInputSource(document, graph, target, handle, source))
   const conflict =
@@ -506,14 +536,9 @@ export function inputSourceCandidates(
       if (node == null) return []
       const outputs = Object.entries(nodeOutputPorts(document, node)).flatMap(([output, definition]) => {
         if (!mappingAvailable(graph, target, { kind: 'sources', sources: [{ kind: 'node', nodeId, output }] }, analysis)) return []
-        const comparison = comparePorts(definition, input)
-        const check: InputSourceCandidateCheck =
-          comparison.kind == 'compatible'
-            ? { kind: 'available' }
-            : comparison.kind == 'incompatible'
-              ? { kind: 'schema', mismatch: comparison.mismatch }
-              : { kind: 'schema-error' }
-        return [{ output, check }]
+        const check = sourceCompatibility(definition, input)
+        const fields = sourceFields(definition).map(({ field, port }) => ({ output, field, check: sourceCompatibility(port, input) }))
+        return [{ output, check, ...(fields.length > 0 ? { fields } : {}) }]
       })
       return outputs.length == 0 ? [] : [[nodeId, outputs]]
     }),
@@ -778,8 +803,8 @@ export function validateFlowGraph(revision: RevisionContent, closure: SemanticCl
         )
       }
       for (const source of output.sources) {
-        const sourcePort = checkSource(source, subflow.graph, revision.document, inputs, undefined, `${path}/outputs/${output.handle}/sources`, diagnostics)
-        const comparison = sourcePort == null ? undefined : comparePorts(sourcePort, output)
+        const selectedPort = checkSource(source, subflow.graph, revision.document, inputs, undefined, `${path}/outputs/${output.handle}/sources`, diagnostics)
+        const comparison = selectedPort == null ? undefined : comparePorts(selectedPort, output)
         if (comparison != null && comparison.kind != 'compatible') {
           diagnostics.push(
             graphDiagnostic(

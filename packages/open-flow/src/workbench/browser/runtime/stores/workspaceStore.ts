@@ -661,7 +661,11 @@ export class WorkspaceStore {
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
-  public async setInputSource(nodeId: string, handle: string, source: { readonly nodeId: string; readonly output: string }): Promise<boolean> {
+  public async setInputSource(
+    nodeId: string,
+    handle: string,
+    source: { readonly nodeId: string; readonly output: string; readonly field?: string },
+  ): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null) return false

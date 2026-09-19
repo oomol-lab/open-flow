@@ -249,6 +249,8 @@
       "title": "入力元",
       "sourceMissing": "元の入力元は存在しません。選択し直してください。",
       "outputMissing": "「{{source}}」に「{{output}}」が見つかりません。選択し直してください。",
+      "wholeObject": "オブジェクト全体",
+      "fieldMissing": "「{{output}}」にフィールド {{field}} が宣言されていません。選択し直してください。",
       "notReady": "ここを実行するとき、「{{source}} {{handle}}」にまだ値がない可能性があります。",
       "sourceConflict": "同時に値を持つ可能性があります：{{sources}}。ここでは 1 つだけ使用できます。",
       "incompatibleRight": "右辺の値の型はこの比較に対応していません。",

@@ -87,6 +87,7 @@ function inputUpstreamSources({
         nodeId: source.nodeId,
         nodeName: node?.name,
         output: source.output,
+        field: source.field,
         check: undefined,
       }
     }),

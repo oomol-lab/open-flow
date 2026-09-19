@@ -1,3 +1,4 @@
+import type { NodeSource, RevisionContent } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { InputMapping, JsonValue } from '../../src/workbench/browser/runtime/api.ts'
 import type { InputVariables } from '../../src/workbench/browser/runtime/editor/nodeInputValue.tsx'
@@ -5,6 +6,8 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
+import { currentFlowModelVersion } from '../../src/flow/common/change.ts'
+import { checkInputSource, inputSourceCandidates } from '../../src/flow/common/graph.ts'
 import { NodeInputValue } from '../../src/workbench/browser/runtime/editor/nodeInputValue.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { providerIcon } from '../../src/workbench/browser/runtime/providerIcon.ts'
@@ -33,6 +36,85 @@ function AddonSample({ schema, initial, variables }: { schema: JsonValue; initia
     />
   )
 }
+function ObjectSourceSample({ variables }: { variables: InputVariables }) {
+  const [selected, setSelected] = useState<NodeSource>({ kind: 'node', nodeId: 'data', output: 'payload', field: 'name' })
+  const content: RevisionContent = {
+    modelVersion: currentFlowModelVersion,
+    modules: {},
+    document: {
+      bindings: {},
+      tasks: {},
+      subflows: {},
+      graph: {
+        edges: [{ source: 'data', target: 'sink' }],
+        nodes: {
+          data: {
+            kind: 'value',
+            name: 'Customer',
+            inputs: {},
+            values: [
+              {
+                handle: 'payload',
+                nullable: false,
+                value: { name: 'Ada', count: 2 },
+                jsonSchema: {
+                  type: 'object',
+                  required: ['name'],
+                  properties: {
+                    'name': { type: 'string' },
+                    'count': { type: 'number' },
+                    'profile': { type: 'object' },
+                    'display.name': { type: 'string' },
+                    '': { type: 'string' },
+                  },
+                },
+              },
+            ],
+          },
+          sink: {
+            kind: 'wait',
+            name: 'Wait',
+            prompt: 'Continue?',
+            inputs: {},
+            inputDefinitions: [{ handle: 'customer', jsonSchema: { type: 'string' }, nullable: true }],
+          },
+        },
+      },
+    },
+  }
+  const { document } = content
+  const outputs = inputSourceCandidates(document, document.graph, 'sink', 'customer').data ?? []
+  return (
+    <div className="editor-context-panel" style={{ width: 320, maxWidth: '100%' }}>
+      <NodeInputValue
+        definition={{ handle: 'customer', jsonSchema: { type: 'string' }, nullable: true }}
+        value={undefined}
+        connected
+        variables={variables}
+        disabled={false}
+        onValue={() => {}}
+        onVariable={() => {}}
+        upstream={{
+          current: [{ ...selected, nodeName: 'Customer', check: checkInputSource(document, document.graph, 'sink', 'customer', selected) }],
+          groups: [{ nodeId: 'data', nodeName: 'Customer', outputs }],
+          onChange: (source) => setSelected({ kind: 'node', ...source }),
+        }}
+      />
+      <output aria-label="Saved object source">{JSON.stringify(selected)}</output>
+      <h3>Adjacent section</h3>
+      <NodeInputValue
+        definition={{ handle: 'note', jsonSchema: { type: 'string' }, nullable: true }}
+        value="Follow-up"
+        connected={false}
+        variables={variables}
+        disabled={false}
+        onValue={() => {}}
+        onVariable={() => {}}
+      />
+    </div>
+  )
+}
+
 function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
   const i18n = useMemo(() => createI18n(language), [language])
   const [mapping, setMapping] = useState<InputMapping | undefined>({ kind: 'value', value: 'hello' })
@@ -83,6 +165,8 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
           }}
         />
         <output aria-label="Saved input">{JSON.stringify({ mapping, variableName })}</output>
+        <h3>Object fields</h3>
+        <ObjectSourceSample variables={variables} />
         <h3>Connected source</h3>
         <NodeInputValue
           definition={definition}
@@ -229,6 +313,7 @@ export const nodeInputStory: FrontendStory = {
   group: 'Node Task',
   id: 'node-input',
   title: 'Node Input',
+  description: 'Literal, variable and upstream sources, including whole objects, first-level fields, missing references and type mismatches.',
   standalone: true,
   render: (log, dark, language) => <NodeInputStory dark={dark} language={language} log={log} />,
 }

@@ -175,7 +175,7 @@ Value Node 没有数据输入端口。解码时将其 `inputs` 统一归一化�
 边不含目标 input handle。重复边、缺失端点和指向 Trigger 的边不能通过 validation；允许自连接和回边。边集合按规范顺序参与 Revision digest。
 
 `inputs[handle]` 使用 `{ kind: 'value', value }` 或 `{ kind: 'sources', sources }`。Node source 使用
-`{ kind: 'node', nodeId, output }`；Flow input 与 Variable binding 的 source 形式保持不变。Node source 必须指向经执行边可达的祖先，
+`{ kind: 'node', nodeId, output, field?: string }`；省略 `field` 选择整个输出，提供时选择输出对象 schema 声明的一级属性，字段名按原始 key 处理（包括空字符串、点号和斜杠），不支持多级路径或数组下标。字段选择统一用于 Inputs、Condition 操作数和 Subflow 输出映射。候选字段来自对象 schema 的直接 `properties`，不解析 `$ref`，不展开 `allOf`、`anyOf`、`oneOf` 分支；无法直接列出字段时仍可选择整个输出。父对象为 null 或自身属性缺失视为无可用来源，显式字段 null 仍是可用来源。Flow input 与 Variable binding 的 source 形式保持不变。Node source 必须指向经执行边可达的祖先，
 不要求覆盖目标的每一条执行路径。每条被选中的执行入边分别启动一次 invocation，不等待其他前驱。输入只读取这次到达路径上的结果快照，多个 source 不能在该快照同时提供值；并行前驱的结果分别传给各自触发的 invocation。
 所有可执行节点支持可选正整数 `maxExecutions`，默认 1000；按一次 Flow Run 累计，同一 Subflow 节点跨调用共享计数。下一次到达会超过上限时，Run 报错终止。Wait/Agent 决议恢复不增加次数。
 调度仅依据执行连线及分支状态；输入来源缺失不导致跳过。零个可用来源补 `null`，一个来源取其值，多个来源报错；实际输出 `null` 仍算一个已提供的值。收集后按端口声明校验，失败则报错。

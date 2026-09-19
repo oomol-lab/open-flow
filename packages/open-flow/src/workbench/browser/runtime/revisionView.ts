@@ -19,6 +19,7 @@ import type {
 import { nodeInputMappings } from '../../../flow/common/condition.ts'
 import { checkInputSources, inputSourceCandidates, nodeOutputDescription, nodeOutputPorts } from '../../../flow/common/graph.ts'
 import { agentActions, codeActions } from '../../../flow/common/semantics.ts'
+import { sourcePort } from '../../../flow/common/sourceField.ts'
 
 export interface InputSourceQuery {
   readonly check: () => InputSourcesCheck
@@ -110,7 +111,8 @@ export class RevisionView {
   public sourceType(target: GraphTarget, source: import('../../../flow/common/change.ts').Source): string | undefined {
     const graph = this.graph(target)
     const node = source.kind === 'node' ? graph?.nodes[source.nodeId] : undefined
-    const schema = source.kind === 'node' && node != null ? nodeOutputPorts(this.#document, node)[source.output]?.jsonSchema : undefined
+    const output = source.kind === 'node' && node != null ? nodeOutputPorts(this.#document, node)[source.output] : undefined
+    const schema = output == null || source.kind !== 'node' ? undefined : sourcePort(output, source.field)?.jsonSchema
     if (source.kind === 'binding') return 'string'
     if (schema != null && typeof schema === 'object' && !Array.isArray(schema) && 'type' in schema && typeof schema.type === 'string') return schema.type
     return

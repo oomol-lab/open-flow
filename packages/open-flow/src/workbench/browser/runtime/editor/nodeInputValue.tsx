@@ -9,6 +9,8 @@ import type { InputSourceQuery } from '../revisionView.ts'
 import { useEffect, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { variableInputCompatible } from '../../../../flow/common/schema.ts'
+import { sourceOutputLabel } from '../../../../flow/common/sourceField.ts'
+import { editorComponentIcons } from '../../../../form/browser/editorComponentIcon.tsx'
 import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../form/browser/selectionMenuStyles.ts'
 import { ValueEditor, ValueEditorFeedback } from '../../../../form/browser/valueEditor.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
@@ -42,6 +44,7 @@ export interface NodeInputUpstreamSources {
     readonly nodeId: string
     readonly nodeName?: string
     readonly output: string
+    readonly field?: string
     readonly check: InputSourceCheck | undefined
   }[]
   readonly groups: readonly {
@@ -50,11 +53,11 @@ export interface NodeInputUpstreamSources {
     readonly nodeName: string
     readonly outputs: readonly InputSourceCandidate[]
   }[]
-  readonly onChange: (source: { readonly nodeId: string; readonly output: string }) => void
+  readonly onChange: (source: { readonly nodeId: string; readonly output: string; readonly field?: string }) => void
 }
 const draftIssue = () => {}
 const variableSource = (name: string) => JSON.stringify(['variable', name])
-const upstreamSource = (nodeId: string, output: string) => JSON.stringify(['upstream', nodeId, output])
+const upstreamSource = (nodeId: string, output: string, field?: string) => JSON.stringify(['upstream', nodeId, output, field])
 const sourceItemClass = `${selectionMenuItemClass} gap-2 px-2`
 const sourceEmptyItemClass = `${sourceItemClass} font-normal text-muted-foreground data-disabled:opacity-100`
 const sourceSubTriggerClass = sourceItemClass
@@ -66,6 +69,8 @@ function inputSourceIssue(check: InputSourceCheck | undefined, source: NodeInput
       return
     case 'source-missing':
       return t('inspector.sources.sourceMissing')
+    case 'field-missing':
+      return t('inspector.sources.fieldMissing', { field: JSON.stringify(source.field), output: source.output })
     case 'output-missing':
       return t('inspector.sources.outputMissing', { output: source.output, source: source.nodeName })
     case 'not-ready':
@@ -121,7 +126,9 @@ function SelectedSourceValue({
         ? t('variablePicker.variableIncompatibleHelp')
         : checks?.conflict
           ? t('inspector.sources.sourceConflict', {
-              sources: current?.map((source) => (source.nodeName == null ? source.output : `${source.nodeName} ${source.output}`)).join(', '),
+              sources: current
+                ?.map((source) => (source.nodeName == null ? sourceOutputLabel(source) : `${source.nodeName} ${sourceOutputLabel(source)}`))
+                .join(', '),
             })
           : invalidUpstream != null
             ? inputSourceIssue(invalidUpstream.check, invalidUpstream, t)
@@ -132,7 +139,7 @@ function SelectedSourceValue({
   const sourceLabel = bound
     ? variableName
     : current?.length
-      ? current.map((source) => (source.nodeName == null ? source.output : `${source.nodeName} · ${source.output}`)).join(' / ')
+      ? current.map((source) => (source.nodeName == null ? sourceOutputLabel(source) : `${source.nodeName} · ${sourceOutputLabel(source)}`)).join(' / ')
       : t('nodeInput.connected')
   const selectedUpstreamIcon = connected && current?.length === 1 ? current[0]?.icon : undefined
   const sourceDescriptions = connected && current?.length ? current.map((source) => source.description?.trim()).filter(Boolean) : []
@@ -256,12 +263,51 @@ export function NodeInputValue({
   const currentSource = bound
     ? variableSource(variableName)
     : connected && upstream?.current.length === 1
-      ? upstreamSource(upstream.current[0]!.nodeId, upstream.current[0]!.output)
+      ? upstreamSource(upstream.current[0]!.nodeId, upstream.current[0]!.output, upstream.current[0]!.field)
       : connected
         ? JSON.stringify(['upstream'])
         : literalSource
   const sourceKind = bound ? 'variable' : connected ? 'upstream' : 'literal'
   const sourcePortal = sourceContainer?.closest<HTMLElement>('.editor-context-panel') ?? sourceContainer
+  const sourceOption = (nodeId: string, { output, field, fields, check }: InputSourceCandidate, label: string) => {
+    const selected = sourceKind === 'upstream' && currentSource === upstreamSource(nodeId, output, field)
+    const status = check.kind == 'schema' ? t('inspector.sources.incompatible') : check.kind == 'schema-error' ? t('inspector.sources.unverified') : undefined
+    return (
+      <DropdownMenuRadioItem
+        className={`${sourceItemClass} ${status == null || selected ? 'pr-8' : 'pr-20'}`}
+        key={upstreamSource(nodeId, output, field)}
+        value={upstreamSource(nodeId, output, field)}
+        closeOnClick
+      >
+        <i
+          aria-hidden="true"
+          className={`${
+            fields?.length
+              ? `${editorComponentIcons.object} ${status == null ? 'text-muted-foreground' : ''}`
+              : check.kind == 'available'
+                ? 'i-lucide-light:corner-down-right text-muted-foreground'
+                : check.kind == 'schema'
+                  ? 'i-lucide-light:triangle-alert'
+                  : 'i-lucide-light:circle-help'
+          } size-3.5 shrink-0`}
+          style={status == null ? undefined : { color: 'var(--warning-foreground)' }}
+        />
+        <span className="min-w-0 flex-1 truncate font-mono" title={label}>
+          {label}
+        </span>
+        {!selected && status != null && (
+          <span className="pointer-events-none absolute right-2 shrink-0 text-[10px] leading-4" style={{ color: 'var(--warning-foreground)' }}>
+            {status}
+          </span>
+        )}
+        {selected && status != null && <span className="sr-only">{status}</span>}
+      </DropdownMenuRadioItem>
+    )
+  }
+  const selectUpstream = (next: string) => {
+    const [, nodeId, output, field] = JSON.parse(next) as [string, string, string, string | null]
+    upstream?.onChange({ nodeId, output, ...(field == null ? {} : { field }) })
+  }
   const sourceControl = disabled ? undefined : (
     <div ref={setSourceContainer} className="flex items-center">
       <DropdownMenu
@@ -389,10 +435,7 @@ export function NodeInputValue({
               <DropdownMenuSubContent className={`w-48 min-w-48 ${selectionMenuContentClass}`} container={sourcePortal}>
                 <DropdownMenuRadioGroup
                   value={sourceKind === 'upstream' && upstream.current.length === 1 && upstream.current[0]?.nodeId === group.nodeId ? currentSource : ''}
-                  onValueChange={(next) => {
-                    const [, nodeId, output] = JSON.parse(next) as [string, string, string]
-                    upstream?.onChange({ nodeId, output })
-                  }}
+                  onValueChange={selectUpstream}
                 >
                   {upstream.current
                     .filter(
@@ -400,54 +443,48 @@ export function NodeInputValue({
                         source.nodeId === group.nodeId &&
                         source.check != null &&
                         source.check.kind != 'available' &&
-                        !group.outputs.some((candidate) => candidate.output === source.output),
+                        !group.outputs.some(
+                          (candidate) =>
+                            candidate.output === source.output &&
+                            (source.field === undefined || candidate.fields?.some((child) => child.field === source.field)),
+                        ),
                     )
                     .map((source) => (
-                      <DropdownMenuRadioItem className={sourceItemClass} key={source.output} value={upstreamSource(source.nodeId, source.output)} disabled>
+                      <DropdownMenuRadioItem
+                        className={sourceItemClass}
+                        key={upstreamSource(source.nodeId, source.output, source.field)}
+                        value={upstreamSource(source.nodeId, source.output, source.field)}
+                        disabled
+                      >
                         <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
-                        <span className="min-w-0 flex-1 truncate font-mono" title={source.output}>
-                          {source.output}
+                        <span className="min-w-0 flex-1 truncate font-mono" title={sourceOutputLabel(source)}>
+                          {sourceOutputLabel(source)}
                         </span>
                       </DropdownMenuRadioItem>
                     ))}
-                  {group.outputs.map(({ output, check }) => {
-                    const selected = sourceKind === 'upstream' && currentSource === upstreamSource(group.nodeId, output)
-                    const status =
-                      check.kind == 'schema'
-                        ? t('inspector.sources.incompatible')
-                        : check.kind == 'schema-error'
-                          ? t('inspector.sources.unverified')
-                          : undefined
-                    return (
-                      <DropdownMenuRadioItem
-                        className={`${sourceItemClass} ${status == null || selected ? 'pr-8' : 'pr-20'}`}
-                        key={output}
-                        value={upstreamSource(group.nodeId, output)}
-                        closeOnClick
-                      >
-                        <i
-                          aria-hidden="true"
-                          className={`${
-                            check.kind == 'available'
-                              ? 'i-lucide-light:corner-down-right text-muted-foreground'
-                              : check.kind == 'schema'
-                                ? 'i-lucide-light:triangle-alert'
-                                : 'i-lucide-light:circle-help'
-                          } size-3.5 shrink-0`}
-                          style={status == null ? undefined : { color: 'var(--warning-foreground)' }}
-                        />
-                        <span className="min-w-0 flex-1 truncate font-mono" title={output}>
-                          {output}
-                        </span>
-                        {!selected && status != null && (
-                          <span className="pointer-events-none absolute right-2 shrink-0 text-[10px] leading-4" style={{ color: 'var(--warning-foreground)' }}>
-                            {status}
+                  {group.outputs.map((candidate) =>
+                    candidate.fields?.length ? (
+                      <DropdownMenuSub key={candidate.output}>
+                        <DropdownMenuSubTrigger
+                          className={`${sourceSubTriggerClass} ${connected && upstream.current.some((source) => source.nodeId === group.nodeId && source.output === candidate.output) ? 'bg-accent' : ''}`}
+                        >
+                          <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
+                          <span className="min-w-0 flex-1 truncate font-mono" title={candidate.output}>
+                            {candidate.output}
                           </span>
-                        )}
-                        {selected && status != null && <span className="sr-only">{status}</span>}
-                      </DropdownMenuRadioItem>
-                    )
-                  })}
+                        </DropdownMenuSubTrigger>
+                        <DropdownMenuSubContent className={`w-56 min-w-56 ${selectionMenuContentClass}`} container={sourcePortal}>
+                          <DropdownMenuRadioGroup value={sourceKind === 'upstream' ? currentSource : ''} onValueChange={selectUpstream}>
+                            {sourceOption(group.nodeId, candidate, t('inspector.sources.wholeObject'))}
+                            <DropdownMenuSeparator className="mx-2 bg-border/50" />
+                            {candidate.fields.map((child) => sourceOption(group.nodeId, child, child.field === '' ? '""' : child.field))}
+                          </DropdownMenuRadioGroup>
+                        </DropdownMenuSubContent>
+                      </DropdownMenuSub>
+                    ) : (
+                      sourceOption(group.nodeId, candidate, candidate.output)
+                    ),
+                  )}
                 </DropdownMenuRadioGroup>
               </DropdownMenuSubContent>
             </DropdownMenuSub>

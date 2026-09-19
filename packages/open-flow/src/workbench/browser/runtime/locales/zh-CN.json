@@ -249,6 +249,8 @@
       "title": "输入来源",
       "sourceMissing": "原输入来源已不存在，请重新选择。",
       "outputMissing": "“{{source}}”中找不到“{{output}}”，请重新选择。",
+      "wholeObject": "整个对象",
+      "fieldMissing": "“{{output}}”中已不再声明字段 {{field}}，请重新选择。",
       "notReady": "运行到这里时，“{{source}} {{handle}}”可能还没有值。",
       "sourceConflict": "这些字段可能同时有值：{{sources}}。这里只能取一个。",
       "incompatibleRight": "右值类型不符合此比较的要求。",

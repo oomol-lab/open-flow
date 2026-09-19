@@ -664,7 +664,12 @@ function runGraph(
             if (source.kind == 'binding') return Object.hasOwn(context.bindingValues, source.bindingId) ? [context.bindingValues[source.bindingId]!] : []
             if (source.kind == 'flow') return Object.hasOwn(inputs, source.input) ? [inputs[source.input]!] : []
             const outputs = valuesByNode[source.nodeId]
-            return outputs != null && Object.hasOwn(outputs, source.output) ? [outputs[source.output]!] : []
+            if (outputs == null || !Object.hasOwn(outputs, source.output)) return []
+            const output = outputs[source.output]!
+            if (source.field === undefined) return [output]
+            return output != null && typeof output === 'object' && !Array.isArray(output) && Object.hasOwn(output, source.field)
+              ? [(output as Readonly<Record<string, JsonValue>>)[source.field]!]
+              : []
           })
           if (values.length > 1) throw new Error(`${description} has multiple available sources.`)
           if (required && values.length == 0) throw new Error(`${description} Source has no value.`)

@@ -249,6 +249,8 @@
       "title": "Input source",
       "sourceMissing": "The original input source no longer exists. Choose again.",
       "outputMissing": "“{{output}}” could not be found in “{{source}}”. Choose again.",
+      "wholeObject": "Whole object",
+      "fieldMissing": "Field {{field}} is no longer declared in “{{output}}”. Choose again.",
       "notReady": "“{{source}} {{handle}}” may not have a value when this step runs.",
       "sourceConflict": "These fields may have values at the same time: {{sources}}. Only one can be used here.",
       "incompatibleRight": "The right value type is incompatible with this comparison.",

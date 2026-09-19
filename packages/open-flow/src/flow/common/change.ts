@@ -105,6 +105,7 @@ export function portsByHandle<Value extends Port>(ports: readonly (Value | Group
 }
 
 export interface NodeSource {
+  readonly field?: string
   readonly kind: 'node'
   readonly nodeId: string
   readonly output: string

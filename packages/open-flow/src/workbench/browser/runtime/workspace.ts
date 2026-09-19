@@ -29,6 +29,7 @@ import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionVi
 
 import { dequal } from 'dequal/lite'
 import { resolutionOutputPorts } from '../../../flow/common/graph.ts'
+import { sourceOutputLabel } from '../../../flow/common/sourceField.ts'
 import { triggerOutputPorts } from '../../../trigger/common/contract.ts'
 import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
@@ -359,7 +360,7 @@ function conditionOperand(operand: ConditionOperand, context: NodeProjectionCont
   return {
     icon: presentation?.icon,
     kind: 'node',
-    label: `${presentation?.title ?? source.nodeId} · ${source.output}`,
+    label: `${presentation?.title ?? source.nodeId} · ${sourceOutputLabel(source)}`,
   }
 }
 

@@ -3,6 +3,7 @@ import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { Diagnostic, FlowCheck, GraphNode } from '../api.ts'
 import type { ResolvedSelection, RevisionView } from '../revisionView.ts'
 
+import { sourceOutputLabel } from '../../../../flow/common/sourceField.ts'
 import { schemaMismatchMessage } from './schemaMismatchMessage.ts'
 
 export type InspectorSection = 'account' | 'condition' | 'inputs' | 'module' | 'node' | 'task' | 'trigger'
@@ -31,6 +32,8 @@ export function diagnosticNodeId(diagnostic: Diagnostic): string | undefined {
 
 export function diagnosticMessage(diagnostic: Diagnostic, t: TFunction, nodeTitle?: (nodeId: string) => string | undefined): string {
   if (diagnostic.code == 'agent.config-invalid' && diagnostic.message == 'Declare between 1 and 64 Agent tools.') return t('agent.toolsRequired')
+  if (diagnostic.code == 'graph.source-missing' && diagnostic.values?.variant == 'field')
+    return t('inspector.sources.fieldMissing', { field: JSON.stringify(diagnostic.values.field), output: diagnostic.values.output })
   if (diagnostic.mismatch != null) {
     const issue = schemaMismatchMessage(diagnostic.mismatch, t)
     const input = /\/graph\/nodes\/([^/]+)\/inputs\/([^/]+)$/.exec(diagnostic.path)
@@ -41,7 +44,7 @@ export function diagnosticMessage(diagnostic: Diagnostic, t: TFunction, nodeTitl
       if (sourceId != null && typeof output == 'string') {
         return t('diagnostics.messages.graph.node-output-schema-incompatible', {
           issue,
-          source: `${nodeTitle?.(sourceId) ?? sourceId} ${output}`,
+          source: `${nodeTitle?.(sourceId) ?? sourceId} ${sourceOutputLabel({ output, field: typeof diagnostic.values?.field === 'string' ? diagnostic.values.field : undefined })}`,
           target,
         })
       }

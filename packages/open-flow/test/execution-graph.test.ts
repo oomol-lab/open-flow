@@ -339,7 +339,7 @@ it('only offers resolution outputs on their reachable paths', () => {
   expect(availableOutputs(content.document, graph, 'approve', 'input')).toEqual({ approval: ['approve'] })
   expect(availableOutputs(content.document, graph, 'reject', 'input')).toEqual({ approval: ['reject'] })
   expect(inputSourceCandidates(content.document, graph, 'waitNotify', 'input')).toEqual({
-    wait: [{ output: 'pending', check: { kind: 'available' } }],
+    wait: [expect.objectContaining({ output: 'pending', check: { kind: 'available' } })],
   })
 })
 

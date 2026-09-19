@@ -249,6 +249,8 @@
       "title": "입력 소스",
       "sourceMissing": "기존 입력 소스가 더 이상 존재하지 않습니다. 다시 선택하세요.",
       "outputMissing": "“{{source}}”에서 “{{output}}”을(를) 찾을 수 없습니다. 다시 선택하세요.",
+      "wholeObject": "전체 객체",
+      "fieldMissing": "“{{output}}”에 {{field}} 필드가 선언되어 있지 않습니다. 다시 선택하세요.",
       "notReady": "여기까지 실행될 때 “{{source}} {{handle}}”에 아직 값이 없을 수 있습니다.",
       "sourceConflict": "다음 필드에 값이 동시에 있을 수 있습니다: {{sources}}. 여기서는 하나만 사용할 수 있습니다.",
       "incompatibleRight": "오른쪽 값의 형식이 이 비교와 호환되지 않습니다.",
