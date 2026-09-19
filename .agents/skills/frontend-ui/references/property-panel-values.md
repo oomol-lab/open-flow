@@ -77,7 +77,10 @@ collections, definitions, and field, node, or group settings. Also read the
   item; leaving sorting restores indices. Fixed item schemas do not prevent sorting editable values.
 - Node settings reuse the panel's current field controls, typography, radius, and border/surface
   rules. Do not retain the older 22px borderless gray control style alongside the value table.
-- Node settings keep their section title and always show their contents, without a disclosure control.
+- Node settings keep the standard section-title typography and use a disclosure control whose
+  contents start collapsed whenever the panel opens for a node.
+- LLM task definition is an always-visible standard section immediately below Outputs and before
+  Node settings.
 - Value Node does not show timeout settings or a Node settings section.
 
 ## Secondary field settings

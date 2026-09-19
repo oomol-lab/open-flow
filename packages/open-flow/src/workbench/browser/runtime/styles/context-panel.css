@@ -438,6 +438,12 @@
     line-height: 17px;
   }
 
+  .inspector-disclosure-summary .inspector-section-title-text {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 20px;
+  }
+
   .inspector-disclosure-summary > span {
     color: var(--ui-muted-foreground);
     font-size: 10px;

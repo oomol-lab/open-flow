@@ -160,9 +160,14 @@ function GeneralSettings({
   }
 
   return (
-    <Field className="inspector-field-section" data-inspector-section="node">
-      <FieldLabel className="inspector-section-title">{t('inspector.node.title')}</FieldLabel>
-      <div className="node-settings">
+    <details key={nodeId} className="inspector-disclosure" data-inspector-section="node">
+      <summary>
+        <Icon name="chevron-down" size={14} />
+        <span className="inspector-disclosure-summary">
+          <strong className="inspector-section-title-text">{t('inspector.node.title')}</strong>
+        </span>
+      </summary>
+      <div className="inspector-disclosure-content node-settings">
         <FieldGroup>
           <Field data-invalid={limitError != null}>
             <FieldLabel htmlFor={`node-${nodeId}-limit`}>{t('inspector.node.maxExecutions')}</FieldLabel>
@@ -199,7 +204,7 @@ function GeneralSettings({
           )}
         </FieldGroup>
       </div>
-    </Field>
+    </details>
   )
 }
 
@@ -466,48 +471,37 @@ function TaskDefinition({
         </div>
       </form>
     ) : undefined
-  const settingsPanel = (
-    <>
-      {children}
-      {'executor' in task && task.executor.kind != 'agent' && llm != null && (
-        <details className="inspector-disclosure inspector-section-divider" data-inspector-section="task">
-          <summary>
-            <Icon name="chevron-down" size={14} />
-            <span className="inspector-disclosure-summary">
-              <strong>{t('inspector.task.definition')}</strong>
-            </span>
-          </summary>
-          <div className="inspector-disclosure-content node-settings">
-            <FieldGroup>
-              {llm != null && (
-                <Field>
-                  <FieldLabel htmlFor={`${fieldIdPrefix}-response-mode`}>{t('inspector.task.responseMode')}</FieldLabel>
-                  <NativeSelect
-                    disabled={disabled}
-                    id={`${fieldIdPrefix}-response-mode`}
-                    onChange={(event) => {
-                      const mode = event.target.value
-                      if ((mode == 'chat' || mode == 'json') && mode != llm.mode) {
-                        void store.saveTaskSettings(selection.id, { kind: 'llm', mode, name: task.name })
-                      }
-                    }}
-                    value={llm.mode}
-                  >
-                    <NativeSelectOption value="chat">{t('inspector.task.chatText')}</NativeSelectOption>
-                    <NativeSelectOption value="json">{t('inspector.task.structuredJson')}</NativeSelectOption>
-                  </NativeSelect>
-                </Field>
-              )}
-            </FieldGroup>
-          </div>
-        </details>
-      )}
-    </>
+  const taskDefinition = llm != null && (
+    <Field className="inspector-field-section" data-inspector-section="task">
+      <FieldLabel className="inspector-section-title">{t('inspector.task.definition')}</FieldLabel>
+      <div className="node-settings">
+        <FieldGroup>
+          <Field>
+            <FieldLabel htmlFor={`${fieldIdPrefix}-response-mode`}>{t('inspector.task.responseMode')}</FieldLabel>
+            <NativeSelect
+              disabled={disabled}
+              id={`${fieldIdPrefix}-response-mode`}
+              onChange={(event) => {
+                const mode = event.target.value
+                if ((mode == 'chat' || mode == 'json') && mode != llm.mode) {
+                  void store.saveTaskSettings(selection.id, { kind: 'llm', mode, name: task.name })
+                }
+              }}
+              value={llm.mode}
+            >
+              <NativeSelectOption value="chat">{t('inspector.task.chatText')}</NativeSelectOption>
+              <NativeSelectOption value="json">{t('inspector.task.structuredJson')}</NativeSelectOption>
+            </NativeSelect>
+          </Field>
+        </FieldGroup>
+      </div>
+    </Field>
   )
   return (
     <>
+      {taskDefinition}
       {codeEditor}
-      {settingsPanel}
+      {children}
     </>
   )
 }

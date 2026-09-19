@@ -106,6 +106,10 @@ describe('Node execution settings', () => {
     const settings = find(element, (item) => typeof item.type == 'function' && item.type.name == 'GeneralSettings')
     if (settings == null || typeof settings.type != 'function') throw new Error('Expected general settings.')
     const rendered = (settings.type as (props: unknown) => ReactElement)(settings.props)
+    expect(rendered.type).toBe('details')
+    expect(rendered.props.className).toBe('inspector-disclosure')
+    expect(rendered.props.open).toBeUndefined()
+    expect(find(rendered, (item) => item.props.className == 'inspector-section-title-text')).toBeDefined()
     const input = find(rendered, (item) => (item.props as { readonly id?: string }).id == 'node-current-timeout')
     if (input == null) throw new Error('Expected timeout input.')
     const blur = (input.props as { readonly onBlur: (event: { currentTarget: { value: string } }) => void }).onBlur
@@ -183,6 +187,42 @@ describe('Code task sections', () => {
     const failed = (task.type as (props: unknown) => ReactElement)(task.props)
     expect(find(failed, (item) => item.props.className == 'form-actions code-actions')).toBeDefined()
     expect(find(failed, (item) => item.props.role == 'status')).toBeUndefined()
+  })
+
+  it('renders the LLM task definition as a standard section before Node settings', () => {
+    const definition = {
+      executor: { kind: 'llm', mode: 'chat' },
+      inputs: [],
+      name: 'Summarize',
+      outputs: [{ handle: 'content', jsonSchema: { type: 'string' }, nullable: false }],
+    }
+    const node = { inputs: {}, kind: 'task', name: 'Summarize', taskId: 'llm' }
+    const element = NodeInspector({
+      variables: { enabled: true, names: [], loaded: true, loading: false, onOpen: vi.fn() },
+      activeConnectorConnections: [],
+      connectorAuthorizationPending: false,
+      connectorLoading: false,
+      connectors: { $: { actions: { value: {} } } } as never,
+      disabled: false,
+      revision: { graph: () => ({ nodes: { llm: node } }) } as never,
+      selection: { id: 'llm', kind: 'task', node, definition } as never,
+      store: { $: { flowId: { value: 'flow' }, moduleEditor: { value: undefined } } } as never,
+      target: { kind: 'flow' },
+      theme: 'light',
+      triggerAuthorizationPending: false,
+      triggerConnectionLoading: false,
+      triggers: {} as never,
+    })
+    const task = find(element, (item) => typeof item.type == 'function' && item.type.name == 'TaskDefinition')
+    if (task == null || typeof task.type != 'function') throw new Error('Expected task definition.')
+    const rendered = (task.type as (props: unknown) => ReactElement)(task.props)
+    const sections = Children.toArray((rendered.props as { readonly children?: ReactNode }).children)
+
+    expect(sections).toHaveLength(2)
+    expect(isValidElement(sections[0]) && sections[0].props['data-inspector-section']).toBe('task')
+    expect(isValidElement(sections[0]) && sections[0].props.className).toBe('inspector-field-section')
+    expect(isValidElement(sections[0]) && find(sections[0], (item) => item.type == 'details')).toBeUndefined()
+    expect(isValidElement(sections[1]) && find(sections[1], (item) => typeof item.type == 'function' && item.type.name == 'GeneralSettings')).toBeDefined()
   })
 })
 

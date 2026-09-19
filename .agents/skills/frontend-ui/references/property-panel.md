@@ -12,6 +12,21 @@ decision changes. Do not apply compact property-panel dimensions to unrelated pr
 - Value table headings are Name, Type, Value; Chinese uses 名称、类型、值. The Chinese panel title
   is 数据. Component and Handle are not the value table's user-facing column headings.
 
+## Section order
+
+Within a selected node's property-panel body, render applicable sections in this order:
+
+1. Warnings
+2. Purpose
+3. Port configuration
+4. Node-specific settings
+5. Node settings
+
+Omit sections that do not apply without leaving placeholders, while preserving the relative order
+of the remaining sections. A feature may define the order of multiple sections within one category,
+but must not move them across these category boundaries. Panel chrome, the node header, empty states,
+and multi-selection states are outside this sequence.
+
 ## Route by task
 
 Read only the detail relevant to the change; combine references when a task crosses domains.

@@ -12,6 +12,7 @@ import { validateCronExpression } from '../../../../trigger/common/cron.ts'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../ui/browser/select.tsx'
+import { Icon } from '../icons.tsx'
 import { deferScheduleCheck } from './triggerScheduleValidation.ts'
 
 interface ScheduleInspection {
@@ -198,9 +199,14 @@ export function TriggerScheduleEditor({
   const language = useLang()
   const id = useId()
   return (
-    <Field className="inspector-field-section" data-inspector-section="trigger">
-      <FieldLabel className="inspector-section-title">{t('inspector.node.title')}</FieldLabel>
-      <div className="node-settings">
+    <details className="inspector-disclosure" data-inspector-section="trigger">
+      <summary>
+        <Icon name="chevron-down" size={14} />
+        <span className="inspector-disclosure-summary">
+          <strong className="inspector-section-title-text">{t('inspector.node.title')}</strong>
+        </span>
+      </summary>
+      <div className="inspector-disclosure-content node-settings">
         <FieldGroup>
           {schedules.map((schedule, index) => {
             const save = (next: TriggerSchedule) => onChange(schedules.with(index, next))
@@ -297,6 +303,6 @@ export function TriggerScheduleEditor({
           {schedules.length === 0 && <p>{t('triggerSchedule.scheduleMissing')}</p>}
         </FieldGroup>
       </div>
-    </Field>
+    </details>
   )
 }
