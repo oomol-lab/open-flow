@@ -23,6 +23,7 @@ function revision(reverse = false): RevisionContent {
       kind: 'condition' as const,
       cases: [
         {
+          description: 'Qualified order',
           output: 'match',
           groups: [
             {
@@ -112,7 +113,7 @@ describe('Flow Revision encoding', () => {
     expect(JSON.parse(decoder.decode(first))).toMatchObject({
       document: {
         bindings: { variable: { kind: 'variable', target: 'TOKEN' } },
-        graph: { edges: [], nodes: { condition: {}, value: {} } },
+        graph: { edges: [], nodes: { condition: { cases: [{ description: 'Qualified order' }] }, value: {} } },
         subflows: { child: { name: 'Child' } },
         tasks: { managed: { executor: { kind: 'llm', mode: 'json' }, name: 'LLM' } },
       },
@@ -121,7 +122,7 @@ describe('Flow Revision encoding', () => {
       modules: { helper: { imports: [] }, main: { imports: ['helper'] } },
       version: 1,
     })
-    await expect(digestBytes(first)).resolves.toBe('sha256:88b7fbb83a386b5db0bbf1bb82613d578de4f2268f69ce06638784d90aae2b99')
+    await expect(digestBytes(first)).resolves.toBe('sha256:d1fa627598fc669e893463589cfa85f0e761001d2b68518d6119ae9fe7350593')
   })
 
   it('changes the encoded Revision when workflow semantics change', () => {

@@ -933,7 +933,8 @@
   },
   "conditionEditor": {
     "addCondition": "조건 추가",
-    "deleteCondition": "조건 삭제",
+    "caseSettings": "케이스 설정",
+    "deleteCase": "케이스 삭제",
     "handleKeyTitle": "Handle",
     "label": "연산자",
     "operator": {
@@ -971,6 +972,7 @@
     "left": "왼쪽 값",
     "right": "오른쪽 값",
     "containsErrors": "조건에 오류가 있습니다.",
+    "conditionRequired": "조건을 하나 이상 추가하세요.",
     "incomplete": "조건 그룹을 완성하세요.",
     "incompatibleRight": "오른쪽 값의 형식이 이 비교와 호환되지 않습니다.",
     "incompatible": "값 유형이 연산자와 호환되지 않습니다."

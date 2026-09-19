@@ -62,6 +62,7 @@ const condition = {
   matchMode: z.enum(['first', 'all']),
   cases: z.array(
     z.object({
+      description: text.optional(),
       output: text,
       groups: z.array(
         z.object({

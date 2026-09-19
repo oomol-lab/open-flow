@@ -20,20 +20,31 @@
   }
   .condition-case-heading {
     display: grid;
-    grid-template-columns: geometry.$toggle-width geometry.$value-name-gap minmax(0, 1fr) 2px 24px 4px 24px;
+    grid-template-columns: geometry.$toggle-width geometry.$value-name-gap minmax(0, 1fr) 4px 24px;
     > :first-child {
       grid-column: 1;
     }
     > div {
       grid-column: 3;
     }
-    > button:nth-child(3) {
+    > :nth-child(3) {
       grid-column: 5;
     }
-    > button:nth-child(4) {
-      grid-column: 7;
-    }
     align-items: center;
+  }
+  .condition-case-empty {
+    display: grid;
+    grid-template-columns: geometry.$toggle-width geometry.$value-name-gap minmax(0, 1fr) 4px 24px;
+    margin-top: 4px;
+    > button {
+      grid-column: 3;
+      justify-content: center;
+      background: color-mix(in srgb, var(--ui-foreground) 5%, transparent);
+      color: var(--ui-muted-foreground);
+      &:hover {
+        background: color-mix(in srgb, var(--ui-foreground) 10%, transparent);
+      }
+    }
   }
   .condition-groups {
     position: relative;
@@ -43,6 +54,8 @@
       @include geometry.branch;
       left: calc(#{geometry.$toggle-width} / 2);
       top: 0;
+    }
+    &:has(> .condition-group)::before {
       width: 6px;
     }
   }

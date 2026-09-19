@@ -933,7 +933,8 @@
   },
   "conditionEditor": {
     "addCondition": "Добавить условие",
-    "deleteCondition": "Удалить условие",
+    "caseSettings": "Настройки варианта",
+    "deleteCase": "Удалить вариант",
     "handleKeyTitle": "Handle",
     "label": "Оператор",
     "operator": {
@@ -971,6 +972,7 @@
     "left": "Левый операнд",
     "right": "Правый операнд",
     "containsErrors": "В условии есть ошибки.",
+    "conditionRequired": "Добавьте хотя бы одно условие.",
     "incomplete": "Заполните группу условий.",
     "incompatibleRight": "Тип правого значения несовместим с этим сравнением.",
     "incompatible": "Типы операндов несовместимы с оператором."

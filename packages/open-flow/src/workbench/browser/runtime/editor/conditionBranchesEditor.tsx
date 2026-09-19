@@ -17,6 +17,10 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Field, FieldLabel, FieldDescription } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
+import { Popover, PopoverPanelContent } from '../../../../ui/browser/popover.tsx'
+import { Textarea } from '../../../../ui/browser/textarea.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
+import { fieldPanelAnchor } from './fieldPanelAnchor.ts'
 import { FieldSectionHeader } from './fieldSectionHeader.tsx'
 import { NodeInputValue } from './nodeInputValue.tsx'
 
@@ -102,6 +106,7 @@ export function ConditionBranchesEditor({
   const [collapsedGroups, setCollapsedGroups] = useState<ReadonlySet<string>>(new Set())
   const [sorting, setSorting] = useState(false)
   const [drag, setDrag] = useState<number>()
+  const [editingCase, setEditingCase] = useState<number>()
   const [menuContainer, setMenuContainer] = useState<HTMLDivElement | null>(null)
   const [operandErrors, setOperandErrors] = useState<Readonly<Record<string, boolean>>>({})
   const names = value.cases.map((item) => item.output)
@@ -116,6 +121,7 @@ export function ConditionBranchesEditor({
     if (to < 0 || to >= value.cases.length || from === to) return
     const cases = [...value.cases]
     cases.splice(to, 0, cases.splice(from, 1)[0]!)
+    setEditingCase(undefined)
     onChange({ ...value, cases })
   }
   const operandType = (operand: ConditionOperand | undefined) =>
@@ -163,6 +169,7 @@ export function ConditionBranchesEditor({
           sorting={sorting}
           onToggleSorting={() => {
             setDrag(undefined)
+            setEditingCase(undefined)
             setSorting(!sorting)
           }}
           addLabel={t('conditionEditor.addCase')}
@@ -171,6 +178,10 @@ export function ConditionBranchesEditor({
         <div ref={setMenuContainer} className="condition-editor-content">
           {value.cases.map((item, c) => {
             const save = (next: typeof item, deletion?: ValueEditorDeletion) => onChange({ ...value, cases: value.cases.with(c, next) }, deletion)
+            const renameOutput = (output: string) => {
+              setCollapsed((previous) => new Set([...previous].map((name) => (name === item.output ? output : name))))
+              save({ ...item, output })
+            }
             const open = !collapsed.has(item.output)
             const groupErrors = item.groups.map((group, g) =>
               group.expressions.length === 0
@@ -219,6 +230,27 @@ export function ConditionBranchesEditor({
                 </DropdownMenuContent>
               </DropdownMenu>
             )
+            const removeCase = () => onChange({ ...value, cases: value.cases.toSpliced(c, 1) }, { target: 'case', name: item.output })
+            const caseSettings = (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      data-case-settings
+                      aria-label={t('conditionEditor.caseSettings')}
+                      aria-expanded={editingCase === c}
+                      onClick={() => setEditingCase(editingCase === c ? undefined : c)}
+                    />
+                  }
+                >
+                  <i aria-hidden="true" className="i-lucide-light:settings text-base" />
+                </TooltipTrigger>
+                <TooltipContent container={menuContainer}>{t('conditionEditor.caseSettings')}</TooltipContent>
+              </Tooltip>
+            )
             return (
               <div
                 className="condition-case"
@@ -232,7 +264,7 @@ export function ConditionBranchesEditor({
                   setDrag(undefined)
                 }}
               >
-                <div className="condition-case-heading">
+                <div className="condition-case-heading" data-condition-case-index={c}>
                   {sorting && !disabled ? (
                     <Button
                       type="button"
@@ -252,7 +284,7 @@ export function ConditionBranchesEditor({
                     >
                       <i aria-hidden="true" className="i-lucide-light:grip-vertical" />
                     </Button>
-                  ) : item.groups.length === 0 ? (
+                  ) : item.groups.length === 0 && disabled ? (
                     <span aria-hidden="true" />
                   ) : (
                     <Button
@@ -267,30 +299,32 @@ export function ConditionBranchesEditor({
                     </Button>
                   )}
                   <OutputName
-                    error={item.groups.length === 0 ? t('conditionEditor.incomplete') : !open ? groupErrors.find(Boolean) : undefined}
+                    error={item.groups.length === 0 ? t('conditionEditor.conditionRequired') : !open ? groupErrors.find(Boolean) : undefined}
                     value={item.output}
                     names={names}
                     disabled={disabled}
-                    onChange={(output) => {
-                      setCollapsed((previous) => new Set([...previous].map((name) => (name === item.output ? output : name))))
-                      save({ ...item, output })
-                    }}
+                    onChange={renameOutput}
                   />
-                  {!disabled &&
-                    iconButton(t('conditionEditor.addOr'), 'i-tabler-light:square-rounded-plus text-lg', () => {
-                      setCollapsed((previous) => new Set([...previous].filter((name) => name !== item.output)))
-                      save({ ...item, groups: [...item.groups, { expressions: [emptyExpression()] }] })
-                    })}
-                  {!disabled &&
-                    iconButton(
-                      t('conditionEditor.deleteCondition'),
-                      'i-tabler-light:square-rounded-minus text-lg',
-                      () => onChange({ ...value, cases: value.cases.toSpliced(c, 1) }, { target: 'case', name: item.output }),
-                      true,
-                    )}
+                  {!disabled && caseSettings}
                 </div>
-                {item.groups.length > 0 && (
+                {(item.groups.length > 0 || !disabled) && (
                   <div className="condition-groups" hidden={!open}>
+                    {item.groups.length === 0 && !disabled && (
+                      <div className="condition-case-empty">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="field"
+                          onClick={() => {
+                            setCollapsed((previous) => new Set([...previous].filter((name) => name !== item.output)))
+                            save({ ...item, groups: [{ expressions: [emptyExpression()] }] })
+                          }}
+                        >
+                          <i aria-hidden="true" className="i-lucide-light:plus" />
+                          {t('conditionEditor.addCondition')}
+                        </Button>
+                      </div>
+                    )}
                     {item.groups.map((group, g) => {
                       const groupKey = `${item.output}/${g}`
                       const groupOpen = !collapsedGroups.has(groupKey)
@@ -466,6 +500,53 @@ export function ConditionBranchesEditor({
                       )
                     })}
                   </div>
+                )}
+                {editingCase === c && (
+                  <Popover
+                    open
+                    onOpenChange={(panelOpen) => {
+                      if (!panelOpen) {
+                        setEditingCase(undefined)
+                        menuContainer?.querySelector<HTMLButtonElement>(`[data-condition-case-index="${c}"] [data-case-settings]`)?.focus()
+                      }
+                    }}
+                  >
+                    <PopoverPanelContent
+                      title={t('conditionEditor.caseSettings')}
+                      closeLabel={t('common.close')}
+                      container={menuContainer?.closest<HTMLElement>('.editor-context-panel') ?? menuContainer}
+                      anchor={() => fieldPanelAnchor(menuContainer?.querySelector(`[data-condition-case-index="${c}"]`))}
+                      footer={
+                        <Button
+                          type="button"
+                          size="field"
+                          variant="destructive"
+                          className="ml-auto"
+                          onClick={() => {
+                            setEditingCase(undefined)
+                            removeCase()
+                          }}
+                        >
+                          {t('conditionEditor.deleteCase')}
+                        </Button>
+                      }
+                    >
+                      <Field className="gap-1.5">
+                        <FieldLabel className="text-xs font-normal text-muted-foreground">{t('conditionEditor.handleKeyTitle')}</FieldLabel>
+                        <OutputName value={item.output} names={names} disabled={false} onChange={renameOutput} />
+                      </Field>
+                      <Field className="gap-1.5">
+                        <FieldLabel className="text-xs font-normal text-muted-foreground">{t('inspector.node.description')}</FieldLabel>
+                        <Textarea
+                          aria-label={t('inspector.node.description')}
+                          rows={2}
+                          className="min-h-16 max-h-40 resize-y text-xs md:text-xs"
+                          value={item.description ?? ''}
+                          onChange={(event) => save({ ...item, description: event.target.value })}
+                        />
+                      </Field>
+                    </PopoverPanelContent>
+                  </Popover>
                 )}
               </div>
             )

@@ -933,7 +933,8 @@
   },
   "conditionEditor": {
     "addCondition": "Add condition",
-    "deleteCondition": "Delete condition",
+    "caseSettings": "Case settings",
+    "deleteCase": "Delete Case",
     "handleKeyTitle": "Handle",
     "label": "Operator",
     "operator": {
@@ -971,6 +972,7 @@
     "left": "Left operand",
     "right": "Right operand",
     "containsErrors": "This condition contains errors.",
+    "conditionRequired": "Add at least one condition.",
     "incomplete": "Complete this condition group.",
     "incompatibleRight": "The right value type is incompatible with this comparison.",
     "incompatible": "The operand types do not match this operator."

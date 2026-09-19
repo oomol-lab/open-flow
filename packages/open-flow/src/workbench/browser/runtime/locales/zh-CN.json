@@ -933,7 +933,8 @@
   },
   "conditionEditor": {
     "addCondition": "添加条件",
-    "deleteCondition": "删除条件",
+    "caseSettings": "分支设置",
+    "deleteCase": "删除分支",
     "handleKeyTitle": "接口名",
     "label": "操作符",
     "operator": {
@@ -971,6 +972,7 @@
     "left": "左值",
     "right": "右值",
     "containsErrors": "条件中存在错误。",
+    "conditionRequired": "请至少添加一个条件。",
     "incomplete": "请补全条件组。",
     "incompatibleRight": "右值类型不符合此比较的要求。",
     "incompatible": "操作数类型与操作符不兼容。"

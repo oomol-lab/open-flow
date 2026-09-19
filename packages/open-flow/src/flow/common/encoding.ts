@@ -120,6 +120,7 @@ function canonicalNode(value: GraphNode): JsonValue {
       return {
         ...common,
         cases: value.cases.map((item) => ({
+          ...(item.description == null ? {} : { description: item.description }),
           output: item.output,
           groups: item.groups.map((group) => ({
             expressions: group.expressions.map((expression) => ({

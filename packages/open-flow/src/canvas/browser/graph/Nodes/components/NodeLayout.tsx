@@ -134,6 +134,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
       problem={problem}
       branches={branches?.map((branch) => {
         const conditionCase = conditionNode?.cases.find((item) => item.output == branch)
+        const caseDescription = conditionCase?.description?.trim() || undefined
         const summary =
           conditionNode != null
             ? conditionBranchSummary(conditionNode, branch, t)
@@ -156,6 +157,7 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
                   title={conditionNode && !tooltip ? summary : undefined}
                 >
                   {conditionCase != null &&
+                  caseDescription == null &&
                   conditionCaseHasExpressions(conditionCase) &&
                   (conditionNode?.diagnostics ?? 0) === 0 &&
                   conditionNode?.run?.status !== 'error' ? (

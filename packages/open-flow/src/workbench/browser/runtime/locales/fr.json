@@ -933,7 +933,8 @@
   },
   "conditionEditor": {
     "addCondition": "Ajouter une condition",
-    "deleteCondition": "Supprimer la condition",
+    "caseSettings": "Paramètres du cas",
+    "deleteCase": "Supprimer le cas",
     "handleKeyTitle": "Handle",
     "label": "Opérateur",
     "operator": {
@@ -971,6 +972,7 @@
     "left": "Opérande gauche",
     "right": "Opérande droit",
     "containsErrors": "Cette condition contient des erreurs.",
+    "conditionRequired": "Ajoutez au moins une condition.",
     "incomplete": "Complétez ce groupe de conditions.",
     "incompatibleRight": "Le type de la valeur de droite est incompatible avec cette comparaison.",
     "incompatible": "Les types des opérandes sont incompatibles avec cet opérateur."

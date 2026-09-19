@@ -255,7 +255,7 @@ function nodePorts(node: ResolvedSelection): NodePorts {
   const outputs = new Map<string, Omit<FlowCanvasViewOutput, 'handle'>>()
   switch (node.kind) {
     case 'condition': {
-      for (const item of node.node.cases) outputs.set(item.output, {})
+      for (const item of node.node.cases) outputs.set(item.output, { description: item.description })
       outputs.set('otherwise', {})
       break
     }
@@ -697,6 +697,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
         ...common,
         kind: node.kind,
         cases: node.cases.map((item) => ({
+          ...(item.description == null ? {} : { description: item.description }),
           groups: item.groups.map((group) => ({
             expressions: group.expressions.map((expression) => ({
               left: conditionOperand(expression.left, context),

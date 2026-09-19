@@ -62,18 +62,25 @@ describe('Canvas content', () => {
             },
           ],
         },
+        {
+          output: 'described',
+          description: '  Send to manual review.  ',
+          groups: [{ expressions: [{ left: 'score', operator: '>=' as const, right: String(60) }] }],
+        },
       ],
       inputs: [],
-      outputs: [{ handle: 'qualified' }, { handle: 'otherwise' }],
+      outputs: [{ handle: 'qualified' }, { handle: 'described' }, { handle: 'otherwise' }],
       defaultOutput: 'otherwise' as const,
       matchMode: 'first' as const,
     }
     const t = createI18n('en').t
     expect(nodeSummary(node)).toBe('Route qualified applications.')
     expect(conditionBranchSummary(node, 'qualified', t)).toBe('score ≥ 80 ∧ active = true')
+    expect(conditionBranchSummary(node, 'described', t)).toBe('Send to manual review.')
     expect(conditionBranchSummary(node, 'otherwise', t)).toBe('Otherwise')
     expect(conditionBranchSummary(node, 'unused', t)).toBe('')
     expect(conditionBranchSummary({ ...node, diagnostics: 1 }, 'qualified', t)).toBe('Invalid condition')
+    expect(conditionBranchSummary({ ...node, diagnostics: 1 }, 'described', t)).toBe('Send to manual review.')
     expect(conditionBranchSummary({ ...node, run: { status: 'error' } }, 'qualified', t)).toBe('Invalid condition')
     expect(conditionBranchSummary({ ...node, diagnostics: 1 }, 'otherwise', t)).toBe('Otherwise')
     expect(conditionBranchSummary({ ...node, diagnostics: 0 }, 'qualified', t)).toBe('score ≥ 80 ∧ active = true')

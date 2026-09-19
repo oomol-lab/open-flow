@@ -933,7 +933,8 @@
   },
   "conditionEditor": {
     "addCondition": "条件を追加",
-    "deleteCondition": "条件を削除",
+    "caseSettings": "ケース設定",
+    "deleteCase": "ケースを削除",
     "handleKeyTitle": "Handle 名",
     "label": "演算子",
     "operator": {
@@ -971,6 +972,7 @@
     "left": "左辺",
     "right": "右辺",
     "containsErrors": "条件にエラーがあります。",
+    "conditionRequired": "条件を1つ以上追加してください。",
     "incomplete": "条件グループを完成させてください。",
     "incompatibleRight": "右辺の値の型はこの比較に対応していません。",
     "incompatible": "値の型が演算子と互換性がありません。"

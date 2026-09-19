@@ -55,6 +55,7 @@ export type FlowCanvasViewConditionOperand =
   | { readonly icon?: string; readonly kind: 'node'; readonly label: string }
 
 export interface FlowCanvasViewConditionCase {
+  readonly description?: string
   readonly groups: readonly {
     readonly expressions: readonly {
       readonly left: FlowCanvasViewConditionOperand

@@ -933,7 +933,8 @@
   },
   "conditionEditor": {
     "addCondition": "新增條件",
-    "deleteCondition": "刪除條件",
+    "caseSettings": "分支設定",
+    "deleteCase": "刪除分支",
     "handleKeyTitle": "Handle 名稱",
     "label": "運算子",
     "operator": {
@@ -971,6 +972,7 @@
     "left": "左值",
     "right": "右值",
     "containsErrors": "條件中存在錯誤。",
+    "conditionRequired": "請至少新增一個條件。",
     "incomplete": "請補全條件群組。",
     "incompatibleRight": "右值類型不符合此比較的要求。",
     "incompatible": "運算元類型與運算子不相容。"

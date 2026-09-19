@@ -204,6 +204,7 @@ export interface ConditionGroup {
 }
 
 export interface ConditionCase {
+  readonly description?: string
   readonly groups: readonly ConditionGroup[]
   readonly output: string
 }

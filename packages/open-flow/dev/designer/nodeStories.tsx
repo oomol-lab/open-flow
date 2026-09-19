@@ -47,6 +47,7 @@ const conditionModel: FlowCanvasViewModel = {
       cases: [
         {
           output: 'matched',
+          description: 'Continue when source data is available.',
           groups: [
             {
               expressions: [
@@ -610,7 +611,7 @@ export const nodeStories: readonly FrontendStory[] = [
     group: 'Node Condition',
     id: 'node-condition',
     description:
-      'Condition nodes · Empty, single, multiple, invalid input and overflowing branch labels. Hover for two seconds to see connection hints; Invalid input replaces its rule summary with an error label and suppresses connection hints.',
+      'Condition nodes · Purpose summary, empty, multiple, invalid input and overflowing branch labels. A Case purpose replaces its rule summary; invalid input without a purpose uses the error label.',
     title: 'Node States',
     standalone: true,
     render: (log, dark, language) => <ConditionStory dark={dark} language={language} log={log} />,

@@ -326,10 +326,11 @@ describe('Condition changes', () => {
     if (node?.kind != 'condition') throw new Error('Expected condition.')
     const changes = updateCondition(revisionView(current), target, 'condition', {
       matchMode: node.matchMode,
-      cases: [{ ...node.cases[0]!, output: 'matched' }],
+      cases: [{ ...node.cases[0]!, description: 'Approved order', output: 'matched' }],
     })!
     current = applyFlowChanges(current, changes)
     expect(current.content.document.graph.edges).toEqual([{ source: 'condition', sourceHandle: 'matched', target: 'task' }])
+    expect(current.content.document.graph.nodes.condition).toMatchObject({ cases: [{ description: 'Approved order', output: 'matched' }] })
     expect(current.content.document.graph.nodes.task).toMatchObject({
       inputs: { value: { sources: [{ kind: 'node', nodeId: 'condition', output: 'yes' }] } },
     })
