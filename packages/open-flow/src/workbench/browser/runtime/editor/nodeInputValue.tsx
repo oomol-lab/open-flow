@@ -6,6 +6,7 @@ import type { VariablePickerProps } from '../../../../ui/browser/variable-picker
 import type { InputPort, JsonValue } from '../api.ts'
 import type { InputSourceQuery } from '../revisionView.ts'
 
+import { Tooltip as TooltipPrimitive } from '@base-ui/react/tooltip'
 import { useEffect, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { variableInputCompatible } from '../../../../flow/common/schema.ts'
@@ -269,15 +270,18 @@ export function NodeInputValue({
         : literalSource
   const sourceKind = bound ? 'variable' : connected ? 'upstream' : 'literal'
   const sourcePortal = sourceContainer?.closest<HTMLElement>('.editor-context-panel') ?? sourceContainer
-  const sourceOption = (nodeId: string, { output, field, fields, check }: InputSourceCandidate, label: string) => {
+  const sourceOption = (nodeId: string, { description, output, field, fields, check }: InputSourceCandidate, label: string) => {
     const selected = sourceKind === 'upstream' && currentSource === upstreamSource(nodeId, output, field)
     const status = check.kind == 'schema' ? t('inspector.sources.incompatible') : check.kind == 'schema-error' ? t('inspector.sources.unverified') : undefined
-    return (
+    const itemKey = upstreamSource(nodeId, output, field)
+    const sourceDescription = description?.trim()
+    const item = (
       <DropdownMenuRadioItem
+        key={itemKey}
         className={`${sourceItemClass} ${status == null || selected ? 'pr-8' : 'pr-20'}`}
-        key={upstreamSource(nodeId, output, field)}
-        value={upstreamSource(nodeId, output, field)}
+        value={itemKey}
         closeOnClick
+        aria-description={sourceDescription}
       >
         <i
           aria-hidden="true"
@@ -302,6 +306,22 @@ export function NodeInputValue({
         )}
         {selected && status != null && <span className="sr-only">{status}</span>}
       </DropdownMenuRadioItem>
+    )
+    if (sourceDescription == null || sourceDescription === '') return item
+    // Intentionally use Base UI directly: source-option tooltips belong to a nested menu surface
+    // and require its pointer-transparent portal and fixed side positioning, not the shared control-tooltip contract.
+    return (
+      <TooltipPrimitive.Root key={itemKey}>
+        <TooltipPrimitive.Trigger render={item} />
+        <TooltipPrimitive.Portal container={sourcePortal} className="contents">
+          <TooltipPrimitive.Positioner side="right" align="start" sideOffset={8} positionMethod="fixed" className="pointer-events-none isolate z-[1000]">
+            <TooltipPrimitive.Popup className="pointer-events-none max-w-64 rounded-md bg-foreground px-3 py-2 text-xs leading-5 text-background shadow-md outline-none">
+              {sourceDescription}
+              <TooltipPrimitive.Arrow className="size-2.5 rotate-45 rounded-[2px] bg-foreground fill-foreground data-[side=bottom]:top-1 data-[side=left]:-right-1 data-[side=right]:-left-1 data-[side=top]:-bottom-2.5" />
+            </TooltipPrimitive.Popup>
+          </TooltipPrimitive.Positioner>
+        </TooltipPrimitive.Portal>
+      </TooltipPrimitive.Root>
     )
   }
   const selectUpstream = (next: string) => {

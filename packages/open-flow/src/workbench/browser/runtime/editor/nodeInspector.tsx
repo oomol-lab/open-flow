@@ -26,7 +26,7 @@ import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { contextName } from '../../typeScriptShadow.ts'
 import { Icon } from '../icons.tsx'
 import { AgentSettings } from './agentSettings.tsx'
-import { presentResolutionOutputs } from './builtInOutputPresentation.ts'
+import { presentBuiltInOutputDescription, presentBuiltInSourceCandidates, presentResolutionOutputs } from './builtInOutputPresentation.ts'
 import { CodeActions } from './codeActions.tsx'
 import { CodeEditor } from './codeEditor.tsx'
 import { ConditionBranchesEditor } from './conditionBranchesEditor.tsx'
@@ -71,9 +71,11 @@ function inputUpstreamSources({
   selection,
   store,
   handleName,
+  t,
 }: Pick<Props, 'revision' | 'sourceNodeIcons' | 'target' | 'store'> & {
   readonly selection: ResolvedNode
   readonly handleName: string
+  readonly t: TFunction
 }): NodeInputUpstreamSources | undefined {
   const graph = revision.graph(target)!
   const mapping = nodeInputMappings(selection.node)[handleName]
@@ -82,7 +84,10 @@ function inputUpstreamSources({
     current: sources.map((source) => {
       const node = graph.nodes[source.nodeId]
       return {
-        description: revision.outputDescription(target, source.nodeId, source.output),
+        description:
+          node == null
+            ? revision.outputDescription(target, source.nodeId, source.output)
+            : presentBuiltInOutputDescription(node, source.output, revision.outputDescription(target, source.nodeId, source.output), t),
         icon: sourceNodeIcons?.[source.nodeId],
         nodeId: source.nodeId,
         nodeName: node?.name,
@@ -94,12 +99,15 @@ function inputUpstreamSources({
     query: revision.inputSource(target, selection.id, handleName),
     groups: [],
     describeGroups: (candidates) =>
-      Object.entries(candidates).map(([nodeId, outputs]) => ({
-        icon: sourceNodeIcons?.[nodeId],
-        nodeId,
-        nodeName: graph.nodes[nodeId]?.name ?? nodeId,
-        outputs,
-      })),
+      Object.entries(candidates).map(([nodeId, outputs]) => {
+        const node = graph.nodes[nodeId]
+        return {
+          icon: sourceNodeIcons?.[nodeId],
+          nodeId,
+          nodeName: node?.name ?? nodeId,
+          outputs: node == null ? outputs : presentBuiltInSourceCandidates(node, outputs, t),
+        }
+      }),
     onChange: (source) => {
       void store.setInputSource(selection.id, handleName, source)
     },
@@ -897,7 +905,7 @@ export function NodeInspector({
                         }
                       : undefined
                 }
-                renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle })}
+                renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t })}
                 variables={variables}
                 disabled={disabled}
                 onValue={(handle, value, deletion) => {
@@ -944,7 +952,7 @@ export function NodeInspector({
                       onVariable={(handle, name) => {
                         void store.setInputVariable(selection.id, handle, name)
                       }}
-                      renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle })}
+                      renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t })}
                     />
                   </section>
                 )}
@@ -957,7 +965,7 @@ export function NodeInspector({
             value={selection.node}
             disabled={disabled}
             variables={variables}
-            renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle })}
+            renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t })}
             variableName={(source) => (source.kind === 'binding' ? revision.binding(source.bindingId)?.target : undefined)}
             sourceType={(source) => revision.sourceType(target, source)}
             onVariable={(handle, name) => {

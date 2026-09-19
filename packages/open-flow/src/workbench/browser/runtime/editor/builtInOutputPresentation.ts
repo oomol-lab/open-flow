@@ -1,5 +1,6 @@
 import type { TFunction } from 'val-i18n'
-import type { Port, ResolutionNode, TriggerNode } from '../../../../flow/common/change.ts'
+import type { GraphNode, Port, ResolutionNode, TriggerNode } from '../../../../flow/common/change.ts'
+import type { InputSourceCandidate } from '../../../../flow/common/graph.ts'
 
 import { waitBranchDescription } from '../../../../canvas/browser/i18n/waitBranchLocales.ts'
 import { resolutionOutputPorts } from '../../../../flow/common/graph.ts'
@@ -23,4 +24,32 @@ export function presentBuiltInTriggerOutputs(trigger: TriggerNode, t: TFunction)
 export function presentResolutionOutputs(node: ResolutionNode, t: TFunction): readonly Port[] {
   const ports = Object.entries(resolutionOutputPorts(node)).map(([handle, port]) => Object.assign({ handle }, port))
   return withDescriptions(ports, (handle) => waitBranchDescription(t, node.kind, handle))
+}
+
+function presentedBuiltInOutputs(node: GraphNode, t: TFunction): readonly Port[] | undefined {
+  switch (node.kind) {
+    case 'approval':
+    case 'wait':
+      return presentResolutionOutputs(node, t)
+    case 'cron':
+      return presentBuiltInTriggerOutputs(node, t)
+    default:
+      return
+  }
+}
+
+/** Applies localized built-in output copy to source candidates without changing graph-owned data. */
+export function presentBuiltInSourceCandidates(node: GraphNode, candidates: readonly InputSourceCandidate[], t: TFunction): readonly InputSourceCandidate[] {
+  const outputs = presentedBuiltInOutputs(node, t)
+  if (outputs == null) return candidates
+  const descriptions = new Map(outputs.map((port) => [port.handle, port.description]))
+  return candidates.map((candidate) => {
+    const description = descriptions.get(candidate.output)
+    return description == null || description == candidate.description ? candidate : Object.assign({}, candidate, { description })
+  })
+}
+
+/** Returns localized built-in copy when available, otherwise preserving the port-owned description. */
+export function presentBuiltInOutputDescription(node: GraphNode, output: string, description: string | undefined, t: TFunction): string | undefined {
+  return presentedBuiltInOutputs(node, t)?.find((port) => port.handle == output)?.description ?? description
 }

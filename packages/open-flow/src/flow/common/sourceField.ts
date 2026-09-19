@@ -11,13 +11,17 @@ export function sourceFields(output: PortDefinition): readonly { readonly field:
   if (properties == null || (schema.type !== undefined && !types.includes('object'))) return []
   const required = Array.isArray(schema.required) ? schema.required : []
   const missingParent = output.nullable || types.some((type) => type !== 'object')
-  return Object.entries(properties).map(([field, jsonSchema]) => ({
-    field,
-    port: {
-      jsonSchema,
-      nullable: missingParent || !required.includes(field),
-    },
-  }))
+  return Object.entries(properties).map(([field, jsonSchema]) => {
+    const description = schemaObject(jsonSchema)?.description
+    return {
+      field,
+      port: {
+        ...(typeof description == 'string' ? { description } : {}),
+        jsonSchema,
+        nullable: missingParent || !required.includes(field),
+      },
+    }
+  })
 }
 
 export function sourcePort(output: PortDefinition, field: string | undefined): PortDefinition | undefined {

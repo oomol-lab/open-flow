@@ -19,7 +19,11 @@ import { advanceWaiting, waitHost } from './waitHost.ts'
 const engine = findEngineContract(currentEngineContract)!
 const target = { kind: 'flow' } as const
 const reference = (field?: string): NodeSource => ({ kind: 'node', nodeId: 'data', output: 'payload', ...(field === undefined ? {} : { field }) })
-const outputSchema = { type: 'object', properties: { name: { type: 'string' }, count: { type: 'number' } }, required: ['name'] }
+const outputSchema = {
+  type: 'object',
+  properties: { name: { type: 'string', description: 'Customer display name.' }, count: { type: 'number' } },
+  required: ['name'],
+}
 function fixture(value: JsonValue = { name: 'Ada', count: 2 }, schema: JsonValue = outputSchema, field = 'name'): RevisionContent {
   return {
     modelVersion: currentFlowModelVersion,
@@ -35,7 +39,12 @@ function fixture(value: JsonValue = { name: 'Ada', count: 2 }, schema: JsonValue
         ],
         nodes: {
           start: { kind: 'manual', name: 'Start' },
-          data: { kind: 'value', name: 'Data', inputs: {}, values: [{ handle: 'payload', jsonSchema: schema, nullable: true, value }] },
+          data: {
+            kind: 'value',
+            name: 'Data',
+            inputs: {},
+            values: [{ handle: 'payload', description: 'Structured customer payload.', jsonSchema: schema, nullable: true, value }],
+          },
           sink: {
             kind: 'task',
             name: 'Sink',
@@ -121,8 +130,9 @@ describe('Source object fields', () => {
     const { document } = content
     const candidates = inputSourceCandidates(document, document.graph, 'sink', 'value').data!
     expect(candidates[0]?.check.kind).toBe('schema')
+    expect(candidates[0]?.description).toBe('Structured customer payload.')
     expect(candidates[0]?.fields).toMatchObject([
-      { field: 'name', check: { kind: 'available' } },
+      { field: 'name', description: 'Customer display name.', check: { kind: 'available' } },
       { field: 'count', check: { kind: 'schema' } },
     ])
     expect(checkInputSource(document, document.graph, 'sink', 'value', reference('removed'))).toEqual({ kind: 'field-missing' })

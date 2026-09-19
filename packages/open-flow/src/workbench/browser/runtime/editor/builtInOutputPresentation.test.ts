@@ -1,11 +1,17 @@
-import type { ResolutionNode, TriggerNode } from '../../../../flow/common/change.ts'
+import type { GraphNode, ResolutionNode, TriggerNode } from '../../../../flow/common/change.ts'
+import type { InputSourceCandidate } from '../../../../flow/common/graph.ts'
 
 import { describe, expect, it } from 'vitest'
 import { resolutionOutputPorts } from '../../../../flow/common/graph.ts'
 import { uiLanguages } from '../../../../localization/common/languages.ts'
 import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
 import { createI18n } from '../i18n.ts'
-import { presentBuiltInTriggerOutputs, presentResolutionOutputs } from './builtInOutputPresentation.ts'
+import {
+  presentBuiltInOutputDescription,
+  presentBuiltInSourceCandidates,
+  presentBuiltInTriggerOutputs,
+  presentResolutionOutputs,
+} from './builtInOutputPresentation.ts'
 
 const resolution = (kind: ResolutionNode['kind']): ResolutionNode => ({
   inputDefinitions: [],
@@ -48,5 +54,21 @@ describe('built-in output presentation', () => {
             { handle: 'continue', description: '收到“继续”操作时触发。' },
           ],
     )
+  })
+
+  it.each(uiLanguages)('localizes built-in source descriptions for %s without changing graph candidates', (language) => {
+    const t = createI18n(language).t
+    const cases: readonly { readonly node: GraphNode; readonly output: string }[] = [
+      { node: { kind: 'cron', name: 'Schedule', cronTimes: [] }, output: 'scheduledAt' },
+      { node: resolution('wait'), output: 'pending' },
+    ]
+    for (const { node, output } of cases) {
+      const candidates: readonly InputSourceCandidate[] = [{ output, check: { kind: 'available' } }]
+      const presented = presentBuiltInSourceCandidates(node, candidates, t)
+      expect(candidates[0]?.description).toBeUndefined()
+      expect(presented[0]?.description).toBeTruthy()
+      expect(presented[0]?.description).not.toContain('inspector.')
+      expect(presentBuiltInOutputDescription(node, output, undefined, t)).toBe(presented[0]?.description)
+    }
   })
 })

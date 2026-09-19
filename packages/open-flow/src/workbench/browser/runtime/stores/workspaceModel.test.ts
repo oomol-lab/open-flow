@@ -64,7 +64,7 @@ describe('Per-field input sources', () => {
       expect(check).not.toHaveBeenCalled()
       expect(query.check()).toEqual({ conflict: false, sources: [] })
       expect(check).not.toHaveBeenCalled()
-      expect(query.candidates()).toEqual({ source: [{ output: 'text', check: { kind: 'available' } }] })
+      expect(query.candidates()).toEqual({ source: [{ description: 'Plain text', output: 'text', check: { kind: 'available' } }] })
       expect(calculate).toHaveBeenCalledTimes(1)
       expect(view.inputSource({ kind: 'flow' }, 'task', 'input0')).toBe(query)
       expect(query.candidates()).toBe(query.candidates())
@@ -133,6 +133,7 @@ describe('Per-field input sources', () => {
       expect(revisionView(changed).inputSource({ kind: 'flow' }, 'task', 'input0').candidates()).toEqual({
         source: [
           {
+            description: 'Plain text',
             output: 'text',
             check: { kind: 'schema', mismatch: { kind: 'keyword', keyword: 'type', path: [], source: 'string', target: 'number' } },
           },
@@ -161,7 +162,7 @@ describe('Per-field input sources', () => {
 
     const view = revisionView(source)
     expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').candidates()).toEqual({
-      source: [{ output: 'text', check: { kind: 'available' } }],
+      source: [{ description: 'Plain text', output: 'text', check: { kind: 'available' } }],
     })
     expect(view.inputSource({ kind: 'flow' }, 'other', 'input0').candidates()).toEqual({})
     expect(view.inputSource({ kind: 'subflow', id: 'nested' }, 'task', 'input0').candidates()).toEqual({})

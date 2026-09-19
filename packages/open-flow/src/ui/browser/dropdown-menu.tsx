@@ -214,16 +214,13 @@ function DropdownMenuRadioGroup({ ...props }: MenuPrimitive.RadioGroup.Props) {
   return <MenuPrimitive.RadioGroup data-slot="dropdown-menu-radio-group" {...props} />
 }
 
-function DropdownMenuRadioItem({
-  className,
-  children,
-  inset,
-  ...props
-}: MenuPrimitive.RadioItem.Props & {
-  inset?: boolean
-}) {
+const DropdownMenuRadioItem = React.forwardRef<HTMLDivElement, MenuPrimitive.RadioItem.Props & { inset?: boolean }>(function DropdownMenuRadioItem(
+  { className, children, inset, ...props },
+  ref,
+) {
   return (
     <MenuPrimitive.RadioItem
+      ref={ref}
       data-slot="dropdown-menu-radio-item"
       data-inset={inset}
       className={cn(
@@ -240,7 +237,7 @@ function DropdownMenuRadioItem({
       {children}
     </MenuPrimitive.RadioItem>
   )
-}
+})
 
 function DropdownMenuSeparator({ className, ...props }: MenuPrimitive.Separator.Props) {
   return <MenuPrimitive.Separator data-slot="dropdown-menu-separator" className={cn('-mx-1 my-1 h-px bg-border', className)} {...props} />

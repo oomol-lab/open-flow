@@ -457,12 +457,14 @@ export type InputSourceCheck =
 export type InputSourceCandidateCheck = Extract<InputSourceCheck, { readonly kind: 'available' | 'schema' | 'schema-error' }>
 
 interface InputSourceFieldCandidate {
+  readonly description?: string
   readonly output: string
   readonly field: string
   readonly check: InputSourceCandidateCheck
 }
 
 export interface InputSourceCandidate {
+  readonly description?: string
   readonly field?: string
   readonly fields?: readonly InputSourceFieldCandidate[]
   readonly output: string
@@ -537,8 +539,10 @@ export function inputSourceCandidates(
       const outputs = Object.entries(nodeOutputPorts(document, node)).flatMap(([output, definition]) => {
         if (!mappingAvailable(graph, target, { kind: 'sources', sources: [{ kind: 'node', nodeId, output }] }, analysis)) return []
         const check = sourceCompatibility(definition, input)
-        const fields = sourceFields(definition).map(({ field, port }) => ({ output, field, check: sourceCompatibility(port, input) }))
-        return [{ output, check, ...(fields.length > 0 ? { fields } : {}) }]
+        const fields = sourceFields(definition).map(({ field, port }) =>
+          Object.assign({ output, field, check: sourceCompatibility(port, input) }, port.description == null ? {} : { description: port.description }),
+        )
+        return [{ ...(definition.description == null ? {} : { description: definition.description }), output, check, ...(fields.length > 0 ? { fields } : {}) }]
       })
       return outputs.length == 0 ? [] : [[nodeId, outputs]]
     }),

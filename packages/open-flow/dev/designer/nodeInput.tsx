@@ -61,10 +61,10 @@ function ObjectSourceSample({ variables }: { variables: InputVariables }) {
                   type: 'object',
                   required: ['name'],
                   properties: {
-                    'name': { type: 'string' },
+                    'name': { type: 'string', description: 'Customer name used in messages and reports.' },
                     'count': { type: 'number' },
-                    'profile': { type: 'object' },
-                    'display.name': { type: 'string' },
+                    'profile': { type: 'object', description: 'Structured customer profile returned by the upstream step.' },
+                    'display.name': { type: 'string', description: 'Preferred display name, including punctuation and spacing.' },
                     '': { type: 'string' },
                   },
                 },
