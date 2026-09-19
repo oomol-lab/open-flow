@@ -26,6 +26,19 @@ context. Hosts retain business layout ownership, while shared UI owns control ap
 the default product colors. Shared components always read the `--ui-*` contract; do not load separate
 light/dark theme modules or theme-selection functions.
 
+Keep style ownership explicit:
+
+- Host styles stay within host-owned UI. Customize Open Flow through `--open-flow-*`; do not target
+  packaged product roots or force them to inherit host tokens.
+- `.open-flow-workbench` establishes `.open-flow-theme` and owns Workbench and canvas chrome,
+  including the node outline, node picker, and canvas control islands.
+- The canvas surface owns node content, edges, handles, and node-local popovers.
+- `.open-flow-property-panel` may override control-specific tokens such as `--ui-control-radius`,
+  but not product-wide tokens such as `--ui-radius`.
+- Lab owns its shell, story framing, and guidance. It must not restyle production components.
+
+Fix boundary leaks at their owner instead of adding compensating component overrides.
+
 Shared controls declare their own dimensions, borders, backgrounds, and interaction states. The
 canvas root provides base typography without overriding all descendant controls through native
 element selectors. Compact text editors and comment title-bar buttons declare their own dimensions

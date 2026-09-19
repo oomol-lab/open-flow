@@ -55,6 +55,23 @@ caching simpler than the repeated work it removes.
 Before implementing or reviewing frontend appearance, layout, components, or interactions, read and
 use the [frontend-ui skill](.agents/skills/frontend-ui/SKILL.md).
 
+### Frontend style boundaries
+
+- **Host shell and chrome:** Keep host selectors inside host-owned UI. Customize Open Flow through
+  public `--open-flow-*` tokens. Do not target packaged product roots or force them to inherit host
+  tokens.
+- **Workbench and canvas chrome:** The `.open-flow-workbench` root establishes `.open-flow-theme`.
+  It owns the node outline, node picker, and canvas control islands. Product theme tokens belong in
+  `packages/open-flow/src/ui/browser/theme.css`.
+- **Canvas content:** The canvas surface owns nodes, edges, handles, and node-local popovers. Its
+  compact palette and geometry must not leak into Workbench chrome.
+- **Property panel:** `.open-flow-property-panel` may narrow control-specific tokens such as
+  `--ui-control-radius`, but must not replace product-wide tokens such as `--ui-radius`.
+- **Lab:** Lab owns its shell, story framing, and guidance. It must not restyle production components,
+  which use the same theme and surface contracts as real hosts.
+
+Fix cross-boundary leaks at their owner. Do not add compensating component overrides.
+
 `ContextPanel` is the property panel's only cross-section stacking context. Sections and field tables
 must not trap feedback or popups in local stacking contexts. Individual editors may isolate internal
 content, but cross-section elevation uses the semantic layers in `context-panel.css`. Do not introduce
