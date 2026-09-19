@@ -901,7 +901,8 @@
     "scheduleMissing": "尚未設定排程"
   },
   "triggerConfig": {
-    "configuration": "設定",
+    "configuration": "觸發器設定",
+    "description": "說明",
     "required": "需要輸入"
   },
   "webhookEditor": {

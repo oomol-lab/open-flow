@@ -10,6 +10,7 @@ import { Field, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Label } from '../../../../ui/browser/label.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
+import { InspectorSection } from './inspectorSection.tsx'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 
 function TextField({
@@ -74,8 +75,7 @@ export function WebhookEditor({
   const changeHeaders = (next: Readonly<Record<string, string>>, deletion?: PropertyDeletion) =>
     changeOption('responseHeaders', Object.keys(next).length === 0 ? undefined : next, deletion)
   return (
-    <section className="inspector-section" data-inspector-section="trigger">
-      <h3>{t('webhookEditor.webhookRequest')}</h3>
+    <InspectorSection title={t('webhookEditor.webhookRequest')} data-inspector-section="trigger">
       <FieldGroup>
         <Field>
           <FieldLabel>{t('webhookEditor.webhookMethods')}</FieldLabel>
@@ -198,6 +198,6 @@ export function WebhookEditor({
           </FieldGroup>
         </details>
       </FieldGroup>
-    </section>
+    </InspectorSection>
   )
 }

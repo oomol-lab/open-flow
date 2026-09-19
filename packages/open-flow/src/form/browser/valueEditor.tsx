@@ -58,6 +58,8 @@ export interface ValueEditorProps {
   /** Renders schema structure without a value editor. */
   readonly definitionOnly?: boolean
   readonly hideOptions?: boolean
+  /** Hides the inline clear and raw JSON controls while preserving field settings. */
+  readonly hideValueTools?: boolean
   readonly arrayChild?: boolean
   readonly objectChild?: boolean
   readonly actions?: ReactNode
@@ -179,7 +181,9 @@ export function ValueEditor(props: ValueEditorProps) {
     (Array.isArray(source.type) && source.type.includes('null')) ||
     (Array.isArray(source.enum) && source.enum.includes(null))
   const presence = value === undefined ? 'unset' : value === null ? 'null' : 'value'
-  const missing = presence === 'unset' && !allowsNull
+  // Definition-only rows describe output schemas; they do not own a runtime value
+  // and must not surface a required-value error or expand themselves as invalid.
+  const missing = !definitionOnly && presence === 'unset' && !allowsNull
   const invalidNull = presence === 'null' && !allowsNull
   const type = valueType(schema, value)
   const language = useVal(useI18n(true)?.lang$ ?? 'en')
@@ -341,7 +345,7 @@ export function ValueEditor(props: ValueEditorProps) {
       ))}
     </div>
   )
-  const inlineTools = (props.layout === 'values' || props.layout === 'ports') && valueEditable && !disabled && !sorting
+  const inlineTools = !props.hideValueTools && (props.layout === 'values' || props.layout === 'ports') && valueEditable && !disabled && !sorting
   const canClear = inlineTools && presence !== 'unset'
   const canToggleJson = inlineTools && expanded && !complex && !enumeration && !itemEnumeration && !showUnset && (type === 'object' || type === 'array')
   const valueSuffix =

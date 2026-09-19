@@ -41,7 +41,7 @@ import { NodeInputs } from './nodeInputs.tsx'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
 import { TriggerScheduleEditor } from './triggerScheduleEditor.tsx'
-import { TriggerInspectorSummary } from './triggerSummary.tsx'
+import { TriggerSummary } from './triggerSummary.tsx'
 import { WebhookEditor } from './webhookEditor.tsx'
 
 const manageAccountOption = '__manage-account__'
@@ -880,16 +880,7 @@ export function NodeInspector({
             }}
           />
         )}
-        {selection?.kind === 'trigger' && (selection.trigger.kind === 'cron' || selection.trigger.kind === 'poll') && (
-          <TriggerScheduleEditor
-            key={`schedule:${selection.id}`}
-            schedules={selection.trigger.kind === 'cron' ? selection.trigger.cronTimes : selection.trigger.pollTimes}
-            disabled={disabled}
-            onChange={(schedule) => {
-              void store.saveTriggerSchedule(selection.id, schedule)
-            }}
-          />
-        )}
+        {selection?.kind === 'trigger' && <TriggerSummary trigger={selection.trigger} />}
         {selection?.kind === 'trigger' &&
           (selection.trigger.kind === 'integration' || selection.trigger.kind === 'poll') &&
           (['feishu.on_event', 'feishu_app_bot.on_event'].includes(selection.trigger.definition.key) ? (
@@ -926,7 +917,16 @@ export function NodeInspector({
             }}
           />
         )}
-        {selection?.kind === 'trigger' && <TriggerInspectorSummary trigger={selection.trigger} catalog={triggers.catalog} />}
+        {selection?.kind === 'trigger' && (selection.trigger.kind === 'cron' || selection.trigger.kind === 'poll') && (
+          <TriggerScheduleEditor
+            key={`schedule:${selection.id}`}
+            schedules={selection.trigger.kind === 'cron' ? selection.trigger.cronTimes : selection.trigger.pollTimes}
+            disabled={disabled}
+            onChange={(schedule) => {
+              void store.saveTriggerSchedule(selection.id, schedule)
+            }}
+          />
+        )}
         {(selection?.kind === 'approval' || selection?.kind === 'wait' || selection?.kind === 'subflow' || selection?.kind === 'task') &&
           (() => {
             const definitions: (InputPort | Group)[] =

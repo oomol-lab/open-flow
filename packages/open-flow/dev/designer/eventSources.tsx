@@ -1,10 +1,9 @@
 import type { ComponentProps } from 'react'
 import type { FrontendStory } from './stories.tsx'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import snapshots from 'virtual:lab-trigger-snapshots'
-import { localizeTrigger } from '../../src/trigger/providers/localization.ts'
 import { ApiError } from '../../src/workbench/browser/runtime/api.ts'
 import { CreateEventSourceDialog } from '../../src/workbench/browser/runtime/createEventSourceDialog.tsx'
 import { EditorContextPanel } from '../../src/workbench/browser/runtime/editor/editorContextPanel.tsx'
@@ -340,22 +339,12 @@ export const feishuFiltersStory: FrontendStory = {
 function SummarySample({ language }: { language: Parameters<FrontendStory['render']>[2] }) {
   const i18n = useMemo(() => createI18n(language), [language])
   const definition = snapshots.find((item) => item.key == 'feishu_app_bot.on_event')!
-  const [display, setDisplay] = useState<ComponentProps<typeof TriggerSummary>['display']>()
-  useEffect(() => {
-    let current = true
-    void localizeTrigger(definition, language).then((value) => {
-      if (current) setDisplay(value)
-    })
-    return () => {
-      current = false
-    }
-  }, [definition, language])
   if (definition.type != 'integration') throw new Error('Expected an integration trigger fixture.')
   return (
     <I18nProvider i18n={i18n}>
       <section>
         <h2 className="text-sm font-medium">{language}</h2>
-        <TriggerSummary trigger={{ kind: 'integration', name: 'Feishu', bindingId: 'sample', definition, config: {} }} display={display} />
+        <TriggerSummary trigger={{ kind: 'integration', name: 'Feishu', bindingId: 'sample', definition, config: {} }} />
       </section>
     </I18nProvider>
   )
@@ -364,9 +353,9 @@ function SummarySample({ language }: { language: Parameters<FrontendStory['rende
 export const feishuSummaryStory: FrontendStory = {
   group: 'Workbench',
   id: 'feishu-trigger-summary',
-  title: 'Feishu Trigger Summary',
+  title: 'Provider Trigger Outputs',
   standalone: true,
-  description: 'Localized descriptions from the provider catalog; protocol identifiers remain unchanged.',
+  description: 'Provider triggers use the standard read-only Outputs section in every UI language.',
   render: (_log, dark) => (
     <div className="open-flow-theme grid gap-6 p-6 text-foreground lg:grid-cols-2" data-theme={dark ? 'dark' : 'light'}>
       <SummarySample language="zh-CN" />

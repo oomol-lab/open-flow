@@ -108,6 +108,51 @@ describe('Provider account section', () => {
   })
 })
 
+describe('Provider Trigger sections', () => {
+  it('orders Outputs and Provider configuration before Node settings', () => {
+    const trigger = {
+      bindingId: 'connection',
+      config: {},
+      definition: {
+        configSchema: { type: 'object', properties: { query: { type: 'string' } } },
+        description: 'Polls a mailbox.',
+        key: 'gmail.on_message_received',
+        name: 'on_message_received',
+        provider: 'gmail',
+        type: 'poll',
+      },
+      inputs: {},
+      kind: 'poll',
+      name: 'New message received',
+      pollTimes: [{ type: 'every', unit: 'minute', value: 5 }],
+    }
+    const element = NodeInspector({
+      variables: { enabled: false, names: [], loaded: true, loading: false, onOpen: vi.fn() },
+      connectorAuthorizationPending: false,
+      connectorLoading: false,
+      connectors: {} as never,
+      disabled: false,
+      revision: {} as never,
+      selection: { id: 'provider-trigger', kind: 'trigger', node: trigger, trigger } as never,
+      store: { $: { flowId: { value: 'flow' } }, saveTriggerConfig: vi.fn(), saveTriggerSchedule: vi.fn() } as never,
+      target: { kind: 'flow' },
+      theme: 'light',
+      triggerActiveConnections: [],
+      triggerAuthorizationPending: false,
+      triggerConnectionLoading: false,
+      triggers: {} as never,
+    })
+    const content = find(element, (item) => item.props.className == 'inspector-content')
+    if (content == null) throw new Error('Expected inspector content.')
+    const sections = Children.toArray((content.props as { readonly children?: ReactNode }).children)
+      .filter(isValidElement)
+      .map((item) => (typeof item.type == 'function' ? item.type.name : item.type))
+
+    expect(sections.indexOf('TriggerSummary')).toBeLessThan(sections.indexOf('TriggerConfigEditor'))
+    expect(sections.indexOf('TriggerConfigEditor')).toBeLessThan(sections.indexOf('TriggerScheduleEditor'))
+  })
+})
+
 describe('Resolution Inspector', () => {
   it.each(['approval', 'wait'] as const)('saves the latest %s prompt on blur and preserves the node name', (kind) => {
     const saveResolution = vi.fn().mockResolvedValue(true)

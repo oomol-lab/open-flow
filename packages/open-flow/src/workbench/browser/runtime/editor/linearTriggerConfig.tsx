@@ -8,6 +8,7 @@ import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Label } from '../../../../ui/browser/label.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../ui/browser/select.tsx'
+import { InspectorSection } from './inspectorSection.tsx'
 
 function useOptions(store: WorkspaceStore, nodeId: string, field: string, scope: string, enabled: boolean) {
   const [attempt, setAttempt] = useState(0)
@@ -51,8 +52,7 @@ export function LinearTriggerConfig({
   const missingTeam = teamId != null && teams.options != null && !teams.options.some((item) => item.value == teamId)
   const missingStates = states.options == null ? [] : selected.filter((id) => !states.options!.some((item) => item.value == id))
   return (
-    <section className="inspector-section" data-inspector-section="trigger">
-      <h3>{t('triggerConfig.configuration')}</h3>
+    <InspectorSection title={t('triggerConfig.configuration')} data-inspector-section="trigger">
       <FieldGroup>
         <Field data-invalid={missingTeam || undefined}>
           <FieldLabel>{t('linearTrigger.team')}</FieldLabel>
@@ -126,6 +126,6 @@ export function LinearTriggerConfig({
           )}
         </Field>
       </FieldGroup>
-    </section>
+    </InspectorSection>
   )
 }

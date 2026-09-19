@@ -901,7 +901,8 @@
     "scheduleMissing": "Расписание не настроено"
   },
   "triggerConfig": {
-    "configuration": "Конфигурация",
+    "configuration": "Настройка триггера",
+    "description": "Описание",
     "required": "Требуется вход"
   },
   "webhookEditor": {

@@ -901,7 +901,8 @@
     "scheduleMissing": "スケジュールが未設定です"
   },
   "triggerConfig": {
-    "configuration": "設定",
+    "configuration": "トリガー設定",
+    "description": "説明",
     "required": "入力が必要"
   },
   "webhookEditor": {

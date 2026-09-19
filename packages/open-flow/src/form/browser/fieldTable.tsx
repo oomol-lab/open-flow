@@ -12,11 +12,12 @@ export const FieldTable = forwardRef<
   ComponentPropsWithoutRef<'div'> & {
     layout?: 'values' | 'ports' | 'definition'
     fixedTypes?: boolean
+    typeColumn?: boolean
     output?: boolean
     nullable?: boolean
     empty?: boolean
   }
->(({ layout = 'definition', fixedTypes, output, nullable, empty, className, children, ...props }, ref) => {
+>(({ layout = 'definition', fixedTypes, typeColumn = true, output, nullable, empty, className, children, ...props }, ref) => {
   const t = useTranslate()
   return (
     <div
@@ -25,6 +26,7 @@ export const FieldTable = forwardRef<
       className={[styles.list, className].filter(Boolean).join(' ')}
       data-value-editor-scope
       data-layout={layout}
+      data-type-column={typeColumn || undefined}
       data-output={output || undefined}
       data-fixed-types={fixedTypes || undefined}
       data-nullable={nullable || undefined}
@@ -32,8 +34,8 @@ export const FieldTable = forwardRef<
     >
       {!empty && (
         <div className={styles.columns} data-layout={layout} data-output={output || undefined}>
-          <span>{t('valueEditor.columnName')}</span>
-          <span>{t('valueEditor.columnType')}</span>
+          <span className={styles.nameHeading}>{t('valueEditor.columnName')}</span>
+          {typeColumn && <span className={styles.typeHeading}>{t('valueEditor.columnType')}</span>}
           {!output && <span className={styles.valueHeading}>{t('valueEditor.columnValue')}</span>}
           {nullable && <span className={styles.nullableHeading}>{t('valueEditor.nullable')}</span>}
         </div>

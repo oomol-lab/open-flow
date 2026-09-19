@@ -27,11 +27,11 @@
   > span {
     padding-left: 7px;
   }
-  > span:nth-child(1) {
+  > .nameHeading {
     grid-column: handle;
     grid-row: 1;
   }
-  > span:nth-child(2) {
+  > .typeHeading {
     grid-column: type;
     grid-row: 1;
     .list[data-fixed-types] & {
@@ -46,6 +46,10 @@
 
 .list[data-fixed-types] {
   --field-type-width: 32px;
+}
+.list:not([data-type-column]) {
+  --field-type-width: 0px;
+  --field-type-value-gap: 0px;
 }
 .list[data-output] {
   --field-type-width: minmax(96px, 0.65fr);

@@ -901,7 +901,8 @@
     "scheduleMissing": "No schedule configured"
   },
   "triggerConfig": {
-    "configuration": "Configuration",
+    "configuration": "Trigger configuration",
+    "description": "Description",
     "required": "Input required"
   },
   "webhookEditor": {

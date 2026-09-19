@@ -8,6 +8,10 @@
     --context-panel-resizer-layer: 5;
     --value-editor-hover-layer: var(--context-panel-feedback-layer);
     --value-editor-active-layer: var(--context-panel-active-layer);
+    /* Section chrome and controls share these horizontal alignment guides. */
+    --inspector-section-inset: 12px;
+    --inspector-content-inset-start: 25px;
+    --inspector-content-inset-end: 20px;
     position: relative;
     isolation: isolate;
     container: context-panel / inline-size;
@@ -319,8 +323,24 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 14px 12px;
+    padding: 14px var(--inspector-content-inset-end) 14px var(--inspector-content-inset-start);
     border-bottom: 1px solid var(--ui-border);
+  }
+
+  .inspector-titled-section {
+    gap: 0;
+    padding: 0;
+  }
+
+  .inspector-section-content {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 2px var(--inspector-content-inset-end) 14px var(--inspector-content-inset-start);
+  }
+
+  .inspector-section-content:not([data-inset]) {
+    padding: 0;
   }
 
   .inspector-section-divider {
@@ -336,7 +356,7 @@
     width: 100%;
     align-items: center;
     gap: 6px;
-    padding: 8px 12px;
+    padding: 8px var(--inspector-section-inset);
     background: var(--ui-background);
     font-size: 13px;
     font-weight: 500;
@@ -350,17 +370,18 @@
 
   .inspector-field-section {
     gap: 0;
-    padding: 0 12px 16px;
+    padding: 0 var(--inspector-section-inset) 16px;
     border-bottom: 1px solid var(--ui-border);
 
     > [data-slot='field-label'] {
-      width: calc(100% + 24px);
-      margin-left: -12px;
+      width: calc(100% + 2 * var(--inspector-section-inset));
+      margin-inline-start: calc(-1 * var(--inspector-section-inset));
     }
 
     > :not([data-slot='field-label']) {
-      width: calc(100% - 21px);
-      margin: 2px 8px 0 13px;
+      width: auto;
+      margin: 2px calc(var(--inspector-content-inset-end) - var(--inspector-section-inset)) 0
+        calc(var(--inspector-content-inset-start) - var(--inspector-section-inset));
     }
 
     > .self-start {
@@ -379,7 +400,7 @@
     min-height: 48px;
     align-items: center;
     gap: 10px;
-    padding: 7px 12px;
+    padding: 7px var(--inspector-section-inset);
     list-style: none;
     color: var(--ui-foreground);
     cursor: pointer;
@@ -454,7 +475,7 @@
     display: flex;
     flex-direction: column;
     gap: 10px;
-    padding: 2px 12px 14px;
+    padding: 2px var(--inspector-content-inset-end) 14px var(--inspector-content-inset-start);
   }
 
   .inspector-section.diagnostic-located,
@@ -462,7 +483,7 @@
     animation: diagnostic-located 1.2s ease-out;
   }
 
-  .inspector-section h3 {
+  .inspector-section h3:not(.inspector-section-title) {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -470,6 +491,10 @@
     font-size: 12px;
     font-weight: 600;
     line-height: 17px;
+  }
+
+  .inspector-section > h3:not(.inspector-section-title) {
+    margin-inline-start: calc(var(--inspector-section-inset) - var(--inspector-content-inset-start));
   }
 
   .inspector-form textarea {
@@ -1283,7 +1308,7 @@
     align-items: stretch;
     flex-direction: column;
     gap: 8px;
-    padding: 2px 20px 16px 25px;
+    padding: 2px var(--inspector-content-inset-end) 16px var(--inspector-content-inset-start);
   }
 
   .connection-state .connection-detail {

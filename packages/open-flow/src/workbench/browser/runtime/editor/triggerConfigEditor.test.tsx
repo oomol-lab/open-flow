@@ -25,10 +25,19 @@ describe('Trigger configuration editor', () => {
         />
       </I18nProvider>,
     )
-    expect(markup).toContain('data-invalid="true"')
+    expect(markup).toContain('class="inspector-section-title"')
+    expect(markup).toContain('Trigger configuration')
+    expect(markup).toContain('aria-invalid="true"')
     expect(markup).toContain('value="example"')
     expect(markup).toContain('value="10"')
-    expect((markup.match(/<button\b[^>]*aria-label="Events"[^>]*>/) ?? [])[0]).toContain('aria-invalid="true"')
+    expect((markup.match(/<button\b[^>]*aria-label="events"[^>]*>/) ?? [])[0]).toContain('aria-invalid="true"')
+    expect(markup).toContain('>Name</span>')
+    expect(markup).toContain('>Value</span>')
+    expect(markup).not.toContain('>Type</span>')
+    expect(markup).toMatch(/<input[^>]*aria-label="Field name"[^>]*readonly=""[^>]*value="owner"/)
+    expect(markup).toContain('aria-label="owner Field settings"')
+    expect(markup).not.toContain('Edit as JSON')
+    expect(markup).not.toContain('Clear owner')
     expect(onChange).not.toHaveBeenCalled()
   })
 

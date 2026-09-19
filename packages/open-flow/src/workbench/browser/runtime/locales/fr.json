@@ -901,7 +901,8 @@
     "scheduleMissing": "Aucune planification configurée"
   },
   "triggerConfig": {
-    "configuration": "Configuration",
+    "configuration": "Configuration du déclencheur",
+    "description": "Description",
     "required": "Entrée requise"
   },
   "webhookEditor": {
