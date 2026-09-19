@@ -175,25 +175,6 @@ export function ConditionBranchesEditor({
   )
   return (
     <div data-inspector-section="condition">
-      <Field className="inspector-field-section">
-        <FieldLabel className="inspector-section-title">{t('conditionEditor.matchMode')}</FieldLabel>
-        <div className="node-settings">
-          <Field>
-            <FieldSelect
-              aria-label={t('conditionEditor.matchMode')}
-              disabled={disabled}
-              value={value.matchMode}
-              onChange={(matchMode) => onChange({ ...value, matchMode: matchMode as 'first' | 'all' })}
-            >
-              <option value="first">{t('conditionEditor.first')}</option>
-              <option value="all">{t('conditionEditor.all')}</option>
-            </FieldSelect>
-            <FieldDescription className="pl-2 text-xs">
-              {t(value.matchMode == 'first' ? 'conditionEditor.firstHelp' : 'conditionEditor.allHelp')}
-            </FieldDescription>
-          </Field>
-        </div>
-      </Field>
       <section className="condition-editor">
         <FieldSectionHeader
           title={t('conditionEditor.cases')}
@@ -588,6 +569,25 @@ export function ConditionBranchesEditor({
           )}
         </div>
       </section>
+      <Field className="inspector-field-section">
+        <FieldLabel className="inspector-section-title">{t('conditionEditor.matchMode')}</FieldLabel>
+        <div className="node-settings">
+          <Field>
+            <FieldSelect
+              aria-label={t('conditionEditor.matchMode')}
+              disabled={disabled}
+              value={value.matchMode}
+              onChange={(matchMode) => onChange({ ...value, matchMode: matchMode as 'first' | 'all' })}
+            >
+              <option value="first">{t('conditionEditor.first')}</option>
+              <option value="all">{t('conditionEditor.all')}</option>
+            </FieldSelect>
+            <FieldDescription className="pl-2 text-xs">
+              {t(value.matchMode == 'first' ? 'conditionEditor.firstHelp' : 'conditionEditor.allHelp')}
+            </FieldDescription>
+          </Field>
+        </div>
+      </Field>
     </div>
   )
 }
