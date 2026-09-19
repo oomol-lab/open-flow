@@ -161,7 +161,8 @@
     "multipleSelected": "노드 {{count}}개 선택됨",
     "account": {
       "required": "계정 연결 필요",
-      "addConnection": "Connection 추가",
+      "addAccount": "계정 추가…",
+      "manage": "관리",
       "authorizationPending": "Connection 페이지에서 인증을 마친 뒤 여기로 돌아와 이 계정을 새로 고치세요.",
       "chooseAccount": "계정 선택",
       "connectBeforeRun": "이 블록을 실행하거나 게시하려면 먼저 {{service}}에 연결하세요.",
@@ -169,7 +170,6 @@
       "connection": "Connection",
       "loading": "Connection 불러오는 중…",
       "missing": "이 블록에 고정된 Connection이 더 이상 존재하지 않습니다. 다른 계정을 선택하거나 Connection을 추가하세요.",
-      "pinned": "팀 기본값이 바뀌어도 이 블록은 현재 Connection에 고정된 상태로 유지됩니다.",
       "refreshFailed": "Connection을 새로 고치지 못했습니다.",
       "retry": "다시 시도",
       "status": {

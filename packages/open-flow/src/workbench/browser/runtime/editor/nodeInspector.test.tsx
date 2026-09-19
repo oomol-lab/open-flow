@@ -56,6 +56,58 @@ function resolutionDefinition(
   return (resolution.type as (props: unknown) => ReactElement)(resolution.props)
 }
 
+describe('Provider account section', () => {
+  it('offers account management without passive active-connection copy', () => {
+    const connect = vi.fn()
+    const setConnection = vi.fn()
+    const node = { inputs: {}, kind: 'task', name: 'Send message', taskId: 'provider-task' }
+    const definition = {
+      executor: { action: 'slack.send-message', connectionId: 'connection', kind: 'connector' },
+      inputs: [],
+      name: 'Send message',
+      outputs: [],
+    }
+    const element = NodeInspector({
+      variables: { enabled: true, names: [], loaded: true, loading: false, onOpen: vi.fn() },
+      activeConnectorConnections: [{ connectionId: 'connection', displayName: 'Work', isDefault: true, serviceId: 'slack', status: 'active' }],
+      connectorAction: { authenticated: true, serviceId: 'slack', serviceName: 'Slack' } as never,
+      connectorAuthorizationPending: false,
+      connectorConnection: { connectionId: 'connection', displayName: 'Work', isDefault: true, serviceId: 'slack', status: 'active' },
+      connectorLoading: false,
+      connectors: { connect, setConnection } as never,
+      disabled: false,
+      revision: { graph: () => ({ nodes: { provider: node } }) } as never,
+      selection: { definition, id: 'provider', kind: 'task', node } as never,
+      store: { $: { flowId: { value: 'flow' }, moduleEditor: { value: undefined } } } as never,
+      target: { kind: 'flow' },
+      theme: 'light',
+      triggerAuthorizationPending: false,
+      triggerConnectionLoading: false,
+      triggers: {} as never,
+    })
+    const account = find(element, (item) => typeof item.type == 'function' && item.type.name == 'ConnectorAccount')
+    if (account == null || typeof account.type != 'function') throw new Error('Expected Provider account section.')
+    const rendered = (account.type as (props: unknown) => ReactElement)(account.props)
+    const manage = find(rendered, (item) => item.props.children == 'inspector.account.manage')
+    const accountSelect = find(rendered, (item) => typeof item.type == 'function' && item.type.name == 'AccountSelect')
+    if (accountSelect == null || typeof accountSelect.type != 'function') throw new Error('Expected account selector.')
+    const renderedSelect = (accountSelect.type as (props: unknown) => ReactElement)(accountSelect.props)
+    const addAccount = find(renderedSelect, (item) => item.props.children == 'inspector.account.addAccount')
+    const select = find(renderedSelect, (item) => typeof item.props.onValueChange == 'function')
+
+    expect(manage?.props.children).toBe('inspector.account.manage')
+    expect(addAccount?.props.children).toBe('inspector.account.addAccount')
+    expect(find(rendered, (item) => item.type == 'p' && item.props.children == 'inspector.account.pinned')).toBeUndefined()
+
+    ;(manage!.props.onClick as () => void)()
+    ;(select!.props.onValueChange as (value: string) => void)(addAccount!.props.value as string)
+
+    expect(connect).toHaveBeenCalledTimes(2)
+    expect(connect).toHaveBeenLastCalledWith('slack')
+    expect(setConnection).not.toHaveBeenCalled()
+  })
+})
+
 describe('Resolution Inspector', () => {
   it.each(['approval', 'wait'] as const)('saves the latest %s prompt on blur and preserves the node name', (kind) => {
     const saveResolution = vi.fn().mockResolvedValue(true)

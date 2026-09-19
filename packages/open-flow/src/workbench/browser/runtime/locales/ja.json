@@ -161,7 +161,8 @@
     "multipleSelected": "{{count}} 個のノードを選択中",
     "account": {
       "required": "アカウント接続が必要",
-      "addConnection": "Connection を追加",
+      "addAccount": "アカウントを追加…",
+      "manage": "管理",
       "authorizationPending": "Connection ページで認証を完了してください。ここに戻ると、このアカウントが更新されます。",
       "chooseAccount": "アカウントを選択",
       "connectBeforeRun": "このノードを実行または公開するには、先に {{service}} を接続してください。",
@@ -169,7 +170,6 @@
       "connection": "Connection",
       "loading": "Connection を読み込み中…",
       "missing": "固定されていた Connection は存在しません。別のアカウントを選択するか、Connection を追加してください。",
-      "pinned": "このノードは、チームのデフォルトが変わってもこの Connection を使い続けます。",
       "refreshFailed": "Connection を更新できませんでした。",
       "retry": "再試行",
       "status": {

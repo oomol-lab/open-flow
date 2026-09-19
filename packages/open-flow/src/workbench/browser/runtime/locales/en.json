@@ -161,7 +161,8 @@
     "multipleSelected": "{{count}} nodes selected",
     "account": {
       "required": "Account connection required",
-      "addConnection": "Add connection",
+      "addAccount": "Add account…",
+      "manage": "Manage",
       "authorizationPending": "Finish authorization in the Connection page, then return here to refresh this account.",
       "chooseAccount": "Choose an account",
       "connectBeforeRun": "Connect {{service}} before this block can run or be published.",
@@ -169,7 +170,6 @@
       "connection": "Connection",
       "loading": "Loading connections…",
       "missing": "This pinned Connection no longer exists. Choose another account or add a Connection.",
-      "pinned": "This block stays pinned to this Connection when the Team default changes.",
       "refreshFailed": "Connections could not be refreshed.",
       "retry": "Retry",
       "status": {

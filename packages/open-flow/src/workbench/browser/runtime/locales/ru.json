@@ -161,7 +161,8 @@
     "multipleSelected": "Выбрано узлов: {{count}}",
     "account": {
       "required": "Требуется подключение аккаунта",
-      "addConnection": "Добавить Connection",
+      "addAccount": "Добавить аккаунт…",
+      "manage": "Управление",
       "authorizationPending": "Завершите авторизацию на странице Connection, затем вернитесь сюда, чтобы обновить этот аккаунт.",
       "chooseAccount": "Выберите аккаунт",
       "connectBeforeRun": "Подключите {{service}}, чтобы этот узел можно было запускать и публиковать.",
@@ -169,7 +170,6 @@
       "connection": "Connection",
       "loading": "Загрузка Connection…",
       "missing": "Закреплённый Connection больше не существует. Выберите другой аккаунт или добавьте Connection.",
-      "pinned": "Этот узел останется закреплён за этим Connection, даже если изменится Connection по умолчанию для команды.",
       "refreshFailed": "Не удалось обновить Connection.",
       "retry": "Повторить",
       "status": {

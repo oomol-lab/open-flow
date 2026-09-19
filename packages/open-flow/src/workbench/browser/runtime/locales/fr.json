@@ -161,7 +161,8 @@
     "multipleSelected": "{{count}} nœuds sélectionnés",
     "account": {
       "required": "Compte à connecter",
-      "addConnection": "Ajouter une Connection",
+      "addAccount": "Ajouter un compte…",
+      "manage": "Gérer",
       "authorizationPending": "Terminez l'autorisation sur la page Connection, puis revenez ici pour actualiser ce compte.",
       "chooseAccount": "Choisir un compte",
       "connectBeforeRun": "Connectez {{service}} pour que ce bloc puisse être exécuté ou publié.",
@@ -169,7 +170,6 @@
       "connection": "Connection",
       "loading": "Chargement des Connections…",
       "missing": "Cette Connection épinglée n'existe plus. Choisissez un autre compte ou ajoutez une Connection.",
-      "pinned": "Ce bloc reste épinglé à cette Connection même si la valeur par défaut de l'équipe change.",
       "refreshFailed": "Impossible d'actualiser les Connections.",
       "retry": "Réessayer",
       "status": {

@@ -1276,29 +1276,6 @@
   .connection-state {
     border-bottom: 1px solid var(--ui-border);
     background: var(--ui-background);
-
-    [data-slot='native-select'] {
-      height: 22px;
-      padding-block: 0;
-      border-color: transparent;
-      border-radius: 3px;
-      background: var(--ui-muted);
-      font-size: 12px;
-      box-shadow: none;
-
-      &:hover {
-        background: var(--ui-accent);
-      }
-
-      &:focus-visible {
-        border-color: var(--ui-ring);
-      }
-    }
-
-    [data-slot='native-select-icon'] {
-      width: 12px;
-      height: 12px;
-    }
   }
 
   .connection-state-content {
@@ -1326,10 +1303,6 @@
     .inspector-section-title {
       background: inherit;
     }
-  }
-
-  .connection-state-content > [data-slot='button'] {
-    align-self: flex-start;
   }
 
   .advanced-row {

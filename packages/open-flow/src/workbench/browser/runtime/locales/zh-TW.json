@@ -161,7 +161,8 @@
     "multipleSelected": "已選擇 {{count}} 個節點",
     "account": {
       "required": "待連線帳號",
-      "addConnection": "新增 Connection",
+      "addAccount": "新增帳號…",
+      "manage": "管理",
       "authorizationPending": "請在 Connection 頁面完成授權，再回到這裡重新整理這個帳號。",
       "chooseAccount": "選擇帳號",
       "connectBeforeRun": "請先連接 {{service}}，這個節點才能執行或發布。",
@@ -169,7 +170,6 @@
       "connection": "Connection",
       "loading": "正在載入 Connection…",
       "missing": "這個固定的 Connection 已不存在。請選擇其他帳號或新增 Connection。",
-      "pinned": "團隊預設變更時，這個節點仍會固定使用這個 Connection。",
       "refreshFailed": "無法重新整理 Connection。",
       "retry": "重試",
       "status": {

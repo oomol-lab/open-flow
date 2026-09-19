@@ -161,7 +161,8 @@
     "multipleSelected": "已选择 {{count}} 个节点",
     "account": {
       "required": "待连接账号",
-      "addConnection": "添加连接",
+      "addAccount": "添加账号…",
+      "manage": "管理",
       "authorizationPending": "请在 Connection 页面完成授权，返回这里后会刷新当前账号。",
       "chooseAccount": "选择账号",
       "connectBeforeRun": "请先连接 {{service}}，此节点才能运行或发布。",
@@ -169,7 +170,6 @@
       "connection": "连接",
       "loading": "正在加载连接…",
       "missing": "此节点固定的 Connection 已不存在，请选择其他账号或添加连接。",
-      "pinned": "此节点会固定使用当前连接，不会随团队默认连接的变化而切换。",
       "refreshFailed": "无法刷新 Connection。",
       "retry": "重试",
       "status": {
