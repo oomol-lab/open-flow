@@ -11,6 +11,10 @@ import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 
 export type NodeInputField = Omit<ComponentProps<typeof NodeInputValue>, 'disabled' | 'variables' | 'onValue' | 'onVariable' | 'handleNames'>
 
+export function inheritedDefaultReset(reset: NodeInputField['onReset'], definitionsEditable: boolean): NodeInputField['onReset'] {
+  return definitionsEditable ? undefined : reset
+}
+
 export function NodeInputs({
   allowAddGroup = true,
   entries,
@@ -39,6 +43,7 @@ export function NodeInputs({
   onVariable: (handle: string, name: string | undefined) => void
 }) {
   const [resetVersion, setResetVersion] = useState(0)
+  const definitionsEditable = onDefinitions != null
   const handleNames = entries.flatMap((entry) => ('group' in entry ? [] : [entry.definition.handle]))
   return (
     <PortDefinitionEditor
@@ -67,6 +72,7 @@ export function NodeInputs({
             <NodeInputValue
               key={port.handle}
               {...entry}
+              onReset={inheritedDefaultReset(entry.onReset, definitionsEditable)}
               embedded
               presentation={{
                 ...presentation,

@@ -79,7 +79,8 @@ collections, definitions, and field, node, or group settings. Also read the
   color, or selection affordances, and keep action order consistent with keyboard order.
 - A cleared field with a definition default exposes an inline reset action on its Set value prompt,
   or on its null control when nullable. Reset removes the saved override so the field inherits its
-  default again. It follows the Clear action's hover and keyboard-focus visibility, and uses the
+  default again. Inputs with editable definitions do not expose Reset because the default changes
+  with the definition. It follows the Clear action's hover and keyboard-focus visibility, and uses the
   danger foreground when the prompt is invalid. Place Reset first in visual and keyboard order when
   the control has other actions, including immediately before the Set value pencil affordance. The
   two hover affordances use the same opacity transition. Hovering an inline action retains the

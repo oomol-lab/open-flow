@@ -1,6 +1,7 @@
 import type { NodeSource, RevisionContent } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { InputMapping, JsonValue } from '../../src/workbench/browser/runtime/api.ts'
+import type { InputMapping, InputPort, JsonValue } from '../../src/workbench/browser/runtime/api.ts'
+import type { NodeInputField } from '../../src/workbench/browser/runtime/editor/nodeInputs.tsx'
 import type { InputVariables } from '../../src/workbench/browser/runtime/editor/sourceValueEditor.tsx'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
@@ -8,6 +9,7 @@ import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { currentFlowModelVersion } from '../../src/flow/common/change.ts'
 import { checkInputSource, inputSourceCandidates } from '../../src/flow/common/graph.ts'
+import { NodeInputs } from '../../src/workbench/browser/runtime/editor/nodeInputs.tsx'
 import { NodeInputValue } from '../../src/workbench/browser/runtime/editor/nodeInputValue.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { providerIcon } from '../../src/workbench/browser/runtime/providerIcon.ts'
@@ -134,6 +136,25 @@ function ObjectSourceSample({ variables }: { variables: InputVariables }) {
   )
 }
 
+function EditableDefinitionSample({ variables }: { variables: InputVariables }) {
+  const [definition, setDefinition] = useState<InputPort>({ handle: 'value', jsonSchema: {}, nullable: true, value: false })
+  const [value, setValue] = useState<JsonValue | undefined>(null)
+  const entry: NodeInputField = { definition, value, connected: false, onReset: () => setValue(definition.value) }
+  return (
+    <NodeInputs
+      entries={[entry]}
+      variables={variables}
+      disabled={false}
+      onDefinitions={(definitions) => {
+        const next = definitions.find((item): item is InputPort => 'handle' in item)
+        if (next != null) setDefinition(next)
+      }}
+      onValue={(_handle, next) => setValue(next)}
+      onVariable={() => {}}
+    />
+  )
+}
+
 function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
   const i18n = useMemo(() => createI18n(language), [language])
   const [mapping, setMapping] = useState<InputMapping | undefined>({ kind: 'value', value: 'hello' })
@@ -183,6 +204,8 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
             log('Save binding', name ?? null)
           }}
         />
+        <h3>Editable definition · no inherited reset</h3>
+        <EditableDefinitionSample variables={variables} />
         <output aria-label="Saved input">{JSON.stringify({ mapping, variableName })}</output>
         <h3>Object fields</h3>
         <ObjectSourceSample variables={variables} />
@@ -367,7 +390,7 @@ export const nodeInputStory: FrontendStory = {
   propertyPanel: true,
   title: 'Node Input',
   description:
-    'Literal, variable and upstream sources, including fixed-schema Any fields with source + value + data type, source-free data type + value, and bound values without a data-type control. Editable Any Schema types retain the generic JSON editor. Also covers whole objects, first-level fields, missing references and type mismatches.',
+    'Literal, variable and upstream sources, including fixed-schema Any fields with source + value + data type, source-free data type + value, and bound values without a data-type control. Editable definitions omit Reset; editable Any Schema types retain the generic JSON editor. Also covers whole objects, first-level fields, missing references and type mismatches.',
   standalone: true,
   render: (log, dark, language) => <NodeInputStory dark={dark} language={language} log={log} />,
 }
