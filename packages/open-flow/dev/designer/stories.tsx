@@ -52,13 +52,18 @@ const basicOptions = [
   { label: 'Boolean', value: 'boolean' },
   { label: 'Disabled option', value: 'disabled', disabled: true },
 ]
+const longOption = {
+  disabled: false,
+  label: 'lishen1635-gmail-com-with-an-intentionally-long-account-alias',
+  value: 'sha256:a9007ef9699c9703b05df0b6f32d2fbaed5ace77b7dccffa7e8252e699bd8fe5',
+}
 
 function SelectOptions({ grouped = false }: { grouped?: boolean }) {
   return (
     <>
       <SelectGroup>
         {grouped && <SelectLabel>Primitive</SelectLabel>}
-        {basicOptions.map((option) => (
+        {[...basicOptions, longOption].map((option) => (
           <SelectItem key={option.value} value={option.value} disabled={option.disabled}>
             {option.label}
           </SelectItem>
@@ -79,18 +84,19 @@ function SelectStory({ log }: { readonly log: LogAction }) {
   const container = useGetStaticPopupContainer()()
   return (
     <StoryColumn>
-      {['Default', 'Grouped', 'Invalid', 'Disabled', 'Empty'].map((label) => (
+      {['Default', 'Grouped', 'Long value', 'Invalid', 'Disabled', 'Empty'].map((label) => (
         <Field key={label} label={label}>
           <Select
             items={[
               ...basicOptions,
+              longOption,
               { label: 'Object', value: 'object' },
               {
                 label: 'Array with an intentionally long label',
                 value: 'array',
               },
             ]}
-            defaultValue={label === 'Empty' ? null : 'string'}
+            defaultValue={label === 'Empty' ? null : label === 'Long value' ? longOption.value : 'string'}
             disabled={label === 'Disabled'}
             onValueChange={(next) => log(`${label.toLowerCase()}.change`, next)}
           >
@@ -488,6 +494,7 @@ export const stories: readonly FrontendStory[] = [
   {
     group: 'Controls',
     id: 'select',
+    description: 'Default, grouped, long, invalid, disabled, and empty Select states within a constrained field.',
     render: (log) => <SelectStory log={log} />,
     title: 'Select',
   },
