@@ -32,7 +32,7 @@ describe('inverse canvas changes', () => {
         target,
         nodeId: 'code',
         handle: 'value',
-        before: { kind: 'value', value: null },
+        before: { kind: 'value', value: 'foo' },
         value: { kind: 'sources', sources: [{ kind: 'binding', bindingId: 'variable' }] },
       },
       {

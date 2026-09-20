@@ -504,7 +504,7 @@ describe('WorkspaceStore', () => {
             kind: 'graph.node.create',
             node: expect.objectContaining({
               task: expect.objectContaining({
-                inputs: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
+                inputs: [{ handle: 'value', jsonSchema: { type: 'string' }, nullable: true, value: 'foo' }],
               }),
             }),
             nodeId: 'code',

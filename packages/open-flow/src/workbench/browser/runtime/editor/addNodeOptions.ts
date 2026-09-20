@@ -83,7 +83,7 @@ function builtinOptions(t: TFunction): readonly AddNodeOption[] {
       group,
       icon: ':carbon:code:',
       id: 'javascript',
-      inputs: [{ handle: 'value', jsonSchema: {} }],
+      inputs: [{ handle: 'value', jsonSchema: { type: 'string' } }],
       kind: 'new-task',
       label: t('addNode.javascript'),
       outputs: [{ handle: 'result', jsonSchema: {} }],

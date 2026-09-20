@@ -119,6 +119,10 @@ describe('Flow changes', () => {
     const source = changed.modules.module?.source
 
     expect(source).toBe('export default async function (inputs, context) {\n  return { result: inputs.value }\n}\n')
+    expect(changed.document.graph.nodes.task).toMatchObject({
+      inputs: { value: { kind: 'value', value: 'foo' } },
+      task: { inputs: [{ handle: 'value', jsonSchema: { type: 'string' }, nullable: true, value: 'foo' }] },
+    })
   })
 
   it('applies every resource lifecycle operation in order', () => {

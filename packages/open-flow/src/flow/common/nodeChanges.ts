@@ -111,7 +111,7 @@ export function createCodeTask(
   name: string,
   module: Pick<CodeModule, 'imports' | 'source'> | undefined = undefined,
   ports: Pick<Extract<TaskDefinition, { readonly moduleId: string }>, 'inputs' | 'outputs' | 'capabilities'> = {
-    inputs: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
+    inputs: [{ handle: 'value', jsonSchema: { type: 'string' }, nullable: true, value: 'foo' }],
     outputs: [{ handle: 'result', jsonSchema: {}, nullable: true }],
   },
 ): readonly ChangeOperation[] {
