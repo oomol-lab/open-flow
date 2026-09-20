@@ -509,7 +509,7 @@ describe('Provider Trigger changes', () => {
       'trigger',
       {
         definition: {
-          configSchema: { additionalProperties: false, type: 'object' },
+          configInputs: [],
           definitionVersion: 2,
           description: 'Runs when a repository changes.',
           displayName: 'Repository event',

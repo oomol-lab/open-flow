@@ -117,7 +117,7 @@ const webhook = {
     .optional(),
 }
 const definition = {
-  configSchema: json,
+  configInputs: ports.inputs,
   definitionVersion: z.literal(2),
   description: text,
   displayName: text,

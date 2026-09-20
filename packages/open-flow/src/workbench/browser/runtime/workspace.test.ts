@@ -328,11 +328,10 @@ describe('Designer port projection', () => {
                 bindingId: 'binding',
                 config: { repo: 'open-flow' },
                 definition: {
-                  configSchema: {
-                    properties: { owner: { type: 'string' }, repo: { type: 'string' } },
-                    required: ['owner', 'repo'],
-                    type: 'object',
-                  },
+                  configInputs: [
+                    { handle: 'owner', jsonSchema: { type: 'string' }, nullable: false },
+                    { handle: 'repo', jsonSchema: { type: 'string' }, nullable: false },
+                  ],
                   definitionVersion: 2,
                   description: '',
                   displayName: 'Repository event',

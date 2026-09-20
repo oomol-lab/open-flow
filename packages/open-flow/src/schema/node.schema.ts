@@ -5,7 +5,7 @@ import { isJsonObject } from '../base/common/json.ts'
 import { LOCAL_BLOCK_REFERENCE_PATTERN } from './block-reference.ts'
 import { InlineConditionBlockSchema } from './block.schema/inline-condition-block.schema.ts'
 import { InlineTaskBlockSchema } from './block.schema/inline-task-block.schema.ts'
-import { HandleNameSchema, InputHandleDefSchema, OutputHandleDefSchema, ValueHandleDefSchema } from './handle.schema.ts'
+import { GroupDividerDefSchema, HandleNameSchema, InputHandleDefSchema, OutputHandleDefSchema, ValueHandleDefSchema } from './handle.schema.ts'
 import { HandleSchemaOverridesItemSchema } from './schema-overrides.schema.ts'
 
 export const NodeIdSchema = /* @__PURE__ */ z.string().describe('Node ID. Unique in current Flow.')
@@ -111,7 +111,7 @@ export const TriggerDefinitionSchema = /* @__PURE__ */ z.strictObject({
       account_required: z.literal(true),
     })
     .optional(),
-  config_schema: JsonObjectSchema,
+  config_inputs: z.array(z.union([InputHandleDefSchema, GroupDividerDefSchema])),
   outputs: z.array(OutputHandleDefSchema).refine((ports) => new Set(ports.map((port) => port.handle)).size === ports.length),
 })
 

@@ -330,7 +330,7 @@ export type TriggerSchedule =
   | { readonly type: 'every'; readonly unit: 'day' | 'hour' | 'minute' | 'month' | 'week'; readonly value: number }
 
 interface TriggerKeySnapshotBase {
-  readonly configSchema: JsonValue
+  readonly configInputs: readonly (InputPort | Group)[]
   readonly definitionVersion: number
   readonly description: string
   readonly displayName: string

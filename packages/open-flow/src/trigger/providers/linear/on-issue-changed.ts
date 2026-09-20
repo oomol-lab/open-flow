@@ -3,7 +3,7 @@ import type { TriggerConfigOption, TriggerConfigOptionsContext } from '../../com
 import type { PollContext, PollDefinition } from '../../common/poll.ts'
 
 import { isJsonObject } from '../../../base/common/json.ts'
-import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { eventsPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 const uuidPattern = '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
 const uuid = new RegExp(uuidPattern)
@@ -31,42 +31,28 @@ const issueSchema = {
 } as const
 
 const snapshot = {
-  configSchema: {
-    type: 'object',
-    additionalProperties: false,
-    properties: {
-      teamId: { title: 'Team ID', description: 'Linear Team UUID. Use Copy model UUID in Linear to find it.', type: 'string', pattern: uuidPattern },
-      stateIds: {
-        title: 'Issue statuses',
-        description: 'Choose statuses from the selected Team. Empty means all statuses. Matches the current status, not every transition into it.',
-        type: 'array',
-        items: { type: 'string', pattern: uuidPattern },
-        uniqueItems: true,
-        maxItems: 50,
-        default: [],
-      },
+  configInputs: [
+    {
+      handle: 'teamId',
+      jsonSchema: { title: 'Team ID', type: 'string', pattern: uuidPattern },
+      nullable: false,
+      description: 'Linear Team UUID. Use Copy model UUID in Linear to find it.',
     },
-    required: ['teamId'],
-    title: 'Linear Issue Changes',
-  },
+    {
+      handle: 'stateIds',
+      jsonSchema: { title: 'Issue statuses', type: 'array', items: { type: 'string', pattern: uuidPattern }, uniqueItems: true, maxItems: 50 },
+      nullable: false,
+      value: [],
+      description: 'Choose statuses from the selected Team. Empty means all statuses. Matches the current status, not every transition into it.',
+    },
+  ],
   definitionVersion: 2,
   description:
     'Watches new and updated issues in a Linear team with periodic checks. Starts from now without running existing issues. Reports observed current states, not deletions or every intermediate status change.',
   displayName: 'Issue Created or Updated',
   key: 'linear.on_issue_changed',
   name: 'on_issue_changed',
-  outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        type: 'object',
-        additionalProperties: false,
-        properties: { events: { type: 'array', items: issueSchema } },
-        required: ['events'],
-      },
-      nullable: false,
-    },
-  ],
+  outputs: [{ handle: 'events', jsonSchema: { type: 'array', items: issueSchema }, nullable: false }],
   provider: 'linear',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
@@ -79,12 +65,12 @@ interface Checkpoint {
 }
 
 export const linearIssueChanged: PollDefinition = {
-  buildOutputs: payloadPollOutputs,
+  buildOutputs: eventsPollOutputs,
   snapshot,
   configOptions: options,
   async poll(context) {
     const teamId = typeof context.config.teamId == 'string' ? context.config.teamId.toLowerCase() : context.config.teamId
-    const stateIds = context.config.stateIds ?? []
+    const stateIds = context.config.stateIds
     if (
       typeof teamId != 'string' ||
       !uuid.test(teamId) ||

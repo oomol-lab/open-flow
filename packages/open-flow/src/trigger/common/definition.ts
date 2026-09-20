@@ -1,13 +1,10 @@
-import type { Schema } from '@cfworker/json-schema'
 import type { JsonObject, JsonValue } from '../../base/common/json.ts'
-import type { Port } from '../../flow/common/change.ts'
+import type { Group, InputPort, Port } from '../../flow/common/change.ts'
 
-import { Validator } from '@cfworker/json-schema'
 import { dequal } from 'dequal/lite'
 import { z } from 'zod'
 import { isJsonObject, isJsonValue } from '../../base/common/json.ts'
-
-const maxConfigBytes = 64 * 1024
+import { configInputsSchema, resolveTriggerConfig } from './config.ts'
 const maxDefinitionProperties = 512
 const maxDefinitionEnumValues = 256
 const maxSchemaBytes = 64 * 1024
@@ -70,6 +67,7 @@ const schemaKeys = new Set([
   'required',
   'title',
   'type',
+  'uniqueItems',
 ])
 const schemaType = z.enum(['array', 'boolean', 'integer', 'null', 'number', 'object', 'string'])
 const nonNegativeInteger = z.number().int().nonnegative()
@@ -97,6 +95,7 @@ const schemaNode = z.strictObject({
   propertyNames: jsonObjectSchema.optional(),
   required: z.array(z.string()).refine(unique, 'Expected unique required properties.').optional(),
   title: z.string().optional(),
+  uniqueItems: z.boolean().optional(),
   type: z.union([schemaType, z.array(schemaType).min(1).refine(unique, 'Expected unique schema types.')]).optional(),
 })
 
@@ -114,15 +113,11 @@ function validateSchemaNode(schema: JsonObject, path: string): void {
   }
 }
 
-function inspectSchema(schema: JsonObject, label: string, objectRoot = false): SchemaStats {
+function inspectSchema(schema: JsonObject, label: string): SchemaStats {
   if (encoder.encode(stringify(schema)).byteLength > maxSchemaBytes) {
     throw new TypeError(`${label} exceeds the ${maxSchemaBytes}-byte limit.`)
   }
   validateSchemaNode(schema, label)
-  const rootType = Reflect.get(schema, 'type')
-  if (objectRoot && rootType != null && rootType != 'object' && !(Array.isArray(rootType) && rootType.includes('object'))) {
-    throw new TypeError(`${label} must allow an object at its root.`)
-  }
 
   let enumValues = 0
   let properties = 0
@@ -168,10 +163,22 @@ function inspectSchema(schema: JsonObject, label: string, objectRoot = false): S
 }
 
 export function validateTriggerDefinitionSchemas(
-  definition: { readonly configSchema: JsonObject; readonly outputs: readonly Port[] },
+  definition: { readonly configInputs: readonly (InputPort | Group)[]; readonly outputs: readonly Port[] },
   label = 'Trigger definition',
 ): void {
-  const configStats = inspectSchema(definition.configSchema, `${label} configSchema`, true)
+  configInputsSchema.parse(definition.configInputs)
+  const inputs = definition.configInputs.filter((input): input is InputPort => 'handle' in input)
+  if (new Set(inputs.map((input) => input.handle)).size !== inputs.length) throw new TypeError(`${label} has duplicate config input handles.`)
+  if (encoder.encode(stringify(definition.configInputs)).byteLength > maxSchemaBytes) throw new TypeError(`${label} config inputs exceed the size limit.`)
+  const configStats = inputs.reduce(
+    (total, input) => {
+      if (!isJsonObject(input.jsonSchema)) throw new TypeError(`${label} config input schema must be an object.`)
+      const stats = inspectSchema(input.jsonSchema, `${label} configInputs.${input.handle}`)
+      if (Object.hasOwn(input, 'value')) resolveTriggerConfig([input], {})
+      return { properties: total.properties + stats.properties + 1, enumValues: total.enumValues + stats.enumValues }
+    },
+    { properties: 0, enumValues: 0 },
+  )
   if (new Set(definition.outputs.map((port) => port.handle)).size !== definition.outputs.length) throw new TypeError(`${label} has duplicate output handles.`)
   if (definition.outputs.length > maxDefinitionProperties || encoder.encode(stringify(definition.outputs)).byteLength > maxSchemaBytes)
     throw new TypeError(`${label} output definitions exceed the size limit.`)
@@ -194,32 +201,17 @@ export function validateTriggerDefinitionSchemas(
 export function validateTriggerDefinition(
   definition: {
     readonly config: JsonObject
-    readonly configSchema: JsonObject
+    readonly configInputs: readonly (InputPort | Group)[]
     readonly outputs: readonly Port[]
   },
   label = 'Trigger definition',
 ): void {
   validateTriggerDefinitionSchemas(definition, label)
-  if (encoder.encode(stringify(definition.config)).byteLength > maxConfigBytes) {
-    throw new TypeError(`${label} config exceeds the ${maxConfigBytes}-byte limit.`)
-  }
-
-  let result
-  try {
-    const validator = new Validator(structuredClone(definition.configSchema) as Schema, '7', false)
-    result = validator.validate(definition.config)
-  } catch (error) {
-    throw new TypeError(`${label} configSchema cannot validate config: ${error instanceof Error ? error.message : String(error)}.`, {
-      cause: error,
-    })
-  }
-  if (!result.valid) {
-    throw new TypeError(`${label} config does not match configSchema: ${result.errors.map((error) => `${error.instanceLocation} ${error.error}`).join('; ')}.`)
-  }
+  resolveTriggerConfig(definition.configInputs, definition.config)
 }
 
 export async function computeTriggerDefinitionDigest(declaration: {
-  readonly configSchema: JsonObject
+  readonly configInputs: readonly (InputPort | Group)[]
   readonly connector?: { readonly accountRequired: true; readonly serviceId: string }
   readonly outputs: readonly Port[]
   readonly provisioning: 'integration' | 'poll' | 'webhook'
@@ -228,7 +220,7 @@ export async function computeTriggerDefinitionDigest(declaration: {
   readonly type: string
 }): Promise<string> {
   const source = stringify({
-    configSchema: declaration.configSchema,
+    configInputs: declaration.configInputs,
     ...(declaration.connector == null ? {} : { connector: declaration.connector }),
     outputs: declaration.outputs,
     provisioning: declaration.provisioning,

@@ -2,7 +2,7 @@ import type { ConnectorProxyRequest, ConnectorProxyResult } from '../../../conne
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
 import type { PollContext, PollDefinition, PollEvent, PollResult } from '../../common/poll.ts'
 
-import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { eventsPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 type EventKind = 'page_added' | 'page_updated'
 type CursorField = 'created_time' | 'last_edited_time'
@@ -64,53 +64,35 @@ const eventSchema = {
 } as const
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: {
-      dataSourceId: {
-        default: '',
-        pattern: '^(?:|[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12})$',
-        type: 'string',
-      },
-      databaseId: { pattern: idPattern, type: 'string' },
-      events: {
-        default: ['page_added'],
-        items: { enum: ['page_added', 'page_updated'], type: 'string' },
-        minItems: 1,
-        type: 'array',
-        uniqueItems: true,
-      },
-      includeProperties: { default: true, type: 'boolean' },
-      maxItemsPerPoll: { default: 25, maximum: 100, minimum: 1, type: 'integer' },
+  configInputs: [
+    {
+      handle: 'dataSourceId',
+      jsonSchema: { pattern: '^(?:|[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12})$', type: 'string' },
+      nullable: false,
+      value: '',
     },
-    required: ['databaseId'],
-    title: 'Notion Database Page Event Config',
-    type: 'object',
-  },
+    { handle: 'databaseId', jsonSchema: { pattern: idPattern, type: 'string' }, nullable: false },
+    {
+      handle: 'events',
+      jsonSchema: { items: { enum: ['page_added', 'page_updated'], type: 'string' }, minItems: 1, type: 'array', uniqueItems: true },
+      nullable: false,
+      value: ['page_added'],
+    },
+    { handle: 'includeProperties', jsonSchema: { type: 'boolean' }, nullable: false, value: true },
+    { handle: 'maxItemsPerPoll', jsonSchema: { maximum: 100, minimum: 1, type: 'integer' }, nullable: false, value: 25 },
+  ],
   definitionVersion: 2,
   description: 'Polls a Notion database and triggers when a page is added to it or an existing page is edited.',
   displayName: 'Database Page Added or Updated',
   key: 'notion.on_database_page_event',
   name: 'on_database_page_event',
-  outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: { events: { items: eventSchema, type: 'array' } },
-        required: ['events'],
-        title: 'Notion Database Page Event Payload',
-        type: 'object',
-      },
-      nullable: false,
-    },
-  ],
+  outputs: [{ handle: 'events', jsonSchema: { items: eventSchema, type: 'array' }, nullable: false }],
   provider: 'notion',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const notionDatabasePageEvent: PollDefinition = {
-  buildOutputs: payloadPollOutputs,
+  buildOutputs: eventsPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)
@@ -123,11 +105,11 @@ export const notionDatabasePageEvent: PollDefinition = {
 
 function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
   return {
-    dataSourceId: (value.dataSourceId as string | undefined) ?? '',
+    dataSourceId: value.dataSourceId as string,
     databaseId: value.databaseId as string,
-    events: [...new Set<EventKind>((value.events as readonly EventKind[] | undefined) ?? ['page_added'])],
-    includeProperties: (value.includeProperties as boolean | undefined) ?? true,
-    maxItemsPerPoll: (value.maxItemsPerPoll as number | undefined) ?? 25,
+    events: [...new Set<EventKind>(value.events as readonly EventKind[])],
+    includeProperties: value.includeProperties as boolean,
+    maxItemsPerPoll: value.maxItemsPerPoll as number,
   }
 }
 

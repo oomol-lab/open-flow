@@ -9,6 +9,7 @@ import type {
 import type { PollContext, PollDefinition } from '../src/trigger/common/poll.ts'
 
 import { describe, expect, it } from 'vitest'
+import { resolveTriggerConfig } from '../src/trigger/common/config.ts'
 import { IntegrationConnectionError } from '../src/trigger/common/integration.ts'
 import { PermanentPollError, PollConnectionError } from '../src/trigger/common/poll.ts'
 import { triggerDefinitions } from '../src/trigger/providers/definitions.ts'
@@ -24,13 +25,17 @@ function getDefinition(key: string) {
 function poll(key: string): PollDefinition {
   const value = getDefinition(key)
   if (!('poll' in value)) throw new Error(`${key} must be Poll.`)
-  return value
+  return { ...value, poll: (context) => value.poll({ ...context, config: resolveTriggerConfig(value.snapshot.configInputs, context.config) }) }
 }
 
 function integration(key: string): IntegrationDefinition {
   const value = getDefinition(key)
   if (!('receive' in value)) throw new Error(`${key} must be Integration.`)
-  return value
+  return {
+    ...value,
+    receive: (context) => value.receive({ ...context, config: resolveTriggerConfig(value.snapshot.configInputs, context.config) }),
+    reconcile: (context) => value.reconcile({ ...context, config: resolveTriggerConfig(value.snapshot.configInputs, context.config) }),
+  }
 }
 
 function connector(execute: (request: ConnectorProxyRequest, index: number) => ConnectorProxyResult | Promise<ConnectorProxyResult>): {
@@ -408,7 +413,7 @@ describe('provider Integration Trigger definitions', () => {
         ),
         rawBody: githubBody,
       }),
-    ).toMatchObject({ dedupeKey: 'd1', outcome: 'event', outputs: { payload: { event: 'push' } } })
+    ).toMatchObject({ dedupeKey: 'd1', outcome: 'event', outputs: { event: 'push' } })
     expect(
       await integration('gitlab.on_project_event').receive(
         receiveContext(
@@ -417,13 +422,13 @@ describe('provider Integration Trigger definitions', () => {
           {},
         ),
       ),
-    ).toMatchObject({ dedupeKey: 'd2', outcome: 'event', outputs: { payload: { event: 'pipeline' } } })
+    ).toMatchObject({ dedupeKey: 'd2', outcome: 'event', outputs: { event: 'pipeline' } })
     expect(
       await integration('shopify.on_shop_event').receive({
         ...receiveContext({ topics: ['orders/create'] }, { 'x-shopify-topic': 'orders/create', 'x-shopify-webhook-id': 'd3' }, { id: 1 }),
         query: (name) => (name == 'open_flow_callback' ? 'secret' : undefined),
       }),
-    ).toMatchObject({ dedupeKey: 'd3', outcome: 'event', outputs: { payload: { topic: 'orders/create' } } })
+    ).toMatchObject({ dedupeKey: 'd3', outcome: 'event', outputs: { topic: 'orders/create' } })
     const stripePayload = { id: 'evt_1', livemode: true, type: 'invoice.paid' }
     const stripeBody = encoder.encode(JSON.stringify(stripePayload))
     const stripeTimestamp = String(Date.parse('2026-08-20T12:34:20.000Z') / 1_000)
@@ -439,7 +444,7 @@ describe('provider Integration Trigger definitions', () => {
         rawBody: stripeBody,
         state: state({ subscription: { endpointId: 'we_4', signingSecret: 'whsec_test' } }).value,
       }),
-    ).toMatchObject({ dedupeKey: 'evt_1', outcome: 'event', outputs: { payload: { event: 'invoice.paid', livemode: true } } })
+    ).toMatchObject({ dedupeKey: 'evt_1', outcome: 'event', outputs: { event: 'invoice.paid', livemode: true } })
     const wooPayload = { id: 1 }
     const wooBody = encoder.encode(JSON.stringify(wooPayload))
     expect(
@@ -455,7 +460,7 @@ describe('provider Integration Trigger definitions', () => {
         ),
         rawBody: wooBody,
       }),
-    ).toMatchObject({ dedupeKey: 'd5', outcome: 'event', outputs: { payload: { topic: 'order.created' } } })
+    ).toMatchObject({ dedupeKey: 'd5', outcome: 'event', outputs: { topic: 'order.created' } })
     const zendeskPayload = { id: 'd6', type: 'zen:event-type:ticket.created' }
     const zendeskBody = encoder.encode(JSON.stringify(zendeskPayload))
     const zendeskTimestamp = '2026-08-20T12:34:20.000Z'
@@ -472,7 +477,7 @@ describe('provider Integration Trigger definitions', () => {
         rawBody: zendeskBody,
         state: state({ subscription: { signingSecret: 'zendesk-secret', webhookId: 'wh_6' } }).value,
       }),
-    ).toMatchObject({ dedupeKey: 'd6', outcome: 'event', outputs: { payload: { event: 'zen:event-type:ticket.created' } } })
+    ).toMatchObject({ dedupeKey: 'd6', outcome: 'event', outputs: { event: 'zen:event-type:ticket.created' } })
   })
 
   it('creates and persists one remote subscription for each provider', async () => {
@@ -590,7 +595,7 @@ describe('provider Integration Trigger definitions', () => {
     expect(await definition.receive(receiveContext(config, { 'x-telegram-bot-api-secret-token': 'secret' }, { message, update_id: 9 }))).toMatchObject({
       dedupeKey: '9',
       outcome: 'event',
-      outputs: { payload: { deliveryId: '9', event: 'message' } },
+      outputs: { deliveryId: '9', event: 'message' },
     })
 
     const target = connector((_request, index) =>
@@ -663,14 +668,12 @@ describe('provider Integration Trigger definitions', () => {
       dedupeKey: 'my-drive:page-1',
       outcome: 'event',
       outputs: {
-        payload: {
-          events: [
-            {
-              changeId: 'drive-1:file-1:2026-08-20T12:35:00.000Z:file:present',
-              notification: { changedTypes: ['content', 'parents'], messageNumber: '2', resourceState: 'change' },
-            },
-          ],
-        },
+        events: [
+          {
+            changeId: 'drive-1:file-1:2026-08-20T12:35:00.000Z:file:present',
+            notification: { changedTypes: ['content', 'parents'], messageNumber: '2', resourceState: 'change' },
+          },
+        ],
       },
     })
     await expect(

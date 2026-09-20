@@ -30,16 +30,10 @@ const topics = [
 ] as const
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: {
-      events: { items: { enum: topics, type: 'string' }, maxItems: 16, minItems: 1, type: 'array', uniqueItems: true },
-      webhookName: { default: 'OOMOL Trigger', maxLength: 120, minLength: 1, type: 'string' },
-    },
-    required: ['events'],
-    title: 'WooCommerce Store Event Config',
-    type: 'object',
-  },
+  configInputs: [
+    { handle: 'events', jsonSchema: { items: { enum: topics, type: 'string' }, maxItems: 16, minItems: 1, type: 'array', uniqueItems: true }, nullable: false },
+    { handle: 'webhookName', jsonSchema: { maxLength: 120, minLength: 1, type: 'string' }, nullable: false, value: 'OOMOL Trigger' },
+  ],
   definitionVersion: 2,
   description: 'Triggers when selected WooCommerce store events occur.',
   displayName: 'Store Event',
@@ -47,25 +41,13 @@ const snapshot = {
   key: 'woocommerce.on_store_event',
   name: 'on_store_event',
   outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: {
-          body: { type: 'object' },
-          deliveryId: { type: 'string' },
-          event: { type: 'string' },
-          resource: { type: 'string' },
-          source: { type: 'string' },
-          topic: { type: 'string' },
-          webhookId: { type: 'string' },
-        },
-        required: ['topic', 'resource', 'event', 'webhookId', 'deliveryId', 'source', 'body'],
-        title: 'WooCommerce Store Event Payload',
-        type: 'object',
-      },
-      nullable: false,
-    },
+    { handle: 'body', jsonSchema: { type: 'object' }, nullable: false },
+    { handle: 'deliveryId', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'event', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'resource', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'source', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'topic', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'webhookId', jsonSchema: { type: 'string' }, nullable: false },
   ],
   provider: 'woocommerce',
   type: 'integration',
@@ -86,15 +68,13 @@ export const wooCommerceStoreEvent: IntegrationDefinition = {
       dedupeKey: deliveryId.length == 0 ? undefined : deliveryId,
       outcome: 'event',
       outputs: {
-        payload: {
-          body: context.payload as Readonly<Record<string, JsonValue>>,
-          deliveryId,
-          event: context.header('x-wc-webhook-event') ?? '',
-          resource: context.header('x-wc-webhook-resource') ?? '',
-          source: context.header('x-wc-webhook-source') ?? '',
-          topic,
-          webhookId: context.header('x-wc-webhook-id') ?? '',
-        },
+        body: context.payload as Readonly<Record<string, JsonValue>>,
+        deliveryId,
+        event: context.header('x-wc-webhook-event') ?? '',
+        resource: context.header('x-wc-webhook-resource') ?? '',
+        source: context.header('x-wc-webhook-source') ?? '',
+        topic,
+        webhookId: context.header('x-wc-webhook-id') ?? '',
       },
     }
   },
@@ -122,7 +102,7 @@ export const wooCommerceStoreEvent: IntegrationDefinition = {
 }
 
 function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
-  return { events: [...new Set(value.events as readonly string[])], webhookName: (value.webhookName as string | undefined) ?? 'OOMOL Trigger' }
+  return { events: [...new Set(value.events as readonly string[])], webhookName: value.webhookName as string }
 }
 
 async function create(context: IntegrationReconcileContext, config: Config, topic: string): Promise<string> {

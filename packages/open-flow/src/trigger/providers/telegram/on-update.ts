@@ -50,43 +50,35 @@ const updateTypes = [
 const defaultUpdates = updateTypes.filter((value) => value != '*' && !optInUpdates.has(value))
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    description: 'Configuration for telegram.on_update.',
-    properties: {
-      chatIds: {
-        default: [],
-        description: 'Only accept updates from these numeric Telegram chat IDs. Empty means every chat.',
-        items: { pattern: '^-?[0-9]{1,20}$', type: 'string' },
-        maxItems: 100,
-        type: 'array',
-        uniqueItems: true,
-      },
-      dropPendingUpdates: {
-        default: true,
-        description: 'Discard updates queued before the webhook is created or resumed.',
-        type: 'boolean',
-      },
-      updates: {
-        description: 'Telegram update types that trigger a Run. Use * for the Telegram default set.',
-        items: { enum: updateTypes },
-        minItems: 1,
-        type: 'array',
-        uniqueItems: true,
-      },
-      userIds: {
-        default: [],
-        description: 'Only accept updates from these numeric Telegram user IDs. Empty means every user.',
-        items: { pattern: '^[0-9]{1,20}$', type: 'string' },
-        maxItems: 100,
-        type: 'array',
-        uniqueItems: true,
-      },
+  configInputs: [
+    {
+      handle: 'chatIds',
+      jsonSchema: { items: { pattern: '^-?[0-9]{1,20}$', type: 'string' }, maxItems: 100, type: 'array', uniqueItems: true },
+      nullable: false,
+      value: [],
+      description: 'Only accept updates from these numeric Telegram chat IDs. Empty means every chat.',
     },
-    required: ['updates'],
-    title: 'Telegram Bot Update Config',
-    type: 'object',
-  },
+    {
+      handle: 'dropPendingUpdates',
+      jsonSchema: { type: 'boolean' },
+      nullable: false,
+      value: true,
+      description: 'Discard updates queued before the webhook is created or resumed.',
+    },
+    {
+      handle: 'updates',
+      jsonSchema: { items: { enum: updateTypes }, minItems: 1, type: 'array', uniqueItems: true },
+      nullable: false,
+      description: 'Telegram update types that trigger a Run. Use * for the Telegram default set.',
+    },
+    {
+      handle: 'userIds',
+      jsonSchema: { items: { pattern: '^[0-9]{1,20}$', type: 'string' }, maxItems: 100, type: 'array', uniqueItems: true },
+      nullable: false,
+      value: [],
+      description: 'Only accept updates from these numeric Telegram user IDs. Empty means every user.',
+    },
+  ],
   definitionVersion: 2,
   description: 'Triggers when the connected Telegram bot receives a selected update.',
   displayName: 'Bot Update',
@@ -94,21 +86,9 @@ const snapshot = {
   key: 'telegram.on_update',
   name: 'on_update',
   outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: {
-          body: { type: 'object' },
-          deliveryId: { type: 'string' },
-          event: { type: 'string' },
-        },
-        required: ['event', 'deliveryId', 'body'],
-        title: 'Telegram Bot Update Payload',
-        type: 'object',
-      },
-      nullable: false,
-    },
+    { handle: 'body', jsonSchema: { type: 'object' }, nullable: false },
+    { handle: 'deliveryId', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'event', jsonSchema: { type: 'string' }, nullable: false },
   ],
   provider: 'telegram',
   type: 'integration',
@@ -141,7 +121,7 @@ export const telegramUpdate: IntegrationDefinition = {
     return {
       dedupeKey: deliveryId,
       outcome: 'event',
-      outputs: { payload: { body: context.payload as Readonly<Record<string, JsonValue>>, deliveryId, event } },
+      outputs: { body: context.payload as Readonly<Record<string, JsonValue>>, deliveryId, event },
     }
   },
   async reconcile(context) {
@@ -166,10 +146,10 @@ export const telegramUpdate: IntegrationDefinition = {
 
 function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
   return {
-    chatIds: (value.chatIds as readonly string[] | undefined) ?? [],
-    dropPendingUpdates: (value.dropPendingUpdates as boolean | undefined) ?? true,
+    chatIds: value.chatIds as readonly string[],
+    dropPendingUpdates: value.dropPendingUpdates as boolean,
     updates: value.updates as readonly string[],
-    userIds: (value.userIds as readonly string[] | undefined) ?? [],
+    userIds: value.userIds as readonly string[],
   }
 }
 

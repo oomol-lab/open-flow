@@ -2,7 +2,7 @@ import type { ConnectorProxyResult } from '../../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
 import type { PollContext, PollDefinition, PollEvent } from '../../common/poll.ts'
 
-import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { eventsPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 interface Config {
   readonly folder: string
@@ -90,50 +90,33 @@ const eventSchema = {
 } as const
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    description: 'Configuration for outlook.on_message_received. Every configured matching field must match.',
-    properties: {
-      folder: {
-        default: defaultFolder,
-        description: 'A well-known mail folder name, folder ID, or an empty string for the whole mailbox.',
-        pattern: '^[A-Za-z0-9_=-]*$',
-        type: 'string',
-      },
-      includeDrafts: { default: false, type: 'boolean' },
-      maxMessagesPerPoll: { default: defaultPageSize, maximum: 100, minimum: 1, type: 'integer' },
-      readStatus: { default: 'All', enum: ['All', 'Read', 'Unread'], type: 'string' },
-      senderAddress: { default: '', description: 'Exact sender address, or empty for any sender.', type: 'string' },
-      subjectContains: { default: '', description: 'Case-insensitive subject text.', type: 'string' },
-      withAttachmentsOnly: { default: false, type: 'boolean' },
+  configInputs: [
+    {
+      handle: 'folder',
+      jsonSchema: { pattern: '^[A-Za-z0-9_=-]*$', type: 'string' },
+      nullable: false,
+      value: defaultFolder,
+      description: 'A well-known mail folder name, folder ID, or an empty string for the whole mailbox.',
     },
-    title: 'Outlook New Message Config',
-    type: 'object',
-  },
+    { handle: 'includeDrafts', jsonSchema: { type: 'boolean' }, nullable: false, value: false },
+    { handle: 'maxMessagesPerPoll', jsonSchema: { maximum: 100, minimum: 1, type: 'integer' }, nullable: false, value: defaultPageSize },
+    { handle: 'readStatus', jsonSchema: { enum: ['All', 'Read', 'Unread'], type: 'string' }, nullable: false, value: 'All' },
+    { handle: 'senderAddress', jsonSchema: { type: 'string' }, nullable: false, value: '', description: 'Exact sender address, or empty for any sender.' },
+    { handle: 'subjectContains', jsonSchema: { type: 'string' }, nullable: false, value: '', description: 'Case-insensitive subject text.' },
+    { handle: 'withAttachmentsOnly', jsonSchema: { type: 'boolean' }, nullable: false, value: false },
+  ],
   definitionVersion: 2,
   description: 'Polls a Microsoft Outlook mail folder and triggers when a new message arrives.',
   displayName: 'New Message Received',
   key: 'outlook.on_message_received',
   name: 'on_message_received',
-  outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: { events: { items: eventSchema, type: 'array' } },
-        required: ['events'],
-        title: 'Outlook New Message Payload',
-        type: 'object',
-      },
-      nullable: false,
-    },
-  ],
+  outputs: [{ handle: 'events', jsonSchema: { items: eventSchema, type: 'array' }, nullable: false }],
   provider: 'outlook',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const outlookMessageReceived: PollDefinition = {
-  buildOutputs: payloadPollOutputs,
+  buildOutputs: eventsPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)
@@ -191,13 +174,13 @@ export const outlookMessageReceived: PollDefinition = {
 
 function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
   return {
-    folder: (value.folder as string | undefined) ?? defaultFolder,
-    includeDrafts: (value.includeDrafts as boolean | undefined) ?? false,
-    maxMessagesPerPoll: (value.maxMessagesPerPoll as number | undefined) ?? defaultPageSize,
-    readStatus: (value.readStatus as Config['readStatus'] | undefined) ?? 'All',
-    senderAddress: ((value.senderAddress as string | undefined) ?? '').trim(),
-    subjectContains: ((value.subjectContains as string | undefined) ?? '').trim(),
-    withAttachmentsOnly: (value.withAttachmentsOnly as boolean | undefined) ?? false,
+    folder: value.folder as string,
+    includeDrafts: value.includeDrafts as boolean,
+    maxMessagesPerPoll: value.maxMessagesPerPoll as number,
+    readStatus: value.readStatus as Config['readStatus'],
+    senderAddress: (value.senderAddress as string).trim(),
+    subjectContains: (value.subjectContains as string).trim(),
+    withAttachmentsOnly: value.withAttachmentsOnly as boolean,
   }
 }
 

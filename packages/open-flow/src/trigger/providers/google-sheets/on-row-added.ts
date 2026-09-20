@@ -2,7 +2,7 @@ import type { ConnectorProxyResult } from '../../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
 import type { PollContext, PollDefinition, PollEvent } from '../../common/poll.ts'
 
-import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { eventsPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 interface Config {
   readonly colEnd: string
@@ -60,50 +60,33 @@ const eventSchema = {
 } as const
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: {
-      columnRange: { default: 'A:ZZZ', pattern: '^[A-Za-z]{1,3}(?::[A-Za-z]{1,3})?$', type: 'string' },
-      dateTimeRender: { default: 'FORMATTED_STRING', enum: ['FORMATTED_STRING', 'SERIAL_NUMBER'], type: 'string' },
-      firstDataRow: { default: 2, minimum: 1, type: 'integer' },
-      headerRow: { default: 1, minimum: 1, type: 'integer' },
-      maxRowsPerPoll: { default: 100, maximum: 500, minimum: 1, type: 'integer' },
-      sheet: { minLength: 1, type: 'string' },
-      spreadsheetId: { minLength: 1, type: 'string' },
-      valueRender: {
-        default: 'UNFORMATTED_VALUE',
-        enum: ['UNFORMATTED_VALUE', 'FORMATTED_VALUE', 'FORMULA'],
-        type: 'string',
-      },
+  configInputs: [
+    { handle: 'columnRange', jsonSchema: { pattern: '^[A-Za-z]{1,3}(?::[A-Za-z]{1,3})?$', type: 'string' }, nullable: false, value: 'A:ZZZ' },
+    { handle: 'dateTimeRender', jsonSchema: { enum: ['FORMATTED_STRING', 'SERIAL_NUMBER'], type: 'string' }, nullable: false, value: 'FORMATTED_STRING' },
+    { handle: 'firstDataRow', jsonSchema: { minimum: 1, type: 'integer' }, nullable: false, value: 2 },
+    { handle: 'headerRow', jsonSchema: { minimum: 1, type: 'integer' }, nullable: false, value: 1 },
+    { handle: 'maxRowsPerPoll', jsonSchema: { maximum: 500, minimum: 1, type: 'integer' }, nullable: false, value: 100 },
+    { handle: 'sheet', jsonSchema: { minLength: 1, type: 'string' }, nullable: false },
+    { handle: 'spreadsheetId', jsonSchema: { minLength: 1, type: 'string' }, nullable: false },
+    {
+      handle: 'valueRender',
+      jsonSchema: { enum: ['UNFORMATTED_VALUE', 'FORMATTED_VALUE', 'FORMULA'], type: 'string' },
+      nullable: false,
+      value: 'UNFORMATTED_VALUE',
     },
-    required: ['spreadsheetId', 'sheet'],
-    title: 'Google Sheets New Row Config',
-    type: 'object',
-  },
+  ],
   definitionVersion: 2,
   description: 'Polls a sheet and triggers once for every new row appended below the last row already seen.',
   displayName: 'New Row Added',
   key: 'googlesheets.on_row_added',
   name: 'on_row_added',
-  outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: { events: { items: eventSchema, type: 'array' } },
-        required: ['events'],
-        title: 'Google Sheets New Row Payload',
-        type: 'object',
-      },
-      nullable: false,
-    },
-  ],
+  outputs: [{ handle: 'events', jsonSchema: { items: eventSchema, type: 'array' }, nullable: false }],
   provider: 'googlesheets',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const googleSheetsRowAdded: PollDefinition = {
-  buildOutputs: payloadPollOutputs,
+  buildOutputs: eventsPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)
@@ -150,7 +133,7 @@ export const googleSheetsRowAdded: PollDefinition = {
 }
 
 function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
-  const range = ((value.columnRange as string | undefined) ?? 'A:ZZZ').trim()
+  const range = (value.columnRange as string).trim()
   const separator = range.indexOf(':')
   const colStart = separator < 0 ? range : range.slice(0, separator)
   const colEnd = separator < 0 ? range : range.slice(separator + 1)
@@ -158,13 +141,13 @@ function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
   return {
     colEnd,
     colStart,
-    dateTimeRender: (value.dateTimeRender as Config['dateTimeRender'] | undefined) ?? 'FORMATTED_STRING',
-    firstDataRow: (value.firstDataRow as number | undefined) ?? 2,
-    headerRow: (value.headerRow as number | undefined) ?? 1,
-    maxRowsPerPoll: (value.maxRowsPerPoll as number | undefined) ?? 100,
+    dateTimeRender: value.dateTimeRender as Config['dateTimeRender'],
+    firstDataRow: value.firstDataRow as number,
+    headerRow: value.headerRow as number,
+    maxRowsPerPoll: value.maxRowsPerPoll as number,
     sheet: value.sheet as string,
     spreadsheetId: /\/spreadsheets\/d\/([A-Za-z0-9_-]+)/.exec(spreadsheet)?.[1] ?? spreadsheet,
-    valueRender: (value.valueRender as Config['valueRender'] | undefined) ?? 'UNFORMATTED_VALUE',
+    valueRender: value.valueRender as Config['valueRender'],
   }
 }
 

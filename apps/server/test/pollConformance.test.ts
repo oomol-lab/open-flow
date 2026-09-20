@@ -3,7 +3,7 @@ import type { PollConformanceFixture, PollConformanceHarness, PollDefinition, Po
 
 import { nextTriggerScheduledAt, scheduledTriggerOccurrenceId } from '@oomol-lab/open-flow/cron-trigger'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
-import { payloadPollOutputs, pollConformanceCases } from '@oomol-lab/open-flow/poll-trigger'
+import { eventsPollOutputs, pollConformanceCases } from '@oomol-lab/open-flow/poll-trigger'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -25,29 +25,13 @@ function next(label: string): string {
 }
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: { source: { type: 'string' } },
-    required: ['source'],
-    type: 'object',
-  },
+  configInputs: [{ handle: 'source', jsonSchema: { type: 'string' }, nullable: false }],
   definitionVersion: 2,
   description: 'Poll conformance definition.',
   displayName: 'Poll conformance',
   key: 'conformance.on_event',
   name: 'on_event',
-  outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: { events: { items: { type: 'object' }, type: 'array' } },
-        required: ['events'],
-        type: 'object',
-      },
-      nullable: false,
-    },
-  ],
+  outputs: [{ handle: 'events', nullable: false, jsonSchema: { items: { type: 'object' }, type: 'array' } }],
   provider: 'conformance',
   type: 'poll',
 } as const
@@ -69,7 +53,7 @@ function revision(config: Readonly<Record<string, JsonValue>>, connectionId: str
                 pollTimes: rules,
               },
               task: {
-                inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'poll', output: 'payload' }] } },
+                inputs: { event: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'poll', output: 'events' }] } },
                 kind: 'task',
                 task: {
                   inputs: [{ handle: 'event', jsonSchema: snapshot.outputs[0]!.jsonSchema, nullable: false }],
@@ -96,7 +80,7 @@ async function createHarness(fixture: PollConformanceFixture): Promise<PollConfo
   let staged: PollResult[] = []
   let calls = 0
   const definition: PollDefinition = {
-    buildOutputs: payloadPollOutputs,
+    buildOutputs: eventsPollOutputs,
     snapshot,
     async poll() {
       calls += 1
@@ -186,7 +170,7 @@ async function createHarness(fixture: PollConformanceFixture): Promise<PollConfo
              ORDER BY poll_admissions.rowid`,
           )
           .all() as { readonly payload: string }[]
-        return { calls, checkpoint: state.checkpoint, health: state.health, payloads: rows.map((row) => JSON.parse(row.payload).payload) }
+        return { calls, checkpoint: state.checkpoint, health: state.health, payloads: rows.map((row) => JSON.parse(row.payload)) }
       } finally {
         database.close()
       }

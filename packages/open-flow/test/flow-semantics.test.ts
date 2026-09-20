@@ -73,12 +73,7 @@ function triggerRevision(config: Readonly<Record<string, JsonValue>>, jsonSchema
             bindingId: 'trigger',
             config,
             definition: {
-              configSchema: {
-                additionalProperties: false,
-                properties: { event: { enum: ['push'], type: 'string' } },
-                required: ['event'],
-                type: 'object',
-              },
+              configInputs: [{ handle: 'event', jsonSchema: { enum: ['push'], type: 'string' }, nullable: false }],
               definitionVersion: 2,
               description: 'Runs when a repository changes.',
               displayName: 'Repository event',
@@ -331,7 +326,7 @@ export default () => value`,
               bindingId: 'binding',
               config: {},
               definition: {
-                configSchema: { additionalProperties: false, type: 'object' },
+                configInputs: [],
                 definitionVersion: 2,
                 description: 'Runs when a repository changes.',
                 displayName: 'Repository event',

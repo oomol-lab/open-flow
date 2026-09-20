@@ -5,73 +5,45 @@ import { createI18n } from '../i18n.ts'
 import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
 
 describe('Trigger configuration editor', () => {
-  it('shows missing required fields and defaults without writing values during rendering', () => {
+  it('uses input defaults without saving them or offering source selection', () => {
     const onChange = vi.fn()
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <TriggerConfigEditor
-          schema={{
-            type: 'object',
-            required: ['owner', 'events'],
-            properties: {
-              owner: { type: 'string', title: 'Owner', default: 'example' },
-              events: { type: 'array', title: 'Events', items: { enum: ['issues', 'push'] } },
-              limit: { type: 'integer', default: 10 },
-            },
-          }}
+          inputs={[
+            { handle: 'owner', nullable: false, jsonSchema: { type: 'string' }, value: 'example' },
+            { handle: 'limit', nullable: false, jsonSchema: { type: 'integer' }, value: 10 },
+            { handle: 'required', nullable: false, jsonSchema: { type: 'string' } },
+            { group: 'Optional' },
+            { handle: 'note', nullable: true, jsonSchema: { type: 'string' } },
+          ]}
           config={{}}
           disabled={false}
           onChange={onChange}
         />
       </I18nProvider>,
     )
-    expect(markup).toContain('class="inspector-section-title"')
-    expect(markup).toContain('Options')
-    expect(markup).toContain('i-carbon:power -rotate-90')
-    expect(markup).toContain('aria-invalid="true"')
     expect(markup).toContain('value="example"')
     expect(markup).toContain('value="10"')
-    expect((markup.match(/<button\b[^>]*aria-label="events"[^>]*>/) ?? [])[0]).toContain('aria-invalid="true"')
-    expect(markup).toContain('>Name</span>')
-    expect(markup).toContain('>Value</span>')
-    expect(markup).not.toContain('>Type</span>')
-    expect(markup).toMatch(/<input[^>]*aria-label="Field name"[^>]*readonly=""[^>]*value="owner"/)
-    expect(markup).toContain('aria-label="owner Field settings"')
-    expect(markup).not.toContain('Edit as JSON')
-    expect(markup).not.toContain('Clear owner')
+    expect(markup).toContain('Optional')
+    expect(markup).not.toContain('Select source')
     expect(onChange).not.toHaveBeenCalled()
   })
 
-  it('preserves enum multi-selection and prevents editing read-only controls', () => {
+  it('renders provider-specific editors inside the shared input table', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <TriggerConfigEditor
-          schema={{
-            type: 'object',
-            properties: {
-              events: { type: 'array', items: { enum: ['issues', 'push'] } },
-              active: { type: 'boolean' },
-            },
-          }}
-          config={{ events: ['issues'], active: false }}
-          disabled
+          inputs={[{ handle: 'teamId', nullable: false, jsonSchema: { type: 'string' } }]}
+          config={{ teamId: 'team-1' }}
+          disabled={false}
           onChange={() => {}}
+          renderEditor={() => <button aria-label="Choose team">Team one</button>}
         />
       </I18nProvider>,
     )
-    expect(markup).toContain('issues')
-    expect(markup).not.toContain('>push<')
-    expect(markup).toContain('aria-label="events"')
-    const controls = markup.match(/<(?:input|button|select|textarea)\b[^>]*>/g) ?? []
-    expect(controls.length).toBeGreaterThan(0)
-    // Opening value options only reveals controls; the actions inside remain disabled.
-    const editingControls = controls.filter((control) => !control.includes('data-value-options="true"'))
-    const editable = editingControls.filter((control) => {
-      if (/\bdisabled(?:=|\s|>)/.test(control)) return false
-      const readOnlyText =
-        /^<(?:input|textarea)\b/.test(control) && !/\btype="(?:checkbox|radio|range|file|color)"/.test(control) && /\breadonly(?:=|\s|>)/.test(control)
-      return !readOnlyText
-    })
-    expect(editable).toEqual([])
+    expect(markup).toContain('Team one')
+    expect(markup).toContain('Choose team')
+    expect(markup).toContain('teamId')
   })
 })

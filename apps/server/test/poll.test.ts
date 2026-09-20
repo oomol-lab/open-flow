@@ -5,7 +5,7 @@ import type { DestinationStream, Logger } from 'pino'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import {
-  payloadPollOutputs,
+  eventsPollOutputs,
   maximumPollCheckpointBytes,
   maximumPollEventsPerPage,
   PollConnectionError,
@@ -50,29 +50,17 @@ function captureLogger(): { readonly logger: Logger; readonly output: () => stri
 }
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: { source: { type: 'string' } },
-    required: ['source'],
-    type: 'object',
-  },
+  configInputs: [
+    { handle: 'source', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'limit', jsonSchema: { type: 'integer' }, nullable: false, value: 10 },
+    { handle: 'filter', jsonSchema: { type: 'string' }, nullable: true },
+  ],
   definitionVersion: 2,
   description: 'Poll test definition.',
   displayName: 'Poll test',
   key: 'test.on_event',
   name: 'on_event',
-  outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: { events: { items: { type: 'object' }, type: 'array' } },
-        required: ['events'],
-        type: 'object',
-      },
-      nullable: false,
-    },
-  ],
+  outputs: [{ handle: 'events', nullable: false, jsonSchema: { items: { type: 'object' }, type: 'array' } }],
   provider: 'test',
   type: 'poll',
 } as const
@@ -243,9 +231,10 @@ describe('Server Poll Trigger', () => {
     const file = await databaseFile()
     let calls = 0
     const definition: PollDefinition = {
-      buildOutputs: payloadPollOutputs,
+      buildOutputs: eventsPollOutputs,
       snapshot,
-      poll: async () => {
+      poll: async (context) => {
+        expect(context.config).toEqual({ source: 'primary', limit: 10, filter: null })
         calls++
         return { checkpoint: {}, events: [] }
       },
@@ -286,7 +275,7 @@ describe('Server Poll Trigger', () => {
       },
     })
     const definition: PollDefinition = {
-      buildOutputs: payloadPollOutputs,
+      buildOutputs: eventsPollOutputs,
       snapshot,
       async poll(context): Promise<PollResult> {
         providerSignal = context.signal
@@ -322,7 +311,7 @@ describe('Server Poll Trigger', () => {
           const entered = Promise.withResolvers<void>()
           const canceled = Promise.withResolvers<void>()
           const definition: PollDefinition = {
-            buildOutputs: payloadPollOutputs,
+            buildOutputs: eventsPollOutputs,
             snapshot,
             async poll(context) {
               const signal = context.signal
@@ -368,7 +357,7 @@ describe('Server Poll Trigger', () => {
     let calls = 0
     let checkpoint: unknown
     const definition: PollDefinition = {
-      buildOutputs: payloadPollOutputs,
+      buildOutputs: eventsPollOutputs,
       snapshot,
       async poll(context): Promise<PollResult> {
         calls += 1
@@ -436,7 +425,7 @@ describe('Server Poll Trigger', () => {
   ] as const)('reports %s preview failures without changing the live checkpoint or health', async (mode, code) => {
     let preview = false
     const definition: PollDefinition = {
-      buildOutputs: payloadPollOutputs,
+      buildOutputs: eventsPollOutputs,
       snapshot,
       async poll() {
         if (!preview) return { checkpoint: { cursor: 'baseline' }, events: [] }
@@ -478,7 +467,7 @@ describe('Server Poll Trigger', () => {
     const file = await databaseFile()
     let calls = 0
     const definition: PollDefinition = {
-      buildOutputs: payloadPollOutputs,
+      buildOutputs: eventsPollOutputs,
       snapshot,
       async poll(): Promise<PollResult> {
         calls += 1
@@ -507,7 +496,7 @@ describe('Server Poll Trigger', () => {
   it('bounds continuation pages processed by one Poll tick', async () => {
     let calls = 0
     const definition: PollDefinition = {
-      buildOutputs: payloadPollOutputs,
+      buildOutputs: eventsPollOutputs,
       snapshot,
       async poll() {
         calls += 1
@@ -532,7 +521,7 @@ describe('Server Poll Trigger', () => {
     const file = await databaseFile()
     const captured = captureLogger()
     const definition: PollDefinition = {
-      buildOutputs: payloadPollOutputs,
+      buildOutputs: eventsPollOutputs,
       snapshot,
       async poll() {
         throw new PollConnectionError('Connection requires reauthorization.')
@@ -565,7 +554,7 @@ describe('Server Poll Trigger', () => {
     const file = await databaseFile()
     let calls = 0
     const definition: PollDefinition = {
-      buildOutputs: payloadPollOutputs,
+      buildOutputs: eventsPollOutputs,
       snapshot,
       async poll() {
         calls += 1
@@ -595,7 +584,7 @@ describe('Server Poll Trigger', () => {
     const file = await databaseFile()
     const checkpoints: unknown[] = []
     const definition: PollDefinition = {
-      buildOutputs: payloadPollOutputs,
+      buildOutputs: eventsPollOutputs,
       snapshot,
       async poll({ checkpoint }) {
         checkpoints.push(checkpoint)
@@ -622,7 +611,7 @@ describe('Server Poll Trigger', () => {
     const entered = Promise.withResolvers<void>()
     const page = Promise.withResolvers<PollResult>()
     const definition: PollDefinition = {
-      buildOutputs: payloadPollOutputs,
+      buildOutputs: eventsPollOutputs,
       snapshot,
       async poll() {
         entered.resolve()
@@ -651,7 +640,7 @@ describe('Server Poll Trigger', () => {
   it('allows an expired durable claim lease to be reacquired', async () => {
     const file = await databaseFile()
     const definition: PollDefinition = {
-      buildOutputs: payloadPollOutputs,
+      buildOutputs: eventsPollOutputs,
       snapshot,
       poll: () => Promise.resolve({ checkpoint: null, events: [] }),
     }

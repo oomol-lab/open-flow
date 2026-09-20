@@ -187,7 +187,7 @@ export type InlineConditionBlock = {
  */
 export type InlineTaskBlock = {
   /** Block input Handles definitions */
-  inputs_def?: (InputHandleDef | GroupDividerDef)[] | undefined
+  inputs_def?: ((Omit<InputHandleDef, 'handle'> & { handle: string }) | GroupDividerDef)[] | undefined
   /** Block output Handles definitions */
   outputs_def?: (OutputHandleDef | GroupDividerDef)[] | undefined
   executor: Executor
@@ -307,7 +307,7 @@ export type Package = {
  */
 export type SubflowBlock = {
   /** Block input Handles definitions */
-  inputs_def?: (InputHandleDef | GroupDividerDef)[] | undefined
+  inputs_def?: ((Omit<InputHandleDef, 'handle'> & { handle: string }) | GroupDividerDef)[] | undefined
   /** Block output Handles definitions */
   outputs_def?: (OutputHandleDef | GroupDividerDef)[] | undefined
   /** UI settings of the block */
@@ -358,7 +358,7 @@ export type SubflowNode = {
  */
 export type TaskBlock = {
   /** Block input Handles definitions */
-  inputs_def?: (InputHandleDef | GroupDividerDef)[] | undefined
+  inputs_def?: ((Omit<InputHandleDef, 'handle'> & { handle: string }) | GroupDividerDef)[] | undefined
   /** Block output Handles definitions */
   outputs_def?: (OutputHandleDef | GroupDividerDef)[] | undefined
   /** UI settings of the block */
@@ -420,7 +420,7 @@ export type TriggerDefinition = {
         account_required: true
       }
     | undefined
-  config_schema: JsonObject
+  config_inputs: ((Omit<InputHandleDef, 'handle'> & { handle: string }) | GroupDividerDef)[]
   outputs: { handle: string; json_schema?: JsonValue; description?: string; nullable?: boolean; kind?: string }[]
 }
 

@@ -46,7 +46,7 @@ it('accepts string or repeated query values and arbitrary own keys', () => {
 
 describe.each(['poll', 'integration'] as const)('%s output definitions', (kind) => {
   const definition = {
-    configSchema: {},
+    configInputs: [],
     definitionVersion: 2,
     description: '',
     displayName: 'Event',
@@ -79,13 +79,13 @@ describe.each(['poll', 'integration'] as const)('%s output definitions', (kind) 
 })
 
 it('allows scalar output schemas, rejects duplicates and retains object config roots', () => {
-  expect(() => validateTriggerDefinitionSchemas({ configSchema: { type: 'object' }, outputs: ports })).not.toThrow()
-  expect(() => validateTriggerDefinitionSchemas({ configSchema: { type: 'string' }, outputs: ports })).toThrow()
-  expect(() => validateTriggerDefinitionSchemas({ configSchema: {}, outputs: [ports[0], ports[0]] })).toThrow(/duplicate/)
+  expect(() => validateTriggerDefinitionSchemas({ configInputs: [], outputs: ports })).not.toThrow()
+  expect(() => validateTriggerDefinitionSchemas({ configInputs: [{ handle: 'bad', nullable: false, jsonSchema: 'string' }], outputs: ports })).toThrow()
+  expect(() => validateTriggerDefinitionSchemas({ configInputs: [], outputs: [ports[0], ports[0]] })).toThrow(/duplicate/)
 })
 
 it('includes output order and nullable in the definition digest', async () => {
-  const definition = { configSchema: {}, outputs: ports, provisioning: 'poll' as const, revision: '2', serviceId: 'test', type: 'test.event' }
+  const definition = { configInputs: [], outputs: ports, provisioning: 'poll' as const, revision: '2', serviceId: 'test', type: 'test.event' }
   const digest = await computeTriggerDefinitionDigest(definition)
   expect(await computeTriggerDefinitionDigest({ ...definition, outputs: ports.toReversed() })).not.toBe(digest)
   expect(await computeTriggerDefinitionDigest({ ...definition, outputs: ports.map((port) => Object.assign({}, port, { nullable: false })) })).not.toBe(digest)

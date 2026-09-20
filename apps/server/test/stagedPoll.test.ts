@@ -1,7 +1,7 @@
 import type { TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { PollDefinition } from '@oomol-lab/open-flow/poll-trigger'
 
-import { payloadPollOutputs, PermanentPollError, TransientPollError } from '@oomol-lab/open-flow/poll-trigger'
+import { eventsPollOutputs, PermanentPollError, TransientPollError } from '@oomol-lab/open-flow/poll-trigger'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -14,29 +14,13 @@ import { closeService, openService, startService } from './serviceFixture.ts'
 const directories: string[] = []
 const services = new Set<ServerService>()
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: { source: { type: 'string' } },
-    required: ['source'],
-    type: 'object',
-  },
+  configInputs: [{ handle: 'source', jsonSchema: { type: 'string' }, nullable: false }],
   definitionVersion: 2,
   description: 'Poll staging test definition.',
   displayName: 'Poll staging test',
   key: 'test.staged_poll',
   name: 'staged_poll',
-  outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: { events: { items: { type: 'object' }, type: 'array' } },
-        required: ['events'],
-        type: 'object',
-      },
-      nullable: false,
-    },
-  ],
+  outputs: [{ handle: 'events', nullable: false, jsonSchema: { items: { type: 'object' }, type: 'array' } }],
   provider: 'test',
   type: 'poll',
 } as const
@@ -114,7 +98,7 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
   let call = 0
   let failOnce = true
   const definition: PollDefinition = {
-    buildOutputs: payloadPollOutputs,
+    buildOutputs: eventsPollOutputs,
     snapshot,
     async poll(context) {
       call += 1
@@ -229,7 +213,7 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
 it('fails a permanent Poll baseline before activation and preserves the old Live Publication', async () => {
   const file = await databaseFile()
   const definition: PollDefinition = {
-    buildOutputs: payloadPollOutputs,
+    buildOutputs: eventsPollOutputs,
     snapshot,
     async poll() {
       throw new PermanentPollError('The fixed Poll configuration is invalid.')
@@ -276,7 +260,7 @@ it('fails a permanent Poll baseline before activation and preserves the old Live
 it('rolls back a changed Poll candidate, lets another Flow publish, and resumes its retry after restart', async () => {
   const file = await databaseFile()
   const definition: PollDefinition = {
-    buildOutputs: payloadPollOutputs,
+    buildOutputs: eventsPollOutputs,
     snapshot,
     poll: async () => ({ checkpoint: { ready: true }, events: [] }),
   }
@@ -329,7 +313,7 @@ it('publishes promptly when asynchronous baseline preparation finishes after mai
   const baseline = Promise.withResolvers<void>()
   const entered = Promise.withResolvers<void>()
   const definition: PollDefinition = {
-    buildOutputs: payloadPollOutputs,
+    buildOutputs: eventsPollOutputs,
     snapshot,
     async poll() {
       entered.resolve()

@@ -200,6 +200,8 @@ function SelectedSourceValue({
 }
 
 export function NodeInputValue({
+  fixed = false,
+  editor: customEditor,
   definition,
   presentation,
   upstream: providedUpstream,
@@ -216,6 +218,8 @@ export function NodeInputValue({
   onValue,
   onVariable,
 }: {
+  readonly fixed?: boolean
+  readonly editor?: ValueEditorProps['editor']
   readonly presentation?: Pick<
     ValueEditorProps,
     | 'layout'
@@ -328,191 +332,195 @@ export function NodeInputValue({
     const [, nodeId, output, field] = JSON.parse(next) as [string, string, string, string | null]
     upstream?.onChange({ nodeId, output, ...(field == null ? {} : { field }) })
   }
-  const sourceControl = disabled ? undefined : (
-    <div ref={setSourceContainer} className="flex items-center">
-      <DropdownMenu
-        onOpenChange={(open) => {
-          setSourceOpen(open)
-          if (open && variables.enabled) variables.onOpen()
-        }}
-      >
-        <Tooltip disabled={sourceOpen}>
-          <TooltipTrigger
-            render={
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    className="aria-pressed:bg-[var(--ui-control-hover-background,var(--ui-muted))] aria-pressed:text-foreground"
-                    aria-label={`${definition.handle} ${t('inspector.sources.select')}`}
-                    aria-pressed={sourceKind !== 'literal'}
-                    disabled={disabled}
-                  >
-                    <i aria-hidden="true" className="i-lucide-light:link" />
-                  </Button>
-                }
-              />
-            }
-          />
-          <TooltipContent container={sourcePortal}>{t('inspector.sources.select')}</TooltipContent>
-        </Tooltip>
-        <DropdownMenuContent align="start" sideOffset={6} className={`w-44 min-w-44 ${selectionMenuContentClass}`} container={sourcePortal}>
-          <MenuHeader>{t('inspector.sources.title')}</MenuHeader>
-          <DropdownMenuRadioGroup
-            value={sourceKind === 'literal' ? literalSource : ''}
-            onValueChange={() => {
-              if (bound) onVariable(undefined)
-              else if (connected) onValue(undefined)
-            }}
-          >
-            <DropdownMenuRadioItem className={sourceItemClass} value={literalSource} closeOnClick>
-              <i aria-hidden="true" className="i-lucide-light:pen-line size-3.5 shrink-0 text-muted-foreground" />
-              <span className="min-w-0 flex-1 truncate">{t('nodeInput.literal')}</span>
-            </DropdownMenuRadioItem>
-          </DropdownMenuRadioGroup>
-          {hasVariables && (
-            <DropdownMenuSub>
-              <DropdownMenuSubTrigger className={`${sourceSubTriggerClass} ${sourceKind === 'variable' ? 'bg-accent' : ''}`}>
-                <i aria-hidden="true" className="i-lucide-light:sliders-horizontal size-3.5 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 truncate">{t('nodeInput.variable')}</span>
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className={`w-48 min-w-48 ${selectionMenuContentClass}`} container={sourcePortal}>
-                <DropdownMenuRadioGroup
-                  value={sourceKind === 'variable' ? currentSource : ''}
-                  onValueChange={(next) => {
-                    const [, name] = JSON.parse(next) as [string, string]
-                    onVariable(name)
-                  }}
-                >
-                  {bound && !variables.names.includes(variableName) && (
-                    <DropdownMenuRadioItem className={sourceItemClass} value={variableSource(variableName)} disabled>
-                      <i aria-hidden="true" className="i-lucide-light:sliders-horizontal size-3.5 shrink-0 text-muted-foreground" />
-                      <span className="min-w-0 flex-1 truncate font-mono" title={variableName}>
-                        {variableName}
-                      </span>
-                    </DropdownMenuRadioItem>
-                  )}
-                  {variables.names.map((name) => {
-                    const selected = sourceKind === 'variable' && currentSource === variableSource(name)
-                    const status = variableCompatible ? undefined : t('inspector.sources.incompatible')
-                    return (
-                      <DropdownMenuRadioItem
-                        className={`${sourceItemClass} ${status == null || selected ? 'pr-8' : 'pr-20'}`}
-                        key={name}
-                        value={variableSource(name)}
-                        closeOnClick
-                      >
-                        <i
-                          aria-hidden="true"
-                          className={`${status == null ? 'i-lucide-light:sliders-horizontal text-muted-foreground' : 'i-lucide-light:triangle-alert'} size-3.5 shrink-0`}
-                          style={status == null ? undefined : { color: 'var(--warning-foreground)' }}
-                        />
-                        <span className="min-w-0 flex-1 truncate font-mono" title={name}>
-                          {name}
-                        </span>
-                        {!selected && status != null && (
-                          <span className="pointer-events-none absolute right-2 shrink-0 text-[10px] leading-4" style={{ color: 'var(--warning-foreground)' }}>
-                            {status}
-                          </span>
-                        )}
-                        {selected && status != null && <span className="sr-only">{status}</span>}
-                      </DropdownMenuRadioItem>
-                    )
-                  })}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          )}
-          <DropdownMenuSeparator className="mx-2 bg-border/50" />
-          {candidates.pending || candidates.failed ? (
-            <DropdownMenuItem className={sourceEmptyItemClass} disabled>
-              {t(candidates.failed ? 'inspector.sources.loadFailed' : 'inspector.sources.loading')}
-            </DropdownMenuItem>
-          ) : (
-            (upstream?.groups.length ?? 0) === 0 && (
-              <DropdownMenuItem className={sourceEmptyItemClass} disabled>
-                <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 truncate">{t('nodeInput.noUpstreamNodes')}</span>
-              </DropdownMenuItem>
-            )
-          )}
-          {upstream?.groups.map((group) => (
-            <DropdownMenuSub key={group.nodeId}>
-              <DropdownMenuSubTrigger
-                className={`${sourceSubTriggerClass} ${connected && upstream.current.some((source) => source.nodeId === group.nodeId) ? 'bg-accent' : ''}`}
-              >
-                <ContentIcon
-                  src={group.icon}
-                  className="size-3.5 shrink-0 data-[icon-kind=initials]:text-[16px]"
-                  fallback={<i aria-hidden="true" className="i-lucide-light:workflow size-3.5 shrink-0 text-muted-foreground" />}
+  const sourceControl =
+    disabled || fixed ? undefined : (
+      <div ref={setSourceContainer} className="flex items-center">
+        <DropdownMenu
+          onOpenChange={(open) => {
+            setSourceOpen(open)
+            if (open && variables.enabled) variables.onOpen()
+          }}
+        >
+          <Tooltip disabled={sourceOpen}>
+            <TooltipTrigger
+              render={
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      className="aria-pressed:bg-[var(--ui-control-hover-background,var(--ui-muted))] aria-pressed:text-foreground"
+                      aria-label={`${definition.handle} ${t('inspector.sources.select')}`}
+                      aria-pressed={sourceKind !== 'literal'}
+                      disabled={disabled}
+                    >
+                      <i aria-hidden="true" className="i-lucide-light:link" />
+                    </Button>
+                  }
                 />
-                <span className="min-w-0 flex-1 truncate" title={group.nodeName}>
-                  {group.nodeName}
-                </span>
-              </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className={`w-48 min-w-48 ${selectionMenuContentClass}`} container={sourcePortal}>
-                <DropdownMenuRadioGroup
-                  value={sourceKind === 'upstream' && upstream.current.length === 1 && upstream.current[0]?.nodeId === group.nodeId ? currentSource : ''}
-                  onValueChange={selectUpstream}
-                >
-                  {upstream.current
-                    .filter(
-                      (source) =>
-                        source.nodeId === group.nodeId &&
-                        source.check != null &&
-                        source.check.kind != 'available' &&
-                        !group.outputs.some(
-                          (candidate) =>
-                            candidate.output === source.output &&
-                            (source.field === undefined || candidate.fields?.some((child) => child.field === source.field)),
-                        ),
-                    )
-                    .map((source) => (
-                      <DropdownMenuRadioItem
-                        className={sourceItemClass}
-                        key={upstreamSource(source.nodeId, source.output, source.field)}
-                        value={upstreamSource(source.nodeId, source.output, source.field)}
-                        disabled
-                      >
-                        <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
-                        <span className="min-w-0 flex-1 truncate font-mono" title={sourceOutputLabel(source)}>
-                          {sourceOutputLabel(source)}
+              }
+            />
+            <TooltipContent container={sourcePortal}>{t('inspector.sources.select')}</TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="start" sideOffset={6} className={`w-44 min-w-44 ${selectionMenuContentClass}`} container={sourcePortal}>
+            <MenuHeader>{t('inspector.sources.title')}</MenuHeader>
+            <DropdownMenuRadioGroup
+              value={sourceKind === 'literal' ? literalSource : ''}
+              onValueChange={() => {
+                if (bound) onVariable(undefined)
+                else if (connected) onValue(undefined)
+              }}
+            >
+              <DropdownMenuRadioItem className={sourceItemClass} value={literalSource} closeOnClick>
+                <i aria-hidden="true" className="i-lucide-light:pen-line size-3.5 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate">{t('nodeInput.literal')}</span>
+              </DropdownMenuRadioItem>
+            </DropdownMenuRadioGroup>
+            {hasVariables && (
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className={`${sourceSubTriggerClass} ${sourceKind === 'variable' ? 'bg-accent' : ''}`}>
+                  <i aria-hidden="true" className="i-lucide-light:sliders-horizontal size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate">{t('nodeInput.variable')}</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className={`w-48 min-w-48 ${selectionMenuContentClass}`} container={sourcePortal}>
+                  <DropdownMenuRadioGroup
+                    value={sourceKind === 'variable' ? currentSource : ''}
+                    onValueChange={(next) => {
+                      const [, name] = JSON.parse(next) as [string, string]
+                      onVariable(name)
+                    }}
+                  >
+                    {bound && !variables.names.includes(variableName) && (
+                      <DropdownMenuRadioItem className={sourceItemClass} value={variableSource(variableName)} disabled>
+                        <i aria-hidden="true" className="i-lucide-light:sliders-horizontal size-3.5 shrink-0 text-muted-foreground" />
+                        <span className="min-w-0 flex-1 truncate font-mono" title={variableName}>
+                          {variableName}
                         </span>
                       </DropdownMenuRadioItem>
-                    ))}
-                  {group.outputs.map((candidate) =>
-                    candidate.fields?.length ? (
-                      <DropdownMenuSub key={candidate.output}>
-                        <DropdownMenuSubTrigger
-                          className={`${sourceSubTriggerClass} ${connected && upstream.current.some((source) => source.nodeId === group.nodeId && source.output === candidate.output) ? 'bg-accent' : ''}`}
+                    )}
+                    {variables.names.map((name) => {
+                      const selected = sourceKind === 'variable' && currentSource === variableSource(name)
+                      const status = variableCompatible ? undefined : t('inspector.sources.incompatible')
+                      return (
+                        <DropdownMenuRadioItem
+                          className={`${sourceItemClass} ${status == null || selected ? 'pr-8' : 'pr-20'}`}
+                          key={name}
+                          value={variableSource(name)}
+                          closeOnClick
+                        >
+                          <i
+                            aria-hidden="true"
+                            className={`${status == null ? 'i-lucide-light:sliders-horizontal text-muted-foreground' : 'i-lucide-light:triangle-alert'} size-3.5 shrink-0`}
+                            style={status == null ? undefined : { color: 'var(--warning-foreground)' }}
+                          />
+                          <span className="min-w-0 flex-1 truncate font-mono" title={name}>
+                            {name}
+                          </span>
+                          {!selected && status != null && (
+                            <span
+                              className="pointer-events-none absolute right-2 shrink-0 text-[10px] leading-4"
+                              style={{ color: 'var(--warning-foreground)' }}
+                            >
+                              {status}
+                            </span>
+                          )}
+                          {selected && status != null && <span className="sr-only">{status}</span>}
+                        </DropdownMenuRadioItem>
+                      )
+                    })}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            )}
+            <DropdownMenuSeparator className="mx-2 bg-border/50" />
+            {candidates.pending || candidates.failed ? (
+              <DropdownMenuItem className={sourceEmptyItemClass} disabled>
+                {t(candidates.failed ? 'inspector.sources.loadFailed' : 'inspector.sources.loading')}
+              </DropdownMenuItem>
+            ) : (
+              (upstream?.groups.length ?? 0) === 0 && (
+                <DropdownMenuItem className={sourceEmptyItemClass} disabled>
+                  <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate">{t('nodeInput.noUpstreamNodes')}</span>
+                </DropdownMenuItem>
+              )
+            )}
+            {upstream?.groups.map((group) => (
+              <DropdownMenuSub key={group.nodeId}>
+                <DropdownMenuSubTrigger
+                  className={`${sourceSubTriggerClass} ${connected && upstream.current.some((source) => source.nodeId === group.nodeId) ? 'bg-accent' : ''}`}
+                >
+                  <ContentIcon
+                    src={group.icon}
+                    className="size-3.5 shrink-0 data-[icon-kind=initials]:text-[16px]"
+                    fallback={<i aria-hidden="true" className="i-lucide-light:workflow size-3.5 shrink-0 text-muted-foreground" />}
+                  />
+                  <span className="min-w-0 flex-1 truncate" title={group.nodeName}>
+                    {group.nodeName}
+                  </span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className={`w-48 min-w-48 ${selectionMenuContentClass}`} container={sourcePortal}>
+                  <DropdownMenuRadioGroup
+                    value={sourceKind === 'upstream' && upstream.current.length === 1 && upstream.current[0]?.nodeId === group.nodeId ? currentSource : ''}
+                    onValueChange={selectUpstream}
+                  >
+                    {upstream.current
+                      .filter(
+                        (source) =>
+                          source.nodeId === group.nodeId &&
+                          source.check != null &&
+                          source.check.kind != 'available' &&
+                          !group.outputs.some(
+                            (candidate) =>
+                              candidate.output === source.output &&
+                              (source.field === undefined || candidate.fields?.some((child) => child.field === source.field)),
+                          ),
+                      )
+                      .map((source) => (
+                        <DropdownMenuRadioItem
+                          className={sourceItemClass}
+                          key={upstreamSource(source.nodeId, source.output, source.field)}
+                          value={upstreamSource(source.nodeId, source.output, source.field)}
+                          disabled
                         >
                           <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
-                          <span className="min-w-0 flex-1 truncate font-mono" title={candidate.output}>
-                            {candidate.output}
+                          <span className="min-w-0 flex-1 truncate font-mono" title={sourceOutputLabel(source)}>
+                            {sourceOutputLabel(source)}
                           </span>
-                        </DropdownMenuSubTrigger>
-                        <DropdownMenuSubContent className={`w-56 min-w-56 ${selectionMenuContentClass}`} container={sourcePortal}>
-                          <DropdownMenuRadioGroup value={sourceKind === 'upstream' ? currentSource : ''} onValueChange={selectUpstream}>
-                            {sourceOption(group.nodeId, candidate, t('inspector.sources.wholeObject'))}
-                            <DropdownMenuSeparator className="mx-2 bg-border/50" />
-                            {candidate.fields.map((child) => sourceOption(group.nodeId, child, child.field === '' ? '""' : child.field))}
-                          </DropdownMenuRadioGroup>
-                        </DropdownMenuSubContent>
-                      </DropdownMenuSub>
-                    ) : (
-                      sourceOption(group.nodeId, candidate, candidate.output)
-                    ),
-                  )}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuSubContent>
-            </DropdownMenuSub>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
-  )
+                        </DropdownMenuRadioItem>
+                      ))}
+                    {group.outputs.map((candidate) =>
+                      candidate.fields?.length ? (
+                        <DropdownMenuSub key={candidate.output}>
+                          <DropdownMenuSubTrigger
+                            className={`${sourceSubTriggerClass} ${connected && upstream.current.some((source) => source.nodeId === group.nodeId && source.output === candidate.output) ? 'bg-accent' : ''}`}
+                          >
+                            <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
+                            <span className="min-w-0 flex-1 truncate font-mono" title={candidate.output}>
+                              {candidate.output}
+                            </span>
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className={`w-56 min-w-56 ${selectionMenuContentClass}`} container={sourcePortal}>
+                            <DropdownMenuRadioGroup value={sourceKind === 'upstream' ? currentSource : ''} onValueChange={selectUpstream}>
+                              {sourceOption(group.nodeId, candidate, t('inspector.sources.wholeObject'))}
+                              <DropdownMenuSeparator className="mx-2 bg-border/50" />
+                              {candidate.fields.map((child) => sourceOption(group.nodeId, child, child.field === '' ? '""' : child.field))}
+                            </DropdownMenuRadioGroup>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      ) : (
+                        sourceOption(group.nodeId, candidate, candidate.output)
+                      ),
+                    )}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    )
   const editor =
     connected || bound || sourceMissing ? (
       <SelectedSourceValue
@@ -553,7 +561,7 @@ export function NodeInputValue({
         path={`/${definition.handle.replaceAll('~', '~0').replaceAll('/', '~1')}`}
         disabled={disabled}
         valueEditable={!connected && !bound && !sourceMissing}
-        editor={editor}
+        editor={customEditor ?? editor}
         onDraftIssue={draftIssue}
         onChange={(next, deletion) => onValue(next as JsonValue | undefined, deletion)}
       />

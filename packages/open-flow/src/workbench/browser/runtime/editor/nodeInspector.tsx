@@ -883,9 +883,16 @@ export function NodeInspector({
         {selection?.kind === 'trigger' &&
           (selection.trigger.kind === 'integration' || selection.trigger.kind === 'poll') &&
           (['feishu.on_event', 'feishu_app_bot.on_event'].includes(selection.trigger.definition.key) ? (
-            <FeishuTriggerConfig config={selection.trigger.config} nodeId={selection.id} disabled={disabled} store={store} />
+            <FeishuTriggerConfig
+              inputs={selection.trigger.definition.configInputs}
+              config={selection.trigger.config}
+              nodeId={selection.id}
+              disabled={disabled}
+              store={store}
+            />
           ) : selection.trigger.definition.key === 'linear.on_issue_changed' ? (
             <LinearTriggerConfig
+              inputs={selection.trigger.definition.configInputs}
               config={selection.trigger.config}
               nodeId={selection.id}
               connectionId={
@@ -897,7 +904,7 @@ export function NodeInspector({
           ) : (
             <TriggerConfigEditor
               key={`config:${selection.id}`}
-              schema={selection.trigger.definition.configSchema}
+              inputs={selection.trigger.definition.configInputs}
               config={selection.trigger.config}
               disabled={disabled}
               onChange={(name, value) => {

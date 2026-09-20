@@ -114,7 +114,7 @@ describe('Provider Trigger sections', () => {
       bindingId: 'connection',
       config: {},
       definition: {
-        configSchema: { type: 'object', properties: { query: { type: 'string' } } },
+        configInputs: [{ handle: 'query', jsonSchema: { type: 'string' }, nullable: true }],
         description: 'Polls a mailbox.',
         key: 'gmail.on_message_received',
         name: 'on_message_received',

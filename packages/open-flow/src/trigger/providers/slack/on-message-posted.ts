@@ -2,7 +2,7 @@ import type { ConnectorProxyResult } from '../../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
 import type { PollContext, PollDefinition, PollEvent } from '../../common/poll.ts'
 
-import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { eventsPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 interface Config {
   readonly channelId: string
@@ -65,39 +65,50 @@ const permanentErrors = new Set([
 ])
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    description:
-      'Configuration for slack.on_message_posted. The trigger polls one conversation and emits every new message that passes the configured filters.',
-    properties: {
-      channelId: { description: 'Slack conversation ID to watch, e.g. C0122KQ70S7E.', pattern: '^[CDG][A-Z0-9]{2,31}$', type: 'string' },
-      fromUserIds: {
-        default: [],
-        description: 'Only trigger on messages written by these Slack user IDs. Empty means any author.',
-        items: { pattern: '^[UW][A-Z0-9]{2,31}$', type: 'string' },
-        type: 'array',
-      },
-      ignoreUserIds: {
-        default: [],
-        description: 'Never trigger on messages written by these Slack user IDs.',
-        items: { pattern: '^[UW][A-Z0-9]{2,31}$', type: 'string' },
-        type: 'array',
-      },
-      includeBotMessages: { default: false, description: 'Also trigger on messages posted by bots and apps.', type: 'boolean' },
-      includeSystemMessages: { default: false, description: 'Also trigger on Slack system notices.', type: 'boolean' },
-      maxMessagesPerPoll: {
-        default: defaultPageSize,
-        description: 'Maximum number of messages processed per poll.',
-        maximum: 100,
-        minimum: 1,
-        type: 'integer',
-      },
-      textContains: { default: '', description: 'Only trigger when message text contains this string, case-insensitively.', type: 'string' },
+  configInputs: [
+    {
+      handle: 'channelId',
+      jsonSchema: { pattern: '^[CDG][A-Z0-9]{2,31}$', type: 'string' },
+      nullable: false,
+      description: 'Slack conversation ID to watch, e.g. C0122KQ70S7E.',
     },
-    required: ['channelId'],
-    title: 'Slack New Channel Message Config',
-    type: 'object',
-  },
+    {
+      handle: 'fromUserIds',
+      jsonSchema: { items: { pattern: '^[UW][A-Z0-9]{2,31}$', type: 'string' }, type: 'array' },
+      nullable: false,
+      value: [],
+      description: 'Only trigger on messages written by these Slack user IDs. Empty means any author.',
+    },
+    {
+      handle: 'ignoreUserIds',
+      jsonSchema: { items: { pattern: '^[UW][A-Z0-9]{2,31}$', type: 'string' }, type: 'array' },
+      nullable: false,
+      value: [],
+      description: 'Never trigger on messages written by these Slack user IDs.',
+    },
+    {
+      handle: 'includeBotMessages',
+      jsonSchema: { type: 'boolean' },
+      nullable: false,
+      value: false,
+      description: 'Also trigger on messages posted by bots and apps.',
+    },
+    { handle: 'includeSystemMessages', jsonSchema: { type: 'boolean' }, nullable: false, value: false, description: 'Also trigger on Slack system notices.' },
+    {
+      handle: 'maxMessagesPerPoll',
+      jsonSchema: { maximum: 100, minimum: 1, type: 'integer' },
+      nullable: false,
+      value: defaultPageSize,
+      description: 'Maximum number of messages processed per poll.',
+    },
+    {
+      handle: 'textContains',
+      jsonSchema: { type: 'string' },
+      nullable: false,
+      value: '',
+      description: 'Only trigger when message text contains this string, case-insensitively.',
+    },
+  ],
   definitionVersion: 2,
   description: 'Polls one Slack conversation and triggers when a new message is posted to it.',
   displayName: 'New Channel Message',
@@ -105,40 +116,32 @@ const snapshot = {
   name: 'on_message_posted',
   outputs: [
     {
-      handle: 'payload',
+      handle: 'events',
       jsonSchema: {
-        additionalProperties: false,
-        properties: {
-          events: {
-            items: {
-              additionalProperties: false,
-              properties: {
-                botId: { type: ['string', 'null'] },
-                channelId: { type: 'string' },
-                files: {
-                  items: {
-                    additionalProperties: false,
-                    properties: { id: { type: 'string' }, mimetype: { type: 'string' }, name: { type: 'string' } },
-                    required: ['id', 'name', 'mimetype'],
-                    type: 'object',
-                  },
-                  type: 'array',
-                },
-                messageTs: { type: 'string' },
-                subtype: { type: ['string', 'null'] },
-                text: { type: 'string' },
-                threadTs: { type: ['string', 'null'] },
-                userId: { type: ['string', 'null'] },
+        items: {
+          additionalProperties: false,
+          properties: {
+            botId: { type: ['string', 'null'] },
+            channelId: { type: 'string' },
+            files: {
+              items: {
+                additionalProperties: false,
+                properties: { id: { type: 'string' }, mimetype: { type: 'string' }, name: { type: 'string' } },
+                required: ['id', 'name', 'mimetype'],
+                type: 'object',
               },
-              required: ['channelId', 'messageTs', 'threadTs', 'userId', 'botId', 'subtype', 'text', 'files'],
-              type: 'object',
+              type: 'array',
             },
-            type: 'array',
+            messageTs: { type: 'string' },
+            subtype: { type: ['string', 'null'] },
+            text: { type: 'string' },
+            threadTs: { type: ['string', 'null'] },
+            userId: { type: ['string', 'null'] },
           },
+          required: ['channelId', 'messageTs', 'threadTs', 'userId', 'botId', 'subtype', 'text', 'files'],
+          type: 'object',
         },
-        required: ['events'],
-        title: 'Slack New Channel Message Payload',
-        type: 'object',
+        type: 'array',
       },
       nullable: false,
     },
@@ -148,7 +151,7 @@ const snapshot = {
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const slackMessagePosted: PollDefinition = {
-  buildOutputs: payloadPollOutputs,
+  buildOutputs: eventsPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)
@@ -174,12 +177,12 @@ export const slackMessagePosted: PollDefinition = {
 function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
   return {
     channelId: value.channelId as string,
-    fromUserIds: (value.fromUserIds as readonly string[] | undefined) ?? [],
-    ignoreUserIds: (value.ignoreUserIds as readonly string[] | undefined) ?? [],
-    includeBotMessages: (value.includeBotMessages as boolean | undefined) ?? false,
-    includeSystemMessages: (value.includeSystemMessages as boolean | undefined) ?? false,
-    maxMessagesPerPoll: (value.maxMessagesPerPoll as number | undefined) ?? defaultPageSize,
-    textContains: (value.textContains as string | undefined) ?? '',
+    fromUserIds: value.fromUserIds as readonly string[],
+    ignoreUserIds: value.ignoreUserIds as readonly string[],
+    includeBotMessages: value.includeBotMessages as boolean,
+    includeSystemMessages: value.includeSystemMessages as boolean,
+    maxMessagesPerPoll: value.maxMessagesPerPoll as number,
+    textContains: value.textContains as string,
   }
 }
 

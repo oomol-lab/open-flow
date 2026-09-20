@@ -26,6 +26,7 @@ function sample(schema: JsonValue): JsonValue {
 }
 
 const configExamples: Readonly<Record<string, Readonly<Record<string, JsonValue>>>> = {
+  feishu_app_bot: { sourceId: 'source_11111111111111111111111111111111', eventTypes: ['im.message.receive_v1'], chatIds: ['oc_demo'] },
   airtable: { baseId: 'app12345678901234', tableIdOrName: 'Orders', triggerField: 'Last modified' },
   gmail: { sender: 'orders@example.com', readStatus: 'Unread' },
   github: { owner: 'oomol-lab', repo: 'open-flow', events: ['issues', 'push'] },
@@ -84,9 +85,13 @@ export const triggerFixtures: readonly TriggerFixture[] = [
     }),
   ),
   ...snapshots.map((definition): TriggerFixture => {
-    const properties = schemaObject(schemaObject(definition.configSchema)?.properties as JsonValue) ?? {}
-    const examples = Object.fromEntries(Object.entries(configExamples[definition.provider] ?? {}).filter(([key]) => key in properties))
-    const config = { ...(sample(definition.configSchema) as Record<string, JsonValue>), ...examples }
+    const fields = definition.configInputs.filter((input) => 'handle' in input)
+    const handles = new Set(fields.map((field) => field.handle))
+    const examples = Object.fromEntries(Object.entries(configExamples[definition.provider] ?? {}).filter(([key]) => handles.has(key)))
+    const config = {
+      ...Object.fromEntries(fields.map((field) => [field.handle, field.value !== undefined ? field.value : field.nullable ? null : sample(field.jsonSchema)])),
+      ...examples,
+    }
     const common = { name: definition.displayName, description: definition.description, bindingId: 'account', config }
     const trigger: TriggerNode =
       definition.type === 'poll'

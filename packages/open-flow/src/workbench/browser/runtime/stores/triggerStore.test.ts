@@ -46,7 +46,7 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
                       bindingId: provider,
                       config: provider == 'linear' ? { teamId: 'team-old', stateIds: ['state-old'] } : {},
                       definition: {
-                        configSchema: { type: 'object' },
+                        configInputs: [],
                         definitionVersion: 2,
                         description: '',
                         displayName: 'New event',
@@ -137,7 +137,7 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
         },
         definitions: [
           {
-            configSchema: { additionalProperties: false, type: 'object' },
+            configInputs: [],
             definitionVersion: 2,
             description: 'Runs when a repository changes.',
             displayName: 'Repository event',

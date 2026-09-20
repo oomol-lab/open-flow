@@ -15,10 +15,11 @@ import type {
 } from './change.ts'
 import type { Diagnostic, SemanticClosure } from './semantics.ts'
 
+import { missingTriggerConfig, resolveTriggerConfig } from '../../trigger/common/config.ts'
 import { triggerOutputDefinitions, triggerOutputPorts } from '../../trigger/common/contract.ts'
 import { portsByHandle, validVariableName } from './change.ts'
 import { conditionInputPorts, nodeInputMappings, otherwiseOutput, unaryOperator, comparisonIssue, valueType } from './condition.ts'
-import { schemaObject, schemaList, matchesSchema, comparePorts, portsAssignable, variableInputCompatible, hasRetiredRef } from './schema.ts'
+import { schemaObject, matchesSchema, comparePorts, portsAssignable, variableInputCompatible, hasRetiredRef } from './schema.ts'
 import { sourceFields, sourcePort, sourceOutputLabel } from './sourceField.ts'
 
 export function isResolutionNode(node: GraphNode | undefined): node is Extract<GraphNode, { readonly kind: 'approval' | 'wait' }> {
@@ -70,19 +71,21 @@ function validateTrigger(triggerId: string, trigger: TriggerNode, document: Flow
       }),
     )
   }
-  const configSchema = schemaObject(trigger.definition.configSchema)
-  const missingConfig =
-    schemaList(configSchema?.required)?.filter((name): name is string => typeof name == 'string' && !Object.hasOwn(trigger.config, name)) ?? []
+  const missingConfig = missingTriggerConfig(trigger.definition.configInputs, trigger.config)
   if (missingConfig.length > 0) {
     diagnostics.push(
       graphDiagnostic('trigger.config-incomplete', `Complete the required Trigger config fields: ${missingConfig.join(', ')}.`, `${path}/config`, {
         fields: missingConfig.join(', '),
       }),
     )
-  } else if (!matchesSchema(trigger.config, trigger.definition.configSchema)) {
-    diagnostics.push(
-      graphDiagnostic('trigger.config-invalid', `Trigger "${triggerId}" config does not match its fixed definition.`, `${path}/config`, { triggerId }),
-    )
+  } else {
+    try {
+      resolveTriggerConfig(trigger.definition.configInputs, trigger.config)
+    } catch {
+      diagnostics.push(
+        graphDiagnostic('trigger.config-invalid', `Trigger "${triggerId}" config does not match its fixed definition.`, `${path}/config`, { triggerId }),
+      )
+    }
   }
 }
 

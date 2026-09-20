@@ -1,4 +1,4 @@
-import type { TriggerDefinition } from '../src/schema/index.ts'
+import type { TriggerKeySnapshot } from '../src/flow/common/change.ts'
 import type { TriggerCatalogSource } from '../src/trigger/common/catalog.ts'
 
 import assert from 'node:assert/strict'
@@ -16,14 +16,14 @@ function catalogItem(
   provider: string,
   key: string,
   displayName: string,
-  configSchema: TriggerDefinition['config_schema'] = { additionalProperties: false, type: 'object' },
+  configInputs: TriggerKeySnapshot['configInputs'] = [],
   type: 'integration' | 'poll' = 'poll',
   outputs: readonly import('../src/flow/common/change.ts').Port[] = [
     { handle: 'payload', jsonSchema: { additionalProperties: true, type: 'object' }, nullable: false },
   ],
 ): Readonly<Record<string, unknown>> {
   const item = {
-    configSchema,
+    configInputs,
     description: `${displayName} event`,
     displayName,
     key,
@@ -42,7 +42,7 @@ function catalogSource(items: readonly Readonly<Record<string, unknown>>[]): Tri
       return item
     },
     async list() {
-      return { keys: items.map(({ configSchema: _configSchema, outputs: _outputs, ...item }) => item) }
+      return { keys: items.map(({ configInputs: _configInputs, outputs: _outputs, ...item }) => item) }
     },
   }
 }
@@ -65,9 +65,7 @@ test('normalizes provider poll and integration Triggers', async () => {
       },
     },
   ] as const
-  const integration = await normalizeTriggerCatalogSourceItem(
-    catalogItem('github', 'github.on_repo_event', 'Repository event', { additionalProperties: false, type: 'object' }, 'integration', outputs),
-  )
+  const integration = await normalizeTriggerCatalogSourceItem(catalogItem('github', 'github.on_repo_event', 'Repository event', [], 'integration', outputs))
   assert.equal(integration.compatible, true)
   if (!integration.compatible) throw new Error('Expected a compatible Integration Trigger.')
   assert.equal(integration.trigger.definition.provisioning.kind, 'integration')
@@ -101,10 +99,7 @@ test('searches summaries before loading matching Trigger details', async () => {
 })
 
 test('rejects incompatible definitions and unsupported identities', async () => {
-  const unsupported = catalogItem('github', 'github.on_push', 'Push', {
-    oneOf: [{ type: 'object' }],
-    type: 'object',
-  })
+  const unsupported = catalogItem('github', 'github.on_push', 'Push', [{ handle: 'value', nullable: true, jsonSchema: { oneOf: [{ type: 'object' }] } }])
   const normalized = await normalizeTriggerCatalogSourceItem(unsupported)
   assert.equal(normalized.compatible, false)
   if (normalized.compatible) throw new Error('Expected an incompatible Trigger Catalog item.')

@@ -8,16 +8,13 @@ export const WEBHOOK_REVISION = '2'
 
 export const webhookTrigger: TriggerCatalogCompatibleItem = {
   compatible: true,
-  definitionDigest: 'sha256:be38773c7273ed490be13a5c30abbc3300c4262b96614d73fb351e01fb36d9dc',
+  definitionDigest: 'sha256:35c07b0b352991fb0dfdeb925b8790cc60684c2cf77ba8ab46c3e32143ac9d5e',
   icon: ':carbon:webhook:',
   revision: WEBHOOK_REVISION,
   trigger: {
     config: {},
     definition: {
-      config_schema: {
-        additionalProperties: false,
-        type: 'object',
-      },
+      config_inputs: [],
       name: 'Webhook',
       provisioning: { kind: 'webhook' },
       outputs: webhookOutputs.map(({ jsonSchema, ...port }) => Object.assign({}, port, { json_schema: jsonSchema })),

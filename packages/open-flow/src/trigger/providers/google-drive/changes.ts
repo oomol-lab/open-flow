@@ -8,6 +8,7 @@ import type {
   IntegrationStateContext,
 } from '../../common/integration.ts'
 
+import { resolveTriggerConfig } from '../../common/config.ts'
 import { IntegrationConnectionError, PermanentIntegrationError, TransientIntegrationError } from '../../common/integration.ts'
 
 interface Config {
@@ -49,30 +50,43 @@ const changeFields =
   'nextPageToken,newStartPageToken,changes(fileId,kind,changeType,removed,time,driveId,file(id,name,mimeType,webViewLink,createdTime,modifiedTime,size,driveId,parents,shared,starred,trashed))'
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    description: 'Configuration for googledrive.changes_detected.',
-    properties: {
-      driveId: { description: 'Optional shared drive ID. Omit it to monitor the connected account.', maxLength: 256, minLength: 1, type: 'string' },
-      includeCorpusRemovals: {
-        default: false,
-        description: 'Include the accessible file resource when an item leaves the change corpus.',
-        type: 'boolean',
-      },
-      includeItemsFromAllDrives: { default: true, description: 'Include items from My Drive and shared drives.', type: 'boolean' },
-      includeRemoved: { default: true, description: 'Include changes caused by deletion or loss of access.', type: 'boolean' },
-      pageSize: {
-        default: defaultPageSize,
-        description: 'Maximum changes included in one Flow Run.',
-        maximum: 100,
-        minimum: 1,
-        type: 'integer',
-      },
-      restrictToMyDrive: { default: false, description: 'Restrict changes to the My Drive hierarchy.', type: 'boolean' },
+  configInputs: [
+    {
+      handle: 'driveId',
+      jsonSchema: { maxLength: 256, minLength: 1, type: 'string' },
+      nullable: true,
+      description: 'Optional shared drive ID. Omit it to monitor the connected account.',
     },
-    title: 'Google Drive Changes Config',
-    type: 'object',
-  },
+    {
+      handle: 'includeCorpusRemovals',
+      jsonSchema: { type: 'boolean' },
+      nullable: false,
+      value: false,
+      description: 'Include the accessible file resource when an item leaves the change corpus.',
+    },
+    {
+      handle: 'includeItemsFromAllDrives',
+      jsonSchema: { type: 'boolean' },
+      nullable: false,
+      value: true,
+      description: 'Include items from My Drive and shared drives.',
+    },
+    {
+      handle: 'includeRemoved',
+      jsonSchema: { type: 'boolean' },
+      nullable: false,
+      value: true,
+      description: 'Include changes caused by deletion or loss of access.',
+    },
+    {
+      handle: 'pageSize',
+      jsonSchema: { maximum: 100, minimum: 1, type: 'integer' },
+      nullable: false,
+      value: defaultPageSize,
+      description: 'Maximum changes included in one Flow Run.',
+    },
+    { handle: 'restrictToMyDrive', jsonSchema: { type: 'boolean' }, nullable: false, value: false, description: 'Restrict changes to the My Drive hierarchy.' },
+  ],
   definitionVersion: 2,
   description: 'Uses a Google Drive changes.watch channel and triggers when Drive changes are available.',
   displayName: 'Changes Detected',
@@ -81,42 +95,34 @@ const snapshot = {
   name: 'changes_detected',
   outputs: [
     {
-      handle: 'payload',
+      handle: 'events',
       jsonSchema: {
-        additionalProperties: false,
-        properties: {
-          events: {
-            items: {
+        items: {
+          additionalProperties: false,
+          properties: {
+            changeId: { type: 'string' },
+            changeType: { type: ['string', 'null'] },
+            driveId: { type: ['string', 'null'] },
+            file: { type: ['object', 'null'] },
+            fileId: { type: ['string', 'null'] },
+            notification: {
               additionalProperties: false,
               properties: {
-                changeId: { type: 'string' },
-                changeType: { type: ['string', 'null'] },
-                driveId: { type: ['string', 'null'] },
-                file: { type: ['object', 'null'] },
-                fileId: { type: ['string', 'null'] },
-                notification: {
-                  additionalProperties: false,
-                  properties: {
-                    changedTypes: { items: { type: 'string' }, type: 'array' },
-                    messageNumber: { type: ['string', 'null'] },
-                    resourceState: { type: 'string' },
-                    resourceUri: { type: ['string', 'null'] },
-                  },
-                  required: ['resourceState', 'changedTypes', 'messageNumber', 'resourceUri'],
-                  type: 'object',
-                },
-                removed: { type: 'boolean' },
-                time: { type: ['string', 'null'] },
+                changedTypes: { items: { type: 'string' }, type: 'array' },
+                messageNumber: { type: ['string', 'null'] },
+                resourceState: { type: 'string' },
+                resourceUri: { type: ['string', 'null'] },
               },
-              required: ['changeId', 'changeType', 'removed', 'time', 'fileId', 'driveId', 'file', 'notification'],
+              required: ['resourceState', 'changedTypes', 'messageNumber', 'resourceUri'],
               type: 'object',
             },
-            type: 'array',
+            removed: { type: 'boolean' },
+            time: { type: ['string', 'null'] },
           },
+          required: ['changeId', 'changeType', 'removed', 'time', 'fileId', 'driveId', 'file', 'notification'],
+          type: 'object',
         },
-        required: ['events'],
-        title: 'Google Drive Changes Payload',
-        type: 'object',
+        type: 'array',
       },
       nullable: false,
     },
@@ -158,7 +164,7 @@ export const googleDriveChanges: IntegrationDefinition = {
     }
     return events.length == 0
       ? { ...delivery, outcome: 'ignored', reason: 'Google Drive change page is empty.' }
-      : { ...delivery, outcome: 'event', outputs: { payload: { events } } }
+      : { ...delivery, outcome: 'event', outputs: { events } }
   },
   async reconcile(context) {
     const state = requireState(context.state)
@@ -220,14 +226,15 @@ function requireState(state: IntegrationStateContext | undefined): IntegrationSt
   return state
 }
 
-function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
+function resolveConfig(config: Readonly<Record<string, JsonValue>>): Config {
+  const value = resolveTriggerConfig(snapshot.configInputs, config)
   return {
     ...(typeof value.driveId == 'string' ? { driveId: value.driveId } : {}),
-    includeCorpusRemovals: (value.includeCorpusRemovals as boolean | undefined) ?? false,
-    includeItemsFromAllDrives: (value.includeItemsFromAllDrives as boolean | undefined) ?? true,
-    includeRemoved: (value.includeRemoved as boolean | undefined) ?? true,
-    pageSize: (value.pageSize as number | undefined) ?? defaultPageSize,
-    restrictToMyDrive: (value.restrictToMyDrive as boolean | undefined) ?? false,
+    includeCorpusRemovals: value.includeCorpusRemovals as boolean,
+    includeItemsFromAllDrives: value.includeItemsFromAllDrives as boolean,
+    includeRemoved: value.includeRemoved as boolean,
+    pageSize: value.pageSize as number,
+    restrictToMyDrive: value.restrictToMyDrive as boolean,
   }
 }
 
@@ -568,28 +575,17 @@ export const googleDriveChangeListener: IntegrationDefinition = {
         checkpoint: page.checkpoint,
         dedupeKey: page.dedupeKey,
         hasMore: page.hasMore,
-        outputs: page.changes.length == 0 ? null : { payload: { events: page.changes } },
+        outputs: page.changes.length == 0 ? null : { events: page.changes },
       }
     },
   },
   snapshot: {
     ...snapshot,
-    configSchema: { ...snapshot.configSchema, description: 'Configuration for googledrive.watch_changes.' },
+    configInputs: snapshot.configInputs,
     key: 'googledrive.watch_changes',
     name: 'watch_changes',
     displayName: 'Watch Changes',
     description: 'Monitors Drive changes using notifications and periodic scans of the same change stream.',
-    outputs: [
-      {
-        handle: 'payload',
-        jsonSchema: {
-          type: 'object',
-          additionalProperties: false,
-          properties: { events: { type: 'array', items: { type: 'object' } } },
-          required: ['events'],
-        },
-        nullable: false,
-      },
-    ],
+    outputs: [{ handle: 'events', jsonSchema: { type: 'array', items: { type: 'object' } }, nullable: false }],
   },
 }

@@ -9,6 +9,7 @@ import type {
   TriggerKeySummary,
 } from './api.ts'
 
+import { configInputsSchema } from '../../trigger/common/config.ts'
 import { integer, invalidResponse, jsonValue, optionalString, record, string } from './decoding.ts'
 
 export function triggerKeySummary(value: unknown): TriggerKeySummary {
@@ -29,7 +30,7 @@ export function triggerKey(value: unknown): TriggerKeySnapshot {
   const source = record(value)
   const summary = triggerKeySummary(source)
   const base = {
-    configSchema: jsonValue(source.configSchema),
+    configInputs: configInputsSchema.parse(source.configInputs),
     definitionVersion: source.definitionVersion === 2 ? 2 : invalidResponse(),
     description: summary.description,
     displayName: summary.displayName,

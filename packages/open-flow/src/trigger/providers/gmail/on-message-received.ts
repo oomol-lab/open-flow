@@ -2,7 +2,7 @@ import type { ConnectorProxyResult } from '../../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
 import type { PollContext, PollDefinition, PollEvent } from '../../common/poll.ts'
 
-import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { eventsPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 interface Config {
   readonly includeDrafts: boolean
@@ -59,49 +59,45 @@ const eventSchema = {
 } as const
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    description: 'Configuration for gmail.on_message_received. Every configured matching field must match.',
-    properties: {
-      includeDrafts: { default: false, description: 'Also trigger on draft messages.', type: 'boolean' },
-      includeSpamAndTrash: { default: false, description: 'Also trigger on messages in SPAM and TRASH.', type: 'boolean' },
-      labelNamesOrIds: {
-        description: 'Only trigger on messages carrying all of these labels, referenced by name or ID.',
-        items: { minLength: 1, type: 'string' },
-        type: 'array',
-      },
-      maxMessagesPerPoll: { default: defaultPageSize, maximum: 100, minimum: 1, type: 'integer' },
-      readStatus: { default: 'All', enum: ['Read', 'Unread', 'All'], type: 'string' },
-      search: { description: 'Gmail search-syntax query the message must match.', type: 'string' },
-      sender: { description: 'Only trigger on messages whose sender matches this address or name.', type: 'string' },
+  configInputs: [
+    { handle: 'includeDrafts', jsonSchema: { type: 'boolean' }, nullable: false, value: false, description: 'Also trigger on draft messages.' },
+    {
+      handle: 'includeSpamAndTrash',
+      jsonSchema: { type: 'boolean' },
+      nullable: false,
+      value: false,
+      description: 'Also trigger on messages in SPAM and TRASH.',
     },
-    title: 'Gmail Config',
-    type: 'object',
-  },
+    {
+      handle: 'labelNamesOrIds',
+      jsonSchema: { items: { minLength: 1, type: 'string' }, type: 'array' },
+      nullable: false,
+      description: 'Only trigger on messages carrying all of these labels, referenced by name or ID.',
+      value: [],
+    },
+    { handle: 'maxMessagesPerPoll', jsonSchema: { maximum: 100, minimum: 1, type: 'integer' }, nullable: false, value: defaultPageSize },
+    { handle: 'readStatus', jsonSchema: { enum: ['Read', 'Unread', 'All'], type: 'string' }, nullable: false, value: 'All' },
+    { handle: 'search', jsonSchema: { type: 'string' }, nullable: false, description: 'Gmail search-syntax query the message must match.', value: '' },
+    {
+      handle: 'sender',
+      jsonSchema: { type: 'string' },
+      nullable: false,
+      description: 'Only trigger on messages whose sender matches this address or name.',
+      value: '',
+    },
+  ],
   definitionVersion: 2,
   description: 'Polls the Gmail mailbox and triggers when a new message is received.',
   displayName: 'New Message Received',
   key: 'gmail.on_message_received',
   name: 'on_message_received',
-  outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: { events: { items: eventSchema, type: 'array' } },
-        required: ['events'],
-        title: 'Gmail New Message Payload',
-        type: 'object',
-      },
-      nullable: false,
-    },
-  ],
+  outputs: [{ handle: 'events', jsonSchema: { items: eventSchema, type: 'array' }, nullable: false }],
   provider: 'gmail',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const gmailMessageReceived: PollDefinition = {
-  buildOutputs: payloadPollOutputs,
+  buildOutputs: eventsPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)
@@ -127,13 +123,13 @@ export const gmailMessageReceived: PollDefinition = {
 
 function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
   return {
-    includeDrafts: (value.includeDrafts as boolean | undefined) ?? false,
-    includeSpamAndTrash: (value.includeSpamAndTrash as boolean | undefined) ?? false,
-    labelNamesOrIds: (value.labelNamesOrIds as readonly string[] | undefined) ?? [],
-    maxMessagesPerPoll: (value.maxMessagesPerPoll as number | undefined) ?? defaultPageSize,
-    readStatus: (value.readStatus as Config['readStatus'] | undefined) ?? 'All',
-    search: ((value.search as string | undefined) ?? '').trim(),
-    sender: ((value.sender as string | undefined) ?? '').trim(),
+    includeDrafts: value.includeDrafts as boolean,
+    includeSpamAndTrash: value.includeSpamAndTrash as boolean,
+    labelNamesOrIds: value.labelNamesOrIds as readonly string[],
+    maxMessagesPerPoll: value.maxMessagesPerPoll as number,
+    readStatus: value.readStatus as Config['readStatus'],
+    search: (value.search as string).trim(),
+    sender: (value.sender as string).trim(),
   }
 }
 

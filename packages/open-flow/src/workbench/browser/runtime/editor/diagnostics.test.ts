@@ -78,7 +78,7 @@ describe('Workbench Diagnostic messages', () => {
                 bindingId: 'binding',
                 config: {},
                 definition: {
-                  configSchema: { additionalProperties: false, type: 'object' },
+                  configInputs: [],
                   definitionVersion: 2,
                   description: '',
                   displayName: 'Repository event',

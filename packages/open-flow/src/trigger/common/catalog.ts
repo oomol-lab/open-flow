@@ -4,7 +4,8 @@ import { z } from 'zod'
 import { isJsonObject } from '../../base/common/json.ts'
 import { TriggerDefinitionSchema, TriggerPollTimeSchema } from '../../schema/index.ts'
 import { isBuiltInTriggerType } from './builtins.ts'
-import { computeTriggerDefinitionDigest, validateTriggerDefinition, validateTriggerDefinitionSchemas } from './definition.ts'
+import { configInputsSchema } from './config.ts'
+import { computeTriggerDefinitionDigest, validateTriggerDefinitionSchemas } from './definition.ts'
 
 export interface TriggerCatalogIdentity {
   readonly revision: string
@@ -65,8 +66,18 @@ const sourceKeySchema = z.discriminatedUnion('type', [
 ])
 const outputSchema = z.strictObject({ handle: z.string().min(1), jsonSchema: jsonObjectSchema, nullable: z.boolean(), description: z.string().optional() })
 const sourceItemSchema = z.discriminatedUnion('type', [
-  z.strictObject({ ...sourceKeyFields, configSchema: jsonObjectSchema, outputs: z.array(outputSchema), type: z.literal('integration') }),
-  z.strictObject({ ...sourceKeyFields, configSchema: jsonObjectSchema, outputs: z.array(outputSchema), type: z.literal('poll') }),
+  z.strictObject({
+    ...sourceKeyFields,
+    configInputs: configInputsSchema,
+    outputs: z.array(outputSchema),
+    type: z.literal('integration'),
+  }),
+  z.strictObject({
+    ...sourceKeyFields,
+    configInputs: configInputsSchema,
+    outputs: z.array(outputSchema),
+    type: z.literal('poll'),
+  }),
 ])
 const sourceListSchema = z.strictObject({ keys: z.array(sourceKeySchema) })
 const compatibleItemSchema = z.strictObject({
@@ -102,7 +113,7 @@ function triggerDescriptor(item: z.infer<typeof sourceItemSchema>): TriggerCatal
     type: item.key,
     revision: TRIGGER_CATALOG_REVISION,
     definition: {
-      config_schema: item.configSchema,
+      config_inputs: item.configInputs.map((port) => ('group' in port ? port : (({ jsonSchema, ...field }) => ({ ...field, json_schema: jsonSchema }))(port))),
       connector: { account_required: true, service_id: item.provider },
       name: item.displayName,
       outputs: item.outputs.map(({ jsonSchema, ...port }) => Object.assign({}, port, { json_schema: jsonSchema })),
@@ -122,14 +133,15 @@ function compatibilityReason(error: unknown): string {
 
 async function validateDescriptor(trigger: TriggerCatalogDescriptor, definitionDigest: string): Promise<void> {
   const definition = {
-    configSchema: trigger.definition.config_schema,
+    configInputs: trigger.definition.config_inputs.map((port) =>
+      'group' in port ? port : (({ json_schema, ...input }) => ({ ...input, jsonSchema: json_schema ?? {}, nullable: input.nullable ?? false }))(port),
+    ),
     outputs: trigger.definition.outputs.map(({ json_schema, ...port }) =>
       Object.assign({}, port, { nullable: port.nullable ?? false, jsonSchema: json_schema ?? {} }),
     ),
   }
   const label = `Trigger Catalog item "${trigger.type}" revision "${trigger.revision}"`
-  if (trigger.definition.provisioning.kind == 'integration') validateTriggerDefinitionSchemas(definition, label)
-  else validateTriggerDefinition({ ...definition, config: trigger.config }, label)
+  validateTriggerDefinitionSchemas(definition, label)
   if (trigger.definition.provisioning.kind == 'poll' && trigger.definition.connector == null) {
     throw new TypeError('Poll Trigger definitions require a Connector service.')
   }
@@ -140,7 +152,9 @@ async function validateDescriptor(trigger: TriggerCatalogDescriptor, definitionD
     throw new TypeError(`${trigger.definition.provisioning.kind == 'webhook' ? 'Webhook' : 'Integration'} Trigger definitions cannot provide poll times.`)
   }
   const digest = await computeTriggerDefinitionDigest({
-    configSchema: trigger.definition.config_schema,
+    configInputs: trigger.definition.config_inputs.map((port) =>
+      'group' in port ? port : (({ json_schema, ...input }) => ({ ...input, jsonSchema: json_schema ?? {}, nullable: input.nullable ?? false }))(port),
+    ),
     connector:
       trigger.definition.connector == null
         ? undefined
@@ -175,7 +189,9 @@ export async function normalizeTriggerCatalogSourceItem(value: unknown): Promise
   }
   const trigger = triggerDescriptor(item)
   const definitionDigest = await computeTriggerDefinitionDigest({
-    configSchema: trigger.definition.config_schema,
+    configInputs: trigger.definition.config_inputs.map((port) =>
+      'group' in port ? port : (({ json_schema, ...input }) => ({ ...input, jsonSchema: json_schema ?? {}, nullable: input.nullable ?? false }))(port),
+    ),
     connector: { accountRequired: true, serviceId: item.provider },
     outputs: trigger.definition.outputs.map(({ json_schema, ...port }) =>
       Object.assign({}, port, { nullable: port.nullable ?? false, jsonSchema: json_schema ?? {} }),

@@ -52,23 +52,21 @@ const eventNames = new Map([
 ])
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: {
-      events: { items: { enum: events, type: 'string' }, minItems: 1, type: 'array', uniqueItems: true },
-      insecureSsl: { default: false, type: 'boolean' },
-      project: {
+  configInputs: [
+    { handle: 'events', jsonSchema: { items: { enum: events, type: 'string' }, minItems: 1, type: 'array', uniqueItems: true }, nullable: false },
+    { handle: 'insecureSsl', jsonSchema: { type: 'boolean' }, nullable: false, value: false },
+    {
+      handle: 'project',
+      jsonSchema: {
         maxLength: 255,
         minLength: 1,
         pattern: '^(?:[0-9]+|(?!\\.{1,2}(?:/|$))[A-Za-z0-9_.][A-Za-z0-9_.-]*(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9_.][A-Za-z0-9_.-]*)*)$',
         type: 'string',
       },
-      pushBranchFilter: { default: '', maxLength: 255, type: 'string' },
+      nullable: false,
     },
-    required: ['project', 'events'],
-    title: 'GitLab Project Event Config',
-    type: 'object',
-  },
+    { handle: 'pushBranchFilter', jsonSchema: { maxLength: 255, type: 'string' }, nullable: false, value: '' },
+  ],
   definitionVersion: 2,
   description: 'Triggers when selected GitLab webhook events occur in a project.',
   displayName: 'Project Event',
@@ -76,22 +74,10 @@ const snapshot = {
   key: 'gitlab.on_project_event',
   name: 'on_project_event',
   outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: {
-          body: { type: 'object' },
-          deliveryId: { type: 'string' },
-          event: { type: 'string' },
-          gitlabEvent: { type: 'string' },
-        },
-        required: ['event', 'gitlabEvent', 'deliveryId', 'body'],
-        title: 'GitLab Project Event Payload',
-        type: 'object',
-      },
-      nullable: false,
-    },
+    { handle: 'body', jsonSchema: { type: 'object' }, nullable: false },
+    { handle: 'deliveryId', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'event', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'gitlabEvent', jsonSchema: { type: 'string' }, nullable: false },
   ],
   provider: 'gitlab',
   type: 'integration',
@@ -113,7 +99,7 @@ export const gitlabProjectEvent: IntegrationDefinition = {
     return {
       dedupeKey: deliveryId.length == 0 ? undefined : deliveryId,
       outcome: 'event',
-      outputs: { payload: { body: context.payload as Readonly<Record<string, JsonValue>>, deliveryId, event, gitlabEvent } },
+      outputs: { body: context.payload as Readonly<Record<string, JsonValue>>, deliveryId, event, gitlabEvent },
     }
   },
   async reconcile(context) {
@@ -159,9 +145,9 @@ export const gitlabProjectEvent: IntegrationDefinition = {
 function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
   return {
     events: value.events as readonly string[],
-    insecureSsl: (value.insecureSsl as boolean | undefined) ?? false,
+    insecureSsl: value.insecureSsl as boolean,
     project: value.project as string,
-    pushBranchFilter: (value.pushBranchFilter as string | undefined) ?? '',
+    pushBranchFilter: value.pushBranchFilter as string,
   }
 }
 

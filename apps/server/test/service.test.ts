@@ -346,7 +346,7 @@ describe('Server application service', () => {
           config: {},
           pollTimes: [],
           definition: {
-            configSchema: {},
+            configInputs: [],
             outputs: [{ handle: 'payload', jsonSchema: {}, nullable: false }],
             definitionVersion: 2,
             description: '',

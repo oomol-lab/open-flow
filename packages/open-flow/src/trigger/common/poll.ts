@@ -1,3 +1,4 @@
+export { resolveTriggerConfig } from './config.ts'
 import type { ConnectorProxy } from '../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot, TriggerSchedule } from '../../flow/common/change.ts'
 import type { TriggerConfigOption, TriggerConfigOptionsContext } from './configOptions.ts'
@@ -22,14 +23,15 @@ export interface PollResult {
 
 export interface PollContext {
   readonly checkpoint: JsonValue
+  /** Fixed inputs resolved with resolveTriggerConfig before invoking the Provider. */
   readonly config: Readonly<Record<string, JsonValue>>
   readonly connector: ConnectorProxy
   readonly now: Date
   readonly signal?: AbortSignal
 }
 
-export function payloadPollOutputs(events: readonly PollEvent[]): Readonly<Record<string, JsonValue>> {
-  return { payload: { events: events.map((event) => event.payload) } }
+export function eventsPollOutputs(events: readonly PollEvent[]): Readonly<Record<string, JsonValue>> {
+  return { events: events.map((event) => event.payload) }
 }
 
 export interface PollDefinition {

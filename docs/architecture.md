@@ -249,7 +249,8 @@ Trigger 的有序数据输出由公共 contract 统一定义和校验。接入�
 
 Integration 的事件型 callback 返回 `outputs`，listener 页面返回 `outputs` 或 `null`（无事件）。两者都由 Provider 构造完整端口映射，Server 按固定 Trigger contract 校验后原样准入。
 Poll 保留原始事件和逐事件去重，Provider 的 `buildOutputs(events)` 将非空的已去重事件批次转换为一次 Run 的完整输出；基线、空页面与全部重复的页面不调用它。
-现有 Poll Provider 显式使用 `payloadPollOutputs` 保留 `{ payload: { events } }` 形状；通用运行时不预设输出端口名称，也不合并不同事件的端口值。
+Provider 配置通过 `configInputs` 复用节点的 `InputPort | Group` 定义。未配置字段使用定义的 `value`，无默认值时为 `null`，由 `nullable` 和字段 Schema 校验；配置只接受固定值。
+Provider 输出直接声明原 `payload` 的一级字段，内部业务对象不递归展开。现有 Poll Provider 显式使用 `eventsPollOutputs` 返回 `{ events }`；通用运行时不预设输出端口名称，也不合并不同事件的端口值。
 
 一次有效 Trigger occurrence 只能准入普通 Flow Run，之后复用相同的 Run、执行、事件、取消和 terminal 语义。重投 occurrence 必须通过稳定 identity
 和权威 store 约束为最多一个 Run。

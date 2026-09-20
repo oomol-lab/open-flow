@@ -42,7 +42,7 @@ it('prepares and executes an entry while unrelated nodes remain invalid', async 
         config: {},
         pollTimes: [],
         definition: {
-          configSchema: {},
+          configInputs: [],
           outputs: [{ handle: 'payload', jsonSchema: {}, nullable: false }],
           definitionVersion: 2,
           description: '',

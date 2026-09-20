@@ -2,7 +2,7 @@ import type { ConnectorProxyResult } from '../../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
 import type { PollContext, PollDefinition, PollEvent, PollResult } from '../../common/poll.ts'
 
-import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { eventsPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 type Change = 'created' | 'updated'
 type ItemType = 'file' | 'folder'
@@ -73,51 +73,32 @@ const eventSchema = {
 } as const
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: {
-      changeType: { enum: ['created', 'updated'], type: 'string' },
-      driveId: { default: '', pattern: '^[A-Za-z0-9_-]{0,512}$', type: 'string' },
-      folderId: { pattern: '^[A-Za-z0-9_-]{2,512}$', type: 'string' },
-      itemTypes: {
-        default: ['file'],
-        items: { enum: ['file', 'folder'], type: 'string' },
-        minItems: 1,
-        type: 'array',
-        uniqueItems: true,
-      },
-      maxFilesPerPoll: { default: 50, maximum: 200, minimum: 1, type: 'integer' },
-      mimeTypes: { default: [], items: { minLength: 1, type: 'string' }, type: 'array' },
-      namePrefix: { default: '', type: 'string' },
+  configInputs: [
+    { handle: 'changeType', jsonSchema: { enum: ['created', 'updated'], type: 'string' }, nullable: false },
+    { handle: 'driveId', jsonSchema: { pattern: '^[A-Za-z0-9_-]{0,512}$', type: 'string' }, nullable: false, value: '' },
+    { handle: 'folderId', jsonSchema: { pattern: '^[A-Za-z0-9_-]{2,512}$', type: 'string' }, nullable: false },
+    {
+      handle: 'itemTypes',
+      jsonSchema: { items: { enum: ['file', 'folder'], type: 'string' }, minItems: 1, type: 'array', uniqueItems: true },
+      nullable: false,
+      value: ['file'],
     },
-    required: ['folderId', 'changeType'],
-    title: 'Google Drive Folder Change Config',
-    type: 'object',
-  },
+    { handle: 'maxFilesPerPoll', jsonSchema: { maximum: 200, minimum: 1, type: 'integer' }, nullable: false, value: 50 },
+    { handle: 'mimeTypes', jsonSchema: { items: { minLength: 1, type: 'string' }, type: 'array' }, nullable: false, value: [] },
+    { handle: 'namePrefix', jsonSchema: { type: 'string' }, nullable: false, value: '' },
+  ],
   definitionVersion: 2,
   description: 'Polls one Google Drive folder and triggers when a file or folder directly inside it is created or updated.',
   displayName: 'File or Folder Change in a Folder',
   key: 'googledrive.on_file_change',
   name: 'on_file_change',
-  outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: { events: { items: eventSchema, type: 'array' } },
-        required: ['events'],
-        title: 'Google Drive File Change Payload',
-        type: 'object',
-      },
-      nullable: false,
-    },
-  ],
+  outputs: [{ handle: 'events', jsonSchema: { items: eventSchema, type: 'array' }, nullable: false }],
   provider: 'googledrive',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const googleDriveFileChange: PollDefinition = {
-  buildOutputs: payloadPollOutputs,
+  buildOutputs: eventsPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)
@@ -133,12 +114,12 @@ export const googleDriveFileChange: PollDefinition = {
 function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
   return {
     changeType: value.changeType as Change,
-    driveId: (value.driveId as string | undefined) ?? '',
+    driveId: value.driveId as string,
     folderId: value.folderId as string,
-    itemTypes: new Set((value.itemTypes as readonly ItemType[] | undefined) ?? ['file']),
-    maxFilesPerPoll: (value.maxFilesPerPoll as number | undefined) ?? 50,
-    mimeTypes: (value.mimeTypes as readonly string[] | undefined) ?? [],
-    namePrefix: (value.namePrefix as string | undefined) ?? '',
+    itemTypes: new Set(value.itemTypes as readonly ItemType[]),
+    maxFilesPerPoll: value.maxFilesPerPoll as number,
+    mimeTypes: value.mimeTypes as readonly string[],
+    namePrefix: value.namePrefix as string,
   }
 }
 

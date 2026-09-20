@@ -20,12 +20,14 @@ export function NodeInputs({
   reservedNames,
   renderSource,
   title,
+  titleIcon = 'input',
 }: {
   allowAddGroup?: boolean
   onDefinitions?: (values: readonly (InputPort | Group)[], deletion?: PropertyDeletion) => void
   reservedNames?: readonly string[]
   renderSource?: (handle: string) => NodeInputUpstreamSources | undefined
   title?: ReactNode
+  titleIcon?: 'input' | null
   entries: readonly (Group | NodeInputField)[]
   variables: InputVariables
   disabled: boolean
@@ -38,7 +40,7 @@ export function NodeInputs({
       groups
       layout="ports"
       title={title}
-      titleIcon={title == null ? undefined : 'input'}
+      titleIcon={title == null ? undefined : (titleIcon ?? undefined)}
       allowAddGroup={allowAddGroup}
       values={entries.map((entry) => ('group' in entry ? entry : entry.definition))}
       disabled={disabled || onDefinitions == null}

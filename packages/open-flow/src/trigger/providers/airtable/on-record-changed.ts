@@ -2,7 +2,7 @@ import type { ConnectorProxyResult } from '../../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
 import type { PollContext, PollDefinition, PollEvent } from '../../common/poll.ts'
 
-import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { eventsPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 interface Config {
   readonly baseId: string
@@ -55,45 +55,27 @@ const eventSchema = {
 } as const
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: {
-      baseId: { pattern: '^app[A-Za-z0-9]{14}$', type: 'string' },
-      fields: { default: [], items: { minLength: 1, type: 'string' }, type: 'array' },
-      formula: { default: '', type: 'string' },
-      maxRecordsPerPoll: { default: 200, maximum: 1_000, minimum: 1, type: 'integer' },
-      tableIdOrName: { maxLength: 255, minLength: 1, type: 'string' },
-      triggerField: { maxLength: 255, minLength: 1, not: { pattern: '}' }, type: 'string' },
-      view: { default: '', type: 'string' },
-    },
-    required: ['baseId', 'tableIdOrName', 'triggerField'],
-    title: 'Airtable Record Change Config',
-    type: 'object',
-  },
+  configInputs: [
+    { handle: 'baseId', jsonSchema: { pattern: '^app[A-Za-z0-9]{14}$', type: 'string' }, nullable: false },
+    { handle: 'fields', jsonSchema: { items: { minLength: 1, type: 'string' }, type: 'array' }, nullable: false, value: [] },
+    { handle: 'formula', jsonSchema: { type: 'string' }, nullable: false, value: '' },
+    { handle: 'maxRecordsPerPoll', jsonSchema: { maximum: 1_000, minimum: 1, type: 'integer' }, nullable: false, value: 200 },
+    { handle: 'tableIdOrName', jsonSchema: { maxLength: 255, minLength: 1, type: 'string' }, nullable: false },
+    { handle: 'triggerField', jsonSchema: { maxLength: 255, minLength: 1, pattern: '^[^}]*$', type: 'string' }, nullable: false },
+    { handle: 'view', jsonSchema: { type: 'string' }, nullable: false, value: '' },
+  ],
   definitionVersion: 2,
   description: 'Polls an Airtable table and triggers when a record is created or updated, ordered by a time field.',
   displayName: 'Record Created or Updated',
   key: 'airtable.on_record_changed',
   name: 'on_record_changed',
-  outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: { events: { items: eventSchema, type: 'array' } },
-        required: ['events'],
-        title: 'Airtable Record Change Payload',
-        type: 'object',
-      },
-      nullable: false,
-    },
-  ],
+  outputs: [{ handle: 'events', jsonSchema: { items: eventSchema, type: 'array' }, nullable: false }],
   provider: 'airtable',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const airtableRecordChanged: PollDefinition = {
-  buildOutputs: payloadPollOutputs,
+  buildOutputs: eventsPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)
@@ -118,12 +100,12 @@ export const airtableRecordChanged: PollDefinition = {
 function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
   return {
     baseId: value.baseId as string,
-    fields: (value.fields as readonly string[] | undefined) ?? [],
-    formula: ((value.formula as string | undefined) ?? '').trim(),
-    maxRecordsPerPoll: (value.maxRecordsPerPoll as number | undefined) ?? 200,
+    fields: value.fields as readonly string[],
+    formula: (value.formula as string).trim(),
+    maxRecordsPerPoll: value.maxRecordsPerPoll as number,
     tableIdOrName: value.tableIdOrName as string,
     triggerField: value.triggerField as string,
-    view: ((value.view as string | undefined) ?? '').trim(),
+    view: (value.view as string).trim(),
   }
 }
 

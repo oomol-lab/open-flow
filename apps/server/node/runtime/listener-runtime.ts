@@ -21,6 +21,7 @@ import {
   TransientIntegrationError,
   validateListenerPage,
 } from '@oomol-lab/open-flow/integration-trigger'
+import { resolveTriggerConfig } from '@oomol-lab/open-flow/poll-trigger'
 import {
   maximumPollCheckpointBytes,
   maximumPollEventsPerPage,
@@ -126,7 +127,13 @@ export class ListenerRuntime {
       if (connection?.kind != 'connection' || connection.target != target.connectionId) {
         throw new ControlError(controlErrorCode.bindingUnresolved, 'The fixed Poll Trigger Connection is unresolved.')
       }
-      const result = await this.#run(this.#request(target, definition, { checkpoint: target.checkpoint, config: trigger.config, now: new Date(this.#clock()) }))
+      const result = await this.#run(
+        this.#request(target, definition, {
+          checkpoint: target.checkpoint,
+          config: resolveTriggerConfig(trigger.definition.configInputs, trigger.config),
+          now: new Date(this.#clock()),
+        }),
+      )
       return {
         events: result.events.map((event) => event.payload),
         filtered: result.filtered ?? 0,
@@ -288,7 +295,7 @@ export class ListenerRuntime {
           }
           return result
         },
-        { checkpoint, config: trigger.config, now: new Date(now) },
+        { checkpoint, config: resolveTriggerConfig(trigger.definition.configInputs, trigger.config), now: new Date(now) },
         new TransientIntegrationError('Listener scan exceeded its execution deadline.'),
       )
       let event: { occurrenceId: string; outputs: Readonly<Record<string, JsonValue>>; requestDigest: string } | undefined
@@ -355,7 +362,7 @@ export class ListenerRuntime {
       }
       const result = yield* this.#request(candidate, definition, {
         checkpoint: JSON.parse(candidate.checkpointJson) as JsonValue,
-        config: trigger.config,
+        config: resolveTriggerConfig(trigger.definition.configInputs, trigger.config),
         now: new Date(now),
       })
       const checkpointJson = JSON.stringify(result.checkpoint)
@@ -443,7 +450,11 @@ export class ListenerRuntime {
         if (connection?.kind != 'connection' || connection.target != target.connectionId) {
           return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger Connection does not match its Publication.'))
         }
-        const result = yield* this.#request(target, definition, { checkpoint: target.checkpoint, config: trigger.config, now: new Date(now) })
+        const result = yield* this.#request(target, definition, {
+          checkpoint: target.checkpoint,
+          config: resolveTriggerConfig(trigger.definition.configInputs, trigger.config),
+          now: new Date(now),
+        })
         const checkpointJson = JSON.stringify(result.checkpoint)
         if (checkpointJson == null || encoder.encode(checkpointJson).byteLength > maximumPollCheckpointBytes) {
           return yield* Effect.fail(new PermanentPollError('Poll checkpoint exceeds 64 KiB.'))

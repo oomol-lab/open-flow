@@ -25,17 +25,11 @@ const pullRequestSchema = {
 } as const
 
 const snapshot = {
-  configSchema: {
-    type: 'object',
-    additionalProperties: false,
-    properties: {
-      owner: { pattern: '^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$', type: 'string' },
-      repo: { pattern: '^(?!\\.{1,2}$)[a-zA-Z0-9._-]{1,100}$', type: 'string' },
-      number: { type: 'integer', minimum: 1, description: 'Number of the pull request to watch.' },
-    },
-    required: ['owner', 'repo', 'number'],
-    title: 'Watch a Pull Request',
-  },
+  configInputs: [
+    { handle: 'owner', jsonSchema: { pattern: '^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$', type: 'string' }, nullable: false },
+    { handle: 'repo', jsonSchema: { pattern: '^(?!\\.{1,2}$)[a-zA-Z0-9._-]{1,100}$', type: 'string' }, nullable: false },
+    { handle: 'number', jsonSchema: { type: 'integer', minimum: 1 }, nullable: false, description: 'Number of the pull request to watch.' },
+  ],
   definitionVersion: 2,
   description:
     'Watches one pull request using notifications and periodic checks. Starts from its current state; reports observed changes, not every intermediate transition or review event.',
@@ -46,16 +40,8 @@ const snapshot = {
   provider: 'github',
   type: 'integration',
   outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        type: 'object',
-        additionalProperties: false,
-        properties: { pullRequest: pullRequestSchema, version: { type: 'string' } },
-        required: ['pullRequest', 'version'],
-      },
-      nullable: false,
-    },
+    { handle: 'pullRequest', jsonSchema: pullRequestSchema, nullable: false },
+    { handle: 'version', jsonSchema: { type: 'string' }, nullable: false },
   ],
 } as const satisfies TriggerKeySnapshot & { readonly type: 'integration' }
 
@@ -96,7 +82,7 @@ export const githubPullRequestListener: IntegrationDefinition = {
       const current = await readPullRequest(context)
       if (current.version == checkpoint.version) return { checkpoint, dedupeKey: current.version, hasMore: false, outputs: null }
       const sequence = Number(checkpoint.sequence) + 1
-      return { checkpoint: { version: current.version, sequence }, dedupeKey: `${sequence}:${current.version}`, hasMore: false, outputs: { payload: current } }
+      return { checkpoint: { version: current.version, sequence }, dedupeKey: `${sequence}:${current.version}`, hasMore: false, outputs: current }
     },
   },
 }

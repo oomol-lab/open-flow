@@ -82,13 +82,7 @@ const events = [
 const endpoint = '/api/v2/webhooks'
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: { events: { items: { enum: events, type: 'string' }, minItems: 1, type: 'array', uniqueItems: true } },
-    required: ['events'],
-    title: 'Zendesk Event Subscription Config',
-    type: 'object',
-  },
+  configInputs: [{ handle: 'events', jsonSchema: { items: { enum: events, type: 'string' }, minItems: 1, type: 'array', uniqueItems: true }, nullable: false }],
   definitionVersion: 2,
   description: 'Triggers when one of the selected Zendesk account events occurs.',
   displayName: 'Event Subscription',
@@ -96,17 +90,10 @@ const snapshot = {
   key: 'zendesk.on_event',
   name: 'on_event',
   outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: { body: { type: 'object' }, deliveryId: { type: 'string' }, event: { type: 'string' }, subject: { type: 'string' } },
-        required: ['event', 'deliveryId', 'body'],
-        title: 'Zendesk Event Payload',
-        type: 'object',
-      },
-      nullable: false,
-    },
+    { handle: 'body', jsonSchema: { type: 'object' }, nullable: false },
+    { handle: 'deliveryId', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'event', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'subject', jsonSchema: { type: 'string' }, nullable: false },
   ],
   provider: 'zendesk',
   type: 'integration',
@@ -141,12 +128,10 @@ export const zendeskEvent: IntegrationDefinition = {
       dedupeKey: deliveryId.length == 0 ? undefined : deliveryId,
       outcome: 'event',
       outputs: {
-        payload: {
-          body: payload,
-          deliveryId,
-          event,
-          ...(typeof subject == 'string' ? { subject } : {}),
-        },
+        body: payload,
+        deliveryId,
+        event,
+        ...(typeof subject == 'string' ? { subject } : {}),
       },
     }
   },

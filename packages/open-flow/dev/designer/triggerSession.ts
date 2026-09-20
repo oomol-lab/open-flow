@@ -47,6 +47,55 @@ export function createTriggerSession(
   const client = new WorkbenchClient(async (path, init) => {
     const url = new URL(path instanceof Request ? path.url : path, 'https://lab.invalid')
     if (url.pathname === '/v1/trigger-keys/catalog' && catalog != null) return catalog.request(url, init)
+    if (url.pathname === '/v1/event-sources')
+      return Response.json({
+        version: 1,
+        teamId: null,
+        sources: [
+          {
+            version: 1,
+            sourceId: 'source_11111111111111111111111111111111',
+            revision: 1,
+            name: 'Messages',
+            provider: 'feishu_app_bot',
+            appId: 'cli_demo',
+            tenantKey: 'demo',
+            connectionId: 'lab-account',
+            teamId: null,
+            enabled: true,
+            eventTypes: ['im.message.receive_v1', 'im.chat.member.bot.added_v1'],
+            manageSubscriptions: true,
+            verificationTokenConfigured: true,
+            encryptKeyConfigured: true,
+            endpointUrl: null,
+            verifiedAt: null,
+            lastReceivedAt: null,
+            updatedAt: flow.updatedAt,
+            consumers: [],
+          },
+          {
+            version: 1,
+            sourceId: 'source_22222222222222222222222222222222',
+            revision: 1,
+            name: 'Documents',
+            provider: 'feishu_app_bot',
+            appId: 'cli_docs',
+            tenantKey: 'demo',
+            connectionId: 'lab-documents',
+            teamId: null,
+            enabled: true,
+            eventTypes: ['drive.file.edit_v1'],
+            manageSubscriptions: true,
+            verificationTokenConfigured: true,
+            encryptKeyConfigured: true,
+            endpointUrl: null,
+            verifiedAt: null,
+            lastReceivedAt: null,
+            updatedAt: flow.updatedAt,
+            consumers: [],
+          },
+        ],
+      })
     if (url.pathname === '/v1/flows') return Response.json({ flows: [flow], total: 1, version: 1 })
     if (url.pathname.endsWith('/editor'))
       return Response.json({

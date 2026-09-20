@@ -201,7 +201,7 @@ function sameTriggerSemantics(left: TriggerDefinitionSnapshot, right: TriggerDef
     left.definition.service_id == right.definition.service_id &&
     dequal(left.definition.provisioning, right.definition.provisioning) &&
     dequal(left.definition.connector, right.definition.connector) &&
-    dequal(left.definition.config_schema, right.definition.config_schema) &&
+    dequal(left.definition.config_inputs, right.definition.config_inputs) &&
     dequal(left.definition.outputs, right.definition.outputs)
   )
 }

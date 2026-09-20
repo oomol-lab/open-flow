@@ -190,13 +190,9 @@ const topics = [
 ] as const
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: { topics: { items: { enum: topics, type: 'string' }, maxItems: 20, minItems: 1, type: 'array', uniqueItems: true } },
-    required: ['topics'],
-    title: 'Shopify Store Event Config',
-    type: 'object',
-  },
+  configInputs: [
+    { handle: 'topics', jsonSchema: { items: { enum: topics, type: 'string' }, maxItems: 20, minItems: 1, type: 'array', uniqueItems: true }, nullable: false },
+  ],
   definitionVersion: 2,
   description: 'Triggers when selected Shopify webhook topics occur in the connected store.',
   displayName: 'Store Event',
@@ -204,25 +200,13 @@ const snapshot = {
   key: 'shopify.on_shop_event',
   name: 'on_shop_event',
   outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: {
-          apiVersion: { type: 'string' },
-          body: { type: 'object' },
-          eventId: { type: 'string' },
-          shopDomain: { type: 'string' },
-          topic: { type: 'string' },
-          triggeredAt: { type: 'string' },
-          webhookId: { type: 'string' },
-        },
-        required: ['topic', 'webhookId', 'eventId', 'shopDomain', 'apiVersion', 'triggeredAt', 'body'],
-        title: 'Shopify Store Event Payload',
-        type: 'object',
-      },
-      nullable: false,
-    },
+    { handle: 'apiVersion', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'body', jsonSchema: { type: 'object' }, nullable: false },
+    { handle: 'eventId', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'shopDomain', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'topic', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'triggeredAt', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'webhookId', jsonSchema: { type: 'string' }, nullable: false },
   ],
   provider: 'shopify',
   type: 'integration',
@@ -243,15 +227,13 @@ export const shopifyShopEvent: IntegrationDefinition = {
       dedupeKey: webhookId.length == 0 ? undefined : webhookId,
       outcome: 'event',
       outputs: {
-        payload: {
-          apiVersion: context.header('x-shopify-api-version') ?? '',
-          body: context.payload as Readonly<Record<string, JsonValue>>,
-          eventId: context.header('x-shopify-event-id') ?? '',
-          shopDomain: context.header('x-shopify-shop-domain') ?? '',
-          topic,
-          triggeredAt: context.header('x-shopify-triggered-at') ?? '',
-          webhookId,
-        },
+        apiVersion: context.header('x-shopify-api-version') ?? '',
+        body: context.payload as Readonly<Record<string, JsonValue>>,
+        eventId: context.header('x-shopify-event-id') ?? '',
+        shopDomain: context.header('x-shopify-shop-domain') ?? '',
+        topic,
+        triggeredAt: context.header('x-shopify-triggered-at') ?? '',
+        webhookId,
       },
     }
   },

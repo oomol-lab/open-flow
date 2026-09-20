@@ -61,11 +61,11 @@ describe('GitHub pull request listener', () => {
     expect(first.outputs).toBeNull()
     const changed: ConnectorProxy = { execute: async () => ({ status: 200, data: { ...pullRequest, draft: false, head: { sha: 'next' } } }) }
     const next = await definition.listener!.read({ checkpoint: state.checkpoint, config, connector: changed, now })
-    expect(next.outputs?.payload).toMatchObject({ pullRequest: { number: 114, draft: false, headSha: 'next' } })
+    expect(next.outputs).toMatchObject({ pullRequest: { number: 114, draft: false, headSha: 'next' } })
     expect(await definition.listener!.read({ checkpoint: state.checkpoint, config, connector: changed, now })).toEqual(next)
     expect((await definition.listener!.read({ checkpoint: next.checkpoint, config, connector: changed, now })).outputs).toBeNull()
     const returned = await definition.listener!.read({ checkpoint: next.checkpoint, config, connector, now })
-    expect(returned.outputs?.payload).toMatchObject({ pullRequest: { draft: true } })
+    expect(returned.outputs).toMatchObject({ pullRequest: { draft: true } })
     expect(returned.dedupeKey).not.toEqual(first.dedupeKey)
   })
 

@@ -21,14 +21,7 @@ const triggerDefinition = {
       service_id: 'github',
       account_required: true,
     },
-    config_schema: {
-      type: 'object',
-      additionalProperties: false,
-      required: ['repository'],
-      properties: {
-        repository: { type: 'string' },
-      },
-    },
+    config_inputs: [{ handle: 'repository', json_schema: { type: 'string' }, nullable: false }],
     provisioning: { kind: 'webhook' },
     outputs: [
       {
@@ -119,7 +112,7 @@ describe('Trigger node authoring', () => {
             ...triggerDefinition,
             definition: {
               ...triggerDefinition.definition,
-              config_schema: { type: 'object', oneOf: [{ type: 'object' }] },
+              config_inputs: [{ handle: 'invalid', nullable: false, json_schema: { oneOf: [{ type: 'string' }] } }],
             },
           },
         ],

@@ -2,7 +2,7 @@ import type { ConnectorProxyResult } from '../../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.ts'
 import type { PollContext, PollDefinition, PollEvent, PollResult } from '../../common/poll.ts'
 
-import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { eventsPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 type Change = 'cancelled' | 'created' | 'updated'
 
@@ -99,42 +99,29 @@ const eventSchema = {
 } as const
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: {
-      calendarId: { maxLength: 1024, minLength: 1, type: 'string' },
-      changes: { default: changes, items: { enum: changes, type: 'string' }, minItems: 1, type: 'array', uniqueItems: true },
-      matchTerm: { default: '', type: 'string' },
-      maxEventsPerPoll: { default: 100, maximum: 500, minimum: 1, type: 'integer' },
+  configInputs: [
+    { handle: 'calendarId', jsonSchema: { maxLength: 1024, minLength: 1, type: 'string' }, nullable: false },
+    {
+      handle: 'changes',
+      jsonSchema: { items: { enum: changes, type: 'string' }, minItems: 1, type: 'array', uniqueItems: true },
+      nullable: false,
+      value: changes,
     },
-    required: ['calendarId'],
-    title: 'Google Calendar Event Change Config',
-    type: 'object',
-  },
+    { handle: 'matchTerm', jsonSchema: { type: 'string' }, nullable: false, value: '' },
+    { handle: 'maxEventsPerPoll', jsonSchema: { maximum: 500, minimum: 1, type: 'integer' }, nullable: false, value: 100 },
+  ],
   definitionVersion: 2,
   description: 'Polls a Google Calendar and triggers when an event is created, updated or cancelled.',
   displayName: 'Event Changed',
   key: 'googlecalendar.on_event_changed',
   name: 'on_event_changed',
-  outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: { events: { items: eventSchema, type: 'array' } },
-        required: ['events'],
-        title: 'Google Calendar Event Change Payload',
-        type: 'object',
-      },
-      nullable: false,
-    },
-  ],
+  outputs: [{ handle: 'events', jsonSchema: { items: eventSchema, type: 'array' }, nullable: false }],
   provider: 'googlecalendar',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const googleCalendarEventChanged: PollDefinition = {
-  buildOutputs: payloadPollOutputs,
+  buildOutputs: eventsPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)
@@ -149,9 +136,9 @@ export const googleCalendarEventChanged: PollDefinition = {
 function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
   return {
     calendarId: value.calendarId as string,
-    changes: new Set((value.changes as readonly Change[] | undefined) ?? changes),
-    matchTerm: ((value.matchTerm as string | undefined) ?? '').trim(),
-    maxEventsPerPoll: (value.maxEventsPerPoll as number | undefined) ?? 100,
+    changes: new Set(value.changes as readonly Change[]),
+    matchTerm: (value.matchTerm as string).trim(),
+    maxEventsPerPoll: value.maxEventsPerPoll as number,
   }
 }
 

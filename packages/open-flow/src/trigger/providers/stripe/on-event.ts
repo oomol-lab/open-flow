@@ -17,22 +17,15 @@ const endpoints = '/v1/webhook_endpoints'
 const formHeaders = { 'Content-Type': 'application/x-www-form-urlencoded' }
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: {
-      apiVersion: { default: '', maxLength: 40, type: 'string' },
-      events: {
-        items: { maxLength: 120, pattern: '^(\\*|[a-z0-9_]+(?:\\.[a-z0-9_]+)+)$', type: 'string' },
-        minItems: 1,
-        type: 'array',
-        uniqueItems: true,
-      },
-      includeConnectedAccounts: { default: false, type: 'boolean' },
+  configInputs: [
+    { handle: 'apiVersion', jsonSchema: { maxLength: 40, type: 'string' }, nullable: false, value: '' },
+    {
+      handle: 'events',
+      jsonSchema: { items: { maxLength: 120, pattern: '^(\\*|[a-z0-9_]+(?:\\.[a-z0-9_]+)+)$', type: 'string' }, minItems: 1, type: 'array', uniqueItems: true },
+      nullable: false,
     },
-    required: ['events'],
-    title: 'Stripe Event Config',
-    type: 'object',
-  },
+    { handle: 'includeConnectedAccounts', jsonSchema: { type: 'boolean' }, nullable: false, value: false },
+  ],
   definitionVersion: 2,
   description: 'Triggers when selected Stripe events happen on the connected account.',
   displayName: 'Account Event',
@@ -40,22 +33,10 @@ const snapshot = {
   key: 'stripe.on_event',
   name: 'on_event',
   outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: {
-          body: { type: 'object' },
-          event: { type: 'string' },
-          eventId: { type: 'string' },
-          livemode: { type: 'boolean' },
-        },
-        required: ['event', 'eventId', 'livemode', 'body'],
-        title: 'Stripe Event Payload',
-        type: 'object',
-      },
-      nullable: false,
-    },
+    { handle: 'body', jsonSchema: { type: 'object' }, nullable: false },
+    { handle: 'event', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'eventId', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'livemode', jsonSchema: { type: 'boolean' }, nullable: false },
   ],
   provider: 'stripe',
   type: 'integration',
@@ -81,7 +62,7 @@ export const stripeEvent: IntegrationDefinition = {
     return {
       dedupeKey: eventId,
       outcome: 'event',
-      outputs: { payload: { body: payload, event, eventId, livemode: payload.livemode === true } },
+      outputs: { body: payload, event, eventId, livemode: payload.livemode === true },
     }
   },
   async reconcile(context) {
@@ -138,9 +119,9 @@ export const stripeEvent: IntegrationDefinition = {
 
 function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
   return {
-    apiVersion: (value.apiVersion as string | undefined) ?? '',
+    apiVersion: value.apiVersion as string,
     events: [...new Set(value.events as readonly string[])],
-    includeConnectedAccounts: (value.includeConnectedAccounts as boolean | undefined) ?? false,
+    includeConnectedAccounts: value.includeConnectedAccounts as boolean,
   }
 }
 

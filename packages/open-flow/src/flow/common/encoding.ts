@@ -270,7 +270,7 @@ function canonicalInlineTask(task: InlineTaskDefinition): JsonValue {
 
 function canonicalTriggerDefinition(snapshot: TriggerKeySnapshot): JsonValue {
   return {
-    configSchema: snapshot.configSchema,
+    configInputs: canonicalPorts(snapshot.configInputs),
     definitionVersion: snapshot.definitionVersion,
     description: snapshot.description,
     displayName: snapshot.displayName,

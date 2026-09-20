@@ -12,12 +12,14 @@ import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { SourceSelect } from '../eventSources.tsx'
 
 export function FeishuEventFilters({
+  field,
   config,
   events,
   managed,
   disabled,
   onChange,
 }: {
+  readonly field?: 'chatIds' | 'resource'
   readonly config: Readonly<Record<string, JsonValue>>
   readonly events: readonly string[]
   readonly managed: boolean
@@ -31,8 +33,8 @@ export function FeishuEventFilters({
   const chatSupported = supportsFeishuChatFilter(events)
   return (
     <>
-      {(chatSupported || chats.length > 0) && (
-        <section className="inspector-section flex flex-col gap-2">
+      {field !== 'resource' && (chatSupported || chats.length > 0) && (
+        <div className="flex flex-col gap-2">
           {chatSupported ? (
             <ChatFilter key={JSON.stringify(chats)} value={chats} disabled={disabled} onChange={(value) => onChange('chatIds', value)} />
           ) : (
@@ -45,10 +47,10 @@ export function FeishuEventFilters({
               </Button>
             </>
           )}
-        </section>
+        </div>
       )}
-      {(kind != null || resource != null) && (
-        <section className="inspector-section flex flex-col gap-3">
+      {field !== 'chatIds' && (kind != null || resource != null) && (
+        <div className="flex flex-col gap-3">
           <Label className="flex items-center gap-2">
             <Checkbox
               checked={resource != null}
@@ -89,7 +91,7 @@ export function FeishuEventFilters({
               <p className="m-0 text-xs leading-5 text-muted-foreground">{t(`eventSources.resourceHints.${kind}`)}</p>
             </>
           )}
-        </section>
+        </div>
       )}
     </>
   )

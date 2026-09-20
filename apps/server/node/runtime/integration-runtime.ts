@@ -17,6 +17,7 @@ import type { IntegrationHealth, StoredIntegrationBinding, StoredIntegrationStat
 import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { matchesTriggerOutputs } from '@oomol-lab/open-flow/flow-semantics'
+import { resolveTriggerConfig } from '@oomol-lab/open-flow/integration-trigger'
 import {
   integrationCallbackSecret,
   integrationOccurrenceId,
@@ -256,7 +257,7 @@ export class IntegrationRuntime {
               allow: () => Promise.resolve(true),
               bindingId: target.stored.bindingId,
               callbackSecret,
-              config: target.trigger.config,
+              config: resolveTriggerConfig(target.trigger.definition.configInputs, target.trigger.config),
               connector: this.#connectorProxy(target.definition, target.stored.bindingId, target.connectionId, target.stored.flowId, signal),
               signal,
               current: target.current,
@@ -375,7 +376,7 @@ export class IntegrationRuntime {
             current: true,
             bindingId: candidate.bindingId,
             callbackSecret,
-            config: target.trigger.config,
+            config: resolveTriggerConfig(target.trigger.definition.configInputs, target.trigger.config),
             connector: this.#connectorProxy(target.definition, candidate.bindingId, candidate.connectionId, candidate.flowId, signal),
             signal,
             header: (name) => input.headers.get(name) ?? undefined,
@@ -475,7 +476,7 @@ export class IntegrationRuntime {
       const outcome = yield* this.#invokeReconcile(resolved.definition, current.bindingId, current.connectionId, current.flowId, {
         active,
         callbackSecret,
-        config: resolved.trigger.config,
+        config: resolveTriggerConfig(resolved.trigger.definition.configInputs, resolved.trigger.config),
         endpointUrl: options.publicOrigin + '/v1/integrations/' + current.endpointId,
         idempotencyKey: ['open-flow', current.operationId, current.nodeId, 'prepare'].join(':'),
         now: new Date(now),
@@ -569,7 +570,7 @@ export class IntegrationRuntime {
           const outcome = yield* this.#invokeReconcile(resolved.definition, binding.bindingId, binding.connectionId, binding.flowId, {
             active: false,
             callbackSecret,
-            config: resolved.trigger.config,
+            config: resolveTriggerConfig(resolved.trigger.definition.configInputs, resolved.trigger.config),
             endpointUrl,
             idempotencyKey: ['integration', binding.bindingId, binding.runtimeVersion, 'retire'].join(':'),
             now: new Date(now),
@@ -600,7 +601,7 @@ export class IntegrationRuntime {
       const outcome = yield* this.#invokeReconcile(previous.definition, binding.bindingId, previousState.connectionId, binding.flowId, {
         active: false,
         callbackSecret,
-        config: previous.trigger.config,
+        config: resolveTriggerConfig(previous.trigger.definition.configInputs, previous.trigger.config),
         endpointUrl,
         idempotencyKey: ['integration', binding.bindingId, previousState.runtimeVersion, 'retire'].join(':'),
         now: new Date(now),
@@ -635,7 +636,7 @@ export class IntegrationRuntime {
       const outcome = yield* this.#invokeReconcile(resolved.definition, binding.bindingId, binding.connectionId, binding.flowId, {
         active: true,
         callbackSecret,
-        config: resolved.trigger.config,
+        config: resolveTriggerConfig(resolved.trigger.definition.configInputs, resolved.trigger.config),
         endpointUrl,
         idempotencyKey: ['integration', binding.bindingId, binding.runtimeVersion, 'activate'].join(':'),
         now: new Date(now),

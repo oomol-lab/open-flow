@@ -6,7 +6,7 @@ import type { ServerServiceOptions } from '../node/application/service.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { IntegrationConnectionError, PermanentIntegrationError, TransientIntegrationError } from '@oomol-lab/open-flow/integration-trigger'
-import { payloadPollOutputs } from '@oomol-lab/open-flow/poll-trigger'
+import { eventsPollOutputs } from '@oomol-lab/open-flow/poll-trigger'
 import { integrationDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
@@ -53,12 +53,7 @@ function captureLogger(): { readonly logger: Logger; readonly output: () => stri
 }
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: { mode: { enum: ['connection', 'permanent', 'ready', 'transient'], type: 'string' } },
-    required: ['mode'],
-    type: 'object',
-  },
+  configInputs: [{ handle: 'mode', jsonSchema: { enum: ['connection', 'permanent', 'ready', 'transient'], type: 'string' }, nullable: false }],
   definitionVersion: 2,
   description: 'Integration runtime test definition.',
   displayName: 'Integration runtime test',
@@ -702,9 +697,9 @@ describe('Server change listener', () => {
       return { checkpoint: Number(checkpoint) + 1, dedupeKey: String(checkpoint), hasMore: continuing, outputs: null }
     })
     const poll: PollDefinition = {
-      buildOutputs: payloadPollOutputs,
+      buildOutputs: eventsPollOutputs,
       snapshot: {
-        configSchema: { type: 'object' },
+        configInputs: [],
         definitionVersion: 2,
         description: 'Poll reader',
         displayName: 'Poll reader',
@@ -712,7 +707,7 @@ describe('Server change listener', () => {
         name: 'poll',
         provider: 'test',
         type: 'poll',
-        outputs: [{ handle: 'payload', jsonSchema: { type: 'object' }, nullable: false }],
+        outputs: [{ handle: 'events', jsonSchema: { type: 'array', items: { type: 'object' } }, nullable: false }],
       },
       async poll({ checkpoint }) {
         reads.push({ kind: 'poll', checkpoint })

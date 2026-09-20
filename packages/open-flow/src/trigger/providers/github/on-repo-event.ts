@@ -70,18 +70,12 @@ const events = [
 ] as const
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: {
-      events: { items: { enum: events, type: 'string' }, minItems: 1, type: 'array', uniqueItems: true },
-      insecureSsl: { default: false, type: 'boolean' },
-      owner: { pattern: '^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$', type: 'string' },
-      repo: { pattern: '^(?!\\.{1,2}$)[a-zA-Z0-9._-]{1,100}$', type: 'string' },
-    },
-    required: ['owner', 'repo', 'events'],
-    title: 'GitHub Repo Event Config',
-    type: 'object',
-  },
+  configInputs: [
+    { handle: 'events', jsonSchema: { items: { enum: events, type: 'string' }, minItems: 1, type: 'array', uniqueItems: true }, nullable: false },
+    { handle: 'insecureSsl', jsonSchema: { type: 'boolean' }, nullable: false, value: false },
+    { handle: 'owner', jsonSchema: { pattern: '^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$', type: 'string' }, nullable: false },
+    { handle: 'repo', jsonSchema: { pattern: '^(?!\\.{1,2}$)[a-zA-Z0-9._-]{1,100}$', type: 'string' }, nullable: false },
+  ],
   definitionVersion: 2,
   description: 'Triggers when selected GitHub webhook events occur in a repository.',
   displayName: 'Repository Event',
@@ -89,17 +83,9 @@ const snapshot = {
   key: 'github.on_repo_event',
   name: 'on_repo_event',
   outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: { body: { type: 'object' }, deliveryId: { type: 'string' }, event: { type: 'string' } },
-        required: ['event', 'deliveryId', 'body'],
-        title: 'GitHub Repo Event Payload',
-        type: 'object',
-      },
-      nullable: false,
-    },
+    { handle: 'body', jsonSchema: { type: 'object' }, nullable: false },
+    { handle: 'deliveryId', jsonSchema: { type: 'string' }, nullable: false },
+    { handle: 'event', jsonSchema: { type: 'string' }, nullable: false },
   ],
   provider: 'github',
   type: 'integration',
@@ -124,7 +110,7 @@ export const githubRepoEvent: IntegrationDefinition = {
     return {
       dedupeKey: deliveryId.length == 0 ? undefined : deliveryId,
       outcome: 'event',
-      outputs: { payload: { body: context.payload as Readonly<Record<string, JsonValue>>, deliveryId, event } },
+      outputs: { body: context.payload as Readonly<Record<string, JsonValue>>, deliveryId, event },
     }
   },
   async reconcile(context) {
@@ -170,7 +156,7 @@ export const githubRepoEvent: IntegrationDefinition = {
 function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
   return {
     events: [...new Set(value.events as readonly string[])],
-    insecureSsl: (value.insecureSsl as boolean | undefined) ?? false,
+    insecureSsl: value.insecureSsl as boolean,
     owner: value.owner as string,
     repo: value.repo as string,
   }

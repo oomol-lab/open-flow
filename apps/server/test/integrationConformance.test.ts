@@ -20,12 +20,7 @@ function next(label: string): string {
 }
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: { source: { type: 'string' } },
-    required: ['source'],
-    type: 'object',
-  },
+  configInputs: [{ handle: 'source', jsonSchema: { type: 'string' }, nullable: false }],
   definitionVersion: 2,
   description: 'Integration conformance definition.',
   displayName: 'Integration conformance',

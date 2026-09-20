@@ -3,7 +3,7 @@ import type { JsonValue, TriggerKeySnapshot } from '../../../flow/common/change.
 import type { PollContext, PollDefinition, PollEvent } from '../../common/poll.ts'
 
 import { canonicalJsonBytes, digestBytes } from '../../../flow/common/encoding.ts'
-import { payloadPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
+import { eventsPollOutputs, PermanentPollError, PollConnectionError, TransientPollError } from '../../common/poll.ts'
 
 type Change = 'created' | 'deleted' | 'updated'
 type ItemType = 'file' | 'folder'
@@ -78,54 +78,35 @@ const eventSchema = {
 } as const
 
 const snapshot = {
-  configSchema: {
-    additionalProperties: false,
-    properties: {
-      events: {
-        default: ['created', 'updated'],
-        items: { enum: ['created', 'updated', 'deleted'], type: 'string' },
-        minItems: 1,
-        type: 'array',
-        uniqueItems: true,
-      },
-      itemId: { default: '', type: 'string' },
-      itemTypes: {
-        default: ['file'],
-        items: { enum: ['file', 'folder'], type: 'string' },
-        minItems: 1,
-        type: 'array',
-        uniqueItems: true,
-      },
-      maxItemsPerPoll: { default: 50, maximum: 200, minimum: 1, type: 'integer' },
-      parentFolderId: { default: '', type: 'string' },
+  configInputs: [
+    {
+      handle: 'events',
+      jsonSchema: { items: { enum: ['created', 'updated', 'deleted'], type: 'string' }, minItems: 1, type: 'array', uniqueItems: true },
+      nullable: false,
+      value: ['created', 'updated'],
     },
-    title: 'OneDrive Item Change Config',
-    type: 'object',
-  },
+    { handle: 'itemId', jsonSchema: { type: 'string' }, nullable: false, value: '' },
+    {
+      handle: 'itemTypes',
+      jsonSchema: { items: { enum: ['file', 'folder'], type: 'string' }, minItems: 1, type: 'array', uniqueItems: true },
+      nullable: false,
+      value: ['file'],
+    },
+    { handle: 'maxItemsPerPoll', jsonSchema: { maximum: 200, minimum: 1, type: 'integer' }, nullable: false, value: 50 },
+    { handle: 'parentFolderId', jsonSchema: { type: 'string' }, nullable: false, value: '' },
+  ],
   definitionVersion: 2,
   description: 'Polls the OneDrive change feed and triggers when a file or folder is created, updated or deleted.',
   displayName: 'File or Folder Changed',
   key: 'one_drive.on_item_changed',
   name: 'on_item_changed',
-  outputs: [
-    {
-      handle: 'payload',
-      jsonSchema: {
-        additionalProperties: false,
-        properties: { events: { items: eventSchema, type: 'array' } },
-        required: ['events'],
-        title: 'OneDrive Item Change Payload',
-        type: 'object',
-      },
-      nullable: false,
-    },
-  ],
+  outputs: [{ handle: 'events', jsonSchema: { items: eventSchema, type: 'array' }, nullable: false }],
   provider: 'one_drive',
   type: 'poll',
 } as const satisfies TriggerKeySnapshot & { readonly type: 'poll' }
 
 export const oneDriveItemChanged: PollDefinition = {
-  buildOutputs: payloadPollOutputs,
+  buildOutputs: eventsPollOutputs,
   snapshot,
   async poll(context) {
     const config = resolveConfig(context.config)
@@ -146,11 +127,11 @@ export const oneDriveItemChanged: PollDefinition = {
 
 function resolveConfig(value: Readonly<Record<string, JsonValue>>): Config {
   return {
-    events: (value.events as readonly Change[] | undefined) ?? ['created', 'updated'],
-    itemId: ((value.itemId as string | undefined) ?? '').trim(),
-    itemTypes: (value.itemTypes as readonly ItemType[] | undefined) ?? ['file'],
-    maxItemsPerPoll: (value.maxItemsPerPoll as number | undefined) ?? 50,
-    parentFolderId: ((value.parentFolderId as string | undefined) ?? '').trim(),
+    events: value.events as readonly Change[],
+    itemId: (value.itemId as string).trim(),
+    itemTypes: value.itemTypes as readonly ItemType[],
+    maxItemsPerPoll: value.maxItemsPerPoll as number,
+    parentFolderId: (value.parentFolderId as string).trim(),
   }
 }
 

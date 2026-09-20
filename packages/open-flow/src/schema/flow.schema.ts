@@ -82,7 +82,11 @@ export const FlowSchema = /* @__PURE__ */ z
         try {
           validateTriggerDefinitionSchemas(
             {
-              configSchema: definition.config_schema,
+              configInputs: definition.config_inputs.map((port) =>
+                'group' in port
+                  ? port
+                  : (({ json_schema, ...input }) => ({ ...input, jsonSchema: json_schema ?? {}, nullable: input.nullable ?? false }))(port),
+              ),
               outputs: definition.outputs.map(({ json_schema, ...port }) =>
                 Object.assign({}, port, { nullable: port.nullable ?? false, jsonSchema: json_schema ?? {} }),
               ),

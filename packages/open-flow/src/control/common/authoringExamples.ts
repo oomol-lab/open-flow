@@ -103,16 +103,15 @@ export function authoringExample(name: string): { version: 1; operations: readon
         'Format',
         {
           imports: [],
-          source:
-            'export default async function (inputs) { return { text: inputs.payload.events.map(event => `${event.sender}: ${event.subject}`).join("\\n") } }',
+          source: 'export default async function (inputs) { return { text: inputs.events.map(event => `${event.sender}: ${event.subject}`).join("\\n") } }',
         },
         {
           inputs: [
             {
-              handle: 'payload',
-              jsonSchema: { type: 'object', properties: { events: { type: 'array', items: { type: 'object' } } }, required: ['events'] },
+              handle: 'events',
+              jsonSchema: { type: 'array', items: { type: 'object' } },
               nullable: false,
-              value: { events: [] },
+              value: [],
             },
           ],
           outputs: [{ handle: 'text', jsonSchema: { type: 'string' }, nullable: false }],
@@ -150,9 +149,9 @@ export function authoringExample(name: string): { version: 1; operations: readon
           kind: 'graph.node.input.set',
           target,
           nodeId: 'format',
-          handle: 'payload',
-          before: { kind: 'value', value: { events: [] } },
-          value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'mail', output: 'payload' }] },
+          handle: 'events',
+          before: { kind: 'value', value: [] },
+          value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'mail', output: 'events' }] },
         },
         {
           kind: 'graph.node.input.set',

@@ -56,7 +56,7 @@ Add production node boundary cases to `nodeStories.tsx`, layered card examples t
 
 `?story=trigger-schedule` 使用生产触发计划编辑器，展示定时间隔、Cron、多条规则、只读和未配置状态。
 
-`?story=trigger-config` 使用生产服务触发器配置组件，展示 Schema 字段、多选、必填、默认值和只读状态。
+`?story=trigger-config` 使用生产服务触发器配置组件，展示与节点输入共用的固定字段、分组、nullable、默认值和只读状态。
 
 `?story=webhook-editor` 使用生产 Webhook 配置组件，展示请求字段、HTTP 方法、响应配置及只读切换。
 
@@ -70,7 +70,7 @@ Add production node boundary cases to `nodeStories.tsx`, layered card examples t
 
 ## Trigger galleries
 
-Each `Trigger [name]` group contains **Node states**, **Run menu states**, and **Properties**. The four groups are Manual, Schedule, Webhook, and Provider. Provider opens representative Integration and Poll cases, including long enums, event arrays, nested payloads, missing configuration and account failures. Its selector exposes every registered provider without repeating their stories in the sidebar. Provider schemas and names come directly from the production registry; the Vite plugin sends only definition snapshots to the browser.
+Each `Trigger [name]` group contains **Node states**, **Run menu states**, and **Properties**. The four groups are Manual, Schedule, Webhook, and Provider. Provider opens representative Integration and Poll cases, including long enums, event arrays, nested business objects, missing configuration and account failures. Its selector exposes every registered provider without repeating their stories in the sidebar. Provider schemas and names come directly from the production registry; the Vite plugin sends only definition snapshots to the browser.
 
 Run panels are laid out open in the page, with empty, ready, invalid, starting and disabled cases. Test data and Properties share the form field table and panel surface. The test form edits values under fixed schemas without mounting the definition editor. Webhook includes empty fixed objects, open objects and nested arrays; compare these with Properties in both themes. Manual and Schedule also show direct execution and downstream input requests. Property cases use the production `EditorContextPanel` and `NodeInspector` with local transport responses and the production change reducer. Display, editing, missing configuration and account errors are separate visible samples; Webhook advanced settings start expanded. Node cases cover selection, diagnostics, execution states and long content. Select one node to view its exact sample configuration in the read-only production inspector beside the canvas; one sample is selected on entry.
 
