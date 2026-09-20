@@ -17,8 +17,8 @@ export function valueType(schema: unknown, value: unknown): ValueType {
   return 'string'
 }
 
-/** Defaults are only inserted by an explicit editor action, never by reading a field. */
-export function initialValue(schema: unknown, type = valueType(schema, undefined)): unknown {
+/** Explicit creation honors defaults; unconstrained JSON starts as null, never an inferred string. */
+export function initialValue(schema: unknown, type = valueType(schema, null)): unknown {
   const source = objectValue(schema)
   if (source && Object.hasOwn(source, 'default')) return structuredClone(source.default)
   if (source && Object.hasOwn(source, 'const')) return structuredClone(source.const)

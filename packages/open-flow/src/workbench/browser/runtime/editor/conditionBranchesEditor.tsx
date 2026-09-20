@@ -8,10 +8,10 @@ import type { InputVariables, NodeInputUpstreamSources } from './sourceValueEdit
 import { useEffect, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { operandHandle, operatorsForType, otherwiseOutput, unaryOperator, valueType, comparisonIssue } from '../../../../flow/common/condition.ts'
-import { EditorComponentSelect } from '../../../../form/browser/editorComponentSelect.tsx'
 import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { FieldBranch } from '../../../../form/browser/fieldLayout.tsx'
 import { FieldSelect } from '../../../../form/browser/fieldSelect.tsx'
+import { FieldTypeAddon } from '../../../../form/browser/fieldTypeAddon.tsx'
 import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../form/browser/selectionMenuStyles.ts'
 import { valueForEditor } from '../../../../form/common/editorComponent.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
@@ -417,10 +417,9 @@ export function ConditionBranchesEditor({
                                         onDefinitionChange: changeDefinition,
                                         valueSuffix:
                                           operand.kind === 'value' && !disabled ? (
-                                            <EditorComponentSelect
+                                            <FieldTypeAddon
                                               schema={schema}
                                               name={t(side === 'left' ? 'conditionEditor.left' : 'conditionEditor.right')}
-                                              addon
                                               onChange={(next) => changeDefinition(next, valueForEditor(next, operand.value))}
                                             />
                                           ) : undefined,

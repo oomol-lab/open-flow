@@ -4,6 +4,7 @@ import type { FieldValueEditorProps } from '../src/form/browser/fieldValueEditor
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it, vi } from 'vitest'
+import { ArrayValueFields } from '../src/form/browser/collectionValueFields.tsx'
 import { FieldSorting } from '../src/form/browser/fieldSorting.ts'
 import { FieldValueEditor } from '../src/form/browser/fieldValueEditor.tsx'
 import * as validationHooks from '../src/form/browser/useValueIssues.ts'
@@ -38,6 +39,46 @@ const cases = [
 ] as const
 
 describe('Field validation presentation', () => {
+  it.each([null, undefined])('does not mount or disclose an uncreated multiline value %s', (value) => {
+    const onChange = vi.fn()
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <FieldValueEditor
+          label="note"
+          header={<span>note</span>}
+          schema={{ 'type': 'string', 'ui:widget': 'text' }}
+          value={value}
+          nullable
+          onChange={onChange}
+          path="/note"
+          onDraftIssue={vi.fn()}
+          hideOptions
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('aria-label="note Set value"')
+    expect(markup).not.toContain('aria-expanded=')
+    expect(markup).not.toContain('data-value-body')
+    expect(markup).not.toContain('<textarea')
+    expect(onChange).not.toHaveBeenCalled()
+  })
+  it.each([null, ''])('keeps unconstrained array items in the JSON editor for %s', (value) => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <ArrayValueFields
+          label="items"
+          schema={{ type: 'array' }}
+          value={[value]}
+          onChange={vi.fn()}
+          path="/items"
+          onDraftIssue={vi.fn()}
+          expansionPolicy={() => true}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('aria-label="items.0 JSON"')
+    expect(markup).toContain('<textarea')
+  })
   it.each(cases)('keeps %s presence errors and control state consistent', async (_label, schema, _invalid, valid) => {
     const onChange = vi.fn()
     const i18n = createI18n('en')
@@ -311,7 +352,7 @@ describe('Collapsed validation presentation', () => {
     try {
       const markup = await render(invalid)
       const buttons = markup.match(/<button\b[^>]*>/g) ?? []
-      const control = buttons.find((button) => button.includes(label === 'array' ? 'role="combobox"' : 'aria-label="sample Set value"'))
+      const control = buttons.find((button) => button.includes('aria-label="sample Set value"'))
       expect(control).toContain('aria-invalid="true"')
       expect(buttons.find((button) => button.includes('aria-label="sample"'))).not.toContain('aria-invalid="true"')
       expect(markup).toContain('role="alert"')

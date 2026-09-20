@@ -82,7 +82,11 @@ collections, definitions, and field, node, or group settings. Also read the
 - Object children and array items use the established rounded plus/minus buttons. Plus inserts
   after the current item; minus removes that item. A nonempty collection has no redundant bottom
   add button. An empty collection has one full-row add action on the child indentation baseline.
-- Arrays choose the common item type in the parent row. Child rows show a zero-based index and the
+- Arrays keep the parent value control, preceded by the localized `valueEditor.arrayOf` label, with a compact item-type suffix.
+  This suffix shares the Case type-addon component but edits `items`, not the whole value Schema.
+  It remains present for unset, null and source-bound arrays; changing item type preserves source
+  bindings and never creates an unset value. Value errors belong to the value control, not the type.
+  Arrays choose the common item type in the parent row. Child rows show a zero-based index and the
   value, with no repeated per-item type selector. Reuse existing schema/value rules for add, remove,
   conversion, nested definitions, and constraints.
 - During sorting, editable array items replace their indices with drag handles. Dragging or the

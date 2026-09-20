@@ -17,6 +17,8 @@
   --field-value-row: 1;
   --value-addon-width: 28px;
   --value-end-addon-width: 0px;
+  --value-prefix-width: 0px;
+  --value-start-addon-width: 0px;
   --field-control-height: 30px;
   --value-editor-feedback-layer: 1;
   --value-editor-control-layer: 2;
@@ -142,7 +144,7 @@
    must not suppress hover feedback after collapsing a field. Text inputs retain
    :focus-visible on pointer focus; keyboard-focused value buttons do as well. */
 // Reuse the same focus targets for field ownership and table-wide suppression.
-$summary-focus: '> .summary:focus-visible, > :is(.arrayItemType, .valueTools) :focus-visible';
+$summary-focus: '> .summary:focus-visible, > :is(.valueTools) :focus-visible';
 $feedback-targets: '#{$summary-focus}, > .body:not([hidden]) :focus-visible';
 $feedback-focus: ':has(#{$feedback-targets})';
 :global([data-value-editor-scope]):has(#{selector.nest('.root', $feedback-targets)}),
@@ -151,7 +153,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
   --error-hover-visibility: hidden;
 }
 :is(.body:not([hidden]), .errorAnchor):hover > .error,
-.root:has(> :is(.summary, .arrayItemType, .valueTools):hover) > .summaryError > .error,
+.root:has(> :is(.summary, .valueTools):hover) > .summaryError > .error,
 .summaryError:hover > .error {
   opacity: var(--error-hover-opacity, 1);
   visibility: var(--error-hover-visibility, visible);
@@ -163,7 +165,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
   opacity: 1;
   visibility: visible;
 }
-.root:not(#{$feedback-focus}):has(> :is(.body, .summary, .arrayItemType, .valueTools, .summaryError):hover) {
+.root:not(#{$feedback-focus}):has(> :is(.body, .summary, .valueTools, .summaryError):hover) {
   z-index: var(--value-editor-hover-layer, 1);
 }
 .root#{$feedback-focus},
@@ -200,6 +202,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
 .leadingControl,
 .toggleControl {
   margin-left: var(--field-indent, 0px);
+  justify-self: start;
   grid-row: 1;
   display: flex;
   align-items: center;
@@ -271,11 +274,11 @@ $feedback-focus: ':has(#{$feedback-targets})';
   }
 }
 .root[data-value-addon] {
+  --value-start-addon-width: var(--value-addon-width);
   > .summary,
-  > .arrayItemType,
   &:not([data-collection]) > .body {
     position: relative;
-    margin-left: var(--value-addon-width);
+    margin-left: calc(var(--value-start-addon-width) + var(--value-prefix-width));
   }
   &:has(> .summary[aria-expanded='true']) > .valueAddon {
     background: color-mix(in srgb, var(--ui-foreground) 3%, var(--ui-background));
@@ -293,8 +296,10 @@ $feedback-focus: ':has(#{$feedback-targets})';
 }
 .root[data-value-suffix] {
   --value-end-addon-width: var(--value-addon-width);
+  > .summaryError {
+    margin-right: var(--value-end-addon-width);
+  }
   > .summary,
-  > .arrayItemType,
   &:not([data-collection]) > .body {
     position: relative;
     margin-right: var(--value-end-addon-width);
@@ -318,8 +323,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
 .body:has([data-popup-open]) {
   z-index: var(--value-editor-overlay-layer);
 }
-.summary,
-.arrayItemType {
+.summary {
   z-index: var(--value-editor-control-layer);
 }
 .summary {
@@ -345,13 +349,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.arrayItemType {
-  grid-column: var(--field-value-column);
-  grid-row: var(--field-value-row);
-  min-width: 0;
-}
-.root[data-expanded] > .summary > .summaryText,
-.root[data-expanded] > .arrayItemType [data-slot='select-value'] {
+.root[data-expanded] > .summary > .summaryText {
   color: color-mix(in srgb, var(--ui-muted-foreground) 70%, transparent);
 }
 
@@ -369,7 +367,6 @@ $feedback-focus: ':has(#{$feedback-targets})';
 }
 .root[data-value-tools] {
   > .summary,
-  > .arrayItemType [data-slot='select-trigger'],
   &:not([data-collection]) > .body > div > :is([data-slot='select-trigger'], [aria-haspopup]) {
     position: relative;
     > svg {
@@ -379,7 +376,6 @@ $feedback-focus: ':has(#{$feedback-targets})';
     }
   }
   > .summary,
-  > .arrayItemType [data-slot='select-trigger'],
   &:not([data-collection]) > .body > :is(input, select, button, [role='button']),
   &:not([data-collection]) > .body > div > :is([data-slot='select-trigger'], [data-field-control]) {
     padding-right: calc(var(--value-tools-width) + var(--value-suffix-width) + 8px);
@@ -397,7 +393,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
     opacity: 0;
     pointer-events: none;
   }
-  &:has(> .body:hover, > .summary:hover, > .arrayItemType:hover, > .valueTools:hover) > .valueTools > .clearValue,
+  &:has(> .body:hover, > .summary:hover, > .valueTools:hover) > .valueTools > .clearValue,
   > .valueTools > .clearValue:focus-visible {
     opacity: 1;
     pointer-events: auto;
@@ -414,7 +410,6 @@ $feedback-focus: ':has(#{$feedback-targets})';
 }
 .root[data-header][data-array-child] {
   > .summary,
-  > .arrayItemType,
   &:not([data-collection]) > .body {
     grid-column: handle / content-end;
     grid-row: 1;
@@ -708,7 +703,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
   grid-row: var(--field-value-row);
 }
 .root[data-value-addon] > .summaryError {
-  margin-left: var(--value-addon-width);
+  margin-left: calc(var(--value-start-addon-width) + var(--value-prefix-width));
 }
 .root[data-array-child] > .summaryError {
   grid-column: handle / content-end;
@@ -735,4 +730,26 @@ $feedback-focus: ':has(#{$feedback-targets})';
   justify-content: center;
   flex-wrap: wrap;
   gap: 4px 8px;
+}
+
+.valuePrefix {
+  grid-column: var(--field-value-column);
+  grid-row: var(--field-value-row);
+  align-self: start;
+  display: flex;
+  align-items: center;
+  height: var(--field-control-height);
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
+}
+.root[data-value-prefix] {
+  --value-prefix-width: 40px;
+  > .valueAddon:not([data-side='end']) {
+    margin-left: var(--value-prefix-width);
+  }
+  > .summary,
+  > .summaryError,
+  &:not([data-collection]) > .body {
+    margin-left: calc(var(--value-prefix-width) + var(--value-start-addon-width));
+  }
 }

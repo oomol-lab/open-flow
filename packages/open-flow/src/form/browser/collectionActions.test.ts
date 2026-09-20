@@ -4,6 +4,11 @@ import { collectionCreateAction, objectFieldAdder } from './collectionActions.ts
 const base = { label: 'field', path: '/field', onDraftIssue: () => {} }
 
 describe('collection creation', () => {
+  it('creates a JSON placeholder for an unconstrained array item', () => {
+    const onChange = vi.fn()
+    collectionCreateAction({ ...base, schema: { type: 'array' }, value: undefined, onChange })?.()
+    expect(onChange).toHaveBeenCalledExactlyOnceWith([null])
+  })
   it.each([null, undefined])('adds the first array item from %s without mutating on inspection', (value) => {
     const onChange = vi.fn()
     const create = collectionCreateAction({ ...base, schema: { type: 'array', items: { type: 'string' } }, value, onChange })

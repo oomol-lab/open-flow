@@ -260,7 +260,6 @@ export function ArrayValueFields(props: CollectionProps) {
           return (
             <div data-array-field-content>
               {child(index, itemSchema, item, (next, deletion) => onChange(setArrayItem(array, index, next), deletion), {
-                objectChild: true,
                 arrayChild: true,
                 header: <></>,
                 disclosureContent: <span className={styles.arrayIndex}>{index}.</span>,

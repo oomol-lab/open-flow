@@ -34,6 +34,9 @@ const fixtures = [
   { name: 'emptyObject', schema: { type: 'object', additionalProperties: false }, value: {}, nullable: false },
   { name: 'emptyArray', schema: { type: 'array', items: { type: 'string' } }, value: [], nullable: false },
   { name: 'emptyText', schema: { 'type': 'string', 'ui:widget': 'text' }, value: '', nullable: false },
+  { name: 'nullableText', schema: { 'type': 'string', 'ui:widget': 'text' }, value: undefined, nullable: true },
+  { name: 'nullText', schema: { 'type': 'string', 'ui:widget': 'text' }, value: null, nullable: true },
+  { name: 'unsetText', schema: { 'type': 'string', 'ui:widget': 'text' }, value: undefined, nullable: false },
   { name: 'invalidText', schema: { 'type': 'string', 'ui:widget': 'text', 'minLength': 12 }, value: 'short', nullable: false },
   { name: 'emptyJson', schema: {}, value: undefined, nullable: true },
 ] as const

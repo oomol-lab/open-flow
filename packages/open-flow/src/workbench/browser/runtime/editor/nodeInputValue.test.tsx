@@ -348,3 +348,45 @@ it('checks a saved binding synchronously without enumerating candidates', () => 
     i18n.dispose()
   }
 })
+
+it.each([undefined, null, []])('keeps array item type separate from the literal value (%j)', (value) => {
+  const onValue = vi.fn()
+  const markup = renderToStaticMarkup(
+    <I18nProvider i18n={createI18n('en')}>
+      <NodeInputValue
+        definition={{ handle: 'items', jsonSchema: { type: 'array' }, nullable: true }}
+        presentation={{ header: <span>items</span>, layout: 'ports', onDefinitionChange: vi.fn() }}
+        value={value}
+        connected={false}
+        variables={variables}
+        disabled={false}
+        onValue={onValue}
+        onVariable={vi.fn()}
+      />
+    </I18nProvider>,
+  )
+  expect(markup).toContain('aria-label="items Set value"')
+  expect(markup).toContain('aria-label="items[] type: JSON"')
+  expect(onValue).not.toHaveBeenCalled()
+})
+
+it('shows a bound array source alongside its independent item type', () => {
+  const markup = renderToStaticMarkup(
+    <I18nProvider i18n={createI18n('en')}>
+      <NodeInputValue
+        definition={{ handle: 'items', jsonSchema: { type: 'array' }, nullable: true }}
+        presentation={{ header: <span>items</span>, layout: 'ports', onDefinitionChange: vi.fn() }}
+        value={undefined}
+        variableName="API_TOKEN"
+        connected={false}
+        variables={variables}
+        disabled={false}
+        onValue={vi.fn()}
+        onVariable={vi.fn()}
+      />
+    </I18nProvider>,
+  )
+  expect(markup).toContain('API_TOKEN')
+  expect(markup).toContain('aria-label="items[] type: JSON"')
+  expect(markup).toContain('aria-invalid="true"')
+})

@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest'
 import { initialValue, isJsonValue, renameObjectField, setObjectField } from './value.ts'
 
 describe('JSON field editing', () => {
+  it('initializes unconstrained JSON as null instead of assuming a string', () => {
+    expect(initialValue({})).toBeNull()
+    expect(initialValue({ type: 'string' })).toBe('')
+  })
   it('adds, edits, renames and removes open object fields without mutating the original', () => {
     const original = { existing: true }
     const added = setObjectField(original, 'field', 'hello')

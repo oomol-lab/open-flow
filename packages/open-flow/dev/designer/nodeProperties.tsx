@@ -14,6 +14,7 @@ import { useStoryActions } from './storyActions.tsx'
 
 const field = (handle: string, type = 'string'): InputPort => ({ handle, jsonSchema: { type }, nullable: false })
 const taskFields: readonly InputPort[] = [
+  { handle: 'boundArray', nullable: true, jsonSchema: { type: 'array' } },
   ...values.slice(0, 6),
   ...values.slice(10),
   {
@@ -34,11 +35,16 @@ const fixtures: readonly Fixture[] = [
   {
     id: 'task',
     group: 'Task',
+    content: { bindings: { arrayVariable: { kind: 'variable', target: 'API_TOKEN' } } },
     node: {
       kind: 'task',
       name: 'Prepare report',
       description: 'Transform the request into a release report.',
-      inputs: { ...taskInputValues, clearedObject: { kind: 'unset' } },
+      inputs: {
+        ...taskInputValues,
+        clearedObject: { kind: 'unset' },
+        boundArray: { kind: 'sources', sources: [{ kind: 'binding', bindingId: 'arrayVariable' }] },
+      },
       task: {
         name: 'Prepare report',
         moduleId: 'module',

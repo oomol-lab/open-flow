@@ -22,10 +22,10 @@ import { initialValue, objectValue } from '../common/value.ts'
 import { collectionCreateAction } from './collectionActions.ts'
 import { ObjectValueFields, ArrayValueFields } from './collectionValueFields.tsx'
 import { EditableChoices } from './editableChoices.tsx'
-import { EditorComponentSelect } from './editorComponentSelect.tsx'
 import { FieldRow, FieldBranch } from './fieldLayout.tsx'
 import { FieldSelect } from './fieldSelect.tsx'
 import { FieldSorting } from './fieldSorting.ts'
+import { FieldTypeAddon } from './fieldTypeAddon.tsx'
 import { JsonEditor } from './jsonEditor.tsx'
 import { useFieldExpansion } from './useFieldExpansion.ts'
 import { useValueIssues } from './useValueIssues.ts'
@@ -101,7 +101,8 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
   const availableTypes = Array.isArray(source.type) ? types.filter((candidate) => (source.type as unknown[]).includes(candidate)) : types
   const structured = !raw && shape.collection && props.editor === undefined
   const expandable = !showUnset && (structured || (valueEditable && (raw || complex || (type === 'string' && source['ui:widget'] === 'text'))))
-  const hasBranch = expandable && !(structured && type === 'object' && presence !== 'value')
+  const uncreatedText = compactValue && expandable && shape.text && !raw && presence !== 'value'
+  const hasBranch = expandable && !uncreatedText && !(structured && type === 'object' && presence !== 'value')
   // Keep the complete error set authoritative for both control state and feedback.
   const errors =
     draftInvalid || props.editor !== undefined
@@ -120,7 +121,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
   const { expanded, bodyMounted, setExpanded } = useFieldExpansion(
     {
       depth,
-      expandable,
+      expandable: expandable && !uncreatedText,
       editable: valueEditable && !disabled,
       empty: state.empty,
       validation: errors.length > 0 ? 'invalid' : needsValidation && issues == null ? 'pending' : 'valid',
@@ -149,7 +150,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
     messages,
     anchor,
   } = valueFeedback(errors, {
-    expanded,
+    expanded: hasBranch && expanded,
     hasSummary: expandable && compactValue,
     hasChildren: structured,
     draftInvalid,
@@ -167,17 +168,41 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
   const inlineTools = !props.hideValueTools && (props.layout === 'values' || props.layout === 'ports') && valueEditable && !disabled && !sorting
   const canClear = inlineTools && state.canClear
   const canToggleJson = inlineTools && expanded && shape.collection && presence === 'value'
-  const showArrayItemType = props.header != null && expandable && structured && presence === 'value' && type === 'array' && !Array.isArray(source.items)
-  const emptyCollection = structured && presence !== 'value' && valueEditable && !disabled
+  const arrayDefinition = props.header != null && source.type === 'array' && !Array.isArray(source.items) && !choiceOptions
+  const typeAddon =
+    props.valueSuffix ??
+    (arrayDefinition ? (
+      <FieldTypeAddon
+        schema={source.items ?? {}}
+        name={`${label}[]`}
+        menuTitle={t('valueEditor.arrayItemTypeTitle')}
+        disabled={disabled}
+        onChange={
+          props.onDefinitionChange
+            ? (items) => props.onDefinitionChange!({ ...source, items }, Array.isArray(value) ? value.map((item) => valueForEditor(items, item)) : value)
+            : undefined
+        }
+      />
+    ) : undefined)
+  const emptyCollection = structured && presence !== 'value'
+  const needsCreation = emptyCollection || uncreatedText
   const valueSuffix =
     !expandable && !showUnset && (enumeration || itemEnumeration || source['ui:widget'] === 'color' || isDateFormat(source.format))
       ? 26
       : type === 'boolean' && !expandable && !showUnset
         ? 30
-        : (expandable && compactValue && props.header == null && !emptyCollection) || showArrayItemType
+        : expandable && compactValue && props.header == null && !needsCreation
           ? 26
           : 0
-  const createCollection = emptyCollection ? collectionCreateAction(props) : undefined
+  const createValue =
+    uncreatedText && valueEditable && !disabled
+      ? () => {
+          onChange('')
+          setEditorFocusRequest((request) => request + 1)
+        }
+      : emptyCollection
+        ? collectionCreateAction(props)
+        : undefined
   const toggleExpanded = () => {
     setExpanded(!expanded)
     if (!expanded) setEditorFocusRequest((request) => request + 1)
@@ -257,7 +282,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
       : firstName != null &&
         ((sorting && props.onDefinitionChange != null) || fieldValueShape(firstSchema, firstValue, { objectChild: true, depth: depth + 1 }).expandable)
   const shouldMountBody = !compactValue || !expandable || expanded || bodyMounted
-  const body = shouldMountBody && (
+  const body = shouldMountBody && !uncreatedText && (
     <FieldBranch
       depth={depth + 1}
       endpoint={structured && presence === 'value' && childMarker ? 'marker' : 'control'}
@@ -405,75 +430,56 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
       data-header={props.header != null || undefined}
       data-collection={expandable || undefined}
       data-value-addon={props.valueAddon != null || undefined}
-      data-value-suffix={props.valueSuffix != null || undefined}
+      data-value-suffix={typeAddon != null || undefined}
+      data-value-prefix={arrayDefinition || undefined}
       data-expanded={(hasBranch && expanded) || undefined}
       data-structured={(structured && !showUnset) || undefined}
       data-branch={hasBranch || undefined}
     >
+      {arrayDefinition && <span className={styles.valuePrefix}>{t('valueEditor.arrayOf')}</span>}
       {props.valueAddon != null && (
         <div className={styles.valueAddon} data-value-addon-control>
           {props.valueAddon}
         </div>
       )}
-      {showArrayItemType ? (
-        <div className={styles.arrayItemType}>
-          <EditorComponentSelect
-            schema={source.items ?? {}}
-            name={`${label}[]`}
-            menuTitle={t('valueEditor.arrayItemTypeTitle')}
-            compact={false}
-            showIcon={false}
-            invalid={summaryInvalid}
-            disabled={disabled || !props.onDefinitionChange}
-            onChange={(items) =>
-              props.onDefinitionChange?.(
-                { ...source, items },
-                array.map((item) => valueForEditor(items, item)),
-              )
-            }
-          />
-        </div>
-      ) : (
-        compactValue &&
-        expandable && (
-          <Button
-            type="button"
-            variant="disclosure"
-            size="field"
-            className={styles.summary}
-            data-field-prompt={summaryInvalid || undefined}
-            data-readonly={disabled || undefined}
-            data-field-control
-            disabled={sorting || (!hasBranch && !createCollection) || (emptyCollection && !createCollection)}
-            aria-label={`${label} ${t('valueEditor.setValue')}`}
-            aria-expanded={emptyCollection || !hasBranch ? undefined : expanded}
-            aria-invalid={summaryInvalid}
-            aria-controls={`${id}-body`}
-            onClick={
-              emptyCollection
-                ? () => {
-                    createCollection?.()
-                    setExpanded(true)
-                  }
-                : toggleExpanded
-            }
-          >
-            <span className={styles.summaryText}>
-              {state.display === 'null'
-                ? 'null'
-                : presence === 'unset'
-                  ? t('valueEditor.unset')
-                  : structured
-                    ? JSON.stringify(value)
-                    : typeof value === 'string'
-                      ? value === ''
-                        ? t('valueEditor.emptyStringValue')
-                        : value
-                      : JSON.stringify(value)}
-            </span>
-            {props.header == null && hasBranch && !emptyCollection && <SelectChevron className={expanded ? 'rotate-180' : undefined} />}
-          </Button>
-        )
+      {compactValue && expandable && (
+        <Button
+          type="button"
+          variant="disclosure"
+          size="field"
+          className={styles.summary}
+          data-field-prompt={summaryInvalid || undefined}
+          data-readonly={disabled || undefined}
+          data-field-control
+          disabled={sorting || (!hasBranch && !createValue) || (needsCreation && !createValue)}
+          aria-label={`${label} ${t('valueEditor.setValue')}`}
+          aria-expanded={needsCreation || !hasBranch ? undefined : expanded}
+          aria-invalid={summaryInvalid}
+          aria-controls={`${id}-body`}
+          onClick={
+            needsCreation
+              ? () => {
+                  createValue?.()
+                  setExpanded(true)
+                }
+              : toggleExpanded
+          }
+        >
+          <span className={styles.summaryText}>
+            {state.display === 'null'
+              ? 'null'
+              : presence === 'unset'
+                ? t('valueEditor.unset')
+                : structured
+                  ? JSON.stringify(value)
+                  : typeof value === 'string'
+                    ? value === ''
+                      ? t('valueEditor.emptyStringValue')
+                      : value
+                    : JSON.stringify(value)}
+          </span>
+          {props.header == null && hasBranch && !needsCreation && <SelectChevron className={expanded ? 'rotate-180' : undefined} />}
+        </Button>
       )}
       {!expandable && body}
       <ValueTools
@@ -499,9 +505,9 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
             : undefined
         }
       />
-      {props.valueSuffix != null && (
+      {typeAddon != null && (
         <div className={styles.valueAddon} data-value-addon-control data-side="end">
-          {props.valueSuffix}
+          {typeAddon}
         </div>
       )}
       {props.trailingControl}

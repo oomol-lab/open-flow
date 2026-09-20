@@ -82,7 +82,7 @@ export function NodeInputs({
                                 : item.definition,
                           ),
                           deletion,
-                          { [port.handle]: value as JsonValue | undefined },
+                          entry.connected || entry.variableName != null || entry.sourceMissing ? undefined : { [port.handle]: value as JsonValue | undefined },
                         )
                     : undefined,
               }}
