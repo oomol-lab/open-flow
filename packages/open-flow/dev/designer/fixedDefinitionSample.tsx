@@ -48,9 +48,18 @@ export const propertyValues: readonly InputPort[] = [
   field('unset'),
 ]
 
+const fixedDefinitionValues: readonly InputPort[] = [
+  { ...field('openPayload', 'object'), value: { model: 0, nested: { enabled: true } } },
+  ...propertyValues,
+  { ...field('nullableArray', 'array'), nullable: true, value: null },
+  { ...field('nullableObject', 'object'), nullable: true, value: null },
+]
+
 export function FixedDefinitionSample({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
   const i18n = useMemo(() => createI18n(language), [language])
-  const [values, setValues] = useState<Record<string, JsonValue | undefined>>(() => Object.fromEntries(propertyValues.map((port) => [port.handle, port.value])))
+  const [values, setValues] = useState<Record<string, JsonValue | undefined>>(() =>
+    Object.fromEntries(fixedDefinitionValues.map((port) => [port.handle, port.value])),
+  )
   return (
     <I18nProvider i18n={i18n}>
       <section className="node-properties-case trigger-case" aria-label="Fixed types · editable values">
@@ -60,7 +69,7 @@ export function FixedDefinitionSample({ dark, language, log }: { dark: boolean; 
           data-theme={dark ? 'dark' : 'light'}
         >
           <NodeInputs
-            entries={propertyValues.map(({ value: _value, ...definition }) => ({ definition, value: values[definition.handle], connected: false }))}
+            entries={fixedDefinitionValues.map(({ value: _value, ...definition }) => ({ definition, value: values[definition.handle], connected: false }))}
             variables={{ enabled: false, loaded: true, loading: false, names: [], onOpen: () => {} }}
             disabled={false}
             onValue={(name, value) => {

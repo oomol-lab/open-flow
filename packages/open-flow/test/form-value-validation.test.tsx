@@ -204,6 +204,53 @@ describe('Nullable field presentation', () => {
       i18n.dispose()
     }
   })
+
+  it.each(['array', 'object'] as const)('keeps a null nullable %s on the value row instead of exposing collection contents', (type) => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <ValueEditor
+          header={<span>sample</span>}
+          label="sample"
+          schema={type === 'array' ? { type, items: { type: 'string' } } : { type, properties: { child: { type: 'string' } } }}
+          value={null}
+          nullable
+          onChange={vi.fn()}
+          path="/sample"
+          onDraftIssue={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    expect(markup).toContain('aria-label="sample null"')
+    expect(markup).toContain('aria-label="sample" aria-expanded="true"')
+    expect(markup).not.toContain('data-collection=')
+    expect(markup).toContain('data-empty-collection-branch="true"')
+    expect(markup).toContain(type === 'object' ? 'aria-label="Add field sample"' : 'aria-label="Add item sample"')
+  })
+
+  it.each(['array', 'object'] as const)('offers a nested add action for an unset editable %s', (type) => {
+    const onChange = vi.fn()
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <ValueEditor
+          header={<span>sample</span>}
+          label="sample"
+          schema={type === 'array' ? { type, items: { type: 'string' } } : { type }}
+          value={undefined}
+          onChange={onChange}
+          path="/sample"
+          onDraftIssue={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    expect(markup).toContain('sample Set value')
+    expect(markup).toContain('aria-label="sample" aria-expanded="true"')
+    expect(markup).toContain('-empty-collection')
+    expect(markup).toContain('data-empty-collection-branch="true"')
+    expect(markup).toContain(type === 'object' ? 'aria-label="Add field sample"' : 'aria-label="Add item sample"')
+    expect(onChange).not.toHaveBeenCalled()
+  })
 })
 
 describe('Read-only value controls', () => {
@@ -316,6 +363,30 @@ it('restores object field display order without reordering or changing the value
   expect(onValue).not.toHaveBeenCalled()
 })
 
+it('uses the inferred runtime type for unconstrained object children', () => {
+  const onValue = vi.fn()
+  const markup = renderToStaticMarkup(
+    <I18nProvider i18n={createI18n('en')}>
+      <ValueEditor
+        label="object"
+        path="/object"
+        schema={{ type: 'object' }}
+        value={{ extra: 'Editable field' }}
+        disabled={false}
+        onChange={onValue}
+        onDraftIssue={vi.fn()}
+      />
+    </I18nProvider>,
+  )
+
+  expect(markup).toContain('aria-label="object.extra type"')
+  expect(markup).toContain('aria-label="object.extra"')
+  expect(markup).toContain('value="Editable field"')
+  expect(markup).not.toContain('aria-label="object.extra" aria-expanded=')
+  expect(markup).not.toContain('aria-label="object.extra JSON"')
+  expect(onValue).not.toHaveBeenCalled()
+})
+
 it('offers to repair a non-nullable array item cleared to null', () => {
   const markup = renderToStaticMarkup(
     <I18nProvider i18n={createI18n('en')}>
@@ -386,6 +457,7 @@ describe('Fixed schema value presentation', () => {
     expect(fixed).toContain('aria-expanded="false"')
     const expandedContent = renderFixedValue({ type: 'object', additionalProperties: false }, {}, false)
     expect(expandedContent).toContain('Empty object only')
+    expect(expandedContent).toContain('data-branch="true"')
     expect(expandedContent).toMatch(/disabled=""[^>]*aria-label="Empty object only fixed"/)
     expect(expandedContent).not.toContain('aria-label="Add field fixed"')
     const readOnlyContent = renderFixedValue({ type: 'object', additionalProperties: false }, {}, false, true)

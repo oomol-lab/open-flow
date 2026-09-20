@@ -587,6 +587,36 @@ $feedback-focus: ':has(#{$feedback-targets})';
   font: inherit;
 }
 
+.emptyCollectionBranch {
+  --branch-extension: 0px;
+  position: relative;
+  display: grid;
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
+  grid-row: var(--field-branch-row);
+  min-width: 0;
+  padding-top: 4px;
+  &::before {
+    @include geometry.branch;
+    left: calc(var(--field-indent) + var(--field-toggle-width, 24px) / 2);
+    top: calc(-1 * var(--branch-extension));
+    width: 16px;
+  }
+  > .emptyObjectContent {
+    grid-column: handle / content-end;
+  }
+}
+
+.emptyCollectionBranch[hidden] {
+  display: none;
+}
+
+@container value-fields (max-width: #{fieldLayout.$wrap-width}) {
+  .root[data-header] > .emptyCollectionBranch {
+    --branch-extension: calc(var(--field-control-height) + var(--field-row-gap));
+  }
+}
+
 .emptyObjectConstraint {
   height: auto;
   min-height: var(--field-control-height, 30px);

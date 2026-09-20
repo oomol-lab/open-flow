@@ -221,8 +221,17 @@ function LazyFieldsStory({ dark, language, log }: { dark: boolean; language: UiL
 }
 
 function FlatInputsSample({ log }: { log: LogAction }) {
-  const [values, setValues] = useState<Readonly<Record<string, JsonValue | undefined>>>({})
+  const [values, setValues] = useState<Readonly<Record<string, JsonValue | undefined>>>({
+    nullableArray: null,
+    nullableObject: null,
+    unconstrainedObject: { model: 'deepseek-v4-flash' },
+    fixedEmptyObject: {},
+  })
   const handles = [
+    'nullableArray',
+    'nullableObject',
+    'unconstrainedObject',
+    'fixedEmptyObject',
     'receiveId',
     'receiveIdType',
     'contentKind',
@@ -251,13 +260,21 @@ function FlatInputsSample({ log }: { log: LogAction }) {
           (handle): NodeInputField => ({
             definition: {
               handle,
-              nullable: !['receiveId', 'contentKind'].includes(handle),
+              nullable: !['receiveId', 'contentKind', 'fixedEmptyObject'].includes(handle),
               jsonSchema:
-                handle === 'rawContent'
-                  ? {}
-                  : ['receiveIdType', 'contentKind', 'fileType'].includes(handle)
-                    ? { type: 'string', enum: ['text', 'image', 'file'] }
-                    : { type: 'string' },
+                handle === 'nullableArray'
+                  ? { type: 'array', items: { type: 'object' } }
+                  : handle === 'nullableObject'
+                    ? { type: 'object' }
+                    : handle === 'unconstrainedObject'
+                      ? { type: 'object' }
+                      : handle === 'fixedEmptyObject'
+                        ? { type: 'object', additionalProperties: false }
+                        : handle === 'rawContent'
+                          ? {}
+                          : ['receiveIdType', 'contentKind', 'fileType'].includes(handle)
+                            ? { type: 'string', enum: ['text', 'image', 'file'] }
+                            : { type: 'string' },
             },
             value: Object.hasOwn(values, handle)
               ? values[handle]

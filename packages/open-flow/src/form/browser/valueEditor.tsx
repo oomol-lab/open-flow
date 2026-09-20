@@ -157,13 +157,25 @@ export function ValueEditor(props: ValueEditorProps) {
   const { schema, value, onChange, label, nullable, disabled, path, onDraftIssue, depth = 0 } = props
   const t = useTranslate()
   const id = useId()
+  const source = objectValue(schema) ?? {}
+  const definitionOnly = props.definitionOnly === true
+  const valueEditable = props.valueEditable !== false && !definitionOnly
+  const readOnlyDefinition = definitionOnly && disabled
+  const presence = value === undefined ? 'unset' : value === null ? 'null' : 'value'
+  const type = valueType(schema, value)
+  const canAddObjectField = props.onDefinitionChange != null || source.additionalProperties !== false
+  const showAddObjectField = canAddObjectField && !disabled
+  const arrayUsesChoices = source.uniqueItems === true && Array.isArray(objectValue(source.items)?.enum)
+  const emptyCollectionType =
+    type === 'object' ? (showAddObjectField ? 'object' : undefined) : type === 'array' && !arrayUsesChoices && !disabled ? 'array' : undefined
+  const hasEmptyCollectionBranch = props.editor === undefined && !definitionOnly && valueEditable && presence !== 'value' && emptyCollectionType != null
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const [raw, setRaw] = useState(false)
   const focusCreatedValue = useRef(false)
   const hasImmediateError = props.invalid === true || props.validationError != null
-  const [expanded, setExpandedState] = useState(hasImmediateError)
+  const [expanded, setExpandedState] = useState(hasImmediateError || hasEmptyCollectionBranch)
   const [bodyMounted, setBodyMounted] = useState(hasImmediateError)
-  const defaultExpansionPending = useRef(!hasImmediateError)
+  const defaultExpansionPending = useRef(!hasImmediateError && !hasEmptyCollectionBranch)
   const setExpanded = (next: boolean) => {
     setExpandedState(next)
     // Keep drafts and editor history alive after the first expansion.
@@ -171,21 +183,15 @@ export function ValueEditor(props: ValueEditorProps) {
   }
   const [editorFocusRequest, setEditorFocusRequest] = useState(0)
   const [optionsOpen, setOptionsOpen] = useState(false)
-  const source = objectValue(schema) ?? {}
-  const definitionOnly = props.definitionOnly === true
-  const valueEditable = props.valueEditable !== false && !definitionOnly
-  const readOnlyDefinition = definitionOnly && disabled
   const allowsNull =
     nullable === true ||
     source.type === 'null' ||
     (Array.isArray(source.type) && source.type.includes('null')) ||
     (Array.isArray(source.enum) && source.enum.includes(null))
-  const presence = value === undefined ? 'unset' : value === null ? 'null' : 'value'
   // Definition-only rows describe output schemas; they do not own a runtime value
   // and must not surface a required-value error or expand themselves as invalid.
   const missing = !definitionOnly && presence === 'unset' && !allowsNull
   const invalidNull = presence === 'null' && !allowsNull
-  const type = valueType(schema, value)
   const language = useVal(useI18n(true)?.lang$ ?? 'en')
   const [draftInvalid, setDraftInvalid] = useState(false)
   const draftCallback = useRef(onDraftIssue)
@@ -199,7 +205,16 @@ export function ValueEditor(props: ValueEditorProps) {
   const enumeration = Array.isArray(source.enum) ? source.enum : Object.hasOwn(source, 'const') ? [source.const] : undefined
   const component = editorComponent(schema)
   const compactCollection = compactValue && props.header == null && (component === 'object' || component === 'array')
-  const complex = component === 'json' || compactCollection || depth > 12
+  const inferredObjectChild =
+    props.objectChild === true &&
+    source.type == null &&
+    source.enum == null &&
+    source.const === undefined &&
+    !Object.hasOwn(source, 'oneOf') &&
+    !Object.hasOwn(source, 'anyOf') &&
+    !Object.hasOwn(source, 'allOf') &&
+    !Object.hasOwn(source, '$ref')
+  const complex = (component === 'json' && !inferredObjectChild) || compactCollection || depth > 12
   const choiceOptions = Array.isArray(source.enum)
     ? source.enum
     : source.uniqueItems === true && Array.isArray(objectValue(source.items)?.enum)
@@ -276,8 +291,6 @@ export function ValueEditor(props: ValueEditorProps) {
     ? source['ui:order'].filter((name): name is string => typeof name === 'string' && availableNames.includes(name))
     : []
   const names = [...new Set([...savedOrder, ...availableNames])]
-  const canAddObjectField = props.onDefinitionChange != null || source.additionalProperties !== false
-  const showAddObjectField = canAddObjectField && !disabled
   const addObjectField = (after?: string) => {
     let name = 'field'
     let index = 1
@@ -292,14 +305,54 @@ export function ValueEditor(props: ValueEditorProps) {
       onChange(Object.fromEntries(order.filter((key) => Object.hasOwn(next, key)).map((key) => [key, next[key]])))
     }
   }
+  const emptyObjectControl = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="field"
+      className={`bg-foreground/5 hover:bg-foreground/10 dark:hover:bg-foreground/10 ${styles.emptyObjectContent} ${canAddObjectField ? '' : styles.emptyObjectConstraint}`}
+      disabled={disabled || !canAddObjectField}
+      aria-label={`${t(showAddObjectField ? 'valueEditor.addField' : disabled ? 'valueEditor.emptyObjectReadonly' : 'valueEditor.emptyObject')} ${label}`}
+      onClick={showAddObjectField ? () => addObjectField() : undefined}
+    >
+      {showAddObjectField && <i aria-hidden="true" className="i-lucide-light:plus" />}
+      {t(showAddObjectField ? 'valueEditor.addField' : disabled ? 'valueEditor.emptyObjectReadonly' : 'valueEditor.emptyObject')}
+    </Button>
+  )
   const array = Array.isArray(value) ? value : []
+  const emptyArrayControl = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="field"
+      className={`bg-foreground/5 hover:bg-foreground/10 dark:hover:bg-foreground/10 ${styles.emptyObjectContent}`}
+      aria-label={`${t('valueEditor.addItem')} ${label}`}
+      disabled={disabled || (typeof source.maxItems === 'number' && array.length >= source.maxItems)}
+      onClick={() => onChange([initialValue(Array.isArray(source.items) ? (source.items[0] ?? source.additionalItems ?? {}) : (source.items ?? {}))])}
+    >
+      <i aria-hidden="true" className="i-lucide-light:plus" />
+      {t('valueEditor.addItem')}
+    </Button>
+  )
+  const emptyCollectionBranch = hasEmptyCollectionBranch && (
+    <div id={`${id}-empty-collection`} className={styles.emptyCollectionBranch} data-empty-collection-branch hidden={!expanded}>
+      {emptyCollectionType === 'object' ? emptyObjectControl : emptyArrayControl}
+    </div>
+  )
   const canChooseType = source.type == null || Array.isArray(source.type)
   const availableTypes = Array.isArray(source.type) ? types.filter((candidate) => (source.type as unknown[]).includes(candidate)) : types
   const structured =
-    !raw && !complex && !enumeration && (type === 'object' || (type === 'array' && !itemEnumeration)) && (props.editor === undefined || definitionOnly)
+    !raw &&
+    !complex &&
+    !enumeration &&
+    (type === 'object' || (type === 'array' && !itemEnumeration)) &&
+    (props.editor === undefined || definitionOnly) &&
+    (definitionOnly || presence === 'value')
   const expandable =
     !showUnset &&
     ((structured && (!definitionOnly || type === 'object')) || (valueEditable && (raw || complex || (type === 'string' && source['ui:widget'] === 'text'))))
+  const disclosable = expandable || hasEmptyCollectionBranch
+  const disclosureControls = hasEmptyCollectionBranch && !expandable ? `${id}-empty-collection` : `${id}-body`
   useEffect(() => {
     if (!expanded || !editorFocusRequest || disabled || raw || complex) return
     container?.querySelector<HTMLTextAreaElement>(':scope > [data-value-body] > textarea')?.focus()
@@ -347,7 +400,8 @@ export function ValueEditor(props: ValueEditorProps) {
   )
   const inlineTools = !props.hideValueTools && (props.layout === 'values' || props.layout === 'ports') && valueEditable && !disabled && !sorting
   const canClear = inlineTools && presence !== 'unset'
-  const canToggleJson = inlineTools && expanded && !complex && !enumeration && !itemEnumeration && !showUnset && (type === 'object' || type === 'array')
+  const canToggleJson =
+    inlineTools && expanded && structured && !complex && !enumeration && !itemEnumeration && !showUnset && (type === 'object' || type === 'array')
   const valueSuffix =
     !expandable && !showUnset && (enumeration || itemEnumeration || source['ui:widget'] === 'color' || isDateFormat(source.format))
       ? 26
@@ -670,20 +724,7 @@ export function ValueEditor(props: ValueEditorProps) {
             }}
           </SortableFieldList>
           <div className={styles.collectionActions} data-layout="values">
-            {names.length === 0 && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="field"
-                className={`bg-foreground/5 hover:bg-foreground/10 dark:hover:bg-foreground/10 ${styles.emptyObjectContent} ${canAddObjectField ? '' : styles.emptyObjectConstraint}`}
-                disabled={disabled || !canAddObjectField}
-                aria-label={`${t(showAddObjectField ? 'valueEditor.addField' : disabled ? 'valueEditor.emptyObjectReadonly' : 'valueEditor.emptyObject')} ${label}`}
-                onClick={showAddObjectField ? () => addObjectField() : undefined}
-              >
-                {showAddObjectField && <i aria-hidden="true" className="i-lucide-light:plus" />}
-                {t(showAddObjectField ? 'valueEditor.addField' : disabled ? 'valueEditor.emptyObjectReadonly' : 'valueEditor.emptyObject')}
-              </Button>
-            )}
+            {names.length === 0 && emptyObjectControl}
           </div>
         </div>
       ) : type === 'array' ? (
@@ -758,18 +799,7 @@ export function ValueEditor(props: ValueEditorProps) {
           </ArrayFieldList>
           {array.length === 0 && (
             <div className={styles.collectionActions} data-layout="values">
-              <Button
-                type="button"
-                variant="ghost"
-                size="field"
-                className={`bg-foreground/5 hover:bg-foreground/10 dark:hover:bg-foreground/10 ${styles.emptyObjectContent}`}
-                aria-label={`${t('valueEditor.addItem')} ${label}`}
-                disabled={disabled || (typeof source.maxItems === 'number' && array.length >= source.maxItems)}
-                onClick={() => onChange([initialValue(Array.isArray(source.items) ? (source.items[0] ?? source.additionalItems ?? {}) : (source.items ?? {}))])}
-              >
-                <i aria-hidden="true" className="i-lucide-light:plus" />
-                {t('valueEditor.addItem')}
-              </Button>
+              {emptyArrayControl}
             </div>
           )}
         </div>
@@ -891,15 +921,15 @@ export function ValueEditor(props: ValueEditorProps) {
       data-output={definitionOnly || undefined}
       data-value-addon={props.valueAddon != null || undefined}
       data-value-suffix={props.valueSuffix != null || undefined}
-      data-expanded={(expandable && expanded) || undefined}
+      data-expanded={(disclosable && expanded) || undefined}
       data-structured={(structured && !showUnset) || undefined}
-      data-branch={(expandable && !(structured && type === 'object' && names.length === 0 && !canAddObjectField)) || undefined}
+      data-branch={expandable || undefined}
     >
       {props.header != null && (
         <div className={styles.header}>
           {props.leadingControl != null && <div className={styles.leadingControl}>{props.leadingControl}</div>}
           <div className={styles.toggleControl}>
-            {expandable && !sorting && (
+            {disclosable && !sorting && (
               <Button
                 type="button"
                 size="icon-xs"
@@ -907,7 +937,8 @@ export function ValueEditor(props: ValueEditorProps) {
                 variant="disclosure"
                 aria-label={label}
                 aria-expanded={expanded}
-                aria-controls={`${id}-body`}
+                aria-invalid={(hasEmptyCollectionBranch && invalid) || undefined}
+                aria-controls={disclosureControls}
                 onClick={toggleExpanded}
               >
                 <i aria-hidden="true" className={expanded ? 'i-lucide-light:chevron-down' : 'i-lucide-light:chevron-right'} />
@@ -916,9 +947,9 @@ export function ValueEditor(props: ValueEditorProps) {
           </div>
           {typeof props.header === 'function'
             ? props.header(
-                expandable && type === 'object'
+                disclosable && type === 'object'
                   ? {
-                      controls: `${id}-body`,
+                      controls: disclosureControls,
                       expanded,
                       onToggle: toggleExpanded,
                     }
@@ -992,8 +1023,8 @@ export function ValueEditor(props: ValueEditorProps) {
         onClear={
           canClear
             ? () => {
-                onChange(undefined)
-                setExpanded(false)
+                onChange((type === 'object' || type === 'array') && allowsNull ? null : undefined)
+                setExpanded(emptyCollectionType != null)
                 setRaw(false)
                 setEditorFocusRequest(0)
               }
@@ -1038,6 +1069,7 @@ export function ValueEditor(props: ValueEditorProps) {
             ))}
         </div>
       )}
+      {emptyCollectionBranch}
       {expandable && body}
       {anchor === 'summary' && errorMessage && <div className={styles.summaryError}>{errorMessage}</div>}
     </div>
