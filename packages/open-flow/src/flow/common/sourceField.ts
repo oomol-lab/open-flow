@@ -28,7 +28,7 @@ export function sourcePort(output: PortDefinition, field: string | undefined): P
   return field === undefined ? output : sourceFields(output).find((candidate) => candidate.field === field)?.port
 }
 
-/** Brackets keep literal keys (including dots and empty strings) unambiguous. */
+/** Present a selected first-level field as a compact path from its output. */
 export function sourceOutputLabel(source: Pick<NodeSource, 'output' | 'field'>): string {
-  return source.field === undefined ? source.output : `${source.output}[${JSON.stringify(source.field)}]`
+  return source.field === undefined ? source.output : `${source.output} / ${source.field}`
 }

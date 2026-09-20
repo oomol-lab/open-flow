@@ -97,7 +97,7 @@ describe('Source object fields', () => {
     expect(sourcePort(port, 'nested')?.nullable).toBe(true)
     expect(sourcePort({ ...port, nullable: true }, '')?.nullable).toBe(true)
     expect(sourcePort(port, 'missing')).toBeUndefined()
-    expect(sourceOutputLabel(reference('a.b/~'))).toBe('payload["a.b/~"]')
+    expect(sourceOutputLabel(reference('a.b/~'))).toBe('payload / a.b/~')
     expect(sourceFields({ nullable: false, jsonSchema: { anyOf: [outputSchema] } })).toEqual([])
     expect(sourceFields({ nullable: false, jsonSchema: { type: 'array', items: outputSchema } })).toEqual([])
   })
