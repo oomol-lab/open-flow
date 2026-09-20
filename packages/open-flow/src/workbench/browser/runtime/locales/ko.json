@@ -776,6 +776,7 @@
     "title": "테스트 데이터",
     "trigger": "시작 노드",
     "selectTrigger": "시작 노드 선택",
+    "selectTriggerToTest": "테스트할 시작 노드 선택",
     "noTrigger": "실행하기 전에 시작 노드로 사용할 트리거를 추가하세요.",
     "triggerSubtitle": "트리거 · {{name}}"
   },

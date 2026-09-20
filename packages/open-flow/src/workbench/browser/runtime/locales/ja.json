@@ -776,6 +776,7 @@
     "title": "テストデータ",
     "trigger": "開始ノード",
     "selectTrigger": "開始ノードを選択",
+    "selectTriggerToTest": "テストする開始ノードを選択",
     "noTrigger": "実行する前に開始ノードとなるトリガーを追加してください。",
     "triggerSubtitle": "トリガー · {{name}}"
   },

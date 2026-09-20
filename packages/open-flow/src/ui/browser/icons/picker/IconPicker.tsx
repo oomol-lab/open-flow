@@ -1,8 +1,9 @@
 import styles from './IconPicker.module.scss'
+import type { IconifyJSON } from '@iconify/types'
 import type { UiLanguage } from '../../../../localization/common/languages.ts'
 import type { GeneralIconifyData } from '../iconifyContext.tsx'
-import type { IconifyIconProps } from '../IconifyIcon.tsx'
 
+import { getIconData, iconToSVG, replaceIDs } from '@iconify/utils'
 import { clsx } from 'clsx'
 import { AsyncFzf } from 'fzf'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -14,8 +15,8 @@ import { Button } from '../../button.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../input-group.tsx'
 import { ScrollArea } from '../../scroll-area.tsx'
 import { Tabs, TabsList, TabsTrigger } from '../../tabs.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../tooltip.tsx'
 import { useIconifyCollectionLoader, useIconifyData } from '../iconifyContext.tsx'
-import { IconifyIcon } from '../IconifyIcon.tsx'
 import en from './locales/en.json'
 import fr from './locales/fr.json'
 import ja from './locales/ja.json'
@@ -122,26 +123,45 @@ function computeRows(
 }
 
 const ICON_SIZE = 32
+const BUFFER_SIZE = ICON_SIZE * ROWS
 const ROW_STYLE = { height: ICON_SIZE }
 
-const LazyIcon = (props: IconifyIconProps) => {
-  const [show, setShow] = useState(false)
-
-  useEffect(() => {
-    const t = requestIdleCallback(() => setShow(true))
-    return () => cancelIdleCallback(t)
-  }, [])
-
-  return show ? <IconifyIcon {...props} /> : null
+interface PickerIconProps {
+  iconSet: IconifyJSON
+  name: string
+  color?: string
 }
 
-function renderRow(index: number, row: Row, collection: string, color?: string): React.ReactElement {
+const PickerIcon = ({ iconSet, name, color }: PickerIconProps) => {
+  const svg = useMemo(() => {
+    const icon = getIconData(iconSet, name)
+    if (!icon) return null
+    const result = iconToSVG(icon, { width: '1em', height: '1em' })
+    return { body: replaceIDs(result.body), viewBox: result.attributes.viewBox }
+  }, [iconSet, name])
+
+  if (!svg) return null
+
+  return (
+    <svg
+      aria-hidden="true"
+      className={clsx(styles.icon, 'text-lg')}
+      focusable="false"
+      style={{ color }}
+      viewBox={svg.viewBox}
+      // The picker only renders trusted SVG bodies from bundled Iconify collections.
+      dangerouslySetInnerHTML={{ __html: svg.body }}
+    />
+  )
+}
+
+function renderRow(index: number, row: Row, iconSet: IconifyJSON, color?: string): React.ReactElement {
   return (
     <div key={index} className={styles.row} style={ROW_STYLE}>
       {Array.isArray(row) ? (
         row.map((icon) => (
           <Button variant="ghost" size="icon-sm" aria-label={icon} data-icon={icon} title={icon} key={icon} type="button">
-            <LazyIcon collection={collection} icon={icon} color={color} className="text-lg" />
+            <PickerIcon iconSet={iconSet} name={icon} color={color} />
           </Button>
         ))
       ) : (
@@ -154,15 +174,16 @@ function renderRow(index: number, row: Row, collection: string, color?: string):
 // This can be used to handle both font awesome and emoji icons.
 const IconPickerIconsPanel = ({ filteredIcons, collection, color, categories, onClick }: IconPickerPanelProps) => {
   const iconifyData = useIconifyData(true)
+  const iconSet = iconifyData?.[collection]?.icons
 
   const [viewport, setViewport] = useState<HTMLElement | null>(null)
   const rows = useMemo(() => computeRows(iconifyData, filteredIcons, categories, collection), [iconifyData, filteredIcons, categories, collection])
 
   return (
     <ScrollArea className={styles.panel} defer={false} events={{ initialized: (instance) => setViewport(instance.elements().viewport) }} onClick={onClick}>
-      {viewport && (
-        <Virtualizer data={rows} itemSize={ICON_SIZE} scrollRef={{ current: viewport }}>
-          {(row, index) => renderRow(index, row, collection, color)}
+      {viewport && iconSet && (
+        <Virtualizer data={rows} itemSize={ICON_SIZE} bufferSize={BUFFER_SIZE} scrollRef={{ current: viewport }}>
+          {(row, index) => renderRow(index, row, iconSet, color)}
         </Virtualizer>
       )}
     </ScrollArea>
@@ -308,9 +329,12 @@ export const IconPicker = ({
             autoFocus
           />
         </InputGroup>
-        <Button variant="ghost" size="icon-xs" aria-label={t('random')} onClick={onClickShuffle} title={t('random')} type="button">
-          <i aria-hidden="true" className="i-lucide-light:shuffle text-sm" />
-        </Button>
+        <Tooltip>
+          <TooltipTrigger render={<Button variant="ghost" size="icon-xs" aria-label={t('random')} onClick={onClickShuffle} type="button" />}>
+            <i aria-hidden="true" className="i-lucide-light:shuffle text-sm" />
+          </TooltipTrigger>
+          <TooltipContent>{t('random')}</TooltipContent>
+        </Tooltip>
       </div>
       <div className={styles.tabs}>
         <Tabs
@@ -335,17 +359,14 @@ export const IconPicker = ({
           </TabsList>
         </Tabs>
         {hasColors && (
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-expanded={colorsPanel}
-            aria-label={t('color')}
-            onClick={toggleColorsPanel}
-            title={t('color')}
-            type="button"
-          >
-            <i aria-hidden="true" className="i-lucide-light:palette text-sm" style={{ color: selectedColor }} />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={<Button variant="ghost" size="icon-xs" aria-expanded={colorsPanel} aria-label={t('color')} onClick={toggleColorsPanel} type="button" />}
+            >
+              <i aria-hidden="true" className="i-lucide-light:palette text-sm" style={{ color: selectedColor }} />
+            </TooltipTrigger>
+            <TooltipContent>{t('color')}</TooltipContent>
+          </Tooltip>
         )}
         <div onClick={onClickColors} className={styles.colors} style={hasColors && colorsPanel ? {} : { display: 'none' }}>
           {COLORS.map((color) => (

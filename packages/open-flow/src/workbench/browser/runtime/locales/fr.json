@@ -776,6 +776,7 @@
     "title": "Données de test",
     "trigger": "Nœud de départ",
     "selectTrigger": "Choisir un nœud de départ",
+    "selectTriggerToTest": "Choisir un nœud de départ à tester",
     "noTrigger": "Ajoutez un déclencheur comme nœud de départ avant de lancer le flux.",
     "triggerSubtitle": "Déclencheur · {{name}}"
   },

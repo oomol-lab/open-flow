@@ -60,6 +60,7 @@ describe('RunControl', () => {
     )
 
     expect(markup).toContain('Start node')
+    expect(markup).toContain('aria-label="Select a start node to test"')
     expect(captured.items).toHaveLength(2)
 
     expect(captured.items[1]?.value).toBe('cron')

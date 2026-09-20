@@ -127,11 +127,11 @@ export function RunControl({
         </div>
         <div aria-hidden={triggers.length <= 1 || undefined} className="run-control-segment-slot" data-visible={triggers.length > 1}>
           <DropdownMenu>
-            <CanvasTooltip placement="top" title={t('runInput.selectTrigger')} getPopupContainer={() => popupContainer || document.body}>
+            <CanvasTooltip placement="top" title={t('runInput.selectTriggerToTest')} getPopupContainer={() => popupContainer || document.body}>
               <DropdownMenuTrigger
                 render={
                   <Button
-                    aria-label={t('runInput.selectTrigger')}
+                    aria-label={t('runInput.selectTriggerToTest')}
                     className="run-control-segment"
                     disabled={disabled || starting || triggers.length <= 1}
                     size="icon"

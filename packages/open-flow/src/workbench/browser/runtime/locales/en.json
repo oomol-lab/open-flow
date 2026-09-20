@@ -776,6 +776,7 @@
     "title": "Test data",
     "trigger": "Start node",
     "selectTrigger": "Select a start node",
+    "selectTriggerToTest": "Select a start node to test",
     "noTrigger": "Add a trigger as a start node before running.",
     "triggerSubtitle": "Trigger · {{name}}"
   },

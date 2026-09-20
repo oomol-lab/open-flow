@@ -776,6 +776,7 @@
     "title": "测试数据",
     "trigger": "起始节点",
     "selectTrigger": "选择起始节点",
+    "selectTriggerToTest": "选择起始节点进行测试",
     "noTrigger": "请先添加一个触发器作为起始节点。",
     "triggerSubtitle": "触发器 · {{name}}"
   },

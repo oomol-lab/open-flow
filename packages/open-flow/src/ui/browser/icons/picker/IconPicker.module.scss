@@ -24,7 +24,7 @@
   align-items: center;
   position: relative;
   flex-shrink: 0;
-  gap: 4px;
+  gap: 8px;
   padding: 0 12px 8px;
 }
 
@@ -78,6 +78,13 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.icon {
+  display: block;
+  flex: none;
+  width: 1em;
+  height: 1em;
 }
 
 .subtitle {
