@@ -1,5 +1,7 @@
 {
   "addNode": {
+    "agent": "AI Agent",
+    "agentDescription": "実行したいタスクを説明してください。AI Agent はノードの入力と追加したツールを使ってタスクを完了します。",
     "blocks": "ノード",
     "codeTaskName": "コードタスク {{number}}",
     "comment": "コメント",
@@ -15,8 +17,8 @@
     "connectorActions": "Connector アクション",
     "connectorBrowseActions": "展開してアクションを参照します。",
     "connectorNeedsConnection": "{{description}} このノードを追加した後に {{service}} を接続してください。",
-    "javascript": "JavaScript",
-    "javascriptDescription": "このノード用の JavaScript スクリプトレットを作成します。",
+    "javascript": "JavaScript スクリプト",
+    "javascriptDescription": "このノードで JavaScript コードを実行します。",
     "llmChat": "LLM チャット",
     "llmChatDescription": "メッセージとプロンプトテンプレートからテキストの応答を生成します。",
     "llmStructured": "LLM JSON",

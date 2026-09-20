@@ -1,5 +1,7 @@
 {
   "addNode": {
+    "agent": "AI Agent",
+    "agentDescription": "描述要完成的任务。AI Agent 会使用节点输入和你添加的工具来完成。",
     "blocks": "节点",
     "codeTaskName": "代码任务 {{number}}",
     "comment": "注释",
@@ -15,8 +17,8 @@
     "connectorActions": "连接器操作",
     "connectorBrowseActions": "展开浏览操作。",
     "connectorNeedsConnection": "{{description}} 添加此节点后连接 {{service}}。",
-    "javascript": "JavaScript",
-    "javascriptDescription": "为此节点创建 JavaScript scriptlet。",
+    "javascript": "JavaScript 脚本",
+    "javascriptDescription": "在此节点中运行 JavaScript 代码。",
     "llmChat": "LLM 对话",
     "llmChatDescription": "根据消息和提示词模板生成文本回复。",
     "llmStructured": "LLM JSON",

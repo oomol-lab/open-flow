@@ -523,6 +523,7 @@ export function ConditionBranchesEditor({
                     }}
                   >
                     <PopoverPanelContent
+                      sectionTitle={t('conditionEditor.cases')}
                       title={t('conditionEditor.caseSettings')}
                       closeLabel={t('common.close')}
                       container={menuContainer?.closest<HTMLElement>('.editor-context-panel') ?? menuContainer}

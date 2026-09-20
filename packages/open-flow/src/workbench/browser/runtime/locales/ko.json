@@ -1,5 +1,7 @@
 {
   "addNode": {
+    "agent": "AI Agent",
+    "agentDescription": "완료하려는 작업을 설명하세요. AI Agent가 노드 입력과 추가한 도구를 사용해 작업을 수행합니다.",
     "blocks": "블록",
     "codeTaskName": "코드 태스크 {{number}}",
     "comment": "주석",
@@ -15,8 +17,8 @@
     "connectorActions": "Connector 액션",
     "connectorBrowseActions": "펼쳐서 액션을 살펴보세요.",
     "connectorNeedsConnection": "{{description}} 이 블록을 추가한 뒤 {{service}}에 연결하세요.",
-    "javascript": "JavaScript",
-    "javascriptDescription": "이 노드에 사용할 JavaScript 스크립틀릿을 만듭니다.",
+    "javascript": "JavaScript 스크립트",
+    "javascriptDescription": "이 노드에서 JavaScript 코드를 실행합니다.",
     "llmChat": "LLM 대화",
     "llmChatDescription": "메시지와 프롬프트 템플릿으로 텍스트 응답을 생성합니다.",
     "llmStructured": "LLM JSON",

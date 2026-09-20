@@ -78,15 +78,21 @@ export { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitl
 /** Additional property controls, anchored beside their owning field. */
 function PopoverPanelContent({
   title,
+  sectionTitle,
   closeLabel,
   footer,
   children,
   ...props
-}: Omit<React.ComponentProps<typeof PopoverContent>, 'title'> & { title: string; closeLabel: string; footer?: React.ReactNode }) {
+}: Omit<React.ComponentProps<typeof PopoverContent>, 'title'> & {
+  title: React.ReactNode
+  sectionTitle?: React.ReactNode
+  closeLabel: string
+  footer?: React.ReactNode
+}) {
   return (
     <PopoverContent
       collisionBoundary={[]}
-      collisionAvoidance={{ side: 'flip', align: 'none', fallbackAxisSide: 'none' }}
+      collisionAvoidance={{ side: 'flip', align: 'shift', fallbackAxisSide: 'none' }}
       positionMethod="fixed"
       side="left"
       align="start"
@@ -98,7 +104,15 @@ function PopoverPanelContent({
       )}
     >
       <div className="flex h-10 shrink-0 items-center gap-2 px-3">
-        <PopoverTitle className="min-w-0 flex-1 truncate text-sm">{title}</PopoverTitle>
+        <PopoverTitle className="min-w-0 flex-1 truncate text-sm">
+          <span>{title}</span>
+          {sectionTitle != null && (
+            <>
+              <span className="px-1 text-muted-foreground">·</span>
+              <span className="text-muted-foreground">{sectionTitle}</span>
+            </>
+          )}
+        </PopoverTitle>
         <PopoverPrimitive.Close render={<Button type="button" variant="ghost" size="icon-sm" aria-label={closeLabel} />}>
           <i aria-hidden="true" className="i-lucide-light:x text-base" />
         </PopoverPrimitive.Close>

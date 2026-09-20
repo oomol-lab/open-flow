@@ -273,7 +273,7 @@ export function GroupSettingsPanel({
   group: Group
   onChange: (group: Group) => void
   onRemove: () => void
-} & Pick<ComponentProps<typeof PopoverPanelContent>, 'anchor' | 'container' | 'side' | 'positionMethod'>) {
+} & Pick<ComponentProps<typeof PopoverPanelContent>, 'anchor' | 'container' | 'side' | 'positionMethod' | 'sectionTitle'>) {
   const t = useTranslate()
   const id = useId()
   return (
@@ -301,7 +301,7 @@ export function PortSettingsPanel({
   showNullable,
   ...props
 }: ComponentProps<typeof PortSettingsFields> &
-  Pick<ComponentProps<typeof PopoverPanelContent>, 'anchor' | 'container' | 'side' | 'positionMethod'> & { onRemove: () => void }) {
+  Pick<ComponentProps<typeof PopoverPanelContent>, 'anchor' | 'container' | 'side' | 'positionMethod' | 'sectionTitle'> & { onRemove: () => void }) {
   const t = useTranslate()
   return (
     <PopoverPanelContent
@@ -603,6 +603,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           }}
         >
           <PortSettingsPanel
+            sectionTitle={title}
             showNullable={!tableLayout}
             container={list.current?.closest<HTMLElement>('.editor-context-panel') ?? list.current}
             anchor={() => fieldPanelAnchor(list.current?.querySelector(`[data-port-index="${index}"]`))}
@@ -790,6 +791,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
                       }}
                     >
                       <GroupSettingsPanel
+                        sectionTitle={title}
                         container={list.current?.closest<HTMLElement>('.editor-context-panel') ?? list.current}
                         anchor={() => fieldPanelAnchor(list.current?.querySelector(`[data-group-index="${section.index}"] > details > summary`))}
                         group={section.group}

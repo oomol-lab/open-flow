@@ -1,5 +1,7 @@
 {
   "addNode": {
+    "agent": "AI Agent",
+    "agentDescription": "Describe the task. The AI Agent can use node inputs and the tools you add to complete it.",
     "blocks": "Blocks",
     "codeTaskName": "Code task {{number}}",
     "comment": "Comment",
@@ -16,7 +18,7 @@
     "connectorBrowseActions": "Expand to browse actions.",
     "connectorNeedsConnection": "{{description}} Connect {{service}} after adding this block.",
     "javascript": "JavaScript",
-    "javascriptDescription": "Create a JavaScript scriptlet for this node.",
+    "javascriptDescription": "Run JavaScript code in this node.",
     "llmChat": "LLM Chat",
     "llmChatDescription": "Generate a text response from messages and a prompt template.",
     "llmStructured": "LLM JSON",

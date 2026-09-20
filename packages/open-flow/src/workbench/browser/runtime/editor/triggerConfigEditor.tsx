@@ -34,7 +34,13 @@ function ConfigFieldSettings({
 }) {
   const t = useTranslate()
   return (
-    <PopoverPanelContent anchor={anchor} container={container} title={t('valueEditor.fieldSettings')} closeLabel={t('common.close')}>
+    <PopoverPanelContent
+      anchor={anchor}
+      container={container}
+      sectionTitle={t('triggerConfig.configuration')}
+      title={t('valueEditor.fieldSettings')}
+      closeLabel={t('common.close')}
+    >
       <Field className="gap-1.5">
         <FieldLabel className="text-xs font-normal text-muted-foreground">{t('valueEditor.fieldName')}</FieldLabel>
         <Input controlSize="field" value={name} readOnly />

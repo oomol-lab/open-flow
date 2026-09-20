@@ -1,5 +1,7 @@
 {
   "addNode": {
+    "agent": "AI Agent",
+    "agentDescription": "Décrivez la tâche à accomplir. L’AI Agent utilisera les entrées du nœud et les outils ajoutés pour la réaliser.",
     "blocks": "Blocs",
     "codeTaskName": "Tâche de code {{number}}",
     "comment": "Commentaire",
@@ -15,8 +17,8 @@
     "connectorActions": "Actions Connector",
     "connectorBrowseActions": "Déplier pour parcourir les actions.",
     "connectorNeedsConnection": "{{description}} Connectez {{service}} après avoir ajouté ce bloc.",
-    "javascript": "JavaScript",
-    "javascriptDescription": "Créer un mini-script JavaScript pour ce nœud.",
+    "javascript": "Script JavaScript",
+    "javascriptDescription": "Exécuter du code JavaScript dans ce nœud.",
     "llmChat": "Conversation LLM",
     "llmChatDescription": "Générer une réponse texte à partir de messages et d'un modèle de prompt.",
     "llmStructured": "LLM JSON",

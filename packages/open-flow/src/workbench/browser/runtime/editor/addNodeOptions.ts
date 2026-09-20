@@ -89,44 +89,14 @@ function builtinOptions(t: TFunction): readonly AddNodeOption[] {
       outputs: [{ handle: 'result', jsonSchema: {} }],
     },
     {
-      description: t('agent.intro'),
+      description: t('addNode.agentDescription'),
       group,
       id: 'agent',
       icon: ':carbon:machine-learning-model:',
       inputs: [{ handle: 'input', jsonSchema: { type: 'string' } }],
       outputs: [{ handle: 'output', jsonSchema: { type: 'string' } }],
       kind: 'agent',
-      label: 'Agent',
-    },
-    {
-      description: t('addNode.llmChatDescription'),
-      group,
-      id: 'llm:chat',
-      icon: ':carbon:machine-learning-model:',
-      inputs: [
-        { handle: 'messages', jsonSchema: { type: 'array' } },
-        { handle: 'input', jsonSchema: { type: 'string' } },
-        { handle: 'template', jsonSchema: { type: 'array' } },
-        { handle: 'model', jsonSchema: { type: 'object' } },
-      ],
-      kind: 'llm',
-      label: t('addNode.llmChat'),
-      outputs: [{ handle: 'output', jsonSchema: { type: 'string' } }],
-    },
-    {
-      description: t('addNode.llmStructuredDescription'),
-      group,
-      id: 'llm:json',
-      icon: ':carbon:machine-learning-model:',
-      inputs: [
-        { handle: 'messages', jsonSchema: { type: 'array' } },
-        { handle: 'input', jsonSchema: { type: 'string' } },
-        { handle: 'template', jsonSchema: { type: 'array' } },
-        { handle: 'model', jsonSchema: { type: 'object' } },
-      ],
-      kind: 'llm',
-      label: t('addNode.llmStructured'),
-      outputs: [{ handle: 'output', jsonSchema: {} }],
+      label: t('addNode.agent'),
     },
     {
       description: t('addNode.valueDescription'),
@@ -203,6 +173,7 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
       outputs: triggerOutputDefinitions({ kind: 'cron', name: 'Cron', cronTimes: [] }),
       trigger: { kind: 'cron' },
     },
+    ...options,
     {
       description: t('addNode.approvalDescription'),
       group: t('addNode.blocks'),
@@ -226,7 +197,6 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
       label: t('addNode.wait'),
       outputs: [{ handle: 'continue', jsonSchema: {} }],
     },
-    ...options,
   ]
   return Object.values(revisionView(draft).graph(target)?.nodes ?? {}).some((node) => node.kind == 'manual')
     ? triggers.filter((option) => option.id != 'trigger:manual')
@@ -242,7 +212,7 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, tar
       return { kind: 'code', name }
     }
     case 'agent':
-      return target.kind == 'flow' ? { kind: 'agent', name: 'Agent' } : undefined
+      return target.kind == 'flow' ? { kind: 'agent', name: t('addNode.agent') } : undefined
     case 'llm': {
       const mode = option.id == 'llm:json' ? 'json' : 'chat'
       return {

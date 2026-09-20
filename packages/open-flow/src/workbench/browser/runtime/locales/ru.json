@@ -1,5 +1,7 @@
 {
   "addNode": {
+    "agent": "AI Agent",
+    "agentDescription": "Опишите задачу. AI Agent выполнит её, используя входные данные узла и добавленные вами инструменты.",
     "blocks": "Узлы",
     "codeTaskName": "Задача с кодом {{number}}",
     "comment": "Комментарий",
@@ -15,8 +17,8 @@
     "connectorActions": "Действия Connector",
     "connectorBrowseActions": "Разверните, чтобы посмотреть действия.",
     "connectorNeedsConnection": "{{description}} Подключите {{service}} после добавления этого узла.",
-    "javascript": "JavaScript",
-    "javascriptDescription": "Создать JavaScript-скриптлет для этого узла.",
+    "javascript": "Скрипт JavaScript",
+    "javascriptDescription": "Выполнить код JavaScript в этом узле.",
     "llmChat": "Чат LLM",
     "llmChatDescription": "Генерировать текстовый ответ по сообщениям и шаблону промпта.",
     "llmStructured": "LLM JSON",
