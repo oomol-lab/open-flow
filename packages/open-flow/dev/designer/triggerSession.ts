@@ -119,6 +119,7 @@ export function createTriggerSession(
         version: 1,
       })
     if (url.pathname.includes('/options/')) {
+      if (nodeId.endsWith('-empty-options')) return Response.json({ options: [], version: 1 })
       const failed =
         trigger.kind == 'poll' &&
         trigger.definition.provider == 'linear' &&

@@ -6,7 +6,6 @@ import type { DraftRun, TriggerBinding } from '../../src/workbench/browser/runti
 import type { FrontendStory, LogAction } from './stories.tsx'
 import type { TriggerFixture } from './triggerFixtures.ts'
 
-import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
@@ -366,6 +365,7 @@ function RunStory(props: StoryProps) {
 }
 
 type SidebarState =
+  | 'empty-options'
   | 'missing-status'
   | 'options-error'
   | 'created-with-default'
@@ -395,9 +395,10 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
     }
     if (trigger.kind === 'poll' && trigger.definition.provider === 'linear') {
       if (state === 'missing-status')
-        trigger = { ...trigger, config: inputValues({ ...trigger.config, stateIds: { kind: 'value', value: ['00000000-0000-4000-8000-000000000098'] } }) }
+        trigger = { ...trigger, config: { ...trigger.config, stateIds: { kind: 'value', value: ['00000000-0000-4000-8000-000000000098'] } } }
       if (state === 'options-error')
-        trigger = { ...trigger, config: inputValues({ ...trigger.config, teamId: { kind: 'value', value: '00000000-0000-4000-8000-000000000099' } }) }
+        trigger = { ...trigger, config: { ...trigger.config, teamId: { kind: 'value', value: '00000000-0000-4000-8000-000000000099' } } }
+      if (state === 'empty-options') trigger = { ...trigger, config: {} }
     }
     const next = createTriggerSession(
       trigger,
@@ -481,7 +482,7 @@ function SidebarStory(props: StoryProps) {
           ? (['no-event-sources'] as const)
           : []),
         ...(props.fixture.trigger.kind === 'poll' && props.fixture.trigger.definition.provider === 'linear'
-          ? (['missing-status', 'options-error'] as const)
+          ? (['empty-options', 'missing-status', 'options-error'] as const)
           : []),
       ]
     : ['display', 'edit', props.fixture.trigger.kind === 'manual' ? 'description' : 'unconfigured']

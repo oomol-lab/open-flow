@@ -1025,10 +1025,10 @@
   "linearTrigger": {
     "team": "Team",
     "selectTeam": "选择 Team",
-    "connectFirst": "请先选择连接。",
     "loading": "加载中…",
     "noTeams": "没有可访问的 Team。",
     "missingTeam": "已选 Team 不再可用，请重新选择。",
+    "unavailableTeam": "不可用的 Team（{{id}}）",
     "loadFailed": "无法加载选项。",
     "retry": "重试",
     "statuses": "Issue 状态",

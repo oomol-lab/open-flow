@@ -1025,10 +1025,10 @@
   "linearTrigger": {
     "team": "Team",
     "selectTeam": "Select a Team",
-    "connectFirst": "Select a Connection first.",
     "loading": "Loading…",
     "noTeams": "No accessible Teams.",
     "missingTeam": "The selected Team is no longer available. Choose another Team.",
+    "unavailableTeam": "Unavailable Team ({{id}})",
     "loadFailed": "Could not load options.",
     "retry": "Retry",
     "statuses": "Issue statuses",
