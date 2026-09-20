@@ -106,6 +106,8 @@ collections, definitions, and field, node, or group settings. Also read the
   rules. Do not retain the older 22px borderless gray control style alongside the value table.
 - Node settings keep the standard section-title typography and use a disclosure control whose
   contents start collapsed whenever the panel opens for a node.
+- Cron and Poll schedule controls share the fixed Trigger schedule section title. They do not use
+  the Node settings title or vary the section title with the trigger or schedule type.
 - LLM task definition is an always-visible standard section immediately below Outputs and before
   Node settings.
 - Value Node does not show timeout settings or a Node settings section.

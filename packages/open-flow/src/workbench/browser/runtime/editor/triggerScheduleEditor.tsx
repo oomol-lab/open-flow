@@ -203,7 +203,7 @@ export function TriggerScheduleEditor({
       <summary>
         <Icon name="chevron-down" size={14} />
         <span className="inspector-disclosure-summary">
-          <strong className="inspector-section-title-text">{t('inspector.node.title')}</strong>
+          <strong className="inspector-section-title-text">{t('triggerSchedule.title')}</strong>
         </span>
       </summary>
       <div className="inspector-disclosure-content node-settings">

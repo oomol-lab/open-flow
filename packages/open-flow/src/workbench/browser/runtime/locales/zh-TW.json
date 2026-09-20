@@ -888,6 +888,7 @@
     "search": "搜尋應用程式或動作…"
   },
   "triggerSchedule": {
+    "title": "觸發排程",
     "scheduleType": "排程類型",
     "scheduleEvery": "每隔",
     "scheduleCron": "Cron",

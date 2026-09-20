@@ -5,7 +5,7 @@ import { createI18n } from '../i18n.ts'
 import { TriggerScheduleEditor } from './triggerScheduleEditor.tsx'
 
 describe('Trigger schedule editor', () => {
-  it('starts the Node settings section collapsed', () => {
+  it('renders a fixed Trigger schedule section title and starts collapsed', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <TriggerScheduleEditor schedules={[{ type: 'every', unit: 'minute', value: 5 }]} disabled={false} onChange={() => {}} />
@@ -15,6 +15,6 @@ describe('Trigger schedule editor', () => {
     expect(markup).toContain('<details class="inspector-disclosure"')
     expect(markup).not.toContain('inspector-section-divider')
     expect(markup).not.toMatch(/<details[^>]*\sopen(?:=""|(?=[\s>]))/)
-    expect(markup).toContain('<strong class="inspector-section-title-text">Node settings</strong>')
+    expect(markup).toContain('<strong class="inspector-section-title-text">Trigger schedule</strong>')
   })
 })

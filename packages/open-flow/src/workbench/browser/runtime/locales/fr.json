@@ -888,6 +888,7 @@
     "search": "Rechercher une application ou une action…"
   },
   "triggerSchedule": {
+    "title": "Planification du déclencheur",
     "scheduleType": "Type de planification",
     "scheduleEvery": "Fréquence",
     "scheduleCron": "Cron",

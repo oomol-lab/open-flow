@@ -888,6 +888,7 @@
     "search": "Поиск приложений и действий…"
   },
   "triggerSchedule": {
+    "title": "Расписание триггера",
     "scheduleType": "Тип расписания",
     "scheduleEvery": "Каждые",
     "scheduleCron": "Cron",

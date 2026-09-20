@@ -888,6 +888,7 @@
     "search": "앱 또는 작업 검색…"
   },
   "triggerSchedule": {
+    "title": "트리거 일정",
     "scheduleType": "일정 유형",
     "scheduleEvery": "주기",
     "scheduleCron": "Cron",

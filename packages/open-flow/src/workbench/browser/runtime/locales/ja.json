@@ -888,6 +888,7 @@
     "search": "アプリやアクションを検索…"
   },
   "triggerSchedule": {
+    "title": "トリガースケジュール",
     "scheduleType": "スケジュール種別",
     "scheduleEvery": "間隔",
     "scheduleCron": "Cron",
