@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { isJsonObject } from '../../base/common/json.ts'
 import { TriggerDefinitionSchema, TriggerPollTimeSchema } from '../../schema/index.ts'
 import { isBuiltInTriggerType } from './builtins.ts'
-import { configInputsSchema } from './config.ts'
+import { configInputsSchema } from './configSchema.ts'
 import { computeTriggerDefinitionDigest, validateTriggerDefinitionSchemas } from './definition.ts'
 
 export interface TriggerCatalogIdentity {
