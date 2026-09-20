@@ -9,7 +9,7 @@ import { Input } from '../../ui/browser/input.tsx'
 import { valueForEditor } from '../common/editorComponent.ts'
 import { fieldValueState, setArrayItem } from '../common/fieldValue.ts'
 import { objectFieldNames, renameFieldDefinition, removeFieldDefinition } from '../common/objectFields.ts'
-import { initialValue, objectValue, renameObjectField, setObjectField, valueType } from '../common/value.ts'
+import { initialValue, jsonDataTypes, objectValue, renameObjectField, setObjectField, valueType } from '../common/value.ts'
 import { ArrayFieldList } from './arrayFieldList.tsx'
 import { collectionCreateAction, objectFieldAdder } from './collectionActions.ts'
 import { editorComponentIcons } from './editorComponentIcon.tsx'
@@ -19,7 +19,6 @@ import { FieldSelect } from './fieldSelect.tsx'
 import { FieldValueEditor } from './fieldValueEditor.tsx'
 import { PropertyName } from './propertyName.tsx'
 import { SortableFieldList } from './sortableFieldList.tsx'
-const types: readonly ValueType[] = ['string', 'number', 'boolean', 'object', 'array', 'null']
 type CollectionProps = FieldValueEditorProps & { empty?: boolean }
 function childFields(props: FieldValueEditorProps) {
   const { label, disabled, path, onDraftIssue, depth = 0, valueEditable } = props
@@ -176,7 +175,7 @@ export function ObjectValueFields(props: CollectionProps) {
                             onChange(setObjectField(value, name, initialValue(fieldSchema, next as ValueType)))
                           }}
                         >
-                          {[...types, 'integer' as const]
+                          {[...jsonDataTypes, 'integer' as const]
                             .filter((candidate) => !Array.isArray(fieldSource.type) || (fieldSource.type as unknown[]).includes(candidate))
                             .map((candidate) => (
                               <option key={candidate} value={candidate}>

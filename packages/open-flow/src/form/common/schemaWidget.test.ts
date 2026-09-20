@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { getDefaultValue, typeOfSchema } from './schemaWidget.ts'
+import { getDefaultValue, isUnconstrainedSchema, typeOfSchema } from './schemaWidget.ts'
 
 afterEach(() => vi.useRealTimers())
 
@@ -41,5 +41,36 @@ describe('widget value creation', () => {
     expect(getDefaultValue('date', { format: 'time' })).toMatch(/^15:04:05[+-]\d{2}:\d{2}$/)
     expect(getDefaultValue('date')).toMatch(/^2026-09-09T15:04:05[+-]\d{2}:\d{2}$/)
     expect(typeOfSchema({ type: 'string', format: 'date-time' })).toBe('date')
+  })
+})
+
+describe('unconstrained schema detection', () => {
+  it.each([
+    true,
+    {},
+    { title: 'Payload', description: 'Any JSON value.', default: { enabled: true } },
+    { '$defs': { item: { type: 'string' } }, 'ui:placeholder': 'Choose a value' },
+    { 'ui:widget': 'any' },
+    { 'ui:widget': '', 'ui:custom': true },
+  ])('recognizes a canonical Any schema: %j', (schema) => {
+    expect(isUnconstrainedSchema(schema)).toBe(true)
+  })
+
+  it.each([
+    false,
+    null,
+    [],
+    { type: 'string' },
+    { minLength: 1 },
+    { anyOf: [] },
+    { allOf: [] },
+    { oneOf: [] },
+    { not: false },
+    { $ref: '#/$defs/item' },
+    { contentMediaType: 'oomol/bin' },
+    { 'ui:widget': 'text' },
+    { 'ui:widget': 'color' },
+  ])('does not broaden a constrained or explicitly presented schema: %j', (schema) => {
+    expect(isUnconstrainedSchema(schema)).toBe(false)
   })
 })

@@ -9,6 +9,68 @@ import { NodeInputValue } from './nodeInputValue.tsx'
 const variables = { enabled: true, names: ['API_TOKEN'], loaded: true, loading: false, onOpen: vi.fn() }
 
 describe('Independent node inputs', () => {
+  it('orders an editable Any literal as source, value, then data type', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <NodeInputValue
+          definition={{ handle: 'payload', jsonSchema: {}, nullable: false }}
+          value={42}
+          connected={false}
+          variables={variables}
+          disabled={false}
+          onValue={vi.fn()}
+          onVariable={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    const sourceControl = markup.indexOf('aria-label="payload Select input source"')
+    const valueControl = markup.match(/<input[^>]*aria-label="payload"/)?.index ?? -1
+    const typeControl = markup.indexOf('aria-label="payload, data type: Number"')
+    expect(sourceControl).toBeGreaterThan(-1)
+    expect(valueControl).toBeGreaterThan(sourceControl)
+    expect(typeControl).toBeGreaterThan(valueControl)
+  })
+
+  it.each([
+    { state: 'variable', variableName: 'API_TOKEN', connected: false },
+    { state: 'upstream', variableName: undefined, connected: true },
+  ])('hides the Any data type for a bound $state source', ({ variableName, connected }) => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <NodeInputValue
+          definition={{ handle: 'payload', jsonSchema: {}, nullable: false }}
+          value={undefined}
+          variableName={variableName}
+          connected={connected}
+          variables={variables}
+          disabled={false}
+          onValue={vi.fn()}
+          onVariable={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('aria-label="payload Select input source"')
+    expect(markup).not.toContain('data type')
+  })
+
+  it('keeps an explicit widget without adding an Any data type', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <NodeInputValue
+          definition={{ handle: 'payload', jsonSchema: { 'ui:widget': 'text' }, nullable: false }}
+          value="hello"
+          connected={false}
+          variables={variables}
+          disabled={false}
+          onValue={vi.fn()}
+          onVariable={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('aria-label="payload Set value"')
+    expect(markup).not.toContain('data type')
+  })
+
   it('keeps a standalone array source on its collapsed preview, including enum item schemas', () => {
     const onValue = vi.fn()
     const markup = renderToStaticMarkup(

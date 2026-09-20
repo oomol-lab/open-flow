@@ -45,8 +45,35 @@ const widgets = new Set<WidgetType>([
   'literal',
   'null',
 ])
+const unconstrainedAnnotations = new Set([
+  '$anchor',
+  '$comment',
+  '$defs',
+  '$dynamicAnchor',
+  '$id',
+  '$schema',
+  '$vocabulary',
+  'default',
+  'definitions',
+  'deprecated',
+  'description',
+  'examples',
+  'readOnly',
+  'title',
+  'writeOnly',
+])
 export function isWidgetType(value: unknown): value is WidgetType {
   return typeof value == 'string' && widgets.has(value as WidgetType)
+}
+
+/** Canonical unconstrained schemas may carry annotations and UI metadata, but no assertions or applicators. */
+export function isUnconstrainedSchema(source: unknown): boolean {
+  if (source === true) return true
+  const schema = objectValue(source)
+  if (!schema) return false
+  const widget = schema[ui_widget]
+  if (isWidgetType(widget) && widget !== 'any') return false
+  return Object.keys(schema).every((key) => key.startsWith('ui:') || unconstrainedAnnotations.has(key))
 }
 
 /** Widget inference is independent of canvas rendering and schema-editor icon choices. */

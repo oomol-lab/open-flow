@@ -33,6 +33,18 @@ collections, definitions, and field, node, or group settings. Also read the
   Read-only and populated summaries remain disclosures. The leading arrow toggles expansion.
 - Opening a panel or inspecting an unset field must not silently create a value. Value creation and
   type changes use the existing shared rules rather than local guesses about defaults.
+- A canonical unconstrained Schema (`true`, an empty object, or an object containing only standard
+  annotations and `ui:*` metadata) remains Any while its editor follows the current runtime value.
+  `ui:widget: "any"` explicitly selects this behavior; another recognized widget, an assertion,
+  applicator, reference, or `false` does not. Do not normalize logically equivalent forms such as
+  `allOf: []` or `not: false` into Any. The data-type selector offers String, Number, Boolean, Object,
+  Array, and Null. Unset displays Any; selecting Any preserves the value and opens the generic JSON
+  editor. A concrete choice creates an initial value when unset. Compatible values survive a type
+  choice; incompatible values use the shared reset rule. Concrete type changes never mutate Schema,
+  and they close raw JSON mode and collapse collection previews.
+- Any Object and Array values use the structured collection editors and retain their JSON-mode
+  action. Empty top-level collections follow the normal collapsed-empty rule, including automatic
+  expansion for an initial validation error. Explicit recognized widgets retain their own editor.
 - Deleting an upstream node or output preserves saved source references. Show the missing node or
   output as invalid until the user explicitly selects another source or switches to a fixed value.
   A deleted node uses the neutral source icon and its saved output name; never expose its internal

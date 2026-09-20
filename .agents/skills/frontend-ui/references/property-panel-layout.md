@@ -88,6 +88,13 @@ the [property panel entry](property-panel.md) for shared scope.
   editable literal and bound values. Read-only inputs omit the source addon and its reserved space,
   matching Value Node; existing source labels remain visible. The source action stays neutral when the value is invalid; danger
   styling belongs to the value region.
+- An unconstrained Any field adds a compact data-type control inside the Value region. It
+  precedes the value when no source addon exists, and follows the value when the editable source
+  addon is present, producing `type + value` or `source + value + type` in DOM and visual order.
+  Variable and upstream bindings hide the data-type control. An external value suffix retains
+  ownership of that slot and suppresses the automatic type control. Disabled value fields show the
+  current data type as a non-interactive label. This control describes the stored value only; the
+  table Type column continues to describe Schema presentation.
 - A single selected upstream value shows the same node icon used on the canvas, including the
   resolved Provider icon for connector nodes, before the node and output label.
 - A selected Variable value shows the Variable icon before its name, matching the icon used by
@@ -173,8 +180,9 @@ the [property panel entry](property-panel.md) for shared scope.
   Handle lazy CodeMirror initialization and its textarea fallback, repeated expansion, and disabled
   fields. Use the shared minimal CodeMirror editor with no line numbers or active-line decoration;
   JSON strings use the established warm/orange highlighting.
-- DOM and Tab order follow the visual row: disclosure/ordering control when present, Name, Type,
-  the Input source action when present, Value and its actions, Allow null, field settings, then
+- DOM and Tab order follow the visual row: disclosure/ordering control when present, Name, Schema
+  Type, the Input source action when present, Value and its actions, an Any data type when
+  it follows the value, Allow null, field settings, then
   expanded content and subsequent rows.
   Hidden/collapsed descendants do not enter the tab sequence. Closing popups restores focus to the
   corresponding trigger.

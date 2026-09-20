@@ -1,3 +1,5 @@
+import type { JsonDataType } from './value.ts'
+
 import { typeOfSchema } from './schemaWidget.ts'
 import { initialValue, objectValue, valueType } from './value.ts'
 
@@ -68,4 +70,11 @@ export function valueForEditor(schema: unknown, value: unknown): unknown {
   )
     return value
   return initialValue(schema)
+}
+
+/** An explicit data-type choice creates a value when unset and otherwise follows the shared compatibility rules. */
+export function valueForDataType(type: JsonDataType, value: unknown): unknown {
+  const schema = { type }
+  const converted = valueForEditor(schema, value)
+  return converted === undefined ? initialValue(schema, type) : converted
 }

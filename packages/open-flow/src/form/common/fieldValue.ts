@@ -1,4 +1,5 @@
 import { editorComponent } from './editorComponent.ts'
+import { isUnconstrainedSchema } from './schemaWidget.ts'
 import { objectValue, valueType } from './value.ts'
 
 /** Presentation never normalizes the stored value. */
@@ -40,13 +41,14 @@ export function fieldValueShape(schema: unknown, value: unknown, options: { comp
   const source = objectValue(schema) ?? {}
   const type = valueType(schema, value)
   const component = editorComponent(schema)
+  const unconstrained = isUnconstrainedSchema(schema)
   const inferredObjectChild =
     options.objectChild === true &&
     source.type == null &&
     source.enum == null &&
     !['const', 'oneOf', 'anyOf', 'allOf', '$ref'].some((key) => Object.hasOwn(source, key))
   const complex =
-    (component === 'json' && !inferredObjectChild) ||
+    (component === 'json' && !inferredObjectChild && !unconstrained) ||
     (options.compactCollection === true && (component === 'object' || component === 'array')) ||
     (options.depth ?? 0) > 12
   const enumeration = Array.isArray(source.enum) ? source.enum : Object.hasOwn(source, 'const') ? [source.const] : undefined
@@ -54,5 +56,5 @@ export function fieldValueShape(schema: unknown, value: unknown, options: { comp
   const choiceOptions = component === 'select' || component === 'multiSelect' ? (Array.isArray(choices) ? choices : []) : undefined
   const collection = !complex && !enumeration && (type === 'object' || (type === 'array' && !choiceOptions))
   const text = type === 'string' && source['ui:widget'] === 'text'
-  return { type, component, complex, enumeration, choiceOptions, collection, text, expandable: collection || complex || text }
+  return { type, component, unconstrained, complex, enumeration, choiceOptions, collection, text, expandable: collection || complex || text }
 }

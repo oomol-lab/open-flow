@@ -67,6 +67,24 @@ describe('field value shape', () => {
       collection: false,
     })
   })
+  it.each([
+    ['text', 'hello', false, false],
+    ['number', 3, false, false],
+    ['boolean', true, false, false],
+    ['null', null, false, false],
+    ['object', { answer: 42 }, false, true],
+    ['array', ['answer'], false, true],
+  ] as const)('uses the runtime %s value shape for an unconstrained schema', (_name, value, complex, collection) => {
+    expect(fieldValueShape({}, value)).toMatchObject({ unconstrained: true, complex, collection })
+  })
+  it('keeps constrained and compound JSON schemas in the JSON editor', () => {
+    expect(fieldValueShape({ minLength: 1 }, 'value')).toMatchObject({ unconstrained: false, complex: true, collection: false })
+    expect(fieldValueShape({ anyOf: [{ type: 'string' }, { type: 'number' }] }, 'value')).toMatchObject({
+      unconstrained: false,
+      complex: true,
+      collection: false,
+    })
+  })
 })
 
 it('renames and removes a definition together with order and required membership', () => {

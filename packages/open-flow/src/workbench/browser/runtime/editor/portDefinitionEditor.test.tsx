@@ -218,9 +218,10 @@ describe('Property panel port layout', () => {
   })
 
   it.each([
-    { state: 'valid empty', validationError: undefined, expanded: false },
-    { state: 'invalid empty', validationError: 'Invalid payload', expanded: true },
-  ])('starts a $state top-level JSON value with expanded=$expanded', ({ validationError, expanded }) => {
+    { state: 'valid empty object', value: {}, validationError: undefined, expanded: false },
+    { state: 'valid empty array', value: [], validationError: undefined, expanded: false },
+    { state: 'invalid empty object', value: {}, validationError: 'Invalid payload', expanded: true },
+  ])('starts a $state top-level Any collection with expanded=$expanded', ({ value, validationError, expanded }) => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <FieldValueEditor
@@ -228,8 +229,7 @@ describe('Property panel port layout', () => {
           label="payload"
           path="/payload"
           schema={{}}
-          value={undefined}
-          nullable
+          value={value}
           validationError={validationError}
           onChange={vi.fn()}
           onDraftIssue={vi.fn()}
@@ -239,6 +239,55 @@ describe('Property panel port layout', () => {
 
     expect(markup).toContain(`aria-expanded="${expanded}"`)
     expect(markup.includes('data-value-body="true"')).toBe(expanded)
+  })
+
+  it('puts the Any data type before a value when no source addon exists', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <FieldValueEditor label="payload" path="/payload" schema={{}} value={42} onChange={vi.fn()} onDraftIssue={vi.fn()} />
+      </I18nProvider>,
+    )
+    const typeControl = markup.indexOf('aria-label="payload, data type: Number"')
+    const valueControl = markup.match(/<input[^>]*aria-label="payload"/)?.index ?? -1
+    expect(typeControl).toBeGreaterThan(-1)
+    expect(valueControl).toBeGreaterThan(typeControl)
+  })
+
+  it('keeps an external value suffix instead of adding an Any data-type control', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <FieldValueEditor
+          label="payload"
+          path="/payload"
+          schema={{}}
+          value="hello"
+          valueSuffix={<span data-custom-suffix>custom</span>}
+          onChange={vi.fn()}
+          onDraftIssue={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('data-custom-suffix="true"')
+    expect(markup).not.toContain('data type')
+  })
+
+  it('shows a read-only Any data type without making it interactive', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <FieldValueEditor disabled label="payload" path="/payload" schema={{}} value onChange={vi.fn()} onDraftIssue={vi.fn()} />
+      </I18nProvider>,
+    )
+    expect(markup).toMatch(/<span[^>]*role="img"[^>]*aria-label="payload, data type: Boolean"/)
+    expect(markup).not.toMatch(/<button[^>]*aria-label="payload, data type: Boolean"/)
+  })
+
+  it('distinguishes the current data type from the Schema type in Chinese', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('zh-CN')}>
+        <FieldValueEditor label="value" path="/value" schema={{}} value={42} onChange={vi.fn()} onDraftIssue={vi.fn()} />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('aria-label="value，数据类型：数字"')
   })
 
   it('does not place an empty value body over output array type controls', () => {

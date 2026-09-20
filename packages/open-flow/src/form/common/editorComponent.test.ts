@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { editorComponent, schemaForEditor, valueForEditor } from './editorComponent.ts'
+import { editorComponent, schemaForEditor, valueForDataType, valueForEditor } from './editorComponent.ts'
 
 describe('Editor component selection', () => {
   it('keeps text when switching between single line and multiline', () => {
@@ -39,5 +39,13 @@ describe('Editor component selection', () => {
     })
     expect(schemaForEditor('json', { 'title': 'Payload', 'ui:widget': 'any' })).toEqual({ title: 'Payload' })
     expect(editorComponent({ 'ui:widget': 'any' })).toBe('json')
+  })
+  it('creates and converts values from an explicit data-type choice', () => {
+    expect(valueForDataType('string', undefined)).toBe('')
+    expect(valueForDataType('number', undefined)).toBe(0)
+    expect(valueForDataType('array', undefined)).toEqual([])
+    expect(valueForDataType('object', { answer: 42 })).toEqual({ answer: 42 })
+    expect(valueForDataType('boolean', 'true')).toBe(false)
+    expect(valueForDataType('null', 'value')).toBeNull()
   })
 })

@@ -9,6 +9,15 @@ import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { useStoryActions } from './storyActions.tsx'
 
 const fixtures = [
+  { name: 'anyUnset', schema: {}, value: undefined, nullable: false },
+  { name: 'nullableAnyUnset', schema: {}, value: undefined, nullable: true },
+  { name: 'anyString', schema: {}, value: 'hello', nullable: false },
+  { name: 'anyNumber', schema: { 'title': 'Runtime value', 'ui:placeholder': 'Choose a value' }, value: 42, nullable: false },
+  { name: 'anyObject', schema: {}, value: { title: 'Draft', enabled: true }, nullable: false },
+  { name: 'anyArray', schema: { 'ui:widget': 'any' }, value: ['one', 2, true], nullable: false },
+  { name: 'explicitTextWidget', schema: { 'ui:widget': 'text' }, value: 'Explicit widget', nullable: false },
+  { name: 'emptyAnyObject', schema: {}, value: {}, nullable: false },
+  { name: 'invalidEmptyAnyObject', schema: {}, value: {}, nullable: false, validationError: 'Sample validation error' },
   { name: 'openEmptyObject', schema: { type: 'object' }, value: {}, nullable: false },
   {
     name: 'openObject',
@@ -91,6 +100,7 @@ function FieldLayouts({ dark, language }: { dark: boolean; language: UiLanguage 
                 value={values[index]}
                 nullable={field.nullable}
                 disabled={readOnly}
+                validationError={'validationError' in field ? field.validationError : undefined}
                 path={`/${field.name}`}
                 onDraftIssue={() => {}}
                 onChange={(value) => setValues((current) => current.with(index, value))}
@@ -112,6 +122,6 @@ export const fieldLayoutStory: FrontendStory = {
   propertyPanel: true,
   standalone: true,
   description:
-    'Array-item text and JSON values start collapsed and expand in place. Compare emptyJson, which remains collapsed after validation, with invalidEmptyJson, which opens for its initial error. Root and object-child editors retain their branches. Clear a text item to keep an editable empty string. Compare wide, narrow and read-only states. Collapse invalidText, then update it externally to check that it stays collapsed.',
+    'Any fields adapt to unset, scalar, object and array values while keeping the schema type fixed as JSON. Select Any to use the generic JSON editor without replacing the value. Their data-type control stays read-only with the panel. Explicit widgets keep their own editor. Empty top-level Any collections remain collapsed, while invalidEmptyAnyObject opens for its initial error. Array-item text and JSON values expand in place. Compare wide and narrow layouts, then collapse invalidText before an external update to verify that it stays collapsed.',
   render: (_log, dark, language) => <FieldLayouts dark={dark} language={language} />,
 }

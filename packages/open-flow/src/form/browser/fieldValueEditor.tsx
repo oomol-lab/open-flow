@@ -2,7 +2,7 @@ import styles from './valueEditor.module.scss'
 import type { CSSProperties, ReactNode } from 'react'
 import type { FieldExpansionPolicy } from '../common/fieldExpansion.ts'
 import type { FieldValueDeletion } from '../common/fieldValue.ts'
-import type { ValueType } from '../common/value.ts'
+import type { JsonDataType, ValueType } from '../common/value.ts'
 import type { FieldRowPresentation } from './fieldLayout.tsx'
 import type { ValueControlProps } from './valueControlProps.ts'
 
@@ -14,11 +14,11 @@ import { Popover, PopoverContent, PopoverTrigger } from '../../ui/browser/popove
 import { SelectChevron } from '../../ui/browser/select.tsx'
 import { enumIndex } from '../common/choices.ts'
 import { isDateFormat } from '../common/dateValue.ts'
-import { valueForEditor } from '../common/editorComponent.ts'
+import { valueForDataType, valueForEditor } from '../common/editorComponent.ts'
 import { fieldValueState, fieldValueShape } from '../common/fieldValue.ts'
 import { objectFieldNames } from '../common/objectFields.ts'
-import { getDefaultValue, typeOfSchema } from '../common/schemaWidget.ts'
-import { initialValue, objectValue } from '../common/value.ts'
+import { getDefaultValue, isUnconstrainedSchema, typeOfSchema } from '../common/schemaWidget.ts'
+import { initialValue, jsonDataTypes, objectValue } from '../common/value.ts'
 import { collectionCreateAction } from './collectionActions.ts'
 import { ObjectValueFields, ArrayValueFields } from './collectionValueFields.tsx'
 import { EditableChoices } from './editableChoices.tsx'
@@ -32,6 +32,7 @@ import { useValueIssues } from './useValueIssues.ts'
 import { ValueEditor } from './valueEditor.tsx'
 import { valueFeedback } from './valueFeedback.ts'
 import { ValueTools } from './valueTools.tsx'
+import { DataTypeAddon } from './valueTypeAddon.tsx'
 
 export interface FieldValueEditorProps extends ValueControlProps, FieldRowPresentation {
   readonly expansionPolicy?: FieldExpansionPolicy
@@ -55,23 +56,23 @@ export interface FieldValueEditorProps extends ValueControlProps, FieldRowPresen
   readonly options?: ReactNode
 }
 
-const types: readonly ValueType[] = ['string', 'number', 'boolean', 'object', 'array', 'null']
-
 /** Controlled JSON value editing. It has no graph, port, persistence, or theme context. */
 export function FieldValueEditor(props: FieldValueEditorProps) {
-  const compactValue = props.compact === true || props.header != null || props.valueAddon != null || props.valueSuffix != null
   const sorting = useContext(FieldSorting)
   const { schema, value, onChange, label, nullable, disabled, onDraftIssue, depth = 0 } = props
   const t = useTranslate()
   const id = useId()
   const source = objectValue(schema) ?? {}
   const valueEditable = props.valueEditable !== false
+  const showDataType = isUnconstrainedSchema(schema) && valueEditable && props.valueSuffix == null
+  const compactValue = props.compact === true || props.header != null || props.valueAddon != null || props.valueSuffix != null || showDataType
   const state = fieldValueState(schema, value, nullable)
   const { presence, missing, invalidNull } = state
   const shape = fieldValueShape(schema, value, { compactCollection: compactValue && props.header == null, objectChild: props.objectChild, depth })
   const { type, complex, enumeration, choiceOptions } = shape
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const [raw, setRaw] = useState(false)
+  const jsonMode = raw || (showDataType && value === undefined)
   const focusCreatedValue = useRef(false)
   const [editorFocusRequest, setEditorFocusRequest] = useState(0)
   const [optionsOpen, setOptionsOpen] = useState(false)
@@ -91,6 +92,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
     !choiceOptions &&
     !complex &&
     !shape.collection &&
+    !jsonMode &&
     source['ui:widget'] !== 'text' &&
     state.display === 'unset' &&
     props.editor === undefined &&
@@ -98,13 +100,13 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
   const optionLabels = objectValue(source['ui:options'])?.labels
   const array = Array.isArray(value) ? value : []
   const canChooseType = source.type == null || Array.isArray(source.type)
-  const availableTypes = Array.isArray(source.type) ? types.filter((candidate) => (source.type as unknown[]).includes(candidate)) : types
-  const structured = !raw && shape.collection && props.editor === undefined
-  const expandable = !showUnset && (structured || (valueEditable && (raw || complex || (type === 'string' && source['ui:widget'] === 'text'))))
+  const availableTypes = Array.isArray(source.type) ? jsonDataTypes.filter((candidate) => (source.type as unknown[]).includes(candidate)) : jsonDataTypes
+  const structured = !jsonMode && shape.collection && props.editor === undefined
+  const expandable = !showUnset && (structured || (valueEditable && (jsonMode || complex || (type === 'string' && source['ui:widget'] === 'text'))))
   const inlineExpansion = compactValue && props.arrayChild && expandable && !structured
   const expansionPlacement = expandable ? (inlineExpansion ? 'inline' : 'branch') : undefined
   const restorePreviewFocus = useRef(false)
-  const uncreatedText = compactValue && expandable && shape.text && !raw && presence !== 'value'
+  const uncreatedText = compactValue && expandable && shape.text && !jsonMode && presence !== 'value'
   const hasExpandedContent = expandable && !uncreatedText && !(structured && type === 'object' && presence !== 'value')
   // Keep the complete error set authoritative for both control state and feedback.
   const errors =
@@ -152,9 +154,9 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
     else body?.querySelector<HTMLButtonElement>('button')?.focus()
   }, [presence, value, expanded, container])
   useEffect(() => {
-    if (!expanded || !editorFocusRequest || disabled || raw || complex) return
+    if (!expanded || !editorFocusRequest || disabled || jsonMode || complex) return
     container?.querySelector<HTMLTextAreaElement>(':scope > [data-value-body] > textarea')?.focus()
-  }, [expanded, editorFocusRequest, disabled, raw, complex, container])
+  }, [expanded, editorFocusRequest, disabled, jsonMode, complex, container])
   const {
     editorInvalid: invalid,
     summaryInvalid,
@@ -182,9 +184,25 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
   const canClear = inlineTools && state.canClear
   const canToggleJson = inlineTools && expanded && shape.collection && presence === 'value'
   const arrayDefinition = props.header != null && source.type === 'array' && !Array.isArray(source.items) && !choiceOptions
-  const typeAddon =
+  const changeDataType = (nextType: JsonDataType | undefined) => {
+    if (nextType === undefined) {
+      setRaw(true)
+      setExpanded(true)
+      setEditorFocusRequest((request) => request + 1)
+    } else {
+      onChange(valueForDataType(nextType, value))
+      setRaw(false)
+      setExpanded(false)
+      setEditorFocusRequest(0)
+    }
+  }
+  const dataTypeAddon = showDataType ? <DataTypeAddon name={label} value={value} any={jsonMode} disabled={disabled} onChange={changeDataType} /> : undefined
+  const startAddon = props.valueAddon ?? dataTypeAddon
+  const endAddon =
     props.valueSuffix ??
-    (arrayDefinition ? (
+    (props.valueAddon != null && dataTypeAddon != null ? (
+      dataTypeAddon
+    ) : arrayDefinition ? (
       <FieldTypeAddon
         schema={source.items ?? {}}
         name={`${label}[]`}
@@ -222,7 +240,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
     if (!expanded) setEditorFocusRequest((request) => request + 1)
   }
   const clearValue = () => {
-    const clearTextItem = props.arrayChild && shape.text && !raw && !complex
+    const clearTextItem = props.arrayChild && shape.text && !jsonMode && !complex
     onChange(clearTextItem ? '' : undefined)
     setExpanded(shape.expandable)
     setRaw(false)
@@ -238,7 +256,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
     >
       {valueEditable && !inlineTools && (
         <>
-          {canChooseType && !complex && !enumeration && (
+          {canChooseType && !shape.unconstrained && !complex && !enumeration && (
             <FieldSelect
               size="sm"
               aria-label={t('valueEditor.type', { name: label })}
@@ -261,10 +279,10 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
               variant="ghost"
               disabled={disabled}
               onClick={() => {
-                setRaw(!raw)
+                setRaw(!jsonMode)
                 setExpanded(true)
               }}
-              aria-pressed={raw || complex}
+              aria-pressed={jsonMode || complex}
             >
               <i aria-hidden="true" className="i-lucide-light:braces" />
               JSON
@@ -337,7 +355,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
           <span>{t('valueEditor.setValue')}</span>
           <i aria-hidden="true" className="i-lucide-light:pencil" />
         </Button>
-      ) : valueEditable && (raw || complex) ? (
+      ) : valueEditable && (jsonMode || complex) ? (
         <JsonEditor
           {...props}
           onDraftIssue={reportDraftIssue}
@@ -452,17 +470,17 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
       }
       data-header={props.header != null || undefined}
       data-expansion={expansionPlacement}
-      data-value-addon={props.valueAddon != null || undefined}
-      data-value-suffix={typeAddon != null || undefined}
+      data-value-addon={startAddon != null || undefined}
+      data-value-suffix={endAddon != null || undefined}
       data-value-prefix={arrayDefinition || undefined}
       data-expanded={(hasExpandedContent && expanded) || undefined}
       data-structured={(structured && !showUnset) || undefined}
       data-branch={hasExpandedContent || undefined}
     >
       {arrayDefinition && <span className={styles.valuePrefix}>{t('valueEditor.arrayOf')}</span>}
-      {props.valueAddon != null && (
+      {startAddon != null && (
         <div className={styles.valueAddon} data-value-addon-control>
-          {props.valueAddon}
+          {startAddon}
         </div>
       )}
       {compactValue && expandable && (
@@ -512,7 +530,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
       <ValueTools
         label={label}
         container={container}
-        raw={raw}
+        raw={jsonMode}
         danger={canReset && showUnset && invalid}
         disclosure={inlineExpansion && hasExpandedContent ? { controls: `${id}-body`, expanded, onToggle: toggleExpanded, disabled: sorting } : undefined}
         onReset={canReset ? props.onReset : undefined}
@@ -520,15 +538,15 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
         onToggleJson={
           canToggleJson
             ? () => {
-                setRaw(!raw)
-                if (!raw) setEditorFocusRequest((request) => request + 1)
+                setRaw(!jsonMode)
+                if (!jsonMode) setEditorFocusRequest((request) => request + 1)
               }
             : undefined
         }
       />
-      {typeAddon != null && (
+      {endAddon != null && (
         <div className={styles.valueAddon} data-value-addon-control data-side="end">
-          {typeAddon}
+          {endAddon}
         </div>
       )}
       {props.trailingControl}

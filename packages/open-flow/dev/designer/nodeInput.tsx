@@ -11,13 +11,26 @@ import { checkInputSource, inputSourceCandidates } from '../../src/flow/common/g
 import { NodeInputValue } from '../../src/workbench/browser/runtime/editor/nodeInputValue.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { providerIcon } from '../../src/workbench/browser/runtime/providerIcon.ts'
-function AddonSample({ schema, initial, variables }: { schema: JsonValue; initial: JsonValue | undefined; variables: InputVariables }) {
+function AddonSample({
+  schema,
+  initial,
+  variables,
+  fixed,
+  initialVariableName,
+}: {
+  schema: JsonValue
+  initial: JsonValue | undefined
+  variables: InputVariables
+  fixed?: boolean
+  initialVariableName?: string
+}) {
   const [definition, setDefinition] = useState(schema)
   const [value, setValue] = useState(initial)
-  const [variableName, setVariableName] = useState<string>()
+  const [variableName, setVariableName] = useState<string | undefined>(initialVariableName)
   return (
     <NodeInputValue
       embedded
+      fixed={fixed}
       definition={{ handle: 'sample', jsonSchema: definition, nullable: false }}
       value={value}
       connected={false}
@@ -270,6 +283,35 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
           onValue={() => {}}
           onVariable={() => {}}
         />
+        <h3>Any data types</h3>
+        <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
+          <div>
+            <h4>Source + value + type</h4>
+            <AddonSample schema={{}} initial="hello" variables={variables} />
+          </div>
+          <div>
+            <h4>Type + value</h4>
+            <AddonSample fixed schema={{}} initial={42} variables={variables} />
+          </div>
+          <div>
+            <h4>Variable binding</h4>
+            <AddonSample schema={{}} initial={undefined} initialVariableName="API_TOKEN" variables={variables} />
+          </div>
+          <div>
+            <h4>Upstream binding</h4>
+            <NodeInputValue
+              embedded
+              definition={{ handle: 'sample', jsonSchema: {}, nullable: false }}
+              value={undefined}
+              connected
+              upstream={providerSource}
+              variables={variables}
+              disabled={false}
+              onValue={() => {}}
+              onVariable={() => {}}
+            />
+          </div>
+        </div>
         <h3>Value addons · editor types</h3>
         <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
           {(
@@ -314,7 +356,8 @@ export const nodeInputStory: FrontendStory = {
   id: 'node-input',
   propertyPanel: true,
   title: 'Node Input',
-  description: 'Literal, variable and upstream sources, including whole objects, first-level fields, missing references and type mismatches.',
+  description:
+    'Literal, variable and upstream sources, including Any fields with source + value + type, source-free type + value, and bound values without a data-type control. Also covers whole objects, first-level fields, missing references and type mismatches.',
   standalone: true,
   render: (log, dark, language) => <NodeInputStory dark={dark} language={language} log={log} />,
 }

@@ -62,7 +62,10 @@ describe('Field validation presentation', () => {
     expect(markup).not.toContain('<textarea')
     expect(onChange).not.toHaveBeenCalled()
   })
-  it.each([null, ''])('keeps unconstrained array items in the JSON editor for %s', (value) => {
+  it.each([
+    { value: null, type: 'Null', control: 'aria-label="items.0 null"' },
+    { value: '', type: 'String', control: 'placeholder="Empty string"' },
+  ])('adapts unconstrained array items to the runtime $type editor', ({ value, type, control }) => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <ArrayValueFields
@@ -76,8 +79,9 @@ describe('Field validation presentation', () => {
         />
       </I18nProvider>,
     )
-    expect(markup).toContain('aria-label="items.0 JSON"')
-    expect(markup).toContain('<textarea')
+    expect(markup).toContain(`aria-label="items.0, data type: ${type}"`)
+    expect(markup).toContain(control)
+    expect(markup).not.toContain('<textarea')
   })
   it.each(cases)('keeps %s presence errors and control state consistent', async (_label, schema, _invalid, valid) => {
     const onChange = vi.fn()
@@ -237,10 +241,14 @@ describe('Nullable field presentation', () => {
           <FieldValueEditor label="note" schema={{}} value={null} nullable onChange={onChange} path="/note" onDraftIssue={vi.fn()} />
         </I18nProvider>,
       )
-      expect(jsonNull).toContain('aria-label="note JSON"')
-      expect(jsonNull).toContain('>null</textarea>')
+      expect(jsonNull).toContain('aria-label="note, data type: Null"')
+      expect(jsonNull).toContain('aria-label="note null"')
       expect(jsonNull).not.toContain('Unset')
       expect(jsonNull).not.toContain('aria-invalid="true"')
+      const jsonUnset = render(undefined, {})
+      expect(jsonUnset).toContain('aria-label="note, data type: Any"')
+      expect(jsonUnset).toContain('aria-label="note Set value" aria-expanded="false"')
+      expect(jsonUnset).not.toContain('aria-label="note null"')
       expect(onChange).not.toHaveBeenCalled()
     } finally {
       i18n.dispose()
@@ -364,11 +372,11 @@ describe('Collapsed validation presentation', () => {
 
 describe('Collapsed field mounting', () => {
   it.each([
-    [{ type: 'object', properties: { child: { type: 'string' } } }, { child: 'hello' }],
-    [{ type: 'array', items: { type: 'string' } }, ['hello']],
-    [{}, { child: 'hello' }],
-    [{ 'type': 'string', 'ui:widget': 'text' }, 'hello'],
-  ])('defers compact bodies while keeping standalone editors mounted', (schema, value) => {
+    [{ type: 'object', properties: { child: { type: 'string' } } }, { child: 'hello' }, true],
+    [{ type: 'array', items: { type: 'string' } }, ['hello'], true],
+    [{}, { child: 'hello' }, false],
+    [{ 'type': 'string', 'ui:widget': 'text' }, 'hello', true],
+  ])('defers compact bodies and mounts standalone editors when their layout is not intrinsically compact', (schema, value, standaloneMounted) => {
     const i18n = createI18n('en')
     const onChange = vi.fn()
     const render = (compact: boolean) =>
@@ -382,7 +390,7 @@ describe('Collapsed field mounting', () => {
       expect(collapsed).toContain('aria-expanded="false"')
       expect(collapsed).not.toContain('data-value-body')
       expect(collapsed).not.toContain('<textarea')
-      expect(render(false)).toContain('data-value-body')
+      expect(render(false).includes('data-value-body')).toBe(standaloneMounted)
       expect(onChange).not.toHaveBeenCalled()
     } finally {
       i18n.dispose()

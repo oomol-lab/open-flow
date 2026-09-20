@@ -1,4 +1,8 @@
 export type ValueType = 'string' | 'number' | 'integer' | 'boolean' | 'object' | 'array' | 'null'
+export type JsonDataType = Exclude<ValueType, 'integer'>
+
+/** JSON values do not distinguish integers from other numbers at runtime. */
+export const jsonDataTypes: readonly JsonDataType[] = ['string', 'number', 'boolean', 'object', 'array', 'null']
 
 export function objectValue(value: unknown): Record<string, unknown> | undefined {
   if (value == null || typeof value != 'object' || Array.isArray(value)) return
