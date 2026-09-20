@@ -48,6 +48,8 @@ export interface FieldValueEditorProps extends ValueControlProps, FieldRowPresen
   readonly hideOptions?: boolean
   /** Hides the inline clear and raw JSON controls while preserving field settings. */
   readonly hideValueTools?: boolean
+  /** Restores an inherited default. The action is shown only for the unset/null prompt controls. */
+  readonly onReset?: () => void
   readonly arrayChild?: boolean
   readonly objectChild?: boolean
   readonly options?: ReactNode
@@ -176,6 +178,8 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
     </div>
   )
   const inlineTools = !props.hideValueTools && (props.layout === 'values' || props.layout === 'ports') && valueEditable && !disabled && !sorting
+  const nullControl = (state.display === 'null' || presence === 'null') && props.editor === undefined && !choiceOptions && !enumeration
+  const canReset = inlineTools && props.onReset != null && (showUnset || (!!nullable && nullControl))
   const canClear = inlineTools && state.canClear
   const canToggleJson = inlineTools && expanded && shape.collection && presence === 'value'
   const arrayDefinition = props.header != null && source.type === 'array' && !Array.isArray(source.items) && !choiceOptions
@@ -197,9 +201,9 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
   const emptyCollection = structured && presence !== 'value'
   const needsCreation = emptyCollection || uncreatedText
   const valueSuffix =
-    !expandable && !showUnset && (enumeration || itemEnumeration || source['ui:widget'] === 'color' || isDateFormat(source.format))
+    !nullControl && !expandable && !showUnset && (enumeration || itemEnumeration || source['ui:widget'] === 'color' || isDateFormat(source.format))
       ? 26
-      : type === 'boolean' && !expandable && !showUnset
+      : !nullControl && type === 'boolean' && !expandable && !showUnset
         ? 30
         : expandable && compactValue && props.header == null && !needsCreation
           ? 26
@@ -435,14 +439,15 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
       ref={setContainer}
       data-inline={(props.hideOptions && !props.header) || undefined}
       data-compact={props.compact || undefined}
-      data-value-tools={canClear || canToggleJson || (inlineExpansion && hasExpandedContent) || undefined}
+      data-value-tools={canReset || canClear || canToggleJson || (inlineExpansion && hasExpandedContent) || undefined}
       data-array-child={props.arrayChild || undefined}
       data-object-child={props.objectChild || undefined}
       data-nested-field={depth > 0 || undefined}
       style={
         {
           '--field-indent': `${depth * 16}px`,
-          '--value-tools-width': `${(Number(canClear) + Number(canToggleJson) + Number(!!inlineExpansion && hasExpandedContent)) * 24}px`,
+          '--value-tools-width': `${(Number(canReset) + Number(canClear) + Number(canToggleJson) + Number(!!inlineExpansion && hasExpandedContent)) * 24}px`,
+          '--value-native-action-width': `${canReset && showUnset ? 24 : 0}px`,
           '--value-suffix-width': `${valueSuffix}px`,
         } as CSSProperties
       }
@@ -509,7 +514,9 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
         label={label}
         container={container}
         raw={raw}
+        danger={canReset && showUnset && invalid}
         disclosure={inlineExpansion && hasExpandedContent ? { controls: `${id}-body`, expanded, onToggle: toggleExpanded, disabled: sorting } : undefined}
+        onReset={canReset ? props.onReset : undefined}
         onClear={canClear ? clearValue : undefined}
         onToggleJson={
           canToggleJson

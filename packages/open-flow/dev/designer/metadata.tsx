@@ -51,6 +51,7 @@ function MetadataStory({ dark, language, log }: { dark: boolean; language: UiLan
 export const metadataStory: FrontendStory = {
   group: 'Node Task',
   id: 'node-metadata',
+  propertyPanel: true,
   title: 'Node Metadata',
   standalone: true,
   render: (log, dark, language) => <MetadataStory dark={dark} language={language} log={log} />,

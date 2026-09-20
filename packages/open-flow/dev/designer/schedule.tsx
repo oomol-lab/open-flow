@@ -40,6 +40,7 @@ function ScheduleStory({ dark, language, log }: { dark: boolean; language: UiLan
 export const scheduleStory: FrontendStory = {
   group: 'Trigger Schedule',
   id: 'trigger-schedule',
+  propertyPanel: true,
   title: 'Trigger Schedule',
   standalone: true,
   render: (log, dark, language) => <ScheduleStory dark={dark} language={language} log={log} />,

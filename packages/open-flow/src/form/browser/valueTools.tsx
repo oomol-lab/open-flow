@@ -10,6 +10,8 @@ export function ValueTools({
   label,
   container,
   raw,
+  danger,
+  onReset,
   onClear,
   onToggleJson,
   disclosure,
@@ -17,13 +19,15 @@ export function ValueTools({
   label: string
   container: HTMLElement | null
   raw: boolean
+  danger?: boolean
+  onReset?: () => void
   onClear?: () => void
   onToggleJson?: () => void
   disclosure?: FieldDisclosure & { disabled?: boolean }
 }) {
   const t = useTranslate()
   const toggleLabel = t(raw ? 'valueEditor.editAsForm' : 'valueEditor.editRawData')
-  if (!onClear && !onToggleJson && !disclosure) return null
+  if (!onReset && !onClear && !onToggleJson && !disclosure) return null
   const disclosureButton = disclosure && (
     <Button
       key="disclosure"
@@ -58,6 +62,25 @@ export function ValueTools({
       <TooltipContent container={container}>{t('valueEditor.clear')}</TooltipContent>
     </Tooltip>
   )
+  const resetButton = onReset && (
+    <Tooltip key="reset">
+      <TooltipTrigger
+        render={
+          <Button
+            className={styles.resetValue}
+            type="button"
+            variant={danger ? 'destructive-ghost' : 'ghost'}
+            size="icon-xs"
+            aria-label={`${t('valueEditor.resetDefaults')} ${label}`}
+            onClick={onReset}
+          />
+        }
+      >
+        <i aria-hidden="true" className="i-lucide-light:rotate-ccw" />
+      </TooltipTrigger>
+      <TooltipContent container={container}>{t('valueEditor.resetDefaults')}</TooltipContent>
+    </Tooltip>
+  )
   const jsonButton = onToggleJson && (
     <Tooltip key="json">
       <TooltipTrigger
@@ -69,6 +92,8 @@ export function ValueTools({
     </Tooltip>
   )
   return (
-    <div className={styles.valueTools}>{disclosure?.expanded ? [disclosureButton, clearButton, jsonButton] : [clearButton, jsonButton, disclosureButton]}</div>
+    <div className={styles.valueTools}>
+      {disclosure?.expanded ? [resetButton, disclosureButton, clearButton, jsonButton] : [resetButton, clearButton, jsonButton, disclosureButton]}
+    </div>
   )
 }

@@ -13,6 +13,7 @@
   min-width: 0;
 }
 .root {
+  --ui-danger-control-background: var(--ui-danger-control-background-default);
   --field-value-column: 1;
   --field-value-row: 1;
   --value-addon-width: 28px;
@@ -29,6 +30,9 @@
   align-items: start;
   column-gap: 4px;
   color: var(--ui-foreground);
+}
+.root:has(> .valueTools:hover) {
+  --ui-danger-control-background: var(--ui-danger-control-background-hover);
 }
 .body {
   isolation: isolate;
@@ -364,9 +368,15 @@ $feedback-focus: ':has(#{$feedback-targets})';
   display: flex;
   align-items: center;
   height: var(--field-control-height);
-  margin-right: calc(var(--value-suffix-width) + var(--value-end-addon-width) + 3px);
+  margin-right: calc(var(--value-native-action-width, 0px) + var(--value-suffix-width) + var(--value-end-addon-width) + 3px);
   z-index: var(--value-editor-control-layer);
   color: var(--ui-muted-foreground);
+}
+.resetValue,
+.unsetValue > i {
+  transition-property: opacity;
+  transition-duration: var(--default-transition-duration, 100ms);
+  transition-timing-function: var(--default-transition-timing-function, cubic-bezier(0.4, 0, 0.2, 1));
 }
 .root[data-value-tools] {
   > .summary,
@@ -381,7 +391,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
   > .summary,
   &:not([data-expansion='branch']) > .body > :is(input, select, button, [role='button']),
   &:not([data-expansion='branch']) > .body > div > :is([data-slot='select-trigger'], [data-field-control]) {
-    padding-right: calc(var(--value-tools-width) + var(--value-suffix-width) + 8px);
+    padding-right: calc(var(--value-tools-width) + var(--value-native-action-width, 0px) + var(--value-suffix-width) + 8px);
   }
   &:not([data-expansion='branch']) > .body [data-slot='input-group'] input {
     padding-right: calc(var(--value-tools-width) + 8px);
@@ -392,12 +402,12 @@ $feedback-focus: ':has(#{$feedback-targets})';
   grid-row: 1;
 }
 .root {
-  > .valueTools > .clearValue {
+  > .valueTools > :is(.clearValue, .resetValue) {
     opacity: 0;
     pointer-events: none;
   }
-  &:has(> .body:hover, > .summary:hover, > .valueTools:hover) > .valueTools > .clearValue,
-  > .valueTools > .clearValue:focus-visible {
+  &:has(> .body:hover, > .summary:hover, > .valueTools:hover) > .valueTools > :is(.clearValue, .resetValue),
+  > .valueTools > :is(.clearValue, .resetValue):focus-visible {
     opacity: 1;
     pointer-events: auto;
   }
@@ -586,11 +596,14 @@ $feedback-focus: ':has(#{$feedback-targets})';
 }
 
 .unsetValue {
+  position: relative;
   width: 100%;
   justify-content: space-between;
   border-color: var(--ui-input);
   background: var(--ui-control-background, var(--ui-muted));
   > i {
+    position: absolute;
+    right: 8px;
     opacity: 0;
   }
   &:hover > i,

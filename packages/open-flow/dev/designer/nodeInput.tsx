@@ -312,6 +312,7 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
 export const nodeInputStory: FrontendStory = {
   group: 'Node Task',
   id: 'node-input',
+  propertyPanel: true,
   title: 'Node Input',
   description: 'Literal, variable and upstream sources, including whole objects, first-level fields, missing references and type mismatches.',
   standalone: true,

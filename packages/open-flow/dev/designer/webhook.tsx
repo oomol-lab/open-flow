@@ -39,6 +39,7 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
 export const webhookStory: FrontendStory = {
   group: 'Trigger Webhook',
   id: 'webhook-editor',
+  propertyPanel: true,
   title: 'Webhook Editor',
   standalone: true,
   render: (log, dark, language) => <WebhookStory dark={dark} language={language} log={log} />,

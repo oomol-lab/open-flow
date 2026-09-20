@@ -139,11 +139,17 @@
 .open-flow-code-editor.cm-editor[data-invalid='true'] {
   border-width: var(--ui-danger-border-width, 1px);
   border-color: var(--ui-destructive);
-  background-color: color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background)));
+  background-color: var(
+    --ui-danger-control-background,
+    var(--ui-danger-control-background-default, color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background))))
+  );
   &:not(:disabled):not([readonly]):not([aria-disabled='true']):not(.cm-focused):not(:is(input, textarea):focus):not(
     :has(:disabled, [readonly], input:focus, textarea:focus, .cm-content[contenteditable='false'])
   ):hover {
-    background-color: color-mix(in srgb, var(--ui-destructive) 8%, var(--ui-control-background, var(--ui-background)));
+    background-color: var(
+      --ui-danger-control-background-hover,
+      color-mix(in srgb, var(--ui-destructive) 8%, var(--ui-control-background, var(--ui-background)))
+    );
   }
 }
 

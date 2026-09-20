@@ -256,7 +256,11 @@ export function FrontendLab() {
           <StorySidebarLayout>
             <div className="lab-story-body">
               {story.standalone ? (
-                <div className="standalone-stage" key={story.id}>
+                <div
+                  className={`standalone-stage ${story.propertyPanel ? 'editor-context-panel open-flow-property-panel' : ''}`}
+                  data-property-panel={story.propertyPanel || undefined}
+                  key={story.id}
+                >
                   {story.render(log, dark, language)}
                 </div>
               ) : (

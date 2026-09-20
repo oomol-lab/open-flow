@@ -15,9 +15,11 @@ export function TriggerConfigEditor({
   disabled,
   onChange,
   onReset,
+  onResetValue,
   renderEditor,
 }: {
   readonly onReset?: () => void | Promise<boolean>
+  readonly onResetValue?: (name: string) => void
   readonly inputs: readonly (InputPort | Group)[]
   readonly config: InputValues
   readonly disabled: boolean
@@ -40,6 +42,8 @@ export function TriggerConfigEditor({
                 connected: false,
                 fixed: true,
                 value: triggerConfigValue(input, config),
+                onReset:
+                  input.value !== undefined && Object.hasOwn(config, input.handle) && onResetValue != null ? () => onResetValue(input.handle) : undefined,
                 editor: renderEditor?.(input),
               },
         )}

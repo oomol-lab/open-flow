@@ -137,9 +137,10 @@ function ConditionEditorStory({ dark, language, log }: { dark: boolean; language
 export const conditionEditorStory: FrontendStory = {
   group: 'Node Condition',
   id: 'condition-editor',
+  propertyPanel: true,
   title: 'Condition Editor',
   standalone: true,
   description:
-    'Expand Cases to inspect AND/OR groups, attached Source and type buttons, operator tooltips, Case settings panels, missing references, and constant comparisons. Use the toolbar for invalid comparisons, empty groups, read-only and narrow layouts.',
+    'Expand Cases to inspect compact single conditions, AND/OR groups, attached Source and type buttons, operator tooltips, Case settings panels, missing references, and constant comparisons. Use the toolbar for invalid comparisons, empty groups, read-only and narrow layouts.',
   render: (log, dark, language) => <ConditionEditorStory dark={dark} language={language} log={log} />,
 }

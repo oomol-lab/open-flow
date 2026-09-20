@@ -166,6 +166,7 @@ export const valueEditorDangerStory: FrontendStory = {
   description:
     'All 15 editors, expanded and collapsed errors, unset values, missing options, nested Schema errors and invalid drafts. Hover reveals attached errors; focus takes priority within each panel. Reset restores initial sample states. Compare themes, languages and panel widths.',
   group: 'Node Fixed Values',
+  propertyPanel: true,
   standalone: true,
   render: (log, dark, language) => <ValueEditorDanger dark={dark} language={language} log={log} />,
 }

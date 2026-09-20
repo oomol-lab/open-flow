@@ -63,6 +63,14 @@ collections, definitions, and field, node, or group settings. Also read the
   receives keyboard focus. Focusing the editor alone does not reveal them. Keep hidden buttons in
   the natural Tab order and preserve pointer clicks when focus moves. Reserve space for existing date,
   color, or selection affordances, and keep action order consistent with keyboard order.
+- A cleared field with a definition default exposes an inline reset action on its Set value prompt,
+  or on its null control when nullable. Reset removes the saved override so the field inherits its
+  default again. It follows the Clear action's hover and keyboard-focus visibility, and uses the
+  danger foreground when the prompt is invalid. Place Reset first in visual and keyboard order when
+  the control has other actions, including immediately before the Set value pencil affordance. The
+  two hover affordances use the same opacity transition. Hovering an inline action retains the
+  underlying value control's hover surface. A null control does not reserve the declared type's
+  inactive trailing affordance space.
 - Select and Multi-select menus omit Clear. Value rows use the shared inline clear x
   with hover and keyboard focus visibility; clearing produces undefined.
 - Boolean uses a full-frame toggle with True/False on the left and a small Switch on the right.

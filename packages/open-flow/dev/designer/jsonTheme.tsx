@@ -88,6 +88,7 @@ export const jsonThemeStory: FrontendStory = {
   title: 'JSON Colors',
   description: 'Warm strings, neutral keys and muted blue values. Edit JSON to inspect selection, focus and invalid drafts.',
   group: 'Node Fixed Values',
+  propertyPanel: true,
   standalone: true,
   render: (log, _dark, language) => <JsonThemeStory language={language} log={log} />,
 }

@@ -670,13 +670,17 @@ export class WorkspaceStore {
     return (await this.#editDraft(resetInputValues(revision.revision.content, target, nodeId, handles))) != null
   }
 
-  public async resetTriggerConfig(triggerId: string): Promise<boolean> {
+  public async resetTriggerConfig(triggerId: string, names?: readonly string[]): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target?.kind !== 'flow') return false
     const trigger = revision.graph(target)?.nodes[triggerId]
     if (trigger?.kind !== 'poll' && trigger?.kind !== 'integration') return false
-    const changes = Object.entries(trigger.config).map(([name, before]) => ({
+    const selected =
+      names == null
+        ? Object.entries(trigger.config)
+        : names.flatMap((name) => (Object.hasOwn(trigger.config, name) ? [[name, trigger.config[name]] as const] : []))
+    const changes = selected.map(([name, before]) => ({
       kind: 'graph.trigger.config.set' as const,
       nodeId: triggerId,
       name,

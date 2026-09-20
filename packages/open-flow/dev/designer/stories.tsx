@@ -38,6 +38,8 @@ export type LogAction = (name: string, value?: unknown) => void
 export interface FrontendStory {
   readonly group: string
   readonly id: string
+  /** Supplies the production property-panel theme and popup-container boundary to standalone component stories. */
+  readonly propertyPanel?: boolean
   readonly render: (log: LogAction, dark: boolean, language: UiLanguage) => ReactNode
   readonly standalone?: boolean
   readonly title: string

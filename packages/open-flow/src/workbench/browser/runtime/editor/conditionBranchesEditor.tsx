@@ -199,6 +199,7 @@ export function ConditionBranchesEditor({
               save({ ...item, output })
             }
             const open = !collapsed.has(item.output)
+            const singleCondition = item.groups.length === 1 && item.groups[0]?.expressions.length === 1
             const groupErrors = caseIssues
               .get(item.output)!
               .groups.map((issue) =>
@@ -320,7 +321,12 @@ export function ConditionBranchesEditor({
                   {!disabled && caseSettings}
                 </div>
                 {(item.groups.length > 0 || !disabled) && (
-                  <FieldBody placement="branch" className="condition-groups" endpoint={item.groups.length ? 'marker' : 'control'} hidden={!open}>
+                  <FieldBody
+                    placement="branch"
+                    className="condition-groups"
+                    endpoint={singleCondition || item.groups.length === 0 ? 'control' : 'marker'}
+                    hidden={!open}
+                  >
                     {item.groups.length === 0 && !disabled && (
                       <div className="condition-case-empty">
                         <Button
@@ -347,30 +353,32 @@ export function ConditionBranchesEditor({
                               <span className="condition-logic">OR</span>
                             </div>
                           )}
-                          <ValueEditorFeedback error={groupOpen && group.expressions.length === 0 ? groupErrors[g] : undefined}>
-                            {(errorId) => (
-                              <div
-                                className="condition-group-heading"
-                                data-invalid={group.expressions.length === 0 || (!groupOpen && groupErrors[g] != null) || undefined}
-                              >
-                                <Button
-                                  type="button"
-                                  variant="disclosure"
-                                  size="icon-xs"
-                                  aria-expanded={groupOpen}
-                                  aria-label={`AND ${g + 1}`}
-                                  aria-describedby={errorId}
-                                  aria-invalid={groupOpen && group.expressions.length === 0}
-                                  onClick={() => toggle(groupKey, setCollapsedGroups)}
+                          {!singleCondition && (
+                            <ValueEditorFeedback error={groupOpen && group.expressions.length === 0 ? groupErrors[g] : undefined}>
+                              {(errorId) => (
+                                <div
+                                  className="condition-group-heading"
+                                  data-invalid={group.expressions.length === 0 || (!groupOpen && groupErrors[g] != null) || undefined}
                                 >
-                                  <i aria-hidden="true" className={groupOpen ? 'i-lucide-light:chevron-down' : 'i-lucide-light:chevron-right'} />
-                                </Button>
-                                <span className="condition-logic">AND</span>
-                                <span className="condition-group-summary">{t('conditionEditor.groupSummary')}</span>
-                              </div>
-                            )}
-                          </ValueEditorFeedback>
-                          <div className="condition-expressions" hidden={!groupOpen}>
+                                  <Button
+                                    type="button"
+                                    variant="disclosure"
+                                    size="icon-xs"
+                                    aria-expanded={groupOpen}
+                                    aria-label={`AND ${g + 1}`}
+                                    aria-describedby={errorId}
+                                    aria-invalid={groupOpen && group.expressions.length === 0}
+                                    onClick={() => toggle(groupKey, setCollapsedGroups)}
+                                  >
+                                    <i aria-hidden="true" className={groupOpen ? 'i-lucide-light:chevron-down' : 'i-lucide-light:chevron-right'} />
+                                  </Button>
+                                  <span className="condition-logic">AND</span>
+                                  <span className="condition-group-summary">{t('conditionEditor.groupSummary')}</span>
+                                </div>
+                              )}
+                            </ValueEditorFeedback>
+                          )}
+                          <div className="condition-expressions" hidden={!singleCondition && !groupOpen}>
                             {group.expressions.length === 0 && <div className="flex items-center justify-between">{!disabled && addMenu(g, -1)}</div>}
                             {group.expressions.map((expression, e) => {
                               const change = (next: typeof expression, deletion?: FieldValueDeletion) =>

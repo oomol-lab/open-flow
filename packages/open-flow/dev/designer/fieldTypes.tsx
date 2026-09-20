@@ -63,6 +63,7 @@ export const fieldTypesStory: FrontendStory = {
   title: 'Type States',
   description: 'All 15 types: editable selectors, fixed labels, and temporarily disabled selectors.',
   group: 'Node Fixed Values',
+  propertyPanel: true,
   standalone: true,
   render: (_log, dark, language) => <FieldTypes dark={dark} language={language} />,
 }

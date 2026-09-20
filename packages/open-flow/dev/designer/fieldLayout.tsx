@@ -108,6 +108,7 @@ export const fieldLayoutStory: FrontendStory = {
   id: 'field-layout',
   title: 'Field Layout',
   group: 'Node Fixed Values',
+  propertyPanel: true,
   standalone: true,
   description:
     'Array-item text and JSON values start collapsed and expand in place; root and object-child editors retain their branches. Clear a text item to keep an editable empty string. Compare wide, narrow and read-only states. Collapse invalidText, then update it externally to check that it stays collapsed.',

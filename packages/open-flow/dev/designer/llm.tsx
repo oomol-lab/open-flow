@@ -60,6 +60,7 @@ function LlmStory({ dark, language, log }: { dark: boolean; language: UiLanguage
 export const llmStory: FrontendStory = {
   group: 'Node LLM',
   id: 'llm-inputs',
+  propertyPanel: true,
   title: 'LLM Inputs',
   standalone: true,
   render: (log, dark, language) => <LlmStory dark={dark} language={language} log={log} />,

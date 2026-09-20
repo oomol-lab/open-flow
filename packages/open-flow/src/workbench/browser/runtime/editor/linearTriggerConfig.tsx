@@ -62,6 +62,7 @@ export function LinearTriggerConfig({
       onReset={() => {
         return store.resetTriggerConfig(nodeId)
       }}
+      onResetValue={(name) => void store.resetTriggerConfig(nodeId, [name])}
       inputs={inputs}
       config={assignments}
       disabled={disabled}

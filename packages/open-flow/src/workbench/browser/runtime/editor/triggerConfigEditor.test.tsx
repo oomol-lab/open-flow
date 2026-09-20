@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it, vi } from 'vitest'
-import { inputValues } from '../../../../flow/common/inputValue.ts'
+import { fixedInputValue, inputValues } from '../../../../flow/common/inputValue.ts'
 import { createI18n } from '../i18n.ts'
 import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
 
@@ -46,6 +46,31 @@ describe('Trigger configuration editor', () => {
     expect(markup).toContain('Team one')
     expect(markup).toContain('Choose team')
     expect(markup).toContain('teamId')
+  })
+
+  it('offers field reset on cleared default prompts and nullable null controls', () => {
+    const onResetValue = vi.fn()
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <TriggerConfigEditor
+          inputs={[
+            { handle: 'owner', nullable: false, jsonSchema: { type: 'string' }, value: 'example' },
+            { handle: 'note', nullable: true, jsonSchema: { type: 'string' }, value: 'default note' },
+            { handle: 'withoutDefault', nullable: false, jsonSchema: { type: 'string' } },
+          ]}
+          config={{ owner: fixedInputValue(undefined), note: fixedInputValue(null), withoutDefault: fixedInputValue(undefined) }}
+          disabled={false}
+          onChange={vi.fn()}
+          onResetValue={onResetValue}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('aria-label="owner Set value"')
+    expect(markup).toContain('aria-label="Reset to defaults owner"')
+    expect(markup).toContain('aria-label="note null"')
+    expect(markup).toContain('aria-label="Reset to defaults note"')
+    expect(markup).not.toContain('aria-label="Reset to defaults withoutDefault"')
+    expect(onResetValue).not.toHaveBeenCalled()
   })
 })
 

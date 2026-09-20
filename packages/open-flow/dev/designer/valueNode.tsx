@@ -96,6 +96,7 @@ export const valueNodeStory: FrontendStory = {
   description:
     'All 15 field types, nested fields, and arrays. Hover field names to compare side descriptions, multiline descriptions, and name fallbacks above. Expand collections to inspect nested fields.',
   group: 'Node Fixed Values',
+  propertyPanel: true,
   standalone: true,
   render: (log, dark, language) => <ValueStory log={log} dark={dark} language={language} />,
 }
@@ -104,6 +105,7 @@ export const additionalInputsStory: FrontendStory = {
   id: 'additional-inputs',
   title: 'Additional Inputs',
   group: 'Node Task',
+  propertyPanel: true,
   standalone: true,
   render: (log, dark, language) => <ValueStory log={log} dark={dark} language={language} reservedNames={['value1', 'message']} />,
 }
@@ -188,6 +190,7 @@ export const groupedInputsStory: FrontendStory = {
   id: 'grouped-inputs',
   title: 'Grouped Inputs',
   group: 'Node Task',
+  propertyPanel: true,
   standalone: true,
   render: (log, dark, language) => <GroupedInputsStory log={log} dark={dark} language={language} />,
 }
@@ -196,6 +199,7 @@ export const outputPortsStory: FrontendStory = {
   id: 'output-ports',
   title: 'Output Ports',
   group: 'Node Task',
+  propertyPanel: true,
   standalone: true,
   render: (log, dark, language) => <GroupedInputsStory log={log} dark={dark} language={language} output />,
 }
@@ -334,6 +338,7 @@ export const lazyFieldsStory: FrontendStory = {
   title: 'Collapsed Fields',
   description: 'Compare 40-entry collections with flat connector inputs. Expand to edit; reset to inspect initial mounting.',
   group: 'Node Fixed Values',
+  propertyPanel: true,
   standalone: true,
   render: (log, dark, language) => <LazyFieldsStory log={log} dark={dark} language={language} />,
 }

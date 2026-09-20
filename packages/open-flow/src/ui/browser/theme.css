@@ -43,6 +43,8 @@
   --ui-accent: var(--open-flow-accent);
   --ui-accent-foreground: var(--open-flow-accent-foreground);
   --ui-destructive: var(--open-flow-destructive);
+  --ui-danger-control-background-default: color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background)));
+  --ui-danger-control-background-hover: color-mix(in srgb, var(--ui-destructive) 8%, var(--ui-control-background, var(--ui-background)));
   --ui-border: var(--open-flow-border);
   --ui-input: var(--open-flow-input);
   --ui-ring: var(--open-flow-ring);

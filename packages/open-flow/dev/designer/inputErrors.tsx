@@ -114,6 +114,7 @@ export const inputErrorsStory: FrontendStory = {
   description:
     'Invalid fields in both themes. Property rows compare valid, invalid and unset surfaces. Focus and correct values to inspect error borders and backgrounds; JSON requires a title. Selection controls at the bottom show fixed invalid states.',
   group: 'Node Fixed Values',
+  propertyPanel: true,
   standalone: true,
   render: (_log, _dark, language) => <InputErrors language={language} />,
 }

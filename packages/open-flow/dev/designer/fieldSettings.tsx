@@ -80,6 +80,7 @@ export const fieldSettingsStory: FrontendStory = {
   id: 'field-settings',
   title: 'Field Settings',
   group: 'Node Fixed Values',
+  propertyPanel: true,
   description:
     'Open production panels with editable and read-only fields. Removal is immediate; toggle advanced settings to inspect stable positioning, nullability and Schema validation. Long Schema content scrolls with the panel; reserved is a duplicate field name.',
   standalone: true,
@@ -126,6 +127,7 @@ export const groupSettingsStory: FrontendStory = {
   id: 'group-settings',
   title: 'Group Settings',
   group: 'Node Task',
+  propertyPanel: true,
   description: 'Edit an input/output group in the production secondary panel and inspect the immediate removal action.',
   standalone: true,
   render: (log, dark, language) => <GroupSettingsStory log={log} dark={dark} language={language} />,

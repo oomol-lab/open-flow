@@ -908,6 +908,9 @@ export function NodeInspector({
               onReset={() => {
                 return store.resetTriggerConfig(selection.id)
               }}
+              onResetValue={(name) => {
+                void store.resetTriggerConfig(selection.id, [name])
+              }}
               inputs={selection.trigger.definition.configInputs}
               config={selection.trigger.config}
               disabled={disabled}
@@ -959,6 +962,7 @@ export function NodeInspector({
               return {
                 definition,
                 value: inputValue(mapping, definition.value),
+                onReset: definition.value !== undefined && mapping != null ? () => void store.resetInputs(selection.id, [definition.handle]) : undefined,
                 connected: mapping?.kind === 'sources' && binding?.kind !== 'variable',
                 variableName: binding?.kind === 'variable' ? binding.target : undefined,
               }
@@ -1022,6 +1026,8 @@ export function NodeInspector({
                         return {
                           definition,
                           value: inputValue(mapping, definition.value),
+                          onReset:
+                            definition.value !== undefined && mapping != null ? () => void store.resetInputs(selection.id, [definition.handle]) : undefined,
                           connected: mapping?.kind === 'sources' && binding?.kind !== 'variable',
                           variableName: binding?.kind === 'variable' ? binding.target : undefined,
                         }

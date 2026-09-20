@@ -222,6 +222,7 @@ export function SourceValueEditor({
   disabled,
   onValue,
   onVariable,
+  onReset,
 }: {
   readonly fixed?: boolean
   readonly editor?: FieldValueEditorProps['editor']
@@ -259,6 +260,7 @@ export function SourceValueEditor({
   readonly disabled: boolean
   readonly onValue: (value: JsonValue | undefined, deletion?: FieldValueDeletion) => void
   readonly onVariable: (name: string | undefined) => void
+  readonly onReset?: () => void
 }) {
   const t = useTranslate()
   const [sourceOpen, setSourceOpen] = useState(false)
@@ -563,6 +565,7 @@ export function SourceValueEditor({
         label={fieldLabel}
         path={`/${fieldLabel.replaceAll('~', '~0').replaceAll('/', '~1')}`}
         disabled={disabled}
+        onReset={onReset}
         valueEditable={!connected && !bound && !sourceMissing}
         editor={customEditor ?? editor}
         onDraftIssue={draftIssue}

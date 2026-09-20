@@ -64,6 +64,7 @@ export function FeishuTriggerConfig({
       onReset={() => {
         return store.resetTriggerConfig(nodeId)
       }}
+      onResetValue={(name) => void store.resetTriggerConfig(nodeId, [name])}
       inputs={visibleInputs}
       config={assignments}
       disabled={disabled}
