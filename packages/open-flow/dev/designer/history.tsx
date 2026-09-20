@@ -213,7 +213,7 @@ function HistorySample({
                     void notice.undo?.run()
                   },
                 },
-          duration: notice.kind == 'error' ? 8000 : 4000,
+          duration: notice.kind == 'error' || notice.undo != null ? 8000 : 4000,
           onDismiss: ({ id }: { id: string | number }) => forgetToast(id),
           onAutoClose: ({ id }: { id: string | number }) => forgetToast(id),
         }

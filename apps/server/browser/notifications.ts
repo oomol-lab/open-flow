@@ -34,7 +34,7 @@ export function notify(notification: WorkbenchNotification | undefined): void {
               void notification.undo?.run()
             },
           },
-    duration: notification.kind == 'error' ? 8000 : 4000,
+    duration: notification.kind == 'error' || notification.undo != null ? 8000 : 4000,
     onDismiss: ({ id }: { id: string | number }) => forget(id),
     onAutoClose: ({ id }: { id: string | number }) => forget(id),
   }

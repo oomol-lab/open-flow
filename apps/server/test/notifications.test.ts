@@ -46,6 +46,7 @@ it('forgets a notification when its Undo action dismisses it', () => {
   vi.mocked(toast.success).mockReturnValueOnce(6)
   const run = vi.fn(async () => {})
   notify({ kind: 'success', message: 'Node deleted.', undo: { label: 'Undo', run } })
+  expect(toast.success).toHaveBeenCalledWith('Node deleted.', expect.objectContaining({ duration: 8000 }))
   const action = vi.mocked(toast.success).mock.calls[0]?.[1]?.action
   if (action == null || typeof action != 'object' || !('onClick' in action)) throw new Error('Expected Undo action')
   action.onClick({} as Parameters<typeof action.onClick>[0])

@@ -88,7 +88,7 @@
   padding-inline: 6px;
   font-size: 12px;
   line-height: 16px;
-  border-radius: calc(var(--ui-radius) - 2px);
+  border-radius: var(--ui-control-radius, var(--ui-radius));
   background: var(--ui-primary);
   color: var(--ui-primary-foreground);
 }
