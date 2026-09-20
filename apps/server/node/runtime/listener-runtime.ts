@@ -3,7 +3,7 @@ import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { IntegrationDefinition, ListenerReadContext } from '@oomol-lab/open-flow/integration-trigger'
 import type { PollContext, PollDefinition, PollResult } from '@oomol-lab/open-flow/poll-trigger'
 import type { Logger } from 'pino'
-import type { ConnectorHost } from '../deployment/connector.ts'
+import type { ConnectorAccessContext, ConnectorHost } from '../deployment/connector.ts'
 import type { ListenerLease } from '../storage/integration-store.ts'
 import type { PollCandidate } from '../storage/poll-store.ts'
 import type { Store } from '../storage/store.ts'
@@ -215,7 +215,9 @@ export class ListenerRuntime {
   }
 
   #request(
-    target: Pick<StoredPollTarget, 'bindingId' | 'connectionId' | 'flowId'>,
+    target:
+      | Pick<StoredPollTarget, 'bindingId' | 'connectionId' | 'flowId' | 'publicationId'>
+      | Pick<PollCandidate, 'bindingId' | 'connectionId' | 'flowId' | 'operationId'>,
     definition: PollDefinition,
     context: Omit<PollContext, 'connector' | 'signal'>,
   ): Effect.Effect<PollResult, unknown> {
@@ -235,7 +237,9 @@ export class ListenerRuntime {
   }
 
   #readPage<Result>(
-    target: Pick<StoredPollTarget, 'bindingId' | 'connectionId' | 'flowId'>,
+    target:
+      | Pick<StoredPollTarget, 'bindingId' | 'connectionId' | 'flowId' | 'publicationId'>
+      | Pick<PollCandidate, 'bindingId' | 'connectionId' | 'flowId' | 'operationId'>,
     provider: string,
     read: (context: ListenerReadContext) => Promise<Result>,
     context: Omit<ListenerReadContext, 'connector' | 'signal'>,
@@ -244,6 +248,20 @@ export class ListenerRuntime {
     return Effect.gen({ self: this }, function* () {
       const connector = this.#resolveConnector()
       if (connector == null) return yield* Effect.fail(new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.'))
+      const providerAccess =
+        'publicationId' in target
+          ? this.#store.publications.providerAccess(target.publicationId)
+          : this.#store.publications.operationProviderAccess(target.operationId)
+      if (providerAccess == null) return yield* Effect.fail(new Error('Fixed Publication Connector access is unavailable.'))
+      const teamId = this.#store.connectorTeams.get(target.flowId)
+      const access = {
+        flowId: target.flowId,
+        providerAccess,
+        providerId: provider,
+        purpose: 'trigger',
+        source: 'publication',
+        ...(teamId == null ? {} : { teamId }),
+      } satisfies ConnectorAccessContext
       return yield* Effect.tryPromise({
         try: async (signal) => {
           const result = await read({
@@ -256,7 +274,7 @@ export class ListenerRuntime {
                   target.bindingId,
                   request,
                   requestSignal == null ? signal : AbortSignal.any([signal, requestSignal]),
-                  this.#store.connectorTeams.get(target.flowId),
+                  access,
                 ),
             },
             signal,
@@ -285,7 +303,7 @@ export class ListenerRuntime {
       if (source == null) return yield* Effect.fail(new PermanentIntegrationError('Listener source is unavailable.'))
       const checkpoint = JSON.parse(target.state.checkpointJson) as JsonValue
       const page = yield* this.#readPage(
-        target,
+        { ...target, publicationId: target.currentPublicationId },
         definition.snapshot.provider,
         async (context) => {
           const result = await source.read(context)
@@ -572,13 +590,21 @@ function failure(error: unknown): Extract<PollState['health'], 'failed' | 'needs
   for (let current: unknown = error; current instanceof Error; current = current.cause) {
     if (current instanceof PollConnectionError) return 'needs_reauth'
     if (current instanceof PermanentPollError) return 'failed'
-    if (current instanceof ConnectorTaskError && current.code == 'connector.connection-required') return 'needs_reauth'
+    if (
+      current instanceof ConnectorTaskError &&
+      (current.code == 'connector.connection-required' || current.code == 'connector.access-required' || current.code == 'connector.access-invalid')
+    )
+      return 'needs_reauth'
   }
 }
 
 function listenerFailure(error: unknown): 'failed' | 'needs_reauth' {
   for (let current: unknown = error; current instanceof Error; current = current.cause) {
-    if (current instanceof IntegrationConnectionError || (current instanceof ConnectorTaskError && current.code == 'connector.connection-required'))
+    if (
+      current instanceof IntegrationConnectionError ||
+      (current instanceof ConnectorTaskError &&
+        (current.code == 'connector.connection-required' || current.code == 'connector.access-required' || current.code == 'connector.access-invalid'))
+    )
       return 'needs_reauth'
   }
   return 'failed'

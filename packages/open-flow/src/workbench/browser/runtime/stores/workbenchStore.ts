@@ -1,11 +1,11 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { GraphTarget } from '../../../../flow/common/change.ts'
-import type { WorkbenchClient, Draft, FlowCheck, Run, RunEvent } from '../api.ts'
+import type { ConnectorConnection, WorkbenchClient, Draft, FlowCheck, Run, RunEvent } from '../api.ts'
 import type { FlowChangeEvent, WorkbenchHost, WorkbenchPreferences } from '../contract.ts'
 import type { AddNodeOption } from '../editor/addNodeOptions.ts'
 import type { DiagnosticItem } from '../editor/diagnostics.ts'
-import type { DesignerEdge, DesignerNode, DesignerGraph, Point } from '../workspace.ts'
+import type { ConnectorActionView, DesignerEdge, DesignerNode, DesignerGraph, Point } from '../workspace.ts'
 import type { Notice } from './workbenchNotice.ts'
 import type { WorkspaceBusy } from './workspaceModel.ts'
 
@@ -21,6 +21,7 @@ import { RunRequestStore } from '../runs/runRequestStore.ts'
 import { RunStore } from '../runs/runStore.ts'
 import { designerGraph, targetPresentation } from '../workspace.ts'
 import { CatalogStores } from './catalogStores.ts'
+import { ConnectorAccessStore } from './connectorAccessStore.ts'
 import { ConnectorStore } from './connectorStore.ts'
 import { Latest } from './latest.ts'
 import { combineSources } from './optionSource.ts'
@@ -100,6 +101,7 @@ export class WorkbenchStore {
   public readonly preferences: WorkbenchPreferences
   public readonly $: Workbench$
   public readonly connectors: ConnectorStore
+  public readonly connectorAccess: ConnectorAccessStore
   public readonly publications: PublicationStore
   public readonly runRequests: RunRequestStore
   public readonly runs: RunStore
@@ -122,6 +124,7 @@ export class WorkbenchStore {
     const setNotice = (notice: Notice): void => {
       if (!this.#disposed) this.#notice.set(notice)
     }
+    this.connectorAccess = new ConnectorAccessStore(client, setNotice, i18n)
     this.runs = new RunStore(client, setNotice, i18n)
     this.workspace = new WorkspaceStore(
       client,
@@ -134,6 +137,10 @@ export class WorkbenchStore {
       },
       new CatalogStores(client, host.connectorCache),
       (flowId) => void this.#openCreatedFlow(flowId),
+      (flowId) => {
+        this.connectorAccess.changed(flowId)
+        this.workspace.catalogs.refreshFlow(flowId)
+      },
     )
     this.connectors = new ConnectorStore(client, this.workspace, setNotice, host, i18n)
     this.triggers = new TriggerStore(client, this.workspace, setNotice, host, i18n)
@@ -231,6 +238,7 @@ export class WorkbenchStore {
     this.#externalRuns.invalidate()
     for (const value of Object.values(this.$)) value.dispose()
     this.connectors.dispose()
+    this.connectorAccess.dispose()
     this.publications.dispose()
     this.runRequests.dispose()
     this.runs.dispose()
@@ -248,7 +256,7 @@ export class WorkbenchStore {
     this.publications.reset()
     this.runRequests.reset()
     this.runs.reset()
-    await this.workspace.start(flowId)
+    await Promise.all([this.workspace.start(flowId), this.connectorAccess.load(flowId)])
   }
 
   public async retryFlows(): Promise<void> {
@@ -347,6 +355,11 @@ export class WorkbenchStore {
         await this.triggers.connect(option.trigger.provider)
         return
       }
+      if (option.kind == 'connector') {
+        const prepared = await this.prepareConnectorAction(option.connector)
+        if (prepared == null) return
+        option = { ...option, connector: prepared.action }
+      }
       const nodeId = await this.workspace.addNode(option, position, connection)
       if (nodeId != null && option.kind == 'connector') void this.connectors.refresh()
       if (nodeId != null && option.kind == 'trigger') void this.triggers.refresh()
@@ -355,6 +368,45 @@ export class WorkbenchStore {
       if (!this.#disposed) this.#notice.set(errorNotice(error, this.#i18n.t))
       return undefined
     }
+  }
+
+  public async prepareConnectorAction(
+    action: ConnectorActionView,
+  ): Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] } | undefined> {
+    const flowId = this.workspace.$.flowId.value
+    if (flowId == null) return
+    if (this.connectorAccess.$.value.access == null) await this.connectorAccess.load(flowId)
+    if (this.#disposed || flowId != this.workspace.$.flowId.value) return
+    let access = this.connectorAccess.$.value.access
+    let actionAccessAllowed: boolean | undefined
+    if (access?.mode == 'selectable') {
+      if (this.connectorAccess.$.value.candidates[action.serviceId] == null) await this.connectorAccess.loadCandidates(action.serviceId)
+      const candidates = this.connectorAccess.$.value.candidates[action.serviceId]?.candidates.filter(
+        (candidate) => candidate.permissions == null || candidate.permissions.allActions || candidate.permissions.actionIds.includes(action.actionId),
+      )
+      const activeBindingIds = new Set(
+        access.bindings.filter((binding) => binding.providerId == action.serviceId && binding.status == 'active').map((binding) => binding.accessBindingId),
+      )
+      if (candidates != null && !candidates.some((candidate) => activeBindingIds.has(candidate.accessBindingId))) {
+        const candidate = candidates.find((item) => item.isDefault) ?? (candidates.length == 1 ? candidates[0] : undefined)
+        if (candidate != null) {
+          await this.connectorAccess.select(action.serviceId, candidate.accessBindingId)
+          access = this.connectorAccess.$.value.access
+        }
+      }
+      actionAccessAllowed = candidates?.some((candidate) =>
+        access?.bindings.some((binding) => binding.accessBindingId == candidate.accessBindingId && binding.status == 'active'),
+      )
+    }
+    if (this.#disposed || flowId != this.workspace.$.flowId.value) return
+    const hasActiveBinding = access?.bindings.some((binding) => binding.providerId == action.serviceId && binding.status == 'active') ?? false
+    if (access?.mode != 'implicit' && !(actionAccessAllowed ?? hasActiveBinding)) {
+      return { action, connections: [] }
+    }
+    this.workspace.catalogs.refreshFlow(flowId)
+    const prepared = await this.connectors.resolveAction(action.actionId)
+    if (prepared.action.serviceId != action.serviceId) throw new Error('Connector Action Provider changed while access was being configured.')
+    return prepared
   }
 
   public readonly retryCatalog = (): void => {

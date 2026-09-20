@@ -1,428 +1,233 @@
 import type { ReactElement } from 'react'
-import type { ConnectorCapability } from '../../../../flow/common/change.ts'
+import type { ConnectorAccessCapability, ConnectorCapability } from '../../../../flow/common/change.ts'
+import type { ConnectorAccess, ConnectorConnection, ConnectorProvider } from '../api.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
+import type { ConnectorActionView } from '../workspace.ts'
 
-import { Check, ChevronDown, Code2, Copy, Plus, RefreshCw, X } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
-import { useTranslate } from 'val-i18n-react'
+import { useLang, useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
-import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
-import { Field, FieldLabel, FieldError } from '../../../../ui/browser/field.tsx'
-import { NativeSelect, NativeSelectOption } from '../../../../ui/browser/native-select.tsx'
-import { NativeScrollArea } from '../../../../ui/browser/scroll-area.tsx'
-import { ToggleGroup, ToggleGroupItem } from '../../../../ui/browser/toggle-group.tsx'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle, DialogTrigger } from '../../../../ui/browser/dialog.tsx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../ui/browser/select.tsx'
 import { ActionPicker } from './actionPicker.tsx'
 
-function property(name: string): string {
-  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) ? `.${name}` : `[${JSON.stringify(name)}]`
+interface PreparedAction {
+  readonly action: ConnectorActionView
+  readonly connections: readonly ConnectorConnection[]
+}
+
+export function availableConnectionGroups(
+  connections: readonly ConnectorConnection[],
+  providers: readonly ConnectorProvider[] | undefined,
+  language: string,
+  access?: ConnectorAccess,
+): readonly { readonly connections: readonly ConnectorConnection[]; readonly name: string; readonly serviceId: string }[] {
+  const providerNames = new Map(providers?.map((provider) => [provider.serviceId, provider.serviceName]))
+  const bindings = new Set(access?.bindings.filter((binding) => binding.status == 'active').map((binding) => binding.providerId))
+  const grouped = new Map<string, ConnectorConnection[]>()
+  if (access?.mode == 'selectable') for (const providerId of bindings) grouped.set(providerId, [])
+  for (const connection of connections) {
+    if (connection.status != 'active' || (access?.mode == 'selectable' && !bindings.has(connection.serviceId))) continue
+    const entries = grouped.get(connection.serviceId) ?? []
+    entries.push(connection)
+    grouped.set(connection.serviceId, entries)
+  }
+  return [...grouped]
+    .map(([serviceId, entries]) => ({
+      connections: entries.toSorted(
+        (left, right) => Number(right.isDefault) - Number(left.isDefault) || left.displayName.localeCompare(right.displayName, language),
+      ),
+      name: providerNames.get(serviceId) ?? serviceId,
+      serviceId,
+    }))
+    .toSorted((left, right) => left.name.localeCompare(right.name, language))
+}
+
+export function hintedCapability(capabilities: readonly ConnectorCapability[], action: ConnectorActionView, connectionId?: string): ConnectorAccessCapability {
+  const current = capabilities.find((capability): capability is ConnectorAccessCapability => !('action' in capability))
+  const actionHints = [
+    ...new Set([
+      ...(current?.actionHints ?? []),
+      ...capabilities.flatMap((capability) => ('action' in capability ? [capability.action] : [])),
+      action.actionId,
+    ]),
+  ]
+  const legacyHints: { action: string; connectionId: string; alias?: string }[] = capabilities.flatMap((capability) =>
+    'action' in capability
+      ? [
+          ...capability.connections.flatMap((connection) =>
+            connection.alias == null ? [] : [{ action: capability.action, connectionId: connection.connectionId, alias: connection.alias }],
+          ),
+          ...(capability.connectionId == null ? [] : [{ action: capability.action, connectionId: capability.connectionId }]),
+        ]
+      : [],
+  )
+  const connectionHints = [...(current?.connectionHints ?? legacyHints)].filter(
+    (hint) => hint.action != action.actionId || hint.alias != null || connectionId == null,
+  )
+  if (connectionId != null) connectionHints.push({ action: action.actionId, connectionId })
+  return { kind: 'connector', actionHints, ...(connectionHints.length == 0 ? {} : { connectionHints }) }
+}
+
+function callSource(context: string, actionId: string, connectionId?: string): string {
+  const options = connectionId == null ? '' : `, { connectionId: ${JSON.stringify(connectionId)} }`
+  return `await ${context}.actions.call(${JSON.stringify(actionId)}, {}${options})`
 }
 
 export function CodeActions({
+  access,
   capabilities,
   connectors,
   disabled,
   nodeId,
+  onInsert,
+  prepareAction,
   store,
   context,
 }: {
+  readonly access?: ConnectorAccess
   readonly capabilities: readonly ConnectorCapability[]
   readonly connectors: ConnectorStore
   readonly disabled: boolean
   readonly nodeId: string
+  readonly onInsert: (source: string) => void
+  readonly prepareAction?: (action: ConnectorActionView) => Promise<PreparedAction | undefined>
   readonly store: WorkspaceStore
   readonly context: string
 }): ReactElement {
   const t = useTranslate()
-  const actions = useVal(connectors.$.actions)
-  const catalogs = useVal(connectors.$.catalogs)
-  const flowId = useVal(store.$.flowId)
-  const [preview, setPreview] = useState<string>()
-  const [fullId, setFullId] = useState(false)
-  const [copied, setCopied] = useState<string>()
-  const [copyError, setCopyError] = useState<string>()
-  useEffect(() => {
-    if (copied == null) return
-    const timer = setTimeout(() => setCopied(undefined), 2000)
-    return () => clearTimeout(timer)
-  }, [copied])
-  const [expanded, setExpanded] = useState<string>()
-  const [accountPicker, setAccountPicker] = useState<string>()
-  const [error, setError] = useState<string>()
+  const language = useLang()
   const [saving, setSaving] = useState(false)
-  const [refresh, setRefresh] = useState(0)
-
-  const actionIds = capabilities.map((item) => item.action).join(',')
-  const services = [
-    ...new Set(
-      capabilities
-        .filter((item) => actions[item.action]?.authenticated == true || item.connections.length > 0)
-        .map((item) => item.action.slice(0, item.action.indexOf('.'))),
-    ),
-  ]
-    .toSorted()
-    .join(',')
-
-  useEffect(() => {
-    const controller = new AbortController()
-    setError(undefined)
-    void Promise.all([
-      ...(services == '' ? [] : services.split(',').map((service) => connectors.loadCodeConnections(service, controller.signal))),
-      ...(actionIds == '' ? [] : actionIds.split(',').map((id) => connectors.loadCodeAction(id, controller.signal))),
-    ]).catch((cause: unknown) => {
-      if (!controller.signal.aborted) setError(cause instanceof Error ? cause.message : String(cause))
-    })
-    return () => controller.abort()
-  }, [connectors, flowId, nodeId, services, actionIds, refresh])
-
-  const save = async (value: readonly ConnectorCapability[]): Promise<boolean> => {
+  const [pending, setPending] = useState<PreparedAction>()
+  const [connectionId, setConnectionId] = useState<string>()
+  const [root, setRoot] = useState<HTMLElement | null>(null)
+  const portal = useCallback((element: HTMLDivElement | null) => setRoot(element?.closest<HTMLElement>('.open-flow-workbench') ?? null), [])
+  const connections = useVal(connectors.$.connections)
+  const providers = useVal(store.catalogs.providers.get(undefined, language)).data
+  const connectionGroups = availableConnectionGroups(connections, providers, language, access)
+  const locked = disabled || saving
+  const insert = async (action: ConnectorActionView, selectedConnectionId?: string): Promise<boolean> => {
     setSaving(true)
     try {
-      if (await store.saveCodeActions(nodeId, value)) {
-        return true
-      }
-      return false
+      if (!(await store.saveCodeActions(nodeId, [hintedCapability(capabilities, action, selectedConnectionId)]))) return false
+      onInsert(callSource(context, action.actionId, selectedConnectionId))
+      setPending(undefined)
+      setConnectionId(undefined)
+      return true
     } finally {
       setSaving(false)
     }
   }
-  const replace = (current: ConnectorCapability, next: ConnectorCapability): void => {
-    void save(capabilities.map((item) => (item.action == current.action ? next : item)))
+  const refreshPending = async (): Promise<void> => {
+    if (pending == null || prepareAction == null) return
+    const prepared = await prepareAction(pending.action)
+    if (prepared != null) setPending(prepared)
   }
-  const locked = disabled || saving
+
   return (
-    <NativeScrollArea className="code-action-panel" tabIndex={-1}>
-      <section aria-label={t('inspector.actions.title')} aria-busy={saving}>
-        <div className="code-action-toolbar">
-          <span className="code-action-caption">
-            {t('inspector.actions.title')}
-            {capabilities.length > 0 && <span className="code-action-count">{capabilities.length}</span>}
-          </span>
-          <ActionPicker
-            connectors={connectors}
-            disabled={locked}
-            label={t('inspector.actions.add')}
-            exclude={capabilities.map((item) => item.action)}
-            onSelect={async (action) => {
-              const connection = action.defaultConnection
-              const saved = await save([
-                ...capabilities,
-                {
-                  kind: 'connector',
-                  action: action.actionId,
-                  connections:
-                    connection == null ? [] : [{ connectionId: connection.connectionId, ...(connection.alias == null ? {} : { alias: connection.alias }) }],
-                  ...(connection == null ? {} : { connectionId: connection.connectionId }),
-                },
-              ])
-              if (saved) setExpanded(action.authenticated && connection == null ? action.actionId : undefined)
-              return saved
-            }}
-          />
-        </div>
-        {capabilities.length == 0 && <p className="code-action-description">{t('inspector.actions.introDescription', { context: `${context}.actions` })}</p>}
-        {capabilities.map((declaration) => {
-          const service = declaration.action.slice(0, declaration.action.indexOf('.'))
-          const action = actions[declaration.action]
-          const catalog = catalogs[service]
-          const first = declaration.connections[0]
-          const current = declaration.connections.find((connection) => connection.connectionId == declaration.connectionId)
-          const currentName = current == null ? undefined : (current.alias ?? catalog?.byId.get(current.connectionId)?.displayName)
-          const options =
-            declaration.connectionId == null && first != null
-              ? `, { ${first.alias == null ? `connectionId: ${JSON.stringify(first.connectionId)}` : `connectionAlias: ${JSON.stringify(first.alias)}`} }`
-              : ''
-          const example = `await ${context}.actions${fullId ? `[${JSON.stringify(declaration.action)}]` : `${property(service)}${property(declaration.action.slice(service.length + 1))}`}({}${options})`
-          const exampleId = `action-example-${nodeId}-${declaration.action}`
-          const open = expanded == declaration.action
-          const needsAccount = action?.authenticated == true && declaration.connections.length == 0
-          const unavailable = catalog != null && declaration.connections.some((connection) => catalog.byId.get(connection.connectionId)?.status != 'active')
-          const summary = unavailable
-            ? t('inspector.actions.unavailable')
-            : needsAccount
-              ? t('inspector.actions.needsAccount')
-              : (currentName ??
-                (declaration.connections.length > 0
-                  ? t('inspector.actions.accounts', { count: declaration.connections.length })
-                  : action?.authenticated == false
-                    ? t('inspector.actions.public')
-                    : '…'))
-          const panelId = `action-settings-${nodeId}-${declaration.action}`
-          return (
-            <div key={declaration.action} className="code-action-entry">
-              <div className="code-action-row">
-                <Button
-                  type="button"
-                  variant="disclosure"
-                  className="code-action-toggle"
-                  disabled={locked}
-                  aria-expanded={open}
-                  aria-controls={panelId}
-                  onClick={() => setExpanded(open ? undefined : declaration.action)}
-                >
-                  <ChevronDown className="code-action-chevron" />
-                  <span className="code-action-name" title={declaration.action}>
-                    <span>{action?.name ?? declaration.action}</span>
-                    <code>{declaration.action}</code>
-                  </span>
-                  {(!open || needsAccount || unavailable) && (
-                    <span className={`code-action-account${needsAccount || unavailable ? ' needs-account' : ''}`} title={summary}>
-                      {summary}
-                    </span>
-                  )}
+    <section className="code-action-panel" aria-label={t('inspector.actions.title')} aria-busy={saving} ref={portal}>
+      <p className="code-action-description">{t('inspector.actions.connectorCapabilityDescription')}</p>
+      <div className="code-action-entrypoints">
+        <ActionPicker
+          connectors={connectors}
+          disabled={locked}
+          label={t('inspector.actions.addAction')}
+          prepare={prepareAction}
+          onSelect={async (action, actionConnections) => {
+            if (!action.authenticated) return await insert(action)
+            else {
+              setPending({ action, connections: actionConnections })
+              setConnectionId(action.defaultConnection?.connectionId)
+            }
+            return true
+          }}
+        />
+        <Dialog>
+          <DialogTrigger disabled={locked} render={<Button type="button" variant="ghost" size="xs" />}>
+            {t('inspector.actions.availableConnections')}
+          </DialogTrigger>
+          <DialogContent container={root} className="sm:max-w-lg">
+            <DialogTitle>{t('inspector.actions.availableConnectionsTitle')}</DialogTitle>
+            <DialogDescription>
+              {t(access?.mode == 'selectable' ? 'inspector.actions.availableConnectionsDescription' : 'inspector.actions.deploymentConnectionsDescription')}
+            </DialogDescription>
+            {connectionGroups.length == 0 ? (
+              <p className="text-sm text-muted-foreground">{t('inspector.actions.noConnections')}</p>
+            ) : (
+              <div className="code-action-available-connections">
+                {connectionGroups.map((group) => (
+                  <section className="code-action-provider" key={group.serviceId}>
+                    <h4>{group.name}</h4>
+                    {group.connections.length == 0 ? (
+                      <p className="text-xs text-muted-foreground">{t('inspector.actions.noConnections')}</p>
+                    ) : (
+                      group.connections.map((connection) => (
+                        <div className="code-action-available-connection" key={connection.connectionId}>
+                          <span>
+                            {connection.displayName}
+                            {connection.isDefault && <small>{t('inspector.actions.defaultConnection')}</small>}
+                          </span>
+                          <code>{connection.connectionId}</code>
+                        </div>
+                      ))
+                    )}
+                  </section>
+                ))}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+      <Dialog open={pending != null} onOpenChange={(open) => !open && setPending(undefined)}>
+        <DialogContent container={root} className="sm:max-w-md">
+          <DialogTitle>{t('inspector.actions.chooseConnection', { provider: pending?.action.serviceName ?? '' })}</DialogTitle>
+          <DialogDescription>{t('inspector.actions.connectionDescription')}</DialogDescription>
+          {pending != null && pending.connections.length > 0 ? (
+            <Select
+              items={pending.connections.map((connection) => ({
+                label: `${connection.displayName}${connection.isDefault ? ` · ${t('inspector.actions.defaultConnection')}` : ''}`,
+                value: connection.connectionId,
+              }))}
+              value={connectionId ?? null}
+              onValueChange={(value) => setConnectionId(typeof value == 'string' ? value : undefined)}
+            >
+              <SelectTrigger aria-label={t('inspector.actions.chooseConnection', { provider: pending.action.serviceName })} className="w-full">
+                <SelectValue placeholder={t('inspector.account.chooseAccount')} />
+              </SelectTrigger>
+              <SelectContent>
+                {pending.connections.map((connection) => (
+                  <SelectItem key={connection.connectionId} value={connection.connectionId}>
+                    {connection.displayName}
+                    {connection.isDefault ? ` · ${t('inspector.actions.defaultConnection')}` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">{t('inspector.actions.noConnections')}</p>
+              <div className="flex gap-2">
+                <Button onClick={() => pending != null && void connectors.connect(pending.action.serviceId)} size="sm" type="button" variant="secondary">
+                  {t('inspector.account.addAccount')}
                 </Button>
-                <Button
-                  type="button"
-                  size="xs"
-                  variant="ghost"
-                  aria-expanded={preview == declaration.action}
-                  aria-controls={exampleId}
-                  onClick={() => {
-                    setPreview(preview == declaration.action ? undefined : declaration.action)
-                    setFullId(false)
-                    setCopied(undefined)
-                    setCopyError(undefined)
-                  }}
-                >
-                  <Code2 />
-                  {t('inspector.actions.example')}
-                </Button>
-                <Button
-                  type="button"
-                  size="icon-xs"
-                  variant="ghost"
-                  disabled={locked}
-                  title={t('inspector.actions.removeAction')}
-                  aria-label={`${t('inspector.actions.removeAction')} · ${action?.name ?? declaration.action}`}
-                  onClick={() => void save(capabilities.filter((item) => item.action != declaration.action))}
-                >
-                  <X />
+                <Button onClick={() => void refreshPending()} size="sm" type="button" variant="ghost">
+                  {t('contextPanel.retry')}
                 </Button>
               </div>
-              {preview == declaration.action && (
-                <div id={exampleId} className="code-action-example">
-                  <div className="code-action-toolbar">
-                    <ToggleGroup<'nested' | 'id'>
-                      size="sm"
-                      spacing={2}
-                      variant="default"
-                      value={[fullId ? 'id' : 'nested']}
-                      aria-label={t('inspector.actions.syntax')}
-                      onValueChange={(value) => {
-                        if (value[0] != null) setFullId(value[0] == 'id')
-                        setCopied(undefined)
-                        setCopyError(undefined)
-                      }}
-                    >
-                      <ToggleGroupItem value="nested">{t('inspector.actions.nested')}</ToggleGroupItem>
-                      <ToggleGroupItem value="id">{t('inspector.actions.fullId')}</ToggleGroupItem>
-                    </ToggleGroup>
-                    <Button
-                      type="button"
-                      size="xs"
-                      variant="ghost"
-                      onClick={async () => {
-                        setCopyError(undefined)
-                        try {
-                          await navigator.clipboard.writeText(example)
-                          setCopied(example)
-                        } catch {
-                          setCopyError(example)
-                        }
-                      }}
-                    >
-                      {copied == example ? <Check /> : <Copy />}
-                      <span role="status">{t(copied == example ? 'inspector.actions.copied' : 'inspector.actions.copy')}</span>
-                    </Button>
-                  </div>
-                  <pre tabIndex={0} aria-label={t('inspector.actions.example')}>
-                    <code>{example}</code>
-                  </pre>
-                  {copyError == example && <FieldError>{t('inspector.actions.copyError')}</FieldError>}
-                </div>
-              )}
-              {open && (action?.authenticated == true || declaration.connections.length > 0) && (
-                <div id={panelId} className="code-action-settings">
-                  {declaration.connections.length > 0 && (
-                    <Field className="code-action-default">
-                      <FieldLabel htmlFor={`actions-default-${nodeId}-${declaration.action}`}>{t('inspector.actions.default')}</FieldLabel>
-                      <NativeSelect
-                        size="sm"
-                        id={`actions-default-${nodeId}-${declaration.action}`}
-                        value={declaration.connectionId ?? ''}
-                        title={t('inspector.actions.defaultHint')}
-                        aria-description={t('inspector.actions.defaultHint')}
-                        disabled={locked}
-                        onChange={(event) => {
-                          const { connectionId: _default, ...next } = declaration
-                          replace(declaration, { ...next, ...(event.target.value == '' ? {} : { connectionId: event.target.value }) })
-                        }}
-                      >
-                        <NativeSelectOption value="">{t('inspector.actions.explicit')}</NativeSelectOption>
-                        {declaration.connections.map((connection) => (
-                          <NativeSelectOption key={connection.connectionId} value={connection.connectionId}>
-                            {connection.alias ?? catalog?.byId.get(connection.connectionId)?.displayName ?? connection.connectionId}
-                          </NativeSelectOption>
-                        ))}
-                      </NativeSelect>
-                    </Field>
-                  )}
-                  <div className="code-action-picker">
-                    <div className="code-action-toolbar">
-                      <Button
-                        type="button"
-                        size="xs"
-                        variant="disclosure"
-                        className="code-action-picker-toggle"
-                        aria-expanded={accountPicker == declaration.action}
-                        aria-controls={`accounts-${nodeId}-${declaration.action}`}
-                        onClick={() => setAccountPicker(accountPicker == declaration.action ? undefined : declaration.action)}
-                      >
-                        <ChevronDown />
-                        <span>{t('inspector.actions.chooseAccounts')}</span>
-                        <span className="code-action-hint">{t('inspector.actions.accounts', { count: declaration.connections.length })}</span>
-                      </Button>
-                      {accountPicker == declaration.action && (
-                        <div className="code-action-tools">
-                          <Button type="button" size="xs" variant="ghost" disabled={locked} onClick={() => void connectors.connect(service)}>
-                            <Plus />
-                            {t('inspector.actions.connect')}
-                          </Button>
-                          <Button
-                            type="button"
-                            size="icon-xs"
-                            variant="ghost"
-                            disabled={locked}
-                            title={t('inspector.actions.refresh')}
-                            aria-label={t('inspector.actions.refresh')}
-                            onClick={() => setRefresh((value) => value + 1)}
-                          >
-                            <RefreshCw />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                    {accountPicker == declaration.action && (
-                      <div
-                        id={`accounts-${nodeId}-${declaration.action}`}
-                        className="code-action-accounts"
-                        role="group"
-                        aria-label={t('inspector.actions.allowed')}
-                      >
-                        <div className="code-action-connections">
-                          {(catalog?.all ?? []).map((connection) => {
-                            const binding = declaration.connections.find((item) => item.connectionId == connection.connectionId)
-                            const alias = binding == null ? connection.alias : binding.alias
-                            return (
-                              <FieldLabel
-                                key={connection.connectionId}
-                                className="code-action-connection"
-                                title={connection.connectionId}
-                                data-unavailable={connection.status != 'active'}
-                              >
-                                <Checkbox
-                                  disabled={locked || (connection.status != 'active' && binding == null)}
-                                  checked={binding != null}
-                                  onCheckedChange={(checked) => {
-                                    const connections = checked
-                                      ? [
-                                          ...declaration.connections,
-                                          { connectionId: connection.connectionId, ...(connection.alias == null ? {} : { alias: connection.alias }) },
-                                        ]
-                                      : declaration.connections.filter((item) => item.connectionId != connection.connectionId)
-                                    const { connectionId, ...next } = declaration
-                                    const defaultId = checked && declaration.connections.length == 0 ? connection.connectionId : connectionId
-                                    replace(declaration, {
-                                      ...next,
-                                      connections,
-                                      ...(defaultId != null && connections.some((item) => item.connectionId == defaultId) ? { connectionId: defaultId } : {}),
-                                    })
-                                  }}
-                                />
-                                <span className="code-action-name">
-                                  <span>{connection.displayName}</span>
-                                  {alias != null && alias != connection.displayName && <code>{alias}</code>}
-                                </span>
-                                {connection.status != 'active' && <span className="code-action-hint">{t('inspector.actions.unavailable')}</span>}
-                              </FieldLabel>
-                            )
-                          })}
-                          {declaration.connections
-                            .filter((connection) => catalog != null && !catalog.byId.has(connection.connectionId))
-                            .map((connection) => (
-                              <div key={connection.connectionId} className="code-action-toolbar">
-                                <span className="code-action-name" title={connection.connectionId}>
-                                  <span>{connection.alias ?? connection.connectionId}</span>
-                                  <span className="code-action-hint">{t('inspector.actions.unavailable')}</span>
-                                </span>
-                                <Button
-                                  type="button"
-                                  size="icon-xs"
-                                  variant="ghost"
-                                  disabled={locked}
-                                  aria-label={`${t('inspector.actions.remove')} · ${connection.alias ?? connection.connectionId}`}
-                                  onClick={() => {
-                                    const { connectionId, ...next } = declaration
-                                    replace(declaration, {
-                                      ...next,
-                                      connections: declaration.connections.filter((item) => item.connectionId != connection.connectionId),
-                                      ...(connectionId == connection.connectionId || connectionId == null ? {} : { connectionId }),
-                                    })
-                                  }}
-                                >
-                                  <X />
-                                </Button>
-                              </div>
-                            ))}
-                        </div>
-                        {declaration.connections.length > 0 && (
-                          <details className="code-action-details">
-                            <summary>{t('inspector.actions.details')}</summary>
-                            {declaration.connections.map((connection) => (
-                              <div key={connection.connectionId} className="code-action-identity">
-                                <span>{connection.alias ?? catalog?.byId.get(connection.connectionId)?.displayName ?? '—'}</span>
-                                <code>{connection.connectionId}</code>
-                              </div>
-                            ))}
-                            <Button
-                              type="button"
-                              size="xs"
-                              variant="ghost"
-                              disabled={locked || catalog == null}
-                              onClick={() =>
-                                replace(declaration, {
-                                  ...declaration,
-                                  connections: declaration.connections.map((selected) => {
-                                    const connection = catalog?.byId.get(selected.connectionId)
-                                    return connection == null
-                                      ? selected
-                                      : { connectionId: selected.connectionId, ...(connection.alias == null ? {} : { alias: connection.alias }) }
-                                  }),
-                                })
-                              }
-                            >
-                              {t('inspector.actions.aliases')}
-                            </Button>
-                          </details>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
             </div>
-          )
-        })}
-        {error != null && (
-          <FieldError role="alert">
-            {error}
-            <Button type="button" size="xs" variant="ghost" disabled={locked} onClick={() => setRefresh((value) => value + 1)}>
-              {t('inspector.actions.refresh')}
+          )}
+          <DialogFooter>
+            <Button onClick={() => setPending(undefined)} type="button" variant="ghost">
+              {t('common.cancel')}
             </Button>
-          </FieldError>
-        )}
-      </section>
-    </NativeScrollArea>
+            <Button disabled={connectionId == null || saving} onClick={() => pending != null && void insert(pending.action, connectionId)} type="button">
+              {t('inspector.actions.insertAction')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </section>
   )
 }

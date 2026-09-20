@@ -118,6 +118,96 @@ describe('ControlClient Flow API', () => {
     await expect(client.createConnectorConnectionPage('mail', flow.flowId)).resolves.toBe('https://connector.example/providers/mail')
   })
 
+  it('reads and updates deployment-neutral Provider access bindings', async () => {
+    const implicit = { accessRevision: 0, bindings: [], mode: 'implicit', providerAccessDigest: 'implicit', version: 1 } as const
+    const selectable = {
+      accessRevision: 2,
+      bindings: [
+        {
+          accessBindingId: 'editors',
+          connectionDisplayName: 'Work account',
+          permissionGroupName: 'Editors',
+          providerId: 'mail',
+          status: 'active',
+        },
+        {
+          accessBindingId: 'personal',
+          connectionDisplayName: 'Personal account',
+          permissionGroupName: null,
+          providerId: 'mail',
+          status: 'active',
+        },
+      ],
+      mode: 'selectable',
+      providerAccessDigest: 'sha256:access',
+      version: 1,
+    } as const
+    const request = vi.fn(async (path: string, init?: RequestInit) => {
+      if (path == '/v1/flows/flow%2F1/connector-access' && init?.method == null) return Response.json(implicit)
+      if (path == '/v1/flows/flow%2F1/connector-access/mail/candidates') {
+        return Response.json({
+          candidates: [
+            {
+              accessBindingId: 'editors',
+              connectionDisplayName: 'Work account',
+              isDefault: true,
+              permissions: { actionIds: ['mail.send'], allActions: false, configured: true, proxy: false },
+              permissionGroupName: 'Editors',
+              providerId: 'mail',
+            },
+          ],
+          mode: 'selectable',
+          providerId: 'mail',
+          version: 1,
+        })
+      }
+      if (path == '/v1/flows/flow%2F1/connector-access/mail' && (init?.method == 'PUT' || init?.method == 'DELETE')) return Response.json(selectable)
+      throw new Error(path)
+    })
+    const client = new ControlClient(request)
+
+    await expect(client.getConnectorAccess(flow.flowId)).resolves.toEqual(implicit)
+    await expect(client.listProviderAccessBindingCandidates(flow.flowId, 'mail')).resolves.toEqual({
+      candidates: [
+        {
+          accessBindingId: 'editors',
+          connectionDisplayName: 'Work account',
+          isDefault: true,
+          permissions: { actionIds: ['mail.send'], allActions: false, configured: true, proxy: false },
+          permissionGroupName: 'Editors',
+          providerId: 'mail',
+        },
+      ],
+      mode: 'selectable',
+      providerId: 'mail',
+      version: 1,
+    })
+    await expect(client.addProviderAccessBinding(flow.flowId, 'mail', 'editors', 1)).resolves.toEqual(selectable)
+    await expect(client.removeProviderAccessBinding(flow.flowId, 'mail', 'editors', 2)).resolves.toEqual(selectable)
+    expect(JSON.parse(String(request.mock.calls[2]![1]?.body))).toEqual({ accessBindingId: 'editors', expectedAccessRevision: 1, version: 1 })
+    expect(JSON.parse(String(request.mock.calls[3]![1]?.body))).toEqual({ accessBindingId: 'editors', expectedAccessRevision: 2, version: 1 })
+  })
+
+  it('rejects inconsistent Provider access permission summaries', async () => {
+    const client = new ControlClient(async () =>
+      Response.json({
+        candidates: [
+          {
+            accessBindingId: 'editors',
+            connectionDisplayName: 'Work account',
+            permissions: { actionIds: [], allActions: false, configured: false, proxy: false },
+            providerId: 'mail',
+          },
+        ],
+        mode: 'selectable',
+        providerId: 'mail',
+        version: 1,
+      }),
+    )
+
+    await expect(client.listProviderAccessBindingCandidates(flow.flowId, 'mail')).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
+  })
+
   it('preserves structured Diagnostic values', async () => {
     const checked = {
       closureDigest: 'closure-1',
@@ -252,6 +342,7 @@ describe('ControlClient Wait API', () => {
     engineDigest: 'engine-1',
     flowId: flow.flowId,
     modelVersion: currentFlowModelVersion,
+    providerAccessDigest: 'implicit:1',
     revisionDigest: 'revision-digest-1',
     revisionId: flow.draftRevisionId,
     runId: 'run-waiting',

@@ -32,6 +32,8 @@ const samples = {
   createLiveRun: { publicationId: 'p1', inputs: {}, trigger: { nodeId: 'start', outputs: {} }, version: 2 },
   resolveWait: { action: 'continue', version: 1 },
   putVariable: { value: '' },
+  addProviderAccessBinding: { accessBindingId: 'editors', expectedAccessRevision: 1, version: 1 },
+  removeProviderAccessBinding: { accessBindingId: 'editors', expectedAccessRevision: 1, version: 1 },
   versionOnly: { version: 1 },
 } satisfies Record<keyof typeof controlRequests, unknown>
 

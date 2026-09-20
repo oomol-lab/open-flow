@@ -1029,6 +1029,44 @@ export const triggerControlApiConformanceCases: readonly ControlApiConformanceCa
 
 export const connectorControlApiConformanceCases: readonly ControlApiConformanceCase[] = [
   {
+    name: 'projects implicit Connector access without writable binding state',
+    async verify(harness) {
+      const created = await createFlow(harness, 'Connector access', 'connector-access-create')
+      const flowId = requiredString(created.flowId, 'Flow ID')
+      const access = await json(await request(harness, `/v1/flows/${flowId}/connector-access`), 200, 'Read Connector access')
+      equal(access.accessRevision, 0, 'Implicit Connector access revision')
+      equal(access.bindings, [], 'Implicit Connector access bindings')
+      equal(access.mode, 'implicit', 'Implicit Connector access mode')
+      if (!requiredString(access.providerAccessDigest, 'Implicit Connector access digest').startsWith('implicit')) {
+        fail('Implicit Connector access digest must identify the implicit authority generation.')
+      }
+      equal(access.version, 1, 'Implicit Connector access version')
+      equal(
+        await json(await request(harness, `/v1/flows/${flowId}/connector-access/mail/candidates`), 200, 'Read Connector access candidates'),
+        { candidates: [], mode: 'implicit', providerId: 'mail', version: 1 },
+        'Implicit Connector access candidates',
+      )
+      await error(
+        await request(harness, `/v1/flows/${flowId}/connector-access/mail`, {
+          body: JSON.stringify({ accessBindingId: 'editors', expectedAccessRevision: 0, version: 1 }),
+          method: 'PUT',
+        }),
+        409,
+        'connector.access-unsupported',
+        'Set implicit Connector access',
+      )
+      await error(
+        await request(harness, `/v1/flows/${flowId}/connector-access/mail`, {
+          body: JSON.stringify({ accessBindingId: 'editors', expectedAccessRevision: 0, version: 1 }),
+          method: 'DELETE',
+        }),
+        409,
+        'connector.access-unsupported',
+        'Clear implicit Connector access',
+      )
+    },
+  },
+  {
     name: 'projects the deployment Connector catalog and authorized Connections',
     async verify(harness) {
       const providers = list(
@@ -1069,6 +1107,121 @@ export const connectorControlApiConformanceCases: readonly ControlApiConformance
     },
   },
 ]
+
+export function selectableConnectorAccessControlApiConformanceCases(fixture: {
+  readonly accessBindingId: string
+  readonly connectionDisplayName: string
+  readonly permissionGroupName: string | null
+  readonly providerId: string
+}): readonly ControlApiConformanceCase[] {
+  return [
+    {
+      name: 'selects Provider access with optimistic concurrency',
+      async verify(harness) {
+        const created = await createFlow(harness, 'Selectable Connector access', 'selectable-connector-access-create')
+        const flowId = requiredString(created.flowId, 'Flow ID')
+        const path = `/v1/flows/${flowId}/connector-access/${encodeURIComponent(fixture.providerId)}`
+        const initial = await json(await request(harness, `/v1/flows/${flowId}/connector-access`), 200, 'Read selectable Connector access')
+        equal(initial.mode, 'selectable', 'Selectable Connector access mode')
+        equal(initial.accessRevision, 0, 'Initial selectable Connector access revision')
+        const candidates = await json(await request(harness, `${path}/candidates`), 200, 'Read Provider access candidates')
+        equal(candidates.mode, 'selectable', 'Provider access candidate mode')
+        equal(candidates.providerId, fixture.providerId, 'Provider access candidate Provider')
+        const candidate = list(candidates.candidates, 'Provider access candidates').find(
+          (value) => record(value, 'Provider access candidate').accessBindingId == fixture.accessBindingId,
+        )
+        if (candidate == null) fail('Expected selectable Provider access candidate was not returned.')
+        equal(
+          record(candidate, 'Provider access candidate').connectionDisplayName,
+          fixture.connectionDisplayName,
+          'Provider access candidate connection display name',
+        )
+        equal(
+          record(candidate, 'Provider access candidate').permissionGroupName,
+          fixture.permissionGroupName,
+          'Provider access candidate permission group name',
+        )
+
+        const selected = await json(
+          await request(harness, path, {
+            body: JSON.stringify({ accessBindingId: fixture.accessBindingId, expectedAccessRevision: 0, version: 1 }),
+            method: 'PUT',
+          }),
+          200,
+          'Select Provider access',
+        )
+        equal(selected.accessRevision, 1, 'Selected Connector access revision')
+        equal(selected.mode, 'selectable', 'Selected Connector access mode')
+        const binding = list(selected.bindings, 'Selected Connector access bindings').find(
+          (value) => record(value, 'Selected Connector access binding').providerId == fixture.providerId,
+        )
+        if (binding == null) fail('Selected Provider access binding was not projected.')
+        equal(record(binding, 'Selected Connector access binding').accessBindingId, fixture.accessBindingId, 'Selected Provider access binding ID')
+        equal(
+          record(binding, 'Selected Connector access binding').connectionDisplayName,
+          fixture.connectionDisplayName,
+          'Selected Provider access binding connection display name',
+        )
+        equal(
+          record(binding, 'Selected Connector access binding').permissionGroupName,
+          fixture.permissionGroupName,
+          'Selected Provider access binding permission group name',
+        )
+        const selectedDigest = requiredString(selected.providerAccessDigest, 'Selected Connector access digest')
+
+        const revisionId = await addManualTrigger(harness, flowId, requiredString(created.draftRevisionId, 'Draft Revision ID'))
+        const draftRun = await json(
+          await request(harness, `/v1/flows/${flowId}/revisions/${revisionId}/runs`, {
+            body: JSON.stringify({ engineContract, inputs: {}, trigger: { nodeId: 'start', outputs: {} }, version: 2 }),
+            headers: { 'idempotency-key': 'selectable-connector-access-draft-run' },
+            method: 'POST',
+          }),
+          202,
+          'Admit Draft Run with selected Provider access',
+        )
+        equal(draftRun.providerAccessDigest, selectedDigest, 'Draft Run Provider access snapshot')
+
+        const published = await completePublish(
+          harness,
+          await publishRequest(harness, flowId, revisionId, null, 'selectable-connector-access-publish'),
+          202,
+          'Publish selected Provider access',
+        )
+        equal(published.publication.providerAccessDigest, selectedDigest, 'Publication Provider access snapshot')
+
+        await error(
+          await request(harness, path, {
+            body: JSON.stringify({ accessBindingId: fixture.accessBindingId, expectedAccessRevision: 0, version: 1 }),
+            method: 'PUT',
+          }),
+          412,
+          'connector.access-conflict',
+          'Overwrite Provider access with a stale revision',
+        )
+
+        const cleared = await json(
+          await request(harness, path, {
+            body: JSON.stringify({ accessBindingId: fixture.accessBindingId, expectedAccessRevision: 1, version: 1 }),
+            method: 'DELETE',
+          }),
+          200,
+          'Clear Provider access',
+        )
+        equal(cleared.accessRevision, 2, 'Cleared Connector access revision')
+        equal(cleared.bindings, [], 'Cleared Connector access bindings')
+        const live = await json(await request(harness, `/v1/flows/${flowId}/live`), 200, 'Read Live after clearing Provider access')
+        equal(live.hasUnpublishedChanges, true, 'Cleared Draft access marks Live as unpublished')
+        const publicationId = requiredString(published.publication.publicationId, 'Publication ID')
+        const liveRun = await json(
+          await liveRunRequest(harness, publicationId, 'selectable-connector-access-live-run'),
+          202,
+          'Admit Live Run after clearing Draft access',
+        )
+        equal(liveRun.providerAccessDigest, selectedDigest, 'Live Run preserves Publication Provider access snapshot')
+      },
+    },
+  ]
+}
 
 export const controlRecoveryConformanceCases: readonly {
   readonly name: string

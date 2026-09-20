@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import type { ConnectorConnection } from '../api.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { ConnectorActionView } from '../workspace.ts'
 import type { AddNodeOption } from './addNodeOptions.ts'
@@ -20,12 +21,16 @@ export function ActionPicker({
   label,
   exclude = [],
   onSelect,
+  prepare,
 }: {
   readonly connectors: ConnectorStore
   readonly disabled: boolean
   readonly label: string
   readonly exclude?: readonly string[]
-  readonly onSelect: (action: ConnectorActionView) => Promise<boolean>
+  readonly onSelect: (action: ConnectorActionView, connections: readonly ConnectorConnection[]) => Promise<boolean>
+  readonly prepare?: (
+    action: ConnectorActionView,
+  ) => Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] } | undefined>
 }): ReactElement {
   const t = useTranslate()
   const [open, setOpen] = useState(false)
@@ -76,7 +81,9 @@ export function ActionPicker({
                 if (option.kind != 'connector') return
                 setError(undefined)
                 try {
-                  if (!(await onSelect(option.connector))) {
+                  const prepared = prepare == null ? { action: option.connector, connections: [] } : await prepare(option.connector)
+                  if (prepared == null) return
+                  if (!(await onSelect(prepared.action, prepared.connections))) {
                     setError(t('actionPicker.failed'))
                     return
                   }

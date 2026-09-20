@@ -52,6 +52,49 @@ function diagnostics(source: string, declarations = [declaration], catalog: Read
 }
 
 describe('Code Action editor types', () => {
+  it('types the dynamic call API for every Code Task', () => {
+    expect(
+      diagnostics(
+        `export default async (_, ctx) => {
+          await ctx.actions.call('unlisted.action', {}, { connectionId: 'outside' })
+          await ctx.actions.unlisted.action({ any: 'value' })
+          return {}
+        }`,
+        [],
+      ),
+    ).toEqual([])
+  })
+
+  it('adds precise overloads for hinted Actions while keeping the dynamic fallback', () => {
+    expect(
+      diagnostics(
+        `export default async (_, ctx) => {
+          const result = await ctx.actions.call('example.echo', { any: 'value' }, { connectionId: 'work' })
+          const nested = await ctx.actions.example.echo({ any: 'value' })
+          await ctx.actions.call('unlisted.action', {})
+          await ctx.actions.example.unlisted({ anything: true })
+          return { text: result.result.toUpperCase() + nested.result }
+        }`,
+        [
+          {
+            kind: 'connector',
+            actionHints: ['example.echo'],
+            connectionHints: [{ action: 'example.echo', connectionId: 'work' }],
+          },
+        ],
+      ),
+    ).toEqual([])
+    expect(
+      diagnostics(
+        `export default async (_, ctx) => {
+          await ctx.actions.call('example.echo', { any: 1 }, { connectionId: 'other' })
+          return {}
+        }`,
+        [{ kind: 'connector', actionHints: ['example.echo'], connectionHints: [{ action: 'example.echo', connectionId: 'work' }] }],
+      ).length,
+    ).toBeGreaterThan(0)
+  })
+
   it('checks both APIs against raw optional fields, output schemas and exact Connection choices', () => {
     expect(
       diagnostics(`export default async (_, ctx) => {
@@ -68,7 +111,6 @@ describe('Code Action editor types', () => {
     "ctx.actions.example.echo({}, { connectionId: 'other' })",
     "ctx.actions.example.echo({}, { connectionAlias: 'renamed' })",
     "ctx.actions.example.echo({}, { connectionId: 'work', connectionAlias: 'office' })",
-    "ctx.actions['example.missing']({})",
     "ctx.actions.example.echo({ any: 1 }, { connectionId: 'work' })",
   ])('diagnoses invalid calls: %s', (call) => {
     expect(diagnostics(`export default async (_, ctx) => { await ${call}; return {} }`).length).toBeGreaterThan(0)
@@ -98,20 +140,19 @@ describe('Code Action editor types', () => {
     ).toEqual([])
   })
 
-  it('requires narrowing an arbitrary string and diagnoses removed bindings', () => {
+  it('allows dynamic IDs and diagnoses removed Connection aliases for hinted Actions', () => {
     const source = `export default async (_, ctx) => {
       /** @type {string} */ const id = 'example.echo'
       await ctx.actions[id]({}, { connectionId: 'work' })
       return {}
     }`
-    expect(diagnostics(source).length).toBeGreaterThan(0)
-    expect(diagnostics(source.replace('await ctx.actions[id]', "if (id === 'example.echo') await ctx.actions[id]"))).toEqual([])
+    expect(diagnostics(source)).toEqual([])
     expect(
       diagnostics(`export default async (_, ctx) => { await ctx.actions.example.echo({}, { connectionAlias: 'office' }); return {} }`, [
         { ...declaration, connections: [{ connectionId: 'work' }] },
       ]).length,
     ).toBeGreaterThan(0)
-    expect(diagnostics(`export default async (_, ctx) => { await ctx.actions.example.echo({}); return {} }`, []).length).toBeGreaterThan(0)
+    expect(diagnostics(`export default async (_, ctx) => { await ctx.actions.example.echo({}); return {} }`, [])).toEqual([])
   })
 
   it('permits omitted options for a default or public Action and keeps missing schemas unknown', () => {

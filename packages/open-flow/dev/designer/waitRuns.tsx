@@ -44,6 +44,7 @@ const base: RunDetails = {
   engineContract: 'open-flow-engine/v5',
   engineDigest: 'lab',
   modelVersion: currentFlowModelVersion,
+  providerAccessDigest: 'implicit:lab',
   revisionDigest: 'lab',
   waits,
 }

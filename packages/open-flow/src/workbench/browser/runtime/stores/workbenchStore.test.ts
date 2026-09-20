@@ -36,7 +36,7 @@ function catalogSession(initialFlowId?: string) {
   const store = new WorkbenchStore(client, { getItem: () => null, setItem: () => {} })
   const navigate = vi.fn()
   const navigation = new NavigationStore(store, { flowId: initialFlowId, view: 'design' }, navigate)
-  return { store, navigation, navigate, list, emit: (event?: FlowCatalogEvent) => emit!(event) }
+  return { client, store, navigation, navigate, list, emit: (event?: FlowCatalogEvent) => emit!(event) }
 }
 
 describe('Flow creation notifications', () => {
@@ -491,6 +491,111 @@ it('reports thrown add failures through notices without treating an empty result
     expect(store.$.notice.value).toBeUndefined()
     expect(add).toHaveBeenCalledTimes(2)
   } finally {
+    store.dispose()
+  }
+})
+
+it('adds default Provider access while creating a Connector node without prompting', async () => {
+  const { client, navigation, store } = catalogSession('flow-1')
+  const discovered = {
+    actionId: 'mail.send',
+    authenticated: true,
+    description: 'Global catalog',
+    inputs: {},
+    name: 'Send',
+    outputs: {},
+    serviceId: 'mail',
+    serviceName: 'Mail',
+  }
+  const connection = {
+    connectionId: 'mail-default',
+    displayName: 'Default account',
+    isDefault: true,
+    serviceId: 'mail',
+    status: 'active' as const,
+  }
+  const resolved = { ...discovered, defaultConnection: connection, description: 'Flow catalog' }
+  const option = {
+    connector: discovered,
+    description: discovered.description,
+    group: 'Connector Actions',
+    id: 'connector:mail.send',
+    inputs: [],
+    kind: 'connector' as const,
+    label: discovered.name,
+    outputs: [],
+  }
+  vi.spyOn(client, 'getConnectorAccess').mockResolvedValue({
+    accessRevision: 1,
+    bindings: [
+      {
+        accessBindingId: 'mail-read-access',
+        connectionDisplayName: connection.displayName,
+        permissionGroupName: null,
+        providerId: 'mail',
+        status: 'active',
+      },
+    ],
+    mode: 'selectable',
+    providerAccessDigest: 'access-1',
+    version: 1,
+  })
+  vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
+    candidates: [
+      {
+        accessBindingId: 'mail-read-access',
+        connectionDisplayName: connection.displayName,
+        isDefault: true,
+        permissions: { actionIds: ['mail.read'], allActions: false, configured: false, proxy: false },
+        permissionGroupName: null,
+        providerId: 'mail',
+      },
+      {
+        accessBindingId: 'mail-send-access',
+        connectionDisplayName: 'Sending account',
+        isDefault: false,
+        permissions: { actionIds: ['mail.send'], allActions: false, configured: false, proxy: false },
+        permissionGroupName: 'Senders',
+        providerId: 'mail',
+      },
+    ],
+    mode: 'selectable',
+    providerId: 'mail',
+    version: 1,
+  })
+  const addAccess = vi.spyOn(client, 'addProviderAccessBinding').mockResolvedValue({
+    accessRevision: 2,
+    bindings: [
+      {
+        accessBindingId: 'mail-read-access',
+        connectionDisplayName: connection.displayName,
+        permissionGroupName: null,
+        providerId: 'mail',
+        status: 'active',
+      },
+      {
+        accessBindingId: 'mail-send-access',
+        connectionDisplayName: 'Sending account',
+        permissionGroupName: 'Senders',
+        providerId: 'mail',
+        status: 'active',
+      },
+    ],
+    mode: 'selectable',
+    providerAccessDigest: 'access-2',
+    version: 1,
+  })
+  const resolve = vi.spyOn(store.connectors, 'resolveAction').mockResolvedValue({ action: resolved, connections: [connection] })
+  const add = vi.spyOn(store.workspace, 'addNode').mockResolvedValue('node')
+  try {
+    await navigation.start()
+
+    await expect(store.addNode(option, { x: 0, y: 0 })).resolves.toBe('node')
+    expect(addAccess).toHaveBeenCalledWith('flow-1', 'mail', 'mail-send-access', 1)
+    expect(resolve).toHaveBeenCalledWith('mail.send')
+    expect(add).toHaveBeenCalledWith({ ...option, connector: resolved }, { x: 0, y: 0 }, undefined)
+  } finally {
+    navigation.dispose()
     store.dispose()
   }
 })

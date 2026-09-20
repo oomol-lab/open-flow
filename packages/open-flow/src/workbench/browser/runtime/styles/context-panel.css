@@ -753,25 +753,6 @@
     font-size: 12px;
   }
 
-  .code-action-toolbar,
-  .code-action-row,
-  .code-action-tools {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    min-width: 0;
-  }
-
-  .code-action-caption {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--ui-muted-foreground);
-    font-size: 11px;
-    font-weight: 500;
-  }
-
   .code-action-description {
     margin: 4px 0 8px;
     max-width: 65ch;
@@ -780,258 +761,89 @@
     overflow-wrap: anywhere;
   }
 
-  .code-action-count {
-    font-variant-numeric: tabular-nums;
-  }
-
   .code-action-panel [data-slot='button'] {
     font-size: 11px;
   }
 
-  .code-action-panel :is([data-slot='button'], [data-slot='checkbox'], [data-slot='native-select'], [data-slot='toggle-group-item']):focus-visible {
+  .code-action-panel :is([data-slot='button'], [data-slot='checkbox']):focus-visible {
     border-color: var(--ui-ring);
     box-shadow: inset 0 0 0 1px var(--ui-ring);
   }
 
-  .code-action-picker {
-    width: 100%;
-    max-width: 420px;
-  }
-
-  .code-action-picker > .code-action-toolbar {
+  .code-action-entrypoints {
+    display: flex;
     flex-wrap: wrap;
-    gap: 4px 8px;
+    gap: 8px;
   }
 
-  .code-action-picker-toggle {
-    padding-left: 0;
-  }
-
-  .code-action-picker-toggle > svg {
-    transform: rotate(-90deg);
-  }
-
-  .code-action-picker-toggle[aria-expanded='true'] > svg {
-    transform: none;
-  }
-
-  .code-action-picker .code-action-connections {
-    max-height: 160px;
+  .code-action-available-connections {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-height: min(52vh, 420px);
     overflow-y: auto;
     overscroll-behavior: contain;
-    padding: 4px 0;
   }
 
-  .code-action-entry + .code-action-entry {
-    margin-top: 8px;
-    padding-top: 8px;
+  .code-action-provider {
+    display: grid;
+    gap: 4px;
+  }
+
+  .code-action-provider + .code-action-provider {
+    padding-top: 12px;
     border-top: 1px solid var(--ui-border);
   }
 
-  .code-action-row {
-    gap: 8px;
-  }
-
-  .code-action-toggle .code-action-name > span {
-    color: var(--ui-foreground);
-  }
-
-  .code-action-toggle {
-    flex: 1;
-    justify-content: flex-start;
-    min-width: 0;
-    height: auto;
-    padding: 7px 4px;
-    text-align: left;
-  }
-
-  .code-action-chevron {
-    width: 12px;
-    height: 12px;
-    color: var(--ui-muted-foreground);
-    transform: rotate(-90deg);
-  }
-
-  .code-action-toggle[aria-expanded='true'] .code-action-chevron {
-    transform: none;
-  }
-
-  .code-action-name {
+  .code-action-provider > h4 {
     display: flex;
-    flex: 1;
-    min-width: 0;
-    flex-direction: column;
-    gap: 2px;
-    font-size: 12px;
-    font-weight: 500;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 0;
+    color: var(--ui-foreground);
+    font-size: 13px;
+    font-weight: 600;
   }
 
-  .code-action-name > span,
-  .code-action-name > code {
+  .code-action-provider > h4 small {
     overflow: hidden;
+    color: var(--ui-muted-foreground);
+    font-size: 10px;
+    font-weight: 400;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
-  .code-action-name > code,
-  .code-action-hint {
-    margin: 0;
-    color: var(--ui-muted-foreground);
-    font-size: 11px;
-    font-weight: 400;
-  }
-
-  .code-action-account {
-    flex: 0 1 35%;
-    overflow: hidden;
-    color: var(--ui-muted-foreground);
-    font-size: 11px;
-    font-weight: 400;
-    text-align: right;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .code-action-account.needs-account {
-    color: var(--ui-destructive);
-  }
-
-  .code-action-example {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin: 4px 0 8px;
-    padding: 6px 8px;
-    border: 1px solid var(--ui-border);
-    border-radius: var(--ui-radius);
-    background: var(--ui-muted);
-  }
-
-  .code-action-example .code-action-toolbar {
-    flex-wrap: wrap;
-  }
-
-  .code-action-example [data-slot='toggle-group-item'] {
-    min-height: 24px;
-    height: auto;
-    padding: 2px 6px;
-    font-size: 11px;
-  }
-
-  .code-action-example pre {
-    margin: 0;
-    padding: 6px 2px;
-    overflow-x: auto;
-    color: var(--ui-foreground);
-    font-size: 12px;
-    line-height: 1.6;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    user-select: text;
-  }
-
-  .code-action-example pre:focus-visible {
-    outline: 1px solid var(--ui-ring);
-    outline-offset: -1px;
-  }
-
-  .code-action-settings {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    margin-left: 22px;
-    padding: 4px 0 8px;
-  }
-
-  .code-action-accounts {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin: 4px 0 0 6px;
-    padding: 0 0 0 12px;
-    border-left: 1px solid var(--ui-border);
-  }
-
-  .code-action-connections {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-  }
-
-  .code-action-connection {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    width: 100%;
-    margin: 0;
-    padding: 4px 0;
-    background: transparent;
-    cursor: pointer;
-  }
-
-  .code-action-connection .code-action-name {
-    font-weight: 400;
-  }
-
-  .code-action-connection[data-unavailable='true'] {
-    color: var(--ui-muted-foreground);
-  }
-
-  .code-action-default {
+  .code-action-available-connection {
     display: grid;
-    grid-template-columns: auto minmax(0, 180px);
-    justify-content: start;
+    grid-template-columns: minmax(0, 1fr) minmax(100px, auto);
+    gap: 12px;
     align-items: center;
-    gap: 8px;
-  }
-
-  .code-action-default [data-slot='field-label'] {
-    margin: 0;
-    color: var(--ui-muted-foreground);
-    font-size: 11px;
-    font-weight: 400;
-  }
-
-  .code-action-default [data-slot='native-select-wrapper'] {
-    width: 100%;
-  }
-
-  .code-action-default select {
-    height: 26px;
-    border-color: transparent;
+    min-width: 0;
+    padding: 6px 8px;
+    border-radius: var(--ui-control-radius);
     background: var(--ui-muted);
     font-size: 12px;
   }
 
-  .code-action-default select:hover {
-    border-color: var(--ui-border);
+  .code-action-available-connection > span {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 6px;
   }
 
-  .code-action-details {
+  .code-action-available-connection small {
+    flex: none;
+    color: var(--ui-muted-foreground);
+    font-size: 10px;
+  }
+
+  .code-action-available-connection code {
     color: var(--ui-muted-foreground);
     font-size: 11px;
-  }
-
-  .code-action-details > summary {
-    width: fit-content;
-    padding-block: 4px;
-    cursor: pointer;
-  }
-
-  .code-action-details > summary:focus-visible {
-    outline: 2px solid var(--ui-ring);
-    outline-offset: 2px;
-  }
-
-  .code-action-identity {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    padding-block: 6px;
-  }
-
-  .code-action-identity code {
+    text-align: right;
     overflow-wrap: anywhere;
     user-select: text;
   }

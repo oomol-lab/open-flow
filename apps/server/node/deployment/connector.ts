@@ -1,18 +1,21 @@
 import type { ConnectorProxyRequest, ConnectorProxyResult } from '@oomol-lab/open-flow/connector-proxy'
-import type { ConnectorActionMetadata, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
-import type { ConnectorCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
+import type { ConnectorAccess, ConnectorActionMetadata, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorActionCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { Logger } from 'pino'
+import type { ResolvedProviderAccessBinding, TeamAppAccess } from './provider-access.ts'
 
 import { connectorActionPorts } from '@oomol-lab/open-flow/connector-action'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import { errorKind, silentLogger } from '../logger.ts'
+import { providerAccessAllowsAction, providerAccessAllowsProxy, providerAccessBindingCandidates, resolveProviderAccessBinding } from './provider-access.ts'
 
 const maxResponseBytes = 1024 * 1024
 const maxActionResponseBytes = 32 * 1024 * 1024
 const maxActionCatalogBytes = 8 * 1024 * 1024
 const catalogConcurrency = 16
 const readinessTimeoutMs = 1_000
+const hostedAccessFreshMs = 5 * 60 * 1_000
 const responseDecoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false })
 
 interface ResponseBudget {
@@ -46,26 +49,44 @@ export interface ConnectorHost {
     input: Readonly<Record<string, JsonValue>>,
     invocationId: string,
     signal: AbortSignal,
-    teamId?: string,
+    access?: ConnectorAccessContext,
   ): Promise<JsonValue>
-  getAction(actionId: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<ConnectorActionMetadata>
-  listActions(serviceId?: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorActionMetadata[]>
-  listAllConnections(signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]>
-  listConnections(serviceId: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]>
-  listProviders(signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorProvider[]>
+  getAction(actionId: string, signal?: AbortSignal, access?: ConnectorAccessContext, locale?: string): Promise<ConnectorActionMetadata>
+  listActions(serviceId?: string, signal?: AbortSignal, access?: ConnectorAccessContext, locale?: string): Promise<readonly ConnectorActionMetadata[]>
+  listAllConnections(signal?: AbortSignal, access?: ConnectorAccessContext): Promise<readonly ConnectorConnection[]>
+  listConnections(serviceId: string, signal?: AbortSignal, access?: ConnectorAccessContext): Promise<readonly ConnectorConnection[]>
+  listProviders(signal?: AbortSignal, access?: ConnectorAccessContext, locale?: string): Promise<readonly ConnectorProvider[]>
   proxy(
     provider: string,
     connectionId: string,
     rateLimitId: string,
     request: ConnectorProxyRequest,
     signal: AbortSignal,
-    teamId?: string,
+    access?: ConnectorAccessContext,
   ): Promise<ConnectorProxyResult>
   ready(): Promise<boolean>
-  searchActions(query: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorActionMetadata[]>
+  searchActions(query: string, signal?: AbortSignal, access?: ConnectorAccessContext, locale?: string): Promise<readonly ConnectorActionMetadata[]>
+}
+
+export interface ConnectorAccessContext {
+  readonly actorId?: string
+  readonly flowId?: string
+  readonly providerAccess: ConnectorAccess
+  readonly providerId?: string
+  readonly purpose: 'catalog' | 'eligibility' | 'execute' | 'proxy' | 'trigger'
+  readonly source: 'operator' | 'draft' | 'publication' | 'run'
+  readonly teamId?: string
+}
+
+type ConnectorClientAccess = ConnectorAccessContext | string
+
+function connectorTeamId(access: ConnectorClientAccess | undefined): string | undefined {
+  return typeof access == 'string' ? access : access?.teamId
 }
 
 export type ConnectorErrorCode =
+  | 'connector.access-invalid'
+  | 'connector.access-required'
   | 'connector.input-invalid'
   | 'connector.indeterminate'
   | 'connector.action-not-found'
@@ -96,11 +117,14 @@ class RequestError extends ConnectorTaskError {
 }
 
 export class ConnectorClient implements ConnectorHost {
+  readonly #apiOrigin?: URL
   readonly #logger: Logger
   readonly #origin: URL
   readonly #teamOrigin?: URL
   readonly #timeoutMs: number
   readonly #token: string
+  readonly #teamAccess = new Map<string, { readonly expiresAt: number; readonly value: TeamAppAccess }>()
+  #userId?: string
 
   constructor(origin: string, token: string, timeoutMs = 30_000, logger: Logger = silentLogger) {
     const url = new URL(origin)
@@ -113,7 +137,9 @@ export class ConnectorClient implements ConnectorHost {
     this.#logger = logger.child({ component: 'connector' })
     this.#origin = url
     if (url.hostname == 'connector.oomol.com' || url.hostname == 'connector.oomol.dev') {
-      this.#teamOrigin = new URL(`https://relation-control.${url.hostname.slice('connector.'.length)}/`)
+      const domain = url.hostname.slice('connector.'.length)
+      this.#apiOrigin = new URL(`https://api.${domain}/`)
+      this.#teamOrigin = new URL(`https://relation-control.${domain}/`)
     }
     this.#timeoutMs = timeoutMs
     this.#token = token
@@ -144,6 +170,72 @@ export class ConnectorClient implements ConnectorHost {
     })
   }
 
+  async listProviderAccessBindingCandidates(
+    teamId: string,
+    providerId: string,
+    signal?: AbortSignal,
+  ): Promise<
+    readonly {
+      readonly accessBindingId: string
+      readonly connectionDisplayName: string
+      readonly isDefault: boolean
+      readonly permissions: {
+        readonly actionIds: readonly string[]
+        readonly allActions: boolean
+        readonly configured: boolean
+        readonly proxy: boolean
+      }
+      readonly permissionGroupName: string | null
+      readonly policyRevision?: string
+      readonly providerId: string
+    }[]
+  > {
+    const [actorId, connections, access] = await Promise.all([
+      this.#oomolUserId(signal),
+      this.#connections(providerId, signal, teamId),
+      this.#readTeamAppAccess(teamId, signal),
+    ])
+    return await providerAccessBindingCandidates({ actorId, connections, ...access, providerId, teamId })
+  }
+
+  async resolveProviderAccessBinding(
+    teamId: string,
+    providerId: string,
+    accessBindingId: string,
+    signal?: AbortSignal,
+  ): Promise<ResolvedProviderAccessBinding | undefined> {
+    const [connections, access] = await Promise.all([this.#connections(providerId, signal, teamId), this.#readTeamAppAccess(teamId, signal)])
+    return await resolveProviderAccessBinding({ accessBindingId, connections, ...access, providerId, teamId })
+  }
+
+  async #oomolUserId(signal?: AbortSignal): Promise<string> {
+    if (this.#apiOrigin == null || this.#token.length == 0) throw unavailable()
+    if (this.#userId != null) return this.#userId
+    const response = await this.#request('user.profile', 'v1/users/profile', { method: 'GET' }, signal, { origin: this.#apiOrigin })
+    if (!response.ok) throw unavailable('The OOMOL user profile could not be loaded.')
+    const envelope = record(response.value) && response.value.success === true && record(response.value.data) ? response.value.data : response.value
+    if (!record(envelope) || typeof envelope.uid != 'string' || envelope.uid.length == 0) {
+      throw unavailable('The OOMOL user profile was invalid.')
+    }
+    this.#userId = envelope.uid
+    return envelope.uid
+  }
+
+  async #readTeamAppAccess(teamId: string, signal?: AbortSignal): Promise<TeamAppAccess> {
+    if (this.#teamOrigin == null || this.#token.length == 0) throw unavailable()
+    const cached = this.#teamAccess.get(teamId)
+    if (cached != null && cached.expiresAt > Date.now()) return cached.value
+    const response = await this.#request('team.app-access', `v1/teams/${encodeURIComponent(teamId)}/app-access`, { method: 'GET' }, signal, {
+      maximumResponseBytes: maxActionCatalogBytes,
+      origin: this.#teamOrigin,
+    })
+    if (!response.ok || !record(response.value)) throw unavailable('The OOMOL Team Connector access could not be loaded.')
+    const policyRevision = response.headers.get('etag')?.trim()
+    const value = { policy: response.value, ...(policyRevision ? { policyRevision } : {}) }
+    this.#teamAccess.set(teamId, { expiresAt: Date.now() + hostedAccessFreshMs, value })
+    return value
+  }
+
   async ready(): Promise<boolean> {
     try {
       const response = await fetch(new URL('health', this.#origin), {
@@ -157,8 +249,14 @@ export class ConnectorClient implements ConnectorHost {
     }
   }
 
-  async listProviders(signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorProvider[]> {
-    return (await this.#providers(signal, teamId, locale)).map((provider) =>
+  async listProviders(signal?: AbortSignal, access?: ConnectorClientAccess, locale?: string): Promise<readonly ConnectorProvider[]> {
+    const teamId = connectorTeamId(access)
+    let providers = await this.#providers(signal, teamId, locale)
+    if (selectableAccess(access)) {
+      const allowed = new Set(access.providerAccess.bindings.filter((binding) => binding.status == 'active').map((binding) => binding.providerId))
+      providers = providers.filter((provider) => allowed.has(provider.serviceId))
+    }
+    return providers.map((provider) =>
       Object.assign(
         { serviceId: provider.serviceId, serviceName: provider.serviceName },
         provider.noSetup ? { noSetup: true } : {},
@@ -172,17 +270,25 @@ export class ConnectorClient implements ConnectorHost {
     return this.#get('providers.list', 'v1/providers', (data) => runtimeList(runtimeData(data), runtimeProvider), signal, { teamId, locale })
   }
 
-  async listActions(serviceId?: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
+  async listActions(serviceId?: string, signal?: AbortSignal, access?: ConnectorClientAccess, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
+    const teamId = connectorTeamId(access)
     if (serviceId != null) {
+      const bindings = await this.#providerAccessBindings(access, serviceId, signal)
+      if (bindings != null && bindings.length == 0) return []
       const [providers, actions] = await Promise.all([
         this.#providers(signal, teamId, locale),
         this.#actions(`v1/actions?service=${encodeURIComponent(serviceId)}`, false, signal, teamId, { serviceId }, undefined, locale),
       ])
-      return this.#decode('actions.list', { serviceId }, () => mapActions(actions, providers))
+      const mapped = this.#decode('actions.list', { serviceId }, () => mapActions(actions, providers))
+      return bindings == null ? mapped : mapped.filter((action) => bindings.some((binding) => providerAccessAllowsAction(binding, action)))
     }
+    const bindings = await this.#accessBindings(access, signal)
+    if (bindings != null && bindings.length == 0) return []
     return await Effect.runPromise(
       Effect.gen({ self: this }, function* () {
-        const providers = yield* Effect.tryPromise({ try: (requestSignal) => this.#providers(requestSignal, teamId, locale), catch: (error) => error })
+        const catalogProviders = yield* Effect.tryPromise({ try: (requestSignal) => this.#providers(requestSignal, teamId, locale), catch: (error) => error })
+        const providers =
+          bindings == null ? catalogProviders : catalogProviders.filter((provider) => bindings.some((binding) => binding.providerId == provider.serviceId))
         const exhausted = Deferred.makeUnsafe<never, ConnectorTaskError>()
         let catalogError: ConnectorTaskError | undefined
         const budget = {
@@ -223,21 +329,38 @@ export class ConnectorClient implements ConnectorHost {
             }),
           { concurrency: catalogConcurrency },
         ).pipe(Effect.raceFirst(Deferred.await(exhausted)))
-        return this.#decode('actions.list', {}, () => mapActions(catalogs.flat(), providers))
+        const mapped = this.#decode('actions.list', {}, () => mapActions(catalogs.flat(), providers))
+        return bindings == null
+          ? mapped
+          : mapped.filter((action) => {
+              return bindings.some((binding) => binding.providerId == action.serviceId && providerAccessAllowsAction(binding, action))
+            })
       }),
       { signal },
     )
   }
 
-  async searchActions(query: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
+  async searchActions(query: string, signal?: AbortSignal, access?: ConnectorClientAccess, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
+    const teamId = connectorTeamId(access)
+    const bindings = await this.#accessBindings(access, signal)
+    if (bindings != null && bindings.length == 0) return []
     const [providers, actions] = await Promise.all([
       this.#providers(signal, teamId, locale),
       this.#actions(`v1/actions/search?q=${encodeURIComponent(query)}`, true, signal, teamId, {}, undefined, locale),
     ])
-    return this.#decode('actions.search', {}, () => mapActions(actions, providers))
+    const mapped = this.#decode('actions.search', {}, () => mapActions(actions, providers))
+    return bindings == null
+      ? mapped
+      : mapped.filter((action) => {
+          return bindings.some((binding) => binding.providerId == action.serviceId && providerAccessAllowsAction(binding, action))
+        })
   }
 
-  async getAction(actionId: string, signal?: AbortSignal, teamId?: string, locale?: string): Promise<ConnectorActionMetadata> {
+  async getAction(actionId: string, signal?: AbortSignal, access?: ConnectorClientAccess, locale?: string): Promise<ConnectorActionMetadata> {
+    const teamId = connectorTeamId(access)
+    const separator = actionId.indexOf('.')
+    if (separator <= 0) throw actionNotFound()
+    const bindings = await this.#providerAccessBindings(access, actionId.slice(0, separator), signal, true)
     const [providers, action] = await Promise.all([
       this.#providers(signal, teamId, locale),
       this.#get('actions.get', `v1/actions/${encodeURIComponent(actionId)}`, (data) => runtimeAction(runtimeData(data)), signal, {
@@ -247,15 +370,22 @@ export class ConnectorClient implements ConnectorHost {
         failure: (data) => (record(data) && data.success === false && data.errorCode === 'unknown_action' ? actionNotFound() : unavailable()),
       }),
     ])
-    return this.#decode('actions.get', { actionId }, () => mapAction(action, providers))
+    const mapped = this.#decode('actions.get', { actionId }, () => mapAction(action, providers))
+    if (bindings != null && !bindings.some((binding) => providerAccessAllowsAction(binding, mapped))) throw accessInvalid()
+    return mapped
   }
 
-  async listAllConnections(signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]> {
-    return await this.#connections(undefined, signal, teamId)
+  async listAllConnections(signal?: AbortSignal, access?: ConnectorClientAccess): Promise<readonly ConnectorConnection[]> {
+    const connections = await this.#connections(undefined, signal, connectorTeamId(access))
+    const bindings = await this.#accessBindings(access, signal)
+    if (bindings == null) return connections
+    const allowed = new Set(bindings.map((binding) => binding.appId))
+    return connections.filter((connection) => allowed.has(connection.connectionId))
   }
 
-  async listConnections(serviceId: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]> {
-    return await this.#connections(serviceId, signal, teamId)
+  async listConnections(serviceId: string, signal?: AbortSignal, access?: ConnectorClientAccess): Promise<readonly ConnectorConnection[]> {
+    const bindings = await this.#providerAccessBindings(access, serviceId, signal)
+    return bindings == null ? await this.#connections(serviceId, signal, connectorTeamId(access)) : bindings.map((binding) => binding.connection)
   }
 
   async execute(
@@ -264,11 +394,28 @@ export class ConnectorClient implements ConnectorHost {
     input: Readonly<Record<string, JsonValue>>,
     invocationId: string,
     signal: AbortSignal,
-    teamId?: string,
+    access?: ConnectorClientAccess,
   ): Promise<JsonValue> {
+    const teamId = connectorTeamId(access)
     const separator = action.indexOf('.')
     if (separator <= 0) throw connectionRequired()
-    const alias = connectionId == null ? undefined : await this.#resolveConnection(connectionId, action.slice(0, separator), signal, teamId)
+    const providerId = action.slice(0, separator)
+    const bindings = await this.#providerAccessBindings(access, providerId, signal, true)
+    if (bindings != null) {
+      const binding =
+        connectionId == null
+          ? bindings.length == 1
+            ? bindings[0]
+            : bindings.find((candidate) => candidate.connection.isDefault)
+          : bindings.find((candidate) => candidate.appId == connectionId)
+      if (binding == null) throw connectionId == null ? connectionRequired() : accessInvalid()
+      if (!providerAccessAllowsAction(binding, { actionId: action, serviceId: providerId })) throw accessInvalid()
+      if (binding.accessGrant.appAccessConfig != null) {
+        throw accessInvalid('This Provider access binding requires the hosted Flow runtime.')
+      }
+      connectionId = binding.appId
+    }
+    const alias = connectionId == null ? undefined : await this.#resolveConnection(connectionId, providerId, signal, teamId)
 
     const actionResponse = await this.#request(
       'action.execute',
@@ -314,8 +461,14 @@ export class ConnectorClient implements ConnectorHost {
     rateLimitId: string,
     request: ConnectorProxyRequest,
     signal: AbortSignal,
-    teamId?: string,
+    access?: ConnectorClientAccess,
   ): Promise<ConnectorProxyResult> {
+    const teamId = connectorTeamId(access)
+    const bindings = await this.#providerAccessBindings(access, provider, signal, true)
+    if (bindings != null) {
+      const binding = bindings.find((candidate) => candidate.appId == connectionId)
+      if (binding == null || !providerAccessAllowsProxy(binding)) throw accessInvalid()
+    }
     const alias = await this.#resolveConnection(connectionId, provider, signal, teamId)
     const proxyResponse = await this.#request(
       'proxy.execute',
@@ -342,6 +495,37 @@ export class ConnectorClient implements ConnectorHost {
     }
     if (response.errorCode === 'connection_not_allowed' || response.errorCode === 'connection_not_found') throw connectionRequired()
     throw unavailable()
+  }
+
+  async #accessBindings(access: ConnectorClientAccess | undefined, signal?: AbortSignal): Promise<readonly ResolvedProviderAccessBinding[] | null> {
+    if (!selectableAccess(access)) return null
+    const bindings = access.providerAccess.bindings.filter((binding) => binding.status == 'active')
+    if (access.teamId == null) throw accessInvalid()
+    const resolved = await Promise.all(
+      bindings.map((binding) => this.resolveProviderAccessBinding(access.teamId!, binding.providerId, binding.accessBindingId, signal)),
+    )
+    if (resolved.some((binding) => binding == null)) throw accessInvalid()
+    return resolved.filter((binding): binding is ResolvedProviderAccessBinding => binding != null)
+  }
+
+  async #providerAccessBindings(
+    access: ConnectorClientAccess | undefined,
+    providerId: string,
+    signal?: AbortSignal,
+    required = false,
+  ): Promise<readonly ResolvedProviderAccessBinding[] | null> {
+    if (!selectableAccess(access)) return null
+    const selected = access.providerAccess.bindings.filter((binding) => binding.providerId == providerId && binding.status == 'active')
+    if (selected.length == 0) {
+      if (required) throw accessRequired()
+      return []
+    }
+    if (access.teamId == null) throw accessInvalid()
+    const resolved = await Promise.all(
+      selected.map((binding) => this.resolveProviderAccessBinding(access.teamId!, providerId, binding.accessBindingId, signal)),
+    )
+    if (resolved.some((binding) => binding == null)) throw accessInvalid()
+    return resolved.filter((binding): binding is ResolvedProviderAccessBinding => binding != null)
   }
 
   async #actions(
@@ -452,7 +636,7 @@ export class ConnectorClient implements ConnectorHost {
       readonly origin?: URL
       readonly teamId?: string
     } = {},
-  ): Promise<{ readonly ok: boolean; readonly status: number; readonly value: unknown }> {
+  ): Promise<{ readonly headers: Headers; readonly ok: boolean; readonly status: number; readonly value: unknown }> {
     const startedAt = performance.now()
     const timeout = AbortSignal.timeout(this.#timeoutMs)
     let status: number | undefined
@@ -484,7 +668,7 @@ export class ConnectorClient implements ConnectorHost {
           'Connector request failed.',
         )
       }
-      return { ok: response.ok, status: response.status, value }
+      return { headers: response.headers, ok: response.ok, status: response.status, value }
     } catch (error) {
       if (signal?.aborted) throw signal.reason
       let failure = 'transport'
@@ -514,6 +698,18 @@ export class ConnectorClient implements ConnectorHost {
 
 function connectionRequired(): ConnectorTaskError {
   return new ConnectorTaskError('connector.connection-required', 'The selected Connector Connection must be reconnected or replaced.')
+}
+
+function accessRequired(): ConnectorTaskError {
+  return new ConnectorTaskError('connector.access-required', 'This Flow has no Provider access binding for the requested Connector.')
+}
+
+function accessInvalid(message = 'The Flow Provider access binding is no longer valid.'): ConnectorTaskError {
+  return new ConnectorTaskError('connector.access-invalid', message)
+}
+
+function selectableAccess(access: ConnectorClientAccess | undefined): access is ConnectorAccessContext {
+  return typeof access != 'string' && access?.flowId != null && access.providerAccess.mode == 'selectable'
 }
 
 function actionNotFound(): ConnectorTaskError {
@@ -717,9 +913,9 @@ function unavailable(message = 'The Connector request could not be completed.'):
 }
 
 export async function checkCodeActions(
-  declarations: readonly ConnectorCapability[],
+  declarations: readonly ConnectorActionCapability[],
   connector: ConnectorHost | undefined,
-  teamId?: string,
+  access?: ConnectorAccessContext,
   signal?: AbortSignal,
 ): Promise<void> {
   if (declarations.length == 0) return
@@ -729,7 +925,7 @@ export async function checkCodeActions(
   for (const declaration of declarations) {
     let action = actions.get(declaration.action)
     if (action == null) {
-      action = connector.getAction(declaration.action, signal, teamId)
+      action = connector.getAction(declaration.action, signal, access)
       actions.set(declaration.action, action)
     }
     const definition = await action
@@ -737,7 +933,7 @@ export async function checkCodeActions(
     if (declaration.connections.length == 0) continue
     let catalog = catalogs.get(definition.serviceId)
     if (catalog == null) {
-      catalog = connector.listConnections(definition.serviceId, signal, teamId)
+      catalog = connector.listConnections(definition.serviceId, signal, access)
       catalogs.set(definition.serviceId, catalog)
     }
     const connections = await catalog

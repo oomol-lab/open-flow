@@ -73,6 +73,7 @@ export function runDetails(value: unknown): RunDetails {
     engineDigest: string(source.engineDigest),
     ...(eventsExpiresAt == null ? {} : { eventsExpiresAt }),
     modelVersion: integer(source.modelVersion),
+    providerAccessDigest: string(source.providerAccessDigest),
     revisionDigest: string(source.revisionDigest),
     ...state,
   }

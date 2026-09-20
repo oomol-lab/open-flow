@@ -1,3 +1,4 @@
+import type { ConnectorAccess } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { DatabaseSync } from 'node:sqlite'
 import type {
@@ -423,8 +424,8 @@ export class IntegrationStore {
       .prepare(
         `INSERT INTO integration_states (
            binding_id, runtime_version, trigger_json, connection_id,
-           checkpoint_json, subscription_json, reconcile_at, updated_at
-         ) VALUES (?, 1, ?, ?, ?, ?, ?, ?)`,
+           checkpoint_json, subscription_json, reconcile_at, updated_at, provider_access_snapshot
+         ) SELECT ?, 1, ?, ?, ?, ?, ?, ?, provider_access_snapshot FROM publications WHERE publication_id = ?`,
       )
       .run(
         candidate.bindingId,
@@ -434,6 +435,7 @@ export class IntegrationStore {
         candidate.subscriptionJson,
         candidate.reconcileAt,
         now,
+        publicationId,
       )
     this.#database.prepare('DELETE FROM integration_candidates WHERE operation_id = ? AND node_id = ?').run(operationId, integration.triggerNodeId)
     return true
@@ -700,6 +702,7 @@ export class IntegrationStore {
     binding: Pick<StoredIntegrationBinding, 'bindingId' | 'connectionId' | 'runtimeVersion' | 'triggerJson'>,
     checkpoint: JsonValue,
     subscription: Readonly<Record<string, JsonValue>>,
+    providerAccess: ConnectorAccess,
     now: number,
   ): boolean {
     return (
@@ -707,8 +710,8 @@ export class IntegrationStore {
         .prepare(
           `INSERT OR IGNORE INTO integration_states (
              binding_id, runtime_version, trigger_json, connection_id,
-             checkpoint_json, subscription_json, reconcile_at, updated_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+             checkpoint_json, subscription_json, reconcile_at, updated_at, provider_access_snapshot
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           binding.bindingId,
@@ -719,6 +722,7 @@ export class IntegrationStore {
           JSON.stringify(subscription),
           now,
           now,
+          JSON.stringify(providerAccess),
         ).changes == 1
     )
   }
@@ -809,15 +813,16 @@ export class IntegrationStore {
   }
 
   integrationState(bindingId: string): StoredIntegrationState | undefined {
-    return this.#database
+    const row = this.#database
       .prepare(
         `SELECT binding_id AS bindingId, runtime_version AS runtimeVersion,
                 trigger_json AS triggerJson, connection_id AS connectionId,
                 checkpoint_json AS checkpointJson, subscription_json AS subscriptionJson,
-                reconcile_at AS reconcileAt, updated_at AS updatedAt
+                reconcile_at AS reconcileAt, updated_at AS updatedAt, provider_access_snapshot AS providerAccess
          FROM integration_states WHERE binding_id = ?`,
       )
-      .get(bindingId) as StoredIntegrationState | undefined
+      .get(bindingId) as (Omit<StoredIntegrationState, 'providerAccess'> & { readonly providerAccess: string }) | undefined
+    return row == null ? undefined : { ...row, providerAccess: JSON.parse(row.providerAccess) as ConnectorAccess }
   }
 
   integrationTarget(endpointId: string): StoredIntegrationTarget | undefined {
@@ -835,7 +840,8 @@ export class IntegrationStore {
                 states.binding_id AS stateBindingId, states.runtime_version AS stateRuntimeVersion,
                 states.trigger_json AS stateTriggerJson, states.connection_id AS stateConnectionId,
                 states.checkpoint_json AS stateCheckpointJson, states.subscription_json AS stateSubscriptionJson,
-                states.reconcile_at AS stateReconcileAt, states.updated_at AS stateUpdatedAt
+                states.reconcile_at AS stateReconcileAt, states.updated_at AS stateUpdatedAt,
+                states.provider_access_snapshot AS stateProviderAccess
          FROM integration_bindings AS bindings
          JOIN flow_live
            ON flow_live.enabled = 1 AND flow_live.flow_id = bindings.flow_id
@@ -852,6 +858,7 @@ export class IntegrationStore {
           readonly stateCheckpointJson: string | null
           readonly stateConnectionId: string | null
           readonly stateReconcileAt: number | null
+          readonly stateProviderAccess: string | null
           readonly stateRuntimeVersion: number | null
           readonly stateSubscriptionJson: string | null
           readonly stateTriggerJson: string | null
@@ -864,6 +871,7 @@ export class IntegrationStore {
       stateCheckpointJson,
       stateConnectionId,
       stateReconcileAt,
+      stateProviderAccess,
       stateRuntimeVersion,
       stateSubscriptionJson,
       stateTriggerJson,
@@ -877,7 +885,8 @@ export class IntegrationStore {
       stateRuntimeVersion == null ||
       stateSubscriptionJson == null ||
       stateTriggerJson == null ||
-      stateUpdatedAt == null
+      stateUpdatedAt == null ||
+      stateProviderAccess == null
     ) {
       return target
     }
@@ -888,6 +897,7 @@ export class IntegrationStore {
         checkpointJson: stateCheckpointJson,
         connectionId: stateConnectionId,
         reconcileAt: stateReconcileAt,
+        providerAccess: JSON.parse(stateProviderAccess) as ConnectorAccess,
         runtimeVersion: stateRuntimeVersion,
         subscriptionJson: stateSubscriptionJson,
         triggerJson: stateTriggerJson,

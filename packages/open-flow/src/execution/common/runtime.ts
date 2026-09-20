@@ -419,10 +419,7 @@ export default () => fs.readFileSync('/etc/passwd', 'utf8')`,
   },
 ]
 
-export function createActions(
-  declarations: readonly ConnectorCapability[],
-  invoke: (payload: JsonValue) => Promise<RuntimeCapabilityResponse>,
-): Readonly<Record<string, unknown>> {
+export function createActions(invoke: (payload: JsonValue) => Promise<RuntimeCapabilityResponse>): Readonly<Record<string, unknown>> {
   // Keep validation inside the function serialized into the isolated runtime.
   // eslint-disable-next-line unicorn/consistent-function-scoping
   const json = (value: unknown, parents: Set<object>): void => {
@@ -438,29 +435,45 @@ export function createActions(
     for (const child of Array.isArray(value) ? value : Object.values(value)) json(child, parents)
     parents.delete(value)
   }
-  const actions: Record<string, unknown> = Object.create(null)
-  const providers = new Map<string, Record<string, unknown>>()
-  for (const declaration of declarations) {
-    const separator = declaration.action.indexOf('.')
-    const provider = declaration.action.slice(0, separator)
-    const name = declaration.action.slice(separator + 1)
-    let methods = providers.get(provider)
-    if (methods == null) {
-      methods = Object.create(null) as Record<string, unknown>
-      providers.set(provider, methods)
-      actions[provider] = methods
-    }
-    const call = async (input: JsonValue = {}, options?: JsonValue): Promise<JsonValue> => {
+  const target: Record<string, unknown> = Object.create(null)
+  const calls = new Map<string, (input?: JsonValue, options?: JsonValue) => Promise<JsonValue>>()
+  const providers = new Map<string, Readonly<Record<string, unknown>>>()
+  const actionCall = (action: string): ((input?: JsonValue, options?: JsonValue) => Promise<JsonValue>) => {
+    let call = calls.get(action)
+    if (call != null) return call
+    call = async (input: JsonValue = {}, options?: JsonValue): Promise<JsonValue> => {
       json(input, new Set())
       if (options !== undefined) json(options, new Set())
-      const response = await invoke({ action: declaration.action, input, ...(options === undefined ? {} : { options }) })
+      const response = await invoke({ action, input, ...(options === undefined ? {} : { options }) })
       return response.body
     }
-    actions[declaration.action] = call
-    methods[name] = call
+    calls.set(action, call)
+    return call
   }
-  for (const methods of providers.values()) Object.freeze(methods)
-  return Object.freeze(actions)
+  target.call = async (action: JsonValue, input: JsonValue = {}, options?: JsonValue): Promise<JsonValue> => {
+    if (typeof action != 'string') throw Object.assign(new Error('Action ID must be a string.'), { code: 'capability.invalid' })
+    return actionCall(action)(input, options)
+  }
+  Object.freeze(target)
+  return new Proxy(target, {
+    get(object, property) {
+      if (typeof property != 'string') return Reflect.get(object, property)
+      if (Object.hasOwn(object, property)) return object[property]
+      if (property.includes('.')) return actionCall(property)
+      let methods = providers.get(property)
+      if (methods == null) {
+        const provider = property
+        const providerTarget = Object.freeze(Object.create(null) as Record<string, unknown>)
+        methods = new Proxy(providerTarget, {
+          get(_object, name) {
+            return typeof name == 'string' ? actionCall(`${provider}.${name}`) : undefined
+          },
+        })
+        providers.set(property, methods)
+      }
+      return methods
+    },
+  })
 }
 
 export function resolveAction(
@@ -468,20 +481,31 @@ export function resolveAction(
   payload: unknown,
 ): { readonly action: string; readonly connectionId?: string; readonly input: Readonly<Record<string, JsonValue>> } {
   const invalid = Object.assign(new Error('The Action request is invalid.'), { code: 'capability.invalid' })
-  const denied = Object.assign(new Error('The Action or Connection is not declared for this Task.'), { code: 'capability.denied' })
+  const denied = Object.assign(new Error('The Connection alias is unavailable for this Action.'), { code: 'capability.denied' })
   if (payload == null || typeof payload != 'object' || Array.isArray(payload)) throw invalid
   const source = payload as Record<string, JsonValue>
   if (
     Object.keys(source).some((key) => !['action', 'input', 'options'].includes(key)) ||
     typeof source.action != 'string' ||
+    !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+$/.test(source.action) ||
     source.input == null ||
     typeof source.input != 'object' ||
     Array.isArray(source.input)
   )
     throw invalid
-  const declaration = declarations.find((item) => item.action == source.action)
-  if (declaration == null) throw denied
-  let connectionId = declaration.connectionId
+  const hints = declarations.flatMap((declaration) => {
+    if ('action' in declaration) {
+      if (declaration.action != source.action) return []
+      return [
+        ...declaration.connections.flatMap((connection) =>
+          connection.alias == null ? [] : [{ action: declaration.action, connectionId: connection.connectionId, alias: connection.alias }],
+        ),
+        ...(declaration.connectionId == null ? [] : [{ action: declaration.action, connectionId: declaration.connectionId }]),
+      ]
+    }
+    return declaration.connectionHints?.filter((hint) => hint.action == source.action) ?? []
+  })
+  let connectionId = hints.find((hint) => hint.alias == null)?.connectionId
   if (Object.hasOwn(source, 'options')) {
     if (source.options == null || typeof source.options != 'object' || Array.isArray(source.options)) throw invalid
     const options = source.options as Record<string, JsonValue>
@@ -490,13 +514,9 @@ export function resolveAction(
     if (typeof options.connectionId == 'string' && options.connectionId.length > 0 && keys[0] == 'connectionId') {
       connectionId = options.connectionId
     } else if (typeof options.connectionAlias == 'string' && options.connectionAlias.length > 0 && keys[0] == 'connectionAlias') {
-      connectionId = declaration.connections.find((item) => item.alias == options.connectionAlias)?.connectionId
+      connectionId = hints.find((item) => item.alias == options.connectionAlias)?.connectionId
       if (connectionId == null) throw denied
     } else throw invalid
-  }
-  if (connectionId != null && !declaration.connections.some((item) => item.connectionId == connectionId)) throw denied
-  if (connectionId == null && declaration.connections.length > 0) {
-    throw Object.assign(new Error('Choose a Connector Connection for this Action.'), { code: 'connector.connection-required' })
   }
   return { action: source.action, input: source.input as Readonly<Record<string, JsonValue>>, ...(connectionId == null ? {} : { connectionId }) }
 }

@@ -112,6 +112,7 @@ export function publication(stored: StoredPublication): Publication {
     modelVersion: stored.modelVersion,
     operation: stored.operation,
     publicationId: stored.publicationId,
+    providerAccessDigest: stored.providerAccessDigest,
     revisionDigest: stored.revisionDigest,
     revisionId: stored.revisionId,
     ...(stored.sourcePublicationId == null ? {} : { sourcePublicationId: stored.sourcePublicationId }),

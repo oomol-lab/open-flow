@@ -12,6 +12,7 @@ import { Empty, EmptyHeader, EmptyTitle } from '../../../ui/browser/empty.tsx'
 import { IconifyProvider } from '../../../ui/browser/icons/iconifyContext.tsx'
 import { CanvasHistoryScope } from './editor/canvasHistoryScope.tsx'
 import { CommentInspector } from './editor/commentInspector.tsx'
+import { ConnectorAccessSettings } from './editor/connectorAccessSettings.tsx'
 import { EditorContextPanel } from './editor/editorContextPanel.tsx'
 import { FlowNodeList } from './editor/flowNodeList.tsx'
 import { inspectorIcon, NodeInspector } from './editor/nodeInspector.tsx'
@@ -105,6 +106,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   const variableNamesLoaded = useVal(store.$.variableNamesLoaded)
   const variableNamesLoading = useVal(store.$.variableNamesLoading)
   const connectorAction = useVal(store.connectors.$.selectedAction)
+  const connectorAccess = useVal(store.connectorAccess.$).access
   const connectorActionError = useVal(store.connectors.$.selectedActionError)
   const connectorActionLoading = useVal(store.connectors.$.actionLoading)
   const connectorAuthorizationPending = useVal(store.connectors.$.selectedAuthorizationPending)
@@ -134,12 +136,14 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
         },
       }}
       connectorAction={connectorAction}
+      connectorAccess={connectorAccess}
       connectorActionError={connectorActionError}
       connectorAuthorizationPending={connectorAuthorizationPending}
       connectorConnection={connectorConnection}
       connectorConnectionError={connectorConnectionError}
       activeConnectorConnections={activeConnectorConnections}
       connectors={store.connectors}
+      prepareConnectorAction={(action) => store.prepareConnectorAction(action)}
       connectorLoading={connectorActionLoading != null || connectorConnectionLoading != null}
       focus={focus}
       disabled={disabled}
@@ -165,6 +169,7 @@ export function FlowEditor({
   onRunStarted,
   onCloseRuns,
   onConfigureConnector,
+  onManageConnectorAccess,
   onToggleRuns,
   runDrawerOpen,
   runDrawerVisible,
@@ -175,6 +180,7 @@ export function FlowEditor({
   readonly onRunStarted: () => void
   readonly onCloseRuns: () => void
   readonly onConfigureConnector?: (() => void) | undefined
+  readonly onManageConnectorAccess?: ((flowId: string) => void) | undefined
   readonly onToggleRuns: () => void
   readonly runDrawerOpen: boolean
   readonly runDrawerVisible: boolean
@@ -444,6 +450,7 @@ export function FlowEditor({
           title={contextPanelTitle}
         >
           <div hidden={!flowSelected} className="h-full">
+            <ConnectorAccessSettings onManage={onManageConnectorAccess} store={store} />
             <FlowNodeList key={JSON.stringify([flowId, target])} groupTriggers nodes={designer.nodes} onFocusNode={focusNode} onSelect={selectOutlineNode} />
           </div>
           {multipleSelected ? (
@@ -490,6 +497,7 @@ export default function FlowWorkspace({
   hrefFor,
   navigation,
   onConfigureConnector,
+  onManageConnectorAccess,
   onHostAction,
   store,
   theme,
@@ -499,6 +507,7 @@ export default function FlowWorkspace({
   readonly hrefFor: (location: WorkbenchLocation) => string
   readonly navigation: NavigationStore
   readonly onConfigureConnector?: (() => void) | undefined
+  readonly onManageConnectorAccess?: ((flowId: string) => void) | undefined
   readonly onHostAction?: (() => void) | undefined
   readonly store: WorkbenchStore
   readonly theme: WorkbenchTheme
@@ -609,6 +618,7 @@ export default function FlowWorkspace({
             onRunStarted={revealRun}
             onCloseRuns={() => setRunDrawerVisible(false)}
             onConfigureConnector={onConfigureConnector}
+            onManageConnectorAccess={onManageConnectorAccess}
             onToggleRuns={() => setRunDrawerOpen(!runDrawerOpen)}
             runDrawerOpen={runDrawerOpen}
             runDrawerVisible={runDrawerVisible}

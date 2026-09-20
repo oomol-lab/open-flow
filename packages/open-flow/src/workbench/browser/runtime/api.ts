@@ -13,8 +13,12 @@ export type {
   Diagnostic,
   ConnectorAction,
   ConnectorActionMetadata,
+  ConnectorAccess,
+  ConnectorAccessCandidates,
   ConnectorConnection,
   ConnectorProvider,
+  ProviderAccessBinding,
+  ProviderAccessBindingCandidate,
   Live,
   LiveRun,
   Presentation,
@@ -118,10 +122,12 @@ export class WorkbenchClient extends ControlClient {
     flowId: string,
     changed: (revisionId?: string) => void,
     runChanged: (event: Extract<FlowChangeEvent, { readonly kind: 'run.changed' | 'run.created' }>) => void = () => {},
+    accessChanged: (accessRevision: number) => void = () => {},
   ): ReturnType<FlowSubscriber> {
     return this.subscribeFlow(flowId, (event?: FlowChangeEvent) => {
       if (event == null) changed()
       else if (event.kind == 'draft.changed') changed(event.revisionId)
+      else if (event.kind == 'access.changed') accessChanged(event.accessRevision)
       else runChanged(event)
     })
   }

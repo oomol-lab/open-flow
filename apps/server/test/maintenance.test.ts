@@ -3,6 +3,7 @@ import * as Effect from 'effect/Effect'
 import * as Semaphore from 'effect/Semaphore'
 import { expect, it, onTestFinished, vi } from 'vitest'
 import { Maintenance } from '../node/application/maintenance.ts'
+import { ImplicitConnectorAccessHost } from '../node/deployment/connector-access.ts'
 import { silentLogger } from '../node/logger.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
@@ -85,6 +86,7 @@ it('schedules and expires a Wait without notifications before the periodic maint
     clock,
     silentLogger,
     () => undefined,
+    new ImplicitConnectorAccessHost(),
     () => {},
     () => false,
     () => {},
@@ -179,6 +181,7 @@ it('preserves a maintenance wake received while a notification is being delivere
     clock,
     silentLogger,
     () => connector,
+    new ImplicitConnectorAccessHost(),
     () => {},
     () => false,
     () => {},

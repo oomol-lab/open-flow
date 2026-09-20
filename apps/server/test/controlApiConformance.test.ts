@@ -1,11 +1,13 @@
-import type { ConnectorAction, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAccess, ConnectorAction, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
 import type { ControlApiConformanceHarness } from '@oomol-lab/open-flow/control-api-conformance'
+import type { ConnectorAccessHost } from '../node/deployment/connector-access.ts'
 
 import {
   connectorControlApiConformanceCases,
   controlApiConformanceCases,
   controlRecoveryConformanceCases,
   publicationControlApiConformanceCases,
+  selectableConnectorAccessControlApiConformanceCases,
   triggerControlApiConformanceCases,
 } from '@oomol-lab/open-flow/control-api-conformance'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -53,7 +55,7 @@ const connectorAction: ConnectorAction = {
   serviceName: 'Mail',
 }
 
-async function createHarness(start = false): Promise<ControlApiConformanceHarness & { restart(): Promise<void> }> {
+async function createHarness(start = false, connectorAccess?: ConnectorAccessHost): Promise<ControlApiConformanceHarness & { restart(): Promise<void> }> {
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-control-conformance-'))
   const file = path.join(directory, 'open-flow.sqlite')
   const connector = createConnectorHost({
@@ -73,6 +75,7 @@ async function createHarness(start = false): Promise<ControlApiConformanceHarnes
     const service = await openService(file, {
       capabilities: {
         connector: connector == null ? undefined : () => connector,
+        connectorAccess,
         connectorConsoleOrigin: () => new URL('https://connector.example'),
       },
       clock: () => {
@@ -110,6 +113,66 @@ async function createHarness(start = false): Promise<ControlApiConformanceHarnes
         app = createServerApp(service, options)
       }
       return response
+    },
+  }
+}
+
+function selectableConnectorAccess(): ConnectorAccessHost {
+  const accesses = new Map<string, ConnectorAccess>()
+  const current = (flowId: string): ConnectorAccess =>
+    accesses.get(flowId) ?? { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 }
+  return {
+    async remove(_actorId, flowId, providerId, accessBindingId, expectedAccessRevision) {
+      const access = current(flowId)
+      if (access.accessRevision != expectedAccessRevision) return { kind: 'conflict' }
+      if (!access.bindings.some((binding) => binding.providerId == providerId && binding.accessBindingId == accessBindingId)) return { kind: 'invalid' }
+      const next = {
+        ...access,
+        accessRevision: access.accessRevision + 1,
+        bindings: access.bindings.filter((binding) => binding.providerId != providerId || binding.accessBindingId != accessBindingId),
+        providerAccessDigest: `selectable:${access.accessRevision + 1}`,
+      }
+      accesses.set(flowId, next)
+      return { access: next, kind: 'saved' }
+    },
+    current,
+    delete(flowId) {
+      accesses.delete(flowId)
+      return true
+    },
+    async listCandidates(_actorId, _flowId, providerId) {
+      return {
+        candidates:
+          providerId == 'mail' ? [{ accessBindingId: 'editors', connectionDisplayName: 'Work account', permissionGroupName: 'Editors', providerId }] : [],
+        mode: 'selectable',
+        providerId,
+        version: 1,
+      }
+    },
+    read(_actorId, flowId) {
+      return current(flowId)
+    },
+    async add(_actorId, flowId, providerId, accessBindingId, expectedAccessRevision) {
+      const access = current(flowId)
+      if (access.accessRevision != expectedAccessRevision) return { kind: 'conflict' }
+      if (providerId != 'mail' || accessBindingId != 'editors') return { kind: 'invalid' }
+      const next = {
+        ...access,
+        accessRevision: access.accessRevision + 1,
+        bindings: [
+          ...access.bindings.filter((binding) => binding.accessBindingId != accessBindingId),
+          {
+            accessBindingId,
+            connectionDisplayName: 'Work account',
+            permissionGroupName: 'Editors',
+            providerId,
+            status: 'active' as const,
+          },
+        ],
+        providerAccessDigest: `selectable:${access.accessRevision + 1}`,
+      }
+      accesses.set(flowId, next)
+      return { access: next, kind: 'saved' }
     },
   }
 }
@@ -157,6 +220,24 @@ describe('Server P3 Connector Control API conformance', () => {
   for (const conformance of connectorControlApiConformanceCases) {
     it(conformance.name, async () => {
       const harness = await createHarness()
+      try {
+        await conformance.verify(harness)
+      } finally {
+        await harness.dispose()
+      }
+    })
+  }
+})
+
+describe('Server selectable Connector access conformance', () => {
+  for (const conformance of selectableConnectorAccessControlApiConformanceCases({
+    accessBindingId: 'editors',
+    connectionDisplayName: 'Work account',
+    permissionGroupName: 'Editors',
+    providerId: 'mail',
+  })) {
+    it(conformance.name, async () => {
+      const harness = await createHarness(false, selectableConnectorAccess())
       try {
         await conformance.verify(harness)
       } finally {

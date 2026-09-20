@@ -46,6 +46,51 @@ function draft(): Draft {
   }
 }
 
+describe('Connector providers', () => {
+  it('derives Providers used by Actions and Triggers in the revision view', () => {
+    const base = draft()
+    const source: Draft = {
+      ...base,
+      content: {
+        ...base.content,
+        document: {
+          ...base.content.document,
+          graph: {
+            ...base.content.document.graph,
+            nodes: {
+              ...base.content.document.graph.nodes,
+              watch: {
+                bindingId: 'github-connection',
+                config: {},
+                definition: {
+                  configInputs: [],
+                  definitionVersion: 1,
+                  description: '',
+                  displayName: 'GitHub',
+                  key: 'github-watch',
+                  name: 'Watch GitHub',
+                  outputs: [],
+                  provider: 'github',
+                  type: 'poll',
+                },
+                kind: 'poll',
+                name: 'Watch GitHub',
+                pollTimes: [],
+              },
+            },
+          },
+          tasks: {
+            ...base.content.document.tasks,
+            task: { ...base.content.document.tasks.task!, executor: { action: 'mail.send', kind: 'connector' } },
+          },
+        },
+      },
+    }
+
+    expect([...revisionView(source).connectorProviderIds].toSorted()).toEqual(['github', 'mail'])
+  })
+})
+
 describe('Per-field input sources', () => {
   it('describes node outputs through the revision view', () => {
     const view = revisionView(draft())

@@ -155,6 +155,7 @@ export class WorkspaceStore {
     runChanged: (event: Extract<FlowChangeEvent, { readonly kind: 'run.changed' | 'run.created' }>) => void = () => {},
     public readonly catalogs = new CatalogStores(client),
     private readonly flowCreated: (flowId: string) => void = () => {},
+    private readonly accessChanged: (flowId: string, accessRevision: number) => void = () => {},
   ) {
     this.#client = client
     this.#setNotice = setNotice
@@ -280,6 +281,12 @@ export class WorkspaceStore {
         (event) => {
           if (current()) this.#runChanged(event)
         },
+        (accessRevision) => {
+          if (current()) {
+            this.accessChanged(flowId, accessRevision)
+            void this.#refreshLive(flowId, current)
+          }
+        },
       )
       this.#stopFlowWatch = subscription.stop
       await subscription.ready
@@ -344,6 +351,15 @@ export class WorkspaceStore {
         },
         workspaceRepairing: false,
       })
+    }
+  }
+
+  async #refreshLive(flowId: string, current: () => boolean): Promise<void> {
+    try {
+      const live = await this.#client.getLive(flowId)
+      if (current() && this.#model.value.flowId == flowId) this.#set({ live })
+    } catch (error) {
+      if (current() && this.#model.value.flowId == flowId) this.#setNotice(errorNotice(error, this.#i18n.t))
     }
   }
 

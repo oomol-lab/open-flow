@@ -129,6 +129,8 @@ function decodeCatalogEvent(value: unknown): FlowCatalogEvent | undefined {
 function decodeFlowEvent(value: unknown): FlowChangeEvent | undefined {
   const event = value as Partial<FlowChangeEvent>
   if (event.version != 1 || typeof event.flowId != 'string') return
+  if (event.kind == 'access.changed' && typeof event.accessRevision == 'number' && Number.isSafeInteger(event.accessRevision) && event.accessRevision >= 0)
+    return event as FlowChangeEvent
   if (event.kind == 'draft.changed' && typeof event.revisionId == 'string') return event as FlowChangeEvent
-  if (event.kind == 'run.created' && typeof event.runId == 'string') return event as FlowChangeEvent
+  if ((event.kind == 'run.created' || event.kind == 'run.changed') && typeof event.runId == 'string') return event as FlowChangeEvent
 }

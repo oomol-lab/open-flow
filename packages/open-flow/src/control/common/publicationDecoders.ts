@@ -18,6 +18,7 @@ export function publication(value: unknown): Publication {
     modelVersion: integer(source.modelVersion),
     operation: operation as Publication['operation'],
     publicationId: string(source.publicationId),
+    providerAccessDigest: string(source.providerAccessDigest),
     revisionDigest: string(source.revisionDigest),
     revisionId: string(source.revisionId),
     ...(sourcePublicationId == null ? {} : { sourcePublicationId }),

@@ -1,4 +1,4 @@
-import type { CreateEventSource, EventSource, UpdateEventSource } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAccess, CreateEventSource, EventSource, UpdateEventSource } from '@oomol-lab/open-flow/control-api'
 import type { TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { FeishuEvent } from '@oomol-lab/open-flow/provider-triggers'
 import type { DatabaseSync } from 'node:sqlite'
@@ -44,6 +44,7 @@ export interface SourceDelivery {
 }
 
 export interface SourceSubscription {
+  readonly providerAccess: ConnectorAccess
   readonly sourceId: string
   readonly resourceKey: string
   readonly resourceJson: string
@@ -288,16 +289,24 @@ export class EventSourceStore {
   }
 
   subscription(sourceId: string, resourceKey: string): SourceSubscription | undefined {
-    return this.#database
-      .prepare(`SELECT source_id AS sourceId, resource_key AS resourceKey, resource_json AS resourceJson, status
+    const row = this.#database
+      .prepare(`SELECT source_id AS sourceId, resource_key AS resourceKey, resource_json AS resourceJson, status,
+      provider_access_snapshot AS providerAccess
       FROM source_subscriptions WHERE source_id = ? AND resource_key = ?`)
-      .get(sourceId, resourceKey) as SourceSubscription | undefined
+      .get(sourceId, resourceKey) as (Omit<SourceSubscription, 'providerAccess'> & { readonly providerAccess: string }) | undefined
+    return row == null ? undefined : { ...row, providerAccess: JSON.parse(row.providerAccess) as ConnectorAccess }
   }
 
-  demand(sourceId: string, resourceKey: string, resourceJson: string, bindingId: string, now: number): SourceSubscription {
+  demand(sourceId: string, resourceKey: string, resourceJson: string, bindingId: string, providerAccess: ConnectorAccess, now: number): SourceSubscription {
     return this.#transaction(() => {
       this.#database.prepare('INSERT OR IGNORE INTO source_demands VALUES (?, ?, ?)').run(sourceId, resourceKey, bindingId)
-      this.#database.prepare("INSERT OR IGNORE INTO source_subscriptions VALUES (?, ?, ?, 'creating', ?)").run(sourceId, resourceKey, resourceJson, now)
+      this.#database
+        .prepare(
+          `INSERT OR IGNORE INTO source_subscriptions
+           (source_id, resource_key, resource_json, status, updated_at, provider_access_snapshot)
+           VALUES (?, ?, ?, 'creating', ?, ?)`,
+        )
+        .run(sourceId, resourceKey, resourceJson, now, JSON.stringify(providerAccess))
       return this.subscription(sourceId, resourceKey)!
     })
   }
@@ -319,11 +328,17 @@ export class EventSourceStore {
       AND NOT EXISTS (SELECT 1 FROM integration_candidates c JOIN publish_operations p USING (operation_id)
       WHERE c.binding_id = source_demands.binding_id AND c.status != 'cleanup' AND p.status = 'pending')`)
       .run()
-    return this.#database
-      .prepare(`SELECT source_id AS sourceId, resource_key AS resourceKey, resource_json AS resourceJson, status
+    const rows = this.#database
+      .prepare(`SELECT source_id AS sourceId, resource_key AS resourceKey, resource_json AS resourceJson, status,
+      provider_access_snapshot AS providerAccess
       FROM source_subscriptions s WHERE NOT EXISTS (SELECT 1 FROM source_demands d WHERE d.source_id = s.source_id AND d.resource_key = s.resource_key)
       LIMIT 100`)
-      .all() as unknown as SourceSubscription[]
+      .all() as unknown as readonly (Omit<SourceSubscription, 'providerAccess'> & { readonly providerAccess: string })[]
+    const subscriptions: SourceSubscription[] = []
+    for (const { providerAccess, ...row } of rows) {
+      subscriptions.push({ ...row, providerAccess: JSON.parse(providerAccess) as ConnectorAccess })
+    }
+    return subscriptions
   }
 
   deleteSubscription(sourceId: string, resourceKey: string): void {

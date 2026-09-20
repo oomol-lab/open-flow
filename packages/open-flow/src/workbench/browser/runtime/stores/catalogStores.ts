@@ -66,6 +66,11 @@ class ProxyStore {
   retryFailed(): void {
     for (const entry of this.entries.values()) if (entry.state.value.error != null) void entry.refresh()
   }
+  refreshFlow(flowId: string): void {
+    for (const [path, entry] of this.entries) {
+      if (new URL(path, 'https://open-flow.invalid').searchParams.get('flowId') == flowId) void entry.refresh(true)
+    }
+  }
   dispose(): void {
     for (const entry of this.entries.values()) entry.dispose()
     this.entries.clear()
@@ -116,6 +121,9 @@ export class ProviderStore {
   retryFailed(): void {
     this.raw.retryFailed()
   }
+  refreshFlow(flowId: string): void {
+    this.raw.refreshFlow(flowId)
+  }
   dispose(): void {
     this.#views.dispose()
     this.raw.dispose()
@@ -135,6 +143,9 @@ export class ConnectionStore {
   }
   retryFailed(): void {
     this.#raw.retryFailed()
+  }
+  refreshFlow(flowId: string): void {
+    this.#raw.refreshFlow(flowId)
   }
   dispose(): void {
     this.#views.dispose()
@@ -217,6 +228,9 @@ export class ActionStore {
   retryFailed(): void {
     this.#raw.retryFailed()
   }
+  refreshFlow(flowId: string): void {
+    this.#raw.refreshFlow(flowId)
+  }
   dispose(): void {
     for (const search of this.#searches) search.dispose()
     this.#searches.clear()
@@ -240,5 +254,10 @@ export class CatalogStores {
     this.actions.dispose()
     this.connections.dispose()
     this.providers.dispose()
+  }
+  refreshFlow(flowId: string): void {
+    this.actions.refreshFlow(flowId)
+    this.connections.refreshFlow(flowId)
+    this.providers.refreshFlow(flowId)
   }
 }

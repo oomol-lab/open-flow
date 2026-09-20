@@ -195,11 +195,9 @@ async function invoke(kind, payload) {
   if (!result.ok) throw Object.assign(new Error(result.error), { code: result.code })
   return result.value
 }
-const declarations = globalThis.__openFlowActions
-delete globalThis.__openFlowActions
 const createActions = ${createActions.toString()}
 export const capability = Object.freeze({
-  actions: createActions(declarations, (payload) => invoke('connector', payload)),
+  actions: createActions((payload) => invoke('connector', payload)),
   artifact: Object.freeze({
     open: (reference) => invoke('artifact.open', reference),
     put: (input) => invoke('artifact.put', input),
@@ -323,7 +321,6 @@ function installGlobals(
       )
       .finally(() => sourceReference.release())
   })
-  context.global.setSync('__openFlowActions', new ivm.ExternalCopy(capabilities).copyInto())
   context.global.setSync('__openFlowCapability', capability)
   context.global.setSync('__openFlowClearTimeout', cancelTimer)
   context.global.setSync('__openFlowClone', cloneValue)

@@ -1,5 +1,6 @@
 import type { ReactElement, SetStateAction } from 'react'
 import type { AgentInput, AgentTool, InputPort, JsonValue, ManagedTaskDefinition, ManagedTaskExecutor } from '../../../../flow/common/change.ts'
+import type { ConnectorConnection } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
@@ -161,6 +162,7 @@ export function AgentSettings({
   nodeId,
   store,
   connectors,
+  prepareAction,
   disabled,
   theme,
 }: {
@@ -168,6 +170,9 @@ export function AgentSettings({
   readonly nodeId: string
   readonly store: WorkspaceStore
   readonly connectors: ConnectorStore
+  readonly prepareAction?: (
+    action: ConnectorActionView,
+  ) => Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] } | undefined>
   readonly disabled: boolean
   readonly theme: WorkbenchTheme
 }): ReactElement | null {
@@ -521,6 +526,7 @@ export function AgentSettings({
               connectors={connectors}
               disabled={disabled}
               label={t('agent.addTool')}
+              prepare={prepareAction}
               onSelect={async (action) => {
                 setPendingTool(action)
                 setApproval(false)

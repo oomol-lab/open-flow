@@ -108,7 +108,7 @@ function capabilityFlow(declared = true): RevisionContent {
       capability: {
         imports: [],
         name: 'Capability',
-        source: 'export default async (input, capability) => await capability.actions.example.echo(input)',
+        source: `export default async (input, capability) => await capability.actions.example.echo(input${declared ? '' : ", { connectionId: 'connection-work' }"})`,
       },
     },
   }
@@ -199,6 +199,83 @@ describe('Server Connector client', () => {
     ])
     expect(new ConnectorClient('https://connector.example.com', 'runtime-token').teamSupported()).toBe(false)
     expect(new ConnectorClient('https://connector.oomol.com', '').teamSupported()).toBe(false)
+  })
+
+  it('uses the OOMOL profile UID to enumerate assignable Provider access bindings', async () => {
+    const requests: string[] = []
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input)
+        requests.push(url)
+        if (url == 'https://api.oomol.dev/v1/users/profile') return Response.json({ uid: 'oomol-user' })
+        if (url == 'https://relation-control.oomol.dev/v1/teams/team-1/app-access') {
+          return Response.json(
+            {
+              'role::connector-app:connection-work': {
+                connector: [
+                  {
+                    app: 'connection-work',
+                    method: 'POST',
+                    permissionRules: {
+                      assignments: { 'oomol-user': 'editor' },
+                      rules: [{ actions: ['echo'], id: 'editor', name: 'Editors' }],
+                      teamDefault: { actions: [] },
+                    },
+                    provider: 'example',
+                  },
+                ],
+              },
+            },
+            { headers: { etag: 'policy-7' } },
+          )
+        }
+        if (url == 'https://connector.oomol.dev/v1/apps/services/example') {
+          return Response.json(success([{ ...app, displayName: 'Work account', isDefault: true }]))
+        }
+        throw new Error(`Unexpected request: ${url}`)
+      }),
+    )
+    const connector = new ConnectorClient('https://connector.oomol.dev', 'runtime-token')
+
+    const candidates = await connector.listProviderAccessBindingCandidates('team-1', 'example')
+    expect(candidates).toEqual([
+      {
+        accessBindingId: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
+        connectionDisplayName: 'Work account',
+        isDefault: true,
+        permissions: { actionIds: ['example.echo'], allActions: false, configured: false, proxy: false },
+        permissionGroupName: 'Editors',
+        policyRevision: 'policy-7',
+        providerId: 'example',
+      },
+    ])
+    await expect(connector.listProviderAccessBindingCandidates('team-1', 'example')).resolves.toEqual(candidates)
+    expect(requests.filter((url) => url.includes('/v1/users/profile'))).toHaveLength(1)
+    expect(requests.filter((url) => url.includes('/app-access'))).toHaveLength(1)
+  })
+
+  it('requires a Flow Provider binding before executing against hosted Connector', async () => {
+    const request = vi.fn()
+    vi.stubGlobal('fetch', request)
+    const connector = new ConnectorClient('https://connector.oomol.dev', 'runtime-token')
+
+    await expect(
+      connector.execute('example.echo', 'connection-work', {}, 'invocation-1', new AbortController().signal, {
+        flowId: 'flow-1',
+        providerAccess: {
+          accessRevision: 0,
+          bindings: [],
+          mode: 'selectable',
+          providerAccessDigest: 'empty',
+          version: 1,
+        },
+        purpose: 'execute',
+        source: 'draft',
+        teamId: 'team-1',
+      }),
+    ).rejects.toMatchObject({ code: 'connector.access-required' })
+    expect(request).not.toHaveBeenCalled()
   })
 
   it('loads all scoped Connections independently of Providers', async () => {
@@ -847,7 +924,7 @@ describe('Server Connector client', () => {
     },
   )
 
-  it('executes only Connector Capabilities declared by the current inline Task', async () => {
+  it('executes Connector Actions from inline Code Tasks without a node-level switch', async () => {
     const calls: string[] = []
     const origin = await startConnector((request, response) => {
       calls.push(request.url!)
@@ -879,11 +956,12 @@ describe('Server Connector client', () => {
     expect(calls.slice(-2)).toEqual(['/v1/apps', '/v1/actions/example.echo'])
 
     calls.length = 0
-    const deniedRunId = await run(service, capabilityFlow(false))
-    expect(service.events(deniedRunId).find((event) => event.kind == 'node.failed')).toMatchObject({
-      payload: { error: { code: 'node.failed' } },
+    const implicitRunId = await run(service, capabilityFlow(false))
+    expect(service.run(implicitRunId)).toMatchObject({
+      result: { kind: 'node-results', nodes: [{ status: 'completed', outputs: { message: 'hello' }, nodeId: 'capability' }] },
+      status: 'completed',
     })
-    expect(calls).toEqual([])
+    expect(calls).toEqual(['/v1/apps', '/v1/actions/example.echo'])
   })
 
   it('proxies a Provider request through the resolved stable Connection', async () => {

@@ -299,7 +299,7 @@ export class ConnectorStore {
   }
 
   public readonly browseAddNodeOptions = (signal: AbortSignal) => {
-    const source = this.data.providers.get(this.#workspace.$.flowId.value, this.#language)
+    const source = this.data.providers.get(undefined, this.#language)
     return scopedValue(signal, (get) => {
       const state = get(source)
       const t = get(this.#i18n.t$)
@@ -312,14 +312,11 @@ export class ConnectorStore {
 
   public readonly provideAddNodeOptionChoices = (optionId: string, signal: AbortSignal) => {
     const service = optionId.slice('connector-provider:'.length)
-    const flowId = this.#workspace.$.flowId.value
-    const source = this.data.actions.get(service, flowId, this.#language)
-    const providers = this.data.providers.get(flowId, this.#language)
-    const connections = this.data.connections.get(service, flowId)
+    const source = this.data.actions.get(service, undefined, this.#language)
+    const providers = this.data.providers.get(undefined, this.#language)
     return scopedValue(signal, (get) => {
       const state = get(source)
       const provider = get(providers).data?.find((item) => item.serviceId == service)
-      const catalog = get(connections).data
       const t = get(this.#i18n.t$)
       return {
         ...state,
@@ -327,7 +324,7 @@ export class ConnectorStore {
           option(
             actionWithConnections(
               { ...action, ...(provider == null ? {} : { serviceName: provider.serviceName, icon: action.icon ?? provider.icon }) },
-              catalog,
+              undefined,
             ),
             t,
           ),
@@ -337,7 +334,6 @@ export class ConnectorStore {
   }
 
   public readonly provideAddNodeOptions = (searchTerm: string, signal: AbortSignal, sessionSignal = signal) => {
-    const flowId = this.#workspace.$.flowId.value
     const query = searchTerm.trim()
     if (query.length == 0)
       return scopedValue(signal, (get) => ({
@@ -345,15 +341,26 @@ export class ConnectorStore {
         refreshing: false,
         error: undefined,
       }))
-    const source = this.data.actions.search(query, flowId, this.#language, sessionSignal).get()
+    const source = this.data.actions.search(query, undefined, this.#language, sessionSignal).get()
     return scopedValue(signal, (get) => {
       const state = get(source)
       const t = get(this.#i18n.t$)
       return {
         ...state,
-        data: state.data?.map((action) => option(actionWithConnections(action, get(resourceData(this.data.connections.get(action.serviceId, flowId)))), t)),
+        data: state.data?.map((action) => option(actionWithConnections(action, undefined), t)),
       }
     })
+  }
+
+  public async resolveAction(actionId: string): Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] }> {
+    const flowId = this.#workspace.$.flowId.value
+    if (flowId == null || this.#disposed) throw new Error('Connector Action cannot be resolved without an active Flow.')
+    await Promise.resolve()
+    const action = await resourceValue(this.data.actions.detail(actionId, flowId, this.#language), undefined, true)
+    const connections = action.authenticated ? await resourceValue(this.data.connections.get(action.serviceId, flowId), undefined, true) : []
+    this.#remember(this.#actionIds, [actionId])
+    if (action.authenticated) this.#remember(this.#services, [action.serviceId])
+    return { action: actionWithConnections(action, connections), connections: connectionCatalog(connections).active }
   }
 
   public readonly retryCatalog = (): void => {

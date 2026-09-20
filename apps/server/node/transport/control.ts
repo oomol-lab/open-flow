@@ -27,6 +27,7 @@ export type ResolveControlActor = (request: Request) => Promise<string | undefin
 
 type Environment = { Variables: { actorId: string } }
 type InvalidCode =
+  | typeof controlErrorCode.connectorAccessInvalid
   | typeof controlErrorCode.eventSourceInvalid
   | typeof controlErrorCode.flowInvalid
   | typeof controlErrorCode.pageInvalidCursor
@@ -197,6 +198,52 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
 
   app.get('/flows/:flowId/editor', async (context) => response(200, await service.getEditor(context.req.param('flowId'))))
+  app.get('/flows/:flowId/connector-access', (context) => {
+    query(context.req.raw, [], controlErrorCode.connectorAccessInvalid)
+    return response(200, service.getConnectorAccess(context.get('actorId'), context.req.param('flowId')))
+  })
+  app.get('/flows/:flowId/connector-access/:providerId/candidates', async (context) => {
+    query(context.req.raw, [], controlErrorCode.connectorAccessInvalid)
+    return response(
+      200,
+      await service.getProviderAccessBindingCandidates(
+        context.get('actorId'),
+        context.req.param('flowId'),
+        connectorService(context.req.param('providerId')),
+        context.req.raw.signal,
+      ),
+    )
+  })
+  app.put('/flows/:flowId/connector-access/:providerId', async (context) => {
+    query(context.req.raw, [], controlErrorCode.connectorAccessInvalid)
+    const providerId = connectorService(context.req.param('providerId'))
+    const body = await decodeRequest(context.req.raw, controlErrorCode.connectorAccessInvalid, controlRequests.addProviderAccessBinding)
+    return response(
+      200,
+      await service.addProviderAccessBinding(
+        context.get('actorId'),
+        context.req.param('flowId'),
+        providerId,
+        body.accessBindingId,
+        body.expectedAccessRevision,
+      ),
+    )
+  })
+  app.delete('/flows/:flowId/connector-access/:providerId', async (context) => {
+    query(context.req.raw, [], controlErrorCode.connectorAccessInvalid)
+    const providerId = connectorService(context.req.param('providerId'))
+    const body = await decodeRequest(context.req.raw, controlErrorCode.connectorAccessInvalid, controlRequests.removeProviderAccessBinding)
+    return response(
+      200,
+      await service.removeProviderAccessBinding(
+        context.get('actorId'),
+        context.req.param('flowId'),
+        providerId,
+        body.accessBindingId,
+        body.expectedAccessRevision,
+      ),
+    )
+  })
   app.get('/flows/:flowId/draft', (context) => response(200, service.getDraft(context.req.param('flowId'))))
   app.get('/flows/:flowId/draft/sync', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
@@ -242,6 +289,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
         flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid),
         undefined,
         metadataLocale(context, ['flowId', 'locale']),
+        context.get('actorId'),
       ),
       version: 1,
     })
@@ -260,10 +308,12 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       const locale = metadataLocale(context, ['flowId', 'q', 'service', 'locale'])
       const actions =
         queryValue == null
-          ? await (metadata ? service.listConnectorActionMetadata(serviceId, scope, locale) : service.listConnectorActions(serviceId, scope, locale))
+          ? await (metadata
+              ? service.listConnectorActionMetadata(serviceId, scope, locale, context.get('actorId'))
+              : service.listConnectorActions(serviceId, scope, locale, context.get('actorId')))
           : await (metadata
-              ? service.searchConnectorActionMetadata(queryValue, scope, undefined, locale)
-              : service.searchConnectorActions(queryValue, scope, undefined, locale))
+              ? service.searchConnectorActionMetadata(queryValue, scope, undefined, locale, context.get('actorId'))
+              : service.searchConnectorActions(queryValue, scope, undefined, locale, context.get('actorId')))
       return response(200, { actions, version: 1 })
     })
     app.get(`${path}/:actionId`, async (context) => {
@@ -274,6 +324,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
           flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid),
           undefined,
           metadataLocale(context, ['flowId', 'locale']),
+          context.get('actorId'),
         ),
         version: 1,
       })
@@ -282,7 +333,11 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   app.get('/connector/connections', async (context) => {
     const flowId = query(context.req.raw, ['flowId'], controlErrorCode.flowInvalid).get('flowId')
     return response(200, {
-      connections: await service.listAllConnectorConnections(flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid)),
+      connections: await service.listAllConnectorConnections(
+        flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid),
+        undefined,
+        context.get('actorId'),
+      ),
       version: 1,
     })
   })
@@ -290,7 +345,12 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const flowId = query(context.req.raw, ['flowId'], controlErrorCode.flowInvalid).get('flowId')
     const serviceId = connectorService(context.req.param('serviceId'))
     return response(200, {
-      connections: await service.listConnectorConnections(serviceId, flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid)),
+      connections: await service.listConnectorConnections(
+        serviceId,
+        flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid),
+        undefined,
+        context.get('actorId'),
+      ),
       serviceId,
       version: 1,
     })
@@ -320,6 +380,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
         context.req.param('triggerNodeId'),
         context.req.param('field'),
         context.req.raw.signal,
+        context.get('actorId'),
       ),
       version: 1,
     })

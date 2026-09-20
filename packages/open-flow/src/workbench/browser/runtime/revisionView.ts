@@ -60,6 +60,7 @@ const views = new WeakMap<Draft, RevisionView>()
 
 export class RevisionView {
   public readonly connectorActionIds: ReadonlySet<string>
+  public readonly connectorProviderIds: ReadonlySet<string>
   readonly #document: FlowDocument
   readonly #modules: Draft['content']['modules']
   readonly #resolvedNodes = new WeakMap<GraphNode, Map<string, ResolvedSelection>>()
@@ -71,8 +72,25 @@ export class RevisionView {
     this.#modules = revision.content.modules
     const connectorActionIds = new Set<string>()
     for (const task of Object.values(this.#document.tasks)) if (task.executor.kind == 'connector') connectorActionIds.add(task.executor.action)
-    for (const declaration of [...codeActions(this.#document), ...agentActions(this.#document)]) connectorActionIds.add(declaration.action)
+    for (const declaration of [...codeActions(this.#document), ...agentActions(this.#document)]) {
+      if ('action' in declaration) connectorActionIds.add(declaration.action)
+      else {
+        for (const action of declaration.actionHints ?? []) connectorActionIds.add(action)
+        for (const hint of declaration.connectionHints ?? []) connectorActionIds.add(hint.action)
+      }
+    }
     this.connectorActionIds = connectorActionIds
+    const connectorProviderIds = new Set<string>()
+    for (const actionId of connectorActionIds) {
+      const separator = actionId.indexOf('.')
+      if (separator > 0) connectorProviderIds.add(actionId.slice(0, separator))
+    }
+    for (const graph of [this.#document.graph, ...Object.values(this.#document.subflows).map((subflow) => subflow.graph)]) {
+      for (const node of Object.values(graph.nodes)) {
+        if (node.kind == 'integration' || node.kind == 'poll') connectorProviderIds.add(node.definition.provider)
+      }
+    }
+    this.connectorProviderIds = connectorProviderIds
   }
 
   public subflow(subflowId: string): SubflowDefinition | undefined {

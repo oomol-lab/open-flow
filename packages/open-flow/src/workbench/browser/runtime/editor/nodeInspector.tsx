@@ -2,13 +2,14 @@ import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
 import type { TriggerDisplay } from '../../../../control/common/triggerCatalog.ts'
 import type { GraphNode, GraphTarget } from '../../../../flow/common/change.ts'
-import type { ConnectorAction, ConnectorConnection, Group, InputPort } from '../api.ts'
+import type { ConnectorAccess, ConnectorAction, ConnectorConnection, Group, InputPort } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from '../revisionView.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { TriggerStore } from '../stores/triggerStore.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
+import type { ConnectorActionView } from '../workspace.ts'
 import type { DiagnosticFocus } from './diagnostics.ts'
 import type { SubflowSettings } from './flowChanges.ts'
 import type { NodeInputField } from './nodeInputs.tsx'
@@ -416,7 +417,10 @@ function ConnectorAccount({
           </Button>
         )}
       </h3>
-      <div className="connection-state-content">{content}</div>
+      <div className="connection-state-content">
+        {content}
+        <p className="connection-detail">{t('inspector.account.inheritsFlowAccess')}</p>
+      </div>
     </section>
   )
 }
@@ -480,7 +484,9 @@ function ResolutionDefinition({
 
 function TaskDefinition({
   children,
+  connectorAccess,
   connectors,
+  prepareConnectorAction,
   disabled,
   focus,
   selection,
@@ -488,7 +494,11 @@ function TaskDefinition({
   theme,
 }: {
   readonly children: ReactElement
+  readonly connectorAccess?: ConnectorAccess
   readonly connectors: ConnectorStore
+  readonly prepareConnectorAction?: (
+    action: ConnectorActionView,
+  ) => Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] } | undefined>
   readonly disabled: boolean
   readonly focus?: DiagnosticFocus
   readonly selection: Extract<ResolvedNode, { readonly kind: 'task' }>
@@ -502,6 +512,7 @@ function TaskDefinition({
   const fieldIdPrefix = `task-${selection.id}`
   const moduleEditor = useVal(store.$.moduleEditor)
   const moduleLocation = focus?.section == 'module' ? focus.diagnostic : undefined
+  const [insert, setInsert] = useState<{ readonly id: number; readonly text: string }>()
 
   if (task == null) return <div className="inspector-section section-error">{t('inspector.task.missing')}</div>
   const llm = 'executor' in task && task.executor.kind == 'llm' ? task.executor : undefined
@@ -525,11 +536,14 @@ function TaskDefinition({
         <div className="inspector-section-title">{t('inspector.task.javascriptModule')}</div>
         <div className="code-section-content">
           <CodeActions
+            access={connectorAccess}
             key={`${moduleEditor.moduleId}-${selection.id}`}
             capabilities={task.capabilities ?? []}
             connectors={connectors}
             disabled={disabled || moduleEditor.status == 'saving'}
             nodeId={selection.id}
+            onInsert={(text) => setInsert((current) => ({ id: (current?.id ?? 0) + 1, text }))}
+            prepareAction={prepareConnectorAction}
             store={store}
             context={contextName(moduleEditor.source) ?? 'context'}
           />
@@ -537,6 +551,7 @@ function TaskDefinition({
             ariaLabel={t('inspector.task.source')}
             disabled={disabled}
             errorLabel={t('inspector.task.editorUnavailable')}
+            insert={insert}
             loadingLabel={t('inspector.task.editorLoading')}
             location={moduleLocation == null ? undefined : { column: moduleLocation.column, line: moduleLocation.line }}
             onBlur={() => {
@@ -718,6 +733,7 @@ function TriggerConnection({
           )}
         </h3>
         <div className="connection-state-content">
+          <p className="connection-detail">{t('inspector.account.inheritsFlowAccess')}</p>
           {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
           {connectionLoading ? (
             <p>{t('inspector.account.loading')}</p>
@@ -770,6 +786,10 @@ interface Props {
   readonly connectorConnectionError?: string
   readonly activeConnectorConnections?: readonly ConnectorConnection[]
   readonly connectors: ConnectorStore
+  readonly connectorAccess?: ConnectorAccess
+  readonly prepareConnectorAction?: (
+    action: ConnectorActionView,
+  ) => Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] } | undefined>
   readonly connectorLoading: boolean
   readonly disabled: boolean
   readonly focus?: DiagnosticFocus
@@ -797,6 +817,8 @@ export function NodeInspector({
   connectorConnectionError,
   activeConnectorConnections,
   connectors,
+  connectorAccess,
+  prepareConnectorAction,
   connectorLoading,
   disabled,
   focus,
@@ -879,6 +901,7 @@ export function NodeInspector({
             nodeId={selection.id}
             store={store}
             connectors={connectors}
+            prepareAction={prepareConnectorAction}
             disabled={disabled}
             theme={theme}
           />
@@ -1146,7 +1169,16 @@ export function NodeInspector({
         ) : (
           <>
             {selection.kind == 'trigger' ? null : selection.kind == 'task' ? (
-              <TaskDefinition connectors={connectors} disabled={disabled} focus={focus} selection={selection} store={store} theme={theme}>
+              <TaskDefinition
+                connectorAccess={connectorAccess}
+                connectors={connectors}
+                prepareConnectorAction={prepareConnectorAction}
+                disabled={disabled}
+                focus={focus}
+                selection={selection}
+                store={store}
+                theme={theme}
+              >
                 <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
               </TaskDefinition>
             ) : selection.kind == 'approval' || selection.kind == 'wait' ? (

@@ -4,7 +4,7 @@ import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { RuntimeCapabilityCall, RuntimeCapabilityResponse } from '@oomol-lab/open-flow/runtime-contract'
 import type { FlowRunOutcome, FlowRunResult, RunLaunch, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
 import type { Logger } from 'pino'
-import type { ConnectorHost } from '../deployment/connector.ts'
+import type { ConnectorAccessContext, ConnectorHost } from '../deployment/connector.ts'
 import type { LlmHost } from '../deployment/llm.ts'
 import type { StoredRun } from '../storage/run-store.ts'
 import type { Store } from '../storage/store.ts'
@@ -12,7 +12,7 @@ import type { Store } from '../storage/store.ts'
 import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-action'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { decodeRevision, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
-import { agentActions, codeActions, prepareFlow, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
+import { agentActions, prepareFlow, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { createEventProjector } from '@oomol-lab/open-flow/run-events'
 import { resolveAction } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
@@ -26,6 +26,8 @@ const encoder = new TextEncoder()
 const nodeFailureCodes: ReadonlySet<string> = new Set([
   'capability.denied',
   'capability.invalid',
+  'connector.access-invalid',
+  'connector.access-required',
   'connector.connection-required',
   'connector.input-invalid',
   'connector.indeterminate',
@@ -120,8 +122,7 @@ export class RunExecutor {
         return yield* Effect.fail(new Error(`Fixed Flow Revision can no longer be prepared: ${prepared.kind}.`))
       }
       yield* Effect.tryPromise({
-        try: (signal) =>
-          checkCodeActions([...codeActions(prepared.flow), ...agentActions(prepared.flow)], this.#resolveConnector(), run.connectorTeamId, signal),
+        try: (signal) => checkCodeActions(agentActions(prepared.flow), this.#resolveConnector(), this.#connectorContext(run, 'eligibility'), signal),
         catch: (error) => error,
       })
       const projectEvent = createEventProjector(run.runId, nodeFailureCodes)
@@ -225,7 +226,7 @@ export class RunExecutor {
       }
       yield* this.#isolatedVm
         .run(flow, {
-          capability: (capabilities, call) => this.#invokeCapability(capabilities, call, run.connectorTeamId),
+          capability: (capabilities, call) => this.#invokeCapability(capabilities, call, this.#connectorContext(run, 'execute')),
           emit: async (event) => {
             if (event.type == 'run.started' && event.runId == run.runId) return
             const projected = await projectEvent(event)
@@ -349,7 +350,7 @@ export class RunExecutor {
     run: StoredRun,
     report: (event: Readonly<Record<string, JsonValue>>) => Promise<void>,
   ): Promise<unknown> {
-    const teamId = run.connectorTeamId
+    const access = this.#connectorContext(run, 'execute')
     const task = prepared.tasks[invocation.taskId]!
     const executor = task.executor
     switch (executor.kind) {
@@ -371,10 +372,10 @@ export class RunExecutor {
             await checkCodeActions(
               [{ kind: 'connector', action: tool.action, connections: tool.connectionId == null ? [] : [{ connectionId: tool.connectionId }] }],
               connector,
-              teamId,
+              access,
               signal,
             )
-            return connector.execute(tool.action, tool.connectionId, normalizeConnectorRuntimeInputs(tool.inputs, input), callId, signal, teamId)
+            return connector.execute(tool.action, tool.connectionId, normalizeConnectorRuntimeInputs(tool.inputs, input), callId, signal, access)
           },
           report,
           {
@@ -397,7 +398,7 @@ export class RunExecutor {
           ),
           invocation.invocationId,
           invocation.signal,
-          teamId,
+          access,
         )
       case 'llm':
         const llm = this.#resolveLlm()
@@ -420,7 +421,11 @@ export class RunExecutor {
     }
   }
 
-  async #invokeCapability(capabilities: readonly ConnectorCapability[], call: RuntimeCapabilityCall, teamId?: string): Promise<RuntimeCapabilityResponse> {
+  async #invokeCapability(
+    capabilities: readonly ConnectorCapability[],
+    call: RuntimeCapabilityCall,
+    access: ConnectorAccessContext,
+  ): Promise<RuntimeCapabilityResponse> {
     if (call.kind != 'connector') throw new TaskHostError('capability.denied', 'The Runtime Capability is not declared for this Task.')
     let payload: ReturnType<typeof resolveAction>
     try {
@@ -432,7 +437,10 @@ export class RunExecutor {
     }
     const connector = this.#resolveConnector()
     if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
-    if (payload.connectionId == null && (await connector.getAction(payload.action, call.signal, teamId)).authenticated) {
+    if (
+      payload.connectionId == null &&
+      (await connector.getAction(payload.action, call.signal, { ...access, providerId: payload.action.split('.')[0] })).authenticated
+    ) {
       throw new ConnectorTaskError('connector.connection-required', 'Choose a Connector Connection for this Action.')
     }
     this.#logger.debug(
@@ -440,8 +448,21 @@ export class RunExecutor {
       'Code Action started.',
     )
     return {
-      body: await connector.execute(payload.action, payload.connectionId, payload.input, call.callId, call.signal, teamId),
+      body: await connector.execute(payload.action, payload.connectionId, payload.input, call.callId, call.signal, {
+        ...access,
+        providerId: payload.action.split('.')[0],
+      }),
       status: 200,
+    }
+  }
+
+  #connectorContext(run: StoredRun, purpose: ConnectorAccessContext['purpose']): ConnectorAccessContext {
+    return {
+      flowId: run.flowId,
+      providerAccess: run.providerAccess,
+      purpose,
+      source: 'run',
+      ...(run.connectorTeamId == null ? {} : { teamId: run.connectorTeamId }),
     }
   }
 }
