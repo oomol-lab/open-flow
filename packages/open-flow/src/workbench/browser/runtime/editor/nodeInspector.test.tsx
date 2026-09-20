@@ -109,6 +109,47 @@ describe('Provider account section', () => {
 })
 
 describe('Provider Trigger sections', () => {
+  it('shows the standard account section for Feishu App Bot triggers', () => {
+    const trigger = {
+      bindingId: 'account',
+      config: {},
+      definition: {
+        configInputs: [{ handle: 'sourceId', jsonSchema: { type: 'string' }, nullable: false }],
+        description: 'Receives Feishu events.',
+        endpoint: { body: { allowArray: false, allowEmpty: false, formats: ['json'] }, methods: ['POST'], successStatus: 200 },
+        key: 'feishu_app_bot.on_event',
+        name: 'on_event',
+        provider: 'feishu_app_bot',
+        type: 'integration',
+      },
+      inputs: {},
+      kind: 'integration',
+      name: 'Application Event',
+    }
+    const element = NodeInspector({
+      variables: { enabled: false, names: [], loaded: true, loading: false, onOpen: vi.fn() },
+      connectorAuthorizationPending: false,
+      connectorLoading: false,
+      connectors: {} as never,
+      disabled: false,
+      revision: { binding: () => ({ kind: 'connection', target: 'feishu-account' }) } as never,
+      selection: { id: 'feishu-trigger', kind: 'trigger', node: trigger, trigger } as never,
+      store: { $: { flowId: { value: 'flow' } } } as never,
+      target: { kind: 'flow' },
+      theme: 'light',
+      triggerActiveConnections: [],
+      triggerAuthorizationPending: false,
+      triggerConnectionLoading: false,
+      triggers: {} as never,
+    })
+
+    const connection = find(element, (item) => typeof item.type == 'function' && item.type.name == 'TriggerConnection')
+    const config = find(element, (item) => typeof item.type == 'function' && item.type.name == 'FeishuTriggerConfig')
+
+    expect(connection).toBeDefined()
+    expect(config?.props.connectionId).toBe('feishu-account')
+  })
+
   it('orders Provider options before Outputs and Node settings', () => {
     const trigger = {
       bindingId: 'connection',

@@ -1,4 +1,4 @@
-import type { ComponentProps } from 'react'
+import type { ComponentProps, ReactElement } from 'react'
 import type { EventSource } from '../../../control/common/api.ts'
 
 import { useCallback, useState } from 'react'
@@ -15,6 +15,8 @@ export function CreateEventSourceDialog({
   existingNames,
   disabled,
   defaultOpen = false,
+  className,
+  trigger,
   onSelect,
   onCreated,
 }: {
@@ -22,6 +24,8 @@ export function CreateEventSourceDialog({
   readonly teamId: string | null
   readonly existingNames: readonly string[]
   readonly defaultOpen?: boolean
+  readonly className?: string
+  readonly trigger?: ReactElement
   readonly disabled: boolean
   readonly onCreated: (source: EventSource) => void
   readonly onSelect: (source: EventSource) => Promise<boolean>
@@ -51,7 +55,7 @@ export function CreateEventSourceDialog({
   }
 
   return (
-    <div ref={portal}>
+    <div ref={portal} className={className}>
       <Dialog
         open={open}
         onOpenChange={(value) => {
@@ -64,7 +68,7 @@ export function CreateEventSourceDialog({
           }
         }}
       >
-        <DialogTrigger disabled={disabled} render={<Button type="button" size="sm" />}>
+        <DialogTrigger disabled={disabled} render={trigger ?? <Button type="button" size="sm" />}>
           {t('eventSources.create')}
         </DialogTrigger>
         <DialogContent container={root} closeLabel={t('contextPanel.close')} className="flex max-h-[85dvh] flex-col overflow-hidden sm:max-w-2xl">

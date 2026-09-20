@@ -843,7 +843,7 @@ export function NodeInspector({
   return (
     <NativeScrollArea className="inspector-scroll" tabIndex={-1}>
       <div className="inspector-content" ref={content}>
-        {selection?.kind == 'trigger' && !(selection.trigger.kind == 'integration' && selection.trigger.definition.key == 'feishu_app_bot.on_event') && (
+        {selection?.kind == 'trigger' && (
           <TriggerConnection
             activeConnections={triggerActiveConnections}
             authorizationPending={triggerAuthorizationPending}
@@ -900,6 +900,9 @@ export function NodeInspector({
               inputs={presentProviderTriggerConfig(selection.trigger.definition.configInputs, triggerDisplays?.[selection.trigger.definition.key])}
               config={selection.trigger.config}
               nodeId={selection.id}
+              connectionId={
+                revision.binding(selection.trigger.bindingId)?.kind === 'connection' ? revision.binding(selection.trigger.bindingId)!.target : undefined
+              }
               disabled={disabled}
               store={store}
             />

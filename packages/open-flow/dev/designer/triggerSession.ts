@@ -1,3 +1,4 @@
+import type { EventSource } from '../../src/control/common/api.ts'
 import type { ChangeOperation, RevisionContent, TriggerNode } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { WorkbenchHost } from '../../src/workbench/browser/runtime/contract.ts'
@@ -25,6 +26,7 @@ export function createTriggerSession(
     request: (url: URL, init?: RequestInit) => Promise<Response>
     cache: WorkbenchHost['triggerCatalogCache']
   },
+  eventSources?: readonly EventSource[],
 ) {
   const i18n = createI18n(language)
   const { flow, draft } = triggerDraft(trigger)
@@ -62,7 +64,7 @@ export function createTriggerSession(
       return Response.json({
         version: 1,
         teamId: null,
-        sources: [
+        sources: eventSources ?? [
           {
             version: 1,
             sourceId: 'source_11111111111111111111111111111111',
@@ -167,6 +169,9 @@ export function createTriggerSession(
         success: true,
         data: [{ id: account.connectionId, service: serviceId, displayName: account.displayName, isDefault: account.isDefault, status: account.status }],
       })
+    if (url.pathname === '/v1/event-sources/connections') return Response.json({ version: 1, connections: [account] })
+    if (url.pathname === `/v1/connector/connections/${serviceId}/page`)
+      return Response.json({ version: 1, url: `https://connector.example/providers/${serviceId}` })
     throw new Error(`Unsupported Trigger Lab request: ${url.pathname}`)
   })
   const notice = (value: unknown) => log('trigger.notice', value)

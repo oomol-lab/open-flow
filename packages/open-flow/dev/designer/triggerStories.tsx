@@ -365,7 +365,16 @@ function RunStory(props: StoryProps) {
   )
 }
 
-type SidebarState = 'missing-status' | 'options-error' | 'created-with-default' | 'display' | 'edit' | 'unconfigured' | 'connection-error' | 'description'
+type SidebarState =
+  | 'missing-status'
+  | 'options-error'
+  | 'created-with-default'
+  | 'display'
+  | 'edit'
+  | 'unconfigured'
+  | 'connection-error'
+  | 'description'
+  | 'no-event-sources'
 function SidebarSample({ fixture, dark, language, log, state, framed = true }: StoryProps & { state: SidebarState; framed?: boolean }) {
   const [session, setSession] = useState<ReturnType<typeof createTriggerSession>>()
   const sidebar = useRef<HTMLDivElement>(null)
@@ -379,7 +388,7 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
         description:
           'Start the workflow manually to inspect a complete sample execution. This longer description exercises the sidebar’s text wrapping and editing.',
       }
-    if (state === 'unconfigured') {
+    if (state === 'unconfigured' || state === 'no-event-sources') {
       if (trigger.kind === 'poll' || trigger.kind === 'integration') trigger = { ...trigger, config: {} }
       else if (trigger.kind === 'cron') trigger = { ...trigger, cronTimes: [] }
       else if (trigger.kind === 'webhook') trigger = { ...trigger, bodyFields: [], options: {} }
@@ -396,6 +405,8 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
       (name, value) => logRef.current(name, value),
       `trigger-${fixture.id}-${state}`,
       state === 'created-with-default',
+      undefined,
+      state === 'no-event-sources' ? [] : undefined,
     )
     setSession(next)
     void next.start()
@@ -466,6 +477,9 @@ function SidebarStory(props: StoryProps) {
         'created-with-default',
         'unconfigured',
         'connection-error',
+        ...(props.fixture.trigger.kind === 'integration' && props.fixture.trigger.definition.key === 'feishu_app_bot.on_event'
+          ? (['no-event-sources'] as const)
+          : []),
         ...(props.fixture.trigger.kind === 'poll' && props.fixture.trigger.definition.provider === 'linear'
           ? (['missing-status', 'options-error'] as const)
           : []),
