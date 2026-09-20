@@ -1,9 +1,11 @@
-import type { JsonValue, EventSource } from '../../../../control/common/api.ts'
+import type { EventSource } from '../../../../control/common/api.ts'
+import type { InputValues } from '../../../../flow/common/change.ts'
 import type { Group, InputPort } from '../api.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 
 import { useEffect, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { triggerConfigValues } from '../../../../trigger/common/config.ts'
 import { feishuResourceKind, supportsFeishuChatFilter } from '../../../../trigger/providers/feishu/config.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { CreateEventSourceDialog } from '../createEventSourceDialog.tsx'
@@ -14,17 +16,18 @@ import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
 
 export function FeishuTriggerConfig({
   inputs,
-  config,
+  config: assignments,
   nodeId,
   disabled,
   store,
 }: {
   readonly inputs: readonly (InputPort | Group)[]
-  readonly config: Readonly<Record<string, JsonValue>>
+  readonly config: InputValues
   readonly nodeId: string
   readonly disabled: boolean
   readonly store: WorkspaceStore
 }) {
+  const config = triggerConfigValues(inputs, assignments)
   const t = useTranslate()
   const [attempt, setAttempt] = useState(0)
   const sourceId = typeof config.sourceId == 'string' ? config.sourceId : ''
@@ -58,8 +61,11 @@ export function FeishuTriggerConfig({
   })
   return (
     <TriggerConfigEditor
+      onReset={() => {
+        return store.resetTriggerConfig(nodeId)
+      }}
       inputs={visibleInputs}
-      config={config}
+      config={assignments}
       disabled={disabled}
       onChange={(name, value) => void store.saveTriggerConfig(nodeId, name, value)}
       renderEditor={(input) =>

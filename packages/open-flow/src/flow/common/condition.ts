@@ -105,7 +105,7 @@ export function setConditionInput(node: ConditionNode, handle: string, mapping: 
       : {
           kind: 'value',
           ...(entry.operand.kind === 'value' && entry.operand.jsonSchema != null ? { jsonSchema: entry.operand.jsonSchema } : {}),
-          ...(mapping == null ? {} : { value: mapping.value }),
+          ...(mapping?.kind == 'value' ? { value: mapping.value } : {}),
         }
   const [c, g, e] = handle.split('/').map(Number)
   return {

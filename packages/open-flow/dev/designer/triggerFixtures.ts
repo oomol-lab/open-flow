@@ -3,6 +3,7 @@ import type { Draft, Flow } from '../../src/workbench/browser/runtime/api.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import snapshots from 'virtual:lab-trigger-snapshots'
+import { inputValues } from '../../src/flow/common/inputValue.ts'
 import { schemaObject } from '../../src/flow/common/schema.ts'
 import { triggerOutputDefinitions } from '../../src/trigger/common/contract.ts'
 
@@ -92,7 +93,7 @@ export const triggerFixtures: readonly TriggerFixture[] = [
       ...Object.fromEntries(fields.map((field) => [field.handle, field.value !== undefined ? field.value : field.nullable ? null : sample(field.jsonSchema)])),
       ...examples,
     }
-    const common = { name: definition.displayName, description: definition.description, bindingId: 'account', config }
+    const common = { name: definition.displayName, description: definition.description, bindingId: 'account', config: inputValues(config) }
     const trigger: TriggerNode =
       definition.type === 'poll'
         ? { ...common, kind: 'poll', definition, pollTimes: [{ type: 'every', unit: 'minute', value: 5 }] }

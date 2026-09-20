@@ -1440,3 +1440,41 @@ it('validates formed Webhook outputs at launch and checkpoint recovery without p
 function decisionOutput(action: 'continue' | 'approve' | 'reject', value: unknown) {
   return { inputs: { value }, action, resolvedAt: '2026-09-18T08:30:00.000Z', comment: null }
 }
+
+it.each([true, false])('does not execute with a cleared collection default (nullable=%s)', async (nullable) => {
+  const source = revision(
+    {
+      bindings: {},
+      subflows: {},
+      tasks: {},
+      graph: {
+        edges: [],
+        nodes: {
+          capture: {
+            kind: 'task',
+            inputs: { value: { kind: 'unset' } },
+            task: {
+              ...task('capture', ['value'], []),
+              inputs: [{ handle: 'value', jsonSchema: { type: 'object' }, nullable, value: { model: 'default' } }],
+            },
+          },
+        },
+      },
+    },
+    ['capture'],
+  )
+  const prepared = await prepareFlow(source, 'main', engine)
+  const received: Readonly<Record<string, JsonValue>>[] = []
+  const result = runFlow(prepared, {
+    emit: () => Effect.void,
+    invokeTask: (invocation) =>
+      Effect.sync(() => {
+        received.push(invocation.input)
+        return {}
+      }),
+    runId: 'run-cleared',
+  })
+  if (nullable) await result
+  else await expect(result).rejects.toThrow('does not match its declared schema')
+  expect(received).toEqual(nullable ? [{ value: null }] : [])
+})

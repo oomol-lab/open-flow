@@ -1,7 +1,7 @@
 import type { NodeSource, RevisionContent } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { InputMapping, JsonValue } from '../../src/workbench/browser/runtime/api.ts'
-import type { InputVariables } from '../../src/workbench/browser/runtime/editor/nodeInputValue.tsx'
+import type { InputVariables } from '../../src/workbench/browser/runtime/editor/sourceValueEditor.tsx'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'

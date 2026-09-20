@@ -5,6 +5,7 @@ $wrap-width: 340px;
   --field-nullable-width: var(--field-table-nullable-width, 0px);
   --field-name-track: minmax(0, 1fr);
   --field-type-track: minmax(64px, 0.48fr);
+  --field-value-track: minmax(0, 1.5fr);
   --field-name-gap: 4px;
   --field-actions-gap: 4px;
   --field-name-type-gap: 4px;
@@ -19,13 +20,23 @@ $wrap-width: 340px;
     [toggle] var(--field-toggle-width, 24px) var(--field-name-gap)
     [handle] var(--field-name-track) var(--field-name-type-gap)
     [type] var(--field-type-track) var(--field-type-value-gap)
-    [value] minmax(0, 1.5fr) [content-end] var(--field-actions-gap)
+    [value] var(--field-value-track) [content-end] var(--field-actions-gap)
     [nullable] var(--field-nullable-width)
     [actions] var(--field-actions-width, 28px) [end];
 
   &[data-layout='values'],
   &[data-layout='ports'] {
-    --field-name-track: minmax(90px, 1fr);
+    // Keep the name boundary independent of a row's editable/static type width.
+    --field-name-track: minmax(
+      90px,
+      calc(
+        (100% - var(--field-grip-width, 0px) - var(--field-toggle-width, 24px) - var(--field-name-gap) - var(--field-name-type-gap) -
+            var(--field-table-type-width, 56px) - var(--field-type-value-gap) - var(--field-actions-gap) - var(--field-nullable-width) -
+            var(--field-actions-width, 28px)) *
+          0.4
+      )
+    );
+    --field-value-track: minmax(0, 1fr);
     --field-type-track: var(--field-type-width, 56px);
     --field-name-gap: var(--field-value-name-gap, 2px);
     --field-actions-gap: 2px;

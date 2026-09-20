@@ -1,9 +1,11 @@
-import type { JsonValue, TriggerConfigOption } from '../../../../control/common/api.ts'
+import type { TriggerConfigOption } from '../../../../control/common/api.ts'
+import type { InputValues } from '../../../../flow/common/change.ts'
 import type { Group, InputPort } from '../api.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 
 import { useEffect, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { triggerConfigValues } from '../../../../trigger/common/config.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
 import { Field, FieldDescription, FieldError } from '../../../../ui/browser/field.tsx'
@@ -33,19 +35,20 @@ function useOptions(store: WorkspaceStore, nodeId: string, field: string, scope:
 
 export function LinearTriggerConfig({
   inputs,
-  config,
+  config: assignments,
   nodeId,
   connectionId,
   disabled,
   store,
 }: {
   readonly inputs: readonly (InputPort | Group)[]
-  readonly config: Readonly<Record<string, JsonValue>>
+  readonly config: InputValues
   readonly nodeId: string
   readonly connectionId?: string
   readonly disabled: boolean
   readonly store: WorkspaceStore
 }) {
+  const config = triggerConfigValues(inputs, assignments)
   const t = useTranslate()
   const teamId = typeof config.teamId == 'string' ? config.teamId : undefined
   const selected = Array.isArray(config.stateIds) ? config.stateIds.filter((id): id is string => typeof id == 'string') : []
@@ -56,8 +59,11 @@ export function LinearTriggerConfig({
   const missingStates = states.options == null ? [] : selected.filter((id) => !states.options!.some((item) => item.value == id))
   return (
     <TriggerConfigEditor
+      onReset={() => {
+        return store.resetTriggerConfig(nodeId)
+      }}
       inputs={inputs}
-      config={config}
+      config={assignments}
       disabled={disabled}
       onChange={(name, value) => void store.saveTriggerConfig(nodeId, name, value)}
       renderEditor={(input) =>

@@ -1,5 +1,7 @@
 {
   "valueEditor": {
+    "reset": "Сбросить",
+    "resetDefaults": "Восстановить значения по умолчанию",
     "editRawData": "Редактировать исходные данные",
     "editAsForm": "Переключиться на редактирование формы",
     "advancedSettings": "Дополнительные настройки",
@@ -87,7 +89,10 @@
     "arrayOf": "из",
     "columnValue": "Значение",
     "noOptions": "Нет доступных вариантов",
-    "emptyObject": "Только пустой объект",
-    "emptyObjectReadonly": "Пустой объект"
+    "closedObjectDefinition": "Только пустой объект",
+    "emptyObjectValue": "Пустой объект",
+    "unrestrictedFields": "Нет предопределённых полей",
+    "additionalFieldValues": "Значения дополнительных полей",
+    "schemaDefinedFields": "Поля ограничены схемой"
   }
 }

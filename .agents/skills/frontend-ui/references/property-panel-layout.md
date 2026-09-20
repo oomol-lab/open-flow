@@ -53,13 +53,17 @@ the [property panel entry](property-panel.md) for shared scope.
 - Property panels use the node outer-surface token; input controls use the node content-surface
   token. Theme values belong to `src/ui/browser/theme.css`. Keep control borders quiet and avoid
   introducing local shades to compensate for a mismatch in the shared state styling.
-- Rows share column tracks. Object nesting consumes 16px per level inside the Name/Handle region;
-  Type, Value, nullable, and action columns stay aligned with their parent rows.
+- Rows in the same layout share default column tracks. Object nesting consumes 16px per level
+  inside the Name/Handle region. A heterogeneous row may override its own tracks: an editable
+  child type uses 56px without widening static 32px type cells in other rows. In the single-line
+  layout, the Name column keeps its shared boundary; a wider type consumes Value space. Array items and Cases
+  compose their own cells. Do not infer table geometry from descendant controls.
 - Hide column headings when the field editor switches to its wrapped layout at the shared
   container-width breakpoint; restore them when the rows fit on one line.
 - Expanded Multiline and JSON editors follow the same cumulative nesting baseline as object
   children without a disclosure arrow. Array item values align to that child-field baseline, and
-  their zero-based indices are centered at the corresponding disclosure-arrow position.
+  their zero-based indices replace the disclosure arrows at the same position. For expandable items,
+  the index is the disclosure button and supports clicking and keyboard activation; scalar indices are static.
 - Connectors stop earlier before an arrow, sorting drag handle, or array index than before an ordinary child field.
   Reuse the same endpoint rule for arrows and indices. Keep curves, indentation, and row geometry
   coherent at multiple nesting levels; do not tune one screenshot with independent offsets.
@@ -133,9 +137,15 @@ the [property panel entry](property-panel.md) for shared scope.
 
 ## Disclosure, focus, and keyboard order
 
-- Expandable fields in Inputs, Outputs, Values, and Cases start collapsed when the panel opens,
-  except fields with validation errors, which start expanded so the controls that own those errors
-  are visible. This default must not override a later manual collapse.
+- Expandable value fields start collapsed unless their initial validation fails or their value is
+  editable and empty (undefined, null, empty string, empty object, or empty array). False, zero,
+  and whitespace-only strings are populated values. Read-only empty fields remain collapsed;
+  initial errors may expand them. Definition trees start collapsed. Case groups and saved port
+  groups retain their own defaults. Code-level expansion policies own these decisions.
+- Default expansion runs only for initialization and the first validation result. Manual actions
+  cancel pending automatic expansion; later value updates never reapply the default. Creating a
+  value, clearing, and switching JSON mode explicitly control expansion. Reopening the panel
+  resets defaults; sorting preserves identity, expansion, and mounted editor drafts.
 - Object, JSON, and Multiline use a compact preview in both collapsed and expanded states. The
   expanded preview retains the same shallow neutral block and standard control border. Its value
   summary and the array item-type name use muted foreground while expanded, restoring normal

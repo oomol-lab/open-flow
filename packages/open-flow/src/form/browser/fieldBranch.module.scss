@@ -1,0 +1,18 @@
+@use './fieldGeometry.scss' as geometry;
+.branch {
+  --branch-origin: calc(var(--field-indent, 0px) + var(--field-toggle-width, 24px) / 2);
+  --branch-extension: 0px;
+  position: relative;
+  &::before {
+    @include geometry.branch;
+    left: var(--branch-origin, calc(var(--field-indent, 0px) + var(--field-toggle-width, 24px) / 2));
+    top: calc(-1 * var(--branch-extension, 0px));
+    width: 16px;
+  }
+  &[data-branch-endpoint='marker']::before {
+    width: 6px;
+  }
+  &[hidden] {
+    display: none;
+  }
+}

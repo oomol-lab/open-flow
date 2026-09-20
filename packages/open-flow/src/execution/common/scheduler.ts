@@ -14,6 +14,7 @@ import { agentInput } from '../../flow/common/agent.ts'
 import { portsByHandle } from '../../flow/common/change.ts'
 import { conditionInputPorts, nodeInputMappings, selectConditionBranches } from '../../flow/common/condition.ts'
 import { isResolutionNode, resolutionActions, resolutionOutputPorts } from '../../flow/common/graph.ts'
+import { inputValue } from '../../flow/common/inputValue.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'
 import { matchesTriggerOutputs } from '../../trigger/common/contract.ts'
 import { normalizeWaitComment as normalizeComment } from './wait.ts'
@@ -658,7 +659,7 @@ function runGraph(
         valuesByNode: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>,
         required = false,
       ): JsonValue => {
-        let value = mapping?.kind == 'value' ? mapping.value : supplied === undefined ? port.value : supplied
+        let value = inputValue(mapping, supplied === undefined ? port.value : supplied)
         if (mapping?.kind == 'sources') {
           const values = mapping.sources.flatMap((source) => {
             if (source.kind == 'binding') return Object.hasOwn(context.bindingValues, source.bindingId) ? [context.bindingValues[source.bindingId]!] : []

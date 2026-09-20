@@ -1,4 +1,4 @@
-export { resolveTriggerConfig } from './config.ts'
+export { resolveTriggerConfig, triggerConfigValues } from './config.ts'
 import type { ConnectorProxy } from '../../connector/common/proxy.ts'
 import type { JsonValue, TriggerKeySnapshot, TriggerSchedule } from '../../flow/common/change.ts'
 import type { TriggerConfigOption, TriggerConfigOptionsContext } from './configOptions.ts'

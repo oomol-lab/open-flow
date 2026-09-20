@@ -1,9 +1,11 @@
 import type { ComponentProps, ReactNode } from 'react'
-import type { ValueEditorDeletion } from '../../../../form/browser/valueEditor.tsx'
+import type { FieldValueDeletion } from '../../../../form/common/fieldValue.ts'
 import type { Group, InputPort, JsonValue } from '../api.ts'
-import type { InputVariables, NodeInputUpstreamSources } from './nodeInputValue.tsx'
+import type { FieldSectionIcon } from './fieldSectionHeader.tsx'
 import type { PropertyDeletion } from './propertyDeletion.ts'
+import type { InputVariables, NodeInputUpstreamSources } from './sourceValueEditor.tsx'
 
+import { useState } from 'react'
 import { NodeInputValue } from './nodeInputValue.tsx'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 
@@ -17,30 +19,41 @@ export function NodeInputs({
   onValue,
   onVariable,
   onDefinitions,
+  onReset,
   reservedNames,
   renderSource,
   title,
   titleIcon = 'input',
 }: {
+  onReset?: () => void | Promise<boolean>
   allowAddGroup?: boolean
-  onDefinitions?: (values: readonly (InputPort | Group)[], deletion?: PropertyDeletion) => void
+  onDefinitions?: (definitions: readonly (InputPort | Group)[], deletion?: PropertyDeletion, values?: Readonly<Record<string, JsonValue | undefined>>) => void
   reservedNames?: readonly string[]
   renderSource?: (handle: string) => NodeInputUpstreamSources | undefined
   title?: ReactNode
-  titleIcon?: 'input' | null
+  titleIcon?: FieldSectionIcon
   entries: readonly (Group | NodeInputField)[]
   variables: InputVariables
   disabled: boolean
-  onValue: (handle: string, value: JsonValue | undefined, deletion?: ValueEditorDeletion) => void
+  onValue: (handle: string, value: JsonValue | undefined, deletion?: FieldValueDeletion) => void
   onVariable: (handle: string, name: string | undefined) => void
 }) {
+  const [resetVersion, setResetVersion] = useState(0)
   const handleNames = entries.flatMap((entry) => ('group' in entry ? [] : [entry.definition.handle]))
   return (
     <PortDefinitionEditor
+      key={resetVersion}
       groups
+      onReset={
+        !disabled && onDefinitions == null && onReset
+          ? async () => {
+              if ((await onReset()) !== false) setResetVersion((version) => version + 1)
+            }
+          : undefined
+      }
       layout="ports"
       title={title}
-      titleIcon={title == null ? undefined : (titleIcon ?? undefined)}
+      titleIcon={titleIcon}
       allowAddGroup={allowAddGroup}
       values={entries.map((entry) => ('group' in entry ? entry : entry.definition))}
       disabled={disabled || onDefinitions == null}
@@ -55,7 +68,24 @@ export function NodeInputs({
               key={port.handle}
               {...entry}
               embedded
-              presentation={presentation}
+              presentation={{
+                ...presentation,
+                onDefinitionChange:
+                  presentation.onDefinitionChange && onDefinitions
+                    ? (schema, value, deletion) =>
+                        onDefinitions(
+                          entries.map((item) =>
+                            'group' in item
+                              ? item
+                              : item.definition.handle === port.handle
+                                ? { ...item.definition, jsonSchema: schema as InputPort['jsonSchema'] }
+                                : item.definition,
+                          ),
+                          deletion,
+                          { [port.handle]: value as JsonValue | undefined },
+                        )
+                    : undefined,
+              }}
               upstream={renderSource?.(port.handle)}
               handleNames={handleNames}
               variables={variables}

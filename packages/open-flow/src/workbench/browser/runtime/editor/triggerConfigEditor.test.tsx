@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it, vi } from 'vitest'
+import { inputValues } from '../../../../flow/common/inputValue.ts'
 import { createI18n } from '../i18n.ts'
 import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
 
@@ -35,7 +36,7 @@ describe('Trigger configuration editor', () => {
       <I18nProvider i18n={createI18n('en')}>
         <TriggerConfigEditor
           inputs={[{ handle: 'teamId', nullable: false, jsonSchema: { type: 'string' } }]}
-          config={{ teamId: 'team-1' }}
+          config={inputValues({ teamId: 'team-1' })}
           disabled={false}
           onChange={() => {}}
           renderEditor={() => <button aria-label="Choose team">Team one</button>}
@@ -46,4 +47,21 @@ describe('Trigger configuration editor', () => {
     expect(markup).toContain('Choose team')
     expect(markup).toContain('teamId')
   })
+})
+
+it.each([false, true])('offers form reset only while values are editable (disabled=%s)', (disabled) => {
+  const onReset = vi.fn()
+  const markup = renderToStaticMarkup(
+    <I18nProvider i18n={createI18n('en')}>
+      <TriggerConfigEditor
+        inputs={[{ handle: 'limit', nullable: false, jsonSchema: { type: 'integer' }, value: 10 }]}
+        config={inputValues({ limit: 25 })}
+        disabled={disabled}
+        onReset={onReset}
+        onChange={vi.fn()}
+      />
+    </I18nProvider>,
+  )
+  expect(markup.includes('aria-label="Reset to defaults"')).toBe(!disabled)
+  expect(onReset).not.toHaveBeenCalled()
 })

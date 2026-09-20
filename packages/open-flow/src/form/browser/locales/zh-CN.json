@@ -1,5 +1,7 @@
 {
   "valueEditor": {
+    "reset": "重置",
+    "resetDefaults": "恢复默认值",
     "editRawData": "编辑原始数据",
     "editAsForm": "切换表单编辑",
     "advancedSettings": "高级设置",
@@ -87,7 +89,10 @@
     "arrayOf": "元素为",
     "columnValue": "值",
     "noOptions": "无可用选项",
-    "emptyObject": "仅允许空对象",
-    "emptyObjectReadonly": "空对象"
+    "closedObjectDefinition": "仅允许空对象",
+    "emptyObjectValue": "空对象",
+    "unrestrictedFields": "未限定字段",
+    "additionalFieldValues": "额外字段值类型",
+    "schemaDefinedFields": "字段受 Schema 约束"
   }
 }

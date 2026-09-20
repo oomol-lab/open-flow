@@ -8,6 +8,7 @@ import type {
   IntegrationStateContext,
 } from '../../common/integration.ts'
 
+import { inputValues } from '../../../flow/common/inputValue.ts'
 import { resolveTriggerConfig } from '../../common/config.ts'
 import { IntegrationConnectionError, PermanentIntegrationError, TransientIntegrationError } from '../../common/integration.ts'
 
@@ -227,7 +228,7 @@ function requireState(state: IntegrationStateContext | undefined): IntegrationSt
 }
 
 function resolveConfig(config: Readonly<Record<string, JsonValue>>): Config {
-  const value = resolveTriggerConfig(snapshot.configInputs, config)
+  const value = resolveTriggerConfig(snapshot.configInputs, inputValues(config))
   return {
     ...(typeof value.driveId == 'string' ? { driveId: value.driveId } : {}),
     includeCorpusRemovals: value.includeCorpusRemovals as boolean,

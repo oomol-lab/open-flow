@@ -303,11 +303,12 @@ describe('Unset input presentation', () => {
         />
       </I18nProvider>,
     )
-    const trigger = (markup.match(/<button\b[^>]*>/g) ?? []).find((tag) => tag.includes('aria-label="missing Set value"'))
+    const trigger = (markup.match(/<button\b[^>]*>/g) ?? []).find((tag) =>
+      tag.includes(nullable ? 'aria-label="missing null"' : 'aria-label="missing Set value"'),
+    )
     expect(trigger).toBeDefined()
     expect(trigger!.includes('aria-invalid="true"')).toBe(!nullable)
-    expect(markup).toContain('>Set value</span>')
-    expect(markup).not.toContain('>null</span>')
+    expect(markup).toContain(nullable ? '>null</span>' : '>Set value</span>')
     expect(onValue).not.toHaveBeenCalled()
   })
 })

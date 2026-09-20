@@ -6,7 +6,7 @@ import { useEffect, useMemo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
 import { FieldTable, FieldTableRow } from '../../form/browser/fieldTable.tsx'
-import { ValueEditor } from '../../form/browser/valueEditor.tsx'
+import { FieldValueEditor } from '../../form/browser/fieldValueEditor.tsx'
 import { ValueField } from '../../form/browser/valueField.tsx'
 import { FlowRunInputEditorStore } from './flowRunInputEditorStore.ts'
 import { createI18n } from './runtime/i18n.ts'
@@ -41,7 +41,7 @@ function InputFields({ store, showErrors, labelledBy }: { store: FlowRunInputEdi
   const t = useTranslate()
   const values = useVal(store.values$)
   const issues = useVal(store.issues$)
-  const Editor = labelledBy == null ? ValueField : ValueEditor
+  const Editor = labelledBy == null ? ValueField : FieldValueEditor
   const renderValue = (definition: FlowRunInputEditorStore['definitions'][number]) => (
     <>
       <Editor

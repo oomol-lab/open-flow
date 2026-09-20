@@ -1,6 +1,8 @@
 import type { TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { ConnectorHost } from '../node/deployment/connector.ts'
 
+import { fixedInputValue } from '@oomol-lab/open-flow/flow-change'
+import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { integrationDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -33,7 +35,7 @@ async function databaseFile(): Promise<string> {
 function stripeNode(events: readonly string[]): Extract<TriggerNode, { readonly kind: 'integration' }> {
   return {
     bindingId: 'stripe-connection',
-    config: { apiVersion: '', events, includeConnectedAccounts: false },
+    config: inputValues({ apiVersion: '', events, includeConnectedAccounts: false }),
     definition: stripe.snapshot,
     kind: 'integration',
     name: 'Stripe events',
@@ -50,7 +52,7 @@ async function addStripe(service: ServerService, flowId: string, revisionId: str
 
 async function replaceStripe(service: ServerService, flowId: string, revisionId: string, events: readonly string[]): Promise<string> {
   const changed = await service.control.changeDraft('operator', flowId, revisionId, [
-    { before: ['charge.succeeded'], kind: 'graph.trigger.config.set', name: 'events', nodeId: 'stripe', value: events },
+    { before: fixedInputValue(['charge.succeeded']), kind: 'graph.trigger.config.set', name: 'events', nodeId: 'stripe', value: fixedInputValue([...events]) },
   ])
   return changed.revision.revisionId
 }

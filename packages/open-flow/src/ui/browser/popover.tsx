@@ -104,12 +104,12 @@ function PopoverPanelContent({
       )}
     >
       <div className="flex h-10 shrink-0 items-center gap-2 px-3">
-        <PopoverTitle className="min-w-0 flex-1 truncate text-sm">
-          <span>{title}</span>
+        <PopoverTitle className="flex min-w-0 flex-1 items-center text-sm">
+          <span className="shrink-0">{title}</span>
           {sectionTitle != null && (
             <>
-              <span className="px-1 text-muted-foreground">·</span>
-              <span className="text-muted-foreground">{sectionTitle}</span>
+              <span className="shrink-0 px-1 text-muted-foreground">·</span>
+              <span className="flex min-w-0 items-center gap-1 overflow-hidden whitespace-nowrap text-muted-foreground [&>i]:shrink-0">{sectionTitle}</span>
             </>
           )}
         </PopoverTitle>

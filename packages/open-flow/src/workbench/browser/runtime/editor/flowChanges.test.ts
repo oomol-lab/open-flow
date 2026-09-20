@@ -4,7 +4,7 @@ import type { Draft } from '../api.ts'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
 import { inverseFlowChanges } from '../../../../flow/common/inverseChanges.ts'
-import { setTriggerConnection, updateTriggerSchedule } from '../../../../flow/common/nodeChanges.ts'
+import { resetInputValues, setTriggerConnection, updateTriggerSchedule } from '../../../../flow/common/nodeChanges.ts'
 import { revisionView } from '../revisionView.ts'
 import { designerGraph } from '../workspace.ts'
 import {
@@ -106,7 +106,7 @@ describe('Code task port changes', () => {
     const task = current.content.document.graph.nodes.task
     if (task?.kind != 'task' || task.task == null) throw new Error('Expected code Task fixture.')
 
-    expect(updateTaskPorts(revisionView(current), { kind: 'flow' }, 'task', task.task)).toBeUndefined()
+    expect(updateTaskPorts(revisionView(current), { kind: 'flow' }, 'task', task.task)).toEqual([])
   })
 
   it('uses the node ID for a new code module', () => {
@@ -434,10 +434,17 @@ describe('Resolution node changes', () => {
 })
 
 describe('Variable input changes', () => {
-  it('does not emit a Draft change when clearing an unbound Variable input', () => {
+  it('persists an explicit clear for an unbound input', () => {
     const current = draft('export default ({ value }) => ({ result: value })\n')
 
-    expect(setInputValue(revisionView(current), { kind: 'flow' }, 'task', 'value', undefined)).toBeUndefined()
+    const changes = setInputValue(revisionView(current), { kind: 'flow' }, 'task', 'value', undefined)!
+    expect(applyFlowChanges(current, changes).content.document.graph.nodes.task).toMatchObject({ inputs: { value: { kind: 'unset' } } })
+    const saved = applyFlowChanges(current, changes)
+    expect(applyFlowChanges(saved, inverseFlowChanges(current.content, changes)).content).toEqual(current.content)
+    expect(setInputValue(revisionView(saved), { kind: 'flow' }, 'task', 'value', undefined)).toEqual([])
+    const clipboard = copyNodes(revisionView(saved), { kind: 'flow' }, ['task'])
+    const pasted = pasteNodes(revisionView(saved), { kind: 'flow' }, clipboard, () => 'copied-task')
+    expect(applyFlowChanges(saved, pasted.changes).content.document.graph.nodes['copied-task']).toMatchObject({ inputs: { value: { kind: 'unset' } } })
   })
 
   it('creates, replaces, copies on shared edit, and cleans Variable bindings', () => {
@@ -898,5 +905,41 @@ it.each(['wait', 'approval'] as const)('preserves %s bindings when only the prom
     prompt: 'Updated prompt',
     inputs: { unavailable: { kind: 'value', value: 'keep for repair' } },
   })
+  expect(applyFlowChanges(saved, inverseFlowChanges(current.content, changes)).content).toEqual(current.content)
+})
+
+it('resets only the requested input form and restores all overrides with one undo', () => {
+  const initial = draft('export default () => ({})')
+  const target = { kind: 'flow' } as const
+  let current = applyFlowChanges(initial, setInputValue(revisionView(initial), target, 'task', 'value', undefined)!)
+  current = applyFlowChanges(current, setInputValue(revisionView(current), target, 'task', 'other', 42)!)
+  const changes = resetInputValues(current.content, target, 'task', ['value'])
+  const saved = applyFlowChanges(current, changes)
+  expect(saved.content.document.graph.nodes.task).toMatchObject({ inputs: { other: { kind: 'value', value: 42 } } })
+  expect('value' in (saved.content.document.graph.nodes.task as { inputs: object }).inputs).toBe(false)
+  expect(applyFlowChanges(saved, inverseFlowChanges(current.content, changes)).content).toEqual(current.content)
+})
+
+it.each([undefined, { kind: 'unset' } as const])('creates a nullable collection over an empty assignment (%j) in one undoable transaction', (mapping) => {
+  const target = { kind: 'flow' } as const
+  const initial = draft('export default () => ({})')
+  const current = mapping ? applyFlowChanges(initial, [{ kind: 'graph.node.input.set', target, nodeId: 'task', handle: 'value', value: mapping }]) : initial
+  const revision = revisionView(current)
+  const changes = updateTaskPorts(
+    revision,
+    target,
+    'task',
+    {
+      inputs: [{ handle: 'value', nullable: true, jsonSchema: { type: 'object', properties: { field: { type: 'string' } } } }],
+      outputs: [{ handle: 'result', jsonSchema: {}, nullable: true }],
+    },
+    { value: { field: '' } },
+  )!
+  const saved = applyFlowChanges(current, changes)
+  expect(saved.content.document.graph.nodes.task).toMatchObject({
+    inputs: { value: { kind: 'value', value: { field: '' } } },
+    task: { inputs: [{ handle: 'value', nullable: true, jsonSchema: { type: 'object', properties: { field: { type: 'string' } } } }] },
+  })
+  expect(JSON.parse(JSON.stringify(saved)).content.document.graph.nodes.task.inputs.value.value).toEqual({ field: '' })
   expect(applyFlowChanges(saved, inverseFlowChanges(current.content, changes)).content).toEqual(current.content)
 })

@@ -3,6 +3,7 @@ import type { PollDefinition, PollResult } from '@oomol-lab/open-flow/poll-trigg
 import type { DestinationStream, Logger } from 'pino'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
+import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import {
   eventsPollOutputs,
@@ -74,7 +75,7 @@ function revision(source = 'primary', definition: PollDefinition['snapshot'] = s
         nodes: {
           poll: {
             bindingId: 'connection',
-            config: { source },
+            config: inputValues({ source }),
             definition,
             kind: 'poll',
             name: 'Poll test trigger',
@@ -204,7 +205,7 @@ describe('Server Poll Trigger', () => {
           ...content.document.graph,
           nodes: {
             ...content.document.graph.nodes,
-            poll: { ...original, config: { teamId }, definition: definition.snapshot },
+            poll: { ...original, config: inputValues({ teamId }), definition: definition.snapshot },
           },
         },
       },

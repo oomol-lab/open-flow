@@ -1,6 +1,8 @@
 import type { TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { PollDefinition } from '@oomol-lab/open-flow/poll-trigger'
 
+import { fixedInputValue } from '@oomol-lab/open-flow/flow-change'
+import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { eventsPollOutputs, PermanentPollError, TransientPollError } from '@oomol-lab/open-flow/poll-trigger'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -51,7 +53,7 @@ async function databaseFile(): Promise<string> {
 function pollNode(source: string): Extract<TriggerNode, { readonly kind: 'poll' }> {
   return {
     bindingId: 'poll-connection',
-    config: { source },
+    config: inputValues({ source }),
     definition: snapshot,
     kind: 'poll',
     name: 'Poll events',
@@ -69,7 +71,7 @@ async function addPoll(service: ServerService, flowId: string, revisionId: strin
 
 async function replacePoll(service: ServerService, flowId: string, revisionId: string, source: string): Promise<string> {
   const changed = await service.control.changeDraft('operator', flowId, revisionId, [
-    { before: 'initial', kind: 'graph.trigger.config.set', name: 'source', nodeId: 'poll', value: source },
+    { before: fixedInputValue('initial'), kind: 'graph.trigger.config.set', name: 'source', nodeId: 'poll', value: fixedInputValue(source) },
   ])
   return changed.revision.revisionId
 }

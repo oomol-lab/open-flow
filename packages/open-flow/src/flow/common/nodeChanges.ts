@@ -6,6 +6,7 @@ import type {
   GraphNode,
   GraphTarget,
   InputMapping,
+  InputValues,
   JsonValue,
   PortDefinition,
   RevisionContent,
@@ -19,6 +20,7 @@ import type {
 import { dequal } from 'dequal/lite'
 import { applyFlowChanges, nextNodeName, normalizeNodeName } from './change.ts'
 import { nodeInputMappings } from './condition.ts'
+import { fixedInputValue, inputValues } from './inputValue.ts'
 
 const codeTaskTemplate = `export default async function (inputs, context) {
   return { result: inputs.value }
@@ -97,11 +99,11 @@ export type TriggerSettings =
     })
   | (TriggerSettingsBase & { readonly kind: 'cron'; readonly schedule: readonly TriggerSchedule[] })
   | (TriggerSettingsBase & {
-      readonly config: Readonly<Record<string, JsonValue>>
+      readonly config: InputValues
       readonly kind: 'poll'
       readonly schedule: readonly TriggerSchedule[]
     })
-  | (TriggerSettingsBase & { readonly config: Readonly<Record<string, JsonValue>>; readonly kind: 'integration' })
+  | (TriggerSettingsBase & { readonly config: InputValues; readonly kind: 'integration' })
 
 export function createCodeTask(
   target: GraphTarget,
@@ -295,7 +297,7 @@ export function createProviderTrigger(
     definition.type == 'poll'
       ? {
           bindingId: identity.bindingId,
-          config: options.config,
+          config: inputValues(options.config),
           definition,
           kind: 'poll',
           name,
@@ -303,7 +305,7 @@ export function createProviderTrigger(
         }
       : {
           bindingId: identity.bindingId,
-          config: options.config,
+          config: inputValues(options.config),
           definition,
           kind: 'integration',
           name,
@@ -380,11 +382,24 @@ export function setInputValues(
   const operations: ChangeOperation[] = []
   for (const [handle, value] of Object.entries(values)) {
     const before = nodeInputMappings(node)[handle]
-    const next: InputMapping | undefined = value === undefined ? undefined : { kind: 'value', value }
+    const next = fixedInputValue(value)
     if (dequal(before, next)) continue
     operations.push({ before, handle, kind: 'graph.node.input.set', nodeId, target, value: next })
   }
   return cleanVariableBindings(content, operations)
+}
+
+/** Restore inheritance for this form in one undoable change. */
+export function resetInputValues(content: RevisionContent, target: GraphTarget, nodeId: string, handles: readonly string[]): readonly ChangeOperation[] {
+  const node = graph(content, target)?.nodes[nodeId]
+  if (node == null || !('inputs' in node)) return []
+  const mappings = nodeInputMappings(node)
+  return cleanVariableBindings(
+    content,
+    [...new Set(handles)].flatMap((handle): ChangeOperation[] =>
+      mappings[handle] == null ? [] : [{ kind: 'graph.node.input.set', target, nodeId, handle, before: mappings[handle], value: undefined }],
+    ),
+  )
 }
 
 export function setInputSources(
@@ -529,8 +544,9 @@ export function updateTriggerConfig(
 ): readonly ChangeOperation[] | undefined {
   const trigger = content.document.graph.nodes[nodeId]
   if (trigger == null || (trigger.kind != 'integration' && trigger.kind != 'poll')) return
-  if (dequal(trigger.config[name], value)) return []
-  return [{ before: trigger.config[name], kind: 'graph.trigger.config.set', name, nodeId, value }]
+  const next = fixedInputValue(value)
+  if (dequal(trigger.config[name], next)) return []
+  return [{ before: trigger.config[name], kind: 'graph.trigger.config.set', name, nodeId, value: next }]
 }
 
 export function updateTriggerSchedule(

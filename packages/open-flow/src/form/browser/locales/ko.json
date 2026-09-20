@@ -1,5 +1,7 @@
 {
   "valueEditor": {
+    "reset": "재설정",
+    "resetDefaults": "기본값으로 재설정",
     "editRawData": "원시 데이터 편집",
     "editAsForm": "양식 편집으로 전환",
     "advancedSettings": "고급 설정",
@@ -87,7 +89,10 @@
     "arrayOf": "의",
     "columnValue": "값",
     "noOptions": "사용 가능한 옵션 없음",
-    "emptyObject": "빈 객체만 허용",
-    "emptyObjectReadonly": "빈 객체"
+    "closedObjectDefinition": "빈 객체만 허용",
+    "emptyObjectValue": "빈 객체",
+    "unrestrictedFields": "미리 정의된 필드 없음",
+    "additionalFieldValues": "추가 필드 값",
+    "schemaDefinedFields": "스키마로 제한된 필드"
   }
 }

@@ -1,6 +1,7 @@
 import type { JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { IntegrationConformanceFixture, IntegrationConformanceHarness, IntegrationDefinition } from '@oomol-lab/open-flow/integration-trigger'
 
+import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { integrationCallbackSecret, integrationConformanceCases, listenerConformanceCases } from '@oomol-lab/open-flow/integration-trigger'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -53,7 +54,7 @@ function revision(fixture: IntegrationConformanceFixture, enabled = true): Revis
           ? {
               integration: {
                 bindingId: 'connection',
-                config: fixture.config,
+                config: inputValues(fixture.config),
                 definition: snapshot,
                 kind: 'integration',
                 name: 'Integration conformance trigger',

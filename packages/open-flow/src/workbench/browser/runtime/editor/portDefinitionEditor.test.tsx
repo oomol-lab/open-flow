@@ -1,7 +1,8 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it, vi } from 'vitest'
-import { ValueEditor } from '../../../../form/browser/valueEditor.tsx'
+import { DefinitionField } from '../../../../form/browser/definitionField.tsx'
+import { FieldValueEditor } from '../../../../form/browser/fieldValueEditor.tsx'
 import { createI18n } from '../i18n.ts'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 
@@ -22,7 +23,7 @@ describe('Output definitions', () => {
         />
       </I18nProvider>,
     )
-    expect(markup).toContain('Value options for answer')
+    expect(markup).toContain('answer Field settings')
     expect(markup).toContain('number')
     expect(markup).not.toContain('JSON Schema')
     expect(markup).toContain('aria-label="Group settings"')
@@ -155,17 +156,13 @@ describe('Property panel port layout', () => {
   it('renders nested read-only output types with the output control surface', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
-        <ValueEditor
+        <DefinitionField
           layout="ports"
           label="result"
-          path="/result"
           schema={{ type: 'object', properties: { status: { type: 'string' }, details: { type: 'object', properties: { count: { type: 'integer' } } } } }}
-          value={undefined}
           disabled
-          valueEditable={false}
-          definitionOnly
+          expansionPolicy={({ depth }) => depth === 0}
           onChange={vi.fn()}
-          onDraftIssue={vi.fn()}
         />
       </I18nProvider>,
     )
@@ -181,7 +178,7 @@ describe('Property panel port layout', () => {
   it('starts an invalid expandable value open', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
-        <ValueEditor
+        <FieldValueEditor
           compact
           label="payload"
           path="/payload"

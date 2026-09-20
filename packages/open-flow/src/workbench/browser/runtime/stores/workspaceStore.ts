@@ -32,9 +32,11 @@ import { isJsonObject } from '../../../../base/common/json.ts'
 import { controlErrorCode } from '../../../../control/common/errors.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
 import { connect as connectFlowNodes, disconnect as disconnectFlowNodes } from '../../../../flow/common/edgeChanges.ts'
+import { inputValue } from '../../../../flow/common/inputValue.ts'
 import { inverseFlowChanges } from '../../../../flow/common/inverseChanges.ts'
 import { imports as moduleImports, replaceSource as replaceModuleSource } from '../../../../flow/common/moduleChanges.ts'
 import {
+  resetInputValues,
   setCodeActions,
   setInputSources,
   setConnectorConnection as changeConnectorConnection,
@@ -661,6 +663,29 @@ export class WorkspaceStore {
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
+  public async resetInputs(nodeId: string, handles: readonly string[]): Promise<boolean> {
+    const revision = this.$.revision.value
+    const target = this.#model.value.target
+    if (revision == null || target == null) return false
+    return (await this.#editDraft(resetInputValues(revision.revision.content, target, nodeId, handles))) != null
+  }
+
+  public async resetTriggerConfig(triggerId: string): Promise<boolean> {
+    const revision = this.$.revision.value
+    const target = this.#model.value.target
+    if (revision == null || target?.kind !== 'flow') return false
+    const trigger = revision.graph(target)?.nodes[triggerId]
+    if (trigger?.kind !== 'poll' && trigger?.kind !== 'integration') return false
+    const changes = Object.entries(trigger.config).map(([name, before]) => ({
+      kind: 'graph.trigger.config.set' as const,
+      nodeId: triggerId,
+      name,
+      before,
+      value: undefined,
+    }))
+    return (await this.#editDraft(changes)) != null
+  }
+
   public async setInputSource(
     nodeId: string,
     handle: string,
@@ -706,11 +731,12 @@ export class WorkspaceStore {
       readonly inputDefinitions?: readonly InputPort[]
     },
     deletion?: PropertyDeletion,
+    values?: Readonly<Record<string, JsonValue | undefined>>,
   ): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target?.kind != 'flow') return false
-    const changes = updateResolution(revision, target, nodeId, settings)
+    const changes = updateResolution(revision, target, nodeId, settings, values)
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
@@ -745,19 +771,29 @@ export class WorkspaceStore {
     return changes == null || (await this.#editDraft(changes)) != null
   }
 
-  public async saveTaskPorts(nodeId: string, ports: TaskPorts, deletion?: PropertyDeletion): Promise<boolean> {
+  public async saveTaskPorts(
+    nodeId: string,
+    ports: TaskPorts,
+    deletion?: PropertyDeletion,
+    values?: Readonly<Record<string, JsonValue | undefined>>,
+  ): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null) return false
-    const changes = updateTaskPorts(revision, target, nodeId, ports)
+    const changes = updateTaskPorts(revision, target, nodeId, ports, values)
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
-  public async saveTaskAdditionalInputs(nodeId: string, inputs: readonly InputPort[], deletion?: PropertyDeletion): Promise<boolean> {
+  public async saveTaskAdditionalInputs(
+    nodeId: string,
+    inputs: readonly InputPort[],
+    deletion?: PropertyDeletion,
+    values?: Readonly<Record<string, JsonValue | undefined>>,
+  ): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null) return false
-    const changes = updateTaskAdditionalInputs(revision, target, nodeId, inputs)
+    const changes = updateTaskAdditionalInputs(revision, target, nodeId, inputs, values)
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
@@ -786,7 +822,7 @@ export class WorkspaceStore {
     if (trigger?.kind != 'integration' || trigger.definition.key != 'feishu_app_bot.on_event' || source.provider != trigger.definition.provider) return false
     const connectionChanges = changeTriggerConnection(revision.revision.content, target, triggerId, source.connectionId)
     if (connectionChanges == null) return false
-    const changed = trigger.config.sourceId != source.sourceId
+    const changed = inputValue(trigger.config.sourceId, undefined) != source.sourceId
     return (
       (await this.#editDraft([
         ...connectionChanges,
@@ -818,7 +854,8 @@ export class WorkspaceStore {
       const events = Array.isArray(value) ? value.filter((item): item is string => typeof item == 'string') : []
       if (!supportsFeishuChatFilter(events))
         changes = [...changes, ...(updateTriggerConfig(revision.revision.content, target, triggerId, 'chatIds', undefined) ?? [])]
-      if (isJsonObject(trigger.config.resource) && trigger.config.resource.kind != feishuResourceKind(events)) {
+      const resource = inputValue(trigger.config.resource, undefined)
+      if (isJsonObject(resource) && resource.kind != feishuResourceKind(events)) {
         changes = [...changes, ...(updateTriggerConfig(revision.revision.content, target, triggerId, 'resource', undefined) ?? [])]
       }
     }

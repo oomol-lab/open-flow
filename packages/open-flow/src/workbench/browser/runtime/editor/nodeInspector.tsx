@@ -11,12 +11,13 @@ import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 import type { DiagnosticFocus } from './diagnostics.ts'
 import type { SubflowSettings } from './flowChanges.ts'
 import type { NodeInputField } from './nodeInputs.tsx'
-import type { InputVariables, NodeInputUpstreamSources } from './nodeInputValue.tsx'
+import type { InputVariables, NodeInputUpstreamSources } from './sourceValueEditor.tsx'
 
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { nodeInputMappings } from '../../../../flow/common/condition.ts'
+import { inputValue } from '../../../../flow/common/inputValue.ts'
 import { fieldSelectTriggerClass } from '../../../../form/browser/fieldSelect.tsx'
 import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../form/browser/selectionMenuStyles.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
@@ -904,6 +905,9 @@ export function NodeInspector({
           ) : (
             <TriggerConfigEditor
               key={`config:${selection.id}`}
+              onReset={() => {
+                return store.resetTriggerConfig(selection.id)
+              }}
               inputs={selection.trigger.definition.configInputs}
               config={selection.trigger.config}
               disabled={disabled}
@@ -954,7 +958,7 @@ export function NodeInspector({
               const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
               return {
                 definition,
-                value: mapping?.kind === 'value' ? mapping.value : definition.value,
+                value: inputValue(mapping, definition.value),
                 connected: mapping?.kind === 'sources' && binding?.kind !== 'variable',
                 variableName: binding?.kind === 'variable' ? binding.target : undefined,
               }
@@ -965,13 +969,19 @@ export function NodeInspector({
                 allowAddGroup={selection.kind !== 'wait' && selection.kind !== 'approval'}
                 title={t('inspector.ports.inputsTitle')}
                 entries={entries}
+                onReset={() => {
+                  return store.resetInputs(
+                    selection.id,
+                    entries.flatMap((entry) => ('group' in entry ? [] : [entry.definition.handle])),
+                  )
+                }}
                 onDefinitions={
                   selection.kind === 'task' && selection.definition != null && (selection.node.task != null || isAgent)
-                    ? (inputs, deletion) => {
-                        void store.saveTaskPorts(selection.id, { inputs, outputs: selection.definition!.outputs }, deletion)
+                    ? (inputs, deletion, values) => {
+                        void store.saveTaskPorts(selection.id, { inputs, outputs: selection.definition!.outputs }, deletion, values)
                       }
                     : selection.kind === 'wait' || selection.kind === 'approval'
-                      ? (inputs, deletion) => {
+                      ? (inputs, deletion, values) => {
                           void store.saveResolution(
                             selection.id,
                             {
@@ -980,6 +990,7 @@ export function NodeInspector({
                               inputDefinitions: inputs.filter((port): port is InputPort => 'handle' in port),
                             },
                             deletion,
+                            values,
                           )
                         }
                       : undefined
@@ -1010,7 +1021,7 @@ export function NodeInspector({
                         const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
                         return {
                           definition,
-                          value: mapping?.kind === 'value' ? mapping.value : definition.value,
+                          value: inputValue(mapping, definition.value),
                           connected: mapping?.kind === 'sources' && binding?.kind !== 'variable',
                           variableName: binding?.kind === 'variable' ? binding.target : undefined,
                         }
@@ -1018,11 +1029,12 @@ export function NodeInspector({
                       variables={variables}
                       disabled={disabled}
                       reservedNames={selection.definition.inputs.flatMap((port) => ('handle' in port ? [port.handle] : []))}
-                      onDefinitions={(inputs, deletion) => {
+                      onDefinitions={(inputs, deletion, values) => {
                         void store.saveTaskAdditionalInputs(
                           selection.id,
                           inputs.filter((port): port is InputPort => 'handle' in port),
                           deletion,
+                          values,
                         )
                       }}
                       onValue={(handle, value, deletion) => {

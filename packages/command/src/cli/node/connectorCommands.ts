@@ -13,6 +13,7 @@ import {
   setTriggerConnection,
   updateTrigger,
 } from '@oomol-lab/open-flow/flow-authoring'
+import { fixedInputValue } from '@oomol-lab/open-flow/flow-change'
 import {
   CliError,
   selectedDraftFlow,
@@ -372,8 +373,7 @@ export async function triggerCommand(
           case 'poll': {
             const config = { ...resolved.trigger.config }
             for (const [field, value] of Object.entries(values)) {
-              if (value === undefined) delete config[field]
-              else config[field] = value
+              config[field] = fixedInputValue(value)
             }
             changedTrigger = updateTrigger(selected.draft.content, selected.target, resolved.triggerId, {
               ...(description == null ? {} : { description }),
@@ -387,8 +387,7 @@ export async function triggerCommand(
           case 'integration': {
             const config = { ...resolved.trigger.config }
             for (const [field, value] of Object.entries(values)) {
-              if (value === undefined) delete config[field]
-              else config[field] = value
+              config[field] = fixedInputValue(value)
             }
             changedTrigger = updateTrigger(selected.draft.content, selected.target, resolved.triggerId, {
               ...(description == null ? {} : { description }),

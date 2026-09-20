@@ -1,17 +1,18 @@
 import './conditionBranchesEditor.scss'
 import type { ConditionExpression, ConditionOperand, JsonValue, Source } from '../../../../flow/common/change.ts'
-import type { ValueEditorDeletion } from '../../../../form/browser/valueEditor.tsx'
+import type { FieldValueDeletion } from '../../../../form/common/fieldValue.ts'
 import type { ConditionSettings } from './flowChanges.ts'
-import type { InputVariables, NodeInputUpstreamSources } from './nodeInputValue.tsx'
 import type { PropertyDeletion } from './propertyDeletion.ts'
+import type { InputVariables, NodeInputUpstreamSources } from './sourceValueEditor.tsx'
 
 import { useEffect, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { operandHandle, operatorsForType, otherwiseOutput, unaryOperator, valueType, comparisonIssue } from '../../../../flow/common/condition.ts'
 import { EditorComponentSelect } from '../../../../form/browser/editorComponentSelect.tsx'
+import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
+import { FieldBranch } from '../../../../form/browser/fieldLayout.tsx'
 import { FieldSelect } from '../../../../form/browser/fieldSelect.tsx'
 import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../form/browser/selectionMenuStyles.ts'
-import { ValueEditorFeedback } from '../../../../form/browser/valueEditor.tsx'
 import { valueForEditor } from '../../../../form/common/editorComponent.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
@@ -22,7 +23,7 @@ import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { fieldPanelAnchor } from './fieldPanelAnchor.ts'
 import { FieldSectionHeader } from './fieldSectionHeader.tsx'
-import { NodeInputValue } from './nodeInputValue.tsx'
+import { SourceValueEditor } from './sourceValueEditor.tsx'
 
 const emptyExpression = (): ConditionExpression => ({ left: { kind: 'value' }, operator: '==', right: { kind: 'value' } })
 const operatorSymbols: Readonly<Record<string, string>> = { '==': '=', '!=': '≠', '<': '<', '<=': '≤', '>': '>', '>=': '≥' }
@@ -191,7 +192,7 @@ export function ConditionBranchesEditor({
         />
         <div ref={setMenuContainer} className="condition-editor-content">
           {value.cases.map((item, c) => {
-            const save = (next: typeof item, deletion?: ValueEditorDeletion) => onChange({ ...value, cases: value.cases.with(c, next) }, deletion)
+            const save = (next: typeof item, deletion?: FieldValueDeletion) => onChange({ ...value, cases: value.cases.with(c, next) }, deletion)
             const renameOutput = (output: string) => {
               setCollapsed((previous) => new Set([...previous].map((name) => (name === item.output ? output : name))))
               manuallyToggledCases.current = new Set([...manuallyToggledCases.current].map((name) => (name === item.output ? output : name)))
@@ -319,7 +320,7 @@ export function ConditionBranchesEditor({
                   {!disabled && caseSettings}
                 </div>
                 {(item.groups.length > 0 || !disabled) && (
-                  <div className="condition-groups" hidden={!open}>
+                  <FieldBranch className="condition-groups" endpoint={item.groups.length ? 'marker' : 'control'} hidden={!open}>
                     {item.groups.length === 0 && !disabled && (
                       <div className="condition-case-empty">
                         <Button
@@ -372,7 +373,7 @@ export function ConditionBranchesEditor({
                           <div className="condition-expressions" hidden={!groupOpen}>
                             {group.expressions.length === 0 && <div className="flex items-center justify-between">{!disabled && addMenu(g, -1)}</div>}
                             {group.expressions.map((expression, e) => {
-                              const change = (next: typeof expression, deletion?: ValueEditorDeletion) =>
+                              const change = (next: typeof expression, deletion?: FieldValueDeletion) =>
                                 save({ ...item, groups: item.groups.with(g, { expressions: group.expressions.with(e, next) }) }, deletion)
                               const available = operatorsForType(operandType(expression.left))
                               const issue = comparisonIssue(expression.operator, operandType(expression.left), operandType(expression.right))
@@ -385,7 +386,7 @@ export function ConditionBranchesEditor({
                                   operand.kind === 'value'
                                     ? (operand.jsonSchema ?? { type: operand.value === undefined ? 'string' : valueType(operand.value) })
                                     : {}
-                                const changeDefinition = (jsonSchema: unknown, next: unknown, deletion?: ValueEditorDeletion) =>
+                                const changeDefinition = (jsonSchema: unknown, next: unknown, deletion?: FieldValueDeletion) =>
                                   change(
                                     {
                                       ...expression,
@@ -399,18 +400,16 @@ export function ConditionBranchesEditor({
                                   )
                                 return (
                                   <div className="condition-operand">
-                                    <NodeInputValue
+                                    <SourceValueEditor
                                       embedded
                                       validationError={side === 'right' && rightInvalid ? t('conditionEditor.incompatibleRight') : undefined}
                                       onInvalidChange={(operandInvalid) => {
                                         const key = `${item.output}/${g}/${e}/${side}`
                                         setOperandErrors((previous) => (previous[key] === operandInvalid ? previous : { ...previous, [key]: operandInvalid }))
                                       }}
-                                      definition={{
-                                        handle: t(side === 'left' ? 'conditionEditor.left' : 'conditionEditor.right'),
-                                        jsonSchema: schema,
-                                        nullable: operand.kind === 'source' || (operand.kind === 'value' && operand.value === null),
-                                      }}
+                                      label={t(side === 'left' ? 'conditionEditor.left' : 'conditionEditor.right')}
+                                      schema={schema}
+                                      nullable={operand.kind === 'source' || (operand.kind === 'value' && operand.value === null)}
                                       presentation={{
                                         compact: true,
                                         layout: 'ports',
@@ -510,7 +509,7 @@ export function ConditionBranchesEditor({
                         </div>
                       )
                     })}
-                  </div>
+                  </FieldBranch>
                 )}
                 {editingCase === c && (
                   <Popover

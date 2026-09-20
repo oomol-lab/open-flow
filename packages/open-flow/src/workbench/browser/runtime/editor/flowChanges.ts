@@ -21,6 +21,7 @@ import type { ConnectorActionView } from '../workspace.ts'
 import { dequal } from 'dequal/lite'
 import { applyFlowChanges as reduceFlowChanges, nextNodeName, normalizeNodeName } from '../../../../flow/common/change.ts'
 import { nodeInputMappings, mapConditionSources, otherwiseOutput } from '../../../../flow/common/condition.ts'
+import { fixedInputValue } from '../../../../flow/common/inputValue.ts'
 import {
   cleanVariableBindings,
   createApproval,
@@ -347,7 +348,7 @@ export function pasteNodes(revision: RevisionView, target: GraphTarget, clipboar
     const remapInputs = (sourceInputs: Readonly<Record<string, InputMapping>>): Readonly<Record<string, InputMapping>> => {
       const inputs: Record<string, InputMapping> = {}
       for (const [handle, mapping] of Object.entries(sourceInputs)) {
-        if (mapping.kind == 'value') {
+        if (mapping.kind != 'sources') {
           inputs[handle] = mapping
           continue
         }
@@ -441,8 +442,6 @@ export function setInputValue(
   handle: string,
   value: JsonValue | undefined,
 ): FlowChanges | undefined {
-  const node = revision.graph(target)?.nodes[nodeId]
-  if (value === undefined && node != null && 'inputs' in node && nodeInputMappings(node)[handle] == null) return
   return setGraphInputValue(revision.revision.content, target, nodeId, handle, value)
 }
 
@@ -501,6 +500,7 @@ export function updateResolution(
     readonly name?: string
     readonly inputDefinitions?: readonly InputPort[]
   },
+  values?: Readonly<Record<string, JsonValue | undefined>>,
 ): FlowChanges | undefined {
   if (target.kind != 'flow') return
   const graph = revision.graph(target)
@@ -519,8 +519,8 @@ export function updateResolution(
     changes.push({ before: current.name, field: 'name', kind: 'graph.node.field.set', nodeId, target, value: settings.name })
   }
   if (!dequal(before, value)) changes.push({ before, kind: 'graph.node.resolution.set', nodeId, target, value })
-  if (dequal(before.inputDefinitions, value.inputDefinitions)) return changes
-  const inputs = updatedInputMappings(current.inputs, before.inputDefinitions, value.inputDefinitions)
+  if (values == null && dequal(before.inputDefinitions, value.inputDefinitions)) return changes
+  const inputs = updatedInputMappings(current.inputs, before.inputDefinitions, value.inputDefinitions, undefined, values)
   changes.push(...changedInputs(current.inputs, inputs, target, nodeId))
   return cleanVariableBindings(revision.revision.content, changes)
 }
@@ -557,7 +557,13 @@ export function updateTask(revision: RevisionView, target: GraphTarget, nodeId: 
   }
 }
 
-export function updateTaskPorts(revision: RevisionView, target: GraphTarget, nodeId: string, ports: TaskPorts): FlowChanges | undefined {
+export function updateTaskPorts(
+  revision: RevisionView,
+  target: GraphTarget,
+  nodeId: string,
+  ports: TaskPorts,
+  values?: Readonly<Record<string, JsonValue | undefined>>,
+): FlowChanges | undefined {
   const selection = revision.node(target, nodeId)
   if (
     selection?.kind == 'task' &&
@@ -566,12 +572,12 @@ export function updateTaskPorts(revision: RevisionView, target: GraphTarget, nod
     'executor' in selection.definition &&
     selection.definition.executor.kind == 'agent'
   ) {
-    const changes = replaceTaskPorts(revision, target, nodeId, { ...selection.definition, ...ports })
+    const changes = replaceTaskPorts(revision, target, nodeId, { ...selection.definition, ...ports }, values)
     return changes == null ? undefined : cleanVariableBindings(revision.revision.content, changes)
   }
   if (selection?.kind != 'task' || selection.node.task == null || selection.module == null) return
-  if (dequal(selection.node.task.inputs, ports.inputs) && dequal(selection.node.task.outputs, ports.outputs)) return
-  const changes = replaceTaskPorts(revision, target, nodeId, { ...selection.node.task, ...ports })
+  if (values == null && dequal(selection.node.task.inputs, ports.inputs) && dequal(selection.node.task.outputs, ports.outputs)) return []
+  const changes = replaceTaskPorts(revision, target, nodeId, { ...selection.node.task, ...ports }, values)
   if (changes == null) return
   return cleanVariableBindings(revision.revision.content, changes)
 }
@@ -581,11 +587,12 @@ export function updateTaskAdditionalInputs(
   target: GraphTarget,
   nodeId: string,
   additionalInputs: readonly InputPort[],
+  values?: Readonly<Record<string, JsonValue | undefined>>,
 ): FlowChanges | undefined {
   const selection = revision.node(target, nodeId)
   if (selection?.kind != 'task' || selection.node.task != null || selection.definition == null) return
   const current = selection.node
-  if (dequal(current.additionalInputs ?? [], additionalInputs)) return
+  if (values == null && dequal(current.additionalInputs ?? [], additionalInputs)) return []
   const rename = renamedPort(current.additionalInputs ?? [], additionalInputs)
   const handles = new Set(
     selection.definition.inputs.flatMap((port) => ('handle' in port ? [port.handle] : [])).concat(additionalInputs.map((port) => port.handle)),
@@ -598,7 +605,7 @@ export function updateTaskAdditionalInputs(
   for (const handle of Object.keys(inputs)) {
     if (!handles.has(handle)) delete inputs[handle]
   }
-  convertInputValues(inputs, current.additionalInputs ?? [], additionalInputs, rename)
+  convertInputValues(inputs, current.additionalInputs ?? [], additionalInputs, rename, values)
   const value = additionalInputs.length == 0 ? undefined : additionalInputs
   return cleanVariableBindings(revision.revision.content, [
     { before: current.additionalInputs, kind: 'graph.node.additional-inputs.set', nodeId, target, value },
@@ -663,6 +670,7 @@ function updatedInputMappings(
   previous: TaskDefinition['inputs'],
   next: TaskDefinition['inputs'],
   rename = renamedPort(previous, next),
+  values?: Readonly<Record<string, JsonValue | undefined>>,
 ): Record<string, InputMapping> {
   const inputs = { ...mappings }
   if (rename != null && Object.hasOwn(inputs, rename[0])) {
@@ -671,7 +679,7 @@ function updatedInputMappings(
   }
   const names = new Set(next.flatMap((port) => ('handle' in port ? [port.handle] : [])))
   for (const name of Object.keys(inputs)) if (!names.has(name)) delete inputs[name]
-  convertInputValues(inputs, previous, next, rename)
+  convertInputValues(inputs, previous, next, rename, values)
   return inputs
 }
 
@@ -681,9 +689,14 @@ function convertInputValues(
   previous: readonly (InputPort | { readonly group: string })[],
   next: readonly (InputPort | { readonly group: string })[],
   rename: readonly [string, string] | undefined,
+  values?: Readonly<Record<string, JsonValue | undefined>>,
 ): void {
   for (const port of next) {
     if (!('handle' in port)) continue
+    if (values != null && Object.hasOwn(values, port.handle)) {
+      inputs[port.handle] = fixedInputValue(values[port.handle])
+      continue
+    }
     const oldHandle = rename?.[1] === port.handle ? rename[0] : port.handle
     const before = previous.find((item): item is InputPort => 'handle' in item && item.handle === oldHandle)
     const mapping = inputs[port.handle]
@@ -711,7 +724,13 @@ function changedInputs(
   return changes
 }
 
-function replaceTaskPorts(revision: RevisionView, target: GraphTarget, nodeId: string, task: TaskDefinition): FlowChanges | undefined {
+function replaceTaskPorts(
+  revision: RevisionView,
+  target: GraphTarget,
+  nodeId: string,
+  task: TaskDefinition,
+  values?: Readonly<Record<string, JsonValue | undefined>>,
+): FlowChanges | undefined {
   const graph = revision.graph(target)
   const current = graph?.nodes[nodeId]
   if (graph == null || current?.kind != 'task') return
@@ -732,7 +751,8 @@ function replaceTaskPorts(revision: RevisionView, target: GraphTarget, nodeId: s
 
   for (const [currentNodeId, node] of Object.entries(graph.nodes)) {
     if (!('inputs' in node)) continue
-    const inputs = currentNodeId == nodeId ? updatedInputMappings(node.inputs, previous.inputs, task.inputs, inputRename) : { ...nodeInputMappings(node) }
+    const inputs =
+      currentNodeId == nodeId ? updatedInputMappings(node.inputs, previous.inputs, task.inputs, inputRename, values) : { ...nodeInputMappings(node) }
 
     for (const [name, mapping] of Object.entries(inputs)) {
       if (mapping.kind != 'sources') continue

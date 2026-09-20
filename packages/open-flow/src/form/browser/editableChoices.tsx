@@ -1,4 +1,4 @@
-import type { ValueEditorDeletion } from './valueEditor.tsx'
+import type { FieldValueDeletion } from '../common/fieldValue.ts'
 
 import { useId, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
@@ -29,7 +29,7 @@ export function EditableChoices({
   invalid?: boolean
   multiple: boolean
   onChange: (value: unknown) => void
-  onOptionsChange?: (options: unknown[], deletion?: ValueEditorDeletion) => void
+  onOptionsChange?: (options: unknown[], deletion?: FieldValueDeletion) => void
 }) {
   const t = useTranslate()
   const group = useId()

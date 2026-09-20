@@ -1,4 +1,4 @@
-import type { ValueEditorDeletion } from './valueEditor.tsx'
+import type { FieldValueDeletion } from '../common/fieldValue.ts'
 
 import { useEffect } from 'react'
 import { useTranslate } from 'val-i18n-react'
@@ -12,7 +12,7 @@ export function ChoiceOptions({
 }: {
   options: readonly unknown[]
   disabled?: boolean
-  onChange: (options: unknown[], deletion?: ValueEditorDeletion) => void
+  onChange: (options: unknown[], deletion?: FieldValueDeletion) => void
 }) {
   const t = useTranslate()
   const createOptionLabel = (list: readonly unknown[], offset: number) => {

@@ -1,8 +1,10 @@
 import type { CreateEventSource, EventSource, UpdateEventSource } from '@oomol-lab/open-flow/control-api'
+import type { TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { FeishuEvent } from '@oomol-lab/open-flow/provider-triggers'
 import type { DatabaseSync } from 'node:sqlite'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
+import { resolveTriggerConfig } from '@oomol-lab/open-flow/integration-trigger'
 import { matchesFeishuEvent } from '@oomol-lab/open-flow/provider-triggers'
 import { randomUUID } from 'node:crypto'
 import { ControlError } from '../error.ts'
@@ -130,13 +132,15 @@ export class EventSourceStore {
         (input.encryptKey != null && input.encryptKey != source.encryptKey)
       const required = this.#database
         .prepare(`SELECT trigger_json AS triggerJson FROM integration_bindings
-        WHERE current_publication_id IS NOT NULL AND json_extract(trigger_json, '$.config.sourceId') = ?
+        WHERE current_publication_id IS NOT NULL AND json_extract(trigger_json, '$.config.sourceId.value') = ?
         UNION ALL SELECT trigger_json AS triggerJson FROM integration_candidates
-        WHERE status != 'cleanup' AND json_extract(trigger_json, '$.config.sourceId') = ?`)
+        WHERE status != 'cleanup' AND json_extract(trigger_json, '$.config.sourceId.value') = ?`)
         .all(sourceId, sourceId) as { triggerJson: string }[]
       for (const row of required) {
-        const trigger = JSON.parse(row.triggerJson) as { config: { eventTypes: string[] } }
-        if (trigger.config.eventTypes.some((type) => !input.eventTypes.includes(type))) {
+        const trigger = JSON.parse(row.triggerJson) as Extract<TriggerNode, { kind: 'integration' }>
+        const config = resolveTriggerConfig(trigger.definition.configInputs, trigger.config)
+        const eventTypes = config.eventTypes as readonly string[]
+        if (eventTypes.some((type) => !input.eventTypes.includes(type))) {
           throw new ControlError(controlErrorCode.eventSourceConflict, 'Published or preparing Triggers still require these event types.')
         }
       }
@@ -164,7 +168,7 @@ export class EventSourceStore {
         this.consumers(sourceId).length > 0 ||
         this.#database.prepare('SELECT 1 FROM source_subscriptions WHERE source_id = ?').get(sourceId) != null ||
         this.#database
-          .prepare("SELECT 1 FROM integration_candidates WHERE status != 'cleanup' AND json_extract(trigger_json, '$.config.sourceId') = ?")
+          .prepare("SELECT 1 FROM integration_candidates WHERE status != 'cleanup' AND json_extract(trigger_json, '$.config.sourceId.value') = ?")
           .get(sourceId) != null
       ) {
         throw new ControlError(
@@ -189,7 +193,7 @@ export class EventSourceStore {
     return this.#database
       .prepare(`SELECT b.flow_id AS flowId, f.name AS flowName, b.trigger_node_id AS triggerNodeId
       FROM integration_bindings b JOIN flows f ON f.flow_id = b.flow_id
-      WHERE b.current_publication_id IS NOT NULL AND json_extract(b.trigger_json, '$.config.sourceId') = ?
+      WHERE b.current_publication_id IS NOT NULL AND json_extract(b.trigger_json, '$.config.sourceId.value') = ?
       ORDER BY f.name, b.trigger_node_id`)
       .all(sourceId) as unknown as EventSource['consumers']
   }
@@ -224,7 +228,7 @@ export class EventSourceStore {
         JOIN flow_live l ON l.flow_id = b.flow_id AND l.publication_id = b.current_publication_id AND l.enabled = 1
         LEFT JOIN flow_connector_teams t ON t.flow_id = b.flow_id
         WHERE b.health = 'healthy' AND b.operator_state = 'active' AND b.connection_id = ? AND t.team_id IS ?
-          AND json_extract(b.trigger_json, '$.definition.provider') = ? AND json_extract(b.trigger_json, '$.config.sourceId') = ?`)
+          AND json_extract(b.trigger_json, '$.definition.provider') = ? AND json_extract(b.trigger_json, '$.config.sourceId.value') = ?`)
         .all(source.connectionId, source.teamId, source.provider, source.sourceId) as {
         bindingId: string
         endpointId: string
@@ -232,7 +236,10 @@ export class EventSourceStore {
         runtimeVersion: number
         triggerJson: string
       }[]
-      const matches = targets.filter((target) => matchesFeishuEvent(JSON.parse(target.triggerJson).config, event))
+      const matches = targets.filter((target) => {
+        const trigger = JSON.parse(target.triggerJson) as Extract<TriggerNode, { kind: 'integration' }>
+        return matchesFeishuEvent(resolveTriggerConfig(trigger.definition.configInputs, trigger.config), event)
+      })
       if (count.count + matches.length > 10_000) return 'overloaded'
       this.#database.prepare('INSERT INTO source_events VALUES (?, ?, ?, ?)').run(source.sourceId, event.id, payloadJson, now)
       for (const target of matches) {

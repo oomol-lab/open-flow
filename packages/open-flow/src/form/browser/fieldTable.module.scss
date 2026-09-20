@@ -45,13 +45,11 @@
 }
 
 .list[data-fixed-types] {
+  --field-table-type-width: 32px;
   --field-type-width: 32px;
-  /* Open object children can still choose a value type on the shared tracks. */
-  &:has([data-field-type] [role='combobox']) {
-    --field-type-width: 56px;
-  }
 }
 .list:not([data-type-column]) {
+  --field-table-type-width: 0px;
   --field-type-width: 0px;
   --field-type-value-gap: 0px;
 }

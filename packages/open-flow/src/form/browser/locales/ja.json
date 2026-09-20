@@ -1,5 +1,7 @@
 {
   "valueEditor": {
+    "reset": "リセット",
+    "resetDefaults": "既定値に戻す",
     "editRawData": "生データを編集",
     "editAsForm": "フォーム編集に切り替え",
     "advancedSettings": "詳細設定",
@@ -87,7 +89,10 @@
     "arrayOf": "の",
     "columnValue": "値",
     "noOptions": "選択肢がありません",
-    "emptyObject": "空のオブジェクトのみ",
-    "emptyObjectReadonly": "空のオブジェクト"
+    "closedObjectDefinition": "空のオブジェクトのみ",
+    "emptyObjectValue": "空のオブジェクト",
+    "unrestrictedFields": "定義済みフィールドなし",
+    "additionalFieldValues": "追加フィールドの値",
+    "schemaDefinedFields": "スキーマによるフィールド制約"
   }
 }

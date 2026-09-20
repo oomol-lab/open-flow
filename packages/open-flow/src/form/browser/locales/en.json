@@ -1,5 +1,7 @@
 {
   "valueEditor": {
+    "reset": "Reset",
+    "resetDefaults": "Reset to defaults",
     "editRawData": "Edit raw data",
     "editAsForm": "Switch to form editing",
     "advancedSettings": "Advanced settings",
@@ -87,7 +89,10 @@
     "arrayOf": "of",
     "columnValue": "Value",
     "noOptions": "No options available",
-    "emptyObject": "Empty object only",
-    "emptyObjectReadonly": "Empty object"
+    "closedObjectDefinition": "Empty object only",
+    "emptyObjectValue": "Empty object",
+    "unrestrictedFields": "No predefined fields",
+    "additionalFieldValues": "Additional field values",
+    "schemaDefinedFields": "Fields constrained by schema"
   }
 }

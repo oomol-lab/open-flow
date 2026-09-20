@@ -5,6 +5,20 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 
+export type FieldSectionIcon = 'input' | 'output' | 'configuration'
+
+/** The same title content is used by section headings and their settings panels. */
+export function FieldSectionTitle({ children, icon }: { children: ReactNode; icon?: FieldSectionIcon }) {
+  return (
+    <>
+      {icon === 'input' && <i aria-hidden="true" className="i-carbon:port-input text-base" />}
+      {icon === 'output' && <i aria-hidden="true" className="i-carbon:port-output text-base" />}
+      {icon === 'configuration' && <i aria-hidden="true" className="i-carbon:power -rotate-90 text-base" />}
+      {children}
+    </>
+  )
+}
+
 /** Shared heading and actions for editable property-panel field lists. */
 export function FieldSectionHeader({
   ref,
@@ -15,6 +29,7 @@ export function FieldSectionHeader({
   onToggleSorting,
   addLabel,
   onAdd,
+  onReset,
 }: {
   ref?: Ref<HTMLDivElement>
   title?: ReactNode
@@ -23,6 +38,7 @@ export function FieldSectionHeader({
   sorting: boolean
   onToggleSorting: () => void
   addLabel: string
+  onReset?: () => void
   onAdd: () => void
 }) {
   const t = useTranslate()
@@ -30,6 +46,15 @@ export function FieldSectionHeader({
   return (
     <div ref={ref} className="inspector-section-title justify-between">
       {title != null ? <FieldLabel>{title}</FieldLabel> : <span />}
+      {onReset && (
+        <Tooltip>
+          <TooltipTrigger render={<Button type="button" variant="ghost" size="xs" aria-label={t('valueEditor.resetDefaults')} onClick={onReset} />}>
+            <i aria-hidden="true" data-icon="inline-start" className="i-lucide-light:rotate-ccw" />
+            {t('valueEditor.reset')}
+          </TooltipTrigger>
+          <TooltipContent>{t('valueEditor.resetDefaults')}</TooltipContent>
+        </Tooltip>
+      )}
       {!disabled && (
         <div className="ml-auto flex items-center">
           {canSort && (

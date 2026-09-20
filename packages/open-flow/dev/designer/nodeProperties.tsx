@@ -13,7 +13,15 @@ import { createInspectorSession } from './inspectorSession.ts'
 import { useStoryActions } from './storyActions.tsx'
 
 const field = (handle: string, type = 'string'): InputPort => ({ handle, jsonSchema: { type }, nullable: false })
-const taskFields = [...values.slice(0, 6), ...values.slice(10)]
+const taskFields: readonly InputPort[] = [
+  ...values.slice(0, 6),
+  ...values.slice(10),
+  {
+    handle: 'clearedObject',
+    nullable: true,
+    jsonSchema: { type: 'object', properties: { title: { type: 'string', default: 'Do not apply on creation' }, count: { type: 'number' } } },
+  },
+]
 const taskInputValues = Object.fromEntries(
   taskFields.flatMap((port) => (port.value === undefined ? [] : [[port.handle, { kind: 'value' as const, value: port.value }]])),
 )
@@ -30,7 +38,7 @@ const fixtures: readonly Fixture[] = [
       kind: 'task',
       name: 'Prepare report',
       description: 'Transform the request into a release report.',
-      inputs: taskInputValues,
+      inputs: { ...taskInputValues, clearedObject: { kind: 'unset' } },
       task: {
         name: 'Prepare report',
         moduleId: 'module',

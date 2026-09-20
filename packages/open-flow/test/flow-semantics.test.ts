@@ -3,6 +3,7 @@ import type { JsonValue, RevisionContent as RevisionFixture } from '../src/flow/
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
 import { currentEngineContract, nodejsEngineContract, findEngineContract } from '../src/execution/common/runtime.ts'
+import { inputValues } from '../src/flow/common/inputValue.ts'
 import { validateModules } from '../src/flow/common/modules.ts'
 import { matchesSchema } from '../src/flow/common/schema.ts'
 import { createRuntimeProgram, flowDependencies, prepareFlow, validateFlow, validateFlowInputs } from '../src/flow/common/semantics.ts'
@@ -71,7 +72,7 @@ function triggerRevision(config: Readonly<Record<string, JsonValue>>, jsonSchema
         nodes: {
           trigger: {
             bindingId: 'trigger',
-            config,
+            config: inputValues(config),
             definition: {
               configInputs: [{ handle: 'event', jsonSchema: { enum: ['push'], type: 'string' }, nullable: false }],
               definitionVersion: 2,

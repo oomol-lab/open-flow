@@ -1,5 +1,4 @@
 @use './fieldLayout.scss';
-@use './fieldGeometry.scss' as geometry;
 @use 'sass:selector';
 
 /* Each editor is one stacking unit. The field table raises the active unit;
@@ -200,6 +199,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
 }
 .leadingControl,
 .toggleControl {
+  margin-left: var(--field-indent, 0px);
   grid-row: 1;
   display: flex;
   align-items: center;
@@ -404,16 +404,11 @@ $feedback-focus: ':has(#{$feedback-targets})';
   }
 }
 .arrayIndex {
-  position: absolute;
-  left: var(--field-indent);
-  top: 0;
   height: var(--field-control-height);
   display: flex;
   align-items: center;
   justify-content: center;
   width: var(--field-toggle-width, 24px);
-  z-index: var(--value-editor-control-layer);
-  pointer-events: none;
   color: var(--ui-muted-foreground);
   font-variant-numeric: tabular-nums;
 }
@@ -425,12 +420,10 @@ $feedback-focus: ':has(#{$feedback-targets})';
     grid-row: 1;
     margin-left: var(--field-indent);
   }
-  > .header > .toggleControl i {
-    visibility: hidden;
-  }
 }
 .root[data-header][data-collection] > .body {
   --value-body-inset: calc(var(--field-indent, 0px) + 16px);
+  --branch-origin: calc(var(--field-indent, 0px) - var(--branch-offset));
   --branch-offset: calc(var(--field-toggle-width, 24px) / 2 + var(--field-name-gap));
   --branch-extension: 0px;
   grid-column: handle / content-end;
@@ -438,17 +431,14 @@ $feedback-focus: ':has(#{$feedback-targets})';
   margin: 0 0 4px;
   padding: 4px 0 0 var(--value-body-inset);
 }
-.root[data-header][data-branch] > .body::before {
-  @include geometry.branch;
-  left: calc(var(--field-indent, 0px) - var(--branch-offset));
-  top: calc(-1 * var(--branch-extension));
-}
+
 @container value-fields (max-width: #{fieldLayout.$wrap-width}) {
-  .root[data-header][data-structured]:not([data-array-child], [data-output]) > .body {
+  .root[data-header][data-collection]:not([data-array-child], [data-output]) > .body {
     --branch-extension: calc(var(--field-control-height) + var(--field-row-gap));
   }
 }
 .root[data-header][data-structured] > .body {
+  --branch-origin: calc(var(--field-indent, 0px) + var(--field-toggle-width, 24px) / 2);
   grid-column: handle / end;
 }
 .body[hidden] {
@@ -582,39 +572,13 @@ $feedback-focus: ':has(#{$feedback-targets})';
   display: flex;
   align-items: center;
   color: var(--ui-muted-foreground);
+  background-color: color-mix(in srgb, var(--ui-foreground) 5%, transparent);
+  &:not(:disabled):hover {
+    background-color: color-mix(in srgb, var(--ui-foreground) 10%, transparent);
+  }
   margin-left: calc(var(--field-indent, 0px) + 16px);
   height: var(--field-control-height, 30px);
   font: inherit;
-}
-
-.emptyCollectionBranch {
-  --branch-extension: 0px;
-  position: relative;
-  display: grid;
-  grid-template-columns: subgrid;
-  grid-column: 1 / -1;
-  grid-row: var(--field-branch-row);
-  min-width: 0;
-  padding-top: 4px;
-  &::before {
-    @include geometry.branch;
-    left: calc(var(--field-indent) + var(--field-toggle-width, 24px) / 2);
-    top: calc(-1 * var(--branch-extension));
-    width: 16px;
-  }
-  > .emptyObjectContent {
-    grid-column: handle / content-end;
-  }
-}
-
-.emptyCollectionBranch[hidden] {
-  display: none;
-}
-
-@container value-fields (max-width: #{fieldLayout.$wrap-width}) {
-  .root[data-header] > .emptyCollectionBranch {
-    --branch-extension: calc(var(--field-control-height) + var(--field-row-gap));
-  }
 }
 
 .emptyObjectConstraint {
@@ -675,81 +639,32 @@ $feedback-focus: ':has(#{$feedback-targets})';
   opacity: 0.5;
 }
 
-/* Nested fields share their owner's tracks. Only the handle consumes nesting space. */
+/* Each recursive row owns its tracks; indentation affects only its leading cells. */
 .root[data-header][data-structured] > .body {
-  display: grid;
-  grid-template-columns: subgrid;
+  --branch-origin: calc(var(--field-indent, 0px) + var(--field-toggle-width, 24px) / 2);
   grid-column: 1 / -1;
   margin-bottom: 0;
   padding-left: 0;
-  &::before {
-    left: calc(var(--field-indent) + var(--field-toggle-width, 24px) / 2);
-    width: 16px;
-  }
-  &:has(
-    > .collection
-      > [data-object-fields]
-      > [data-object-field]:first-child
-      > [data-object-field-content]
-      > .root
-      > .header
-      > :is(.toggleControl:not(:empty), .leadingControl:not(:empty))
-  )::before,
-  &:has(
-    > .collection
-      > [data-array-fields]
-      > [data-array-field]:first-child
-      > [data-array-field-content]
-      > .root
-      > .header
-      > :is(.toggleControl:not(:empty), .leadingControl:not(:empty), .arrayIndex)
-  )::before {
-    width: 6px;
-  }
   > .collection {
     container-type: normal;
   }
-  > .collection,
-  > .collection > [data-array-fields],
-  > .collection > [data-array-fields] > [data-array-field],
-  > .collection > [data-array-fields] > [data-array-field] > [data-array-field-content],
-  > .collection > [data-array-fields] > [data-array-field] > [data-array-field-content] > .root,
-  > .collection > [data-object-fields],
-  > .collection > [data-object-fields] > [data-object-field],
-  > .collection > [data-object-fields] > [data-object-field] > [data-object-field-content],
-  > .collection > [data-object-fields] > [data-object-field] > [data-object-field-content] > .root {
-    display: grid;
-    grid-template-columns: subgrid;
-    grid-column: 1 / -1;
-    min-width: 0;
-  }
-  > .collection > .collectionActions,
-  > .collection > .actions {
-    grid-column: 1 / -1;
-  }
-  > .collection > .collectionActions {
-    grid-template-columns: subgrid;
-  }
-  > .collection > [data-object-fields]:empty,
-  > .collection > [data-array-fields]:empty {
-    display: none;
-  }
-  .root[data-nested-field] {
-    > .header [data-field-name],
-    > .header > .fieldName {
-      padding-left: var(--field-indent);
-    }
-    > .header > .toggleControl,
-    > .header > .leadingControl {
-      transform: translateX(var(--field-indent));
-    }
-  }
-  .root[data-object-child] > .options {
-    grid-column: nullable / end;
-    justify-content: space-around;
+}
+.root[data-header][data-nested-field] {
+  > .header [data-field-name],
+  > .header > .fieldName {
+    padding-left: var(--field-indent);
   }
 }
-
+.root[data-object-child] > .options {
+  grid-column: nullable / end;
+  justify-content: space-around;
+}
+.root:not([data-collection]) > .body::before {
+  content: none;
+}
+.root:not([data-header]) > .body::before {
+  content: none;
+}
 .booleanControl {
   position: relative;
   > [data-field-control] {
@@ -806,4 +721,18 @@ $feedback-focus: ':has(#{$feedback-targets})';
 }
 .errorAnchor:has(:focus-visible, [data-popup-open]) {
   z-index: var(--value-editor-active-layer, 2);
+}
+
+.collection > :is([data-object-fields], [data-array-fields]):empty {
+  display: none;
+}
+
+.objectNotice {
+  height: auto;
+  min-height: var(--field-control-height, 30px);
+  padding: 4px 8px;
+  border-radius: var(--ui-control-radius);
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
 }

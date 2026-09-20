@@ -1,18 +1,21 @@
 import styles from './portList.module.scss'
 import type { ComponentProps, ReactNode } from 'react'
 import type { FieldDisclosure } from '../../../../form/browser/fieldTypeDisplay.tsx'
-import type { ValueEditorDeletion, ValueEditorProps } from '../../../../form/browser/valueEditor.tsx'
+import type { FieldValueEditorProps } from '../../../../form/browser/fieldValueEditor.tsx'
+import type { FieldValueDeletion } from '../../../../form/common/fieldValue.ts'
 import type { Group, InputPort } from '../api.ts'
+import type { FieldSectionIcon } from './fieldSectionHeader.tsx'
 import type { PropertyDeletion } from './propertyDeletion.ts'
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { DefinitionField } from '../../../../form/browser/definitionField.tsx'
 import { EditorComponentSelect } from '../../../../form/browser/editorComponentSelect.tsx'
 import { FieldName } from '../../../../form/browser/fieldName.tsx'
 import { FieldSorting } from '../../../../form/browser/fieldSorting.ts'
 import { FieldNullable, FieldTable, FieldTableRow } from '../../../../form/browser/fieldTable.tsx'
+import { FieldValueEditor } from '../../../../form/browser/fieldValueEditor.tsx'
 import { JsonEditor } from '../../../../form/browser/jsonEditor.tsx'
-import { ValueEditor } from '../../../../form/browser/valueEditor.tsx'
 import { valueForEditor } from '../../../../form/common/editorComponent.ts'
 import { compile } from '../../../../form/common/validation/validator.ts'
 import { objectValue } from '../../../../form/common/value.ts'
@@ -25,7 +28,7 @@ import { Popover, PopoverPanelContent } from '../../../../ui/browser/popover.tsx
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { fieldPanelAnchor } from './fieldPanelAnchor.ts'
-import { FieldSectionHeader } from './fieldSectionHeader.tsx'
+import { FieldSectionHeader, FieldSectionTitle } from './fieldSectionHeader.tsx'
 import { movePort } from './portOrder.ts'
 
 export function portType(port: InputPort): string {
@@ -201,7 +204,7 @@ function PortSettingsFields({
         <FieldLabel htmlFor={`${id}-type`} className="text-xs font-normal text-muted-foreground">
           {t('inspector.ports.columnType')}
         </FieldLabel>
-        <PortType id={`${id}-type`} compact={false} name={port.handle} value={port.jsonSchema} disabled={disabled} onChange={updateSchema} />
+        <PortType id={`${id}-type`} compact={false} readOnlySurface name={port.handle} value={port.jsonSchema} disabled={disabled} onChange={updateSchema} />
       </Field>
       <details className={styles.schema}>
         <summary>
@@ -316,9 +319,11 @@ export function PortSettingsPanel({
 }
 
 type PortEditorProps = {
+  onReset?: () => void
+  expansionPolicy?: FieldValueEditorProps['expansionPolicy']
   layout?: 'values' | 'ports' | 'definition'
   title?: ReactNode
-  titleIcon?: 'input' | 'output'
+  titleIcon?: FieldSectionIcon
   defaultNullable?: boolean
   reservedNames?: readonly string[]
   disabled: boolean
@@ -327,8 +332,8 @@ type PortEditorProps = {
   renderValue?: (
     port: InputPort,
     presentation: Pick<
-      ValueEditorProps,
-      'layout' | 'header' | 'leadingControl' | 'valueAddon' | 'trailingControl' | 'description' | 'options' | 'onDefinitionChange'
+      FieldValueEditorProps,
+      'expansionPolicy' | 'layout' | 'header' | 'leadingControl' | 'valueAddon' | 'trailingControl' | 'description' | 'options' | 'onDefinitionChange'
     >,
   ) => ReactNode
 } & (
@@ -357,6 +362,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
   const t = useTranslate()
   const title = props.title ?? (props.layout === 'values' ? t('inspector.ports.valuesTitle') : undefined)
   const titleIcon = props.titleIcon ?? (props.output && props.layout === 'ports' && props.title != null ? 'output' : undefined)
+  const sectionTitle = title == null ? undefined : <FieldSectionTitle icon={titleIcon}>{title}</FieldSectionTitle>
   const [sorting, setSorting] = useState(false)
   const fieldCount = values.filter((port) => 'handle' in port).length
   const hasFields = fieldCount > 0
@@ -573,7 +579,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           render={
             <Button
               type="button"
-              size={tableLayout ? 'icon-sm' : 'xs'}
+              size={tableLayout || props.output ? 'icon-sm' : 'xs'}
               variant="ghost"
               data-value-options
               aria-label={`${port.handle} ${t('valueEditor.fieldSettings')}`}
@@ -586,7 +592,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           }
         >
           <i aria-hidden="true" className="i-lucide-light:settings text-base" />
-          {!tableLayout && t('valueEditor.fieldSettings')}
+          {!tableLayout && !props.output && t('valueEditor.fieldSettings')}
         </TooltipTrigger>
         <TooltipContent container={list.current}>{t('valueEditor.fieldSettings')}</TooltipContent>
       </Tooltip>
@@ -603,7 +609,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           }}
         >
           <PortSettingsPanel
-            sectionTitle={title}
+            sectionTitle={sectionTitle}
             showNullable={!tableLayout}
             container={list.current?.closest<HTMLElement>('.editor-context-panel') ?? list.current}
             anchor={() => fieldPanelAnchor(list.current?.querySelector(`[data-port-index="${index}"]`))}
@@ -623,7 +629,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
       ) : null
     const onDefinitionChange =
       tableLayout && !disabled
-        ? (jsonSchema: unknown, value: unknown, deletion?: ValueEditorDeletion) => {
+        ? (jsonSchema: unknown, value: unknown, deletion?: FieldValueDeletion) => {
             const { value: _value, ...rest } = port
             onChange(
               values.map((entry, i) =>
@@ -651,6 +657,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
       >
         {props.renderValue ? (
           props.renderValue(port, {
+            expansionPolicy: props.expansionPolicy,
             layout: tableLayout ? props.layout : undefined,
             header,
             leadingControl,
@@ -659,8 +666,22 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             description: port.description,
             onDefinitionChange,
           })
+        ) : props.output ? (
+          <DefinitionField
+            expansionPolicy={props.expansionPolicy}
+            schema={port.jsonSchema}
+            label={port.handle}
+            disabled={disabled}
+            layout={tableLayout ? props.layout : undefined}
+            header={header}
+            leadingControl={leadingControl}
+            trailingControl={trailingControl}
+            options={options}
+            onChange={onDefinitionChange ? (schema, deletion) => onDefinitionChange(schema, undefined, deletion) : undefined}
+          />
         ) : (
-          <ValueEditor
+          <FieldValueEditor
+            expansionPolicy={props.expansionPolicy}
             leadingControl={leadingControl}
             layout={tableLayout ? props.layout : undefined}
             header={header}
@@ -672,7 +693,6 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             label={port.handle}
             nullable={port.nullable}
             disabled={disabled}
-            definitionOnly={props.output}
             path={`/${index}`}
             onDraftIssue={onDraftIssue}
             onDefinitionChange={onDefinitionChange}
@@ -701,15 +721,8 @@ export function PortDefinitionEditor(props: PortEditorProps) {
       {(props.title != null || props.layout === 'values' || !disabled) && (
         <FieldSectionHeader
           ref={heading}
-          title={
-            title == null ? undefined : (
-              <>
-                {titleIcon === 'input' && <i aria-hidden="true" className="i-carbon:port-input text-base" />}
-                {titleIcon === 'output' && <i aria-hidden="true" className="i-carbon:port-output text-base" />}
-                {title}
-              </>
-            )
-          }
+          title={sectionTitle}
+          onReset={disabled && hasFields ? props.onReset : undefined}
           disabled={disabled}
           canSort={canSort}
           sorting={sortingEnabled}
@@ -791,7 +804,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
                       }}
                     >
                       <GroupSettingsPanel
-                        sectionTitle={title}
+                        sectionTitle={sectionTitle}
                         container={list.current?.closest<HTMLElement>('.editor-context-panel') ?? list.current}
                         anchor={() => fieldPanelAnchor(list.current?.querySelector(`[data-group-index="${section.index}"] > details > summary`))}
                         group={section.group}

@@ -33,6 +33,7 @@ import { resolveDraftOperations } from '@oomol-lab/open-flow/control-requests'
 import { applyFlowChanges, currentFlowModelVersion, FlowChangeError } from '@oomol-lab/open-flow/flow-change'
 import { canonicalJsonBytes, digestBytes, encodeRevision, repairRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { flowClosure, validateFlow } from '@oomol-lab/open-flow/flow-semantics'
+import { triggerConfigValues } from '@oomol-lab/open-flow/integration-trigger'
 import { PermanentPollError, PollConnectionError } from '@oomol-lab/open-flow/poll-trigger'
 import { triggerDefinitions as providerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
@@ -207,7 +208,9 @@ export class ControlService {
       )
       if (field == 'sourceId') return sources.map((source) => ({ value: source.sourceId, label: source.name }))
       if (field == 'eventTypes')
-        return (sources.find((source) => source.sourceId == trigger.config.sourceId)?.eventTypes ?? []).map((type) => ({ value: type, label: type }))
+        return (
+          sources.find((source) => source.sourceId == (trigger.config.sourceId?.kind === 'value' ? trigger.config.sourceId.value : undefined))?.eventTypes ?? []
+        ).map((type) => ({ value: type, label: type }))
       throw new ControlError(controlErrorCode.triggerKeyInvalid, 'Unknown event source configuration field.')
     }
     if (definition?.configOptions == null) throw new ControlError(controlErrorCode.triggerKeyInvalid, 'This Trigger has no dynamic configuration options.')
@@ -217,7 +220,7 @@ export class ControlService {
       try {
         return await definition.configOptions!({
           field,
-          config: trigger.config,
+          config: triggerConfigValues(trigger.definition.configInputs, trigger.config),
           signal,
           connector: {
             execute: (request) => connector.proxy(definition.snapshot.provider, binding.target, `trigger-options:${flowId}`, request, signal, teamId),

@@ -14,7 +14,8 @@ const group = z.object({ collapsed: z.boolean().optional(), group: text })
 const nodeSource = z.object({ kind: z.literal('node'), nodeId: text, output: text, field: text.optional() })
 const flowSource = z.object({ kind: z.literal('flow'), input: text })
 const source = z.union([nodeSource, flowSource, z.object({ kind: z.literal('binding'), bindingId: text })])
-const mapping = z.union([z.object({ kind: z.literal('value'), value: json }), z.object({ kind: z.literal('sources'), sources: z.array(source) })])
+const fixedInput = z.union([z.object({ kind: z.literal('unset') }), z.object({ kind: z.literal('value'), value: json })])
+const mapping = z.union([fixedInput, z.object({ kind: z.literal('sources'), sources: z.array(source) })])
 const inputs = z.record(text, mapping)
 const ports = { inputs: z.array(z.union([input, group])), outputs: z.array(z.union([port, group])) }
 const capability = z.object({
@@ -165,7 +166,7 @@ const node = z.union([
     ...trigger,
     kind: z.literal('poll'),
     bindingId: text,
-    config: z.record(text, json),
+    config: z.record(text, fixedInput),
     definition: z.object({ ...definition, type: z.literal('poll') }),
     pollTimes: triggerScheduleSchema,
   }),
@@ -173,7 +174,7 @@ const node = z.union([
     ...trigger,
     kind: z.literal('integration'),
     bindingId: text,
-    config: z.record(text, json),
+    config: z.record(text, fixedInput),
     definition: z.object({ ...definition, type: z.literal('integration'), endpoint }),
   }),
 ])
@@ -406,7 +407,7 @@ const shapes = {
   'graph.node.task.ports.set': { ...at, before: z.object(ports), value: z.object(ports) },
   'graph.node.task.name.set': { ...at, before: text, value: text },
   'graph.node.task.capabilities.set': { ...at, before: z.array(capability).optional(), value: z.array(capability).optional() },
-  'graph.trigger.config.set': { nodeId: text, name: text, before: json.optional(), value: json.optional() },
+  'graph.trigger.config.set': { nodeId: text, name: text, before: fixedInput.optional(), value: fixedInput.optional() },
   'graph.trigger.schedule.set': { nodeId: text, before: triggerScheduleSchema, value: triggerScheduleSchema },
   'module.create': { moduleId: text, module },
   'module.delete': { moduleId: text },

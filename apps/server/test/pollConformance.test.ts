@@ -2,6 +2,7 @@ import type { JsonValue, RevisionContent, TriggerSchedule } from '@oomol-lab/ope
 import type { PollConformanceFixture, PollConformanceHarness, PollDefinition, PollResult } from '@oomol-lab/open-flow/poll-trigger'
 
 import { nextTriggerScheduledAt, scheduledTriggerOccurrenceId } from '@oomol-lab/open-flow/cron-trigger'
+import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { eventsPollOutputs, pollConformanceCases } from '@oomol-lab/open-flow/poll-trigger'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -46,7 +47,7 @@ function revision(config: Readonly<Record<string, JsonValue>>, connectionId: str
           ? {
               poll: {
                 bindingId: 'connection',
-                config,
+                config: inputValues(config),
                 definition: snapshot,
                 kind: 'poll',
                 name: 'Poll conformance trigger',

@@ -3,6 +3,7 @@ import type { JsonValue } from '../src/flow/common/change.ts'
 import type { PollContext } from '../src/trigger/common/poll.ts'
 
 import { describe, expect, it, vi } from 'vitest'
+import { inputValues } from '../src/flow/common/inputValue.ts'
 import { resolveTriggerConfig } from '../src/trigger/common/config.ts'
 import { PermanentPollError, PollConnectionError, TransientPollError } from '../src/trigger/common/poll.ts'
 import { linearIssueChanged as definition } from '../src/trigger/providers/linear/on-issue-changed.ts'
@@ -24,7 +25,12 @@ function page(nodes: readonly unknown[] = [issue], hasNextPage = false, endCurso
 }
 function setup(result = page(), checkpoint: JsonValue = { startedAt: start, since: start }) {
   const execute = vi.fn(async () => result)
-  const context: PollContext = { checkpoint, config: resolveTriggerConfig(definition.snapshot.configInputs, { teamId }), connector: { execute }, now }
+  const context: PollContext = {
+    checkpoint,
+    config: resolveTriggerConfig(definition.snapshot.configInputs, inputValues({ teamId })),
+    connector: { execute },
+    now,
+  }
   return { context, execute }
 }
 

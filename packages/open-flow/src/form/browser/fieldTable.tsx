@@ -5,6 +5,7 @@ import { forwardRef } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Checkbox } from '../../ui/browser/checkbox.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/browser/tooltip.tsx'
+import { FieldLayout } from './fieldLayout.tsx'
 
 /** Shared field geometry. Callers own definitions, values, actions and persistence. */
 export const FieldTable = forwardRef<
@@ -40,7 +41,7 @@ export const FieldTable = forwardRef<
           {nullable && <span className={styles.nullableHeading}>{t('valueEditor.nullable')}</span>}
         </div>
       )}
-      {children}
+      <FieldLayout layout={layout}>{children}</FieldLayout>
     </div>
   )
 })

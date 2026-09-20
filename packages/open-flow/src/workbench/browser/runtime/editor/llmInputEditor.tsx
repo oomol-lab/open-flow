@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react'
-import type { ValueEditorDeletion } from '../../../../form/browser/valueEditor.tsx'
+import type { FieldValueDeletion } from '../../../../form/common/fieldValue.ts'
 import type { JsonValue } from '../api.ts'
 
 import { useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { isUnknownRecord } from '../../../../base/common/type.ts'
-import { ValueControl } from '../../../../form/browser/valueEditor.tsx'
+import { ValueControl } from '../../../../form/browser/fieldControl.tsx'
 import { defaultLlmMaxTokens, defaultLlmTemperature, defaultLlmTopP, maximumLlmOutputTokens } from '../../../../llm/common/model.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
@@ -40,7 +40,7 @@ export function LlmInputEditor({
   disabled: boolean
   handleNames: readonly string[]
   label: string
-  onChange: (value: JsonValue | undefined, deletion?: ValueEditorDeletion) => void
+  onChange: (value: JsonValue | undefined, deletion?: FieldValueDeletion) => void
 }) {
   const t = useTranslate()
   const [expanded, setExpanded] = useState(false)

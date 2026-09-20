@@ -493,3 +493,21 @@ describe('Revision decoding', () => {
     expect(() => decodeFlowDocument({ ...revision().document, graph: { edges: [] } })).toThrow()
   })
 })
+
+it('round trips explicit unset input mappings through canonical persistence', () => {
+  const content = revision()
+  const next: RevisionContent = {
+    ...content,
+    document: {
+      ...content.document,
+      graph: {
+        ...content.document.graph,
+        nodes: {
+          ...content.document.graph.nodes,
+          cleared: { kind: 'task', taskId: 'managed', inputs: { model: { kind: 'unset' } } },
+        },
+      },
+    },
+  }
+  expect(decodeRevision(encodeRevision(next))).toEqual(next)
+})

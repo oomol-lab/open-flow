@@ -5,6 +5,7 @@ import type { LogAction } from './stories.tsx'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { applyFlowChanges } from '../../src/flow/common/change.ts'
+import { inputValue } from '../../src/flow/common/inputValue.ts'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { ConnectorStore } from '../../src/workbench/browser/runtime/stores/connectorStore.ts'
@@ -106,7 +107,10 @@ export function createTriggerSession(
         version: 1,
       })
     if (url.pathname.includes('/options/')) {
-      const failed = trigger.kind == 'poll' && trigger.definition.provider == 'linear' && trigger.config.teamId === '00000000-0000-4000-8000-000000000099'
+      const failed =
+        trigger.kind == 'poll' &&
+        trigger.definition.provider == 'linear' &&
+        inputValue(trigger.config.teamId, undefined) === '00000000-0000-4000-8000-000000000099'
       if (failed) return Response.json({ error: { code: 'connector.unavailable', message: 'Sample connection failure.' }, version: 1 }, { status: 503 })
       const options = url.pathname.endsWith('/teamId')
         ? [
@@ -118,7 +122,11 @@ export function createTriggerSession(
             { value: '539068e2-ae88-4d09-bd75-22eb4a59612f', label: 'Done', color: '#5e6ad2' },
           ]
       const current = content.document.graph.nodes[nodeId]
-      if (url.pathname.endsWith('/stateIds') && current?.kind === 'poll' && current.config.teamId === '00000000-0000-4000-8000-000000000002') {
+      if (
+        url.pathname.endsWith('/stateIds') &&
+        current?.kind === 'poll' &&
+        inputValue(current.config.teamId, undefined) === '00000000-0000-4000-8000-000000000002'
+      ) {
         return Response.json({ options: [{ value: '00000000-0000-4000-8000-000000000004', label: 'Ready to review', color: '#4ea7fc' }], version: 1 })
       }
       return Response.json({ options, version: 1 })

@@ -14,21 +14,31 @@ collections, definitions, and field, node, or group settings. Also read the
 
 ## Value semantics
 
-- Undefined (unset), empty string, null, and empty collections are distinct states. State labels
-  must remain distinguishable from user-entered content.
+- Stored undefined, null, empty strings, and empty collections remain distinct. Nullable fields
+  display both undefined and null as null and expose no clear action in either state. Non-nullable
+  fields display undefined as unset and null as a stored value, with validation and a clear action.
+  Empty strings and collections keep their own presentation. Display never writes a normalized value.
 - Clear always sets the value to undefined. Allow null permits null; it does not convert a clear
-  action into null. Preserve this distinction through callbacks, serialization, and reload.
+  action into null. Node input persistence stores an explicit `kind: unset` mapping when cleared;
+  only an absent mapping inherits the field default. Preserve this distinction through callbacks,
+  serialization, reload, and execution.
 - Changing type preserves compatible values. Apply the shared conversion/reset rules to incompatible
   values, including every affected array item; do not retain a string under an Object definition.
   Check the collapsed preview after a type change as well as the expanded editor.
+- An editable Object summary in null/unset state creates an empty object without changing Schema
+  or applying child defaults. Its declared children then render with unset values. No add-field
+  action appears until the object exists; adding a field is a separate definition/value edit.
+  An empty Array summary creates its first item using the same action as its branch add button.
+  Read-only and populated summaries remain disclosures. The leading arrow toggles expansion.
 - Opening a panel or inspecting an unset field must not silently create a value. Value creation and
   type changes use the existing shared rules rather than local guesses about defaults.
 - Deleting an upstream node or output preserves saved source references. Show the missing node or
   output as invalid until the user explicitly selects another source or switches to a fixed value.
   A deleted node uses the neutral source icon and its saved output name; never expose its internal
   node ID as a user-facing fallback or imply a Provider identity that is no longer known.
-- A non-nullable field containing `null` exposes the same explicit value-repair action as an unset
-  field. Repair prefers the schema default and otherwise uses the shared type default.
+- A non-nullable field containing `null` displays null with its validation error; it must not look
+  unset. An explicit edit/create action uses the shared default rules. Array item clearing retains
+  the item position as null because the persisted JSON array cannot contain undefined.
 
 ## Validation lifecycle
 
@@ -62,8 +72,11 @@ collections, definitions, and field, node, or group settings. Also read the
 - Fixed definitions omit option editing and all nested definition mutations while values remain editable.
   Empty fixed choices show "No options available". Closed empty objects retain the standard preview
   and disclosure; the expanded child row uses the disabled add-action surface to explain that an empty
-  object is required and fields cannot be added. Read-only empty objects use the shorter "Empty object"
-  label. Open objects retain their add-field action.
+  object is required and fields cannot be added. Read-only object values use "Empty object" only for `{}`; null and unset retain their value
+  semantics. Output definitions describe Schema constraints instead: no declared fields means
+  "Empty object only" when additional properties are forbidden, or "No predefined fields" when
+  allowed, with any additional-property value type shown separately. Pattern properties describe
+  schema-constrained fields rather than an empty object. Open editable objects retain their add-field action.
 - Missing editable choice definitions show a danger "Edit options…" entry point. Choice editing shares the
   selection popup, with a back chevron and an Add option button matching the list's typography.
 - Object children and array items use the established rounded plus/minus buttons. Plus inserts

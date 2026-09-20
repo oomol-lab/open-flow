@@ -1,6 +1,6 @@
-import type { ValueEditorDeletion } from '../../../../form/browser/valueEditor.tsx'
+import type { FieldValueDeletion } from '../../../../form/common/fieldValue.ts'
 
 export type PropertyDeletion =
-  | ValueEditorDeletion
+  | FieldValueDeletion
   | { readonly target: 'field' | 'group' | 'case'; readonly name: string }
   | { readonly target: 'condition' | 'conditionGroup' }

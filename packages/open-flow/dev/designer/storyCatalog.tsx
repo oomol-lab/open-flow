@@ -8,6 +8,7 @@ import { commentPropertiesStory } from './commentProperties.tsx'
 import { conditionEditorStory } from './conditionEditor.tsx'
 import { connectionPathsStory } from './connectionPaths.tsx'
 import { eventSourcesStory, createEventSourceStory, eventSourceSetupStory, feishuFiltersStory, feishuSummaryStory, eventPickerStory } from './eventSources.tsx'
+import { fieldLayoutStory } from './fieldLayout.tsx'
 import { fieldSettingsStory, groupSettingsStory } from './fieldSettings.tsx'
 import { fieldTypesStory } from './fieldTypes.tsx'
 import { formStory } from './form.tsx'
@@ -107,6 +108,7 @@ export const labStories: readonly FrontendStory[] = [
   valueNodeStory,
   valueEditorDangerStory,
   fieldTypesStory,
+  fieldLayoutStory,
   lazyFieldsStory,
   fieldSettingsStory,
   groupSettingsStory,

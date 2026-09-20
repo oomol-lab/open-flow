@@ -4,6 +4,8 @@ import type { PollDefinition } from '@oomol-lab/open-flow/poll-trigger'
 import type { DestinationStream, Logger } from 'pino'
 import type { ServerServiceOptions } from '../node/application/service.ts'
 
+import { fixedInputValue } from '@oomol-lab/open-flow/flow-change'
+import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { IntegrationConnectionError, PermanentIntegrationError, TransientIntegrationError } from '@oomol-lab/open-flow/integration-trigger'
 import { eventsPollOutputs } from '@oomol-lab/open-flow/poll-trigger'
@@ -97,7 +99,7 @@ function revision(mode: 'connection' | 'permanent' | 'ready' | 'transient', defi
         nodes: {
           integration: {
             bindingId: 'connection',
-            config: { mode },
+            config: inputValues({ mode }),
             definition,
             kind: 'integration',
             name: 'Integration runtime test',
@@ -1127,7 +1129,7 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
     expect(changesRead).toBe(3)
     const live = await service.control.getLive(flowId)
     const scoped = await service.control.changeDraft('operator', flowId, changed.revision.revisionId, [
-      { kind: 'graph.trigger.config.set', name: 'driveId', nodeId: 'listen', value: 'shared-drive' },
+      { kind: 'graph.trigger.config.set', name: 'driveId', nodeId: 'listen', value: fixedInputValue('shared-drive') },
     ])
     failPreparation = true
     const replacement = await service.control.publishFlow(

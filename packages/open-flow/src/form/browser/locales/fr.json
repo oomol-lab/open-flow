@@ -1,5 +1,7 @@
 {
   "valueEditor": {
+    "reset": "Réinitialiser",
+    "resetDefaults": "Rétablir les valeurs par défaut",
     "editRawData": "Modifier les données brutes",
     "editAsForm": "Passer à l’édition par formulaire",
     "advancedSettings": "Paramètres avancés",
@@ -87,7 +89,10 @@
     "arrayOf": "de",
     "columnValue": "Valeur",
     "noOptions": "Aucune option disponible",
-    "emptyObject": "Objet vide uniquement",
-    "emptyObjectReadonly": "Objet vide"
+    "closedObjectDefinition": "Objet vide uniquement",
+    "emptyObjectValue": "Objet vide",
+    "unrestrictedFields": "Aucun champ prédéfini",
+    "additionalFieldValues": "Valeurs des champs supplémentaires",
+    "schemaDefinedFields": "Champs contraints par le schéma"
   }
 }

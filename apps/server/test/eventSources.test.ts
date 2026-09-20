@@ -2,6 +2,7 @@ import type { CreateEventSource } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, TriggerNode } from '@oomol-lab/open-flow/flow-change'
 
 import { decodeEventSources } from '@oomol-lab/open-flow/control-api'
+import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { integrationDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { createCipheriv, createHash } from 'node:crypto'
 import { expect, it, vi } from 'vitest'
@@ -84,11 +85,11 @@ async function publish(context: Awaited<ReturnType<typeof setup>>, name: string,
     name: 'Feishu events',
     bindingId: 'connection',
     definition: definition.snapshot,
-    config: {
+    config: inputValues({
       sourceId: source.sourceId,
       eventTypes: [resource == null ? 'im.message.receive_v1' : 'approval_instance'],
       ...(resource == null ? {} : { resource }),
-    },
+    }),
   }
   const draft = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
     { kind: 'binding.create', bindingId: 'connection', binding: { kind: 'connection', target: input.connectionId } },

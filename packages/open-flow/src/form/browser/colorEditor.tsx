@@ -1,5 +1,5 @@
 import styles from './valueEditor.module.scss'
-import type { ValueEditorProps } from './valueEditor.tsx'
+import type { ValueControlProps } from './valueControlProps.ts'
 
 import { useEffect, useRef, useState } from 'react'
 import { HexAlphaColorPicker, HexColorPicker } from 'react-colorful'
@@ -15,7 +15,7 @@ interface ScreenColorPicker {
   open(options: { signal: AbortSignal }): Promise<{ sRGBHex: string }>
 }
 
-export function ColorEditor({ value, schema, label, disabled, onChange, path, onDraftIssue, invalid: schemaInvalid }: ValueEditorProps) {
+export function ColorEditor({ value, schema, label, disabled, onChange, path, onDraftIssue, invalid: schemaInvalid }: ValueControlProps) {
   const t = useTranslate()
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const picker = useRef<AbortController>()

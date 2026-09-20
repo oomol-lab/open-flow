@@ -6,6 +6,7 @@ import type { DraftRun, TriggerBinding } from '../../src/workbench/browser/runti
 import type { FrontendStory, LogAction } from './stories.tsx'
 import type { TriggerFixture } from './triggerFixtures.ts'
 
+import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
@@ -384,8 +385,10 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
       else if (trigger.kind === 'webhook') trigger = { ...trigger, bodyFields: [], options: {} }
     }
     if (trigger.kind === 'poll' && trigger.definition.provider === 'linear') {
-      if (state === 'missing-status') trigger = { ...trigger, config: { ...trigger.config, stateIds: ['00000000-0000-4000-8000-000000000098'] } }
-      if (state === 'options-error') trigger = { ...trigger, config: { ...trigger.config, teamId: '00000000-0000-4000-8000-000000000099' } }
+      if (state === 'missing-status')
+        trigger = { ...trigger, config: inputValues({ ...trigger.config, stateIds: { kind: 'value', value: ['00000000-0000-4000-8000-000000000098'] } }) }
+      if (state === 'options-error')
+        trigger = { ...trigger, config: inputValues({ ...trigger.config, teamId: { kind: 'value', value: '00000000-0000-4000-8000-000000000099' } }) }
     }
     const next = createTriggerSession(
       trigger,

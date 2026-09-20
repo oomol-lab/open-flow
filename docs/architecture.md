@@ -131,6 +131,8 @@ Engine Contract、部署中立 Runtime invocation、Scheduler 图执行语义、
 checkpoint 的格式版本和状态一致性由 Scheduler decoder 校验，恢复时同时检查所需 Engine Contract 与隔离运行时是否受支持。
 
 Flow 和 Subflow graph 允许自连接和回边。连线表示执行触发，输入映射独立声明数据来源；保存或删除执行边不会隐式创建或删除输入映射。
+
+输入映射区分固定值 `value`、来源 `sources` 与明确未设置 `unset`。清空输入保存 `{ kind: "unset" }`，阻止字段默认值回退；只有缺少映射时才继承字段默认值。显示和执行共用此解析规则，保存、复制与撤销保留该状态。
 每条被选中的入边到达都创建一次独立节点 invocation，不等待其他前驱，也不合并多个到达。Flow Run 固定一个 Trigger 起始节点；未被该 Trigger 路径触达的节点不执行。Subflow 的无入边普通根节点由调用启动，不同到达可以并行。
 Condition 的每个 Case 由 AND 表达式组组成，组间使用 OR。`first` 按保存顺序选择首个匹配 Case，`all` 选择所有匹配 Case；零匹配时选择固定 `otherwise` 路由端口。分支端口不提供数据输出，Source 选择器不列出 Condition。左右操作数独立保存固定值或公共 Source，不声明节点级统一 Input，可引用节点输出对象中 schema 声明的一级字段，不支持多级路径或数组下标。所有操作数 Source 在匹配前解析；缺失值、不完整配置和类型不兼容都报错，不转入 Otherwise。每次 Wait invocation 登记后释放 pending，决议后释放所选 action，同一次 invocation 的 pending 只触发一次。未选中的分支不产生到达或公开节点事件。
 
@@ -249,7 +251,7 @@ Trigger 的有序数据输出由公共 contract 统一定义和校验。接入�
 
 Integration 的事件型 callback 返回 `outputs`，listener 页面返回 `outputs` 或 `null`（无事件）。两者都由 Provider 构造完整端口映射，Server 按固定 Trigger contract 校验后原样准入。
 Poll 保留原始事件和逐事件去重，Provider 的 `buildOutputs(events)` 将非空的已去重事件批次转换为一次 Run 的完整输出；基线、空页面与全部重复的页面不调用它。
-Provider 配置通过 `configInputs` 复用节点的 `InputPort | Group` 定义。未配置字段使用定义的 `value`，无默认值时为 `null`，由 `nullable` 和字段 Schema 校验；配置只接受固定值。
+Provider 配置通过 `configInputs` 复用节点的 `InputPort | Group` 定义，并以与节点输入相同的固定赋值结构持久化：`value` 保存显式 JSON 值，`unset` 表示明确清空，缺少覆盖才使用定义默认值。清空写入 `unset`，重置删除覆盖。表单保留未设置状态；调用 Provider 前解析成普通 JSON，无值时为 `null`，由 `nullable` 和字段 Schema 校验。配置不支持来源绑定。
 Provider 输出直接声明原 `payload` 的一级字段，内部业务对象不递归展开。现有 Poll Provider 显式使用 `eventsPollOutputs` 返回 `{ events }`；通用运行时不预设输出端口名称，也不合并不同事件的端口值。
 
 一次有效 Trigger occurrence 只能准入普通 Flow Run，之后复用相同的 Run、执行、事件、取消和 terminal 语义。重投 occurrence 必须通过稳定 identity

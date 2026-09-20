@@ -1,9 +1,11 @@
+import type { InputValues } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
-import type { Group, InputPort, JsonValue } from '../../src/workbench/browser/runtime/api.ts'
+import type { Group, InputPort } from '../../src/workbench/browser/runtime/api.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
+import { fixedInputValue, inputValues } from '../../src/flow/common/inputValue.ts'
 import { TriggerConfigEditor } from '../../src/workbench/browser/runtime/editor/triggerConfigEditor.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 
@@ -19,7 +21,7 @@ const inputs: readonly (InputPort | Group)[] = [
 
 function ConfigStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
   const i18n = useMemo(() => createI18n(language), [language])
-  const [config, setConfig] = useState<Record<string, JsonValue>>({ owner: '', events: ['issues'], mode: 'all', filters: { branch: 'main' } })
+  const [config, setConfig] = useState<InputValues>(() => inputValues({ owner: '', events: ['issues'], mode: 'all', filters: { branch: 'main' } }))
   return (
     <I18nProvider i18n={i18n}>
       <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ padding: 24, maxWidth: 480 }}>
@@ -27,10 +29,13 @@ function ConfigStory({ dark, language, log }: { dark: boolean; language: UiLangu
           inputs={inputs}
           config={config}
           disabled={false}
+          onReset={() => {
+            setConfig({})
+            log('Reset configuration')
+          }}
           onChange={(name, value) => {
             const next = { ...config }
-            if (value === undefined) delete next[name]
-            else next[name] = value
+            next[name] = fixedInputValue(value)
             setConfig(next)
             log('Save configuration', next)
           }}

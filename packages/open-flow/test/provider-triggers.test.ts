@@ -9,6 +9,7 @@ import type {
 import type { PollContext, PollDefinition } from '../src/trigger/common/poll.ts'
 
 import { describe, expect, it } from 'vitest'
+import { inputValues } from '../src/flow/common/inputValue.ts'
 import { resolveTriggerConfig } from '../src/trigger/common/config.ts'
 import { IntegrationConnectionError } from '../src/trigger/common/integration.ts'
 import { PermanentPollError, PollConnectionError } from '../src/trigger/common/poll.ts'
@@ -25,7 +26,7 @@ function getDefinition(key: string) {
 function poll(key: string): PollDefinition {
   const value = getDefinition(key)
   if (!('poll' in value)) throw new Error(`${key} must be Poll.`)
-  return { ...value, poll: (context) => value.poll({ ...context, config: resolveTriggerConfig(value.snapshot.configInputs, context.config) }) }
+  return { ...value, poll: (context) => value.poll({ ...context, config: resolveTriggerConfig(value.snapshot.configInputs, inputValues(context.config)) }) }
 }
 
 function integration(key: string): IntegrationDefinition {
@@ -33,8 +34,8 @@ function integration(key: string): IntegrationDefinition {
   if (!('receive' in value)) throw new Error(`${key} must be Integration.`)
   return {
     ...value,
-    receive: (context) => value.receive({ ...context, config: resolveTriggerConfig(value.snapshot.configInputs, context.config) }),
-    reconcile: (context) => value.reconcile({ ...context, config: resolveTriggerConfig(value.snapshot.configInputs, context.config) }),
+    receive: (context) => value.receive({ ...context, config: resolveTriggerConfig(value.snapshot.configInputs, inputValues(context.config)) }),
+    reconcile: (context) => value.reconcile({ ...context, config: resolveTriggerConfig(value.snapshot.configInputs, inputValues(context.config)) }),
   }
 }
 

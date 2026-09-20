@@ -4,7 +4,7 @@ import type { FrontendStory } from './stories.tsx'
 
 import { useCallback, useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
-import { ValueEditor } from '../../src/form/browser/valueEditor.tsx'
+import { FieldValueEditor } from '../../src/form/browser/fieldValueEditor.tsx'
 import { Checkbox } from '../../src/ui/browser/checkbox.tsx'
 import { NativeSelect } from '../../src/ui/browser/native-select.tsx'
 import { Switch } from '../../src/ui/browser/switch.tsx'
@@ -51,7 +51,7 @@ function ErrorPanel({ theme }: { theme: 'light' | 'dark' }) {
         {cases.map((item, index) => (
           <div key={item.label}>
             <h3 style={{ fontSize: 12, margin: '0 0 6px' }}>{item.label}</h3>
-            <ValueEditor
+            <FieldValueEditor
               label={`${theme} ${item.label}`}
               schema={item.schema}
               value={values[index]}

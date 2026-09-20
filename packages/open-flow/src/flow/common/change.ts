@@ -1,3 +1,4 @@
+export { fixedInputValue, inputValue, inputValues } from './inputValue.ts'
 import { dequal } from 'dequal/lite'
 import { currentFlowModelVersion } from './changeSchema.ts'
 import { nodeInputMappings, setConditionInput } from './condition.ts'
@@ -121,9 +122,10 @@ export interface BindingSource {
   readonly kind: 'binding'
 }
 
-export type InputMapping =
-  | { readonly kind: 'sources'; readonly sources: readonly (BindingSource | FlowSource | NodeSource)[] }
-  | { readonly kind: 'value'; readonly value: JsonValue }
+export type FixedInputValue = { readonly kind: 'unset' } | { readonly kind: 'value'; readonly value: JsonValue }
+export type InputValues = Readonly<Record<string, FixedInputValue>>
+
+export type InputMapping = FixedInputValue | { readonly kind: 'sources'; readonly sources: readonly (BindingSource | FlowSource | NodeSource)[] }
 
 export interface OutputMapping {
   readonly sources: readonly (FlowSource | NodeSource)[]
@@ -385,14 +387,14 @@ export type TriggerNode =
   | (TriggerNodeBase & { readonly cronTimes: readonly TriggerSchedule[]; readonly kind: 'cron' })
   | (TriggerNodeBase & {
       readonly bindingId: string
-      readonly config: Readonly<Record<string, JsonValue>>
+      readonly config: InputValues
       readonly definition: TriggerKeySnapshot & { readonly type: 'poll' }
       readonly kind: 'poll'
       readonly pollTimes: readonly TriggerSchedule[]
     })
   | (TriggerNodeBase & {
       readonly bindingId: string
-      readonly config: Readonly<Record<string, JsonValue>>
+      readonly config: InputValues
       readonly definition: TriggerKeySnapshot & { readonly type: 'integration' }
       readonly kind: 'integration'
     })
@@ -542,11 +544,11 @@ export type ChangeOperation =
       readonly value: Pick<Extract<TriggerNode, { readonly kind: 'webhook' }>, 'bodyFields' | 'options'>
     }
   | {
-      readonly before?: JsonValue
+      readonly before?: FixedInputValue
       readonly kind: 'graph.trigger.config.set'
       readonly name: string
       readonly nodeId: string
-      readonly value?: JsonValue
+      readonly value?: FixedInputValue
     }
   | {
       readonly before: readonly TriggerSchedule[]

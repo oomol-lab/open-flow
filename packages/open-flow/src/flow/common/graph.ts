@@ -407,7 +407,7 @@ function sourcePaths(graph: Graph, paths: ReturnType<typeof graphPaths>['paths']
 }
 
 function mappingAvailable(graph: Graph, target: string | undefined, mapping: InputMapping, analysis: ReturnType<typeof graphPaths>): boolean {
-  if (mapping.kind == 'value') return true
+  if (mapping.kind != 'sources') return true
   const { ancestors, paths } = analysis
   if (target != null && mapping.sources.some((source) => source.kind == 'node' && !ancestors.get(target)?.has(source.nodeId))) return false
   if (

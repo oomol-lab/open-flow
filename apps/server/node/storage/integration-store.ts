@@ -392,7 +392,7 @@ export class IntegrationStore {
     ) {
       return false
     }
-    const sourceId = (JSON.parse(integration.triggerJson) as { config?: { sourceId?: string } }).config?.sourceId
+    const sourceId = (JSON.parse(integration.triggerJson) as { config?: { sourceId?: { kind: string; value?: string } } }).config?.sourceId?.value
     if (
       sourceId != null &&
       (this.#database.prepare('SELECT 1 FROM event_sources WHERE source_id = ? AND enabled = 1 AND verified_at IS NOT NULL').get(sourceId) == null ||

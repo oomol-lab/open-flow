@@ -1,3 +1,4 @@
+import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
 import { createI18n } from './i18n.ts'
@@ -326,7 +327,7 @@ describe('Designer port projection', () => {
             nodes: {
               trigger: {
                 bindingId: 'binding',
-                config: { repo: 'open-flow' },
+                config: inputValues({ repo: 'open-flow' }),
                 definition: {
                   configInputs: [
                     { handle: 'owner', jsonSchema: { type: 'string' }, nullable: false },
@@ -407,7 +408,10 @@ describe('Designer port projection', () => {
         ...draft.content,
         document: {
           ...draft.content.document,
-          graph: { ...draft.content.document.graph, nodes: { trigger: { ...trigger, config: { ...trigger.config, owner: 'owner' } } } },
+          graph: {
+            ...draft.content.document.graph,
+            nodes: { trigger: { ...trigger, config: { ...trigger.config, owner: { kind: 'value' as const, value: 'owner' } } } },
+          },
         },
       },
     }

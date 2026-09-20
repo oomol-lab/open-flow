@@ -1,5 +1,5 @@
 import type { DateFormat } from '../common/dateValue.ts'
-import type { ValueEditorProps } from './valueEditor.tsx'
+import type { ValueControlProps } from './valueControlProps.ts'
 
 import { useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
@@ -17,7 +17,7 @@ export function DateEditor({
   disabled,
   invalid,
   format,
-}: Pick<ValueEditorProps, 'value' | 'onChange' | 'label' | 'disabled' | 'invalid'> & { format: DateFormat }) {
+}: Pick<ValueControlProps, 'value' | 'onChange' | 'label' | 'disabled' | 'invalid'> & { format: DateFormat }) {
   const t = useTranslate()
   const [open, setOpen] = useState(false)
   const wall = datePickerValue(value, format)

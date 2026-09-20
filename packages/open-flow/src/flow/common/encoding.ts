@@ -74,6 +74,8 @@ export function canonicalPorts(value: readonly (InputPort | Port | Group)[]): Js
 
 function canonicalInputMapping(value: InputMapping): JsonValue {
   switch (value.kind) {
+    case 'unset':
+      return { kind: 'unset' }
     case 'sources':
       return { kind: value.kind, sources: value.sources.map((source) => ({ ...source })) }
     case 'value':

@@ -2,6 +2,7 @@ import type { ConnectorConnection } from '../api.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it, vi } from 'vitest'
+import { inputValues } from '../../../../flow/common/inputValue.ts'
 import { WorkbenchClient } from '../api.ts'
 import { createI18n } from '../i18n.ts'
 import { providerIcon } from '../providerIcon.ts'
@@ -44,7 +45,7 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
                     provider,
                     {
                       bindingId: provider,
-                      config: provider == 'linear' ? { teamId: 'team-old', stateIds: ['state-old'] } : {},
+                      config: inputValues(provider == 'linear' ? { teamId: 'team-old', stateIds: ['state-old'] } : {}),
                       definition: {
                         configInputs: [],
                         definitionVersion: 2,
@@ -300,7 +301,7 @@ describe('TriggerStore', () => {
       node.definition.endpoint = { body: { formats: ['json'], allowArray: false, allowEmpty: false }, methods: ['POST'], successStatus: 200 }
       node.definition.provider = 'feishu_app_bot'
       node.definition.key = 'feishu_app_bot.on_event'
-      node.config = { sourceId: 'old-source', eventTypes: ['drive.file.edit_v1'], resource: { kind: 'document', id: 'doc' } }
+      node.config = inputValues({ sourceId: 'old-source', eventTypes: ['drive.file.edit_v1'], resource: { kind: 'document', id: 'doc' } })
       delete node.pollTimes
       return Response.json(data)
     })
@@ -331,17 +332,17 @@ describe('TriggerStore', () => {
       ).toBe(true)
       const node = workspace.$.draft.value!.content.document.graph.nodes.linear!
       if (node.kind != 'integration') throw new Error('Expected integration.')
-      expect(node.config).toEqual({ sourceId: 'new-source', eventTypes: [] })
+      expect(node.config).toEqual({ ...inputValues({ sourceId: 'new-source', eventTypes: [] }), resource: { kind: 'unset' }, chatIds: { kind: 'unset' } })
       expect(workspace.$.revision.value!.binding(node.bindingId)).toMatchObject({ kind: 'connection', target: 'app-connection' })
       expect(request.mock.calls.filter(([path]) => path.endsWith('/draft/changes'))).toHaveLength(1)
       await workspace.saveTriggerConfig('linear', 'chatIds', ['chat'])
       await workspace.saveTriggerConfig('linear', 'eventTypes', ['drive.file.edit_v1'])
-      expect(workspace.$.draft.value!.content.document.graph.nodes.linear).not.toHaveProperty('config.chatIds')
+      expect(workspace.$.draft.value!.content.document.graph.nodes.linear).toHaveProperty('config.chatIds.kind', 'unset')
       await workspace.saveTriggerConfig('linear', 'resource', { kind: 'document', id: 'token', documentType: 'docx' })
       await workspace.saveTriggerConfig('linear', 'eventTypes', ['drive.file.title_updated_v1'])
-      expect(workspace.$.draft.value!.content.document.graph.nodes.linear).toHaveProperty('config.resource.id', 'token')
+      expect(workspace.$.draft.value!.content.document.graph.nodes.linear).toHaveProperty('config.resource.value.id', 'token')
       await workspace.saveTriggerConfig('linear', 'eventTypes', ['contact.user.created_v3'])
-      expect(workspace.$.draft.value!.content.document.graph.nodes.linear).not.toHaveProperty('config.resource')
+      expect(workspace.$.draft.value!.content.document.graph.nodes.linear).toHaveProperty('config.resource.kind', 'unset')
     } finally {
       triggers.dispose()
       workspace.dispose()
@@ -382,7 +383,7 @@ describe('TriggerStore', () => {
       else await workspace.setTriggerConnection('linear', 'connection-new')
       const node = workspace.$.draft.value!.content.document.graph.nodes.linear!
       if (node.kind != 'poll') throw new Error('Expected Poll.')
-      expect(node.config).toEqual(change == 'team' ? { teamId: 'team-new' } : {})
+      expect(node.config).toEqual({ teamId: change == 'team' ? { kind: 'value', value: 'team-new' } : { kind: 'unset' }, stateIds: { kind: 'unset' } })
       const saves = request.mock.calls.filter(([path]) => path.endsWith('/draft/changes'))
       expect(saves).toHaveLength(1)
       const body = JSON.parse(String(saves[0]![1]?.body))

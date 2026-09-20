@@ -1,5 +1,5 @@
 import styles from './valueEditor.module.scss'
-import type { ValueEditorProps } from './valueEditor.tsx'
+import type { ValueControlProps } from './valueControlProps.ts'
 
 import { useEffect, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
@@ -18,7 +18,7 @@ export function JsonEditor({
   focusRequest = 0,
   autoHeight = false,
   ariaLabel = `${label} JSON`,
-}: ValueEditorProps & { focusRequest?: number; ariaLabel?: string; autoHeight?: boolean }) {
+}: ValueControlProps & { focusRequest?: number; ariaLabel?: string; autoHeight?: boolean }) {
   const t = useTranslate()
   const lastValue = useRef(value)
   const [text, setText] = useState(() => (value === undefined ? '' : JSON.stringify(value, null, 2)))

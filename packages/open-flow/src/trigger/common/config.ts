@@ -1,6 +1,7 @@
-import type { Group, InputPort, JsonValue } from '../../flow/common/change.ts'
+import type { Group, InputPort, InputValues, JsonValue } from '../../flow/common/change.ts'
 
 import { z } from 'zod'
+import { inputValue } from '../../flow/common/inputValue.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'
 
 export const configInputsSchema = z.array(
@@ -10,19 +11,21 @@ export const configInputsSchema = z.array(
   ]),
 )
 
-export function triggerConfigValue(input: InputPort, config: Readonly<Record<string, JsonValue>>): JsonValue {
-  const value = Object.hasOwn(config, input.handle) ? config[input.handle] : input.value
-  return value === undefined ? null : value
+export function triggerConfigValue(input: InputPort, config: InputValues): JsonValue | undefined {
+  return inputValue(config[input.handle], input.value)
 }
 
-export function missingTriggerConfig(inputs: readonly (InputPort | Group)[], config: Readonly<Record<string, JsonValue>>): readonly string[] {
-  return inputs.flatMap((input) =>
-    'handle' in input && !input.nullable && !Object.hasOwn(config, input.handle) && input.value === undefined ? [input.handle] : [],
-  )
+/** Provider-specific controls consume values, never persistence wrappers. */
+export function triggerConfigValues(inputs: readonly (InputPort | Group)[], config: InputValues): Readonly<Record<string, JsonValue>> {
+  return Object.fromEntries(inputs.flatMap((input) => ('handle' in input ? [[input.handle, triggerConfigValue(input, config) ?? null]] : [])))
+}
+
+export function missingTriggerConfig(inputs: readonly (InputPort | Group)[], config: InputValues): readonly string[] {
+  return inputs.flatMap((input) => ('handle' in input && !input.nullable && triggerConfigValue(input, config) === undefined ? [input.handle] : []))
 }
 
 /** Resolves fixed inputs before a Provider sees them, using the same defaults/null semantics as node inputs. */
-export function resolveTriggerConfig(inputs: readonly (InputPort | Group)[], config: Readonly<Record<string, JsonValue>>): Readonly<Record<string, JsonValue>> {
+export function resolveTriggerConfig(inputs: readonly (InputPort | Group)[], config: InputValues): Readonly<Record<string, JsonValue>> {
   const fields = inputs.filter((input): input is InputPort => 'handle' in input)
   const handles = new Set(fields.map((input) => input.handle))
   if (handles.size !== fields.length) throw new TypeError('Trigger config has duplicate input handles.')
@@ -30,7 +33,7 @@ export function resolveTriggerConfig(inputs: readonly (InputPort | Group)[], con
   if (unknown != null) throw new TypeError(`Unknown Trigger config input "${unknown}".`)
   const resolved = Object.fromEntries(
     fields.map((input) => {
-      const value = triggerConfigValue(input, config)
+      const value = triggerConfigValue(input, config) ?? null
       if (!(value === null && input.nullable) && !matchesSchema(value, input.jsonSchema)) {
         throw new TypeError(`Trigger config input "${input.handle}" does not match its declared schema.`)
       }

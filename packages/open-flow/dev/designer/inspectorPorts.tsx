@@ -7,7 +7,7 @@ import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
-import { ValueEditor } from '../../src/form/browser/valueEditor.tsx'
+import { FieldValueEditor } from '../../src/form/browser/fieldValueEditor.tsx'
 import { EditorContextPanel } from '../../src/workbench/browser/runtime/editor/editorContextPanel.tsx'
 import { NodeInspector } from '../../src/workbench/browser/runtime/editor/nodeInspector.tsx'
 import { PortDefinitionEditor } from '../../src/workbench/browser/runtime/editor/portDefinitionEditor.tsx'
@@ -53,6 +53,8 @@ const outputs = [
   port('count', 'integer'),
 ]
 const readOnlyCompositeOutputs: (Group | InputPort)[] = [
+  port('openObject', 'object'),
+  { ...port('textMap', 'object'), jsonSchema: { type: 'object', additionalProperties: { type: 'string' } } },
   { group: 'Objects' },
   {
     ...port('emptyObject', 'object'),
@@ -233,7 +235,7 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
         <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(320px,1fr))] items-start gap-5">
           <section className="inspector-port-section p-3">
             <h3 className="mb-3 text-xs font-medium">Payload · structured fields</h3>
-            <ValueEditor
+            <FieldValueEditor
               key={`payload-${generation}`}
               label="payload"
               path="/payload"
@@ -251,7 +253,7 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
           </section>
           <section className="inspector-port-section p-3">
             <h3 className="mb-3 text-xs font-medium">Array · nested values</h3>
-            <ValueEditor
+            <FieldValueEditor
               key={`items-${generation}`}
               label="items"
               path="/items"

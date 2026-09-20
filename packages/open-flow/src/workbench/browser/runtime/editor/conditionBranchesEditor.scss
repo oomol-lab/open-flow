@@ -50,15 +50,9 @@
     position: relative;
     margin: 0;
     padding: 4px 0 0 16px;
-    &::before {
-      @include geometry.branch;
-      left: calc(#{geometry.$toggle-width} / 2);
-      top: 0;
-    }
-    &:has(> .condition-group)::before {
-      width: 6px;
-    }
+    --field-toggle-width: #{geometry.$toggle-width};
   }
+
   .condition-group-heading {
     display: flex;
     align-items: center;

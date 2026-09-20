@@ -1,4 +1,4 @@
-import type { ValueEditorProps } from './valueEditor.tsx'
+import type { FieldValueEditorProps } from './fieldValueEditor.tsx'
 
 import { useTranslate } from 'val-i18n-react'
 import { Input } from '../../ui/browser/input.tsx'
@@ -7,15 +7,15 @@ import { EditorComponentIcon } from './editorComponentIcon.tsx'
 import { FieldName } from './fieldName.tsx'
 import { FieldNullable } from './fieldTable.tsx'
 import { FieldTypeDisplay } from './fieldTypeDisplay.tsx'
-import { ValueEditor } from './valueEditor.tsx'
+import { FieldValueEditor } from './fieldValueEditor.tsx'
 
 /** A schema-defined field edits values only; its name, type and nullability stay fixed. */
-export function ValueField(props: Omit<ValueEditorProps, 'header' | 'layout' | 'trailingControl' | 'onDefinitionChange'>) {
+export function ValueField(props: Omit<FieldValueEditorProps, 'header' | 'layout' | 'trailingControl' | 'onDefinitionChange'>) {
   const t = useTranslate()
   const component = editorComponent(props.schema)
   const type = t(`valueEditor.components.${component}`)
   return (
-    <ValueEditor
+    <FieldValueEditor
       {...props}
       layout="ports"
       header={

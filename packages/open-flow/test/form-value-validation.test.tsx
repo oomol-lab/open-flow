@@ -1,18 +1,19 @@
 import type { ReactElement } from 'react'
-import type { ValueEditorProps } from '../src/form/browser/valueEditor.tsx'
+import type { FieldValueEditorProps } from '../src/form/browser/fieldValueEditor.tsx'
 
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it, vi } from 'vitest'
+import { FieldSorting } from '../src/form/browser/fieldSorting.ts'
+import { FieldValueEditor } from '../src/form/browser/fieldValueEditor.tsx'
 import * as validationHooks from '../src/form/browser/useValueIssues.ts'
-import { ValueEditor } from '../src/form/browser/valueEditor.tsx'
 import { ajv } from '../src/form/common/validation/validator.ts'
 import { valueIssues } from '../src/form/common/validation/valueIssues.ts'
 import { createI18n } from '../src/workbench/browser/runtime/i18n.ts'
 
 // Static rendering cannot run effects. Supply the real asynchronous result to test
 // presentation separately; browser acceptance covers the hook and editor interaction.
-async function renderWithIssues(element: ReactElement<{ children: ReactElement<ValueEditorProps> }>) {
+async function renderWithIssues(element: ReactElement<{ children: ReactElement<FieldValueEditorProps> }>) {
   const { schema, value } = element.props.children.props
   const result = await valueIssues(schema, value, 'en', new AbortController().signal)
   const hook = vi.spyOn(validationHooks, 'useValueIssues').mockImplementation((_schema, _value, _language, enabled) => (enabled ? result : undefined))
@@ -43,7 +44,7 @@ describe('Field validation presentation', () => {
     const render = (value: unknown, nullable = false) =>
       renderWithIssues(
         <I18nProvider i18n={i18n}>
-          <ValueEditor label="sample" schema={schema} value={value} nullable={nullable} onChange={onChange} path="/sample" onDraftIssue={vi.fn()} />
+          <FieldValueEditor label="sample" schema={schema} value={value} nullable={nullable} onChange={onChange} path="/sample" onDraftIssue={vi.fn()} />
         </I18nProvider>,
       )
     try {
@@ -57,7 +58,7 @@ describe('Field validation presentation', () => {
         }
         const nullableMarkup = await render(value, true)
         expect(nullableMarkup).not.toContain('role="alert"')
-        expect(nullableMarkup.includes('>null<')).toBe(value === null)
+        expect(nullableMarkup).toContain('>null<')
       }
       const validMarkup = await render(valid)
       expect(validMarkup).not.toContain('role="alert"')
@@ -74,7 +75,7 @@ describe('Field validation presentation', () => {
     const render = (value: unknown, nullable = false) =>
       renderWithIssues(
         <I18nProvider i18n={i18n}>
-          <ValueEditor label="sample" schema={schema} value={value} nullable={nullable} onChange={onChange} path="/sample" onDraftIssue={vi.fn()} />
+          <FieldValueEditor label="sample" schema={schema} value={value} nullable={nullable} onChange={onChange} path="/sample" onDraftIssue={vi.fn()} />
         </I18nProvider>,
       )
     try {
@@ -98,7 +99,7 @@ describe('Empty string presentation', () => {
     const render = (value: string | undefined) =>
       renderToStaticMarkup(
         <I18nProvider i18n={i18n}>
-          <ValueEditor
+          <FieldValueEditor
             label="sample"
             schema={{ 'type': 'string', 'ui:widget': widget }}
             value={value}
@@ -128,7 +129,7 @@ describe('JSON component with union schemas', () => {
     const render = (value: unknown, editDefinition: boolean) =>
       renderWithIssues(
         <I18nProvider i18n={i18n}>
-          <ValueEditor
+          <FieldValueEditor
             label="choice"
             schema={schema}
             value={value}
@@ -159,14 +160,14 @@ describe('JSON component with union schemas', () => {
 })
 
 describe('Nullable field presentation', () => {
-  it('keeps null distinct from an unset nullable value without writing either', () => {
+  it('presents null and unset nullable values as null without writing either', () => {
     const i18n = createI18n('en')
     const onChange = vi.fn()
     try {
       const render = (value: unknown, schema: unknown = { type: 'string' }) =>
         renderToStaticMarkup(
           <I18nProvider i18n={i18n}>
-            <ValueEditor
+            <FieldValueEditor
               label="note"
               header={<span>note</span>}
               schema={schema}
@@ -184,15 +185,15 @@ describe('Nullable field presentation', () => {
       expect(nullMarkup).not.toContain('note Set value')
       expect(nullMarkup).not.toContain('aria-invalid="true"')
       const unsetMarkup = render(undefined)
-      expect(unsetMarkup).toContain('note Set value')
-      expect(unsetMarkup).toContain('>Set value</span>')
-      expect(unsetMarkup).not.toContain('aria-label="note null"')
+      expect(unsetMarkup).not.toContain('note Set value')
+      expect(unsetMarkup).toContain('>null</span>')
+      expect(unsetMarkup).toContain('aria-label="note null"')
       expect(unsetMarkup).not.toContain('aria-invalid="true"')
       expect(render('', { type: 'string' })).toContain('placeholder="Empty string"')
       expect(render(null, { type: 'null' })).toContain('>null</span>')
       const jsonNull = renderToStaticMarkup(
         <I18nProvider i18n={i18n}>
-          <ValueEditor label="note" schema={{}} value={null} nullable onChange={onChange} path="/note" onDraftIssue={vi.fn()} />
+          <FieldValueEditor label="note" schema={{}} value={null} nullable onChange={onChange} path="/note" onDraftIssue={vi.fn()} />
         </I18nProvider>,
       )
       expect(jsonNull).toContain('aria-label="note JSON"')
@@ -205,10 +206,10 @@ describe('Nullable field presentation', () => {
     }
   })
 
-  it.each(['array', 'object'] as const)('keeps a null nullable %s on the value row instead of exposing collection contents', (type) => {
+  it.each(['array', 'object'] as const)('offers creation from the summary and branch for a null nullable %s', (type) => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
-        <ValueEditor
+        <FieldValueEditor
           header={<span>sample</span>}
           label="sample"
           schema={type === 'array' ? { type, items: { type: 'string' } } : { type, properties: { child: { type: 'string' } } }}
@@ -221,18 +222,21 @@ describe('Nullable field presentation', () => {
       </I18nProvider>,
     )
 
-    expect(markup).toContain('aria-label="sample null"')
-    expect(markup).toContain('aria-label="sample" aria-expanded="true"')
-    expect(markup).not.toContain('data-collection=')
-    expect(markup).toContain('data-empty-collection-branch="true"')
-    expect(markup).toContain(type === 'object' ? 'aria-label="Add field sample"' : 'aria-label="Add item sample"')
+    expect(markup).toContain('aria-label="sample Set value"')
+    expect(markup).not.toContain('aria-label="sample Set value" aria-expanded=')
+    if (type === 'object') expect(markup).not.toContain('aria-label="sample" aria-expanded=')
+    else expect(markup).toContain('aria-label="sample" aria-expanded="true"')
+    expect(markup).toContain('data-collection="true"')
+    expect(markup).toContain('data-value-body="true"')
+    if (type === 'object') expect(markup).not.toContain('aria-label="Add field sample"')
+    else expect(markup).toContain('aria-label="Add item sample"')
   })
 
   it.each(['array', 'object'] as const)('offers a nested add action for an unset editable %s', (type) => {
     const onChange = vi.fn()
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
-        <ValueEditor
+        <FieldValueEditor
           header={<span>sample</span>}
           label="sample"
           schema={type === 'array' ? { type, items: { type: 'string' } } : { type }}
@@ -245,10 +249,13 @@ describe('Nullable field presentation', () => {
     )
 
     expect(markup).toContain('sample Set value')
-    expect(markup).toContain('aria-label="sample" aria-expanded="true"')
-    expect(markup).toContain('-empty-collection')
-    expect(markup).toContain('data-empty-collection-branch="true"')
-    expect(markup).toContain(type === 'object' ? 'aria-label="Add field sample"' : 'aria-label="Add item sample"')
+    if (type === 'object') expect(markup).not.toContain('aria-label="sample" aria-expanded=')
+    else expect(markup).toContain('aria-label="sample" aria-expanded="true"')
+    expect(markup).toContain('aria-label="sample Set value"')
+    expect(markup).not.toContain('aria-label="sample Set value" aria-expanded=')
+    expect(markup).toContain('data-value-body="true"')
+    if (type === 'object') expect(markup).not.toContain('aria-label="Add field sample"')
+    else expect(markup).toContain('aria-label="Add item sample"')
     expect(onChange).not.toHaveBeenCalled()
   })
 })
@@ -264,7 +271,7 @@ describe('Read-only value controls', () => {
     try {
       const markup = renderToStaticMarkup(
         <I18nProvider i18n={i18n}>
-          <ValueEditor label="sample" schema={schema} value={value} disabled path="/sample" onChange={vi.fn()} onDraftIssue={vi.fn()} />
+          <FieldValueEditor label="sample" schema={schema} value={value} disabled path="/sample" onChange={vi.fn()} onDraftIssue={vi.fn()} />
         </I18nProvider>,
       )
       const input = markup.match(/<(?:input|textarea)\b[^>]*(?:aria-label="sample"|id="[^"]+")[^>]*>/)?.[0]
@@ -288,7 +295,8 @@ describe('Collapsed validation presentation', () => {
     const render = (value: unknown) =>
       renderWithIssues(
         <I18nProvider i18n={i18n}>
-          <ValueEditor
+          <FieldValueEditor
+            expansionPolicy={() => false}
             header={<span>sample</span>}
             label="sample"
             schema={schema}
@@ -326,7 +334,7 @@ describe('Collapsed field mounting', () => {
     const render = (compact: boolean) =>
       renderToStaticMarkup(
         <I18nProvider i18n={i18n}>
-          <ValueEditor compact={compact} label="sample" schema={schema} value={value} onChange={onChange} path="/sample" onDraftIssue={vi.fn()} />
+          <FieldValueEditor compact={compact} label="sample" schema={schema} value={value} onChange={onChange} path="/sample" onDraftIssue={vi.fn()} />
         </I18nProvider>,
       )
     try {
@@ -347,7 +355,7 @@ it('restores object field display order without reordering or changing the value
   const value = { '1': 'one', '2': 'two', 'extra': 'three' }
   const markup = renderToStaticMarkup(
     <I18nProvider i18n={createI18n('en')}>
-      <ValueEditor
+      <FieldValueEditor
         label="object"
         path="/object"
         schema={{ 'type': 'object', 'ui:order': ['2', 'missing', '2', '1'] }}
@@ -367,7 +375,7 @@ it('uses the inferred runtime type for unconstrained object children', () => {
   const onValue = vi.fn()
   const markup = renderToStaticMarkup(
     <I18nProvider i18n={createI18n('en')}>
-      <ValueEditor
+      <FieldValueEditor
         label="object"
         path="/object"
         schema={{ type: 'object' }}
@@ -387,10 +395,10 @@ it('uses the inferred runtime type for unconstrained object children', () => {
   expect(onValue).not.toHaveBeenCalled()
 })
 
-it('offers to repair a non-nullable array item cleared to null', () => {
+it('shows a non-nullable array null as an invalid stored value', () => {
   const markup = renderToStaticMarkup(
     <I18nProvider i18n={createI18n('en')}>
-      <ValueEditor
+      <FieldValueEditor
         label="items"
         path="/items"
         schema={{ type: 'array', items: { type: 'object', default: { enabled: true } } }}
@@ -400,8 +408,8 @@ it('offers to repair a non-nullable array item cleared to null', () => {
       />
     </I18nProvider>,
   )
-  expect(markup).toContain('aria-label="items.0 Set value"')
-  expect(markup).toContain('>Set value<')
+  expect(markup).toContain('aria-label="items.0 Set value" aria-invalid="true"')
+  expect(markup).toContain('>null</span>')
 })
 
 describe('Lazy schema compilation', () => {
@@ -413,7 +421,7 @@ describe('Lazy schema compilation', () => {
     const render = (value: unknown, nullable = false, invalid = false) =>
       renderToStaticMarkup(
         <I18nProvider i18n={i18n}>
-          <ValueEditor label="sample" compact schema={schema} value={value} nullable={nullable} invalid={invalid} onChange={onChange} />
+          <FieldValueEditor label="sample" compact schema={schema} value={value} nullable={nullable} invalid={invalid} onChange={onChange} />
         </I18nProvider>,
       )
     try {
@@ -437,7 +445,7 @@ describe('Lazy schema compilation', () => {
 const renderFixedValue = (schema: unknown, value: unknown, compact = true, disabled = false) =>
   renderToStaticMarkup(
     <I18nProvider i18n={createI18n('en')}>
-      <ValueEditor
+      <FieldValueEditor
         compact={compact}
         label="fixed"
         schema={schema}
@@ -454,7 +462,7 @@ describe('Fixed schema value presentation', () => {
   it('keeps empty objects expandable and explains the fixed object constraint', () => {
     const fixed = renderFixedValue({ type: 'object', additionalProperties: false }, {})
     expect(fixed).toContain('{}')
-    expect(fixed).toContain('aria-expanded="false"')
+    expect(fixed).toContain('aria-expanded="true"')
     const expandedContent = renderFixedValue({ type: 'object', additionalProperties: false }, {}, false)
     expect(expandedContent).toContain('Empty object only')
     expect(expandedContent).toContain('data-branch="true"')
@@ -463,7 +471,7 @@ describe('Fixed schema value presentation', () => {
     const readOnlyContent = renderFixedValue({ type: 'object', additionalProperties: false }, {}, false, true)
     expect(readOnlyContent).toContain('Empty object')
     expect(readOnlyContent).not.toContain('Empty object only')
-    expect(renderFixedValue({ type: 'object' }, {})).toContain('aria-expanded="false"')
+    expect(renderFixedValue({ type: 'object' }, {})).toContain('aria-expanded="true"')
     expect(renderFixedValue({ type: 'object', additionalProperties: false }, undefined)).toContain('Set value')
   })
   it.each([{ enum: [] }, { type: 'array', uniqueItems: true, items: { enum: [] } }])('does not offer to edit missing fixed options', (schema) => {
@@ -488,7 +496,7 @@ describe('Null editor', () => {
       const render = (value: unknown) =>
         renderWithIssues(
           <I18nProvider i18n={i18n}>
-            <ValueEditor label="sample" schema={{ type: 'null' }} nullable value={value} onChange={onChange} path="/sample" onDraftIssue={vi.fn()} />
+            <FieldValueEditor label="sample" schema={{ type: 'null' }} nullable value={value} onChange={onChange} path="/sample" onDraftIssue={vi.fn()} />
           </I18nProvider>,
         )
       expect(await render('old value')).toContain('old value')
@@ -501,4 +509,92 @@ describe('Null editor', () => {
       i18n.dispose()
     }
   })
+})
+
+describe('Inline null actions', () => {
+  it.each([
+    { type: 'string' },
+    { type: 'number' },
+    { type: 'boolean' },
+    { type: 'object' },
+    { type: 'array', items: { type: 'string' } },
+    { enum: ['one', null] },
+    {},
+  ])('hides clear for both nullable null states under %j without writing', (schema) => {
+    const onChange = vi.fn()
+    const i18n = createI18n('en')
+    try {
+      for (const value of [null, undefined]) {
+        const markup = renderToStaticMarkup(
+          <I18nProvider i18n={i18n}>
+            <FieldValueEditor
+              layout="ports"
+              header={<span>sample</span>}
+              label="sample"
+              schema={schema}
+              value={value}
+              nullable
+              onChange={onChange}
+              path="/sample"
+              onDraftIssue={vi.fn()}
+              hideOptions
+            />
+          </I18nProvider>,
+        )
+        expect(markup).toContain('>null<')
+        expect(markup).not.toContain('aria-label="Clear sample"')
+      }
+      expect(onChange).not.toHaveBeenCalled()
+    } finally {
+      i18n.dispose()
+    }
+  })
+  it('allows clearing an invalid stored null independently of validation', () => {
+    const i18n = createI18n('en')
+    try {
+      const markup = renderToStaticMarkup(
+        <I18nProvider i18n={i18n}>
+          <FieldValueEditor
+            layout="ports"
+            label="sample"
+            schema={{ type: 'number' }}
+            value={null}
+            onChange={vi.fn()}
+            path="/sample"
+            onDraftIssue={vi.fn()}
+            hideOptions
+          />
+        </I18nProvider>,
+      )
+      expect(markup).toContain('aria-label="Clear sample"')
+      expect(markup).toContain('aria-invalid="true"')
+      expect(markup).toContain('>null</span>')
+    } finally {
+      i18n.dispose()
+    }
+  })
+})
+
+it('offers array value sorting under a fixed schema without granting definition editing', () => {
+  const i18n = createI18n('en')
+  try {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={i18n}>
+        <FieldSorting.Provider value>
+          <FieldValueEditor
+            label="items"
+            schema={{ type: 'array', items: { type: 'string' } }}
+            value={['same', 'same']}
+            onChange={vi.fn()}
+            path="/items"
+            onDraftIssue={vi.fn()}
+          />
+        </FieldSorting.Provider>
+      </I18nProvider>,
+    )
+    expect(markup).toContain('aria-label="Reorder items.0"')
+    expect(markup).toContain('aria-label="Reorder items.1"')
+  } finally {
+    i18n.dispose()
+  }
 })

@@ -4,6 +4,7 @@ import type { Group, InputPort, Port } from '../../flow/common/change.ts'
 import { dequal } from 'dequal/lite'
 import { z } from 'zod'
 import { isJsonObject, isJsonValue } from '../../base/common/json.ts'
+import { inputValues } from '../../flow/common/inputValue.ts'
 import { configInputsSchema, resolveTriggerConfig } from './config.ts'
 const maxDefinitionProperties = 512
 const maxDefinitionEnumValues = 256
@@ -207,7 +208,7 @@ export function validateTriggerDefinition(
   label = 'Trigger definition',
 ): void {
   validateTriggerDefinitionSchemas(definition, label)
-  resolveTriggerConfig(definition.configInputs, definition.config)
+  resolveTriggerConfig(definition.configInputs, inputValues(definition.config))
 }
 
 export async function computeTriggerDefinitionDigest(declaration: {

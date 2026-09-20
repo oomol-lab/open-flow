@@ -316,7 +316,7 @@ function runRevision(revision: RevisionContent, triggerId: string): RevisionCont
     return Object.fromEntries(
       Object.entries(mappings).map(([handle, mapping]) => [
         handle,
-        mapping.kind == 'value'
+        mapping.kind != 'sources'
           ? mapping
           : {
               ...mapping,
