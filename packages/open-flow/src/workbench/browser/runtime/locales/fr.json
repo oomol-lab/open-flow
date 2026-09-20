@@ -905,7 +905,7 @@
     "more": "Autres réglages",
     "invalidValues": "Corrigez les paramètres fixes invalides pour enregistrer leurs valeurs.",
     "ports": "Entrées et sortie",
-    "toolsRequired": "Ajoutez au moins un outil avant d’exécuter l’Agent (64 maximum).",
+    "toolsLimit": "Un Agent peut avoir au maximum 64 outils.",
     "execution": "Mode d’exécution",
     "auto": "Exécuter automatiquement",
     "confirm": "Confirmer avant d’exécuter",

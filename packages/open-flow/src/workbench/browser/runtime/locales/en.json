@@ -905,7 +905,7 @@
     "more": "More settings",
     "invalidValues": "Some fixed parameters are invalid. Correct them to save their values.",
     "ports": "Inputs and output",
-    "toolsRequired": "Add at least one tool before running this Agent (up to 64).",
+    "toolsLimit": "An Agent can have at most 64 tools.",
     "execution": "Execution",
     "auto": "Run automatically",
     "confirm": "Confirm before running",

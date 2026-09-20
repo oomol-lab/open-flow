@@ -44,10 +44,10 @@ describe('Workbench Diagnostic messages', () => {
     i18n.dispose()
   })
 
-  it('explains how to finish an Agent without hiding other configuration errors', () => {
+  it('explains the Agent tool limit without hiding other configuration errors', () => {
     const i18n = createI18n('zh-CN')
-    const diagnostic: Diagnostic = { ...base, code: 'agent.config-invalid', message: 'Declare between 1 and 64 Agent tools.' }
-    expect(diagnosticMessage(diagnostic, i18n.t)).toBe('请先添加至少一个工具，再运行 Agent（最多 64 个）。')
+    const diagnostic: Diagnostic = { ...base, code: 'agent.config-invalid', message: 'Declare at most 64 Agent tools.' }
+    expect(diagnosticMessage(diagnostic, i18n.t)).toBe('Agent 最多可配置 64 个工具。')
     expect(diagnosticMessage({ ...diagnostic, message: 'Tool send requires a description.' }, i18n.t)).toBe('Tool send requires a description.')
     i18n.dispose()
   })

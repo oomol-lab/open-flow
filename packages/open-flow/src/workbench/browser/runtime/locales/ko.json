@@ -905,7 +905,7 @@
     "more": "추가 설정",
     "invalidValues": "일부 고정 매개변수가 올바르지 않습니다. 수정하면 저장됩니다.",
     "ports": "입력 및 출력",
-    "toolsRequired": "실행 전에 도구를 하나 이상 추가하세요(최대 64개).",
+    "toolsLimit": "Agent에는 도구를 최대 64개까지 설정할 수 있습니다.",
     "execution": "실행 방식",
     "auto": "자동 실행",
     "confirm": "실행 전 확인",

@@ -178,6 +178,7 @@ Wait 与 Approval 使用同一个等待执行机制，分别提供固定的 `con
 各等待保留独立决议事实，后续等待和 Run terminal 不覆盖旧决议；这些事实不受 RunEvent retention 影响，随 Flow 物理删除清理。
 
 Agent 是根 Flow 中的 Managed Task，拥有显式输入、固定模型、Connector 工具与可选代码计算能力声明。模型不能改变工具 Action、Connection、固定参数或审批策略。
+Connector 工具和代码计算均可不配置；Agent 可以仅根据模型和提示词生成结果，仍须满足声明的输出 schema。Connector 工具最多 64 个。
 Agent 的工具批次串行处理，批准或拒绝只处理该次固定调用。框架 continuation 属于部署私有数据；Run owner 持久化审批等待与通知 work，在安全冻结时保存完整 continuation 和 Scheduler 状态。并行 Agent 的等待独立可决议，框架不拥有另一套 Run 状态机。
 Agent 节点超时累计各次实际执行段，审批与排队不消耗节点预算；Run 总预算独立保留。执行结果不明时终止为不确定失败，不能让模型自动重试。
 

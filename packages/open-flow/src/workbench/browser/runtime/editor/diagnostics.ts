@@ -31,7 +31,7 @@ export function diagnosticNodeId(diagnostic: Diagnostic): string | undefined {
 }
 
 export function diagnosticMessage(diagnostic: Diagnostic, t: TFunction, nodeTitle?: (nodeId: string) => string | undefined): string {
-  if (diagnostic.code == 'agent.config-invalid' && diagnostic.message == 'Declare between 1 and 64 Agent tools.') return t('agent.toolsRequired')
+  if (diagnostic.code == 'agent.config-invalid' && diagnostic.message == 'Declare at most 64 Agent tools.') return t('agent.toolsLimit')
   if (diagnostic.code == 'graph.source-missing' && diagnostic.values?.variant == 'field')
     return t('inspector.sources.fieldMissing', { field: JSON.stringify(diagnostic.values.field), output: diagnostic.values.output })
   if (diagnostic.mismatch != null) {

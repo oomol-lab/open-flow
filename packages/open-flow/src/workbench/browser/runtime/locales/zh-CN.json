@@ -905,7 +905,7 @@
     "more": "更多设置",
     "invalidValues": "部分固定参数填写有误，请修正后保存这些值。",
     "ports": "输入与输出",
-    "toolsRequired": "请先添加至少一个工具，再运行 Agent（最多 64 个）。",
+    "toolsLimit": "Agent 最多可配置 64 个工具。",
     "execution": "执行方式",
     "auto": "自动执行",
     "confirm": "执行前确认",

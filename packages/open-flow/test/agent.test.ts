@@ -540,10 +540,23 @@ it('reserves the saved result reader name for the host', () => {
   expect(agentConfigIssues(task([{ ...tool, name: 'read_result' }]), {}).join(' ')).toContain('reserved')
 })
 
+it('accepts an Agent without tools or code computation', async () => {
+  const agent = task([])
+  expect(agentConfigIssues(agent, {})).toEqual([])
+  const value = revision(agent)
+  expect((await validateFlow(value, findEngineContract(currentEngineContract)!)).diagnostics).toEqual([])
+  expect(decodeRevision(encodeRevision(value))).toEqual(value)
+})
+
+it('accepts 64 tools and rejects 65 tools', () => {
+  const tools = Array.from({ length: 65 }, (_, index) => ({ ...tool, id: `tool-${index}`, name: `tool_${index}` }))
+  expect(agentConfigIssues(task(tools.slice(0, 64)), {})).toEqual([])
+  expect(agentConfigIssues(task(tools), {})).toEqual(['Declare at most 64 Agent tools.'])
+})
+
 it('round trips code capability and permits an Agent without Connector tools', () => {
   const agent = task([])
   if (agent.executor.kind != 'agent') throw new Error('Expected Agent.')
-  expect(agentConfigIssues(agent, {})).not.toEqual([])
   const enabled = { ...agent, executor: { ...agent.executor, code: true } }
   expect(agentConfigIssues(enabled, {})).toEqual([])
   const value = revision(enabled)
