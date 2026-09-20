@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { valueFieldExpansion } from './fieldExpansion.ts'
-import { fieldValueState, setArrayItem } from './fieldValue.ts'
+import { fieldValueShape, fieldValueState, setArrayItem } from './fieldValue.ts'
 import { objectFieldNames, removeFieldDefinition, renameFieldDefinition } from './objectFields.ts'
 
 describe('field presence and actions', () => {
@@ -42,6 +42,23 @@ describe('initial field expansion policy', () => {
   })
   it('opens initial errors, including read-only fields', () => {
     expect(valueFieldExpansion({ expandable: true, editable: false, empty: false, validation: 'invalid' })).toBe(true)
+  })
+})
+
+describe('field value shape', () => {
+  it('uses the inferred editor component as the choice authority', () => {
+    expect(fieldValueShape({ type: 'array', uniqueItems: true, items: { type: 'string' } }, [])).toMatchObject({
+      choiceOptions: undefined,
+      collection: true,
+    })
+    expect(fieldValueShape({ type: 'array', uniqueItems: true, items: { enum: ['one', 'two'] } }, [])).toMatchObject({
+      choiceOptions: ['one', 'two'],
+      collection: false,
+    })
+    expect(fieldValueShape({ 'type': 'array', 'ui:widget': 'multiSelect', 'items': { type: 'string' } }, [])).toMatchObject({
+      choiceOptions: [],
+      collection: false,
+    })
   })
 })
 

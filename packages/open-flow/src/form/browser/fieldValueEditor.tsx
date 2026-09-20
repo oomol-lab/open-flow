@@ -85,11 +85,9 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
   }, [])
   const needsValidation = !draftInvalid && presence === 'value' && props.editor === undefined
   const issues = useValueIssues(schema, value, language, needsValidation)
-  const itemEnumeration = source.uniqueItems === true ? objectValue(source.items)?.enum : undefined
   const showUnset =
     type !== 'boolean' &&
     !enumeration &&
-    !itemEnumeration &&
     !choiceOptions &&
     !complex &&
     !shape.collection &&
@@ -201,7 +199,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
   const emptyCollection = structured && presence !== 'value'
   const needsCreation = emptyCollection || uncreatedText
   const valueSuffix =
-    !nullControl && !expandable && !showUnset && (enumeration || itemEnumeration || source['ui:widget'] === 'color' || isDateFormat(source.format))
+    !nullControl && !expandable && !showUnset && (enumeration || choiceOptions || source['ui:widget'] === 'color' || isDateFormat(source.format))
       ? 26
       : !nullControl && type === 'boolean' && !expandable && !showUnset
         ? 30

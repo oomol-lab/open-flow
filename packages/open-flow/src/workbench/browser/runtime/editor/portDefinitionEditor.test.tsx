@@ -83,6 +83,28 @@ describe('Property panel port layout', () => {
     expect(markup).toContain('message Nullable')
   })
 
+  it('renders unique free-entry arrays separately from multi-select choices', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <PortDefinitionEditor
+          layout="ports"
+          title="Configuration"
+          disabled={false}
+          values={[
+            { handle: 'chatIds', jsonSchema: { type: 'array', uniqueItems: true, items: { type: 'string' } }, nullable: false, value: [] },
+            { handle: 'updates', jsonSchema: { type: 'array', uniqueItems: true, items: { enum: ['message', 'callback'] } }, nullable: false },
+          ]}
+          onChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('aria-label="chatIds type: Array"')
+    expect(markup).toContain('aria-label="chatIds[] type: Text"')
+    expect(markup).toContain('aria-label="updates type: Multi-select"')
+    expect(markup).toContain('aria-label="updates"')
+    expect(markup).toContain('Select values')
+  })
+
   it('keeps output type icons and names visible in the wider output layout', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>

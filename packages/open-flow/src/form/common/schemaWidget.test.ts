@@ -28,6 +28,12 @@ describe('widget value creation', () => {
     expect(getDefaultValue('integer')).toBe(0)
   })
 
+  it('distinguishes unique arrays from multi-select choices', () => {
+    expect(typeOfSchema({ type: 'array', uniqueItems: true, items: { type: 'string' } })).toBe('array')
+    expect(typeOfSchema({ type: 'array', uniqueItems: true, items: { enum: ['one', 'two'] } })).toBe('multiSelect')
+    expect(typeOfSchema({ 'type': 'array', 'ui:widget': 'multiSelect', 'items': { type: 'string' } })).toBe('multiSelect')
+  })
+
   it('creates local date and time strings with the existing offset format', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 8, 9, 15, 4, 5))

@@ -67,8 +67,10 @@ export function typeOfSchema(source: unknown): WidgetType {
     case 'number':
     case 'object':
       return schema.type
-    case 'array':
-      return schema.uniqueItems ? 'multiSelect' : 'array'
+    case 'array': {
+      const itemEnum = objectValue(schema.items)?.enum
+      return schema.uniqueItems === true && Array.isArray(itemEnum) ? 'multiSelect' : 'array'
+    }
     case 'string':
       return isDateFormat(schema.format) ? 'date' : 'string'
     default:

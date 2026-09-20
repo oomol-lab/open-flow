@@ -50,11 +50,8 @@ export function fieldValueShape(schema: unknown, value: unknown, options: { comp
     (options.compactCollection === true && (component === 'object' || component === 'array')) ||
     (options.depth ?? 0) > 12
   const enumeration = Array.isArray(source.enum) ? source.enum : Object.hasOwn(source, 'const') ? [source.const] : undefined
-  const choiceOptions = Array.isArray(source.enum)
-    ? source.enum
-    : source.uniqueItems === true && Array.isArray(objectValue(source.items)?.enum)
-      ? (objectValue(source.items)!.enum as unknown[])
-      : undefined
+  const choices = component === 'multiSelect' ? objectValue(source.items)?.enum : source.enum
+  const choiceOptions = component === 'select' || component === 'multiSelect' ? (Array.isArray(choices) ? choices : []) : undefined
   const collection = !complex && !enumeration && (type === 'object' || (type === 'array' && !choiceOptions))
   const text = type === 'string' && source['ui:widget'] === 'text'
   return { type, complex, enumeration, choiceOptions, collection, text, expandable: collection || complex || text }
