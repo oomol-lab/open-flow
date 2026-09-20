@@ -16,12 +16,14 @@ function AddonSample({
   initial,
   variables,
   fixed,
+  schemaEditable,
   initialVariableName,
 }: {
   schema: JsonValue
   initial: JsonValue | undefined
   variables: InputVariables
   fixed?: boolean
+  schemaEditable?: boolean
   initialVariableName?: string
 }) {
   const [definition, setDefinition] = useState(schema)
@@ -41,10 +43,14 @@ function AddonSample({
       onVariable={setVariableName}
       presentation={{
         header: <span data-field-name>sample</span>,
-        onDefinitionChange: (next, nextValue) => {
-          setDefinition(next as JsonValue)
-          setValue(nextValue as JsonValue | undefined)
-        },
+        ...(schemaEditable
+          ? {
+              onDefinitionChange: (next: unknown, nextValue: unknown) => {
+                setDefinition(next as JsonValue)
+                setValue(nextValue as JsonValue | undefined)
+              },
+            }
+          : {}),
       }}
     />
   )
@@ -286,12 +292,16 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
         <h3>Any data types</h3>
         <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
           <div>
-            <h4>Source + value + type</h4>
+            <h4>Source + value + data type</h4>
             <AddonSample schema={{}} initial="hello" variables={variables} />
           </div>
           <div>
-            <h4>Type + value</h4>
+            <h4>Data type + value</h4>
             <AddonSample fixed schema={{}} initial={42} variables={variables} />
+          </div>
+          <div>
+            <h4>Editable Schema type + JSON</h4>
+            <AddonSample schemaEditable schema={{}} initial={{ answer: 42 }} variables={variables} />
           </div>
           <div>
             <h4>Variable binding</h4>
@@ -357,7 +367,7 @@ export const nodeInputStory: FrontendStory = {
   propertyPanel: true,
   title: 'Node Input',
   description:
-    'Literal, variable and upstream sources, including Any fields with source + value + type, source-free type + value, and bound values without a data-type control. Also covers whole objects, first-level fields, missing references and type mismatches.',
+    'Literal, variable and upstream sources, including fixed-schema Any fields with source + value + data type, source-free data type + value, and bound values without a data-type control. Editable Any Schema types retain the generic JSON editor. Also covers whole objects, first-level fields, missing references and type mismatches.',
   standalone: true,
   render: (log, dark, language) => <NodeInputStory dark={dark} language={language} log={log} />,
 }

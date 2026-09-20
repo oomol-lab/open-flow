@@ -88,13 +88,14 @@ the [property panel entry](property-panel.md) for shared scope.
   editable literal and bound values. Read-only inputs omit the source addon and its reserved space,
   matching Value Node; existing source labels remain visible. The source action stays neutral when the value is invalid; danger
   styling belongs to the value region.
-- An unconstrained Any field adds a compact data-type control inside the Value region. It
+- An unconstrained Any field whose Schema type is fixed adds a compact data-type control inside the Value region. It
   precedes the value when no source addon exists, and follows the value when the editable source
   addon is present, producing `type + value` or `source + value + type` in DOM and visual order.
   Variable and upstream bindings hide the data-type control. An external value suffix retains
   ownership of that slot and suppresses the automatic type control. Disabled value fields show the
   current data type as a non-interactive label. This control describes the stored value only; the
-  table Type column continues to describe Schema presentation.
+  table Type column continues to describe Schema presentation. When that Schema type is editable,
+  Value retains the generic JSON editor and omits the data-type control.
 - A single selected upstream value shows the same node icon used on the canvas, including the
   resolved Provider icon for connector nodes, before the node and output label.
 - A selected Variable value shows the Variable icon before its name, matching the icon used by

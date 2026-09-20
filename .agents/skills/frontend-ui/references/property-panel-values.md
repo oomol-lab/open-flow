@@ -37,11 +37,13 @@ collections, definitions, and field, node, or group settings. Also read the
   annotations and `ui:*` metadata) remains Any while its editor follows the current runtime value.
   `ui:widget: "any"` explicitly selects this behavior; another recognized widget, an assertion,
   applicator, reference, or `false` does not. Do not normalize logically equivalent forms such as
-  `allOf: []` or `not: false` into Any. The data-type selector offers String, Number, Boolean, Object,
-  Array, and Null. Unset displays Any; selecting Any preserves the value and opens the generic JSON
-  editor. A concrete choice creates an initial value when unset. Compatible values survive a type
-  choice; incompatible values use the shared reset rule. Concrete type changes never mutate Schema,
-  and they close raw JSON mode and collapse collection previews.
+  `allOf: []` or `not: false` into Any. When the field's Schema type is fixed, the data-type selector
+  offers String, Number, Boolean, Object, Array, and Null. Unset displays Any; selecting Any preserves
+  the value and opens the generic JSON editor. A concrete choice creates an initial value when unset.
+  Compatible values survive a type choice; incompatible values use the shared reset rule. Concrete
+  type changes never mutate Schema, and they close raw JSON mode and collapse collection previews.
+  When the field's Schema type is editable, an unconstrained Schema retains the established generic
+  JSON editor and does not add a second data-type selector inside Value.
 - Any Object and Array values use the structured collection editors and retain their JSON-mode
   action. Empty top-level collections follow the normal collapsed-empty rule, including automatic
   expansion for an initial validation error. Explicit recognized widgets retain their own editor.

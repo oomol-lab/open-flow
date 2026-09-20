@@ -64,12 +64,15 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
   const id = useId()
   const source = objectValue(schema) ?? {}
   const valueEditable = props.valueEditable !== false
-  const showDataType = isUnconstrainedSchema(schema) && valueEditable && props.valueSuffix == null
+  const unconstrained = isUnconstrainedSchema(schema)
+  const definitionEditable = props.onDefinitionChange != null && !disabled
+  const showDataType = unconstrained && !definitionEditable && valueEditable && props.valueSuffix == null
   const compactValue = props.compact === true || props.header != null || props.valueAddon != null || props.valueSuffix != null || showDataType
   const state = fieldValueState(schema, value, nullable)
   const { presence, missing, invalidNull } = state
   const shape = fieldValueShape(schema, value, { compactCollection: compactValue && props.header == null, objectChild: props.objectChild, depth })
-  const { type, complex, enumeration, choiceOptions } = shape
+  const { type, enumeration, choiceOptions } = shape
+  const complex = shape.complex || (unconstrained && definitionEditable)
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const [raw, setRaw] = useState(false)
   const jsonMode = raw || (showDataType && value === undefined)
@@ -101,7 +104,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
   const array = Array.isArray(value) ? value : []
   const canChooseType = source.type == null || Array.isArray(source.type)
   const availableTypes = Array.isArray(source.type) ? jsonDataTypes.filter((candidate) => (source.type as unknown[]).includes(candidate)) : jsonDataTypes
-  const structured = !jsonMode && shape.collection && props.editor === undefined
+  const structured = !jsonMode && !complex && shape.collection && props.editor === undefined
   const expandable = !showUnset && (structured || (valueEditable && (jsonMode || complex || (type === 'string' && source['ui:widget'] === 'text'))))
   const inlineExpansion = compactValue && props.arrayChild && expandable && !structured
   const expansionPlacement = expandable ? (inlineExpansion ? 'inline' : 'branch') : undefined

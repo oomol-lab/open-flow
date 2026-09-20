@@ -83,6 +83,27 @@ describe('Property panel port layout', () => {
     expect(markup).toContain('message Nullable')
   })
 
+  it('keeps the generic JSON editor when the Any Schema type is editable', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <PortDefinitionEditor
+          layout="ports"
+          disabled={false}
+          expansionPolicy={() => true}
+          values={[{ handle: 'payload', jsonSchema: {}, nullable: false, value: { answer: 42 } }]}
+          onChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    expect(markup).toContain('aria-label="payload type: JSON"')
+    expect(markup).toContain('aria-label="payload JSON"')
+    expect(markup).toContain('&quot;answer&quot;: 42')
+    expect(markup).not.toContain('data type')
+    expect(markup).not.toContain('data-structured')
+    expect(markup).not.toContain('Add field payload')
+  })
+
   it('renders unique free-entry arrays separately from multi-select choices', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>

@@ -14,8 +14,9 @@ is invalid. Insert defaults only when the user explicitly creates a value.
 configuration uses this implementation; its semantics differ from the generic initial-value function
 that reads JSON Schema `default` values.
 It also owns conservative detection of canonical unconstrained Schemas. `FieldValueEditor` consumes
-that result to select an editor from the stored value and to expose a data-type selector; consumers
-must not infer Any independently or rewrite the Schema during data-type changes.
+that result to select an editor from the stored value and, for fixed Schema types, to expose a
+data-type selector. Editable Schema types keep the generic JSON editor. Consumers must not infer Any
+independently or rewrite the Schema during data-type changes.
 
 ## Shared Code Editor
 
