@@ -10,6 +10,7 @@ $wrap-width: 340px;
   --field-actions-gap: 4px;
   --field-name-type-gap: 4px;
   --field-type-value-gap: 4px;
+  --field-value-prefix-gap: 8px;
   --field-value-column: value;
   --field-value-row: 1;
   --field-branch-row: 2;
@@ -23,6 +24,19 @@ $wrap-width: 340px;
     [value] var(--field-value-track) [content-end] var(--field-actions-gap)
     [nullable] var(--field-nullable-width)
     [actions] var(--field-actions-width, 28px) [end];
+
+  // Localized value prefixes use their intrinsic width without moving the shared Name/Type boundaries.
+  &[data-value-prefix] {
+    grid-template-columns:
+      [grip] var(--field-grip-width, 0px)
+      [toggle] var(--field-toggle-width, 24px) var(--field-name-gap)
+      [handle] var(--field-name-track) var(--field-name-type-gap)
+      [type] var(--field-type-track) var(--field-type-value-gap)
+      [value-prefix] max-content var(--field-value-prefix-gap)
+      [value] var(--field-value-track) [content-end] var(--field-actions-gap)
+      [nullable] var(--field-nullable-width)
+      [actions] var(--field-actions-width, 28px) [end];
+  }
 
   &[data-layout='values'],
   &[data-layout='ports'] {
@@ -59,6 +73,17 @@ $wrap-width: 340px;
         [grip] var(--field-grip-width, 0px)
         [toggle] var(--field-toggle-width, 24px) var(--field-name-gap)
         [handle] minmax(0, 1fr) var(--field-name-type-gap)
+        [type] var(--field-type-track) [content-end] var(--field-actions-gap)
+        [nullable] var(--field-nullable-width)
+        [actions] var(--field-actions-width, 28px) [end];
+    }
+    &[data-value-prefix]:not([data-output]) {
+      --field-value-column: value / content-end;
+      grid-template-columns:
+        [grip] var(--field-grip-width, 0px)
+        [toggle] var(--field-toggle-width, 24px) var(--field-name-gap)
+        [handle value-prefix] max-content var(--field-value-prefix-gap)
+        [value] minmax(0, 1fr) var(--field-name-type-gap)
         [type] var(--field-type-track) [content-end] var(--field-actions-gap)
         [nullable] var(--field-nullable-width)
         [actions] var(--field-actions-width, 28px) [end];

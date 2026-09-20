@@ -18,7 +18,6 @@
   --field-value-row: 1;
   --value-addon-width: 28px;
   --value-end-addon-width: 0px;
-  --value-prefix-width: 0px;
   --value-start-addon-width: 0px;
   --field-control-height: 30px;
   --value-editor-feedback-layer: 1;
@@ -282,7 +281,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
   > .summary,
   &:not([data-expansion='branch']) > .body {
     position: relative;
-    margin-left: calc(var(--value-start-addon-width) + var(--value-prefix-width));
+    margin-left: var(--value-start-addon-width);
   }
   &:has(> .summary[aria-expanded='true']) > .valueAddon {
     background: color-mix(in srgb, var(--ui-foreground) 3%, var(--ui-background));
@@ -725,7 +724,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
   grid-row: var(--field-value-row);
 }
 .root[data-value-addon] > .summaryError {
-  margin-left: calc(var(--value-start-addon-width) + var(--value-prefix-width));
+  margin-left: var(--value-start-addon-width);
 }
 .root[data-array-child] > .summaryError {
   grid-column: handle / content-end;
@@ -755,7 +754,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
 }
 
 .valuePrefix {
-  grid-column: var(--field-value-column);
+  grid-column: value-prefix;
   grid-row: var(--field-value-row);
   align-self: start;
   display: flex;
@@ -764,15 +763,13 @@ $feedback-focus: ':has(#{$feedback-targets})';
   color: var(--ui-muted-foreground);
   font-size: 12px;
 }
-.root[data-value-prefix] {
-  --value-prefix-width: 40px;
-  > .valueAddon:not([data-side='end']) {
-    margin-left: var(--value-prefix-width);
-  }
-  > .summary,
-  > .summaryError,
-  &:not([data-expansion='branch']) > .body {
-    margin-left: calc(var(--value-prefix-width) + var(--value-start-addon-width));
+
+@container value-fields (max-width: #{fieldLayout.$wrap-width}) {
+  .root[data-header][data-value-prefix] > .header {
+    [data-field-name],
+    > .fieldName {
+      grid-column: handle / type;
+    }
   }
 }
 
