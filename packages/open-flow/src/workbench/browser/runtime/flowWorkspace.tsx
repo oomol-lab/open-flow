@@ -5,7 +5,7 @@ import type { WorkbenchCanvasHandle } from './editor/workbenchCanvas.tsx'
 
 import { memo, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
-import { useTranslate } from 'val-i18n-react'
+import { useLang, useTranslate } from 'val-i18n-react'
 import { useIgnoredNodes } from '../../../canvas/browser/useIgnoredNodes.ts'
 import { nodeNameIssue } from '../../../flow/common/change.ts'
 import { Empty, EmptyHeader, EmptyTitle } from '../../../ui/browser/empty.tsx'
@@ -100,6 +100,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
 }: Pick<ComponentProps<typeof NodeInspector>, 'focus' | 'disabled' | 'revision' | 'selection' | 'target' | 'theme'> & {
   readonly store: WorkbenchStore
 }): ReactElement {
+  const language = useLang()
   const variableNames = useVal(store.$.variableNames)
   const variableNamesLoaded = useVal(store.$.variableNamesLoaded)
   const variableNamesLoading = useVal(store.$.variableNamesLoading)
@@ -116,7 +117,11 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   const triggerConnectionError = useVal(store.triggers.$.selectedConnectionError)
   const triggerConnectionLoading = useVal(store.triggers.$.connectionLoading)
   const triggerActiveConnections = useVal(store.triggers.$.selectedActiveConnections)
+  const triggerCatalog = useVal(store.triggers.catalog.state)
   const sourceNodeIcons = useVal(store.$.sourceNodeIcons)
+  useEffect(() => {
+    store.triggers.catalog.get()
+  }, [language, store])
   return (
     <NodeInspector
       variables={{
@@ -149,6 +154,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
       triggerConnection={triggerConnection}
       triggerConnectionError={triggerConnectionError}
       triggerConnectionLoading={triggerConnectionLoading != null}
+      triggerDisplays={triggerCatalog.data?.display}
       triggers={store.triggers}
     />
   )

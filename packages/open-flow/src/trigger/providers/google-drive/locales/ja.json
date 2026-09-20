@@ -1,14 +1,48 @@
 {
   "googledrive.changes_detected": {
     "displayName": "変更の検出",
-    "description": "Google Drive の changes.watch チャネルを使用し、ドライブの変更を取得できるようになると実行します。"
+    "description": "Google Drive の changes.watch チャネルを使用し、ドライブの変更を取得できるようになると実行します。",
+    "configInputs": {
+      "driveId": "共有ドライブのID。空欄にすると接続済みアカウントを監視します。",
+      "includeCorpusRemovals": "アイテムが変更対象範囲から外れた際にアクセス可能なファイルリソースを含みます。",
+      "includeItemsFromAllDrives": "マイドライブと共有ドライブのアイテムを含みます。",
+      "includeRemoved": "削除またはアクセス権喪失による変更を含みます。",
+      "pageSize": "1回のFlow Runに含める最大変更件数。",
+      "restrictToMyDrive": "変更をマイドライブの階層に限定します。"
+    },
+    "outputs": {
+      "events": "通知受信時に利用可能なGoogle Driveの変更。"
+    }
   },
   "googledrive.watch_changes": {
     "displayName": "変更の監視",
-    "description": "通知と同じ変更ストリームの定期スキャンでドライブの変更を監視します。"
+    "description": "通知と同じ変更ストリームの定期スキャンでドライブの変更を監視します。",
+    "configInputs": {
+      "driveId": "共有ドライブのID。空欄にすると接続済みアカウントを監視します。",
+      "includeCorpusRemovals": "アイテムが変更対象範囲から外れた際にアクセス可能なファイルリソースを含みます。",
+      "includeItemsFromAllDrives": "マイドライブと共有ドライブのアイテムを含みます。",
+      "includeRemoved": "削除またはアクセス権喪失による変更を含みます。",
+      "pageSize": "1回のFlow Runに含める最大変更件数。",
+      "restrictToMyDrive": "変更をマイドライブの階層に限定します。"
+    },
+    "outputs": {
+      "events": "通知または定期的なスキャンによって観測されたGoogle Driveの変更。"
+    }
   },
   "googledrive.on_file_change": {
     "displayName": "フォルダ直下のファイル・フォルダの変更",
-    "description": "Google Drive の1つのフォルダを定期的に確認し、直下のファイルやフォルダが作成、更新されると実行します。"
+    "description": "Google Drive の1つのフォルダを定期的に確認し、直下のファイルやフォルダが作成、更新されると実行します。",
+    "configInputs": {
+      "changeType": "作成または更新されたアイテムで実行をトリガーするかどうか。",
+      "driveId": "共有ドライブのID。空欄にするとマイドライブを使用します。",
+      "folderId": "監視対象のGoogle DriveフォルダのID。",
+      "itemTypes": "ファイル、フォルダ、または両方を監視するかどうか。",
+      "maxFilesPerPoll": "1回のポーリングで処理する最大変更アイテム数。",
+      "mimeTypes": "指定したMIMEタイプでのみトリガーします。空欄にするとすべてのMIMEタイプを含みます。",
+      "namePrefix": "指定したテキストで始まるアイテムでのみトリガーします。空欄にするとすべての名前を対象とします。"
+    },
+    "outputs": {
+      "events": "前のポーリング以降に作成または更新されたファイルまたはフォルダ。"
+    }
   }
 }

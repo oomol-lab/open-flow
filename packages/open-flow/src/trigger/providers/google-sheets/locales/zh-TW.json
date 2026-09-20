@@ -1,6 +1,19 @@
 {
   "googlesheets.on_row_added": {
     "displayName": "新增列",
-    "description": "輪詢工作表，在上次已知的最後一列下方附加新列時，為每個新列觸發一次。"
+    "description": "輪詢工作表，在上次已知的最後一列下方附加新列時，為每個新列觸發一次。",
+    "configInputs": {
+      "columnRange": "要讀取的 A1 列範圍，例如 A:Z。",
+      "dateTimeRender": "日期和時間值的返回方式。",
+      "firstDataRow": "位於標題下方的第一行數據。",
+      "headerRow": "其單元格成為輸出欄位名稱的行。",
+      "maxRowsPerPoll": "每次輪詢處理的最大新增行數。",
+      "sheet": "要監控的工作表名稱。",
+      "spreadsheetId": "Google 表格電子表格的 ID。",
+      "valueRender": "單元格值的返回方式。"
+    },
+    "outputs": {
+      "events": "自上次輪詢以來追加的行。"
+    }
   }
 }

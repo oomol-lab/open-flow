@@ -1,6 +1,18 @@
 {
   "gmail.on_message_received": {
     "displayName": "Nouveau message reçu",
-    "description": "Interroge périodiquement la boîte Gmail et se déclenche à la réception d’un nouveau message."
+    "description": "Interroge périodiquement la boîte Gmail et se déclenche à la réception d’un nouveau message.",
+    "configInputs": {
+      "includeDrafts": "Déclencher également sur les messages brouillons.",
+      "includeSpamAndTrash": "Déclencher également sur les messages dans les dossiers Spam et Corbeille.",
+      "labelNamesOrIds": "Déclencher uniquement sur les messages portant toutes ces étiquettes, référencées par nom ou ID.",
+      "maxMessagesPerPoll": "Nombre maximal de messages traités par interrogation.",
+      "readStatus": "Déclencher uniquement sur les messages lus, non lus ou les deux.",
+      "search": "Requête de recherche Gmail que chaque message doit respecter.",
+      "sender": "Déclencher uniquement sur les messages dont l'expéditeur correspond à cette adresse ou ce nom."
+    },
+    "outputs": {
+      "events": "Messages reçus depuis la précédente interrogation."
+    }
   }
 }

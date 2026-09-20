@@ -1,6 +1,19 @@
 {
   "googlesheets.on_row_added": {
     "displayName": "新增行",
-    "description": "轮询工作表，在上次已知的末行下方追加新行时，为每个新行触发一次。"
+    "description": "轮询工作表，在上次已知的末行下方追加新行时，为每个新行触发一次。",
+    "configInputs": {
+      "columnRange": "要读取的A1列范围，如A:Z。",
+      "dateTimeRender": "日期和时间值的返回方式。",
+      "firstDataRow": "位于标题下方的第一行数据。",
+      "headerRow": "其单元格将成为输出字段名的行。",
+      "maxRowsPerPoll": "每次轮询处理的新行最大数量。",
+      "sheet": "要监控的工作表名称。",
+      "spreadsheetId": "Google 表格文件的 ID。",
+      "valueRender": "单元格值的返回方式。"
+    },
+    "outputs": {
+      "events": "自上次轮询以来追加的行。"
+    }
   }
 }

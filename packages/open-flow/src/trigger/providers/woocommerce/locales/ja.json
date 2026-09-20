@@ -1,6 +1,19 @@
 {
   "woocommerce.on_store_event": {
     "displayName": "ストアイベント",
-    "description": "選択した WooCommerce ストアイベントが発生すると実行します。"
+    "description": "選択した WooCommerce ストアイベントが発生すると実行します。",
+    "configInputs": {
+      "events": "実行をトリガーするWooCommerceストアイベント。",
+      "webhookName": "WooCommerceに表示されるWebhookの名前。"
+    },
+    "outputs": {
+      "body": "元のWooCommerce Webhookペイロード。",
+      "deliveryId": "一意のWooCommerce Webhook配信ID。",
+      "event": "WooCommerceイベントアクション。",
+      "resource": "WooCommerceリソースタイプ。",
+      "source": "イベントを生成したWooCommerceストアのURL。",
+      "topic": "完全なWooCommerce Webhookトピック。",
+      "webhookId": "WooCommerce WebhookサブスクリプションのID。"
+    }
   }
 }

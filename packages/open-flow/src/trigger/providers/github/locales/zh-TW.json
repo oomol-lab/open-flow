@@ -1,10 +1,30 @@
 {
   "github.on_repo_event": {
     "displayName": "儲存庫事件",
-    "description": "在儲存庫發生所選 GitHub webhook 事件時觸發。"
+    "description": "在儲存庫發生所選 GitHub webhook 事件時觸發。",
+    "configInputs": {
+      "events": "觸發執行的 GitHub 網路鉤子事件。",
+      "insecureSsl": "允許 GitHub 在未驗證 SSL 證書的情況下傳遞網路鉤子。",
+      "owner": "GitHub 倉庫的擁有者。",
+      "repo": "GitHub 倉庫的名稱。"
+    },
+    "outputs": {
+      "body": "原始 GitHub 網絡鉤子載荷。",
+      "deliveryId": "唯一的 GitHub 網絡鉤子交付 ID。",
+      "event": "GitHub 網絡鉤子事件名稱。"
+    }
   },
   "github.watch_pull_request": {
     "displayName": "追蹤提取要求",
-    "description": "透過通知與定期檢查追蹤一個提取要求。從目前狀態開始，回報觀察到的變更，不保證涵蓋每次中間狀態轉換或審查事件。"
+    "description": "透過通知與定期檢查追蹤一個提取要求。從目前狀態開始，回報觀察到的變更，不保證涵蓋每次中間狀態轉換或審查事件。",
+    "configInputs": {
+      "owner": "GitHub 倉庫的擁有者。",
+      "repo": "GitHub 倉庫的名稱。",
+      "number": "要監控的拉取請求編號。"
+    },
+    "outputs": {
+      "pullRequest": "觀察到變更後的當前拉取請求詳情。",
+      "version": "觀察到的拉取請求版本的穩定識別符。"
+    }
   }
 }

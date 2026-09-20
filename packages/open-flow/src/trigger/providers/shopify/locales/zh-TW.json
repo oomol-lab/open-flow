@@ -1,6 +1,18 @@
 {
   "shopify.on_shop_event": {
     "displayName": "商店事件",
-    "description": "在已連線商店發生所選 Shopify webhook 主題對應的事件時觸發。"
+    "description": "在已連線商店發生所選 Shopify webhook 主題對應的事件時觸發。",
+    "configInputs": {
+      "topics": "觸發執行的 Shopify 網絡鉤子主題。"
+    },
+    "outputs": {
+      "apiVersion": "用於網路鉤子的 Shopify API 版本。",
+      "body": "原始 Shopify 網絡鉤子載荷。",
+      "eventId": "唯一的 Shopify 事件 ID。",
+      "shopDomain": "產生事件的 Shopify 商店域名。",
+      "topic": "Shopify 網絡鉤子主題。",
+      "triggeredAt": "Shopify 觸發網路鉤子的時間。",
+      "webhookId": "Shopify 網絡鉤子訂閱的 ID。"
+    }
   }
 }

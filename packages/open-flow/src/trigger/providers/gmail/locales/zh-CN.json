@@ -1,6 +1,18 @@
 {
   "gmail.on_message_received": {
     "displayName": "收到新邮件",
-    "description": "轮询 Gmail 邮箱，在收到新邮件时触发。"
+    "description": "轮询 Gmail 邮箱，在收到新邮件时触发。",
+    "configInputs": {
+      "includeDrafts": "也对草稿消息触发。",
+      "includeSpamAndTrash": "也对垃圾邮件和回收站中的邮件触发。",
+      "labelNamesOrIds": "仅对同时带有这些标签的消息触发，可通过名称或ID引用。",
+      "maxMessagesPerPoll": "每次轮询处理的最大消息数。",
+      "readStatus": "仅对已读、未读消息或两者都触发。",
+      "search": "每封邮件必须匹配的 Gmail 搜索查询。",
+      "sender": "仅对发件人与该地址或名称匹配的消息触发。"
+    },
+    "outputs": {
+      "events": "自上次轮询以来收到的消息。"
+    }
   }
 }

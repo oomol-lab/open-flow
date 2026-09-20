@@ -1,6 +1,19 @@
 {
   "woocommerce.on_store_event": {
     "displayName": "Événement de boutique",
-    "description": "Se déclenche lors des événements de boutique WooCommerce sélectionnés."
+    "description": "Se déclenche lors des événements de boutique WooCommerce sélectionnés.",
+    "configInputs": {
+      "events": "Événements du magasin WooCommerce qui déclenchent une exécution.",
+      "webhookName": "Nom affiché pour le webhook dans WooCommerce."
+    },
+    "outputs": {
+      "body": "Charge utile originale du webhook WooCommerce.",
+      "deliveryId": "ID unique de livraison du webhook WooCommerce.",
+      "event": "Action de l'événement WooCommerce.",
+      "resource": "Type de ressource WooCommerce.",
+      "source": "URL du magasin WooCommerce ayant généré l'événement.",
+      "topic": "Thème complet du webhook WooCommerce.",
+      "webhookId": "ID de l'abonnement au webhook WooCommerce."
+    }
   }
 }

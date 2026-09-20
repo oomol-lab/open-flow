@@ -1,6 +1,17 @@
 {
   "telegram.on_update": {
     "displayName": "Mise à jour du bot",
-    "description": "Se déclenche lorsque le bot Telegram connecté reçoit une mise à jour sélectionnée."
+    "description": "Se déclenche lorsque le bot Telegram connecté reçoit une mise à jour sélectionnée.",
+    "configInputs": {
+      "chatIds": "Accepter uniquement les mises à jour provenant de ces IDs numériques de chats Telegram. Laissez vide pour autoriser tous les chats.",
+      "dropPendingUpdates": "Jeter les mises à jour en attente avant la création ou la reprise du webhook.",
+      "updates": "Types de mise à jour Telegram qui déclenchent une exécution. Utilisez * pour le jeu par défaut de Telegram.",
+      "userIds": "Accepter uniquement les mises à jour provenant de ces IDs numériques d'utilisateurs Telegram. Laissez vide pour autoriser tous les utilisateurs."
+    },
+    "outputs": {
+      "body": "Charge utile originale de la mise à jour Telegram.",
+      "deliveryId": "ID unique généré pour cette mise à jour Telegram.",
+      "event": "Type de mise à jour Telegram."
+    }
   }
 }

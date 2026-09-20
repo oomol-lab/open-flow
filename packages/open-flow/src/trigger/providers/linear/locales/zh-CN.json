@@ -1,6 +1,13 @@
 {
   "linear.on_issue_changed": {
     "displayName": "议题创建或更新",
-    "description": "定期检查 Linear 团队中新建和更新的议题。从现在开始，不触发已有议题。报告观察到的当前状态，不报告删除，也不保证涵盖每次中间状态变化。"
+    "description": "定期检查 Linear 团队中新建和更新的议题。从现在开始，不触发已有议题。报告观察到的当前状态，不报告删除，也不保证涵盖每次中间状态变化。",
+    "configInputs": {
+      "teamId": "Linear团队的UUID。可在Linear中复制模型UUID获取。",
+      "stateIds": "所选团队的状态。留空则涵盖所有状态。匹配当前状态，而非每次进入该状态的转变。"
+    },
+    "outputs": {
+      "events": "自上次轮询以来新建或更新的Linear问题。"
+    }
   }
 }

@@ -12,9 +12,11 @@ describe('Trigger localization', () => {
       const translations = await loadTriggerTranslations(locale)
       expect(Object.keys(translations).toSorted()).toEqual(keys)
       for (const copy of Object.values(translations)) {
-        expect(Object.keys(copy).toSorted()).toEqual(['description', 'displayName'])
+        expect(Object.keys(copy).toSorted()).toEqual(['configInputs', 'description', 'displayName', 'outputs'])
         expect(copy.description?.trim().length).toBeGreaterThan(0)
         expect(copy.displayName?.trim().length).toBeGreaterThan(0)
+        expect(Object.values(copy.configInputs ?? {}).every((description) => description.trim().length > 0)).toBe(true)
+        expect(Object.values(copy.outputs ?? {}).every((description) => description.trim().length > 0)).toBe(true)
       }
     }
   })
@@ -25,8 +27,12 @@ describe('Trigger localization', () => {
     expect((await localizeTrigger(snapshot, 'zh-CN')).displayName).not.toBe(snapshot.displayName)
     expect(snapshot).toEqual(before)
     expect(await localizeTrigger({ ...snapshot, key: 'custom.trigger' }, 'zh-CN')).toEqual({
+      configInputs: Object.fromEntries(
+        snapshot.configInputs.flatMap((field) => ('handle' in field && field.description != null ? [[field.handle, field.description]] : [])),
+      ),
       displayName: snapshot.displayName,
       description: snapshot.description,
+      outputs: Object.fromEntries(snapshot.outputs.flatMap((field) => (field.description == null ? [] : [[field.handle, field.description]]))),
     })
   })
 

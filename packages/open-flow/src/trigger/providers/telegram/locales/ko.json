@@ -1,6 +1,17 @@
 {
   "telegram.on_update": {
     "displayName": "봇 업데이트",
-    "description": "연결된 Telegram 봇이 선택한 업데이트를 받으면 실행합니다."
+    "description": "연결된 Telegram 봇이 선택한 업데이트를 받으면 실행합니다.",
+    "configInputs": {
+      "chatIds": "이러한 숫자 Telegram 채팅 ID의 업데이트만 수락합니다. 모든 채팅을 허용하려면 비워 두세요.",
+      "dropPendingUpdates": "웹훅 생성 또는 재개 전에 대기 중이던 업데이트를 삭제합니다.",
+      "updates": "실행을 트리거하는 Telegram 업데이트 유형. Telegram 기본 설정은 '*'로 표시됩니다.",
+      "userIds": "이러한 숫자 Telegram 사용자 ID의 업데이트만 수락합니다. 모든 사용자를 허용하려면 비워 두세요."
+    },
+    "outputs": {
+      "body": "원본 Telegram 업데이트 페이로드.",
+      "deliveryId": "이 Telegram 업데이트에 대해 생성된 고유 ID.",
+      "event": "Telegram 업데이트 유형."
+    }
   }
 }

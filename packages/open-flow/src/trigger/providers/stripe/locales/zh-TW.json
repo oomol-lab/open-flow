@@ -1,6 +1,17 @@
 {
   "stripe.on_event": {
     "displayName": "帳戶事件",
-    "description": "在已連線帳戶發生所選 Stripe 事件時觸發。"
+    "description": "在已連線帳戶發生所選 Stripe 事件時觸發。",
+    "configInputs": {
+      "apiVersion": "用於網路鉤子事件的 Stripe API 版本。留空則使用帳戶預設。",
+      "events": "觸發執行的 Stripe 事件類型。",
+      "includeConnectedAccounts": "也接收來自連結 Stripe 帳戶的事件。"
+    },
+    "outputs": {
+      "body": "原始 Stripe 事件載荷。",
+      "event": "Stripe 事件類型。",
+      "eventId": "唯一的 Stripe 事件 ID。",
+      "livemode": "事件是否在實時模式下創建。"
+    }
   }
 }

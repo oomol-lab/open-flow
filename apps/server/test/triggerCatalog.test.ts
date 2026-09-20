@@ -29,6 +29,12 @@ describe('Trigger catalog HTTP representations', () => {
     expect(first.headers.get('cache-control')).toBe('private, no-cache')
     expect(body.definitions).toEqual(triggerDefinitions.map(({ snapshot }) => snapshot))
     expect(body.display[body.definitions[0].key].displayName).not.toBe(body.definitions[0].displayName)
+    expect(Object.keys(body.display[body.definitions[0].key].configInputs).toSorted()).toEqual(
+      body.definitions[0].configInputs.flatMap((field: { handle?: string }) => (field.handle == null ? [] : [field.handle])).toSorted(),
+    )
+    expect(Object.keys(body.display[body.definitions[0].key].outputs).toSorted()).toEqual(
+      body.definitions[0].outputs.map((field: { handle: string }) => field.handle).toSorted(),
+    )
     const etag = first.headers.get('etag')!
     expect(etag).toBeTruthy()
     const next = await app.request('/trigger-keys/catalog?locale=zh-CN', { headers: { 'if-none-match': etag } })

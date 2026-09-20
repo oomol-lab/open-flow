@@ -1,6 +1,18 @@
 {
   "airtable.on_record_changed": {
     "displayName": "记录创建或更新",
-    "description": "轮询 Airtable 表，按时间字段排序，在记录创建或更新时触发。"
+    "description": "轮询 Airtable 表，按时间字段排序，在记录创建或更新时触发。",
+    "configInputs": {
+      "baseId": "要监控的 Airtable Base ID。",
+      "fields": "每条返回记录包含的字段。留空则包含所有字段。",
+      "formula": "用于筛选记录的 Airtable 公式。留空则包含所有记录。",
+      "maxRecordsPerPoll": "每次轮询处理的最大记录数。",
+      "tableIdOrName": "要监控的 Airtable 表 ID 或名称。",
+      "triggerField": "用于检测新建或更新记录的日期/时间字段。",
+      "view": "用于筛选和排序记录的 Airtable 视图。留空则使用表的默认视图。"
+    },
+    "outputs": {
+      "events": "自上次轮询以来新建或更新的记录。"
+    }
   }
 }

@@ -1,6 +1,18 @@
 {
   "airtable.on_record_changed": {
     "displayName": "Création ou mise à jour d’un enregistrement",
-    "description": "Interroge périodiquement une table Airtable et se déclenche à la création ou à la mise à jour d’un enregistrement, dans l’ordre d’un champ temporel."
+    "description": "Interroge périodiquement une table Airtable et se déclenche à la création ou à la mise à jour d’un enregistrement, dans l’ordre d’un champ temporel.",
+    "configInputs": {
+      "baseId": "ID de la base Airtable à surveiller.",
+      "fields": "Champs à inclure dans chaque enregistrement retourné. Laissez vide pour inclure tous les champs.",
+      "formula": "Formule Airtable utilisée pour filtrer les enregistrements. Laissez vide pour inclure tous les enregistrements.",
+      "maxRecordsPerPoll": "Nombre maximal d'enregistrements traités par interrogation.",
+      "tableIdOrName": "ID ou nom de la table Airtable à surveiller.",
+      "triggerField": "Champ de date ou d'heure utilisé pour détecter les enregistrements créés ou mis à jour.",
+      "view": "Vue Airtable utilisée pour filtrer et trier les enregistrements. Laissez vide pour utiliser la vue par défaut de la table."
+    },
+    "outputs": {
+      "events": "Enregistrements créés ou mis à jour depuis la précédente interrogation."
+    }
   }
 }

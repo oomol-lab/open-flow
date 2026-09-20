@@ -1,6 +1,15 @@
 {
   "googlecalendar.on_event_changed": {
     "displayName": "日历事件变更",
-    "description": "轮询 Google 日历，在事件创建、更新或取消时触发。"
+    "description": "轮询 Google 日历，在事件创建、更新或取消时触发。",
+    "configInputs": {
+      "calendarId": "要监控的Google日历ID。",
+      "changes": "触发运行的日历事件变更。",
+      "matchTerm": "事件摘要、描述、地点或参与者中必须出现的文本。留空则匹配所有事件。",
+      "maxEventsPerPoll": "每次轮询处理的最大日历事件数。"
+    },
+    "outputs": {
+      "events": "自上次轮询以来新建、更新或取消的日历事件。"
+    }
   }
 }

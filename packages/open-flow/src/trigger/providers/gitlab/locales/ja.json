@@ -1,6 +1,18 @@
 {
   "gitlab.on_project_event": {
     "displayName": "プロジェクトイベント",
-    "description": "プロジェクトで選択した GitLab webhook イベントが発生すると実行します。"
+    "description": "プロジェクトで選択した GitLab webhook イベントが発生すると実行します。",
+    "configInputs": {
+      "events": "実行をトリガーするGitLabプロジェクトイベント。",
+      "insecureSsl": "GitLabがSSL証明書の検証なしでWebhookを配信することを許可します。",
+      "project": "プロジェクトの数値IDまたはURLエンコード済みパス。",
+      "pushBranchFilter": "プッシュイベントをフィルタリングするために使用するブランチまたはワイルドカードパターン。空欄にするとすべてのブランチを含みます。"
+    },
+    "outputs": {
+      "body": "元のGitLab Webhookペイロード。",
+      "deliveryId": "このWebhook配信用に生成された一意のID。",
+      "event": "正規化されたGitLabイベント名。",
+      "gitlabEvent": "元のGitLabイベントヘッダー値。"
+    }
   }
 }

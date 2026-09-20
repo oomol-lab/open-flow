@@ -1,6 +1,19 @@
 {
   "woocommerce.on_store_event": {
     "displayName": "商店事件",
-    "description": "在發生所選 WooCommerce 商店事件時觸發。"
+    "description": "在發生所選 WooCommerce 商店事件時觸發。",
+    "configInputs": {
+      "events": "觸發執行的 WooCommerce 商店事件。",
+      "webhookName": "在 WooCommerce 中顯示的網路鉤子名稱。"
+    },
+    "outputs": {
+      "body": "原始 WooCommerce 網絡鉤子載荷。",
+      "deliveryId": "唯一的 WooCommerce 網絡鉤子交付 ID。",
+      "event": "WooCommerce 事件動作。",
+      "resource": "WooCommerce 資源類型。",
+      "source": "產生事件的 WooCommerce 商店 URL。",
+      "topic": "完整的 WooCommerce 網絡鉤子主題。",
+      "webhookId": "WooCommerce 網絡鉤子訂閱的 ID。"
+    }
   }
 }

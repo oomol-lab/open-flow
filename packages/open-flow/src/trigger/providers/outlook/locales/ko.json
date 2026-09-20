@@ -1,6 +1,18 @@
 {
   "outlook.on_message_received": {
     "displayName": "새 메일 수신",
-    "description": "Microsoft Outlook 메일 폴더를 주기적으로 확인하고 새 메일이 도착하면 실행합니다."
+    "description": "Microsoft Outlook 메일 폴더를 주기적으로 확인하고 새 메일이 도착하면 실행합니다.",
+    "configInputs": {
+      "folder": "잘 알려진 메일 폴더 이름, 폴더 ID 또는 전체 사서함을 위한 빈 값.",
+      "includeDrafts": "초안 메시지도 트리거합니다.",
+      "maxMessagesPerPoll": "각 폴링에서 처리할 최대 메시지 수.",
+      "readStatus": "읽은 메시지, 읽지 않은 메시지 또는 둘 다에서만 트리거합니다.",
+      "senderAddress": "정확한 발신자 주소. 모든 발신자를 허용하려면 비워 두세요.",
+      "subjectContains": "메시지 제목에 반드시 나타나야 하는 대소문자 구분 없는 텍스트.",
+      "withAttachmentsOnly": "첨부 파일이 있는 메시지에서만 트리거합니다."
+    },
+    "outputs": {
+      "events": "이전 폴링 이후 수신된 Outlook 메시지."
+    }
   }
 }

@@ -1,6 +1,15 @@
 {
   "zendesk.on_event": {
     "displayName": "事件訂閱",
-    "description": "在發生任一所選 Zendesk 帳戶事件時觸發。"
+    "description": "在發生任一所選 Zendesk 帳戶事件時觸發。",
+    "configInputs": {
+      "events": "觸發執行的 Zendesk 事件類型。"
+    },
+    "outputs": {
+      "body": "原始 Zendesk 事件載荷。",
+      "deliveryId": "為本次 Zendesk 事件交付生成的唯一 ID。",
+      "event": "Zendesk 事件類型。",
+      "subject": "與事件相關聯的 Zendesk 主題。"
+    }
   }
 }

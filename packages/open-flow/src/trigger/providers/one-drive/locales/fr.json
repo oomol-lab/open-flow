@@ -1,6 +1,16 @@
 {
   "one_drive.on_item_changed": {
     "displayName": "Modification d’un fichier ou dossier",
-    "description": "Interroge périodiquement le flux de modifications OneDrive et se déclenche à la création, à la modification ou à la suppression d’un fichier ou dossier."
+    "description": "Interroge périodiquement le flux de modifications OneDrive et se déclenche à la création, à la modification ou à la suppression d’un fichier ou dossier.",
+    "configInputs": {
+      "events": "Changements d'élément OneDrive qui déclenchent une exécution.",
+      "itemId": "Surveiller uniquement cet ID de fichier ou de dossier. Laissez vide pour surveiller plusieurs éléments.",
+      "itemTypes": "Surveiller les fichiers, les dossiers ou les deux.",
+      "maxItemsPerPoll": "Nombre maximal d'éléments modifiés traités par interrogation.",
+      "parentFolderId": "Surveiller uniquement les éléments de ce dossier parent. Laissez vide pour surveiller tout le lecteur."
+    },
+    "outputs": {
+      "events": "Éléments OneDrive créés, mis à jour ou supprimés depuis la précédente interrogation."
+    }
   }
 }

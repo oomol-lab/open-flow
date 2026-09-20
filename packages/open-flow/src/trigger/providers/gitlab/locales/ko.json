@@ -1,6 +1,18 @@
 {
   "gitlab.on_project_event": {
     "displayName": "프로젝트 이벤트",
-    "description": "프로젝트에서 선택한 GitLab webhook 이벤트가 발생하면 실행합니다."
+    "description": "프로젝트에서 선택한 GitLab webhook 이벤트가 발생하면 실행합니다.",
+    "configInputs": {
+      "events": "실행을 트리거하는 GitLab 프로젝트 이벤트.",
+      "insecureSsl": "GitLab이 SSL 인증서 검증 없이 웹훅을 전송하도록 허용합니다.",
+      "project": "숫자 프로젝트 ID 또는 URL 인코딩된 프로젝트 경로.",
+      "pushBranchFilter": "푸시 이벤트를 필터링하는 브랜치 또는 와일드카드 패턴. 모든 브랜치를 포함하려면 비워 두세요."
+    },
+    "outputs": {
+      "body": "원본 GitLab 웹훅 페이로드.",
+      "deliveryId": "이 웹훅 배달에 대해 생성된 고유 ID.",
+      "event": "정규화된 GitLab 이벤트 이름.",
+      "gitlabEvent": "원본 GitLab 이벤트 헤더 값."
+    }
   }
 }

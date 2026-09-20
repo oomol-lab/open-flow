@@ -1,6 +1,18 @@
 {
   "slack.on_message_posted": {
     "displayName": "Nouveau message de canal",
-    "description": "Interroge périodiquement une conversation Slack et se déclenche à la publication d’un nouveau message."
+    "description": "Interroge périodiquement une conversation Slack et se déclenche à la publication d’un nouveau message.",
+    "configInputs": {
+      "channelId": "ID de conversation Slack à surveiller, par exemple C0122KQ70S7E.",
+      "fromUserIds": "Déclencher uniquement sur les messages provenant de ces IDs d'utilisateurs Slack. Laissez vide pour autoriser tout auteur.",
+      "ignoreUserIds": "Ne jamais déclencher sur les messages provenant de ces IDs d'utilisateurs Slack.",
+      "includeBotMessages": "Déclencher également sur les messages publiés par les bots et les applications.",
+      "includeSystemMessages": "Déclencher également sur les avis système Slack.",
+      "maxMessagesPerPoll": "Nombre maximal de messages traités par interrogation.",
+      "textContains": "Déclencher uniquement lorsque le texte du message contient cette chaîne, sans tenir compte de la casse."
+    },
+    "outputs": {
+      "events": "Messages Slack postés depuis la précédente interrogation."
+    }
   }
 }

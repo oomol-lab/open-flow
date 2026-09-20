@@ -1,6 +1,17 @@
 {
   "stripe.on_event": {
     "displayName": "Événement de compte",
-    "description": "Se déclenche lors des événements Stripe sélectionnés sur le compte connecté."
+    "description": "Se déclenche lors des événements Stripe sélectionnés sur le compte connecté.",
+    "configInputs": {
+      "apiVersion": "Version API Stripe utilisée pour les événements webhook. Laissez vide pour utiliser la valeur par défaut du compte.",
+      "events": "Types d'événements Stripe qui déclenchent une exécution.",
+      "includeConnectedAccounts": "Recevoir également les événements des comptes Stripe connectés."
+    },
+    "outputs": {
+      "body": "Charge utile originale de l'événement Stripe.",
+      "event": "Type d'événement Stripe.",
+      "eventId": "ID unique de l'événement Stripe.",
+      "livemode": "Indique si l'événement a été créé en mode de production."
+    }
   }
 }

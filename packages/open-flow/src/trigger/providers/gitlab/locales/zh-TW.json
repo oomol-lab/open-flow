@@ -1,6 +1,18 @@
 {
   "gitlab.on_project_event": {
     "displayName": "專案事件",
-    "description": "在專案發生所選 GitLab webhook 事件時觸發。"
+    "description": "在專案發生所選 GitLab webhook 事件時觸發。",
+    "configInputs": {
+      "events": "觸發執行的 GitLab 項目事件。",
+      "insecureSsl": "允許 GitLab 在未驗證 SSL 證書的情況下傳遞網路鉤子。",
+      "project": "項目的數字 ID 或 URL 編碼的項目路徑。",
+      "pushBranchFilter": "用於過濾推送事件的分支或通配符模式。留空則包含所有分支。"
+    },
+    "outputs": {
+      "body": "原始 GitLab 網絡鉤子載荷。",
+      "deliveryId": "為本次網絡鉤子交付生成的唯一 ID。",
+      "event": "規範化的 GitLab 事件名稱。",
+      "gitlabEvent": "原始 GitLab 事件頭部值。"
+    }
   }
 }

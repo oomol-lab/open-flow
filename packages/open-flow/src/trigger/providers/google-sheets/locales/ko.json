@@ -1,6 +1,19 @@
 {
   "googlesheets.on_row_added": {
     "displayName": "새 행 추가",
-    "description": "시트를 주기적으로 확인하고 마지막으로 확인한 행 아래에 추가된 새 행마다 한 번 실행합니다."
+    "description": "시트를 주기적으로 확인하고 마지막으로 확인한 행 아래에 추가된 새 행마다 한 번 실행합니다.",
+    "configInputs": {
+      "columnRange": "A1 열 범위(예: A:Z)를 읽습니다.",
+      "dateTimeRender": "날짜 및 시간 값을 반환하는 방식.",
+      "firstDataRow": "헤더 아래 데이터가 포함된 첫 번째 행.",
+      "headerRow": "셀이 출력 필드 이름이 되는 행.",
+      "maxRowsPerPoll": "각 폴링에서 처리할 최대 신규 행 수.",
+      "sheet": "모니터링할 워크시트 이름.",
+      "spreadsheetId": "Google 스프레드시트 ID.",
+      "valueRender": "셀 값을 반환하는 방식."
+    },
+    "outputs": {
+      "events": "이전 폴링 이후 추가된 행."
+    }
   }
 }

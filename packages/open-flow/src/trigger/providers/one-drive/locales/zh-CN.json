@@ -1,6 +1,16 @@
 {
   "one_drive.on_item_changed": {
     "displayName": "文件或文件夹变更",
-    "description": "轮询 OneDrive 变更流，在文件或文件夹创建、更新或删除时触发。"
+    "description": "轮询 OneDrive 变更流，在文件或文件夹创建、更新或删除时触发。",
+    "configInputs": {
+      "events": "触发运行的OneDrive项目变更。",
+      "itemId": "仅监控此文件或文件夹ID。留空则监控多个项目。",
+      "itemTypes": "监控文件、文件夹还是两者。",
+      "maxItemsPerPoll": "每次轮询处理的最大变更项目数。",
+      "parentFolderId": "仅监控此父文件夹中的项目。留空则监控整个驱动器。"
+    },
+    "outputs": {
+      "events": "自上次轮询以来创建、更新或删除的OneDrive项目。"
+    }
   }
 }

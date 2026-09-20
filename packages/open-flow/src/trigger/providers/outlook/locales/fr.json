@@ -1,6 +1,18 @@
 {
   "outlook.on_message_received": {
     "displayName": "Nouveau message reçu",
-    "description": "Interroge périodiquement un dossier de courrier Microsoft Outlook et se déclenche à l’arrivée d’un nouveau message."
+    "description": "Interroge périodiquement un dossier de courrier Microsoft Outlook et se déclenche à l’arrivée d’un nouveau message.",
+    "configInputs": {
+      "folder": "Nom connu du dossier de messagerie, ID du dossier ou valeur vide pour toute la boîte aux lettres.",
+      "includeDrafts": "Déclencher également sur les messages brouillons.",
+      "maxMessagesPerPoll": "Nombre maximal de messages traités par interrogation.",
+      "readStatus": "Déclencher uniquement sur les messages lus, non lus ou les deux.",
+      "senderAddress": "Adresse exacte de l'expéditeur. Laissez vide pour autoriser tout expéditeur.",
+      "subjectContains": "Texte insensible à la casse devant apparaître dans l'objet du message.",
+      "withAttachmentsOnly": "Déclencher uniquement sur les messages comportant des pièces jointes."
+    },
+    "outputs": {
+      "events": "Messages Outlook reçus depuis la précédente interrogation."
+    }
   }
 }

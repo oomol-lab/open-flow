@@ -1,6 +1,18 @@
 {
   "shopify.on_shop_event": {
     "displayName": "商店事件",
-    "description": "在已连接商店发生所选 Shopify webhook 主题对应的事件时触发。"
+    "description": "在已连接商店发生所选 Shopify webhook 主题对应的事件时触发。",
+    "configInputs": {
+      "topics": "触发运行的Shopify Webhook主题。"
+    },
+    "outputs": {
+      "apiVersion": "用于Webhook的Shopify API版本。",
+      "body": "原始Shopify Webhook负载。",
+      "eventId": "唯一的Shopify事件ID。",
+      "shopDomain": "产生事件的Shopify店铺域名。",
+      "topic": "Shopify Webhook主题。",
+      "triggeredAt": "Shopify触发Webhook的时间。",
+      "webhookId": "Shopify Webhook订阅的ID。"
+    }
   }
 }

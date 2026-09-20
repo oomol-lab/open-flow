@@ -1,10 +1,30 @@
 {
   "github.on_repo_event": {
     "displayName": "リポジトリイベント",
-    "description": "リポジトリで選択した GitHub webhook イベントが発生すると実行します。"
+    "description": "リポジトリで選択した GitHub webhook イベントが発生すると実行します。",
+    "configInputs": {
+      "events": "実行をトリガーするGitHubのWebhookイベント。",
+      "insecureSsl": "GitHubがSSL証明書の検証なしでWebhookを配信することを許可します。",
+      "owner": "GitHubリポジトリの所有者。",
+      "repo": "GitHubリポジトリの名前。"
+    },
+    "outputs": {
+      "body": "元のGitHub Webhookペイロード。",
+      "deliveryId": "一意のGitHub Webhook配信ID。",
+      "event": "GitHub Webhookイベント名。"
+    }
   },
   "github.watch_pull_request": {
     "displayName": "プルリクエストの監視",
-    "description": "通知と定期チェックで1件のプルリクエストを監視します。現在の状態から開始し、観測した変更を報告します。途中の状態遷移やレビューイベントをすべて報告するとは限りません。"
+    "description": "通知と定期チェックで1件のプルリクエストを監視します。現在の状態から開始し、観測した変更を報告します。途中の状態遷移やレビューイベントをすべて報告するとは限りません。",
+    "configInputs": {
+      "owner": "GitHubリポジトリの所有者。",
+      "repo": "GitHubリポジトリの名前。",
+      "number": "監視するプルリクエストの番号。"
+    },
+    "outputs": {
+      "pullRequest": "観測された変更後の現在のプルリクエストの詳細。",
+      "version": "観測されたプルリクエストのバージョンを示す安定した識別子。"
+    }
   }
 }

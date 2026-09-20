@@ -132,8 +132,10 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
         locale: language,
         display: {
           'github.on_repo_event': {
+            configInputs: {},
             displayName: language == 'en' ? 'Repository event' : '仓库事件',
             description: language == 'en' ? 'Runs when a repository changes.' : '仓库变更时运行。',
+            outputs: { payload: language == 'en' ? 'Repository event payload.' : '仓库事件负载。' },
           },
         },
         definitions: [
@@ -154,7 +156,7 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
             type: 'integration',
           },
         ],
-        version: 1,
+        version: 2,
       })
     }
     throw new Error(`Unexpected request: ${path}`)

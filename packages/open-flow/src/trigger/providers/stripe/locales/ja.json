@@ -1,6 +1,17 @@
 {
   "stripe.on_event": {
     "displayName": "アカウントイベント",
-    "description": "接続したアカウントで選択した Stripe イベントが発生すると実行します。"
+    "description": "接続したアカウントで選択した Stripe イベントが発生すると実行します。",
+    "configInputs": {
+      "apiVersion": "Webhookイベントに使用されるStripe APIバージョン。空欄にするとアカウントのデフォルトを使用します。",
+      "events": "実行をトリガーするStripeのイベントタイプ。",
+      "includeConnectedAccounts": "連携したStripeアカウントからのイベントも受信します。"
+    },
+    "outputs": {
+      "body": "元のStripeイベントペイロード。",
+      "event": "Stripeイベントタイプ。",
+      "eventId": "一意のStripeイベントID。",
+      "livemode": "ライブモードで作成されたイベントかどうか。"
+    }
   }
 }

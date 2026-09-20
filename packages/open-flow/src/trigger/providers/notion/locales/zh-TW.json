@@ -1,6 +1,16 @@
 {
   "notion.on_database_page_event": {
     "displayName": "資料庫頁面新增或更新",
-    "description": "輪詢 Notion 資料庫，在新增頁面或編輯現有頁面時觸發。"
+    "description": "輪詢 Notion 資料庫，在新增頁面或編輯現有頁面時觸發。",
+    "configInputs": {
+      "dataSourceId": "資料庫內的資料來源 ID。留空則使用主資料來源。",
+      "databaseId": "要監控的 Notion 資料庫 ID。",
+      "events": "觸發執行的頁面變更。",
+      "includeProperties": "在每個輸出事件中包含頁面屬性。",
+      "maxItemsPerPoll": "每次輪詢處理的最大變更頁面數。"
+    },
+    "outputs": {
+      "events": "自上次輪詢以來新增或更新的資料庫頁面。"
+    }
   }
 }

@@ -29,7 +29,7 @@ function Sample({
     const data = async (count: number) => {
       const definitions = snapshots.slice(0, count)
       return {
-        version: 1,
+        version: 2,
         locale: language,
         definitions,
         display: Object.fromEntries(await Promise.all(definitions.map(async (definition) => [definition.key, await localizeTrigger(definition, language)]))),

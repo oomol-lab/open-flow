@@ -1,6 +1,18 @@
 {
   "gmail.on_message_received": {
     "displayName": "新着メール",
-    "description": "Gmail のメールボックスを定期的に確認し、新しいメールを受信すると実行します。"
+    "description": "Gmail のメールボックスを定期的に確認し、新しいメールを受信すると実行します。",
+    "configInputs": {
+      "includeDrafts": "下書きメッセージでもトリガーします。",
+      "includeSpamAndTrash": "スパムとゴミ箱のメッセージでもトリガーします。",
+      "labelNamesOrIds": "指定したラベルをすべて持つメッセージでのみトリガーします（名前またはIDで指定）。",
+      "maxMessagesPerPoll": "1回のポーリングで処理する最大メッセージ数。",
+      "readStatus": "既読メッセージ、未読メッセージ、または両方でのみトリガーします。",
+      "search": "各メッセージが一致する必要のあるGmailの検索クエリ。",
+      "sender": "指定したアドレスまたは名前の送信者からのメッセージでのみトリガーします。"
+    },
+    "outputs": {
+      "events": "前のポーリング以降に受信したメッセージ。"
+    }
   }
 }

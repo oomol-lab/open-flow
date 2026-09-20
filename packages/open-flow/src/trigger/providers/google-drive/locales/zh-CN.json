@@ -1,14 +1,48 @@
 {
   "googledrive.changes_detected": {
     "displayName": "检测到变更",
-    "description": "使用 Google Drive changes.watch 通道，在有云端硬盘变更可用时触发。"
+    "description": "使用 Google Drive changes.watch 通道，在有云端硬盘变更可用时触发。",
+    "configInputs": {
+      "driveId": "共享驱动器ID。留空则监控已连接账户。",
+      "includeCorpusRemovals": "当某项离开变更范围时包含其可访问的文件资源。",
+      "includeItemsFromAllDrives": "包含“我的云端硬盘”及共享驱动器中的项目。",
+      "includeRemoved": "包含因删除或失去访问权限导致的变更。",
+      "pageSize": "一次Flow运行中包含的最大变更数。",
+      "restrictToMyDrive": "将变更限制在“我的云端硬盘”层级内。"
+    },
+    "outputs": {
+      "events": "收到通知时可用的Google云端硬盘变更。"
+    }
   },
   "googledrive.watch_changes": {
     "displayName": "关注变更",
-    "description": "通过通知和对同一变更流的定期扫描监控云端硬盘变更。"
+    "description": "通过通知和对同一变更流的定期扫描监控云端硬盘变更。",
+    "configInputs": {
+      "driveId": "共享驱动器ID。留空则监控已连接账户。",
+      "includeCorpusRemovals": "当某项离开变更范围时包含其可访问的文件资源。",
+      "includeItemsFromAllDrives": "包含“我的云端硬盘”及共享驱动器中的项目。",
+      "includeRemoved": "包含因删除或失去访问权限导致的变更。",
+      "pageSize": "一次Flow运行中包含的最大变更数。",
+      "restrictToMyDrive": "将变更限制在“我的云端硬盘”层级内。"
+    },
+    "outputs": {
+      "events": "通过通知或定期扫描观察到的Google云端硬盘变更。"
+    }
   },
   "googledrive.on_file_change": {
     "displayName": "文件夹内的文件或文件夹变更",
-    "description": "轮询一个 Google Drive 文件夹，在其直属文件或文件夹创建或更新时触发。"
+    "description": "轮询一个 Google Drive 文件夹，在其直属文件或文件夹创建或更新时触发。",
+    "configInputs": {
+      "changeType": "新建或更新的项目是否触发运行。",
+      "driveId": "共享驱动器ID。留空则使用“我的云端硬盘”。",
+      "folderId": "要监控的Google云端硬盘文件夹ID。",
+      "itemTypes": "监控文件、文件夹还是两者。",
+      "maxFilesPerPoll": "每次轮询处理的最大变更项目数。",
+      "mimeTypes": "仅对这些MIME类型触发。留空则包含所有MIME类型。",
+      "namePrefix": "仅对名称以此开头的项目触发。留空则包含所有名称。"
+    },
+    "outputs": {
+      "events": "自上次轮询以来新建或更新的文件或文件夹。"
+    }
   }
 }

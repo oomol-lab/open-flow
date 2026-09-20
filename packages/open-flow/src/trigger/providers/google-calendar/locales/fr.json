@@ -1,6 +1,15 @@
 {
   "googlecalendar.on_event_changed": {
     "displayName": "Modification d’un événement",
-    "description": "Interroge périodiquement un agenda Google et se déclenche à la création, à la modification ou à l’annulation d’un événement."
+    "description": "Interroge périodiquement un agenda Google et se déclenche à la création, à la modification ou à l’annulation d’un événement.",
+    "configInputs": {
+      "calendarId": "ID du calendrier Google à surveiller.",
+      "changes": "Changements d'événements du calendrier qui déclenchent une exécution.",
+      "matchTerm": "Texte devant apparaître dans le résumé, la description, l'emplacement ou les participants de l'événement. Laissez vide pour correspondre à tous les événements.",
+      "maxEventsPerPoll": "Nombre maximal d'événements du calendrier traités par interrogation."
+    },
+    "outputs": {
+      "events": "Événements du calendrier créés, mis à jour ou annulés depuis la précédente interrogation."
+    }
   }
 }

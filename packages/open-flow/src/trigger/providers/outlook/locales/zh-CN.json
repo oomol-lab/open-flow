@@ -1,6 +1,18 @@
 {
   "outlook.on_message_received": {
     "displayName": "收到新邮件",
-    "description": "轮询 Microsoft Outlook 邮件文件夹，在新邮件到达时触发。"
+    "description": "轮询 Microsoft Outlook 邮件文件夹，在新邮件到达时触发。",
+    "configInputs": {
+      "folder": "预定义邮件文件夹名称、文件夹 ID，或留空以监控整个邮箱。",
+      "includeDrafts": "也对草稿消息触发。",
+      "maxMessagesPerPoll": "每次轮询处理的最大消息数。",
+      "readStatus": "仅对已读、未读消息或两者都触发。",
+      "senderAddress": "精确的发件人地址。留空则允许任何发件人。",
+      "subjectContains": "消息主题中必须出现的不区分大小写的文本。",
+      "withAttachmentsOnly": "仅对带有附件的消息触发。"
+    },
+    "outputs": {
+      "events": "自上次轮询以来收到的Outlook消息。"
+    }
   }
 }

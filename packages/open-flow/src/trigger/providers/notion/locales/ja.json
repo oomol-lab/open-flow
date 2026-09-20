@@ -1,6 +1,16 @@
 {
   "notion.on_database_page_event": {
     "displayName": "データベースページの追加・更新",
-    "description": "Notion データベースを定期的に確認し、ページの追加や既存ページの編集を検出すると実行します。"
+    "description": "Notion データベースを定期的に確認し、ページの追加や既存ページの編集を検出すると実行します。",
+    "configInputs": {
+      "dataSourceId": "データベース内のデータソースID。空欄にするとプライマリデータソースを使用します。",
+      "databaseId": "監視対象のNotionデータベースのID。",
+      "events": "実行をトリガーするページの変更。",
+      "includeProperties": "各出力イベントにページプロパティを含めるかどうか。",
+      "maxItemsPerPoll": "1回のポーリングで処理する最大変更ページ数。"
+    },
+    "outputs": {
+      "events": "前のポーリング以降に追加または更新されたデータベースのページ。"
+    }
   }
 }

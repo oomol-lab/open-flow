@@ -1,6 +1,18 @@
 {
   "gitlab.on_project_event": {
     "displayName": "Événement de projet",
-    "description": "Se déclenche lors des événements webhook GitLab sélectionnés dans un projet."
+    "description": "Se déclenche lors des événements webhook GitLab sélectionnés dans un projet.",
+    "configInputs": {
+      "events": "Événements du projet GitLab qui déclenchent une exécution.",
+      "insecureSsl": "Autoriser GitLab à envoyer des webhooks sans vérification du certificat SSL.",
+      "project": "ID numérique du projet ou chemin du projet encodé en URL.",
+      "pushBranchFilter": "Branche ou motif générique utilisé pour filtrer les événements push. Laissez vide pour inclure toutes les branches."
+    },
+    "outputs": {
+      "body": "Charge utile originale du webhook GitLab.",
+      "deliveryId": "ID unique généré pour cette livraison de webhook.",
+      "event": "Nom normalisé de l'événement GitLab.",
+      "gitlabEvent": "Valeur originale de l'en-tête de l'événement GitLab."
+    }
   }
 }

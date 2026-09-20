@@ -1,6 +1,15 @@
 {
   "zendesk.on_event": {
     "displayName": "이벤트 구독",
-    "description": "선택한 Zendesk 계정 이벤트 중 하나가 발생하면 실행합니다."
+    "description": "선택한 Zendesk 계정 이벤트 중 하나가 발생하면 실행합니다.",
+    "configInputs": {
+      "events": "실행을 트리거하는 Zendesk 이벤트 유형."
+    },
+    "outputs": {
+      "body": "원본 Zendesk 이벤트 페이로드.",
+      "deliveryId": "이 Zendesk 이벤트 배달에 대해 생성된 고유 ID.",
+      "event": "Zendesk 이벤트 유형.",
+      "subject": "이벤트와 관련된 Zendesk 주제."
+    }
   }
 }

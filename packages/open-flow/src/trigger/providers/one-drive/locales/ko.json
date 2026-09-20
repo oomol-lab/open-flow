@@ -1,6 +1,16 @@
 {
   "one_drive.on_item_changed": {
     "displayName": "파일 또는 폴더 변경",
-    "description": "OneDrive 변경 피드를 주기적으로 확인하고 파일이나 폴더가 생성, 업데이트 또는 삭제되면 실행합니다."
+    "description": "OneDrive 변경 피드를 주기적으로 확인하고 파일이나 폴더가 생성, 업데이트 또는 삭제되면 실행합니다.",
+    "configInputs": {
+      "events": "실행을 트리거하는 OneDrive 항목 변경 사항.",
+      "itemId": "이 파일 또는 폴더 ID만 모니터링합니다. 여러 항목을 모니터링하려면 비워 두세요.",
+      "itemTypes": "파일, 폴더 또는 둘 다를 모니터링할지 여부.",
+      "maxItemsPerPoll": "각 폴링에서 처리할 최대 변경된 항목 수.",
+      "parentFolderId": "이 상위 폴더의 항목만 모니터링합니다. 전체 드라이브를 모니터링하려면 비워 두세요."
+    },
+    "outputs": {
+      "events": "이전 폴링 이후 생성, 업데이트 또는 삭제된 OneDrive 항목."
+    }
   }
 }

@@ -1,6 +1,17 @@
 {
   "telegram.on_update": {
     "displayName": "机器人更新",
-    "description": "在已连接的 Telegram 机器人收到所选更新时触发。"
+    "description": "在已连接的 Telegram 机器人收到所选更新时触发。",
+    "configInputs": {
+      "chatIds": "仅接受来自这些Telegram聊天ID的更新。留空则允许所有聊天。",
+      "dropPendingUpdates": "丢弃在Webhook创建或恢复前排队的更新。",
+      "updates": "触发运行的Telegram更新类型。使用*表示Telegram默认集合。",
+      "userIds": "仅接受来自这些Telegram用户ID的更新。留空则允许所有用户。"
+    },
+    "outputs": {
+      "body": "原始Telegram更新负载。",
+      "deliveryId": "为此Telegram更新生成的唯一ID。",
+      "event": "Telegram更新类型。"
+    }
   }
 }

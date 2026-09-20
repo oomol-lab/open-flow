@@ -1,6 +1,18 @@
 {
   "gmail.on_message_received": {
     "displayName": "새 메일 수신",
-    "description": "Gmail 메일함을 주기적으로 확인하고 새 메일을 받으면 실행합니다."
+    "description": "Gmail 메일함을 주기적으로 확인하고 새 메일을 받으면 실행합니다.",
+    "configInputs": {
+      "includeDrafts": "초안 메시지도 트리거합니다.",
+      "includeSpamAndTrash": "스팸 및 휴지통의 메시지도 트리거합니다.",
+      "labelNamesOrIds": "이름이나 ID로 참조된 모든 라벨을 가진 메시지에서만 트리거합니다.",
+      "maxMessagesPerPoll": "각 폴링에서 처리할 최대 메시지 수.",
+      "readStatus": "읽은 메시지, 읽지 않은 메시지 또는 둘 다에서만 트리거합니다.",
+      "search": "각 메시지가 일치해야 하는 Gmail 검색 쿼리.",
+      "sender": "이 주소나 이름과 일치하는 발신자의 메시지에서만 트리거합니다."
+    },
+    "outputs": {
+      "events": "이전 폴링 이후 수신된 메시지."
+    }
   }
 }

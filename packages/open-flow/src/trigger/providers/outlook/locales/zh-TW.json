@@ -1,6 +1,18 @@
 {
   "outlook.on_message_received": {
     "displayName": "收到新郵件",
-    "description": "輪詢 Microsoft Outlook 郵件資料夾，在新郵件到達時觸發。"
+    "description": "輪詢 Microsoft Outlook 郵件資料夾，在新郵件到達時觸發。",
+    "configInputs": {
+      "folder": "知名郵箱資料夾名稱、資料夾 ID，或留空以監控整個郵箱。",
+      "includeDrafts": "也對草稿郵件觸發。",
+      "maxMessagesPerPoll": "每次輪詢處理的最大郵件數。",
+      "readStatus": "僅對已讀郵件、未讀郵件或兩者都觸發。",
+      "senderAddress": "精確的寄件人地址。留空則允許任何寄件人。",
+      "subjectContains": "郵件主題中必須出現的不區分大小寫的文本。",
+      "withAttachmentsOnly": "僅對帶附件的郵件觸發。"
+    },
+    "outputs": {
+      "events": "自上次輪詢以來收到的 Outlook 郵件。"
+    }
   }
 }

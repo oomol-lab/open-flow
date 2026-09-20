@@ -1,6 +1,18 @@
 {
   "outlook.on_message_received": {
     "displayName": "新着メール",
-    "description": "Microsoft Outlook のメールフォルダを定期的に確認し、新しいメールが届くと実行します。"
+    "description": "Microsoft Outlook のメールフォルダを定期的に確認し、新しいメールが届くと実行します。",
+    "configInputs": {
+      "folder": "よく知られたメールフォルダ名、フォルダID、または全メールボックスを対象とする空欄。",
+      "includeDrafts": "下書きメッセージでもトリガーします。",
+      "maxMessagesPerPoll": "1回のポーリングで処理する最大メッセージ数。",
+      "readStatus": "既読メッセージ、未読メッセージ、または両方でのみトリガーします。",
+      "senderAddress": "正確な送信者アドレス。空欄にすると任意の送信者を許可します。",
+      "subjectContains": "メッセージの件名に含まれる必要がある大文字小文字無視のテキスト。",
+      "withAttachmentsOnly": "添付ファイル付きのメッセージでのみトリガーします。"
+    },
+    "outputs": {
+      "events": "前のポーリング以降に受信したOutlookのメッセージ。"
+    }
   }
 }

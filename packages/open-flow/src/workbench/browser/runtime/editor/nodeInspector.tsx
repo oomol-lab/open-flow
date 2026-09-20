@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
-import type { GraphTarget } from '../../../../flow/common/change.ts'
+import type { TriggerDisplay } from '../../../../control/common/triggerCatalog.ts'
+import type { GraphNode, GraphTarget } from '../../../../flow/common/change.ts'
 import type { ConnectorAction, ConnectorConnection, Group, InputPort } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
@@ -40,6 +41,7 @@ import { LinearTriggerConfig } from './linearTriggerConfig.tsx'
 import { NodeDescription } from './nodeDescription.tsx'
 import { NodeInputs } from './nodeInputs.tsx'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
+import { presentProviderOutputDescription, presentProviderSourceCandidates, presentProviderTriggerConfig } from './providerTriggerPresentation.ts'
 import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
 import { TriggerScheduleEditor } from './triggerScheduleEditor.tsx'
 import { TriggerSummary } from './triggerSummary.tsx'
@@ -155,7 +157,8 @@ function inputUpstreamSources({
   store,
   handleName,
   t,
-}: Pick<Props, 'revision' | 'sourceNodeIcons' | 'target' | 'store'> & {
+  triggerDisplays,
+}: Pick<Props, 'revision' | 'sourceNodeIcons' | 'target' | 'store' | 'triggerDisplays'> & {
   readonly selection: ResolvedNode
   readonly handleName: string
   readonly t: TFunction
@@ -163,6 +166,8 @@ function inputUpstreamSources({
   const graph = revision.graph(target)!
   const mapping = nodeInputMappings(selection.node)[handleName]
   const sources = mapping?.kind == 'sources' ? mapping.sources.filter((source) => source.kind == 'node') : []
+  const providerDisplay = (node: GraphNode | undefined) =>
+    node?.kind == 'integration' || node?.kind == 'poll' ? triggerDisplays?.[node.definition.key] : undefined
   return {
     current: sources.map((source) => {
       const node = graph.nodes[source.nodeId]
@@ -170,7 +175,12 @@ function inputUpstreamSources({
         description:
           node == null
             ? revision.outputDescription(target, source.nodeId, source.output)
-            : presentBuiltInOutputDescription(node, source.output, revision.outputDescription(target, source.nodeId, source.output), t),
+            : presentProviderOutputDescription(
+                node,
+                source.output,
+                presentBuiltInOutputDescription(node, source.output, revision.outputDescription(target, source.nodeId, source.output), t),
+                providerDisplay(node),
+              ),
         icon: sourceNodeIcons?.[source.nodeId],
         nodeId: source.nodeId,
         nodeName: node?.name,
@@ -188,7 +198,7 @@ function inputUpstreamSources({
           icon: sourceNodeIcons?.[nodeId],
           nodeId,
           nodeName: node?.name ?? nodeId,
-          outputs: node == null ? outputs : presentBuiltInSourceCandidates(node, outputs, t),
+          outputs: node == null ? outputs : presentProviderSourceCandidates(node, presentBuiltInSourceCandidates(node, outputs, t), providerDisplay(node)),
         }
       }),
     onChange: (source) => {
@@ -774,6 +784,7 @@ interface Props {
   readonly triggerConnection?: ConnectorConnection
   readonly triggerConnectionError?: string
   readonly triggerConnectionLoading: boolean
+  readonly triggerDisplays?: Readonly<Record<string, TriggerDisplay>>
   readonly triggers: TriggerStore
 }
 
@@ -800,6 +811,7 @@ export function NodeInspector({
   triggerConnection,
   triggerConnectionError,
   triggerConnectionLoading,
+  triggerDisplays,
   triggers,
 }: Props): ReactElement {
   const t = useTranslate()
@@ -885,7 +897,7 @@ export function NodeInspector({
           (selection.trigger.kind === 'integration' || selection.trigger.kind === 'poll') &&
           (['feishu.on_event', 'feishu_app_bot.on_event'].includes(selection.trigger.definition.key) ? (
             <FeishuTriggerConfig
-              inputs={selection.trigger.definition.configInputs}
+              inputs={presentProviderTriggerConfig(selection.trigger.definition.configInputs, triggerDisplays?.[selection.trigger.definition.key])}
               config={selection.trigger.config}
               nodeId={selection.id}
               disabled={disabled}
@@ -893,7 +905,7 @@ export function NodeInspector({
             />
           ) : selection.trigger.definition.key === 'linear.on_issue_changed' ? (
             <LinearTriggerConfig
-              inputs={selection.trigger.definition.configInputs}
+              inputs={presentProviderTriggerConfig(selection.trigger.definition.configInputs, triggerDisplays?.[selection.trigger.definition.key])}
               config={selection.trigger.config}
               nodeId={selection.id}
               connectionId={
@@ -911,7 +923,7 @@ export function NodeInspector({
               onResetValue={(name) => {
                 void store.resetTriggerConfig(selection.id, [name])
               }}
-              inputs={selection.trigger.definition.configInputs}
+              inputs={presentProviderTriggerConfig(selection.trigger.definition.configInputs, triggerDisplays?.[selection.trigger.definition.key])}
               config={selection.trigger.config}
               disabled={disabled}
               onChange={(name, value) => {
@@ -919,7 +931,14 @@ export function NodeInspector({
               }}
             />
           ))}
-        {selection?.kind === 'trigger' && <TriggerSummary trigger={selection.trigger} />}
+        {selection?.kind === 'trigger' && (
+          <TriggerSummary
+            trigger={selection.trigger}
+            display={
+              selection.trigger.kind == 'integration' || selection.trigger.kind == 'poll' ? triggerDisplays?.[selection.trigger.definition.key] : undefined
+            }
+          />
+        )}
         {selection?.kind === 'trigger' && selection.trigger.kind === 'webhook' && (
           <WebhookEditor
             key={`webhook:${selection.id}`}
@@ -999,7 +1018,7 @@ export function NodeInspector({
                         }
                       : undefined
                 }
-                renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t })}
+                renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t, triggerDisplays })}
                 variables={variables}
                 disabled={disabled}
                 onValue={(handle, value, deletion) => {
@@ -1049,7 +1068,9 @@ export function NodeInspector({
                       onVariable={(handle, name) => {
                         void store.setInputVariable(selection.id, handle, name)
                       }}
-                      renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t })}
+                      renderSource={(handle) =>
+                        inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t, triggerDisplays })
+                      }
                     />
                   </section>
                 )}
@@ -1062,7 +1083,7 @@ export function NodeInspector({
             value={selection.node}
             disabled={disabled}
             variables={variables}
-            renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t })}
+            renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t, triggerDisplays })}
             variableName={(source) => (source.kind === 'binding' ? revision.binding(source.bindingId)?.target : undefined)}
             sourceType={(source) => revision.sourceType(target, source)}
             onVariable={(handle, name) => {

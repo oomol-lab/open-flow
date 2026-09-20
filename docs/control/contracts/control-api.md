@@ -446,17 +446,27 @@ Trigger Key catalog 是 deployment scope 资源：
 { keys: readonly TriggerKeySummary[]; version: 1 }
 {
   definitions: readonly TriggerKeySnapshot[]
-  display: Readonly<Record<string, { displayName: string; description: string }>>
+  display: Readonly<
+    Record<
+      string,
+      {
+        configInputs: Readonly<Record<string, string>>
+        displayName: string
+        description: string
+        outputs: Readonly<Record<string, string>>
+      }
+    >
+  >
   locale: 'en' | 'zh-CN' | 'zh-TW' | 'ja' | 'ko' | 'ru' | 'fr'
-  version: 1
+  version: 2
 }
 { definition: TriggerKeySnapshot; version: 1 }
 ```
 
 `GET /v1/trigger-keys` 与 `GET /v1/trigger-keys/catalog` 接受可选 `locale` query；query 优先于
 `Accept-Language`，缺省与不支持的语言回退英文，非法 BCP 47 query 返回 400。语言映射复用公共 localization
-契约。摘要返回翻译后的名称与描述；完整 catalog 的 `display` 按 Trigger key 保存展示文案，`definitions`
-始终保留原始英文定义。单条 definition、CLI 与持久化的 Flow definition 不因界面语言改变。
+契约。摘要返回翻译后的名称与描述；完整 catalog 的 `display` 按 Trigger key 保存触发器以及配置、输出字段的展示文案，
+`definitions` 始终保留原始英文定义。单条 definition、CLI 与持久化的 Flow definition 不因界面语言改变。
 
 公共 `provider-triggers` entry 的 `localizeTrigger(definition, locale)` 返回 `Promise<TriggerDisplay>`，调用方需等待
 本地化结果。非英文翻译按语言延迟加载并缓存；英文使用原始定义，不加载翻译资源。

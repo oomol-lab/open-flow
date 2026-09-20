@@ -1,6 +1,20 @@
 {
   "feishu_app_bot.on_event": {
     "displayName": "应用事件",
-    "description": "通过共享事件源接收所选飞书应用事件。"
+    "description": "通过共享事件源接收所选飞书应用事件。",
+    "configInputs": {
+      "sourceId": "接收此触发器事件的事件源。",
+      "eventTypes": "触发运行的飞书事件类型。",
+      "chatIds": "接收事件的聊天ID。留空则从该源可访问的每个聊天接收事件。",
+      "resource": "可选订阅的文档、日历或审批资源。"
+    },
+    "outputs": {
+      "event": "飞书事件类型。",
+      "deliveryId": "此事件的唯一投递ID。",
+      "appId": "接收事件的飞书应用ID。",
+      "tenantKey": "产生事件的飞书租户密钥。",
+      "occurredAt": "事件发生时间（由飞书提供）。",
+      "body": "原始飞书事件负载。"
+    }
   }
 }

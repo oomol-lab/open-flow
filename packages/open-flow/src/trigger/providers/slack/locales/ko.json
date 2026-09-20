@@ -1,6 +1,18 @@
 {
   "slack.on_message_posted": {
     "displayName": "채널 새 메시지",
-    "description": "Slack 대화 하나를 주기적으로 확인하고 새 메시지가 게시되면 실행합니다."
+    "description": "Slack 대화 하나를 주기적으로 확인하고 새 메시지가 게시되면 실행합니다.",
+    "configInputs": {
+      "channelId": "C0122KQ70S7E와 같은 Slack 대화 ID를 모니터링합니다.",
+      "fromUserIds": "이 Slack 사용자 ID의 메시지에서만 트리거합니다. 모든 작성자를 허용하려면 비워 두세요.",
+      "ignoreUserIds": "이 Slack 사용자 ID의 메시지에서는 절대 트리거하지 않습니다.",
+      "includeBotMessages": "봇과 앱이 게시한 메시지도 트리거합니다.",
+      "includeSystemMessages": "Slack 시스템 알림도 트리거합니다.",
+      "maxMessagesPerPoll": "각 폴링에서 처리할 최대 메시지 수.",
+      "textContains": "메시지 텍스트에 이 문자열이 포함되어야만 트리거하며 대소문자는 무시합니다."
+    },
+    "outputs": {
+      "events": "이전 폴링 이후 게시된 Slack 메시지."
+    }
   }
 }

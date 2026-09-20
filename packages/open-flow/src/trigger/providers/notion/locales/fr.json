@@ -1,6 +1,16 @@
 {
   "notion.on_database_page_event": {
     "displayName": "Ajout ou mise à jour d’une page de base de données",
-    "description": "Interroge périodiquement une base Notion et se déclenche à l’ajout d’une page ou à la modification d’une page existante."
+    "description": "Interroge périodiquement une base Notion et se déclenche à l’ajout d’une page ou à la modification d’une page existante.",
+    "configInputs": {
+      "dataSourceId": "ID de la source de données dans la base. Laissez vide pour utiliser la source principale.",
+      "databaseId": "ID de la base Notion à surveiller.",
+      "events": "Changements de page qui déclenchent une exécution.",
+      "includeProperties": "Inclure les propriétés de la page dans chaque événement de sortie.",
+      "maxItemsPerPoll": "Nombre maximal de pages modifiées traitées par interrogation."
+    },
+    "outputs": {
+      "events": "Pages de la base ajoutées ou mises à jour depuis la précédente interrogation."
+    }
   }
 }

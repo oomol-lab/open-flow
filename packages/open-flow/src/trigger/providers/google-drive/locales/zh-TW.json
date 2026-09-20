@@ -1,14 +1,48 @@
 {
   "googledrive.changes_detected": {
     "displayName": "偵測到變更",
-    "description": "使用 Google Drive changes.watch 通道，在有雲端硬碟變更可用時觸發。"
+    "description": "使用 Google Drive changes.watch 通道，在有雲端硬碟變更可用時觸發。",
+    "configInputs": {
+      "driveId": "共享驅動器 ID。留空則監控連接帳戶。",
+      "includeCorpusRemovals": "當項目離開變更範圍時，包含可訪問的檔案資源。",
+      "includeItemsFromAllDrives": "包含我的雲盤和共享驅動器中的項目。",
+      "includeRemoved": "包含因刪除或失去存取權限而引起的變更。",
+      "pageSize": "一次 Flow Run 中包含的最大變更數。",
+      "restrictToMyDrive": "將變更限制在我的雲盤層次結構內。"
+    },
+    "outputs": {
+      "events": "通知接收時可用的 Google 雲盤變更。"
+    }
   },
   "googledrive.watch_changes": {
     "displayName": "追蹤變更",
-    "description": "透過通知與對同一變更串流的定期掃描監控雲端硬碟變更。"
+    "description": "透過通知與對同一變更串流的定期掃描監控雲端硬碟變更。",
+    "configInputs": {
+      "driveId": "共享驅動器 ID。留空則監控連接帳戶。",
+      "includeCorpusRemovals": "當項目離開變更範圍時，包含可訪問的檔案資源。",
+      "includeItemsFromAllDrives": "包含我的雲盤和共享驅動器中的項目。",
+      "includeRemoved": "包含因刪除或失去存取權限而引起的變更。",
+      "pageSize": "一次 Flow Run 中包含的最大變更數。",
+      "restrictToMyDrive": "將變更限制在我的雲盤層次結構內。"
+    },
+    "outputs": {
+      "events": "通過通知或定期掃描觀察到的 Google 雲盤變更。"
+    }
   },
   "googledrive.on_file_change": {
     "displayName": "資料夾內的檔案或資料夾變更",
-    "description": "輪詢一個 Google Drive 資料夾，在其直屬檔案或資料夾建立或更新時觸發。"
+    "description": "輪詢一個 Google Drive 資料夾，在其直屬檔案或資料夾建立或更新時觸發。",
+    "configInputs": {
+      "changeType": "是否對新建或更新的項目觸發執行。",
+      "driveId": "共享驅動器 ID。留空則使用我的雲盤。",
+      "folderId": "要監控的 Google 雲盤資料夾 ID。",
+      "itemTypes": "是否監控文件、資料夾或兩者。",
+      "maxFilesPerPoll": "每次輪詢處理的最大變更項目數。",
+      "mimeTypes": "僅對這些 MIME 類型觸發。留空則包含所有 MIME 類型。",
+      "namePrefix": "僅對名稱以該文本開頭的項目觸發。留空則包含所有名稱。"
+    },
+    "outputs": {
+      "events": "自上次輪詢以來新建或更新的文件或資料夾。"
+    }
   }
 }

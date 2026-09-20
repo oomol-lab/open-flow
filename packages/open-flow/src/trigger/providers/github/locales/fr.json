@@ -1,10 +1,30 @@
 {
   "github.on_repo_event": {
     "displayName": "Événement de dépôt",
-    "description": "Se déclenche lors des événements webhook GitHub sélectionnés dans un dépôt."
+    "description": "Se déclenche lors des événements webhook GitHub sélectionnés dans un dépôt.",
+    "configInputs": {
+      "events": "Événements webhook GitHub qui déclenchent une exécution.",
+      "insecureSsl": "Autoriser GitHub à envoyer des webhooks sans vérification du certificat SSL.",
+      "owner": "Propriétaire du dépôt GitHub.",
+      "repo": "Nom du dépôt GitHub."
+    },
+    "outputs": {
+      "body": "Charge utile originale du webhook GitHub.",
+      "deliveryId": "ID de livraison unique du webhook GitHub.",
+      "event": "Nom de l'événement webhook GitHub."
+    }
   },
   "github.watch_pull_request": {
     "displayName": "Suivi d’une pull request",
-    "description": "Suit une pull request grâce aux notifications et à des vérifications périodiques. Part de son état actuel et signale les changements observés, sans garantir chaque transition intermédiaire ou événement de revue."
+    "description": "Suit une pull request grâce aux notifications et à des vérifications périodiques. Part de son état actuel et signale les changements observés, sans garantir chaque transition intermédiaire ou événement de revue.",
+    "configInputs": {
+      "owner": "Propriétaire du dépôt GitHub.",
+      "repo": "Nom du dépôt GitHub.",
+      "number": "Numéro de la demande de tirage à surveiller."
+    },
+    "outputs": {
+      "pullRequest": "Détails actuels de la demande de tirage après un changement observé.",
+      "version": "Identifiant stable de la version observée de la demande de tirage."
+    }
   }
 }

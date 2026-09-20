@@ -1,6 +1,17 @@
 {
   "telegram.on_update": {
     "displayName": "機器人更新",
-    "description": "在已連線的 Telegram 機器人收到所選更新時觸發。"
+    "description": "在已連線的 Telegram 機器人收到所選更新時觸發。",
+    "configInputs": {
+      "chatIds": "僅接受來自這些數字 Telegram 聊天 ID 的更新。留空則允許所有聊天。",
+      "dropPendingUpdates": "丟棄在建立或恢復網路鉤子之前排隊的更新。",
+      "updates": "觸發執行的 Telegram 更新類型。使用 * 表示 Telegram 默認集合。",
+      "userIds": "僅接受來自這些數字 Telegram 使用者 ID 的更新。留空則允許所有用戶。"
+    },
+    "outputs": {
+      "body": "原始 Telegram 更新載荷。",
+      "deliveryId": "為本次 Telegram 更新生成的唯一 ID。",
+      "event": "Telegram 更新類型。"
+    }
   }
 }

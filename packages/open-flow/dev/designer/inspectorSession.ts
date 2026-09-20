@@ -39,7 +39,7 @@ export function createInspectorTransport(log: LogAction, initialContent: Revisio
     if (url.pathname.endsWith('/connector/proxy/providers')) return Response.json({ success: true, data: [] })
     if (url.pathname.endsWith('/connector/proxy/apps')) return Response.json({ success: true, data: [] })
     if (url.pathname === '/v1/trigger-keys/catalog')
-      return Response.json({ version: 1, locale: url.searchParams.get('locale') ?? 'en', definitions: [], display: {} })
+      return Response.json({ version: 2, locale: url.searchParams.get('locale') ?? 'en', definitions: [], display: {} })
     if (url.pathname === '/v1/flows') return Response.json({ flows: [{ ...flow, draftRevisionId: revision().revisionId }], total: 1, version: 1 })
     if (url.pathname.endsWith('/editor'))
       return Response.json({

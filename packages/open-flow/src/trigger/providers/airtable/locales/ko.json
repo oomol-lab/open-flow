@@ -1,6 +1,18 @@
 {
   "airtable.on_record_changed": {
     "displayName": "레코드 생성 또는 업데이트",
-    "description": "Airtable 테이블을 주기적으로 확인하고 시간 필드 순서에 따라 레코드가 생성되거나 업데이트되면 실행합니다."
+    "description": "Airtable 테이블을 주기적으로 확인하고 시간 필드 순서에 따라 레코드가 생성되거나 업데이트되면 실행합니다.",
+    "configInputs": {
+      "baseId": "모니터링할 Airtable 베이스 ID.",
+      "fields": "반환되는 각 레코드에 포함할 필드. 모든 필드를 포함하려면 비워 두세요.",
+      "formula": "레코드를 필터링하는 Airtable 수식. 모든 레코드를 포함하려면 비워 두세요.",
+      "maxRecordsPerPoll": "각 폴링에서 처리할 최대 레코드 수.",
+      "tableIdOrName": "모니터링할 Airtable 테이블 ID 또는 이름.",
+      "triggerField": "생성 또는 업데이트된 레코드를 감지하는 데 사용되는 날짜 또는 시간 필드.",
+      "view": "레코드를 필터링하고 정렬하는 데 사용되는 Airtable 보기. 테이블 기본값을 사용하려면 비워 두세요."
+    },
+    "outputs": {
+      "events": "이전 폴링 이후 생성되거나 업데이트된 레코드."
+    }
   }
 }

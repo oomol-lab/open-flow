@@ -1,10 +1,30 @@
 {
   "github.on_repo_event": {
     "displayName": "저장소 이벤트",
-    "description": "저장소에서 선택한 GitHub webhook 이벤트가 발생하면 실행합니다."
+    "description": "저장소에서 선택한 GitHub webhook 이벤트가 발생하면 실행합니다.",
+    "configInputs": {
+      "events": "실행을 트리거하는 GitHub 웹훅 이벤트.",
+      "insecureSsl": "GitHub가 SSL 인증서 검증 없이 웹훅을 전송하도록 허용합니다.",
+      "owner": "GitHub 저장소의 소유자.",
+      "repo": "GitHub 저장소의 이름."
+    },
+    "outputs": {
+      "body": "원본 GitHub 웹훅 페이로드.",
+      "deliveryId": "고유한 GitHub 웹훅 배달 ID.",
+      "event": "GitHub 웹훅 이벤트 이름."
+    }
   },
   "github.watch_pull_request": {
     "displayName": "풀 리퀘스트 감시",
-    "description": "알림과 정기 확인으로 풀 리퀘스트 하나를 감시합니다. 현재 상태에서 시작하며 관찰된 변경을 보고합니다. 모든 중간 상태 전환이나 리뷰 이벤트를 보고하지는 않습니다."
+    "description": "알림과 정기 확인으로 풀 리퀘스트 하나를 감시합니다. 현재 상태에서 시작하며 관찰된 변경을 보고합니다. 모든 중간 상태 전환이나 리뷰 이벤트를 보고하지는 않습니다.",
+    "configInputs": {
+      "owner": "GitHub 저장소의 소유자.",
+      "repo": "GitHub 저장소의 이름.",
+      "number": "모니터링할 풀 리퀘스트 번호."
+    },
+    "outputs": {
+      "pullRequest": "관찰된 변경 후 현재 풀 리퀘스트 세부 정보.",
+      "version": "관찰된 풀 리퀘스트 버전의 안정적 식별자."
+    }
   }
 }

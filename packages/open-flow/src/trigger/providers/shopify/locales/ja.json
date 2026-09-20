@@ -1,6 +1,18 @@
 {
   "shopify.on_shop_event": {
     "displayName": "ストアイベント",
-    "description": "接続したストアで選択した Shopify webhook トピックのイベントが発生すると実行します。"
+    "description": "接続したストアで選択した Shopify webhook トピックのイベントが発生すると実行します。",
+    "configInputs": {
+      "topics": "実行をトリガーするShopifyのWebhookトピック。"
+    },
+    "outputs": {
+      "apiVersion": "Webhookに使用されたShopify APIバージョン。",
+      "body": "元のShopify Webhookペイロード。",
+      "eventId": "一意のShopifyイベントID。",
+      "shopDomain": "イベントを生成したShopifyショップのドメイン。",
+      "topic": "Shopify Webhookトピック。",
+      "triggeredAt": "ShopifyがWebhookをトリガーした時刻。",
+      "webhookId": "Shopify WebhookサブスクリプションのID。"
+    }
   }
 }

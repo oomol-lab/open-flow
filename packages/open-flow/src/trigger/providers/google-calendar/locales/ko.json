@@ -1,6 +1,15 @@
 {
   "googlecalendar.on_event_changed": {
     "displayName": "일정 변경",
-    "description": "Google Calendar를 주기적으로 확인하고 일정이 생성, 업데이트 또는 취소되면 실행합니다."
+    "description": "Google Calendar를 주기적으로 확인하고 일정이 생성, 업데이트 또는 취소되면 실행합니다.",
+    "configInputs": {
+      "calendarId": "모니터링할 Google 캘린더 ID.",
+      "changes": "실행을 트리거하는 캘린더 이벤트 변경 사항.",
+      "matchTerm": "이벤트 요약, 설명, 위치 또는 참석자에 반드시 나타나야 하는 텍스트. 모든 이벤트와 일치하려면 비워 두세요.",
+      "maxEventsPerPoll": "각 폴링에서 처리할 최대 캘린더 이벤트 수."
+    },
+    "outputs": {
+      "events": "이전 폴링 이후 생성, 업데이트 또는 취소된 캘린더 이벤트."
+    }
   }
 }

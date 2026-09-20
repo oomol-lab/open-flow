@@ -1,6 +1,18 @@
 {
   "slack.on_message_posted": {
     "displayName": "频道新消息",
-    "description": "轮询一个 Slack 会话，在有新消息发布时触发。"
+    "description": "轮询一个 Slack 会话，在有新消息发布时触发。",
+    "configInputs": {
+      "channelId": "要监控的Slack对话ID，如C0122KQ70S7E。",
+      "fromUserIds": "仅对来自这些Slack用户ID的消息触发。留空则允许任何作者。",
+      "ignoreUserIds": "不对这些 Slack 用户 ID 发送的消息触发。",
+      "includeBotMessages": "也对机器人和应用发布的消息触发。",
+      "includeSystemMessages": "也对Slack系统通知触发。",
+      "maxMessagesPerPoll": "每次轮询处理的最大消息数。",
+      "textContains": "仅当消息文本包含此字符串时触发，不区分大小写。"
+    },
+    "outputs": {
+      "events": "自上次轮询以来发布的Slack消息。"
+    }
   }
 }

@@ -72,7 +72,10 @@ function option(definition: TriggerKeySnapshot, i18n: I18n, display?: TriggerDis
     inputs: [],
     kind: 'trigger',
     label: display?.displayName ?? definition.displayName,
-    outputs: definition.outputs,
+    outputs: definition.outputs.map((output) => {
+      const description = display?.outputs[output.handle]
+      return description == null ? output : { ...output, description }
+    }),
     trigger: { definition, kind: 'catalog' },
   }
 }

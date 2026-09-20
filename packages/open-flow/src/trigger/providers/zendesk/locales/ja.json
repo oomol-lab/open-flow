@@ -1,6 +1,15 @@
 {
   "zendesk.on_event": {
     "displayName": "イベント購読",
-    "description": "選択した Zendesk アカウントイベントのいずれかが発生すると実行します。"
+    "description": "選択した Zendesk アカウントイベントのいずれかが発生すると実行します。",
+    "configInputs": {
+      "events": "実行をトリガーするZendeskのイベントタイプ。"
+    },
+    "outputs": {
+      "body": "元のZendeskイベントペイロード。",
+      "deliveryId": "このZendeskイベント配信用に生成された一意のID。",
+      "event": "Zendeskイベントタイプ。",
+      "subject": "イベントに関連するZendeskの件名。"
+    }
   }
 }

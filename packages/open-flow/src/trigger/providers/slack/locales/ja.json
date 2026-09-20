@@ -1,6 +1,18 @@
 {
   "slack.on_message_posted": {
     "displayName": "チャンネルの新着メッセージ",
-    "description": "Slack の1つの会話を定期的に確認し、新しいメッセージが投稿されると実行します。"
+    "description": "Slack の1つの会話を定期的に確認し、新しいメッセージが投稿されると実行します。",
+    "configInputs": {
+      "channelId": "Slackの会話ID（例：C0122KQ70S7E）。",
+      "fromUserIds": "指定したSlackユーザーIDからのメッセージでのみトリガーします。空欄にすると任意の著者を許可します。",
+      "ignoreUserIds": "指定したSlackユーザーIDからのメッセージでは決してトリガーしません。",
+      "includeBotMessages": "ボットやアプリが投稿したメッセージでもトリガーします。",
+      "includeSystemMessages": "Slackのシステム通知でもトリガーします。",
+      "maxMessagesPerPoll": "1回のポーリングで処理する最大メッセージ数。",
+      "textContains": "メッセージ本文に指定した文字列が含まれる場合のみトリガーします（大文字小文字無視）。"
+    },
+    "outputs": {
+      "events": "前のポーリング以降に投稿されたSlackのメッセージ。"
+    }
   }
 }

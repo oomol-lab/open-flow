@@ -399,9 +399,11 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
     )
     setSession(next)
     void next.start()
+    next.triggers.catalog.get()
     return () => next.dispose()
   }, [fixture, language, state])
   const revision = useVal(session?.workspace.$.revision)
+  const triggerCatalog = useVal(session?.triggers.catalog.state)
   const createdConnection = useVal(session?.triggers.$.selectedConnection)
   const selection = revision?.selection({ kind: 'flow' }, `trigger-${fixture.id}-${state}`)
   useEffect(() => {
@@ -446,6 +448,7 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
               triggerConnection={state === 'unconfigured' ? undefined : state === 'created-with-default' ? createdConnection : session.account}
               triggerConnectionError={state === 'connection-error' ? 'Unable to load accounts. Sample network failure.' : undefined}
               triggerConnectionLoading={false}
+              triggerDisplays={triggerCatalog?.data?.display}
               triggers={session.triggers}
             />
           </InspectorSamplePanel>

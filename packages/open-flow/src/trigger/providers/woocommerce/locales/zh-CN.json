@@ -1,6 +1,19 @@
 {
   "woocommerce.on_store_event": {
     "displayName": "商店事件",
-    "description": "在发生所选 WooCommerce 商店事件时触发。"
+    "description": "在发生所选 WooCommerce 商店事件时触发。",
+    "configInputs": {
+      "events": "触发运行的WooCommerce商店事件。",
+      "webhookName": "在WooCommerce中显示的Webhook名称。"
+    },
+    "outputs": {
+      "body": "原始WooCommerce Webhook负载。",
+      "deliveryId": "唯一的WooCommerce Webhook投递ID。",
+      "event": "WooCommerce事件动作。",
+      "resource": "WooCommerce资源类型。",
+      "source": "产生事件的WooCommerce商店URL。",
+      "topic": "完整的WooCommerce Webhook主题。",
+      "webhookId": "WooCommerce Webhook订阅的ID。"
+    }
   }
 }

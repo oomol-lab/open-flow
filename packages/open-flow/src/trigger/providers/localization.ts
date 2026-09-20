@@ -2,6 +2,8 @@ import type { TriggerDisplay } from '../../control/common/triggerCatalog.ts'
 import type { TriggerKeySnapshot } from '../../flow/common/change.ts'
 import type { UiLanguage } from '../../localization/common/languages.ts'
 
+import { englishTriggerFieldDescriptions } from './fieldDescriptions.ts'
+
 type Translations = Readonly<Record<string, Partial<TriggerDisplay>>>
 
 const loaders = {
@@ -31,5 +33,25 @@ export function loadTriggerTranslations(locale: UiLanguage): Promise<Translation
 export async function localizeTrigger(definition: TriggerKeySnapshot, locale: UiLanguage): Promise<TriggerDisplay> {
   const translations = await loadTriggerTranslations(locale)
   const copy = translations[definition.key]
-  return { displayName: copy?.displayName ?? definition.displayName, description: copy?.description ?? definition.description }
+  const englishFields = englishTriggerFieldDescriptions[definition.key as keyof typeof englishTriggerFieldDescriptions]
+  return {
+    configInputs: fieldDescriptions(definition.configInputs, copy?.configInputs, englishFields?.configInputs),
+    displayName: copy?.displayName ?? definition.displayName,
+    description: copy?.description ?? definition.description,
+    outputs: fieldDescriptions(definition.outputs, copy?.outputs, englishFields?.outputs),
+  }
+}
+
+function fieldDescriptions(
+  fields: TriggerKeySnapshot['configInputs'] | TriggerKeySnapshot['outputs'],
+  translations?: Readonly<Record<string, string>>,
+  fallback?: Readonly<Record<string, string>>,
+): Readonly<Record<string, string>> {
+  return Object.fromEntries(
+    fields.flatMap((field) => {
+      if (!('handle' in field)) return []
+      const description = translations?.[field.handle] ?? fallback?.[field.handle] ?? field.description
+      return description == null ? [] : [[field.handle, description]]
+    }),
+  )
 }

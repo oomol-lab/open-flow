@@ -1,6 +1,18 @@
 {
   "shopify.on_shop_event": {
     "displayName": "Событие магазина",
-    "description": "Срабатывает при событиях выбранных тем webhook Shopify в подключённом магазине."
+    "description": "Срабатывает при событиях выбранных тем webhook Shopify в подключённом магазине.",
+    "configInputs": {
+      "topics": "Темы вебхуков Shopify, запускающие выполнение."
+    },
+    "outputs": {
+      "apiVersion": "Версия API Shopify, использованная для вебхука.",
+      "body": "Оригинальное тело вебхука Shopify.",
+      "eventId": "Уникальный ID события Shopify.",
+      "shopDomain": "Домен магазина Shopify, который сгенерировал событие.",
+      "topic": "Тема вебхука Shopify.",
+      "triggeredAt": "Время, когда Shopify инициировал вебхук.",
+      "webhookId": "ID подписки на вебхук Shopify."
+    }
   }
 }

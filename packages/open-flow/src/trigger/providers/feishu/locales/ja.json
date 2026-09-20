@@ -1,6 +1,20 @@
 {
   "feishu_app_bot.on_event": {
     "displayName": "アプリのイベント",
-    "description": "共有イベントソースで選択した Feishu イベントを受信します。"
+    "description": "共有イベントソースで選択した Feishu イベントを受信します。",
+    "configInputs": {
+      "sourceId": "このトリガーがイベントを受信するイベントソース。",
+      "eventTypes": "実行をトリガーするFeishuのイベントタイプ。",
+      "chatIds": "イベントを受信するチャットID。空欄にすると、ソースがアクセスできるすべてのチャットからイベントを受信します。",
+      "resource": "サブスクライブするドキュメント、カレンダー、または承認リソース（オプション）。"
+    },
+    "outputs": {
+      "event": "Feishuのイベントタイプ。",
+      "deliveryId": "このイベントの一意の配信ID。",
+      "appId": "イベントを受信したFeishuアプリのID。",
+      "tenantKey": "イベントを生成したFeishuテナントのキー。",
+      "occurredAt": "Feishuから提供された場合、イベントが発生した時刻。",
+      "body": "元のFeishuイベントペイロード。"
+    }
   }
 }

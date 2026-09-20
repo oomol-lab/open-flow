@@ -1,6 +1,19 @@
 {
   "woocommerce.on_store_event": {
     "displayName": "Событие магазина",
-    "description": "Срабатывает при выбранных событиях магазина WooCommerce."
+    "description": "Срабатывает при выбранных событиях магазина WooCommerce.",
+    "configInputs": {
+      "events": "События магазина WooCommerce, запускающие выполнение.",
+      "webhookName": "Название, отображаемое для вебхука в WooCommerce."
+    },
+    "outputs": {
+      "body": "Оригинальное тело вебхука WooCommerce.",
+      "deliveryId": "Уникальный ID доставки вебхука WooCommerce.",
+      "event": "Действие события WooCommerce.",
+      "resource": "Тип ресурса WooCommerce.",
+      "source": "URL магазина WooCommerce, который сгенерировал событие.",
+      "topic": "Полная тема вебхука WooCommerce.",
+      "webhookId": "ID подписки на вебхук WooCommerce."
+    }
   }
 }

@@ -1,6 +1,15 @@
 {
   "zendesk.on_event": {
     "displayName": "Подписка на события",
-    "description": "Срабатывает при любом из выбранных событий аккаунта Zendesk."
+    "description": "Срабатывает при любом из выбранных событий аккаунта Zendesk.",
+    "configInputs": {
+      "events": "Типы событий Zendesk, запускающие выполнение."
+    },
+    "outputs": {
+      "body": "Оригинальное тело события Zendesk.",
+      "deliveryId": "Уникальный ID, сгенерированный для этой доставки события Zendesk.",
+      "event": "Тип события Zendesk.",
+      "subject": "Тема Zendesk, связанная со случаем."
+    }
   }
 }

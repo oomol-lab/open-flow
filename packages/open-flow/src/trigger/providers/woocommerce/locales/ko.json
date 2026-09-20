@@ -1,6 +1,19 @@
 {
   "woocommerce.on_store_event": {
     "displayName": "스토어 이벤트",
-    "description": "선택한 WooCommerce 스토어 이벤트가 발생하면 실행합니다."
+    "description": "선택한 WooCommerce 스토어 이벤트가 발생하면 실행합니다.",
+    "configInputs": {
+      "events": "실행을 트리거하는 WooCommerce 스토어 이벤트.",
+      "webhookName": "WooCommerce에 표시될 웹훅 이름."
+    },
+    "outputs": {
+      "body": "원본 WooCommerce 웹훅 페이로드.",
+      "deliveryId": "고유한 WooCommerce 웹훅 배달 ID.",
+      "event": "WooCommerce 이벤트 동작.",
+      "resource": "WooCommerce 리소스 유형.",
+      "source": "이벤트를 생성한 WooCommerce 스토어의 URL.",
+      "topic": "완전한 WooCommerce 웹훅 주제.",
+      "webhookId": "WooCommerce 웹훅 구독 ID."
+    }
   }
 }

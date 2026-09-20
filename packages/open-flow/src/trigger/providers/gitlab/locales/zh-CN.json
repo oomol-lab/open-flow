@@ -1,6 +1,18 @@
 {
   "gitlab.on_project_event": {
     "displayName": "项目事件",
-    "description": "在项目发生所选 GitLab webhook 事件时触发。"
+    "description": "在项目发生所选 GitLab webhook 事件时触发。",
+    "configInputs": {
+      "events": "触发运行的GitLab项目事件。",
+      "insecureSsl": "允许GitLab在不验证SSL证书的情况下发送Webhook。",
+      "project": "项目的数字ID或URL编码的项目路径。",
+      "pushBranchFilter": "用于筛选推送事件的分支或通配符模式。留空则包含所有分支。"
+    },
+    "outputs": {
+      "body": "原始GitLab Webhook负载。",
+      "deliveryId": "为此Webhook投递生成的唯一ID。",
+      "event": "归一化的GitLab事件名称。",
+      "gitlabEvent": "原始GitLab事件头值。"
+    }
   }
 }

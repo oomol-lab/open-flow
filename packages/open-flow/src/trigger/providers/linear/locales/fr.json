@@ -1,6 +1,13 @@
 {
   "linear.on_issue_changed": {
     "displayName": "Création ou mise à jour d’un ticket",
-    "description": "Vérifie périodiquement les tickets nouveaux et modifiés d’une équipe Linear. Commence maintenant, sans déclencher les tickets existants. Signale les états actuels observés, sans couvrir les suppressions ni chaque changement de statut intermédiaire."
+    "description": "Vérifie périodiquement les tickets nouveaux et modifiés d’une équipe Linear. Commence maintenant, sans déclencher les tickets existants. Signale les états actuels observés, sans couvrir les suppressions ni chaque changement de statut intermédiaire.",
+    "configInputs": {
+      "teamId": "UUID de l'équipe Linear. Utilisez le UUID du modèle Copier dans Linear pour le trouver.",
+      "stateIds": "Statuts de l'équipe sélectionnée. Laissez vide pour tous les statuts. Correspond au statut actuel, pas à chaque transition vers celui-ci."
+    },
+    "outputs": {
+      "events": "Problèmes Linear créés ou mis à jour depuis la précédente interrogation."
+    }
   }
 }

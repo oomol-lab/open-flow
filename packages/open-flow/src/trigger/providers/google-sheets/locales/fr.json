@@ -1,6 +1,19 @@
 {
   "googlesheets.on_row_added": {
     "displayName": "Nouvelle ligne ajoutée",
-    "description": "Interroge périodiquement une feuille et se déclenche une fois pour chaque nouvelle ligne ajoutée après la dernière ligne déjà observée."
+    "description": "Interroge périodiquement une feuille et se déclenche une fois pour chaque nouvelle ligne ajoutée après la dernière ligne déjà observée.",
+    "configInputs": {
+      "columnRange": "Plage de colonnes A1 à lire, par exemple A:Z.",
+      "dateTimeRender": "Méthode de restitution des valeurs de date et d'heure.",
+      "firstDataRow": "Première ligne contenant des données sous l'en-tête.",
+      "headerRow": "Ligne dont les cellules deviennent les noms des champs de sortie.",
+      "maxRowsPerPoll": "Nombre maximal de nouvelles lignes traitées par interrogation.",
+      "sheet": "Nom de la feuille de calcul à surveiller.",
+      "spreadsheetId": "ID du classeur Google Sheets.",
+      "valueRender": "Méthode de restitution des valeurs des cellules."
+    },
+    "outputs": {
+      "events": "Lignes ajoutées depuis la précédente interrogation."
+    }
   }
 }

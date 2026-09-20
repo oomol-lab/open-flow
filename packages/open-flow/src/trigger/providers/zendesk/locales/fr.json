@@ -1,6 +1,15 @@
 {
   "zendesk.on_event": {
     "displayName": "Abonnement aux événements",
-    "description": "Se déclenche lorsque l’un des événements de compte Zendesk sélectionnés se produit."
+    "description": "Se déclenche lorsque l’un des événements de compte Zendesk sélectionnés se produit.",
+    "configInputs": {
+      "events": "Types d'événements Zendesk qui déclenchent une exécution."
+    },
+    "outputs": {
+      "body": "Charge utile originale de l'événement Zendesk.",
+      "deliveryId": "ID unique généré pour cette livraison d'événement Zendesk.",
+      "event": "Type d'événement Zendesk.",
+      "subject": "Objet Zendesk associé à l'événement."
+    }
   }
 }

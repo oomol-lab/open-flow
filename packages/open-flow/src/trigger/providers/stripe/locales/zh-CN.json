@@ -1,6 +1,17 @@
 {
   "stripe.on_event": {
     "displayName": "账户事件",
-    "description": "在已连接账户发生所选 Stripe 事件时触发。"
+    "description": "在已连接账户发生所选 Stripe 事件时触发。",
+    "configInputs": {
+      "apiVersion": "用于Webhook事件的Stripe API版本。留空则使用账户默认。",
+      "events": "触发运行的Stripe事件类型。",
+      "includeConnectedAccounts": "也接收来自关联Stripe账户的事件。"
+    },
+    "outputs": {
+      "body": "原始Stripe事件负载。",
+      "event": "Stripe事件类型。",
+      "eventId": "唯一的Stripe事件ID。",
+      "livemode": "事件是否在生产环境中产生。"
+    }
   }
 }

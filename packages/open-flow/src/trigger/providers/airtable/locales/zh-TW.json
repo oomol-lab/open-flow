@@ -1,6 +1,18 @@
 {
   "airtable.on_record_changed": {
     "displayName": "記錄建立或更新",
-    "description": "輪詢 Airtable 資料表，依時間欄位排序，在記錄建立或更新時觸發。"
+    "description": "輪詢 Airtable 資料表，依時間欄位排序，在記錄建立或更新時觸發。",
+    "configInputs": {
+      "baseId": "要監控的 Airtable 基地 ID。",
+      "fields": "每個返回記錄中包含的欄位。留空則包含所有欄位。",
+      "formula": "用於過濾記錄的 Airtable 公式。留空則包含所有記錄。",
+      "maxRecordsPerPoll": "每次輪詢處理的最大記錄數。",
+      "tableIdOrName": "要監控的 Airtable 表格 ID 或名稱。",
+      "triggerField": "用於檢測新建或更新記錄的日期或時間欄位。",
+      "view": "用於過濾和排序記錄的 Airtable 視圖。留空則使用表格預設視圖。"
+    },
+    "outputs": {
+      "events": "自上次輪詢以來新建或更新的記錄。"
+    }
   }
 }

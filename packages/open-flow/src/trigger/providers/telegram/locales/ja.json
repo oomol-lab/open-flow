@@ -1,6 +1,17 @@
 {
   "telegram.on_update": {
     "displayName": "ボットの更新",
-    "description": "接続した Telegram ボットが選択した更新を受信すると実行します。"
+    "description": "接続した Telegram ボットが選択した更新を受信すると実行します。",
+    "configInputs": {
+      "chatIds": "指定したTelegramのチャットIDからのみアップデートを受け付けます。空欄にするとすべてのチャットを許可します。",
+      "dropPendingUpdates": "Webhookの作成または再開前にキューに入っていたアップデートを破棄します。",
+      "updates": "実行をトリガーするTelegramのアップデートタイプ。デフォルトは*です。",
+      "userIds": "指定したTelegramのユーザーIDからのみアップデートを受け付けます。空欄にするとすべてのユーザーを許可します。"
+    },
+    "outputs": {
+      "body": "元のTelegramアップデートペイロード。",
+      "deliveryId": "このTelegramアップデート用に生成された一意のID。",
+      "event": "Telegramアップデートタイプ。"
+    }
   }
 }

@@ -1,6 +1,20 @@
 {
   "feishu_app_bot.on_event": {
     "displayName": "Événement d’application",
-    "description": "Reçoit les événements Feishu sélectionnés via une source partagée."
+    "description": "Reçoit les événements Feishu sélectionnés via une source partagée.",
+    "configInputs": {
+      "sourceId": "Source d'événements qui reçoit les événements pour ce déclencheur.",
+      "eventTypes": "Types d'événements Feishu qui déclenchent une exécution.",
+      "chatIds": "ID des chats à partir desquels recevoir les événements. Laissez vide pour recevoir les événements de tous les chats accessibles à la source.",
+      "resource": "Ressource documentaire, calendrier ou approbation optionnelle à laquelle s'abonner."
+    },
+    "outputs": {
+      "event": "Type d'événement Feishu.",
+      "deliveryId": "ID de livraison unique pour cet événement.",
+      "appId": "ID de l'application Feishu qui a reçu l'événement.",
+      "tenantKey": "Clé du locataire Feishu ayant généré l'événement.",
+      "occurredAt": "Heure de l'événement, lorsque fournie par Feishu.",
+      "body": "Charge utile originale de l'événement Feishu."
+    }
   }
 }

@@ -1,6 +1,16 @@
 {
   "notion.on_database_page_event": {
     "displayName": "数据库页面新增或更新",
-    "description": "轮询 Notion 数据库，在新增页面或编辑现有页面时触发。"
+    "description": "轮询 Notion 数据库，在新增页面或编辑现有页面时触发。",
+    "configInputs": {
+      "dataSourceId": "数据库内的数据源ID。留空则使用主数据源。",
+      "databaseId": "要监控的Notion数据库ID。",
+      "events": "触发运行的页面变更。",
+      "includeProperties": "在每条输出事件中包含页面属性。",
+      "maxItemsPerPoll": "每次轮询处理的最大变更页面数。"
+    },
+    "outputs": {
+      "events": "自上次轮询以来新增或更新的数据库页面。"
+    }
   }
 }

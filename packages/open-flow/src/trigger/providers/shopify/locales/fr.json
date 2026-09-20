@@ -1,6 +1,18 @@
 {
   "shopify.on_shop_event": {
     "displayName": "Événement de boutique",
-    "description": "Se déclenche lors des événements correspondant aux sujets webhook Shopify sélectionnés dans la boutique connectée."
+    "description": "Se déclenche lors des événements correspondant aux sujets webhook Shopify sélectionnés dans la boutique connectée.",
+    "configInputs": {
+      "topics": "Thèmes de webhook Shopify qui déclenchent une exécution."
+    },
+    "outputs": {
+      "apiVersion": "Version API Shopify utilisée pour le webhook.",
+      "body": "Charge utile originale du webhook Shopify.",
+      "eventId": "ID unique de l'événement Shopify.",
+      "shopDomain": "Domaine du magasin Shopify ayant généré l'événement.",
+      "topic": "Thème du webhook Shopify.",
+      "triggeredAt": "Heure à laquelle Shopify a déclenché le webhook.",
+      "webhookId": "ID de l'abonnement au webhook Shopify."
+    }
   }
 }

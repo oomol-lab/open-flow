@@ -1,6 +1,15 @@
 {
   "googlecalendar.on_event_changed": {
     "displayName": "予定の変更",
-    "description": "Google カレンダーを定期的に確認し、予定が作成、更新、キャンセルされると実行します。"
+    "description": "Google カレンダーを定期的に確認し、予定が作成、更新、キャンセルされると実行します。",
+    "configInputs": {
+      "calendarId": "監視対象のGoogleカレンダーのID。",
+      "changes": "実行をトリガーするカレンダーイベントの変更。",
+      "matchTerm": "イベントの概要、説明、場所、参加者に含まれる必要があるテキスト。空欄にするとすべてのイベントを対象とします。",
+      "maxEventsPerPoll": "1回のポーリングで処理する最大カレンダーイベント数。"
+    },
+    "outputs": {
+      "events": "前のポーリング以降に作成、更新、またはキャンセルされたカレンダーイベント。"
+    }
   }
 }

@@ -6,6 +6,7 @@ import type { LogAction } from './stories.tsx'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { applyFlowChanges } from '../../src/flow/common/change.ts'
 import { inputValue } from '../../src/flow/common/inputValue.ts'
+import { localizeTrigger } from '../../src/trigger/providers/localization.ts'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { ConnectorStore } from '../../src/workbench/browser/runtime/stores/connectorStore.ts'
@@ -47,7 +48,16 @@ export function createTriggerSession(
   const account = { connectionId: 'lab-account', serviceId, displayName: 'Design team', isDefault: true, status: 'active' as const }
   const client = new WorkbenchClient(async (path, init) => {
     const url = new URL(path instanceof Request ? path.url : path, 'https://lab.invalid')
-    if (url.pathname === '/v1/trigger-keys/catalog' && catalog != null) return catalog.request(url, init)
+    if (url.pathname === '/v1/trigger-keys/catalog') {
+      if (catalog != null) return catalog.request(url, init)
+      const definitions = trigger.kind === 'poll' || trigger.kind === 'integration' ? [trigger.definition] : []
+      return Response.json({
+        version: 2,
+        locale: language,
+        definitions,
+        display: Object.fromEntries(await Promise.all(definitions.map(async (definition) => [definition.key, await localizeTrigger(definition, language)]))),
+      })
+    }
     if (url.pathname === '/v1/event-sources')
       return Response.json({
         version: 1,

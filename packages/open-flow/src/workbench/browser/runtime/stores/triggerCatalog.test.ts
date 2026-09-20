@@ -12,7 +12,7 @@ it('restores local data, retains replacement 304 ETags and separates languages',
     },
   }
   const local = browserTriggerCatalogStorage('test', storage)
-  local.setItem('en', JSON.stringify({ data: { version: 1, locale: 'en', definitions: [], display: {} }, etag: '"old"' }))
+  local.setItem('en', JSON.stringify({ data: { version: 2, locale: 'en', definitions: [], display: {} }, etag: '"old"' }))
   const request = vi.fn(async (_path: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
     expect(new Headers(init?.headers).get('if-none-match')).toBe('"old"')
     return new Response(null, { status: 304, headers: { etag: 'W/"new"' } })
@@ -24,7 +24,7 @@ it('restores local data, retains replacement 304 ETags and separates languages',
   expect(JSON.parse(local.getItem('en')!).etag).toBe('W/"new"')
   request.mockImplementation(async (_path, init) => {
     expect(new Headers(init?.headers).has('if-none-match')).toBe(false)
-    return Response.json({ version: 1, locale: 'zh-CN', definitions: [], display: {} })
+    return Response.json({ version: 2, locale: 'zh-CN', definitions: [], display: {} })
   })
   store.setLanguage('zh-CN')
   expect((await resourceValue(store.get())).locale).toBe('zh-CN')
@@ -36,7 +36,7 @@ it('restores local data, retains replacement 304 ETags and separates languages',
 
 it('rejects a mismatched locale without persisting or publishing it', async () => {
   const storage = { getItem: () => null, setItem: vi.fn() }
-  const store = new TriggerCatalogStore(new WorkbenchClient(async () => Response.json({ version: 1, locale: 'en', definitions: [], display: {} })), 'zh-CN', {
+  const store = new TriggerCatalogStore(new WorkbenchClient(async () => Response.json({ version: 2, locale: 'en', definitions: [], display: {} })), 'zh-CN', {
     triggerCatalogCache: { namespace: 'test', storage },
   })
   await store.refresh()

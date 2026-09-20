@@ -663,7 +663,7 @@ export class ControlClient {
 
   async listTriggerDefinitions(signal?: AbortSignal): Promise<readonly TriggerKeySnapshot[]> {
     const source = record(await this.request('/v1/trigger-keys/catalog', { signal }))
-    if (source.version != 1 || !Array.isArray(source.definitions)) return invalidResponse()
+    if (source.version != 2 || !Array.isArray(source.definitions)) return invalidResponse()
     return source.definitions.map(triggerKey)
   }
 
