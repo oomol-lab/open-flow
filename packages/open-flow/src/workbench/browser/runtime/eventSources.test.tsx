@@ -14,7 +14,6 @@ const source: NonNullable<ComponentProps<typeof SourceForm>['source']> = {
   name: 'Demo events',
   provider: 'feishu_app_bot',
   appId: 'cli_demo',
-  tenantKey: 'tenant',
   connectionId: 'connection',
   teamId: null,
   enabled: true,
@@ -56,9 +55,8 @@ it('shows verified app identity as text and keeps stored callback secrets out of
     </I18nProvider>,
   )
   expect(markup).toContain('App ID: cli_demo')
-  expect(markup).toContain('Tenant Key: tenant')
+  expect(markup).not.toContain('Tenant Key')
   expect(markup).not.toContain('value="cli_demo"')
-  expect(markup).not.toContain('value="tenant"')
   expect(markup.match(/type="password"/g)).toHaveLength(2)
   expect(markup).not.toContain('I confirm')
 })

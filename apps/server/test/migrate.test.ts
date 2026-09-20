@@ -40,7 +40,7 @@ it('applies the Flow-first schema without foreign keys', async () => {
   Database.open(file).close()
   const database = new DatabaseSync(file)
   try {
-    expect(version(database)).toBe(23)
+    expect(version(database)).toBe(24)
     const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as {
       readonly name: string
     }[]
@@ -82,7 +82,7 @@ it('upgrades a version 1 Flow database without changing its data', async () => {
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(23)
+    expect(version(reopened)).toBe(24)
     expect(reopened.prepare('SELECT revision_id AS revisionId FROM revisions').all()).toEqual([{ revisionId: 'revision-a' }])
     expect(reopened.prepare('SELECT name FROM variables').all()).toEqual([])
   } finally {
@@ -112,7 +112,7 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(23)
+    expect(version(reopened)).toBe(24)
     expect(reopened.prepare('SELECT flow_id AS flowId, team_id AS teamId FROM flow_connector_teams').all()).toEqual([{ flowId: 'flow-a', teamId: null }])
     expect(reopened.prepare("SELECT name FROM pragma_table_info('runs') WHERE name = 'connector_team_id'").get()).toEqual({ name: 'connector_team_id' })
   } finally {
@@ -160,13 +160,13 @@ it('rejects a newer Flow schema version without modifying it', async () => {
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
-  database.exec('PRAGMA user_version = 24')
+  database.exec('PRAGMA user_version = 25')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('SQLite schema version 24 is newer than the supported version 23.')
+  expect(() => Database.open(file)).toThrow('SQLite schema version 25 is newer than the supported version 24.')
 
   const reopened = new DatabaseSync(file)
-  expect(version(reopened)).toBe(24)
+  expect(version(reopened)).toBe(25)
   reopened.close()
 })
 
@@ -204,7 +204,7 @@ it('preserves old checkpoint bytes for explicit recovery validation', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(23)
+    expect(version(reopened)).toBe(24)
     expect(reopened.prepare('SELECT * FROM run_checkpoints').get()).toEqual({
       run_id: 'run-a',
       checkpoint_json: '{"value":42}',
@@ -237,7 +237,7 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   Database.open(file).close()
   const upgraded = new DatabaseSync(file)
   try {
-    expect(version(upgraded)).toBe(23)
+    expect(version(upgraded)).toBe(24)
     const after = tables.map((table) => upgraded.prepare('SELECT * FROM ' + table).all())
     expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
     expect(after[2]).toEqual(
@@ -248,6 +248,31 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
       ),
     )
     expect(upgraded.prepare('SELECT * FROM listener_work').all()).toEqual([])
+  } finally {
+    upgraded.close()
+  }
+})
+
+it('removes the event source tenant binding while preserving source configuration and queued events', async () => {
+  const file = await databaseFile()
+  const database = legacyDatabase(file, 23)
+  database
+    .prepare(`INSERT INTO event_sources
+    (source_id, revision, name, provider, app_id, tenant_key, connection_id, verification_token, encrypt_key,
+     event_types_json, manage_subscriptions, verified_at, updated_at)
+    VALUES ('source', 2, 'Events', 'feishu_app_bot', 'cli_test', 'tenant', 'connection', 'token', 'key', '[]', 0, 100, 100)`)
+    .run()
+  database.prepare('INSERT INTO source_events VALUES (?, ?, ?, ?)').run('source', 'event', '{"tenantKey":"tenant"}', 100)
+  const { tenant_key: _tenant, ...source } = database.prepare('SELECT * FROM event_sources').get()!
+  const events = database.prepare('SELECT * FROM source_events').all()
+  database.close()
+
+  Database.open(file).close()
+
+  const upgraded = new DatabaseSync(file)
+  try {
+    expect(upgraded.prepare('SELECT * FROM event_sources').get()).toEqual(source)
+    expect(upgraded.prepare('SELECT * FROM source_events').all()).toEqual(events)
   } finally {
     upgraded.close()
   }

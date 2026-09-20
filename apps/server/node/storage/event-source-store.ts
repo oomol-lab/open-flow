@@ -9,7 +9,7 @@ import { matchesFeishuEvent } from '@oomol-lab/open-flow/provider-triggers'
 import { randomUUID } from 'node:crypto'
 import { ControlError } from '../error.ts'
 
-const sourceColumns = `source_id AS sourceId, revision, name, provider, app_id AS appId, tenant_key AS tenantKey,
+const sourceColumns = `source_id AS sourceId, revision, name, provider, app_id AS appId,
   connection_id AS connectionId, team_id AS teamId, verification_token AS verificationToken, encrypt_key AS encryptKey,
   event_types_json AS eventTypesJson, manage_subscriptions AS manageSubscriptions, enabled, verified_at AS verifiedAt,
   last_received_at AS lastReceivedAt, updated_at AS updatedAt`
@@ -20,7 +20,6 @@ export interface StoredEventSource {
   readonly name: string
   readonly provider: 'feishu' | 'feishu_app_bot'
   readonly appId: string
-  readonly tenantKey: string
   readonly connectionId: string
   readonly teamId: string | null
   readonly verificationToken: string
@@ -79,7 +78,6 @@ export class EventSourceStore {
       name: row.name,
       provider: row.provider,
       appId: row.appId,
-      tenantKey: row.tenantKey,
       connectionId: row.connectionId,
       teamId: row.teamId,
       enabled: row.enabled == 1,
@@ -95,7 +93,7 @@ export class EventSourceStore {
     }
   }
 
-  create(input: CreateEventSource & { readonly provider: string; readonly appId: string; readonly tenantKey: string }): StoredEventSource {
+  create(input: CreateEventSource & { readonly provider: string; readonly appId: string }): StoredEventSource {
     return this.#transaction(() => {
       if (this.#database.prepare('SELECT 1 FROM event_sources WHERE app_id = ?').get(input.appId) != null) {
         throw new ControlError(controlErrorCode.eventSourceConflict, 'This application already has an event source.')
@@ -104,15 +102,14 @@ export class EventSourceStore {
       if (count.count >= 100) throw new ControlError(controlErrorCode.eventSourceConflict, 'The deployment event source limit has been reached.')
       const sourceId = `source_${randomUUID().replaceAll('-', '')}`
       this.#database
-        .prepare(`INSERT INTO event_sources (source_id, revision, name, provider, app_id, tenant_key, connection_id,
+        .prepare(`INSERT INTO event_sources (source_id, revision, name, provider, app_id, connection_id,
         team_id, verification_token, encrypt_key, event_types_json, manage_subscriptions, updated_at)
-        VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(
           sourceId,
           input.name,
           input.provider,
           input.appId,
-          input.tenantKey,
           input.connectionId,
           input.teamId,
           input.verificationToken,

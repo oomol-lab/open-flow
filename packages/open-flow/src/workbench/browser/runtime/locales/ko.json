@@ -1110,7 +1110,6 @@
   "eventSources": {
     "required": "필수",
     "optional": "선택",
-    "tenantHint": "저장할 때 선택한 연결에서 테넌트 정보를 자동으로 가져옵니다. Tenant Key를 입력할 필요가 없습니다.",
     "secretsHint": "앱의 이벤트 및 콜백 암호화 설정에서 두 값을 복사하세요. 암호화된 콜백이 필요합니다. 수정 시 비워 두면 기존 키가 유지됩니다.",
     "openConsole": "Feishu 개발자 콘솔 열기",
     "defaultName": "Feishu 이벤트 소스",

@@ -1,10 +1,11 @@
 import { createCipheriv, createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
+import { PermanentIntegrationError } from '../src/trigger/common/integration.ts'
 import { receiveFeishuEvent, matchesFeishuEvent } from '../src/trigger/providers/feishu/events.ts'
 import { feishuResponse, feishuSubscriptions } from '../src/trigger/providers/feishu/subscriptions.ts'
 
 const now = Date.parse('2026-09-14T08:00:00.000Z')
-const source = { appId: 'cli_test', tenantKey: 'tenant', verificationToken: 'verification-secret', encryptKey: 'encryption-secret' }
+const source = { appId: 'cli_test', verificationToken: 'verification-secret', encryptKey: 'encryption-secret' }
 
 function request(value: unknown) {
   const iv = Buffer.alloc(16, 7)
@@ -24,7 +25,7 @@ function event(overrides = {}) {
     schema: '2.0',
     header: {
       app_id: source.appId,
-      tenant_key: source.tenantKey,
+      tenant_key: 'tenant',
       token: source.verificationToken,
       event_id: 'delivery',
       event_type: 'im.message.receive_v1',
@@ -54,7 +55,12 @@ describe('Feishu event boundary', () => {
     await expect(receiveFeishuEvent(Buffer.from(first.raw.toString() + ' '), first.headers, source, now)).rejects.toThrow('signature')
   })
 
-  it.each([{ app_id: 'cli_other' }, { tenant_key: 'other' }, { token: 'wrong' }, { event_type: 'card.action.trigger' }])(
+  it.each(['tenant-a', 'tenant-b'])('accepts authenticated events from tenant %s and preserves their tenant metadata', async (tenantKey) => {
+    const { raw, headers } = request(event({ tenant_key: tenantKey }))
+    await expect(receiveFeishuEvent(raw, headers, source, now)).resolves.toMatchObject({ event: { appId: source.appId, tenantKey } })
+  })
+
+  it.each([{ app_id: 'cli_other' }, { tenant_key: 42 }, { tenant_key: '' }, { token: 'wrong' }, { event_type: 'card.action.trigger' }])(
     'rejects invalid authority or synchronous callbacks: %j',
     async (overrides) => {
       const { raw, headers } = request(event(overrides))
@@ -78,7 +84,7 @@ describe('Feishu event boundary', () => {
       event: {
         type: 'approval_instance',
         app_id: source.appId,
-        tenant_key: source.tenantKey,
+        tenant_key: 'tenant',
         approval_code: 'approval',
         instance_code: 'instance',
         status: 'APPROVED',
@@ -108,5 +114,15 @@ describe('Feishu resource subscriptions', () => {
     expect(() => feishuResponse({ status: 200, data: { code: 99991671 } })).toThrow('Connection')
     expect(() => feishuResponse({ status: 200, data: { code: 1234, msg: 'secret raw error' } })).toThrow('rejected')
     expect(() => feishuResponse({ status: 429, data: { code: 99991400 } })).toThrow('temporarily')
+  })
+  it('preserves diagnostic codes without exposing raw provider messages', () => {
+    expect(() => feishuResponse({ status: 200, data: { code: 99991672, msg: 'secret raw error' } })).toThrow(
+      new PermanentIntegrationError(
+        "Feishu rejected the request (HTTP 200, Feishu code 99991672). Check the application's API permissions and request parameters.",
+      ),
+    )
+    expect(() => feishuResponse({ status: 400, data: { code: 'secret raw error' } })).toThrow(
+      new PermanentIntegrationError("Feishu rejected the request (HTTP 400). Check the application's API permissions and request parameters."),
+    )
   })
 })

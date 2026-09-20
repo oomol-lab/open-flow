@@ -63,9 +63,10 @@ export function feishuResponse(result: ConnectorProxyResult): Readonly<Record<st
   if (!isJsonObject(result.data)) throw new TransientIntegrationError('Feishu returned an invalid response.')
   const code = result.data.code
   if (result.status >= 200 && result.status < 300 && code === 0) return isJsonObject(result.data.data) ? result.data.data : {}
+  const details = `HTTP ${result.status}${typeof code == 'number' && Number.isSafeInteger(code) ? `, Feishu code ${code}` : ''}`
   if (result.status == 401 || result.status == 403 || [99991661, 99991663, 99991668, 99991671, 99991677].includes(Number(code))) {
-    throw new IntegrationConnectionError('Feishu rejected the Connection.')
+    throw new IntegrationConnectionError(`Feishu rejected the Connection (${details}).`)
   }
-  if (result.status == 429 || result.status >= 500 || code === 99991400) throw new TransientIntegrationError('Feishu is temporarily unavailable.')
-  throw new PermanentIntegrationError('Feishu rejected the request. Check resource permissions and application event configuration.')
+  if (result.status == 429 || result.status >= 500 || code === 99991400) throw new TransientIntegrationError(`Feishu is temporarily unavailable (${details}).`)
+  throw new PermanentIntegrationError(`Feishu rejected the request (${details}). Check the application's API permissions and request parameters.`)
 }

@@ -1110,7 +1110,6 @@
   "eventSources": {
     "required": "Required",
     "optional": "Optional",
-    "tenantHint": "The tenant is retrieved automatically from the selected Connection when you save.",
     "secretsHint": "Copy both values from the app’s Events & Callbacks encryption settings. This event source requires encrypted callbacks. When editing, leave a secret blank to keep its current value.",
     "openConsole": "Open Feishu Developer Console",
     "defaultName": "Feishu event source",

@@ -11,7 +11,6 @@ const eventSourceSchema = z.strictObject({
   name,
   provider: z.enum(['feishu', 'feishu_app_bot']),
   appId: id,
-  tenantKey: id,
   connectionId: id,
   teamId: id.nullable(),
   enabled: z.boolean(),
@@ -54,7 +53,6 @@ export interface EventSource {
   readonly name: string
   readonly provider: 'feishu' | 'feishu_app_bot'
   readonly appId: string
-  readonly tenantKey: string
   readonly connectionId: string
   readonly teamId: string | null
   readonly enabled: boolean

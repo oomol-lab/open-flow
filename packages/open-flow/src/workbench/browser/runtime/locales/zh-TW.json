@@ -1110,7 +1110,6 @@
   "eventSources": {
     "required": "必填",
     "optional": "選填",
-    "tenantHint": "儲存時會從所選連線帳號自動取得租戶資訊，無需填寫 Tenant Key。",
     "secretsHint": "從飛書應用程式的「事件與回呼」加密設定中複製這兩項。本事件來源使用加密回呼；編輯時留空可保留原金鑰。",
     "openConsole": "開啟飛書開發者後台",
     "defaultName": "飛書事件來源",

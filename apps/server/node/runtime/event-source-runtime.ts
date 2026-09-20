@@ -53,15 +53,8 @@ export class EventSourceRuntime {
     const appId = connection.providerAccountId
     if (appId == null || !/^cli_[a-zA-Z0-9]+$/.test(appId))
       throw new ControlError(controlErrorCode.eventSourceIdentityUnavailable, 'Connector must provide the verified application identity.')
-    const endpoint = '/tenant/v2/tenant/query'
-    const data = feishuResponse(await connector.proxy(provider, input.connectionId, 'event-source-identity', { method: 'GET', endpoint }, signal, access))
-    const identity = data.tenant
-    const tenantKey = identity != null && typeof identity == 'object' && !Array.isArray(identity) && 'tenant_key' in identity ? identity.tenant_key : undefined
-    if (typeof tenantKey != 'string' || tenantKey.trim().length == 0 || tenantKey.length > 256) {
-      throw new ControlError(controlErrorCode.eventSourceInvalid, 'The Connection did not return a valid Feishu tenant.')
-    }
     signal.throwIfAborted()
-    const source = this.#store.eventSources.create({ ...input, provider, appId, tenantKey })
+    const source = this.#store.eventSources.create({ ...input, provider, appId })
     return this.#store.eventSources.view(source, this.#options()?.publicOrigin)
   }
 

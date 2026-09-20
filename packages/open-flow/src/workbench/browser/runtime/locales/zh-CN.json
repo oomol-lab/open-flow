@@ -1110,7 +1110,6 @@
   "eventSources": {
     "required": "必填",
     "optional": "选填",
-    "tenantHint": "保存时会从所选连接账号自动获取租户信息，无需填写 Tenant Key。",
     "secretsHint": "从飞书应用的“事件与回调”加密设置中复制这两项。本事件源使用加密回调；编辑时留空可保留原密钥。",
     "openConsole": "打开飞书开发者后台",
     "defaultName": "飞书事件源",

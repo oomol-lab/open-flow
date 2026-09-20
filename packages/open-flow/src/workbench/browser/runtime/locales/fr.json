@@ -1110,7 +1110,6 @@
   "eventSources": {
     "required": "Obligatoire",
     "optional": "Facultatif",
-    "tenantHint": "Le tenant est récupéré automatiquement depuis la connexion sélectionnée lors de l’enregistrement.",
     "secretsHint": "Copiez ces deux valeurs depuis les paramètres de chiffrement des événements et rappels de l’application. Les rappels chiffrés sont requis. Lors d’une modification, laissez un secret vide pour conserver sa valeur.",
     "openConsole": "Ouvrir la console développeur Feishu",
     "defaultName": "Source d’événements Feishu",

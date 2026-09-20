@@ -682,6 +682,11 @@ Connection；客户端不能改用 Team ID、Connection owner 或其他外部 id
 自部署 Connector 使用显式配置的 Console origin 和 `/providers/:serviceId` 路径。未配置 Console origin 时返回
 `503 connector.console-unconfigured`；它与 Connector 请求失败的 `connector.unavailable` 分开，客户端应提示配置授权控制台地址。
 
+`POST /v1/event-sources` 创建飞书事件源时，从所选 active Connection 获取应用身份；
+缺少可信的 App ID 时返回 `409 event-source.identity-unavailable`。事件源以应用为边界，不绑定企业，
+不查询企业信息，也不要求 `tenant:tenant:readonly` 权限。事件源响应不含 `tenantKey`。
+接收事件时校验加密内容、Verification Token、签名和 App ID；事件自身的 `tenant_key` 作为触发器输出保留，不用于企业匹配。
+
 `GET /v1/connector/connections` 返回 `{ version: 1, connections: ConnectorConnection[] }`，与按服务读取的接口使用相同的 Flow scope 校验。
 Provider 列表接受可选 `locale`，省略时按 `Accept-Language` 解析默认语言；响应携带 `Content-Language` 和 `Vary: Accept-Language`。
 Workbench 将界面语言写入 Provider 请求 URL，按语言分别持久化响应及 ETag；部署将相同语言传递至上游，Action 中的应用名称也采用该语言。
