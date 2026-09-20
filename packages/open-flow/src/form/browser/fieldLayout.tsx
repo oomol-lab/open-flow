@@ -115,21 +115,28 @@ export const FieldRow = forwardRef<
   },
 )
 
-/** The first child's semantic leading slot determines the connector endpoint. */
-export function FieldBranch({
+/** Expanded values stay in their cell; structural branches establish a child geometry and connector. */
+export function FieldBody({
+  placement,
   endpoint = 'control',
   depth,
   className,
   children,
   ...props
 }: ComponentPropsWithoutRef<'div'> & {
+  placement: 'inline' | 'branch'
   endpoint?: 'control' | 'marker'
   depth?: number
 }) {
   const geometry = useContext(Geometry)
   return (
-    <div {...props} className={[className, branchStyles.branch].filter(Boolean).join(' ')} data-field-branch data-branch-endpoint={endpoint}>
-      <FieldLayout {...geometry} depth={depth ?? geometry.depth + 1}>
+    <div
+      {...props}
+      className={[className, placement === 'branch' && branchStyles.branch].filter(Boolean).join(' ')}
+      data-field-branch={placement === 'branch' || undefined}
+      data-branch-endpoint={placement === 'branch' ? endpoint : undefined}
+    >
+      <FieldLayout {...geometry} depth={depth ?? geometry.depth + (placement === 'branch' ? 1 : 0)}>
         {children}
       </FieldLayout>
     </div>

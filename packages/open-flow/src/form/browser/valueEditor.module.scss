@@ -269,14 +269,14 @@ $feedback-focus: ':has(#{$feedback-targets})';
 .root:not([data-header])[data-value-addon] {
   --field-value-column: 1;
   --field-value-row: 1;
-  &[data-collection] > .body {
+  &[data-expansion='branch'] > .body {
     grid-row: 2;
   }
 }
 .root[data-value-addon] {
   --value-start-addon-width: var(--value-addon-width);
   > .summary,
-  &:not([data-collection]) > .body {
+  &:not([data-expansion='branch']) > .body {
     position: relative;
     margin-left: calc(var(--value-start-addon-width) + var(--value-prefix-width));
   }
@@ -300,13 +300,13 @@ $feedback-focus: ':has(#{$feedback-targets})';
     margin-right: var(--value-end-addon-width);
   }
   > .summary,
-  &:not([data-collection]) > .body {
+  &:not([data-expansion='branch']) > .body {
     position: relative;
     margin-right: var(--value-end-addon-width);
     z-index: var(--value-editor-control-layer);
   }
 }
-.root[data-compact][data-collection] {
+.root[data-compact][data-expansion='branch'] {
   > .summary {
     grid-column: 1;
     grid-row: 1;
@@ -344,6 +344,9 @@ $feedback-focus: ':has(#{$feedback-targets})';
   }
 }
 .summaryText {
+  &[data-empty-string] {
+    color: var(--ui-muted-foreground);
+  }
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -367,7 +370,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
 }
 .root[data-value-tools] {
   > .summary,
-  &:not([data-collection]) > .body > div > :is([data-slot='select-trigger'], [aria-haspopup]) {
+  &:not([data-expansion='branch']) > .body > div > :is([data-slot='select-trigger'], [aria-haspopup]) {
     position: relative;
     > svg {
       position: absolute;
@@ -376,11 +379,11 @@ $feedback-focus: ':has(#{$feedback-targets})';
     }
   }
   > .summary,
-  &:not([data-collection]) > .body > :is(input, select, button, [role='button']),
-  &:not([data-collection]) > .body > div > :is([data-slot='select-trigger'], [data-field-control]) {
+  &:not([data-expansion='branch']) > .body > :is(input, select, button, [role='button']),
+  &:not([data-expansion='branch']) > .body > div > :is([data-slot='select-trigger'], [data-field-control]) {
     padding-right: calc(var(--value-tools-width) + var(--value-suffix-width) + 8px);
   }
-  &:not([data-collection]) > .body [data-slot='input-group'] input {
+  &:not([data-expansion='branch']) > .body [data-slot='input-group'] input {
     padding-right: calc(var(--value-tools-width) + 8px);
   }
 }
@@ -410,13 +413,13 @@ $feedback-focus: ':has(#{$feedback-targets})';
 }
 .root[data-header][data-array-child] {
   > .summary,
-  &:not([data-collection]) > .body {
+  &:not([data-expansion='branch']) > .body {
     grid-column: handle / content-end;
     grid-row: 1;
     margin-left: var(--field-indent);
   }
 }
-.root[data-header][data-collection] > .body {
+.root[data-header][data-expansion='branch'] > .body {
   --value-body-inset: calc(var(--field-indent, 0px) + 16px);
   --branch-origin: calc(var(--field-indent, 0px) - var(--branch-offset));
   --branch-offset: calc(var(--field-toggle-width, 24px) / 2 + var(--field-name-gap));
@@ -428,7 +431,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
 }
 
 @container value-fields (max-width: #{fieldLayout.$wrap-width}) {
-  .root[data-header][data-collection]:not([data-array-child], [data-output]) > .body {
+  .root[data-header][data-expansion='branch']:not([data-array-child], [data-output]) > .body {
     --branch-extension: calc(var(--field-control-height) + var(--field-row-gap));
   }
 }
@@ -468,7 +471,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
   font-size: 12px;
 }
 
-.root[data-collection]:not([data-header]) > .options {
+.root[data-expansion='branch']:not([data-header]) > .options {
   align-self: end;
   margin: 0;
 }
@@ -630,7 +633,8 @@ $feedback-focus: ':has(#{$feedback-targets})';
   }
 }
 
-.emptyString::placeholder {
+.emptyString::placeholder,
+.summaryText[data-empty-string] {
   opacity: 0.5;
 }
 
@@ -650,11 +654,16 @@ $feedback-focus: ':has(#{$feedback-targets})';
     padding-left: var(--field-indent);
   }
 }
-.root[data-object-child] > .options {
+.root:is([data-object-child], [data-array-child]) > .options {
   grid-column: nullable / end;
-  justify-content: space-around;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0;
+  > * {
+    justify-self: center;
+  }
 }
-.root:not([data-collection]) > .body::before {
+.root:not([data-expansion='branch']) > .body::before {
   content: none;
 }
 .root:not([data-header]) > .body::before {
@@ -749,7 +758,24 @@ $feedback-focus: ':has(#{$feedback-targets})';
   }
   > .summary,
   > .summaryError,
-  &:not([data-collection]) > .body {
+  &:not([data-expansion='branch']) > .body {
     margin-left: calc(var(--value-prefix-width) + var(--value-start-addon-width));
+  }
+}
+
+/* Nested text/code values grow in their existing value cell, without a tree branch. */
+.summary[hidden] {
+  display: none;
+}
+/* The expanded editor stacks disclosure and value actions in its top-right corner. */
+.root[data-expansion='inline'][data-expanded] {
+  > .valueTools {
+    flex-direction: column;
+    height: auto;
+    margin-top: 3px;
+  }
+  > .body > textarea,
+  > .body :global(.cm-content) {
+    padding-right: 32px;
   }
 }

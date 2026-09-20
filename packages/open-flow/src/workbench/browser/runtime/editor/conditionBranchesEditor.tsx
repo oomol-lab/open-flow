@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { operandHandle, operatorsForType, otherwiseOutput, unaryOperator, valueType, comparisonIssue } from '../../../../flow/common/condition.ts'
 import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
-import { FieldBranch } from '../../../../form/browser/fieldLayout.tsx'
+import { FieldBody } from '../../../../form/browser/fieldLayout.tsx'
 import { FieldSelect } from '../../../../form/browser/fieldSelect.tsx'
 import { FieldTypeAddon } from '../../../../form/browser/fieldTypeAddon.tsx'
 import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../form/browser/selectionMenuStyles.ts'
@@ -320,7 +320,7 @@ export function ConditionBranchesEditor({
                   {!disabled && caseSettings}
                 </div>
                 {(item.groups.length > 0 || !disabled) && (
-                  <FieldBranch className="condition-groups" endpoint={item.groups.length ? 'marker' : 'control'} hidden={!open}>
+                  <FieldBody placement="branch" className="condition-groups" endpoint={item.groups.length ? 'marker' : 'control'} hidden={!open}>
                     {item.groups.length === 0 && !disabled && (
                       <div className="condition-case-empty">
                         <Button
@@ -508,7 +508,7 @@ export function ConditionBranchesEditor({
                         </div>
                       )
                     })}
-                  </FieldBranch>
+                  </FieldBody>
                 )}
                 {editingCase === c && (
                   <Popover

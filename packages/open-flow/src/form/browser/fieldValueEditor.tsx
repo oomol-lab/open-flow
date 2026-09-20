@@ -22,7 +22,7 @@ import { initialValue, objectValue } from '../common/value.ts'
 import { collectionCreateAction } from './collectionActions.ts'
 import { ObjectValueFields, ArrayValueFields } from './collectionValueFields.tsx'
 import { EditableChoices } from './editableChoices.tsx'
-import { FieldRow, FieldBranch } from './fieldLayout.tsx'
+import { FieldRow, FieldBody } from './fieldLayout.tsx'
 import { FieldSelect } from './fieldSelect.tsx'
 import { FieldSorting } from './fieldSorting.ts'
 import { FieldTypeAddon } from './fieldTypeAddon.tsx'
@@ -101,8 +101,11 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
   const availableTypes = Array.isArray(source.type) ? types.filter((candidate) => (source.type as unknown[]).includes(candidate)) : types
   const structured = !raw && shape.collection && props.editor === undefined
   const expandable = !showUnset && (structured || (valueEditable && (raw || complex || (type === 'string' && source['ui:widget'] === 'text'))))
+  const inlineExpansion = compactValue && props.arrayChild && expandable && !structured
+  const expansionPlacement = expandable ? (inlineExpansion ? 'inline' : 'branch') : undefined
+  const restorePreviewFocus = useRef(false)
   const uncreatedText = compactValue && expandable && shape.text && !raw && presence !== 'value'
-  const hasBranch = expandable && !uncreatedText && !(structured && type === 'object' && presence !== 'value')
+  const hasExpandedContent = expandable && !uncreatedText && !(structured && type === 'object' && presence !== 'value')
   // Keep the complete error set authoritative for both control state and feedback.
   const errors =
     draftInvalid || props.editor !== undefined
@@ -121,6 +124,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
   const { expanded, bodyMounted, setExpanded } = useFieldExpansion(
     {
       depth,
+      placement: expansionPlacement,
       expandable: expandable && !uncreatedText,
       editable: valueEditable && !disabled,
       empty: state.empty,
@@ -128,6 +132,12 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
     },
     props.expansionPolicy,
   )
+  useEffect(() => {
+    if (!expanded && restorePreviewFocus.current) {
+      restorePreviewFocus.current = false
+      container?.querySelector<HTMLButtonElement>(':scope > [data-value-preview]')?.focus()
+    }
+  }, [expanded, container])
   useEffect(() => {
     if (!focusCreatedValue.current || presence === 'unset' || !container) return
     focusCreatedValue.current = false
@@ -150,7 +160,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
     messages,
     anchor,
   } = valueFeedback(errors, {
-    expanded: hasBranch && expanded,
+    expanded: hasExpandedContent && expanded,
     hasSummary: expandable && compactValue,
     hasChildren: structured,
     draftInvalid,
@@ -204,8 +214,16 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
         ? collectionCreateAction(props)
         : undefined
   const toggleExpanded = () => {
+    restorePreviewFocus.current = !!inlineExpansion && expanded
     setExpanded(!expanded)
     if (!expanded) setEditorFocusRequest((request) => request + 1)
+  }
+  const clearValue = () => {
+    const clearTextItem = props.arrayChild && shape.text && !raw && !complex
+    onChange(clearTextItem ? '' : undefined)
+    setExpanded(shape.expandable)
+    setRaw(false)
+    setEditorFocusRequest((request) => (clearTextItem ? request + 1 : 0))
   }
   const toolbar = (
     <div
@@ -262,7 +280,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
             </Button>
           )}
           {state.canClear && (
-            <Button type="button" size="xs" variant="ghost" disabled={disabled} onClick={() => onChange(undefined)}>
+            <Button type="button" size="xs" variant="ghost" disabled={disabled} onClick={clearValue}>
               <i aria-hidden="true" className="i-lucide-light:eraser" />
               {t('valueEditor.clear')}
             </Button>
@@ -283,13 +301,14 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
         ((sorting && props.onDefinitionChange != null) || fieldValueShape(firstSchema, firstValue, { objectChild: true, depth: depth + 1 }).expandable)
   const shouldMountBody = !compactValue || !expandable || expanded || bodyMounted
   const body = shouldMountBody && !uncreatedText && (
-    <FieldBranch
-      depth={depth + 1}
+    <FieldBody
+      placement={expansionPlacement ?? 'inline'}
+      depth={depth + (expansionPlacement === 'branch' ? 1 : 0)}
       endpoint={structured && presence === 'value' && childMarker ? 'marker' : 'control'}
       id={`${id}-body`}
       className={styles.body}
       data-value-body
-      hidden={(compactValue && expandable && !expanded) || (expandable && !hasBranch)}
+      hidden={(compactValue && expandable && !expanded) || (expandable && !hasExpandedContent)}
     >
       {!showUnset && !compactValue && valueEditable && presence !== 'value' && (
         <span className={styles.presence}>{state.display === 'null' ? 'null' : t('valueEditor.unset')}</span>
@@ -395,7 +414,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
         <ValueEditor {...props} onDraftIssue={reportDraftIssue} invalid={invalid} />
       )}
       {anchor === 'body' && errorMessage}
-    </FieldBranch>
+    </FieldBody>
   )
   return (
     <FieldRow
@@ -409,32 +428,32 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
       columns={props.columns}
       gap={props.gap}
       sorting={sorting}
-      disclosure={hasBranch ? { controls: `${id}-body`, expanded, onToggle: toggleExpanded } : undefined}
+      disclosure={hasExpandedContent && !inlineExpansion ? { controls: `${id}-body`, expanded, onToggle: toggleExpanded } : undefined}
       role="group"
       aria-label={label}
       aria-describedby={messages.length ? `${id}-error` : undefined}
       ref={setContainer}
       data-inline={(props.hideOptions && !props.header) || undefined}
       data-compact={props.compact || undefined}
-      data-value-tools={canClear || canToggleJson || undefined}
+      data-value-tools={canClear || canToggleJson || (inlineExpansion && hasExpandedContent) || undefined}
       data-array-child={props.arrayChild || undefined}
       data-object-child={props.objectChild || undefined}
       data-nested-field={depth > 0 || undefined}
       style={
         {
           '--field-indent': `${depth * 16}px`,
-          '--value-tools-width': `${(Number(canClear) + Number(canToggleJson)) * 24}px`,
+          '--value-tools-width': `${(Number(canClear) + Number(canToggleJson) + Number(!!inlineExpansion && hasExpandedContent)) * 24}px`,
           '--value-suffix-width': `${valueSuffix}px`,
         } as CSSProperties
       }
       data-header={props.header != null || undefined}
-      data-collection={expandable || undefined}
+      data-expansion={expansionPlacement}
       data-value-addon={props.valueAddon != null || undefined}
       data-value-suffix={typeAddon != null || undefined}
       data-value-prefix={arrayDefinition || undefined}
-      data-expanded={(hasBranch && expanded) || undefined}
+      data-expanded={(hasExpandedContent && expanded) || undefined}
       data-structured={(structured && !showUnset) || undefined}
-      data-branch={hasBranch || undefined}
+      data-branch={hasExpandedContent || undefined}
     >
       {arrayDefinition && <span className={styles.valuePrefix}>{t('valueEditor.arrayOf')}</span>}
       {props.valueAddon != null && (
@@ -448,12 +467,14 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
           variant="disclosure"
           size="field"
           className={styles.summary}
+          data-value-preview
+          hidden={inlineExpansion && hasExpandedContent && expanded}
           data-field-prompt={summaryInvalid || undefined}
           data-readonly={disabled || undefined}
           data-field-control
-          disabled={sorting || (!hasBranch && !createValue) || (needsCreation && !createValue)}
+          disabled={sorting || (!hasExpandedContent && !createValue) || (needsCreation && !createValue)}
           aria-label={`${label} ${t('valueEditor.setValue')}`}
-          aria-expanded={needsCreation || !hasBranch ? undefined : expanded}
+          aria-expanded={needsCreation || !hasExpandedContent ? undefined : expanded}
           aria-invalid={summaryInvalid}
           aria-controls={`${id}-body`}
           onClick={
@@ -465,7 +486,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
               : toggleExpanded
           }
         >
-          <span className={styles.summaryText}>
+          <span className={styles.summaryText} data-empty-string={value === '' || undefined}>
             {state.display === 'null'
               ? 'null'
               : presence === 'unset'
@@ -478,24 +499,18 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
                       : value
                     : JSON.stringify(value)}
           </span>
-          {props.header == null && hasBranch && !needsCreation && <SelectChevron className={expanded ? 'rotate-180' : undefined} />}
+          {!inlineExpansion && props.header == null && hasExpandedContent && !needsCreation && (
+            <SelectChevron className={expanded ? 'rotate-180' : undefined} />
+          )}
         </Button>
       )}
-      {!expandable && body}
+      {(!expandable || inlineExpansion) && body}
       <ValueTools
         label={label}
         container={container}
         raw={raw}
-        onClear={
-          canClear
-            ? () => {
-                onChange(undefined)
-                setExpanded(shape.expandable)
-                setRaw(false)
-                setEditorFocusRequest(0)
-              }
-            : undefined
-        }
+        disclosure={inlineExpansion && hasExpandedContent ? { controls: `${id}-body`, expanded, onToggle: toggleExpanded, disabled: sorting } : undefined}
+        onClear={canClear ? clearValue : undefined}
         onToggleJson={
           canToggleJson
             ? () => {
@@ -535,7 +550,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
             ))}
         </div>
       )}
-      {expandable && body}
+      {expandable && !inlineExpansion && body}
       {anchor === 'summary' && errorMessage && <div className={styles.summaryError}>{errorMessage}</div>}
     </FieldRow>
   )

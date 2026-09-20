@@ -60,9 +60,12 @@ the [property panel entry](property-panel.md) for shared scope.
   compose their own cells. Do not infer table geometry from descendant controls.
 - Hide column headings when the field editor switches to its wrapped layout at the shared
   container-width breakpoint; restore them when the rows fit on one line.
-- Expanded Multiline and JSON editors follow the same cumulative nesting baseline as object
-  children without a disclosure arrow. Array item values align to that child-field baseline, and
-  their zero-based indices replace the disclosure arrows at the same position. For expandable items,
+- Root and object-child Multiline/JSON editors follow the child-field nesting baseline. Array-item
+  Multiline and JSON editors replace their preview in the same value cell, without extra indentation or a connector.
+  Their disclosure button stays at the value control’s top-right corner. While expanded, Clear
+  and any JSON mode action stack directly below it inside the editor, in visual and keyboard order.
+  Array indices remain static for these inline editors. Array item values align to that child-field baseline, and
+  their zero-based indices replace the disclosure arrows at the same position. For structurally expandable items,
   the index is the disclosure button and supports clicking and keyboard activation; scalar indices are static.
 - Connectors stop earlier before an arrow, sorting drag handle, or array index than before an ordinary child field.
   Reuse the same endpoint rule for arrows and indices. Keep curves, indentation, and row geometry
@@ -137,7 +140,8 @@ the [property panel entry](property-panel.md) for shared scope.
 
 ## Disclosure, focus, and keyboard order
 
-- Expandable value fields start collapsed unless their initial validation fails or their value is
+- Array-item inline Multiline and JSON editors always start collapsed, including empty or invalid values.
+  Their errors remain visible on the collapsed preview. Other expandable value fields start collapsed unless their initial validation fails or their value is
   editable and empty (undefined, null, empty string, empty object, or empty array). False, zero,
   and whitespace-only strings are populated values. Read-only empty fields remain collapsed;
   initial errors may expand them. Definition trees start collapsed. Case groups and saved port
@@ -146,7 +150,9 @@ the [property panel entry](property-panel.md) for shared scope.
   cancel pending automatic expansion; later value updates never reapply the default. Creating a
   value, clearing, and switching JSON mode explicitly control expansion. Reopening the panel
   resets defaults; sorting preserves identity, expansion, and mounted editor drafts.
-- Object, JSON, and Multiline use a compact preview in both collapsed and expanded states. The
+- Object collections and root/object-child JSON/Multiline use a compact preview in both collapsed and expanded states.
+  Array-item JSON/Multiline use the preview only while collapsed; their mounted editor replaces it on
+  expansion. Closing restores focus to the preview and preserves drafts and editor state. The
   expanded preview retains the same shallow neutral block and standard control border. Its value
   summary and the array item-type name use muted foreground while expanded, restoring normal
   foreground when collapsed. While collapsed, the first-row value control represents all field errors. While

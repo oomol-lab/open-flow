@@ -12,7 +12,7 @@ import { definitionFieldExpansion } from '../common/fieldExpansion.ts'
 import { objectFieldNames, renameFieldDefinition, removeFieldDefinition } from '../common/objectFields.ts'
 import { objectValue } from '../common/value.ts'
 import { EditorComponentSelect } from './editorComponentSelect.tsx'
-import { FieldRow, FieldBranch } from './fieldLayout.tsx'
+import { FieldRow, FieldBody } from './fieldLayout.tsx'
 import { FieldName } from './fieldName.tsx'
 import { FieldSorting } from './fieldSorting.ts'
 import { PropertyName } from './propertyName.tsx'
@@ -67,14 +67,15 @@ export function DefinitionField({
       aria-label={label}
       data-output
       data-object-child={depth > 0 || undefined}
-      data-collection={expandable || undefined}
+      data-expansion={expandable ? 'branch' : undefined}
       data-structured={expandable || undefined}
       data-expanded={expanded || undefined}
       disclosure={expandable ? { controls: id, expanded, onToggle: () => setExpanded(!expanded) } : undefined}
       actions={row.actions ?? options}
     >
       {expandable && bodyMounted && (
-        <FieldBranch
+        <FieldBody
+          placement="branch"
           id={id}
           className={styles.body}
           endpoint={names.length && (sorting || objectValue(properties[names[0]!])?.type === 'object') ? 'marker' : 'control'}
@@ -190,7 +191,7 @@ export function DefinitionField({
               </div>
             )}
           </div>
-        </FieldBranch>
+        </FieldBody>
       )}
     </FieldRow>
   )

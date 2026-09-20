@@ -267,7 +267,6 @@ describe('Nullable field presentation', () => {
     expect(markup).not.toContain('aria-label="sample Set value" aria-expanded=')
     if (type === 'object') expect(markup).not.toContain('aria-label="sample" aria-expanded=')
     else expect(markup).toContain('aria-label="sample" aria-expanded="true"')
-    expect(markup).toContain('data-collection="true"')
     expect(markup).toContain('data-value-body="true"')
     if (type === 'object') expect(markup).not.toContain('aria-label="Add field sample"')
     else expect(markup).toContain('aria-label="Add item sample"')

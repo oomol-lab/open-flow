@@ -22,6 +22,18 @@ const fixtures = [
     value: [{ note: '' }, { note: 'Saved draft' }],
     nullable: false,
   },
+  {
+    name: 'textArray',
+    schema: { type: 'array', items: { 'type': 'string', 'ui:widget': 'text' } },
+    value: ['First line\nSecond line', ''],
+    nullable: false,
+  },
+  {
+    name: 'jsonArray',
+    schema: { type: 'array', items: {} },
+    value: [{ title: 'Draft', enabled: true }, {}],
+    nullable: false,
+  },
   { name: 'nullableUnset', schema: { type: 'string' }, value: undefined, nullable: true },
   { name: 'nullObject', schema: { type: 'object' }, value: null, nullable: true },
   { name: 'unsetObject', schema: { type: 'object' }, value: undefined, nullable: false },
@@ -98,6 +110,6 @@ export const fieldLayoutStory: FrontendStory = {
   group: 'Node Fixed Values',
   standalone: true,
   description:
-    'Mixed fixed and open types, nested arrays, null states and initial expansion. Collapse invalidText, then update it externally to check that it stays collapsed.',
+    'Array-item text and JSON values start collapsed and expand in place; root and object-child editors retain their branches. Clear a text item to keep an editable empty string. Compare wide, narrow and read-only states. Collapse invalidText, then update it externally to check that it stays collapsed.',
   render: (_log, dark, language) => <FieldLayouts dark={dark} language={language} />,
 }

@@ -57,3 +57,9 @@ it('renames and removes a definition together with order and required membership
   expect(objectFieldNames(removed)).toEqual(['second'])
   expect(schema.required).toEqual(['first'])
 })
+
+describe('Inline editor expansion', () => {
+  it.each(['pending', 'valid', 'invalid'] as const)('keeps empty nested editors collapsed with %s validation', (validation) => {
+    expect(valueFieldExpansion({ placement: 'inline', expandable: true, editable: true, empty: true, validation })).toBe(false)
+  })
+})

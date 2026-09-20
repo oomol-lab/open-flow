@@ -18,7 +18,8 @@ collections, definitions, and field, node, or group settings. Also read the
   display both undefined and null as null and expose no clear action in either state. Non-nullable
   fields display undefined as unset and null as a stored value, with validation and a clear action.
   Empty strings and collections keep their own presentation. Display never writes a normalized value.
-- Clear always sets the value to undefined. Allow null permits null; it does not convert a clear
+- Clear in an array-item Multiline text editor sets the value to an empty string and keeps the
+  editor open and editable. Other Clear actions set the value to undefined. Allow null permits null; it does not convert a clear
   action into null. Node input persistence stores an explicit `kind: unset` mapping when cleared;
   only an absent mapping inherits the field default. Preserve this distinction through callbacks,
   serialization, reload, and execution.
@@ -37,8 +38,9 @@ collections, definitions, and field, node, or group settings. Also read the
   A deleted node uses the neutral source icon and its saved output name; never expose its internal
   node ID as a user-facing fallback or imply a Provider identity that is no longer known.
 - A non-nullable field containing `null` displays null with its validation error; it must not look
-  unset. An explicit edit/create action uses the shared default rules. Array item clearing retains
-  the item position as null because the persisted JSON array cannot contain undefined.
+  unset. An explicit edit/create action uses the shared default rules. Array item clearing to undefined retains
+  the item position as null because the persisted JSON array cannot contain undefined. Multiline
+  text items instead retain an empty string; JSON editors keep their existing clearing semantics.
 
 ## Validation lifecycle
 
