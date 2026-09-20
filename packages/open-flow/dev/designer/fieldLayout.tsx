@@ -51,6 +51,7 @@ const fixtures = [
   { name: 'unsetText', schema: { 'type': 'string', 'ui:widget': 'text' }, value: undefined, nullable: false },
   { name: 'invalidText', schema: { 'type': 'string', 'ui:widget': 'text', 'minLength': 12 }, value: 'short', nullable: false },
   { name: 'emptyJson', schema: {}, value: undefined, nullable: true },
+  { name: 'invalidEmptyJson', schema: { minProperties: 1 }, value: {}, nullable: false },
 ] as const
 
 function FieldLayouts({ dark, language }: { dark: boolean; language: UiLanguage }) {
@@ -111,6 +112,6 @@ export const fieldLayoutStory: FrontendStory = {
   propertyPanel: true,
   standalone: true,
   description:
-    'Array-item text and JSON values start collapsed and expand in place; root and object-child editors retain their branches. Clear a text item to keep an editable empty string. Compare wide, narrow and read-only states. Collapse invalidText, then update it externally to check that it stays collapsed.',
+    'Array-item text and JSON values start collapsed and expand in place. Compare emptyJson, which remains collapsed after validation, with invalidEmptyJson, which opens for its initial error. Root and object-child editors retain their branches. Clear a text item to keep an editable empty string. Compare wide, narrow and read-only states. Collapse invalidText, then update it externally to check that it stays collapsed.',
   render: (_log, dark, language) => <FieldLayouts dark={dark} language={language} />,
 }

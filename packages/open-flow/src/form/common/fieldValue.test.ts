@@ -43,6 +43,13 @@ describe('initial field expansion policy', () => {
   it('opens initial errors, including read-only fields', () => {
     expect(valueFieldExpansion({ expandable: true, editable: false, empty: false, validation: 'invalid' })).toBe(true)
   })
+  it('keeps an empty top-level JSON field collapsed unless its initial validation fails', () => {
+    const field = { component: 'json', depth: 0, expandable: true, editable: true, empty: true } as const
+    expect(valueFieldExpansion({ ...field, validation: 'pending' })).toBeUndefined()
+    expect(valueFieldExpansion({ ...field, validation: 'valid' })).toBe(false)
+    expect(valueFieldExpansion({ ...field, validation: 'invalid' })).toBe(true)
+    expect(valueFieldExpansion({ ...field, depth: 1, validation: 'valid' })).toBe(true)
+  })
 })
 
 describe('field value shape', () => {

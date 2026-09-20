@@ -124,6 +124,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
   const { expanded, bodyMounted, setExpanded } = useFieldExpansion(
     {
       depth,
+      component: shape.component,
       placement: expansionPlacement,
       expandable: expandable && !uncreatedText,
       editable: valueEditable && !disabled,

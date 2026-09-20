@@ -54,5 +54,5 @@ export function fieldValueShape(schema: unknown, value: unknown, options: { comp
   const choiceOptions = component === 'select' || component === 'multiSelect' ? (Array.isArray(choices) ? choices : []) : undefined
   const collection = !complex && !enumeration && (type === 'object' || (type === 'array' && !choiceOptions))
   const text = type === 'string' && source['ui:widget'] === 'text'
-  return { type, complex, enumeration, choiceOptions, collection, text, expandable: collection || complex || text }
+  return { type, component, complex, enumeration, choiceOptions, collection, text, expandable: collection || complex || text }
 }

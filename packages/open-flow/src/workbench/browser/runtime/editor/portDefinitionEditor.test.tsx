@@ -217,6 +217,30 @@ describe('Property panel port layout', () => {
     expect(markup).toContain('data-value-body="true"')
   })
 
+  it.each([
+    { state: 'valid empty', validationError: undefined, expanded: false },
+    { state: 'invalid empty', validationError: 'Invalid payload', expanded: true },
+  ])('starts a $state top-level JSON value with expanded=$expanded', ({ validationError, expanded }) => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <FieldValueEditor
+          compact
+          label="payload"
+          path="/payload"
+          schema={{}}
+          value={undefined}
+          nullable
+          validationError={validationError}
+          onChange={vi.fn()}
+          onDraftIssue={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+
+    expect(markup).toContain(`aria-expanded="${expanded}"`)
+    expect(markup.includes('data-value-body="true"')).toBe(expanded)
+  })
+
   it('does not place an empty value body over output array type controls', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>

@@ -141,7 +141,8 @@ the [property panel entry](property-panel.md) for shared scope.
 ## Disclosure, focus, and keyboard order
 
 - Array-item inline Multiline and JSON editors always start collapsed, including empty or invalid values.
-  Their errors remain visible on the collapsed preview. Other expandable value fields start collapsed unless their initial validation fails or their value is
+  Their errors remain visible on the collapsed preview. An empty top-level JSON field stays collapsed
+  after a valid initial result, while an initial validation failure expands it. Other expandable value fields start collapsed unless their initial validation fails or their value is
   editable and empty (undefined, null, empty string, empty object, or empty array). False, zero,
   and whitespace-only strings are populated values. Read-only empty fields remain collapsed;
   initial errors may expand them. Definition trees start collapsed. Case groups and saved port
