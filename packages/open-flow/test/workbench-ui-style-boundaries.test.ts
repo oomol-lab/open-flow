@@ -107,7 +107,8 @@ test('keeps global CSS ownership in explicit package entries', async () => {
   assert.equal(normalizeLineEndings(uiStyles).trim(), "@import './theme.css';\n@import './styles.css';")
   assert.match(workbenchStyles, /^@import '\.\.\/\.\.\/\.\.\/ui\/browser\/public\.css';/)
   assert.match(packagedUi, /^import '\.\.\/\.\.\/ui\/browser\/public\.css'/)
-  assert.match(packagedWorkbench, /^import '\.\.\/\.\.\/workbench\/browser\/runtime\/styles\.css'/)
+  assert.match(packagedWorkbench, /^import 'virtual:uno\.css'/m)
+  assert.match(packagedWorkbench, /^import '\.\.\/\.\.\/workbench\/browser\/runtime\/styles\.css'/m)
 })
 
 test('keeps development stories on production component boundaries', async () => {
