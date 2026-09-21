@@ -46,7 +46,7 @@
   },
   "connectorAccess": {
     "noAccount": "尚未連接帳號。連接後即可選擇此流程可使用的帳號。",
-    "permissionDenied": "已有連接的帳號，但你沒有可用權限。請聯絡管理員開通。",
+    "noAvailablePermissions": "帳號已連接，但暫無可選權限。請檢查團隊的帳號權限設定。",
     "reconnectAccount": "帳號連接已失效，請重新連接。",
     "connect": "連接帳號",
     "reconnect": "重新連接",

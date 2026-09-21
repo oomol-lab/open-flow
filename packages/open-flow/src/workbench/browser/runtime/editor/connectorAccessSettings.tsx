@@ -263,17 +263,15 @@ export function ConnectorAccessEmptyState({ store, serviceId }: { readonly store
   }
   if (connections.data == null) return <p className="text-xs text-muted-foreground">{t('connectorAccess.loading')}</p>
   const hasAccounts = connections.data.length > 0
-  const denied = connections.data.some((connection) => connection.status == 'active')
+  const hasActiveAccounts = connections.data.some((connection) => connection.status == 'active')
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
       <p className="text-xs leading-5 text-muted-foreground" role="status">
-        {t(denied ? 'connectorAccess.permissionDenied' : hasAccounts ? 'connectorAccess.reconnectAccount' : 'connectorAccess.noAccount')}
+        {t(hasActiveAccounts ? 'connectorAccess.noAvailablePermissions' : hasAccounts ? 'connectorAccess.reconnectAccount' : 'connectorAccess.noAccount')}
       </p>
-      {!denied && (
-        <Button onClick={() => void store.connectors.connect(serviceId)} size="xs" type="button" variant="secondary">
-          {t(hasAccounts ? 'connectorAccess.reconnect' : 'connectorAccess.connect')}
-        </Button>
-      )}
+      <Button onClick={() => void store.connectors.connect(serviceId)} size="xs" type="button" variant="secondary">
+        {t(hasActiveAccounts ? 'inspector.account.manageAccount' : hasAccounts ? 'connectorAccess.reconnect' : 'connectorAccess.connect')}
+      </Button>
     </div>
   )
 }

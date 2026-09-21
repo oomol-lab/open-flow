@@ -46,7 +46,7 @@
   },
   "connectorAccess": {
     "noAccount": "尚未连接账号。连接后即可选择此流程可使用的账号。",
-    "permissionDenied": "已有连接的账号，但你没有可用权限。请联系管理员开通。",
+    "noAvailablePermissions": "账号已连接，但暂无可选权限。请检查团队的账号权限设置。",
     "reconnectAccount": "账号连接已失效，请重新连接。",
     "connect": "连接账号",
     "reconnect": "重新连接",

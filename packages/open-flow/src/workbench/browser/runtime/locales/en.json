@@ -46,7 +46,7 @@
   },
   "connectorAccess": {
     "noAccount": "No accounts connected yet. Connect an account, then select it for this flow.",
-    "permissionDenied": "Accounts are connected, but you have no usable permissions. Ask an administrator to grant access.",
+    "noAvailablePermissions": "Accounts are connected, but no permissions are available to select. Check the team’s account permission settings.",
     "reconnectAccount": "Account connections are unavailable. Please reconnect.",
     "connect": "Connect account",
     "reconnect": "Reconnect",
