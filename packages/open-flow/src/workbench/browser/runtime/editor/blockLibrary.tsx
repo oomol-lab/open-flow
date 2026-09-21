@@ -58,7 +58,7 @@ export interface BlockLibraryProps {
   readonly loadConnections?: (signal: AbortSignal) => Promise<void>
   readonly isOptionDisabled?: (option: AddNodeOption) => boolean
   readonly initialTab?: 'nodes' | 'triggers'
-  readonly presentation?: 'picker'
+  readonly presentation?: 'picker' | 'actions'
   readonly catalogFailed?: boolean
   readonly refreshCatalog?: () => void
 
@@ -90,7 +90,7 @@ function menuItems(options: readonly AddNodeOption[]): LibraryMenuItem[] {
         label: choice.label,
       })),
       data: option.id,
-      description: option.description,
+      description: option.kind == 'connector-group' ? undefined : option.description,
       detail: option.description,
       icon: option.icon,
       label: option.label,
@@ -228,7 +228,7 @@ function LibraryItem({ disabled, draggable, item, onAdd, onDrag, onDragEnd, onLo
       >
         <summary
           aria-disabled={disabled}
-          className={cn(buttonVariants({ variant: 'ghost' }), 'block-library-item h-auto min-h-12 justify-start whitespace-normal px-2 py-2')}
+          className={cn(buttonVariants({ variant: 'ghost' }), 'block-library-item h-auto min-h-10 justify-start whitespace-normal px-2 py-2')}
           onClick={(event) => disabled && event.preventDefault()}
         >
           <LibraryRow
@@ -320,6 +320,7 @@ function SidebarBlockLibrary({
   options,
   provideChoices,
   searchOptions,
+  presentation,
 }: BlockLibraryProps): ReactElement {
   const t = useTranslate()
   const searchLabel = options.length == 0 ? t('actionPicker.search') : t('contextPanel.search')
@@ -399,6 +400,7 @@ function SidebarBlockLibrary({
       ordered.splice(end < 0 ? ordered.length : end, 0, ...group)
     }
     const matches = filterCollectionItems('', ordered)
+    if (presentation == 'actions') return matches.filter((item) => item.type != 'divider' || item.label != integrationGroup)
     if (searching) return matches
     let hidden = false
     return matches.filter((item) => {
@@ -408,7 +410,7 @@ function SidebarBlockLibrary({
       }
       return !hidden
     })
-  }, [catalogItems, integrationGroup, triggerGroup, triggers, openGroups, searching])
+  }, [catalogItems, integrationGroup, triggerGroup, triggers, openGroups, searching, presentation])
   const keptItems = useMemo(() => {
     const indexes: number[] = []
     for (let index = 0; index < items.length; index++) {
@@ -497,7 +499,7 @@ function SidebarBlockLibrary({
       option?.kind == 'connector' || option?.kind == 'connector-group' || (option?.kind == 'trigger' && 'trigger' in option && option.trigger.kind == 'catalog')
     return (
       <div
-        className={cn('block-library-list-entry', nested && 'block-library-subitem')}
+        className={cn(presentation == 'actions' ? 'px-0' : 'block-library-list-entry', nested && presentation != 'actions' && 'block-library-subitem')}
         key={item.type == 'divider' ? `group:${item.label}` : (item.data ?? item.label)}
       >
         {item.type == 'divider' ? (
@@ -541,7 +543,7 @@ function SidebarBlockLibrary({
 
   return (
     <div aria-busy={adding || loading} className="block-library">
-      <div className="mx-3.5 mb-2 mt-3 flex-none">
+      <div className={cn('mb-2 flex-none', presentation == 'actions' ? 'mt-1' : 'mx-3.5 mt-3')}>
         <InputGroup>
           <span className="sr-only">{searchLabel}</span>
           <InputGroupAddon>

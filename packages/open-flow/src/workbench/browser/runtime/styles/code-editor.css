@@ -107,10 +107,7 @@
   .code-editor {
     position: relative;
     height: 280px;
-    overflow: hidden;
-    border: 1px solid var(--ui-border);
     border-radius: var(--ui-radius);
-    background: color-mix(in srgb, var(--ui-background) 88%, var(--ui-card));
   }
 
   .code-section-content {
@@ -127,6 +124,13 @@
   .code-editor-host,
   .code-editor-host > .cm-editor {
     height: 100%;
+    border-radius: inherit;
+  }
+
+  .code-editor-host > .cm-editor {
+    overflow: hidden;
+    border: 1px solid var(--ui-border);
+    background: color-mix(in srgb, var(--ui-background) 88%, var(--ui-card));
   }
 
   .code-editor-host .cm-scroller {
@@ -288,6 +292,7 @@
   .code-editor-state {
     position: absolute;
     inset: 0;
+    border-radius: inherit;
     display: grid;
     place-items: center;
     background: var(--ui-background);

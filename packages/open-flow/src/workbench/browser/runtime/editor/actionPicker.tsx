@@ -65,10 +65,11 @@ export function ActionPicker({
           <Plus />
           {label}
         </DialogTrigger>
-        <DialogContent container={root} closeLabel={t('contextPanel.close')} className="flex h-[min(560px,80dvh)] flex-col gap-2 overflow-hidden sm:max-w-lg">
+        <DialogContent container={root} closeLabel={t('contextPanel.close')} className="flex h-[min(560px,80dvh)] flex-col gap-3 overflow-hidden sm:max-w-lg">
           <DialogTitle>{t('actionPicker.title')}</DialogTitle>
           {open && (
             <BlockLibrary
+              presentation="actions"
               refreshCatalog={connectors.retryCatalog}
               browseOptions={connectors.browseAddNodeOptions}
               searchOptions={search}

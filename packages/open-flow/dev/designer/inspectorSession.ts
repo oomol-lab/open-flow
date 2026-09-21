@@ -93,6 +93,13 @@ export function createInspectorTransport(
       return Response.json(access)
     }
     if (url.pathname.endsWith('/connector/proxy/providers')) return Response.json({ success: true, data: options.providers ?? [] })
+    if (url.pathname.endsWith('/connector/action-metadata')) {
+      const query = (url.searchParams.get('q') ?? '').toLowerCase()
+      return Response.json({
+        actions: (options.actions ?? []).filter((action) => `${action.serviceName} ${action.name} ${action.description}`.toLowerCase().includes(query)),
+        version: 1,
+      })
+    }
     if (url.pathname.endsWith('/connector/proxy/actions'))
       return Response.json({
         success: true,
