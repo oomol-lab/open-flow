@@ -61,6 +61,7 @@ export class ConnectorAccessStore {
   configure(providerId: string): void {
     if (this.#disposed || this.#flowId == null) return
     this.#state.set({ ...this.#state.value, configuration: { providerId } })
+    void this.loadCandidates(providerId)
   }
 
   async loadCandidates(providerId: string): Promise<void> {

@@ -7,7 +7,7 @@ import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from '../revisionView.ts'
-import type { ConnectorStore } from '../stores/connectorStore.ts'
+import type { ConnectorActionError, ConnectorStore } from '../stores/connectorStore.ts'
 import type { TriggerStore } from '../stores/triggerStore.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 import type { DiagnosticFocus } from './diagnostics.ts'
@@ -113,7 +113,7 @@ function inputUpstreamSources({
 interface Props {
   readonly variables: InputVariables
   readonly connectorAction?: ConnectorAction
-  readonly connectorActionError?: string
+  readonly connectorActionError?: ConnectorActionError
   readonly connectorAccessError?: string
   readonly connectorAuthorizationPending: boolean
   readonly connectorConnection?: ConnectorConnection

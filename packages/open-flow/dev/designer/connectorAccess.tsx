@@ -6,6 +6,7 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { useEffect, useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
+import { ConnectorAccount } from '../../src/workbench/browser/runtime/editor/connectionSettings.tsx'
 import { ConnectorAccessSettings } from '../../src/workbench/browser/runtime/editor/connectorAccessSettings.tsx'
 import { EditorContextPanel } from '../../src/workbench/browser/runtime/editor/editorContextPanel.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
@@ -34,7 +35,7 @@ const emptyContent: RevisionContent = {
   modelVersion: currentFlowModelVersion,
   modules: {},
 }
-const provider = { authTypes: ['oauth2'], displayName: 'Mail', service: 'mail' } as const
+const provider = { authTypes: ['oauth2'], displayName: 'Gmail', iconUrl: 'https://static.oomol.com/logo/third-party/Gmail.svg', service: 'mail' } as const
 const candidates = [
   {
     accessBindingId: 'sha256:a9007ef9699c9703b05df0b6f32d2fbaed5ace77b7dccffa7e8252e699bd8fe5',
@@ -65,6 +66,8 @@ function Sample({
   loadFailed = false,
   log,
   noCandidates = false,
+  noAuth = false,
+  connectionStatus,
   configure = false,
   language,
 }: {
@@ -74,6 +77,8 @@ function Sample({
   readonly label: string
   readonly loadFailed?: boolean
   readonly log: LogAction
+  readonly connectionStatus?: 'active' | 'reauth_required'
+  readonly noAuth?: boolean
   readonly noCandidates?: boolean
   readonly configure?: boolean
   readonly language: UiLanguage
@@ -85,7 +90,9 @@ function Sample({
       access,
       accessError: loadFailed,
       candidates: noCandidates ? [] : candidates,
-      providers: [provider],
+      connections:
+        connectionStatus == null ? [] : [{ id: 'mail-account', service: 'mail', displayName: 'Work account', isDefault: true, status: connectionStatus }],
+      providers: [noAuth ? { ...provider, authTypes: ['no_auth'] } : provider],
     })
     const next = new WorkbenchStore(client, { getItem: () => null, setItem: () => {} }, undefined, i18n)
     setStore(next)
@@ -93,13 +100,43 @@ function Sample({
       if (configure) next.connectorAccess.configure('mail')
     })
     return () => next.dispose()
-  }, [access, configure, emptyFlow, i18n, loadFailed, log, noCandidates])
+  }, [access, configure, connectionStatus, emptyFlow, i18n, loadFailed, log, noAuth, noCandidates])
   return (
     <section>
       <h3 className="mb-2 text-sm font-medium">{label}</h3>
       <div className="grid h-[480px] overflow-hidden rounded-lg border border-border">
         <EditorContextPanel focusOnOpen={false} icon="flow" onClose={() => {}} theme={dark ? 'dark' : 'light'} title="Flow outline">
           {store != null && <ConnectorAccessSettings onManage={(flowId) => log('connector-access.manage', flowId)} store={store} />}
+          {store != null && noCandidates && (
+            <div className="p-3">
+              <ConnectorAccount
+                action={{
+                  actionId: 'mail.send',
+                  authenticated: true,
+                  description: 'Send mail',
+                  inputs: {},
+                  outputs: {},
+                  name: 'Send mail',
+                  serviceId: 'mail',
+                  serviceName: 'Mail',
+                }}
+                actionError={undefined}
+                actionId="mail.send"
+                accessError={i18n.t('notice.error.connectorAccessRequired')}
+                activeConnections={[]}
+                authorizationPending={false}
+                connection={undefined}
+                connectionError={undefined}
+                connectionId={undefined}
+                connectors={store.connectors}
+                disabled={false}
+                fieldIdPrefix="unconnected-mail"
+                loading={false}
+                taskId="mail"
+                onConfigureAccess={() => store.connectorAccess.configure('mail')}
+              />
+            </div>
+          )}
         </EditorContextPanel>
       </div>
     </section>
@@ -112,6 +149,8 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
     readonly emptyFlow?: boolean
     readonly label: string
     readonly loadFailed?: boolean
+    readonly connectionStatus?: 'active' | 'reauth_required'
+    readonly noAuth?: boolean
     readonly noCandidates?: boolean
     readonly configure?: boolean
   }[] = [
@@ -185,8 +224,28 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
     },
     {
       access: { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 },
-      label: 'No available groups',
+      label: 'No connected accounts',
       noCandidates: true,
+      configure: true,
+    },
+    {
+      access: { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 },
+      label: 'Connected account without permission',
+      noCandidates: true,
+      connectionStatus: 'active',
+      configure: true,
+    },
+    {
+      access: { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 },
+      label: 'Account needs reconnection',
+      noCandidates: true,
+      connectionStatus: 'reauth_required',
+      configure: true,
+    },
+    {
+      access: { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 },
+      label: 'No-auth service — authorization not required',
+      noAuth: true,
     },
     {
       access: { accessRevision: 0, bindings: [], mode: 'implicit', providerAccessDigest: 'implicit:lab', version: 1 },
@@ -210,10 +269,10 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
 
 export const connectorAccessStory: FrontendStory = {
   description:
-    'Flow-level Provider access using production settings: expand the multiple-Provider sample and scroll to its last connection. Covers compact summaries, bounded scrolling, long names, deployment-managed, invalid binding, empty candidate, and load failure states.',
+    'Flow-level Provider access using production settings: expand the multiple-Provider sample and scroll to its last connection. Covers compact summaries, bounded scrolling, long names, deployment-managed, invalid binding, empty candidate, and load failure states. The empty candidate sample includes the node account section with account management and Flow access configuration available before authorization.',
   group: 'Workbench',
   id: 'connector-access',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,
   standalone: true,
-  title: 'External Access',
+  title: 'Services and Authorization',
 }

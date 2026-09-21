@@ -31,6 +31,7 @@ function setup() {
   const sessionStorage = storage()
   const request = vi.fn(async (path: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
     const url = new URL(String(path), 'https://test.invalid')
+    if (url.pathname.includes('/action-metadata/')) return Response.json({ version: 1, action })
     const data = url.pathname.endsWith('/providers')
       ? [{ service: 'mail', displayName: url.searchParams.get('locale')!, authTypes: ['oauth2'], extra: 'preserved' }]
       : url.pathname.endsWith('/actions')
@@ -62,8 +63,8 @@ it('stores Providers and Action lists locally, Connections in session storage, a
   await resourceValue(stores.connections.get('mail', 'flow'))
   const detail = stores.actions.detail('mail.send', 'flow', 'en')
   expect(detail).toBe(stores.actions.detail('mail.send', 'flow', 'en'))
-  expect(detail.value.data).not.toHaveProperty('defaultConnection')
-  expect(test.request).toHaveBeenCalledTimes(3)
+  expect(await resourceValue(detail)).not.toHaveProperty('defaultConnection')
+  expect(test.request).toHaveBeenCalledTimes(4)
   expect(test.localStorage.entries.size).toBe(2)
   expect(test.sessionStorage.entries.size).toBe(1)
   const persisted = [...test.localStorage.entries].find(([key]) => key.includes(':actions:'))![1]
@@ -338,4 +339,45 @@ it('isolates search identities and releases results when the panel closes', asyn
     nextPanel.abort()
     stores.dispose()
   }
+})
+
+it('loads draft Action metadata when the Flow catalogs contain no authorized Providers or Actions', async () => {
+  const test = setup()
+  test.request.mockImplementation(async (path) => {
+    if (String(path).includes('/action-metadata/mail.send?')) return Response.json({ version: 1, action })
+    return Response.json({ success: true, data: [] })
+  })
+  const stores = test.create()
+  expect(await resourceValue(stores.actions.get('mail', 'flow', 'en'))).toEqual([])
+  expect(await resourceValue(stores.actions.detail('mail.send', 'flow', 'en'))).toEqual(action)
+  expect(await resourceValue(stores.connections.get('mail', 'flow'))).toEqual([])
+  stores.dispose()
+})
+
+it('keeps Action detail scopes and locales independent and retries a failed detail immediately', async () => {
+  const test = setup()
+  test.request.mockImplementation(async (path) => {
+    const params = new URL(String(path), 'https://test.invalid').searchParams
+    return Response.json({ version: 1, action: { ...action, description: `${params.get('flowId')}:${params.get('locale')}` } })
+  })
+  const stores = test.create()
+  expect((await resourceValue(stores.actions.detail('mail.send', 'a', 'en'))).description).toBe('a:en')
+  expect((await resourceValue(stores.actions.detail('mail.send', 'b', 'en'))).description).toBe('b:en')
+  expect((await resourceValue(stores.actions.detail('mail.send', 'a', 'zh-CN'))).description).toBe('a:zh-CN')
+  test.request.mockResolvedValueOnce(Response.json({ error: { code: 'connector.action-not-found', message: 'Removed action.' }, version: 1 }, { status: 404 }))
+  const failed = stores.actions.detail('mail.send', 'c', 'en')
+  await expect(resourceValue(failed)).rejects.toMatchObject({ code: 'connector.action-not-found' })
+  stores.actions.detail('mail.send', 'c', 'en', true)
+  await vi.waitFor(() => expect(failed.value.data?.description).toBe('c:en'))
+  expect(failed.value.error).toBeUndefined()
+  expect(test.localStorage.entries.size).toBe(0)
+  stores.dispose()
+})
+
+it('rejects mismatched Action details', async () => {
+  const test = setup()
+  test.request.mockResolvedValue(Response.json({ version: 1, action: { ...action, actionId: 'mail.other' } }))
+  const stores = test.create()
+  await expect(resourceValue(stores.actions.detail('mail.send', 'flow', 'en'))).rejects.toThrow()
+  stores.dispose()
 })

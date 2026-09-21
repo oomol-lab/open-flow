@@ -101,24 +101,20 @@ describe('ConnectorStore', () => {
         })
       }
       if (path.startsWith('/v1/connector/proxy/apps')) return Response.json({ success: true, data: [] })
-      if (path.startsWith('/v1/connector/action-metadata?')) {
+      if (path.startsWith('/v1/connector/action-metadata')) {
         connectorRequests.push(path)
-        return Response.json({
-          actions: [
-            {
-              actionId: 'mail.send',
-              authenticated: false,
-              description: `Send for ${scope}.`,
-              homepageUrl: 'https://mail.example',
-              inputs: {},
-              name: 'Send',
-              outputs: {},
-              serviceId: 'mail',
-              serviceName: `Mail ${scope}`,
-            },
-          ],
-          version: 1,
-        })
+        const action = {
+          actionId: 'mail.send',
+          authenticated: false,
+          description: `Send for ${scope}.`,
+          homepageUrl: 'https://mail.example',
+          inputs: {},
+          name: 'Send',
+          outputs: {},
+          serviceId: 'mail',
+          serviceName: `Mail ${scope}`,
+        }
+        return Response.json({ version: 1, ...(path.includes('/action-metadata/') ? { action } : { actions: [action] }) })
       }
       throw new Error(`Unexpected request: ${path}`)
     })
@@ -163,7 +159,7 @@ describe('ConnectorStore', () => {
       expect(connectors.$.actions.value).toEqual({})
       expect(connectorRequests).toContain('/v1/connector/proxy/providers?locale=en')
       expect(connectorRequests).toContain('/v1/connector/proxy/actions?service=mail&locale=en')
-      expect(connectorRequests).toContain('/v1/connector/proxy/actions?flowId=flow-a&service=mail&locale=en')
+      expect(connectorRequests).toContain('/v1/connector/action-metadata/mail.send?flowId=flow-a&locale=en')
       expect(connectorRequests).toContain('/v1/connector/action-metadata?q=send&locale=en')
       expect(connectorRequests.some((path) => path.includes('flowId=flow-b'))).toBe(false)
       connectors.setLanguage('zh-CN')

@@ -12,6 +12,7 @@ import type { WorkspaceStore } from './workspaceStore.ts'
 
 import { compute, derive, val } from 'value-enhancer'
 import { flowDependencies } from '../../../../flow/common/semantics.ts'
+import { ApiError } from '../api.ts'
 import { connectionCatalog, actionWithConnections } from '../connectionCatalog.ts'
 import { createI18n } from '../i18n.ts'
 import { providerIcon } from '../providerIcon.ts'
@@ -28,9 +29,14 @@ interface ConnectorState {
   readonly connectionLoading?: string
 }
 
+export interface ConnectorActionError {
+  readonly code?: string
+  readonly message: string
+}
+
 interface Selection {
   readonly action?: ConnectorActionView
-  readonly actionError?: string
+  readonly actionError?: ConnectorActionError
   readonly activeConnections?: readonly ConnectorConnection[]
   readonly authorizationPending: boolean
   readonly connection?: ConnectorConnection
@@ -52,7 +58,7 @@ export interface Connector$ {
   readonly connectionLoading: ReadonlyVal<string | undefined>
   readonly diagnostics: ReadonlyVal<readonly Diagnostic[]>
   readonly selectedAction: ReadonlyVal<ConnectorActionView | undefined>
-  readonly selectedActionError: ReadonlyVal<string | undefined>
+  readonly selectedActionError: ReadonlyVal<ConnectorActionError | undefined>
   readonly selectedActiveConnections: ReadonlyVal<readonly ConnectorConnection[] | undefined>
   readonly selectedAuthorizationPending: ReadonlyVal<boolean>
   readonly selectedConnection: ReadonlyVal<ConnectorConnection | undefined>
@@ -233,7 +239,13 @@ export class ConnectorStore {
       const connection = target.connectionId == null ? undefined : catalog?.byId.get(target.connectionId)
       return {
         action,
-        actionError: actionFailure == null ? undefined : errorNotice(actionFailure, this.#i18n.t).message,
+        actionError:
+          actionFailure == null
+            ? undefined
+            : {
+                ...(actionFailure instanceof ApiError ? { code: actionFailure.code } : {}),
+                message: errorNotice(actionFailure, this.#i18n.t).message,
+              },
         activeConnections: catalog?.active,
         authorizationPending: action != null && state.authorizationServiceId == action.serviceId,
         connection,
@@ -380,7 +392,7 @@ export class ConnectorStore {
       }
       return
     }
-    const actionState = this.data.actions.detail(target.actionId, flowId, this.#language)
+    const actionState = this.data.actions.detail(target.actionId, flowId, this.#language, force)
     this.#set({
       actionError: undefined,
       actionLoading: actionState.value.data == null ? target.actionId : undefined,
@@ -388,7 +400,8 @@ export class ConnectorStore {
       connectionLoading: undefined,
     })
     try {
-      const action = await resourceValue(actionState)
+      await Promise.resolve()
+      const action = await resourceValue(actionState, undefined, force)
       if (!this.#isCurrent(current, flowId)) return
       this.#remember(this.#actionIds, [action.actionId])
       if (action.authenticated) await this.#refreshConnections(flowId, target, action.serviceId, force, current)
