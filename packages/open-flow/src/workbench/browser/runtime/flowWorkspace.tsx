@@ -101,12 +101,35 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
 }: Pick<ComponentProps<typeof NodeInspector>, 'focus' | 'disabled' | 'revision' | 'selection' | 'target' | 'theme'> & {
   readonly store: WorkbenchStore
 }): ReactElement {
+  const t = useTranslate()
   const language = useLang()
   const variableNames = useVal(store.$.variableNames)
   const variableNamesLoaded = useVal(store.$.variableNamesLoaded)
   const variableNamesLoading = useVal(store.$.variableNamesLoading)
   const connectorAction = useVal(store.connectors.$.selectedAction)
-  const connectorAccess = useVal(store.connectorAccess.$).access
+  const accessState = useVal(store.connectorAccess.$)
+  const connectorAccess = accessState.access
+  const providerId = connectorAction?.authenticated ? connectorAction.serviceId : undefined
+  useEffect(() => {
+    if (providerId != null && connectorAccess?.mode == 'selectable' && accessState.candidates[providerId] == null) {
+      void store.connectorAccess.loadCandidates(providerId)
+    }
+  }, [providerId, connectorAccess?.mode, store])
+  const bindings = connectorAccess?.bindings.filter((binding) => binding.providerId == providerId && binding.status == 'active') ?? []
+  const candidates = providerId == null ? undefined : accessState.candidates[providerId]?.candidates
+  const accessError =
+    providerId == null || connectorAccess?.mode != 'selectable'
+      ? undefined
+      : bindings.length == 0
+        ? t('notice.error.connectorAccessRequired')
+        : candidates != null &&
+            !candidates.some(
+              (candidate) =>
+                bindings.some((binding) => binding.accessBindingId == candidate.accessBindingId) &&
+                (candidate.permissions == null || candidate.permissions.allActions || candidate.permissions.actionIds.includes(connectorAction!.actionId)),
+            )
+          ? t('notice.error.connectorAccessInvalid')
+          : undefined
   const connectorActionError = useVal(store.connectors.$.selectedActionError)
   const connectorActionLoading = useVal(store.connectors.$.actionLoading)
   const connectorAuthorizationPending = useVal(store.connectors.$.selectedAuthorizationPending)
@@ -137,6 +160,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
       }}
       connectorAction={connectorAction}
       connectorAccess={connectorAccess}
+      connectorAccessError={accessError}
       connectorActionError={connectorActionError}
       connectorAuthorizationPending={connectorAuthorizationPending}
       connectorConnection={connectorConnection}
@@ -144,6 +168,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
       activeConnectorConnections={activeConnectorConnections}
       connectors={store.connectors}
       prepareConnectorAction={(action) => store.prepareConnectorAction(action)}
+      onConfigureConnectorAccess={(serviceId) => store.connectorAccess.configure(serviceId)}
       connectorLoading={connectorActionLoading != null || connectorConnectionLoading != null}
       focus={focus}
       disabled={disabled}
@@ -216,6 +241,12 @@ export function FlowEditor({
     onSelectNodes: (ids) => store.selectNodes(ids),
   })
   const designerRef = useRef<WorkbenchCanvasHandle>(null)
+  const accessConfiguration = useVal(store.connectorAccess.$).configuration
+  useEffect(() => {
+    if (accessConfiguration == null) return
+    panel.openInspector()
+    panel.back()
+  }, [accessConfiguration])
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent): void => {
       if (!store.workspace.hasUnsavedCode) return

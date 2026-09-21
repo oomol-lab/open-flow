@@ -236,7 +236,8 @@ Connector service 拥有 Provider 授权、credential、Connection lifecycle 和
 Provider Access Binding 是 deployment-owned Flow 状态，不属于 Revision。`selectable` 部署按 Provider 保存零个或多个 opaque Connection bindings；`implicit`
 部署不保存伪造的 binding，直接使用部署配置的 scoped Connector authority。绑定只引用 Connector 管理的权限边界，不能包含 credential，也不能演化为 Flow
 service account。Publication 和 Run 固定接受时的 binding identities；Connector 按目标 Connection 对 live policy 和 Action 做最终授权，缺失、失效或不匹配时
-fail closed。
+fail closed。Connector 目录声明为无需账号授权的 Action 不要求 Provider Access Binding，仍使用部署要求的平台身份。
+Workbench 允许先添加 Connector 节点再配置权限。权限缺失不阻断 Draft 编辑或隐藏 Action 元数据；界面显示待配置状态，Run／Publish 准入和执行仍校验授权。
 Publish operation、Publication、Run、Wait 通知和共享事件源订阅分别持久化对应的 access snapshot；Rollback 复制来源 Publication snapshot，
 Trigger/listener/maintenance 从固定记录恢复，不能重新读取当前 Draft binding。Flow 物理删除前 deployment access owner 必须完成对应 Draft map 清理。
 

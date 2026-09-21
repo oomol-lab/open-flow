@@ -114,12 +114,14 @@ interface Props {
   readonly variables: InputVariables
   readonly connectorAction?: ConnectorAction
   readonly connectorActionError?: string
+  readonly connectorAccessError?: string
   readonly connectorAuthorizationPending: boolean
   readonly connectorConnection?: ConnectorConnection
   readonly connectorConnectionError?: string
   readonly activeConnectorConnections?: readonly ConnectorConnection[]
   readonly connectors: ConnectorStore
   readonly connectorAccess?: ConnectorAccess
+  readonly onConfigureConnectorAccess?: (providerId: string) => void
   readonly prepareConnectorAction?: (
     action: ConnectorActionView,
   ) => Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] } | undefined>
@@ -145,12 +147,14 @@ export function NodeInspector({
   variables,
   connectorAction,
   connectorActionError,
+  connectorAccessError,
   connectorAuthorizationPending,
   connectorConnection,
   connectorConnectionError,
   activeConnectorConnections,
   connectors,
   connectorAccess,
+  onConfigureConnectorAccess,
   prepareConnectorAction,
   connectorLoading,
   disabled,
@@ -214,7 +218,11 @@ export function NodeInspector({
           <ConnectorAccount
             action={connectorAction}
             actionError={connectorActionError}
+            accessError={connectorAccessError}
             actionId={connector.action}
+            onConfigureAccess={
+              onConfigureConnectorAccess == null ? undefined : () => onConfigureConnectorAccess(connectorAction?.serviceId ?? connector.action.split('.')[0]!)
+            }
             activeConnections={activeConnectorConnections}
             authorizationPending={connectorAuthorizationPending}
             connection={connectorConnection}

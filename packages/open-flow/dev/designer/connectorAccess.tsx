@@ -65,6 +65,7 @@ function Sample({
   loadFailed = false,
   log,
   noCandidates = false,
+  configure = false,
   language,
 }: {
   readonly access: ConnectorAccess
@@ -74,6 +75,7 @@ function Sample({
   readonly loadFailed?: boolean
   readonly log: LogAction
   readonly noCandidates?: boolean
+  readonly configure?: boolean
   readonly language: UiLanguage
 }) {
   const i18n = useMemo(() => createI18n(language), [language])
@@ -87,9 +89,11 @@ function Sample({
     })
     const next = new WorkbenchStore(client, { getItem: () => null, setItem: () => {} }, undefined, i18n)
     setStore(next)
-    void next.start(flowId)
+    void next.start(flowId).then(() => {
+      if (configure) next.connectorAccess.configure('mail')
+    })
     return () => next.dispose()
-  }, [access, emptyFlow, i18n, loadFailed, log, noCandidates])
+  }, [access, configure, emptyFlow, i18n, loadFailed, log, noCandidates])
   return (
     <section>
       <h3 className="mb-2 text-sm font-medium">{label}</h3>
@@ -109,7 +113,14 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
     readonly label: string
     readonly loadFailed?: boolean
     readonly noCandidates?: boolean
+    readonly configure?: boolean
   }[] = [
+    {
+      access: { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 },
+      emptyFlow: true,
+      configure: true,
+      label: 'Configure access on request',
+    },
     {
       access: { accessRevision: 0, bindings: [], mode: 'implicit', providerAccessDigest: 'implicit:lab', version: 1 },
       label: 'Deployment managed',

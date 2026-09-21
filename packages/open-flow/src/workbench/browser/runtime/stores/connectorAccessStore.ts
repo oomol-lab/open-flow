@@ -8,6 +8,7 @@ import { createI18n } from '../i18n.ts'
 import { errorNotice } from './workbenchNotice.ts'
 
 interface ConnectorAccessState {
+  readonly configuration?: { readonly providerId: string }
   readonly access?: ConnectorAccess
   readonly candidateErrors: readonly string[]
   readonly candidates: Readonly<Record<string, ConnectorAccessCandidates | undefined>>
@@ -55,6 +56,11 @@ export class ConnectorAccessStore {
 
   changed(flowId: string): void {
     if (flowId == this.#flowId) void this.load(flowId)
+  }
+
+  configure(providerId: string): void {
+    if (this.#disposed || this.#flowId == null) return
+    this.#state.set({ ...this.#state.value, configuration: { providerId } })
   }
 
   async loadCandidates(providerId: string): Promise<void> {

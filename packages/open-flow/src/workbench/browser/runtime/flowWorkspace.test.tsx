@@ -68,6 +68,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
         selectedConnectionError: value(undefined),
       },
     },
+    connectorAccess: { $: value({}) },
     addNode: vi.fn().mockResolvedValue('new-node'),
     selectNodes: vi.fn(),
     editDraftRunInputs: vi.fn().mockResolvedValue('input'),

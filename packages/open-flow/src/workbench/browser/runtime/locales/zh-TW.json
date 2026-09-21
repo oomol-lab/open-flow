@@ -400,6 +400,8 @@
       "authenticationRequired": "請登入後繼續。",
       "authorizationDenied": "你沒有執行此操作的權限。",
       "bindingUnresolved": "缺少必要的 Connection 或環境變數。請完成設定後再試一次。",
+      "connectorAccessRequired": "此 Flow 尚未設定此 Provider 的存取權限，請在執行前設定。",
+      "connectorAccessInvalid": "此 Flow 的 Provider 存取權限不允許此 Action，請調整帳號或權限設定。",
       "connectorActionNotFound": "所選的 Connector action 已無法使用。請選擇其他 action。",
       "connectorConnectionRequired": "需要有效的 Connection。請連線或重新連線帳號後再試一次。",
       "connectorUnavailable": "Connector 暫時無法使用，請稍後再試一次。",
