@@ -100,6 +100,8 @@ export class WorkbenchStore {
   #variableRequest: Promise<void> | undefined
   #disposed = false
   #openingCreatedFlow = false
+  readonly #stopAccessReaction: () => void
+  #accessLoading: Promise<void> = Promise.resolve()
 
   public readonly preferences: WorkbenchPreferences
   public readonly $: Workbench$
@@ -145,6 +147,9 @@ export class WorkbenchStore {
         this.workspace.catalogs.refreshFlow(flowId)
       },
     )
+    this.#stopAccessReaction = this.workspace.$.flowId.reaction((flowId) => {
+      this.#accessLoading = this.connectorAccess.load(flowId)
+    })
     this.connectors = new ConnectorStore(client, this.workspace, setNotice, host, i18n)
     this.triggers = new TriggerStore(client, this.workspace, setNotice, host, i18n)
     this.publications = new PublicationStore(client, this.workspace, setNotice, preferences, identity, i18n)
@@ -238,6 +243,7 @@ export class WorkbenchStore {
 
   public dispose(): void {
     this.#disposed = true
+    this.#stopAccessReaction()
     this.#externalRuns.invalidate()
     for (const value of Object.values(this.$)) value.dispose()
     this.connectors.dispose()
@@ -259,7 +265,8 @@ export class WorkbenchStore {
     this.publications.reset()
     this.runRequests.reset()
     this.runs.reset()
-    await Promise.all([this.workspace.start(flowId), this.connectorAccess.load(flowId)])
+    await this.workspace.start(flowId)
+    await this.#accessLoading
   }
 
   public async retryFlows(): Promise<void> {
@@ -311,6 +318,7 @@ export class WorkbenchStore {
     this.publications.reset()
     this.runRequests.reset()
     this.runs.reset()
+    await this.#accessLoading
     return true
   }
 

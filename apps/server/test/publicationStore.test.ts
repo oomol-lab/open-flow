@@ -1,11 +1,17 @@
+import type { ConnectorAccess } from '@oomol-lab/open-flow/control-api'
+
 import { expect, it, onTestFinished } from 'vitest'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 
-function fixture() {
+function fixture(providerAccess?: ConnectorAccess) {
   const database = Database.open(':memory:')
   onTestFinished(() => database.close())
   const store = new Store(database, () => 1_000)
+  if (providerAccess != null)
+    database.connection
+      .prepare('INSERT INTO flow_provider_access VALUES (?, ?, ?, ?)')
+      .run('flow', providerAccess.accessRevision, JSON.stringify(providerAccess.bindings), providerAccess.providerAccessDigest)
   store.flows.createFlow({
     actorId: 'operator',
     content: '{"modelVersion":2}',
@@ -34,6 +40,7 @@ function fixture() {
       },
     ],
     polls: [{ connectionId: 'connection', nextAt: 2_000, scheduleJson: '[]', triggerJson: '{"kind":"poll"}', triggerNodeId: 'poll' }],
+    providerAccess,
     publishedAt: 1_000,
     requestDigest: 'publish',
     revisionDigest: 'digest',
@@ -50,6 +57,52 @@ function fixture() {
   store.integrations.initializeCandidate(integration, {}, {}, 1_000)
   return { database: database.connection, store, input: { ...input, operationId }, poll, integration }
 }
+
+const selectedAccess: ConnectorAccess = {
+  version: 1,
+  mode: 'selectable',
+  accessRevision: 1,
+  providerAccessDigest: 'selected',
+  bindings: [{ providerId: 'stripe', accessBindingId: 'binding', connectionDisplayName: 'Stripe', permissionGroupName: null, status: 'active' }],
+}
+
+it.each(['publish', 'acceptPublishOperation'] as const)(
+  'rejects stale access in the %s transaction without persisting candidates or publications',
+  (method) => {
+    const { database, store, input } = fixture(selectedAccess)
+    database.prepare('UPDATE flow_provider_access SET provider_access_digest = ?').run('changed')
+    const result = store.publications[method]({ ...input, operationId: undefined, idempotencyKey: 'stale', requestDigest: 'stale' }, () => {
+      expect(database.isTransaction).toBe(true)
+      const row = database.prepare('SELECT provider_access_digest AS digest FROM flow_provider_access').get() as { digest: string }
+      return { ...selectedAccess, providerAccessDigest: row.digest }
+    })
+    expect(result).toEqual({ kind: 'access-conflict' })
+    expect(database.prepare('SELECT COUNT(*) AS count FROM publications').get()).toEqual({ count: 0 })
+    expect(database.prepare('SELECT COUNT(*) AS count FROM publish_operations').get()).toEqual({ count: 1 })
+    expect(database.prepare('SELECT COUNT(*) AS count FROM integration_candidates').get()).toEqual({ count: 1 })
+  },
+)
+
+it('keeps accepted operation and cleanup snapshots fixed when Draft access changes', () => {
+  const { database, store, input, poll, integration } = fixture(selectedAccess)
+  database.prepare('UPDATE flow_provider_access SET provider_access_digest = ?').run('changed')
+  store.polls.completeCandidate(poll, '{}', false, 1_000)
+  store.integrations.markCandidateReady(integration, 1_000)
+  expect(JSON.parse(store.integrations.candidate(input.operationId, 'integration')!.providerAccessJson)).toEqual(selectedAccess)
+  const result = store.publications.publish(input)
+  expect(result.kind).toBe('published')
+  if (result.kind != 'published') throw new Error('Publication was not committed.')
+  expect(store.publications.providerAccess(result.publicationId)).toEqual(selectedAccess)
+  const rollback = store.publications.publish({
+    ...input,
+    operationId: undefined,
+    expectedLivePublicationId: result.publicationId,
+    idempotencyKey: 'rollback',
+    requestDigest: 'rollback',
+    metadata: { actorId: 'operator', modelVersion: 2, operation: 'rollback', sourcePublicationId: result.publicationId },
+  })
+  expect(rollback.kind).toBe('published')
+})
 
 it.each(['poll', 'integration'] as const)('commits %s readiness and Publish work together, including rollback on a failed write', (kind) => {
   const { database, store, poll, integration } = fixture()

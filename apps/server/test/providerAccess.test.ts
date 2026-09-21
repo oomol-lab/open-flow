@@ -233,7 +233,13 @@ describe('configured Connector access', () => {
       teamId: 'team-1',
     }
 
+    const requests = vi.mocked(fetch)
+    requests.mockClear()
     await expect(connector.listConnections('example', undefined, access)).resolves.toHaveLength(2)
+    expect(requests.mock.calls.filter(([url]) => String(url) == 'https://connector.oomol.dev/v1/apps/services/example')).toHaveLength(1)
+    requests.mockClear()
+    await expect(connector.listAllConnections(undefined, access)).resolves.toHaveLength(2)
+    expect(requests.mock.calls.filter(([url]) => String(url).startsWith('https://connector.oomol.dev/v1/apps'))).toHaveLength(1)
     await expect(connector.execute('example.echo', 'connection-personal', {}, 'invocation-1', new AbortController().signal, access)).resolves.toBe('ok')
     expect(aliases).toEqual(['personal'])
     await expect(connector.execute('example.echo', 'connection-other', {}, 'invocation-2', new AbortController().signal, access)).rejects.toMatchObject({

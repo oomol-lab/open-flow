@@ -198,16 +198,6 @@ export class ConnectorClient implements ConnectorHost {
     return await providerAccessBindingCandidates({ actorId, connections, ...access, providerId, teamId })
   }
 
-  async resolveProviderAccessBinding(
-    teamId: string,
-    providerId: string,
-    accessBindingId: string,
-    signal?: AbortSignal,
-  ): Promise<ResolvedProviderAccessBinding | undefined> {
-    const [connections, access] = await Promise.all([this.#connections(providerId, signal, teamId), this.#readTeamAppAccess(teamId, signal)])
-    return await resolveProviderAccessBinding({ accessBindingId, connections, ...access, providerId, teamId })
-  }
-
   async #oomolUserId(signal?: AbortSignal): Promise<string> {
     if (this.#apiOrigin == null || this.#token.length == 0) throw unavailable()
     if (this.#userId != null) return this.#userId
@@ -377,7 +367,7 @@ export class ConnectorClient implements ConnectorHost {
 
   async listAllConnections(signal?: AbortSignal, access?: ConnectorClientAccess): Promise<readonly ConnectorConnection[]> {
     const connections = await this.#connections(undefined, signal, connectorTeamId(access))
-    const bindings = await this.#accessBindings(access, signal)
+    const bindings = await this.#accessBindings(access, signal, connections)
     if (bindings == null) return connections
     const allowed = new Set(bindings.map((binding) => binding.appId))
     return connections.filter((connection) => allowed.has(connection.connectionId))
@@ -497,15 +487,15 @@ export class ConnectorClient implements ConnectorHost {
     throw unavailable()
   }
 
-  async #accessBindings(access: ConnectorClientAccess | undefined, signal?: AbortSignal): Promise<readonly ResolvedProviderAccessBinding[] | null> {
+  async #accessBindings(
+    access: ConnectorClientAccess | undefined,
+    signal?: AbortSignal,
+    connections?: readonly ConnectorConnection[],
+  ): Promise<readonly ResolvedProviderAccessBinding[] | null> {
     if (!selectableAccess(access)) return null
     const bindings = access.providerAccess.bindings.filter((binding) => binding.status == 'active')
     if (access.teamId == null) throw accessInvalid()
-    const resolved = await Promise.all(
-      bindings.map((binding) => this.resolveProviderAccessBinding(access.teamId!, binding.providerId, binding.accessBindingId, signal)),
-    )
-    if (resolved.some((binding) => binding == null)) throw accessInvalid()
-    return resolved.filter((binding): binding is ResolvedProviderAccessBinding => binding != null)
+    return this.#resolveAccessBindings(access.teamId, bindings, signal, connections)
   }
 
   async #providerAccessBindings(
@@ -521,8 +511,28 @@ export class ConnectorClient implements ConnectorHost {
       return []
     }
     if (access.teamId == null) throw accessInvalid()
+    return this.#resolveAccessBindings(access.teamId, selected, signal)
+  }
+
+  async #resolveAccessBindings(
+    teamId: string,
+    bindings: readonly { readonly providerId: string; readonly accessBindingId: string }[],
+    signal?: AbortSignal,
+    connections?: readonly ConnectorConnection[],
+  ): Promise<readonly ResolvedProviderAccessBinding[]> {
+    if (bindings.length == 0) return []
+    const policy = this.#readTeamAppAccess(teamId, signal)
+    const requests = new Map<string, Promise<readonly ConnectorConnection[]>>()
     const resolved = await Promise.all(
-      selected.map((binding) => this.resolveProviderAccessBinding(access.teamId!, providerId, binding.accessBindingId, signal)),
+      bindings.map(async ({ providerId, accessBindingId }) => {
+        let request = requests.get(providerId)
+        if (request == null) {
+          request = connections == null ? this.#connections(providerId, signal, teamId) : Promise.resolve(connections)
+          requests.set(providerId, request)
+        }
+        const [available, access] = await Promise.all([request, policy])
+        return resolveProviderAccessBinding({ accessBindingId, providerId, teamId, connections: available, ...access })
+      }),
     )
     if (resolved.some((binding) => binding == null)) throw accessInvalid()
     return resolved.filter((binding): binding is ResolvedProviderAccessBinding => binding != null)

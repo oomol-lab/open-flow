@@ -16,7 +16,16 @@ import { VariableStore } from './variable-store.ts'
 export type PublicationAcceptance =
   | { readonly created: boolean; readonly kind: 'published'; readonly publicationId: string }
   | {
-      readonly kind: 'binding-unresolved' | 'busy' | 'conflict' | 'live-conflict' | 'not-found' | 'operation-pending' | 'revision-conflict' | 'source-not-found'
+      readonly kind:
+        | 'access-conflict'
+        | 'binding-unresolved'
+        | 'busy'
+        | 'conflict'
+        | 'live-conflict'
+        | 'not-found'
+        | 'operation-pending'
+        | 'revision-conflict'
+        | 'source-not-found'
     }
 
 export interface StoredPublication {
@@ -162,18 +171,6 @@ export class PublicationStore {
     return row == null ? undefined : (JSON.parse(row.providerAccess) as ConnectorAccess)
   }
 
-  operationPreviousProviderAccess(operationId: string): ConnectorAccess | undefined {
-    const row = this.#database
-      .prepare(
-        `SELECT publications.provider_access_snapshot AS providerAccess
-         FROM publish_operations
-         JOIN publications ON publications.publication_id = publish_operations.expected_live_publication_id
-         WHERE publish_operations.operation_id = ?`,
-      )
-      .get(operationId) as { readonly providerAccess: string } | undefined
-    return row == null ? undefined : (JSON.parse(row.providerAccess) as ConnectorAccess)
-  }
-
   live(flowId: string): StoredLive | undefined {
     const row = this.#database
       .prepare(
@@ -226,9 +223,10 @@ export class PublicationStore {
 
   acceptPublishOperation(
     input: Parameters<PublicationStore['publish']>[0],
+    currentProviderAccess?: () => ConnectorAccess,
   ):
     | { readonly kind: 'accepted'; readonly operation: PublishOperation }
-    | { readonly kind: 'binding-unresolved' | 'busy' | 'conflict' | 'live-conflict' | 'not-found' | 'revision-conflict' | 'unsupported' } {
+    | { readonly kind: 'access-conflict' | 'binding-unresolved' | 'busy' | 'conflict' | 'live-conflict' | 'not-found' | 'revision-conflict' | 'unsupported' } {
     return this.#transaction(() => {
       const now = this.#clock()
       this.#database
@@ -267,6 +265,7 @@ export class PublicationStore {
         return { kind: 'accepted', operation }
       }
 
+      if (!this.#providerAccessMatches(input, currentProviderAccess)) return { kind: 'access-conflict' }
       const flow = this.#flow(input.flowId)
       if (flow == null) return { kind: 'not-found' }
       if (flow.status != 'active') return { kind: 'busy' }
@@ -284,7 +283,16 @@ export class PublicationStore {
 
       const operationId = `publish_${randomUUID().replaceAll('-', '')}`
       const createdAt = now
-      if (!this.#integrations.createCandidates(operationId, input.flowId, input.expectedLivePublicationId, input.integrations, createdAt)) {
+      if (
+        !this.#integrations.createCandidates(
+          operationId,
+          input.flowId,
+          input.expectedLivePublicationId,
+          input.integrations,
+          createdAt,
+          input.providerAccess ?? legacyProviderAccess,
+        )
+      ) {
         return { kind: 'unsupported' }
       }
       this.#polls.createCandidates(operationId, input.flowId, input.expectedLivePublicationId, input.polls, createdAt)
@@ -502,7 +510,7 @@ export class PublicationStore {
     return { created: false, kind: 'published', publicationId: existing.publicationId }
   }
 
-  publish(input: PublishInput): PublicationAcceptance {
+  publish(input: PublishInput, currentProviderAccess?: () => ConnectorAccess): PublicationAcceptance {
     try {
       return this.#transaction(() => {
         const providerAccess = input.providerAccess ?? legacyProviderAccess
@@ -520,6 +528,7 @@ export class PublicationStore {
           return existing
         }
 
+        if (input.operationId == null && !this.#providerAccessMatches(input, currentProviderAccess)) return { kind: 'access-conflict' }
         if (input.operationId != null) {
           const operation = this.#database
             .prepare('SELECT publication_id AS publicationId, status FROM publish_operations WHERE operation_id = ?')
@@ -716,6 +725,14 @@ export class PublicationStore {
           input.publishedAt,
         )
     }
+  }
+
+  #providerAccessMatches(input: PublishInput, currentProviderAccess?: () => ConnectorAccess): boolean {
+    return (
+      input.metadata?.operation == 'rollback' ||
+      currentProviderAccess == null ||
+      currentProviderAccess().providerAccessDigest == input.providerAccess?.providerAccessDigest
+    )
   }
 
   #flow(flowId: string): StoredFlow | undefined {

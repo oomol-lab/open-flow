@@ -79,7 +79,7 @@ export function createInspectorTransport(
           init.method == 'DELETE'
             ? access.bindings.filter((binding) => binding.providerId != providerId || binding.accessBindingId != input.accessBindingId)
             : [
-                ...access.bindings.filter((binding) => binding.accessBindingId != input.accessBindingId),
+                ...access.bindings.filter((binding) => binding.providerId != providerId || binding.accessBindingId != input.accessBindingId),
                 {
                   accessBindingId: selected!.accessBindingId,
                   connectionDisplayName: selected!.connectionDisplayName,

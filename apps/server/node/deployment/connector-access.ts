@@ -119,7 +119,7 @@ export class ConfiguredConnectorAccessHost implements ConnectorAccessHost {
     if (current.accessRevision != expectedAccessRevision) return { kind: 'conflict' }
     const { isDefault: _isDefault, permissions: _permissions, ...binding } = candidate
     const bindings = [
-      ...current.bindings.filter((existing) => existing.accessBindingId != accessBindingId),
+      ...current.bindings.filter((existing) => existing.providerId != providerId || existing.accessBindingId != accessBindingId),
       { ...binding, status: 'active' as const },
     ].toSorted(compareBindings)
     return this.#save(flowId, expectedAccessRevision, bindings)

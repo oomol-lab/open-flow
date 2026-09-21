@@ -39,7 +39,44 @@ function catalogSession(initialFlowId?: string) {
   return { client, store, navigation, navigate, list, emit: (event?: FlowCatalogEvent) => emit!(event) }
 }
 
+function access(flowId: string) {
+  return {
+    version: 1 as const,
+    mode: 'selectable' as const,
+    accessRevision: flowId == 'first' ? 1 : 2,
+    bindings: [],
+    providerAccessDigest: flowId,
+  }
+}
+
 describe('Flow creation notifications', () => {
+  it('switches access and candidate requests to the selected Flow and clears access on exit', async () => {
+    const { client, store, navigation } = catalogSession('first')
+    vi.spyOn(client, 'getConnectorAccess').mockImplementation(async (flowId) => access(flowId))
+    const candidates = vi
+      .spyOn(client, 'listProviderAccessBindingCandidates')
+      .mockResolvedValue({ version: 1, mode: 'selectable', providerId: 'example', candidates: [] })
+    const add = vi.spyOn(client, 'addProviderAccessBinding').mockResolvedValue(access('second'))
+    try {
+      await navigation.start()
+      expect(store.connectorAccess.$.value.access?.providerAccessDigest).toBe('first')
+      await store.connectorAccess.loadCandidates('example')
+      await store.selectFlow('second')
+      expect(store.connectorAccess.$.value.candidates).toEqual({})
+      expect(store.connectorAccess.$.value.access?.providerAccessDigest).toBe('second')
+      await store.connectorAccess.loadCandidates('example')
+      expect(candidates).toHaveBeenLastCalledWith('second', 'example')
+      await store.connectorAccess.select('example', 'binding')
+      expect(add).toHaveBeenCalledWith('second', 'example', 'binding', 2)
+      await store.selectFlow(undefined)
+      expect(store.connectorAccess.$.value.access).toBeUndefined()
+      expect(await store.connectorAccess.select('example', 'binding')).toBe(false)
+    } finally {
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+
   it('opens a newly created Flow from the catalog and ignores a burst once navigation starts', async () => {
     const { store, navigation, navigate, emit } = catalogSession()
     try {

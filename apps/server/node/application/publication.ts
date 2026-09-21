@@ -103,7 +103,7 @@ export class Publisher {
     )
     if (replay != null) return replay
     const planned = await this.#publication(input, providerAccess)
-    const accepted = this.#store.publications.publish(planned)
+    const accepted = this.#store.publications.publish(planned, () => this.#connectorAccess.current(input.flowId))
     this.#signal()
     return accepted
   }
@@ -120,8 +120,12 @@ export class Publisher {
     if (replay?.kind == 'conflict') {
       throw new ControlError(controlErrorCode.publicationConflict, 'The idempotency key refers to another Publish request.')
     }
-    const accepted = this.#store.publications.acceptPublishOperation(await this.#publication(input, providerAccess))
+    const accepted = this.#store.publications.acceptPublishOperation(await this.#publication(input, providerAccess), () =>
+      this.#connectorAccess.current(input.flowId),
+    )
     switch (accepted.kind) {
+      case 'access-conflict':
+        throw new ControlError(controlErrorCode.connectorAccessConflict, 'Connector access changed while the Publication was being accepted.')
       case 'accepted':
         this.#wakeMaintenance()
         return accepted.operation
@@ -163,9 +167,6 @@ export class Publisher {
       this.#resolveWaitPublicOrigin() == null
     ) {
       throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
-    }
-    if (input.control?.operation != 'rollback' && this.#connectorAccess.current(input.flowId).providerAccessDigest != providerAccess.providerAccessDigest) {
-      throw new ControlError(controlErrorCode.connectorAccessConflict, 'Connector access changed while the Publication was being accepted.')
     }
     const requestDigest = await this.#publicationRequestDigest(input, fixed.revisionDigest, providerAccess.providerAccessDigest)
     const publishedAt = this.#clock()
@@ -337,6 +338,8 @@ export class Publisher {
             'Publish operation succeeded.',
           )
           break
+        case 'access-conflict':
+          throw new Error('An accepted Publish operation cannot change its Connector access snapshot.')
         case 'binding-unresolved':
           this.#store.publications.failPublishOperation(target.operationId, {
             code: controlErrorCode.bindingUnresolved,

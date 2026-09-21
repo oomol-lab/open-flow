@@ -18,8 +18,9 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ServerService } from '../node/application/service.ts'
+import { ImplicitConnectorAccessHost } from '../node/deployment/connector-access.ts'
 import { createLogger } from '../node/logger.ts'
 import { Database } from '../node/storage/database.ts'
 import { createServerApp } from '../node/transport/http.ts'
@@ -181,6 +182,40 @@ it('rejects Integration publication when the callback runtime is not configured'
 })
 
 describe('Server Integration reconciliation', () => {
+  it.each(['publish', 'accept'] as const)('rejects access changes during asynchronous %s validation', async (method) => {
+    const accessHost = new ImplicitConnectorAccessHost()
+    const original = accessHost.current('main')
+    let digest = 'selected'
+    vi.spyOn(accessHost, 'current').mockImplementation(() => ({ ...original, mode: 'selectable', providerAccessDigest: digest }))
+    const definition: IntegrationDefinition = {
+      snapshot,
+      reconcile: async () => ({ outcome: 'ready' }),
+      receive: () => ({ outcome: 'ignored', reason: 'unused' }),
+    }
+    const host = createConnectorHost({
+      ...connector,
+      listConnections: async (...args) => {
+        const connections = await connector.listConnections(...args)
+        digest = 'changed'
+        return connections
+      },
+    })
+    const config = options(Date.now, [definition])
+    const file = await databaseFile()
+    const service = await openService(file, { ...config, capabilities: { ...config.capabilities, connector: () => host, connectorAccess: accessHost } })
+    const input = { flowId: 'main', revisionId: 'candidate', revision: revision('ready'), expectedLivePublicationId: null, idempotencyKey: 'race' }
+    if (method == 'publish') await expect(service.publisher.publish(input)).resolves.toEqual({ kind: 'access-conflict' })
+    else await expect(service.publisher.accept(input)).rejects.toMatchObject({ code: 'connector.access-conflict' })
+    const database = new DatabaseSync(file, { readOnly: true })
+    try {
+      expect(database.prepare('SELECT COUNT(*) AS count FROM publications').get()).toEqual({ count: 0 })
+      expect(database.prepare('SELECT COUNT(*) AS count FROM publish_operations').get()).toEqual({ count: 0 })
+    } finally {
+      database.close()
+      await closeService(service)
+    }
+  })
+
   it('aborts an in-flight Provider reconciliation when the service closes', async () => {
     const entered = Promise.withResolvers<void>()
     const canceled = Promise.withResolvers<void>()
@@ -436,6 +471,51 @@ describe('Server Integration reconciliation', () => {
 })
 
 describe('Server Integration callback fencing', () => {
+  it('uses the old state access while a new runtime is awaiting reconciliation', async () => {
+    const accessHost = new ImplicitConnectorAccessHost()
+    const original = accessHost.current('main')
+    let digest = 'old'
+    vi.spyOn(accessHost, 'current').mockImplementation(() => ({ ...original, providerAccessDigest: digest }))
+    const seen: string[] = []
+    const host = createConnectorHost({
+      ...connector,
+      proxy: async (_provider, _connection, _binding, _request, _signal, access) => {
+        seen.push(access!.providerAccess!.providerAccessDigest)
+        return { status: 200, data: {} }
+      },
+    })
+    const definition: IntegrationDefinition = {
+      snapshot,
+      initialState: { checkpoint: null, subscription: {} },
+      reconcile: async () => ({ outcome: 'ready' }),
+      async receive(context) {
+        await context.connector.execute({ method: 'GET', endpoint: '/event' })
+        return { outcome: 'ignored', reason: 'unused' }
+      },
+    }
+    const config = options(() => Date.parse('2026-08-21T00:00:00.000Z'), [definition])
+    const service = await openService(await databaseFile(), {
+      ...config,
+      capabilities: { ...config.capabilities, connector: () => host, connectorAccess: accessHost },
+    })
+    const first = await publish(service, 'ready', null)
+    await service.tickIntegration()
+    const endpointId = service.integrationEndpoint('main', 'integration')!
+    digest = 'new'
+    await publish(service, 'transient', first)
+    const target = service.integrationTarget(endpointId)!
+    expect(target).toMatchObject({ current: false })
+    await service.receiveIntegrationTarget(target, {
+      headers: new Headers(),
+      method: 'POST',
+      payload: {},
+      query: new URLSearchParams(),
+      rawBody: new TextEncoder().encode('{}'),
+    })
+    expect(seen).toEqual(['old'])
+    await closeService(service)
+  })
+
   it.each(['checkpoint', 'subscription'] as const)('updates the %s snapshot only after a successful save', async (field) => {
     const definition: IntegrationDefinition = {
       initialState: { checkpoint: { version: 0 }, subscription: { version: 0 } },
@@ -1035,6 +1115,11 @@ describe('Server change listener', () => {
 })
 
 it('prepares a Drive listener, preserves candidate wakes across restart, and scans after activation', async () => {
+  const accessHost = new ImplicitConnectorAccessHost()
+  const originalAccess = accessHost.current('main')
+  let accessDigest = 'initial'
+  vi.spyOn(accessHost, 'current').mockImplementation(() => ({ ...originalAccess, providerAccessDigest: accessDigest }))
+  const stoppedWithAccess: string[] = []
   const file = await databaseFile()
   let now = 0
   let changesRead = 0
@@ -1044,7 +1129,7 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
   let notification: { address: string; id: string; token: string } | undefined
   const drive = createConnectorHost({
     listConnections: async () => [{ connectionId: 'connection-main', displayName: 'Drive', isDefault: true, serviceId: 'googledrive', status: 'active' }],
-    proxy: async (_provider, _connection, _binding, request) => {
+    proxy: async (_provider, _connection, _binding, request, _signal, access) => {
       if (request.endpoint == '/changes/startPageToken') return { status: 200, data: { startPageToken: 'baseline' } }
       if (request.endpoint == '/changes/watch') {
         if (failPreparation) return { status: 503, data: {} }
@@ -1059,6 +1144,7 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
       }
       if (request.endpoint == '/channels/stop') {
         stopped += 1
+        stoppedWithAccess.push(access!.providerAccess!.providerAccessDigest)
         return { status: 204, data: null }
       }
       throw new Error('Unexpected Drive request')
@@ -1069,6 +1155,7 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
     triggerDefinitions: [definition],
     capabilities: {
       connector: () => drive,
+      connectorAccess: accessHost,
       integration: () => ({ callbackKey: 'callback-key', publicOrigin: 'https://flow.example' }),
     },
   }
@@ -1132,6 +1219,7 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
       { kind: 'graph.trigger.config.set', name: 'driveId', nodeId: 'listen', value: fixedInputValue('shared-drive') },
     ])
     failPreparation = true
+    accessDigest = 'replacement'
     const replacement = await service.control.publishFlow(
       'operator',
       flowId,
@@ -1156,6 +1244,7 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
     await service.tickIntegration()
     expect(admissionCount(file)).toBe(2)
     expect(stopped).toBe(1)
+    expect(stoppedWithAccess).toEqual(['initial'])
     service.control.retireFlow(flowId)
     await service.tickMaintenance()
     await service.tickIntegration()
@@ -1170,6 +1259,7 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
       retired.close()
     }
     expect(stopped).toBe(2)
+    expect(stoppedWithAccess).toEqual(['initial', 'replacement'])
   } finally {
     await closeService(service)
   }

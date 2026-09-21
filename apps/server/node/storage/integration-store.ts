@@ -30,6 +30,7 @@ export interface IntegrationCandidate {
   readonly flowId: string
   readonly nodeId: string
   readonly operationId: string
+  readonly providerAccessJson: string
   readonly reconcileAt: number | null
   readonly status: 'cleanup' | 'preparing' | 'ready'
   readonly subscriptionJson: string | null
@@ -70,6 +71,7 @@ export class IntegrationStore {
       readonly triggerNodeId: string
     }[],
     now: number,
+    providerAccess: ConnectorAccess,
   ): boolean {
     const candidates = []
     for (const integration of integrations) {
@@ -94,10 +96,22 @@ export class IntegrationStore {
         .prepare(
           `INSERT INTO integration_candidates (
              operation_id, node_id, binding_id, endpoint_id, flow_id, trigger_json, connection_id,
-             checkpoint_json, subscription_json, reconcile_at, status, next_at, created_at, updated_at
-           ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 'preparing', ?, ?, ?)`,
+             checkpoint_json, subscription_json, reconcile_at, status, next_at, created_at, updated_at, provider_access_snapshot
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL, NULL, 'preparing', ?, ?, ?, ?)`,
         )
-        .run(operationId, integration.triggerNodeId, bindingId, endpointId, flowId, integration.triggerJson, integration.connectionId, now, now, now)
+        .run(
+          operationId,
+          integration.triggerNodeId,
+          bindingId,
+          endpointId,
+          flowId,
+          integration.triggerJson,
+          integration.connectionId,
+          now,
+          now,
+          now,
+          JSON.stringify(providerAccess),
+        )
       this.#database
         .prepare(
           `INSERT INTO publish_work (
@@ -126,7 +140,8 @@ export class IntegrationStore {
         .prepare(
           `SELECT binding_id AS bindingId, checkpoint_json AS checkpointJson, connection_id AS connectionId,
                   endpoint_id AS endpointId, flow_id AS flowId, node_id AS nodeId, operation_id AS operationId,
-                  reconcile_at AS reconcileAt, status, subscription_json AS subscriptionJson, trigger_json AS triggerJson
+                  reconcile_at AS reconcileAt, status, subscription_json AS subscriptionJson, trigger_json AS triggerJson,
+                  provider_access_snapshot AS providerAccessJson
            FROM integration_candidates
            WHERE status IN ('preparing', 'cleanup') AND next_at <= ?
            ORDER BY next_at, operation_id, node_id
@@ -154,7 +169,8 @@ export class IntegrationStore {
       .prepare(
         `SELECT binding_id AS bindingId, checkpoint_json AS checkpointJson, connection_id AS connectionId,
                 endpoint_id AS endpointId, flow_id AS flowId, node_id AS nodeId, operation_id AS operationId,
-                reconcile_at AS reconcileAt, status, subscription_json AS subscriptionJson, trigger_json AS triggerJson
+                reconcile_at AS reconcileAt, status, subscription_json AS subscriptionJson, trigger_json AS triggerJson,
+                provider_access_snapshot AS providerAccessJson
          FROM integration_candidates WHERE operation_id = ? AND node_id = ?`,
       )
       .get(operationId, nodeId) as IntegrationCandidate | undefined
@@ -459,8 +475,8 @@ export class IntegrationStore {
       this.#database
         .prepare(`INSERT INTO integration_candidates (
         operation_id, node_id, binding_id, endpoint_id, flow_id, trigger_json, connection_id,
-        checkpoint_json, subscription_json, reconcile_at, status, next_at, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cleanup', ?, ?, ?)`)
+        checkpoint_json, subscription_json, reconcile_at, status, next_at, created_at, updated_at, provider_access_snapshot
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'cleanup', ?, ?, ?, ?)`)
         .run(
           operationId,
           'retired:' + bindingId,
@@ -475,6 +491,7 @@ export class IntegrationStore {
           now,
           now,
           now,
+          JSON.stringify(previous.providerAccess),
         )
     }
     this.#database.prepare('DELETE FROM integration_states WHERE binding_id = ?').run(bindingId)

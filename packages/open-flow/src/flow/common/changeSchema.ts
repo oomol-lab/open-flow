@@ -18,18 +18,18 @@ const fixedInput = z.union([z.object({ kind: z.literal('unset') }), z.object({ k
 const mapping = z.union([fixedInput, z.object({ kind: z.literal('sources'), sources: z.array(source) })])
 const inputs = z.record(text, mapping)
 const ports = { inputs: z.array(z.union([input, group])), outputs: z.array(z.union([port, group])) }
-const legacyCapability = z.object({
+const legacyCapability = z.strictObject({
   kind: z.literal('connector'),
   action: text,
   connectionId: text.optional(),
-  connections: z.array(z.object({ connectionId: text, alias: text.optional() })),
+  connections: z.array(z.strictObject({ connectionId: text, alias: text.optional() })),
 })
 const capability = z.union([
   legacyCapability,
-  z.object({
+  z.strictObject({
     kind: z.literal('connector'),
     actionHints: z.array(text).optional(),
-    connectionHints: z.array(z.object({ action: text, connectionId: text, alias: text.optional() })).optional(),
+    connectionHints: z.array(z.strictObject({ action: text, connectionId: text, alias: text.optional() })).optional(),
   }),
 ])
 const inline = z.object({ ...ports, name: text, moduleId: text, capabilities: z.array(capability).optional() })

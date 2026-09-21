@@ -590,21 +590,13 @@ function failure(error: unknown): Extract<PollState['health'], 'failed' | 'needs
   for (let current: unknown = error; current instanceof Error; current = current.cause) {
     if (current instanceof PollConnectionError) return 'needs_reauth'
     if (current instanceof PermanentPollError) return 'failed'
-    if (
-      current instanceof ConnectorTaskError &&
-      (current.code == 'connector.connection-required' || current.code == 'connector.access-required' || current.code == 'connector.access-invalid')
-    )
-      return 'needs_reauth'
+    if (current instanceof ConnectorTaskError && current.code == 'connector.connection-required') return 'needs_reauth'
   }
 }
 
 function listenerFailure(error: unknown): 'failed' | 'needs_reauth' {
   for (let current: unknown = error; current instanceof Error; current = current.cause) {
-    if (
-      current instanceof IntegrationConnectionError ||
-      (current instanceof ConnectorTaskError &&
-        (current.code == 'connector.connection-required' || current.code == 'connector.access-required' || current.code == 'connector.access-invalid'))
-    )
+    if (current instanceof IntegrationConnectionError || (current instanceof ConnectorTaskError && current.code == 'connector.connection-required'))
       return 'needs_reauth'
   }
   return 'failed'

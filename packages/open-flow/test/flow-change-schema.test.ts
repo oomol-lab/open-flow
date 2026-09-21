@@ -4,6 +4,7 @@ import { Validator } from '@cfworker/json-schema'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
 import { applyFlowChanges, changeOperationsSchema, decodeChangeOperations } from '../src/flow/common/change.ts'
+import { decodeFlowDocument } from '../src/flow/common/changeSchema.ts'
 
 const target = { kind: 'flow' }
 const operations = [
@@ -23,6 +24,33 @@ const operations = [
     value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'start', output: 'payload' }] },
   },
 ]
+
+it.each([
+  { kind: 'connector', action: 42, connections: [] },
+  { kind: 'connector', action: 'example.echo', connections: [], actionHints: ['example.other'] },
+  { kind: 'connector', connectionHints: [{ action: 'example.echo', connectionId: 'connection', extra: true }] },
+])('rejects malformed Connector capabilities instead of stripping them: %j', (capability) => {
+  const node = { kind: 'task', inputs: {}, task: { name: 'Code', moduleId: 'main', inputs: [], outputs: [], capabilities: [capability] } }
+  const operation = { kind: 'graph.node.create', target, nodeId: 'code', node }
+  expect(() => decodeChangeOperations([operation])).toThrow()
+  expect(new Validator(changeOperationsSchema() as object).validate([operation]).valid).toBe(false)
+  expect(() => decodeFlowDocument({ bindings: {}, tasks: {}, subflows: {}, graph: { nodes: { code: node }, edges: [] } })).toThrow()
+})
+
+it.each([
+  { kind: 'connector', action: 'example.echo', connections: [{ connectionId: 'connection', alias: 'work' }] },
+  { kind: 'connector', actionHints: ['example.echo'], connectionHints: [{ action: 'example.echo', connectionId: 'connection' }] },
+  { kind: 'connector' },
+])('preserves valid Connector capability declarations: %j', (capability) => {
+  const operation = {
+    kind: 'graph.node.create',
+    target,
+    nodeId: 'code',
+    node: { kind: 'task', inputs: {}, task: { name: 'Code', moduleId: 'main', inputs: [], outputs: [], capabilities: [capability] } },
+  }
+  expect(decodeChangeOperations([operation])).toEqual([operation])
+  expect(new Validator(changeOperationsSchema() as object).validate([operation]).valid).toBe(true)
+})
 
 describe('ChangeOperation wire contract', () => {
   it('decodes an atomic creation and mapping batch without changing its meaning', () => {

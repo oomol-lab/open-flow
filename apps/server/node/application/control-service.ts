@@ -663,11 +663,13 @@ export class ControlService {
       }
     }
     const draftClosure = await flowClosure(revisionContent(current))
+    const providerAccess = this.connectorAccess.current(flowId)
     return {
       flowId,
       hasUnpublishedChanges:
         draftClosure.digest != stored.publication.closureDigest ||
-        this.connectorAccess.current(flowId).providerAccessDigest != stored.publication.providerAccessDigest,
+        ((stored.publication.providerAccessDigest != 'legacy' || providerAccess.mode != 'implicit') &&
+          providerAccess.providerAccessDigest != stored.publication.providerAccessDigest),
       publication: publication(stored.publication),
       revision: stored.revision,
       status: currentFlow.live?.enabled == false ? 'suspended' : liveStatus(currentFlow.status, stored.publication.engineContract),
@@ -876,6 +878,8 @@ export class ControlService {
       this.publicationError(error)
     }
     switch (accepted.kind) {
+      case 'access-conflict':
+        throw new ControlError(controlErrorCode.connectorAccessConflict, 'Connector access changed while the Publication was being accepted.')
       case 'binding-unresolved':
         throw new ControlError(controlErrorCode.bindingUnresolved, 'A required environment variable is unresolved.')
       case 'busy':

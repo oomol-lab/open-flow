@@ -21,6 +21,7 @@ import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ServerService } from '../node/application/service.ts'
+import { ConnectorTaskError } from '../node/deployment/connector.ts'
 import { serverErrorCode } from '../node/error.ts'
 import { createLogger } from '../node/logger.ts'
 import { Database } from '../node/storage/database.ts'
@@ -515,6 +516,30 @@ describe('Server Poll Trigger', () => {
 
     expect(calls).toBe(100)
     expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: { page: 100 }, health: 'initializing' })
+    await closeService(service)
+  })
+
+  it.each(['connector.access-required', 'connector.access-invalid'] as const)('retries %s without requesting Connection reauthorization', async (code) => {
+    let failed = true
+    const definition: PollDefinition = {
+      buildOutputs: eventsPollOutputs,
+      snapshot,
+      async poll() {
+        if (failed) throw new ConnectorTaskError(code, 'Flow access is unavailable.')
+        return { checkpoint: 'recovered', events: [], hasMore: false }
+      },
+    }
+    const service = await openService(await databaseFile(), {
+      capabilities: { connector: () => connector },
+      clock: () => publishedAt,
+      triggerDefinitions: [definition],
+    })
+    await publish(service)
+    await service.tickListeners('2026-08-21T00:01:00.000Z')
+    expect(service.pollState('main', 'poll')?.health).not.toBe('needs_reauth')
+    failed = false
+    await service.tickListeners('2026-08-21T00:01:01.000Z')
+    expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: 'recovered', health: 'healthy' })
     await closeService(service)
   })
 

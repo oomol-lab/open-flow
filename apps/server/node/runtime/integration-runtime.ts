@@ -52,6 +52,7 @@ export interface IntegrationResponse {
 interface ActiveIntegrationTarget {
   readonly connectionId: string
   readonly current: boolean
+  readonly providerAccess: ConnectorAccess
   readonly definition: IntegrationDefinition
   readonly state: IntegrationStateContext
   readonly stored: StoredIntegrationTarget
@@ -66,8 +67,6 @@ interface CandidateIntegrationTarget {
 }
 
 interface ConnectorScope {
-  readonly cleanup?: boolean
-  readonly operationId?: string
   readonly providerAccess?: ConnectorAccess
   readonly publicationId?: string
 }
@@ -209,6 +208,7 @@ export class IntegrationRuntime {
     return {
       connectionId: current ? stored.connectionId : state.connectionId,
       current,
+      providerAccess: current ? this.#publicationAccess(stored.currentPublicationId) : state.providerAccess,
       definition: resolved.definition,
       state: this.#stateContext(state, this.#clock()),
       stored,
@@ -277,7 +277,7 @@ export class IntegrationRuntime {
               callbackSecret,
               config: resolveTriggerConfig(target.trigger.definition.configInputs, target.trigger.config),
               connector: this.#connectorProxy(target.definition, target.stored.bindingId, target.connectionId, target.stored.flowId, signal, {
-                publicationId: target.stored.currentPublicationId,
+                providerAccess: target.providerAccess,
               }),
               signal,
               current: target.current,
@@ -398,7 +398,7 @@ export class IntegrationRuntime {
             callbackSecret,
             config: resolveTriggerConfig(target.trigger.definition.configInputs, target.trigger.config),
             connector: this.#connectorProxy(target.definition, candidate.bindingId, candidate.connectionId, candidate.flowId, signal, {
-              operationId: candidate.operationId,
+              providerAccess: JSON.parse(candidate.providerAccessJson) as ConnectorAccess,
             }),
             signal,
             header: (name) => input.headers.get(name) ?? undefined,
@@ -504,7 +504,7 @@ export class IntegrationRuntime {
         current.bindingId,
         current.connectionId,
         current.flowId,
-        { cleanup: !active, operationId: current.operationId },
+        { providerAccess: JSON.parse(current.providerAccessJson) as ConnectorAccess },
         {
           active,
           callbackSecret,
@@ -786,11 +786,6 @@ export class IntegrationRuntime {
     const providerAccess =
       access.providerAccess ??
       (access.publicationId == null ? undefined : this.#store.publications.providerAccess(access.publicationId)) ??
-      (access.operationId == null
-        ? undefined
-        : access.cleanup
-          ? this.#store.publications.operationPreviousProviderAccess(access.operationId)
-          : this.#store.publications.operationProviderAccess(access.operationId)) ??
       this.#connectorAccess.current(flowId)
     const teamId = this.#store.connectorTeams.get(flowId)
     return {
@@ -928,10 +923,6 @@ function failure(error: unknown): Extract<IntegrationHealth, 'failed' | 'needs_r
   for (let current: unknown = error; current instanceof Error; current = current.cause) {
     if (current instanceof IntegrationConnectionError) return 'needs_reauth'
     if (current instanceof PermanentIntegrationError) return 'failed'
-    if (
-      current instanceof ConnectorTaskError &&
-      (current.code == 'connector.connection-required' || current.code == 'connector.access-required' || current.code == 'connector.access-invalid')
-    )
-      return 'needs_reauth'
+    if (current instanceof ConnectorTaskError && current.code == 'connector.connection-required') return 'needs_reauth'
   }
 }

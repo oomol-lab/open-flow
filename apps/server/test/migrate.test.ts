@@ -35,12 +35,57 @@ function legacyDatabase(file: string, schemaVersion: number): DatabaseSync {
   return database
 }
 
+function accessSnapshot(digest: string): string {
+  return JSON.stringify({ version: 1, mode: 'implicit', accessRevision: 0, bindings: [], providerAccessDigest: digest })
+}
+
+it('backfills each candidate with its creation snapshot, including failed and retired subscriptions', async () => {
+  const file = await databaseFile()
+  const database = legacyDatabase(file, 24)
+  database
+    .prepare(`INSERT INTO publications (publication_id, flow_id, revision_id, revision_digest, closure_digest, engine_contract,
+    idempotency_key, request_digest, actor_id, operation, model_version, created_at, provider_access_snapshot)
+    VALUES ('previous', 'flow', 'revision', 'revision', 'closure', 'engine', 'previous', 'previous', 'actor', 'publish', 3, 1, ?)`)
+    .run(accessSnapshot('previous'))
+  database
+    .prepare(`INSERT INTO publish_operations (operation_id, flow_id, revision_id, revision_digest, closure_digest, engine_contract,
+    expected_live_publication_id, idempotency_key, request_digest, input_json, status, deadline_at, created_at, updated_at, expires_at, provider_access_snapshot)
+    VALUES ('operation', 'flow', 'revision', 'revision', 'closure', 'engine', 'previous', 'operation', 'operation', '{}', 'pending', 100, 1, 1, 1000, ?)`)
+    .run(accessSnapshot('candidate'))
+  for (const [nodeId, status] of [
+    ['new', 'preparing'],
+    ['failed', 'cleanup'],
+    ['retired:old', 'cleanup'],
+  ]) {
+    database
+      .prepare(`INSERT INTO integration_candidates (operation_id, node_id, binding_id, endpoint_id, flow_id, trigger_json,
+      connection_id, status, created_at, updated_at) VALUES ('operation', ?, ?, ?, 'flow', '{}', 'connection', ?, 1, 1)`)
+      .run(nodeId!, nodeId!, nodeId!, status!)
+  }
+  database.close()
+  const upgraded = Database.open(file)
+  try {
+    expect(
+      upgraded.connection
+        .prepare(`SELECT node_id AS nodeId, json_extract(provider_access_snapshot, '$.providerAccessDigest') AS digest
+      FROM integration_candidates ORDER BY node_id`)
+        .all(),
+    ).toEqual([
+      { nodeId: 'failed', digest: 'candidate' },
+      { nodeId: 'new', digest: 'candidate' },
+      { nodeId: 'retired:old', digest: 'previous' },
+    ])
+  } finally {
+    upgraded.close()
+  }
+})
+
 it('applies the Flow-first schema without foreign keys', async () => {
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
   try {
-    expect(version(database)).toBe(24)
+    expect(version(database)).toBe(25)
     const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as {
       readonly name: string
     }[]
@@ -82,7 +127,7 @@ it('upgrades a version 1 Flow database without changing its data', async () => {
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(24)
+    expect(version(reopened)).toBe(25)
     expect(reopened.prepare('SELECT revision_id AS revisionId FROM revisions').all()).toEqual([{ revisionId: 'revision-a' }])
     expect(reopened.prepare('SELECT name FROM variables').all()).toEqual([])
   } finally {
@@ -112,7 +157,7 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(24)
+    expect(version(reopened)).toBe(25)
     expect(reopened.prepare('SELECT flow_id AS flowId, team_id AS teamId FROM flow_connector_teams').all()).toEqual([{ flowId: 'flow-a', teamId: null }])
     expect(reopened.prepare("SELECT name FROM pragma_table_info('runs') WHERE name = 'connector_team_id'").get()).toEqual({ name: 'connector_team_id' })
   } finally {
@@ -160,13 +205,13 @@ it('rejects a newer Flow schema version without modifying it', async () => {
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
-  database.exec('PRAGMA user_version = 25')
+  database.exec('PRAGMA user_version = 26')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('SQLite schema version 25 is newer than the supported version 24.')
+  expect(() => Database.open(file)).toThrow('SQLite schema version 26 is newer than the supported version 25.')
 
   const reopened = new DatabaseSync(file)
-  expect(version(reopened)).toBe(25)
+  expect(version(reopened)).toBe(26)
   reopened.close()
 })
 
@@ -204,7 +249,7 @@ it('preserves old checkpoint bytes for explicit recovery validation', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(24)
+    expect(version(reopened)).toBe(25)
     expect(reopened.prepare('SELECT * FROM run_checkpoints').get()).toEqual({
       run_id: 'run-a',
       checkpoint_json: '{"value":42}',
@@ -237,7 +282,7 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   Database.open(file).close()
   const upgraded = new DatabaseSync(file)
   try {
-    expect(version(upgraded)).toBe(24)
+    expect(version(upgraded)).toBe(25)
     const after = tables.map((table) => upgraded.prepare('SELECT * FROM ' + table).all())
     expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
     expect(after[2]).toEqual(
