@@ -371,18 +371,29 @@ describe('isolated-vm runtime conformance', () => {
     ).rejects.toMatchObject({ code: 'limit-exceeded' })
   })
 
-  it('enforces the wall-clock and isolate memory limits', async () => {
+  it('enforces the wall-clock limit', async () => {
     await expect(invoke('export default async () => await new Promise(() => {})', { ...isolatedVmLimits, wallMs: 20 })).rejects.toMatchObject({
       code: 'limit-exceeded',
     })
+  })
+
+  it('enforces the isolate memory limit and accepts the next invocation', async () => {
     await expect(
-      invoke('export default () => new Array(2_000_000).fill("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")', {
-        ...isolatedVmLimits,
-        cpuMs: 2_000,
-        memoryMb: 8,
-        wallMs: 5_000,
-      }),
-    ).rejects.toMatchObject({ code: 'limit-exceeded' })
+      invoke(
+        `export default () => {
+  const chunks = []
+  for (let index = 0; index < 1_024; index++) chunks.push(new Array(16_384).fill(index))
+  return chunks.length
+}`,
+        {
+          ...isolatedVmLimits,
+          cpuMs: 2_000,
+          memoryMb: 32,
+          wallMs: 5_000,
+        },
+      ),
+    ).rejects.toMatchObject({ code: 'limit-exceeded', message: expect.stringMatching(/memory limit/i) })
+    await expect(invoke('export default () => "after-memory-limit"')).resolves.toBe('after-memory-limit')
   })
 
   it.each([
