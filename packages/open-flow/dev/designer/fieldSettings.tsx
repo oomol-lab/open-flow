@@ -7,7 +7,7 @@ import { I18nProvider } from 'val-i18n-react'
 import { Button } from '../../src/ui/browser/button.tsx'
 import { Popover, PopoverTrigger } from '../../src/ui/browser/popover.tsx'
 import { FieldSectionTitle } from '../../src/workbench/browser/runtime/editor/fieldSectionHeader.tsx'
-import { GroupSettingsPanel, PortSettingsPanel } from '../../src/workbench/browser/runtime/editor/portDefinitionEditor.tsx'
+import { GroupSettingsPanel, PortSettingsPanel } from '../../src/workbench/browser/runtime/editor/portSettings.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { useStoryActions } from './storyActions.tsx'
 

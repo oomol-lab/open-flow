@@ -5,7 +5,8 @@ import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it } from 'vitest'
 import { createI18n } from '../i18n.ts'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
-import { BlockLibrary, ContextPanel } from './contextPanel.tsx'
+import { BlockLibrary } from './blockLibrary.tsx'
+import { ContextPanel } from './contextPanel.tsx'
 
 const connector: AddNodeOption = {
   connector: {

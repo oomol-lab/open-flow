@@ -1,0 +1,80 @@
+.open-flow-workbench {
+  .connection-state-content:has(> .connection-prompt) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 16px;
+
+    > p {
+      grid-column: 1;
+    }
+
+    &:has(> p) .connection-prompt > [data-slot='button'] {
+      grid-row: 1 / span 3;
+    }
+  }
+
+  .connection-prompt {
+    display: contents;
+
+    > p {
+      grid-column: 1;
+      text-wrap: pretty;
+    }
+
+    > [data-slot='button'] {
+      grid-column: 2;
+      grid-row: 1 / span 2;
+      align-self: center;
+    }
+  }
+
+  .connection-state p {
+    margin: 0;
+    color: var(--ui-muted-foreground);
+    font-size: 11px;
+    line-height: 17px;
+  }
+
+  .connection-field {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .connection-field > span {
+    color: var(--ui-muted-foreground);
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .connection-state {
+    background: var(--ui-background);
+  }
+
+  .connection-state-content {
+    display: flex;
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+    padding: 2px var(--inspector-content-inset-end) 16px var(--inspector-content-inset-start);
+  }
+
+  .connection-state .connection-detail {
+    color: var(--ui-muted-foreground);
+  }
+
+  .connection-state.required {
+    background: var(--warning-surface);
+    color: var(--warning-foreground);
+
+    h3,
+    p {
+      color: inherit;
+    }
+
+    .inspector-section-title {
+      background: inherit;
+    }
+  }
+}

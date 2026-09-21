@@ -122,6 +122,32 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
   const i18n = useMemo(() => createI18n(language), [language])
   useEffect(() => {
     const { client, flowId } = createInspectorTransport(log, content, {
+      actions: [
+        {
+          actionId: 'github.get_current_user',
+          serviceId: 'github',
+          serviceName: 'GitHub',
+          name: 'Get current user',
+          description: 'Read the signed-in user.',
+          authenticated: true,
+          inputs: {},
+          outputs: {},
+          inputSchema: { type: 'object', properties: {} },
+          outputSchema: { type: 'object', properties: { login: { type: 'string' } }, required: ['login'] },
+        },
+        {
+          actionId: 'slack.post_message',
+          serviceId: 'slack',
+          serviceName: 'Slack',
+          name: 'Post message',
+          description: 'Post a message.',
+          authenticated: true,
+          inputs: {},
+          outputs: {},
+          inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+          outputSchema: { type: 'object', properties: {} },
+        },
+      ],
       connections: [
         { id: 'github-work', displayName: 'GitHub · Work', isDefault: true, service: 'github', status: 'active' },
         { id: 'github-personal', displayName: 'GitHub · Personal', isDefault: false, service: 'github', status: 'active' },
@@ -189,6 +215,6 @@ export const inspectorPanelStory: FrontendStory = {
   title: 'Properties Panel',
   standalone: true,
   description:
-    'Production editor: inspect outline and selection states, including a Code node with Flow-scoped Connector access and available Connections grouped by Provider.',
+    'Production editor: inspect outline and selection states. Open properties for the Code node to check the compact action row, narrow-panel wrapping, and available connections grouped by Provider.',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,
 }

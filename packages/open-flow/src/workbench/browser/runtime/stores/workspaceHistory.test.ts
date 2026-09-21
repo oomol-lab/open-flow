@@ -5,7 +5,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { applyFlowChanges, decodeChangeOperations } from '../../../../flow/common/change.ts'
 import { createCodeTask, createValue } from '../../../../flow/common/nodeChanges.ts'
 import { ApiError, WorkbenchClient } from '../api.ts'
-import { designerGraph, setComment, setNodePositions } from '../workspace.ts'
+import { setComment, setNodePositions } from '../canvasPresentation.ts'
+import { designerGraph } from '../workspace.ts'
 import { WorkspaceStore } from './workspaceStore.ts'
 
 const target = { kind: 'flow' } as const

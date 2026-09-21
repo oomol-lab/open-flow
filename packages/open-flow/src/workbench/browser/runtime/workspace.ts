@@ -10,48 +10,17 @@ import type {
   FlowCanvasViewTriggerNode,
 } from '../../../canvas/browser/graph/FlowCanvas/model.ts'
 import type { ConditionOperand, GraphTarget } from '../../../flow/common/change.ts'
-import type {
-  ConnectorActionMetadata,
-  ConnectorConnection,
-  ConnectorProvider,
-  Diagnostic,
-  Draft,
-  GraphNode,
-  Group,
-  JsonValue,
-  Run,
-  RunDetails,
-  RunEvent,
-  TaskDefinition,
-  TriggerNode,
-} from './api.ts'
+import type { ConnectorProvider, Diagnostic, Draft, GraphNode, Group, JsonValue, Run, RunDetails, RunEvent, TaskDefinition, TriggerNode } from './api.ts'
+import type { Point, DesignerViewport } from './canvasPresentation.ts'
+import type { ConnectionCatalog, ConnectorActionView } from './connectionCatalog.ts'
 import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionView.ts'
 
-import { dequal } from 'dequal/lite'
 import { resolutionOutputPorts } from '../../../flow/common/graph.ts'
 import { sourceOutputLabel } from '../../../flow/common/sourceField.ts'
 import { triggerOutputPorts } from '../../../trigger/common/contract.ts'
+import { savedPositions, savedOrder, savedViewport, savedComments, savedHiddenNodeContent } from './canvasPresentation.ts'
 import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
-
-/** Consumer-derived account state; never part of the Action API or metadata cache. */
-export interface ConnectorActionView extends ConnectorActionMetadata {
-  readonly defaultConnection?: ConnectorConnection
-}
-
-export function actionWithConnections(action: ConnectorActionMetadata, connections: readonly ConnectorConnection[] | undefined): ConnectorActionView {
-  const preferred = action.authenticated && connections != null ? connectionCatalog(connections).preferred : undefined
-  return { ...action, ...(preferred == null ? {} : { defaultConnection: preferred }) }
-}
-
-export interface Point {
-  readonly x: number
-  readonly y: number
-}
-
-export interface DesignerViewport extends Point {
-  readonly zoom: number
-}
 
 export type DesignerNode = FlowCanvasViewNode
 
@@ -67,19 +36,6 @@ export interface DesignerGraph extends FlowCanvasViewModel {
   readonly edges: readonly DesignerEdge[]
   readonly nodes: readonly DesignerNode[]
   readonly viewport: DesignerViewport
-}
-
-export interface ConnectionCatalog {
-  readonly active: readonly ConnectorConnection[]
-  readonly all: readonly ConnectorConnection[]
-  readonly byId: ReadonlyMap<string, ConnectorConnection>
-  readonly preferred?: ConnectorConnection
-}
-
-export interface DesignerComment {
-  readonly content: string
-  readonly position: Point
-  readonly title: string
 }
 
 interface NodePorts {
@@ -122,24 +78,6 @@ function sourceNodePresentation(node: ResolvedSelection, context: NodeProjection
   return { icon: triggerNodeIcon(node.trigger, context.providers), title: node.trigger.name }
 }
 
-export function connectionCatalog(connections: readonly ConnectorConnection[]): ConnectionCatalog {
-  const active: ConnectorConnection[] = []
-  const byId = new Map<string, ConnectorConnection>()
-  let defaultConnection: ConnectorConnection | undefined
-  for (const connection of connections) {
-    byId.set(connection.connectionId, connection)
-    if (connection.status != 'active') continue
-    active.push(connection)
-    if (connection.isDefault) defaultConnection = connection
-  }
-  return {
-    active,
-    all: connections,
-    byId,
-    preferred: defaultConnection ?? (active.length == 1 ? active[0] : undefined),
-  }
-}
-
 function nodeTitle(node: ResolvedNode, t?: TFunction): string {
   if (node.node.name != null) return node.node.name
   switch (node.kind) {
@@ -177,71 +115,6 @@ function nodeIcon(node: ResolvedNode): string | undefined {
       return task.executor.kind == 'connector' ? ':carbon:connection-signal:' : ':carbon:machine-learning-model:'
     }
   }
-}
-
-function record(value: JsonValue | undefined): Readonly<Record<string, JsonValue>> | undefined {
-  if (value == null || typeof value != 'object' || Array.isArray(value)) return undefined
-  return value as Readonly<Record<string, JsonValue>>
-}
-
-function finite(value: JsonValue | undefined): number | undefined {
-  return typeof value == 'number' && Number.isFinite(value) ? value : undefined
-}
-
-export function targetPresentation(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): Readonly<Record<string, JsonValue>> | undefined {
-  const designer = record(value.designer)
-  if (designer?.version != 1) return undefined
-  return presentationTarget(designer, target)
-}
-
-function savedPositions(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): Readonly<Record<string, { readonly x: number; readonly y: number }>> {
-  const current = targetPresentation(value, target)
-  const positions = (source: JsonValue | undefined): Readonly<Record<string, { readonly x: number; readonly y: number }>> => {
-    return Object.fromEntries(
-      Object.entries(record(source) ?? {}).flatMap(([nodeId, candidate]) => {
-        const position = record(candidate)
-        const x = finite(position?.x)
-        const y = finite(position?.y)
-        return x == null || y == null ? [] : [[nodeId, { x, y }]]
-      }),
-    )
-  }
-  return positions(current?.nodes)
-}
-
-function savedOrder(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): readonly string[] {
-  const positions = savedPositions(value, target)
-  const source = targetPresentation(value, target)?.order
-  const order = Array.isArray(source) ? source.flatMap((nodeId) => (typeof nodeId == 'string' && positions[nodeId] != null ? [nodeId] : [])) : []
-  return [...new Set([...order, ...Object.keys(positions)])]
-}
-
-function optionalViewport(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): DesignerViewport | undefined {
-  const viewport = record(targetPresentation(value, target)?.viewport)
-  const x = finite(viewport?.x)
-  const y = finite(viewport?.y)
-  const zoom = finite(viewport?.zoom)
-  return x == null || y == null || zoom == null || zoom <= 0 ? undefined : { x, y, zoom }
-}
-
-function savedViewport(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): DesignerViewport {
-  return optionalViewport(value, target) ?? { x: 0, y: 0, zoom: 1 }
-}
-
-function savedComments(
-  value: Readonly<Record<string, JsonValue>>,
-  target: GraphTarget,
-  positions: Readonly<Record<string, Point>>,
-): Readonly<Record<string, DesignerComment>> {
-  const comments = record(targetPresentation(value, target)?.comments) ?? {}
-  return Object.fromEntries(
-    Object.entries(comments).flatMap(([nodeId, candidate]) => {
-      const comment = record(candidate)
-      const title = typeof comment?.title == 'string' ? comment.title : undefined
-      const content = typeof comment?.content == 'string' ? comment.content : undefined
-      return title == null || content == null ? [] : [[nodeId, { content, position: positions[nodeId] ?? { x: 80, y: 80 }, title }]]
-    }),
-  )
 }
 
 function edgeId(source: string, sourceHandle: string, target: string, targetHandle: string): string {
@@ -771,7 +644,7 @@ export function designerGraph(
   const edgeProjection = projectEdges(graph, nodeIds)
   const layout = layoutNodes(nodeIds, edgeProjection.dependencies, edgeProjection.dependents)
   const positions = savedPositions(presentation, target)
-  const hiddenNodeContent = record(targetPresentation(presentation, target)?.hiddenNodeContent)
+  const hiddenNodeContent = savedHiddenNodeContent(presentation, target)
   const context: NodeProjectionContext = {
     connectionCatalogs,
     connectorActions,
@@ -817,212 +690,4 @@ export function designerGraph(
     ...(projectedRun.status == null ? {} : { runStatus: projectedRun.status }),
     viewport: savedViewport(presentation, target),
   }
-}
-
-function designerPresentation(value: Readonly<Record<string, JsonValue>>): Readonly<Record<string, JsonValue>> {
-  const designer = record(value.designer)
-  return designer?.version == 1 ? designer : { version: 1 }
-}
-
-function presentationTarget(designer: Readonly<Record<string, JsonValue>>, target: GraphTarget): Readonly<Record<string, JsonValue>> | undefined {
-  return target.kind == 'flow' ? record(designer.flow) : record(record(designer.subflows)?.[target.id])
-}
-
-function replacePresentationTarget(
-  designer: Readonly<Record<string, JsonValue>>,
-  target: GraphTarget,
-  value: Readonly<Record<string, JsonValue>>,
-): Readonly<Record<string, JsonValue>> {
-  if (target.kind == 'flow') return { ...designer, flow: value, version: 1 }
-  const subflows = record(designer.subflows) ?? {}
-  return { ...designer, subflows: { ...subflows, [target.id]: value }, version: 1 }
-}
-
-function normalizedTarget(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): Record<string, JsonValue> {
-  const normalized: Record<string, JsonValue> = {
-    ...targetPresentation(value, target),
-    viewport: { ...savedViewport(value, target) },
-    nodes: savedPositions(value, target),
-    order: savedOrder(value, target),
-  }
-  delete normalized.layouts
-  return normalized
-}
-
-export function setNodePosition(
-  value: Readonly<Record<string, JsonValue>>,
-  target: GraphTarget,
-  nodeId: string,
-  position: Point,
-): Readonly<Record<string, JsonValue>> {
-  return setNodePositions(value, target, { [nodeId]: position })
-}
-
-export function setNodePositions(
-  value: Readonly<Record<string, JsonValue>>,
-  target: GraphTarget,
-  positions: Readonly<Record<string, Point>>,
-): Readonly<Record<string, JsonValue>> {
-  const designer = designerPresentation(value)
-  const current = normalizedTarget(value, target)
-  const nodes = record(current.nodes) ?? {}
-  const order = [...savedOrder(value, target)]
-  for (const nodeId of Object.keys(positions)) {
-    if (!order.includes(nodeId)) order.push(nodeId)
-  }
-  const nextNodes: Record<string, JsonValue> = {
-    ...nodes,
-    ...Object.fromEntries(Object.entries(positions).map(([nodeId, position]) => [nodeId, { x: position.x, y: position.y }])),
-  }
-  return {
-    ...value,
-    designer: replacePresentationTarget(designer, target, { ...current, nodes: nextNodes, order }),
-  }
-}
-
-export function setNodeContentHidden(
-  value: Readonly<Record<string, JsonValue>>,
-  target: GraphTarget,
-  nodeId: string,
-  hidden: boolean,
-): Readonly<Record<string, JsonValue>> {
-  if ((record(targetPresentation(value, target)?.hiddenNodeContent)?.[nodeId] === true) === hidden) return value
-  const current = normalizedTarget(value, target)
-  const hiddenNodeContent = { ...record(current.hiddenNodeContent) }
-  if (hidden) hiddenNodeContent[nodeId] = true
-  else delete hiddenNodeContent[nodeId]
-  return {
-    ...value,
-    designer: replacePresentationTarget(designerPresentation(value), target, { ...current, hiddenNodeContent }),
-  }
-}
-
-export function setComment(
-  value: Readonly<Record<string, JsonValue>>,
-  target: GraphTarget,
-  nodeId: string,
-  comment: DesignerComment,
-): Readonly<Record<string, JsonValue>> {
-  const positioned = setNodePositions(value, target, { [nodeId]: comment.position })
-  const designer = designerPresentation(positioned)
-  const current = presentationTarget(designer, target) ?? {}
-  const comments = record(current.comments) ?? {}
-  return {
-    ...positioned,
-    designer: replacePresentationTarget(designer, target, {
-      ...current,
-      comments: { ...comments, [nodeId]: { content: comment.content, title: comment.title } },
-    }),
-  }
-}
-
-export function removeComments(
-  value: Readonly<Record<string, JsonValue>>,
-  target: GraphTarget,
-  nodeIds: ReadonlySet<string>,
-): Readonly<Record<string, JsonValue>> {
-  const designer = designerPresentation(value)
-  const current = normalizedTarget(value, target)
-  const comments = { ...record(current.comments) }
-  const nodes = { ...record(current.nodes) }
-  for (const nodeId of nodeIds) {
-    delete comments[nodeId]
-    delete nodes[nodeId]
-  }
-  const order = savedOrder(value, target).filter((nodeId) => !nodeIds.has(nodeId))
-  return {
-    ...value,
-    designer: replacePresentationTarget(designer, target, { ...current, comments, nodes, order }),
-  }
-}
-
-export function commentIds(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): ReadonlySet<string> {
-  return new Set(Object.keys(record(targetPresentation(value, target)?.comments) ?? {}))
-}
-
-export function setFlowViewport(
-  value: Readonly<Record<string, JsonValue>>,
-  target: GraphTarget,
-  viewport: DesignerViewport,
-): Readonly<Record<string, JsonValue>> {
-  const currentViewport = optionalViewport(value, target)
-  if (currentViewport?.x == viewport.x && currentViewport.y == viewport.y && currentViewport.zoom == viewport.zoom) return value
-  const designer = designerPresentation(value)
-  const current = normalizedTarget(value, target)
-  return {
-    ...value,
-    designer: replacePresentationTarget(designer, target, {
-      ...current,
-      viewport: { x: viewport.x, y: viewport.y, zoom: viewport.zoom },
-    }),
-  }
-}
-
-export function eventSubject(event: RunEvent, t?: TFunction, nodeTitles?: ReadonlyMap<string, string>): string {
-  const title = event.kind == 'node.started' ? event.payload.nodeTitle : undefined
-  if (typeof title == 'string') return title
-  const executionId = 'executionId' in event.payload ? event.payload.executionId : undefined
-  if (typeof executionId == 'string') {
-    const executionTitle = nodeTitles?.get(executionId)
-    if (executionTitle != null) return executionTitle
-  }
-  const nodeId = event.payload.nodeId
-  if (typeof nodeId == 'string') return nodeTitles?.get(nodeId) ?? nodeId
-  return event.kind.startsWith('run.') ? (t?.('run.flowSubject') ?? 'Flow run') : (t?.('run.nodeSubject') ?? 'Node')
-}
-
-/** Only changed node presentation is retained; viewport navigation is never restored. */
-export interface CanvasPresentationChange {
-  readonly before: Readonly<Record<string, JsonValue>>
-  readonly after: Readonly<Record<string, JsonValue>>
-  readonly nodeIds: readonly string[]
-  readonly beforeOrder: readonly string[]
-  readonly afterOrder: readonly string[]
-}
-
-export function canvasPresentationChange(
-  before: Readonly<Record<string, JsonValue>>,
-  after: Readonly<Record<string, JsonValue>>,
-  target: GraphTarget,
-): CanvasPresentationChange {
-  const first = normalizedTarget(before, target)
-  const last = normalizedTarget(after, target)
-  const nodeIds = new Set<string>()
-  for (const field of ['nodes', 'comments', 'hiddenNodeContent']) {
-    const previous = record(first[field]) ?? {}
-    const next = record(last[field]) ?? {}
-    for (const id of new Set([...Object.keys(previous), ...Object.keys(next)])) {
-      if (!dequal(previous[id], next[id])) nodeIds.add(id)
-    }
-  }
-  const select = (value: Record<string, JsonValue>): Record<string, JsonValue> =>
-    Object.fromEntries(
-      ['nodes', 'comments', 'hiddenNodeContent'].map((field) => [
-        field,
-        Object.fromEntries(Object.entries(record(value[field]) ?? {}).filter(([id]) => nodeIds.has(id))),
-      ]),
-    )
-  return { before: select(first), after: select(last), nodeIds: [...nodeIds], beforeOrder: savedOrder(before, target), afterOrder: savedOrder(after, target) }
-}
-
-export function restoreCanvasPresentation(
-  value: Readonly<Record<string, JsonValue>>,
-  target: GraphTarget,
-  change: CanvasPresentationChange,
-  redo: boolean,
-): Readonly<Record<string, JsonValue>> {
-  if (change.nodeIds.length == 0) return value
-  const current = normalizedTarget(value, target)
-  const saved = redo ? change.after : change.before
-  for (const field of ['nodes', 'comments', 'hiddenNodeContent']) {
-    const next = { ...record(current[field]) }
-    const source = record(saved[field]) ?? {}
-    for (const id of change.nodeIds) {
-      if (source[id] == null) delete next[id]
-      else next[id] = source[id]!
-    }
-    current[field] = next
-  }
-  current.order = [...(redo ? change.afterOrder : change.beforeOrder)]
-  return { ...value, designer: replacePresentationTarget(designerPresentation(value), target, current) }
 }

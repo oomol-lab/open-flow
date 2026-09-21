@@ -1,7 +1,7 @@
 import styles from './nodePicker.module.scss'
 import type { DragEvent as ReactDragEvent, ReactElement } from 'react'
 import type { AddNodeOption } from './addNodeOptions.ts'
-import type { BlockLibraryProps } from './contextPanel.tsx'
+import type { BlockLibraryProps } from './blockLibrary.tsx'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'

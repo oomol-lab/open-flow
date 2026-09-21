@@ -1,9 +1,6 @@
-import type { GraphTarget } from '../../../../flow/common/change.ts'
-import type { AgentInput, AgentTool, ConnectorAccessCapability, ConnectorCapability, ManagedTaskDefinition } from '../../../../flow/common/change.ts'
-import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
+import type { GraphTarget, AgentInput, AgentTool, ManagedTaskDefinition } from '../../../../flow/common/change.ts'
 import type {
   ChangeOperation,
-  CodeModule,
   ConditionNode,
   Draft,
   GraphNode,
@@ -15,12 +12,12 @@ import type {
   TriggerNode,
   WebhookOptions,
 } from '../api.ts'
+import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { RevisionView } from '../revisionView.ts'
-import type { ConnectorActionView } from '../workspace.ts'
 
 import { dequal } from 'dequal/lite'
-import { applyFlowChanges as reduceFlowChanges, nextNodeName, normalizeNodeName } from '../../../../flow/common/change.ts'
-import { nodeInputMappings, mapConditionSources, otherwiseOutput } from '../../../../flow/common/condition.ts'
+import { nextNodeName, normalizeNodeName, applyFlowChanges as reduceFlowChanges } from '../../../../flow/common/change.ts'
+import { nodeInputMappings, otherwiseOutput } from '../../../../flow/common/condition.ts'
 import { fixedInputValue } from '../../../../flow/common/inputValue.ts'
 import {
   cleanVariableBindings,
@@ -36,19 +33,11 @@ import {
   createWait,
   defaultNodeName,
   deleteNodes,
+  updateSettings,
   setInputValue as setGraphInputValue,
   setInputVariable as setGraphInputVariable,
-  updateSettings,
 } from '../../../../flow/common/nodeChanges.ts'
 import { valueForEditor } from '../../../../form/common/editorComponent.ts'
-import { generateTyping, typescriptOf } from '../../../../manifest/common/meta/block/generateTyping.ts'
-
-export interface NodeClipboard {
-  readonly edges: Draft['content']['document']['graph']['edges']
-  readonly bindings: Draft['content']['document']['bindings']
-  readonly modules: Readonly<Record<string, CodeModule>>
-  readonly nodes: Readonly<Record<string, GraphNode>>
-}
 
 export type FlowChanges = readonly ChangeOperation[]
 
@@ -83,69 +72,6 @@ export type TaskSettings =
 
 export type TaskPorts = Pick<TaskDefinition, 'inputs' | 'outputs'>
 
-export function codeTyping(
-  ports: TaskPorts,
-  capabilities: readonly ConnectorCapability[] = [],
-  catalog: Readonly<Record<string, ConnectorActionView>> = {},
-): string {
-  const typing = generateTyping(
-    'javascript',
-    ports.inputs.flatMap((port) => ('handle' in port ? [{ handle: port.handle, json_schema: port.jsonSchema, nullable: port.nullable }] : [])),
-    ports.outputs.flatMap((port) => ('handle' in port ? [{ handle: port.handle, json_schema: port.jsonSchema, nullable: port.nullable }] : [])),
-  )
-  const dynamicOptions = '{ connectionId?: string; connectionAlias?: string }'
-  const access = capabilities.find((capability): capability is ConnectorAccessCapability => !('action' in capability))
-  const legacy = capabilities.filter((capability) => 'action' in capability)
-  const connectionHints = [
-    ...(access?.connectionHints ?? []),
-    ...legacy.flatMap((declaration) => declaration.connections.map((connection) => ({ action: declaration.action, ...connection }))),
-  ]
-  const hintedActions = [
-    ...new Set([...(access?.actionHints ?? []), ...connectionHints.map((hint) => hint.action), ...legacy.map((declaration) => declaration.action)]),
-  ]
-  const declarations = hintedActions.map((action) => ({
-    action,
-    connectionId:
-      access?.connectionHints?.find((hint) => hint.action == action && hint.alias == null)?.connectionId ??
-      legacy.find((declaration) => declaration.action == action)?.connectionId,
-    connections: connectionHints.filter((hint) => hint.action == action),
-  }))
-  const fields: string[] = []
-  const calls: string[] = []
-  const providers = new Map<string, string[]>()
-  for (const declaration of declarations) {
-    const definition = catalog[declaration.action]
-    const input = definition?.inputSchema == null ? 'Record<string, unknown>' : typescriptOf(definition.inputSchema, false)
-    const output = definition?.outputSchema == null ? 'unknown' : typescriptOf(definition.outputSchema, false)
-    const ids = declaration.connections.map((connection) => JSON.stringify(connection.connectionId)).join(' | ') || 'never'
-    const aliases = declaration.connections.flatMap((connection) => (connection.alias == null ? [] : [JSON.stringify(connection.alias)])).join(' | ') || 'never'
-    const options =
-      declaration.connections.length == 0
-        ? dynamicOptions
-        : `{ connectionId: ${ids}; connectionAlias?: never } | { connectionAlias: ${aliases}; connectionId?: never }`
-    const required = declaration.connections.length > 0 && declaration.connectionId == null
-    const args = required
-      ? `[input: {} extends ${input} ? ${input} | undefined : ${input}, options: ${options}]`
-      : `{} extends ${input} ? [input?: ${input}, options?: ${options}] : [input: ${input}, options?: ${options}]`
-    const signature = `(...args: ${args}) => Promise<${output}>`
-    calls.push(`(...args: [actionId: ${JSON.stringify(declaration.action)}, ...args: ${args}]): Promise<${output}>`)
-    fields.push(`${JSON.stringify(declaration.action)}: ${signature}`)
-    const separator = declaration.action.indexOf('.')
-    const provider = declaration.action.slice(0, separator)
-    const methods = providers.get(provider) ?? []
-    methods.push(`${JSON.stringify(declaration.action.slice(separator + 1))}: ${signature}`)
-    providers.set(provider, methods)
-  }
-  for (const [provider, methods] of providers) fields.push(`${JSON.stringify(provider)}: { ${methods.join('; ')}; [key: string]: any }`)
-  const hinted = declarations.map((declaration) => JSON.stringify(declaration.action)).join(' | ')
-  const fallback =
-    hinted == ''
-      ? `(actionId: string, input?: Record<string, unknown>, options?: ${dynamicOptions}): Promise<unknown>`
-      : `<Action extends string>(actionId: Action extends ${hinted} ? never : Action, input?: Record<string, unknown>, options?: ${dynamicOptions}): Promise<unknown>`
-  fields.push(`call: { ${calls.join('; ')}${calls.length == 0 ? '' : '; '}${fallback} }`, '[key: string]: any')
-  return `${typing}/** @typedef {import("@oomol-lab/open-flow").TaskContext<{ ${fields.join('; ').replaceAll('*/', '*\\/')} }>} TaskContext */\n`
-}
-
 export interface SubflowSettings {
   readonly inputs: NonNullable<ReturnType<RevisionView['subflow']>>['inputs']
   readonly name: string
@@ -166,12 +92,6 @@ export type AddNodeIntent =
   | { readonly kind: 'value'; readonly name: string }
   | { readonly kind: 'wait'; readonly name: string }
   | { readonly kind: 'webhook'; readonly name: string }
-
-export interface PastedNodes {
-  readonly changes: FlowChanges
-  readonly nodeIds: readonly string[]
-  readonly sourceIds: readonly string[]
-}
 
 function connectorTask(action: ConnectorActionView): Extract<TaskDefinition, { readonly executor: unknown }> {
   return {
@@ -222,7 +142,7 @@ export function createResource(id: string, name: string): FlowChanges {
   ]
 }
 
-function nameCreatedNodes(revision: RevisionView, target: GraphTarget, changes: FlowChanges): FlowChanges {
+export function nameCreatedNodes(revision: RevisionView, target: GraphTarget, changes: FlowChanges): FlowChanges {
   const graph = revision.graph(target)
   if (graph == null) return changes
   const names = new Set(Object.values(graph.nodes).flatMap((node) => (node.name == null ? [] : [node.name])))
@@ -299,142 +219,6 @@ export function addNode(revision: RevisionView, target: GraphTarget, nodeId: str
 
 export function deleteSelection(revision: RevisionView, target: GraphTarget, nodeIds: readonly string[]): FlowChanges {
   return deleteNodes(revision.revision.content, target, nodeIds)
-}
-
-export function copyNodes(revision: RevisionView, target: GraphTarget, nodeIds: readonly string[]): NodeClipboard {
-  const nodes = revision.graph(target)?.nodes ?? {}
-  const copied = Object.fromEntries(nodeIds.flatMap((nodeId) => (nodes[nodeId] == null ? [] : [[nodeId, nodes[nodeId]]])))
-  return {
-    edges: (revision.graph(target)?.edges ?? []).filter((edge) => copied[edge.source] != null && copied[edge.target] != null),
-    bindings: Object.fromEntries(
-      Object.values(copied).flatMap((node) => {
-        if (!('inputs' in node)) return []
-        const inputs = Object.values(nodeInputMappings(node))
-        return inputs.flatMap((mapping) =>
-          mapping.kind == 'sources'
-            ? mapping.sources.flatMap((source) => {
-                if (source.kind != 'binding') return []
-                const binding = revision.binding(source.bindingId)
-                return binding?.kind == 'variable' ? [[source.bindingId, binding]] : []
-              })
-            : [],
-        )
-      }),
-    ),
-    modules: Object.fromEntries(
-      Object.values(copied).flatMap((node) => {
-        if (node.kind != 'task' || node.task == null) return []
-        const module = revision.revision.content.modules[node.task.moduleId]
-        return module == null ? [] : [[node.task.moduleId, module]]
-      }),
-    ),
-    nodes: copied,
-  }
-}
-
-export function pasteNodes(revision: RevisionView, target: GraphTarget, clipboard: NodeClipboard, identity: () => string): PastedNodes {
-  if (revision.graph(target) == null) return { changes: [], nodeIds: [], sourceIds: [] }
-  const hasManualTrigger = Object.values(revision.graph(target)?.nodes ?? {}).some((node) => node.kind === 'manual')
-  const entries = Object.entries(clipboard.nodes).filter(
-    ([, node]) =>
-      (target.kind == 'flow' || 'inputs' in node) &&
-      (node.kind !== 'manual' || !hasManualTrigger) &&
-      (node.kind != 'task' || node.task == null || clipboard.modules[node.task.moduleId] != null),
-  )
-  const sourceIds = entries.map(([sourceId]) => sourceId)
-  const ids = new Map(sourceIds.map((sourceId) => [sourceId, identity()]))
-  const operations: ChangeOperation[] = []
-  const bindingIds = new Map<string, string>()
-  for (const [, node] of entries) {
-    if (!('inputs' in node)) continue
-    const inputs = Object.values(nodeInputMappings(node))
-    for (const mapping of inputs) {
-      if (mapping.kind != 'sources') continue
-      for (const source of mapping.sources) {
-        if (source.kind != 'binding' || clipboard.bindings[source.bindingId]?.kind != 'variable' || bindingIds.has(source.bindingId)) continue
-        bindingIds.set(source.bindingId, identity())
-      }
-    }
-  }
-  for (const [sourceId, bindingId] of bindingIds) {
-    const binding = clipboard.bindings[sourceId]
-    if (binding != null) operations.push({ binding, bindingId, kind: 'binding.create' })
-  }
-  for (const [sourceId, node] of entries) {
-    const nodeId = ids.get(sourceId)!
-    if (!('inputs' in node)) {
-      if (node.kind == 'poll' || node.kind == 'integration') {
-        const binding = revision.binding(node.bindingId)
-        const bindingId = identity()
-        if (binding != null) operations.push({ binding, bindingId, kind: 'binding.create' })
-        operations.push({ kind: 'graph.node.create', node: { ...node, bindingId }, nodeId, target })
-      } else {
-        operations.push({ kind: 'graph.node.create', node, nodeId, target })
-      }
-      continue
-    }
-    const remapInputs = (sourceInputs: Readonly<Record<string, InputMapping>>): Readonly<Record<string, InputMapping>> => {
-      const inputs: Record<string, InputMapping> = {}
-      for (const [handle, mapping] of Object.entries(sourceInputs)) {
-        if (mapping.kind != 'sources') {
-          inputs[handle] = mapping
-          continue
-        }
-        const sources: (typeof mapping.sources)[number][] = []
-        for (const source of mapping.sources) {
-          if (source.kind == 'binding') {
-            const copiedBindingId = bindingIds.get(source.bindingId)
-            if (copiedBindingId != null) sources.push({ ...source, bindingId: copiedBindingId })
-            continue
-          }
-          if (source.kind != 'node') {
-            sources.push(source)
-            continue
-          }
-          const copiedNodeId = ids.get(source.nodeId)
-          if (copiedNodeId != null) sources.push({ ...source, nodeId: copiedNodeId })
-        }
-        if (sources.length > 0) inputs[handle] = { kind: 'sources', sources }
-      }
-      return inputs
-    }
-    const inputs = remapInputs(node.inputs)
-    let copy: GraphNode = {
-      ...node,
-      inputs,
-    }
-    if (node.kind == 'condition')
-      copy = mapConditionSources(node, (source) =>
-        source.kind == 'node'
-          ? { ...source, nodeId: ids.get(source.nodeId) ?? source.nodeId }
-          : source.kind == 'binding'
-            ? { ...source, bindingId: bindingIds.get(source.bindingId) ?? source.bindingId }
-            : source,
-      )
-    if (node.kind == 'task' && node.task != null) {
-      const moduleId = nodeId
-      const module = clipboard.modules[node.task.moduleId]
-      operations.push({ kind: 'module.create', module: { ...module, name: `${module.name} copy` }, moduleId })
-      copy = {
-        ...node,
-        inputs,
-        ...(node.name == null ? {} : { name: node.name }),
-        task: { ...node.task, moduleId, name: `${node.task.name} copy` },
-      }
-    }
-    operations.push({
-      kind: 'graph.node.create',
-      node: copy,
-      nodeId,
-      target,
-    })
-  }
-  for (const edge of clipboard.edges) {
-    const source = ids.get(edge.source)
-    const destination = ids.get(edge.target)
-    if (source != null && destination != null) operations.push({ kind: 'graph.edge.connect', target, edge: { ...edge, source, target: destination } })
-  }
-  return { changes: nameCreatedNodes(revision, target, operations), nodeIds: [...ids.values()], sourceIds }
 }
 
 export function updateNodeSettings(revision: RevisionView, target: GraphTarget, nodeId: string, settings: NodeSettings): FlowChanges | undefined {
@@ -833,3 +617,4 @@ function replaceTaskPorts(
   }
   return changes
 }
+import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'

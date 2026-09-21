@@ -30,7 +30,6 @@ interface Props {
   readonly ariaLabel: string
   readonly disabled: boolean
   readonly errorLabel: string
-  readonly insert?: { readonly id: number; readonly text: string }
   readonly loadingLabel: string
   readonly location?: { readonly column: number; readonly line: number }
   readonly onBlur: () => void
@@ -41,20 +40,7 @@ interface Props {
   readonly value: string
 }
 
-export function CodeEditor({
-  ariaLabel,
-  disabled,
-  errorLabel,
-  insert,
-  loadingLabel,
-  location,
-  onBlur,
-  onChange,
-  theme,
-  typing,
-  uri,
-  value,
-}: Props): ReactElement {
+export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, location, onBlur, onChange, theme, typing, uri, value }: Props): ReactElement {
   const host = useRef<HTMLDivElement>(null)
   const editor = useRef<Editor>()
   const darkMode = useRef<ReturnType<typeof val<boolean>>>()
@@ -65,8 +51,6 @@ export function CodeEditor({
   const onBlurRef = useRef(onBlur)
   const onChangeRef = useRef(onChange)
   const typingRef = useRef(typing)
-  const insertRef = useRef(insert)
-  const inserted = useRef<number>()
   const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   valueRef.current = value
@@ -75,7 +59,6 @@ export function CodeEditor({
   onBlurRef.current = onBlur
   onChangeRef.current = onChange
   typingRef.current = typing
-  insertRef.current = insert
 
   useEffect(() => {
     const container = host.current!
@@ -128,11 +111,6 @@ export function CodeEditor({
         })
         const position = locationRef.current
         if (position != null) created.revealPosition?.(position.line, position.column)
-        const request = insertRef.current
-        if (request != null && request.id != inserted.current) {
-          inserted.current = request.id
-          created.insertText(request.text)
-        }
         setLoading(false)
       })
       .catch(() => {
@@ -179,13 +157,6 @@ export function CodeEditor({
   useEffect(() => {
     if (location != null) editor.current?.revealPosition?.(location.line, location.column)
   }, [location?.column, location?.line])
-
-  useEffect(() => {
-    const current = editor.current
-    if (current == null || insert == null || insert.id == inserted.current) return
-    inserted.current = insert.id
-    current.insertText(insert.text)
-  }, [insert])
 
   return (
     <div

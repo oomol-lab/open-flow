@@ -4,7 +4,7 @@ import type { ConnectorCapability } from '../../flow/common/change.ts'
 import { createSystem, createVirtualTypeScriptEnvironment } from '@typescript/vfs'
 import ts from 'typescript-lsp'
 import { describe, expect, it } from 'vitest'
-import { codeTyping } from './runtime/editor/flowChanges.ts'
+import { codeTyping } from './runtime/editor/codeTyping.ts'
 import { contextName, ShadowDocument } from './typeScriptShadow.ts'
 
 const libraries = import.meta.glob<string>('../../../node_modules/typescript-lsp/lib/lib.*.d.ts', { eager: true, query: '?raw', import: 'default' })
@@ -27,14 +27,19 @@ const definition: ConnectorAction = {
   outputSchema: { type: 'object', properties: { result: { type: 'string' } }, required: ['result'] },
 }
 
-function diagnostics(source: string, declarations = [declaration], catalog: Readonly<Record<string, ConnectorAction>> = { 'example.echo': definition }) {
+function editorService(
+  source: string,
+  declarations = [declaration],
+  catalog: Readonly<Record<string, ConnectorAction>> = { 'example.echo': definition },
+  providerIds: readonly string[] = [],
+) {
   const files = new Map(Object.entries(libraries).map(([path, text]) => [`/${path.split('/').at(-1)}`, text]))
   const roots = [...files.keys()]
   const types = platform['../../types/index.ts']
   if (types == null) throw new Error('Public Task types are missing.')
   files.set('/node_modules/@oomol-lab/open-flow/index.d.ts', types)
   files.set('/node_modules/@oomol-lab/open-flow/package.json', '{ "types": "index.d.ts" }')
-  const shadow = new ShadowDocument(source, codeTyping({ inputs: [], outputs: [] }, declarations, catalog))
+  const shadow = new ShadowDocument(source, codeTyping({ inputs: [], outputs: [] }, declarations, catalog, providerIds))
   files.set('/module.js', shadow.text)
   const compiler = ts as unknown as Parameters<typeof createVirtualTypeScriptEnvironment>[2]
   const environment = createVirtualTypeScriptEnvironment(createSystem(files), [...roots, '/module.js'], compiler, {
@@ -46,12 +51,34 @@ function diagnostics(source: string, declarations = [declaration], catalog: Read
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.Bundler,
   })
-  return environment.languageService
-    .getSemanticDiagnostics('/module.js')
+  return { service: environment.languageService, text: shadow.text }
+}
+
+function diagnostics(source: string, declarations = [declaration], catalog: Readonly<Record<string, ConnectorAction>> = { 'example.echo': definition }) {
+  return editorService(source, declarations, catalog)
+    .service.getSemanticDiagnostics('/module.js')
     .map((diagnostic: ts.Diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))
 }
 
 describe('Code Action editor types', () => {
+  it('completes every available Provider without requiring inserted Action hints', () => {
+    const { service, text } = editorService('export default async (_, ctx) => { ctx.actions. }', [], {}, ['github', 'gmail', 'sheets'])
+    const position = text.indexOf('ctx.actions.') + 'ctx.actions.'.length
+    const names = service.getCompletionsAtPosition('/module.js', position, {})?.entries.map((entry: ts.CompletionEntry) => entry.name)
+    expect(names).toEqual(expect.arrayContaining(['call', 'github', 'gmail', 'sheets']))
+  })
+
+  it('completes catalog Actions and checks their schemas without saved hints', () => {
+    const { service, text } = editorService('export default async (_, ctx) => { ctx.actions.example. }', [], { 'example.echo': definition }, ['example'])
+    const names = service
+      .getCompletionsAtPosition('/module.js', text.indexOf('ctx.actions.example.') + 'ctx.actions.example.'.length, {})
+      ?.entries.map((entry: ts.CompletionEntry) => entry.name)
+    expect(names).toContain('echo')
+    expect(diagnostics('export default async (_, ctx) => ctx.actions.example.echo({ any: 123 })', [], { 'example.echo': definition }).length).toBeGreaterThan(0)
+    expect(
+      diagnostics('export default async (_, ctx) => (await ctx.actions.example.echo({ any: "ok" })).result.toUpperCase()', [], { 'example.echo': definition }),
+    ).toEqual([])
+  })
   it('types the dynamic call API for every Code Task', () => {
     expect(
       diagnostics(

@@ -13,6 +13,9 @@ const workbenchStyleImports = [
   "@import './styles/workspace.css';",
   "@import './styles/canvas.css';",
   "@import './styles/context-panel.css';",
+  "@import './styles/block-library.css';",
+  "@import './styles/code-editor.css';",
+  "@import './styles/connection-settings.css';",
   "@import './styles/runs.css';",
   "@import './styles/publications.css';",
   "@import './styles/responsive.css';",
@@ -131,8 +134,23 @@ test('keeps browser control normalization below Workbench component utilities', 
   assert.doesNotMatch(workbenchStyles, /\n  button \{\n    border: 0;/)
 })
 
-test('keeps Workbench feature styles in their original cascade order', async () => {
-  const [entry, tokens, shell, resourceBrowser, status, workspace, canvas, contextPanel, runs, publications, responsive] = await Promise.all([
+test('keeps Workbench feature styles in their declared cascade order', async () => {
+  const [
+    entry,
+    tokens,
+    shell,
+    resourceBrowser,
+    status,
+    workspace,
+    canvas,
+    contextPanel,
+    blockLibrary,
+    codeEditor,
+    connectionSettings,
+    runs,
+    publications,
+    responsive,
+  ] = await Promise.all([
     readFile(new URL('src/workbench/browser/runtime/styles.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/tokens.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/shell.css', packageRoot), 'utf8'),
@@ -141,6 +159,9 @@ test('keeps Workbench feature styles in their original cascade order', async () 
     readFile(new URL('src/workbench/browser/runtime/styles/workspace.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/canvas.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/context-panel.css', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/styles/block-library.css', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/styles/code-editor.css', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/styles/connection-settings.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/runs.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/publications.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/responsive.css', packageRoot), 'utf8'),
@@ -150,7 +171,21 @@ test('keeps Workbench feature styles in their original cascade order', async () 
     [...entry.matchAll(/^@import [^;]+;/gm)].map((match) => match[0]),
     workbenchStyleImports,
   )
-  for (const source of [tokens, shell, resourceBrowser, status, workspace, canvas, contextPanel, runs, publications, responsive]) {
+  for (const source of [
+    tokens,
+    shell,
+    resourceBrowser,
+    status,
+    workspace,
+    canvas,
+    contextPanel,
+    blockLibrary,
+    codeEditor,
+    connectionSettings,
+    runs,
+    publications,
+    responsive,
+  ]) {
     assert.match(source, /^\.open-flow-workbench \{/)
   }
   assert.match(tokens, /background: var\(--ui-background\)/)
@@ -242,7 +277,7 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
     resourceBrowser,
     runInputPanel,
     workbenchCanvas,
-    contextPanel,
+    blockLibrary,
     runDrawer,
     runs,
     publications,
@@ -259,13 +294,17 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
     readFile(new URL('src/workbench/browser/runtime/shell/resourceBrowser.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/runs/runInputPanel.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/editor/workbenchCanvas.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/editor/contextPanel.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/editor/blockLibrary.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/runs/runDrawer.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/runs/runsView.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/publications/publicationsView.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/workspace.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/canvas.css', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/styles/context-panel.css', packageRoot), 'utf8'),
+    Promise.all(
+      ['context-panel', 'block-library', 'code-editor', 'connection-settings'].map((name) =>
+        readFile(new URL(`src/workbench/browser/runtime/styles/${name}.css`, packageRoot), 'utf8'),
+      ),
+    ).then((sources) => sources.join('\n')),
     readFile(new URL('src/workbench/browser/runtime/styles/runs.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/publications.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/responsive.css', packageRoot), 'utf8'),
@@ -283,10 +322,10 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
   assert.doesNotMatch(runInputPanel, /run-input-error/)
   assert.match(workbenchCanvas, /model\.nodes\.length == 0[\s\S]*?<Button[^>]*onClick=\{openAddNode\}[\s\S]*?designer\.addNode/)
   assert.doesNotMatch(workbenchCanvas, /canvas-empty-recommendations|recommendedOptions/)
-  assert.match(contextPanel, /<InputGroup>/)
-  assert.match(contextPanel, /buttonVariants\(\{ variant: 'ghost' \}\)/)
-  assert.doesNotMatch(contextPanel, /block-library-search/)
-  assert.doesNotMatch(contextPanel, /BlockPickerRow|designerThemeClass/)
+  assert.match(blockLibrary, /<InputGroup>/)
+  assert.match(blockLibrary, /buttonVariants\(\{ variant: 'ghost' \}\)/)
+  assert.doesNotMatch(blockLibrary, /block-library-search/)
+  assert.doesNotMatch(blockLibrary, /BlockPickerRow|designerThemeClass/)
   assert.match(runs, /aria-current=\{candidate\.runId == run\?\.runId \? 'true' : undefined\}/)
   assert.match(runs, /className="run-list-item"/)
   assert.match(runs, /className="mx-2 mb-2"[\s\S]*?size="lg"[\s\S]*?variant="outline"/)

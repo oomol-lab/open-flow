@@ -270,18 +270,6 @@ class CodeMirrorEditor {
     return this.view.state.doc.toString()
   }
 
-  public insertText(value: string): void {
-    if (this.disposed || this.readOnly) return
-    const selection = this.view.state.selection.main
-    const anchor = selection.from + value.length
-    this.view.dispatch({
-      changes: { from: selection.from, to: selection.to, insert: value },
-      effects: this.modules.EditorView.scrollIntoView(anchor),
-      selection: { anchor },
-    })
-    this.focus()
-  }
-
   public onChange(listener: () => void): () => void {
     this.changeListeners.add(listener)
     return () => {

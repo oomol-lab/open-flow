@@ -1,9 +1,10 @@
 import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
+import { setComment, setFlowViewport, setNodePositions, setNodeContentHidden, targetPresentation } from './canvasPresentation.ts'
 import { createI18n } from './i18n.ts'
 import { providerIcon } from './providerIcon.ts'
-import { designerGraph, setComment, setFlowViewport, setNodePositions, setNodeContentHidden, targetPresentation } from './workspace.ts'
+import { designerGraph } from './workspace.ts'
 
 describe('Designer port projection', () => {
   it('ignores malformed remote edges instead of throwing', () => {

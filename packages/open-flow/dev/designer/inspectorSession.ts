@@ -1,4 +1,4 @@
-import type { ConnectorAccess } from '../../src/control/common/api.ts'
+import type { ConnectorAccess, ConnectorActionMetadata } from '../../src/control/common/api.ts'
 import type { ChangeOperation, RevisionContent } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { LogAction } from './stories.tsx'
@@ -6,11 +6,11 @@ import type { LogAction } from './stories.tsx'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { applyFlowChanges } from '../../src/flow/common/change.ts'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
+import { setNodePositions } from '../../src/workbench/browser/runtime/canvasPresentation.ts'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { ConnectorStore } from '../../src/workbench/browser/runtime/stores/connectorStore.ts'
 import { TriggerStore } from '../../src/workbench/browser/runtime/stores/triggerStore.ts'
 import { WorkspaceStore } from '../../src/workbench/browser/runtime/stores/workspaceStore.ts'
-import { setNodePositions } from '../../src/workbench/browser/runtime/workspace.ts'
 
 const target = { kind: 'flow' } as const
 // Only transport responses are fixtures; saves use the production Store and Flow reducer.
@@ -20,6 +20,7 @@ export function createInspectorTransport(
   options: {
     readonly access?: ConnectorAccess
     readonly accessError?: boolean
+    readonly actions?: readonly ConnectorActionMetadata[]
     readonly candidates?: readonly {
       readonly accessBindingId: string
       readonly connectionDisplayName: string
@@ -92,6 +93,20 @@ export function createInspectorTransport(
       return Response.json(access)
     }
     if (url.pathname.endsWith('/connector/proxy/providers')) return Response.json({ success: true, data: options.providers ?? [] })
+    if (url.pathname.endsWith('/connector/proxy/actions'))
+      return Response.json({
+        success: true,
+        data: (options.actions ?? [])
+          .filter((action) => action.serviceId == url.searchParams.get('service'))
+          .map((action) => ({
+            id: action.actionId,
+            service: action.serviceId,
+            name: action.name,
+            description: action.description,
+            inputSchema: action.inputSchema,
+            outputSchema: action.outputSchema,
+          })),
+      })
     if (url.pathname.endsWith('/connector/proxy/apps')) return Response.json({ success: true, data: options.connections ?? [] })
     if (url.pathname === '/v1/trigger-keys/catalog')
       return Response.json({ version: 2, locale: url.searchParams.get('locale') ?? 'en', definitions: [], display: {} })

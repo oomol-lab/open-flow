@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { ConnectorConnection } from '../api.ts'
+import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
-import type { ConnectorActionView } from '../workspace.ts'
 import type { AddNodeOption } from './addNodeOptions.ts'
 
 import { Plus } from 'lucide-react'
@@ -11,7 +11,7 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '../../../../ui/browser/dialog.tsx'
 import { FieldError } from '../../../../ui/browser/field.tsx'
 import { mapSource } from '../stores/optionSource.ts'
-import { BlockLibrary } from './contextPanel.tsx'
+import { BlockLibrary } from './blockLibrary.tsx'
 
 const empty: readonly AddNodeOption[] = []
 

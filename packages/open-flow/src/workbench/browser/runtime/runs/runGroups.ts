@@ -152,3 +152,16 @@ export function agentSummary(event: RunEvent, t: TFunction): string | undefined 
       return t('run.agentToolRejected', { action })
   }
 }
+
+export function eventSubject(event: RunEvent, t?: TFunction, nodeTitles?: ReadonlyMap<string, string>): string {
+  const title = event.kind == 'node.started' ? event.payload.nodeTitle : undefined
+  if (typeof title == 'string') return title
+  const executionId = 'executionId' in event.payload ? event.payload.executionId : undefined
+  if (typeof executionId == 'string') {
+    const executionTitle = nodeTitles?.get(executionId)
+    if (executionTitle != null) return executionTitle
+  }
+  const nodeId = event.payload.nodeId
+  if (typeof nodeId == 'string') return nodeTitles?.get(nodeId) ?? nodeId
+  return event.kind.startsWith('run.') ? (t?.('run.flowSubject') ?? 'Flow run') : (t?.('run.nodeSubject') ?? 'Node')
+}

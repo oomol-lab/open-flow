@@ -1,6 +1,6 @@
 import type { GraphTarget } from '../../../../flow/common/change.ts'
+import type { CanvasPresentationChange } from '../canvasPresentation.ts'
 import type { FlowChanges } from '../editor/flowChanges.ts'
-import type { CanvasPresentationChange } from '../workspace.ts'
 
 import { val } from 'value-enhancer'
 
