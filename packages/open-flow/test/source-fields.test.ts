@@ -12,7 +12,7 @@ import { checkInputSource, inputSourceCandidates } from '../src/flow/common/grap
 import { inverseFlowChanges } from '../src/flow/common/inverseChanges.ts'
 import { prepareFlow, validateFlow } from '../src/flow/common/semantics.ts'
 import { sourceFields, sourceOutputLabel, sourcePort } from '../src/flow/common/sourceField.ts'
-import { copyNodes, pasteNodes } from '../src/workbench/browser/runtime/editor/flowChanges.ts'
+import { copyNodes, pasteNodes } from '../src/workbench/browser/runtime/editor/nodeClipboard.ts'
 import { revisionView } from '../src/workbench/browser/runtime/revisionView.ts'
 import { advanceWaiting, waitHost } from './waitHost.ts'
 

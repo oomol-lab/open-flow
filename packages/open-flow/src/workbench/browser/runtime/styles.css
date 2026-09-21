@@ -7,6 +7,9 @@
 @import './styles/workspace.css';
 @import './styles/canvas.css';
 @import './styles/context-panel.css';
+@import './styles/block-library.css';
+@import './styles/code-editor.css';
+@import './styles/connection-settings.css';
 @import './styles/runs.css';
 @import './styles/publications.css';
 @import './styles/responsive.css';

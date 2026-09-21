@@ -248,15 +248,75 @@ export interface AgentTool {
   readonly inputs: readonly (InputPort & { readonly source: AgentInput })[]
 }
 
-export interface ConnectorCapability {
+export interface ConnectorAccessCapability {
+  readonly actionHints?: readonly string[]
+  readonly connectionHints?: readonly {
+    readonly action: string
+    readonly connectionId: string
+    readonly alias?: string
+  }[]
+  readonly kind: 'connector'
+}
+
+export interface ConnectorActionCapability {
   readonly action: string
   readonly connections: readonly { readonly connectionId: string; readonly alias?: string }[]
   readonly connectionId?: string
   readonly kind: 'connector'
 }
 
+export type ConnectorCapability = ConnectorAccessCapability | ConnectorActionCapability
+
 export function decodeConnectorCapabilities(value: unknown): readonly ConnectorCapability[] {
   if (!Array.isArray(value)) throw new TypeError('Connector capabilities must be an array.')
+  if (value.length == 0) return []
+  if (value.some((item) => item != null && typeof item == 'object' && !Array.isArray(item) && !Object.hasOwn(item, 'action'))) {
+    if (value.length != 1) throw new TypeError('Connector capability is declared more than once.')
+    const item = value[0]
+    if (item == null || typeof item != 'object' || Array.isArray(item)) throw new TypeError('Invalid Connector capability.')
+    const source = item as Record<string, unknown>
+    if (
+      Object.keys(source).some((key) => !['kind', 'actionHints', 'connectionHints'].includes(key)) ||
+      source.kind != 'connector' ||
+      (Object.hasOwn(source, 'actionHints') && !Array.isArray(source.actionHints)) ||
+      (Object.hasOwn(source, 'connectionHints') && !Array.isArray(source.connectionHints))
+    ) {
+      throw new TypeError('Invalid Connector capability.')
+    }
+    const actionHints = ((source.actionHints as readonly unknown[] | undefined) ?? []).map((action: unknown) => {
+      if (typeof action != 'string' || !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+$/.test(action)) throw new TypeError('Invalid Connector Action hint.')
+      return action
+    })
+    if (new Set(actionHints).size != actionHints.length) throw new TypeError('Duplicate Connector Action hint.')
+    const keys = new Set<string>()
+    const connectionHints = ((source.connectionHints as readonly unknown[] | undefined) ?? []).map((entry: unknown) => {
+      if (entry == null || typeof entry != 'object' || Array.isArray(entry)) throw new TypeError('Invalid Connector Connection hint.')
+      const hint = entry as Record<string, unknown>
+      if (
+        Object.keys(hint).some((key) => !['action', 'connectionId', 'alias'].includes(key)) ||
+        typeof hint.action != 'string' ||
+        !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+$/.test(hint.action) ||
+        typeof hint.connectionId != 'string' ||
+        hint.connectionId.length == 0 ||
+        (Object.hasOwn(hint, 'alias') && (typeof hint.alias != 'string' || hint.alias.length == 0))
+      ) {
+        throw new TypeError('Invalid Connector Connection hint.')
+      }
+      const key = `${hint.action}\0${hint.alias ?? ''}`
+      if (keys.has(key)) throw new TypeError('Duplicate Connector Connection hint.')
+      keys.add(key)
+      return hint.alias == null
+        ? { action: hint.action, connectionId: hint.connectionId }
+        : { action: hint.action, connectionId: hint.connectionId, alias: hint.alias as string }
+    })
+    return [
+      {
+        kind: 'connector',
+        ...(actionHints.length == 0 ? {} : { actionHints }),
+        ...(connectionHints.length == 0 ? {} : { connectionHints }),
+      },
+    ]
+  }
   const actions = new Set<string>()
   return value.map((item: unknown) => {
     if (item == null || typeof item != 'object' || Array.isArray(item)) throw new TypeError('Invalid Connector capability.')

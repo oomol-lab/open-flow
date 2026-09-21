@@ -13,6 +13,7 @@
 - [前端架构重构记录](2026-09-09-frontend-refactor.md)
 - [添加节点浮窗统一计划](2026-09-11-node-picker.md)
 - [Code 节点调用 Connector Action 实施计划](code-actions.md)
+- [Provider Access Binding 接入计划](2026-09-18-provider-access-bindings.md)
 - [统一业务变化监听实施计划](2026-09-11-unified-change-listener.md)
 - [飞书 Trigger 接入计划](2026-09-14-feishu-triggers.md)
 - [等待节点通知出口与局部等待规格草案](2026-09-15-wait-notification-branch-spec.md)

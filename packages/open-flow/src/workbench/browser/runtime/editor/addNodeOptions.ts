@@ -1,8 +1,8 @@
 import type { TFunction } from 'val-i18n'
 import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { Draft, JsonValue, TriggerKeySnapshot } from '../api.ts'
+import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { RevisionView } from '../revisionView.ts'
-import type { ConnectorActionView } from '../workspace.ts'
 import type { AddNodeIntent } from './flowChanges.ts'
 
 import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'

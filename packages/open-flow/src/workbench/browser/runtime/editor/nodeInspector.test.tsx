@@ -289,7 +289,7 @@ describe('Code task sections', () => {
       activeConnectorConnections: [],
       connectorAuthorizationPending: false,
       connectorLoading: false,
-      connectors: { $: { actions: { value: {} } } } as never,
+      connectors: { $: { actions: { value: {} }, connections: { value: [] } } } as never,
       disabled: false,
       revision: { graph: () => ({ nodes: { task: node } }) } as never,
       selection: {
@@ -311,14 +311,11 @@ describe('Code task sections', () => {
       triggerConnectionLoading: false,
       triggers: {} as never,
     })
-    const task = find(element, (item) => typeof item.type == 'function' && item.type.name == 'TaskDefinition')
+    const task = find(element, (item) => typeof item.type == 'function' && item.type.name == 'CodeTaskSection')
     if (task == null || typeof task.type != 'function') throw new Error('Expected task definition.')
     const rendered = (task.type as (props: unknown) => ReactElement)(task.props)
-    const sections = Children.toArray((rendered.props as { readonly children?: ReactNode }).children)
-
-    expect(sections).toHaveLength(2)
-    expect(isValidElement(sections[0]) && sections[0].props['data-inspector-section']).toBe('module')
-    expect(isValidElement(sections[1]) && find(sections[1], (item) => typeof item.type == 'function' && item.type.name == 'GeneralSettings')).toBeDefined()
+    expect(rendered.props['data-inspector-section']).toBe('module')
+    expect(find(element, (item) => typeof item.type == 'function' && item.type.name == 'GeneralSettings')).toBeDefined()
     expect(find(rendered, (item) => item.props.className == 'form-actions code-actions')).toBeUndefined()
 
     moduleEditor.value = { ...moduleEditor.value, status: 'failed' }
@@ -340,7 +337,7 @@ describe('Code task sections', () => {
       activeConnectorConnections: [],
       connectorAuthorizationPending: false,
       connectorLoading: false,
-      connectors: { $: { actions: { value: {} } } } as never,
+      connectors: { $: { actions: { value: {} }, connections: { value: [] } } } as never,
       disabled: false,
       revision: { graph: () => ({ nodes: { llm: node } }) } as never,
       selection: { id: 'llm', kind: 'task', node, definition } as never,
@@ -351,16 +348,13 @@ describe('Code task sections', () => {
       triggerConnectionLoading: false,
       triggers: {} as never,
     })
-    const task = find(element, (item) => typeof item.type == 'function' && item.type.name == 'TaskDefinition')
+    const task = find(element, (item) => typeof item.type == 'function' && item.type.name == 'LlmTaskSection')
     if (task == null || typeof task.type != 'function') throw new Error('Expected task definition.')
     const rendered = (task.type as (props: unknown) => ReactElement)(task.props)
-    const sections = Children.toArray((rendered.props as { readonly children?: ReactNode }).children)
-
-    expect(sections).toHaveLength(2)
-    expect(isValidElement(sections[0]) && sections[0].props['data-inspector-section']).toBe('task')
-    expect(isValidElement(sections[0]) && sections[0].props.className).toBe('inspector-field-section')
-    expect(isValidElement(sections[0]) && find(sections[0], (item) => item.type == 'details')).toBeUndefined()
-    expect(isValidElement(sections[1]) && find(sections[1], (item) => typeof item.type == 'function' && item.type.name == 'GeneralSettings')).toBeDefined()
+    expect(rendered.props['data-inspector-section']).toBe('task')
+    expect(rendered.props.className).toBe('inspector-field-section')
+    expect(find(rendered, (item) => item.type == 'details')).toBeUndefined()
+    expect(find(element, (item) => typeof item.type == 'function' && item.type.name == 'GeneralSettings')).toBeDefined()
   })
 })
 

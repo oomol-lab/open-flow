@@ -17,6 +17,7 @@ describe('RunsView timeline', () => {
       engineContract: 'open-flow-engine/v5',
       engineDigest: 'engine',
       modelVersion: currentFlowModelVersion,
+      providerAccessDigest: 'implicit:test',
       revisionDigest: 'revision',
       waits:
         status == 'failed'

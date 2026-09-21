@@ -428,11 +428,6 @@ export function SourceForm({
           <div className="rounded-md bg-muted p-3 text-xs leading-5">
             <p className="m-0 font-medium">{connection?.displayName ?? source?.name}</p>
             <p className="m-0 break-all">App ID: {appId}</p>
-            {source != null ? (
-              <p className="m-0 break-all">Tenant Key: {source.tenantKey}</p>
-            ) : (
-              <p className="m-0 text-muted-foreground">{t('eventSources.tenantHint')}</p>
-            )}
           </div>
           <Label className="flex flex-col items-stretch gap-2">
             {t('eventSources.name')}

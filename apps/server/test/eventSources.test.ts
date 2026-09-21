@@ -58,7 +58,7 @@ async function setup() {
     ],
     proxy: async (_provider, _connection, _rate, request) => {
       requests.push(request.method + ' ' + request.endpoint)
-      return { status: 200, data: { code: 0, data: request.endpoint == '/tenant/v2/tenant/query' ? { tenant: { tenant_key: 'tenant' } } : {} } }
+      return { status: 200, data: { code: 0, data: {} } }
     },
   })
   const service = await openService(':memory:', {
@@ -141,7 +141,7 @@ it('durably fans out to current Flows and does not add later Flows when a messag
     schema: '2.0',
     header: {
       app_id: context.source.appId,
-      tenant_key: context.source.tenantKey,
+      tenant_key: 'tenant',
       token: input.verificationToken,
       event_id: 'event',
       event_type: 'im.message.receive_v1',
@@ -161,6 +161,28 @@ it('durably fans out to current Flows and does not add later Flows when a messag
   expect((await context.app.request(context.endpoint, forged)).status).toBe(401)
 })
 
+it('delivers events from different enterprises through the same application source', async () => {
+  const context = await setup()
+  const flowId = await publish(context, 'Application events')
+  for (const tenantKey of ['tenant-a', 'tenant-b']) {
+    const event = {
+      schema: '2.0',
+      header: {
+        app_id: context.source.appId,
+        tenant_key: tenantKey,
+        token: input.verificationToken,
+        event_id: `event-${tenantKey}`,
+        event_type: 'im.message.receive_v1',
+        create_time: String(now),
+      },
+      event: { message: { message_id: `message-${tenantKey}`, chat_id: 'chat' } },
+    }
+    expect((await context.app.request(context.endpoint, delivery(event))).status).toBe(200)
+  }
+  await context.service.tickIntegration()
+  expect(context.service.control.runs.listRuns(flowId, 20).page.runs).toHaveLength(2)
+})
+
 it('shares one approval subscription and prevents deleting an event source still in use', async () => {
   const context = await setup()
   await publish(context, 'A', { kind: 'approval', id: 'approval' })
@@ -177,16 +199,15 @@ it('shares one approval subscription and prevents deleting an event source still
   ).toBe(409)
 })
 
-it('derives the application and tenant from the selected Connection', async () => {
+it('creates an application event source without querying tenant information', async () => {
   const provider = 'feishu_app_bot'
   const connector = createConnectorHost({
     listConnections: async () => [
       { connectionId: input.connectionId, providerAccountId: 'cli_test', displayName: 'Feishu', serviceId: provider, status: 'active', isDefault: true },
     ],
-    proxy: async (_provider, _connection, _rate, request) => {
-      expect(request.endpoint).toBe('/tenant/v2/tenant/query')
-      return { status: 200, data: { code: 0, data: { tenant: { tenant_key: 'derived-tenant' } } } }
-    },
+    proxy: vi.fn(async () => {
+      throw new Error('Creating an event source must not require a provider API request.')
+    }),
   })
   const service = await openService(':memory:', { capabilities: { connector: () => connector } })
   const app = createServerApp(service, { resolveControlActor: () => 'operator' })
@@ -196,32 +217,12 @@ it('derives the application and tenant from the selected Connection', async () =
     body: JSON.stringify(input),
   })
   expect(response.status, await response.clone().text()).toBe(201)
-  expect(await response.json()).toMatchObject({ appId: 'cli_test', tenantKey: 'derived-tenant', provider: 'feishu_app_bot' })
+  const source = await response.json()
+  expect(source).toMatchObject({ appId: 'cli_test', provider: 'feishu_app_bot' })
+  expect(source).not.toHaveProperty('tenantKey')
+  expect(connector.proxy).not.toHaveBeenCalled()
+  expect(decodeEventSources(await (await app.request('/v1/event-sources')).json()).sources).toEqual([source])
 })
-
-it.each([null, {}, { tenant_key: '' }, { tenant_key: ' ' }, { tenant_key: 42 }, { tenant_key: 'x'.repeat(257) }])(
-  'rejects invalid tenant identity %j without creating a source',
-  async (tenant) => {
-    const connector = createConnectorHost({
-      listConnections: async () => [
-        {
-          connectionId: input.connectionId,
-          providerAccountId: 'cli_test',
-          displayName: 'Feishu',
-          serviceId: 'feishu_app_bot',
-          status: 'active',
-          isDefault: true,
-        },
-      ],
-      proxy: async () => ({ status: 200, data: { code: 0, data: { tenant } } }),
-    })
-    const service = await openService(':memory:', { capabilities: { connector: () => connector } })
-    const app = createServerApp(service, { resolveControlActor: () => 'operator' })
-    const response = await app.request('/v1/event-sources', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) })
-    expect(response.status).toBe(400)
-    expect((await (await app.request('/v1/event-sources')).json()).sources).toEqual([])
-  },
-)
 
 it('rejects missing application identity instead of accepting a manually supplied App ID', async () => {
   const connector = createConnectorHost({

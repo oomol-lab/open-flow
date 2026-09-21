@@ -22,7 +22,6 @@ const sampleSource: NonNullable<ComponentProps<typeof SourceForm>['source']> = {
   name: 'Demo events',
   provider: 'feishu_app_bot',
   appId: 'cli_demo',
-  tenantKey: 'demo-tenant',
   connectionId: 'sample-bot',
   teamId: null,
   enabled: true,

@@ -7,6 +7,7 @@ import { cardStories } from './cards.tsx'
 import { commentPropertiesStory } from './commentProperties.tsx'
 import { conditionEditorStory } from './conditionEditor.tsx'
 import { connectionPathsStory } from './connectionPaths.tsx'
+import { connectorAccessStory } from './connectorAccess.tsx'
 import { eventSourcesStory, createEventSourceStory, eventSourceSetupStory, feishuFiltersStory, feishuSummaryStory, eventPickerStory } from './eventSources.tsx'
 import { fieldLayoutStory } from './fieldLayout.tsx'
 import { fieldSettingsStory, groupSettingsStory } from './fieldSettings.tsx'
@@ -82,6 +83,7 @@ export const labStories: readonly FrontendStory[] = [
   ...workflowStories,
   workspaceRecoveryStory,
   connectionPathsStory,
+  connectorAccessStory,
   ...stories,
   formStory,
   popupLayoutStory,

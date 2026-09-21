@@ -1,6 +1,7 @@
 import type { ProviderTriggerDefinition } from '@oomol-lab/open-flow/provider-triggers'
 import type * as Clock from 'effect/Clock'
 import type { Logger } from 'pino'
+import type { ConnectorAccessHost } from '../deployment/connector-access.ts'
 import type { ConnectorHost } from '../deployment/connector.ts'
 import type { LlmHost } from '../deployment/llm.ts'
 import type { IntegrationOptions } from '../runtime/integration-runtime.ts'
@@ -13,6 +14,7 @@ export interface ServerRuntime {
 }
 
 export interface ServerCapabilities {
+  readonly connectorAccess?: ConnectorAccessHost
   readonly connector?: () => ConnectorHost | undefined
   readonly connectorConsoleOrigin?: () => URL | undefined
   readonly integration?: () => IntegrationOptions | undefined

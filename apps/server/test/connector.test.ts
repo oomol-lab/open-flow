@@ -222,7 +222,7 @@ describe('Server Connector host', () => {
     expect(service.events(uncaught).find((event) => event.kind == 'node.failed')).toMatchObject({ payload: { error: { code: 'connector.unavailable' } } })
   })
 
-  it('checks every allowed Connection before publishing and replays accepted operations before probing the provider', async () => {
+  it('checks the selected Connection without treating legacy capability hints as an allowlist', async () => {
     let active = true
     const listConnections = vi.fn(
       async (): Promise<readonly ConnectorConnection[]> => [
@@ -250,18 +250,11 @@ describe('Server Connector host', () => {
     ])
     const stored = await storeRevision(service, revision, 'multi-account-publish')
     active = false
-    await expect(service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v5', null, 'publish')).rejects.toMatchObject({
-      code: 'connector.connection-required',
-    })
+    const accepted = await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v5', null, 'publish')
     await expect(
       service.control.runs.createDraftRun(stored.flowId, stored.revisionId, 'open-flow-engine/v5', {}, 'run', { nodeId: 'start', outputs: {} }),
-    ).rejects.toMatchObject({
-      code: 'connector.connection-required',
-    })
-    active = true
-    const accepted = await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v5', null, 'publish')
+    ).resolves.toMatchObject({ created: true })
     const checks = listConnections.mock.calls.length
-    active = false
     const replay = await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v5', null, 'publish')
     expect(replay.operationId).toBe(accepted.operationId)
     expect(listConnections).toHaveBeenCalledTimes(checks)
@@ -319,7 +312,14 @@ describe('Server Connector host', () => {
     const service = await open(createConnectorHost({ execute }))
     const runId = await run(service, connectorFlow())
 
-    expect(execute).toHaveBeenCalledWith('example.echo', 'connection-work', { message: 'hello' }, expect.any(String), expect.any(AbortSignal), undefined)
+    expect(execute).toHaveBeenCalledWith(
+      'example.echo',
+      'connection-work',
+      { message: 'hello' },
+      expect.any(String),
+      expect.any(AbortSignal),
+      expect.objectContaining({ flowId: expect.any(String), purpose: 'execute', source: 'run' }),
+    )
     expect(service.run(runId)).toMatchObject({
       result: { kind: 'node-results', nodes: [{ status: 'completed', outputs: { message: 'hello' }, nodeId: 'connector' }] },
       status: 'completed',
@@ -340,7 +340,14 @@ describe('Server Connector host', () => {
     }
     const runId = await run(service, revision)
 
-    expect(execute).toHaveBeenCalledWith('example.echo', undefined, { message: 'hello' }, expect.any(String), expect.any(AbortSignal), undefined)
+    expect(execute).toHaveBeenCalledWith(
+      'example.echo',
+      undefined,
+      { message: 'hello' },
+      expect.any(String),
+      expect.any(AbortSignal),
+      expect.objectContaining({ flowId: expect.any(String), purpose: 'execute', source: 'run' }),
+    )
     expect(service.run(runId)?.status).toBe('completed')
   })
 
@@ -427,10 +434,18 @@ describe('Server Connector host', () => {
       vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
         const url = String(input)
         requests.push({ teamId: new Headers(init?.headers).get('x-oo-team-id'), url })
+        if (url == 'https://api.oomol.dev/v1/users/profile') return Response.json({ uid: 'oomol-user' })
+        if (url.endsWith('/app-access')) {
+          return Response.json({
+            'role::connector-app:connection-work': {
+              connector: [{ app: 'connection-work', method: 'POST', provider: 'example' }],
+            },
+          })
+        }
         if (url.startsWith('https://relation-control.oomol.dev/')) {
           return Response.json({ teams: [{ id: 'team-a', name: 'Team A', system_created: false }] })
         }
-        if (url.endsWith('/v1/apps')) {
+        if (url.endsWith('/v1/apps') || url.endsWith('/v1/apps/services/example')) {
           return Response.json({
             data: [{ alias: 'work', displayName: 'Work', id: 'connection-work', isDefault: true, service: 'example', status: 'active' }],
             success: true,
@@ -441,6 +456,8 @@ describe('Server Connector host', () => {
     )
     const service = await open(new ConnectorClient('https://connector.oomol.dev', 'runtime-token'))
     const created = await service.control.createFlow('test', 'Team Run', 'create-team-run', 'team-a')
+    const candidates = await service.control.getProviderAccessBindingCandidates('test', created.flow.flowId, 'example')
+    await service.control.addProviderAccessBinding('test', created.flow.flowId, 'example', candidates.candidates[0]!.accessBindingId, 0)
     const revision = connectorFlow()
     const changed = await service.control.changeDraft('test', created.flow.flowId, created.flow.draftRevisionId, [
       { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start', target: { kind: 'flow' } },
@@ -460,7 +477,9 @@ describe('Server Connector host', () => {
     await service.waitForIdle()
 
     expect(service.run(accepted.run.runId)?.status).toBe('completed')
-    expect(requests.filter((request) => request.url.startsWith('https://connector.oomol.dev/'))).toEqual([
+    const connectorRequests = requests.filter((request) => request.url.startsWith('https://connector.oomol.dev/'))
+    expect(connectorRequests.every((request) => request.teamId == 'team-a')).toBe(true)
+    expect(connectorRequests.slice(-2)).toEqual([
       { teamId: 'team-a', url: 'https://connector.oomol.dev/v1/apps' },
       { teamId: 'team-a', url: 'https://connector.oomol.dev/v1/actions/example.echo' },
     ])
@@ -471,11 +490,18 @@ describe('Server Connector host', () => {
     const service = await open(createConnectorHost({ execute }))
     const runId = await run(service, connectorFlow(undefined, true))
 
-    expect(execute).toHaveBeenCalledWith('example.echo', 'connection-work', { message: 'hello' }, expect.any(String), expect.any(AbortSignal), undefined)
+    expect(execute).toHaveBeenCalledWith(
+      'example.echo',
+      'connection-work',
+      { message: 'hello' },
+      expect.any(String),
+      expect.any(AbortSignal),
+      expect.objectContaining({ flowId: expect.any(String), purpose: 'execute', source: 'run' }),
+    )
     expect(service.run(runId)?.status).toBe('completed')
   })
 
-  it('allows only Connector Capabilities declared by the current inline Task', async () => {
+  it('lets an inline Code Task call Connector Actions without a node-level switch', async () => {
     const execute = vi.fn(async (_action: string, _connectionId: string, input: Readonly<Record<string, JsonValue>>) => input)
     const service = await open(
       createConnectorHost({
@@ -497,11 +523,9 @@ describe('Server Connector host', () => {
     expect(service.run(allowedRunId)?.status).toBe('completed')
     expect(execute).toHaveBeenCalledTimes(1)
 
-    const deniedRunId = await run(service, capabilityFlow(false))
-    expect(service.events(deniedRunId).find((event) => event.kind == 'node.failed')).toMatchObject({
-      payload: { error: { code: 'node.failed' } },
-    })
-    expect(execute).toHaveBeenCalledTimes(1)
+    const implicitRunId = await run(service, capabilityFlow(false, "capability.actions.example.echo(input, { connectionId: 'connection-work' })"))
+    expect(service.run(implicitRunId)?.status).toBe('completed')
+    expect(execute).toHaveBeenCalledTimes(2)
   })
 
   it.each(['null', '{}', "{ connectionId: '' }", "{ connectionId: 'connection-work', connectionAlias: 'work' }", '{ extra: true }'])(

@@ -35,6 +35,8 @@ const schemas = {
   putVariable: z.strictObject({
     value: z.string().refine((value) => new TextEncoder().encode(value).byteLength <= 65_536, 'Environment variable value is too large.'),
   }),
+  addProviderAccessBinding: z.strictObject({ accessBindingId: id, expectedAccessRevision: z.int().nonnegative(), version }),
+  removeProviderAccessBinding: z.strictObject({ accessBindingId: id, expectedAccessRevision: z.int().nonnegative(), version }),
   versionOnly: z.strictObject({ version }),
 }
 
@@ -62,6 +64,8 @@ export const controlRequests = {
   createLiveRun: decoder(schemas.createLiveRun),
   resolveWait: decoder(schemas.resolveWait),
   putVariable: decoder(schemas.putVariable),
+  addProviderAccessBinding: decoder(schemas.addProviderAccessBinding),
+  removeProviderAccessBinding: decoder(schemas.removeProviderAccessBinding),
   versionOnly: decoder(schemas.versionOnly),
 }
 

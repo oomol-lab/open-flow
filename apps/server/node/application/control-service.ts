@@ -2,6 +2,8 @@ import type { CreateEventSource, UpdateEventSource } from '@oomol-lab/open-flow/
 import type {
   ConnectorAction,
   ConnectorActionMetadata,
+  ConnectorAccess,
+  ConnectorAccessCandidates,
   ConnectorConnection,
   ConnectorProvider,
   Draft,
@@ -22,7 +24,8 @@ import type {
 } from '@oomol-lab/open-flow/control-api'
 import type { DraftOperation } from '@oomol-lab/open-flow/control-requests'
 import type { JsonValue, RevisionContent, TriggerKeySnapshot } from '@oomol-lab/open-flow/flow-change'
-import type { ConnectorHost } from '../deployment/connector.ts'
+import type { ConnectorAccessHost, ConnectorAccessMutation } from '../deployment/connector-access.ts'
+import type { ConnectorAccessContext, ConnectorHost } from '../deployment/connector.ts'
 import type { EventSourceRuntime } from '../runtime/event-source-runtime.ts'
 import type { StoredFlow, StoredFlowRevision } from '../storage/flow-store.ts'
 import type { PublicationAcceptance } from '../storage/publication-store.ts'
@@ -80,6 +83,7 @@ export class ControlService {
   private readonly llmAvailable: (kind?: 'agent') => boolean
   private readonly publish: (input: PublishInput) => Promise<PublicationAcceptance>
   private readonly resolveConnector: () => ConnectorHost | undefined
+  private readonly connectorAccess: ConnectorAccessHost
   private readonly resolveConnectorConsoleOrigin: () => URL | undefined
   private readonly resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>
   private readonly store: Store
@@ -104,12 +108,13 @@ export class ControlService {
     flowChanged: (event: FlowChangeEvent) => void,
     llmAvailable: (kind?: 'agent') => boolean,
     resolveConnector: () => ConnectorHost | undefined,
+    connectorAccess: ConnectorAccessHost,
     resolveConnectorConsoleOrigin: () => URL | undefined,
     resolveWaitPublicOrigin: () => URL | undefined,
     resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>,
     eventSources?: EventSourceRuntime,
   ) {
-    this.runs = new RunControl(store, clock, abortRun, wake, flowChanged, llmAvailable, resolveConnector, resolveWaitPublicOrigin)
+    this.runs = new RunControl(store, clock, abortRun, wake, flowChanged, llmAvailable, resolveConnector, connectorAccess, resolveWaitPublicOrigin)
     this.eventSources = eventSources
     this.store = store
     this.clock = clock
@@ -122,6 +127,7 @@ export class ControlService {
     this.flowChanged = flowChanged
     this.llmAvailable = llmAvailable
     this.resolveConnector = resolveConnector
+    this.connectorAccess = connectorAccess
     this.resolveConnectorConsoleOrigin = resolveConnectorConsoleOrigin
     this.resolveConnectorTeam = resolveConnectorTeam
   }
@@ -138,7 +144,7 @@ export class ControlService {
     if (scope != teamId) throw new ControlError(controlErrorCode.eventSourceInvalid, 'Select the Connector Team explicitly.')
     const connector = this.resolveConnector()
     if (connector == null) throw new ControlError(controlErrorCode.connectorUnconfigured, 'Connector is not configured.')
-    return { version: 1, connections: await connector.listConnections('feishu_app_bot', signal, scope) }
+    return { version: 1, connections: await connector.listConnections('feishu_app_bot', signal, this.#connectorContext(undefined, scope)) }
   }
 
   async createEventSource(input: CreateEventSource, signal: AbortSignal) {
@@ -194,7 +200,7 @@ export class ControlService {
     return definition
   }
 
-  async listTriggerConfigOptions(flowId: string, nodeId: string, field: string, signal: AbortSignal) {
+  async listTriggerConfigOptions(flowId: string, nodeId: string, field: string, signal: AbortSignal, actorId?: string) {
     const currentDraft = this.getDraft(flowId)
     const trigger = currentDraft.content.document.graph.nodes[nodeId]
     if (trigger == null || (trigger.kind != 'poll' && trigger.kind != 'integration'))
@@ -216,72 +222,158 @@ export class ControlService {
     if (definition?.configOptions == null) throw new ControlError(controlErrorCode.triggerKeyInvalid, 'This Trigger has no dynamic configuration options.')
     const binding = currentDraft.content.document.bindings[trigger.bindingId]
     if (binding?.kind != 'connection') throw new ControlError(serverErrorCode.connectorConnectionRequired, 'Select a Connection first.')
-    return await this.#connectorRequest(flowId, async (connector, teamId) => {
-      try {
-        return await definition.configOptions!({
-          field,
-          config: triggerConfigValues(trigger.definition.configInputs, trigger.config),
-          signal,
-          connector: {
-            execute: (request) => connector.proxy(definition.snapshot.provider, binding.target, `trigger-options:${flowId}`, request, signal, teamId),
-          },
-        })
-      } catch (error) {
-        if (error instanceof PollConnectionError) throw new ControlError(serverErrorCode.connectorConnectionRequired, error.message)
-        if (error instanceof PermanentPollError) throw new ControlError(controlErrorCode.triggerKeyInvalid, error.message)
-        if (error instanceof ConnectorTaskError) throw error
-        if (signal.aborted) throw error
-        throw new ControlError(controlErrorCode.connectorUnavailable, 'Trigger configuration options could not be loaded.')
-      }
-    })
+    return await this.#connectorRequest(
+      flowId,
+      async (connector, access) => {
+        try {
+          return await definition.configOptions!({
+            field,
+            config: triggerConfigValues(trigger.definition.configInputs, trigger.config),
+            signal,
+            connector: {
+              execute: (request) => connector.proxy(definition.snapshot.provider, binding.target, `trigger-options:${flowId}`, request, signal, access),
+            },
+          })
+        } catch (error) {
+          if (error instanceof PollConnectionError) throw new ControlError(serverErrorCode.connectorConnectionRequired, error.message)
+          if (error instanceof PermanentPollError) throw new ControlError(controlErrorCode.triggerKeyInvalid, error.message)
+          if (error instanceof ConnectorTaskError) throw error
+          if (signal.aborted) throw error
+          throw new ControlError(controlErrorCode.connectorUnavailable, 'Trigger configuration options could not be loaded.')
+        }
+      },
+      actorId,
+    )
   }
 
-  async listConnectorProviders(flowId?: string, signal?: AbortSignal, locale?: string): Promise<readonly ConnectorProvider[]> {
-    return await this.#connectorRequest(flowId, (connector, teamId) => connector.listProviders(signal, teamId, locale))
+  async listConnectorProviders(flowId?: string, signal?: AbortSignal, locale?: string, actorId?: string): Promise<readonly ConnectorProvider[]> {
+    return await this.#connectorRequest(flowId, (connector, access) => connector.listProviders(signal, access, locale), actorId)
   }
 
-  async listConnectorActionMetadata(serviceId?: string, flowId?: string, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
-    return await this.#connectorRequest(flowId, (connector, teamId) => connector.listActions(serviceId, undefined, teamId, locale))
+  getConnectorAccess(actorId: string, flowId: string): ConnectorAccess {
+    this.getFlow(flowId)
+    return this.connectorAccess.read(actorId, flowId)
   }
 
-  async searchConnectorActionMetadata(query: string, flowId?: string, signal?: AbortSignal, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
-    return await this.#connectorRequest(flowId, (connector, teamId) => connector.searchActions(query, signal, teamId, locale))
+  async getProviderAccessBindingCandidates(actorId: string, flowId: string, providerId: string, signal?: AbortSignal): Promise<ConnectorAccessCandidates> {
+    this.getFlow(flowId)
+    if (providerId.length == 0) throw new ControlError(controlErrorCode.connectorAccessInvalid, 'Connector Provider is invalid.')
+    try {
+      return await this.connectorAccess.listCandidates(actorId, flowId, providerId, signal)
+    } catch (error) {
+      if (error instanceof ConnectorTaskError) throw new ControlError(error.code, error.message)
+      throw error
+    }
   }
 
-  async getConnectorActionMetadata(actionId: string, flowId?: string, signal?: AbortSignal, locale?: string): Promise<ConnectorActionMetadata> {
-    return await this.#connectorRequest(flowId, (connector, teamId) => connector.getAction(actionId, signal, teamId, locale))
+  async addProviderAccessBinding(
+    actorId: string,
+    flowId: string,
+    providerId: string,
+    accessBindingId: string,
+    expectedAccessRevision: number,
+  ): Promise<ConnectorAccess> {
+    this.getFlow(flowId)
+    try {
+      return this.#accessMutation(flowId, await this.connectorAccess.add(actorId, flowId, providerId, accessBindingId, expectedAccessRevision))
+    } catch (error) {
+      if (error instanceof ConnectorTaskError) throw new ControlError(error.code, error.message)
+      throw error
+    }
   }
 
-  async listConnectorActions(serviceId?: string, flowId?: string, locale?: string): Promise<readonly ConnectorAction[]> {
-    return await this.#connectorRequest(flowId, async (connector, teamId) => {
-      const [actions, connections] = await Promise.all([
-        connector.listActions(serviceId, undefined, teamId, locale),
-        serviceId == null ? connector.listAllConnections(undefined, teamId) : connector.listConnections(serviceId, undefined, teamId),
-      ])
-      return actions.map((action) => actionWithDefaultConnection(action, connections))
-    })
+  async removeProviderAccessBinding(
+    actorId: string,
+    flowId: string,
+    providerId: string,
+    accessBindingId: string,
+    expectedAccessRevision: number,
+  ): Promise<ConnectorAccess> {
+    this.getFlow(flowId)
+    return this.#accessMutation(flowId, await this.connectorAccess.remove(actorId, flowId, providerId, accessBindingId, expectedAccessRevision))
   }
 
-  async searchConnectorActions(query: string, flowId?: string, signal?: AbortSignal, locale?: string): Promise<readonly ConnectorAction[]> {
-    return await this.#connectorRequest(flowId, async (connector, teamId) => {
-      const [actions, connections] = await Promise.all([connector.searchActions(query, signal, teamId, locale), connector.listAllConnections(signal, teamId)])
-      return actions.map((action) => actionWithDefaultConnection(action, connections))
-    })
+  #accessMutation(flowId: string, mutation: ConnectorAccessMutation): ConnectorAccess {
+    switch (mutation.kind) {
+      case 'saved':
+        this.flowChanged({ accessRevision: mutation.access.accessRevision, flowId, kind: 'access.changed', version: 1 })
+        this.flowCatalogChanged()
+        return mutation.access
+      case 'conflict':
+        throw new ControlError(controlErrorCode.connectorAccessConflict, 'Connector access changed concurrently.')
+      case 'invalid':
+        throw new ControlError(controlErrorCode.connectorAccessInvalid, 'The Provider access binding is invalid or unavailable.')
+      case 'unsupported':
+        throw new ControlError(controlErrorCode.connectorAccessUnsupported, 'This deployment manages Connector access implicitly.')
+    }
   }
 
-  async getConnectorAction(actionId: string, flowId?: string, signal?: AbortSignal, locale?: string): Promise<ConnectorAction> {
-    return await this.#connectorRequest(flowId, async (connector, teamId) => {
-      const [action, connections] = await Promise.all([connector.getAction(actionId, signal, teamId, locale), connector.listAllConnections(signal, teamId)])
-      return actionWithDefaultConnection(action, connections)
-    })
+  async listConnectorActionMetadata(serviceId?: string, flowId?: string, locale?: string, actorId?: string): Promise<readonly ConnectorActionMetadata[]> {
+    return await this.#connectorRequest(flowId, (connector, access) => connector.listActions(serviceId, undefined, access, locale), actorId)
   }
 
-  async listAllConnectorConnections(flowId?: string, signal?: AbortSignal): Promise<readonly ConnectorConnection[]> {
-    return await this.#connectorRequest(flowId, (connector, teamId) => connector.listAllConnections(signal, teamId))
+  async searchConnectorActionMetadata(
+    query: string,
+    flowId?: string,
+    signal?: AbortSignal,
+    locale?: string,
+    actorId?: string,
+  ): Promise<readonly ConnectorActionMetadata[]> {
+    return await this.#connectorRequest(flowId, (connector, access) => connector.searchActions(query, signal, access, locale), actorId)
   }
 
-  async listConnectorConnections(serviceId: string, flowId?: string, signal?: AbortSignal): Promise<readonly ConnectorConnection[]> {
-    return await this.#connectorRequest(flowId, (connector, teamId) => connector.listConnections(serviceId, signal, teamId))
+  async getConnectorActionMetadata(
+    actionId: string,
+    flowId?: string,
+    signal?: AbortSignal,
+    locale?: string,
+    actorId?: string,
+  ): Promise<ConnectorActionMetadata> {
+    return await this.#connectorRequest(flowId, (connector, access) => connector.getAction(actionId, signal, access, locale), actorId)
+  }
+
+  async listConnectorActions(serviceId?: string, flowId?: string, locale?: string, actorId?: string): Promise<readonly ConnectorAction[]> {
+    return await this.#connectorRequest(
+      flowId,
+      async (connector, access) => {
+        const [actions, connections] = await Promise.all([
+          connector.listActions(serviceId, undefined, access, locale),
+          serviceId == null ? connector.listAllConnections(undefined, access) : connector.listConnections(serviceId, undefined, access),
+        ])
+        return actions.map((action) => actionWithDefaultConnection(action, connections))
+      },
+      actorId,
+    )
+  }
+
+  async searchConnectorActions(query: string, flowId?: string, signal?: AbortSignal, locale?: string, actorId?: string): Promise<readonly ConnectorAction[]> {
+    return await this.#connectorRequest(
+      flowId,
+      async (connector, access) => {
+        const [actions, connections] = await Promise.all([connector.searchActions(query, signal, access, locale), connector.listAllConnections(signal, access)])
+        return actions.map((action) => actionWithDefaultConnection(action, connections))
+      },
+      actorId,
+    )
+  }
+
+  async getConnectorAction(actionId: string, flowId?: string, signal?: AbortSignal, locale?: string, actorId?: string): Promise<ConnectorAction> {
+    return await this.#connectorRequest(
+      flowId,
+      async (connector, access) => {
+        const [action, connections] = await Promise.all([connector.getAction(actionId, signal, access, locale), connector.listAllConnections(signal, access)])
+        return actionWithDefaultConnection(action, connections)
+      },
+      actorId,
+    )
+  }
+
+  async listAllConnectorConnections(flowId?: string, signal?: AbortSignal, actorId?: string): Promise<readonly ConnectorConnection[]> {
+    return await this.#connectorRequest(flowId, (connector, access) => connector.listAllConnections(signal, access), actorId)
+  }
+
+  async listConnectorConnections(serviceId: string, flowId?: string, signal?: AbortSignal, actorId?: string): Promise<readonly ConnectorConnection[]> {
+    return await this.#connectorRequest(flowId, (connector, access) => connector.listConnections(serviceId, signal, access), actorId)
   }
 
   async connectorConnectionPage(serviceId: string, flowId?: string, teamId?: string, signal?: AbortSignal): Promise<string> {
@@ -317,15 +409,30 @@ export class ControlService {
     return teamId
   }
 
-  async #connectorRequest<Value>(flowId: string | undefined, request: (connector: ConnectorHost, teamId?: string) => Promise<Value>): Promise<Value> {
+  async #connectorRequest<Value>(
+    flowId: string | undefined,
+    request: (connector: ConnectorHost, access: ConnectorAccessContext) => Promise<Value>,
+    actorId?: string,
+  ): Promise<Value> {
     const connector = this.resolveConnector()
     if (connector == null) throw new ControlError(controlErrorCode.connectorUnconfigured, 'Connector is not configured for this deployment.')
     const teamId = await this.resolveConnectorScope(flowId)
     try {
-      return await request(connector, teamId)
+      return await request(connector, this.#connectorContext(flowId, teamId, actorId))
     } catch (error) {
       if (!(error instanceof ConnectorTaskError)) throw error
       throw new ControlError(error.code, error.message)
+    }
+  }
+
+  #connectorContext(flowId: string | undefined, teamId?: string, actorId?: string): ConnectorAccessContext {
+    return {
+      ...(actorId == null ? {} : { actorId }),
+      ...(flowId == null ? {} : { flowId }),
+      providerAccess: flowId != null && actorId != null ? this.connectorAccess.read(actorId, flowId) : this.connectorAccess.current(flowId ?? ''),
+      purpose: 'catalog',
+      source: flowId == null ? 'operator' : 'draft',
+      ...(teamId == null ? {} : { teamId }),
     }
   }
 
@@ -556,9 +663,13 @@ export class ControlService {
       }
     }
     const draftClosure = await flowClosure(revisionContent(current))
+    const providerAccess = this.connectorAccess.current(flowId)
     return {
       flowId,
-      hasUnpublishedChanges: draftClosure.digest != stored.publication.closureDigest,
+      hasUnpublishedChanges:
+        draftClosure.digest != stored.publication.closureDigest ||
+        ((stored.publication.providerAccessDigest != 'legacy' || providerAccess.mode != 'implicit') &&
+          providerAccess.providerAccessDigest != stored.publication.providerAccessDigest),
       publication: publication(stored.publication),
       revision: stored.revision,
       status: currentFlow.live?.enabled == false ? 'suspended' : liveStatus(currentFlow.status, stored.publication.engineContract),
@@ -767,6 +878,8 @@ export class ControlService {
       this.publicationError(error)
     }
     switch (accepted.kind) {
+      case 'access-conflict':
+        throw new ControlError(controlErrorCode.connectorAccessConflict, 'Connector access changed while the Publication was being accepted.')
       case 'binding-unresolved':
         throw new ControlError(controlErrorCode.bindingUnresolved, 'A required environment variable is unresolved.')
       case 'busy':

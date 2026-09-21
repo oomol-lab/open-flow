@@ -1,3 +1,4 @@
+import type { ConnectorAccess, ConnectorActionMetadata } from '../../src/control/common/api.ts'
 import type { ChangeOperation, RevisionContent } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { LogAction } from './stories.tsx'
@@ -5,18 +6,41 @@ import type { LogAction } from './stories.tsx'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { applyFlowChanges } from '../../src/flow/common/change.ts'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
+import { setNodePositions } from '../../src/workbench/browser/runtime/canvasPresentation.ts'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { ConnectorStore } from '../../src/workbench/browser/runtime/stores/connectorStore.ts'
 import { TriggerStore } from '../../src/workbench/browser/runtime/stores/triggerStore.ts'
 import { WorkspaceStore } from '../../src/workbench/browser/runtime/stores/workspaceStore.ts'
-import { setNodePositions } from '../../src/workbench/browser/runtime/workspace.ts'
 
 const target = { kind: 'flow' } as const
 // Only transport responses are fixtures; saves use the production Store and Flow reducer.
-export function createInspectorTransport(log: LogAction, initialContent: RevisionContent) {
+export function createInspectorTransport(
+  log: LogAction,
+  initialContent: RevisionContent,
+  options: {
+    readonly access?: ConnectorAccess
+    readonly accessError?: boolean
+    readonly actions?: readonly ConnectorActionMetadata[]
+    readonly candidates?: readonly {
+      readonly accessBindingId: string
+      readonly connectionDisplayName: string
+      readonly permissionGroupName?: string | null
+      readonly providerId: string
+    }[]
+    readonly connections?: readonly {
+      readonly displayName: string
+      readonly id: string
+      readonly isDefault: boolean
+      readonly service: string
+      readonly status: 'active' | 'disconnected' | 'error' | 'reauth_required'
+    }[]
+    readonly providers?: readonly { readonly authTypes: readonly string[]; readonly displayName: string; readonly service: string }[]
+  } = {},
+) {
   const timestamp = '2026-09-14T00:00:00.000Z'
   let sequence = 1
   let content = initialContent
+  let access = options.access ?? { accessRevision: 0, bindings: [], mode: 'implicit', providerAccessDigest: 'implicit:lab', version: 1 }
 
   let presentation = setNodePositions(
     {},
@@ -36,8 +60,61 @@ export function createInspectorTransport(log: LogAction, initialContent: Revisio
   })
   const client = new WorkbenchClient(async (path, init) => {
     const url = new URL(path instanceof Request ? path.url : path, 'https://lab.invalid')
-    if (url.pathname.endsWith('/connector/proxy/providers')) return Response.json({ success: true, data: [] })
-    if (url.pathname.endsWith('/connector/proxy/apps')) return Response.json({ success: true, data: [] })
+    if (url.pathname.endsWith('/connector-access')) {
+      if (options.accessError) return Response.json({ error: { code: 'connector.unavailable', message: 'Unavailable.' }, version: 1 }, { status: 503 })
+      return Response.json(access)
+    }
+    const candidate = /\/connector-access\/([^/]+)\/candidates$/.exec(url.pathname)
+    if (candidate != null)
+      return Response.json({ candidates: options.candidates ?? [], mode: access.mode, providerId: decodeURIComponent(candidate[1]!), version: 1 })
+    const mutation = /\/connector-access\/([^/]+)$/.exec(url.pathname)
+    if (mutation != null && (init?.method == 'PUT' || init?.method == 'DELETE')) {
+      const providerId = decodeURIComponent(mutation[1]!)
+      const input = JSON.parse(String(init.body)) as { readonly accessBindingId?: string }
+      const selected = options.candidates?.find((item) => item.providerId == providerId && item.accessBindingId == input.accessBindingId)
+      access = {
+        ...access,
+        accessRevision: access.accessRevision + 1,
+        bindings:
+          init.method == 'DELETE'
+            ? access.bindings.filter((binding) => binding.providerId != providerId || binding.accessBindingId != input.accessBindingId)
+            : [
+                ...access.bindings.filter((binding) => binding.providerId != providerId || binding.accessBindingId != input.accessBindingId),
+                {
+                  accessBindingId: selected!.accessBindingId,
+                  connectionDisplayName: selected!.connectionDisplayName,
+                  ...(selected!.permissionGroupName === undefined ? {} : { permissionGroupName: selected!.permissionGroupName }),
+                  providerId,
+                  status: 'active',
+                },
+              ],
+        providerAccessDigest: `selectable:lab:${access.accessRevision + 1}`,
+      }
+      return Response.json(access)
+    }
+    if (url.pathname.endsWith('/connector/proxy/providers')) return Response.json({ success: true, data: options.providers ?? [] })
+    if (url.pathname.endsWith('/connector/action-metadata')) {
+      const query = (url.searchParams.get('q') ?? '').toLowerCase()
+      return Response.json({
+        actions: (options.actions ?? []).filter((action) => `${action.serviceName} ${action.name} ${action.description}`.toLowerCase().includes(query)),
+        version: 1,
+      })
+    }
+    if (url.pathname.endsWith('/connector/proxy/actions'))
+      return Response.json({
+        success: true,
+        data: (options.actions ?? [])
+          .filter((action) => action.serviceId == url.searchParams.get('service'))
+          .map((action) => ({
+            id: action.actionId,
+            service: action.serviceId,
+            name: action.name,
+            description: action.description,
+            inputSchema: action.inputSchema,
+            outputSchema: action.outputSchema,
+          })),
+      })
+    if (url.pathname.endsWith('/connector/proxy/apps')) return Response.json({ success: true, data: options.connections ?? [] })
     if (url.pathname === '/v1/trigger-keys/catalog')
       return Response.json({ version: 2, locale: url.searchParams.get('locale') ?? 'en', definitions: [], display: {} })
     if (url.pathname === '/v1/flows') return Response.json({ flows: [{ ...flow, draftRevisionId: revision().revisionId }], total: 1, version: 1 })

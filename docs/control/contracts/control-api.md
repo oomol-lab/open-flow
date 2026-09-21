@@ -230,6 +230,7 @@ interface Publication {
   modelVersion: number
   operation: 'publish' | 'rollback'
   publicationId: string
+  providerAccessDigest: string
   revisionDigest: string
   revisionId: string
   sourcePublicationId?: string
@@ -317,7 +318,7 @@ interface Run {
 }
 ```
 
-Run detail 增加固定的 `closureDigest`、`engineContract`、`engineDigest`、`modelVersion` 和 `revisionDigest`。Live Run 增加
+Run detail 增加固定的 `closureDigest`、`engineContract`、`engineDigest`、`modelVersion`、`providerAccessDigest` 和 `revisionDigest`。Live Run 增加
 `publicationId`；Trigger Run 增加 `publicationId`、`occurrenceId` 和 `triggerNodeId`。
 
 `RunStatus` 包含 `queued | starting | running | waiting | canceled | completed | failed | indeterminate`。所有 Run detail 必须返回待决议集合：
@@ -511,6 +512,60 @@ Connector credential 不进入响应、Revision 或 RunEvent。
 部署没有配置 Connector 时，catalog、Connection 请求和 Connector Task 运行失败返回 `connector.unconfigured`；已经配置但上游不可用或响应无效时返回
 `connector.unavailable`，客户端不能把两者合并为同一配置提示。
 
+### Provider Access Binding
+
+Provider access 是 deployment-owned Flow 状态，不进入 Revision。公共 API 支持两种模式：`implicit` 使用部署已配置的 scoped Connector authority；
+`selectable` 由部署按 Provider 返回并保存 opaque access binding。公共合同和 Workbench 不解析权限组内容、不接收 credential，也不创建 Flow service account；
+具体 deployment adapter 负责把外部权限组投影成 opaque candidate 和 binding。
+
+```ts
+type ConnectorAccessMode = 'implicit' | 'selectable'
+type ProviderAccessBindingStatus = 'active' | 'forbidden' | 'invalid' | 'missing'
+
+interface ConnectorAccess {
+  accessRevision: number
+  bindings: readonly {
+    accessBindingId: string
+    connectionDisplayName: string
+    permissionGroupName: string | null
+    policyRevision?: string
+    providerId: string
+    status: ProviderAccessBindingStatus
+  }[]
+  mode: ConnectorAccessMode
+  providerAccessDigest: string
+  version: 1
+}
+```
+
+| Method   | Path                                                        | Body                                                      |
+| -------- | ----------------------------------------------------------- | --------------------------------------------------------- |
+| `GET`    | `/v1/flows/:flowId/connector-access`                        | 无                                                        |
+| `GET`    | `/v1/flows/:flowId/connector-access/:providerId/candidates` | 无                                                        |
+| `PUT`    | `/v1/flows/:flowId/connector-access/:providerId`            | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
+| `DELETE` | `/v1/flows/:flowId/connector-access/:providerId`            | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
+
+候选响应为 `{ candidates, mode, providerId, version: 1 }`；candidate 使用 `connectionDisplayName`、可为空的 `permissionGroupName` 和可选的 `isDefault`
+分别投影连接、权限组名称与部署的默认连接，但不包含 credential 或原始权限规则。`permissionGroupName: null` 表示部署的默认权限组。candidate 可提供只读的
+`permissions: { actionIds, allActions, configured, proxy }` 摘要供 Workbench 展示和筛选；`actionIds` 使用完整 Action ID，`configured` 只表示权限组包含托管访问配置，
+不得投影配置内容。该摘要不是授权依据，也不得写入 Flow binding。Workbench 添加 Connector Action 时先排除摘要明确不允许该 Action 的 candidate，再优先分配
+`isDefault: true` 的 candidate；兼容未提供摘要、或未提供 `isDefault` 但只有一个可用 candidate 的部署。多个 candidate 没有明确默认项时不自动分配。
+同一 Provider 可以保存多个 binding，
+每个 binding 授权一个 Connection 及该操作者可分配给 Flow 的权限组；`PUT` 增加一个 binding，`DELETE` 删除 body 指定的 binding。更新成功返回完整
+`ConnectorAccess` snapshot。
+`expectedAccessRevision` 使用单调 revision 防止覆盖并发修改；冲突返回 `connector.access-conflict`。缺失、无权分配、失效和部署不支持写入分别使用
+`connector.access-required`、`connector.access-invalid` 和 `connector.access-unsupported`。并发冲突使用 HTTP `412`。access 改变通过 `{ kind: 'access.changed', flowId,
+accessRevision, version: 1 }` 通知客户端失效缓存。
+
+开源 Server 根据 Connector endpoint 选择模式：OpenConnector 使用 `implicit`，snapshot 固定为 revision `0`、空 bindings 和 digest `implicit`，候选列表为空，
+PUT/DELETE 返回 `connector.access-unsupported`；`connector.oomol.com` 和 `connector.oomol.dev` 使用 `selectable`。托管模式用配置的 OOMOL 用户 token 从
+`api.oomol.{com|dev}/v1/users/profile` 取得当前用户 UID，从 relation-control 读取 Flow Team 的 app-access，校验该用户可分配的 candidate，并只保存 opaque
+binding。app-access 投影缓存五分钟；Action、Connection、catalog、execute 和 proxy 都按同一 binding fail closed。
+开源 Server 以用户 token 调用托管 Connector，因此不会伪造只允许 Team token 携带的 `accessGrant`；包含 `appAccessConfig` 的 binding 必须由具备 Team token
+transport 的托管 Flow runtime 执行，开源 Server 对这类执行返回 `connector.access-invalid`。
+
+Workbench 的 `onManageConnectorAccess(flowId)` 是可选宿主导航钩子，只负责打开部署自己的权限管理界面；权限规则和 token 不进入 Workbench props。
+
 ### Connector 原样透传
 
 以下 GET 接口独立于 Flow catalog 接口实现，直接访问部署配置的 Connector：
@@ -627,6 +682,11 @@ Connection；客户端不能改用 Team ID、Connection owner 或其他外部 id
 自部署 Connector 使用显式配置的 Console origin 和 `/providers/:serviceId` 路径。未配置 Console origin 时返回
 `503 connector.console-unconfigured`；它与 Connector 请求失败的 `connector.unavailable` 分开，客户端应提示配置授权控制台地址。
 
+`POST /v1/event-sources` 创建飞书事件源时，从所选 active Connection 获取应用身份；
+缺少可信的 App ID 时返回 `409 event-source.identity-unavailable`。事件源以应用为边界，不绑定企业，
+不查询企业信息，也不要求 `tenant:tenant:readonly` 权限。事件源响应不含 `tenantKey`。
+接收事件时校验加密内容、Verification Token、签名和 App ID；事件自身的 `tenant_key` 作为触发器输出保留，不用于企业匹配。
+
 `GET /v1/connector/connections` 返回 `{ version: 1, connections: ConnectorConnection[] }`，与按服务读取的接口使用相同的 Flow scope 校验。
 Provider 列表接受可选 `locale`，省略时按 `Accept-Language` 解析默认语言；响应携带 `Content-Language` 和 `Vary: Accept-Language`。
 Workbench 将界面语言写入 Provider 请求 URL，按语言分别持久化响应及 ETag；部署将相同语言传递至上游，Action 中的应用名称也采用该语言。
@@ -739,31 +799,21 @@ Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 只保�
 
 当前脚本合同为 `open-flow-engine/v5`，执行调度采用每条入边到达分别执行和每节点累计次数限制；v4 及更早的 Publication / Run 不能按此合同执行，需要重新发布或新建 Run。它用 `context.actions` 替代 v1 的 `context.connector`，不提供旧名转发；
 固定为 v1 的 Publication / Run 必须由相应 Engine 执行，当前 Server 对 v1 明确返回不支持。
-升级已有 Code Task 时，将单账号 capability 改为以下允许集合，并更新源码后创建 v2 Publication。
+Code Connector 授权由 Provider Access Binding 或部署的 implicit Connector authority 管理，不增加节点级开关或白名单。
 
 ### Revision 与编辑 operation
 
-Inline Task 的 `capabilities` 可省略或为空数组；每个元素使用现有 `ConnectorCapability`：
+Inline Task 的 `capabilities` 可省略或为空数组。Workbench 只在需要保存非授权的 Action/Connection 编辑提示时写入声明：
 
 ```json
 {
-  "kind": "connector",
-  "action": "github.get_current_user",
-  "connections": [
-    { "connectionId": "connection-work", "alias": "work" },
-    { "connectionId": "connection-personal", "alias": "personal" }
-  ],
-  "connectionId": "connection-work"
+  "kind": "connector"
 }
 ```
 
-`action` 必须是目录原始完整 ID，匹配 `^[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+$`。以第一个 `.` 分成 provider 与剩余动作名；
-provider 不含 `.`，所以两种入口在根表没有键冲突。每个 Task 中 Action 不重复；每个 Action 的 Connection ID 和已保存 alias 分别唯一。
-ID 和 alias 是非空、大小写敏感的字符串，不把 displayName 当 alias。所有对象拒绝未知字段。
-
-`connections` 必需，可为空；可选的顶层 `connectionId` 是固定默认，存在时必须属于允许集合。authenticated Action 在 Draft 中可暂不绑账号，
-Publish 和 Run admission 要求其至少有一个 active Connection，并检查全部允许账号的 service、状态和固定 scope。无需默认项也可以发布。
-无认证 Action 允许空集合。绑定、alias 和默认值均进入 canonical Revision 与 semantic closure digest；schema 和目录缓存不进入声明。
+声明是否存在不控制 Connector API；所有 Code Task 都可动态调用当前 Flow 可访问的 Action。严格 decoder 仍读取旧 immutable Revision 的
+`action`、`connections` 和 `connectionId` 结构，但这些字段不再授权，alias/default 仅转换为按 Action 查找的调用提示。
+新的可选 `actionHints` 只保存 Action ID 以恢复 schema typing，`connectionHints` 只保存 alias/default 解析提示；两者都不是允许集合，也不参与 Provider 授权。所有对象拒绝未知字段。
 
 通过既有 Draft changes 提交：
 
@@ -786,34 +836,33 @@ CLI 的 `flow apply` JSON 中，`kind: "code"` 节点直接接受同一 `capabil
 
 ```js
 export default async (inputs, context) => {
-  // 省略账号选项时使用声明中的固定默认。
+  // 动态 Provider 方法。
   const user = await context.actions.github.get_current_user({})
 
-  // 完整 ID 索引与分层方法是同一个函数，支持解构后调用。
+  // 完整 ID 与显式 call 进入同一个 validator 和 Capability host。
   const getUser = context.actions['github.get_current_user']
-  const [work, personal] = await Promise.all([getUser({}, { connectionId: 'connection-work' }), getUser({}, { connectionAlias: 'personal' })])
-  return { user, work, personal }
+  const work = await getUser({}, { connectionId: 'connection-work' })
+  const message = await context.actions.call('slack.send_message', { text: inputs.text }, { connectionId: 'connection-work' })
+  return { user, work, message }
 }
 ```
 
 非 JavaScript 标识符名称使用方括号，如 `context.actions['google-drive'].list_files({})`；剩余动作名含点时也只占第二级键。
-根表和 provider 表使用空原型并冻结，仅暴露当前节点声明的方法。
+根表和 provider 表使用空原型并冻结，通过 Proxy 动态构造稳定的方法引用。
 
 省略第一个参数或传入 `undefined` 等价于传入 `{}`，必填字段仍由 Action schema 校验。业务参数必须是 JSON 对象，保留字段中的显式 `null`，不套用图端口的 null/default 归一化。循环引用、`undefined` 属性、非有限数字、函数、BigInt、
 Date 等非 JSON 值在进入 transport 前失败。方法返回 Connector Action data，直接 `await` 取得；失败抛出含稳定 `code` 的 Error。
 
 第二参数可以省略，或恰为 `{ connectionId: string }` / `{ connectionAlias: string }`，两个字段互斥。空对象、空字符串、null 和未知字段返回
-`capability.invalid`；未授权 Action、ID 或 alias 返回 `capability.denied`。需选账号而未设置默认、也未显式选择时返回
-`connector.connection-required`，不按目录默认或集合顺序回退。访问不存在的方法得到普通 JavaScript TypeError；伪造桥接请求仍由宿主拒绝。
+`capability.invalid`。显式 `connectionId` 不经过 Revision 白名单；Connector 按固定 Provider access 独立授权。未知 alias 返回
+`capability.denied`。authenticated Action 未提供 Connection 时返回 `connector.connection-required`；伪造桥接请求仍由宿主拒绝。
 
-alias 按 Revision 内的原值精确匹配并解析为固定 ID。Connector 目录中的改名、默认变更或 alias 重用不改变这份映射；
-Workbench 的显式刷新绑定生成新 Revision 才会采纳新 alias。每次调用都可以选择不同账号，允许循环和并发。
+旧 alias/default 提示按 Revision 内的原值精确匹配并解析为固定 ID。Connector 目录中的改名、默认变更或 alias 重用不改变这份映射；
+它们不能扩大 Provider binding 的权限。每次调用都可以选择不同账号，允许循环和并发。
 
 公开 `TaskContext<Actions>` 和 `Task<Inputs, Outputs, Actions>` 接受节点对应的 Action 方法表类型；默认表为空。
-Workbench 由当前声明和目录的原始 schema 生成局部精确类型，包含两种入口、允许的 ID / alias、必需的账号选项与返回值。
-普通 `string` 必须先收窄为已声明 ID；不同方法参数的联合也需要相应收窄。取不到 schema 时参数为 `Record<string, unknown>`、结果为 `unknown`。
-
-Workbench 的调用示例以只读预览展示，支持分层写法与完整 ID 写法切换，并复制当前预览。预览按当前声明生成账号选择；不直接修改源码、光标或代码保存状态。
+Workbench 对新声明提供动态 `call(actionId, input, options)` 类型与动态属性访问；旧声明继续使用目录 schema 提供精确迁移期提示。
+节点面板直接提供 Action 插入和有效连接查看入口，不显示 Connector Capability 开关，也不编辑 Action/Connection 白名单。
 
 ### 调用身份、生命周期与目录投影
 

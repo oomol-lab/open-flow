@@ -17,7 +17,7 @@ export interface FeishuEvent {
 export async function receiveFeishuEvent(
   rawBody: Uint8Array,
   headers: Headers,
-  source: { readonly appId: string; readonly tenantKey: string; readonly verificationToken: string; readonly encryptKey: string },
+  source: { readonly appId: string; readonly verificationToken: string; readonly encryptKey: string },
   now: number,
 ): Promise<{ readonly challenge: string } | { readonly event: FeishuEvent }> {
   const envelope: unknown = JSON.parse(decoder.decode(rawBody))
@@ -59,7 +59,8 @@ export async function receiveFeishuEvent(
   if (typeof id != 'string' || id.length == 0 || id.length > 256 || typeof type != 'string' || !/^[a-z][a-z0-9_.]{0,127}$/.test(type)) {
     throw new TypeError('Missing Feishu event identity.')
   }
-  if (appId != source.appId || tenantKey != source.tenantKey) throw new TypeError('Feishu event source does not match.')
+  if (appId != source.appId) throw new TypeError('Feishu event source does not match.')
+  if (typeof tenantKey != 'string' || tenantKey.length == 0 || tenantKey.length > 256) throw new TypeError('Invalid Feishu event tenant.')
   if (type == 'card.action.trigger' || type == 'app_ticket') throw new TypeError('This callback is not an asynchronous business event.')
   const { token: _token, ...business } = body
   const occurredAt = header?.create_time ?? value.ts
@@ -68,7 +69,7 @@ export async function receiveFeishuEvent(
       id: `${type}:${id}`,
       type,
       appId: source.appId,
-      tenantKey: source.tenantKey,
+      tenantKey,
       occurredAt: typeof occurredAt == 'string' ? occurredAt : null,
       body: business,
     },

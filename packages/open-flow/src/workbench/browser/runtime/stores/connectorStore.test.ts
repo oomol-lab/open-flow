@@ -41,7 +41,7 @@ function draft(flowId: string, revisionId: string) {
 }
 
 describe('ConnectorStore', () => {
-  it('reloads provider and action caches after switching Flows', async () => {
+  it('keeps discovery global and resolves selected Actions in the active Flow', async () => {
     const connectorRequests: string[] = []
     const request = vi.fn(async (path: string) => {
       if (path == '/v1/flows?limit=50&includeTotal=true') return Response.json({ flows, total: flows.length, version: 1 })
@@ -69,6 +69,7 @@ describe('ConnectorStore', () => {
         }
       }
       const flowId = new URL(path, 'https://open-flow.example').searchParams.get('flowId')
+      const scope = flowId ?? 'global'
       if (path.startsWith('/v1/connector/proxy/providers?')) {
         connectorRequests.push(path)
         return Response.json({
@@ -77,7 +78,7 @@ describe('ConnectorStore', () => {
               homepageUrl: 'https://mail.example',
               authTypes: ['no_auth'],
               service: 'mail',
-              displayName: `${new URL(path, 'https://open-flow.example').searchParams.get('locale') == 'zh-CN' ? '邮件' : 'Mail'} ${flowId}`,
+              displayName: `${new URL(path, 'https://open-flow.example').searchParams.get('locale') == 'zh-CN' ? '邮件' : 'Mail'} ${scope}`,
             },
           ],
           success: true,
@@ -92,7 +93,7 @@ describe('ConnectorStore', () => {
               id: 'mail.send',
               service: 'mail',
               name: 'Send',
-              description: `Send for ${flowId}.`,
+              description: `Send for ${scope}.`,
               inputSchema: { type: 'object', properties: {} },
               outputSchema: { type: 'object', properties: {} },
             },
@@ -107,13 +108,13 @@ describe('ConnectorStore', () => {
             {
               actionId: 'mail.send',
               authenticated: false,
-              description: `Send for ${flowId}.`,
+              description: `Send for ${scope}.`,
               homepageUrl: 'https://mail.example',
               inputs: {},
               name: 'Send',
               outputs: {},
               serviceId: 'mail',
-              serviceName: `Mail ${flowId}`,
+              serviceName: `Mail ${scope}`,
             },
           ],
           version: 1,
@@ -131,12 +132,13 @@ describe('ConnectorStore', () => {
       const firstProviders = await resourceValue(connectors.browseAddNodeOptions(signal))
       const firstActions = await resourceValue(connectors.provideAddNodeOptionChoices('connector-provider:mail', signal))
 
-      expect(firstProviders?.[0]?.label).toBe('Mail flow-a')
-      expect(firstProviders?.[0]?.icon).toBe(providerIcon({ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail flow-a' }))
-      expect(firstActions?.[0]?.description).toBe('Send for flow-a.')
-      expect(firstActions?.[0]?.icon).toBe(providerIcon({ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail flow-a' }))
+      expect(firstProviders?.[0]?.label).toBe('Mail global')
+      expect(firstProviders?.[0]?.icon).toBe(providerIcon({ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail global' }))
+      expect(firstActions?.[0]?.description).toBe('Send for global.')
+      expect(firstActions?.[0]?.icon).toBe(providerIcon({ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail global' }))
       expect(connectors.$.actions.value).toEqual({})
-      await connectors.loadCodeAction('mail.send', signal)
+      const prepared = await connectors.resolveAction('mail.send')
+      expect(prepared.action.description).toBe('Send for flow-a.')
       await resourceValue(connectors.provideAddNodeOptions('send', signal))
       expect(connectors.$.actions.value['mail.send']?.description).toBe('Send for flow-a.')
 
@@ -157,23 +159,21 @@ describe('ConnectorStore', () => {
       const secondProviders = await resourceValue(connectors.browseAddNodeOptions(signal))
       await resourceValue(connectors.provideAddNodeOptionChoices('connector-provider:mail', signal))
 
-      expect(secondProviders?.[0]?.label).toBe('Mail flow-b')
+      expect(secondProviders?.[0]?.label).toBe('Mail global')
       expect(connectors.$.actions.value).toEqual({})
-      expect(connectorRequests).toEqual([
-        '/v1/connector/proxy/providers?flowId=flow-a&locale=en',
-        '/v1/connector/proxy/actions?flowId=flow-a&service=mail&locale=en',
-        '/v1/connector/action-metadata?flowId=flow-a&q=send&locale=en',
-        '/v1/connector/proxy/providers?flowId=flow-b&locale=en',
-        '/v1/connector/proxy/actions?flowId=flow-b&service=mail&locale=en',
-      ])
+      expect(connectorRequests).toContain('/v1/connector/proxy/providers?locale=en')
+      expect(connectorRequests).toContain('/v1/connector/proxy/actions?service=mail&locale=en')
+      expect(connectorRequests).toContain('/v1/connector/proxy/actions?flowId=flow-a&service=mail&locale=en')
+      expect(connectorRequests).toContain('/v1/connector/action-metadata?q=send&locale=en')
+      expect(connectorRequests.some((path) => path.includes('flowId=flow-b'))).toBe(false)
       connectors.setLanguage('zh-CN')
       const localizedProviders = await resourceValue(connectors.browseAddNodeOptions(signal))
-      expect(localizedProviders?.[0]?.label).toBe('邮件 flow-b')
+      expect(localizedProviders?.[0]?.label).toBe('邮件 global')
       await resourceValue(connectors.provideAddNodeOptionChoices(localizedProviders![0]!.id, signal))
       await resourceValue(connectors.provideAddNodeOptions('send', signal))
       expect(connectorRequests.slice(-2)).toEqual([
-        '/v1/connector/proxy/actions?flowId=flow-b&service=mail&locale=zh-CN',
-        '/v1/connector/action-metadata?flowId=flow-b&q=send&locale=zh-CN',
+        '/v1/connector/proxy/actions?service=mail&locale=zh-CN',
+        '/v1/connector/action-metadata?q=send&locale=zh-CN',
       ])
     } finally {
       connectors.dispose()

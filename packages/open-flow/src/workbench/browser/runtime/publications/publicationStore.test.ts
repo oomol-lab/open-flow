@@ -14,6 +14,7 @@ const publication = {
   modelVersion: currentFlowModelVersion,
   operation: 'publish',
   publicationId: 'publication-1',
+  providerAccessDigest: 'implicit:test',
   revisionDigest: 'digest-1',
   revisionId: 'revision-1',
   version: 1,

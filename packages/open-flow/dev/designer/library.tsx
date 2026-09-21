@@ -4,7 +4,8 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useCallback, useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
-import { BlockLibrary, ContextPanel } from '../../src/workbench/browser/runtime/editor/contextPanel.tsx'
+import { BlockLibrary } from '../../src/workbench/browser/runtime/editor/blockLibrary.tsx'
+import { ContextPanel } from '../../src/workbench/browser/runtime/editor/contextPanel.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 
 const options: readonly AddNodeOption[] = [

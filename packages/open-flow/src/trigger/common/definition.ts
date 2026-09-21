@@ -5,7 +5,8 @@ import { dequal } from 'dequal/lite'
 import { z } from 'zod'
 import { isJsonObject, isJsonValue } from '../../base/common/json.ts'
 import { inputValues } from '../../flow/common/inputValue.ts'
-import { configInputsSchema, resolveTriggerConfig } from './config.ts'
+import { resolveTriggerConfig } from './config.ts'
+import { configInputsSchema } from './configSchema.ts'
 const maxDefinitionProperties = 512
 const maxDefinitionEnumValues = 256
 const maxSchemaBytes = 64 * 1024

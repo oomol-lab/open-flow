@@ -4,6 +4,12 @@ export type FlowCatalogEvent =
 
 export type FlowChangeEvent =
   | {
+      readonly accessRevision: number
+      readonly flowId: string
+      readonly kind: 'access.changed'
+      readonly version: 1
+    }
+  | {
       readonly kind: 'draft.changed'
       readonly flowId: string
       readonly revisionId: string

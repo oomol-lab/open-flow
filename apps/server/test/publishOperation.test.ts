@@ -38,6 +38,26 @@ async function addMarker(service: ServerService, flowId: string, revisionId: str
   return changed.revision.revisionId
 }
 
+it('does not mark an unchanged implicit legacy Publication as dirty', async () => {
+  const file = await databaseFile()
+  const service = await openService(file)
+  services.add(service)
+  const created = await service.control.createFlow('operator', 'Legacy', 'create-legacy')
+  const flowId = created.flow.flowId
+  const operation = await service.control.publishFlow('operator', flowId, created.flow.draftRevisionId, 'open-flow-engine/v5', null, 'publish-legacy')
+  await service.tickMaintenance()
+  expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('succeeded')
+  const database = new DatabaseSync(file)
+  try {
+    database.exec("UPDATE publications SET provider_access_digest = 'legacy'")
+    await expect(service.control.getLive(flowId)).resolves.toMatchObject({ hasUnpublishedChanges: false })
+    await addMarker(service, flowId, created.flow.draftRevisionId, 'changed')
+    await expect(service.control.getLive(flowId)).resolves.toMatchObject({ hasUnpublishedChanges: true })
+  } finally {
+    database.close()
+  }
+})
+
 it('keeps Live fixed while persistent Publish work is pending or failed and activates one Publication after recovery', async () => {
   const file = await databaseFile()
   let service = await openService(file)

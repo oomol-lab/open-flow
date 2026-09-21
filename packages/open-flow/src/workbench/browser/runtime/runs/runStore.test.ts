@@ -21,6 +21,7 @@ const details = {
   engineContract: 'open-flow-engine/v5',
   engineDigest: 'engine-1',
   modelVersion: currentFlowModelVersion,
+  providerAccessDigest: 'implicit:1',
   revisionDigest: 'digest-1',
 } as const
 

@@ -1,3 +1,4 @@
+import type { ConnectorAccess } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { RunAcceptance } from '@oomol-lab/open-flow/run-lifecycle'
 import type { DatabaseSync } from 'node:sqlite'
@@ -127,6 +128,7 @@ export interface StoredIntegrationState {
   readonly bindingId: string
   readonly checkpointJson: string
   readonly connectionId: string
+  readonly providerAccess: ConnectorAccess
   readonly reconcileAt: number | null
   readonly runtimeVersion: number
   readonly subscriptionJson: string

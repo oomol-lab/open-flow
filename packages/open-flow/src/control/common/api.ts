@@ -29,7 +29,7 @@ import type { RunStatus } from '../../execution/common/runLifecycle.ts'
 import type { InputPortDefinition, JsonValue, PortDefinition, RevisionContent, TriggerKeySnapshot, WaitAction } from '../../flow/common/change.ts'
 
 import { flowCheck } from './checkDecoders.ts'
-import { connection, connectorAction } from './connectorDecoders.ts'
+import { connection, connectorAccess, connectorAccessCandidates, connectorAction } from './connectorDecoders.ts'
 import { allConnectorConnectionsQuery, connectorActionQuery, connectorConnectionsQuery, connectorProvidersQuery } from './connectorQueries.ts'
 import { exact, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 import { flow, flowPage, variable } from './flowDecoders.ts'
@@ -183,6 +183,48 @@ export interface ConnectorProvider {
   readonly serviceName: string
 }
 
+export type ConnectorAccessMode = 'implicit' | 'selectable'
+export type ProviderAccessBindingStatus = 'active' | 'forbidden' | 'invalid' | 'missing'
+
+export interface ProviderAccessBinding {
+  readonly accessBindingId: string
+  readonly connectionDisplayName: string
+  readonly permissionGroupName?: string | null
+  readonly policyRevision?: string
+  readonly providerId: string
+  readonly status: ProviderAccessBindingStatus
+}
+
+export interface ProviderAccessBindingCandidate {
+  readonly accessBindingId: string
+  readonly connectionDisplayName: string
+  readonly isDefault?: boolean
+  readonly permissions?: {
+    readonly actionIds: readonly string[]
+    readonly allActions: boolean
+    readonly configured: boolean
+    readonly proxy: boolean
+  }
+  readonly permissionGroupName?: string | null
+  readonly policyRevision?: string
+  readonly providerId: string
+}
+
+export interface ConnectorAccess {
+  readonly accessRevision: number
+  readonly bindings: readonly ProviderAccessBinding[]
+  readonly mode: ConnectorAccessMode
+  readonly providerAccessDigest: string
+  readonly version: 1
+}
+
+export interface ConnectorAccessCandidates {
+  readonly candidates: readonly ProviderAccessBindingCandidate[]
+  readonly mode: ConnectorAccessMode
+  readonly providerId: string
+  readonly version: 1
+}
+
 export interface RevisionMetadata {
   readonly actorId: string
   readonly createdAt: string
@@ -218,6 +260,7 @@ export interface Publication {
   readonly modelVersion: number
   readonly operation: 'publish' | 'rollback'
   readonly publicationId: string
+  readonly providerAccessDigest: string
   readonly revisionDigest: string
   readonly revisionId: string
   readonly sourcePublicationId?: string
@@ -320,6 +363,7 @@ type RunDetailsBase = Run & {
   readonly engineDigest: string
   readonly eventsExpiresAt?: string
   readonly modelVersion: number
+  readonly providerAccessDigest: string
   readonly revisionDigest: string
   readonly waits: readonly RunWait[]
 }
@@ -797,6 +841,35 @@ export class ControlClient {
   async listConnectorProviders(signal?: AbortSignal, flowId?: string, locale?: string): Promise<readonly ConnectorProvider[]> {
     const query = connectorProvidersQuery(flowId, locale)
     return this.connectorRequest(query.path, 'providers', signal, query.decode)
+  }
+
+  async getConnectorAccess(flowId: string, signal?: AbortSignal): Promise<ConnectorAccess> {
+    return connectorAccess(await this.request(`/v1/flows/${segment(flowId)}/connector-access`, { signal }))
+  }
+
+  async listProviderAccessBindingCandidates(flowId: string, providerId: string, signal?: AbortSignal): Promise<ConnectorAccessCandidates> {
+    return connectorAccessCandidates(
+      await this.request(`/v1/flows/${segment(flowId)}/connector-access/${segment(providerId)}/candidates`, { signal }),
+      providerId,
+    )
+  }
+
+  async addProviderAccessBinding(flowId: string, providerId: string, accessBindingId: string, expectedAccessRevision: number): Promise<ConnectorAccess> {
+    return connectorAccess(
+      await this.request(`/v1/flows/${segment(flowId)}/connector-access/${segment(providerId)}`, {
+        body: JSON.stringify({ accessBindingId, expectedAccessRevision, version: 1 }),
+        method: 'PUT',
+      }),
+    )
+  }
+
+  async removeProviderAccessBinding(flowId: string, providerId: string, accessBindingId: string, expectedAccessRevision: number): Promise<ConnectorAccess> {
+    return connectorAccess(
+      await this.request(`/v1/flows/${segment(flowId)}/connector-access/${segment(providerId)}`, {
+        body: JSON.stringify({ accessBindingId, expectedAccessRevision, version: 1 }),
+        method: 'DELETE',
+      }),
+    )
   }
 
   async listConnectorActions(serviceId?: string, signal?: AbortSignal, flowId?: string, locale?: string): Promise<readonly ConnectorAction[]> {

@@ -1,4 +1,5 @@
 import type { RunEventKind } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAccess } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { RunStatus, RunTerminalStatus } from '@oomol-lab/open-flow/run-lifecycle'
@@ -29,6 +30,7 @@ export interface StoredRun {
   readonly flowId: string
   readonly inputs: RunInputs
   readonly llmConfig?: LlmConfig
+  readonly providerAccess: ConnectorAccess
   readonly remainingMs?: number
   readonly resume?: { readonly checkpoint: FlowRunCheckpoint }
   readonly resumeUnavailable?: true
@@ -57,6 +59,13 @@ const maxEventBytes = 1024 * 1024
 const maxEventCount = 1_000
 const maxEventTotalBytes = 16 * 1024 * 1024
 const waitDurationMs = 7 * 24 * 60 * 60 * 1_000
+const legacyProviderAccess: ConnectorAccess = {
+  accessRevision: 0,
+  bindings: [],
+  mode: 'implicit',
+  providerAccessDigest: 'legacy',
+  version: 1,
+}
 
 /**
  * The authoritative Run state machine: admission, execution transitions,
@@ -97,6 +106,7 @@ export class RunStore {
     readonly idempotencyKey: string
     readonly inputs: RunInputs
     readonly modelVersion: number
+    readonly providerAccess?: ConnectorAccess
     readonly requestDigest: string
     readonly revisionDigest: string
     readonly revisionId: string
@@ -127,6 +137,7 @@ export class RunStore {
 
       const runId = this.#queueRun({
         ...input,
+        providerAccess: input.providerAccess ?? legacyProviderAccess,
         source: 'draft',
       })
       return { created: true, kind: 'accepted', runId, status: 'queued' }
@@ -176,6 +187,7 @@ export class RunStore {
       const runId = this.#queueRun({
         ...input,
         publicationId: publication.publicationId,
+        providerAccess: this.#deps.publications.providerAccess(publication.publicationId)!,
         source: 'live',
       })
       return { created: true, kind: 'accepted', runId, status: 'queued' }
@@ -208,6 +220,7 @@ export class RunStore {
       ...input,
       idempotencyKey: `trigger:${randomUUID()}`,
       inputs: {},
+      providerAccess: this.#deps.publications.providerAccess(input.publicationId)!,
       trigger: { nodeId: input.triggerNodeId, outputs: input.outputs },
     })
     this.#database
@@ -235,6 +248,7 @@ export class RunStore {
         .prepare(
           `SELECT revisions.content, runs.engine_contract AS engineContract, runs.engine_digest AS engineDigest,
                   runs.binding_values AS bindingValues, runs.llm_config AS llmConfig, runs.connector_team_id AS connectorTeamId, runs.flow_id AS flowId, runs.inputs,
+                  runs.provider_access_snapshot AS providerAccess,
                   runs.revision_digest AS revisionDigest, runs.run_id AS runId, runs.source,
                   run_checkpoints.checkpoint_json AS checkpointJson,
                   run_checkpoints.remaining_ms AS remainingMs, run_checkpoints.run_id AS checkpointRunId,
@@ -256,6 +270,7 @@ export class RunStore {
         readonly engineDigest: string
         readonly flowId: string
         readonly inputs: string
+        readonly providerAccess: string
         readonly llmConfig: string | null
         readonly remainingMs: number | null
         readonly revisionDigest: string
@@ -283,6 +298,7 @@ export class RunStore {
         engineDigest: row.engineDigest,
         flowId: row.flowId,
         inputs: JSON.parse(row.inputs) as RunInputs,
+        providerAccess: JSON.parse(row.providerAccess) as ConnectorAccess,
         ...(resumeUnavailable
           ? { resumeUnavailable: true as const }
           : resume == null || row.remainingMs == null
@@ -778,6 +794,8 @@ export class RunStore {
         readonly connectionId?: string
         readonly input: Readonly<Record<string, JsonValue>>
         readonly invocationId: string
+        readonly flowId: string
+        readonly providerAccess: ConnectorAccess
         readonly runId: string
         readonly teamId?: string
         readonly waitId: string
@@ -799,7 +817,8 @@ export class RunStore {
       .prepare(
         `SELECT wait_notifications.action, wait_notifications.connection_id AS connectionId,
                 wait_notifications.input_json AS inputJson, wait_notifications.invocation_id AS invocationId,
-                wait_notifications.run_id AS runId, runs.connector_team_id AS teamId,
+                wait_notifications.run_id AS runId, runs.flow_id AS flowId, runs.connector_team_id AS teamId,
+                runs.provider_access_snapshot AS providerAccess,
                 wait_notifications.wait_id AS waitId
          FROM wait_notifications JOIN runs USING (run_id) JOIN wait_receipts USING (run_id)
          WHERE wait_notifications.status = 'pending'
@@ -816,6 +835,8 @@ export class RunStore {
           readonly connectionId: string | null
           readonly inputJson: string
           readonly invocationId: string
+          readonly flowId: string
+          readonly providerAccess: string
           readonly runId: string
           readonly teamId: string | null
           readonly waitId: string
@@ -837,6 +858,8 @@ export class RunStore {
       connectionId: row.connectionId ?? undefined,
       input: JSON.parse(row.inputJson) as Readonly<Record<string, JsonValue>>,
       invocationId: row.invocationId,
+      flowId: row.flowId,
+      providerAccess: JSON.parse(row.providerAccess) as ConnectorAccess,
       runId: row.runId,
       teamId: row.teamId ?? undefined,
       waitId: row.waitId,
@@ -874,6 +897,7 @@ export class RunStore {
     readonly idempotencyKey: string
     readonly inputs: RunInputs
     readonly modelVersion: number
+    readonly providerAccess: ConnectorAccess
     readonly publicationId?: string
     readonly requestDigest: string
     readonly revisionDigest: string
@@ -889,8 +913,8 @@ export class RunStore {
         `INSERT INTO runs (
            run_id, idempotency_key, request_digest, revision_id, revision_digest, flow_id,
            engine_contract, engine_digest, inputs, status, source, closure_digest,
-           model_version, created_at, publication_id, connector_team_id, trigger_node_id, trigger_outputs, llm_config, binding_values
-         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           model_version, created_at, publication_id, connector_team_id, trigger_node_id, trigger_outputs, llm_config, binding_values, provider_access_snapshot
+         ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'queued', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         runId,
@@ -912,6 +936,7 @@ export class RunStore {
         JSON.stringify(input.trigger.outputs),
         JSON.stringify(snapshot?.model) ?? null,
         JSON.stringify(snapshot?.bindings) ?? null,
+        JSON.stringify(input.providerAccess),
       )
     this.#database.prepare('INSERT INTO work (run_id) VALUES (?)').run(runId)
     const payload = {}

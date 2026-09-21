@@ -1,4 +1,4 @@
-import type { ConnectorCapability, RevisionContent } from '../src/flow/common/change.ts'
+import type { ConnectorActionCapability, ConnectorCapability, RevisionContent } from '../src/flow/common/change.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
@@ -10,11 +10,13 @@ import { createCodeTask, setCodeActions } from '../src/flow/common/nodeChanges.t
 import { codeActions, flowClosure, prepareFlow } from '../src/flow/common/semantics.ts'
 
 const target = { kind: 'flow' } as const
-const action: ConnectorCapability = {
+const capability: ConnectorCapability = { kind: 'connector' }
+const legacyAction: ConnectorActionCapability = {
   kind: 'connector',
   action: 'github.get_current_user',
   connections: [{ connectionId: 'work', alias: 'office' }, { connectionId: 'home' }],
 }
+
 function revision(): RevisionContent {
   return applyFlowChanges(
     { document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} }, modules: {}, modelVersion: currentFlowModelVersion },
@@ -22,78 +24,85 @@ function revision(): RevisionContent {
   )
 }
 
-describe('Code Action declarations', () => {
-  it('supports fixed aliases, multiple connections, optional defaults and public actions', () => {
-    const declarations = [action, { kind: 'connector', action: 'public.echo', connections: [] }]
-    expect(decodeConnectorCapabilities(declarations)).toEqual(declarations)
-    expect(decodeConnectorCapabilities([{ ...action, connectionId: 'work' }])).toEqual([{ ...action, connectionId: 'work' }])
+describe('Code Connector capability', () => {
+  it('decodes the coarse capability and non-authorizing Connection hints', () => {
+    const hinted = {
+      kind: 'connector' as const,
+      actionHints: ['github.get_current_user'],
+      connectionHints: [
+        { action: 'github.get_current_user', connectionId: 'work' },
+        { action: 'github.get_current_user', connectionId: 'home', alias: 'personal' },
+      ],
+    }
+    expect(decodeConnectorCapabilities([capability])).toEqual([capability])
+    expect(decodeConnectorCapabilities([hinted])).toEqual([hinted])
+    expect(decodeConnectorCapabilities([legacyAction])).toEqual([legacyAction])
   })
 
   it.each([
     null,
-    [{ ...action, extra: true }],
-    [{ ...action, action: 'github' }],
-    [action, action],
-    [{ ...action, connectionId: 'other' }],
-    [{ ...action, connections: [{ connectionId: 'work' }, { connectionId: 'work' }] }],
+    [{ kind: 'connector', extra: true }],
+    [capability, capability],
+    [{ kind: 'connector', connectionHints: null }],
+    [{ kind: 'connector', actionHints: null }],
+    [{ kind: 'connector', actionHints: ['github'] }],
+    [{ kind: 'connector', actionHints: ['github.user', 'github.user'] }],
+    [{ kind: 'connector', connectionHints: [{ action: 'github', connectionId: 'work' }] }],
+    [{ kind: 'connector', connectionHints: [{ action: 'github.user', connectionId: '' }] }],
+    [{ kind: 'connector', connectionHints: [{ action: 'github.user', connectionId: 'work', alias: '' }] }],
     [
       {
-        ...action,
-        connections: [
-          { connectionId: 'work', alias: 'same' },
-          { connectionId: 'home', alias: 'same' },
+        kind: 'connector',
+        connectionHints: [
+          { action: 'github.user', connectionId: 'work', alias: 'same' },
+          { action: 'github.user', connectionId: 'home', alias: 'same' },
         ],
       },
     ],
-    [{ ...action, connections: [{ connectionId: 'work', alias: '' }] }],
-    [{ ...action, connections: [{ connectionId: 'work', token: 'secret' }] }],
-    [{ ...action, connections: null }],
   ])('rejects invalid declarations %j', (value) => {
     expect(() => decodeConnectorCapabilities(value)).toThrow()
   })
 
-  it('saves declarations without losing source and rejects stale edits', () => {
+  it('saves the capability without losing source and rejects stale edits', () => {
     const source = revision()
-    const operations = setCodeActions(source, target, 'code', [action])
-    if (operations == null) throw new Error('Expected Action edit.')
+    const operations = setCodeActions(source, target, 'code', [capability])
+    if (operations == null) throw new Error('Expected capability edit.')
     const saved = applyFlowChanges(source, operations)
     expect(saved.modules).toEqual(source.modules)
-    expect(saved.document.graph.nodes.code).toMatchObject({ task: { capabilities: [action] } })
-    expect(setCodeActions(saved, target, 'code', [action])).toBeUndefined()
+    expect(saved.document.graph.nodes.code).toMatchObject({ task: { capabilities: [capability] } })
+    expect(setCodeActions(saved, target, 'code', [capability])).toBeUndefined()
     expect(() => applyFlowChanges(saved, operations)).toThrow(/changed/)
-    expect(() =>
-      applyFlowChanges(source, [{ kind: 'graph.node.task.capabilities.set', target, nodeId: 'code', value: [{ ...action, connectionId: 'missing' }] }]),
-    ).toThrow()
   })
 
-  it('preserves declarations in canonical serialization and includes aliases and defaults in the digest', async () => {
+  it('preserves hints in canonical serialization and includes them in the digest', async () => {
     const source = revision()
-    const variants = [
-      action,
-      { ...action, connectionId: 'work' },
-      { ...action, connections: [{ connectionId: 'work', alias: 'changed' }, { connectionId: 'home' }] },
+    const variants: readonly ConnectorCapability[] = [
+      capability,
+      { kind: 'connector', actionHints: ['github.user'] },
+      { kind: 'connector', connectionHints: [{ action: 'github.user', connectionId: 'work' }] },
+      { kind: 'connector', connectionHints: [{ action: 'github.user', connectionId: 'work', alias: 'office' }] },
     ]
     const contents = variants.map((value) => {
       const changes = setCodeActions(source, target, 'code', [value])
-      if (changes == null) throw new Error('Expected Action edit.')
+      if (changes == null) throw new Error('Expected capability edit.')
       return applyFlowChanges(source, changes)
     })
     const digests = await Promise.all(contents.map((content) => digestBytes(encodeRevision(content))))
-    expect(new Set(digests).size).toBe(3)
+    expect(new Set(digests).size).toBe(4)
     const closures = await Promise.all(contents.map(flowClosure))
-    expect(new Set(closures.map((closure) => closure.digest)).size).toBe(3)
+    expect(new Set(closures.map((closure) => closure.digest)).size).toBe(4)
     for (const content of contents) {
       const decoded = JSON.parse(new TextDecoder().decode(encodeRevision(content))) as RevisionContent
       expect(decoded).toEqual({ ...content, kind: 'open-flow-flow-revision', version: 1 })
     }
   })
 
-  it('collects declarations from referenced Subflows and excludes unused definitions', async () => {
+  it('collects the capability from referenced Subflows and excludes unused definitions', async () => {
     const source = revision()
     const subflow = { name: 'Child', inputs: [], outputs: [], graph: { ...source.document.graph, nodes: { ...source.document.graph.nodes } } }
     const child = source.document.graph.nodes.code
     if (child?.kind != 'task' || child.task == null) throw new Error('Expected Code node.')
-    subflow.graph.nodes.code = { ...child, task: { ...child.task, capabilities: [action] } }
+    subflow.graph.nodes.code = { ...child, task: { ...child.task, capabilities: [capability] } }
     const prepared = await prepareFlow(
       {
         ...source,
@@ -102,13 +111,7 @@ describe('Code Action declarations', () => {
           graph: { edges: [], nodes: { child: { kind: 'subflow', subflowId: 'child', inputs: {} } } },
           subflows: {
             child: subflow,
-            unused: {
-              ...subflow,
-              graph: {
-                edges: [],
-                nodes: { code: { ...child, task: { ...child.task, capabilities: [{ kind: 'connector', action: 'unused.action', connections: [] }] } } },
-              },
-            },
+            unused: { ...subflow, graph: { edges: [], nodes: { code: { ...child, task: { ...child.task, capabilities: [capability] } } } } },
           },
         },
       },
@@ -116,45 +119,60 @@ describe('Code Action declarations', () => {
     )
     expect(prepared.kind).toBe('prepared')
     if (prepared.kind != 'prepared') throw new Error('Expected prepared Subflow.')
-    expect(codeActions(prepared.flow)).toEqual([action])
+    expect(codeActions(prepared.flow)).toEqual([capability])
   })
 })
 
-describe('Code Action calls', () => {
-  it('keeps special property names as ordinary frozen methods', async () => {
-    const actions = createActions([{ kind: 'connector', action: '__proto__.constructor', connections: [] }], async () => ({ body: null, status: 200 }))
+describe('Code Connector calls', () => {
+  it('exposes dynamic full-ID, provider and explicit call entry points', async () => {
+    const seen: unknown[] = []
+    const actions = createActions(async (payload) => {
+      seen.push(payload)
+      return { body: payload, status: 200 }
+    })
+    const full = actions['github.get_current_user'] as (input: {}) => Promise<unknown>
+    const nested = (actions.github as Record<string, unknown>).get_current_user as (input: {}) => Promise<unknown>
+    const call = actions.call as (action: string, input: {}) => Promise<unknown>
+    await Promise.all([full({}), nested({}), call('slack.post_message', {})])
+    expect(seen).toEqual([
+      { action: 'github.get_current_user', input: {} },
+      { action: 'github.get_current_user', input: {} },
+      { action: 'slack.post_message', input: {} },
+    ])
+    expect(full).toBe((actions.github as Record<string, unknown>).get_current_user)
+    expect(Object.getPrototypeOf(actions)).toBeNull()
+    expect(Object.isFrozen(actions)).toBe(true)
+  })
+
+  it('keeps special property names as ordinary frozen methods', () => {
+    const actions = createActions(async () => ({ body: null, status: 200 }))
     const methods = actions.__proto__ as Record<string, unknown>
     expect(Object.getPrototypeOf(methods)).toBeNull()
     expect(methods.constructor).toBe(actions['__proto__.constructor'])
-    expect(Object.isFrozen(actions)).toBe(true)
+    expect(Object.isFrozen(methods)).toBe(true)
   })
-  it('shares both entry points and supports ID, aliases and concurrent calls', async () => {
-    const seen: unknown[] = []
-    const actions = createActions([action], async (payload) => {
-      const selected = resolveAction([action], payload)
-      seen.push(selected)
-      return { body: selected.connectionId ?? null, status: 200 }
+
+  it('permits dynamic Actions and explicit Connection IDs without a node-level switch', () => {
+    expect(resolveAction([], { action: 'other.action', input: {}, options: { connectionId: 'other' } })).toEqual({
+      action: 'other.action',
+      connectionId: 'other',
+      input: {},
     })
-    const call = actions[action.action] as (input: {}, options: { connectionId?: string; connectionAlias?: string }) => Promise<unknown>
-    expect((actions.github as Record<string, unknown>).get_current_user).toBe(call)
-    expect(await Promise.all([call({}, { connectionAlias: 'office' }), call({}, { connectionId: 'home' })])).toEqual(['work', 'home'])
-    expect(seen).toHaveLength(2)
-    expect(Object.getPrototypeOf(actions)).toBeNull()
-    expect(Object.isFrozen(actions.github)).toBe(true)
   })
-  it('uses a fixed default and permits public actions', () => {
-    expect(resolveAction([{ ...action, connectionId: 'work' }], { action: action.action, input: {} }).connectionId).toBe('work')
-    expect(resolveAction([{ ...action, connections: [] }], { action: action.action, input: {} }).connectionId).toBeUndefined()
+
+  it('preserves legacy aliases and defaults as non-authorizing hints', () => {
+    expect(resolveAction([{ ...legacyAction, connectionId: 'work' }], { action: legacyAction.action, input: {} }).connectionId).toBe('work')
+    expect(resolveAction([legacyAction], { action: legacyAction.action, input: {}, options: { connectionAlias: 'office' } }).connectionId).toBe('work')
+    expect(resolveAction([legacyAction], { action: 'other.action', input: {}, options: { connectionId: 'outside' } }).connectionId).toBe('outside')
   })
+
   it.each([
-    { action: 'other.action', input: {} },
-    { action: action.action, input: {} },
-    { action: action.action, input: {}, options: { connectionId: 'other' } },
-    { action: action.action, input: {}, options: { connectionAlias: 'other' } },
-    { action: action.action, input: {}, options: { connectionId: 'work', connectionAlias: 'office' } },
-    { action: action.action, input: {}, options: null },
-    { action: action.action, input: {}, teamId: 'other' },
-  ])('rejects unauthorized or malformed selection %j', (payload) => {
-    expect(() => resolveAction([action], payload)).toThrow()
+    { capabilities: [capability], payload: { action: 'invalid', input: {} } },
+    { capabilities: [capability], payload: { action: 'other.action', input: {}, options: { connectionAlias: 'missing' } } },
+    { capabilities: [capability], payload: { action: 'other.action', input: {}, options: { connectionId: 'work', connectionAlias: 'office' } } },
+    { capabilities: [capability], payload: { action: 'other.action', input: {}, options: null } },
+    { capabilities: [capability], payload: { action: 'other.action', input: {}, teamId: 'other' } },
+  ])('rejects malformed calls $payload', ({ capabilities, payload }) => {
+    expect(() => resolveAction(capabilities, payload)).toThrow()
   })
 })

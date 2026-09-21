@@ -1,15 +1,7 @@
 import type { Group, InputPort, InputValues, JsonValue } from '../../flow/common/change.ts'
 
-import { z } from 'zod'
 import { inputValue } from '../../flow/common/inputValue.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'
-
-export const configInputsSchema = z.array(
-  z.union([
-    z.strictObject({ handle: z.string().min(1), description: z.string().optional(), jsonSchema: z.json(), nullable: z.boolean(), value: z.json().optional() }),
-    z.strictObject({ group: z.string(), collapsed: z.boolean().optional() }),
-  ]),
-)
 
 export function triggerConfigValue(input: InputPort, config: InputValues): JsonValue | undefined {
   return inputValue(config[input.handle], input.value)

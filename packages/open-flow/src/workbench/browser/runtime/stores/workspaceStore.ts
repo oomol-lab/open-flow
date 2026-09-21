@@ -1,31 +1,23 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal } from 'value-enhancer'
 import type { EventSource } from '../../../../control/common/api.ts'
-import type { GraphTarget } from '../../../../flow/common/change.ts'
-import type { ConnectorCapability } from '../../../../flow/common/change.ts'
+import type { GraphTarget, ConnectorCapability } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
 import type { WorkbenchClient, Draft, Flow, GraphNode, InputPort, JsonValue, Live, TriggerSchedule } from '../api.ts'
+import type { DesignerViewport, Point } from '../canvasPresentation.ts'
 import type { FlowChangeEvent } from '../contract.ts'
 import type { AddNodeOption } from '../editor/addNodeOptions.ts'
 import type { DiagnosticItem } from '../editor/diagnostics.ts'
-import type {
-  ConditionSettings,
-  TaskPorts,
-  NodeClipboard,
-  FlowChanges,
-  SubflowSettings,
-  TaskSettings,
-  ValueSettings,
-  WebhookSettings,
-} from '../editor/flowChanges.ts'
+import type { ConditionSettings, TaskPorts, FlowChanges, SubflowSettings, TaskSettings, ValueSettings, WebhookSettings } from '../editor/flowChanges.ts'
+import type { NodeClipboard } from '../editor/nodeClipboard.ts'
 import type { PropertyDeletion } from '../editor/propertyDeletion.ts'
 import type { RevisionView } from '../revisionView.ts'
-import type { DesignerEdge, DesignerGraph, DesignerViewport, Point } from '../workspace.ts'
+import type { DesignerEdge, DesignerGraph } from '../workspace.ts'
 import type { CanvasAction, CanvasHistoryEntry } from './canvasHistory.ts'
 import type { DraftChangeContext } from './draftChanges.ts'
 import type { PresentationUpdate } from './presentationChanges.ts'
 import type { SetNotice } from './workbenchNotice.ts'
-import type { ModuleEditorDraft, Workspace$, WorkspaceState } from './workspaceModel.ts'
+import type { ModuleEditorDraft, WorkspaceState, Workspace$ } from './workspaceModel.ts'
 
 import { dequal } from 'dequal/lite'
 import { isJsonObject } from '../../../../base/common/json.ts'
@@ -34,29 +26,33 @@ import { createAuthoringId } from '../../../../flow/common/authoring.ts'
 import { connect as connectFlowNodes, disconnect as disconnectFlowNodes } from '../../../../flow/common/edgeChanges.ts'
 import { inputValue } from '../../../../flow/common/inputValue.ts'
 import { inverseFlowChanges } from '../../../../flow/common/inverseChanges.ts'
-import { imports as moduleImports, replaceSource as replaceModuleSource } from '../../../../flow/common/moduleChanges.ts'
 import {
   resetInputValues,
   setCodeActions,
   setInputSources,
-  setConnectorConnection as changeConnectorConnection,
-  setTriggerConnection as changeTriggerConnection,
   repairNodeNames,
   updateTriggerConfig,
   updateTriggerSchedule,
+  setConnectorConnection as changeConnectorConnection,
+  setTriggerConnection as changeTriggerConnection,
 } from '../../../../flow/common/nodeChanges.ts'
 import { feishuResourceKind, supportsFeishuChatFilter } from '../../../../trigger/providers/feishu/config.ts'
 import { ApiError } from '../api.ts'
+import {
+  canvasPresentationChange,
+  restoreCanvasPresentation,
+  commentIds,
+  removeComments,
+  setComment,
+  setFlowViewport,
+  setNodePositions,
+  setNodeContentHidden,
+} from '../canvasPresentation.ts'
+import { connectionCatalog } from '../connectionCatalog.ts'
 import { addNodeIntent } from '../editor/addNodeOptions.ts'
 import {
-  addNode as addFlowNode,
   applyFlowChanges,
-  copyNodes,
-  createResource as createFlowResource,
   deleteSelection,
-  pasteNodes,
-  setInputVariable as changeInputVariable,
-  setInputValue as changeInputValue,
   updateCondition,
   updateTaskPorts,
   updateTaskAdditionalInputs,
@@ -69,16 +65,21 @@ import {
   updateValue,
   updateResolution,
   updateWebhook,
+  addNode as addFlowNode,
+  createResource as createFlowResource,
+  setInputVariable as changeInputVariable,
+  setInputValue as changeInputValue,
 } from '../editor/flowChanges.ts'
+import { copyNodes, pasteNodes } from '../editor/nodeClipboard.ts'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
-import { connectionCatalog, canvasPresentationChange, restoreCanvasPresentation } from '../workspace.ts'
-import { commentIds, designerGraph, removeComments, setComment, setFlowViewport, setNodePositions, setNodeContentHidden } from '../workspace.ts'
+import { designerGraph } from '../workspace.ts'
 import { CanvasHistory } from './canvasHistory.ts'
 import { CatalogStores } from './catalogStores.ts'
 import { DraftChanges } from './draftChanges.ts'
 import { FlowCatalog } from './flowCatalog.ts'
 import { Latest } from './latest.ts'
+import { ModuleEditorSession } from './moduleEditorSession.ts'
 import { PresentationChanges } from './presentationChanges.ts'
 import { resourceValue } from './resource.ts'
 import { errorNotice } from './workbenchNotice.ts'
@@ -129,11 +130,10 @@ export class WorkspaceStore {
   readonly #runChanged: (event: Extract<FlowChangeEvent, { readonly kind: 'run.changed' | 'run.created' }>) => void
   readonly #setNotice: SetNotice
   readonly #model: WorkspaceModel
-  readonly #moduleDrafts = new Map<string, { editor: ModuleEditorDraft; base: Draft['content']['modules'][string] }>()
+  readonly #modules: ModuleEditorSession
   readonly #history = new CanvasHistory()
   public readonly history$: ReadonlyVal<CanvasHistory['state$']['value']> = this.#history.state$
   #historyRecovery?: Promise<void>
-  #moduleSave?: Promise<boolean>
   #clipboard?: Clipboard
   #diagnosticFocusId = 0
   #draftInvalidation = 0
@@ -155,6 +155,7 @@ export class WorkspaceStore {
     runChanged: (event: Extract<FlowChangeEvent, { readonly kind: 'run.changed' | 'run.created' }>) => void = () => {},
     public readonly catalogs = new CatalogStores(client),
     private readonly flowCreated: (flowId: string) => void = () => {},
+    private readonly accessChanged: (flowId: string, accessRevision: number) => void = () => {},
   ) {
     this.#client = client
     this.#setNotice = setNotice
@@ -163,6 +164,7 @@ export class WorkspaceStore {
     this.#runChanged = runChanged
     this.#flows = new FlowCatalog(client, setNotice, i18n)
     this.#model = new WorkspaceModel(i18n, this.#flows)
+    this.#modules = new ModuleEditorSession(this.#model, this.#draftSession, (changes) => this.#changeDraft(changes, false), setNotice, i18n)
     this.#draftChanges = new DraftChanges(client, setNotice, i18n, {
       apply: (draft) => this.#applyDraft(draft, 'local'),
       beforeChange: (manageBusy) => {
@@ -188,6 +190,7 @@ export class WorkspaceStore {
   public dispose(): void {
     this.catalogs.dispose()
     this.#disposed = true
+    this.#modules.dispose()
     this.#draftSession.invalidate()
     this.#presentationChanges.dispose()
     this.#stopCatalogWatch?.()
@@ -280,6 +283,12 @@ export class WorkspaceStore {
         (event) => {
           if (current()) this.#runChanged(event)
         },
+        (accessRevision) => {
+          if (current()) {
+            this.accessChanged(flowId, accessRevision)
+            void this.#refreshLive(flowId, current)
+          }
+        },
       )
       this.#stopFlowWatch = subscription.stop
       await subscription.ready
@@ -347,10 +356,19 @@ export class WorkspaceStore {
     }
   }
 
+  async #refreshLive(flowId: string, current: () => boolean): Promise<void> {
+    try {
+      const live = await this.#client.getLive(flowId)
+      if (current() && this.#model.value.flowId == flowId) this.#set({ live })
+    } catch (error) {
+      if (current() && this.#model.value.flowId == flowId) this.#setNotice(errorNotice(error, this.#i18n.t))
+    }
+  }
+
   public selectTarget(target: GraphTarget | undefined): boolean {
     if (this.#history.applying) return false
     if (!dequal(target, this.#model.value.target)) this.#history.clear()
-    void this.#flushModules()
+    void this.#modules.flush()
     this.#set({
       diagnosticFocus: undefined,
       diagnostics: undefined,
@@ -366,7 +384,7 @@ export class WorkspaceStore {
   public selectNodes(nodeIds: readonly string[]): boolean {
     if (nodeIds.length == this.#model.value.selectedNodeIds.length && nodeIds.every((nodeId, index) => nodeId == this.#model.value.selectedNodeIds[index]))
       return true
-    void this.#flushModules()
+    void this.#modules.flush()
     this.#set({
       diagnosticFocus: undefined,
       moduleEditor: selectedModuleEditor(
@@ -914,23 +932,15 @@ export class WorkspaceStore {
     const editor = this.#model.value.moduleEditor
     if (this.#history.applying || this.#history.failed || editor == null || editor.source == source) return
     this.#clearHistoryForEdit()
-    const pending = this.#moduleDrafts.get(editor.moduleId)
-    const base = pending?.base ?? this.#model.value.draft?.content.modules[editor.moduleId]
-    if (base == null) return
-    this.#moduleDrafts.set(editor.moduleId, { base, editor: { ...editor, phase: undefined, source } })
-    this.#publishEditor()
+    this.#modules.updateModuleSource(source)
   }
 
   public discardModuleChanges(): void {
-    const editor = this.#model.value.moduleEditor
-    if (editor == null || this.#moduleSave != null) return
-    this.#moduleDrafts.delete(editor.moduleId)
-    const module = this.#model.value.draft?.content.modules[editor.moduleId]
-    this.#set({ moduleEditor: module == null ? undefined : { moduleId: editor.moduleId, source: module.source } })
+    this.#modules.discardModuleChanges()
   }
 
   public get hasUnsavedCode(): boolean {
-    return this.#moduleDrafts.size > 0
+    return this.#modules.hasUnsavedCode
   }
 
   public async saveDraft(): Promise<boolean> {
@@ -940,66 +950,8 @@ export class WorkspaceStore {
     return (await this.#draftChanges.flush()) && current() && !this.#disposed && !this.#history.failed
   }
 
-  public async saveModuleEditor(): Promise<boolean> {
-    if (this.#disposed) return false
-    for (const pending of this.#moduleDrafts.values()) {
-      if (pending.editor.phase == 'failed') pending.editor = { ...pending.editor, phase: undefined }
-    }
-    this.#publishEditor()
-    return await this.#flushModules()
-  }
-
-  #flushModules(): Promise<boolean> {
-    if (this.#moduleSave != null) return this.#moduleSave
-    if (this.#disposed) return Promise.resolve(false)
-    if (![...this.#moduleDrafts.values()].some((pending) => pending.editor.phase != 'failed')) return Promise.resolve(this.#moduleDrafts.size == 0)
-    const current = this.#draftSession.capture()
-    this.#moduleSave = this.#saveModules(current).finally(() => {
-      this.#moduleSave = undefined
-    })
-    return this.#moduleSave
-  }
-
-  async #saveModules(current: () => boolean): Promise<boolean> {
-    while (!this.#disposed && current()) {
-      const entry = [...this.#moduleDrafts.entries()].find(([, pending]) => pending.editor.phase != 'failed')
-      if (entry == null) return this.#moduleDrafts.size == 0
-      const [moduleId, pending] = entry
-      const source = pending.editor.source
-      pending.editor = { ...pending.editor, phase: 'saving' }
-      this.#publishEditor()
-      try {
-        const imports = await moduleImports(source)
-        if (this.#disposed || !current()) return false
-        const module = this.#model.value.draft?.content.modules[moduleId]
-        if (module == null || module.source != pending.base.source || JSON.stringify(module.imports) != JSON.stringify(pending.base.imports)) {
-          throw new Error(this.#i18n.t('notice.moduleUpdated'))
-        }
-        const changed =
-          source == module.source && JSON.stringify(imports) == JSON.stringify(module.imports)
-            ? this.#model.value.draft
-            : await this.#changeDraft(replaceModuleSource(moduleId, pending.base.source, pending.base.imports, source, imports), false)
-        if (this.#disposed || !current()) return false
-        const latest = this.#moduleDrafts.get(moduleId)
-        if (latest == null) continue
-        if (changed == null) {
-          latest.editor = { ...latest.editor, phase: 'failed' }
-        } else if (latest.editor.source == source) {
-          this.#moduleDrafts.delete(moduleId)
-          if (this.#model.value.moduleEditor?.moduleId == moduleId) this.#set({ moduleEditor: { moduleId, source } })
-        } else {
-          latest.base = { ...pending.base, source, imports }
-          latest.editor = { ...latest.editor, phase: undefined }
-        }
-      } catch (error) {
-        if (this.#disposed || !current()) return false
-        const latest = this.#moduleDrafts.get(moduleId)
-        if (latest != null) latest.editor = { ...latest.editor, phase: 'failed' }
-        this.#setNotice(errorNotice(error, this.#i18n.t))
-      }
-      this.#publishEditor()
-    }
-    return false
+  public saveModuleEditor(): Promise<boolean> {
+    return this.#modules.saveModuleEditor()
   }
 
   public async moveNodes(positions: Readonly<Record<string, Point>>): Promise<void> {
@@ -1385,21 +1337,9 @@ export class WorkspaceStore {
     return !this.#disposed && context.flowId == this.#model.value.flowId && context.current()
   }
 
-  #editorState(editor: ModuleEditorDraft | undefined): Pick<WorkspaceState, 'moduleEditor' | 'moduleSaveStatus'> {
-    const moduleEditor = editor == null ? undefined : (this.#moduleDrafts.get(editor.moduleId)?.editor ?? editor)
-    let moduleSaveStatus: WorkspaceState['moduleSaveStatus']
-    if ([...this.#moduleDrafts.values()].some((pending) => pending.editor.phase == 'failed')) moduleSaveStatus = 'failed'
-    else if (this.#moduleDrafts.size > 0) moduleSaveStatus = 'saving'
-    return { moduleEditor, moduleSaveStatus }
-  }
-
-  #publishEditor(): void {
-    if (!this.#disposed) this.#model.set(this.#editorState(this.#model.value.moduleEditor))
-  }
-
   #set(patch: Partial<WorkspaceState>): void {
     if (this.#disposed) return
     const editor = Object.hasOwn(patch, 'moduleEditor') ? patch.moduleEditor : this.#model.value.moduleEditor
-    this.#model.set({ ...patch, ...this.#editorState(editor) })
+    this.#model.set({ ...patch, ...this.#modules.state(editor) })
   }
 }

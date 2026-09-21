@@ -3,7 +3,7 @@ import { nodeInputMappings } from './condition.ts'
 export { matchesTriggerOutputs, triggerOutputDefinitions, triggerOutputPorts } from '../../trigger/common/contract.ts'
 import type { EngineContract } from '../../execution/common/engineContract.ts'
 import type { RuntimeProgram } from '../../execution/common/runtime.ts'
-import type { ConnectorCapability, FlowDocument, Graph, InputMapping, RevisionContent, SchemaMismatch } from './change.ts'
+import type { ConnectorActionCapability, ConnectorCapability, FlowDocument, Graph, InputMapping, RevisionContent, SchemaMismatch } from './change.ts'
 
 import { findEngineContract } from '../../execution/common/engineContract.ts'
 import { agentConfigIssues } from './agent.ts'
@@ -398,7 +398,7 @@ export function createRuntimeProgram(prepared: PreparedFlow, entryModuleId: stri
   }
 }
 
-export function agentActions(flow: Pick<PreparedFlow, 'tasks'>): readonly ConnectorCapability[] {
+export function agentActions(flow: Pick<PreparedFlow, 'tasks'>): readonly ConnectorActionCapability[] {
   return Object.values(flow.tasks).flatMap((task) => {
     if (task.executor.kind != 'agent') return []
     const notice = task.executor.notification == null ? undefined : flow.tasks[task.executor.notification.taskId]?.executor

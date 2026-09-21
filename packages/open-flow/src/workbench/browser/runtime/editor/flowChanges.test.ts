@@ -15,8 +15,6 @@ import {
   updateWebhook,
   agentTool,
   applyFlowChanges,
-  copyNodes,
-  pasteNodes,
   setInputValue,
   setInputVariable,
   updateTaskPorts,
@@ -24,6 +22,7 @@ import {
   updateTaskAdditionalInputs,
   updateResolution,
 } from './flowChanges.ts'
+import { copyNodes, pasteNodes } from './nodeClipboard.ts'
 import { movePort } from './portOrder.ts'
 
 function draft(source: string): Draft {

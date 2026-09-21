@@ -1,5 +1,5 @@
 import type { FlowCanvasViewProps } from '../../../../canvas/browser/graph/FlowCanvas/model.ts'
-import type { BlockLibraryProps } from './contextPanel.tsx'
+import type { BlockLibraryProps } from './blockLibrary.tsx'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
@@ -7,7 +7,7 @@ import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { Icon } from '../icons.tsx'
-import { BlockLibrary } from './contextPanel.tsx'
+import { BlockLibrary } from './blockLibrary.tsx'
 
 export function NodePickerPopover(
   props: BlockLibraryProps & { readonly anchor?: { readonly x: number; readonly y: number }; readonly centered?: boolean; readonly onClose?: () => void },

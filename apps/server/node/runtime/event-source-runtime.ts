@@ -1,6 +1,7 @@
 import type { CreateEventSource, EventSource, UpdateEventSource } from '@oomol-lab/open-flow/control-api'
 import type { IntegrationDefinition, IntegrationReconcileContext, IntegrationReconcileResult } from '@oomol-lab/open-flow/integration-trigger'
-import type { ConnectorHost } from '../deployment/connector.ts'
+import type { ConnectorAccessHost } from '../deployment/connector-access.ts'
+import type { ConnectorAccessContext, ConnectorHost } from '../deployment/connector.ts'
 import type { StoredEventSource, SourceSubscription } from '../storage/event-source-store.ts'
 import type { Store } from '../storage/store.ts'
 import type { IntegrationOptions } from './integration-runtime.ts'
@@ -13,14 +14,23 @@ import { ControlError } from '../error.ts'
 export class EventSourceRuntime {
   readonly #store: Store
   readonly #connector: () => ConnectorHost | undefined
+  readonly #connectorAccess: ConnectorAccessHost
   readonly #options: () => IntegrationOptions | undefined
   readonly #clock: () => number
   readonly #wake: () => void
   readonly #operations = new Map<string, Promise<void>>()
 
-  constructor(store: Store, connector: () => ConnectorHost | undefined, options: () => IntegrationOptions | undefined, clock: () => number, wake: () => void) {
+  constructor(
+    store: Store,
+    connector: () => ConnectorHost | undefined,
+    connectorAccess: ConnectorAccessHost,
+    options: () => IntegrationOptions | undefined,
+    clock: () => number,
+    wake: () => void,
+  ) {
     this.#store = store
     this.#connector = connector
+    this.#connectorAccess = connectorAccess
     this.#options = options
     this.#clock = clock
     this.#wake = wake
@@ -34,7 +44,8 @@ export class EventSourceRuntime {
     const connector = this.#connector()
     if (connector == null) throw new ControlError(controlErrorCode.connectorUnconfigured, 'Connector is not configured.')
     const provider = 'feishu_app_bot'
-    const connections = await connector.listConnections(provider, signal, input.teamId ?? undefined)
+    const access = this.#operatorContext(provider, input.teamId ?? undefined)
+    const connections = await connector.listConnections(provider, signal, access)
     const connection = connections.find((item) => item.connectionId == input.connectionId && item.status == 'active')
     if (connection == null) {
       throw new ControlError(controlErrorCode.eventSourceInvalid, 'Choose an active Connection in this Connector Team.')
@@ -42,17 +53,8 @@ export class EventSourceRuntime {
     const appId = connection.providerAccountId
     if (appId == null || !/^cli_[a-zA-Z0-9]+$/.test(appId))
       throw new ControlError(controlErrorCode.eventSourceIdentityUnavailable, 'Connector must provide the verified application identity.')
-    const endpoint = '/tenant/v2/tenant/query'
-    const data = feishuResponse(
-      await connector.proxy(provider, input.connectionId, 'event-source-identity', { method: 'GET', endpoint }, signal, input.teamId ?? undefined),
-    )
-    const identity = data.tenant
-    const tenantKey = identity != null && typeof identity == 'object' && !Array.isArray(identity) && 'tenant_key' in identity ? identity.tenant_key : undefined
-    if (typeof tenantKey != 'string' || tenantKey.trim().length == 0 || tenantKey.length > 256) {
-      throw new ControlError(controlErrorCode.eventSourceInvalid, 'The Connection did not return a valid Feishu tenant.')
-    }
     signal.throwIfAborted()
-    const source = this.#store.eventSources.create({ ...input, provider, appId, tenantKey })
+    const source = this.#store.eventSources.create({ ...input, provider, appId })
     return this.#store.eventSources.view(source, this.#options()?.publicOrigin)
   }
 
@@ -118,6 +120,7 @@ export class EventSourceRuntime {
     bindingId: string,
     connectionId: string,
     flowId: string,
+    access: ConnectorAccessContext,
     context: IntegrationReconcileContext,
   ): Promise<IntegrationReconcileResult> {
     if (!context.active) {
@@ -139,7 +142,7 @@ export class EventSourceRuntime {
       throw new PermanentIntegrationError('Configure the requested events on the event source first.')
     const connector = this.#connector()
     if (connector == null) throw new TransientIntegrationError('Connector is unavailable.')
-    const connections = await connector.listConnections(source.provider, context.signal, source.teamId ?? undefined)
+    const connections = await connector.listConnections(source.provider, context.signal, access)
     if (
       !connections.some(
         (connection) => connection.connectionId == connectionId && connection.status == 'active' && connection.providerAccountId == source.appId,
@@ -150,7 +153,14 @@ export class EventSourceRuntime {
     if (subscriptions.length > 0 && source.manageSubscriptions != 1) throw new PermanentIntegrationError('This source does not manage resource subscriptions.')
     for (const subscription of subscriptions) {
       const previous = this.#store.eventSources.subscription(source.sourceId, subscription.key)
-      const stored = this.#store.eventSources.demand(source.sourceId, subscription.key, JSON.stringify(subscription), bindingId, this.#clock())
+      const stored = this.#store.eventSources.demand(
+        source.sourceId,
+        subscription.key,
+        JSON.stringify(subscription),
+        bindingId,
+        access.providerAccess,
+        this.#clock(),
+      )
       if (stored.status == 'ready') continue
       const key = JSON.stringify([source.sourceId, subscription.key])
       const running = this.#operations.get(key)
@@ -198,20 +208,29 @@ export class EventSourceRuntime {
     if (connector == null) throw new TransientIntegrationError('Connector is unavailable.')
     try {
       const request = active ? subscription.subscribe : subscription.unsubscribe
-      const result = await connector.proxy(
-        source.provider,
-        source.connectionId,
-        source.sourceId,
-        request,
-        signal ?? AbortSignal.timeout(30_000),
-        source.teamId ?? undefined,
-      )
+      const result = await connector.proxy(source.provider, source.connectionId, source.sourceId, request, signal ?? AbortSignal.timeout(30_000), {
+        providerAccess: stored.providerAccess,
+        providerId: source.provider,
+        purpose: 'trigger',
+        source: 'publication',
+        ...(source.teamId == null ? {} : { teamId: source.teamId }),
+      })
       feishuResponse(result)
       if (active) this.#store.eventSources.subscriptionState(source.sourceId, stored.resourceKey, 'ready', this.#clock())
       else this.#store.eventSources.deleteSubscription(source.sourceId, stored.resourceKey)
     } catch (error) {
       this.#store.eventSources.subscriptionState(source.sourceId, stored.resourceKey, 'uncertain', this.#clock())
       throw error
+    }
+  }
+
+  #operatorContext(providerId: string, teamId: string | undefined): ConnectorAccessContext {
+    return {
+      providerAccess: this.#connectorAccess.current(''),
+      providerId,
+      purpose: 'catalog',
+      source: 'operator',
+      ...(teamId == null ? {} : { teamId }),
     }
   }
 }

@@ -317,7 +317,6 @@ describe('TriggerStore', () => {
           name: 'Events',
           provider: 'feishu_app_bot',
           appId: 'cli_demo',
-          tenantKey: 'tenant',
           connectionId: 'app-connection',
           teamId: null,
           enabled: true,

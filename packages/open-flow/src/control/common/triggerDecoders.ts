@@ -9,7 +9,7 @@ import type {
   TriggerKeySummary,
 } from './api.ts'
 
-import { configInputsSchema } from '../../trigger/common/config.ts'
+import { configInputsSchema } from '../../trigger/common/configSchema.ts'
 import { integer, invalidResponse, jsonValue, optionalString, record, string } from './decoding.ts'
 
 export function triggerKeySummary(value: unknown): TriggerKeySummary {

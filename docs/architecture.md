@@ -178,6 +178,7 @@ Wait 与 Approval 使用同一个等待执行机制，分别提供固定的 `con
 各等待保留独立决议事实，后续等待和 Run terminal 不覆盖旧决议；这些事实不受 RunEvent retention 影响，随 Flow 物理删除清理。
 
 Agent 是根 Flow 中的 Managed Task，拥有显式输入、固定模型、Connector 工具与可选代码计算能力声明。模型不能改变工具 Action、Connection、固定参数或审批策略。
+Connector 工具和代码计算均可不配置；Agent 可以仅根据模型和提示词生成结果，仍须满足声明的输出 schema。Connector 工具最多 64 个。
 Agent 的工具批次串行处理，批准或拒绝只处理该次固定调用。框架 continuation 属于部署私有数据；Run owner 持久化审批等待与通知 work，在安全冻结时保存完整 continuation 和 Scheduler 状态。并行 Agent 的等待独立可决议，框架不拥有另一套 Run 状态机。
 Agent 节点超时累计各次实际执行段，审批与排队不消耗节点预算；Run 总预算独立保留。执行结果不明时终止为不确定失败，不能让模型自动重试。
 
@@ -202,7 +203,9 @@ Agent 仍可使用内联 Connector 通知，先登记等待和通知 work，再�
 部署只声明自己实现的 Engine Contract；Node 兼容合同的内存文件系统属于单次 Task invocation，不在 Task 之间共享或持久化。Capability host 必须校验当前
 Flow、Run、Task、invocation、binding 和 Run 状态；Task 或 Run 结束后旧 Capability 必须 fail closed。
 
-Code Task 的 Action 声明属于 Revision，固定允许的 Action、Connection 集合和可选默认账号。分层属性与完整 Action ID 索引共享同一调用合同；
+Code Task 默认获得动态 Connector API，不保存节点级开关或 Action/Connection 白名单。显式 `call(actionId, ...)`、分层属性与完整 Action ID 索引共享
+同一动态调用合同；Provider access 是独立的部署状态和最终授权来源。旧 Revision 中的 Connection alias 与默认
+Connection 仅作为调用解析提示，不能授权 Action 或 Connection。
 每次业务调用有独立身份，用于外部幂等处理，不复用 Task invocation identity。Action 调用仍属于当前节点的生命周期，不创建图节点或独立 Run。
 普通调用错误可以被代码捕获，取消、deadline 和资源限制不能因用户捕获错误而失效。
 
@@ -230,8 +233,15 @@ Connector service 拥有 Provider 授权、credential、Connection lifecycle 和
 不能把 credential、token 或 Connector 数据库复制进 Revision、Browser 或 RunEvent。Connector catalog 和 Connection 是 deployment scope 资源，
 不从属于单个 Flow。
 
-Code Action 可以将绑定时的 Connector alias 与稳定 ID 一起固定在 Revision；alias 只是当前 Action 允许集合内的选择名称，不能成为动态授权依据。
-目录改名不修改旧 Revision。Publish 与 Run eligibility 检查完整执行 closure 的允许账号集合，具体调用仍由宿主检查当前外部授权状态。
+Provider Access Binding 是 deployment-owned Flow 状态，不属于 Revision。`selectable` 部署按 Provider 保存零个或多个 opaque Connection bindings；`implicit`
+部署不保存伪造的 binding，直接使用部署配置的 scoped Connector authority。绑定只引用 Connector 管理的权限边界，不能包含 credential，也不能演化为 Flow
+service account。Publication 和 Run 固定接受时的 binding identities；Connector 按目标 Connection 对 live policy 和 Action 做最终授权，缺失、失效或不匹配时
+fail closed。
+Publish operation、Publication、Run、Wait 通知和共享事件源订阅分别持久化对应的 access snapshot；Rollback 复制来源 Publication snapshot，
+Trigger/listener/maintenance 从固定记录恢复，不能重新读取当前 Draft binding。Flow 物理删除前 deployment access owner 必须完成对应 Draft map 清理。
+
+Code Action 可以把旧声明中的 Connector alias 与稳定 ID 解释为调用提示；alias 不能成为动态授权依据。目录改名不修改旧 Revision。
+Publish 与 Run eligibility 按固定 Provider access snapshot 检查执行 closure，具体调用仍由宿主和 Connector 检查当前外部授权状态。
 Connector adapter 必须明确自己的执行身份保证；本地按 ID 解析到 alias 不等于上游按稳定 ID 原子执行。
 
 Server 使用 OOMOL-hosted Connector 时，Operator 创建 Flow 必须选择一个具体 OOMOL Team，并由 Server 在同一个创建 operation boundary 内保存为

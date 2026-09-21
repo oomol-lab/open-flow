@@ -37,7 +37,10 @@ const triggerNode: FlowCanvasViewTriggerNode = {
 }
 const content: RevisionContent = {
   modelVersion: currentFlowModelVersion,
-  modules: { review: { name: 'Review', imports: [], source: 'export default () => ({ summary: "Ready for review" })' } },
+  modules: {
+    automation: { name: 'Automation', imports: [], source: 'export default async (_, context) => context.actions.call("github.get_current_user", {})' },
+    review: { name: 'Review', imports: [], source: 'export default () => ({ summary: "Ready for review" })' },
+  },
   document: {
     bindings: {},
     tasks: {},
@@ -51,6 +54,12 @@ const content: RevisionContent = {
           values: [{ handle: 'text', nullable: false, jsonSchema: { type: 'string' }, value: 'Review sidebar interactions' }],
         },
         review: { kind: 'task', name: 'Review issues', inputs: {}, task: { name: 'Review', moduleId: 'review', inputs: [], outputs: [] } },
+        automation: {
+          kind: 'task',
+          name: 'Code with Connector access',
+          inputs: {},
+          task: { capabilities: [{ kind: 'connector' }], name: 'Automation', moduleId: 'automation', inputs: [], outputs: [] },
+        },
       },
       edges: [],
     },
@@ -112,7 +121,43 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
   const [store, setStore] = useState<WorkbenchStore>()
   const i18n = useMemo(() => createI18n(language), [language])
   useEffect(() => {
-    const { client, flowId } = createInspectorTransport(log, content)
+    const { client, flowId } = createInspectorTransport(log, content, {
+      actions: [
+        {
+          actionId: 'github.get_current_user',
+          serviceId: 'github',
+          serviceName: 'GitHub',
+          name: 'Get current user',
+          description: 'Read the signed-in user.',
+          authenticated: true,
+          inputs: {},
+          outputs: {},
+          inputSchema: { type: 'object', properties: {} },
+          outputSchema: { type: 'object', properties: { login: { type: 'string' } }, required: ['login'] },
+        },
+        {
+          actionId: 'slack.post_message',
+          serviceId: 'slack',
+          serviceName: 'Slack',
+          name: 'Post message',
+          description: 'Post a message.',
+          authenticated: true,
+          inputs: {},
+          outputs: {},
+          inputSchema: { type: 'object', properties: { text: { type: 'string' } }, required: ['text'] },
+          outputSchema: { type: 'object', properties: {} },
+        },
+      ],
+      connections: [
+        { id: 'github-work', displayName: 'GitHub · Work', isDefault: true, service: 'github', status: 'active' },
+        { id: 'github-personal', displayName: 'GitHub · Personal', isDefault: false, service: 'github', status: 'active' },
+        { id: 'slack-team', displayName: 'Slack · Product', isDefault: true, service: 'slack', status: 'active' },
+      ],
+      providers: [
+        { authTypes: ['oauth2'], displayName: 'GitHub', service: 'github' },
+        { authTypes: ['oauth2'], displayName: 'Slack', service: 'slack' },
+      ],
+    })
     const next = new WorkbenchStore(
       client,
       {
@@ -125,7 +170,7 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
       false,
     )
     setStore(next)
-    void next.workspace.start(flowId)
+    void next.start(flowId)
     return () => next.dispose()
   }, [generation, i18n, log])
   useStoryActions([
@@ -170,6 +215,6 @@ export const inspectorPanelStory: FrontendStory = {
   title: 'Properties Panel',
   standalone: true,
   description:
-    'Production editor: open properties from the node toolbar, return without clearing selection, and marquee-select. Panel states appear together above the editor, including the centered empty outline without add controls.',
+    'Production editor: inspect outline and selection states. Open Code properties to check editor focus, available connections, and the action picker with compact app rows, expanded actions, and search results.',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,
 }

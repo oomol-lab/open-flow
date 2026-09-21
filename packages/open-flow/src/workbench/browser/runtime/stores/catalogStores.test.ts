@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
-import { actionWithConnections } from '../workspace.ts'
+import { actionWithConnections } from '../connectionCatalog.ts'
 import { CatalogStores } from './catalogStores.ts'
 import { resourceValue } from './resource.ts'
 

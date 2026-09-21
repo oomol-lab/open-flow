@@ -204,10 +204,12 @@ it('fails a Stripe candidate before activation, preserves old Live, and recovers
   const file = await databaseFile()
   let createdUrl = ''
   let deletes = 0
+  const accessDigests: string[] = []
   const service = await openService(
     file,
     options(
-      connector(async (_provider, _connectionId, _rateLimitId, request) => {
+      connector(async (_provider, _connectionId, _rateLimitId, request, _signal, access) => {
+        accessDigests.push(access!.providerAccess!.providerAccessDigest)
         if (request.endpoint == '/v1/webhook_endpoints' && request.method == 'GET') {
           return {
             data: { data: createdUrl == '' ? [] : [{ id: 'we_failed', url: createdUrl }], has_more: false },
@@ -245,6 +247,10 @@ it('fails a Stripe candidate before activation, preserves old Live, and recovers
   const initialDone = service.control.getPublishOperation(created.flow.flowId, initial.operationId)
   if (initialDone.status != 'succeeded') throw new Error('Initial Publish operation did not succeed.')
 
+  const previous = new DatabaseSync(file)
+  previous.exec("UPDATE publications SET provider_access_snapshot = json_set(provider_access_snapshot, '$.providerAccessDigest', 'previous')")
+  previous.close()
+
   const revisionId = await addStripe(service, created.flow.flowId, created.flow.draftRevisionId, ['charge.succeeded'])
   const operation = await service.control.publishFlow(
     'operator',
@@ -267,6 +273,8 @@ it('fails a Stripe candidate before activation, preserves old Live, and recovers
   })
   expect(service.control.listPublications(created.flow.flowId, 10).page.publications).toHaveLength(1)
   expect(deletes).toBe(1)
+  expect(accessDigests.length).toBeGreaterThan(1)
+  expect(new Set(accessDigests)).toEqual(new Set(['implicit']))
   const database = new DatabaseSync(file, { readOnly: true })
   expect(database.prepare('SELECT COUNT(*) AS count FROM integration_candidates').get()).toEqual({ count: 0 })
   database.close()

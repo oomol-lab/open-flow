@@ -1,4 +1,4 @@
-import type { CreateEventSource, EventSource, UpdateEventSource } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAccess, CreateEventSource, EventSource, UpdateEventSource } from '@oomol-lab/open-flow/control-api'
 import type { TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { FeishuEvent } from '@oomol-lab/open-flow/provider-triggers'
 import type { DatabaseSync } from 'node:sqlite'
@@ -9,7 +9,7 @@ import { matchesFeishuEvent } from '@oomol-lab/open-flow/provider-triggers'
 import { randomUUID } from 'node:crypto'
 import { ControlError } from '../error.ts'
 
-const sourceColumns = `source_id AS sourceId, revision, name, provider, app_id AS appId, tenant_key AS tenantKey,
+const sourceColumns = `source_id AS sourceId, revision, name, provider, app_id AS appId,
   connection_id AS connectionId, team_id AS teamId, verification_token AS verificationToken, encrypt_key AS encryptKey,
   event_types_json AS eventTypesJson, manage_subscriptions AS manageSubscriptions, enabled, verified_at AS verifiedAt,
   last_received_at AS lastReceivedAt, updated_at AS updatedAt`
@@ -20,7 +20,6 @@ export interface StoredEventSource {
   readonly name: string
   readonly provider: 'feishu' | 'feishu_app_bot'
   readonly appId: string
-  readonly tenantKey: string
   readonly connectionId: string
   readonly teamId: string | null
   readonly verificationToken: string
@@ -44,6 +43,7 @@ export interface SourceDelivery {
 }
 
 export interface SourceSubscription {
+  readonly providerAccess: ConnectorAccess
   readonly sourceId: string
   readonly resourceKey: string
   readonly resourceJson: string
@@ -78,7 +78,6 @@ export class EventSourceStore {
       name: row.name,
       provider: row.provider,
       appId: row.appId,
-      tenantKey: row.tenantKey,
       connectionId: row.connectionId,
       teamId: row.teamId,
       enabled: row.enabled == 1,
@@ -94,7 +93,7 @@ export class EventSourceStore {
     }
   }
 
-  create(input: CreateEventSource & { readonly provider: string; readonly appId: string; readonly tenantKey: string }): StoredEventSource {
+  create(input: CreateEventSource & { readonly provider: string; readonly appId: string }): StoredEventSource {
     return this.#transaction(() => {
       if (this.#database.prepare('SELECT 1 FROM event_sources WHERE app_id = ?').get(input.appId) != null) {
         throw new ControlError(controlErrorCode.eventSourceConflict, 'This application already has an event source.')
@@ -103,15 +102,14 @@ export class EventSourceStore {
       if (count.count >= 100) throw new ControlError(controlErrorCode.eventSourceConflict, 'The deployment event source limit has been reached.')
       const sourceId = `source_${randomUUID().replaceAll('-', '')}`
       this.#database
-        .prepare(`INSERT INTO event_sources (source_id, revision, name, provider, app_id, tenant_key, connection_id,
+        .prepare(`INSERT INTO event_sources (source_id, revision, name, provider, app_id, connection_id,
         team_id, verification_token, encrypt_key, event_types_json, manage_subscriptions, updated_at)
-        VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
         .run(
           sourceId,
           input.name,
           input.provider,
           input.appId,
-          input.tenantKey,
           input.connectionId,
           input.teamId,
           input.verificationToken,
@@ -288,16 +286,24 @@ export class EventSourceStore {
   }
 
   subscription(sourceId: string, resourceKey: string): SourceSubscription | undefined {
-    return this.#database
-      .prepare(`SELECT source_id AS sourceId, resource_key AS resourceKey, resource_json AS resourceJson, status
+    const row = this.#database
+      .prepare(`SELECT source_id AS sourceId, resource_key AS resourceKey, resource_json AS resourceJson, status,
+      provider_access_snapshot AS providerAccess
       FROM source_subscriptions WHERE source_id = ? AND resource_key = ?`)
-      .get(sourceId, resourceKey) as SourceSubscription | undefined
+      .get(sourceId, resourceKey) as (Omit<SourceSubscription, 'providerAccess'> & { readonly providerAccess: string }) | undefined
+    return row == null ? undefined : { ...row, providerAccess: JSON.parse(row.providerAccess) as ConnectorAccess }
   }
 
-  demand(sourceId: string, resourceKey: string, resourceJson: string, bindingId: string, now: number): SourceSubscription {
+  demand(sourceId: string, resourceKey: string, resourceJson: string, bindingId: string, providerAccess: ConnectorAccess, now: number): SourceSubscription {
     return this.#transaction(() => {
       this.#database.prepare('INSERT OR IGNORE INTO source_demands VALUES (?, ?, ?)').run(sourceId, resourceKey, bindingId)
-      this.#database.prepare("INSERT OR IGNORE INTO source_subscriptions VALUES (?, ?, ?, 'creating', ?)").run(sourceId, resourceKey, resourceJson, now)
+      this.#database
+        .prepare(
+          `INSERT OR IGNORE INTO source_subscriptions
+           (source_id, resource_key, resource_json, status, updated_at, provider_access_snapshot)
+           VALUES (?, ?, ?, 'creating', ?, ?)`,
+        )
+        .run(sourceId, resourceKey, resourceJson, now, JSON.stringify(providerAccess))
       return this.subscription(sourceId, resourceKey)!
     })
   }
@@ -319,11 +325,17 @@ export class EventSourceStore {
       AND NOT EXISTS (SELECT 1 FROM integration_candidates c JOIN publish_operations p USING (operation_id)
       WHERE c.binding_id = source_demands.binding_id AND c.status != 'cleanup' AND p.status = 'pending')`)
       .run()
-    return this.#database
-      .prepare(`SELECT source_id AS sourceId, resource_key AS resourceKey, resource_json AS resourceJson, status
+    const rows = this.#database
+      .prepare(`SELECT source_id AS sourceId, resource_key AS resourceKey, resource_json AS resourceJson, status,
+      provider_access_snapshot AS providerAccess
       FROM source_subscriptions s WHERE NOT EXISTS (SELECT 1 FROM source_demands d WHERE d.source_id = s.source_id AND d.resource_key = s.resource_key)
       LIMIT 100`)
-      .all() as unknown as SourceSubscription[]
+      .all() as unknown as readonly (Omit<SourceSubscription, 'providerAccess'> & { readonly providerAccess: string })[]
+    const subscriptions: SourceSubscription[] = []
+    for (const { providerAccess, ...row } of rows) {
+      subscriptions.push({ ...row, providerAccess: JSON.parse(providerAccess) as ConnectorAccess })
+    }
+    return subscriptions
   }
 
   deleteSubscription(sourceId: string, resourceKey: string): void {

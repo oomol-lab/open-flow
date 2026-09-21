@@ -1,6 +1,7 @@
 import type * as Semaphore from 'effect/Semaphore'
 import type { Logger } from 'pino'
-import type { ConnectorHost } from '../deployment/connector.ts'
+import type { ConnectorAccessHost } from '../deployment/connector-access.ts'
+import type { ConnectorAccessContext, ConnectorHost } from '../deployment/connector.ts'
 import type { Store } from '../storage/store.ts'
 import type { Publisher } from './publication.ts'
 
@@ -16,6 +17,7 @@ const waitNotificationMaxAttempts = 3
 
 export class Maintenance {
   readonly #clock: () => number
+  readonly #connectorAccess: ConnectorAccessHost
   readonly #interrupt: (runId: string) => void
   readonly #isFlowRunning: (flowId: string) => boolean
   readonly #logger: Logger
@@ -34,6 +36,7 @@ export class Maintenance {
     clock: () => number,
     logger: Logger,
     resolveConnector: () => ConnectorHost | undefined,
+    connectorAccess: ConnectorAccessHost,
     interrupt: (runId: string) => void,
     isFlowRunning: (flowId: string) => boolean,
     notifyFlowCatalog: () => void,
@@ -42,6 +45,7 @@ export class Maintenance {
     maintenanceLock: Semaphore.Semaphore,
   ) {
     this.#clock = clock
+    this.#connectorAccess = connectorAccess
     this.#interrupt = interrupt
     this.#isFlowRunning = isFlowRunning
     this.#logger = logger
@@ -92,7 +96,14 @@ export class Maintenance {
           } else {
             yield* Effect.tryPromise({
               try: (signal) =>
-                connector.execute(notification.action, notification.connectionId, notification.input, notification.invocationId, signal, notification.teamId),
+                connector.execute(notification.action, notification.connectionId, notification.input, notification.invocationId, signal, {
+                  flowId: notification.flowId,
+                  providerAccess: notification.providerAccess,
+                  providerId: notification.action.split('.')[0],
+                  purpose: 'execute',
+                  source: 'run',
+                  ...(notification.teamId == null ? {} : { teamId: notification.teamId }),
+                } satisfies ConnectorAccessContext),
               catch: (error) => error,
             }).pipe(
               Effect.matchEffect({
@@ -144,6 +155,7 @@ export class Maintenance {
     if (this.#isFlowRunning(flowId)) return maintenanceRetryMs
     if (this.#store.flows.hasIntegrationState(flowId)) return nextDelay
     if (this.#store.runs.deleteByFlow(flowId, maintenanceBatchSize) > 0) return 0
+    if (!this.#connectorAccess.delete(flowId)) return maintenanceRetryMs
     if (!this.#store.flows.delete(flowId)) return nextDelay
 
     this.#logger.info({ category: 'flow.deleted', flowId }, 'Retired Flow was physically deleted.')

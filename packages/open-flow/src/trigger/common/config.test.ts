@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest'
 import { currentFlowModelVersion } from '../../flow/common/changeSchema.ts'
 import { encodeRevision, decodeRevision } from '../../flow/common/encoding.ts'
 import { triggerDefinitions } from '../providers/definitions.ts'
-import { configInputsSchema, missingTriggerConfig, resolveTriggerConfig, triggerConfigValue } from './config.ts'
+import { missingTriggerConfig, resolveTriggerConfig, triggerConfigValue } from './config.ts'
+import { configInputsSchema } from './configSchema.ts'
 import { validateTriggerDefinitionSchemas } from './definition.ts'
 
 const inputs: readonly (InputPort | Group)[] = [

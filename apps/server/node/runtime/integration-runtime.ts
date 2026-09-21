@@ -1,4 +1,5 @@
 import type { ConnectorProxy } from '@oomol-lab/open-flow/connector-proxy'
+import type { ConnectorAccess } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, RevisionContent, TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type {
@@ -9,7 +10,8 @@ import type {
   IntegrationStateContext,
 } from '@oomol-lab/open-flow/integration-trigger'
 import type { Logger } from 'pino'
-import type { ConnectorHost } from '../deployment/connector.ts'
+import type { ConnectorAccessHost } from '../deployment/connector-access.ts'
+import type { ConnectorAccessContext, ConnectorHost } from '../deployment/connector.ts'
 import type { SourceDelivery } from '../storage/event-source-store.ts'
 import type { IntegrationCandidate } from '../storage/integration-store.ts'
 import type { IntegrationHealth, StoredIntegrationBinding, StoredIntegrationState, StoredIntegrationTarget } from '../storage/trigger-store.ts'
@@ -50,6 +52,7 @@ export interface IntegrationResponse {
 interface ActiveIntegrationTarget {
   readonly connectionId: string
   readonly current: boolean
+  readonly providerAccess: ConnectorAccess
   readonly definition: IntegrationDefinition
   readonly state: IntegrationStateContext
   readonly stored: StoredIntegrationTarget
@@ -61,6 +64,11 @@ interface CandidateIntegrationTarget {
   readonly definition: IntegrationDefinition
   readonly state: IntegrationStateContext
   readonly trigger: Extract<TriggerNode, { readonly kind: 'integration' }>
+}
+
+interface ConnectorScope {
+  readonly providerAccess?: ConnectorAccess
+  readonly publicationId?: string
 }
 
 export type IntegrationTarget = ActiveIntegrationTarget | CandidateIntegrationTarget
@@ -84,6 +92,7 @@ const retryMs = 1_000
 export class IntegrationRuntime {
   readonly sources: EventSourceRuntime
   readonly #clock: () => number
+  readonly #connectorAccess: ConnectorAccessHost
   readonly #definitions: ReadonlyMap<string, IntegrationDefinition>
   readonly #logger: Logger
   readonly #lock = Semaphore.makeUnsafe(1)
@@ -98,6 +107,7 @@ export class IntegrationRuntime {
   constructor(
     store: Store,
     resolveConnector: () => ConnectorHost | undefined,
+    connectorAccess: ConnectorAccessHost,
     clock: () => number,
     resolveOptions: () => IntegrationOptions | undefined,
     definitions: readonly IntegrationDefinition[],
@@ -106,8 +116,9 @@ export class IntegrationRuntime {
     runCreated: (flowId: string, runId: string) => void,
     logger: Logger,
   ) {
-    this.sources = new EventSourceRuntime(store, resolveConnector, resolveOptions, clock, wake)
+    this.sources = new EventSourceRuntime(store, resolveConnector, connectorAccess, resolveOptions, clock, wake)
     this.#clock = clock
+    this.#connectorAccess = connectorAccess
     this.#definitions = new Map(definitions.map((definition) => [definition.snapshot.key, definition]))
     this.#logger = logger.child({ component: 'integration' })
     this.#resolveConnector = resolveConnector
@@ -180,7 +191,13 @@ export class IntegrationRuntime {
     if (stored.state == null) {
       const { definition } = this.#trigger(stored.triggerJson)
       const initial = definition.initialState ?? { checkpoint: null, subscription: {} }
-      this.#store.integrations.createIntegrationState(stored, initial.checkpoint, initial.subscription, this.#clock())
+      this.#store.integrations.createIntegrationState(
+        stored,
+        initial.checkpoint,
+        initial.subscription,
+        this.#publicationAccess(stored.currentPublicationId),
+        this.#clock(),
+      )
       stored = this.#store.integrations.integrationTarget(endpointId)
       if (stored == null) throw new TransientIntegrationError('Integration runtime state changed.')
     }
@@ -191,6 +208,7 @@ export class IntegrationRuntime {
     return {
       connectionId: current ? stored.connectionId : state.connectionId,
       current,
+      providerAccess: current ? this.#publicationAccess(stored.currentPublicationId) : state.providerAccess,
       definition: resolved.definition,
       state: this.#stateContext(state, this.#clock()),
       stored,
@@ -258,7 +276,9 @@ export class IntegrationRuntime {
               bindingId: target.stored.bindingId,
               callbackSecret,
               config: resolveTriggerConfig(target.trigger.definition.configInputs, target.trigger.config),
-              connector: this.#connectorProxy(target.definition, target.stored.bindingId, target.connectionId, target.stored.flowId, signal),
+              connector: this.#connectorProxy(target.definition, target.stored.bindingId, target.connectionId, target.stored.flowId, signal, {
+                providerAccess: target.providerAccess,
+              }),
               signal,
               current: target.current,
               header: (name) => input.headers.get(name) ?? undefined,
@@ -377,7 +397,9 @@ export class IntegrationRuntime {
             bindingId: candidate.bindingId,
             callbackSecret,
             config: resolveTriggerConfig(target.trigger.definition.configInputs, target.trigger.config),
-            connector: this.#connectorProxy(target.definition, candidate.bindingId, candidate.connectionId, candidate.flowId, signal),
+            connector: this.#connectorProxy(target.definition, candidate.bindingId, candidate.connectionId, candidate.flowId, signal, {
+              providerAccess: JSON.parse(candidate.providerAccessJson) as ConnectorAccess,
+            }),
             signal,
             header: (name) => input.headers.get(name) ?? undefined,
             method: input.method,
@@ -417,12 +439,16 @@ export class IntegrationRuntime {
     bindingId: string,
     connectionId: string,
     flowId: string,
+    access: ConnectorScope,
     context: Omit<IntegrationReconcileContext, 'connector' | 'signal'>,
   ): Effect.Effect<IntegrationReconcileResult, unknown> {
     return Effect.tryPromise({
       try: (signal) => {
-        const input = { ...context, connector: this.#connectorProxy(definition, bindingId, connectionId, flowId, signal), signal }
-        return definition.eventSource == null ? definition.reconcile(input) : this.sources.reconcile(definition, bindingId, connectionId, flowId, input)
+        const connectorAccess = this.#connectorContext(definition.snapshot.provider, flowId, access)
+        const input = { ...context, connector: this.#connectorProxy(definition, bindingId, connectionId, flowId, signal, access), signal }
+        return definition.eventSource == null
+          ? definition.reconcile(input)
+          : this.sources.reconcile(definition, bindingId, connectionId, flowId, connectorAccess, input)
       },
       catch: (error) => error,
     }).pipe(
@@ -473,15 +499,22 @@ export class IntegrationRuntime {
       })
       const active = current.status == 'preparing'
       if (active && resolved.definition.listener != null) this.#store.integrations.initializeListener(current.bindingId, 1, now)
-      const outcome = yield* this.#invokeReconcile(resolved.definition, current.bindingId, current.connectionId, current.flowId, {
-        active,
-        callbackSecret,
-        config: resolveTriggerConfig(resolved.trigger.definition.configInputs, resolved.trigger.config),
-        endpointUrl: options.publicOrigin + '/v1/integrations/' + current.endpointId,
-        idempotencyKey: ['open-flow', current.operationId, current.nodeId, 'prepare'].join(':'),
-        now: new Date(now),
-        state: this.#candidateStateContext(current, now),
-      })
+      const outcome = yield* this.#invokeReconcile(
+        resolved.definition,
+        current.bindingId,
+        current.connectionId,
+        current.flowId,
+        { providerAccess: JSON.parse(current.providerAccessJson) as ConnectorAccess },
+        {
+          active,
+          callbackSecret,
+          config: resolveTriggerConfig(resolved.trigger.definition.configInputs, resolved.trigger.config),
+          endpointUrl: options.publicOrigin + '/v1/integrations/' + current.endpointId,
+          idempotencyKey: ['open-flow', current.operationId, current.nodeId, 'prepare'].join(':'),
+          now: new Date(now),
+          state: this.#candidateStateContext(current, now),
+        },
+      )
       if (outcome.outcome == 'pending') {
         return yield* Effect.fail(new TransientIntegrationError('Integration candidate is still converging.'))
       }
@@ -567,15 +600,22 @@ export class IntegrationRuntime {
       if (!active) {
         const resolved = this.#trigger(binding.triggerJson)
         if (!retiredPrevious && (state != null || resolved.definition.initialState == null)) {
-          const outcome = yield* this.#invokeReconcile(resolved.definition, binding.bindingId, binding.connectionId, binding.flowId, {
-            active: false,
-            callbackSecret,
-            config: resolveTriggerConfig(resolved.trigger.definition.configInputs, resolved.trigger.config),
-            endpointUrl,
-            idempotencyKey: ['integration', binding.bindingId, binding.runtimeVersion, 'retire'].join(':'),
-            now: new Date(now),
-            ...(state == null ? {} : { state: this.#stateContext(state, now) }),
-          })
+          const outcome = yield* this.#invokeReconcile(
+            resolved.definition,
+            binding.bindingId,
+            binding.connectionId,
+            binding.flowId,
+            state == null ? {} : { providerAccess: state.providerAccess },
+            {
+              active: false,
+              callbackSecret,
+              config: resolveTriggerConfig(resolved.trigger.definition.configInputs, resolved.trigger.config),
+              endpointUrl,
+              idempotencyKey: ['integration', binding.bindingId, binding.runtimeVersion, 'retire'].join(':'),
+              now: new Date(now),
+              ...(state == null ? {} : { state: this.#stateContext(state, now) }),
+            },
+          )
           if (outcome.outcome == 'pending') {
             return yield* Effect.fail(new TransientIntegrationError('Integration subscription is still retiring.'))
           }
@@ -598,15 +638,22 @@ export class IntegrationRuntime {
   ) {
     return Effect.gen({ self: this }, function* () {
       const previous = this.#trigger(previousState.triggerJson)
-      const outcome = yield* this.#invokeReconcile(previous.definition, binding.bindingId, previousState.connectionId, binding.flowId, {
-        active: false,
-        callbackSecret,
-        config: resolveTriggerConfig(previous.trigger.definition.configInputs, previous.trigger.config),
-        endpointUrl,
-        idempotencyKey: ['integration', binding.bindingId, previousState.runtimeVersion, 'retire'].join(':'),
-        now: new Date(now),
-        state: this.#stateContext(previousState, now),
-      })
+      const outcome = yield* this.#invokeReconcile(
+        previous.definition,
+        binding.bindingId,
+        previousState.connectionId,
+        binding.flowId,
+        { providerAccess: previousState.providerAccess },
+        {
+          active: false,
+          callbackSecret,
+          config: resolveTriggerConfig(previous.trigger.definition.configInputs, previous.trigger.config),
+          endpointUrl,
+          idempotencyKey: ['integration', binding.bindingId, previousState.runtimeVersion, 'retire'].join(':'),
+          now: new Date(now),
+          state: this.#stateContext(previousState, now),
+        },
+      )
       if (outcome.outcome == 'pending') {
         return yield* Effect.fail(new TransientIntegrationError('Previous Integration subscription is still retiring.'))
       }
@@ -626,22 +673,36 @@ export class IntegrationRuntime {
       const resolved = this.#trigger(binding.triggerJson)
       if (state == null) {
         const initial = resolved.definition.initialState ?? { checkpoint: null, subscription: {} }
-        this.#store.integrations.createIntegrationState(binding, initial.checkpoint, initial.subscription, now)
+        if (binding.currentPublicationId == null) return yield* Effect.fail(new TransientIntegrationError('Integration Publication is unavailable.'))
+        this.#store.integrations.createIntegrationState(
+          binding,
+          initial.checkpoint,
+          initial.subscription,
+          this.#publicationAccess(binding.currentPublicationId),
+          now,
+        )
         state = this.#store.integrations.integrationState(binding.bindingId)
         if (state == null || state.runtimeVersion != binding.runtimeVersion) {
           return yield* Effect.fail(new TransientIntegrationError('Integration runtime state changed.'))
         }
       }
       if (resolved.definition.listener != null) this.#store.integrations.initializeListener(binding.bindingId, binding.runtimeVersion, now)
-      const outcome = yield* this.#invokeReconcile(resolved.definition, binding.bindingId, binding.connectionId, binding.flowId, {
-        active: true,
-        callbackSecret,
-        config: resolveTriggerConfig(resolved.trigger.definition.configInputs, resolved.trigger.config),
-        endpointUrl,
-        idempotencyKey: ['integration', binding.bindingId, binding.runtimeVersion, 'activate'].join(':'),
-        now: new Date(now),
-        state: this.#stateContext(state, now),
-      })
+      const outcome = yield* this.#invokeReconcile(
+        resolved.definition,
+        binding.bindingId,
+        binding.connectionId,
+        binding.flowId,
+        { publicationId: binding.currentPublicationId ?? undefined },
+        {
+          active: true,
+          callbackSecret,
+          config: resolveTriggerConfig(resolved.trigger.definition.configInputs, resolved.trigger.config),
+          endpointUrl,
+          idempotencyKey: ['integration', binding.bindingId, binding.runtimeVersion, 'activate'].join(':'),
+          now: new Date(now),
+          state: this.#stateContext(state, now),
+        },
+      )
       if (outcome.outcome == 'pending') {
         return yield* Effect.fail(new TransientIntegrationError('Integration subscription is still converging.'))
       }
@@ -689,14 +750,28 @@ export class IntegrationRuntime {
     }
   }
 
-  #connectorProxy(definition: IntegrationDefinition, bindingId: string, connectionId: string, flowId: string, parentSignal: AbortSignal): ConnectorProxy {
+  #connectorProxy(
+    definition: IntegrationDefinition,
+    bindingId: string,
+    connectionId: string,
+    flowId: string,
+    parentSignal: AbortSignal,
+    access: ConnectorScope,
+  ): ConnectorProxy {
     return {
       execute: async (request, signal) => {
         try {
           const connector = this.#resolveConnector()
           if (connector == null) throw new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.')
           const connectorSignal = signal == null ? parentSignal : AbortSignal.any([parentSignal, signal])
-          return await connector.proxy(definition.snapshot.provider, connectionId, bindingId, request, connectorSignal, this.#store.connectorTeams.get(flowId))
+          return await connector.proxy(
+            definition.snapshot.provider,
+            connectionId,
+            bindingId,
+            request,
+            connectorSignal,
+            this.#connectorContext(definition.snapshot.provider, flowId, access),
+          )
         } catch (cause) {
           if (cause instanceof ConnectorTaskError && cause.code == 'connector.connection-required') {
             throw new IntegrationConnectionError('Integration Connection requires reauthorization.', { cause })
@@ -705,6 +780,28 @@ export class IntegrationRuntime {
         }
       },
     }
+  }
+
+  #connectorContext(providerId: string, flowId: string, access: ConnectorScope): ConnectorAccessContext {
+    const providerAccess =
+      access.providerAccess ??
+      (access.publicationId == null ? undefined : this.#store.publications.providerAccess(access.publicationId)) ??
+      this.#connectorAccess.current(flowId)
+    const teamId = this.#store.connectorTeams.get(flowId)
+    return {
+      flowId,
+      providerAccess,
+      providerId,
+      purpose: 'trigger',
+      source: access.publicationId == null && access.providerAccess == null ? 'draft' : 'publication',
+      ...(teamId == null ? {} : { teamId }),
+    }
+  }
+
+  #publicationAccess(publicationId: string): ConnectorAccess {
+    const access = this.#store.publications.providerAccess(publicationId)
+    if (access == null) throw new TransientIntegrationError('Integration Publication access is unavailable.')
+    return access
   }
 
   #stateContext(record: StoredIntegrationState, now: number): IntegrationStateContext {

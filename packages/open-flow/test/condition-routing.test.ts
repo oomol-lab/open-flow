@@ -11,7 +11,8 @@ import { decodeRevision, encodeRevision } from '../src/flow/common/encoding.ts'
 import { availableOutputs } from '../src/flow/common/graph.ts'
 import { inverseFlowChanges } from '../src/flow/common/inverseChanges.ts'
 import { flowDependencies, prepareFlow } from '../src/flow/common/semantics.ts'
-import { copyNodes, pasteNodes, updateCondition, updateTaskPorts } from '../src/workbench/browser/runtime/editor/flowChanges.ts'
+import { updateCondition, updateTaskPorts } from '../src/workbench/browser/runtime/editor/flowChanges.ts'
+import { copyNodes, pasteNodes } from '../src/workbench/browser/runtime/editor/nodeClipboard.ts'
 import { revisionView } from '../src/workbench/browser/runtime/revisionView.ts'
 
 const draft = (revision: RevisionContent) => ({ content: revision, flowId: 'flow', revision: 'draft' }) as unknown as Parameters<typeof revisionView>[0]

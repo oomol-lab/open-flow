@@ -257,6 +257,7 @@ function RunSample({ fixture, dark, language, log, state, downstream = false, la
         engineContract: 'open-flow-engine/v5',
         engineDigest: 'lab',
         modelVersion: currentFlowModelVersion,
+        providerAccessDigest: 'implicit:lab',
         revisionDigest: draft.digest,
       }
     }

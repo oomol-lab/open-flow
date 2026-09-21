@@ -5,6 +5,7 @@ import type { PollDefinition } from '@oomol-lab/open-flow/poll-trigger'
 import type { ProviderTriggerDefinition } from '@oomol-lab/open-flow/provider-triggers'
 import type * as Deferred from 'effect/Deferred'
 import type { Logger } from 'pino'
+import type { ConnectorAccessHost } from '../deployment/connector-access.ts'
 import type { ConnectorHost } from '../deployment/connector.ts'
 import type { LlmHost } from '../deployment/llm.ts'
 import type { IntegrationOptions, IntegrationResponse, IntegrationRuntimeState, IntegrationTarget } from '../runtime/integration-runtime.ts'
@@ -23,6 +24,7 @@ import * as FiberSet from 'effect/FiberSet'
 import * as Queue from 'effect/Queue'
 import * as Scope from 'effect/Scope'
 import * as Semaphore from 'effect/Semaphore'
+import { ConfiguredConnectorAccessHost, ImplicitConnectorAccessHost } from '../deployment/connector-access.ts'
 import { ConnectorClient, ConnectorTaskError } from '../deployment/connector.ts'
 import { ControlError } from '../error.ts'
 import { silentLogger } from '../logger.ts'
@@ -78,6 +80,7 @@ export class ServerService {
   readonly #flowCatalogSubscribers = new Set<(event: FlowCatalogEvent) => void>()
   readonly #flowSubscribers = new Map<string, Set<(event: FlowChangeEvent) => void>>()
   readonly #integration: IntegrationRuntime
+  readonly #connectorAccess: ConnectorAccessHost
   readonly #logger: Logger
   readonly #maintenance: Maintenance
   readonly #listeners: ListenerRuntime
@@ -118,6 +121,7 @@ export class ServerService {
     this.#clockService = clockService
     this.#logger = logger.child({ component: 'runtime' })
     this.#resolveConnector = capabilities.connector ?? (() => undefined)
+    this.#connectorAccess = capabilities.connectorAccess ?? new ImplicitConnectorAccessHost()
     this.#resolveConnectorConsoleOrigin = capabilities.connectorConsoleOrigin ?? (() => undefined)
     this.#resolveIntegration = capabilities.integration ?? (() => undefined)
     this.#resolveLlm = capabilities.llm ?? (() => undefined)
@@ -141,6 +145,7 @@ export class ServerService {
     this.#integration = new IntegrationRuntime(
       store,
       this.#resolveConnector,
+      this.#connectorAccess,
       this.#clock,
       this.#resolveIntegration,
       integrationDefinitions,
@@ -166,6 +171,7 @@ export class ServerService {
       store,
       this.#integration,
       this.#listeners,
+      this.#connectorAccess,
       this.#resolveConnector,
       this.#resolveWaitPublicOrigin,
       this.#clock,
@@ -182,6 +188,7 @@ export class ServerService {
       this.#clock,
       this.#logger,
       this.#resolveConnector,
+      this.#connectorAccess,
       (runId) => this.#supervisor.interrupt(runId),
       (flowId) => this.#supervisor.isFlowRunning(flowId),
       () => this.#notifyFlowCatalog(),
@@ -236,6 +243,7 @@ export class ServerService {
       (event) => this.#notifyFlow(event),
       (kind) => (kind == 'agent' ? this.#resolveLlm()?.config != null : this.#resolveLlm() != null),
       this.#resolveConnector,
+      this.#connectorAccess,
       this.#resolveConnectorConsoleOrigin,
       this.#resolveWaitPublicOrigin,
       (teamId) => this.#connectorTeam(teamId),
@@ -259,6 +267,11 @@ export class ServerService {
         try: () => new Store(database, now, runtime.runEventRetentionMs, runtime.maxPendingRuns, () => capabilities.llm?.()?.config),
         catch: (error) => (error instanceof Error ? error : new Error(String(error))),
       })
+      const resolvedCapabilities: ServerCapabilities = {
+        ...capabilities,
+        connectorAccess:
+          capabilities.connectorAccess ?? new ConfiguredConnectorAccessHost(database, store.connectorTeams, capabilities.connector ?? (() => undefined)),
+      }
       const isolatedVm = yield* Effect.acquireRelease(
         Effect.sync(() => new IsolatedVmHost()),
         (opened) => Effect.promise(() => opened.close()),
@@ -284,7 +297,7 @@ export class ServerService {
           workers,
           receive: (effect, signal) => runRequest(effect.pipe(Effect.provideService(Clock.Clock, clockService)), { signal }),
         },
-        capabilities,
+        resolvedCapabilities,
         now,
         runtime,
         logger,

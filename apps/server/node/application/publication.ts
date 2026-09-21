@@ -1,8 +1,10 @@
 import type { PublishOperation } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAccess } from '@oomol-lab/open-flow/control-api'
 import type { RevisionContent, TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { Logger } from 'pino'
-import type { ConnectorHost } from '../deployment/connector.ts'
+import type { ConnectorAccessHost } from '../deployment/connector-access.ts'
+import type { ConnectorAccessContext, ConnectorHost } from '../deployment/connector.ts'
 import type { IntegrationRuntime } from '../runtime/integration-runtime.ts'
 import type { ListenerRuntime } from '../runtime/listener-runtime.ts'
 import type { PublicationStore } from '../storage/publication-store.ts'
@@ -12,7 +14,7 @@ import type { Store } from '../storage/store.ts'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { nextTriggerScheduledAt, validateTriggerSchedule } from '@oomol-lab/open-flow/cron-trigger'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
-import { agentActions, codeActions } from '@oomol-lab/open-flow/flow-semantics'
+import { agentActions } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { checkCodeActions, ConnectorTaskError } from '../deployment/connector.ts'
 import { AcceptanceError, ControlError } from '../error.ts'
@@ -39,6 +41,7 @@ type PublicationMetadata =
 export class Publisher {
   readonly #store: Store
   readonly #integration: IntegrationRuntime
+  readonly #connectorAccess: ConnectorAccessHost
   readonly #listeners: ListenerRuntime
   readonly #agentAvailable: () => boolean
   readonly #resolveConnector: () => ConnectorHost | undefined
@@ -59,6 +62,7 @@ export class Publisher {
     store: Store,
     integration: IntegrationRuntime,
     listeners: ListenerRuntime,
+    connectorAccess: ConnectorAccessHost,
     resolveConnector: () => ConnectorHost | undefined,
     resolveWaitPublicOrigin: () => URL | undefined,
     clock: () => number,
@@ -78,6 +82,7 @@ export class Publisher {
     this.#store = store
     this.#integration = integration
     this.#listeners = listeners
+    this.#connectorAccess = connectorAccess
     this.#resolveConnector = resolveConnector
     this.#resolveWaitPublicOrigin = resolveWaitPublicOrigin
     this.#clock = clock
@@ -90,27 +95,37 @@ export class Publisher {
 
   async publish(input: PublishFlowInput): Promise<PublicationAcceptance> {
     const revisionDigest = input.revisionDigest ?? (await this.#validatedFlow(input.revision)).revisionDigest
-    const replay = this.#store.publications.replayPublication(input.flowId, input.idempotencyKey, await this.#publicationRequestDigest(input, revisionDigest))
+    const providerAccess = this.#providerAccess(input)
+    const replay = this.#store.publications.replayPublication(
+      input.flowId,
+      input.idempotencyKey,
+      await this.#publicationRequestDigest(input, revisionDigest, providerAccess.providerAccessDigest),
+    )
     if (replay != null) return replay
-    const planned = await this.#publication(input)
-    const accepted = this.#store.publications.publish(planned)
+    const planned = await this.#publication(input, providerAccess)
+    const accepted = this.#store.publications.publish(planned, () => this.#connectorAccess.current(input.flowId))
     this.#signal()
     return accepted
   }
 
   async accept(input: PublishFlowInput): Promise<PublishOperation> {
     const revisionDigest = input.revisionDigest ?? (await this.#validatedFlow(input.revision)).revisionDigest
+    const providerAccess = this.#providerAccess(input)
     const replay = this.#store.publications.replayPublishOperation(
       input.flowId,
       input.idempotencyKey,
-      await this.#publicationRequestDigest(input, revisionDigest),
+      await this.#publicationRequestDigest(input, revisionDigest, providerAccess.providerAccessDigest),
     )
     if (replay?.kind == 'accepted') return replay.operation
     if (replay?.kind == 'conflict') {
       throw new ControlError(controlErrorCode.publicationConflict, 'The idempotency key refers to another Publish request.')
     }
-    const accepted = this.#store.publications.acceptPublishOperation(await this.#publication(input))
+    const accepted = this.#store.publications.acceptPublishOperation(await this.#publication(input, providerAccess), () =>
+      this.#connectorAccess.current(input.flowId),
+    )
     switch (accepted.kind) {
+      case 'access-conflict':
+        throw new ControlError(controlErrorCode.connectorAccessConflict, 'Connector access changed while the Publication was being accepted.')
       case 'accepted':
         this.#wakeMaintenance()
         return accepted.operation
@@ -131,15 +146,18 @@ export class Publisher {
     }
   }
 
-  async #publication(input: PublishFlowInput): Promise<Parameters<PublicationStore['publish']>[0]> {
+  async #publication(input: PublishFlowInput, providerAccess: ConnectorAccess): Promise<Parameters<PublicationStore['publish']>[0]> {
     const fixed = await this.#validatedFlow(input.revision)
     if (Object.values(fixed.prepared.tasks).some((task) => task.executor.kind == 'agent') && !this.#agentAvailable())
       throw new ControlError(controlErrorCode.flowInvalid, 'Agent requires a configured model host.')
-    await checkCodeActions(
-      [...codeActions(fixed.prepared), ...agentActions(fixed.prepared)],
-      this.#resolveConnector(),
-      this.#store.connectorTeams.get(input.flowId),
-    )
+    const connectorAccess: ConnectorAccessContext = {
+      flowId: input.flowId,
+      providerAccess,
+      purpose: 'eligibility',
+      source: 'publication',
+      ...(this.#store.connectorTeams.get(input.flowId) == null ? {} : { teamId: this.#store.connectorTeams.get(input.flowId) }),
+    }
+    await checkCodeActions(agentActions(fixed.prepared), this.#resolveConnector(), connectorAccess)
     const engineContract = input.engineContract ?? currentEngineContract
     if (input.revisionDigest != null && input.revisionDigest != fixed.revisionDigest) {
       throw new AcceptanceError('revision-conflict', 'The fixed Revision digest does not match its content.')
@@ -150,7 +168,7 @@ export class Publisher {
     ) {
       throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
     }
-    const requestDigest = await this.#publicationRequestDigest(input, fixed.revisionDigest)
+    const requestDigest = await this.#publicationRequestDigest(input, fixed.revisionDigest, providerAccess.providerAccessDigest)
     const publishedAt = this.#clock()
     const integrations = this.#integration.bindings(input.revision, fixed.prepared, publishedAt)
     const connectorTasks = Object.values(fixed.prepared.tasks).flatMap((task) =>
@@ -162,20 +180,19 @@ export class Publisher {
     if (connectorTasks.length > 0 || providerTriggers.length > 0) {
       const connector = this.#resolveConnector()
       if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
-      const teamId = this.#store.connectorTeams.get(input.flowId)
       const actionRequests = new Map<string, ReturnType<ConnectorHost['getAction']>>()
       const connectionRequests = new Map<string, ReturnType<ConnectorHost['listConnections']>>()
       const action = (actionId: string): ReturnType<ConnectorHost['getAction']> => {
         const existing = actionRequests.get(actionId)
         if (existing != null) return existing
-        const request = connector.getAction(actionId, undefined, teamId)
+        const request = connector.getAction(actionId, undefined, connectorAccess)
         actionRequests.set(actionId, request)
         return request
       }
       const connections = (serviceId: string): ReturnType<ConnectorHost['listConnections']> => {
         const existing = connectionRequests.get(serviceId)
         if (existing != null) return existing
-        const request = connector.listConnections(serviceId, undefined, teamId)
+        const request = connector.listConnections(serviceId, undefined, connectorAccess)
         connectionRequests.set(serviceId, request)
         return request
       }
@@ -269,6 +286,7 @@ export class Publisher {
       integrations,
       ...(metadata == null ? {} : { metadata }),
       polls,
+      providerAccess,
       publishedAt,
       requestDigest,
       revisionDigest: fixed.revisionDigest,
@@ -278,13 +296,21 @@ export class Publisher {
     }
   }
 
-  async #publicationRequestDigest(input: PublishFlowInput, revisionDigest: string): Promise<string> {
+  #providerAccess(input: PublishFlowInput): ConnectorAccess {
+    if (input.control?.operation != 'rollback') return this.#connectorAccess.current(input.flowId)
+    const source = this.#store.publications.providerAccess(input.control.sourcePublicationId)
+    if (source == null) throw new ControlError(controlErrorCode.publicationNotFound, 'The rollback Publication was not found.')
+    return source
+  }
+
+  async #publicationRequestDigest(input: PublishFlowInput, revisionDigest: string, providerAccessDigest: string): Promise<string> {
     return await digestBytes(
       canonicalJsonBytes({
         engineContract: input.engineContract ?? currentEngineContract,
         expectedLivePublicationId: input.expectedLivePublicationId,
         flowId: input.flowId,
         operation: input.control?.operation ?? 'publish',
+        providerAccessDigest,
         revisionDigest,
         ...(input.control?.operation == 'rollback' ? { sourcePublicationId: input.control.sourcePublicationId } : {}),
       }),
@@ -312,6 +338,8 @@ export class Publisher {
             'Publish operation succeeded.',
           )
           break
+        case 'access-conflict':
+          throw new Error('An accepted Publish operation cannot change its Connector access snapshot.')
         case 'binding-unresolved':
           this.#store.publications.failPublishOperation(target.operationId, {
             code: controlErrorCode.bindingUnresolved,

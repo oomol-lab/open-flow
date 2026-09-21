@@ -3,13 +3,14 @@ import type { JsonValue, RevisionContent, WaitAction } from '@oomol-lab/open-flo
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunOptions, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
+import type { ConnectorAccessHost } from '../deployment/connector-access.ts'
 import type { ConnectorHost } from '../deployment/connector.ts'
 import type { StoredControlRun } from '../storage/run-view-store.ts'
 import type { Store } from '../storage/store.ts'
 
 import { controlErrorCode, decodeRunEvent, readResult } from '@oomol-lab/open-flow/control-api'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
-import { agentActions, codeActions, prepareFlow, validateFlowInputs, validRunTrigger, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
+import { agentActions, prepareFlow, validateFlowInputs, validRunTrigger, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { checkCodeActions } from '../deployment/connector.ts'
 import { ControlError, serverErrorCode } from '../error.ts'
@@ -30,6 +31,7 @@ export class RunControl {
   private readonly flowChanged: (event: FlowChangeEvent) => void
   private readonly llmAvailable: (kind?: 'agent') => boolean
   private readonly resolveConnector: () => ConnectorHost | undefined
+  private readonly connectorAccess: ConnectorAccessHost
   private readonly resolveWaitPublicOrigin: () => URL | undefined
 
   constructor(
@@ -40,6 +42,7 @@ export class RunControl {
     flowChanged: (event: FlowChangeEvent) => void,
     llmAvailable: (kind?: 'agent') => boolean,
     resolveConnector: () => ConnectorHost | undefined,
+    connectorAccess: ConnectorAccessHost,
     resolveWaitPublicOrigin: () => URL | undefined,
   ) {
     this.store = store
@@ -49,6 +52,7 @@ export class RunControl {
     this.flowChanged = flowChanged
     this.llmAvailable = llmAvailable
     this.resolveConnector = resolveConnector
+    this.connectorAccess = connectorAccess
     this.resolveWaitPublicOrigin = resolveWaitPublicOrigin
   }
 
@@ -60,7 +64,18 @@ export class RunControl {
     idempotencyKey: string,
     trigger: TriggerSeed,
   ): Promise<{ readonly created: boolean; readonly run: RunDetails }> {
-    const requestDigest = await digestBytes(canonicalJsonBytes({ engineContract, flowId, inputs, trigger: { ...trigger }, kind: 'draft', revisionId }))
+    const providerAccess = this.connectorAccess.current(flowId)
+    const requestDigest = await digestBytes(
+      canonicalJsonBytes({
+        engineContract,
+        flowId,
+        inputs,
+        trigger: { ...trigger },
+        kind: 'draft',
+        providerAccessDigest: providerAccess.providerAccessDigest,
+        revisionId,
+      }),
+    )
     const existing = this.replayRun(idempotencyKey, requestDigest, 'draft')
     if (existing != null) return existing
     if (engineContract != currentEngineContract) throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
@@ -69,8 +84,11 @@ export class RunControl {
     const content = revisionContent(stored)
     if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and outputs.')
     const fixed = await this.prepareRun(content, engineContract, trigger.nodeId)
-    await this.checkRunActions(fixed.flow, flowId)
+    await this.checkRunActions(fixed.flow, flowId, providerAccess, 'draft')
     if (validateFlowInputs(content, inputs) != 'valid') throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
+    if (this.connectorAccess.current(flowId).providerAccessDigest != providerAccess.providerAccessDigest) {
+      throw new ControlError(controlErrorCode.connectorAccessConflict, 'Connector access changed while the Run was being accepted.')
+    }
     const accepted = this.store.runs.acceptControlRun({
       closureDigest: fixed.flow.closureDigest,
       flowId,
@@ -78,6 +96,7 @@ export class RunControl {
       inputs,
       trigger,
       modelVersion: content.modelVersion,
+      providerAccess,
       requestDigest,
       revisionDigest: stored.digest,
       revisionId,
@@ -121,7 +140,9 @@ export class RunControl {
     if (fixed.flow.closureDigest != livePublication.closureDigest || content.modelVersion != livePublication.modelVersion) {
       throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Flow does not match the Publication.')
     }
-    await this.checkRunActions(fixed.flow, flowId)
+    const providerAccess = this.store.publications.providerAccess(livePublication.publicationId)
+    if (providerAccess == null) throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The Publication access snapshot is unavailable.')
+    await this.checkRunActions(fixed.flow, flowId, providerAccess, 'publication')
     const accepted = this.store.runs.acceptLiveControlRun({
       closureDigest: livePublication.closureDigest,
       expectedPublicationId: livePublication.publicationId,
@@ -316,10 +337,22 @@ export class RunControl {
     return fixed
   }
 
-  private async checkRunActions(prepared: PreparedFlow, flowId: string): Promise<void> {
+  private async checkRunActions(
+    prepared: PreparedFlow,
+    flowId: string,
+    providerAccess = this.connectorAccess.current(flowId),
+    source: 'draft' | 'publication' = 'draft',
+  ): Promise<void> {
     if (Object.values(prepared.tasks).some((task) => task.executor.kind == 'agent') && !this.llmAvailable('agent'))
       throw new ControlError(controlErrorCode.flowInvalid, 'Agent requires a configured model host.')
-    await checkCodeActions([...codeActions(prepared), ...agentActions(prepared)], this.resolveConnector(), this.store.connectorTeams.get(flowId))
+    const teamId = this.store.connectorTeams.get(flowId)
+    await checkCodeActions(agentActions(prepared), this.resolveConnector(), {
+      flowId,
+      providerAccess,
+      purpose: 'eligibility',
+      source,
+      ...(teamId == null ? {} : { teamId }),
+    })
   }
 
   private acceptedRun(flowId: string, accepted: ReturnType<Store['runs']['acceptLiveControlRun']>) {
@@ -373,6 +406,7 @@ export class RunControl {
       ...(stored.eventsExpiresAt == null ? {} : { eventsExpiresAt: timestamp(stored.eventsExpiresAt) }),
       modelVersion: stored.modelVersion,
       revisionDigest: stored.revisionDigest,
+      providerAccessDigest: stored.providerAccessDigest,
     }
     switch (stored.source) {
       case 'draft':

@@ -221,8 +221,7 @@ export function agentConfigIssues(task: ManagedTaskDefinition, tasks: Readonly<R
   if (outputs.length != 1 || outputs[0]?.handle != 'output' || outputs[0].nullable || schemaIssue(outputs[0].jsonSchema) != null) {
     issues.push('Agent requires one non-nullable output named output with a supported JSON schema.')
   }
-  if ((config.tools.length == 0 && config.code != true) || config.tools.length > 64)
-    issues.push('Declare up to 64 Agent tools and enable at least one tool or code computation.')
+  if (config.tools.length > 64) issues.push('Declare at most 64 Agent tools.')
   const ids = new Set<string>()
   const names = new Set<string>()
   for (const tool of config.tools) {

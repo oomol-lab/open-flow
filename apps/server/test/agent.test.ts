@@ -166,6 +166,23 @@ it('logs rejected model tool calls before execution and the subsequent recovery'
 const invocation = { invocationId: 'invocation', input: {}, signal: new AbortController().signal }
 
 describe('Agent streaming adapter', () => {
+  it.each<{ jsonSchema: JsonValue; response: string; output: JsonValue }>([
+    { jsonSchema: { type: 'string' }, response: 'Hello', output: 'Hello' },
+    { jsonSchema: { type: 'object', properties: { answer: { type: 'number' } }, required: ['answer'] }, response: '{"answer":42}', output: { answer: 42 } },
+  ])('returns a $jsonSchema.type result without tools or code computation', async ({ jsonSchema, response, output }) => {
+    if (task.executor.kind != 'agent') throw new Error('Expected Agent.')
+    const source: ManagedTaskDefinition = {
+      ...task,
+      outputs: [{ handle: 'output', nullable: false, jsonSchema }],
+      executor: { ...task.executor, tools: [], code: false },
+    }
+    const { model, prompts } = fixture([response])
+    const execute = vi.fn(async () => ({}))
+    await expect(executeAgent(source, invocation, model, execute)).resolves.toEqual({ kind: 'completed', output })
+    expect(prompts).toHaveLength(1)
+    expect(execute).not.toHaveBeenCalled()
+  })
+
   it('lets the model correct a pagination token after a Connector input rejection', async () => {
     if (task.executor.kind != 'agent') throw new Error('Expected Agent.')
     const source: ManagedTaskDefinition = {
