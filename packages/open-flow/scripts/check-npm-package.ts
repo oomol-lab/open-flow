@@ -254,6 +254,9 @@ for (const forbidden of ['bin', 'dependencies', 'devDependencies', 'main', 'modu
 const workbenchStyleEntry = entries.find((entry) => entry.header.name == 'package/dist/browser/workbench.css')
 assert.ok(workbenchStyleEntry?.data)
 const workbenchStyle = new TextDecoder().decode(workbenchStyleEntry.data)
+for (const icon of ['i-lucide-light:zoom-in', 'i-lucide-light:zoom-out', 'i-lucide-light:scan', 'i-codicon:copy', 'i-codicon:trash']) {
+  assert.ok(workbenchStyle.includes(`.${icon.replaceAll(':', '\\:')}`), `Missing packaged icon CSS for ${icon}.`)
+}
 assert.match(workbenchStyle, /:where\([^)]*\.open-flow-workbench[^)]*\)\s+\.hidden\s*\{\s*display:\s*none\s*;?\s*\}/)
 for (const token of sharedUiTokens) assert.ok(workbenchStyle.includes(`${token}:`), `Missing ${token} from the published Workbench CSS.`)
 const themeStyleEntry = entries.find((entry) => entry.header.name == 'package/dist/browser/theme.css')
