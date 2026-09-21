@@ -93,6 +93,8 @@ function AccountSelect({
 }
 
 export function ConnectorAccount({
+  accessError,
+  onConfigureAccess,
   action,
   actionError,
   actionId,
@@ -107,6 +109,8 @@ export function ConnectorAccount({
   loading,
   taskId,
 }: {
+  readonly onConfigureAccess?: (() => void) | undefined
+  readonly accessError?: string | undefined
   readonly action: ConnectorAction | undefined
   readonly actionError: string | undefined
   readonly actionId: string
@@ -123,7 +127,8 @@ export function ConnectorAccount({
 }): ReactElement {
   const t = useTranslate()
   const available = activeConnections ?? []
-  const required = action?.authenticated == true && (connectionId == null || (activeConnections != null && connection?.status != 'active'))
+  const required =
+    accessError != null || (action?.authenticated == true && (connectionId == null || (activeConnections != null && connection?.status != 'active')))
   let onManage: (() => void) | undefined
   let content: ReactElement
   if (loading) {
@@ -137,6 +142,8 @@ export function ConnectorAccount({
         </Button>
       </>
     )
+  } else if (accessError != null) {
+    content = <p>{accessError}</p>
   } else if (connectionError != null) {
     content = (
       <>
@@ -201,6 +208,11 @@ export function ConnectorAccount({
       <div className="connection-state-content">
         {content}
         <p className="connection-detail">{t('inspector.account.inheritsFlowAccess')}</p>
+        {onConfigureAccess != null && (
+          <Button disabled={disabled} onClick={onConfigureAccess} size="sm" type="button" variant="secondary">
+            {t('connectorAccess.title')}
+          </Button>
+        )}
       </div>
     </section>
   )

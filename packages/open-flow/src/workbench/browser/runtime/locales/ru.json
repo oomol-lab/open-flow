@@ -400,6 +400,8 @@
       "authenticationRequired": "Войдите в систему, чтобы продолжить.",
       "authorizationDenied": "У вас нет разрешения на выполнение этого действия.",
       "bindingUnresolved": "Отсутствует обязательное подключение или переменная. Завершите настройку и повторите попытку.",
+      "connectorAccessRequired": "Для этого Flow не настроен доступ к Provider. Настройте его перед запуском.",
+      "connectorAccessInvalid": "Доступ этого Flow к Provider не разрешает этот Action. Измените аккаунт или разрешения.",
       "connectorActionNotFound": "Выбранное действие Connector больше недоступно. Выберите другое действие.",
       "connectorConnectionRequired": "Требуется активное подключение. Подключите учётную запись заново и повторите попытку.",
       "connectorUnavailable": "Connector временно недоступен. Повторите попытку позже.",

@@ -400,6 +400,8 @@
       "authenticationRequired": "続行するにはログインしてください。",
       "authorizationDenied": "この操作を実行する権限がありません。",
       "bindingUnresolved": "必要な Connection または環境変数がありません。設定を完了してから再試行してください。",
+      "connectorAccessRequired": "この Flow の Provider アクセスは未設定です。実行前に設定してください。",
+      "connectorAccessInvalid": "この Flow の Provider アクセスでは、この Action は許可されていません。アカウントまたは権限を変更してください。",
       "connectorActionNotFound": "選択した Connector action は使用できなくなりました。別の action を選択してください。",
       "connectorConnectionRequired": "有効な Connection が必要です。アカウントを接続または再接続してから再試行してください。",
       "connectorUnavailable": "Connector は一時的に利用できません。しばらくしてから再試行してください。",

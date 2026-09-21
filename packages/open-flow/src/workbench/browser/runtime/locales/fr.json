@@ -400,6 +400,8 @@
       "authenticationRequired": "Connectez-vous pour continuer.",
       "authorizationDenied": "Vous n’avez pas l’autorisation d’effectuer cette action.",
       "bindingUnresolved": "Une Connection ou une variable d’environnement requise est manquante. Terminez la configuration, puis réessayez.",
+      "connectorAccessRequired": "L’accès à ce Provider n’est pas configuré pour ce Flow. Configurez-le avant l’exécution.",
+      "connectorAccessInvalid": "L’accès Provider de ce Flow n’autorise pas cette Action. Modifiez le compte ou les permissions.",
       "connectorActionNotFound": "L’action Connector sélectionnée n’est plus disponible. Choisissez une autre action.",
       "connectorConnectionRequired": "Une Connection active est requise. Connectez ou reconnectez le compte, puis réessayez.",
       "connectorUnavailable": "Le Connector est temporairement indisponible. Réessayez plus tard.",

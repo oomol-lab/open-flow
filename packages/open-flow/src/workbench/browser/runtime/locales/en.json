@@ -400,6 +400,8 @@
       "authenticationRequired": "Sign in to continue.",
       "authorizationDenied": "You do not have permission to perform this action.",
       "bindingUnresolved": "A required Connection or environment variable is missing. Complete the configuration and try again.",
+      "connectorAccessRequired": "This Flow has no access configured for this Provider. Configure it before running.",
+      "connectorAccessInvalid": "This Flow’s Provider access does not allow this Action. Update its account or permissions.",
       "connectorActionNotFound": "The selected Connector action is no longer available. Choose another action.",
       "connectorConnectionRequired": "An active Connection is required. Connect or reconnect the account and try again.",
       "connectorUnavailable": "Connector is temporarily unavailable. Try again later.",

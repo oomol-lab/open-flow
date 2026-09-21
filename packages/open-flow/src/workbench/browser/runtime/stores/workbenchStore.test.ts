@@ -532,6 +532,83 @@ it('reports thrown add failures through notices without treating an empty result
   }
 })
 
+it.each(['no candidates', 'ambiguous candidates', 'candidate failure', 'binding failure'] as const)(
+  'allows drafting an unauthorized Connector node after %s',
+  async (scenario) => {
+    const { client, navigation, store } = catalogSession('flow-1')
+    const action = {
+      actionId: 'mail.send',
+      authenticated: true,
+      description: '',
+      inputs: {},
+      name: 'Send',
+      outputs: {},
+      serviceId: 'mail',
+      serviceName: 'Mail',
+    }
+    const option = { connector: action, description: '', id: 'connector:mail.send', inputs: [], kind: 'connector' as const, label: 'Send', outputs: [] }
+    vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(access('flow-1'))
+    const candidate = { accessBindingId: 'mail-1', connectionDisplayName: 'Mail', permissionGroupName: null, providerId: 'mail' }
+    const candidates = vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
+      candidates:
+        scenario == 'no candidates' ? [] : scenario == 'ambiguous candidates' ? [candidate, { ...candidate, accessBindingId: 'mail-2' }] : [candidate],
+      mode: 'selectable',
+      providerId: 'mail',
+      version: 1,
+    })
+    if (scenario == 'candidate failure') candidates.mockRejectedValue(new Error('Candidate lookup failed'))
+    const select = vi.spyOn(client, 'addProviderAccessBinding').mockRejectedValue(new Error('Binding save failed'))
+    const add = vi.spyOn(store.workspace, 'addNode').mockResolvedValue('node')
+    const resolve = vi.spyOn(store.connectors, 'resolveAction')
+    try {
+      await navigation.start()
+      await expect(store.addNode(option, { x: 0, y: 0 })).resolves.toBe('node')
+      expect(add).toHaveBeenCalledWith(option, { x: 0, y: 0 }, undefined)
+      expect(resolve).not.toHaveBeenCalled()
+      expect(store.connectorAccess.$.value.configuration).toBeUndefined()
+      expect(select).toHaveBeenCalledTimes(scenario == 'binding failure' ? 1 : 0)
+      if (scenario == 'binding failure') expect(store.$.notice.value?.message).toBe('Binding save failed')
+      if (scenario == 'candidate failure') expect(store.$.notice.value?.message).toBe('Candidate lookup failed')
+    } finally {
+      navigation.dispose()
+      store.dispose()
+    }
+  },
+)
+
+it('adds a no-auth Action without loading account candidates or creating a binding', async () => {
+  const { client, navigation, store } = catalogSession('flow-1')
+  const action = {
+    actionId: 'oomol_rag.list_files',
+    authenticated: false,
+    description: '',
+    inputs: {},
+    name: 'list_files',
+    outputs: {},
+    serviceId: 'oomol_rag',
+    serviceName: 'RAG',
+  }
+  const candidates = vi.spyOn(client, 'listProviderAccessBindingCandidates')
+  const select = vi.spyOn(client, 'addProviderAccessBinding')
+  vi.spyOn(store.connectors, 'resolveAction').mockResolvedValue({ action, connections: [] })
+  const add = vi.spyOn(store.workspace, 'addNode').mockResolvedValue('node')
+  try {
+    await navigation.start()
+    await expect(
+      store.addNode(
+        { connector: action, description: '', id: 'connector:oomol_rag.list_files', inputs: [], kind: 'connector', label: 'list_files', outputs: [] },
+        { x: 0, y: 0 },
+      ),
+    ).resolves.toBe('node')
+    expect(add).toHaveBeenCalledOnce()
+    expect(candidates).not.toHaveBeenCalled()
+    expect(select).not.toHaveBeenCalled()
+  } finally {
+    navigation.dispose()
+    store.dispose()
+  }
+})
+
 it('adds default Provider access while creating a Connector node without prompting', async () => {
   const { client, navigation, store } = catalogSession('flow-1')
   const discovered = {

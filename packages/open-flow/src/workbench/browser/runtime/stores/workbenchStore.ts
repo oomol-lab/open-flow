@@ -386,22 +386,35 @@ export class WorkbenchStore {
   ): Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] } | undefined> {
     const flowId = this.workspace.$.flowId.value
     if (flowId == null) return
+    const { defaultConnection: _defaultConnection, ...metadata } = action
+    const unconfigured = { action: metadata, connections: [] }
+    if (!action.authenticated) {
+      const prepared = await this.connectors.resolveAction(action.actionId)
+      return this.#disposed || flowId != this.workspace.$.flowId.value ? undefined : prepared
+    }
     if (this.connectorAccess.$.value.access == null) await this.connectorAccess.load(flowId)
     if (this.#disposed || flowId != this.workspace.$.flowId.value) return
     let access = this.connectorAccess.$.value.access
+    if (access == null) return unconfigured
     let actionAccessAllowed: boolean | undefined
     if (access?.mode == 'selectable') {
       if (this.connectorAccess.$.value.candidates[action.serviceId] == null) await this.connectorAccess.loadCandidates(action.serviceId)
+      if (this.#disposed || flowId != this.workspace.$.flowId.value) return
       const candidates = this.connectorAccess.$.value.candidates[action.serviceId]?.candidates.filter(
         (candidate) => candidate.permissions == null || candidate.permissions.allActions || candidate.permissions.actionIds.includes(action.actionId),
       )
+      if (candidates == null) {
+        return unconfigured
+      }
       const activeBindingIds = new Set(
         access.bindings.filter((binding) => binding.providerId == action.serviceId && binding.status == 'active').map((binding) => binding.accessBindingId),
       )
       if (candidates != null && !candidates.some((candidate) => activeBindingIds.has(candidate.accessBindingId))) {
         const candidate = candidates.find((item) => item.isDefault) ?? (candidates.length == 1 ? candidates[0] : undefined)
         if (candidate != null) {
-          await this.connectorAccess.select(action.serviceId, candidate.accessBindingId)
+          if (!(await this.connectorAccess.select(action.serviceId, candidate.accessBindingId))) {
+            return this.#disposed || flowId != this.workspace.$.flowId.value ? undefined : unconfigured
+          }
           access = this.connectorAccess.$.value.access
         }
       }
@@ -412,10 +425,11 @@ export class WorkbenchStore {
     if (this.#disposed || flowId != this.workspace.$.flowId.value) return
     const hasActiveBinding = access?.bindings.some((binding) => binding.providerId == action.serviceId && binding.status == 'active') ?? false
     if (access?.mode != 'implicit' && !(actionAccessAllowed ?? hasActiveBinding)) {
-      return { action, connections: [] }
+      return unconfigured
     }
     this.workspace.catalogs.refreshFlow(flowId)
     const prepared = await this.connectors.resolveAction(action.actionId)
+    if (this.#disposed || flowId != this.workspace.$.flowId.value) return
     if (prepared.action.serviceId != action.serviceId) throw new Error('Connector Action Provider changed while access was being configured.')
     return prepared
   }

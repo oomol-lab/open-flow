@@ -12,8 +12,9 @@ import { Label } from '../../../../ui/browser/label.tsx'
 import { NativeScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { connectorAccessPermissionGroupLabel, connectorAccessPermissionLabel } from './connectorAccessPresentation.ts'
 
-function connectorAccessProviderIds(revision: RevisionView | undefined, access: ConnectorAccess | undefined): readonly string[] {
+function connectorAccessProviderIds(revision: RevisionView | undefined, access: ConnectorAccess | undefined, requestedProviderId?: string): readonly string[] {
   const ids = new Set(access?.bindings.map((binding) => binding.providerId))
+  if (requestedProviderId != null) ids.add(requestedProviderId)
   for (const providerId of revision?.connectorProviderIds ?? []) ids.add(providerId)
   return [...ids].toSorted()
 }
@@ -37,7 +38,13 @@ export function ConnectorAccessSettings({
   const access = state.access
   const expanded = flowId != null && expandedFlowId == flowId
   const providerNames = new Map(providers.data?.map((provider) => [provider.serviceId, provider.serviceName]))
-  const providerRows = connectorAccessProviderIds(revision, access).map((serviceId) => ({ serviceId, serviceName: providerNames.get(serviceId) ?? serviceId }))
+  const providerRows = connectorAccessProviderIds(revision, access, state.configuration?.providerId).map((serviceId) => ({
+    serviceId,
+    serviceName: providerNames.get(serviceId) ?? serviceId,
+  }))
+  useEffect(() => {
+    if (state.configuration != null) setExpandedFlowId(flowId)
+  }, [flowId, state.configuration])
   const providerKey = providerRows.map((provider) => provider.serviceId).join('\0')
   useEffect(() => {
     if (!expanded || flowId == null || access?.mode != 'selectable') return
