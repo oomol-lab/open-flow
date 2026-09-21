@@ -449,9 +449,11 @@ export function FlowEditor({
           theme={theme}
           title={contextPanelTitle}
         >
-          <div hidden={!flowSelected} className="h-full">
+          <div hidden={!flowSelected} className={flowSelected ? 'flex h-full min-h-0 flex-col' : 'hidden'}>
             <ConnectorAccessSettings onManage={onManageConnectorAccess} store={store} />
-            <FlowNodeList key={JSON.stringify([flowId, target])} groupTriggers nodes={designer.nodes} onFocusNode={focusNode} onSelect={selectOutlineNode} />
+            <div className="min-h-0 flex-1">
+              <FlowNodeList key={JSON.stringify([flowId, target])} groupTriggers nodes={designer.nodes} onFocusNode={focusNode} onSelect={selectOutlineNode} />
+            </div>
           </div>
           {multipleSelected ? (
             <FlowNodeList nodes={designer.nodes.filter((node) => selectedNodeIds.includes(node.id))} onSelect={selectOutlineNode} onFocusNode={focusNode} />

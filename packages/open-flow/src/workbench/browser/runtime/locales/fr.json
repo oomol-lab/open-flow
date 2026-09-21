@@ -317,9 +317,9 @@
     },
     "actions": {
       "addAction": "Ajouter une Action Connector",
-      "availableConnections": "Voir l’accès externe du Flow",
-      "availableConnectionsDescription": "Seuls les Providers accordés à ce Flow et leurs connexions actives sont affichés. Le groupe d’accès apparaît à côté de chaque Provider.",
-      "availableConnectionsTitle": "Accès externe du Flow",
+      "availableConnections": "Voir les connexions disponibles",
+      "availableConnectionsDescription": "Connexions actives des services disponibles pour ce Flow.",
+      "availableConnectionsTitle": "Connexions disponibles",
       "chooseConnection": "Choisir une connexion {{provider}}",
       "connectionDescription": "La connexion est insérée dans cet appel. L’accès Provider du Flow détermine toujours si elle peut être utilisée.",
       "title": "Actions accessibles au code",

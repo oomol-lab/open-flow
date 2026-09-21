@@ -317,9 +317,9 @@
     },
     "actions": {
       "addAction": "Добавить Connector Action",
-      "availableConnections": "Показать внешний доступ Flow",
-      "availableConnectionsDescription": "Показаны только Provider, предоставленные этому Flow, и их активные подключения. Группа доступа указана рядом с каждым Provider.",
-      "availableConnectionsTitle": "Внешний доступ Flow",
+      "availableConnections": "Показать доступные подключения",
+      "availableConnectionsDescription": "Активные подключения сервисов, доступных этому Flow.",
+      "availableConnectionsTitle": "Доступные подключения",
       "chooseConnection": "Выбрать подключение {{provider}}",
       "connectionDescription": "Подключение будет вставлено в этот вызов. Возможность его использования по-прежнему контролирует Flow Provider Access.",
       "title": "Действия, доступные коду",

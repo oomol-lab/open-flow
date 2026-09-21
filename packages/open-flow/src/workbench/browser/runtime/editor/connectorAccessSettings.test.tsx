@@ -150,7 +150,7 @@ describe('Connector access settings', () => {
 
     expect(markup).toContain('3 connections authorized across 2 Providers.')
     expect(markup).toContain('aria-expanded="false"')
-    expect(markup).toContain('Manage connections')
+    expect(markup).toContain('aria-controls=')
     expect(markup).not.toContain('Connection: Work Slack')
     expect(markup).not.toContain('Connection: Work Mail · Permission group: Team default')
     expect(markup).not.toContain('Connection: Personal Mail · Permission group: Personal')

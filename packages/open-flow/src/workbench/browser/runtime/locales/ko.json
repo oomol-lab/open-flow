@@ -317,9 +317,9 @@
     },
     "actions": {
       "addAction": "Connector Action 추가",
-      "availableConnections": "Flow 외부 액세스 보기",
-      "availableConnectionsDescription": "이 Flow에 부여된 Provider와 활성 연결만 표시합니다. 각 Provider 옆에 액세스 그룹이 표시됩니다.",
-      "availableConnectionsTitle": "Flow 외부 액세스",
+      "availableConnections": "사용 가능한 연결 보기",
+      "availableConnectionsDescription": "이 Flow에서 사용 가능한 서비스의 활성 연결을 표시합니다.",
+      "availableConnectionsTitle": "사용 가능한 연결",
       "chooseConnection": "{{provider}} Connection 선택",
       "connectionDescription": "Connection이 이 호출에 삽입됩니다. 사용 가능 여부는 계속 Flow Provider Access에서 제어합니다.",
       "title": "이 코드에서 호출할 수 있는 작업",

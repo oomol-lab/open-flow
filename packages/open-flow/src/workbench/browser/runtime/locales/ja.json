@@ -317,9 +317,9 @@
     },
     "actions": {
       "addAction": "Connector Action を追加",
-      "availableConnections": "Flow の外部アクセスを表示",
-      "availableConnectionsDescription": "この Flow に付与された Provider とその有効な接続のみを表示します。各 Provider の右側にアクセスグループを表示します。",
-      "availableConnectionsTitle": "Flow の外部アクセス",
+      "availableConnections": "利用可能な接続を表示",
+      "availableConnectionsDescription": "この Flow で利用可能なサービスの有効な接続を表示します。",
+      "availableConnectionsTitle": "利用可能な接続",
       "chooseConnection": "{{provider}} Connection を選択",
       "connectionDescription": "Connection はこの呼び出しに挿入されます。使用可否は引き続き Flow Provider Access によって制御されます。",
       "title": "このコードから呼び出せるアクション",

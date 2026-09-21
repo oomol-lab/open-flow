@@ -317,9 +317,9 @@
     },
     "actions": {
       "addAction": "添加 Connector Action",
-      "availableConnections": "查看 Flow 外部访问",
-      "availableConnectionsDescription": "仅显示已授予当前 Flow 的 Provider 及其活跃连接；Provider 右侧显示权限组。",
-      "availableConnectionsTitle": "Flow 外部访问",
+      "availableConnections": "查看可用连接",
+      "availableConnectionsDescription": "显示当前 Flow 可用服务下的活跃连接。",
+      "availableConnectionsTitle": "可用连接",
       "chooseConnection": "选择 {{provider}} Connection",
       "connectionDescription": "Connection 将写入本次调用；是否允许使用仍由 Flow Provider Access 决定。",
       "title": "代码可调用的动作",

@@ -317,9 +317,9 @@
     },
     "actions": {
       "addAction": "新增 Connector Action",
-      "availableConnections": "查看 Flow 外部存取",
-      "availableConnectionsDescription": "僅顯示已授予目前 Flow 的 Provider 及其啟用連線；Provider 右側顯示權限群組。",
-      "availableConnectionsTitle": "Flow 外部存取",
+      "availableConnections": "查看可用連線",
+      "availableConnectionsDescription": "顯示目前 Flow 可用服務下的啟用連線。",
+      "availableConnectionsTitle": "可用連線",
       "chooseConnection": "選擇 {{provider}} Connection",
       "connectionDescription": "Connection 將寫入這次呼叫；是否允許使用仍由 Flow Provider Access 決定。",
       "title": "程式碼可呼叫的動作",

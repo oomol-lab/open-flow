@@ -203,7 +203,7 @@ describe('FlowWorkspace run drawer', () => {
     const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
     const contextPanel = (view.props.children as ReactElement[])[1]!
     const panelChildren = contextPanel.props.children as ReactElement[]
-    const nodeList = page == 'outline' ? (panelChildren[0]!.props.children as ReactElement[])[1]! : panelChildren[1]!
+    const nodeList = page == 'outline' ? (panelChildren[0]!.props.children as ReactElement[])[1]!.props.children : panelChildren[1]!
 
     nodeList.props.onSelect('start')
 
@@ -221,7 +221,7 @@ describe('FlowWorkspace run drawer', () => {
     const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
     const contextPanel = (view.props.children as ReactElement[])[1]!
     const panelChildren = contextPanel.props.children as ReactElement[]
-    const nodeList = page == 'outline' ? (panelChildren[0]!.props.children as ReactElement[])[1]! : panelChildren[1]!
+    const nodeList = page == 'outline' ? (panelChildren[0]!.props.children as ReactElement[])[1]!.props.children : panelChildren[1]!
 
     nodeList.props.onFocusNode('start')
 

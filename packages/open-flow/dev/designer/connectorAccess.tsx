@@ -93,7 +93,7 @@ function Sample({
   return (
     <section>
       <h3 className="mb-2 text-sm font-medium">{label}</h3>
-      <div className="grid h-[330px] overflow-hidden rounded-lg border border-border">
+      <div className="grid h-[480px] overflow-hidden rounded-lg border border-border">
         <EditorContextPanel focusOnOpen={false} icon="flow" onClose={() => {}} theme={dark ? 'dark' : 'light'} title="Flow outline">
           {store != null && <ConnectorAccessSettings onManage={(flowId) => log('connector-access.manage', flowId)} store={store} />}
         </EditorContextPanel>
@@ -123,6 +123,31 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
         version: 1,
       },
       label: 'Authorized summary',
+    },
+    {
+      access: {
+        accessRevision: 1,
+        bindings: [
+          {
+            accessBindingId: candidates[0].accessBindingId,
+            connectionDisplayName: candidates[0].connectionDisplayName,
+            permissionGroupName: candidates[0].permissionGroupName,
+            providerId: candidates[0].providerId,
+            status: 'active',
+          },
+          {
+            accessBindingId: 'long-name',
+            connectionDisplayName: 'finance-operations-international-team@example.com',
+            permissionGroupName: 'International finance operations reviewers',
+            providerId: 'sheets',
+            status: 'active',
+          },
+        ],
+        mode: 'selectable',
+        providerAccessDigest: 'selectable:long-names',
+        version: 1,
+      },
+      label: 'Multiple Providers and long names',
     },
     {
       access: { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 },
@@ -174,7 +199,7 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
 
 export const connectorAccessStory: FrontendStory = {
   description:
-    'Flow-level Provider access using production settings: compact authorization summary, expandable permission details, deployment-managed, invalid retained binding, empty candidate, and load failure states.',
+    'Flow-level Provider access using production settings: expand the multiple-Provider sample and scroll to its last connection. Covers compact summaries, bounded scrolling, long names, deployment-managed, invalid binding, empty candidate, and load failure states.',
   group: 'Workbench',
   id: 'connector-access',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,
