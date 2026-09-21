@@ -701,7 +701,7 @@ Providers 和 Actions 使用 localStorage，Connections 使用 sessionStorage；
 存储键包含版本、部署及业务标识：Providers 为 Flow scope 和语言，Actions 为 Flow scope、service 和语言，
 Connections 为 Flow scope 和可选 service，Triggers 为语言。使用新版本键，不读取旧 URL 缓存。
 
-Actions 只持久化 service 列表的元数据，详情从列表派生；默认连接与当前连接状态从独立的 Connections Store 组合。
+Actions 只持久化 service 列表的元数据。详情通过独立的元数据接口读取，按 Flow scope、actionId 和语言在内存中缓存，不能从授权过滤后的列表推断 Action 不存在。默认连接与当前连接状态从独立的 Connections Store 组合。
 Action metadata 保留上游可选的 `operationType` 字段（`read`、`write`、`destructive`）；缺失或未知值在节点面板显示为其他接口。
 
 浏览器使用 `/v1/connector/action-metadata`（可选 `service` 或 `q`）及其 `/:actionId` 详情接口；它们接受 `flowId` 和 `locale`，
@@ -711,7 +711,7 @@ Workbench 使用独立的 `ConnectorActionView` 表示组合后的展示数据�
 CLI 和 MCP 继续使用原 `/v1/connector/actions` 对应的组合接口；它们在响应时选择 active 默认账号或唯一 active 账号，
 保留 `ConnectorAction.defaultConnection`。这些组合响应的 ETag 仍随账号变化，浏览器不使用它们作为 Action 缓存。
 全局搜索使用独立的临时查询状态，不持久化，也不写入 service 列表。全量与按服务的 Connections 独立保存，互不合并或覆盖。
-画布使用派生的 Action 详情；应用排序使用全量 Connections，账号选择使用对应服务的 Connections。
+画布使用独立读取的 Action 详情；应用排序使用全量 Connections，账号选择使用对应服务的 Connections。
 
 业务访问 Store 接口时检查刷新间隔：Providers、Triggers 为 5 分钟，Actions、Connections 为 30 秒。
 没有定时轮询或额外的聚焦刷新；授权完成和手动重试按业务需要强制刷新。普通读取合并同一条目的进行中请求，由 Store 管理取消。

@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { ConnectorAction, ConnectorConnection } from '../api.ts'
 import type { ResolvedSelection } from '../revisionView.ts'
-import type { ConnectorStore } from '../stores/connectorStore.ts'
+import type { ConnectorActionError, ConnectorStore } from '../stores/connectorStore.ts'
 import type { TriggerStore } from '../stores/triggerStore.ts'
 
 import { useState } from 'react'
@@ -112,7 +112,7 @@ export function ConnectorAccount({
   readonly onConfigureAccess?: (() => void) | undefined
   readonly accessError?: string | undefined
   readonly action: ConnectorAction | undefined
-  readonly actionError: string | undefined
+  readonly actionError: ConnectorActionError | undefined
   readonly actionId: string
   readonly activeConnections: readonly ConnectorConnection[] | undefined
   readonly authorizationPending: boolean
@@ -127,29 +127,38 @@ export function ConnectorAccount({
 }): ReactElement {
   const t = useTranslate()
   const available = activeConnections ?? []
+  const accessIssue =
+    accessError ?? (actionError?.code == 'connector.access-required' || actionError?.code == 'connector.access-invalid' ? actionError.message : undefined)
   const required =
-    accessError != null || (action?.authenticated == true && (connectionId == null || (activeConnections != null && connection?.status != 'active')))
+    accessIssue != null || (action?.authenticated == true && (connectionId == null || (activeConnections != null && connection?.status != 'active')))
   let onManage: (() => void) | undefined
   let content: ReactElement
   if (loading) {
     content = <p>{t('inspector.account.loading')}</p>
+  } else if (accessIssue != null) {
+    if (action != null) onManage = () => void connectors.connect(action.serviceId)
+    content = <p>{accessIssue}</p>
   } else if (actionError != null || action == null) {
     content = (
       <>
-        <p>{actionError ?? t('inspector.account.statusUnavailable', { action: actionId })}</p>
-        <Button disabled={disabled} onClick={() => void connectors.refresh(true)} size="sm" type="button" variant="secondary">
-          {t('inspector.account.retry')}
-        </Button>
+        <p>
+          {actionError?.code == 'authorization.denied'
+            ? t('inspector.account.contactAdmin')
+            : (actionError?.message ?? t('inspector.account.statusUnavailable', { action: actionId }))}
+        </p>
+        {actionError?.code != 'authorization.denied' && actionError?.code != 'connector.action-not-found' && (
+          <Button className="self-start" disabled={disabled} onClick={() => void connectors.refresh(true)} size="sm" type="button" variant="secondary">
+            {t('inspector.account.retry')}
+          </Button>
+        )}
       </>
     )
-  } else if (accessError != null) {
-    content = <p>{accessError}</p>
   } else if (connectionError != null) {
     content = (
       <>
         <p>{t('inspector.account.refreshFailed')}</p>
         <p className="connection-detail">{connectionError}</p>
-        <Button disabled={disabled} onClick={() => void connectors.refresh(true)} size="sm" type="button" variant="secondary">
+        <Button className="self-start" disabled={disabled} onClick={() => void connectors.refresh(true)} size="sm" type="button" variant="secondary">
           {t('inspector.account.retry')}
         </Button>
       </>
@@ -198,19 +207,26 @@ export function ConnectorAccount({
   return (
     <section className={`connection-state ${required ? 'required' : ''}`} data-inspector-section="account">
       <h3 className="inspector-section-title">
-        <Icon name="connection" size={15} /> {t(required ? 'inspector.account.required' : 'inspector.account.title')}
+        <Icon name="connection" size={15} />{' '}
+        {t(accessIssue != null ? 'inspector.account.accessTitle' : required ? 'inspector.account.required' : 'inspector.account.title')}
         {onManage != null && (
           <Button className="ml-auto" disabled={disabled} onClick={onManage} size="xs" type="button" variant="ghost">
-            {t('inspector.account.manage')}
+            {t('inspector.account.manageAccount')}
           </Button>
         )}
       </h3>
       <div className="connection-state-content">
         {content}
-        <p className="connection-detail">{t('inspector.account.inheritsFlowAccess')}</p>
-        {onConfigureAccess != null && (
-          <Button disabled={disabled} onClick={onConfigureAccess} size="sm" type="button" variant="secondary">
-            {t('connectorAccess.title')}
+        {!loading && onConfigureAccess != null && (accessIssue != null || (action != null && actionError == null)) && (
+          <Button
+            className="self-start"
+            disabled={disabled}
+            onClick={onConfigureAccess}
+            size="sm"
+            type="button"
+            variant={accessIssue != null ? 'default' : 'secondary'}
+          >
+            {t('inspector.account.configureAccess')}
           </Button>
         )}
       </div>

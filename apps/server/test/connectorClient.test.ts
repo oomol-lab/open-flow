@@ -1,6 +1,7 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import type { DestinationStream, Logger } from 'pino'
+import type { ConnectorAccessContext } from '../node/deployment/connector.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -253,6 +254,49 @@ describe('Server Connector client', () => {
     await expect(connector.listProviderAccessBindingCandidates('team-1', 'example')).resolves.toEqual(candidates)
     expect(requests.filter((url) => url.includes('/v1/users/profile'))).toHaveLength(1)
     expect(requests.filter((url) => url.includes('/app-access'))).toHaveLength(1)
+  })
+
+  it('reads draft Action metadata without a binding while keeping eligibility and execution gated', async () => {
+    const request = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = new URL(String(input))
+      expect(new Headers(init?.headers).get('x-oo-team-id')).toBe('team-1')
+      if (url.pathname == '/v1/providers') return Response.json(success([{ service: 'example', displayName: 'Example', authTypes: ['api_key'] }]))
+      if (url.pathname == '/v1/actions/example.echo')
+        return Response.json(
+          success({
+            id: 'example.echo',
+            service: 'example',
+            name: 'echo',
+            description: 'Echo input.',
+            inputSchema: { type: 'object', properties: { message: { type: 'string' } } },
+            outputSchema: { type: 'object', properties: {} },
+          }),
+        )
+      throw new Error(`Unexpected request: ${url.pathname}`)
+    })
+    vi.stubGlobal('fetch', request)
+    const connector = new ConnectorClient('https://connector.oomol.dev', 'runtime-token')
+    const access: ConnectorAccessContext = {
+      flowId: 'flow-1',
+      providerAccess: { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'empty', version: 1 },
+      purpose: 'catalog',
+      source: 'draft',
+      teamId: 'team-1',
+    }
+    await expect(connector.getAction('example.echo', undefined, access)).resolves.toMatchObject({
+      actionId: 'example.echo',
+      authenticated: true,
+      inputs: { message: { jsonSchema: { type: 'string' } } },
+    })
+    expect(request).toHaveBeenCalledTimes(2)
+    request.mockClear()
+    await expect(connector.getAction('example.echo', undefined, { ...access, purpose: 'eligibility' })).rejects.toMatchObject({
+      code: 'connector.access-required',
+    })
+    await expect(
+      connector.execute('example.echo', undefined, {}, 'invocation-1', new AbortController().signal, { ...access, purpose: 'execute' }),
+    ).rejects.toMatchObject({ code: 'connector.access-required' })
+    expect(request).not.toHaveBeenCalled()
   })
 
   it('requires a Flow Provider binding before executing against hosted Connector', async () => {

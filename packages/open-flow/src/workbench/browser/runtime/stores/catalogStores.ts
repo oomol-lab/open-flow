@@ -156,7 +156,7 @@ export class ConnectionStore {
 export class ActionStore {
   readonly #raw: ProxyStore
   readonly #views = new Views<readonly ConnectorActionMetadata[]>()
-  readonly #details = new Map<string, ReadonlyVal<ResourceState<ConnectorActionMetadata>>>()
+  readonly #details = new Map<string, Resource<ConnectorActionMetadata>>()
   readonly #searches = new Set<Resource<readonly ConnectorActionMetadata[]>>()
   readonly #searchSessions = new WeakMap<AbortSignal, Map<string, Resource<readonly ConnectorActionMetadata[]>>>()
   constructor(
@@ -174,19 +174,33 @@ export class ActionStore {
     )
   }
   detail(actionId: string, flowId?: string, locale = 'en', force = false): ReadonlyVal<ResourceState<ConnectorActionMetadata>> {
-    const source = this.get(actionId.slice(0, actionId.indexOf('.')), flowId, locale, force)
-    const key = identity(flowId, actionId, locale)
-    let detail = this.#details.get(key)
+    const params = new URLSearchParams({ ...(flowId == null ? {} : { flowId }), locale })
+    const path = `/v1/connector/action-metadata/${encodeURIComponent(actionId)}?${params}`
+    let detail = this.#details.get(path)
     if (detail == null) {
-      detail = compute((get) => {
-        const state = get(source)
-        const data = state.data?.find((item) => item.actionId == actionId)
-        return { ...state, data, error: state.error ?? (state.data != null && data == null ? new Error(`Action ${actionId} was not found.`) : undefined) }
-      })
-      this.#details.set(key, detail)
+      detail = new Resource(
+        (etag, signal) =>
+          this.client.readCatalog(
+            {
+              path,
+              decode: (value) => {
+                const source = record(value)
+                if (source.version != 1) return invalidResponse()
+                const metadata = connectorActionMetadata(source.action)
+                if (metadata.actionId != actionId) return invalidResponse()
+                return metadata
+              },
+            },
+            etag,
+            signal,
+          ),
+        30_000,
+      )
+      this.#details.set(path, detail)
     }
-    return detail
+    return detail.get(force)
   }
+
   search(query: string, flowId: string | undefined, locale: string, signal: AbortSignal): Resource<readonly ConnectorActionMetadata[]> {
     const params = new URLSearchParams({ ...(flowId == null ? {} : { flowId }), q: query.trim(), locale })
     const key = params.toString()
@@ -227,9 +241,13 @@ export class ActionStore {
   }
   retryFailed(): void {
     this.#raw.retryFailed()
+    for (const detail of this.#details.values()) if (detail.state.value.error != null) void detail.refresh()
   }
   refreshFlow(flowId: string): void {
     this.#raw.refreshFlow(flowId)
+    for (const [path, detail] of this.#details) {
+      if (new URL(path, 'https://open-flow.invalid').searchParams.get('flowId') == flowId) void detail.refresh(true)
+    }
   }
   dispose(): void {
     for (const search of this.#searches) search.dispose()

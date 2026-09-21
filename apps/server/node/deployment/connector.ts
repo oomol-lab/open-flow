@@ -350,7 +350,8 @@ export class ConnectorClient implements ConnectorHost {
     const teamId = connectorTeamId(access)
     const separator = actionId.indexOf('.')
     if (separator <= 0) throw actionNotFound()
-    const bindings = await this.#providerAccessBindings(access, actionId.slice(0, separator), signal, true)
+    const bindings =
+      typeof access == 'object' && access.purpose == 'catalog' ? null : await this.#providerAccessBindings(access, actionId.slice(0, separator), signal, true)
     const [providers, action] = await Promise.all([
       this.#providers(signal, teamId, locale),
       this.#get('actions.get', `v1/actions/${encodeURIComponent(actionId)}`, (data) => runtimeAction(runtimeData(data)), signal, {

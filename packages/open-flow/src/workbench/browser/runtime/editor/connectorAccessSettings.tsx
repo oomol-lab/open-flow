@@ -3,13 +3,15 @@ import type { ConnectorAccess } from '../../../../control/common/api.ts'
 import type { RevisionView } from '../revisionView.ts'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 
-import { useEffect, useId, useState } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
+import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
 import { Label } from '../../../../ui/browser/label.tsx'
 import { NativeScrollArea } from '../../../../ui/browser/scroll-area.tsx'
+import { providerIcon } from '../providerIcon.ts'
 import { connectorAccessPermissionGroupLabel, connectorAccessPermissionLabel } from './connectorAccessPresentation.ts'
 
 function connectorAccessProviderIds(revision: RevisionView | undefined, access: ConnectorAccess | undefined, requestedProviderId?: string): readonly string[] {
@@ -30,6 +32,7 @@ export function ConnectorAccessSettings({
   const titleId = useId()
   const contentId = useId()
   const language = useLang()
+  const configurationTarget = useRef<HTMLDivElement>(null)
   const flowId = useVal(store.workspace.$.flowId)
   const revision = useVal(store.workspace.$.revision)
   const state = useVal(store.connectorAccess.$)
@@ -37,27 +40,41 @@ export function ConnectorAccessSettings({
   const providers = useVal(store.workspace.catalogs.providers.get(undefined, language))
   const access = state.access
   const expanded = flowId != null && expandedFlowId == flowId
-  const providerNames = new Map(providers.data?.map((provider) => [provider.serviceId, provider.serviceName]))
-  const providerRows = connectorAccessProviderIds(revision, access, state.configuration?.providerId).map((serviceId) => ({
+  const providerMetadata = new Map(providers.data?.map((provider) => [provider.serviceId, provider]))
+  const providerIds = connectorAccessProviderIds(revision, access, state.configuration?.providerId)
+  const providerRows = providerIds.map((serviceId) => ({
     serviceId,
-    serviceName: providerNames.get(serviceId) ?? serviceId,
+    serviceName: providerMetadata.get(serviceId)?.serviceName ?? serviceId,
+    noSetup: providerMetadata.get(serviceId)?.noSetup === true,
+    icon: providerIcon(providerMetadata.get(serviceId) ?? { serviceId, serviceName: serviceId }),
   }))
+  const requiresAuthorization = providerRows.some((provider) => !provider.noSetup)
+  const providersPending = providers.data == null
   useEffect(() => {
     if (state.configuration != null) setExpandedFlowId(flowId)
   }, [flowId, state.configuration])
-  const providerKey = providerRows.map((provider) => provider.serviceId).join('\0')
+  const providerKey = providerRows
+    .filter((provider) => !provider.noSetup)
+    .map((provider) => provider.serviceId)
+    .join('\0')
   useEffect(() => {
-    if (!expanded || flowId == null || access?.mode != 'selectable') return
+    if (!expanded || flowId == null || access?.mode != 'selectable' || providersPending) return
     for (const providerId of providerKey.split('\0').filter(Boolean)) {
       if (state.candidates[providerId] == null) void store.connectorAccess.loadCandidates(providerId)
     }
-  }, [access?.mode, expanded, flowId, providerKey, state.candidates, store])
+  }, [access?.mode, expanded, flowId, providerKey, providersPending, state.candidates, store])
+  useEffect(() => {
+    if (!expanded || providersPending || state.configuration == null) return
+    configurationTarget.current?.focus({ preventScroll: true })
+    configurationTarget.current?.scrollIntoView({ block: 'nearest' })
+  }, [expanded, providersPending, state.configuration])
   if (flowId == null) return null
 
-  const activeBindings = access?.mode == 'selectable' ? access.bindings.filter((binding) => binding.status == 'active') : []
+  const requiredBindings = access?.mode == 'selectable' ? access.bindings.filter((binding) => !providerMetadata.get(binding.providerId)?.noSetup) : []
+  const activeBindings = requiredBindings.filter((binding) => binding.status == 'active')
   const activeProviderCount = new Set(activeBindings.map((binding) => binding.providerId)).size
-  const issueCount = access?.mode == 'selectable' ? access.bindings.length - activeBindings.length : 0
-  const collapsible = !state.loading && access?.mode == 'selectable' && providerRows.length > 0
+  const issueCount = requiredBindings.length - activeBindings.length
+  const collapsible = !state.loading && !providersPending && access?.mode == 'selectable' && providerRows.length > 0
 
   return (
     <section className="flex max-h-[60%] min-h-0 shrink-0 flex-col border-b border-border px-3 py-2" aria-labelledby={titleId}>
@@ -75,9 +92,11 @@ export function ConnectorAccessSettings({
             <span className="min-w-0 flex-1">
               <span className="block text-xs font-medium text-foreground">{t('connectorAccess.title')}</span>
               <span className="mt-1 block text-[11px] leading-4 font-normal text-muted-foreground">
-                {activeBindings.length == 0
-                  ? t('connectorAccess.summaryEmpty')
-                  : t('connectorAccess.summary', { connections: activeBindings.length, providers: activeProviderCount })}
+                {!requiresAuthorization
+                  ? t('connectorAccess.summaryNoAuthorization')
+                  : activeBindings.length == 0
+                    ? t('connectorAccess.summaryEmpty')
+                    : t('connectorAccess.summary', { connections: activeBindings.length, providers: activeProviderCount })}
               </span>
             </span>
           </Button>
@@ -87,7 +106,7 @@ export function ConnectorAccessSettings({
           {t('connectorAccess.title')}
         </h3>
       )}
-      {onManage != null && (
+      {onManage != null && requiresAuthorization && (
         <Button className="mt-1 -ml-2 self-start" onClick={() => onManage(flowId)} size="xs" type="button" variant="ghost">
           {t('connectorAccess.manage')}
         </Button>
@@ -103,6 +122,8 @@ export function ConnectorAccessSettings({
         </p>
       ) : access.mode == 'implicit' ? (
         <p className="mt-1 text-xs text-muted-foreground">{t('connectorAccess.deploymentManaged')}</p>
+      ) : providersPending ? (
+        <p className="mt-1 text-xs text-muted-foreground">{t(providers.error == null ? 'connectorAccess.loading' : 'connectorAccess.providersFailed')}</p>
       ) : (
         <div className="flex min-h-0 flex-col gap-2">
           {providerRows.length == 0 ? (
@@ -119,67 +140,102 @@ export function ConnectorAccessSettings({
               >
                 {expanded && (
                   <div className="flex flex-col gap-3 pb-1">
-                    <p className="text-[11px] leading-4 text-muted-foreground">{t('connectorAccess.description')}</p>
-                    {providerRows.map((provider) => {
-                      const bindings = access.bindings.filter((item) => item.providerId == provider.serviceId)
-                      const candidates = state.candidates[provider.serviceId]?.candidates
-                      const loading = state.loadingCandidates.includes(provider.serviceId)
-                      const saving = state.savingProviderId == provider.serviceId
-                      const options = [
-                        ...(candidates ?? []),
-                        ...bindings.filter((binding) => !candidates?.some((candidate) => candidate.accessBindingId == binding.accessBindingId)),
-                      ].toSorted(
-                        (left, right) =>
-                          left.connectionDisplayName.localeCompare(right.connectionDisplayName) ||
-                          (left.permissionGroupName ?? '').localeCompare(right.permissionGroupName ?? '') ||
-                          left.accessBindingId.localeCompare(right.accessBindingId),
-                      )
-                      return (
-                        <div className="flex flex-col gap-1" key={provider.serviceId}>
-                          <span className="text-xs font-medium">{provider.serviceName}</span>
-                          {options.map((option) => {
-                            const binding = bindings.find((item) => item.accessBindingId == option.accessBindingId)
-                            const groupLabel = connectorAccessPermissionGroupLabel(option, t)
-                            const permissionLabel = connectorAccessPermissionLabel(option, t)
-                            return (
-                              <Label className="min-w-0 items-start py-1 text-xs font-normal" key={option.accessBindingId}>
-                                <Checkbox
-                                  checked={binding != null}
-                                  className="mt-px"
-                                  disabled={saving}
-                                  onCheckedChange={(checked) => void store.connectorAccess.select(provider.serviceId, option.accessBindingId, checked === true)}
-                                />
-                                <span className="min-w-0 flex-1 leading-4">
-                                  <span className="block wrap-anywhere">{option.connectionDisplayName}</span>
-                                  <span className="block text-[11px] text-muted-foreground wrap-anywhere">
-                                    {permissionLabel == null ? groupLabel : `${groupLabel} · ${permissionLabel}`}
+                    {requiresAuthorization && <p className="text-[11px] leading-4 text-muted-foreground">{t('connectorAccess.description')}</p>}
+                    <div className="flex flex-col gap-3">
+                      {providerRows.map((provider) => {
+                        if (provider.noSetup) {
+                          return (
+                            <div
+                              className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3 first:border-t-0 first:pt-0"
+                              key={provider.serviceId}
+                            >
+                              <span className="flex min-w-0 items-center gap-2 text-xs font-medium">
+                                <ContentIcon src={provider.icon} className="size-4 shrink-0 data-[icon-kind=initials]:text-[20px]" />
+                                <span>{provider.serviceName}</span>
+                              </span>
+                              <span className="text-xs text-muted-foreground">{t('connectorAccess.noAuthorization')}</span>
+                            </div>
+                          )
+                        }
+                        const configuring = state.configuration?.providerId == provider.serviceId
+                        const bindings = access.bindings.filter((item) => item.providerId == provider.serviceId)
+                        const candidates = state.candidates[provider.serviceId]?.candidates
+                        const loading = state.loadingCandidates.includes(provider.serviceId)
+                        const saving = state.savingProviderId == provider.serviceId
+                        const options = [
+                          ...(candidates ?? []),
+                          ...bindings.filter((binding) => !candidates?.some((candidate) => candidate.accessBindingId == binding.accessBindingId)),
+                        ].toSorted(
+                          (left, right) =>
+                            left.connectionDisplayName.localeCompare(right.connectionDisplayName) ||
+                            (left.permissionGroupName ?? '').localeCompare(right.permissionGroupName ?? '') ||
+                            left.accessBindingId.localeCompare(right.accessBindingId),
+                        )
+                        return (
+                          <div
+                            aria-label={provider.serviceName}
+                            className="flex flex-col gap-1 border-t border-border/50 pt-3 outline-none first:border-t-0 first:pt-0"
+                            key={provider.serviceId}
+                            ref={configuring ? configurationTarget : undefined}
+                            tabIndex={-1}
+                          >
+                            <span className="flex min-w-0 items-center gap-2 text-xs font-medium">
+                              <ContentIcon src={provider.icon} className="size-4 shrink-0 data-[icon-kind=initials]:text-[20px]" />
+                              <span>{provider.serviceName}</span>
+                            </span>
+                            {configuring && candidates != null && candidates.length > 0 && !loading && !state.candidateErrors.includes(provider.serviceId) && (
+                              <p className="rounded bg-muted px-2 py-1 text-xs leading-5 text-foreground" role="status">
+                                {t('connectorAccess.configureHint')}
+                              </p>
+                            )}
+                            {options.map((option) => {
+                              const binding = bindings.find((item) => item.accessBindingId == option.accessBindingId)
+                              const groupLabel = connectorAccessPermissionGroupLabel(option, t)
+                              const permissionLabel = connectorAccessPermissionLabel(option, t)
+                              return (
+                                <Label className="min-w-0 items-start py-1 text-xs font-normal" key={option.accessBindingId}>
+                                  <Checkbox
+                                    checked={binding != null}
+                                    className="mt-px"
+                                    disabled={saving}
+                                    onCheckedChange={(checked) =>
+                                      void store.connectorAccess.select(provider.serviceId, option.accessBindingId, checked === true)
+                                    }
+                                  />
+                                  <span className="min-w-0 flex-1 leading-4">
+                                    <span className="block wrap-anywhere">{option.connectionDisplayName}</span>
+                                    <span className="block text-[11px] text-muted-foreground wrap-anywhere">
+                                      {permissionLabel == null ? groupLabel : `${groupLabel} · ${permissionLabel}`}
+                                    </span>
                                   </span>
-                                </span>
-                                {binding != null && binding.status != 'active' && (
-                                  <span className="shrink-0 leading-4 text-destructive">{t('connectorAccess.status', { status: binding.status })}</span>
-                                )}
-                              </Label>
-                            )
-                          })}
-                          {loading && <p className="text-xs text-muted-foreground">{t('connectorAccess.loadingCandidates')}</p>}
-                          {candidates?.length == 0 && <p className="text-xs text-muted-foreground">{t('connectorAccess.noCandidates')}</p>}
-                          {state.candidateErrors.includes(provider.serviceId) && (
-                            <p className="text-xs text-destructive">
-                              {t('connectorAccess.candidatesFailed')}{' '}
-                              <Button
-                                className="h-auto p-0 underline"
-                                onClick={() => void store.connectorAccess.loadCandidates(provider.serviceId)}
-                                size="xs"
-                                type="button"
-                                variant="link"
-                              >
-                                {t('connectorAccess.retry')}
-                              </Button>
-                            </p>
-                          )}
-                        </div>
-                      )
-                    })}
+                                  {binding != null && binding.status != 'active' && (
+                                    <span className="shrink-0 leading-4 text-destructive">{t('connectorAccess.status', { status: binding.status })}</span>
+                                  )}
+                                </Label>
+                              )
+                            })}
+                            {loading && <p className="text-xs text-muted-foreground">{t('connectorAccess.loadingCandidates')}</p>}
+                            {candidates?.length == 0 && !loading && !state.candidateErrors.includes(provider.serviceId) && (
+                              <ConnectorAccessEmptyState store={store} serviceId={provider.serviceId} />
+                            )}
+                            {state.candidateErrors.includes(provider.serviceId) && (
+                              <p className="text-xs text-destructive">
+                                {t('connectorAccess.candidatesFailed')}{' '}
+                                <Button
+                                  className="h-auto p-0 underline"
+                                  onClick={() => void store.connectorAccess.loadCandidates(provider.serviceId)}
+                                  size="xs"
+                                  type="button"
+                                  variant="link"
+                                >
+                                  {t('connectorAccess.retry')}
+                                </Button>
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
                     {providers.error != null && <p className="text-xs text-destructive">{t('connectorAccess.providersFailed')}</p>}
                   </div>
                 )}
@@ -189,5 +245,35 @@ export function ConnectorAccessSettings({
         </div>
       )}
     </section>
+  )
+}
+
+export function ConnectorAccessEmptyState({ store, serviceId }: { readonly store: WorkbenchStore; readonly serviceId: string }): ReactElement {
+  const t = useTranslate()
+  const connections = useVal(store.workspace.catalogs.connections.get(serviceId))
+  if (connections.error != null) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-destructive">{t('connectorAccess.accountsFailed')}</span>
+        <Button onClick={() => store.workspace.catalogs.connections.get(serviceId, undefined, true)} size="xs" variant="secondary">
+          {t('connectorAccess.retry')}
+        </Button>
+      </div>
+    )
+  }
+  if (connections.data == null) return <p className="text-xs text-muted-foreground">{t('connectorAccess.loading')}</p>
+  const hasAccounts = connections.data.length > 0
+  const denied = connections.data.some((connection) => connection.status == 'active')
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <p className="text-xs leading-5 text-muted-foreground" role="status">
+        {t(denied ? 'connectorAccess.permissionDenied' : hasAccounts ? 'connectorAccess.reconnectAccount' : 'connectorAccess.noAccount')}
+      </p>
+      {!denied && (
+        <Button onClick={() => void store.connectors.connect(serviceId)} size="xs" type="button" variant="secondary">
+          {t(hasAccounts ? 'connectorAccess.reconnect' : 'connectorAccess.connect')}
+        </Button>
+      )}
+    </div>
   )
 }

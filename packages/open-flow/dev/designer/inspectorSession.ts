@@ -93,6 +93,12 @@ export function createInspectorTransport(
       return Response.json(access)
     }
     if (url.pathname.endsWith('/connector/proxy/providers')) return Response.json({ success: true, data: options.providers ?? [] })
+    if (url.pathname.startsWith('/v1/connector/action-metadata/')) {
+      const action = options.actions?.find((entry) => entry.actionId == decodeURIComponent(url.pathname.split('/').at(-1)!))
+      return action == null
+        ? Response.json({ error: { code: 'connector.action-not-found', message: 'Action not found.' }, version: 1 }, { status: 404 })
+        : Response.json({ action, version: 1 })
+    }
     if (url.pathname.endsWith('/connector/action-metadata')) {
       const query = (url.searchParams.get('q') ?? '').toLowerCase()
       return Response.json({

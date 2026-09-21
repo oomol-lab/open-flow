@@ -148,3 +148,21 @@ describe('ConnectorAccessStore', () => {
     store.dispose()
   })
 })
+
+it('refreshes available accounts when configuring access after connecting an account', async () => {
+  let connected = false
+  const candidate = { accessBindingId: 'work', connectionDisplayName: 'New account', providerId: 'mail' }
+  const request = vi.fn(async (path: string) =>
+    Response.json(path.endsWith('/candidates') ? { candidates: connected ? [candidate] : [], mode: 'selectable', providerId: 'mail', version: 1 } : initial),
+  )
+  const store = new ConnectorAccessStore(new WorkbenchClient(request), vi.fn())
+  await store.load('flow-1')
+  await store.loadCandidates('mail')
+  expect(store.$.value.candidates.mail?.candidates).toEqual([])
+  connected = true
+  store.configure('mail')
+  await vi.waitFor(() => expect(store.$.value.candidates.mail?.candidates).toEqual([candidate]))
+  expect(store.$.value.configuration).toEqual({ providerId: 'mail' })
+  expect(store.$.value.access?.bindings).toEqual([])
+  store.dispose()
+})
