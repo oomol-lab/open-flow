@@ -46,7 +46,7 @@
   },
   "connectorAccess": {
     "noAccount": "Aucun compte connecté. Connectez un compte, puis sélectionnez-le pour ce flux.",
-    "permissionDenied": "Des comptes sont connectés, mais vous ne disposez pas des autorisations nécessaires. Demandez l’accès à un administrateur.",
+    "noAvailablePermissions": "Des comptes sont connectés, mais aucune autorisation ne peut être sélectionnée. Vérifiez les autorisations des comptes de l’équipe.",
     "reconnectAccount": "Les connexions aux comptes sont indisponibles. Reconnectez-les.",
     "connect": "Connecter un compte",
     "reconnect": "Reconnecter",

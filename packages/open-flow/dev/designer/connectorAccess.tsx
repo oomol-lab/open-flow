@@ -230,7 +230,7 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
     },
     {
       access: { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 },
-      label: 'Connected account without permission',
+      label: 'Connected account without selectable permissions',
       noCandidates: true,
       connectionStatus: 'active',
       configure: true,

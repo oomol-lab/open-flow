@@ -215,7 +215,7 @@ describe('Connector access settings', () => {
 describe('Connector account recovery', () => {
   it.each([
     { connections: [], message: 'No accounts connected yet.', button: 'Connect account' },
-    { connections: [{ status: 'active' }], message: 'Ask an administrator to grant access.', button: undefined },
+    { connections: [{ status: 'active' }], message: 'Check the team’s account permission settings.', button: 'Manage accounts' },
     { connections: [{ status: 'reauth_required' }], message: 'Please reconnect.', button: 'Reconnect' },
     { connections: [{ status: 'disconnected' }], message: 'Please reconnect.', button: 'Reconnect' },
     { connections: [{ status: 'error' }], message: 'Please reconnect.', button: 'Reconnect' },
