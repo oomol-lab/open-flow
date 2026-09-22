@@ -343,6 +343,7 @@ describe('Revision decoding', () => {
     legacy.modelVersion = 1
     legacy.document.graph.nodes.hook = {
       kind: 'webhook',
+      method: 'POST',
       name: 'Webhook',
       inputsDef: [{ handle: 'value', jsonSchema: { type: 'number' }, nullable: false }],
     }
@@ -365,7 +366,7 @@ describe('Revision decoding', () => {
     expect(repaired.modelVersion).toBe(currentFlowModelVersion)
     expect(repaired.document.graph.nodes).not.toHaveProperty('broken')
     expect(repaired.modules).not.toHaveProperty('broken')
-    expect(repaired.document.graph.nodes.hook).toMatchObject({ kind: 'webhook', bodyFields: [{ handle: 'value' }] })
+    expect(repaired.document.graph.nodes.hook).toMatchObject({ kind: 'webhook', method: 'POST', bodyFields: [{ handle: 'value' }] })
     const condition = repaired.document.graph.nodes.consumer
     if (condition?.kind != 'task') throw new Error('Expected the consumer node to be preserved.')
     expect(condition.inputs.value).toEqual({

@@ -8,7 +8,7 @@ import { decodeFlowDocument } from '../src/flow/common/changeSchema.ts'
 
 const target = { kind: 'flow' }
 const operations = [
-  { kind: 'graph.node.create', target, nodeId: 'start', node: { kind: 'webhook', name: 'Start', bodyFields: [] } },
+  { kind: 'graph.node.create', target, nodeId: 'start', node: { kind: 'webhook', method: 'POST', name: 'Start', bodyFields: [] } },
   {
     kind: 'graph.node.create',
     target,
@@ -91,6 +91,17 @@ describe('ChangeOperation wire contract', () => {
 
   it('publishes a schema that accepts the same complete batch', () => {
     expect(new Validator(changeOperationsSchema() as object).validate(operations).valid).toBe(true)
+  })
+
+  it.each([
+    { bodyFields: [], kind: 'webhook', method: 'HEAD', name: 'Webhook' },
+    { bodyFields: [], kind: 'webhook', method: 'POST', name: 'Webhook', options: { allowedMethods: ['POST'] } },
+    { bodyFields: [], kind: 'webhook', method: 'POST', name: 'Webhook', options: { noResponseBody: true } },
+    { bodyFields: [], kind: 'webhook', name: 'Webhook', options: { allowedMethods: ['POST'] } },
+  ])('rejects an unsupported or legacy Webhook contract: %j', (node) => {
+    const operation = [{ kind: 'graph.node.create', node, nodeId: 'webhook', target }]
+    expect(() => decodeChangeOperations(operation)).toThrow()
+    expect(new Validator(changeOperationsSchema() as object).validate(operation).valid).toBe(false)
   })
 
   it('accepts Approval as a separate node and rejects legacy actions on both resolution nodes', () => {

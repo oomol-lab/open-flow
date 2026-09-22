@@ -31,6 +31,24 @@ describe('built-in output presentation', () => {
     expect(presented[0]?.description).not.toBe('inspector.ports.builtIn.cron.scheduledAt')
   })
 
+  it.each(uiLanguages)('localizes Webhook outputs for %s without adding copy to their runtime definitions', (language) => {
+    const trigger: TriggerNode = { kind: 'webhook', method: 'POST', name: 'Webhook', bodyFields: [] }
+    const runtime = triggerOutputDefinitions(trigger)
+    const presented = presentBuiltInTriggerOutputs(trigger, createI18n(language).t)
+
+    expect(runtime.every((port) => port.description == null)).toBe(true)
+    expect(presented.map((port) => port.handle)).toEqual(['headers', 'query', 'body', 'webhookUrl'])
+    expect(presented.every((port) => port.description != null && !port.description.startsWith('inspector.'))).toBe(true)
+  })
+
+  it('keeps body and its description out of GET Webhook outputs', () => {
+    const trigger: TriggerNode = { kind: 'webhook', method: 'GET', name: 'Webhook', bodyFields: [] }
+    const presented = presentBuiltInTriggerOutputs(trigger, createI18n('zh-CN').t)
+
+    expect(presented.map((port) => port.handle)).toEqual(['headers', 'query', 'webhookUrl'])
+    expect(presented.every((port) => port.description != null)).toBe(true)
+  })
+
   it.each(['approval', 'wait'] as const)('reuses the canvas branch descriptions for %s outputs', (kind) => {
     const node = resolution(kind)
     const outputs = presentResolutionOutputs(node, createI18n('zh-CN').t)
@@ -60,6 +78,7 @@ describe('built-in output presentation', () => {
     const t = createI18n(language).t
     const cases: readonly { readonly node: GraphNode; readonly output: string }[] = [
       { node: { kind: 'cron', name: 'Schedule', cronTimes: [] }, output: 'scheduledAt' },
+      { node: { kind: 'webhook', method: 'POST', name: 'Webhook', bodyFields: [] }, output: 'body' },
       { node: resolution('wait'), output: 'pending' },
     ]
     for (const { node, output } of cases) {

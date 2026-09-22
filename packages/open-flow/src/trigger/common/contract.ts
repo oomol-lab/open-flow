@@ -2,6 +2,9 @@ import type { JsonValue, Port, PortDefinition, TriggerNode } from '../../flow/co
 
 import { isJsonObject } from '../../base/common/json.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'
+import { webhookMethods, webhookSupportsBody } from '../../flow/common/webhookMethod.ts'
+
+export { webhookMethods, webhookSupportsBody }
 
 export const webhookOutputs: readonly Port[] = [
   { handle: 'headers', jsonSchema: { type: 'object', additionalProperties: { type: 'string' } }, nullable: false },
@@ -27,18 +30,20 @@ export function triggerOutputDefinitions(trigger: TriggerNode): readonly Port[] 
     case 'integration':
       return trigger.definition.outputs
     case 'webhook':
-      return webhookOutputs.map((port) =>
-        port.handle === 'body'
-          ? Object.assign({}, port, {
-              jsonSchema: {
-                type: 'object',
-                additionalProperties: false,
-                properties: Object.fromEntries(trigger.bodyFields.map((field) => [field.handle, field.jsonSchema])),
-                required: trigger.bodyFields.filter((field) => !field.nullable && !Object.hasOwn(field, 'value')).map((field) => field.handle),
-              },
-            })
-          : port,
-      )
+      return webhookOutputs
+        .filter((port) => port.handle !== 'body' || webhookSupportsBody(trigger.method))
+        .map((port) =>
+          port.handle === 'body'
+            ? Object.assign({}, port, {
+                jsonSchema: {
+                  type: 'object',
+                  additionalProperties: false,
+                  properties: Object.fromEntries(trigger.bodyFields.map((field) => [field.handle, field.jsonSchema])),
+                  required: trigger.bodyFields.filter((field) => !field.nullable && !Object.hasOwn(field, 'value')).map((field) => field.handle),
+                },
+              })
+            : port,
+        )
   }
 }
 

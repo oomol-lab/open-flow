@@ -29,6 +29,7 @@ function revision(fixture: WebhookConformanceFixture, enabled = true): RevisionC
               webhook: {
                 bodyFields: fixture.bodyFields,
                 kind: 'webhook',
+                method: fixture.method,
                 name: 'Incoming webhook',
                 ...(fixture.options == null ? {} : { options: fixture.options }),
               },

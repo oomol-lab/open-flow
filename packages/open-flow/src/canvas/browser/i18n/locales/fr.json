@@ -135,7 +135,6 @@
     "webhookHeaderValue": "Valeur de l'en-tête",
     "webhookMethods": "Méthodes autorisées",
     "webhookNoPayloadFields": "La charge utile de la requête accepte un objet vide.",
-    "webhookNoResponseBody": "Aucun corps de réponse",
     "webhookNullable": "Autoriser null",
     "webhookOrigins": "Origines autorisées",
     "webhookPayloadFields": "Données de requête",

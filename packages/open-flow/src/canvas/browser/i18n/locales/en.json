@@ -135,7 +135,6 @@
     "webhookHeaderValue": "Header value",
     "webhookMethods": "Allowed methods",
     "webhookNoPayloadFields": "The request payload accepts an empty object.",
-    "webhookNoResponseBody": "No response body",
     "webhookNullable": "Allow null",
     "webhookOrigins": "Allowed origins",
     "webhookPayloadFields": "Request data",

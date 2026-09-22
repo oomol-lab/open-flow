@@ -267,7 +267,12 @@ describe('revision graph scheduler', () => {
               kind: 'task',
               task: task('ignored', ['event'], ['event']),
             },
-            incoming: { bodyFields: [{ handle: 'action', jsonSchema: { type: 'string' }, nullable: false }], kind: 'webhook', name: 'Incoming' },
+            incoming: {
+              bodyFields: [{ handle: 'action', jsonSchema: { type: 'string' }, nullable: false }],
+              kind: 'webhook',
+              method: 'POST',
+              name: 'Incoming',
+            },
             scheduled: { cronTimes: [{ type: 'every', unit: 'minute', value: 1 }], kind: 'cron', name: 'Scheduled' },
           },
         },
@@ -1402,7 +1407,7 @@ it('validates formed Webhook outputs at launch and checkpoint recovery without p
       tasks: {},
       graph: {
         nodes: {
-          start: { kind: 'webhook', name: 'Webhook', bodyFields: [] },
+          start: { kind: 'webhook', method: 'POST', name: 'Webhook', bodyFields: [] },
           wait: {
             kind: 'wait',
             prompt: 'Continue?',

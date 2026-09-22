@@ -57,7 +57,7 @@ it('offers a manual trigger again after the existing one is removed', () => {
   })
   expect(options.some((option) => option.id == 'trigger:manual')).toBe(false)
   const webhook = options.find((option) => option.id == 'trigger:webhook')!
-  expect(webhook.outputs).toEqual(triggerOutputDefinitions({ kind: 'webhook', name: 'Webhook', bodyFields: [] }))
+  expect(webhook.outputs).toEqual(triggerOutputDefinitions({ kind: 'webhook', method: 'POST', name: 'Webhook', bodyFields: [] }))
   expect(webhook.outputs.map((port) => port.handle)).toEqual(['headers', 'query', 'body', 'webhookUrl'])
   expect(webhook.outputs.map((port) => port.jsonSchema)).toEqual([
     { type: 'object', additionalProperties: { type: 'string' } },

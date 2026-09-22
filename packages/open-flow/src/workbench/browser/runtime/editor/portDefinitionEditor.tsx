@@ -17,6 +17,7 @@ import { FieldValueEditor } from '../../../../form/browser/fieldValueEditor.tsx'
 import { valueForEditor } from '../../../../form/common/editorComponent.ts'
 import { objectValue } from '../../../../form/common/value.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { Field } from '../../../../ui/browser/field.tsx'
 import { Popover } from '../../../../ui/browser/popover.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { fieldPanelAnchor } from './fieldPanelAnchor.ts'
@@ -36,6 +37,8 @@ type PortEditorProps = {
   title?: ReactNode
   titleIcon?: FieldSectionIcon
   defaultNullable?: boolean
+  emptyMessage?: ReactNode
+  embedded?: boolean
   reservedNames?: readonly string[]
   disabled: boolean
   allowAddGroup?: boolean
@@ -85,8 +88,17 @@ export function PortDefinitionEditor(props: PortEditorProps) {
       return type === 'array' || type === 'object'
     })
   const emptyMessage =
-    disabled && !hasFields ? (props.output ? t('inspector.ports.noOutputs') : titleIcon === 'input' ? t('inspector.ports.noInputs') : undefined) : undefined
+    !hasFields && props.emptyMessage != null
+      ? props.emptyMessage
+      : disabled && !hasFields
+        ? props.output
+          ? t('inspector.ports.noOutputs')
+          : titleIcon === 'input'
+            ? t('inspector.ports.noInputs')
+            : undefined
+        : undefined
   const canSort = fieldCount > 1
+  const lastFieldIndex = values.reduce((last, entry, index) => ('handle' in entry ? index : last), -1)
   const sortingEnabled = sorting && !disabled && canSort
   useEffect(() => {
     if (!canSort) setSorting(false)
@@ -118,7 +130,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
     let index = 1
     while (reservedNames.includes(`value${index}`) || values.some((port) => 'handle' in port && port.handle === `value${index}`)) index++
     pendingName.current = `value${index}`
-    onChange([...values, { handle: `value${index}`, jsonSchema: {}, nullable: defaultNullable }])
+    onChange([...values, { handle: `value${index}`, jsonSchema: { type: 'string' }, nullable: defaultNullable }])
   }
   const dragging = useRef<{
     index: number
@@ -361,6 +373,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         key={port.handle}
         className={styles.row}
         data-port={port.handle}
+        data-last-port={index === lastFieldIndex || undefined}
         data-editing={editingIndex === index || undefined}
         data-drop={drop?.index === index ? (drop.after ? 'after' : 'before') : undefined}
         data-port-index={index}
@@ -427,11 +440,12 @@ export function PortDefinitionEditor(props: PortEditorProps) {
       </FieldTableRow>
     )
   }
-  return (
-    <FieldSorting.Provider value={sortingEnabled}>
+  const content = (
+    <>
       {(props.title != null || props.layout === 'values' || !disabled) && (
         <FieldSectionHeader
           ref={heading}
+          compact={props.embedded}
           title={sectionTitle}
           onReset={disabled && hasFields ? props.onReset : undefined}
           disabled={disabled}
@@ -445,7 +459,11 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           onAdd={addField}
         />
       )}
-      {emptyMessage != null && <p className="m-0 pr-3 pb-4 pl-8 text-left text-xs text-muted-foreground">{emptyMessage}</p>}
+      {emptyMessage != null && (
+        <p className={props.embedded ? 'm-0 pt-2 pl-4 text-left text-xs text-muted-foreground' : 'm-0 pr-3 pb-4 pl-8 text-left text-xs text-muted-foreground'}>
+          {emptyMessage}
+        </p>
+      )}
       <FieldTable
         className={styles.list}
         layout={props.layout}
@@ -455,6 +473,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         empty={!hasFields}
         data-inputs={props.renderValue != null || undefined}
         data-composite-types={hasCompositeOutput || undefined}
+        data-embedded={props.embedded || undefined}
         ref={list}
       >
         <span className="sr-only" role="status" aria-live="polite">
@@ -549,6 +568,11 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           </div>
         )}
       </FieldTable>
+    </>
+  )
+  return (
+    <FieldSorting.Provider value={sortingEnabled}>
+      {props.embedded ? <Field className={styles.embeddedEditor}>{content}</Field> : content}
     </FieldSorting.Provider>
   )
 }

@@ -1,6 +1,8 @@
-import type { JsonValue, WebhookBodyField, WebhookOptions } from '../../flow/common/change.ts'
+import type { JsonValue, WebhookBodyField, WebhookMethod, WebhookOptions } from '../../flow/common/change.ts'
 
 import { dequal } from 'dequal/lite'
+
+export { webhookSupportsBody } from './contract.ts'
 
 export const maximumWebhookBodyBytes = 64 * 1024
 
@@ -21,6 +23,7 @@ export async function webhookOccurrenceId(endpointId: string, runtimeVersion: nu
 
 export interface WebhookConformanceFixture {
   readonly bodyFields: readonly WebhookBodyField[]
+  readonly method: WebhookMethod
   readonly options?: WebhookOptions
 }
 
@@ -86,8 +89,8 @@ const messagePayload = { event: { message: 'hello' } } as const
 
 export const webhookConformanceCases: readonly WebhookConformanceCase[] = [
   {
-    fixture: { bodyFields: messageInputs, options: { allowedMethods: ['POST', 'PUT'] } },
-    name: 'stores complete outputs and compares method query and body for idempotency',
+    fixture: { bodyFields: messageInputs, method: 'POST' },
+    name: 'stores complete outputs and compares query and body for idempotency',
     async verify(harness) {
       const url = `${harness.endpointUrl}?tag=a&tag=b&single=x&__proto__=safe&constructor=value`
       const input = {
@@ -112,13 +115,13 @@ export const webhookConformanceCases: readonly WebhookConformanceCase[] = [
       await response(await call(harness, { ...input, headers: { ...input.headers, 'X-Request-ID': 'retry' } }), { status: 200 }, 'Changed header retry')
       await response(await call(harness, { ...input, url: url.replace(new URL(url).host, 'retry.example.com') }), { status: 200 }, 'Changed request URL host')
       equal(await harness.outputs(), stored, 'First outputs remain unchanged')
-      await response(await call(harness, { ...input, method: 'PUT' }), { status: 409 }, 'Changed method')
+      await response(await call(harness, { ...input, method: 'PUT' }), { headers: { allow: 'POST' }, status: 405 }, 'Rejected method')
       await response(await call(harness, { ...input, url: `${url}&extra=1` }), { status: 409 }, 'Changed query')
       await response(await call(harness, { ...input, body: JSON.stringify({ event: { message: 'changed' } }) }), { status: 409 }, 'Changed body')
     },
   },
   {
-    fixture: { bodyFields: noInputs },
+    fixture: { bodyFields: noInputs, method: 'POST' },
     name: 'rejects malformed and unknown endpoint identities',
     async verify(harness) {
       const endpoint = new URL(harness.endpointUrl)
@@ -135,8 +138,8 @@ export const webhookConformanceCases: readonly WebhookConformanceCase[] = [
     },
   },
   {
-    fixture: { bodyFields: noInputs },
-    name: 'uses POST by default and decodes an empty body as an empty object',
+    fixture: { bodyFields: noInputs, method: 'POST' },
+    name: 'uses configured POST and decodes an empty body as an empty object',
     async verify(harness) {
       await response(await call(harness, { method: 'GET' }), { headers: { 'allow': 'POST', 'cache-control': 'no-store' }, status: 405 }, 'Default method')
       await response(await call(harness), { body: '', headers: { 'cache-control': 'no-store' }, status: 200 }, 'Empty payload')
@@ -150,8 +153,8 @@ export const webhookConformanceCases: readonly WebhookConformanceCase[] = [
   {
     fixture: {
       bodyFields: noInputs,
+      method: 'PUT',
       options: {
-        allowedMethods: ['PUT'],
         allowedOrigins: ['https://client.example'],
         responseData: 'accepted',
         responseHeaders: { 'x-webhook-response': 'configured' },
@@ -204,6 +207,7 @@ export const webhookConformanceCases: readonly WebhookConformanceCase[] = [
   {
     fixture: {
       bodyFields: noInputs,
+      method: 'POST',
       options: {
         responseData: '<script>globalThis.compromised = true</script>',
         responseHeaders: {
@@ -240,7 +244,7 @@ export const webhookConformanceCases: readonly WebhookConformanceCase[] = [
     },
   },
   {
-    fixture: { bodyFields: messageInputs },
+    fixture: { bodyFields: messageInputs, method: 'POST' },
     name: 'rejects invalid JSON, invalid payloads, invalid idempotency keys, and oversized bodies',
     async verify(harness) {
       await response(await call(harness, { body: '{' }), { body: '', headers: { 'cache-control': 'no-store' }, status: 400 }, 'Invalid JSON')
@@ -272,7 +276,7 @@ export const webhookConformanceCases: readonly WebhookConformanceCase[] = [
     },
   },
   {
-    fixture: { bodyFields: messageInputs },
+    fixture: { bodyFields: messageInputs, method: 'POST' },
     name: 'replays one idempotent occurrence and rejects conflicting payloads',
     async verify(harness) {
       const headers = { 'idempotency-key': 'delivery-1' }
@@ -291,7 +295,7 @@ export const webhookConformanceCases: readonly WebhookConformanceCase[] = [
     },
   },
   {
-    fixture: { bodyFields: messageInputs },
+    fixture: { bodyFields: messageInputs, method: 'POST' },
     name: 'admits requests without an idempotency key as separate occurrences',
     async verify(harness) {
       const body = JSON.stringify(messagePayload)
@@ -305,7 +309,7 @@ export const webhookConformanceCases: readonly WebhookConformanceCase[] = [
     },
   },
   {
-    fixture: { bodyFields: messageInputs },
+    fixture: { bodyFields: messageInputs, method: 'POST' },
     name: 'scopes occurrence identity to the current runtime version',
     async verify(harness) {
       const body = JSON.stringify(messagePayload)
@@ -323,7 +327,7 @@ export const webhookConformanceCases: readonly WebhookConformanceCase[] = [
     },
   },
   {
-    fixture: { bodyFields: noInputs },
+    fixture: { bodyFields: noInputs, method: 'POST' },
     name: 'fails closed after its trigger is retired',
     async verify(harness) {
       await harness.retire()
@@ -336,17 +340,21 @@ export const webhookConformanceCases: readonly WebhookConformanceCase[] = [
     },
   },
   {
-    fixture: { bodyFields: noInputs, options: { responseData: 'ignored', responseStatusCode: 204 } },
+    fixture: { bodyFields: noInputs, method: 'POST', options: { responseData: 'ignored', responseStatusCode: 204 } },
     name: 'omits a configured response body for null-body statuses',
     async verify(harness) {
       await response(await call(harness, { body: '{}' }), { body: '', status: 204 }, 'Null-body status')
     },
   },
   {
-    fixture: { bodyFields: noInputs, options: { allowedMethods: ['HEAD'], responseData: 'ignored' } },
-    name: 'omits the response body for HEAD requests',
+    fixture: { bodyFields: noInputs, method: 'GET', options: { responseData: 'ignored' } },
+    name: 'omits the body output for GET requests',
     async verify(harness) {
-      await response(await call(harness, { method: 'HEAD' }), { body: '', status: 200 }, 'HEAD response')
+      await response(await call(harness, { method: 'GET' }), { body: 'ignored', status: 200 }, 'GET response')
+      const outputs = await harness.outputs()
+      equal(outputs.length, 1, 'One GET run')
+      equal(Object.keys(outputs[0]!).toSorted(), ['headers', 'query', 'webhookUrl'], 'GET outputs omit body')
+      await response(await call(harness, { method: 'HEAD' }), { body: '', headers: { allow: 'GET' }, status: 405 }, 'HEAD rejected')
     },
   },
 ]

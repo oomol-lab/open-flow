@@ -65,12 +65,13 @@ const builtins: readonly TriggerNode[] = [
   },
   {
     kind: 'webhook',
+    method: 'POST',
     name: 'Webhook',
     bodyFields: [
       { handle: 'event', jsonSchema: { type: 'string' }, nullable: false },
       { handle: 'orderId', jsonSchema: { type: 'string' }, nullable: false },
     ],
-    options: { allowedMethods: ['POST'], responseStatusCode: 202 },
+    options: { responseStatusCode: 202 },
   },
 ]
 
@@ -163,13 +164,14 @@ export function triggerDraft(trigger: TriggerNode, downstream = false): { flow: 
 export const webhookValueFixtures: readonly TriggerFixture[] = [
   {
     id: 'Empty fixed object',
-    trigger: { kind: 'webhook', name: 'Empty request', bodyFields: [], options: {} },
+    trigger: { kind: 'webhook', method: 'POST', name: 'Empty request', bodyFields: [], options: {} },
     outputs: { headers: {}, query: {}, body: {}, webhookUrl: 'https://example.com/webhook' },
   },
   {
     id: 'Nested objects and arrays',
     trigger: {
       kind: 'webhook',
+      method: 'POST',
       name: 'Nested request',
       options: {},
       bodyFields: [

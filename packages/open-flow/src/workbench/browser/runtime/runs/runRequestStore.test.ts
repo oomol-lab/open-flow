@@ -327,7 +327,7 @@ function webhookDraft(): Draft {
       ...revision.content,
       document: {
         ...revision.content.document,
-        graph: { edges: [], nodes: { start: { kind: 'webhook', name: 'Webhook', bodyFields: [], options: {} } } },
+        graph: { edges: [], nodes: { start: { kind: 'webhook', method: 'POST', name: 'Webhook', bodyFields: [], options: {} } } },
       },
     },
   }

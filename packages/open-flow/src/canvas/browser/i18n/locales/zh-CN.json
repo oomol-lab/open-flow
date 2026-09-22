@@ -135,7 +135,6 @@
     "webhookHeaderValue": "响应头值",
     "webhookMethods": "允许的请求方法",
     "webhookNoPayloadFields": "请求载荷接受空对象。",
-    "webhookNoResponseBody": "不返回响应体",
     "webhookNullable": "允许 null",
     "webhookOrigins": "允许的来源",
     "webhookPayloadFields": "请求数据",

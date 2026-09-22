@@ -16,7 +16,7 @@ import type {
 import type { Diagnostic, SemanticClosure } from './semantics.ts'
 
 import { missingTriggerConfig, resolveTriggerConfig } from '../../trigger/common/config.ts'
-import { triggerOutputDefinitions, triggerOutputPorts } from '../../trigger/common/contract.ts'
+import { triggerOutputDefinitions, triggerOutputPorts, webhookSupportsBody } from '../../trigger/common/contract.ts'
 import { portsByHandle, validVariableName } from './change.ts'
 import { conditionInputPorts, nodeInputMappings, otherwiseOutput, unaryOperator, comparisonIssue, valueType } from './condition.ts'
 import { schemaObject, matchesSchema, comparePorts, portsAssignable, variableInputCompatible, hasRetiredRef } from './schema.ts'
@@ -40,6 +40,9 @@ function validateTrigger(triggerId: string, trigger: TriggerNode, document: Flow
   if (new Set(outputHandles).size !== outputHandles.length)
     diagnostics.push(graphDiagnostic('graph.port-duplicate', 'Trigger output handles must be unique.', `${path}/definition/outputs`))
   if (trigger.kind == 'webhook') {
+    if (!webhookSupportsBody(trigger.method) && trigger.bodyFields.length > 0) {
+      diagnostics.push(graphDiagnostic('trigger.webhook-body-unsupported', 'GET Webhook triggers cannot declare request body fields.', `${path}/bodyFields`))
+    }
     const handles = new Set<string>()
     for (const [index, input] of trigger.bodyFields.entries()) {
       if (handles.has(input.handle)) {

@@ -8,8 +8,8 @@ import { runFlow } from '../src/execution/common/scheduler.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
 
 const port = { handle: 'value', jsonSchema: {}, nullable: false } as const
-const start = { kind: 'webhook', name: 'Start', bodyFields: [] } as const
-const other = { kind: 'webhook', name: 'Other', bodyFields: [{ handle: 'entry', jsonSchema: { type: 'string' }, nullable: false }] } as const
+const start = { kind: 'webhook', method: 'POST', name: 'Start', bodyFields: [] } as const
+const other = { kind: 'webhook', method: 'POST', name: 'Other', bodyFields: [{ handle: 'entry', jsonSchema: { type: 'string' }, nullable: false }] } as const
 const task = {
   kind: 'task',
   inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'start', output: 'body' }] } },

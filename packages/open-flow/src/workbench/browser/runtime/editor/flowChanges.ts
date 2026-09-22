@@ -47,6 +47,7 @@ export function applyFlowChanges(draft: Draft, changes: FlowChanges): Draft {
 
 export interface WebhookSettings {
   readonly bodyFields: Extract<TriggerNode, { readonly kind: 'webhook' }>['bodyFields']
+  readonly method: Extract<TriggerNode, { readonly kind: 'webhook' }>['method']
   readonly options: WebhookOptions
 }
 
@@ -193,7 +194,7 @@ export function addNode(revision: RevisionView, target: GraphTarget, nodeId: str
       changes = target.kind == 'flow' ? createBuiltinTrigger(target, nodeId, { kind: 'manual', name: intent.name }) : undefined
       break
     case 'webhook':
-      changes = target.kind == 'flow' ? createBuiltinTrigger(target, nodeId, { bodyFields: [], kind: 'webhook', name: intent.name }) : undefined
+      changes = target.kind == 'flow' ? createBuiltinTrigger(target, nodeId, { bodyFields: [], kind: 'webhook', method: 'POST', name: intent.name }) : undefined
       break
     case 'cron':
       changes =
@@ -433,9 +434,9 @@ export function updateWebhook(
 ): FlowChanges | undefined {
   const trigger = revision.trigger(triggerId)
   if (trigger == null || trigger.kind != 'webhook') return
-  const before = { bodyFields: trigger.bodyFields, options: trigger.options }
-  const value = { bodyFields: settings.bodyFields, options: Object.keys(settings.options).length == 0 ? undefined : settings.options }
-  if (dequal(before.bodyFields, value.bodyFields) && dequal(before.options, value.options)) return []
+  const before = { bodyFields: trigger.bodyFields, method: trigger.method, options: trigger.options }
+  const value = { bodyFields: settings.bodyFields, method: settings.method, options: Object.keys(settings.options).length == 0 ? undefined : settings.options }
+  if (dequal(before, value)) return []
   return [{ before, kind: 'graph.node.webhook.set', nodeId: triggerId, target, value }]
 }
 

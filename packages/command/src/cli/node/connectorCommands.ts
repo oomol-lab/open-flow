@@ -265,7 +265,7 @@ export async function triggerCommand(
         }
         name = args.name?.trim() ?? 'Webhook'
         kind = 'webhook'
-        operations = createBuiltinTrigger(selected.target, triggerId, { bodyFields: [], kind, name })
+        operations = createBuiltinTrigger(selected.target, triggerId, { bodyFields: [], kind, method: 'POST', name })
       } else if (second == 'cron') {
         if (args.connection != null || Object.keys(values).length > 0) {
           throw new CliError('trigger.config-invalid', 'Cron creation does not accept --connection or --set.')
@@ -358,6 +358,7 @@ export async function triggerCommand(
               ...(description == null ? {} : { description }),
               bodyFields: resolved.trigger.bodyFields,
               kind: 'webhook',
+              method: resolved.trigger.method,
               name,
               options: resolved.trigger.options ?? {},
             })

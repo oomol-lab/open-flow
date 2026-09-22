@@ -96,6 +96,7 @@ export type TriggerSettings =
   | (TriggerSettingsBase & {
       readonly bodyFields: Extract<TriggerNode, { readonly kind: 'webhook' }>['bodyFields']
       readonly kind: 'webhook'
+      readonly method: Extract<TriggerNode, { readonly kind: 'webhook' }>['method']
       readonly options: WebhookOptions
     })
   | (TriggerSettingsBase & { readonly kind: 'cron'; readonly schedule: readonly TriggerSchedule[] })
@@ -506,8 +507,12 @@ export function updateTrigger(
       break
     case 'webhook': {
       if (trigger.kind != 'webhook') return
-      const value = { bodyFields: settings.bodyFields, options: Object.keys(settings.options).length == 0 ? undefined : settings.options }
-      const before = { bodyFields: trigger.bodyFields, options: trigger.options }
+      const value = {
+        bodyFields: settings.bodyFields,
+        method: settings.method,
+        options: Object.keys(settings.options).length == 0 ? undefined : settings.options,
+      }
+      const before = { bodyFields: trigger.bodyFields, method: trigger.method, options: trigger.options }
       if (!dequal(before, value)) operations.push({ before, kind: 'graph.node.webhook.set', nodeId, target, value })
       break
     }

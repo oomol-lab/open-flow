@@ -404,6 +404,12 @@
       "builtIn": {
         "cron": {
           "scheduledAt": "本次執行的排程觸發時間，採用 ISO 8601 格式。"
+        },
+        "webhook": {
+          "headers": "此 Webhook 請求攜帶的請求標頭。",
+          "query": "此 Webhook 請求攜帶的 URL 查詢參數。",
+          "body": "此 Webhook 請求攜帶的請求本文。",
+          "webhookUrl": "接收此次請求的 Webhook URL，不含查詢參數。"
         }
       }
     }
@@ -974,33 +980,27 @@
     "required": "需要輸入"
   },
   "webhookEditor": {
-    "webhookAddField": "新增欄位",
     "webhookAddHeader": "新增標頭",
-    "webhookCustomType": "自訂結構描述",
-    "webhookDeleteField": "刪除請求體欄位",
     "webhookDeleteHeader": "刪除回應標頭",
-    "webhookFieldName": "欄位名稱",
-    "webhookFieldNameDuplicate": "欄位名稱不能重複。",
-    "webhookFieldNameRequired": "請輸入欄位名稱。",
-    "webhookFieldType": "類型",
     "webhookHeaderName": "標頭名稱",
+    "webhookHeaderNameDuplicate": "標頭名稱不可重複。",
+    "webhookHeaderNameInvalid": "請輸入有效的 HTTP 標頭名稱。",
     "webhookHeaders": "回應標頭",
     "webhookHeaderValue": "標頭值",
-    "webhookMethods": "允許的請求方法",
-    "webhookNoResponseBody": "不回傳回應內容",
-    "webhookNullable": "允許 null",
-    "webhookOrigins": "允許的來源",
+    "webhookMethod": "請求方法",
+    "webhookOrigins": "允許請求來源",
+    "webhookOriginsHint": "多個來源請以逗號分隔；使用 * 允許任意來源。",
+    "webhookOriginsInvalid": "請輸入不含路徑的 HTTP 或 HTTPS 來源，或輸入 *。",
     "webhookAdvanced": "進階設定",
-    "webhookTest": "草稿測試",
-    "webhookTestHint": "點擊執行並填寫範例輸出進行測試。發佈工作流程後可取得 Webhook URL。",
     "webhookRequest": "請求",
-    "webhookResponse": "回應",
     "webhookResponseData": "回應內容",
-    "webhookStatus": "狀態碼",
-    "webhookSummary": "收到 HTTP 請求時觸發",
-    "webhookDescription": "透過產生的 HTTP 端點接收 JSON 物件。",
+    "webhookResponseDataPlaceholder": "留空則不回傳回應內容",
+    "webhookStatus": "回應狀態碼",
+    "webhookStatusDefault": "200（預設）",
+    "webhookStatusInvalid": "請輸入 200 到 599 之間的整數。",
     "webhookBodyFields": "請求體欄位",
-    "webhookNoBodyFields": "請求體接受空物件。"
+    "webhookNoBodyFields": "請求體接受空物件。",
+    "webhookNoHeaders": "尚未新增回應標頭。"
   },
   "conditionEditor": {
     "addCondition": "新增條件",
@@ -1065,7 +1065,8 @@
       "option": "已刪除選項「{{name}}」。",
       "case": "已刪除分支「{{name}}」。",
       "condition": "已刪除條件。",
-      "conditionGroup": "已刪除條件群組。"
+      "conditionGroup": "已刪除條件群組。",
+      "webhookBody": "已刪除 Webhook 請求體設定。"
     },
     "undo": "復原",
     "redo": "重做",

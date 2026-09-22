@@ -55,6 +55,7 @@ function webhookFlow(): RevisionContent {
           incoming: {
             bodyFields: [{ handle: 'message', ...stringPort }],
             kind: 'webhook',
+            method: 'POST',
             name: 'Incoming',
           },
         },

@@ -135,7 +135,6 @@
     "webhookHeaderValue": "レスポンスヘッダーの値",
     "webhookMethods": "許可するメソッド",
     "webhookNoPayloadFields": "リクエストペイロードは空のオブジェクトを受け付けます。",
-    "webhookNoResponseBody": "レスポンスボディなし",
     "webhookNullable": "null を許可",
     "webhookOrigins": "許可するオリジン",
     "webhookPayloadFields": "リクエストデータ",

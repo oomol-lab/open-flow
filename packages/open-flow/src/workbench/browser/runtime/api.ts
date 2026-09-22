@@ -75,6 +75,7 @@ export type {
   WaitAction,
   WaitNode,
   WebhookOptions,
+  WebhookMethod,
 } from '../../../flow/common/change.ts'
 
 type Fetcher = WorkbenchHost['request']

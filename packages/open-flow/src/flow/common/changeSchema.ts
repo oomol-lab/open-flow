@@ -3,6 +3,7 @@ import type { ChangeOperation, FlowDocument, JsonValue, RevisionContent } from '
 import { z } from 'zod'
 import { checkJsonDepth } from './json.ts'
 import { triggerScheduleSchema } from './triggerScheduleSchema.ts'
+import { webhookMethods } from './webhookMethod.ts'
 
 export const currentFlowModelVersion = 3
 const text = z.string()
@@ -112,18 +113,18 @@ const wait = {
   inputDefinitions: z.array(input),
   prompt: text,
 }
+const webhookOptions = z.object({
+  allowedMethods: z.never().optional(),
+  allowedOrigins: strings.optional(),
+  noResponseBody: z.never().optional(),
+  responseData: text.optional(),
+  responseHeaders: z.record(text, text).optional(),
+  responseStatusCode: z.number().int().min(200).max(599).optional(),
+})
 const webhook = {
   bodyFields: z.array(input),
-  options: z
-    .object({
-      allowedMethods: strings.optional(),
-      allowedOrigins: strings.optional(),
-      noResponseBody: z.boolean().optional(),
-      responseData: text.optional(),
-      responseHeaders: z.record(text, text).optional(),
-      responseStatusCode: z.number().optional(),
-    })
-    .optional(),
+  method: z.enum(webhookMethods),
+  options: webhookOptions.optional(),
 }
 const definition = {
   configInputs: ports.inputs,
@@ -288,9 +289,8 @@ function repairedEntries<Value>(value: unknown, schema: z.ZodType<Value>, repair
 
 function repairTriggerNode(value: unknown): unknown {
   const candidate = record(value)
-  if (candidate.kind == 'webhook' && candidate.bodyFields == null && candidate.inputsDef != null) {
+  if (candidate.kind == 'webhook' && candidate.bodyFields == null && candidate.inputsDef != null)
     return { ...candidate, bodyFields: candidate.inputsDef, inputsDef: undefined }
-  }
   if ((candidate.kind == 'poll' || candidate.kind == 'integration') && candidate.definition != null) {
     const legacyDefinition = record(candidate.definition)
     if (legacyDefinition.outputs == null && legacyDefinition.payloadSchema != null) {
@@ -411,7 +411,12 @@ const shapes = {
   'graph.node.condition.set': { ...at, before: z.object(condition), value: z.object(condition) },
   'graph.node.values.set': { ...at, before: z.array(input), value: z.array(input) },
   'graph.node.resolution.set': { ...at, target: z.object({ kind: z.literal('flow') }), before: z.object(wait), value: z.object(wait) },
-  'graph.node.webhook.set': { ...at, target: z.object({ kind: z.literal('flow') }), before: z.object(webhook), value: z.object(webhook) },
+  'graph.node.webhook.set': {
+    ...at,
+    target: z.object({ kind: z.literal('flow') }),
+    before: z.object(webhook),
+    value: z.object(webhook),
+  },
   'graph.node.task.ports.set': { ...at, before: z.object(ports), value: z.object(ports) },
   'graph.node.task.name.set': { ...at, before: text, value: text },
   'graph.node.task.capabilities.set': { ...at, before: z.array(capability).optional(), value: z.array(capability).optional() },

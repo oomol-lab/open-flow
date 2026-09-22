@@ -404,6 +404,12 @@
       "builtIn": {
         "cron": {
           "scheduledAt": "이 실행을 트리거한 예약 시간이며 ISO 8601 형식입니다."
+        },
+        "webhook": {
+          "headers": "이 Webhook 요청과 함께 수신된 요청 헤더입니다.",
+          "query": "이 Webhook 요청과 함께 수신된 URL 쿼리 매개변수입니다.",
+          "body": "이 Webhook 요청과 함께 수신된 요청 본문입니다.",
+          "webhookUrl": "이 요청을 수신한 Webhook URL이며 쿼리 매개변수는 포함하지 않습니다."
         }
       }
     }
@@ -974,33 +980,27 @@
     "required": "입력 필요"
   },
   "webhookEditor": {
-    "webhookAddField": "필드 추가",
     "webhookAddHeader": "헤더 추가",
-    "webhookCustomType": "사용자 지정 스키마",
-    "webhookDeleteField": "본문 필드 삭제",
     "webhookDeleteHeader": "응답 헤더 삭제",
-    "webhookFieldName": "필드 이름",
-    "webhookFieldNameDuplicate": "필드 이름은 중복될 수 없습니다.",
-    "webhookFieldNameRequired": "필드 이름을 입력하세요.",
-    "webhookFieldType": "타입",
     "webhookHeaderName": "헤더 이름",
+    "webhookHeaderNameDuplicate": "헤더 이름은 중복될 수 없습니다.",
+    "webhookHeaderNameInvalid": "유효한 HTTP 헤더 이름을 입력하세요.",
     "webhookHeaders": "응답 헤더",
     "webhookHeaderValue": "헤더 값",
-    "webhookMethods": "허용 메서드",
-    "webhookNoResponseBody": "응답 본문 없음",
-    "webhookNullable": "null 허용",
-    "webhookOrigins": "허용 출처",
+    "webhookMethod": "요청 메서드",
+    "webhookOrigins": "허용 요청 출처",
+    "webhookOriginsHint": "여러 출처는 쉼표로 구분합니다. 모든 출처를 허용하려면 *를 사용하세요.",
+    "webhookOriginsInvalid": "경로가 없는 HTTP 또는 HTTPS 출처나 *를 입력하세요.",
     "webhookAdvanced": "고급 설정",
-    "webhookTest": "초안 테스트",
-    "webhookTestHint": "실행을 클릭하고 테스트 출력을 입력하세요. 워크플로를 게시하면 Webhook URL을 받을 수 있습니다.",
     "webhookRequest": "요청",
-    "webhookResponse": "응답",
     "webhookResponseData": "응답 본문",
-    "webhookStatus": "상태 코드",
-    "webhookSummary": "HTTP 요청이 도착하면 실행",
-    "webhookDescription": "생성된 HTTP 엔드포인트로 JSON 객체를 수신합니다.",
+    "webhookResponseDataPlaceholder": "비워 두면 응답 본문을 반환하지 않습니다.",
+    "webhookStatus": "응답 상태 코드",
+    "webhookStatusDefault": "200(기본값)",
+    "webhookStatusInvalid": "200에서 599 사이의 정수를 입력하세요.",
     "webhookBodyFields": "요청 본문 필드",
-    "webhookNoBodyFields": "요청 본문은 빈 객체를 허용합니다."
+    "webhookNoBodyFields": "요청 본문은 빈 객체를 허용합니다.",
+    "webhookNoHeaders": "응답 헤더가 없습니다."
   },
   "conditionEditor": {
     "addCondition": "조건 추가",
@@ -1065,7 +1065,8 @@
       "option": "옵션 ‘{{name}}’을(를) 삭제했습니다.",
       "case": "케이스 ‘{{name}}’을(를) 삭제했습니다.",
       "condition": "조건을 삭제했습니다.",
-      "conditionGroup": "조건 그룹을 삭제했습니다."
+      "conditionGroup": "조건 그룹을 삭제했습니다.",
+      "webhookBody": "Webhook 요청 본문 구성을 삭제했습니다."
     },
     "undo": "실행 취소",
     "redo": "다시 실행",

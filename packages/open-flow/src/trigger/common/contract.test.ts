@@ -4,7 +4,12 @@ import { describe, expect, it } from 'vitest'
 import { matchesTriggerOutputs, triggerOutputDefinitions } from './contract.ts'
 import { computeTriggerDefinitionDigest, validateTriggerDefinitionSchemas } from './definition.ts'
 
-const webhook: TriggerNode = { kind: 'webhook', name: 'Webhook', bodyFields: [{ handle: 'message', jsonSchema: { type: 'string' }, nullable: false }] }
+const webhook: TriggerNode = {
+  kind: 'webhook',
+  method: 'POST',
+  name: 'Webhook',
+  bodyFields: [{ handle: 'message', jsonSchema: { type: 'string' }, nullable: false }],
+}
 const outputs = { headers: {}, query: {}, body: { message: 'hello' }, webhookUrl: 'https://example.com/webhook' }
 const ports = [
   { handle: 'text', jsonSchema: { type: 'string' }, nullable: false },
@@ -17,6 +22,17 @@ it('declares ordered built-in ports', () => {
   expect(triggerOutputDefinitions(webhook).map((port) => port.handle)).toEqual(['headers', 'query', 'body', 'webhookUrl'])
   expect(matchesTriggerOutputs({ kind: 'manual', name: 'Manual' }, {})).toBe(true)
   expect(matchesTriggerOutputs({ kind: 'manual', name: 'Manual' }, { payload: null })).toBe(false)
+})
+
+it.each(['POST', 'PUT', 'PATCH', 'DELETE'] as const)('%s exposes the request body output', (method) => {
+  expect(triggerOutputDefinitions({ ...webhook, method }).map((port) => port.handle)).toEqual(['headers', 'query', 'body', 'webhookUrl'])
+})
+
+it('omits the request body output for GET', () => {
+  const get = { ...webhook, bodyFields: [], method: 'GET' as const }
+  expect(triggerOutputDefinitions(get).map((port) => port.handle)).toEqual(['headers', 'query', 'webhookUrl'])
+  expect(matchesTriggerOutputs(get, { headers: {}, query: {}, webhookUrl: 'https://example.com/webhook' })).toBe(true)
+  expect(matchesTriggerOutputs(get, outputs)).toBe(false)
 })
 
 it('validates the Cron scheduled time as a direct output', () => {

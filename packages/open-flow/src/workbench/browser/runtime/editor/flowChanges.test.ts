@@ -3,6 +3,7 @@ import type { Draft } from '../api.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
+import { checkInputSource } from '../../../../flow/common/graph.ts'
 import { inverseFlowChanges } from '../../../../flow/common/inverseChanges.ts'
 import { resetInputValues, setTriggerConnection, updateTriggerSchedule } from '../../../../flow/common/nodeChanges.ts'
 import { revisionView } from '../revisionView.ts'
@@ -732,22 +733,81 @@ describe('Webhook product editing', () => {
           ...base.content.document,
           graph: {
             edges: [],
-            nodes: { hook: { kind: 'webhook' as const, name: 'Inbound', bodyFields: [] } },
+            nodes: { hook: { kind: 'webhook' as const, method: 'POST' as const, name: 'Inbound', bodyFields: [] } },
           },
         },
       },
     }
     const settings = {
       bodyFields: [{ handle: 'event', jsonSchema: { type: 'object' }, nullable: false }],
-      options: { allowedMethods: ['PUT'], responseStatusCode: 202, responseHeaders: { 'X-Example': 'yes' } },
+      method: 'PUT' as const,
+      options: { responseStatusCode: 202, responseHeaders: { 'X-Example': 'yes' } },
     }
     const changes = updateWebhook(revisionView(current), { kind: 'flow' }, 'hook', settings)
     expect(changes).toBeDefined()
     const updated = applyFlowChanges(current, changes!)
-    expect(updated.content.document.graph.nodes.hook).toEqual({ kind: 'webhook', name: 'Inbound', bodyFields: settings.bodyFields, options: settings.options })
+    expect(updated.content.document.graph.nodes.hook).toEqual({
+      kind: 'webhook',
+      method: 'PUT',
+      name: 'Inbound',
+      bodyFields: settings.bodyFields,
+      options: settings.options,
+    })
     expect(updateWebhook(revisionView(updated), { kind: 'flow' }, 'hook', settings)).toEqual([])
-    const cleared = applyFlowChanges(updated, updateWebhook(revisionView(updated), { kind: 'flow' }, 'hook', { bodyFields: settings.bodyFields, options: {} })!)
-    expect(cleared.content.document.graph.nodes.hook).toEqual({ kind: 'webhook', name: 'Inbound', bodyFields: settings.bodyFields })
+    const cleared = applyFlowChanges(
+      updated,
+      updateWebhook(revisionView(updated), { kind: 'flow' }, 'hook', { bodyFields: settings.bodyFields, method: 'POST', options: {} })!,
+    )
+    expect(cleared.content.document.graph.nodes.hook).toEqual({ kind: 'webhook', method: 'POST', name: 'Inbound', bodyFields: settings.bodyFields })
+  })
+
+  it('keeps a downstream body reference missing until one undo restores the previous Webhook', () => {
+    const base = draft('export default () => ({})')
+    const current: Draft = {
+      ...base,
+      content: {
+        ...base.content,
+        document: {
+          ...base.content.document,
+          graph: {
+            edges: [{ source: 'hook', target: 'task' }],
+            nodes: {
+              hook: {
+                bodyFields: [{ handle: 'event', jsonSchema: { type: 'string' }, nullable: false }],
+                kind: 'webhook',
+                method: 'POST',
+                name: 'Inbound',
+              },
+              task: {
+                inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'hook', output: 'body' }] } },
+                kind: 'task',
+                task: {
+                  inputs: [{ handle: 'value', jsonSchema: {}, nullable: true }],
+                  moduleId: 'module',
+                  name: 'Code',
+                  outputs: [],
+                },
+              },
+            },
+          },
+        },
+      },
+    }
+    const changes = updateWebhook(revisionView(current), { kind: 'flow' }, 'hook', { bodyFields: [], method: 'GET', options: {} })!
+    expect(changes).toHaveLength(1)
+    const get = applyFlowChanges(current, changes)
+    expect(get.content.document.graph.nodes.task).toMatchObject({
+      inputs: { value: { sources: [{ nodeId: 'hook', output: 'body' }] } },
+    })
+    expect(checkInputSource(get.content.document, get.content.document.graph, 'task', 'value', { nodeId: 'hook', output: 'body' })).toEqual({
+      kind: 'output-missing',
+    })
+
+    const restored = applyFlowChanges(get, inverseFlowChanges(current.content, changes))
+    expect(restored.content.document.graph).toEqual(current.content.document.graph)
+    expect(checkInputSource(restored.content.document, restored.content.document.graph, 'task', 'value', { nodeId: 'hook', output: 'body' })).toEqual({
+      kind: 'available',
+    })
   })
 })
 
@@ -772,7 +832,7 @@ it('keeps manual trigger names fixed while allowing other trigger names to chang
   const target = { kind: 'flow' } as const
   Object.assign(current.content.document.graph.nodes, {
     manual: { kind: 'manual', name: 'Manual trigger' },
-    webhook: { kind: 'webhook', name: 'Webhook', bodyFields: [] },
+    webhook: { kind: 'webhook', method: 'POST', name: 'Webhook', bodyFields: [] },
     schedule: { kind: 'cron', name: 'Schedule', cronTimes: [] },
   })
   const revision = revisionView(current)

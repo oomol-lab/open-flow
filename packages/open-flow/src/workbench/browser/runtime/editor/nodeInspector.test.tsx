@@ -244,6 +244,30 @@ describe('Provider Trigger sections', () => {
   })
 })
 
+describe('Webhook Trigger sections', () => {
+  it('provides Outputs to the Webhook editor for owned section ordering', () => {
+    const trigger = { bodyFields: [], kind: 'webhook', method: 'POST', name: 'Webhook', options: {} }
+    const element = NodeInspector({
+      variables: { enabled: false, names: [], loaded: true, loading: false, onOpen: vi.fn() },
+      connectorAuthorizationPending: false,
+      connectorLoading: false,
+      connectors: {} as never,
+      disabled: false,
+      revision: {} as never,
+      selection: { id: 'webhook-trigger', kind: 'trigger', node: trigger, trigger } as never,
+      store: { $: { flowId: { value: 'flow' } }, saveWebhook: vi.fn() } as never,
+      target: { kind: 'flow' },
+      theme: 'light',
+      triggerAuthorizationPending: false,
+      triggerConnectionLoading: false,
+      triggers: {} as never,
+    })
+    const editor = find(element, (item) => typeof item.type == 'function' && item.type.name == 'WebhookEditor')
+    expect(isValidElement(editor?.props.outputSection)).toBe(true)
+    expect(typeof editor?.props.outputSection.type == 'function' ? editor.props.outputSection.type.name : undefined).toBe('TriggerSummary')
+  })
+})
+
 describe('Resolution Inspector', () => {
   it.each(['approval', 'wait'] as const)('saves the latest %s prompt on blur and preserves the node name', (kind) => {
     const saveResolution = vi.fn().mockResolvedValue(true)

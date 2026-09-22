@@ -5,6 +5,7 @@ import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
+import { cn } from '../../../../ui/browser/utils.ts'
 
 export type FieldSectionIcon = 'input' | 'output' | 'configuration'
 
@@ -29,17 +30,18 @@ interface FieldSectionHeaderProps {
   addLabel: string
   onReset?: () => void
   onAdd: () => void
+  compact?: boolean
 }
 
 /** Shared heading and actions for editable property-panel field lists. */
 export const FieldSectionHeader = forwardRef<HTMLDivElement, FieldSectionHeaderProps>(function FieldSectionHeader(
-  { title, disabled, canSort, sorting, onToggleSorting, addLabel, onAdd, onReset },
+  { title, disabled, canSort, sorting, onToggleSorting, addLabel, onAdd, onReset, compact },
   ref,
 ) {
   const t = useTranslate()
   const sortLabel = t(sorting ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')
   return (
-    <div ref={ref} className="inspector-section-title justify-between">
+    <div ref={ref} className={cn(compact ? 'flex min-h-7 items-center gap-2' : 'inspector-section-title', 'justify-between')}>
       {title != null ? <FieldLabel>{title}</FieldLabel> : <span />}
       {onReset && (
         <Tooltip>

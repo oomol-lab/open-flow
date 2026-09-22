@@ -159,7 +159,7 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
       inputs: [],
       kind: 'trigger',
       label: t('addNode.webhook'),
-      outputs: triggerOutputDefinitions({ kind: 'webhook', name: 'Webhook', bodyFields: [] }),
+      outputs: triggerOutputDefinitions({ kind: 'webhook', method: 'POST', name: 'Webhook', bodyFields: [] }),
       trigger: { kind: 'webhook' },
     },
     {

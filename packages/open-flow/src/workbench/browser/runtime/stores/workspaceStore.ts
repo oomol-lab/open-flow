@@ -94,6 +94,7 @@ const deletionMessageKeys = {
   case: 'history.deleted.case',
   condition: 'history.deleted.condition',
   conditionGroup: 'history.deleted.conditionGroup',
+  webhookBody: 'history.deleted.webhookBody',
 } as const satisfies Readonly<Record<PropertyDeletion['target'], string>>
 
 interface Clipboard {

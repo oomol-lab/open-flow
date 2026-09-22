@@ -35,6 +35,33 @@ function validate(source: RevisionFixture, moduleIds: readonly string[]) {
   return validateModules(source, moduleIds, engine)
 }
 
+it('rejects request body fields on a GET Webhook', async () => {
+  const content: RevisionFixture = {
+    document: {
+      bindings: {},
+      graph: {
+        edges: [],
+        nodes: {
+          webhook: {
+            bodyFields: [{ handle: 'event', jsonSchema: { type: 'string' }, nullable: false }],
+            kind: 'webhook',
+            method: 'GET',
+            name: 'Webhook',
+          },
+        },
+      },
+      subflows: {},
+      tasks: {},
+    },
+    modelVersion: currentFlowModelVersion,
+    modules: {},
+  }
+  await expect(validateFlow(content, engine)).resolves.toMatchObject({
+    diagnostics: [expect.objectContaining({ code: 'trigger.webhook-body-unsupported', path: '/document/graph/nodes/webhook/bodyFields' })],
+    valid: false,
+  })
+})
+
 function variableRevision(jsonSchema: JsonValue): RevisionFixture {
   const source = revision('export default ({ token }) => ({ token })')
   const task = source.document.graph.nodes.task

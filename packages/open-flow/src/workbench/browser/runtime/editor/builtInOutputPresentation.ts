@@ -16,8 +16,27 @@ function withDescriptions(ports: readonly Port[], descriptionFor: (handle: strin
 /** Adds localized UI copy to built-in Trigger outputs without changing their runtime definitions. */
 export function presentBuiltInTriggerOutputs(trigger: TriggerNode, t: TFunction): readonly Port[] {
   const ports = triggerOutputDefinitions(trigger)
-  if (trigger.kind !== 'cron') return ports
-  return withDescriptions(ports, (handle) => (handle === 'scheduledAt' ? t('inspector.ports.builtIn.cron.scheduledAt') : undefined))
+  switch (trigger.kind) {
+    case 'cron':
+      return withDescriptions(ports, (handle) => (handle === 'scheduledAt' ? t('inspector.ports.builtIn.cron.scheduledAt') : undefined))
+    case 'webhook':
+      return withDescriptions(ports, (handle) => {
+        switch (handle) {
+          case 'headers':
+            return t('inspector.ports.builtIn.webhook.headers')
+          case 'query':
+            return t('inspector.ports.builtIn.webhook.query')
+          case 'body':
+            return t('inspector.ports.builtIn.webhook.body')
+          case 'webhookUrl':
+            return t('inspector.ports.builtIn.webhook.webhookUrl')
+          default:
+            return
+        }
+      })
+    default:
+      return ports
+  }
 }
 
 /** Adds canvas-owned branch copy to built-in Wait and Approval outputs for inspector display only. */
@@ -32,6 +51,7 @@ function presentedBuiltInOutputs(node: GraphNode, t: TFunction): readonly Port[]
     case 'wait':
       return presentResolutionOutputs(node, t)
     case 'cron':
+    case 'webhook':
       return presentBuiltInTriggerOutputs(node, t)
     default:
       return

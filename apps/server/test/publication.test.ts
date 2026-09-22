@@ -41,6 +41,7 @@ function revision(name = 'Incoming', webhook = true): RevisionContent {
                 incoming: {
                   bodyFields: [{ handle: 'message', ...message }],
                   kind: 'webhook' as const,
+                  method: 'POST' as const,
                   name,
                   options: { responseData: name, responseStatusCode: 202 },
                 },
@@ -147,7 +148,7 @@ describe('Server Publication and Webhook target', () => {
       revision: content,
       revisionId: 'revision-a',
       runtimeVersion: 1,
-      trigger: { kind: 'webhook', name: 'Incoming' },
+      trigger: { kind: 'webhook', method: 'POST', name: 'Incoming' },
       triggerNodeId: 'incoming',
     })
     expect(target?.closureDigest).toMatch(/^sha256:[0-9a-f]{64}$/)

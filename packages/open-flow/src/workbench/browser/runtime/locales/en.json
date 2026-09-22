@@ -404,6 +404,12 @@
       "builtIn": {
         "cron": {
           "scheduledAt": "The scheduled time that triggered this run, in ISO 8601 format."
+        },
+        "webhook": {
+          "headers": "The headers received with this Webhook request.",
+          "query": "The URL query parameters received with this Webhook request.",
+          "body": "The body received with this Webhook request.",
+          "webhookUrl": "The Webhook URL that received this request, without query parameters."
         }
       }
     }
@@ -974,33 +980,27 @@
     "required": "Input required"
   },
   "webhookEditor": {
-    "webhookAddField": "Add field",
     "webhookAddHeader": "Add header",
-    "webhookCustomType": "Custom schema",
-    "webhookDeleteField": "Delete body field",
     "webhookDeleteHeader": "Delete response header",
-    "webhookFieldName": "Field name",
-    "webhookFieldNameDuplicate": "Field names must be unique.",
-    "webhookFieldNameRequired": "Enter a field name.",
-    "webhookFieldType": "Type",
     "webhookHeaderName": "Header name",
+    "webhookHeaderNameDuplicate": "Header names must be unique.",
+    "webhookHeaderNameInvalid": "Enter a valid HTTP header name.",
     "webhookHeaders": "Response headers",
     "webhookHeaderValue": "Header value",
-    "webhookMethods": "Allowed methods",
-    "webhookNoResponseBody": "No response body",
-    "webhookNullable": "Allow null",
-    "webhookOrigins": "Allowed origins",
+    "webhookMethod": "Request method",
+    "webhookOrigins": "Allowed request origins",
+    "webhookOriginsHint": "Separate multiple origins with commas. Use * to allow any origin.",
+    "webhookOriginsInvalid": "Enter HTTP or HTTPS origins without paths, or *.",
     "webhookAdvanced": "Advanced settings",
-    "webhookTest": "Draft test",
-    "webhookTestHint": "Click Run and enter sample outputs to test. Publish the workflow to get its Webhook URL.",
     "webhookRequest": "Request",
-    "webhookResponse": "Response",
     "webhookResponseData": "Response body",
-    "webhookStatus": "Status code",
-    "webhookSummary": "When an HTTP request arrives",
-    "webhookDescription": "Receive a JSON object through a generated HTTP endpoint.",
+    "webhookResponseDataPlaceholder": "Leave blank to return no response body.",
+    "webhookStatus": "Response status code",
+    "webhookStatusDefault": "200 (default)",
+    "webhookStatusInvalid": "Enter an integer from 200 to 599.",
     "webhookBodyFields": "Request body fields",
-    "webhookNoBodyFields": "The request body accepts an empty object."
+    "webhookNoBodyFields": "The request body accepts an empty object.",
+    "webhookNoHeaders": "No response headers."
   },
   "conditionEditor": {
     "addCondition": "Add condition",
@@ -1065,7 +1065,8 @@
       "option": "Deleted option “{{name}}”.",
       "case": "Deleted case “{{name}}”.",
       "condition": "Deleted condition.",
-      "conditionGroup": "Deleted condition group."
+      "conditionGroup": "Deleted condition group.",
+      "webhookBody": "Deleted Webhook request body configuration."
     },
     "undo": "Undo",
     "redo": "Redo",

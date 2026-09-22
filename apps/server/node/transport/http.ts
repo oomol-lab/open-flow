@@ -9,7 +9,7 @@ import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { waitActionBodySchema } from '@oomol-lab/open-flow/control-requests'
 import { resourceNameIssue } from '@oomol-lab/open-flow/flow-change'
 import { integrationEndpointId } from '@oomol-lab/open-flow/integration-trigger'
-import { maximumWebhookBodyBytes, webhookEndpointId, webhookOccurrenceId } from '@oomol-lab/open-flow/webhook-trigger'
+import { maximumWebhookBodyBytes, webhookEndpointId, webhookOccurrenceId, webhookSupportsBody } from '@oomol-lab/open-flow/webhook-trigger'
 import { Hono } from 'hono'
 import { parseAccept } from 'hono/utils/accept'
 import { randomUUID } from 'node:crypto'
@@ -25,7 +25,6 @@ import { handleIntegration } from './integration.ts'
 import { createMcpApp } from './mcp.ts'
 import { serverPaths } from './server-paths.ts'
 
-const defaultWebhookMethods = ['POST'] as const
 const nullBodyStatuses = new Set([204, 205, 304])
 const forbiddenWebhookResponseHeaders = new Set([
   'connection',
@@ -412,16 +411,16 @@ async function webhook(
     if (target == null) return plain(404)
     const retryAfter = admitCallback(`webhook:${endpointId}`)
     if (retryAfter != null) return plain(429, { 'retry-after': String(retryAfter) })
-    const methods = (target.trigger.options?.allowedMethods ?? defaultWebhookMethods).map((method) => method.toUpperCase())
+    const configuredMethod = target.trigger.method
     const requestOrigin = requestHeader(request, 'origin')
     origin = corsOrigin(requestOrigin, target.trigger.options?.allowedOrigins)
-    const preflightResponse = preflight(request, methods, origin)
+    const preflightResponse = preflight(request, configuredMethod, origin)
     if (preflightResponse != null) return preflightResponse
     if (requestOrigin != null && origin == null) return plain(403)
     const method = request.method
-    if (!methods.includes(method)) return plain(405, { allow: methods.join(', ') }, origin)
+    if (method !== configuredMethod) return plain(405, { allow: configuredMethod }, origin)
 
-    const body = await readWebhookBody(request)
+    const body = webhookSupportsBody(configuredMethod) ? await readWebhookBody(request) : undefined
     const url = new URL(request.url)
     const query = Object.fromEntries(
       [...new Set(url.searchParams.keys())].map((key) => {
@@ -431,14 +430,19 @@ async function webhook(
     )
     url.search = ''
     url.hash = ''
-    const outputs = { headers: Object.fromEntries(request.headers), query, body, webhookUrl: url.href }
+    const outputs = {
+      headers: Object.fromEntries(request.headers),
+      query,
+      ...(body === undefined ? {} : { body }),
+      webhookUrl: url.href,
+    }
     const occurrenceId = await webhookOccurrenceId(endpointId, target.runtimeVersion, requestHeader(request, 'idempotency-key') ?? null)
     if (occurrenceId == null) throw new WebhookRequestInvalid()
-    const accepted = await service.acceptWebhookTarget(target, occurrenceId, method, outputs)
+    const accepted = await service.acceptWebhookTarget(target, occurrenceId, configuredMethod, outputs)
     if (accepted == null) return plain(404)
     if (accepted.kind == 'conflict') return plain(409, undefined, origin)
     if (accepted.kind == 'overloaded') return plain(429, undefined, origin)
-    return webhookSuccess(method, target.trigger, origin)
+    return webhookSuccess(target.trigger, origin)
   } catch (error) {
     if (error instanceof WebhookBodyTooLarge) return plain(413, undefined, origin)
     if (error instanceof WebhookRequestInvalid || (error instanceof AcceptanceError && error.code == 'trigger-outputs-invalid')) {
@@ -465,12 +469,12 @@ function corsOrigin(origin: string | undefined, allowedOrigins: readonly string[
   if (allowedOrigins?.includes(origin)) return origin
 }
 
-function preflight(request: Request, methods: readonly string[], origin: string | undefined): Response | undefined {
+function preflight(request: Request, method: string, origin: string | undefined): Response | undefined {
   const requestedMethod = requestHeader(request, 'access-control-request-method')?.toUpperCase()
   if (request.method != 'OPTIONS' || requestedMethod == null) return
-  if (origin == null || !methods.includes(requestedMethod)) return plain(403)
+  if (origin == null || requestedMethod !== method) return plain(403)
   const headers = new Headers({
-    'access-control-allow-methods': methods.join(', '),
+    'access-control-allow-methods': method,
     'access-control-max-age': '600',
     'vary': 'Origin, Access-Control-Request-Method, Access-Control-Request-Headers',
   })
@@ -479,7 +483,7 @@ function preflight(request: Request, methods: readonly string[], origin: string 
   return plain(204, headers, origin)
 }
 
-function webhookSuccess(method: string, trigger: Extract<TriggerNode, { readonly kind: 'webhook' }>, origin: string | undefined): Response {
+function webhookSuccess(trigger: Extract<TriggerNode, { readonly kind: 'webhook' }>, origin: string | undefined): Response {
   const status = trigger.options?.responseStatusCode ?? 200
   const headers = new Headers(trigger.options?.responseHeaders)
   for (const name of forbiddenWebhookResponseHeaders) headers.delete(name)
@@ -491,7 +495,7 @@ function webhookSuccess(method: string, trigger: Extract<TriggerNode, { readonly
   headers.set('x-content-type-options', 'nosniff')
   headers.set('x-frame-options', 'DENY')
   withOrigin(headers, origin)
-  const body = trigger.options?.noResponseBody || method == 'HEAD' || nullBodyStatuses.has(status) ? null : (trigger.options?.responseData ?? null)
+  const body = nullBodyStatuses.has(status) ? null : (trigger.options?.responseData ?? null)
   return text(status, body, headers)
 }
 

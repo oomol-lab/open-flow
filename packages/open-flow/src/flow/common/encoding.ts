@@ -299,9 +299,7 @@ function canonicalTriggerDefinition(snapshot: TriggerKeySnapshot): JsonValue {
 
 function canonicalWebhookOptions(value: WebhookOptions): JsonValue {
   return {
-    ...(value.allowedMethods == null ? {} : { allowedMethods: value.allowedMethods }),
     ...(value.allowedOrigins == null ? {} : { allowedOrigins: value.allowedOrigins }),
-    ...(value.noResponseBody == null ? {} : { noResponseBody: value.noResponseBody }),
     ...(value.responseData == null ? {} : { responseData: value.responseData }),
     ...(value.responseHeaders == null ? {} : { responseHeaders: value.responseHeaders }),
     ...(value.responseStatusCode == null ? {} : { responseStatusCode: value.responseStatusCode }),
@@ -331,6 +329,7 @@ function canonicalTriggerNode(trigger: TriggerNode): JsonValue {
       return {
         ...common(trigger.kind),
         bodyFields: trigger.bodyFields.map((input) => ({ handle: input.handle, ...canonicalPort(input) })),
+        method: trigger.method,
         ...(trigger.options == null ? {} : { options: canonicalWebhookOptions(trigger.options) }),
       }
     case 'cron':

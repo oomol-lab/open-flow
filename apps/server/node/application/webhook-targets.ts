@@ -57,7 +57,7 @@ export class WebhookTargets {
         occurrenceId,
         method,
         query: outputs.query!,
-        body: outputs.body!,
+        ...(Object.hasOwn(outputs, 'body') ? { body: outputs.body! } : {}),
         protocolVersion: 2,
         publicationId: target.publicationId,
         revisionDigest: fixed.revisionDigest,

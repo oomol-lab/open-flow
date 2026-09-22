@@ -135,7 +135,6 @@
     "webhookHeaderValue": "Значение заголовка",
     "webhookMethods": "Разрешённые методы",
     "webhookNoPayloadFields": "Полезная нагрузка запроса принимает пустой объект.",
-    "webhookNoResponseBody": "Без тела ответа",
     "webhookNullable": "Разрешить null",
     "webhookOrigins": "Разрешённые источники",
     "webhookPayloadFields": "Данные запроса",

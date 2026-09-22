@@ -299,7 +299,7 @@ export function NodeInspector({
               }}
             />
           ))}
-        {selection?.kind === 'trigger' && (
+        {selection?.kind === 'trigger' && selection.trigger.kind !== 'webhook' && (
           <TriggerSummary
             trigger={selection.trigger}
             display={
@@ -311,8 +311,10 @@ export function NodeInspector({
           <WebhookEditor
             key={`webhook:${selection.id}`}
             bodyFields={selection.trigger.bodyFields}
+            method={selection.trigger.method}
             options={selection.trigger.options ?? {}}
             disabled={disabled}
+            outputSection={<TriggerSummary trigger={selection.trigger} />}
             onChange={(settings, deletion) => {
               void store.saveWebhook(selection.id, settings, deletion)
             }}

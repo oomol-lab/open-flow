@@ -404,6 +404,12 @@
       "builtIn": {
         "cron": {
           "scheduledAt": "本次运行的计划触发时间，采用 ISO 8601 格式。"
+        },
+        "webhook": {
+          "headers": "此 Webhook 请求携带的请求头。",
+          "query": "此 Webhook 请求携带的 URL 查询参数。",
+          "body": "此 Webhook 请求携带的请求体。",
+          "webhookUrl": "接收此次请求的 Webhook URL，不含查询参数。"
         }
       }
     }
@@ -974,33 +980,27 @@
     "required": "需要输入"
   },
   "webhookEditor": {
-    "webhookAddField": "添加字段",
     "webhookAddHeader": "添加响应头",
-    "webhookCustomType": "自定义结构",
-    "webhookDeleteField": "删除请求体字段",
     "webhookDeleteHeader": "删除响应头",
-    "webhookFieldName": "字段名",
-    "webhookFieldNameDuplicate": "字段名不能重复。",
-    "webhookFieldNameRequired": "请输入字段名。",
-    "webhookFieldType": "类型",
     "webhookHeaderName": "响应头名称",
+    "webhookHeaderNameDuplicate": "响应头名称不能重复。",
+    "webhookHeaderNameInvalid": "请输入有效的 HTTP 响应头名称。",
     "webhookHeaders": "响应头",
     "webhookHeaderValue": "响应头值",
-    "webhookMethods": "允许的请求方法",
-    "webhookNoResponseBody": "不返回响应体",
-    "webhookNullable": "允许 null",
-    "webhookOrigins": "允许的来源",
+    "webhookMethod": "请求方法",
+    "webhookOrigins": "允许请求来源",
+    "webhookOriginsHint": "多个来源使用逗号分隔；使用 * 允许任意来源。",
+    "webhookOriginsInvalid": "请输入不带路径的 HTTP 或 HTTPS 来源，或输入 *。",
     "webhookAdvanced": "高级设置",
-    "webhookTest": "草稿测试",
-    "webhookTestHint": "点击运行并填写示例输出进行测试。发布工作流后可获取 Webhook URL。",
     "webhookRequest": "请求",
-    "webhookResponse": "响应",
     "webhookResponseData": "响应内容",
-    "webhookStatus": "状态码",
-    "webhookSummary": "收到 HTTP 请求时触发",
-    "webhookDescription": "通过部署后生成的 HTTP 地址接收 JSON 对象。",
+    "webhookResponseDataPlaceholder": "留空则不返回响应体",
+    "webhookStatus": "响应状态码",
+    "webhookStatusDefault": "200（默认）",
+    "webhookStatusInvalid": "请输入 200 到 599 之间的整数。",
     "webhookBodyFields": "请求体字段",
-    "webhookNoBodyFields": "请求体接受空对象。"
+    "webhookNoBodyFields": "请求体接受空对象。",
+    "webhookNoHeaders": "未添加响应头。"
   },
   "conditionEditor": {
     "addCondition": "添加条件",
@@ -1065,7 +1065,8 @@
       "option": "已删除选项“{{name}}”。",
       "case": "已删除分支“{{name}}”。",
       "condition": "已删除条件。",
-      "conditionGroup": "已删除条件组。"
+      "conditionGroup": "已删除条件组。",
+      "webhookBody": "已删除 Webhook 请求体配置。"
     },
     "undo": "撤销",
     "redo": "重做",

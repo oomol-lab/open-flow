@@ -135,7 +135,6 @@
     "webhookHeaderValue": "標頭值",
     "webhookMethods": "允許的請求方法",
     "webhookNoPayloadFields": "請求酬載可以接受空物件。",
-    "webhookNoResponseBody": "不回傳回應內容",
     "webhookNullable": "允許 null",
     "webhookOrigins": "允許的來源",
     "webhookPayloadFields": "請求資料",

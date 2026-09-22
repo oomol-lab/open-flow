@@ -404,6 +404,12 @@
       "builtIn": {
         "cron": {
           "scheduledAt": "Запланированное время этого запуска в формате ISO 8601."
+        },
+        "webhook": {
+          "headers": "Заголовки, полученные с этим Webhook-запросом.",
+          "query": "Параметры URL-запроса, полученные с этим Webhook-запросом.",
+          "body": "Тело, полученное с этим Webhook-запросом.",
+          "webhookUrl": "URL Webhook, получивший этот запрос, без параметров запроса."
         }
       }
     }
@@ -974,33 +980,27 @@
     "required": "Требуется вход"
   },
   "webhookEditor": {
-    "webhookAddField": "Добавить поле",
     "webhookAddHeader": "Добавить заголовок",
-    "webhookCustomType": "Своя схема",
-    "webhookDeleteField": "Удалить поле тела запроса",
     "webhookDeleteHeader": "Удалить заголовок ответа",
-    "webhookFieldName": "Имя поля",
-    "webhookFieldNameDuplicate": "Имена полей не должны повторяться.",
-    "webhookFieldNameRequired": "Введите имя поля.",
-    "webhookFieldType": "Тип",
     "webhookHeaderName": "Имя заголовка",
+    "webhookHeaderNameDuplicate": "Имена заголовков не должны повторяться.",
+    "webhookHeaderNameInvalid": "Введите допустимое имя HTTP-заголовка.",
     "webhookHeaders": "Заголовки ответа",
     "webhookHeaderValue": "Значение заголовка",
-    "webhookMethods": "Разрешённые методы",
-    "webhookNoResponseBody": "Без тела ответа",
-    "webhookNullable": "Разрешить null",
-    "webhookOrigins": "Разрешённые источники",
+    "webhookMethod": "Метод запроса",
+    "webhookOrigins": "Разрешённые источники запросов",
+    "webhookOriginsHint": "Разделяйте источники запятыми. Используйте *, чтобы разрешить любой источник.",
+    "webhookOriginsInvalid": "Введите источники HTTP или HTTPS без пути либо *.",
     "webhookAdvanced": "Дополнительные настройки",
-    "webhookTest": "Тест черновика",
-    "webhookTestHint": "Нажмите «Запустить» и заполните тестовые выходные данные. Опубликуйте процесс, чтобы получить URL вебхука.",
     "webhookRequest": "Запрос",
-    "webhookResponse": "Ответ",
     "webhookResponseData": "Тело ответа",
-    "webhookStatus": "Код статуса",
-    "webhookSummary": "При получении HTTP-запроса",
-    "webhookDescription": "Получать JSON-объект через сгенерированный HTTP-адрес.",
+    "webhookResponseDataPlaceholder": "Оставьте пустым, чтобы не возвращать тело ответа.",
+    "webhookStatus": "Код статуса ответа",
+    "webhookStatusDefault": "200 (по умолчанию)",
+    "webhookStatusInvalid": "Введите целое число от 200 до 599.",
     "webhookBodyFields": "Поля тела запроса",
-    "webhookNoBodyFields": "Тело запроса допускает пустой объект."
+    "webhookNoBodyFields": "Тело запроса допускает пустой объект.",
+    "webhookNoHeaders": "Заголовки ответа не добавлены."
   },
   "conditionEditor": {
     "addCondition": "Добавить условие",
@@ -1065,7 +1065,8 @@
       "option": "Вариант «{{name}}» удалён.",
       "case": "Ветка «{{name}}» удалена.",
       "condition": "Условие удалено.",
-      "conditionGroup": "Группа условий удалена."
+      "conditionGroup": "Группа условий удалена.",
+      "webhookBody": "Конфигурация тела запроса Webhook удалена."
     },
     "undo": "Отменить",
     "redo": "Повторить",

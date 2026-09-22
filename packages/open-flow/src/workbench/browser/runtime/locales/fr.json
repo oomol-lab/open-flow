@@ -404,6 +404,12 @@
       "builtIn": {
         "cron": {
           "scheduledAt": "Heure planifiée ayant déclenché cette exécution, au format ISO 8601."
+        },
+        "webhook": {
+          "headers": "Les en-têtes reçus avec cette requête Webhook.",
+          "query": "Les paramètres de requête URL reçus avec cette requête Webhook.",
+          "body": "Le corps reçu avec cette requête Webhook.",
+          "webhookUrl": "L’URL Webhook ayant reçu cette requête, sans les paramètres de requête."
         }
       }
     }
@@ -974,33 +980,27 @@
     "required": "Entrée requise"
   },
   "webhookEditor": {
-    "webhookAddField": "Ajouter un champ",
     "webhookAddHeader": "Ajouter un en-tête",
-    "webhookCustomType": "Schéma personnalisé",
-    "webhookDeleteField": "Supprimer le champ du corps",
     "webhookDeleteHeader": "Supprimer l'en-tête de réponse",
-    "webhookFieldName": "Nom du champ",
-    "webhookFieldNameDuplicate": "Les noms de champ doivent être uniques.",
-    "webhookFieldNameRequired": "Saisissez un nom de champ.",
-    "webhookFieldType": "Type",
     "webhookHeaderName": "Nom de l'en-tête",
+    "webhookHeaderNameDuplicate": "Les noms d'en-tête doivent être uniques.",
+    "webhookHeaderNameInvalid": "Saisissez un nom d'en-tête HTTP valide.",
     "webhookHeaders": "En-têtes de réponse",
     "webhookHeaderValue": "Valeur de l'en-tête",
-    "webhookMethods": "Méthodes autorisées",
-    "webhookNoResponseBody": "Aucun corps de réponse",
-    "webhookNullable": "Autoriser null",
-    "webhookOrigins": "Origines autorisées",
+    "webhookMethod": "Méthode de requête",
+    "webhookOrigins": "Origines de requête autorisées",
+    "webhookOriginsHint": "Séparez les origines par des virgules. Utilisez * pour toutes les autoriser.",
+    "webhookOriginsInvalid": "Saisissez des origines HTTP ou HTTPS sans chemin, ou *.",
     "webhookAdvanced": "Paramètres avancés",
-    "webhookTest": "Test du brouillon",
-    "webhookTestHint": "Cliquez sur Exécuter et renseignez des sorties de test. Publiez le workflow pour obtenir son URL Webhook.",
     "webhookRequest": "Requête",
-    "webhookResponse": "Réponse",
     "webhookResponseData": "Corps de la réponse",
-    "webhookStatus": "Code de statut",
-    "webhookSummary": "À la réception d'une requête HTTP",
-    "webhookDescription": "Recevoir un objet JSON via un point de terminaison HTTP généré.",
+    "webhookResponseDataPlaceholder": "Laissez vide pour ne renvoyer aucun corps de réponse.",
+    "webhookStatus": "Code de statut de la réponse",
+    "webhookStatusDefault": "200 (par défaut)",
+    "webhookStatusInvalid": "Saisissez un entier compris entre 200 et 599.",
     "webhookBodyFields": "Champs du corps de la requête",
-    "webhookNoBodyFields": "Le corps de la requête accepte un objet vide."
+    "webhookNoBodyFields": "Le corps de la requête accepte un objet vide.",
+    "webhookNoHeaders": "Aucun en-tête de réponse."
   },
   "conditionEditor": {
     "addCondition": "Ajouter une condition",
@@ -1065,7 +1065,8 @@
       "option": "Option « {{name}} » supprimée.",
       "case": "Cas « {{name}} » supprimé.",
       "condition": "Condition supprimée.",
-      "conditionGroup": "Groupe de conditions supprimé."
+      "conditionGroup": "Groupe de conditions supprimé.",
+      "webhookBody": "Configuration du corps de requête Webhook supprimée."
     },
     "undo": "Annuler",
     "redo": "Rétablir",

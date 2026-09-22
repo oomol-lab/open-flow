@@ -284,7 +284,12 @@ describe('Flow changes', () => {
     { kind: 'module.delete', moduleId: 'missing' },
     { kind: 'subflow.delete', subflowId: 'missing' },
     { kind: 'task.delete', taskId: 'missing' },
-    { kind: 'graph.node.create', node: { bodyFields: [], kind: 'webhook', name: 'Invalid' }, nodeId: 'trigger', target: { id: 'missing', kind: 'subflow' } },
+    {
+      kind: 'graph.node.create',
+      node: { bodyFields: [], kind: 'webhook', method: 'POST', name: 'Invalid' },
+      nodeId: 'trigger',
+      target: { id: 'missing', kind: 'subflow' },
+    },
   ] satisfies readonly ChangeOperation[])('rejects invalid operation %#', (operation) => {
     expect(() => applyFlowChanges(revision(), [operation])).toThrow(FlowChangeError)
   })

@@ -404,6 +404,12 @@
       "builtIn": {
         "cron": {
           "scheduledAt": "この実行をトリガーした予定時刻（ISO 8601 形式）です。"
+        },
+        "webhook": {
+          "headers": "この Webhook リクエストで受信したリクエストヘッダーです。",
+          "query": "この Webhook リクエストで受信した URL クエリパラメーターです。",
+          "body": "この Webhook リクエストで受信したリクエストボディです。",
+          "webhookUrl": "このリクエストを受信した Webhook URL（クエリパラメーターを除く）です。"
         }
       }
     }
@@ -974,33 +980,27 @@
     "required": "入力が必要"
   },
   "webhookEditor": {
-    "webhookAddField": "フィールドを追加",
     "webhookAddHeader": "レスポンスヘッダーを追加",
-    "webhookCustomType": "カスタムスキーマ",
-    "webhookDeleteField": "ボディのフィールドを削除",
     "webhookDeleteHeader": "レスポンスヘッダーを削除",
-    "webhookFieldName": "フィールド名",
-    "webhookFieldNameDuplicate": "フィールド名は重複できません。",
-    "webhookFieldNameRequired": "フィールド名を入力してください。",
-    "webhookFieldType": "型",
     "webhookHeaderName": "レスポンスヘッダー名",
+    "webhookHeaderNameDuplicate": "ヘッダー名は重複できません。",
+    "webhookHeaderNameInvalid": "有効な HTTP ヘッダー名を入力してください。",
     "webhookHeaders": "レスポンスヘッダー",
     "webhookHeaderValue": "レスポンスヘッダーの値",
-    "webhookMethods": "許可するメソッド",
-    "webhookNoResponseBody": "レスポンスボディなし",
-    "webhookNullable": "null を許可",
-    "webhookOrigins": "許可するオリジン",
+    "webhookMethod": "リクエストメソッド",
+    "webhookOrigins": "許可するリクエストオリジン",
+    "webhookOriginsHint": "複数のオリジンはカンマで区切ります。すべて許可するには * を使用します。",
+    "webhookOriginsInvalid": "パスを含まない HTTP または HTTPS オリジン、もしくは * を入力してください。",
     "webhookAdvanced": "詳細設定",
-    "webhookTest": "下書きのテスト",
-    "webhookTestHint": "実行をクリックし、テスト用の出力を入力してください。ワークフローを公開すると Webhook URL を取得できます。",
     "webhookRequest": "リクエスト",
-    "webhookResponse": "レスポンス",
     "webhookResponseData": "レスポンスボディ",
-    "webhookStatus": "ステータスコード",
-    "webhookSummary": "HTTP リクエストを受信したとき",
-    "webhookDescription": "生成された HTTP エンドポイントで JSON オブジェクトを受信します。",
+    "webhookResponseDataPlaceholder": "空欄の場合、レスポンスボディを返しません。",
+    "webhookStatus": "レスポンスステータスコード",
+    "webhookStatusDefault": "200（デフォルト）",
+    "webhookStatusInvalid": "200 から 599 の整数を入力してください。",
     "webhookBodyFields": "リクエストボディのフィールド",
-    "webhookNoBodyFields": "リクエストボディは空のオブジェクトを受け付けます。"
+    "webhookNoBodyFields": "リクエストボディは空のオブジェクトを受け付けます。",
+    "webhookNoHeaders": "レスポンスヘッダーはありません。"
   },
   "conditionEditor": {
     "addCondition": "条件を追加",
@@ -1065,7 +1065,8 @@
       "option": "選択肢「{{name}}」を削除しました。",
       "case": "ケース「{{name}}」を削除しました。",
       "condition": "条件を削除しました。",
-      "conditionGroup": "条件グループを削除しました。"
+      "conditionGroup": "条件グループを削除しました。",
+      "webhookBody": "Webhook リクエストボディ設定を削除しました。"
     },
     "undo": "元に戻す",
     "redo": "やり直す",

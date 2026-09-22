@@ -135,7 +135,6 @@
     "webhookHeaderValue": "헤더 값",
     "webhookMethods": "허용 메서드",
     "webhookNoPayloadFields": "요청 페이로드는 빈 객체를 허용합니다.",
-    "webhookNoResponseBody": "응답 본문 없음",
     "webhookNullable": "null 허용",
     "webhookOrigins": "허용 출처",
     "webhookPayloadFields": "요청 데이터",

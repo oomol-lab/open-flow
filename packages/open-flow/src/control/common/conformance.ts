@@ -434,7 +434,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       const initial = await addManualTrigger(harness, flowId, requiredString(flow.draftRevisionId, 'Partial Draft identity'))
       const changed = await json(
         await changeRequest(harness, flowId, initial, [
-          { kind: 'graph.node.create', nodeId: 'other', target: { kind: 'flow' }, node: { kind: 'webhook', name: 'Other', bodyFields: [] } },
+          { kind: 'graph.node.create', nodeId: 'other', target: { kind: 'flow' }, node: { kind: 'webhook', method: 'POST', name: 'Other', bodyFields: [] } },
           {
             kind: 'graph.node.create',
             nodeId: 'broken',
@@ -966,7 +966,12 @@ export const triggerControlApiConformanceCases: readonly ControlApiConformanceCa
             nodeId: 'cron',
             target: { kind: 'flow' },
           },
-          { kind: 'graph.node.create', node: { bodyFields: [], kind: 'webhook', name: 'Incoming' }, nodeId: 'webhook', target: { kind: 'flow' } },
+          {
+            kind: 'graph.node.create',
+            node: { bodyFields: [], kind: 'webhook', method: 'POST', name: 'Incoming' },
+            nodeId: 'webhook',
+            target: { kind: 'flow' },
+          },
         ]),
         200,
         'Create Trigger nodes',

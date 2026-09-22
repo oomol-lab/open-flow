@@ -42,7 +42,7 @@ export function authoringExample(name: string): { version: 1; operations: readon
       operations = createBuiltinTrigger(target, 'start', { kind: 'manual', name: 'Start' })
       break
     case 'webhook':
-      operations = createBuiltinTrigger(target, 'start', { kind: 'webhook', name: 'Webhook', bodyFields: [] })
+      operations = createBuiltinTrigger(target, 'start', { kind: 'webhook', method: 'POST', name: 'Webhook', bodyFields: [] })
       break
     case 'cron':
       operations = createBuiltinTrigger(target, 'start', { kind: 'cron', name: 'Schedule', cronTimes: [{ type: 'every', unit: 'hour', value: 1 }] })
