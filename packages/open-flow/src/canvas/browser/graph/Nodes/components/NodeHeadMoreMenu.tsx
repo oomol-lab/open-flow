@@ -2,7 +2,7 @@ import styles from './NodeHead.module.scss'
 import type { TFunction } from 'val-i18n'
 import type { CanvasStore } from '../../../stores/canvas/canvas.store.ts'
 
-import { NodeToolbar, useViewport } from '@xyflow/react'
+import { NodeToolbar, useStore, useViewport } from '@xyflow/react'
 import { memo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
@@ -140,6 +140,7 @@ function useNodeMenuItems({ t, nodeStore, onDelete }: Params): ContextMenuItem[]
 export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(function NodeFloatBar({ canvasStore, nodeStore }) {
   const t = useTranslate()
   const { zoom } = useViewport()
+  const selectionInProgress = useStore((state) => state.userSelectionActive)
   const getPopupContainer = useGetStaticPopupContainer()
 
   const editable = useVal(canvasStore.$.editable)
@@ -155,6 +156,8 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
   const commentEditing = useVal(comment?.$.sourceCode)
   const collapsible = content != null ? nodeCardContent(content).collapsible : !!commentBody?.trim()
   const hidden = content?.contentHidden ?? commentHidden ?? false
+  if (selectionInProgress) return null
+
   const floatBarItems = items.filter((item): item is ContextMenuActionItem => !!item)
   if (collapsible && editable && !commentEditing && canvasStore.canChangeNodeContentHidden) {
     const deleteIndex = floatBarItems.findIndex((item) => item.key == '$delete')

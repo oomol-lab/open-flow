@@ -414,6 +414,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
   const nodes = useVal(props.nodes$)
   // React Flow waits for each edge's endpoint measurements before rendering it.
   const edges = useVal(props.edges$)
+  const selectionInProgress = useStore((state) => state.userSelectionActive)
   const selectedNodes = useMemo(() => nodes.filter((node) => node.selected), [nodes])
   const deleteSelectedNodes = useCallback(async () => {
     if (await props.onBeforeDelete({ nodes: selectedNodes, edges: [] })) {
@@ -683,7 +684,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           connectionLineComponent={ConnectionLine}
           aria-readonly={!editable}
         >
-          {(props.canDeleteNodes ?? true) && (
+          {(props.canDeleteNodes ?? true) && !selectionInProgress && (
             <SelectionFloatBar editable={!!editable} nodes={selectedNodes} onDelete={deleteSelectedNodes} duplicateNodes={props.duplicateNodes} />
           )}
           <FlowControls
