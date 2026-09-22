@@ -5,6 +5,7 @@ import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { Agent } from 'node:http'
 import { connect, createServer } from 'node:net'
 import path from 'node:path'
 import { loadEnvFile } from 'node:process'
@@ -14,6 +15,30 @@ const workspaceEnvPath = path.resolve(appRoot, '../..', '.env')
 const developmentStateDirectory = path.join(appRoot, '.open-flow-dev')
 const operatorTokenPath = path.join(developmentStateDirectory, 'operator-token')
 const backendReadyTimeoutMs = 10_000
+
+export function developmentBackendAgent(): Agent {
+  const agent = new Agent({ keepAlive: false })
+  agent.createConnection = (options, callback) => {
+    const deadline = Date.now() + backendReadyTimeoutMs
+    const attempt = (): void => {
+      const socket = Agent.prototype.createConnection(options)!
+      const failed = (error: NodeJS.ErrnoException): void => {
+        if (error.code == 'ECONNREFUSED' && Date.now() < deadline) {
+          setTimeout(attempt, 50).unref()
+        } else callback!(error, socket)
+      }
+      socket.once('error', failed)
+      socket.once('connect', () => {
+        socket.off('error', failed)
+        callback!(null, socket)
+      })
+    }
+    // Buffer the request until connected; never replay a request sent to the backend.
+    attempt()
+    return undefined
+  }
+  return agent
+}
 
 export function developmentBackendPlugin(): Plugin {
   if (existsSync(workspaceEnvPath)) loadEnvFile(workspaceEnvPath)

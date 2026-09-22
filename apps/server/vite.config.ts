@@ -9,7 +9,7 @@ import UnoCSS from '@unocss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 import { serverPaths } from './node/transport/server-paths.ts'
-import { developmentBackendPlugin } from './scripts/dev.ts'
+import { developmentBackendAgent, developmentBackendPlugin } from './scripts/dev.ts'
 
 const serverPathPattern = `^(?:${serverPaths.join('|')})(?:/|$)`
 
@@ -34,7 +34,9 @@ export default defineConfig(({ command }) => ({
     fullReloadPlugin(),
   ],
   server: {
-    proxy: { [serverPathPattern]: { target: process.env.OPEN_FLOW_DEV_API_ORIGIN ?? 'http://127.0.0.1:3001' } },
+    proxy: {
+      [serverPathPattern]: { target: process.env.OPEN_FLOW_DEV_API_ORIGIN ?? 'http://127.0.0.1:3001', agent: developmentBackendAgent() },
+    },
   },
   optimizeDeps: {
     entries: ['index.html', '../../packages/open-flow/src/workbench/browser/typeScriptWorker.ts'],
