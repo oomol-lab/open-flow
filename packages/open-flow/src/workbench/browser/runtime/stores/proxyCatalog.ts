@@ -1,4 +1,4 @@
-import type { ConnectorActionMetadata, ConnectorConnection, ConnectorProvider } from '../api.ts'
+import type { ConnectorActionMetadata, ConnectorProvider } from '../api.ts'
 
 import { connectorActionPorts } from '../../../../connector/common/actionSchema.ts'
 import { invalidResponse, jsonValue, record, string } from '../../../../control/common/decoding.ts'
@@ -32,24 +32,6 @@ export function provider(source: Readonly<Record<string, unknown>>): ConnectorPr
     noSetup: source.authTypes.length == 1 && source.authTypes[0] == 'no_auth',
     ...(source.iconUrl == null || source.iconUrl === '' ? {} : { icon: string(source.iconUrl) }),
     ...(source.homepageUrl == null || source.homepageUrl === '' ? {} : { homepageUrl: string(source.homepageUrl) }),
-  }
-}
-
-export function app(source: Readonly<Record<string, unknown>>): ConnectorConnection {
-  if (
-    typeof source.isDefault != 'boolean' ||
-    typeof source.status != 'string' ||
-    !['active', 'disconnected', 'error', 'reauth_required'].includes(source.status)
-  )
-    return invalidResponse()
-  return {
-    connectionId: string(source.id),
-    serviceId: string(source.service),
-    displayName: string(source.displayName),
-    isDefault: source.isDefault,
-    status: source.status as ConnectorConnection['status'],
-    ...(source.alias == null ? {} : { alias: string(source.alias) }),
-    ...(source.marketplace == null ? {} : { builtInAccount: true }),
   }
 }
 

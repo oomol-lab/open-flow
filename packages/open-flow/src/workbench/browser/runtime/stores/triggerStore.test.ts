@@ -114,17 +114,11 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
         version: 1,
       })
     }
-    if (path.startsWith('/v1/connector/proxy/apps')) {
+    if (path.startsWith('/v1/connector/connections')) {
       const url = new URL(path, 'https://test.invalid')
       return Response.json({
-        success: true,
-        data: (await fetchConnections('github', url.searchParams.get('flowId') ?? undefined)).map((account) => ({
-          id: account.connectionId,
-          service: account.serviceId,
-          displayName: account.displayName,
-          isDefault: account.isDefault,
-          status: account.status,
-        })),
+        version: 1,
+        connections: await fetchConnections('github', url.searchParams.get('flowId') ?? undefined),
       })
     }
     if (path == `/v1/trigger-keys/catalog?locale=${language}`) {
@@ -190,7 +184,7 @@ describe('TriggerStore', () => {
       expect(options?.[0]).not.toHaveProperty('trigger.connectionId')
       expect(searched?.map((option) => option.id)).toEqual(['trigger:github.on_repo_event'])
       expect(requests.filter((path) => path == '/v1/trigger-keys/catalog?locale=en')).toHaveLength(1)
-      expect(requests.some((path) => path.startsWith('/v1/connector/proxy/apps'))).toBe(false)
+      expect(requests.some((path) => path.startsWith('/v1/connector/connections'))).toBe(false)
     } finally {
       triggers.dispose()
       workspace.dispose()

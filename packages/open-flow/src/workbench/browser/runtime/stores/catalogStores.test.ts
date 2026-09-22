@@ -31,6 +31,7 @@ function setup() {
   const sessionStorage = storage()
   const request = vi.fn(async (path: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
     const url = new URL(String(path), 'https://test.invalid')
+    if (url.pathname == '/v1/connector/connections') return Response.json({ version: 1, connections: [connection] }, { headers: { etag: '"one"' } })
     const data = url.pathname.endsWith('/providers')
       ? [{ service: 'mail', displayName: url.searchParams.get('locale')!, authTypes: ['oauth2'], extra: 'preserved' }]
       : url.pathname.endsWith('/actions')
@@ -135,7 +136,7 @@ it('updates the selected account from Connections without changing Action metada
   await new Promise<void>((resolve) => setTimeout(resolve, 0))
   expect(actionWithConnections(metadata[0]!, initial).defaultConnection?.connectionId).toBe('account')
   const persisted = [...test.localStorage.entries]
-  test.request.mockImplementation(async () => Response.json({ success: true, data: [{ ...connection, id: 'new-account', service: 'mail' }] }))
+  test.request.mockImplementation(async () => Response.json({ version: 1, connections: [{ ...connection, connectionId: 'new-account' }] }))
   stores.connections.get('mail', 'flow', true)
   await vi.waitFor(() => expect(source.value.data?.[0]?.connectionId).toBe('new-account'))
   expect(actionWithConnections(metadata[0]!, source.value.data).defaultConnection?.connectionId).toBe('new-account')
@@ -167,7 +168,7 @@ it('does not reuse the old combined Action validator for the metadata endpoint',
   stores.dispose()
 })
 
-it('preserves upstream response fields in storage and shares one Apps response across service views', async () => {
+it('preserves upstream response fields in storage and shares one scoped Connections response across service views', async () => {
   const test = setup()
   const stores = test.create()
   await resourceValue(stores.providers.get('flow', 'en'))
@@ -179,12 +180,12 @@ it('preserves upstream response fields in storage and shares one Apps response a
   await Promise.all([resourceValue(all), resourceValue(mail), resourceValue(other)])
   expect(all.value.data).toEqual(mail.value.data)
   expect(other.value.data).toEqual([])
-  expect(test.request.mock.calls.filter(([path]) => String(path).includes('/proxy/apps'))).toHaveLength(1)
+  expect(test.request.mock.calls.filter(([path]) => String(path).includes('/connections'))).toHaveLength(1)
   await new Promise<void>((resolve) => setTimeout(resolve, 0))
   test.request.mockImplementation(async () =>
     Response.json({
-      success: true,
-      data: [{ id: 'other', service: 'other', displayName: 'Built in', status: 'active', isDefault: true, marketplace: { id: 'oomol' } }],
+      version: 1,
+      connections: [{ connectionId: 'other', serviceId: 'other', displayName: 'Built in', status: 'active', isDefault: true, builtInAccount: true }],
     }),
   )
   stores.connections.get('mail', 'flow', true)
@@ -426,5 +427,60 @@ it('keeps valid Actions when individual records cannot be decoded and retries th
   } finally {
     stores.dispose()
     warning.mockRestore()
+  }
+})
+
+it('uses only Flow-authorized accounts for selection and defaults, and refreshes after revocation', async () => {
+  const test = setup()
+  const unauthorized = { ...connection, connectionId: 'unauthorized', isDefault: true }
+  const authorized = { ...connection, isDefault: false }
+  let revoked = false
+  test.sessionStorage.setItem(
+    'open-flow:proxy:apps:v1:test:/v1/connector/proxy/apps?flowId=flow',
+    JSON.stringify({
+      data: { success: true, data: [{ id: 'unauthorized', service: 'mail', displayName: 'Account', status: 'active', isDefault: true }] },
+      etag: '"old"',
+    }),
+  )
+  test.request.mockImplementation(async (path) => {
+    const url = new URL(String(path), 'https://test.invalid')
+    if (url.pathname != '/v1/connector/connections') throw new Error(`Unexpected account source: ${path}`)
+    return Response.json({ version: 1, connections: url.searchParams.get('flowId') == 'flow' ? (revoked ? [] : [authorized]) : [unauthorized] })
+  })
+  const stores = test.create()
+  try {
+    const selected = stores.connections.get('mail', 'flow')
+    expect(selected.value.data).toBeUndefined()
+    expect(await resourceValue(selected)).toEqual([authorized])
+    expect(actionWithConnections(action, selected.value.data).defaultConnection?.connectionId).toBe('account')
+    expect(await resourceValue(stores.connections.get('mail', 'other-flow'))).toEqual([unauthorized])
+    expect(selected.value.data).toEqual([authorized])
+    revoked = true
+    stores.connections.refreshFlow('flow')
+    await vi.waitFor(() => expect(selected.value.data).toEqual([]))
+    expect(actionWithConnections(action, selected.value.data).defaultConnection).toBeUndefined()
+    expect(stores.connections.get('mail', 'other-flow').value.data).toEqual([unauthorized])
+  } finally {
+    stores.dispose()
+  }
+})
+
+it('restores scoped Connections and revalidates with their own validator', async () => {
+  const test = setup()
+  const first = test.create()
+  await resourceValue(first.connections.get('mail', 'flow'))
+  first.dispose()
+  test.request.mockImplementation(async (_path, init) => {
+    expect(new Headers(init?.headers).get('if-none-match')).toBe('"one"')
+    return new Response(null, { status: 304 })
+  })
+  const restored = test.create()
+  try {
+    const source = restored.connections.get('mail', 'flow')
+    expect(source.value.data).toEqual([connection])
+    await vi.waitFor(() => expect(test.request).toHaveBeenCalledTimes(2))
+    expect(await resourceValue(source, undefined, true)).toEqual([connection])
+  } finally {
+    restored.dispose()
   }
 })

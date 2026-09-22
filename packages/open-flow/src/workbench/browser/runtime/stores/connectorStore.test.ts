@@ -100,10 +100,10 @@ describe('ConnectorStore', () => {
           ],
         })
       }
-      if (path.startsWith('/v1/connector/proxy/apps'))
+      if (path.startsWith('/v1/connector/connections'))
         return Response.json({
-          success: true,
-          data: flowId == null ? [{ id: 'mail-team', service: 'mail', displayName: 'Team account', status: 'active', isDefault: true }] : [],
+          version: 1,
+          connections: flowId == null ? [{ connectionId: 'mail-team', serviceId: 'mail', displayName: 'Team account', status: 'active', isDefault: true }] : [],
         })
       if (path.startsWith('/v1/connector/action-metadata')) {
         connectorRequests.push(path)

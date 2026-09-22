@@ -150,7 +150,24 @@ export function createInspectorTransport(
             outputSchema: action.outputSchema,
           })),
       })
-    if (url.pathname.endsWith('/connector/proxy/apps')) return Response.json({ success: true, data: options.connections ?? [] })
+    if (url.pathname.endsWith('/connector/connections'))
+      return Response.json({
+        version: 1,
+        connections: (options.connections ?? [])
+          .filter(
+            (account) =>
+              !url.searchParams.has('flowId') ||
+              access.mode == 'implicit' ||
+              access.bindings.some((binding) => binding.connectionId == account.id && binding.status == 'active'),
+          )
+          .map((account) => ({
+            connectionId: account.id,
+            serviceId: account.service,
+            displayName: account.displayName,
+            status: account.status,
+            isDefault: account.isDefault,
+          })),
+      })
     if (url.pathname === '/v1/trigger-keys/catalog')
       return Response.json({ version: 2, locale: url.searchParams.get('locale') ?? 'en', definitions: [], display: {} })
     if (url.pathname === '/v1/flows') return Response.json({ flows: [{ ...flow, draftRevisionId: revision().revisionId }], total: 1, version: 1 })

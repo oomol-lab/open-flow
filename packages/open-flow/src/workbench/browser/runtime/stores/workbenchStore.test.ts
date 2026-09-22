@@ -51,8 +51,33 @@ function access(flowId: string) {
 }
 
 describe('Flow creation notifications', () => {
-  it('refreshes scoped accounts after saving and removing access without a server notification', async () => {
+  it('updates node connection state after granting, revoking and restoring Flow access without a server notification', async () => {
     const { client, store, navigation } = catalogSession('first')
+    const editor = await client.getEditor('first')
+    vi.mocked(client.getEditor).mockResolvedValue({
+      ...editor,
+      draft: {
+        ...editor.draft,
+        content: {
+          ...editor.draft.content,
+          document: {
+            ...editor.draft.content.document,
+            tasks: { send: { name: 'Send', executor: { kind: 'connector', action: 'mail.send', connectionId: 'mail-account' }, inputs: [], outputs: [] } },
+            graph: { nodes: { send: { kind: 'task', taskId: 'send', inputs: {} } }, edges: [] },
+          },
+        },
+      },
+    })
+    vi.spyOn(client, 'readProxyCatalog').mockImplementation(async (query) => ({
+      modified: true,
+      etag: null,
+      data: {
+        success: true,
+        data: query.path.includes('/providers')
+          ? [{ service: 'mail', displayName: 'Mail', authTypes: ['oauth2'] }]
+          : [{ id: 'mail.send', service: 'mail', name: 'Send', description: '', inputSchema: { type: 'object' }, outputSchema: { type: 'object' } }],
+      },
+    }))
     let connected = false
     vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(access('first'))
     vi.spyOn(client, 'addProviderAccessBinding').mockImplementation(async () => {
@@ -63,19 +88,31 @@ describe('Flow creation notifications', () => {
       connected = false
       return { ...access('first'), accessRevision: 3 }
     })
-    vi.spyOn(client, 'readProxyCatalog').mockImplementation(async () => ({
+    vi.spyOn(client, 'readCatalog').mockImplementation(async () => ({
       modified: true,
       etag: null,
-      data: { success: true, data: connected ? [{ id: 'mail-account', service: 'mail', displayName: 'Work', status: 'active', isDefault: true }] : [] },
+      data: connected ? [{ connectionId: 'mail-account', serviceId: 'mail', displayName: 'Work', status: 'active', isDefault: true }] : [],
     }))
     try {
       await navigation.start()
       const accounts = store.workspace.catalogs.connections.get('mail', 'first')
       expect(await resourceValue(accounts)).toEqual([])
+      store.workspace.selectNodes(['send'])
+      await store.connectors.refresh()
+      expect(store.$.designer.value.nodes[0]).toMatchObject({ id: 'send', connectionRequired: true })
       await store.connectorAccess.select('mail', 'binding')
       await vi.waitFor(() => expect(accounts.value.data?.map((account) => account.connectionId)).toEqual(['mail-account']))
+      await vi.waitFor(() => expect(store.$.designer.value.nodes[0]).toMatchObject({ connectionRequired: false }))
+      expect(store.connectors.$.selectedConnection.value?.connectionId).toBe('mail-account')
       await store.connectorAccess.select('mail', 'binding', false)
       await vi.waitFor(() => expect(accounts.value.data).toEqual([]))
+      expect(store.$.designer.value.nodes[0]).toMatchObject({ connectionRequired: true })
+      expect(store.connectors.$.selectedConnection.value).toBeUndefined()
+      expect(store.connectors.$.diagnostics.value).toContainEqual(expect.objectContaining({ code: 'task.connector-connection-required' }))
+      await store.connectorAccess.select('mail', 'binding')
+      await vi.waitFor(() => expect(store.$.designer.value.nodes[0]).toMatchObject({ connectionRequired: false }))
+      expect(store.connectors.$.selectedConnection.value?.connectionId).toBe('mail-account')
+      expect(store.connectors.$.diagnostics.value).toEqual([])
     } finally {
       navigation.dispose()
       store.dispose()
@@ -290,19 +327,18 @@ describe('WorkbenchStore diagnostics', () => {
           ],
         })
       }
-      if (path.startsWith(`/v1/connector/proxy/apps?flowId=${flow.flowId}`)) {
+      if (path.startsWith(`/v1/connector/connections?flowId=${flow.flowId}`)) {
         return Response.json({
-          data: [
+          connections: [
             {
-              id: 'connection-1',
+              connectionId: 'connection-1',
               displayName: 'Primary',
               isDefault: true,
-              service: 'amap',
+              serviceId: 'amap',
               status: 'active',
             },
           ],
-          service: 'amap',
-          success: true,
+          version: 1,
         })
       }
       throw new Error(`Unexpected request: ${path}`)
@@ -331,7 +367,7 @@ describe('WorkbenchStore diagnostics', () => {
       expect(store.connectors.$.selectedAction.value?.defaultConnection?.connectionId).toBe('connection-1')
       expect(store.connectors.$.selectedConnection.value).toBeUndefined()
       await vi.waitFor(() => expect(store.$.diagnostics.value?.valid).toBe(false))
-      await vi.waitFor(() => expect(requests).toContain(`/v1/connector/proxy/apps?flowId=${flow.flowId}`))
+      await vi.waitFor(() => expect(requests).toContain(`/v1/connector/connections?flowId=${flow.flowId}`))
 
       expect(store.workspace.$.diagnostics.value).toMatchObject({ diagnostics: [], valid: true })
       expect(store.$.diagnostics.value?.diagnostics).toEqual([

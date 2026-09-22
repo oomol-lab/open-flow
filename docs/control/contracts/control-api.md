@@ -712,7 +712,7 @@ WorkbenchHost 可通过 `connectorCache: { namespace, localStorage?, sessionStor
 Providers 和 Actions 使用 localStorage，Connections 使用 sessionStorage；Triggers 通过 `triggerCatalogCache` 使用 localStorage。
 各数据 Store 持有稳定的 `ReadonlyVal<{ data, refreshing, error }>`，底层请求仅负责传输和解码，不保存缓存。
 存储键包含版本、部署及业务标识：Providers 为 Flow scope 和语言，Actions 为 Flow scope、service 和语言，
-Connections 为 Flow scope 和可选 service，Triggers 为语言。使用新版本键，不读取旧 URL 缓存。
+Connections 为 Flow scope，服务列表从同一份响应派生，Triggers 为语言。使用新版本键，不读取旧 URL 缓存。
 
 Actions 按 Flow scope、service 和语言缓存并持久化完整的 provider 列表响应。画布、节点面板与代码节点所需的单个 Action 从同一份列表派生，不再发起独立详情请求。浏览器 proxy 列表按团队范围读取，不按 Flow 已选授权过滤；成功加载完整列表后才能判断 Action 不存在。默认连接与当前连接状态从独立的 Connections Store 组合。
 Action metadata 保留上游可选的 `operationType` 字段（`read`、`write`、`destructive`）；缺失或未知值在节点面板显示为其他接口。
@@ -723,7 +723,7 @@ Action metadata 保留上游可选的 `operationType` 字段（`read`、`write`�
 Workbench 使用独立的 `ConnectorActionView` 表示组合后的展示数据。
 CLI 和 MCP 继续使用原 `/v1/connector/actions` 对应的组合接口；它们在响应时选择 active 默认账号或唯一 active 账号，
 保留 `ConnectorAction.defaultConnection`。这些组合响应的 ETag 仍随账号变化，浏览器不使用它们作为 Action 缓存。
-全局搜索使用独立的临时查询状态，不持久化，也不写入 service 列表。全量与按服务的 Connections 独立保存，互不合并或覆盖。
+全局搜索使用独立的临时查询状态，不持久化，也不写入 service 列表。Connections Store 读取 `/v1/connector/connections`：带 `flowId` 时仅返回该 Flow 已授权的账号，不带时返回团队账号；同一 scope 的全量与按服务视图共享完整响应。账号缓存使用独立键，不复用原始 proxy Apps 缓存。
 画布按 provider 读取 Action 列表并派生所需详情；应用排序使用全量 Connections，账号选择使用对应服务的 Connections。
 
 业务访问 Store 接口时检查刷新间隔：Providers、Triggers 为 5 分钟，Actions、Connections 为 30 秒。
