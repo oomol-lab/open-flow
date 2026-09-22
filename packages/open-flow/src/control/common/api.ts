@@ -8,7 +8,7 @@ export {
   type ProviderAccessSource,
 } from './providerAccess.ts'
 import type { DraftOperation } from './draftOperations.ts'
-export { inspectFlowDraft } from './flowInspection.ts'
+export { inspectFlowDraft, flowInspection, actionSummary, nodeDetails } from './flowInspection.ts'
 export type { DraftOperation } from './draftOperations.ts'
 import type { SchemaMismatch } from '../../flow/common/change.ts'
 import type { CreateEventSource, UpdateEventSource, EventSource } from './eventSources.ts'
@@ -18,7 +18,7 @@ export { decodeEventSource, decodeEventSources, type CreateEventSource, type Upd
 import type { TriggerCatalogCache } from './triggerCatalog.ts'
 
 import { decodeTriggerCatalog } from './triggerCatalog.ts'
-export { decodeTriggerCatalog, type TriggerCatalog, type TriggerCatalogCache, type TriggerDisplay } from './triggerCatalog.ts'
+export { decodeTriggerCatalog, searchTriggerKeys, type TriggerCatalog, type TriggerCatalogCache, type TriggerDisplay } from './triggerCatalog.ts'
 import type { TriggerConfigOption } from '../../trigger/common/configOptions.ts'
 export type { TriggerConfigOption } from '../../trigger/common/configOptions.ts'
 import type { ResultQuery } from './results.ts'
@@ -691,10 +691,10 @@ export class ControlClient {
     if (source.version != 1) return invalidResponse()
   }
 
-  async createFlow(name: string, idempotencyKey = `flow-${randomId()}`): Promise<Flow> {
+  async createFlow(name: string, idempotencyKey = `flow-${randomId()}`, teamId?: string): Promise<Flow> {
     return flow(
       await this.request('/v1/flows', {
-        body: JSON.stringify({ name, version: 1 }),
+        body: JSON.stringify({ name, ...(teamId == null ? {} : { teamId }), version: 1 }),
         headers: { 'idempotency-key': idempotencyKey },
         method: 'POST',
       }),
@@ -855,6 +855,22 @@ export class ControlClient {
       if (color != null && !/^#[0-9a-fA-F]{6}$/.test(color)) return invalidResponse()
       return color == null ? { value: string(item.value), label: string(item.label) } : { value: string(item.value), label: string(item.label), color }
     })
+  }
+
+  async listConnectorTeams(signal?: AbortSignal) {
+    const source = record(await this.request('/v1/connector/teams', { signal }))
+    exact(source, ['enabled', 'teams', 'version'])
+    if (source.version != 1 || typeof source.enabled != 'boolean' || !Array.isArray(source.teams)) return invalidResponse()
+    return {
+      enabled: source.enabled,
+      teams: source.teams.map((value: unknown) => {
+        const team = record(value)
+        exact(team, ['id', 'name', 'systemCreated'])
+        if (typeof team.systemCreated != 'boolean') return invalidResponse()
+        return { id: string(team.id), name: string(team.name), systemCreated: team.systemCreated }
+      }),
+      version: 1 as const,
+    }
   }
 
   async listConnectorProviders(signal?: AbortSignal, flowId?: string, locale?: string): Promise<readonly ConnectorProvider[]> {

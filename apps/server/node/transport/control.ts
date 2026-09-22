@@ -175,7 +175,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     query(context.req.raw, [], controlErrorCode.flowInvalid)
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.createFlow)
     const name = body.name
-    const created = await service.createFlow(context.get('actorId'), name, idempotencyKey(context.req.raw, controlErrorCode.flowInvalid))
+    const created = await service.createFlow(context.get('actorId'), name, idempotencyKey(context.req.raw, controlErrorCode.flowInvalid), body.teamId)
     return response(created.created ? 201 : 200, created.flow)
   })
   app.get('/flows/:flowId', (context) => {

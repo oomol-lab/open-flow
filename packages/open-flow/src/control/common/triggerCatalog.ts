@@ -1,5 +1,6 @@
 import type { TriggerKeySnapshot } from '../../flow/common/change.ts'
 import type { UiLanguage } from '../../localization/common/languages.ts'
+import type { TriggerKeySummary } from './api.ts'
 
 import { isUiLanguage } from '../../localization/common/languages.ts'
 import { exact, invalidResponse, record, string } from './decoding.ts'
@@ -61,4 +62,12 @@ function descriptions(value: unknown, handles: readonly string[]): Readonly<Reco
   const source = record(value)
   exact(source, handles)
   return Object.fromEntries(Object.entries(source).map(([handle, description]) => [handle, string(description)]))
+}
+
+export function searchTriggerKeys(keys: readonly TriggerKeySummary[], query?: string): readonly TriggerKeySummary[] {
+  if (query == null) return keys
+  const term = query.toLowerCase()
+  return keys.filter((item) =>
+    [item.description, item.displayName, item.key, item.name, item.provider, item.type].some((value) => value.toLowerCase().includes(term)),
+  )
 }

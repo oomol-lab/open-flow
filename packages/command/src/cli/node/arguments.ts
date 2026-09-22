@@ -9,6 +9,12 @@ export interface ParsedArguments {
   readonly expectedPublication?: string
   readonly trigger?: string
   readonly outputs?: string
+  readonly team?: string
+  readonly revision?: string
+  readonly pointer?: string
+  readonly offset?: number
+  readonly maxBytes?: number
+  readonly resultAfter?: string
   readonly after?: number
   readonly code?: string
   readonly connection?: string
@@ -29,7 +35,7 @@ export interface ParsedArguments {
   readonly source: 'draft' | 'live'
   readonly pendingWait?: boolean
   readonly status?: RunStatus
-  readonly summary: boolean
+  readonly full: boolean
   readonly sets: readonly string[]
   readonly comment?: string
   readonly timeoutMs?: number
@@ -48,6 +54,13 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
   const options: string[] = []
   let trigger: string | undefined
   let outputs: string | undefined
+  let team: string | undefined
+  let revision: string | undefined
+  let pointer: string | undefined
+  let offset: number | undefined
+  let maxBytes: number | undefined
+  let resultAfter: string | undefined
+  let rawAfter: string | undefined
   let after: number | undefined
   let code: string | undefined
   let connection: string | undefined
@@ -67,7 +80,7 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
   let source: ParsedArguments['source'] = 'draft'
   let pendingWait: boolean | undefined
   let status: RunStatus | undefined
-  let summary = false
+  let full = false
   let comment: string | undefined
   let timeoutMs: number | undefined
   let timezone: string | undefined
@@ -80,7 +93,7 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     const equals = raw.startsWith('--') ? raw.indexOf('=') : -1
     const argument = equals < 0 ? raw : raw.slice(0, equals)
     const inlineValue = equals < 0 ? undefined : raw.slice(equals + 1)
-    if (inlineValue != null && ['--json', '--follow', '--wait', '--yes', '--summary', '--pending-wait'].includes(argument))
+    if (inlineValue != null && ['--json', '--follow', '--wait', '--yes', '--full', '--pending-wait'].includes(argument))
       throw new CliError('cli.invalid-arguments', `${argument} does not accept a value.`)
     if (argument.startsWith('--')) {
       const flag = argument.slice(2)
@@ -97,11 +110,16 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       yes = true
     } else if (argument == '--pending-wait') {
       pendingWait = true
-    } else if (argument == '--summary') {
-      summary = true
+    } else if (argument == '--full') {
+      full = true
     } else if (
       argument == '--idempotency-key' ||
       argument == '--expected-publication' ||
+      argument == '--team' ||
+      argument == '--revision' ||
+      argument == '--pointer' ||
+      argument == '--offset' ||
+      argument == '--max-bytes' ||
       argument == '--code' ||
       argument == '--connection' ||
       argument == '--cron' ||
@@ -129,6 +147,10 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       if (value == null || value.length == 0) throw new CliError('cli.invalid-arguments', `${argument} requires a value.`)
       if (argument == '--idempotency-key') idempotencyKey = value
       else if (argument == '--expected-publication') expectedPublication = value
+      else if (argument == '--team') team = value
+      else if (argument == '--revision') revision = value
+      else if (argument == '--pointer') pointer = value
+      else if (argument == '--after') rawAfter = value
       else if (argument == '--code') code = value
       else if (argument == '--connection') connection = value
       else if (argument == '--cron') cron = value
@@ -154,12 +176,18 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
         status = value as RunStatus
       } else {
         const numeric = Number(value)
-        const minimum = argument == '--after' ? 0 : 1
-        if (!Number.isSafeInteger(numeric) || numeric < minimum || (argument == '--limit' && numeric > 100)) {
+        const minimum = argument == '--offset' ? 0 : 1
+        if (
+          !Number.isSafeInteger(numeric) ||
+          numeric < minimum ||
+          (argument == '--limit' && numeric > 100) ||
+          (argument == '--max-bytes' && numeric > 1048576)
+        ) {
           throw new CliError('cli.invalid-arguments', `${argument} has an invalid value.`)
         }
         if (argument == '--limit') limit = numeric
-        else if (argument == '--after') after = numeric
+        else if (argument == '--offset') offset = numeric
+        else if (argument == '--max-bytes') maxBytes = numeric
         else timeoutMs = numeric
       }
     } else if (argument.startsWith('-')) {
@@ -169,8 +197,21 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     }
   }
 
+  if (rawAfter != null) {
+    if (positionals[0] == 'runs' && positionals[1] == 'results') resultAfter = rawAfter
+    else {
+      after = Number(rawAfter)
+      if (!Number.isSafeInteger(after) || after < 0) throw new CliError('cli.invalid-arguments', '--after must be a non-negative event sequence.')
+    }
+  }
   return {
     idempotencyKey,
+    ...(resultAfter == null ? {} : { resultAfter }),
+    ...(maxBytes == null ? {} : { maxBytes }),
+    ...(offset == null ? {} : { offset }),
+    ...(pointer == null ? {} : { pointer }),
+    ...(revision == null ? {} : { revision }),
+    ...(team == null ? {} : { team }),
     ...(comment == null ? {} : { comment }),
     ...(expectedPublication == null ? {} : { expectedPublication }),
     ...(after == null ? {} : { after }),
@@ -196,7 +237,7 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     source,
     ...(status == null ? {} : { status }),
     ...(pendingWait == null ? {} : { pendingWait }),
-    summary,
+    full,
     ...(timeoutMs == null ? {} : { timeoutMs }),
     ...(timezone == null ? {} : { timezone }),
     unsets,

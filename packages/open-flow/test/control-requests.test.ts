@@ -79,3 +79,25 @@ it('requires the versioned explicit output map for Run creation', () => {
   expect(() => controlRequests.createDraftRun({ ...run, trigger: { nodeId: 'hook', payload: {} } })).toThrow()
   expect(() => controlRequests.createDraftRun({ ...run, trigger: { nodeId: 'hook', outputs: [] } })).toThrow()
 })
+
+it('expresses mutually exclusive Draft and Live run identities in the MCP schema and validator', () => {
+  const common = { trigger: { nodeId: 'start', outputs: {} }, idempotencyKey: 'run' }
+  const validate = mcpTools.flow_run.inputSchema['~standard'].validate
+  expect(validate({ ...common, source: 'draft', flowId: 'flow', revisionId: 'r1' })).toHaveProperty('value.inputs', {})
+  expect(validate({ ...common, source: 'live', publicationId: 'p1' })).toHaveProperty('value.inputs', {})
+  for (const identity of [
+    { source: 'draft', flowId: 'flow' },
+    { source: 'draft', flowId: 'flow', revisionId: 'r1', publicationId: 'p1' },
+    { source: 'live' },
+    { source: 'live', publicationId: 'p1', flowId: 'flow' },
+  ])
+    expect(validate({ ...common, ...identity })).toHaveProperty('issues')
+  const schema = mcpTools.flow_run.inputSchema['~standard'].jsonSchema.input()
+  expect(schema).toMatchObject({
+    type: 'object',
+    oneOf: [
+      { properties: { source: { const: 'draft' } }, required: expect.arrayContaining(['flowId', 'revisionId']), additionalProperties: false },
+      { properties: { source: { const: 'live' } }, required: expect.arrayContaining(['publicationId']), additionalProperties: false },
+    ],
+  })
+})

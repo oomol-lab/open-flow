@@ -71,8 +71,8 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
       return
     }
     case 'create': {
-      requireCount(operands, 1, 'oo flow create <name> [--json]')
-      const flow = await client.createFlow(checkedResourceName(operands[0]!, 'Flow'), args.idempotencyKey)
+      requireCount(operands, 1, 'oo flow create <name> [--team <teamId>] [--json]')
+      const flow = await client.createFlow(checkedResourceName(operands[0]!, 'Flow'), args.idempotencyKey, args.team)
       write(runtime, args.json, { flow, idempotencyKey: args.idempotencyKey, kind: 'flow.create', version: 1 }, flowText(flow))
       return
     }
@@ -97,14 +97,25 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
       write(runtime, args.json, { flow, kind: 'flow.delete', version: 1 }, flowText(flow))
       return
     }
+    case 'enable':
+    case 'disable': {
+      requireCount(operands, 1, `oo flow ${operation} <flow> --expected-publication <publicationId>`)
+      if (args.expectedPublication == null || args.expectedPublication == 'none')
+        throw new CliError('cli.invalid-arguments', '--expected-publication must identify the observed Live publication.')
+      const current = await referencedFlow(client, operands[0]!)
+      const flow = await client.setFlowEnabled(current.flowId, args.expectedPublication, operation == 'enable')
+      write(runtime, args.json, { flow, kind: `flow.${operation}`, version: 1 }, flowText(flow))
+      return
+    }
     case 'check': {
-      requireCount(operands, 1, 'oo flow check <flow> [--json]')
+      requireCount(operands, 1, 'oo flow check <flow> [--revision <revisionId>] [--json]')
       const flow = await referencedFlow(client, operands[0]!)
-      const check = await client.checkFlow(flow.flowId, flow.draftRevisionId)
+      const revisionId = args.revision ?? flow.draftRevisionId
+      const check = await client.checkFlow(flow.flowId, revisionId)
       write(
         runtime,
         args.json,
-        { check, valid: check.valid, revisionId: flow.draftRevisionId, kind: 'flow.check', scope: 'revision', version: 1 },
+        { check, valid: check.valid, revisionId, kind: 'flow.check', scope: 'revision', version: 1 },
         `${check.valid ? 'valid' : 'invalid'}\trevision\t${flow.name}\t${flow.flowId}`,
       )
       return check.valid ? 0 : 1
@@ -112,7 +123,7 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
     default:
       throw new CliError(
         'cli.invalid-arguments',
-        'Usage: oo flow <list|create|show|inspect|apply|rename|delete|check|node|connect|disconnect|code|connector|trigger|run|runs|publish|publications|rollback|workbench>',
+        'Usage: oo flow <list|create|show|inspect|apply|rename|delete|check|enable|disable|node|connect|disconnect|code|connector|trigger|run|runs|publish|publications|rollback|workbench>',
       )
   }
 }

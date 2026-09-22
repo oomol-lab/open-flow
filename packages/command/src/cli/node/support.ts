@@ -259,35 +259,6 @@ export function actionText(action: ConnectorAction): string {
   return `${action.name}\t${action.actionId}\t${action.serviceName}\t${action.serviceId}`
 }
 
-export function actionSummary(action: ConnectorAction) {
-  return {
-    actionId: action.actionId,
-    ...(action.defaultConnection == null
-      ? {}
-      : {
-          defaultConnection: {
-            connectionId: action.defaultConnection.connectionId,
-            displayName: action.defaultConnection.displayName,
-            status: action.defaultConnection.status,
-          },
-        }),
-    description: action.description,
-    name: action.name,
-    serviceId: action.serviceId,
-    serviceName: action.serviceName,
-  }
-}
-
-export function nodeDetails(content: RevisionContent, nodeId: string, node: GraphNode) {
-  if (node.kind != 'task') return { node, nodeId }
-  if (node.task != null) {
-    const module = content.modules[node.task.moduleId]
-    return { node, nodeId, task: node.task, ...(module == null ? {} : { module }) }
-  }
-  const task = content.document.tasks[node.taskId]
-  return { node, nodeId, ...(task == null ? {} : { task }) }
-}
-
 export function inspectedNodeSummary(content: RevisionContent, nodeId: string, node: GraphNode) {
   if (node.kind != 'task') return { kind: node.kind, ...(node.name == null ? {} : { name: node.name }), nodeId }
   if (node.task != null) {

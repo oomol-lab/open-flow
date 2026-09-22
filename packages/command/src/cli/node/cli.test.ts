@@ -1,6 +1,7 @@
 import type { ChangeOperation, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { UiLanguage } from '@oomol-lab/open-flow/localization'
 
+import { flowInspection, inspectFlowDraft } from '@oomol-lab/open-flow/control-api'
 import { authoringExample } from '@oomol-lab/open-flow/control-requests'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { applyFlowChanges } from '@oomol-lab/open-flow/flow-change'
@@ -429,6 +430,8 @@ describe('agent command contract', () => {
 
   it.each([
     ['list', '--unknown', '--json'],
+    ['inspect', 'flow-1', '--summary', '--json'],
+    ['inspect', 'flow-1', '--full=true', '--json'],
     ['list', '--wait', '--json'],
     ['list', '--limit=0', '--json'],
     ['run', 'flow-1', '--timeout=1', '--json'],
@@ -652,16 +655,18 @@ it('does not hide authorization failures as an unreadable Draft', async () => {
   expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'authorization.denied' } })
 })
 
-it('inspects complete editable content without invoking check', async () => {
+it.each([false, true])('inspects the shared Flow view without invoking check (full=%s)', async (full) => {
   const output = runtime()
+  const live = { flowId: flow.flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 } as const
   const request = vi.fn(async (path: string) => {
     if (path == '/v1/flows/flow-1') return Response.json(flow)
     if (path.endsWith('/revisions/revision-1')) return Response.json(revisionFixture)
+    if (path.endsWith('/live')) return Response.json(live)
     throw new Error(`Unexpected inspection request: ${path}`)
   })
-  expect(await runCli(['inspect', 'flow-1', '--json'], { request }, output.value)).toBe(0)
-  expect(JSON.parse(output.stdout())).toMatchObject({ content: revisionFixture.content, revisionId: 'revision-1' })
-  expect(request).toHaveBeenCalledTimes(2)
+  expect(await runCli(['inspect', 'flow-1', '--json', ...(full ? ['--full'] : [])], { request }, output.value), output.stderr()).toBe(0)
+  expect(JSON.parse(output.stdout())).toEqual({ ...flowInspection(await inspectFlowDraft(flow, () => revisionFixture), live, full), kind: 'flow.inspect' })
+  expect(request).toHaveBeenCalledTimes(3)
 })
 
 it('reports a followed event timeout with a reusable cursor without canceling the run', async () => {
@@ -714,7 +719,7 @@ it('reads and downloads saved results through the public API', async () => {
   }
   for (const command of [
     ['runs', 'results', 'run', '--json'],
-    ['runs', 'read-result', 'run', 'result', '/ok', '0', '--json'],
+    ['runs', 'read-result', 'run', 'result', '--pointer', '/ok', '--offset', '0', '--json'],
     ['runs', 'download-result', 'run', 'result'],
   ]) {
     const io = runtime()
@@ -730,4 +735,88 @@ it('describes Trigger outputs as a JSON object in the CLI schema', async () => {
   const result = runtime()
   expect(await runCli(['schema', 'outputs'], { request: vi.fn() }, result.value)).toBe(0)
   expect(JSON.parse(result.stdout())).toMatchObject({ type: 'object' })
+})
+
+it('discovers Provider and Trigger summaries and creates a Flow in the chosen Team', async () => {
+  const trigger = { key: 'mail.received', name: 'received', displayName: 'Mail received', description: 'Incoming email', provider: 'mail', type: 'poll' }
+  const teams = { enabled: true, teams: [{ id: 'team', name: 'Engineering', systemCreated: false }], version: 1 }
+  const request = async (path: string, init?: RequestInit) => {
+    if (path == '/v1/connector/providers') return Response.json({ providers: [{ serviceId: 'mail', serviceName: 'Mail' }], version: 1 })
+    if (path == '/v1/trigger-keys') return Response.json({ keys: [trigger], version: 1 })
+    if (path == '/v1/connector/teams') return Response.json(teams)
+    if (path == '/v1/flows') {
+      expect(JSON.parse(String(init?.body))).toEqual({ name: 'Main', teamId: 'team', version: 1 })
+      return Response.json(flow)
+    }
+    throw new Error(path)
+  }
+  for (const [command, expected] of [
+    [['connector', 'providers'], { providers: [{ serviceId: 'mail', serviceName: 'Mail' }] }],
+    [['trigger', 'search'], { definitions: [trigger] }],
+    [['trigger', 'search', 'MAIL'], { definitions: [trigger] }],
+    [['trigger', 'search', 'absent'], { definitions: [] }],
+    [['connector', 'teams'], teams],
+    [['create', 'Main', '--team', 'team'], { flow }],
+  ] as const) {
+    const io = runtime()
+    expect(await runCli([...command, '--json'], { request }, io.value), io.stderr()).toBe(0)
+    expect(JSON.parse(io.stdout())).toMatchObject(expected)
+  }
+})
+
+it('checks a fixed Revision and changes only the observed Live publication enablement', async () => {
+  const request = async (path: string, init?: RequestInit) => {
+    if (path == '/v1/flows/flow-1') return Response.json(flow)
+    if (path == '/v1/flows/flow-1/revisions/historical/check')
+      return Response.json({
+        waits: [],
+        closureDigest: 'closure',
+        diagnostics: [],
+        engineContract: 'open-flow-engine/v5',
+        flowId: flow.flowId,
+        modelVersion: currentFlowModelVersion,
+        revisionDigest: 'digest',
+        revisionId: 'historical',
+        valid: true,
+        version: 1,
+      })
+    if (path.endsWith('/enabled')) {
+      const body = JSON.parse(String(init?.body))
+      expect(body).toEqual({ expectedPublicationId: 'published', enabled: expect.any(Boolean), version: 1 })
+      return Response.json({ ...flow, live: { enabled: body.enabled, publicationId: 'published', revisionId: 'historical' } })
+    }
+    throw new Error(path)
+  }
+  const checked = runtime()
+  expect(await runCli(['check', 'flow-1', '--revision', 'historical', '--json'], { request }, checked.value), checked.stderr()).toBe(0)
+  expect(JSON.parse(checked.stdout()).revisionId).toBe('historical')
+  for (const operation of ['enable', 'disable']) {
+    const io = runtime()
+    expect(await runCli([operation, 'flow-1', '--expected-publication', 'published', '--json'], { request }, io.value), io.stderr()).toBe(0)
+    expect(JSON.parse(io.stdout()).flow.live.enabled).toBe(operation == 'enable')
+  }
+})
+
+it('passes result cursors and bounded page options without treating result IDs as event sequences', async () => {
+  const routes: string[] = []
+  const request = async (path: string) => {
+    routes.push(path)
+    return Response.json({ error: { code: 'run.not-found', message: 'Missing' } }, { status: 404 })
+  }
+  for (const command of [
+    ['runs', 'results', 'run', '--after', 'result-previous'],
+    ['runs', 'read-result', 'run', 'result', '--offset', '12', '--limit', '3', '--max-bytes', '200'],
+  ])
+    await runCli([...command, '--json'], { request }, runtime().value)
+  expect(routes).toEqual(['/v1/runs/run/results?after=result-previous', '/v1/runs/run/results/result?pointer=&offset=12&limit=3&maxBytes=200'])
+  for (const command of [
+    ['runs', 'events', 'run', '--after', 'result-previous'],
+    ['runs', 'read-result', 'run', 'result', '--max-bytes', '1048577'],
+    ['connector', 'set', 'flow', 'node', '--name', 'Ignored'],
+    ['connector', 'list'],
+  ]) {
+    const rejectedRequest = vi.fn()
+    expect(await runCli([...command, '--json'], { request: rejectedRequest }, runtime().value)).toBe(1)
+    expect(rejectedRequest).not.toHaveBeenCalled()
+  }
 })

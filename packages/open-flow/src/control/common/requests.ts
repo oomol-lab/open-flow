@@ -20,7 +20,7 @@ const schemas = {
   createEventSource: createEventSourceSchema,
   updateEventSource: updateEventSourceSchema,
   eventSourceRevision: eventSourceRevisionSchema,
-  createFlow: z.strictObject({ name: flowName, version }),
+  createFlow: z.strictObject({ name: flowName, teamId: id.optional(), version }),
   renameFlow: z.strictObject({ name: flowName, version }),
   changeDraft: z.strictObject({ expectedRevisionId: id, operations: z.array(json).min(1), version }),
   repairDraft: z.strictObject({ expectedRevisionId: id, version }),

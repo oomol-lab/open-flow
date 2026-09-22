@@ -3,7 +3,7 @@ import type { TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { ParsedArguments } from './arguments.ts'
 import type { Runtime, SemanticNode } from './support.ts'
 
-import { ApiError, ControlClient, inspectFlowDraft } from '@oomol-lab/open-flow/control-api'
+import { ApiError, ControlClient, inspectFlowDraft, flowInspection, nodeDetails } from '@oomol-lab/open-flow/control-api'
 import {
   setInputSources,
   connect as connectEdge,
@@ -34,7 +34,6 @@ import {
   preferredConnection,
   exactEdgeSource,
   referencedTriggerKey,
-  nodeDetails,
   inspectedNodeSummary,
   inspectedTriggerSummary,
   requireCount,
@@ -476,7 +475,7 @@ export async function inspectFlowCommand(
   args: ParsedArguments,
   runtime: Runtime,
 ): Promise<void> {
-  requireCount(operands, 1, 'oo flow inspect <flow> [--summary] [--json]')
+  requireCount(operands, 1, 'oo flow inspect <flow> [--full] [--json]')
   const inspected = await inspectFlowDraft(flow, () => client.getRevision(flow.flowId, flow.draftRevisionId))
   if (inspected.draft == null) {
     write(
@@ -493,15 +492,8 @@ export async function inspectFlowCommand(
   const triggers = Object.entries(selected.graph.nodes)
     .filter((entry): entry is [string, TriggerNode] => !('inputs' in entry[1]))
     .map(([triggerId, trigger]) => inspectedTriggerSummary(selected.draft.content, triggerId, trigger))
-  const { content, ...revision } = selected.draft
-  const result = {
-    flow: selected.flow,
-    kind: 'flow.inspect',
-    revision,
-    revisionId: revision.revisionId,
-    ...(args.summary ? { summary: true, nodes, triggers, edges: selected.graph.edges } : { content }),
-    version: 1,
-  }
+  const revision = selected.draft
+  const result = { ...flowInspection(inspected, await client.getLive(flow.flowId), args.full), kind: 'flow.inspect' }
   const lines = [
     `${selected.flow.name}\t${selected.flow.flowId}\t${revision.revisionId}`,
     ...triggers.map((entry) => `trigger\t${entry.kind}\t${entry.name}\t${entry.triggerId}`),

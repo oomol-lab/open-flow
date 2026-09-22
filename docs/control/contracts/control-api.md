@@ -699,7 +699,7 @@ Workbench 已完成初始化并停留在 Flows 列表时，收到该事件自动
 | Method    | Path                                                       | 成功状态 | 说明                                              |
 | --------- | ---------------------------------------------------------- | -------: | ------------------------------------------------- |
 | `GET`     | `/v1/flows`                                                |      200 | `cursor`、`limit`、`includeTotal`                 |
-| `POST`    | `/v1/flows`                                                |  201/200 | `{ name, version: 1 }`                            |
+| `POST`    | `/v1/flows`                                                |  201/200 | `{ name, teamId?, version: 1 }`                   |
 | `GET`     | `/v1/flows/:flowId`                                        |      200 | Flow 与 Draft head                                |
 | `PATCH`   | `/v1/flows/:flowId`                                        |      200 | `{ name, version: 1 }`                            |
 | `DELETE`  | `/v1/flows/:flowId`                                        |      202 | 进入 `retiring`                                   |
@@ -733,6 +733,7 @@ Workbench 已完成初始化并停留在 Flows 列表时，收到该事件自动
 | `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/pause`          |      200 | pause                                             |
 | `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/resume`         |      200 | resume                                            |
 | `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/test`           |      200 | Poll test                                         |
+| `GET`     | `/v1/connector/teams`                                      |      200 | 可用 Team 目录：enabled、teams、version           |
 | `GET`     | `/v1/connector/providers`                                  |      200 | Provider catalog；可选 `flowId`                   |
 | `GET`     | `/v1/connector/actions`                                    |      200 | `service` 或 `q`；可选 `flowId`                   |
 | `GET`     | `/v1/connector/actions/:actionId`                          |      200 | Action detail；可选 `flowId`                      |
@@ -1142,3 +1143,9 @@ Flow 服务列表与账号授权分别保存。`ConnectorAccess.providerIds` 保
 `PUT /v1/flows/:flowId/connector-access/:providerId/service` 添加服务；`DELETE` 同一路径原子移除服务及其全部授权绑定。请求为 `{ version: 1, expectedAccessRevision }`，返回更新后的 `ConnectorAccess`，沿用访问版本冲突和 `access.changed` 通知。添加前校验服务存在且需要授权；服务配置持久化到 Flow，刷新或重新打开后保留。
 
 开源 Server 的 OOMOL selectable 模式在列举及保存候选时实时验证 `/v1/me/teams` 的成员身份。正常且未删除的团队中，`creator` 和 `admin` 可为有效账号创建 `admin-delegation`，无需 app-access policy；`member` 继续按 UID 对应的 policy 权限生成候选。成员身份缺失、失效或无法验证时拒绝授权。保存后的管理员委托使用固定身份校验当前账号有效性，不重新查询成员角色或 app-access；上游 Connector 仍按部署配置的用户 token 执行最终授权，Server 不伪造 Team token 或绕过上游限制。
+
+### CLI/MCP Team 选择
+
+`POST /v1/flows` 的创建请求接受 `{ name, teamId?: string, version: 1 }`；teamId 必须是非空字符串，并由部署验证可访问性。省略时保留部署的默认 Team 选择规则。相同 Idempotency-Key 对不同 Team 的创建请求返回冲突。
+
+Server 提供认证后的 `GET /v1/connector/teams`，返回 `{ enabled: boolean, teams: { id: string, name: string, systemCreated: boolean }[], version: 1 }`。不支持 Team 的部署返回 enabled=false 和空 teams。此目录不返回 Flow-Team 绑定列表。公共 ControlClient 通过 listConnectorTeams 读取，并通过 createFlow 的可选第三参数传入 teamId。

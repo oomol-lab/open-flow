@@ -68,7 +68,8 @@ try {
 | 工具                    | 输入要点                                                              | 结果                                             |
 | ----------------------- | --------------------------------------------------------------------- | ------------------------------------------------ |
 | `flow_list`             | `cursor?`、`limit?`                                                   | Flow 列表和 `nextCursor?`                        |
-| `flow_get`              | `flowId`                                                              | Flow、完整 Draft、Live                           |
+| `flow_get`              | `flowId`、可选 `full`                                                 | 默认精简 Draft 和 Live；`full=true` 返回完整内容 |
+| `flow_node_get`         | `flowId`、`revisionId`、`nodeId`、`subflowId?`                        | 固定版本节点、Task 定义或代码模块                |
 | `flow_schema`           | `kind?` 或 `example?`                                                 | Draft operations schema 或完整创建批次           |
 | `flow_create`           | `name`、`idempotencyKey`、`teamId?`                                   | Flow，包含初始 `draftRevisionId`                 |
 | `flow_apply`            | `flowId`、`expectedRevisionId`、`idempotencyKey`、`operations`        | 新 Revision identity                             |
@@ -86,11 +87,11 @@ try {
 | `run_resolve_wait`      | `runId`、`waitId`、`action`                                           | 决议是否被接受、权威 action 和 Run 状态          |
 | `run_cancel`            | `runId`                                                               | 取消是否被接受及权威状态                         |
 | `connector_teams`       | 无                                                                    | 部署的 Team 选择信息                             |
-| `connector_list`        | `flowId?`                                                             | Connector providers                              |
+| `connector_providers`   | `flowId?`                                                             | Connector providers                              |
 | `connector_search`      | `query`、`flowId?`                                                    | Actions                                          |
 | `connector_get`         | `actionId`、`flowId?`                                                 | Action 端口与连接要求                            |
 | `connector_connections` | `serviceId`、`flowId?`                                                | Connection 列表                                  |
-| `trigger_list`          | 无                                                                    | Provider Trigger keys                            |
+| `trigger_search`        | 无                                                                    | Provider Trigger keys                            |
 | `trigger_get`           | `key`                                                                 | Provider Trigger 定义                            |
 
 所有工具拒绝未声明的顶层参数。Flow、Run 列表和事件的 `limit` 范围 1–100，默认 50；事件 `after` 默认 0。
@@ -148,3 +149,19 @@ mutation 内部发生无法确定结果的异常时返回 `flow.mutation-outcome
 - [官方 TypeScript SDK](https://github.com/modelcontextprotocol/typescript-sdk)
 
 工具参数、描述和 annotations 由 `@oomol-lab/open-flow/mcp` 的 `mcpTools` 统一提供。Server 直接注册这些 Standard Schema 定义，并运行同一入口导出的 `mcpConformanceCases`。部署边界及版本规则见[公共契约与版本演进](../control/contracts/compatibility.md)。
+
+`flow_get` 默认与 CLI `oo flow inspect <flow> --json` 使用同一精简视图：`draft.graph.nodes` 按节点 ID 索引，保留原始 kind、输入绑定、inputHandles、outputHandles、未被覆盖的 inputDefaults，以及 Task 的 executor 或代码 moduleId。子流程保留各自图、接口与输出来源；bindings 和模块名称、imports 仍可读取。完整 Schema、源码、actorId、digest、parentRevisionId 和 modelVersion 不在默认视图中。Live 只保留 status、hasUnpublishedChanges 和 publication 的 publicationId/revisionId。
+
+需要完整 Schema、源码或复杂修改的精确 before 值时，使用 `flow_get({ flowId, full: true })`，CLI 使用 `oo flow inspect <flow> --full --json`。完整模式保留原始 `draft.content` 和修订元数据。精简视图不是可直接写回的 Revision，也不会截断或打码用户输入。读取仍使用现有固定 Revision 与 Control API，未改变持久化格式。
+
+### 目录发现和固定版本节点详情
+
+`connector_providers` 列出 Provider，替代原 `connector_list`。`connector_search` 返回 Action 摘要（身份、描述、authenticated 和默认连接摘要），不返回 inputs/outputs/inputSchema/outputSchema；通过 `connector_get` 按需读取完整定义。
+
+`trigger_search({ query? })` 替代原 `trigger_list`，省略 query 列出全部可用定义摘要，提供 query 时进行不区分大小写的匹配。Flow 中已创建的触发器实例由 `flow_get` 读取。Connector 和 Trigger 搜索 query 长度为 1–256 个字符。
+
+`flow_node_get({ flowId, revisionId, nodeId, subflowId? })` 返回固定 Revision 的单个节点及其使用的 Task 定义或代码 module。省略 subflowId 读取根图；指定时仅读取对应子流程图，不回退到根图。代码 Task 定义保留在 node.task，不重复返回顶层 task。Draft 后续变化不影响历史版本详情。找不到目标时返回错误，不自动读取最新版本。
+
+`flow_run` 的输入 Schema 按 source 区分互斥分支：draft 要求 flowId/revisionId，live 要求 publicationId，另一分支字段不允许出现。该约束同时用于工具发现的 JSON Schema 与调用验证。
+
+`connector_teams` 与 CLI Team 目录返回 enabled、teams 和 version，不再附带 Flow-Team 绑定清单。
