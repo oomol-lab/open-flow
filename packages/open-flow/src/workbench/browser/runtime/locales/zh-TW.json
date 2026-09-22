@@ -226,7 +226,6 @@
       "connectBeforeRun": "請先連接 {{service}}，這個節點才能執行或發布。",
       "connectService": "連接 {{service}}",
       "connection": "Connection",
-      "inheritsFlowAccess": "此節點繼承 Flow 的 Provider 存取權限。",
       "loading": "正在載入 Connection…",
       "missing": "這個固定的 Connection 已不存在。請選擇其他帳號或新增 Connection。",
       "refreshFailed": "無法重新整理 Connection。",
@@ -279,7 +278,6 @@
       "editorLoading": "正在載入編輯器…",
       "editorUnavailable": "無法載入程式碼編輯器。",
       "inputPorts": "輸入埠",
-      "importsFromSource": "Flow 的模組相依性會從靜態 import 陳述式自動偵測。",
       "javascriptModule": "程式碼",
       "missing": "引用的任務不存在。",
       "outputPorts": "輸出埠",
@@ -344,8 +342,8 @@
       "typeSeparator": "或"
     },
     "actions": {
-      "flowAccess": "服務授權",
-      "flowAccessHint": "查看和管理此 Flow 的服務授權",
+      "flowAccess": "可用服務",
+      "flowAccessHint": "查看和管理此程式碼可呼叫的服務和工具",
       "chooseConnection": "選擇 {{provider}} Connection",
       "connectionDescription": "Connection 將寫入這次呼叫；是否允許使用仍由 Flow Provider Access 決定。",
       "title": "程式碼可呼叫的動作",

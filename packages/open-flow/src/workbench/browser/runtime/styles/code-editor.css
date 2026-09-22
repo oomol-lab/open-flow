@@ -1,15 +1,12 @@
 .open-flow-workbench {
+  .code-section > .inspector-section-content {
+    padding-inline: 12px;
+  }
+
   .code-editor {
     position: relative;
     height: 280px;
     border-radius: var(--ui-radius);
-  }
-
-  .code-section-content {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 2px 12px 16px;
   }
 
   .code-actions {
@@ -197,12 +194,5 @@
 
   .code-editor-state.error {
     color: var(--ui-destructive);
-  }
-
-  .code-source-note {
-    color: var(--ui-muted-foreground);
-    font-size: 10px;
-    font-weight: 400;
-    line-height: 15px;
   }
 }

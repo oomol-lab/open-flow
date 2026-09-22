@@ -226,7 +226,6 @@
       "connectBeforeRun": "이 블록을 실행하거나 게시하려면 먼저 {{service}}에 연결하세요.",
       "connectService": "{{service}} 연결",
       "connection": "Connection",
-      "inheritsFlowAccess": "이 노드는 Flow의 Provider 액세스를 상속합니다.",
       "loading": "Connection 불러오는 중…",
       "missing": "이 블록에 고정된 Connection이 더 이상 존재하지 않습니다. 다른 계정을 선택하거나 Connection을 추가하세요.",
       "refreshFailed": "Connection을 새로 고치지 못했습니다.",
@@ -279,7 +278,6 @@
       "editorLoading": "편집기 불러오는 중…",
       "editorUnavailable": "코드 편집기를 불러오지 못했습니다.",
       "inputPorts": "입력 포트",
-      "importsFromSource": "Flow 모듈 의존성은 정적 import 문에서 자동으로 감지됩니다.",
       "javascriptModule": "코드",
       "missing": "참조된 태스크가 존재하지 않습니다.",
       "outputPorts": "출력 포트",
@@ -344,8 +342,8 @@
       "typeSeparator": " 또는 "
     },
     "actions": {
-      "flowAccess": "서비스 권한",
-      "flowAccessHint": "이 Flow의 서비스 권한 보기 및 관리",
+      "flowAccess": "사용 가능한 서비스",
+      "flowAccessHint": "이 코드에서 호출할 수 있는 서비스와 도구 보기 및 관리",
       "chooseConnection": "{{provider}} Connection 선택",
       "connectionDescription": "Connection이 이 호출에 삽입됩니다. 사용 가능 여부는 계속 Flow Provider Access에서 제어합니다.",
       "title": "이 코드에서 호출할 수 있는 작업",

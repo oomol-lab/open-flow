@@ -391,9 +391,17 @@ describe('Code task sections', () => {
     if (task == null || typeof task.type != 'function') throw new Error('Expected task definition.')
     const rendered = (task.type as (props: unknown) => ReactElement)(task.props)
     expect(rendered.props['data-inspector-section']).toBe('module')
-    const manage = find(rendered, (item) => item.props.title == 'inspector.actions.flowAccessHint')
-    expect(manage).toBeDefined()
-    ;(manage!.props.onClick as () => void)()
+    expect(rendered.props.className).toContain('inspector-titled-section')
+    expect(find(rendered, (item) => item.type == 'h3' && item.props.className == 'inspector-section-title')).toBeDefined()
+    expect(find(rendered, (item) => item.props.className == 'inspector-section-content')?.props['data-inset']).toBe(true)
+    const hint = find(rendered, (item) => typeof item.type == 'function' && item.type.name == 'TooltipContent')
+    expect(hint?.props.children).toBe('inspector.actions.flowAccessHint')
+    const trigger = find(rendered, (item) => typeof item.type == 'object' && 'render' in item.props)
+    const manage = trigger?.props.render
+    if (!isValidElement(manage)) throw new Error('Expected available services tooltip trigger.')
+    const manageProps = manage.props as { readonly onClick: () => void; readonly title?: string }
+    expect(manageProps.title).toBeUndefined()
+    manageProps.onClick()
     expect(configureAccess).toHaveBeenCalledWith()
 
     expect(find(element, (item) => typeof item.type == 'function' && item.type.name == 'GeneralSettings')).toBeDefined()

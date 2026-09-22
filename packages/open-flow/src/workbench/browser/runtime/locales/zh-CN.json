@@ -226,7 +226,6 @@
       "connectBeforeRun": "请先连接 {{service}}，此节点才能运行或发布。",
       "connectService": "连接 {{service}}",
       "connection": "连接",
-      "inheritsFlowAccess": "此节点继承 Flow 的 Provider 访问权限。",
       "loading": "正在加载连接…",
       "missing": "此节点固定的 Connection 已不存在，请选择其他账号或添加连接。",
       "refreshFailed": "无法刷新 Connection。",
@@ -279,7 +278,6 @@
       "editorLoading": "正在加载编辑器…",
       "editorUnavailable": "代码编辑器加载失败。",
       "inputPorts": "输入端口",
-      "importsFromSource": "Flow 模块依赖会从静态 import 语句自动识别。",
       "javascriptModule": "代码",
       "missing": "引用的任务不存在。",
       "outputPorts": "输出端口",
@@ -344,8 +342,8 @@
       "typeSeparator": "或"
     },
     "actions": {
-      "flowAccess": "服务授权",
-      "flowAccessHint": "查看和管理此 Flow 的服务授权",
+      "flowAccess": "可用服务",
+      "flowAccessHint": "查看并管理此代码可调用的服务和工具",
       "chooseConnection": "选择 {{provider}} Connection",
       "connectionDescription": "Connection 将写入本次调用；是否允许使用仍由 Flow Provider Access 决定。",
       "title": "代码可调用的动作",

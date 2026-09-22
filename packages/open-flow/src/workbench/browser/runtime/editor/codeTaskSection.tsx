@@ -11,6 +11,7 @@ import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { compute } from 'value-enhancer'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { CodeEditor } from './codeEditor.tsx'
 import { codeTyping } from './codeTyping.ts'
 
@@ -63,7 +64,7 @@ export function CodeTaskSection({
   if (task == null) return <div className="inspector-section section-error">{t('inspector.task.missing')}</div>
   return module != null && 'moduleId' in task && moduleEditor?.moduleId == task.moduleId ? (
     <form
-      className="inspector-form code-section"
+      className="inspector-section inspector-titled-section inspector-form code-section"
       data-inspector-section="module"
       onKeyDown={(event) => {
         if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() == 's') {
@@ -77,24 +78,29 @@ export function CodeTaskSection({
         void store.saveModuleEditor()
       }}
     >
-      <div className="inspector-section-title">
+      <h3 className="inspector-section-title">
         <span className="min-w-0 flex-1">{t('inspector.task.javascriptModule')}</span>
         {onConfigureAccess != null && (
-          <Button
-            className="shrink-0 font-normal text-muted-foreground"
-            disabled={disabled}
-            onClick={onConfigureAccess}
-            size="xs"
-            title={t('inspector.actions.flowAccessHint')}
-            type="button"
-            variant="ghost"
-          >
-            {t('inspector.actions.flowAccess')}
-            <i aria-hidden="true" className="i-lucide-light:arrow-right size-3" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger
+              render={
+                <Button
+                  className="shrink-0 font-normal text-muted-foreground"
+                  disabled={disabled}
+                  onClick={onConfigureAccess}
+                  size="xs"
+                  type="button"
+                  variant="ghost"
+                />
+              }
+            >
+              {t('inspector.actions.flowAccess')}
+            </TooltipTrigger>
+            <TooltipContent>{t('inspector.actions.flowAccessHint')}</TooltipContent>
+          </Tooltip>
         )}
-      </div>
-      <div className="code-section-content">
+      </h3>
+      <div className="inspector-section-content" data-inset>
         <CodeEditor
           ariaLabel={t('inspector.task.source')}
           disabled={disabled}
@@ -110,7 +116,6 @@ export function CodeTaskSection({
           uri={`file:///modules/${moduleEditor.moduleId}.js`}
           value={moduleEditor.source}
         />
-        <span className="code-source-note">{t('inspector.task.importsFromSource')}</span>
         {moduleEditor.status == 'failed' && (
           <div className="form-actions code-actions">
             <Button disabled={disabled} onClick={() => store.discardModuleChanges()} size="sm" type="button" variant="secondary">

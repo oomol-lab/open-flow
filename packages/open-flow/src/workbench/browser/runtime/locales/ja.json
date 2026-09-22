@@ -226,7 +226,6 @@
       "connectBeforeRun": "このノードを実行または公開するには、先に {{service}} を接続してください。",
       "connectService": "{{service}} を接続",
       "connection": "Connection",
-      "inheritsFlowAccess": "このノードは Flow の Provider アクセスを継承します。",
       "loading": "Connection を読み込み中…",
       "missing": "固定されていた Connection は存在しません。別のアカウントを選択するか、Connection を追加してください。",
       "refreshFailed": "Connection を更新できませんでした。",
@@ -279,7 +278,6 @@
       "editorLoading": "エディターを読み込み中…",
       "editorUnavailable": "コードエディターを読み込めませんでした。",
       "inputPorts": "入力ポート",
-      "importsFromSource": "Flow のモジュール依存関係は、静的な import 文から検出されます。",
       "javascriptModule": "コード",
       "missing": "参照しているタスクが存在しません。",
       "outputPorts": "出力ポート",
@@ -344,8 +342,8 @@
       "typeSeparator": "または"
     },
     "actions": {
-      "flowAccess": "サービス認可",
-      "flowAccessHint": "この Flow のサービス認可を確認・管理",
+      "flowAccess": "利用可能なサービス",
+      "flowAccessHint": "このコードから呼び出せるサービスとツールを表示・管理",
       "chooseConnection": "{{provider}} Connection を選択",
       "connectionDescription": "Connection はこの呼び出しに挿入されます。使用可否は引き続き Flow Provider Access によって制御されます。",
       "title": "このコードから呼び出せるアクション",

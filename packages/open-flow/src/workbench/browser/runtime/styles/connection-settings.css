@@ -103,10 +103,6 @@
     padding: 2px var(--inspector-content-inset-end) 16px var(--inspector-content-inset-start);
   }
 
-  .connection-state > .connection-state-content > .connection-detail {
-    color: var(--ui-muted-foreground);
-  }
-
   .connection-state.required {
     background: var(--warning-surface);
     color: var(--warning-foreground);

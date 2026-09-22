@@ -226,7 +226,6 @@
       "connectBeforeRun": "Подключите {{service}}, чтобы этот узел можно было запускать и публиковать.",
       "connectService": "Подключить {{service}}",
       "connection": "Connection",
-      "inheritsFlowAccess": "Этот узел наследует доступ Provider от Flow.",
       "loading": "Загрузка Connection…",
       "missing": "Закреплённый Connection больше не существует. Выберите другой аккаунт или добавьте Connection.",
       "refreshFailed": "Не удалось обновить Connection.",
@@ -279,7 +278,6 @@
       "editorLoading": "Загрузка редактора…",
       "editorUnavailable": "Не удалось загрузить редактор кода.",
       "inputPorts": "Входные порты",
-      "importsFromSource": "Зависимости модулей Flow определяются по статическим import-выражениям.",
       "javascriptModule": "Код",
       "missing": "Указанная задача не существует.",
       "outputPorts": "Выходные порты",
@@ -344,8 +342,8 @@
       "typeSeparator": " или "
     },
     "actions": {
-      "flowAccess": "Доступ к сервисам",
-      "flowAccessHint": "Просмотр и управление доступом к сервисам этого Flow",
+      "flowAccess": "Доступные сервисы",
+      "flowAccessHint": "Просмотреть сервисы и инструменты, которые может вызывать этот код, и управлять ими",
       "chooseConnection": "Выбрать подключение {{provider}}",
       "connectionDescription": "Подключение будет вставлено в этот вызов. Возможность его использования по-прежнему контролирует Flow Provider Access.",
       "title": "Действия, доступные коду",

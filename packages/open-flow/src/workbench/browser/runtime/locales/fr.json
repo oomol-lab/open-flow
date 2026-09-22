@@ -226,7 +226,6 @@
       "connectBeforeRun": "Connectez {{service}} pour que ce bloc puisse être exécuté ou publié.",
       "connectService": "Connecter {{service}}",
       "connection": "Connection",
-      "inheritsFlowAccess": "Ce nœud hérite de l’accès Provider du Flow.",
       "loading": "Chargement des Connections…",
       "missing": "Cette Connection épinglée n'existe plus. Choisissez un autre compte ou ajoutez une Connection.",
       "refreshFailed": "Impossible d'actualiser les Connections.",
@@ -279,7 +278,6 @@
       "editorLoading": "Chargement de l'éditeur…",
       "editorUnavailable": "Impossible de charger l'éditeur de code.",
       "inputPorts": "Ports d'entrée",
-      "importsFromSource": "Les dépendances de module du Flow sont détectées à partir des instructions import statiques.",
       "javascriptModule": "Code",
       "missing": "La tâche référencée n'existe pas.",
       "outputPorts": "Ports de sortie",
@@ -344,8 +342,8 @@
       "typeSeparator": " ou "
     },
     "actions": {
-      "flowAccess": "Accès aux services",
-      "flowAccessHint": "Consulter et gérer les accès aux services de ce Flow",
+      "flowAccess": "Services disponibles",
+      "flowAccessHint": "Afficher et gérer les services et outils que ce code peut appeler",
       "chooseConnection": "Choisir une connexion {{provider}}",
       "connectionDescription": "La connexion est insérée dans cet appel. L’accès Provider du Flow détermine toujours si elle peut être utilisée.",
       "title": "Actions accessibles au code",

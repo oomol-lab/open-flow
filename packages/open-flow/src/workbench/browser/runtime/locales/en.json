@@ -226,7 +226,6 @@
       "connectBeforeRun": "Connect {{service}} before this block can run or be published.",
       "connectService": "Connect {{service}}",
       "connection": "Connection",
-      "inheritsFlowAccess": "This node inherits its Provider access from the Flow.",
       "loading": "Loading connections…",
       "missing": "This pinned Connection no longer exists. Choose another account or add a Connection.",
       "refreshFailed": "Connections could not be refreshed.",
@@ -279,7 +278,6 @@
       "editorLoading": "Loading editor…",
       "editorUnavailable": "The code editor couldn’t be loaded.",
       "inputPorts": "Input ports",
-      "importsFromSource": "Flow module dependencies are detected from static import statements.",
       "javascriptModule": "Code",
       "missing": "The referenced Task does not exist.",
       "outputPorts": "Output ports",
@@ -344,8 +342,8 @@
       "typeSeparator": " or "
     },
     "actions": {
-      "flowAccess": "Service access",
-      "flowAccessHint": "View and manage service access for this Flow",
+      "flowAccess": "Available services",
+      "flowAccessHint": "View and manage the services and tools this code can call",
       "chooseConnection": "Choose a {{provider}} connection",
       "connectionDescription": "The connection is inserted into this call. Flow provider access still controls whether it may be used.",
       "title": "Actions available to this code",

@@ -302,7 +302,6 @@ export function TriggerConnection({
           )}
         </h3>
         <div className="connection-state-content">
-          <p className="connection-detail">{t('inspector.account.inheritsFlowAccess')}</p>
           {authorizationPending && <p>{t('inspector.account.authorizationPending')}</p>}
           {connectionLoading ? (
             <p>{t('inspector.account.loading')}</p>
