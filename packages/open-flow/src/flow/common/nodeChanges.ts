@@ -21,6 +21,7 @@ import { dequal } from 'dequal/lite'
 import { applyFlowChanges, nextNodeName, normalizeNodeName } from './change.ts'
 import { nodeInputMappings } from './condition.ts'
 import { fixedInputValue, inputValues } from './inputValue.ts'
+import { referencedTaskIds } from './semantics.ts'
 
 const codeTaskTemplate = `export default async function (inputs, context) {
   return { result: inputs.value }
@@ -330,6 +331,10 @@ export function deleteNodes(content: RevisionContent, target: GraphTarget, nodeI
       ...(node.kind == 'task' && node.task != null ? [{ kind: 'module.delete' as const, moduleId: node.task.moduleId }] : []),
     ]
   })
+  const remaining = referencedTaskIds(applyFlowChanges(content, operations).document)
+  for (const taskId of referencedTaskIds(content.document)) {
+    if (!remaining.has(taskId) && content.document.tasks[taskId] != null) operations.push({ kind: 'task.delete', taskId })
+  }
   if (target.kind == 'subflow') return cleanVariableBindings(content, operations)
   const bindingIds = new Set(
     nodeIds.flatMap((nodeId) => {

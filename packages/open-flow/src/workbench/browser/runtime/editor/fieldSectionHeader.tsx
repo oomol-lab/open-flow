@@ -1,5 +1,6 @@
-import type { ReactNode, Ref } from 'react'
+import type { ReactNode } from 'react'
 
+import { forwardRef } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { FieldLabel } from '../../../../ui/browser/field.tsx'
@@ -19,19 +20,7 @@ export function FieldSectionTitle({ children, icon }: { children: ReactNode; ico
   )
 }
 
-/** Shared heading and actions for editable property-panel field lists. */
-export function FieldSectionHeader({
-  ref,
-  title,
-  disabled,
-  canSort,
-  sorting,
-  onToggleSorting,
-  addLabel,
-  onAdd,
-  onReset,
-}: {
-  ref?: Ref<HTMLDivElement>
+interface FieldSectionHeaderProps {
   title?: ReactNode
   disabled: boolean
   canSort: boolean
@@ -40,7 +29,13 @@ export function FieldSectionHeader({
   addLabel: string
   onReset?: () => void
   onAdd: () => void
-}) {
+}
+
+/** Shared heading and actions for editable property-panel field lists. */
+export const FieldSectionHeader = forwardRef<HTMLDivElement, FieldSectionHeaderProps>(function FieldSectionHeader(
+  { title, disabled, canSort, sorting, onToggleSorting, addLabel, onAdd, onReset },
+  ref,
+) {
   const t = useTranslate()
   const sortLabel = t(sorting ? 'inspector.ports.finishSorting' : 'inspector.ports.sort')
   return (
@@ -78,4 +73,4 @@ export function FieldSectionHeader({
       )}
     </div>
   )
-}
+})

@@ -3,7 +3,7 @@ import type {
   ConnectorAction,
   ConnectorActionMetadata,
   ConnectorAccess,
-  ConnectorAccessCandidates,
+  ConnectorAccessCandidatesBatch,
   ConnectorConnection,
   ConnectorProvider,
   Draft,
@@ -255,11 +255,25 @@ export class ControlService {
     return this.connectorAccess.read(actorId, flowId)
   }
 
-  async getProviderAccessBindingCandidates(actorId: string, flowId: string, providerId: string, signal?: AbortSignal): Promise<ConnectorAccessCandidates> {
+  async getProviderAccessBindingCandidates(
+    actorId: string,
+    flowId: string,
+    providerIds: readonly string[],
+    signal?: AbortSignal,
+  ): Promise<ConnectorAccessCandidatesBatch> {
     this.getFlow(flowId)
-    if (providerId.length == 0) throw new ControlError(controlErrorCode.connectorAccessInvalid, 'Connector Provider is invalid.')
     try {
-      return await this.connectorAccess.listCandidates(actorId, flowId, providerId, signal)
+      return await this.connectorAccess.listCandidates(actorId, flowId, providerIds, signal)
+    } catch (error) {
+      if (error instanceof ConnectorTaskError) throw new ControlError(error.code, error.message)
+      throw error
+    }
+  }
+
+  async setConnectorService(actorId: string, flowId: string, providerId: string, selected: boolean, expectedAccessRevision: number): Promise<ConnectorAccess> {
+    this.getFlow(flowId)
+    try {
+      return this.#accessMutation(flowId, await this.connectorAccess.setService(actorId, flowId, providerId, selected, expectedAccessRevision))
     } catch (error) {
       if (error instanceof ConnectorTaskError) throw new ControlError(error.code, error.message)
       throw error

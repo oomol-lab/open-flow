@@ -35,6 +35,14 @@ const schemas = {
   putVariable: z.strictObject({
     value: z.string().refine((value) => new TextEncoder().encode(value).byteLength <= 65_536, 'Environment variable value is too large.'),
   }),
+  queryConnectorAccessCandidates: z.strictObject({
+    providerIds: z
+      .array(id.max(256))
+      .min(1)
+      .refine((ids) => new Set(ids).size == ids.length, 'Duplicate provider IDs.'),
+    version,
+  }),
+  setConnectorService: z.strictObject({ expectedAccessRevision: z.int().nonnegative(), version }),
   addProviderAccessBinding: z.strictObject({ accessBindingId: id, expectedAccessRevision: z.int().nonnegative(), version }),
   removeProviderAccessBinding: z.strictObject({ accessBindingId: id, expectedAccessRevision: z.int().nonnegative(), version }),
   versionOnly: z.strictObject({ version }),
@@ -64,6 +72,8 @@ export const controlRequests = {
   createLiveRun: decoder(schemas.createLiveRun),
   resolveWait: decoder(schemas.resolveWait),
   putVariable: decoder(schemas.putVariable),
+  queryConnectorAccessCandidates: decoder(schemas.queryConnectorAccessCandidates),
+  setConnectorService: decoder(schemas.setConnectorService),
   addProviderAccessBinding: decoder(schemas.addProviderAccessBinding),
   removeProviderAccessBinding: decoder(schemas.removeProviderAccessBinding),
   versionOnly: decoder(schemas.versionOnly),

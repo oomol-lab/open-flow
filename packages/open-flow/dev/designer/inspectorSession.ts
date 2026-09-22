@@ -20,6 +20,7 @@ export function createInspectorTransport(
   options: {
     readonly access?: ConnectorAccess
     readonly accessError?: boolean
+    readonly accessSaveDelay?: number
     readonly actions?: readonly ConnectorActionMetadata[]
     readonly candidates?: readonly {
       readonly accessBindingId: string
@@ -64,11 +65,44 @@ export function createInspectorTransport(
       if (options.accessError) return Response.json({ error: { code: 'connector.unavailable', message: 'Unavailable.' }, version: 1 }, { status: 503 })
       return Response.json(access)
     }
-    const candidate = /\/connector-access\/([^/]+)\/candidates$/.exec(url.pathname)
-    if (candidate != null)
-      return Response.json({ candidates: options.candidates ?? [], mode: access.mode, providerId: decodeURIComponent(candidate[1]!), version: 1 })
+    const service = /\/connector-access\/([^/]+)\/service$/.exec(url.pathname)
+    if (service != null && (init?.method == 'PUT' || init?.method == 'DELETE')) {
+      const providerId = decodeURIComponent(service[1]!)
+      access = {
+        ...access,
+        accessRevision: access.accessRevision + 1,
+        providerIds:
+          init.method == 'PUT' ? [...new Set([...(access.providerIds ?? []), providerId])] : (access.providerIds ?? []).filter((id) => id != providerId),
+        bindings: init.method == 'PUT' ? access.bindings : access.bindings.filter((binding) => binding.providerId != providerId),
+      }
+      return Response.json(access)
+    }
+    if (url.pathname.endsWith('/connector-access/candidates/query')) {
+      const { providerIds } = JSON.parse(String(init?.body)) as { providerIds: string[] }
+      return Response.json({
+        version: 1,
+        results: providerIds.map((providerId) => ({
+          candidates: (options.candidates ?? [])
+            .filter((item) => item.providerId == providerId)
+            .map((item) => ({
+              accessBindingId: item.accessBindingId,
+              connectionDisplayName: item.connectionDisplayName,
+              providerId: item.providerId,
+              permissionGroupName: item.permissionGroupName,
+              connectionId:
+                options.connections?.find((account) => account.service == item.providerId && account.displayName == item.connectionDisplayName)?.id ??
+                'fixture-account',
+              source: { kind: 'policy', ruleId: null },
+            })),
+          mode: access.mode,
+          providerId,
+          version: 1,
+        })),
+      })
+    }
     const mutation = /\/connector-access\/([^/]+)$/.exec(url.pathname)
     if (mutation != null && (init?.method == 'PUT' || init?.method == 'DELETE')) {
+      if (options.accessSaveDelay) await new Promise((resolve) => setTimeout(resolve, options.accessSaveDelay))
       const providerId = decodeURIComponent(mutation[1]!)
       const input = JSON.parse(String(init.body)) as { readonly accessBindingId?: string }
       const selected = options.candidates?.find((item) => item.providerId == providerId && item.accessBindingId == input.accessBindingId)
@@ -81,6 +115,10 @@ export function createInspectorTransport(
             : [
                 ...access.bindings.filter((binding) => binding.providerId != providerId || binding.accessBindingId != input.accessBindingId),
                 {
+                  connectionId:
+                    options.connections?.find((account) => account.service == providerId && account.displayName == selected?.connectionDisplayName)?.id ??
+                    'fixture-account',
+                  source: { kind: 'policy' as const, ruleId: null },
                   accessBindingId: selected!.accessBindingId,
                   connectionDisplayName: selected!.connectionDisplayName,
                   ...(selected!.permissionGroupName === undefined ? {} : { permissionGroupName: selected!.permissionGroupName }),
@@ -93,12 +131,6 @@ export function createInspectorTransport(
       return Response.json(access)
     }
     if (url.pathname.endsWith('/connector/proxy/providers')) return Response.json({ success: true, data: options.providers ?? [] })
-    if (url.pathname.startsWith('/v1/connector/action-metadata/')) {
-      const action = options.actions?.find((entry) => entry.actionId == decodeURIComponent(url.pathname.split('/').at(-1)!))
-      return action == null
-        ? Response.json({ error: { code: 'connector.action-not-found', message: 'Action not found.' }, version: 1 }, { status: 404 })
-        : Response.json({ action, version: 1 })
-    }
     if (url.pathname.endsWith('/connector/action-metadata')) {
       const query = (url.searchParams.get('q') ?? '').toLowerCase()
       return Response.json({
@@ -120,7 +152,24 @@ export function createInspectorTransport(
             outputSchema: action.outputSchema,
           })),
       })
-    if (url.pathname.endsWith('/connector/proxy/apps')) return Response.json({ success: true, data: options.connections ?? [] })
+    if (url.pathname.endsWith('/connector/connections'))
+      return Response.json({
+        version: 1,
+        connections: (options.connections ?? [])
+          .filter(
+            (account) =>
+              !url.searchParams.has('flowId') ||
+              access.mode == 'implicit' ||
+              access.bindings.some((binding) => binding.connectionId == account.id && binding.status == 'active'),
+          )
+          .map((account) => ({
+            connectionId: account.id,
+            serviceId: account.service,
+            displayName: account.displayName,
+            status: account.status,
+            isDefault: account.isDefault,
+          })),
+      })
     if (url.pathname === '/v1/trigger-keys/catalog')
       return Response.json({ version: 2, locale: url.searchParams.get('locale') ?? 'en', definitions: [], display: {} })
     if (url.pathname === '/v1/flows') return Response.json({ flows: [{ ...flow, draftRevisionId: revision().revisionId }], total: 1, version: 1 })

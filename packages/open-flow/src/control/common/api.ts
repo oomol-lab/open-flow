@@ -1,3 +1,12 @@
+export { connectorAccess as decodeConnectorAccess } from './connectorDecoders.ts'
+import type { ProviderAccessIdentity, ProviderAccessReference } from './providerAccess.ts'
+export {
+  parseProviderAccessSource,
+  providerAccessBindingId,
+  type ProviderAccessIdentity,
+  type ProviderAccessReference,
+  type ProviderAccessSource,
+} from './providerAccess.ts'
 import type { DraftOperation } from './draftOperations.ts'
 export { inspectFlowDraft } from './flowInspection.ts'
 export type { DraftOperation } from './draftOperations.ts'
@@ -29,7 +38,7 @@ import type { RunStatus } from '../../execution/common/runLifecycle.ts'
 import type { InputPortDefinition, JsonValue, PortDefinition, RevisionContent, TriggerKeySnapshot, WaitAction } from '../../flow/common/change.ts'
 
 import { flowCheck } from './checkDecoders.ts'
-import { connection, connectorAccess, connectorAccessCandidates, connectorAction } from './connectorDecoders.ts'
+import { connection, connectorAccess, connectorAccessCandidatesBatch, connectorAction } from './connectorDecoders.ts'
 import { allConnectorConnectionsQuery, connectorActionQuery, connectorConnectionsQuery, connectorProvidersQuery } from './connectorQueries.ts'
 import { exact, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 import { flow, flowPage, variable } from './flowDecoders.ts'
@@ -186,17 +195,17 @@ export interface ConnectorProvider {
 export type ConnectorAccessMode = 'implicit' | 'selectable'
 export type ProviderAccessBindingStatus = 'active' | 'forbidden' | 'invalid' | 'missing'
 
-export interface ProviderAccessBinding {
-  readonly accessBindingId: string
+export type ProviderAccessBinding = (
+  | (ProviderAccessIdentity & { readonly status: ProviderAccessBindingStatus })
+  | (Extract<ProviderAccessReference, { readonly source: null }> & { readonly status: 'invalid' })
+) & {
   readonly connectionDisplayName: string
   readonly permissionGroupName?: string | null
   readonly policyRevision?: string
   readonly providerId: string
-  readonly status: ProviderAccessBindingStatus
 }
 
-export interface ProviderAccessBindingCandidate {
-  readonly accessBindingId: string
+export interface ProviderAccessBindingCandidate extends ProviderAccessIdentity {
   readonly connectionDisplayName: string
   readonly isDefault?: boolean
   readonly permissions?: {
@@ -211,6 +220,8 @@ export interface ProviderAccessBindingCandidate {
 }
 
 export interface ConnectorAccess {
+  readonly discardedBindingCount?: number
+  readonly providerIds?: readonly string[]
   readonly accessRevision: number
   readonly bindings: readonly ProviderAccessBinding[]
   readonly mode: ConnectorAccessMode
@@ -222,6 +233,14 @@ export interface ConnectorAccessCandidates {
   readonly candidates: readonly ProviderAccessBindingCandidate[]
   readonly mode: ConnectorAccessMode
   readonly providerId: string
+  readonly version: 1
+}
+
+export interface ConnectorAccessCandidatesBatch {
+  readonly results: readonly (
+    | ConnectorAccessCandidates
+    | { readonly providerId: string; readonly error: { readonly code: string; readonly message: string } }
+  )[]
   readonly version: 1
 }
 
@@ -847,10 +866,23 @@ export class ControlClient {
     return connectorAccess(await this.request(`/v1/flows/${segment(flowId)}/connector-access`, { signal }))
   }
 
-  async listProviderAccessBindingCandidates(flowId: string, providerId: string, signal?: AbortSignal): Promise<ConnectorAccessCandidates> {
-    return connectorAccessCandidates(
-      await this.request(`/v1/flows/${segment(flowId)}/connector-access/${segment(providerId)}/candidates`, { signal }),
-      providerId,
+  async listProviderAccessBindingCandidates(flowId: string, providerIds: readonly string[], signal?: AbortSignal): Promise<ConnectorAccessCandidatesBatch> {
+    return connectorAccessCandidatesBatch(
+      await this.request(`/v1/flows/${segment(flowId)}/connector-access/candidates/query`, {
+        method: 'POST',
+        body: JSON.stringify({ providerIds, version: 1 }),
+        signal,
+      }),
+      providerIds,
+    )
+  }
+
+  async setConnectorService(flowId: string, providerId: string, selected: boolean, expectedAccessRevision: number): Promise<ConnectorAccess> {
+    return connectorAccess(
+      await this.request(`/v1/flows/${segment(flowId)}/connector-access/${segment(providerId)}/service`, {
+        body: JSON.stringify({ expectedAccessRevision, version: 1 }),
+        method: selected ? 'PUT' : 'DELETE',
+      }),
     )
   }
 

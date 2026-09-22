@@ -43,10 +43,26 @@ const content: RevisionContent = {
   },
   document: {
     bindings: {},
-    tasks: {},
-    subflows: {},
+    tasks: {
+      github: {
+        name: 'Read GitHub profile',
+        executor: { kind: 'connector', action: 'github.get_current_user', connectionId: 'github-work' },
+        inputs: [],
+        outputs: [],
+      },
+    },
+    subflows: {
+      child: {
+        name: 'Follow-up',
+        inputs: [],
+        outputs: [],
+        graph: { edges: [], nodes: { profile: { kind: 'task', inputs: {}, taskId: 'github', name: 'Read child profile' } } },
+      },
+    },
     graph: {
       nodes: {
+        profile: { kind: 'task', inputs: {}, taskId: 'github' },
+        child: { kind: 'subflow', subflowId: 'child', inputs: {} },
         data: {
           kind: 'value',
           name: 'Issue text',
@@ -122,6 +138,28 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
   const i18n = useMemo(() => createI18n(language), [language])
   useEffect(() => {
     const { client, flowId } = createInspectorTransport(log, content, {
+      access: {
+        mode: 'selectable',
+        version: 1,
+        accessRevision: 1,
+        providerAccessDigest: 'lab',
+        providerIds: ['github', 'slack'],
+        bindings: [
+          {
+            accessBindingId: 'github-access',
+            connectionId: 'github-work',
+            connectionDisplayName: 'GitHub · Work',
+            providerId: 'github',
+            source: { kind: 'admin-delegation' },
+            status: 'active',
+          },
+        ],
+      },
+      candidates: [
+        { accessBindingId: 'github-access', connectionDisplayName: 'GitHub · Work', providerId: 'github' },
+        { accessBindingId: 'github-personal-access', connectionDisplayName: 'GitHub · Personal', providerId: 'github' },
+        { accessBindingId: 'slack-access', connectionDisplayName: 'Slack · Product', providerId: 'slack' },
+      ],
       actions: [
         {
           actionId: 'github.get_current_user',
@@ -215,6 +253,6 @@ export const inspectorPanelStory: FrontendStory = {
   title: 'Properties Panel',
   standalone: true,
   description:
-    'Production editor: inspect outline and selection states. Open Code properties to check editor focus, available connections, and the action picker with compact app rows, expanded actions, and search results.',
+    'Production editor: inspect outline and selection states. Expand service authorization to navigate account references in the main graph and Follow-up subflow. Open Code properties to check editor focus and the compact Service access entry beside the Code heading, which navigates to Flow authorization in the outline.',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,
 }

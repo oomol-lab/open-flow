@@ -124,6 +124,8 @@ describe('ControlClient Flow API', () => {
       accessRevision: 2,
       bindings: [
         {
+          connectionId: 'fixture-account',
+          source: { kind: 'policy' as const, ruleId: 'Editors' },
           accessBindingId: 'editors',
           connectionDisplayName: 'Work account',
           permissionGroupName: 'Editors',
@@ -131,6 +133,8 @@ describe('ControlClient Flow API', () => {
           status: 'active',
         },
         {
+          connectionId: 'fixture-account',
+          source: { kind: 'policy' as const, ruleId: null },
           accessBindingId: 'personal',
           connectionDisplayName: 'Personal account',
           permissionGroupName: null,
@@ -144,10 +148,43 @@ describe('ControlClient Flow API', () => {
     } as const
     const request = vi.fn(async (path: string, init?: RequestInit) => {
       if (path == '/v1/flows/flow%2F1/connector-access' && init?.method == null) return Response.json(implicit)
-      if (path == '/v1/flows/flow%2F1/connector-access/mail/candidates') {
+      if (path == '/v1/flows/flow%2F1/connector-access/candidates/query') {
         return Response.json({
+          results: [
+            {
+              candidates: [
+                {
+                  connectionId: 'fixture-account',
+                  source: { kind: 'policy' as const, ruleId: 'Editors' },
+                  accessBindingId: 'editors',
+                  connectionDisplayName: 'Work account',
+                  isDefault: true,
+                  permissions: { actionIds: ['mail.send'], allActions: false, configured: true, proxy: false },
+                  permissionGroupName: 'Editors',
+                  providerId: 'mail',
+                },
+              ],
+              mode: 'selectable',
+              providerId: 'mail',
+              version: 1,
+            },
+          ],
+          version: 1,
+        })
+      }
+      if (path == '/v1/flows/flow%2F1/connector-access/mail' && (init?.method == 'PUT' || init?.method == 'DELETE')) return Response.json(selectable)
+      throw new Error(path)
+    })
+    const client = new ControlClient(request)
+
+    await expect(client.getConnectorAccess(flow.flowId)).resolves.toEqual(implicit)
+    await expect(client.listProviderAccessBindingCandidates(flow.flowId, ['mail'])).resolves.toEqual({
+      results: [
+        {
           candidates: [
             {
+              connectionId: 'fixture-account',
+              source: { kind: 'policy' as const, ruleId: 'Editors' },
               accessBindingId: 'editors',
               connectionDisplayName: 'Work account',
               isDefault: true,
@@ -159,27 +196,8 @@ describe('ControlClient Flow API', () => {
           mode: 'selectable',
           providerId: 'mail',
           version: 1,
-        })
-      }
-      if (path == '/v1/flows/flow%2F1/connector-access/mail' && (init?.method == 'PUT' || init?.method == 'DELETE')) return Response.json(selectable)
-      throw new Error(path)
-    })
-    const client = new ControlClient(request)
-
-    await expect(client.getConnectorAccess(flow.flowId)).resolves.toEqual(implicit)
-    await expect(client.listProviderAccessBindingCandidates(flow.flowId, 'mail')).resolves.toEqual({
-      candidates: [
-        {
-          accessBindingId: 'editors',
-          connectionDisplayName: 'Work account',
-          isDefault: true,
-          permissions: { actionIds: ['mail.send'], allActions: false, configured: true, proxy: false },
-          permissionGroupName: 'Editors',
-          providerId: 'mail',
         },
       ],
-      mode: 'selectable',
-      providerId: 'mail',
       version: 1,
     })
     await expect(client.addProviderAccessBinding(flow.flowId, 'mail', 'editors', 1)).resolves.toEqual(selectable)
@@ -191,21 +209,28 @@ describe('ControlClient Flow API', () => {
   it('rejects inconsistent Provider access permission summaries', async () => {
     const client = new ControlClient(async () =>
       Response.json({
-        candidates: [
+        results: [
           {
-            accessBindingId: 'editors',
-            connectionDisplayName: 'Work account',
-            permissions: { actionIds: [], allActions: false, configured: false, proxy: false },
+            candidates: [
+              {
+                connectionId: 'fixture-account',
+                source: { kind: 'policy' as const, ruleId: null },
+                accessBindingId: 'editors',
+                connectionDisplayName: 'Work account',
+                permissions: { actionIds: [], allActions: false, configured: false, proxy: false },
+                providerId: 'mail',
+              },
+            ],
+            mode: 'selectable',
             providerId: 'mail',
+            version: 1,
           },
         ],
-        mode: 'selectable',
-        providerId: 'mail',
         version: 1,
       }),
     )
 
-    await expect(client.listProviderAccessBindingCandidates(flow.flowId, 'mail')).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
+    await expect(client.listProviderAccessBindingCandidates(flow.flowId, ['mail'])).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
   })
 
   it('preserves structured Diagnostic values', async () => {
@@ -569,4 +594,51 @@ describe('Run event contract', () => {
     )
     await expect(client.getRunEvents('run')).rejects.toMatchObject({ code: 'response.invalid' })
   })
+})
+
+it('adds and removes a Flow service independently of account bindings', async () => {
+  const access = { accessRevision: 1, providerIds: ['2chat'], bindings: [], mode: 'selectable', providerAccessDigest: 'empty', version: 1 }
+  const request = vi.fn(async () => Response.json(access))
+  const client = new ControlClient(request)
+  await expect(client.setConnectorService('flow/1', '2chat', true, 0)).resolves.toEqual(access)
+  await expect(client.setConnectorService('flow/1', '2chat', false, 1)).resolves.toEqual(access)
+  expect(request.mock.calls).toMatchObject([
+    ['/v1/flows/flow%2F1/connector-access/2chat/service', { method: 'PUT', body: JSON.stringify({ expectedAccessRevision: 0, version: 1 }) }],
+    ['/v1/flows/flow%2F1/connector-access/2chat/service', { method: 'DELETE', body: JSON.stringify({ expectedAccessRevision: 1, version: 1 }) }],
+  ])
+})
+
+it.each(
+  [
+    [],
+    [
+      { providerId: 'mail', candidates: [], mode: 'selectable', version: 1 },
+      { providerId: 'mail', candidates: [], mode: 'selectable', version: 1 },
+    ],
+    [{ providerId: 'unexpected', candidates: [], mode: 'selectable', version: 1 }],
+    [{ providerId: 'mail', error: { code: 503, message: 'Unavailable' } }],
+  ].map((results) => ({ results })),
+)('rejects missing, repeated, unsolicited or malformed candidate results: %j', async ({ results }) => {
+  const client = new ControlClient(async () => Response.json({ version: 1, results }))
+  await expect(client.listProviderAccessBindingCandidates('flow', ['mail'])).rejects.toMatchObject({ code: 'response.invalid' })
+})
+
+it('posts one candidate query and preserves independent provider failures', async () => {
+  const response = {
+    version: 1,
+    results: [
+      { providerId: 'mail', candidates: [], mode: 'selectable', version: 1 },
+      { providerId: 'github', error: { code: 'connector.unavailable', message: 'Unavailable' } },
+    ],
+  }
+  const request = vi.fn(async () => Response.json(response))
+  const client = new ControlClient(request)
+  expect(await client.listProviderAccessBindingCandidates('flow/1', ['mail', 'github'])).toEqual(response)
+  expect(request).toHaveBeenCalledExactlyOnceWith(
+    '/v1/flows/flow%2F1/connector-access/candidates/query',
+    expect.objectContaining({
+      method: 'POST',
+      body: JSON.stringify({ providerIds: ['mail', 'github'], version: 1 }),
+    }),
+  )
 })

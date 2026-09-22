@@ -16,11 +16,21 @@ import { createInspectorTransport } from './inspectorSession.ts'
 const content: RevisionContent = {
   document: {
     bindings: {},
-    graph: { edges: [], nodes: { mail: { inputs: {}, kind: 'task', taskId: 'mail' } } },
+    graph: {
+      edges: [],
+      nodes: {
+        mail: { inputs: {}, kind: 'task', taskId: 'mail' },
+        receipt: { inputs: {}, kind: 'task', taskId: 'mail', name: 'Send receipt' },
+        reminder: { inputs: {}, kind: 'task', taskId: 'mail', name: 'Send reminder' },
+        pending: { inputs: {}, kind: 'task', taskId: 'pending', name: 'Send notification' },
+        code: { inputs: {}, kind: 'task', name: 'Process response', task: { name: 'Process response', moduleId: 'code', inputs: [], outputs: [] } },
+      },
+    },
     subflows: {},
     tasks: {
+      pending: { executor: { action: 'mail.send', kind: 'connector' }, inputs: [], outputs: [], name: 'Send notification' },
       mail: {
-        executor: { action: 'mail.send', kind: 'connector' },
+        executor: { action: 'mail.send', kind: 'connector', connectionId: 'mail-default' },
         inputs: [],
         name: 'Send mail',
         outputs: [],
@@ -28,7 +38,7 @@ const content: RevisionContent = {
     },
   },
   modelVersion: currentFlowModelVersion,
-  modules: {},
+  modules: { code: { name: 'Process response', source: 'export default () => ({})', imports: [] } },
 }
 const emptyContent: RevisionContent = {
   document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} },
@@ -38,6 +48,8 @@ const emptyContent: RevisionContent = {
 const provider = { authTypes: ['oauth2'], displayName: 'Gmail', iconUrl: 'https://static.oomol.com/logo/third-party/Gmail.svg', service: 'mail' } as const
 const candidates = [
   {
+    connectionId: 'mail-default',
+    source: { kind: 'policy' as const, ruleId: null },
     accessBindingId: 'sha256:a9007ef9699c9703b05df0b6f32d2fbaed5ace77b7dccffa7e8252e699bd8fe5',
     connectionDisplayName: 'lishen1635-gmail-com',
     permissions: { actionIds: [], allActions: true, configured: false, proxy: true },
@@ -45,6 +57,8 @@ const candidates = [
     providerId: 'mail',
   },
   {
+    connectionId: 'mail-reviewers',
+    source: { kind: 'policy' as const, ruleId: 'reviewers' },
     accessBindingId: 'sha256:b1007ef9699c9703b05df0b6f32d2fbaed5ace77b7dccffa7e8252e699bd8fe6',
     connectionDisplayName: 'lishen1635-gmail-com-2',
     permissions: {
@@ -54,6 +68,15 @@ const candidates = [
       proxy: false,
     },
     permissionGroupName: 'Reviewers',
+    providerId: 'mail',
+  },
+  {
+    connectionId: 'mail-admin',
+    source: { kind: 'admin-delegation' as const },
+    accessBindingId: 'administrator-delegation',
+    connectionDisplayName: 'Operations account',
+    permissions: { actionIds: [], allActions: true, configured: false, proxy: true },
+    permissionGroupName: null,
     providerId: 'mail',
   },
 ] as const
@@ -82,7 +105,7 @@ function Sample({
   readonly noAuth?: boolean
   readonly noCandidates?: boolean
   readonly configure?: boolean
-  readonly accountPending?: 'metadata' | 'connections'
+  readonly accountPending?: 'metadata' | 'connections' | 'setup'
   readonly language: UiLanguage
 }) {
   const i18n = useMemo(() => createI18n(language), [language])
@@ -91,10 +114,11 @@ function Sample({
     const { client, flowId } = createInspectorTransport(log, emptyFlow ? emptyContent : content, {
       access,
       accessError: loadFailed,
+      accessSaveDelay: 800,
       candidates: noCandidates ? [] : candidates,
       connections:
         connectionStatus == null ? [] : [{ id: 'mail-account', service: 'mail', displayName: 'Work account', isDefault: true, status: connectionStatus }],
-      providers: [noAuth ? { ...provider, authTypes: ['no_auth'] } : provider],
+      providers: [noAuth ? { ...provider, authTypes: ['no_auth'] } : provider, { service: 'github', displayName: 'GitHub', authTypes: ['oauth2'] }],
     })
     const next = new WorkbenchStore(client, { getItem: () => null, setItem: () => {} }, undefined, i18n)
     setStore(next)
@@ -108,8 +132,14 @@ function Sample({
       <h3 className="mb-2 text-sm font-medium">{label}</h3>
       <div className="grid h-[480px] overflow-hidden rounded-lg border border-border">
         <EditorContextPanel focusOnOpen={false} icon="flow" onClose={() => {}} theme={dark ? 'dark' : 'light'} title="Flow outline">
-          {store != null && <ConnectorAccessSettings onManage={(flowId) => log('connector-access.manage', flowId)} store={store} />}
-          {store != null && (noCandidates || accountPending != null) && (
+          {store != null && (
+            <ConnectorAccessSettings
+              onSelectReference={(reference) => log('connector-access.reference', reference)}
+              onManage={(flowId) => log('connector-access.manage', flowId)}
+              store={store}
+            />
+          )}
+          {store != null && (noCandidates || accountPending != null || connectionStatus != null) && (
             <div className="p-3">
               <ConnectorAccount
                 action={
@@ -128,16 +158,24 @@ function Sample({
                 }
                 actionError={undefined}
                 actionId="mail.send"
-                accessError={accountPending == null ? i18n.t('notice.error.connectorAccessRequired') : undefined}
-                activeConnections={accountPending == null ? [] : undefined}
+                accessError={noCandidates ? i18n.t('notice.error.connectorAccessRequired') : undefined}
+                activeConnections={
+                  accountPending == 'setup'
+                    ? []
+                    : accountPending != null
+                      ? undefined
+                      : connectionStatus == null
+                        ? []
+                        : [{ connectionId: 'mail-account', displayName: 'Work account', isDefault: true, serviceId: 'mail', status: connectionStatus }]
+                }
                 authorizationPending={false}
                 connection={undefined}
                 connectionError={undefined}
-                connectionId={undefined}
+                connectionId={connectionStatus == null ? undefined : 'mail-account'}
                 connectors={store.connectors}
                 disabled={false}
                 fieldIdPrefix="unconnected-mail"
-                loading={false}
+                loading={accountPending == 'setup'}
                 taskId="mail"
                 onConfigureAccess={() => store.connectorAccess.configure('mail')}
               />
@@ -159,8 +197,14 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
     readonly noAuth?: boolean
     readonly noCandidates?: boolean
     readonly configure?: boolean
-    readonly accountPending?: 'metadata' | 'connections'
+    readonly accountPending?: 'metadata' | 'connections' | 'setup'
   }[] = [
+    {
+      access: { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 },
+      accountPending: 'setup',
+      noCandidates: true,
+      label: 'New node: configuring account',
+    },
     ...(['metadata', 'connections'] as const).map((accountPending) => ({
       access: { accessRevision: 0, bindings: [], mode: 'implicit' as const, providerAccessDigest: 'implicit:lab', version: 1 as const },
       accountPending,
@@ -191,6 +235,8 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
         accessRevision: 1,
         bindings: [
           {
+            connectionId: 'fixture-account',
+            source: { kind: 'policy' as const, ruleId: null },
             accessBindingId: candidates[0].accessBindingId,
             connectionDisplayName: candidates[0].connectionDisplayName,
             permissionGroupName: candidates[0].permissionGroupName,
@@ -198,6 +244,8 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
             status: 'active',
           },
           {
+            connectionId: 'fixture-account',
+            source: { kind: 'policy' as const, ruleId: 'International finance operations reviewers' },
             accessBindingId: 'long-name',
             connectionDisplayName: 'finance-operations-international-team@example.com',
             permissionGroupName: 'International finance operations reviewers',
@@ -207,9 +255,11 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
         ],
         mode: 'selectable',
         providerAccessDigest: 'selectable:long-names',
+        providerIds: ['github'],
         version: 1,
       },
-      label: 'Multiple Providers and long names',
+      label: 'Service cards: accounts, long names and unconnected service',
+      configure: true,
     },
     {
       access: { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 },
@@ -221,6 +271,8 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
         accessRevision: 2,
         bindings: [
           {
+            connectionId: null,
+            source: null,
             accessBindingId: 'retired',
             connectionDisplayName: 'Former work account',
             permissionGroupName: 'Former editors',
@@ -233,6 +285,17 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
         version: 1,
       },
       label: 'Invalid selection retained',
+    },
+    {
+      access: { accessRevision: 1, providerIds: ['mail'], bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:manual', version: 1 },
+      emptyFlow: true,
+      configure: true,
+      label: 'Manually added service can be removed',
+    },
+    {
+      access: { accessRevision: 2, providerIds: [], bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:removed', version: 1 },
+      configure: true,
+      label: 'Flow dependency with accounts available but none selected',
     },
     {
       access: { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 },
@@ -281,7 +344,7 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
 
 export const connectorAccessStory: FrontendStory = {
   description:
-    'Flow-level Provider access using production settings: expand the multiple-Provider sample and scroll to its last connection. Covers compact summaries, bounded scrolling, long names, deployment-managed, invalid binding, empty candidate, and load failure states. The empty candidate sample includes the node account section with account management and Flow access configuration available before authorization.',
+    'Compact service cards with account references (first two plus expansion), pending account selection, and a dynamic code notice using production settings, with shared framing for accounts and unconnected services: expand the multiple-Provider sample and scroll to its last connection. Account saves take 800 ms so immediate checkbox feedback and the saving status can be inspected. Covers compact summaries, bounded scrolling, long names, deployment-managed, invalid binding, empty candidate, and load failure states. Each service requiring authorization has a persistent account menu with Add account and Remove authorization; empty and expired account states retain direct recovery actions. Add service opens a searchable virtual service picker at the end of the expanded list, remains available in the empty state, and can configure GitHub even when the Flow does not reference it. Node account management and add-account entries expand Flow access and focus Mail without adding inline guidance; the empty candidate sample offers the same route before authorization.',
   group: 'Workbench',
   id: 'connector-access',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,

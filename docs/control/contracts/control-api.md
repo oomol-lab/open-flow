@@ -514,6 +514,17 @@ Connector credential 不进入响应、Revision 或 RunEvent。
 
 ### Provider Access Binding
 
+Binding 和 candidate 都携带 `connectionId`、`providerId`、`accessBindingId` 和显式 `source`：
+`{ kind: 'admin-delegation' }` 为管理员委托；`{ kind: 'policy', ruleId: null }` 为团队默认 grant；
+`{ kind: 'policy', ruleId: string }` 为具名规则。`null` 不表示未知或尚未配置。普通规则 ID 可以为 `team-admin`、`team-default` 等任意非空字符串。
+公共 `providerAccessBindingId` 按 canonical JSON 对 `['provider-access', 2, teamId, connectionId, providerId, source]` 求 SHA-256，返回 `sha256:<hex>`。
+规则名称、内容和 policy revision 不参与身份。解析时校验身份与其来源及 Connection 一致，再直接解析指定来源；规则删除、Connection 失效或身份不匹配必须拒绝，不能回退其他授权。
+客户端写入仍只提交候选 ID 和 CAS revision；部署验证候选可分配性后保存完整身份，并将其复制到 Publication、Run 和后台工作快照。不得信任客户端自报的来源。
+旧的无类型 binding ID 不能用于执行。读取已保存的列表时，单条不符合当前协议但仍有合法 `accessBindingId` 和 `providerId` 的记录投影为
+`status: 'invalid', connectionId: null, source: null`，保留可用展示名称，提示重新授权；不能据此恢复或推断任何 grant。
+无法识别的条目被跳过，响应通过可选的 `discardedBindingCount` 提示需要重新配置。合法记录继续显示；响应 envelope 不合法仍报错。
+候选列表继续严格校验，不能把损坏的候选转成可选授权。后台执行也必须拒绝缺少身份的引用。升级与远端资源清理仍按运行手册进行。
+
 Provider access 是 deployment-owned Flow 状态，不进入 Revision。公共 API 支持两种模式：`implicit` 使用部署已配置的 scoped Connector authority；
 `selectable` 由部署按 Provider 返回并保存 opaque access binding。公共合同和 Workbench 不解析权限组内容、不接收 credential，也不创建 Flow service account；
 具体 deployment adapter 负责把外部权限组投影成 opaque candidate 和 binding。
@@ -526,6 +537,8 @@ interface ConnectorAccess {
   accessRevision: number
   bindings: readonly {
     accessBindingId: string
+    connectionId: string
+    source: { kind: 'admin-delegation' } | { kind: 'policy'; ruleId: string | null }
     connectionDisplayName: string
     permissionGroupName: string | null
     policyRevision?: string
@@ -538,15 +551,19 @@ interface ConnectorAccess {
 }
 ```
 
-| Method   | Path                                                        | Body                                                      |
-| -------- | ----------------------------------------------------------- | --------------------------------------------------------- |
-| `GET`    | `/v1/flows/:flowId/connector-access`                        | 无                                                        |
-| `GET`    | `/v1/flows/:flowId/connector-access/:providerId/candidates` | 无                                                        |
-| `PUT`    | `/v1/flows/:flowId/connector-access/:providerId`            | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
-| `DELETE` | `/v1/flows/:flowId/connector-access/:providerId`            | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
+| Method   | Path                                                  | Body                                                      |
+| -------- | ----------------------------------------------------- | --------------------------------------------------------- |
+| `GET`    | `/v1/flows/:flowId/connector-access`                  | 无                                                        |
+| `POST`   | `/v1/flows/:flowId/connector-access/candidates/query` | `{ providerIds: string[], version: 1 }`                   |
+| `PUT`    | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
+| `DELETE` | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
 
-候选响应为 `{ candidates, mode, providerId, version: 1 }`；candidate 使用 `connectionDisplayName`、可为空的 `permissionGroupName` 和可选的 `isDefault`
-分别投影连接、权限组名称与部署的默认连接，但不包含 credential 或原始权限规则。`permissionGroupName: null` 表示部署的默认权限组。candidate 可提供只读的
+候选查询按需批量提交非空、无重复的 `providerIds`（单个 ID 长度不超过 256）。响应为 `{ results, version: 1 }`，每个请求的 Provider 恰好对应一个结果：
+成功项为 `{ candidates, mode, providerId, version: 1 }`，失败项为 `{ providerId, error: { code, message } }`。共享的团队身份、账号目录或权限策略读取失败时，整次请求按常规错误契约失败；某个 Provider 的候选计算失败不影响其他结果。
+多 Provider 查询共用团队成员身份、操作者身份、团队账号目录和权限策略；单 Provider 查询只读取对应服务账号。Workbench 首次展开时批量加载缺失项，新增服务只补查新增项，缓存命中和正在加载的项不重复请求；失败项通过显式重试重新加载，切换 Flow 时取消旧查询。
+
+candidate 使用 `connectionDisplayName`、可为空的 `permissionGroupName` 和可选的 `isDefault`
+分别投影连接、权限组名称与部署的默认连接，但不包含 credential 或原始权限规则。`permissionGroupName` 仅用于展示，不决定权限来源。candidate 可提供只读的
 `permissions: { actionIds, allActions, configured, proxy }` 摘要供 Workbench 展示和筛选；`actionIds` 使用完整 Action ID，`configured` 只表示权限组包含托管访问配置，
 不得投影配置内容。该摘要不是授权依据，也不得写入 Flow binding。Workbench 添加 Connector Action 时先排除摘要明确不允许该 Action 的 candidate，再优先分配
 `isDefault: true` 的 candidate；兼容未提供摘要、或未提供 `isDefault` 但只有一个可用 candidate 的部署。多个 candidate 没有明确默认项时不自动分配。
@@ -699,19 +716,19 @@ WorkbenchHost 可通过 `connectorCache: { namespace, localStorage?, sessionStor
 Providers 和 Actions 使用 localStorage，Connections 使用 sessionStorage；Triggers 通过 `triggerCatalogCache` 使用 localStorage。
 各数据 Store 持有稳定的 `ReadonlyVal<{ data, refreshing, error }>`，底层请求仅负责传输和解码，不保存缓存。
 存储键包含版本、部署及业务标识：Providers 为 Flow scope 和语言，Actions 为 Flow scope、service 和语言，
-Connections 为 Flow scope 和可选 service，Triggers 为语言。使用新版本键，不读取旧 URL 缓存。
+Connections 为 Flow scope，服务列表从同一份响应派生，Triggers 为语言。使用新版本键，不读取旧 URL 缓存。
 
-Actions 只持久化 service 列表的元数据。详情通过独立的元数据接口读取，按 Flow scope、actionId 和语言在内存中缓存，不能从授权过滤后的列表推断 Action 不存在。默认连接与当前连接状态从独立的 Connections Store 组合。
+Actions 按 Flow scope、service 和语言缓存并持久化完整的 provider 列表响应。画布、节点面板与代码节点所需的单个 Action 从同一份列表派生，不再发起独立详情请求。浏览器 proxy 列表按团队范围读取，不按 Flow 已选授权过滤；成功加载完整列表后才能判断 Action 不存在。默认连接与当前连接状态从独立的 Connections Store 组合。
 Action metadata 保留上游可选的 `operationType` 字段（`read`、`write`、`destructive`）；缺失或未知值在节点面板显示为其他接口。
 
-浏览器使用 `/v1/connector/action-metadata`（可选 `service` 或 `q`）及其 `/:actionId` 详情接口；它们接受 `flowId` 和 `locale`，
+元数据接口 `/v1/connector/action-metadata`（可选 `service` 或 `q`）及其 `/:actionId` 详情接口继续可用；浏览器仅在搜索时使用 `q` 入口。它们接受 `flowId` 和 `locale`，
 遵循相同鉴权、语言协商及条件请求规则。响应分别为 `{ version: 1, actions: ConnectorActionMetadata[] }` 和 `{ version: 1, action: ConnectorActionMetadata }`，
 不包含 `defaultConnection`，读取时不查询 Connections。Action 持久化键升级为 v3，避免复用旧组合响应的 ETag。
 Workbench 使用独立的 `ConnectorActionView` 表示组合后的展示数据。
 CLI 和 MCP 继续使用原 `/v1/connector/actions` 对应的组合接口；它们在响应时选择 active 默认账号或唯一 active 账号，
 保留 `ConnectorAction.defaultConnection`。这些组合响应的 ETag 仍随账号变化，浏览器不使用它们作为 Action 缓存。
-全局搜索使用独立的临时查询状态，不持久化，也不写入 service 列表。全量与按服务的 Connections 独立保存，互不合并或覆盖。
-画布使用独立读取的 Action 详情；应用排序使用全量 Connections，账号选择使用对应服务的 Connections。
+全局搜索使用独立的临时查询状态，不持久化，也不写入 service 列表。Connections Store 读取 `/v1/connector/connections`：带 `flowId` 时仅返回该 Flow 已授权的账号，不带时返回团队账号；同一 scope 的全量与按服务视图共享完整响应。账号缓存使用独立键，不复用原始 proxy Apps 缓存。
+画布按 provider 读取 Action 列表并派生所需详情；应用排序使用全量 Connections，账号选择使用对应服务的 Connections。
 
 业务访问 Store 接口时检查刷新间隔：Providers、Triggers 为 5 分钟，Actions、Connections 为 30 秒。
 没有定时轮询或额外的聚焦刷新；授权完成和手动重试按业务需要强制刷新。普通读取合并同一条目的进行中请求，由 Store 管理取消。
@@ -1067,3 +1084,9 @@ Agent 声明的业务工具和审批通知仍独立执行能力检查。
 
 Workbench 切换连接时原子清除 Linear 的 `teamId` 与 `stateIds`；切换 Team 时原子清除 `stateIds`。
 失效的已选项必须保留并明确提示，不能自动替换或清空而扩大筛选范围。
+
+Flow 服务列表与账号授权分别保存。`ConnectorAccess.providerIds` 保存显式添加的服务，允许服务尚无账号或尚未勾选授权；旧快照没有此字段时按空列表处理，已有 bindings 仍提供其所属服务。大纲合并已添加服务、授权绑定所属服务和节点引用服务。新增服务不授予账号权限，也不改变仅由授权绑定计算的 `providerAccessDigest`。
+
+`PUT /v1/flows/:flowId/connector-access/:providerId/service` 添加服务；`DELETE` 同一路径原子移除服务及其全部授权绑定。请求为 `{ version: 1, expectedAccessRevision }`，返回更新后的 `ConnectorAccess`，沿用访问版本冲突和 `access.changed` 通知。添加前校验服务存在且需要授权；服务配置持久化到 Flow，刷新或重新打开后保留。
+
+开源 Server 的 OOMOL selectable 模式在列举及保存候选时实时验证 `/v1/me/teams` 的成员身份。正常且未删除的团队中，`creator` 和 `admin` 可为有效账号创建 `admin-delegation`，无需 app-access policy；`member` 继续按 UID 对应的 policy 权限生成候选。成员身份缺失、失效或无法验证时拒绝授权。保存后的管理员委托使用固定身份校验当前账号有效性，不重新查询成员角色或 app-access；上游 Connector 仍按部署配置的用户 token 执行最终授权，Server 不伪造 Team token 或绕过上游限制。

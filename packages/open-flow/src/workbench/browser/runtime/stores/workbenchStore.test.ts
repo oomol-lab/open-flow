@@ -51,8 +51,33 @@ function access(flowId: string) {
 }
 
 describe('Flow creation notifications', () => {
-  it('refreshes scoped accounts after saving and removing access without a server notification', async () => {
+  it('updates node connection state after granting, revoking and restoring Flow access without a server notification', async () => {
     const { client, store, navigation } = catalogSession('first')
+    const editor = await client.getEditor('first')
+    vi.mocked(client.getEditor).mockResolvedValue({
+      ...editor,
+      draft: {
+        ...editor.draft,
+        content: {
+          ...editor.draft.content,
+          document: {
+            ...editor.draft.content.document,
+            tasks: { send: { name: 'Send', executor: { kind: 'connector', action: 'mail.send', connectionId: 'mail-account' }, inputs: [], outputs: [] } },
+            graph: { nodes: { send: { kind: 'task', taskId: 'send', inputs: {} } }, edges: [] },
+          },
+        },
+      },
+    })
+    vi.spyOn(client, 'readProxyCatalog').mockImplementation(async (query) => ({
+      modified: true,
+      etag: null,
+      data: {
+        success: true,
+        data: query.path.includes('/providers')
+          ? [{ service: 'mail', displayName: 'Mail', authTypes: ['oauth2'] }]
+          : [{ id: 'mail.send', service: 'mail', name: 'Send', description: '', inputSchema: { type: 'object' }, outputSchema: { type: 'object' } }],
+      },
+    }))
     let connected = false
     vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(access('first'))
     vi.spyOn(client, 'addProviderAccessBinding').mockImplementation(async () => {
@@ -63,19 +88,31 @@ describe('Flow creation notifications', () => {
       connected = false
       return { ...access('first'), accessRevision: 3 }
     })
-    vi.spyOn(client, 'readProxyCatalog').mockImplementation(async () => ({
+    vi.spyOn(client, 'readCatalog').mockImplementation(async () => ({
       modified: true,
       etag: null,
-      data: { success: true, data: connected ? [{ id: 'mail-account', service: 'mail', displayName: 'Work', status: 'active', isDefault: true }] : [] },
+      data: connected ? [{ connectionId: 'mail-account', serviceId: 'mail', displayName: 'Work', status: 'active', isDefault: true }] : [],
     }))
     try {
       await navigation.start()
       const accounts = store.workspace.catalogs.connections.get('mail', 'first')
       expect(await resourceValue(accounts)).toEqual([])
+      store.workspace.selectNodes(['send'])
+      await store.connectors.refresh()
+      expect(store.$.designer.value.nodes[0]).toMatchObject({ id: 'send', connectionRequired: true })
       await store.connectorAccess.select('mail', 'binding')
       await vi.waitFor(() => expect(accounts.value.data?.map((account) => account.connectionId)).toEqual(['mail-account']))
+      await vi.waitFor(() => expect(store.$.designer.value.nodes[0]).toMatchObject({ connectionRequired: false }))
+      expect(store.connectors.$.selectedConnection.value?.connectionId).toBe('mail-account')
       await store.connectorAccess.select('mail', 'binding', false)
       await vi.waitFor(() => expect(accounts.value.data).toEqual([]))
+      expect(store.$.designer.value.nodes[0]).toMatchObject({ connectionRequired: true })
+      expect(store.connectors.$.selectedConnection.value).toBeUndefined()
+      expect(store.connectors.$.diagnostics.value).toContainEqual(expect.objectContaining({ code: 'task.connector-connection-required' }))
+      await store.connectorAccess.select('mail', 'binding')
+      await vi.waitFor(() => expect(store.$.designer.value.nodes[0]).toMatchObject({ connectionRequired: false }))
+      expect(store.connectors.$.selectedConnection.value?.connectionId).toBe('mail-account')
+      expect(store.connectors.$.diagnostics.value).toEqual([])
     } finally {
       navigation.dispose()
       store.dispose()
@@ -87,17 +124,17 @@ describe('Flow creation notifications', () => {
     vi.spyOn(client, 'getConnectorAccess').mockImplementation(async (flowId) => access(flowId))
     const candidates = vi
       .spyOn(client, 'listProviderAccessBindingCandidates')
-      .mockResolvedValue({ version: 1, mode: 'selectable', providerId: 'example', candidates: [] })
+      .mockResolvedValue({ version: 1, results: [{ version: 1, mode: 'selectable', providerId: 'example', candidates: [] }] })
     const add = vi.spyOn(client, 'addProviderAccessBinding').mockResolvedValue(access('second'))
     try {
       await navigation.start()
       expect(store.connectorAccess.$.value.access?.providerAccessDigest).toBe('first')
-      await store.connectorAccess.loadCandidates('example')
+      await store.connectorAccess.loadCandidates(['example'])
       await store.selectFlow('second')
       expect(store.connectorAccess.$.value.candidates).toEqual({})
       expect(store.connectorAccess.$.value.access?.providerAccessDigest).toBe('second')
-      await store.connectorAccess.loadCandidates('example')
-      expect(candidates).toHaveBeenLastCalledWith('second', 'example')
+      await store.connectorAccess.loadCandidates(['example'])
+      expect(candidates).toHaveBeenLastCalledWith('second', ['example'], expect.any(AbortSignal))
       await store.connectorAccess.select('example', 'binding')
       expect(add).toHaveBeenCalledWith('second', 'example', 'binding', 2)
       await store.selectFlow(undefined)
@@ -274,36 +311,34 @@ describe('WorkbenchStore diagnostics', () => {
       }
       if (path.startsWith('/v1/connector/proxy/providers?'))
         return Response.json({ success: true, data: [{ service: 'amap', displayName: 'AMap', authTypes: ['api_key'], iconUrl: providerIcon }] })
-      if (path == `/v1/connector/action-metadata/amap.geocode?flowId=${flow.flowId}&locale=en`) {
+      if (path == `/v1/connector/proxy/actions?flowId=${flow.flowId}&service=amap&locale=en`) {
         await actionReady.promise
         return Response.json({
-          action: {
-            actionId: 'amap.geocode',
-            authenticated: true,
-            description: 'Geocode an address.',
-            inputs: {},
-            name: 'Geocode',
-            outputs: {},
-            serviceId: 'amap',
-            serviceName: 'AMap',
-            icon: providerIcon,
-          },
-          version: 1,
-        })
-      }
-      if (path.startsWith(`/v1/connector/proxy/apps?flowId=${flow.flowId}`)) {
-        return Response.json({
+          success: true,
           data: [
             {
-              id: 'connection-1',
+              id: 'amap.geocode',
+              service: 'amap',
+              description: 'Geocode an address.',
+              name: 'Geocode',
+              inputSchema: { type: 'object', properties: {} },
+              outputSchema: { type: 'object', properties: {} },
+            },
+          ],
+        })
+      }
+      if (path.startsWith(`/v1/connector/connections?flowId=${flow.flowId}`)) {
+        return Response.json({
+          connections: [
+            {
+              connectionId: 'connection-1',
               displayName: 'Primary',
               isDefault: true,
-              service: 'amap',
+              serviceId: 'amap',
               status: 'active',
             },
           ],
-          service: 'amap',
-          success: true,
+          version: 1,
         })
       }
       throw new Error(`Unexpected request: ${path}`)
@@ -332,7 +367,7 @@ describe('WorkbenchStore diagnostics', () => {
       expect(store.connectors.$.selectedAction.value?.defaultConnection?.connectionId).toBe('connection-1')
       expect(store.connectors.$.selectedConnection.value).toBeUndefined()
       await vi.waitFor(() => expect(store.$.diagnostics.value?.valid).toBe(false))
-      await vi.waitFor(() => expect(requests).toContain(`/v1/connector/proxy/apps?flowId=${flow.flowId}`))
+      await vi.waitFor(() => expect(requests).toContain(`/v1/connector/connections?flowId=${flow.flowId}`))
 
       expect(store.workspace.$.diagnostics.value).toMatchObject({ diagnostics: [], valid: true })
       expect(store.$.diagnostics.value?.diagnostics).toEqual([
@@ -354,13 +389,13 @@ describe('WorkbenchStore diagnostics', () => {
         expect(store.$.sourceNodeIcons.value).toBe(icons)
         const providerRequests = () => requests.filter((path) => path.startsWith('/v1/connector/proxy/providers?')).length
         const beforeRefresh = providerRequests()
-        const providers = store.workspace.catalogs.actions.detail('amap.geocode', flow.flowId, 'en', true)
+        const providers = store.workspace.catalogs.providers.get(flow.flowId, 'en', true)
         await vi.waitFor(() => expect(providerRequests()).toBeGreaterThan(beforeRefresh))
         await vi.waitFor(() => expect(providers.value.refreshing).toBe(false))
         expect(store.$.sourceNodeIcons.value).toBe(icons)
         expect(iconUpdates).not.toHaveBeenCalled()
         providerIcon = 'https://example.com/amap-updated.svg'
-        store.workspace.catalogs.actions.detail('amap.geocode', flow.flowId, 'en', true)
+        store.workspace.catalogs.providers.get(flow.flowId, 'en', true)
         await vi.waitFor(() => expect(store.$.sourceNodeIcons.value.connector).toContain(encodeURIComponent(providerIcon)))
         expect(iconUpdates).toHaveBeenCalledOnce()
       } finally {
@@ -578,12 +613,24 @@ it.each(['no candidates', 'ambiguous candidates', 'candidate failure', 'binding 
       serviceName: 'Mail',
     }
     vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(access('flow-1'))
-    const candidate = { accessBindingId: 'mail-1', connectionDisplayName: 'Mail', permissionGroupName: null, providerId: 'mail' }
-    const candidates = vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
-      candidates:
-        scenario == 'no candidates' ? [] : scenario == 'ambiguous candidates' ? [candidate, { ...candidate, accessBindingId: 'mail-2' }] : [candidate],
-      mode: 'selectable',
+    const candidate = {
+      connectionId: 'fixture-account',
+      source: { kind: 'policy' as const, ruleId: null },
+      accessBindingId: 'mail-1',
+      connectionDisplayName: 'Mail',
+      permissionGroupName: null,
       providerId: 'mail',
+    }
+    const candidates = vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
+      results: [
+        {
+          candidates:
+            scenario == 'no candidates' ? [] : scenario == 'ambiguous candidates' ? [candidate, { ...candidate, accessBindingId: 'mail-2' }] : [candidate],
+          mode: 'selectable',
+          providerId: 'mail',
+          version: 1,
+        },
+      ],
       version: 1,
     })
     if (scenario == 'candidate failure') candidates.mockRejectedValue(new Error('Candidate lookup failed'))
@@ -663,6 +710,8 @@ it('prepares default Provider access without prompting', async () => {
     accessRevision: 1,
     bindings: [
       {
+        connectionId: 'fixture-account',
+        source: { kind: 'policy' as const, ruleId: null },
         accessBindingId: 'mail-read-access',
         connectionDisplayName: connection.displayName,
         permissionGroupName: null,
@@ -675,32 +724,43 @@ it('prepares default Provider access without prompting', async () => {
     version: 1,
   })
   vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
-    candidates: [
+    results: [
       {
-        accessBindingId: 'mail-read-access',
-        connectionDisplayName: connection.displayName,
-        isDefault: true,
-        permissions: { actionIds: ['mail.read'], allActions: false, configured: false, proxy: false },
-        permissionGroupName: null,
+        candidates: [
+          {
+            connectionId: 'fixture-account',
+            source: { kind: 'policy' as const, ruleId: null },
+            accessBindingId: 'mail-read-access',
+            connectionDisplayName: connection.displayName,
+            isDefault: true,
+            permissions: { actionIds: ['mail.read'], allActions: false, configured: false, proxy: false },
+            permissionGroupName: null,
+            providerId: 'mail',
+          },
+          {
+            connectionId: 'fixture-account',
+            source: { kind: 'policy' as const, ruleId: 'Senders' },
+            accessBindingId: 'mail-send-access',
+            connectionDisplayName: 'Sending account',
+            isDefault: false,
+            permissions: { actionIds: ['mail.send'], allActions: false, configured: false, proxy: false },
+            permissionGroupName: 'Senders',
+            providerId: 'mail',
+          },
+        ],
+        mode: 'selectable',
         providerId: 'mail',
-      },
-      {
-        accessBindingId: 'mail-send-access',
-        connectionDisplayName: 'Sending account',
-        isDefault: false,
-        permissions: { actionIds: ['mail.send'], allActions: false, configured: false, proxy: false },
-        permissionGroupName: 'Senders',
-        providerId: 'mail',
+        version: 1,
       },
     ],
-    mode: 'selectable',
-    providerId: 'mail',
     version: 1,
   })
   const addAccess = vi.spyOn(client, 'addProviderAccessBinding').mockResolvedValue({
     accessRevision: 2,
     bindings: [
       {
+        connectionId: 'fixture-account',
+        source: { kind: 'policy' as const, ruleId: null },
         accessBindingId: 'mail-read-access',
         connectionDisplayName: connection.displayName,
         permissionGroupName: null,
@@ -708,6 +768,8 @@ it('prepares default Provider access without prompting', async () => {
         status: 'active',
       },
       {
+        connectionId: 'fixture-account',
+        source: { kind: 'policy' as const, ruleId: 'Senders' },
         accessBindingId: 'mail-send-access',
         connectionDisplayName: 'Sending account',
         permissionGroupName: 'Senders',
@@ -801,3 +863,54 @@ it.each(['unchanged', 'deleted', 'account selected', 'flow switched', 'failed'] 
     }
   },
 )
+
+it.each(['connected', 'unconfigured', 'failed'] as const)('keeps new Connector account initialization pending until %s completes', async (outcome) => {
+  const { navigation, store } = catalogSession('flow-1')
+  const action = { actionId: 'mail.send', authenticated: true, description: '', inputs: {}, outputs: {}, name: 'Send', serviceId: 'mail', serviceName: 'Mail' }
+  const connection = { connectionId: 'work', displayName: 'Work', isDefault: true, serviceId: 'mail', status: 'active' as const }
+  const preparation = Promise.withResolvers<{ action: typeof action & { defaultConnection?: typeof connection }; connections: (typeof connection)[] }>()
+  const saving = Promise.withResolvers<boolean>()
+  vi.spyOn(store, 'prepareConnectorAction').mockReturnValue(preparation.promise)
+  const save = vi.spyOn(store.workspace, 'setConnectorConnection').mockReturnValue(saving.promise)
+  vi.spyOn(store.connectors, 'refresh').mockResolvedValue()
+  try {
+    await navigation.start()
+    const revision = store.workspace.$.revision.value!
+    const definition = { name: 'Send', inputs: [], outputs: [], executor: { kind: 'connector' as const, action: 'mail.send' } }
+    const node = { id: 'new', kind: 'task' as const, node: { kind: 'task' as const, taskId: 'send', inputs: {} }, definition }
+    vi.spyOn(revision, 'selection').mockImplementation((_target, id) => ({ ...node, id }))
+    vi.spyOn(revision, 'node').mockReturnValue(node)
+    vi.spyOn(revision, 'task').mockReturnValue(definition)
+    vi.spyOn(store.workspace, 'addNode').mockImplementation(async () => {
+      store.workspace.selectNodes(['new'])
+      expect(store.$.connectorSetupPending.value).toBe(true)
+      return 'new'
+    })
+    await expect(
+      store.addNode({ connector: action, description: '', id: 'mail.send', inputs: [], outputs: [], kind: 'connector', label: 'Send' }, { x: 0, y: 0 }),
+    ).resolves.toBe('new')
+    expect(store.$.connectorSetupPending.value).toBe(true)
+    store.workspace.selectNodes(['existing'])
+    expect(store.$.connectorSetupPending.value).toBe(false)
+    store.workspace.selectNodes(['new'])
+    expect(store.$.connectorSetupPending.value).toBe(true)
+    if (outcome == 'failed') preparation.reject(new Error('Authorization failed'))
+    else
+      preparation.resolve({
+        action: outcome == 'connected' ? { ...action, defaultConnection: connection } : action,
+        connections: outcome == 'connected' ? [connection] : [],
+      })
+    if (outcome == 'connected') {
+      await vi.waitFor(() => expect(save).toHaveBeenCalledWith('send', 'work'))
+      expect(store.$.connectorSetupPending.value).toBe(true)
+      saving.resolve(true)
+    }
+    await vi.waitFor(() => expect(store.$.connectorSetupPending.value).toBe(false))
+    if (outcome == 'failed') expect(store.$.notice.value?.message).toBe('Authorization failed')
+  } finally {
+    preparation.resolve({ action, connections: [] })
+    saving.resolve(true)
+    navigation.dispose()
+    store.dispose()
+  }
+})

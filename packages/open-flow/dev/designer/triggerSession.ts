@@ -165,10 +165,10 @@ export function createTriggerSession(
         check: { kind: 'available' },
         version: 1,
       })
-    if (url.pathname === '/v1/connector/proxy/apps')
+    if (url.pathname === '/v1/connector/connections')
       return Response.json({
-        success: true,
-        data: [{ id: account.connectionId, service: serviceId, displayName: account.displayName, isDefault: account.isDefault, status: account.status }],
+        version: 1,
+        connections: [account],
       })
     if (url.pathname === '/v1/event-sources/connections') return Response.json({ version: 1, connections: [account] })
     if (url.pathname === `/v1/connector/connections/${serviceId}/page`)

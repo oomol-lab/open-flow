@@ -100,10 +100,10 @@ describe('ConnectorStore', () => {
           ],
         })
       }
-      if (path.startsWith('/v1/connector/proxy/apps'))
+      if (path.startsWith('/v1/connector/connections'))
         return Response.json({
-          success: true,
-          data: flowId == null ? [{ id: 'mail-team', service: 'mail', displayName: 'Team account', status: 'active', isDefault: true }] : [],
+          version: 1,
+          connections: flowId == null ? [{ connectionId: 'mail-team', serviceId: 'mail', displayName: 'Team account', status: 'active', isDefault: true }] : [],
         })
       if (path.startsWith('/v1/connector/action-metadata')) {
         connectorRequests.push(path)
@@ -167,7 +167,7 @@ describe('ConnectorStore', () => {
       expect(connectors.$.actions.value).toEqual({})
       expect(connectorRequests).toContain('/v1/connector/proxy/providers?locale=en')
       expect(connectorRequests).toContain('/v1/connector/proxy/actions?service=mail&locale=en')
-      expect(connectorRequests).toContain('/v1/connector/action-metadata/mail.send?flowId=flow-a&locale=en')
+      expect(connectorRequests).toContain('/v1/connector/proxy/actions?flowId=flow-a&service=mail&locale=en')
       expect(connectorRequests).toContain('/v1/connector/action-metadata?q=send&locale=en')
       expect(connectorRequests.some((path) => path.includes('flowId=flow-b'))).toBe(false)
       connectors.setLanguage('zh-CN')

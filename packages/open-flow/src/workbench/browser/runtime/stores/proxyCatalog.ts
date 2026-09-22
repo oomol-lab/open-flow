@@ -1,4 +1,4 @@
-import type { ConnectorActionMetadata, ConnectorConnection, ConnectorProvider } from '../api.ts'
+import type { ConnectorActionMetadata, ConnectorProvider } from '../api.ts'
 
 import { connectorActionPorts } from '../../../../connector/common/actionSchema.ts'
 import { invalidResponse, jsonValue, record, string } from '../../../../control/common/decoding.ts'
@@ -11,7 +11,7 @@ export interface ProxyResponse {
 }
 
 /** Validate the fields we consume without discarding upstream representation fields. */
-export function proxyResponse(value: unknown, validate: (item: Readonly<Record<string, unknown>>) => unknown): ProxyResponse {
+export function proxyResponse(value: unknown, validate?: (item: Readonly<Record<string, unknown>>) => unknown): ProxyResponse {
   const source = record(value)
   if (source.success === false)
     throw new ApiError(
@@ -20,7 +20,7 @@ export function proxyResponse(value: unknown, validate: (item: Readonly<Record<s
       typeof source.message == 'string' ? source.message : 'Connector request failed.',
     )
   if (source.success !== true || !Array.isArray(source.data)) return invalidResponse()
-  for (const item of source.data) validate(record(item))
+  if (validate != null) for (const item of source.data) validate(record(item))
   return source as unknown as ProxyResponse
 }
 
@@ -32,24 +32,6 @@ export function provider(source: Readonly<Record<string, unknown>>): ConnectorPr
     noSetup: source.authTypes.length == 1 && source.authTypes[0] == 'no_auth',
     ...(source.iconUrl == null || source.iconUrl === '' ? {} : { icon: string(source.iconUrl) }),
     ...(source.homepageUrl == null || source.homepageUrl === '' ? {} : { homepageUrl: string(source.homepageUrl) }),
-  }
-}
-
-export function app(source: Readonly<Record<string, unknown>>): ConnectorConnection {
-  if (
-    typeof source.isDefault != 'boolean' ||
-    typeof source.status != 'string' ||
-    !['active', 'disconnected', 'error', 'reauth_required'].includes(source.status)
-  )
-    return invalidResponse()
-  return {
-    connectionId: string(source.id),
-    serviceId: string(source.service),
-    displayName: string(source.displayName),
-    isDefault: source.isDefault,
-    status: source.status as ConnectorConnection['status'],
-    ...(source.alias == null ? {} : { alias: string(source.alias) }),
-    ...(source.marketplace == null ? {} : { builtInAccount: true }),
   }
 }
 

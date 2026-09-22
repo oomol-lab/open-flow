@@ -57,9 +57,9 @@ it.each(['metadata', 'connections'] as const)('shows loading while waiting for %
 
 it.each([undefined, { message: 'Earlier request failed.' }])('directs missing access to configuration instead of retrying (%s)', (actionError) => {
   const markup = renderAccount({ actionError })
-  expect(markup).toContain('运行前，请为此流程选择可用账号和权限。')
+  expect(markup).toContain('运行前，请为此 Flow 选择可用账号和权限。')
   expect(markup).toContain('选择可用账号')
-  expect(markup).toContain('管理账号')
+  expect(markup).not.toContain('管理账号')
   expect(markup).not.toContain('重试')
   expect(markup).not.toContain('继承')
   expect(markup).not.toContain('Provider')
@@ -82,5 +82,14 @@ it('asks an administrator for help when the current user is denied permission', 
   const markup = renderAccount({ action: undefined, accessError: undefined, actionError: { code: 'authorization.denied', message: 'Denied.' } })
   expect(markup).toContain('请联系管理员')
   expect(markup).not.toContain('重试')
+  expect(markup).not.toContain('选择可用账号')
+})
+
+it('shows a neutral loading account section while a newly added node is being configured', () => {
+  const markup = renderAccount({ loading: true })
+  expect(markup).toContain(i18n.t('inspector.account.loading'))
+  expect(markup).toContain(i18n.t('inspector.account.title'))
+  expect(markup).not.toContain(i18n.t('inspector.account.accessTitle'))
+  expect(markup).not.toContain(i18n.t('notice.error.connectorAccessRequired'))
   expect(markup).not.toContain('选择可用账号')
 })

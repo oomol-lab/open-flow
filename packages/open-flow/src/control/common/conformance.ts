@@ -1,3 +1,5 @@
+import type { ProviderAccessIdentity } from './providerAccess.ts'
+
 import { dequal } from 'dequal/lite'
 import { decodeRunEvent } from './api.ts'
 
@@ -1042,10 +1044,28 @@ export const connectorControlApiConformanceCases: readonly ControlApiConformance
       }
       equal(access.version, 1, 'Implicit Connector access version')
       equal(
-        await json(await request(harness, `/v1/flows/${flowId}/connector-access/mail/candidates`), 200, 'Read Connector access candidates'),
-        { candidates: [], mode: 'implicit', providerId: 'mail', version: 1 },
+        await json(
+          await request(harness, `/v1/flows/${flowId}/connector-access/candidates/query`, {
+            method: 'POST',
+            body: JSON.stringify({ providerIds: ['mail', 'github'], version: 1 }),
+          }),
+          200,
+          'Read Connector access candidates',
+        ),
+        { results: ['mail', 'github'].map((providerId) => ({ candidates: [], mode: 'implicit', providerId, version: 1 })), version: 1 },
         'Implicit Connector access candidates',
       )
+      for (const providerIds of [[], ['mail', 'mail'], [''], ['x'.repeat(257)], [1]]) {
+        await error(
+          await request(harness, `/v1/flows/${flowId}/connector-access/candidates/query`, {
+            method: 'POST',
+            body: JSON.stringify({ providerIds, version: 1 }),
+          }),
+          409,
+          'connector.access-invalid',
+          'Invalid candidate provider query',
+        )
+      }
       await error(
         await request(harness, `/v1/flows/${flowId}/connector-access/mail`, {
           body: JSON.stringify({ accessBindingId: 'editors', expectedAccessRevision: 0, version: 1 }),
@@ -1108,12 +1128,14 @@ export const connectorControlApiConformanceCases: readonly ControlApiConformance
   },
 ]
 
-export function selectableConnectorAccessControlApiConformanceCases(fixture: {
-  readonly accessBindingId: string
-  readonly connectionDisplayName: string
-  readonly permissionGroupName: string | null
-  readonly providerId: string
-}): readonly ControlApiConformanceCase[] {
+export function selectableConnectorAccessControlApiConformanceCases(
+  fixture: ProviderAccessIdentity & {
+    readonly accessBindingId: string
+    readonly connectionDisplayName: string
+    readonly permissionGroupName: string | null
+    readonly providerId: string
+  },
+): readonly ControlApiConformanceCase[] {
   return [
     {
       name: 'selects Provider access with optimistic concurrency',
@@ -1124,13 +1146,23 @@ export function selectableConnectorAccessControlApiConformanceCases(fixture: {
         const initial = await json(await request(harness, `/v1/flows/${flowId}/connector-access`), 200, 'Read selectable Connector access')
         equal(initial.mode, 'selectable', 'Selectable Connector access mode')
         equal(initial.accessRevision, 0, 'Initial selectable Connector access revision')
-        const candidates = await json(await request(harness, `${path}/candidates`), 200, 'Read Provider access candidates')
+        const batch = await json(
+          await request(harness, `/v1/flows/${flowId}/connector-access/candidates/query`, {
+            method: 'POST',
+            body: JSON.stringify({ providerIds: [fixture.providerId], version: 1 }),
+          }),
+          200,
+          'Read Provider access candidates',
+        )
+        const candidates = record(list(batch.results, 'Provider candidate results')[0], 'Provider candidates')
         equal(candidates.mode, 'selectable', 'Provider access candidate mode')
         equal(candidates.providerId, fixture.providerId, 'Provider access candidate Provider')
         const candidate = list(candidates.candidates, 'Provider access candidates').find(
           (value) => record(value, 'Provider access candidate').accessBindingId == fixture.accessBindingId,
         )
         if (candidate == null) fail('Expected selectable Provider access candidate was not returned.')
+        equal(record(candidate, 'Provider access candidate').connectionId, fixture.connectionId, 'Provider access candidate Connection ID')
+        equal(record(candidate, 'Provider access candidate').source, fixture.source, 'Provider access candidate source')
         equal(
           record(candidate, 'Provider access candidate').connectionDisplayName,
           fixture.connectionDisplayName,
@@ -1156,6 +1188,8 @@ export function selectableConnectorAccessControlApiConformanceCases(fixture: {
           (value) => record(value, 'Selected Connector access binding').providerId == fixture.providerId,
         )
         if (binding == null) fail('Selected Provider access binding was not projected.')
+        equal(record(binding, 'Selected Connector access binding').connectionId, fixture.connectionId, 'Selected Connector access binding Connection ID')
+        equal(record(binding, 'Selected Connector access binding').source, fixture.source, 'Selected Connector access binding source')
         equal(record(binding, 'Selected Connector access binding').accessBindingId, fixture.accessBindingId, 'Selected Provider access binding ID')
         equal(
           record(binding, 'Selected Connector access binding').connectionDisplayName,
