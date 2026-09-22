@@ -256,6 +256,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
     const flowChangeDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/change.d.ts'), 'utf8'))
       .replaceAll("'./changeSchema.ts'", "'./flow-change-schema.js'")
       .replaceAll("'./inputValue.ts'", "'./flow-input-value.js'")
+      .replaceAll("'./webhookMethod.ts'", "'./webhook-method.js'")
     const flowInputValueDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/inputValue.d.ts'), 'utf8')).replaceAll(
       "'./change.ts'",
       "'./flow-change.js'",
@@ -359,16 +360,16 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'../common/poll.ts'", "'./poll-trigger.js'")
       .replaceAll("'../common/configOptions.ts'", "'./trigger-config-options.js'")
       .replaceAll("'./localization.ts'", "'./trigger-localization.js'")
-    const webhookTriggerDeclaration = (await readFile(path.join(declarationRoot, 'trigger/common/webhook.d.ts'), 'utf8')).replaceAll(
-      "'../../flow/common/change.ts'",
-      "'../browser/flow-change.js'",
-    )
+    const webhookTriggerDeclaration = (await readFile(path.join(declarationRoot, 'trigger/common/webhook.d.ts'), 'utf8'))
+      .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
+      .replaceAll("'./contract.ts'", "'./trigger-contract.js'")
     await Promise.all([
       writeFile(path.join(browserOutputPath, 'flow-authoring.d.ts'), flowAuthoringDeclaration),
       writeFile(path.join(browserOutputPath, 'flow-authoring-edge.d.ts'), flowAuthoringEdgeDeclaration),
       writeFile(path.join(browserOutputPath, 'flow-authoring-module.d.ts'), flowAuthoringModuleDeclaration),
       writeFile(path.join(browserOutputPath, 'flow-authoring-node.d.ts'), flowAuthoringNodeDeclaration),
       writeFile(path.join(browserOutputPath, 'flow-change.d.ts'), flowChangeDeclaration),
+      writeFile(path.join(browserOutputPath, 'webhook-method.d.ts'), await readFile(path.join(declarationRoot, 'flow/common/webhookMethod.d.ts'), 'utf8')),
       writeFile(path.join(browserOutputPath, 'flow-input-value.d.ts'), flowInputValueDeclaration),
       writeFile(path.join(browserOutputPath, 'flow-change-schema.d.ts'), flowChangeSchemaDeclaration),
       writeFile(path.join(commonOutputPath, 'flow-json.d.ts'), await readFile(path.join(declarationRoot, 'flow/common/json.d.ts'), 'utf8')),
@@ -438,10 +439,9 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(path.join(commonOutputPath, 'cron-trigger.d.ts'), cronTriggerDeclaration),
       writeFile(
         path.join(commonOutputPath, 'trigger-contract.d.ts'),
-        (await readFile(path.join(declarationRoot, 'trigger/common/contract.d.ts'), 'utf8')).replaceAll(
-          "'../../flow/common/change.ts'",
-          "'../browser/flow-change.js'",
-        ),
+        (await readFile(path.join(declarationRoot, 'trigger/common/contract.d.ts'), 'utf8'))
+          .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
+          .replaceAll("'../../flow/common/webhookMethod.ts'", "'../browser/webhook-method.js'"),
       ),
       writeFile(path.join(commonOutputPath, 'integration-trigger.d.ts'), integrationTriggerDeclaration),
       writeFile(path.join(commonOutputPath, 'poll-trigger.d.ts'), pollTriggerDeclaration),
