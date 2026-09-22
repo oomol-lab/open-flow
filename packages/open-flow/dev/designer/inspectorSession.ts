@@ -77,25 +77,27 @@ export function createInspectorTransport(
       }
       return Response.json(access)
     }
-    const candidate = /\/connector-access\/([^/]+)\/candidates$/.exec(url.pathname)
-    if (candidate != null) {
-      const providerId = decodeURIComponent(candidate[1]!)
+    if (url.pathname.endsWith('/connector-access/candidates/query')) {
+      const { providerIds } = JSON.parse(String(init?.body)) as { providerIds: string[] }
       return Response.json({
-        candidates: (options.candidates ?? [])
-          .filter((item) => item.providerId == providerId)
-          .map((item) => ({
-            accessBindingId: item.accessBindingId,
-            connectionDisplayName: item.connectionDisplayName,
-            providerId: item.providerId,
-            permissionGroupName: item.permissionGroupName,
-            connectionId:
-              options.connections?.find((account) => account.service == item.providerId && account.displayName == item.connectionDisplayName)?.id ??
-              'fixture-account',
-            source: { kind: 'policy', ruleId: null },
-          })),
-        mode: access.mode,
-        providerId,
         version: 1,
+        results: providerIds.map((providerId) => ({
+          candidates: (options.candidates ?? [])
+            .filter((item) => item.providerId == providerId)
+            .map((item) => ({
+              accessBindingId: item.accessBindingId,
+              connectionDisplayName: item.connectionDisplayName,
+              providerId: item.providerId,
+              permissionGroupName: item.permissionGroupName,
+              connectionId:
+                options.connections?.find((account) => account.service == item.providerId && account.displayName == item.connectionDisplayName)?.id ??
+                'fixture-account',
+              source: { kind: 'policy', ruleId: null },
+            })),
+          mode: access.mode,
+          providerId,
+          version: 1,
+        })),
       })
     }
     const mutation = /\/connector-access\/([^/]+)$/.exec(url.pathname)

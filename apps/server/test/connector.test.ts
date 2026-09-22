@@ -456,7 +456,10 @@ describe('Server Connector host', () => {
     )
     const service = await open(new ConnectorClient('https://connector.oomol.dev', 'runtime-token'))
     const created = await service.control.createFlow('test', 'Team Run', 'create-team-run', 'team-a')
-    const candidates = await service.control.getProviderAccessBindingCandidates('test', created.flow.flowId, 'example')
+    const batch = await service.control.getProviderAccessBindingCandidates('test', created.flow.flowId, ['example'])
+    const result = batch.results[0]!
+    if ('error' in result) throw new Error(result.error.message)
+    const candidates = result
     await service.control.addProviderAccessBinding('test', created.flow.flowId, 'example', candidates.candidates[0]!.accessBindingId, 0)
     const revision = connectorFlow()
     const changed = await service.control.changeDraft('test', created.flow.flowId, created.flow.draftRevisionId, [

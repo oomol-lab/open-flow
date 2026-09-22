@@ -16,20 +16,25 @@ describe('ConnectorAccessStore', () => {
     const request = vi.fn(async (path: string, init?: RequestInit) => {
       requests.push({ path, method: init?.method, body: typeof init?.body == 'string' ? init.body : undefined })
       if (path == '/v1/flows/flow-1/connector-access' && init?.method == null) return Response.json(initial)
-      if (path == '/v1/flows/flow-1/connector-access/mail/candidates') {
+      if (path == '/v1/flows/flow-1/connector-access/candidates/query') {
         return Response.json({
-          candidates: [
+          results: [
             {
-              connectionId: 'fixture-account',
-              source: { kind: 'policy' as const, ruleId: 'Editors' },
-              accessBindingId: 'editors',
-              connectionDisplayName: 'Work account',
-              permissionGroupName: 'Editors',
+              candidates: [
+                {
+                  connectionId: 'fixture-account',
+                  source: { kind: 'policy' as const, ruleId: 'Editors' },
+                  accessBindingId: 'editors',
+                  connectionDisplayName: 'Work account',
+                  permissionGroupName: 'Editors',
+                  providerId: 'mail',
+                },
+              ],
+              mode: 'selectable',
               providerId: 'mail',
+              version: 1,
             },
           ],
-          mode: 'selectable',
-          providerId: 'mail',
           version: 1,
         })
       }
@@ -56,7 +61,7 @@ describe('ConnectorAccessStore', () => {
     const store = new ConnectorAccessStore(new WorkbenchClient(request), vi.fn())
 
     await store.load('flow-1')
-    await store.loadCandidates('mail')
+    await store.loadCandidates(['mail'])
     await store.select('mail', 'editors')
 
     expect(store.$.value.access).toMatchObject({ accessRevision: 1, providerAccessDigest: 'access-1' })
@@ -181,11 +186,15 @@ it('refreshes available accounts when configuring access after connecting an acc
     providerId: 'mail',
   }
   const request = vi.fn(async (path: string) =>
-    Response.json(path.endsWith('/candidates') ? { candidates: connected ? [candidate] : [], mode: 'selectable', providerId: 'mail', version: 1 } : initial),
+    Response.json(
+      path.endsWith('/candidates/query')
+        ? { results: [{ candidates: connected ? [candidate] : [], mode: 'selectable', providerId: 'mail', version: 1 }], version: 1 }
+        : initial,
+    ),
   )
   const store = new ConnectorAccessStore(new WorkbenchClient(request), vi.fn())
   await store.load('flow-1')
-  await store.loadCandidates('mail')
+  await store.loadCandidates(['mail'])
   expect(store.$.value.candidates.mail?.candidates).toEqual([])
   connected = true
   store.configure('mail')
@@ -224,7 +233,8 @@ it('persists an unconnected service and restores it in a new Store', async () =>
     if (path.endsWith('/service')) {
       access = { ...access, providerIds: init?.method == 'PUT' ? ['2chat'] : [], accessRevision: access.accessRevision + 1 }
     }
-    if (path.endsWith('/candidates')) return Response.json({ candidates: [], mode: 'selectable', providerId: '2chat', version: 1 })
+    if (path.endsWith('/candidates/query'))
+      return Response.json({ results: [{ candidates: [], mode: 'selectable', providerId: '2chat', version: 1 }], version: 1 })
     return Response.json(access)
   })
   const store = new ConnectorAccessStore(new WorkbenchClient(request), vi.fn())
@@ -294,4 +304,61 @@ it.each([false, true])('clears pending feedback without applying a stale complet
   expect(store.$.value.savingProviderId).toBeUndefined()
   expect(onSaved).toHaveBeenCalledTimes(navigate ? 0 : 1)
   store.dispose()
+})
+
+it('batches missing providers, preserves successful results and retries only the failed provider', async () => {
+  const client = new WorkbenchClient(vi.fn())
+  vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(initial)
+  const candidates = vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
+    version: 1,
+    results: [
+      { providerId: 'mail', candidates: [], mode: 'selectable', version: 1 },
+      { providerId: 'github', error: { code: 'connector.unavailable', message: 'Unavailable' } },
+    ],
+  })
+  const store = new ConnectorAccessStore(client, vi.fn())
+  try {
+    await store.load('flow')
+    const pending = store.loadCandidates(['mail', 'github', 'mail'])
+    await store.loadCandidates(['mail', 'github'])
+    await pending
+    expect(candidates).toHaveBeenCalledExactlyOnceWith('flow', ['mail', 'github'], expect.any(AbortSignal))
+    const mail = store.$.value.candidates.mail
+    expect(mail?.candidates).toEqual([])
+    expect(store.$.value.candidateErrors).toEqual(['github'])
+    await store.loadCandidates(['mail', 'github'])
+    expect(candidates).toHaveBeenCalledTimes(1)
+    candidates.mockResolvedValue({ version: 1, results: [{ providerId: 'github', candidates: [], mode: 'selectable', version: 1 }] })
+    await store.loadCandidates(['github'], true)
+    expect(candidates).toHaveBeenLastCalledWith('flow', ['github'], expect.any(AbortSignal))
+    expect(store.$.value.candidates.mail).toBe(mail)
+    expect(store.$.value.candidateErrors).toEqual([])
+    candidates.mockResolvedValue({ version: 1, results: [{ providerId: 'slack', candidates: [], mode: 'selectable', version: 1 }] })
+    await store.loadCandidates(['mail', 'github', 'slack'])
+    expect(candidates).toHaveBeenLastCalledWith('flow', ['slack'], expect.any(AbortSignal))
+  } finally {
+    store.dispose()
+  }
+})
+
+it('cancels candidate queries when switching Flow and ignores an old response after switching back', async () => {
+  const client = new WorkbenchClient(vi.fn())
+  vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(initial)
+  const delayed = Promise.withResolvers<Awaited<ReturnType<WorkbenchClient['listProviderAccessBindingCandidates']>>>()
+  const candidates = vi.spyOn(client, 'listProviderAccessBindingCandidates').mockReturnValueOnce(delayed.promise)
+  const store = new ConnectorAccessStore(client, vi.fn())
+  try {
+    await store.load('a')
+    const pending = store.loadCandidates(['mail'])
+    const signal = candidates.mock.calls[0]![2]!
+    await store.load('b')
+    expect(signal.aborted).toBe(true)
+    await store.load('a')
+    delayed.resolve({ version: 1, results: [{ providerId: 'mail', candidates: [], mode: 'selectable', version: 1 }] })
+    await pending
+    expect(store.$.value.candidates).toEqual({})
+    expect(store.$.value.loadingCandidates).toEqual([])
+  } finally {
+    store.dispose()
+  }
 })

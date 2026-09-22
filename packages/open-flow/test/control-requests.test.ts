@@ -32,6 +32,7 @@ const samples = {
   createLiveRun: { publicationId: 'p1', inputs: {}, trigger: { nodeId: 'start', outputs: {} }, version: 2 },
   resolveWait: { action: 'continue', version: 1 },
   putVariable: { value: '' },
+  queryConnectorAccessCandidates: { providerIds: ['mail', 'github'], version: 1 },
   setConnectorService: { expectedAccessRevision: 0, version: 1 },
   addProviderAccessBinding: { accessBindingId: 'editors', expectedAccessRevision: 1, version: 1 },
   removeProviderAccessBinding: { accessBindingId: 'editors', expectedAccessRevision: 1, version: 1 },

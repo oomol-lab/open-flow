@@ -551,14 +551,18 @@ interface ConnectorAccess {
 }
 ```
 
-| Method   | Path                                                        | Body                                                      |
-| -------- | ----------------------------------------------------------- | --------------------------------------------------------- |
-| `GET`    | `/v1/flows/:flowId/connector-access`                        | 无                                                        |
-| `GET`    | `/v1/flows/:flowId/connector-access/:providerId/candidates` | 无                                                        |
-| `PUT`    | `/v1/flows/:flowId/connector-access/:providerId`            | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
-| `DELETE` | `/v1/flows/:flowId/connector-access/:providerId`            | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
+| Method   | Path                                                  | Body                                                      |
+| -------- | ----------------------------------------------------- | --------------------------------------------------------- |
+| `GET`    | `/v1/flows/:flowId/connector-access`                  | 无                                                        |
+| `POST`   | `/v1/flows/:flowId/connector-access/candidates/query` | `{ providerIds: string[], version: 1 }`                   |
+| `PUT`    | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
+| `DELETE` | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
 
-候选响应为 `{ candidates, mode, providerId, version: 1 }`；candidate 使用 `connectionDisplayName`、可为空的 `permissionGroupName` 和可选的 `isDefault`
+候选查询按需批量提交非空、无重复的 `providerIds`（单个 ID 长度不超过 256）。响应为 `{ results, version: 1 }`，每个请求的 Provider 恰好对应一个结果：
+成功项为 `{ candidates, mode, providerId, version: 1 }`，失败项为 `{ providerId, error: { code, message } }`。共享的团队身份、账号目录或权限策略读取失败时，整次请求按常规错误契约失败；某个 Provider 的候选计算失败不影响其他结果。
+多 Provider 查询共用团队成员身份、操作者身份、团队账号目录和权限策略；单 Provider 查询只读取对应服务账号。Workbench 首次展开时批量加载缺失项，新增服务只补查新增项，缓存命中和正在加载的项不重复请求；失败项通过显式重试重新加载，切换 Flow 时取消旧查询。
+
+candidate 使用 `connectionDisplayName`、可为空的 `permissionGroupName` 和可选的 `isDefault`
 分别投影连接、权限组名称与部署的默认连接，但不包含 credential 或原始权限规则。`permissionGroupName` 仅用于展示，不决定权限来源。candidate 可提供只读的
 `permissions: { actionIds, allActions, configured, proxy }` 摘要供 Workbench 展示和筛选；`actionIds` 使用完整 Action ID，`configured` 只表示权限组包含托管访问配置，
 不得投影配置内容。该摘要不是授权依据，也不得写入 Flow binding。Workbench 添加 Connector Action 时先排除摘要明确不允许该 Action 的 candidate，再优先分配

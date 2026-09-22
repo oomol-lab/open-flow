@@ -114,7 +114,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   const providerId = connectorAction?.authenticated ? connectorAction.serviceId : undefined
   useEffect(() => {
     if (providerId != null && connectorAccess?.mode == 'selectable' && accessState.candidates[providerId] == null) {
-      void store.connectorAccess.loadCandidates(providerId)
+      void store.connectorAccess.loadCandidates([providerId])
     }
   }, [providerId, connectorAccess?.mode, store])
   const bindings = connectorAccess?.bindings.filter((binding) => binding.providerId == providerId && binding.status == 'active') ?? []

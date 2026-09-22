@@ -70,9 +70,7 @@ export function ConnectorAccessSettings({
     .join('\0')
   useEffect(() => {
     if (!expanded || flowId == null || access?.mode != 'selectable' || providersPending) return
-    for (const providerId of providerKey.split('\0').filter(Boolean)) {
-      if (state.candidates[providerId] == null) void store.connectorAccess.loadCandidates(providerId)
-    }
+    void store.connectorAccess.loadCandidates(providerKey.split('\0').filter(Boolean))
   }, [access?.mode, expanded, flowId, providerKey, providersPending, state.candidates, store])
   useEffect(() => {
     if (!expanded || providersPending || state.configuration == null) return
@@ -320,7 +318,7 @@ export function ConnectorAccessSettings({
                                 {t('connectorAccess.candidatesFailed')}{' '}
                                 <Button
                                   className="h-auto p-0 underline"
-                                  onClick={() => void store.connectorAccess.loadCandidates(provider.serviceId)}
+                                  onClick={() => void store.connectorAccess.loadCandidates([provider.serviceId], true)}
                                   size="xs"
                                   type="button"
                                   variant="link"

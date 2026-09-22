@@ -1,5 +1,5 @@
 import type { ConnectorProxyRequest, ConnectorProxyResult } from '@oomol-lab/open-flow/connector-proxy'
-import type { ProviderAccessReference, ProviderAccessBindingCandidate } from '@oomol-lab/open-flow/control-api'
+import type { ProviderAccessReference, ConnectorAccessCandidates } from '@oomol-lab/open-flow/control-api'
 import type { ConnectorAccess, ConnectorActionMetadata, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
 import type { ConnectorActionCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { Logger } from 'pino'
@@ -171,7 +171,14 @@ export class ConnectorClient implements ConnectorHost {
     })
   }
 
-  async listProviderAccessBindingCandidates(teamId: string, providerId: string, signal?: AbortSignal): Promise<readonly ProviderAccessBindingCandidate[]> {
+  async listProviderAccessBindingCandidates(
+    teamId: string,
+    providerIds: readonly string[],
+    signal?: AbortSignal,
+  ): Promise<{
+    readonly results: readonly (ConnectorAccessCandidates | { readonly providerId: string; readonly error: Pick<ConnectorTaskError, 'code' | 'message'> })[]
+    readonly version: 1
+  }> {
     if (this.#teamOrigin == null || this.#token.length == 0) throw unavailable()
     const response = await this.#request('teams.membership', 'v1/me/teams', { method: 'GET' }, signal, { origin: this.#teamOrigin })
     if (!response.ok || !record(response.value) || !Array.isArray(response.value.teams)) throw unavailable('The OOMOL Team membership could not be loaded.')
@@ -181,10 +188,24 @@ export class ConnectorClient implements ConnectorHost {
     const teamAdmin = team.role == 'creator' || team.role == 'admin'
     const [actorId, connections, access] = await Promise.all([
       teamAdmin ? Promise.resolve('') : this.#oomolUserId(signal),
-      this.#connections(providerId, signal, teamId),
+      this.#connections(providerIds.length == 1 ? providerIds[0] : undefined, signal, teamId),
       teamAdmin ? Promise.resolve({ policy: {} }) : this.#readTeamAppAccess(teamId, signal),
     ])
-    return await providerAccessBindingCandidates({ actorId, connections, ...access, providerId, teamId, teamAdmin })
+    const results = await Promise.all(
+      providerIds.map(async (providerId) => {
+        signal?.throwIfAborted()
+        try {
+          const candidates = await providerAccessBindingCandidates({ actorId, connections, ...access, providerId, teamId, teamAdmin })
+          return { providerId, candidates, mode: 'selectable' as const, version: 1 as const }
+        } catch (error) {
+          signal?.throwIfAborted()
+          if (!(error instanceof TypeError) && !(error instanceof ConnectorTaskError)) throw error
+          const failure = error instanceof ConnectorTaskError ? error : unavailable('Connector access candidates could not be loaded.')
+          return { providerId, error: { code: failure.code, message: failure.message } }
+        }
+      }),
+    )
+    return { results, version: 1 }
   }
 
   async #oomolUserId(signal?: AbortSignal): Promise<string> {

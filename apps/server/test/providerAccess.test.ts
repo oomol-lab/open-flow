@@ -84,10 +84,15 @@ describe('configured Connector access', () => {
     const access = new ConfiguredConnectorAccessHost(storage, new ConnectorTeamStore(storage.connection), () => connector)
 
     expect(access.current('flow-1')).toMatchObject({ bindings: [], mode: 'implicit' })
-    await expect(access.listCandidates('operator', 'flow-1', 'example')).resolves.toEqual({
-      candidates: [],
-      mode: 'implicit',
-      providerId: 'example',
+    await expect(access.listCandidates('operator', 'flow-1', ['example'])).resolves.toEqual({
+      results: [
+        {
+          candidates: [],
+          mode: 'implicit',
+          providerId: 'example',
+          version: 1,
+        },
+      ],
       version: 1,
     })
   })
@@ -145,7 +150,10 @@ describe('configured Connector access', () => {
     const access = new ConfiguredConnectorAccessHost(storage, teams, () => connector)
 
     expect(access.current('flow-1')).toMatchObject({ accessRevision: 0, bindings: [], mode: 'selectable' })
-    const candidates = await access.listCandidates('local-operator', 'flow-1', 'example')
+    const batch = await access.listCandidates('local-operator', 'flow-1', ['example'])
+    const result = batch.results[0]!
+    if ('error' in result) throw new Error(result.error.message)
+    const candidates = result
     expect(candidates.candidates).toEqual([
       expect.objectContaining({ connectionDisplayName: 'Personal account', isDefault: false, permissionGroupName: null, providerId: 'example' }),
       expect.objectContaining({ connectionDisplayName: 'Work account', isDefault: true, permissionGroupName: 'Editors', providerId: 'example' }),
@@ -234,12 +242,15 @@ describe('configured Connector access', () => {
       }),
     )
     const connector = new ConnectorClient('https://connector.oomol.dev', 'token')
-    const candidates = await connector.listProviderAccessBindingCandidates('team-1', 'example')
+    const batch = await connector.listProviderAccessBindingCandidates('team-1', ['example'])
+    const result = batch.results[0]!
+    if ('error' in result) throw new Error(result.error.message)
+    const candidates = result
     const access = {
       flowId: 'flow-1',
       providerAccess: {
         accessRevision: 1,
-        bindings: candidates.map((candidate) => Object.assign({ status: 'active' as const }, candidate)),
+        bindings: candidates.candidates.map((candidate) => Object.assign({ status: 'active' as const }, candidate)),
         mode: 'selectable' as const,
         providerAccessDigest: 'multiple',
         version: 1 as const,
@@ -371,7 +382,10 @@ it.each(['creator', 'admin'])('offers %s delegation without policy and retains i
   const storage = await openDatabase()
   const connector = new ConnectorClient('https://connector.oomol.dev', 'token')
   const access = new ConfiguredConnectorAccessHost(storage, new ConnectorTeamStore(storage.connection), () => connector)
-  const candidates = await access.listCandidates('operator', 'flow-1', 'example')
+  const batch = await access.listCandidates('operator', 'flow-1', ['example'])
+  const result = batch.results[0]!
+  if ('error' in result) throw new Error(result.error.message)
+  const candidates = result
   expect(candidates.candidates).toHaveLength(1)
   const candidate = candidates.candidates[0]!
   expect(candidate).toMatchObject({ source: { kind: 'admin-delegation' }, connectionId: 'active', permissions: { allActions: true, proxy: true } })
@@ -400,7 +414,7 @@ it.each([
     vi.fn(async () => Response.json(membership)),
   )
   const connector = new ConnectorClient('https://connector.oomol.dev', 'token')
-  await expect(connector.listProviderAccessBindingCandidates('team-1', 'example')).rejects.toMatchObject({ code: 'connector.access-invalid' })
+  await expect(connector.listProviderAccessBindingCandidates('team-1', ['example'])).rejects.toMatchObject({ code: 'connector.access-invalid' })
   expect(fetch).toHaveBeenCalledTimes(1)
 })
 
@@ -444,7 +458,7 @@ it.each([Response.json({ teams: 'invalid' }), new Response(null, { status: 503 }
       vi.fn(async () => response),
     )
     const connector = new ConnectorClient('https://connector.oomol.dev', 'token')
-    await expect(connector.listProviderAccessBindingCandidates('team-1', 'example')).rejects.toMatchObject({ code: 'connector.unavailable' })
+    await expect(connector.listProviderAccessBindingCandidates('team-1', ['example'])).rejects.toMatchObject({ code: 'connector.unavailable' })
     expect(fetch).toHaveBeenCalledTimes(1)
   },
 )

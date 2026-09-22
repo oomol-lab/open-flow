@@ -451,7 +451,7 @@ export class WorkbenchStore {
     if (access == null) return unconfigured
     let actionAccessAllowed: boolean | undefined
     if (access?.mode == 'selectable') {
-      if (this.connectorAccess.$.value.candidates[action.serviceId] == null) await this.connectorAccess.loadCandidates(action.serviceId)
+      if (this.connectorAccess.$.value.candidates[action.serviceId] == null) await this.connectorAccess.loadCandidates([action.serviceId])
       if (this.#disposed || flowId != this.workspace.$.flowId.value) return
       const candidates = this.connectorAccess.$.value.candidates[action.serviceId]?.candidates.filter(
         (candidate) => candidate.permissions == null || candidate.permissions.allActions || candidate.permissions.actionIds.includes(action.actionId),

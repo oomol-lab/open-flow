@@ -202,16 +202,12 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     query(context.req.raw, [], controlErrorCode.connectorAccessInvalid)
     return response(200, service.getConnectorAccess(context.get('actorId'), context.req.param('flowId')))
   })
-  app.get('/flows/:flowId/connector-access/:providerId/candidates', async (context) => {
+  app.post('/flows/:flowId/connector-access/candidates/query', async (context) => {
     query(context.req.raw, [], controlErrorCode.connectorAccessInvalid)
+    const body = await decodeRequest(context.req.raw, controlErrorCode.connectorAccessInvalid, controlRequests.queryConnectorAccessCandidates)
     return response(
       200,
-      await service.getProviderAccessBindingCandidates(
-        context.get('actorId'),
-        context.req.param('flowId'),
-        connectorService(context.req.param('providerId')),
-        context.req.raw.signal,
-      ),
+      await service.getProviderAccessBindingCandidates(context.get('actorId'), context.req.param('flowId'), body.providerIds, context.req.raw.signal),
     )
   })
   for (const method of ['PUT', 'DELETE'] as const) {

@@ -124,17 +124,17 @@ describe('Flow creation notifications', () => {
     vi.spyOn(client, 'getConnectorAccess').mockImplementation(async (flowId) => access(flowId))
     const candidates = vi
       .spyOn(client, 'listProviderAccessBindingCandidates')
-      .mockResolvedValue({ version: 1, mode: 'selectable', providerId: 'example', candidates: [] })
+      .mockResolvedValue({ version: 1, results: [{ version: 1, mode: 'selectable', providerId: 'example', candidates: [] }] })
     const add = vi.spyOn(client, 'addProviderAccessBinding').mockResolvedValue(access('second'))
     try {
       await navigation.start()
       expect(store.connectorAccess.$.value.access?.providerAccessDigest).toBe('first')
-      await store.connectorAccess.loadCandidates('example')
+      await store.connectorAccess.loadCandidates(['example'])
       await store.selectFlow('second')
       expect(store.connectorAccess.$.value.candidates).toEqual({})
       expect(store.connectorAccess.$.value.access?.providerAccessDigest).toBe('second')
-      await store.connectorAccess.loadCandidates('example')
-      expect(candidates).toHaveBeenLastCalledWith('second', 'example')
+      await store.connectorAccess.loadCandidates(['example'])
+      expect(candidates).toHaveBeenLastCalledWith('second', ['example'], expect.any(AbortSignal))
       await store.connectorAccess.select('example', 'binding')
       expect(add).toHaveBeenCalledWith('second', 'example', 'binding', 2)
       await store.selectFlow(undefined)
@@ -622,10 +622,15 @@ it.each(['no candidates', 'ambiguous candidates', 'candidate failure', 'binding 
       providerId: 'mail',
     }
     const candidates = vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
-      candidates:
-        scenario == 'no candidates' ? [] : scenario == 'ambiguous candidates' ? [candidate, { ...candidate, accessBindingId: 'mail-2' }] : [candidate],
-      mode: 'selectable',
-      providerId: 'mail',
+      results: [
+        {
+          candidates:
+            scenario == 'no candidates' ? [] : scenario == 'ambiguous candidates' ? [candidate, { ...candidate, accessBindingId: 'mail-2' }] : [candidate],
+          mode: 'selectable',
+          providerId: 'mail',
+          version: 1,
+        },
+      ],
       version: 1,
     })
     if (scenario == 'candidate failure') candidates.mockRejectedValue(new Error('Candidate lookup failed'))
@@ -719,30 +724,35 @@ it('prepares default Provider access without prompting', async () => {
     version: 1,
   })
   vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
-    candidates: [
+    results: [
       {
-        connectionId: 'fixture-account',
-        source: { kind: 'policy' as const, ruleId: null },
-        accessBindingId: 'mail-read-access',
-        connectionDisplayName: connection.displayName,
-        isDefault: true,
-        permissions: { actionIds: ['mail.read'], allActions: false, configured: false, proxy: false },
-        permissionGroupName: null,
+        candidates: [
+          {
+            connectionId: 'fixture-account',
+            source: { kind: 'policy' as const, ruleId: null },
+            accessBindingId: 'mail-read-access',
+            connectionDisplayName: connection.displayName,
+            isDefault: true,
+            permissions: { actionIds: ['mail.read'], allActions: false, configured: false, proxy: false },
+            permissionGroupName: null,
+            providerId: 'mail',
+          },
+          {
+            connectionId: 'fixture-account',
+            source: { kind: 'policy' as const, ruleId: 'Senders' },
+            accessBindingId: 'mail-send-access',
+            connectionDisplayName: 'Sending account',
+            isDefault: false,
+            permissions: { actionIds: ['mail.send'], allActions: false, configured: false, proxy: false },
+            permissionGroupName: 'Senders',
+            providerId: 'mail',
+          },
+        ],
+        mode: 'selectable',
         providerId: 'mail',
-      },
-      {
-        connectionId: 'fixture-account',
-        source: { kind: 'policy' as const, ruleId: 'Senders' },
-        accessBindingId: 'mail-send-access',
-        connectionDisplayName: 'Sending account',
-        isDefault: false,
-        permissions: { actionIds: ['mail.send'], allActions: false, configured: false, proxy: false },
-        permissionGroupName: 'Senders',
-        providerId: 'mail',
+        version: 1,
       },
     ],
-    mode: 'selectable',
-    providerId: 'mail',
     version: 1,
   })
   const addAccess = vi.spyOn(client, 'addProviderAccessBinding').mockResolvedValue({

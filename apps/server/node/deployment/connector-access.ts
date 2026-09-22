@@ -1,11 +1,11 @@
-import type { ConnectorAccess, ConnectorAccessCandidates } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAccess, ConnectorAccessCandidatesBatch } from '@oomol-lab/open-flow/control-api'
 import type { ConnectorTeamStore } from '../storage/connector-team-store.ts'
 import type { Database } from '../storage/database.ts'
 import type { ConnectorHost } from './connector.ts'
 
 import { decodeConnectorAccess } from '@oomol-lab/open-flow/control-api'
 import { createHash } from 'node:crypto'
-import { ConnectorClient } from './connector.ts'
+import { ConnectorClient, ConnectorTaskError } from './connector.ts'
 
 export type ConnectorAccessMutation =
   | { readonly kind: 'conflict' }
@@ -17,7 +17,7 @@ export interface ConnectorAccessHost {
   setService(actorId: string, flowId: string, providerId: string, selected: boolean, expectedAccessRevision: number): Promise<ConnectorAccessMutation>
   delete(flowId: string): boolean
   current(flowId: string): ConnectorAccess
-  listCandidates(actorId: string, flowId: string, providerId: string, signal?: AbortSignal): Promise<ConnectorAccessCandidates>
+  listCandidates(actorId: string, flowId: string, providerIds: readonly string[], signal?: AbortSignal): Promise<ConnectorAccessCandidatesBatch>
   read(actorId: string, flowId: string): ConnectorAccess
   add(actorId: string, flowId: string, providerId: string, accessBindingId: string, expectedAccessRevision: number): Promise<ConnectorAccessMutation>
   remove(actorId: string, flowId: string, providerId: string, accessBindingId: string, expectedAccessRevision: number): Promise<ConnectorAccessMutation>
@@ -46,8 +46,8 @@ export class ImplicitConnectorAccessHost implements ConnectorAccessHost {
     return this.current(flowId)
   }
 
-  async listCandidates(_actorId: string, _flowId: string, providerId: string): Promise<ConnectorAccessCandidates> {
-    return { candidates: [], mode: 'implicit', providerId, version: 1 }
+  async listCandidates(_actorId: string, _flowId: string, providerIds: readonly string[]): Promise<ConnectorAccessCandidatesBatch> {
+    return { results: providerIds.map((providerId) => ({ candidates: [], mode: 'implicit', providerId, version: 1 })), version: 1 }
   }
 
   async add(
@@ -112,23 +112,20 @@ export class ConfiguredConnectorAccessHost implements ConnectorAccessHost {
     return this.current(flowId)
   }
 
-  async listCandidates(_actorId: string, flowId: string, providerId: string, signal?: AbortSignal): Promise<ConnectorAccessCandidates> {
+  async listCandidates(_actorId: string, flowId: string, providerIds: readonly string[], signal?: AbortSignal): Promise<ConnectorAccessCandidatesBatch> {
     const connector = this.#connector()
-    if (connector == null) return { candidates: [], mode: 'implicit', providerId, version: 1 }
+    if (connector == null) return { results: providerIds.map((providerId) => ({ candidates: [], mode: 'implicit', providerId, version: 1 })), version: 1 }
     const teamId = await this.#team(flowId, connector, signal)
-    return {
-      candidates: await connector.listProviderAccessBindingCandidates(teamId, providerId, signal),
-      mode: 'selectable',
-      providerId,
-      version: 1,
-    }
+    return await connector.listProviderAccessBindingCandidates(teamId, providerIds, signal)
   }
 
   async add(_actorId: string, flowId: string, providerId: string, accessBindingId: string, expectedAccessRevision: number): Promise<ConnectorAccessMutation> {
     const connector = this.#connector()
     if (connector == null) return { kind: 'unsupported' }
     const teamId = await this.#team(flowId, connector)
-    const candidate = (await connector.listProviderAccessBindingCandidates(teamId, providerId)).find((item) => item.accessBindingId == accessBindingId)
+    const result = (await connector.listProviderAccessBindingCandidates(teamId, [providerId])).results[0]!
+    if ('error' in result) throw new ConnectorTaskError(result.error.code, result.error.message)
+    const candidate = result.candidates.find((item) => item.accessBindingId == accessBindingId)
     if (candidate == null) return { kind: 'invalid' }
     const current = this.current(flowId)
     if (current.accessRevision != expectedAccessRevision) return { kind: 'conflict' }

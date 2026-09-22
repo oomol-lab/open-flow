@@ -2,6 +2,7 @@ import type { InputPortDefinition } from '../../flow/common/change.ts'
 import type {
   ConnectorAccess,
   ConnectorAccessCandidates,
+  ConnectorAccessCandidatesBatch,
   ConnectorAction,
   ConnectorActionMetadata,
   ConnectorConnection,
@@ -152,6 +153,25 @@ export function connectorAccessCandidates(value: unknown, providerId: string): C
   if (candidates.some((candidate) => candidate.providerId != providerId)) return invalidResponse()
   if (new Set(candidates.map((candidate) => candidate.accessBindingId)).size != candidates.length) return invalidResponse()
   return { candidates, mode: accessMode(source.mode), providerId, version: 1 }
+}
+
+export function connectorAccessCandidatesBatch(value: unknown, providerIds: readonly string[]): ConnectorAccessCandidatesBatch {
+  const source = record(value)
+  exact(source, ['results', 'version'])
+  if (source.version != 1 || !Array.isArray(source.results)) return invalidResponse()
+  const remaining = new Set(providerIds)
+  const results = source.results.map((entry) => {
+    const item = record(entry)
+    const providerId = string(item.providerId)
+    if (!remaining.delete(providerId)) return invalidResponse()
+    if (!Object.hasOwn(item, 'error')) return connectorAccessCandidates(item, providerId)
+    exact(item, ['providerId', 'error'])
+    const error = record(item.error)
+    exact(error, ['code', 'message'])
+    return { providerId, error: { code: string(error.code), message: string(error.message) } }
+  })
+  if (remaining.size != 0) return invalidResponse()
+  return { results, version: 1 }
 }
 
 export function connection(value: unknown): ConnectorConnection {

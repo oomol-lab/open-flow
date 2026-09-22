@@ -1044,10 +1044,28 @@ export const connectorControlApiConformanceCases: readonly ControlApiConformance
       }
       equal(access.version, 1, 'Implicit Connector access version')
       equal(
-        await json(await request(harness, `/v1/flows/${flowId}/connector-access/mail/candidates`), 200, 'Read Connector access candidates'),
-        { candidates: [], mode: 'implicit', providerId: 'mail', version: 1 },
+        await json(
+          await request(harness, `/v1/flows/${flowId}/connector-access/candidates/query`, {
+            method: 'POST',
+            body: JSON.stringify({ providerIds: ['mail', 'github'], version: 1 }),
+          }),
+          200,
+          'Read Connector access candidates',
+        ),
+        { results: ['mail', 'github'].map((providerId) => ({ candidates: [], mode: 'implicit', providerId, version: 1 })), version: 1 },
         'Implicit Connector access candidates',
       )
+      for (const providerIds of [[], ['mail', 'mail'], [''], ['x'.repeat(257)], [1]]) {
+        await error(
+          await request(harness, `/v1/flows/${flowId}/connector-access/candidates/query`, {
+            method: 'POST',
+            body: JSON.stringify({ providerIds, version: 1 }),
+          }),
+          409,
+          'connector.access-invalid',
+          'Invalid candidate provider query',
+        )
+      }
       await error(
         await request(harness, `/v1/flows/${flowId}/connector-access/mail`, {
           body: JSON.stringify({ accessBindingId: 'editors', expectedAccessRevision: 0, version: 1 }),
@@ -1128,7 +1146,15 @@ export function selectableConnectorAccessControlApiConformanceCases(
         const initial = await json(await request(harness, `/v1/flows/${flowId}/connector-access`), 200, 'Read selectable Connector access')
         equal(initial.mode, 'selectable', 'Selectable Connector access mode')
         equal(initial.accessRevision, 0, 'Initial selectable Connector access revision')
-        const candidates = await json(await request(harness, `${path}/candidates`), 200, 'Read Provider access candidates')
+        const batch = await json(
+          await request(harness, `/v1/flows/${flowId}/connector-access/candidates/query`, {
+            method: 'POST',
+            body: JSON.stringify({ providerIds: [fixture.providerId], version: 1 }),
+          }),
+          200,
+          'Read Provider access candidates',
+        )
+        const candidates = record(list(batch.results, 'Provider candidate results')[0], 'Provider candidates')
         equal(candidates.mode, 'selectable', 'Provider access candidate mode')
         equal(candidates.providerId, fixture.providerId, 'Provider access candidate Provider')
         const candidate = list(candidates.candidates, 'Provider access candidates').find(

@@ -152,23 +152,26 @@ function selectableConnectorAccess(): ConnectorAccessHost {
       accesses.delete(flowId)
       return true
     },
-    async listCandidates(_actorId, _flowId, providerId) {
+    async listCandidates(_actorId, _flowId, providerIds) {
       return {
-        candidates:
-          providerId == 'mail'
-            ? [
-                {
-                  connectionId: 'fixture-account',
-                  source: { kind: 'policy' as const, ruleId: 'Editors' },
-                  accessBindingId: 'editors',
-                  connectionDisplayName: 'Work account',
-                  permissionGroupName: 'Editors',
-                  providerId,
-                },
-              ]
-            : [],
-        mode: 'selectable',
-        providerId,
+        results: providerIds.map((providerId) => ({
+          candidates:
+            providerId == 'mail'
+              ? [
+                  {
+                    connectionId: 'fixture-account',
+                    source: { kind: 'policy' as const, ruleId: 'Editors' },
+                    accessBindingId: 'editors',
+                    connectionDisplayName: 'Work account',
+                    permissionGroupName: 'Editors',
+                    providerId,
+                  },
+                ]
+              : [],
+          mode: 'selectable',
+          providerId,
+          version: 1,
+        })),
         version: 1,
       }
     },

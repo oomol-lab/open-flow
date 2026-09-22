@@ -241,7 +241,10 @@ describe('Server Connector client', () => {
     )
     const connector = new ConnectorClient('https://connector.oomol.dev', 'runtime-token')
 
-    const candidates = await connector.listProviderAccessBindingCandidates('team-1', 'example')
+    const batch = await connector.listProviderAccessBindingCandidates('team-1', ['example'])
+    const result = batch.results[0]!
+    if ('error' in result) throw new Error(result.error.message)
+    const candidates = result.candidates
     expect(candidates).toEqual([
       {
         connectionId: 'connection-work',
@@ -255,7 +258,7 @@ describe('Server Connector client', () => {
         providerId: 'example',
       },
     ])
-    await expect(connector.listProviderAccessBindingCandidates('team-1', 'example')).resolves.toEqual(candidates)
+    await expect(connector.listProviderAccessBindingCandidates('team-1', ['example'])).resolves.toMatchObject({ results: [{ candidates }] })
     expect(requests.filter((url) => url.includes('/v1/users/profile'))).toHaveLength(1)
     expect(requests.filter((url) => url.includes('/app-access'))).toHaveLength(1)
   })
@@ -1221,4 +1224,50 @@ it('aborts all active catalog requests when the caller cancels discovery', async
   await rejected
   expect(signals).toHaveLength(2)
   expect(signals.every((signal) => signal.aborted)).toBe(true)
+})
+
+it('shares candidate inputs across providers and isolates a malformed provider policy', async () => {
+  const calls: string[] = []
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = String(input)
+      calls.push(url)
+      if (url.endsWith('/v1/me/teams')) return Response.json({ teams: [{ id: 'team', role: 'member', deleted: false, status: 'normal' }] })
+      if (url.endsWith('/v1/users/profile')) return Response.json({ uid: 'user' })
+      if (url.endsWith('/app-access'))
+        return Response.json({
+          'role::connector-app:mail-account': { connector: [{ app: 'mail-account', provider: 'mail', method: 'POST' }] },
+          'role::connector-app:broken-account': { connector: [] },
+        })
+      if (url.endsWith('/v1/apps')) {
+        expect(new Headers(init?.headers).get('x-oo-team-id')).toBe('team')
+        return Response.json({
+          success: true,
+          data: ['mail', 'broken', 'unrequested'].map((service) => ({
+            id: `${service}-account`,
+            service,
+            displayName: service,
+            isDefault: true,
+            status: 'active',
+          })),
+        })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    }),
+  )
+  const client = new ConnectorClient('https://connector.oomol.dev', 'token')
+  const result = await client.listProviderAccessBindingCandidates('team', ['mail', 'broken'])
+  expect(result).toMatchObject({
+    version: 1,
+    results: [
+      { providerId: 'mail', candidates: [{ connectionId: 'mail-account', providerId: 'mail' }] },
+      { providerId: 'broken', error: { code: 'connector.unavailable' } },
+    ],
+  })
+  expect(result.results).toHaveLength(2)
+  expect(calls).toHaveLength(4)
+  for (const endpoint of ['/v1/me/teams', '/v1/users/profile', '/app-access', '/v1/apps']) {
+    expect(calls.filter((url) => url.endsWith(endpoint))).toHaveLength(1)
+  }
 })

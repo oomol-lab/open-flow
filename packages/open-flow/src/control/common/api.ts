@@ -38,7 +38,7 @@ import type { RunStatus } from '../../execution/common/runLifecycle.ts'
 import type { InputPortDefinition, JsonValue, PortDefinition, RevisionContent, TriggerKeySnapshot, WaitAction } from '../../flow/common/change.ts'
 
 import { flowCheck } from './checkDecoders.ts'
-import { connection, connectorAccess, connectorAccessCandidates, connectorAction } from './connectorDecoders.ts'
+import { connection, connectorAccess, connectorAccessCandidatesBatch, connectorAction } from './connectorDecoders.ts'
 import { allConnectorConnectionsQuery, connectorActionQuery, connectorConnectionsQuery, connectorProvidersQuery } from './connectorQueries.ts'
 import { exact, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 import { flow, flowPage, variable } from './flowDecoders.ts'
@@ -233,6 +233,14 @@ export interface ConnectorAccessCandidates {
   readonly candidates: readonly ProviderAccessBindingCandidate[]
   readonly mode: ConnectorAccessMode
   readonly providerId: string
+  readonly version: 1
+}
+
+export interface ConnectorAccessCandidatesBatch {
+  readonly results: readonly (
+    | ConnectorAccessCandidates
+    | { readonly providerId: string; readonly error: { readonly code: string; readonly message: string } }
+  )[]
   readonly version: 1
 }
 
@@ -858,10 +866,14 @@ export class ControlClient {
     return connectorAccess(await this.request(`/v1/flows/${segment(flowId)}/connector-access`, { signal }))
   }
 
-  async listProviderAccessBindingCandidates(flowId: string, providerId: string, signal?: AbortSignal): Promise<ConnectorAccessCandidates> {
-    return connectorAccessCandidates(
-      await this.request(`/v1/flows/${segment(flowId)}/connector-access/${segment(providerId)}/candidates`, { signal }),
-      providerId,
+  async listProviderAccessBindingCandidates(flowId: string, providerIds: readonly string[], signal?: AbortSignal): Promise<ConnectorAccessCandidatesBatch> {
+    return connectorAccessCandidatesBatch(
+      await this.request(`/v1/flows/${segment(flowId)}/connector-access/candidates/query`, {
+        method: 'POST',
+        body: JSON.stringify({ providerIds, version: 1 }),
+        signal,
+      }),
+      providerIds,
     )
   }
 
