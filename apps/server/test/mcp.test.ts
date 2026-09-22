@@ -524,7 +524,8 @@ it('executes fixed Live code revisions and keeps old Run retries stable after re
   const args = { source: 'live', publicationId: publication.publicationId, trigger: { nodeId: 'start', outputs: {} }, idempotencyKey: 'live-run' }
   const run = await call('flow_run', args)
   await startService(service)
-  await expect.poll(async () => (await call('run_get', { runId: run.runId })).status).toBe('completed')
+  await service.waitForIdle()
+  expect((await call('run_get', { runId: run.runId })).status).toBe('completed')
   expect(JSON.stringify(await call('run_result', { runId: run.runId }))).toContain('42')
   const changed = await call('flow_apply', {
     flowId,
@@ -563,7 +564,8 @@ it('executes fixed Live code revisions and keeps old Run retries stable after re
   const stale = await client.callTool({ name: 'flow_run', arguments: { ...args, idempotencyKey: 'stale-run' } })
   expect(stale.structuredContent).toMatchObject({ error: { code: 'live.conflict' } })
   const failed = await call('flow_run', { ...args, publicationId: published.publicationId, idempotencyKey: 'failed-run' })
-  await expect.poll(async () => (await call('run_get', { runId: failed.runId })).status).toBe('failed')
+  await service.waitForIdle()
+  expect((await call('run_get', { runId: failed.runId })).status).toBe('failed')
   expect(await call('run_result', { runId: failed.runId })).toMatchObject({ status: 'failed', error: expect.any(Object) })
 })
 
