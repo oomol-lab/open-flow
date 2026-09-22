@@ -101,8 +101,13 @@ function handleRequest(method: string, params: any): unknown {
       const offset = positionToOffset(uri, params.position)
       const result = environment.languageService.getCompletionsAtPosition(uri, offset, {})
       if (result == null) return null
+      const replacement = result.optionalReplacementSpan
+      const replacementStart = replacement == null ? undefined : offsetToPosition(uri, replacement.start)
+      const replacementEnd = replacement == null ? undefined : offsetToPosition(uri, replacement.start + replacement.length)
+      const editRange = replacementStart == null || replacementEnd == null ? undefined : { end: replacementEnd, start: replacementStart }
       return {
         isIncomplete: Boolean(result.isIncomplete),
+        itemDefaults: editRange == null ? undefined : { editRange },
         items: result.entries.map((entry: import('typescript-lsp').CompletionEntry) => ({
           data: { name: entry.name, offset, source: entry.source, uri },
           kind: completionKinds[entry.kind] ?? 1,

@@ -79,6 +79,18 @@ describe('Code Action editor types', () => {
       diagnostics('export default async (_, ctx) => (await ctx.actions.example.echo({ any: "ok" })).result.toUpperCase()', [], { 'example.echo': definition }),
     ).toEqual([])
   })
+
+  it('identifies the typed Action prefix as the completion replacement span', () => {
+    const source = `export default async (_, ctx) => { ctx.actions.call('example.') }`
+    const { service, text } = editorService(source)
+    const position = text.indexOf("'example.") + "'example.".length
+    const completions = service.getCompletionsAtPosition('/module.js', position, {})
+    const span = completions?.optionalReplacementSpan
+
+    expect(completions?.entries.map((entry: ts.CompletionEntry) => entry.name)).toContain('example.echo')
+    expect(span == null ? undefined : text.slice(span.start, span.start + span.length)).toBe('example.')
+  })
+
   it('types the dynamic call API for every Code Task', () => {
     expect(
       diagnostics(
