@@ -398,6 +398,19 @@ export function createRuntimeProgram(prepared: PreparedFlow, entryModuleId: stri
   }
 }
 
+export function referencedTaskIds(flow: Pick<FlowDocument, 'graph' | 'subflows' | 'tasks'>): ReadonlySet<string> {
+  const ids = new Set<string>()
+  for (const graph of [flow.graph, ...Object.values(flow.subflows).map((subflow) => subflow.graph)]) {
+    for (const node of Object.values(graph.nodes)) {
+      if (node.kind != 'task' || node.taskId == null) continue
+      ids.add(node.taskId)
+      const executor = flow.tasks[node.taskId]?.executor
+      if (executor?.kind == 'agent' && executor.notification != null) ids.add(executor.notification.taskId)
+    }
+  }
+  return ids
+}
+
 export function agentActions(flow: Pick<PreparedFlow, 'tasks'>): readonly ConnectorActionCapability[] {
   return Object.values(flow.tasks).flatMap((task) => {
     if (task.executor.kind != 'agent') return []

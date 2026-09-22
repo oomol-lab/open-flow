@@ -18,7 +18,7 @@ import type {
 
 import { nodeInputMappings } from '../../../flow/common/condition.ts'
 import { checkInputSources, inputSourceCandidates, nodeOutputDescription, nodeOutputPorts } from '../../../flow/common/graph.ts'
-import { agentActions, codeActions } from '../../../flow/common/semantics.ts'
+import { agentActions, codeActions, referencedTaskIds } from '../../../flow/common/semantics.ts'
 import { sourcePort } from '../../../flow/common/sourceField.ts'
 
 export interface InputSourceQuery {
@@ -71,8 +71,11 @@ export class RevisionView {
     this.#document = revision.content.document
     this.#modules = revision.content.modules
     const connectorActionIds = new Set<string>()
-    for (const task of Object.values(this.#document.tasks)) if (task.executor.kind == 'connector') connectorActionIds.add(task.executor.action)
-    for (const declaration of [...codeActions(this.#document), ...agentActions(this.#document)]) {
+    const tasks = Object.fromEntries(
+      [...referencedTaskIds(this.#document)].flatMap((id) => (this.#document.tasks[id] == null ? [] : [[id, this.#document.tasks[id]]])),
+    )
+    for (const task of Object.values(tasks)) if (task.executor.kind == 'connector') connectorActionIds.add(task.executor.action)
+    for (const declaration of [...codeActions(this.#document), ...agentActions({ tasks })]) {
       if ('action' in declaration) connectorActionIds.add(declaration.action)
       else {
         for (const action of declaration.actionHints ?? []) connectorActionIds.add(action)

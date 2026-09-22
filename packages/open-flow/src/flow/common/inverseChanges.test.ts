@@ -20,6 +20,71 @@ function roundTrip(before: RevisionContent, operations: readonly ChangeOperation
 }
 
 describe('inverse canvas changes', () => {
+  it('removes only tasks losing their last reference and restores them on undo', () => {
+    const task = { name: 'Mail', inputs: [], outputs: [], executor: { kind: 'connector' as const, action: 'netease_mail.list_folders' } }
+    const content: RevisionContent = {
+      ...empty,
+      document: {
+        ...empty.document,
+        tasks: { mail: task, orphan: task },
+        graph: { edges: [], nodes: { a: { kind: 'task', name: 'A', taskId: 'mail', inputs: {} }, b: { kind: 'task', name: 'B', taskId: 'mail', inputs: {} } } },
+      },
+    }
+    expect(applyFlowChanges(content, deleteNodes(content, target, ['a'])).document.tasks.mail).toEqual(task)
+    const operations = deleteNodes(content, target, ['a', 'b'])
+    expect(applyFlowChanges(content, operations).document.tasks).toEqual({ orphan: task })
+    roundTrip(content, operations)
+    const shared: RevisionContent = {
+      ...content,
+      document: {
+        ...content.document,
+        subflows: {
+          sub: { name: 'Sub', inputs: [], outputs: [], graph: { edges: [], nodes: { c: { kind: 'task', name: 'C', taskId: 'mail', inputs: {} } } } },
+        },
+      },
+    }
+    const remaining = applyFlowChanges(shared, deleteNodes(shared, target, ['a', 'b']))
+    expect(remaining.document.tasks.mail).toEqual(task)
+    const removeLast = deleteNodes(remaining, { kind: 'subflow', id: 'sub' }, ['c'])
+    expect(applyFlowChanges(remaining, removeLast).document.tasks.mail).toBeUndefined()
+    roundTrip(remaining, removeLast)
+  })
+
+  it('preserves Agent notification tasks until the Agent is removed', () => {
+    const content: RevisionContent = {
+      ...empty,
+      document: {
+        ...empty.document,
+        tasks: {
+          mail: { name: 'Mail', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send' } },
+          agent: {
+            name: 'Agent',
+            inputs: [],
+            outputs: [],
+            executor: {
+              kind: 'agent',
+              model: 'test',
+              prompt: { kind: 'value', value: '' },
+              system: '',
+              maxRounds: 10,
+              tools: [],
+              notification: { taskId: 'mail', messageHandle: 'message', inputs: {} },
+            },
+          },
+        },
+        graph: {
+          edges: [],
+          nodes: { mail: { kind: 'task', name: 'Mail', taskId: 'mail', inputs: {} }, agent: { kind: 'task', name: 'Agent', taskId: 'agent', inputs: {} } },
+        },
+      },
+    }
+    const remaining = applyFlowChanges(content, deleteNodes(content, target, ['mail']))
+    expect(remaining.document.tasks.mail).toBeDefined()
+    const operations = deleteNodes(remaining, target, ['agent'])
+    expect(applyFlowChanges(remaining, operations).document.tasks).toEqual({})
+    roundTrip(remaining, operations)
+  })
+
   it('restores batch deletion, code, bindings, input references and edge order', () => {
     const content = applyFlowChanges(empty, [
       ...createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Code'),

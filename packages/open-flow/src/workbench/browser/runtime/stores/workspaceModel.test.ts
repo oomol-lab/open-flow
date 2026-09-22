@@ -47,6 +47,51 @@ function draft(): Draft {
 }
 
 describe('Connector providers', () => {
+  it('ignores orphan connector and Agent definitions when reporting service usage', () => {
+    const base = draft()
+    const source: Draft = {
+      ...base,
+      content: {
+        ...base.content,
+        document: {
+          ...base.content.document,
+          tasks: {
+            ...base.content.document.tasks,
+            orphan: { name: 'Mail', inputs: [], outputs: [], executor: { kind: 'connector', action: 'netease_mail.list_folders' } },
+            agent: {
+              name: 'Agent',
+              inputs: [],
+              outputs: [],
+              executor: {
+                kind: 'agent',
+                model: 'test',
+                prompt: { kind: 'value', value: '' },
+                system: '',
+                maxRounds: 10,
+                tools: [{ id: 'user', name: 'User', description: '', approval: false, inputs: [], action: 'github.get_current_user' }],
+              },
+            },
+          },
+        },
+      },
+    }
+    expect([...revisionView(source).connectorProviderIds]).toEqual([])
+    const referenced: Draft = {
+      ...source,
+      content: {
+        ...source.content,
+        document: {
+          ...source.content.document,
+          graph: {
+            ...source.content.document.graph,
+            nodes: { ...source.content.document.graph.nodes, agent: { kind: 'task', name: 'Agent', taskId: 'agent', inputs: {} } },
+          },
+        },
+      },
+    }
+    expect([...revisionView(referenced).connectorProviderIds]).toEqual(['github'])
+  })
+
   it('derives Providers used by Actions and Triggers in the revision view', () => {
     const base = draft()
     const source: Draft = {
