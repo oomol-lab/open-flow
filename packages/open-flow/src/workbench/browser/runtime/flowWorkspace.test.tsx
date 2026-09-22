@@ -57,7 +57,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
     },
     connectors: {
       $: {
-        connections: value([]),
+        pickerConnections: value([]),
         actionLoading: value(undefined),
         connectionLoading: value(undefined),
         selectedAction: value(undefined),

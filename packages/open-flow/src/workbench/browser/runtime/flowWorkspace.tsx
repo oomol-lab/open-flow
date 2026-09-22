@@ -214,7 +214,7 @@ export function FlowEditor({
 }): ReactElement {
   const t = useTranslate()
   const addNodeOptions = useVal(store.workspace.$.addNodeOptions)
-  const connections = useVal(store.connectors.$.connections)
+  const connections = useVal(store.connectors.$.pickerConnections)
   const triggerCatalogState = useVal(store.triggers.catalog.state)
   const [startId, setStartId] = useState<string>()
   const runInputRequest = useVal(store.runRequests.$.inputRequest)

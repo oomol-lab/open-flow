@@ -69,6 +69,7 @@ function Sample({
   noAuth = false,
   connectionStatus,
   configure = false,
+  accountPending,
   language,
 }: {
   readonly access: ConnectorAccess
@@ -81,6 +82,7 @@ function Sample({
   readonly noAuth?: boolean
   readonly noCandidates?: boolean
   readonly configure?: boolean
+  readonly accountPending?: 'metadata' | 'connections'
   readonly language: UiLanguage
 }) {
   const i18n = useMemo(() => createI18n(language), [language])
@@ -107,23 +109,27 @@ function Sample({
       <div className="grid h-[480px] overflow-hidden rounded-lg border border-border">
         <EditorContextPanel focusOnOpen={false} icon="flow" onClose={() => {}} theme={dark ? 'dark' : 'light'} title="Flow outline">
           {store != null && <ConnectorAccessSettings onManage={(flowId) => log('connector-access.manage', flowId)} store={store} />}
-          {store != null && noCandidates && (
+          {store != null && (noCandidates || accountPending != null) && (
             <div className="p-3">
               <ConnectorAccount
-                action={{
-                  actionId: 'mail.send',
-                  authenticated: true,
-                  description: 'Send mail',
-                  inputs: {},
-                  outputs: {},
-                  name: 'Send mail',
-                  serviceId: 'mail',
-                  serviceName: 'Mail',
-                }}
+                action={
+                  accountPending == 'metadata'
+                    ? undefined
+                    : {
+                        actionId: 'mail.send',
+                        authenticated: true,
+                        description: 'Send mail',
+                        inputs: {},
+                        outputs: {},
+                        name: 'Send mail',
+                        serviceId: 'mail',
+                        serviceName: 'Mail',
+                      }
+                }
                 actionError={undefined}
                 actionId="mail.send"
-                accessError={i18n.t('notice.error.connectorAccessRequired')}
-                activeConnections={[]}
+                accessError={accountPending == null ? i18n.t('notice.error.connectorAccessRequired') : undefined}
+                activeConnections={accountPending == null ? [] : undefined}
                 authorizationPending={false}
                 connection={undefined}
                 connectionError={undefined}
@@ -153,7 +159,13 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
     readonly noAuth?: boolean
     readonly noCandidates?: boolean
     readonly configure?: boolean
+    readonly accountPending?: 'metadata' | 'connections'
   }[] = [
+    ...(['metadata', 'connections'] as const).map((accountPending) => ({
+      access: { accessRevision: 0, bindings: [], mode: 'implicit' as const, providerAccessDigest: 'implicit:lab', version: 1 as const },
+      accountPending,
+      label: `Loading account ${accountPending}`,
+    })),
     {
       access: { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 },
       emptyFlow: true,

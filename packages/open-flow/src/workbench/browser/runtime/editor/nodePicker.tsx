@@ -274,6 +274,7 @@ export function NodePickerContent({
         <span className="block truncate">{item.label}</span>
         {description && <span className="mt-1 block text-xs text-muted-foreground">{t('nodePicker.browseNodes')}</span>}
       </span>
+      {item.priority == 0 && <span className="shrink-0 text-xs text-muted-foreground">{t('nodePicker.configured')}</span>}
       <span aria-hidden="true">›</span>
     </Button>
   )

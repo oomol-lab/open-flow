@@ -31,6 +31,7 @@ export class ConnectorAccessStore {
     private readonly client: WorkbenchClient,
     private readonly setNotice: (notice: Notice) => void,
     private readonly i18n: I18n = createI18n(),
+    private readonly onSaved: (flowId: string) => void = () => {},
   ) {}
 
   async load(flowId: string | undefined): Promise<void> {
@@ -105,6 +106,7 @@ export class ConnectorAccessStore {
         : await this.client.removeProviderAccessBinding(flowId, providerId, accessBindingId, access.accessRevision)
       if (!this.#disposed && flowId == this.#flowId) {
         this.#state.set({ ...this.#state.value, access: next, savingProviderId: undefined })
+        this.onSaved(flowId)
         return true
       }
     } catch (error) {
