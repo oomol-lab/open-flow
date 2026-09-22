@@ -322,6 +322,7 @@ export function NodeInspector({
             key={`schedule:${selection.id}`}
             schedules={selection.trigger.kind === 'cron' ? selection.trigger.cronTimes : selection.trigger.pollTimes}
             disabled={disabled}
+            collapsible={selection.trigger.kind === 'poll'}
             onChange={(schedule) => {
               void store.saveTriggerSchedule(selection.id, schedule)
             }}

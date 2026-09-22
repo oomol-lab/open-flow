@@ -13,6 +13,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '../
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../ui/browser/select.tsx'
 import { Icon } from '../icons.tsx'
+import { InspectorSection } from './inspectorSection.tsx'
 import { deferScheduleCheck } from './triggerScheduleValidation.ts'
 
 interface ScheduleInspection {
@@ -189,120 +190,129 @@ function TimeZoneSelect({
 export function TriggerScheduleEditor({
   schedules,
   disabled,
+  collapsible = false,
   onChange,
 }: {
   readonly schedules: readonly TriggerSchedule[]
   readonly disabled: boolean
+  readonly collapsible?: boolean
   readonly onChange: (schedules: readonly TriggerSchedule[]) => void
 }): ReactElement {
   const t = useTranslate()
   const language = useLang()
   const id = useId()
-  return (
-    <details className="inspector-disclosure" data-inspector-section="trigger">
-      <summary>
-        <Icon name="chevron-down" size={14} />
-        <span className="inspector-disclosure-summary">
-          <strong className="inspector-section-title-text">{t('triggerSchedule.title')}</strong>
-        </span>
-      </summary>
-      <div className="inspector-disclosure-content node-settings">
-        <FieldGroup>
-          {schedules.map((schedule, index) => {
-            const save = (next: TriggerSchedule) => onChange(schedules.with(index, next))
-            return (
-              <FieldGroup key={index}>
+  const fields = (
+    <FieldGroup>
+      {schedules.map((schedule, index) => {
+        const save = (next: TriggerSchedule) => onChange(schedules.with(index, next))
+        return (
+          <FieldGroup key={index}>
+            <Field>
+              <FieldLabel htmlFor={`${id}-${index}-type`}>{t('triggerSchedule.scheduleType')}</FieldLabel>
+              <FieldSelect
+                id={`${id}-${index}-type`}
+                aria-label={t('triggerSchedule.scheduleType')}
+                disabled={disabled}
+                value={schedule.type}
+                onChange={(value) => {
+                  if (value !== schedule.type)
+                    save(value === 'cron' ? { type: 'cron', expression: '0 * * * *', timezone: 'UTC' } : { type: 'every', unit: 'minute', value: 5 })
+                }}
+              >
+                <option value="every">{t('triggerSchedule.scheduleEvery')}</option>
+                <option value="cron">{t('triggerSchedule.scheduleCron')}</option>
+              </FieldSelect>
+            </Field>
+            {schedule.type === 'every' ? (
+              <>
+                <ScheduleText
+                  disabled={disabled}
+                  numeric
+                  label={t('triggerSchedule.scheduleInterval')}
+                  value={String(schedule.value)}
+                  commit={(draft, signal) =>
+                    deferScheduleCheck(() => {
+                      const value = Number(draft)
+                      if (!Number.isSafeInteger(value) || value < 1) return String(schedule.value)
+                      if (value !== schedule.value) save({ ...schedule, value })
+                      return String(value)
+                    }, signal)
+                  }
+                />
                 <Field>
-                  <FieldLabel htmlFor={`${id}-${index}-type`}>{t('triggerSchedule.scheduleType')}</FieldLabel>
+                  <FieldLabel htmlFor={`${id}-${index}-unit`}>{t('triggerSchedule.scheduleUnit')}</FieldLabel>
                   <FieldSelect
-                    id={`${id}-${index}-type`}
-                    aria-label={t('triggerSchedule.scheduleType')}
+                    id={`${id}-${index}-unit`}
+                    aria-label={t('triggerSchedule.scheduleUnit')}
                     disabled={disabled}
-                    value={schedule.type}
-                    onChange={(value) => {
-                      if (value !== schedule.type)
-                        save(value === 'cron' ? { type: 'cron', expression: '0 * * * *', timezone: 'UTC' } : { type: 'every', unit: 'minute', value: 5 })
-                    }}
+                    value={schedule.unit}
+                    onChange={(value) => save({ ...schedule, unit: value as typeof schedule.unit })}
                   >
-                    <option value="every">{t('triggerSchedule.scheduleEvery')}</option>
-                    <option value="cron">{t('triggerSchedule.scheduleCron')}</option>
+                    {(['minute', 'hour', 'day', 'week', 'month'] as const).map((unit) => (
+                      <option key={unit} value={unit}>
+                        {t(
+                          {
+                            minute: 'triggerSchedule.scheduleMinutes',
+                            hour: 'triggerSchedule.scheduleHours',
+                            day: 'triggerSchedule.scheduleDays',
+                            week: 'triggerSchedule.scheduleWeeks',
+                            month: 'triggerSchedule.scheduleMonths',
+                          }[unit],
+                        )}
+                      </option>
+                    ))}
                   </FieldSelect>
                 </Field>
-                {schedule.type === 'every' ? (
-                  <>
-                    <ScheduleText
-                      disabled={disabled}
-                      numeric
-                      label={t('triggerSchedule.scheduleInterval')}
-                      value={String(schedule.value)}
-                      commit={(draft, signal) =>
-                        deferScheduleCheck(() => {
-                          const value = Number(draft)
-                          if (!Number.isSafeInteger(value) || value < 1) return String(schedule.value)
-                          if (value !== schedule.value) save({ ...schedule, value })
-                          return String(value)
-                        }, signal)
-                      }
-                    />
-                    <Field>
-                      <FieldLabel htmlFor={`${id}-${index}-unit`}>{t('triggerSchedule.scheduleUnit')}</FieldLabel>
-                      <FieldSelect
-                        id={`${id}-${index}-unit`}
-                        aria-label={t('triggerSchedule.scheduleUnit')}
-                        disabled={disabled}
-                        value={schedule.unit}
-                        onChange={(value) => save({ ...schedule, unit: value as typeof schedule.unit })}
-                      >
-                        {(['minute', 'hour', 'day', 'week', 'month'] as const).map((unit) => (
-                          <option key={unit} value={unit}>
-                            {t(
-                              {
-                                minute: 'triggerSchedule.scheduleMinutes',
-                                hour: 'triggerSchedule.scheduleHours',
-                                day: 'triggerSchedule.scheduleDays',
-                                week: 'triggerSchedule.scheduleWeeks',
-                                month: 'triggerSchedule.scheduleMonths',
-                              }[unit],
-                            )}
-                          </option>
-                        ))}
-                      </FieldSelect>
-                    </Field>
-                  </>
-                ) : (
-                  <>
-                    <ScheduleText
-                      disabled={disabled}
-                      label={t('triggerSchedule.scheduleExpression')}
-                      value={schedule.expression}
-                      inspect={(draft, signal) => inspectCronDraft(draft, language, t('triggerSchedule.scheduleExpressionInvalid'), signal)}
-                      commit={async (draft, signal) => {
-                        const result = await inspectCronDraft(draft, language, t('triggerSchedule.scheduleExpressionInvalid'), signal)
-                        if (result.issue != null) return
-                        if (result.expression !== schedule.expression) save({ ...schedule, expression: result.expression })
-                        return result.expression
-                      }}
-                    />
-                    <Field>
-                      <FieldLabel htmlFor={`${id}-${index}-timezone`}>{t('triggerSchedule.scheduleTimezone')}</FieldLabel>
-                      <TimeZoneSelect
-                        id={`${id}-${index}-timezone`}
-                        label={t('triggerSchedule.scheduleTimezone')}
-                        disabled={disabled}
-                        value={schedule.timezone}
-                        onChange={(timezone) => {
-                          if (timezone !== schedule.timezone) save({ ...schedule, timezone })
-                        }}
-                      />
-                    </Field>
-                  </>
-                )}
-              </FieldGroup>
-            )
-          })}
-          {schedules.length === 0 && <p>{t('triggerSchedule.scheduleMissing')}</p>}
-        </FieldGroup>
-      </div>
-    </details>
+              </>
+            ) : (
+              <>
+                <ScheduleText
+                  disabled={disabled}
+                  label={t('triggerSchedule.scheduleExpression')}
+                  value={schedule.expression}
+                  inspect={(draft, signal) => inspectCronDraft(draft, language, t('triggerSchedule.scheduleExpressionInvalid'), signal)}
+                  commit={async (draft, signal) => {
+                    const result = await inspectCronDraft(draft, language, t('triggerSchedule.scheduleExpressionInvalid'), signal)
+                    if (result.issue != null) return
+                    if (result.expression !== schedule.expression) save({ ...schedule, expression: result.expression })
+                    return result.expression
+                  }}
+                />
+                <Field>
+                  <FieldLabel htmlFor={`${id}-${index}-timezone`}>{t('triggerSchedule.scheduleTimezone')}</FieldLabel>
+                  <TimeZoneSelect
+                    id={`${id}-${index}-timezone`}
+                    label={t('triggerSchedule.scheduleTimezone')}
+                    disabled={disabled}
+                    value={schedule.timezone}
+                    onChange={(timezone) => {
+                      if (timezone !== schedule.timezone) save({ ...schedule, timezone })
+                    }}
+                  />
+                </Field>
+              </>
+            )}
+          </FieldGroup>
+        )
+      })}
+      {schedules.length === 0 && <p>{t('triggerSchedule.scheduleMissing')}</p>}
+    </FieldGroup>
+  )
+  if (collapsible)
+    return (
+      <details className="inspector-disclosure" data-inspector-section="trigger">
+        <summary>
+          <Icon name="chevron-down" size={14} />
+          <span className="inspector-disclosure-summary">
+            <strong className="inspector-section-title-text">{t('triggerSchedule.title')}</strong>
+          </span>
+        </summary>
+        <div className="inspector-disclosure-content node-settings">{fields}</div>
+      </details>
+    )
+  return (
+    <InspectorSection title={t('triggerSchedule.title')} className="node-settings" data-inspector-section="trigger">
+      {fields}
+    </InspectorSection>
   )
 }
