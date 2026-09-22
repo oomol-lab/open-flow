@@ -263,7 +263,7 @@ it.each([true, false])('preserves a newer refresh while setting service selectio
   try {
     await store.load('flow-1')
     const saving = store.setService('mail', selected)
-    expect(save).toHaveBeenCalledWith('flow-1', 'mail', selected, 10)
+    await vi.waitFor(() => expect(save).toHaveBeenCalledWith('flow-1', 'mail', selected, 10))
     const newer = { ...initial, accessRevision: 12, providerIds: selected ? ['mail', 'github'] : ['github'], providerAccessDigest: 'access-12' }
     read.mockResolvedValue(newer)
     await store.load('flow-1')
@@ -428,6 +428,46 @@ it('cancels candidate queries when switching Flow and ignores an old response af
     await Promise.all([reloading, joined])
     expect(store.$.value.candidates.mail?.candidates).toEqual([])
     expect(store.$.value.loadingCandidates).toEqual([])
+  } finally {
+    store.dispose()
+  }
+})
+
+it.each([true, false])('selects only an eligible default account when adding a service (default: %s)', async (isDefault) => {
+  const client = new WorkbenchClient(vi.fn())
+  const candidate = {
+    accessBindingId: 'work',
+    connectionId: 'work',
+    connectionDisplayName: 'Work',
+    providerId: 'mail',
+    source: { kind: 'admin-delegation' as const },
+    isDefault,
+  }
+  vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(initial)
+  vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
+    results: [{ providerId: 'mail', mode: 'selectable', candidates: [candidate], version: 1 }],
+    version: 1,
+  })
+  const add = vi.spyOn(client, 'addProviderAccessBinding').mockResolvedValue({
+    ...initial,
+    accessRevision: 1,
+    providerIds: ['mail'],
+    bindings: [{ ...candidate, status: 'active' }],
+  })
+  const service = vi.spyOn(client, 'setConnectorService').mockResolvedValue({ ...initial, accessRevision: 1, providerIds: ['mail'] })
+  const store = new ConnectorAccessStore(client, vi.fn())
+  try {
+    await store.load('flow-1')
+    expect(await store.setService('mail', true)).toBe(true)
+    if (isDefault) {
+      expect(add).toHaveBeenCalledWith('flow-1', 'mail', 'work', 0)
+      expect(service).not.toHaveBeenCalled()
+      expect(store.$.value.access?.bindings[0]?.connectionId).toBe('work')
+    } else {
+      expect(add).not.toHaveBeenCalled()
+      expect(service).toHaveBeenCalledWith('flow-1', 'mail', true, 0)
+      expect(store.$.value.access?.bindings).toEqual([])
+    }
   } finally {
     store.dispose()
   }

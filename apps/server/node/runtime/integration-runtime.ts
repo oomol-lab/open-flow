@@ -792,6 +792,7 @@ export class IntegrationRuntime {
       flowId,
       providerAccess,
       providerId,
+      usage: 'node',
       purpose: 'trigger',
       source: access.publicationId == null && access.providerAccess == null ? 'draft' : 'publication',
       ...(teamId == null ? {} : { teamId }),

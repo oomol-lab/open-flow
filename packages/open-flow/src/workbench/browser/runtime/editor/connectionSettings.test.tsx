@@ -59,7 +59,7 @@ it.each([undefined, { message: 'Earlier request failed.' }])('directs missing ac
   const markup = renderAccount({ actionError })
   expect(markup).toContain('运行前，请为此 Flow 选择可用账号和权限。')
   expect(markup).toContain('选择可用账号')
-  expect(markup).not.toContain('管理账号')
+  expect(markup).toContain('管理账号')
   expect(markup).not.toContain('重试')
   expect(markup).not.toContain('继承')
   expect(markup).not.toContain('Provider')

@@ -1,0 +1,219 @@
+import type { ConnectorAccess } from '@oomol-lab/open-flow/control-api'
+import type { FlowDocument } from '@oomol-lab/open-flow/flow-change'
+
+import { providerAccessBindingId } from '@oomol-lab/open-flow/control-api'
+import { afterEach, expect, it, vi } from 'vitest'
+import { captureNodeAccess, ImplicitConnectorAccessHost } from '../node/deployment/connector-access.ts'
+import { ConnectorClient } from '../node/deployment/connector.ts'
+
+const document: FlowDocument = {
+  bindings: {},
+  subflows: {},
+  graph: { edges: [], nodes: { send: { kind: 'task', taskId: 'send', name: 'Send', inputs: {} } } },
+  tasks: { send: { name: 'Send', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send', connectionId: 'account' } } },
+}
+const access: ConnectorAccess = { version: 1, mode: 'selectable', accessRevision: 0, bindings: [], providerAccessDigest: 'empty' }
+const candidate = {
+  providerId: 'mail',
+  connectionId: 'account',
+  accessBindingId: 'binding',
+  connectionDisplayName: 'Work',
+  source: { kind: 'admin-delegation' as const },
+  permissions: { allActions: true, actionIds: [], proxy: true, configured: false },
+}
+
+afterEach(() => vi.unstubAllGlobals())
+
+const success = (data: unknown) => Response.json({ success: true, data })
+
+it('captures only selected node connections without adding Code usage and rejects an unavailable selection', async () => {
+  const host = new ImplicitConnectorAccessHost()
+  const lookup = vi.spyOn(host, 'listCandidates').mockResolvedValue({
+    version: 1,
+    results: [
+      { version: 1, providerId: 'mail', mode: 'selectable', candidates: [candidate, { ...candidate, connectionId: 'other', accessBindingId: 'other' }] },
+    ],
+  })
+  const snapshot = await captureNodeAccess(host, 'flow', document, access)
+  expect(snapshot.bindings).toEqual([])
+  expect(snapshot.nodeBindings).toEqual([
+    {
+      providerId: 'mail',
+      connectionId: 'account',
+      accessBindingId: 'binding',
+      connectionDisplayName: 'Work',
+      source: { kind: 'admin-delegation' },
+      status: 'active',
+    },
+  ])
+  expect(access).not.toHaveProperty('nodeBindings')
+  lookup.mockResolvedValue({
+    version: 1,
+    results: [
+      {
+        version: 1,
+        providerId: 'mail',
+        mode: 'selectable',
+        candidates: [{ ...candidate, permissions: { ...candidate.permissions, allActions: false, actionIds: ['mail.read'] } }],
+      },
+    ],
+  })
+  await expect(captureNodeAccess(host, 'flow', document, access)).rejects.toMatchObject({ code: 'connector.access-invalid' })
+})
+
+it('executes nodes with fixed bindings while denying Code the same account, without resolving a new membership', async () => {
+  const identity = { providerId: 'mail', connectionId: 'account', source: { kind: 'admin-delegation' as const } }
+  const binding = { ...identity, accessBindingId: await providerAccessBindingId('team', identity), connectionDisplayName: 'Work', status: 'active' as const }
+  const snapshot = { ...access, nodeBindings: [binding] }
+  const request = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+    const url = new URL(String(input))
+    if (url.pathname == '/v1/providers') return success([{ service: 'mail', displayName: 'Mail', authTypes: ['oauth2'] }])
+    if (url.pathname == '/v1/apps/services/mail' || url.pathname == '/v1/apps')
+      return success([{ id: 'account', displayName: 'Work', alias: 'work', service: 'mail', status: 'active', isDefault: true }])
+    if (url.pathname == '/v1/actions/mail.send' && init?.method == 'POST') return success({ sent: true })
+    throw new Error(`Unexpected request: ${url.pathname}`)
+  })
+  vi.stubGlobal('fetch', request)
+  const connector = new ConnectorClient('https://connector.oomol.dev', 'token')
+  const context = { flowId: 'flow', teamId: 'team', providerAccess: snapshot, purpose: 'execute' as const, source: 'run' as const }
+  await expect(connector.execute('mail.send', 'account', {}, 'call', new AbortController().signal, { ...context, usage: 'node' })).resolves.toEqual({
+    sent: true,
+  })
+  await expect(connector.execute('mail.send', 'account', {}, 'code-call', new AbortController().signal, { ...context, usage: 'code' })).rejects.toMatchObject({
+    code: 'connector.access-required',
+  })
+  await expect(
+    connector.execute('mail.send', undefined, {}, 'missing-selection', new AbortController().signal, { ...context, usage: 'node' }),
+  ).rejects.toMatchObject({ code: 'connector.connection-required' })
+  expect(request.mock.calls.filter(([, init]) => init?.method == 'POST')).toHaveLength(1)
+  await expect(connector.execute('mail.send', 'other', {}, 'other-call', new AbortController().signal, { ...context, usage: 'node' })).rejects.toMatchObject({
+    code: 'connector.access-invalid',
+  })
+  await expect(
+    connector.execute('mail.send', 'account', {}, 'legacy-call', new AbortController().signal, {
+      ...context,
+      providerAccess: { ...access, bindings: [binding] },
+      usage: 'node',
+    }),
+  ).resolves.toEqual({ sent: true })
+})
+
+it('captures Agent tools, notifications and Trigger proxy usage without Code permissions', async () => {
+  const host = new ImplicitConnectorAccessHost()
+  const lookup = vi
+    .spyOn(host, 'listCandidates')
+    .mockResolvedValue({ version: 1, results: [{ version: 1, mode: 'selectable', providerId: 'mail', candidates: [candidate] }] })
+  const source: FlowDocument = {
+    ...document,
+    bindings: { mail: { kind: 'connection', target: 'account' } },
+    graph: {
+      edges: [],
+      nodes: {
+        agent: { kind: 'task', taskId: 'agent', inputs: {} },
+        poll: {
+          name: 'Received',
+          kind: 'poll',
+          bindingId: 'mail',
+          config: {},
+          pollTimes: [],
+          definition: {
+            type: 'poll',
+            provider: 'mail',
+            key: 'mail.received',
+            name: 'received',
+            displayName: 'Received',
+            description: '',
+            definitionVersion: 2,
+            configInputs: [],
+            outputs: [],
+          },
+        },
+      },
+    },
+    tasks: {
+      ...document.tasks,
+      agent: {
+        name: 'Agent',
+        inputs: [],
+        outputs: [],
+        executor: {
+          kind: 'agent',
+          model: 'model',
+          prompt: { kind: 'value', value: '' },
+          system: '',
+          maxRounds: 1,
+          tools: [{ id: 'send', action: 'mail.send', name: 'Send', connectionId: 'account', inputs: [], approval: false, description: '' }],
+          notification: { taskId: 'send', messageHandle: 'message', inputs: {} },
+        },
+      },
+    },
+  }
+  const captured = await captureNodeAccess(host, 'flow', source, access)
+  expect(captured.bindings).toEqual([])
+  expect(captured.nodeBindings).toHaveLength(1)
+  lookup.mockResolvedValue({
+    version: 1,
+    results: [
+      {
+        version: 1,
+        mode: 'selectable',
+        providerId: 'mail',
+        candidates: [{ ...candidate, permissions: { allActions: false, actionIds: ['mail.send'], proxy: false, configured: false } }],
+      },
+    ],
+  })
+  await expect(captureNodeAccess(host, 'flow', source, access)).rejects.toMatchObject({ code: 'connector.access-invalid' })
+})
+
+it('allows actions without accounts with an empty separated snapshot', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input))
+      if (url.pathname == '/v1/providers') return success([{ service: 'utility', displayName: 'Utility', authTypes: ['no_auth'] }])
+      if (url.pathname == '/v1/actions/utility.echo') return success({ value: 'ok' })
+      throw new Error(`Unexpected request: ${url.pathname}`)
+    }),
+  )
+  const connector = new ConnectorClient('https://connector.oomol.dev', 'token')
+  for (const usage of ['node', 'code'] as const) {
+    await expect(
+      connector.execute('utility.echo', undefined, {}, usage, new AbortController().signal, {
+        flowId: 'flow',
+        teamId: 'team',
+        providerAccess: { ...access, nodeBindings: [] },
+        source: 'run',
+        purpose: 'execute',
+        usage,
+      }),
+    ).resolves.toEqual({ value: 'ok' })
+  }
+})
+
+it('lists a new Flow’s accounts using the complete catalog even when no-auth placeholders are absent from service catalogs', async () => {
+  const request = vi.fn(async (input: string | URL | Request) => {
+    const url = new URL(String(input))
+    if (url.pathname == '/v1/me/teams') return Response.json({ teams: [{ id: 'team', role: 'creator', status: 'normal', deleted: false }] })
+    if (url.pathname == '/v1/apps')
+      return success([
+        { id: 'gmail-account', service: 'gmail', displayName: 'Gmail', status: 'active', isDefault: true },
+        { id: 'utility-placeholder', service: 'utility', displayName: 'Utility', status: 'active', isDefault: true },
+      ])
+    if (url.pathname == '/v1/apps/services/gmail')
+      return success([{ id: 'gmail-account', service: 'gmail', displayName: 'Gmail', status: 'active', isDefault: true }])
+    if (url.pathname == '/v1/apps/services/utility') return success([])
+    throw new Error(`Unexpected request: ${url.pathname}`)
+  })
+  vi.stubGlobal('fetch', request)
+  const connector = new ConnectorClient('https://connector.oomol.dev', 'token')
+  const connections = await connector.listAllConnections(undefined, {
+    flowId: 'new-flow',
+    teamId: 'team',
+    providerAccess: access,
+    usage: 'node',
+    purpose: 'catalog',
+    source: 'draft',
+  })
+  expect(connections.map((connection) => connection.connectionId)).toEqual(['gmail-account', 'utility-placeholder'])
+  expect(request.mock.calls.some(([input]) => String(input).includes('/v1/apps/services/'))).toBe(false)
+})

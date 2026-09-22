@@ -33,6 +33,7 @@ const samples = {
   resolveWait: { action: 'continue', version: 1 },
   putVariable: { value: '' },
   queryConnectorAccessCandidates: { providerIds: ['mail', 'github'], version: 1 },
+  removeConnectionUsage: { connectionId: 'account', expectedRevisionId: 'r1', expectedAccessRevision: 1, version: 1 },
   setConnectorService: { expectedAccessRevision: 0, version: 1 },
   addProviderAccessBinding: { accessBindingId: 'editors', expectedAccessRevision: 1, version: 1 },
   removeProviderAccessBinding: { accessBindingId: 'editors', expectedAccessRevision: 1, version: 1 },

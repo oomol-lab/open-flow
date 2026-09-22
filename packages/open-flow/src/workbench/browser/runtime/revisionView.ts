@@ -17,6 +17,7 @@ import type {
 } from './api.ts'
 
 import { nodeInputMappings } from '../../../flow/common/condition.ts'
+import { connectionUsage } from '../../../flow/common/connectionUsage.ts'
 import { checkInputSources, inputSourceCandidates, nodeOutputDescription, nodeOutputPorts } from '../../../flow/common/graph.ts'
 import { agentActions, codeActions, referencedTaskIds } from '../../../flow/common/semantics.ts'
 import { sourcePort } from '../../../flow/common/sourceField.ts'
@@ -269,6 +270,7 @@ export function revisionView(revision: Draft): RevisionView {
 }
 
 export interface ConnectorAccountReference {
+  readonly kind?: 'connector' | 'agent' | 'trigger' | 'notification'
   readonly providerId: string
   readonly connectionId?: string
   readonly nodeId: string
@@ -277,43 +279,11 @@ export interface ConnectorAccountReference {
 }
 
 function connectorAccessReferences(document: FlowDocument): { readonly accounts: readonly ConnectorAccountReference[]; readonly hasCode: boolean } {
-  const accounts: ConnectorAccountReference[] = []
-  let hasCode = false
-  const graphs = [
-    { graph: document.graph, target: { kind: 'flow' } as GraphTarget, name: '' },
-    ...Object.entries(document.subflows).map(([id, subflow]) => ({ graph: subflow.graph, target: { kind: 'subflow', id } as GraphTarget, name: subflow.name })),
+  const accounts = [
+    ...new Map(connectionUsage(document).map((use) => [JSON.stringify([use.target, use.nodeId, use.kind, use.providerId, use.connectionId]), use])).values(),
   ]
-  for (const { graph, target, name: graphName } of graphs) {
-    for (const [nodeId, node] of Object.entries(graph.nodes)) {
-      const task = node.kind == 'task' && node.taskId != null ? document.tasks[node.taskId] : undefined
-      const name = [graphName, node.name ?? task?.name ?? nodeId].filter(Boolean).join(' / ')
-      const add = (providerId: string, connectionId?: string): void => {
-        if (
-          !accounts.some(
-            (item) =>
-              item.target.kind == target.kind &&
-              (target.kind == 'flow' || (item.target.kind == 'subflow' && item.target.id == target.id)) &&
-              item.nodeId == nodeId &&
-              item.providerId == providerId &&
-              item.connectionId == connectionId,
-          )
-        ) {
-          accounts.push({ providerId, ...(connectionId == null ? {} : { connectionId }), nodeId, name, target })
-        }
-      }
-      if (node.kind == 'poll' || node.kind == 'integration') {
-        const binding = document.bindings[node.bindingId]
-        add(node.definition.provider, binding?.kind == 'connection' ? binding.target : undefined)
-      } else if (node.kind == 'task') {
-        if (node.task != null) hasCode = true
-        if (task?.executor.kind == 'connector') add(task.executor.action.split('.')[0]!, task.executor.connectionId)
-        if (task?.executor.kind == 'agent') {
-          for (const tool of task.executor.tools) add(tool.action.split('.')[0]!, tool.connectionId)
-          const notice = task.executor.notification == null ? undefined : document.tasks[task.executor.notification.taskId]?.executor
-          if (notice?.kind == 'connector') add(notice.action.split('.')[0]!, notice.connectionId)
-        }
-      }
-    }
-  }
+  const hasCode = [document.graph, ...Object.values(document.subflows).map((subflow) => subflow.graph)].some((graph) =>
+    Object.values(graph.nodes).some((node) => node.kind == 'task' && node.task != null),
+  )
   return { accounts, hasCode }
 }

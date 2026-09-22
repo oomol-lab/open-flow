@@ -74,6 +74,10 @@ export class ConnectorAccessStore {
     if (providerId != null) void this.loadCandidates([providerId], true)
   }
 
+  closeConfiguration(): void {
+    this.#state.set({ ...this.#state.value, configuration: undefined })
+  }
+
   async loadCandidates(providerIds: readonly string[], force = false): Promise<void> {
     const flowId = this.#flowId
     const state = this.#state.value
@@ -165,7 +169,22 @@ export class ConnectorAccessStore {
     if (this.#disposed || flowId == null || access?.mode != 'selectable' || this.#state.value.savingProviderId != null) return false
     this.#state.set({ ...this.#state.value, savingProviderId: providerId })
     try {
-      const next = await this.client.setConnectorService(flowId, providerId, selected, access.accessRevision)
+      if (selected) {
+        await this.loadCandidates([providerId], true)
+        if (this.#disposed || flowId != this.#flowId) return false
+        if (this.#state.value.candidateErrors.includes(providerId)) {
+          this.#state.set({ ...this.#state.value, savingProviderId: undefined })
+          return false
+        }
+      }
+      const defaultAccount =
+        selected && !access.bindings.some((binding) => binding.providerId == providerId)
+          ? this.#state.value.candidates[providerId]?.candidates.find((candidate) => candidate.isDefault)
+          : undefined
+      const next =
+        defaultAccount == null
+          ? await this.client.setConnectorService(flowId, providerId, selected, access.accessRevision)
+          : await this.client.addProviderAccessBinding(flowId, providerId, defaultAccount.accessBindingId, access.accessRevision)
       if (this.#disposed || flowId != this.#flowId) return false
       const current = this.#state.value.access
       this.#state.set({

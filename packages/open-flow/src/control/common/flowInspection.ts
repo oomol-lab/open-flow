@@ -167,7 +167,16 @@ export function actionSummary(action: ConnectorAction) {
   }
 }
 
-export function nodeDetails(content: RevisionContent, nodeId: string, node: GraphNode) {
+export function nodeDetails(
+  content: RevisionContent,
+  nodeId: string,
+  node: GraphNode,
+): {
+  node: GraphNode
+  nodeId: string
+  module?: RevisionContent['modules'][string]
+  task?: FlowDocument['tasks'][string]
+} {
   if (node.kind != 'task') return { node, nodeId }
   if (node.task != null) {
     const module = content.modules[node.task.moduleId]

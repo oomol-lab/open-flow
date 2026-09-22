@@ -70,6 +70,7 @@ export interface ConnectorHost {
 }
 
 export interface ConnectorAccessContext {
+  readonly usage?: 'node' | 'code'
   readonly actorId?: string
   readonly flowId?: string
   readonly providerAccess: ConnectorAccess
@@ -252,7 +253,7 @@ export class ConnectorClient implements ConnectorHost {
   async listProviders(signal?: AbortSignal, access?: ConnectorClientAccess, locale?: string): Promise<readonly ConnectorProvider[]> {
     const teamId = connectorTeamId(access)
     let providers = await this.#providers(signal, teamId, locale)
-    if (selectableAccess(access)) {
+    if (selectableAccess(access) && access.usage != 'node') {
       const allowed = new Set(access.providerAccess.bindings.filter((binding) => binding.status == 'active').map((binding) => binding.providerId))
       providers = providers.filter((provider) => allowed.has(provider.serviceId))
     }
@@ -273,7 +274,10 @@ export class ConnectorClient implements ConnectorHost {
   async listActions(serviceId?: string, signal?: AbortSignal, access?: ConnectorClientAccess, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
     const teamId = connectorTeamId(access)
     if (serviceId != null) {
-      const bindings = await this.#providerAccessBindings(access, serviceId, signal)
+      const bindings =
+        typeof access == 'object' && access.usage == 'node' && access.purpose == 'catalog'
+          ? null
+          : await this.#providerAccessBindings(access, serviceId, signal)
       if (bindings != null && bindings.length == 0) return []
       const [providers, actions] = await Promise.all([
         this.#providers(signal, teamId, locale),
@@ -282,7 +286,7 @@ export class ConnectorClient implements ConnectorHost {
       const mapped = this.#decode('actions.list', { serviceId }, () => mapActions(actions, providers))
       return bindings == null ? mapped : mapped.filter((action) => bindings.some((binding) => providerAccessAllowsAction(binding, action)))
     }
-    const bindings = await this.#accessBindings(access, signal)
+    const bindings = typeof access == 'object' && access.usage == 'node' && access.purpose == 'catalog' ? null : await this.#accessBindings(access, signal)
     if (bindings != null && bindings.length == 0) return []
     return await Effect.runPromise(
       Effect.gen({ self: this }, function* () {
@@ -342,7 +346,7 @@ export class ConnectorClient implements ConnectorHost {
 
   async searchActions(query: string, signal?: AbortSignal, access?: ConnectorClientAccess, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
     const teamId = connectorTeamId(access)
-    const bindings = await this.#accessBindings(access, signal)
+    const bindings = typeof access == 'object' && access.usage == 'node' && access.purpose == 'catalog' ? null : await this.#accessBindings(access, signal)
     if (bindings != null && bindings.length == 0) return []
     const [providers, actions] = await Promise.all([
       this.#providers(signal, teamId, locale),
@@ -401,6 +405,14 @@ export class ConnectorClient implements ConnectorHost {
     const separator = action.indexOf('.')
     if (separator <= 0) throw connectionRequired()
     const providerId = action.slice(0, separator)
+    if (
+      typeof access == 'object' &&
+      access.usage == 'node' &&
+      access.providerAccess.nodeBindings != null &&
+      connectionId == null &&
+      !(await this.#providers(signal, teamId)).some((provider) => provider.serviceId == providerId && provider.noSetup)
+    )
+      throw connectionRequired()
     const bindings = await this.#providerAccessBindings(access, providerId, signal, true)
     if (bindings != null) {
       const binding =
@@ -408,7 +420,7 @@ export class ConnectorClient implements ConnectorHost {
           ? bindings.length == 1
             ? bindings[0]
             : bindings.find((candidate) => candidate.connection.isDefault)
-          : bindings.find((candidate) => candidate.appId == connectionId)
+          : bindings.find((candidate) => candidate.appId == connectionId && providerAccessAllowsAction(candidate, { actionId: action, serviceId: providerId }))
       if (binding == null) throw connectionId == null ? connectionRequired() : accessInvalid()
       if (!providerAccessAllowsAction(binding, { actionId: action, serviceId: providerId })) throw accessInvalid()
       if (binding.accessGrant.appAccessConfig != null) {
@@ -467,8 +479,8 @@ export class ConnectorClient implements ConnectorHost {
     const teamId = connectorTeamId(access)
     const bindings = await this.#providerAccessBindings(access, provider, signal, true)
     if (bindings != null) {
-      const binding = bindings.find((candidate) => candidate.appId == connectionId)
-      if (binding == null || !providerAccessAllowsProxy(binding)) throw accessInvalid()
+      const binding = bindings.find((candidate) => candidate.appId == connectionId && providerAccessAllowsProxy(candidate))
+      if (binding == null) throw accessInvalid()
     }
     const alias = await this.#resolveConnection(connectionId, provider, signal, teamId)
     const proxyResponse = await this.#request(
@@ -504,7 +516,13 @@ export class ConnectorClient implements ConnectorHost {
     connections?: readonly ConnectorConnection[],
   ): Promise<readonly ResolvedProviderAccessBinding[] | null> {
     if (!selectableAccess(access)) return null
-    const bindings = access.providerAccess.bindings.filter((binding) => binding.status == 'active')
+    if (access.usage == 'node' && access.purpose == 'catalog') {
+      const available = connections ?? (await this.#connections(undefined, signal, access.teamId))
+      return this.#nodeAccessBindings(access, [...new Set(available.map((connection) => connection.serviceId))], signal, available)
+    }
+    const bindings = (access.usage == 'node' ? (access.providerAccess.nodeBindings ?? access.providerAccess.bindings) : access.providerAccess.bindings).filter(
+      (binding) => binding.status == 'active',
+    )
     if (access.teamId == null) throw accessInvalid()
     return this.#resolveAccessBindings(access.teamId, bindings, signal, connections)
   }
@@ -516,13 +534,45 @@ export class ConnectorClient implements ConnectorHost {
     required = false,
   ): Promise<readonly ResolvedProviderAccessBinding[] | null> {
     if (!selectableAccess(access)) return null
-    const selected = access.providerAccess.bindings.filter((binding) => binding.providerId == providerId && binding.status == 'active')
+    if (access.usage == 'node' && access.purpose == 'catalog') {
+      const bindings = await this.#nodeAccessBindings(access, [providerId], signal)
+      if (bindings.length == 0 && required) {
+        const providers = await this.#providers(signal, access.teamId)
+        if (providers.some((provider) => provider.serviceId == providerId && provider.noSetup)) return null
+        throw accessRequired()
+      }
+      return bindings
+    }
+    const selected = (access.usage == 'node' ? (access.providerAccess.nodeBindings ?? access.providerAccess.bindings) : access.providerAccess.bindings).filter(
+      (binding) => binding.providerId == providerId && binding.status == 'active',
+    )
     if (selected.length == 0) {
+      if (
+        access.providerAccess.nodeBindings != null &&
+        (await this.#providers(signal, access.teamId)).some((provider) => provider.serviceId == providerId && provider.noSetup)
+      )
+        return null
       if (required) throw accessRequired()
       return []
     }
     if (access.teamId == null) throw accessInvalid()
     return this.#resolveAccessBindings(access.teamId, selected, signal)
+  }
+
+  async #nodeAccessBindings(
+    access: ConnectorAccessContext,
+    providerIds: readonly string[],
+    signal?: AbortSignal,
+    connections?: readonly ConnectorConnection[],
+  ): Promise<readonly ResolvedProviderAccessBinding[]> {
+    if (access.teamId == null) throw accessInvalid()
+    if (providerIds.length == 0) return []
+    const response = await this.listProviderAccessBindingCandidates(access.teamId, providerIds, signal)
+    const candidates = response.results.flatMap((result) => {
+      if ('error' in result) throw new ConnectorTaskError(result.error.code, result.error.message)
+      return result.candidates
+    })
+    return this.#resolveAccessBindings(access.teamId, candidates, signal, connections)
   }
 
   async #resolveAccessBindings(

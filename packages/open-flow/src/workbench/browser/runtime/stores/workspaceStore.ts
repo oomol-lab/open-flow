@@ -811,7 +811,7 @@ export class WorkspaceStore {
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
-  public async setConnectorConnection(taskId: string, connectionId: string): Promise<boolean> {
+  public async setConnectorConnection(taskId: string, connectionId: string | undefined): Promise<boolean> {
     const revision = this.$.revision.value
     if (revision == null) return false
     const changes = changeConnectorConnection(revision.revision.content, taskId, connectionId)
@@ -895,7 +895,7 @@ export class WorkspaceStore {
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
-  public async setTriggerConnection(triggerId: string, connectionId: string): Promise<boolean> {
+  public async setTriggerConnection(triggerId: string, connectionId: string | undefined): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target?.kind != 'flow') return false

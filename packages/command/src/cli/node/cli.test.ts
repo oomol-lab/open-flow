@@ -820,3 +820,25 @@ it('passes result cursors and bounded page options without treating result IDs a
     expect(rejectedRequest).not.toHaveBeenCalled()
   }
 })
+
+it('removes Draft connection usage through one CAS request with the caller idempotency key', async () => {
+  const output = runtime()
+  const request = vi.fn(async (path: string, init?: RequestInit) => {
+    if (path == '/v1/flows/flow-1') return Response.json(flow)
+    if (path.endsWith('/revisions/revision-1')) return Response.json(revisionFixture)
+    expect(path).toBe('/v1/flows/flow-1/connection-usage/remove')
+    expect(init?.method).toBe('POST')
+    expect(JSON.parse(String(init?.body))).toEqual({ connectionId: 'account', expectedRevisionId: 'revision-1', expectedAccessRevision: 3, version: 1 })
+    expect(new Headers(init?.headers).get('Idempotency-Key')).toBe('remove-account')
+    return Response.json({ version: 1, revision: { ...revisionFixture, revisionId: 'revision-2' } })
+  })
+  expect(
+    await runCli(
+      ['connector', 'remove-usage', 'flow-1', 'account', '3', '--expected-revision', 'revision-1', '--idempotency-key', 'remove-account', '--json'],
+      { request },
+      output.value,
+    ),
+    output.stderr(),
+  ).toBe(0)
+  expect(JSON.parse(output.stdout())).toMatchObject({ kind: 'connector.remove-usage', revision: { revisionId: 'revision-2' } })
+})

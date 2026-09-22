@@ -88,12 +88,16 @@ export function connectorAccess(value: unknown): ConnectorAccess {
   exact(source, [
     'accessRevision',
     'bindings',
+    ...('nodeBindings' in source ? ['nodeBindings'] : []),
     'mode',
     'providerAccessDigest',
     ...('providerIds' in source ? ['providerIds'] : []),
     ...('discardedBindingCount' in source ? ['discardedBindingCount'] : []),
     'version',
   ])
+  if ('nodeBindings' in source && !Array.isArray(source.nodeBindings)) return invalidResponse()
+  const nodeBindings = source.nodeBindings == null ? undefined : (source.nodeBindings as unknown[]).map((entry) => accessBinding(entry, false))
+  if (nodeBindings != null && new Set(nodeBindings.map((binding) => binding.accessBindingId)).size != nodeBindings.length) return invalidResponse()
   const accessRevision = integer(source.accessRevision)
   if (source.version != 1 || accessRevision < 0 || !Array.isArray(source.bindings)) return invalidResponse()
   if ('providerIds' in source && !Array.isArray(source.providerIds)) return invalidResponse()
@@ -136,6 +140,7 @@ export function connectorAccess(value: unknown): ConnectorAccess {
   if (new Set(bindings.map((binding) => binding.accessBindingId)).size != bindings.length) return invalidResponse()
   return {
     accessRevision,
+    ...(nodeBindings == null ? {} : { nodeBindings }),
     ...(discardedBindingCount == 0 ? {} : { discardedBindingCount }),
     ...(providerIds == null ? {} : { providerIds }),
     bindings,

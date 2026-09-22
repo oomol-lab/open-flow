@@ -598,60 +598,56 @@ it('reports thrown add failures through notices without treating an empty result
   }
 })
 
-it.each(['no candidates', 'ambiguous candidates', 'candidate failure', 'binding failure'] as const)(
-  'preserves editable Connector metadata after %s',
-  async (scenario) => {
-    const { client, navigation, store } = catalogSession('flow-1')
-    const action = {
-      actionId: 'mail.send',
-      authenticated: true,
-      description: '',
-      inputs: {},
-      name: 'Send',
-      outputs: {},
-      serviceId: 'mail',
-      serviceName: 'Mail',
-    }
-    vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(access('flow-1'))
-    const candidate = {
-      connectionId: 'fixture-account',
-      source: { kind: 'policy' as const, ruleId: null },
-      accessBindingId: 'mail-1',
-      connectionDisplayName: 'Mail',
-      permissionGroupName: null,
-      providerId: 'mail',
-    }
-    const candidates = vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
-      results: [
-        {
-          candidates:
-            scenario == 'no candidates' ? [] : scenario == 'ambiguous candidates' ? [candidate, { ...candidate, accessBindingId: 'mail-2' }] : [candidate],
-          mode: 'selectable',
-          providerId: 'mail',
-          version: 1,
-        },
-      ],
-      version: 1,
-    })
-    if (scenario == 'candidate failure') candidates.mockRejectedValue(new Error('Candidate lookup failed'))
-    const select = vi.spyOn(client, 'addProviderAccessBinding').mockRejectedValue(new Error('Binding save failed'))
-    const add = vi.spyOn(store.workspace, 'addNode').mockResolvedValue('node')
-    const resolve = vi.spyOn(store.connectors, 'resolveAction')
-    try {
-      await navigation.start()
-      await expect(store.prepareConnectorAction(action)).resolves.toEqual({ action, connections: [] })
-      expect(add).not.toHaveBeenCalled()
-      expect(resolve).not.toHaveBeenCalled()
-      expect(store.connectorAccess.$.value.configuration).toBeUndefined()
-      expect(select).toHaveBeenCalledTimes(scenario == 'binding failure' ? 1 : 0)
-      if (scenario == 'binding failure') expect(store.$.notice.value?.message).toBe('Binding save failed')
-      if (scenario == 'candidate failure') expect(store.$.notice.value?.message).toBe('Candidate lookup failed')
-    } finally {
-      navigation.dispose()
-      store.dispose()
-    }
-  },
-)
+it.each(['no candidates', 'ambiguous candidates', 'candidate failure'] as const)('preserves editable Connector metadata after %s', async (scenario) => {
+  const { client, navigation, store } = catalogSession('flow-1')
+  const action = {
+    actionId: 'mail.send',
+    authenticated: true,
+    description: '',
+    inputs: {},
+    name: 'Send',
+    outputs: {},
+    serviceId: 'mail',
+    serviceName: 'Mail',
+  }
+  vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(access('flow-1'))
+  const candidate = {
+    connectionId: 'fixture-account',
+    source: { kind: 'policy' as const, ruleId: null },
+    accessBindingId: 'mail-1',
+    connectionDisplayName: 'Mail',
+    permissionGroupName: null,
+    providerId: 'mail',
+  }
+  const candidates = vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
+    results: [
+      {
+        candidates:
+          scenario == 'no candidates' ? [] : scenario == 'ambiguous candidates' ? [candidate, { ...candidate, accessBindingId: 'mail-2' }] : [candidate],
+        mode: 'selectable',
+        providerId: 'mail',
+        version: 1,
+      },
+    ],
+    version: 1,
+  })
+  if (scenario == 'candidate failure') candidates.mockRejectedValue(new Error('Candidate lookup failed'))
+  const select = vi.spyOn(client, 'addProviderAccessBinding').mockRejectedValue(new Error('Binding save failed'))
+  const add = vi.spyOn(store.workspace, 'addNode').mockResolvedValue('node')
+  const resolve = vi.spyOn(store.connectors, 'resolveAction').mockResolvedValue({ action, connections: [] })
+  try {
+    await navigation.start()
+    await expect(store.prepareConnectorAction(action)).resolves.toEqual({ action, connections: [] })
+    expect(add).not.toHaveBeenCalled()
+    expect(resolve).toHaveBeenCalledWith('mail.send')
+    expect(store.connectorAccess.$.value.configuration).toBeUndefined()
+    expect(select).not.toHaveBeenCalled()
+    if (scenario == 'candidate failure') expect(store.$.notice.value?.message).toBe('Candidate lookup failed')
+  } finally {
+    navigation.dispose()
+    store.dispose()
+  }
+})
 
 it('adds a no-auth Action without loading account candidates or creating a binding', async () => {
   const { client, navigation, store } = catalogSession('flow-1')
@@ -686,7 +682,7 @@ it('adds a no-auth Action without loading account candidates or creating a bindi
   }
 })
 
-it('prepares default Provider access without prompting', async () => {
+it('selects an eligible default connection without adding shared Code usage', async () => {
   const { client, navigation, store } = catalogSession('flow-1')
   const discovered = {
     actionId: 'mail.send',
@@ -710,7 +706,7 @@ it('prepares default Provider access without prompting', async () => {
     accessRevision: 1,
     bindings: [
       {
-        connectionId: 'fixture-account',
+        connectionId: 'mail-default',
         source: { kind: 'policy' as const, ruleId: null },
         accessBindingId: 'mail-read-access',
         connectionDisplayName: connection.displayName,
@@ -728,7 +724,7 @@ it('prepares default Provider access without prompting', async () => {
       {
         candidates: [
           {
-            connectionId: 'fixture-account',
+            connectionId: 'mail-default',
             source: { kind: 'policy' as const, ruleId: null },
             accessBindingId: 'mail-read-access',
             connectionDisplayName: connection.displayName,
@@ -738,7 +734,7 @@ it('prepares default Provider access without prompting', async () => {
             providerId: 'mail',
           },
           {
-            connectionId: 'fixture-account',
+            connectionId: 'mail-default',
             source: { kind: 'policy' as const, ruleId: 'Senders' },
             accessBindingId: 'mail-send-access',
             connectionDisplayName: 'Sending account',
@@ -759,7 +755,7 @@ it('prepares default Provider access without prompting', async () => {
     accessRevision: 2,
     bindings: [
       {
-        connectionId: 'fixture-account',
+        connectionId: 'mail-default',
         source: { kind: 'policy' as const, ruleId: null },
         accessBindingId: 'mail-read-access',
         connectionDisplayName: connection.displayName,
@@ -768,7 +764,7 @@ it('prepares default Provider access without prompting', async () => {
         status: 'active',
       },
       {
-        connectionId: 'fixture-account',
+        connectionId: 'mail-default',
         source: { kind: 'policy' as const, ruleId: 'Senders' },
         accessBindingId: 'mail-send-access',
         connectionDisplayName: 'Sending account',
@@ -787,7 +783,7 @@ it('prepares default Provider access without prompting', async () => {
     await navigation.start()
 
     await expect(store.prepareConnectorAction(discovered)).resolves.toEqual({ action: resolved, connections: [connection] })
-    expect(addAccess).toHaveBeenCalledWith('flow-1', 'mail', 'mail-send-access', 1)
+    expect(addAccess).not.toHaveBeenCalled()
     expect(resolve).toHaveBeenCalledWith('mail.send')
     expect(add).not.toHaveBeenCalled()
   } finally {
@@ -915,7 +911,7 @@ it.each(['connected', 'unconfigured', 'failed'] as const)('keeps new Connector a
   }
 })
 
-it('waits for a candidate query already started by the inspector before enabling default Connector access', async () => {
+it('waits for a candidate query already started by the inspector before selecting a default connection without enabling Code usage', async () => {
   const { client, navigation, store } = catalogSession('flow-1')
   const action = { actionId: 'mail.send', authenticated: true, description: '', inputs: {}, outputs: {}, name: 'Send', serviceId: 'mail', serviceName: 'Mail' }
   const connection = { connectionId: 'mail-default', displayName: 'Work', isDefault: true, serviceId: 'mail', status: 'active' as const }
@@ -951,7 +947,7 @@ it('waits for a candidate query already started by the inspector before enabling
     })
     await loading
     expect(await preparing).toEqual(resolved)
-    expect(addAccess).toHaveBeenCalledWith('flow-1', 'mail', 'default-access', 2)
+    expect(addAccess).not.toHaveBeenCalled()
     expect(lookup).toHaveBeenCalledTimes(1)
   } finally {
     navigation.dispose()

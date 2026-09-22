@@ -187,6 +187,25 @@ describe('Server Integration reconciliation', () => {
     const original = accessHost.current('main')
     let digest = 'selected'
     vi.spyOn(accessHost, 'current').mockImplementation(() => ({ ...original, mode: 'selectable', providerAccessDigest: digest }))
+    vi.spyOn(accessHost, 'listCandidates').mockResolvedValue({
+      version: 1,
+      results: [
+        {
+          version: 1,
+          providerId: 'test',
+          mode: 'selectable',
+          candidates: [
+            {
+              providerId: 'test',
+              connectionId: 'connection-main',
+              accessBindingId: 'binding',
+              connectionDisplayName: 'Main',
+              source: { kind: 'admin-delegation' },
+            },
+          ],
+        },
+      ],
+    })
     const definition: IntegrationDefinition = {
       snapshot,
       reconcile: async () => ({ outcome: 'ready' }),

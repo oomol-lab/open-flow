@@ -264,17 +264,20 @@ export class FlowStore {
       .get(flowId, changeId) as { readonly requestDigest: string; readonly revisionId: string } | undefined
   }
 
-  commitRevision(input: {
-    readonly actorId: string
-    readonly changeId: string
-    readonly content: string
-    readonly createdAt: number
-    readonly digest: string
-    readonly expectedRevisionId: string
-    readonly flowId: string
-    readonly requestDigest: string
-    readonly revisionId: string
-  }): { readonly kind: 'busy' | 'conflict' | 'not-found' | 'request-conflict' } | { readonly kind: 'committed'; readonly revision: StoredFlowRevision } {
+  commitRevision(
+    input: {
+      readonly actorId: string
+      readonly changeId: string
+      readonly content: string
+      readonly createdAt: number
+      readonly digest: string
+      readonly expectedRevisionId: string
+      readonly flowId: string
+      readonly requestDigest: string
+      readonly revisionId: string
+    },
+    updateAccess?: () => void,
+  ): { readonly kind: 'busy' | 'conflict' | 'not-found' | 'request-conflict' } | { readonly kind: 'committed'; readonly revision: StoredFlowRevision } {
     return this.#transaction(() => {
       const existing = this.change(input.flowId, input.changeId)
       if (existing != null) {
@@ -287,6 +290,7 @@ export class FlowStore {
       if (flow.status != 'active') return { kind: 'busy' }
       if (flow.draftRevisionId != input.expectedRevisionId) return { kind: 'conflict' }
 
+      updateAccess?.()
       this.#revisions.ensure({ content: input.content, revisionDigest: input.digest, revisionId: input.revisionId })
       this.#database
         .prepare(

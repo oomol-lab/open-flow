@@ -613,10 +613,11 @@ describe('Agent input editing', () => {
 })
 
 describe('Agent tool creation', () => {
-  it.each([false, true])('keeps the chosen approval policy (%s) and delegates new parameters explicitly', (approval) => {
+  it.each(['selected-account', undefined])('creates an executable tool with selected account %s and delegates parameters to the model', (connectionId) => {
     const action = {
       actionId: 'mail.send',
       authenticated: true,
+      defaultConnection: { connectionId: 'default-account', displayName: 'Default', isDefault: true, serviceId: 'mail', status: 'active' as const },
       description: 'Send a message',
       name: 'Send email',
       serviceId: 'mail',
@@ -628,8 +629,9 @@ describe('Agent tool creation', () => {
       },
     }
     const original = structuredClone(action)
-    const tool = agentTool(action, approval, 'unique-id')
-    expect(tool.approval).toBe(approval)
+    const tool = agentTool(action, 'unique-id', connectionId)
+    expect(tool.approval).toBe(false)
+    expect(tool.connectionId).toBe(connectionId)
     expect(tool.inputs).toEqual([
       { handle: 'to', jsonSchema: { type: 'string' }, nullable: false, source: { kind: 'model' } },
       { handle: 'cc', jsonSchema: { type: 'array', items: { type: 'string' } }, nullable: true, source: { kind: 'model' } },

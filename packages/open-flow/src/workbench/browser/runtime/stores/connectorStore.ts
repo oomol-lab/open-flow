@@ -455,7 +455,7 @@ export class ConnectorStore {
     }
   }
 
-  public async setConnection(taskId: string, connectionId: string): Promise<boolean> {
+  public async setConnection(taskId: string, connectionId: string | undefined): Promise<boolean> {
     return await this.#workspace.setConnectorConnection(taskId, connectionId)
   }
 

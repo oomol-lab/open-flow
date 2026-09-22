@@ -258,6 +258,7 @@ export class ListenerRuntime {
         flowId: target.flowId,
         providerAccess,
         providerId: provider,
+        usage: 'node',
         purpose: 'trigger',
         source: 'publication',
         ...(teamId == null ? {} : { teamId }),

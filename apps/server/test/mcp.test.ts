@@ -739,3 +739,21 @@ it('discovers Trigger definitions separately from Flow instances and rejects con
   expect(invalid.isError).toBe(true)
   expect(admit).not.toHaveBeenCalled()
 })
+
+it('shares Draft account usage removal with REST and preserves its idempotent result', async () => {
+  const { call, control } = await fixture()
+  const flow = await control.createFlow('Connection usage')
+  const access = await call('flow_code_connections', { flowId: flow.flowId })
+  expect(access).toMatchObject({ mode: 'implicit', bindings: [], accessRevision: 0 })
+  const args = {
+    flowId: flow.flowId,
+    connectionId: 'account',
+    expectedRevisionId: flow.draftRevisionId,
+    expectedAccessRevision: 0,
+    idempotencyKey: 'remove-usage',
+  }
+  const removed = await call('flow_connection_usage_remove', args)
+  expect(await call('flow_connection_usage_remove', args)).toEqual(removed)
+  expect(await control.removeConnectionUsage(flow.flowId, 'account', flow.draftRevisionId, 0, 'remove-usage')).toEqual(removed)
+  expect((await control.getDraft(flow.flowId)).revisionId).not.toBe(flow.draftRevisionId)
+})

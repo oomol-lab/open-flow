@@ -577,7 +577,7 @@ Binding 和 candidate 都携带 `connectionId`、`providerId`、`accessBindingId
 无法识别的条目被跳过，响应通过可选的 `discardedBindingCount` 提示需要重新配置。合法记录继续显示；响应 envelope 不合法仍报错。
 候选列表继续严格校验，不能把损坏的候选转成可选授权。后台执行也必须拒绝缺少身份的引用。升级与远端资源清理仍按运行手册进行。
 
-Provider access 是 deployment-owned Flow 状态，不进入 Revision。公共 API 支持两种模式：`implicit` 使用部署已配置的 scoped Connector authority；
+Code 的共享 Provider access 是 deployment-owned Flow 状态，不进入 Revision。Connector、Agent 固定工具、Trigger 和通知在 Revision 中显式选择连接，不需要添加 Code 使用。公共 API 支持两种模式：`implicit` 使用部署已配置的 scoped Connector authority；
 `selectable` 由部署按 Provider 返回并保存 opaque access binding。公共合同和 Workbench 不解析权限组内容、不接收 credential，也不创建 Flow service account；
 具体 deployment adapter 负责把外部权限组投影成 opaque candidate 和 binding。
 
@@ -597,6 +597,8 @@ interface ConnectorAccess {
     providerId: string
     status: ProviderAccessBindingStatus
   }[]
+  // Present in new immutable snapshots: node use, separate from shared Code bindings.
+  nodeBindings?: ConnectorAccess['bindings']
   mode: ConnectorAccessMode
   providerAccessDigest: string
   version: 1
@@ -609,6 +611,18 @@ interface ConnectorAccess {
 | `POST`   | `/v1/flows/:flowId/connector-access/candidates/query` | `{ providerIds: string[], version: 1 }`                   |
 | `PUT`    | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
 | `DELETE` | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
+
+`bindings` 是整个 Flow（含 Subflow）的 Code 共享允许列表。`nodeBindings` 在新 Publication / Run 快照中固定节点使用；缺失该字段的历史快照沿用旧共享列表语义，空数组则表示没有节点连接。
+`GET /v1/flows/:flowId/connector-access?publicationId=...` 读取归属此 Flow 的已发布快照，只读；不带参数读取 Draft Code 配置。
+
+`POST /v1/flows/:flowId/connection-usage/remove` 接收 `{ version: 1, connectionId, expectedRevisionId, expectedAccessRevision }`，
+通过标准 `Idempotency-Key` 固定请求身份，返回 `DraftChange`。部署在单个事务中检查两个版本并清除该账号的所有节点选择和 Code 使用。
+保留节点、代码、输入与连线，不改上游授权、Publication 或已接受 Run。发生任一冲突时全部失败；成功发送 `draft.changed` 与 `access.changed`。
+重试同一幂等请求返回原结果；不同请求不得复用 key。移除之后可以保存待配置 Draft，不能靠默认连接自动恢复使用。
+
+MCP 提供 `flow_code_connections`、`flow_connection_candidates`、`flow_code_connection_set` 和 `flow_connection_usage_remove`，复用上述业务操作。
+CLI 对应 `oo flow connector code-access <flow>`、`candidates <flow> <provider>`、`code-allow|code-remove <flow> <provider> <binding> <access-revision>`，
+以及 `remove-usage <flow> <connection> <access-revision>`（沿用编辑命令的 Revision 和幂等参数）。所有修改仅作用于 Draft。
 
 候选查询按需批量提交非空、无重复的 `providerIds`（单个 ID 长度不超过 256）。响应为 `{ results, version: 1 }`，每个请求的 Provider 恰好对应一个结果：
 成功项为 `{ candidates, mode, providerId, version: 1 }`，失败项为 `{ providerId, error: { code, message } }`。共享的团队身份、账号目录或权限策略读取失败时，整次请求按常规错误契约失败；某个 Provider 的候选计算失败不影响其他结果。
@@ -780,7 +794,7 @@ Action metadata 保留上游可选的 `operationType` 字段（`read`、`write`�
 Workbench 使用独立的 `ConnectorActionView` 表示组合后的展示数据。
 CLI 和 MCP 继续使用原 `/v1/connector/actions` 对应的组合接口；它们在响应时选择 active 默认账号或唯一 active 账号，
 保留 `ConnectorAction.defaultConnection`。这些组合响应的 ETag 仍随账号变化，浏览器不使用它们作为 Action 缓存。
-全局搜索使用独立的临时查询状态，不持久化，也不写入 service 列表。Connections Store 读取 `/v1/connector/connections`：带 `flowId` 时仅返回该 Flow 已授权的账号，不带时返回团队账号；同一 scope 的全量与按服务视图共享完整响应。账号缓存使用独立键，不复用原始 proxy Apps 缓存。
+全局搜索使用独立的临时查询状态，不持久化，也不写入 service 列表。Connections Store 读取 `/v1/connector/connections`：带 `flowId` 时返回其固定 Team 下当前用户有权选择的账号（不受 Code 共享列表限制），不带时返回团队账号；同一 scope 的全量与按服务视图共享完整响应。账号缓存使用独立键，不复用原始 proxy Apps 缓存。
 画布按 provider 读取 Action 列表并派生所需详情；应用排序使用全量 Connections，账号选择使用对应服务的 Connections。
 
 业务访问 Store 接口时检查刷新间隔：Providers、Triggers 为 5 分钟，Actions、Connections 为 30 秒。
@@ -1138,7 +1152,7 @@ Agent 声明的业务工具和审批通知仍独立执行能力检查。
 Workbench 切换连接时原子清除 Linear 的 `teamId` 与 `stateIds`；切换 Team 时原子清除 `stateIds`。
 失效的已选项必须保留并明确提示，不能自动替换或清空而扩大筛选范围。
 
-Flow 服务列表与账号授权分别保存。`ConnectorAccess.providerIds` 保存显式添加的服务，允许服务尚无账号或尚未勾选授权；旧快照没有此字段时按空列表处理，已有 bindings 仍提供其所属服务。大纲合并已添加服务、授权绑定所属服务和节点引用服务。新增服务不授予账号权限，也不改变仅由授权绑定计算的 `providerAccessDigest`。
+Flow 服务列表与账号授权分别保存。`ConnectorAccess.providerIds` 保存显式添加的服务，允许服务尚无账号或尚未勾选授权；旧快照没有此字段时按空列表处理，已有 bindings 仍提供其所属服务。Code 配置合并显式添加服务和 Code binding 所属服务，不混入节点引用服务；总览从节点配置与 Code binding 派生使用关系。新增服务不授予账号权限，也不改变仅由授权绑定计算的 `providerAccessDigest`。
 
 `PUT /v1/flows/:flowId/connector-access/:providerId/service` 添加服务；`DELETE` 同一路径原子移除服务及其全部授权绑定。请求为 `{ version: 1, expectedAccessRevision }`，返回更新后的 `ConnectorAccess`，沿用访问版本冲突和 `access.changed` 通知。添加前校验服务存在且需要授权；服务配置持久化到 Flow，刷新或重新打开后保留。
 

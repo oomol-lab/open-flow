@@ -22,7 +22,7 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
       return await codeCommand(client, flow, [operands[0]!, ...operands.slice(2)], args, runtime)
     }
     case 'connector': {
-      const mutation = operands[0] == 'add' || operands[0] == 'set' || operands[0] == 'remove'
+      const mutation = ['add', 'set', 'remove', 'code-access', 'candidates', 'code-allow', 'code-remove', 'remove-usage'].includes(operands[0] ?? '')
       const flow = mutation ? await operandFlow(client, operands.slice(1)) : args.flow == null ? undefined : await referencedFlow(client, args.flow)
       return await connectorCommand(client, flow, operands, args, runtime)
     }

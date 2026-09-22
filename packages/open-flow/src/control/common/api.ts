@@ -220,6 +220,7 @@ export interface ProviderAccessBindingCandidate extends ProviderAccessIdentity {
 }
 
 export interface ConnectorAccess {
+  readonly nodeBindings?: readonly ProviderAccessBinding[]
   readonly discardedBindingCount?: number
   readonly providerIds?: readonly string[]
   readonly accessRevision: number
@@ -840,8 +841,8 @@ export class ControlClient {
     return draftSync(await this.request(`/v1/flows/${segment(flowId)}/draft/sync`))
   }
 
-  async getRevision(flowId: string, revisionId: string): Promise<Draft> {
-    return draft(await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}`))
+  async getRevision(flowId: string, revisionId: string, signal?: AbortSignal): Promise<Draft> {
+    return draft(await this.request(`/v1/flows/${segment(flowId)}/revisions/${segment(revisionId)}`, { signal }))
   }
 
   async listTriggerConfigOptions(flowId: string, nodeId: string, field: string, signal?: AbortSignal): Promise<readonly TriggerConfigOption[]> {
@@ -878,8 +879,26 @@ export class ControlClient {
     return this.connectorRequest(query.path, 'providers', signal, query.decode)
   }
 
-  async getConnectorAccess(flowId: string, signal?: AbortSignal): Promise<ConnectorAccess> {
-    return connectorAccess(await this.request(`/v1/flows/${segment(flowId)}/connector-access`, { signal }))
+  async removeConnectionUsage(
+    flowId: string,
+    connectionId: string,
+    expectedRevisionId: string,
+    expectedAccessRevision: number,
+    idempotencyKey: string,
+  ): Promise<DraftChange> {
+    return draftChange(
+      await this.request(`/v1/flows/${segment(flowId)}/connection-usage/remove`, {
+        method: 'POST',
+        headers: { 'idempotency-key': idempotencyKey },
+        body: JSON.stringify({ connectionId, expectedRevisionId, expectedAccessRevision, version: 1 }),
+      }),
+    )
+  }
+
+  async getConnectorAccess(flowId: string, signal?: AbortSignal, publicationId?: string): Promise<ConnectorAccess> {
+    return connectorAccess(
+      await this.request(`/v1/flows/${segment(flowId)}/connector-access${publicationId == null ? '' : `?publicationId=${segment(publicationId)}`}`, { signal }),
+    )
   }
 
   async listProviderAccessBindingCandidates(flowId: string, providerIds: readonly string[], signal?: AbortSignal): Promise<ConnectorAccessCandidatesBatch> {

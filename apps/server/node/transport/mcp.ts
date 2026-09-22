@@ -162,6 +162,21 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
   register('run_result_read', mcpTools.run_result_read, ({ runId, resultId, ...query }) => control.runs.readRunResult(runId, resultId, query))
   register('run_resolve_wait', mcpTools.run_resolve_wait, ({ runId, waitId, action, comment }) => control.runs.resolveRunWait(runId, waitId, action, comment))
   register('run_cancel', mcpTools.run_cancel, ({ runId }) => control.runs.cancelRun(runId))
+  register('flow_code_connections', mcpTools.flow_code_connections, ({ flowId, publicationId }) => control.getConnectorAccess(actorId, flowId, publicationId))
+  register('flow_connection_candidates', mcpTools.flow_connection_candidates, ({ flowId, providerIds }, context) =>
+    control.getProviderAccessBindingCandidates(actorId, flowId, providerIds, context.mcpReq.signal),
+  )
+  register('flow_code_connection_set', mcpTools.flow_code_connection_set, ({ flowId, providerId, accessBindingId, selected, expectedAccessRevision }) =>
+    selected
+      ? control.addProviderAccessBinding(actorId, flowId, providerId, accessBindingId, expectedAccessRevision)
+      : control.removeProviderAccessBinding(actorId, flowId, providerId, accessBindingId, expectedAccessRevision),
+  )
+  register(
+    'flow_connection_usage_remove',
+    mcpTools.flow_connection_usage_remove,
+    ({ flowId, connectionId, expectedRevisionId, expectedAccessRevision, idempotencyKey }) =>
+      control.removeConnectionUsage(actorId, flowId, connectionId, expectedRevisionId, expectedAccessRevision, idempotencyKey),
+  )
   register('connector_teams', mcpTools.connector_teams, async (_, context) => {
     const { enabled, teams, version } = await service.connectorTeams(context.mcpReq.signal)
     return { enabled, teams, version }

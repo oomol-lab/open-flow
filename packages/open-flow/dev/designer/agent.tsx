@@ -84,7 +84,7 @@ function createSession(language: UiLanguage, log: LogAction) {
         modelVersion: currentFlowModelVersion,
         revisionDigest: revision().digest,
         revisionId: revision().revisionId,
-        check: { kind: 'available' },
+        valid: true,
         version: 1,
       })
     if (url.pathname === '/v1/connector/proxy/providers')
@@ -112,6 +112,7 @@ function createSession(language: UiLanguage, log: LogAction) {
       return Response.json({
         connections: [
           { connectionId: 'lab-active', serviceId: 'lab', displayName: 'Lab account', isDefault: true, status: 'active' },
+          { connectionId: 'lab-other', serviceId: 'lab', displayName: 'Second account', isDefault: false, status: 'active' },
           { connectionId: 'lab-expired', serviceId: 'lab', displayName: 'Expired account', isDefault: false, status: 'reauth_required' },
         ],
         version: 1,
@@ -171,6 +172,8 @@ function AgentSession({ session, dark }: { session: ReturnType<typeof createSess
 }
 
 export const agentStory: FrontendStory = {
+  description:
+    'Add a tool, select its account, then add it without an approval choice. Compare the default and second active accounts; expired accounts cannot be selected.',
   group: 'Node Agent',
   id: 'agent-tools',
   propertyPanel: true,

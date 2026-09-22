@@ -31,7 +31,7 @@ function editorService(
   source: string,
   declarations = [declaration],
   catalog: Readonly<Record<string, ConnectorAction>> = { 'example.echo': definition },
-  providerIds: readonly string[] = [],
+  providerIds: readonly string[] = ['example'],
 ) {
   const files = new Map(Object.entries(libraries).map(([path, text]) => [`/${path.split('/').at(-1)}`, text]))
   const roots = [...files.keys()]
@@ -67,6 +67,29 @@ describe('Code Action editor types', () => {
     const names = service.getCompletionsAtPosition('/module.js', position, {})?.entries.map((entry: ts.CompletionEntry) => entry.name)
     expect(names).toEqual(expect.arrayContaining(['call', 'github', 'gmail', 'sheets']))
   })
+
+  it.each([{ providerIds: ['gmail'] }, { providerIds: [] }])(
+    'limits completions to Code-authorized Providers $providerIds even with cached Actions and saved hints',
+    ({ providerIds }) => {
+      const catalog = {
+        'example.echo': definition,
+        'gmail.send': { ...definition, actionId: 'gmail.send', serviceId: 'gmail' },
+      }
+      const { service, text } = editorService('export default async (_, ctx) => { ctx.actions. }', [declaration], catalog, providerIds)
+      const names = service
+        .getCompletionsAtPosition('/module.js', text.indexOf('ctx.actions.') + 'ctx.actions.'.length, {})
+        ?.entries.map((entry: ts.CompletionEntry) => entry.name)
+      expect(names).toContain('call')
+      expect(names).not.toContain('example')
+      expect(names).not.toContain('example.echo')
+      expect(names?.includes('gmail')).toBe(providerIds.length > 0)
+      const call = editorService("export default async (_, ctx) => { ctx.actions.call('') }", [declaration], catalog, providerIds)
+      const actions = call.service
+        .getCompletionsAtPosition('/module.js', call.text.indexOf("call('") + "call('".length, {})
+        ?.entries.map((entry: ts.CompletionEntry) => entry.name)
+      expect(actions ?? []).not.toContain('example.echo')
+    },
+  )
 
   it('completes catalog Actions and checks their schemas without saved hints', () => {
     const { service, text } = editorService('export default async (_, ctx) => { ctx.actions.example. }', [], { 'example.echo': definition }, ['example'])

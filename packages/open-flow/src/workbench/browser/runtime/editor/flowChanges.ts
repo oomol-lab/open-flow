@@ -107,14 +107,14 @@ function connectorTask(action: ConnectorActionView): Extract<TaskDefinition, { r
   }
 }
 
-export function agentTool(action: ConnectorActionView, approval: boolean, id: string): AgentTool {
+export function agentTool(action: ConnectorActionView, id: string, connectionId?: string): AgentTool {
   return {
     id,
     name: `${action.actionId.replace(/[^a-zA-Z0-9_]/g, '_').slice(0, 48)}_${id.slice(0, 8)}`,
     description: action.description,
     action: action.actionId,
-    ...(action.defaultConnection == null ? {} : { connectionId: action.defaultConnection.connectionId }),
-    approval,
+    ...(connectionId == null ? {} : { connectionId }),
+    approval: false,
     inputs: Object.entries(action.inputs).map(([handle, { value: _value, ...port }]) =>
       Object.assign({ handle }, port, { source: { kind: 'model' as const } }),
     ),

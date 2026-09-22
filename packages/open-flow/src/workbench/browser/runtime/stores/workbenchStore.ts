@@ -16,6 +16,7 @@ import { compute, derive, val } from 'value-enhancer'
 import { randomId } from '../../../../control/common/random.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
 import { targetPresentation } from '../canvasPresentation.ts'
+import { actionWithConnections } from '../connectionCatalog.ts'
 import { diagnosticItems } from '../editor/diagnostics.ts'
 import { createI18n } from '../i18n.ts'
 import { PublicationStore } from '../publications/publicationStore.ts'
@@ -447,44 +448,50 @@ export class WorkbenchStore {
     }
     if (this.connectorAccess.$.value.access == null) await this.connectorAccess.load(flowId)
     if (this.#disposed || flowId != this.workspace.$.flowId.value) return
-    let access = this.connectorAccess.$.value.access
+    const access = this.connectorAccess.$.value.access
     if (access == null) return unconfigured
-    let actionAccessAllowed: boolean | undefined
-    if (access?.mode == 'selectable') {
-      if (this.connectorAccess.$.value.candidates[action.serviceId] == null) await this.connectorAccess.loadCandidates([action.serviceId])
-      if (this.#disposed || flowId != this.workspace.$.flowId.value) return
-      const candidates = this.connectorAccess.$.value.candidates[action.serviceId]?.candidates.filter(
-        (candidate) => candidate.permissions == null || candidate.permissions.allActions || candidate.permissions.actionIds.includes(action.actionId),
-      )
-      if (candidates == null) {
-        return unconfigured
-      }
-      const activeBindingIds = new Set(
-        access.bindings.filter((binding) => binding.providerId == action.serviceId && binding.status == 'active').map((binding) => binding.accessBindingId),
-      )
-      if (candidates != null && !candidates.some((candidate) => activeBindingIds.has(candidate.accessBindingId))) {
-        const candidate = candidates.find((item) => item.isDefault) ?? (candidates.length == 1 ? candidates[0] : undefined)
-        if (candidate != null) {
-          if (!(await this.connectorAccess.select(action.serviceId, candidate.accessBindingId))) {
-            return this.#disposed || flowId != this.workspace.$.flowId.value ? undefined : unconfigured
-          }
-          access = this.connectorAccess.$.value.access
-        }
-      }
-      actionAccessAllowed = candidates?.some((candidate) =>
-        access?.bindings.some((binding) => binding.accessBindingId == candidate.accessBindingId && binding.status == 'active'),
-      )
-    }
-    if (this.#disposed || flowId != this.workspace.$.flowId.value) return
-    const hasActiveBinding = access?.bindings.some((binding) => binding.providerId == action.serviceId && binding.status == 'active') ?? false
-    if (access?.mode != 'implicit' && !(actionAccessAllowed ?? hasActiveBinding)) {
-      return unconfigured
-    }
-    this.workspace.catalogs.refreshFlow(flowId)
     const prepared = await this.connectors.resolveAction(action.actionId)
     if (this.#disposed || flowId != this.workspace.$.flowId.value) return
-    if (prepared.action.serviceId != action.serviceId) throw new Error('Connector Action Provider changed while access was being configured.')
+    if (access.mode == 'selectable') {
+      await this.connectorAccess.loadCandidates([action.serviceId])
+      if (this.#disposed || flowId != this.workspace.$.flowId.value) return
+      const candidates = this.connectorAccess.$.value.candidates[action.serviceId]?.candidates
+      if (candidates == null) return unconfigured
+      const allowed = new Set(
+        candidates
+          .filter((candidate) => candidate.permissions == null || candidate.permissions.allActions || candidate.permissions.actionIds.includes(action.actionId))
+          .map((candidate) => candidate.connectionId),
+      )
+      const connections = prepared.connections.filter((connection) => allowed.has(connection.connectionId))
+      return { action: actionWithConnections(prepared.action, connections), connections }
+    }
     return prepared
+  }
+
+  public async publishedConnectionUsage(flowId: string, publicationId: string, revisionId: string, signal: AbortSignal) {
+    const [access, draft] = await Promise.all([
+      this.#client.getConnectorAccess(flowId, signal, publicationId),
+      this.#client.getRevision(flowId, revisionId, signal),
+    ])
+    return { publicationId, access, revision: revisionView(draft) }
+  }
+
+  public async removeConnectionUsage(connectionId: string): Promise<boolean> {
+    if (!(await this.workspace.saveModuleEditor())) return false
+    const flowId = this.workspace.$.flowId.value
+    const revision = this.workspace.$.revision.value
+    const access = this.connectorAccess.$.value.access
+    if (flowId == null || revision == null || access == null) return false
+    try {
+      await this.#client.removeConnectionUsage(flowId, connectionId, revision.revision.revisionId, access.accessRevision, randomId())
+      if (flowId != this.workspace.$.flowId.value || this.#disposed) return false
+      await this.workspace.selectFlow(flowId)
+      await this.connectorAccess.load(flowId)
+      return true
+    } catch (error) {
+      this.#notice.set(errorNotice(error, this.#i18n.t))
+      return false
+    }
   }
 
   public readonly retryCatalog = (): void => {

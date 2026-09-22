@@ -221,7 +221,7 @@ export class TriggerStore {
     }
   }
 
-  public async setConnection(triggerId: string, connectionId: string): Promise<boolean> {
+  public async setConnection(triggerId: string, connectionId: string | undefined): Promise<boolean> {
     return await this.#workspace.setTriggerConnection(triggerId, connectionId)
   }
 

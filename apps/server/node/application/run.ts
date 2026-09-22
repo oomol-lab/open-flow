@@ -122,7 +122,7 @@ export class RunExecutor {
         return yield* Effect.fail(new Error(`Fixed Flow Revision can no longer be prepared: ${prepared.kind}.`))
       }
       yield* Effect.tryPromise({
-        try: (signal) => checkCodeActions(agentActions(prepared.flow), this.#resolveConnector(), this.#connectorContext(run, 'eligibility'), signal),
+        try: (signal) => checkCodeActions(agentActions(prepared.flow), this.#resolveConnector(), this.#connectorContext(run, 'eligibility', 'node'), signal),
         catch: (error) => error,
       })
       const projectEvent = createEventProjector(run.runId, nodeFailureCodes)
@@ -350,7 +350,7 @@ export class RunExecutor {
     run: StoredRun,
     report: (event: Readonly<Record<string, JsonValue>>) => Promise<void>,
   ): Promise<unknown> {
-    const access = this.#connectorContext(run, 'execute')
+    const access = this.#connectorContext(run, 'execute', 'node')
     const task = prepared.tasks[invocation.taskId]!
     const executor = task.executor
     switch (executor.kind) {
@@ -456,10 +456,11 @@ export class RunExecutor {
     }
   }
 
-  #connectorContext(run: StoredRun, purpose: ConnectorAccessContext['purpose']): ConnectorAccessContext {
+  #connectorContext(run: StoredRun, purpose: ConnectorAccessContext['purpose'], usage: 'node' | 'code' = 'code'): ConnectorAccessContext {
     return {
       flowId: run.flowId,
       providerAccess: run.providerAccess,
+      usage,
       purpose,
       source: 'run',
       ...(run.connectorTeamId == null ? {} : { teamId: run.connectorTeamId }),

@@ -212,7 +212,7 @@ export function NodeInspector({
             disabled={disabled}
             selection={selection}
             triggers={triggers}
-            onConfigureAccess={onConfigureConnectorAccess}
+            onConfigureAccess={(providerId) => void triggers.connect(providerId)}
           />
         )}
         {connector != null && taskId != null && connectorAction?.authenticated !== false && (
@@ -221,9 +221,7 @@ export function NodeInspector({
             actionError={connectorActionError}
             accessError={connectorAccessError}
             actionId={connector.action}
-            onConfigureAccess={
-              onConfigureConnectorAccess == null ? undefined : () => onConfigureConnectorAccess(connectorAction?.serviceId ?? connector.action.split('.')[0]!)
-            }
+            onConfigureAccess={() => void connectors.connect(connectorAction?.serviceId ?? connector.action.split('.')[0]!)}
             activeConnections={activeConnectorConnections}
             authorizationPending={connectorAuthorizationPending}
             connection={connectorConnection}

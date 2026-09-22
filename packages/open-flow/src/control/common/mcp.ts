@@ -170,6 +170,26 @@ export const mcpTools = {
     z.strictObject({ runId: run }),
     false,
   ),
+  flow_code_connections: tool(
+    'Read the connections shared by all Code nodes in this Flow. With publicationId, read the fixed published snapshot; it cannot be edited.',
+    z.strictObject({ flowId: flow, publicationId: id.optional() }),
+    true,
+  ),
+  flow_connection_candidates: tool(
+    'List connections and permissions available to select. Node selections do not add shared Code usage.',
+    z.strictObject({ flowId: flow, providerIds: z.array(id).min(1) }),
+    true,
+  ),
+  flow_code_connection_set: tool(
+    'Add or remove shared Code usage in the Draft only. Does not change node selections or published versions. Use the observed accessRevision.',
+    z.strictObject({ flowId: flow, providerId: id, accessBindingId: id, selected: z.boolean(), expectedAccessRevision: z.int().nonnegative() }),
+    false,
+  ),
+  flow_connection_usage_remove: tool(
+    'Remove a connection from all node selections and shared Code usage in this Draft atomically. Keeps the account, published versions and accepted Runs. Use the observed revisionId and accessRevision.',
+    z.strictObject({ flowId: flow, connectionId: id, expectedRevisionId: id, expectedAccessRevision: z.int().nonnegative(), idempotencyKey: mutationKey }),
+    false,
+  ),
   connector_teams: tool('List OOMOL Teams available for Flow creation. An unconfigured or custom Connector may not provide Teams.', z.strictObject({}), true),
   connector_providers: tool('List Connector providers available in the Flow scope.', z.strictObject({ flowId: flow.optional() }), true),
   connector_search: tool(

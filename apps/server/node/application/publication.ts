@@ -16,6 +16,7 @@ import { nextTriggerScheduledAt, validateTriggerSchedule } from '@oomol-lab/open
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { agentActions } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
+import { captureNodeAccess } from '../deployment/connector-access.ts'
 import { checkCodeActions, ConnectorTaskError } from '../deployment/connector.ts'
 import { AcceptanceError, ControlError } from '../error.ts'
 
@@ -148,12 +149,15 @@ export class Publisher {
 
   async #publication(input: PublishFlowInput, providerAccess: ConnectorAccess): Promise<Parameters<PublicationStore['publish']>[0]> {
     const fixed = await this.#validatedFlow(input.revision)
+    if (input.control?.operation != 'rollback')
+      providerAccess = await captureNodeAccess(this.#connectorAccess, input.flowId, { ...input.revision.document, ...fixed.prepared }, providerAccess)
     if (Object.values(fixed.prepared.tasks).some((task) => task.executor.kind == 'agent') && !this.#agentAvailable())
       throw new ControlError(controlErrorCode.flowInvalid, 'Agent requires a configured model host.')
     const connectorAccess: ConnectorAccessContext = {
       flowId: input.flowId,
       providerAccess,
       purpose: 'eligibility',
+      usage: 'node',
       source: 'publication',
       ...(this.#store.connectorTeams.get(input.flowId) == null ? {} : { teamId: this.#store.connectorTeams.get(input.flowId) }),
     }

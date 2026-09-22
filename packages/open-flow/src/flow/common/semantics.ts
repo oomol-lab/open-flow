@@ -1,3 +1,4 @@
+export { connectionUsage, removeConnectionUsage } from './connectionUsage.ts'
 import { matchesTriggerOutputs } from '../../trigger/common/contract.ts'
 import { nodeInputMappings } from './condition.ts'
 export { matchesTriggerOutputs, triggerOutputDefinitions, triggerOutputPorts } from '../../trigger/common/contract.ts'

@@ -1,7 +1,9 @@
-import type { FlowDocument } from '../../../../flow/common/change.ts'
+import type { FlowDocument, RevisionContent } from '../../../../flow/common/change.ts'
 import type { Draft } from '../api.ts'
 
 import { expect, it } from 'vitest'
+import { currentFlowModelVersion } from '../../../../flow/common/change.ts'
+import { removeConnectionUsage } from '../../../../flow/common/connectionUsage.ts'
 import { RevisionView } from '../revisionView.ts'
 
 function connectorAccessReferences(document: FlowDocument) {
@@ -65,9 +67,9 @@ it('matches explicit account IDs across nodes, triggers and subflows without inf
   expect(result.accounts.some((item) => item.nodeId == 'code' || item.connectionId == 'other')).toBe(false)
 })
 
-it('deduplicates agent tool and notification references to the same account', () => {
+it('distinguishes agent tools and notifications using the same account', () => {
   const source = flowDocument()
-  const result = connectorAccessReferences({
+  const document: FlowDocument = {
     ...source,
     graph: { edges: [], nodes: { agent: { kind: 'task', inputs: {}, taskId: 'agent' } } },
     subflows: {},
@@ -88,7 +90,33 @@ it('deduplicates agent tool and notification references to the same account', ()
         },
       },
     },
-  })
+  }
+  const result = connectorAccessReferences(document)
+  const removed = removeConnectionUsage({ modelVersion: currentFlowModelVersion, document, modules: {} }, 'work')
+  expect(connectorAccessReferences(removed.document).accounts.every((use) => use.connectionId == null)).toBe(true)
+  expect(removed.document.tasks.agent?.executor).toMatchObject({ tools: [{ id: 'send', action: 'mail.send' }] })
   expect(result.hasCode).toBe(false)
-  expect(result.accounts).toEqual([{ providerId: 'mail', connectionId: 'work', nodeId: 'agent', name: 'Assistant', target: { kind: 'flow' } }])
+  expect(result.accounts.map(({ kind, connectionId, nodeId }) => ({ kind, connectionId, nodeId }))).toEqual([
+    { kind: 'agent', connectionId: 'work', nodeId: 'agent' },
+    { kind: 'notification', connectionId: 'work', nodeId: 'agent' },
+  ])
+})
+
+it('removes account usage across subflows and triggers while preserving graph, code and other accounts', () => {
+  const document = flowDocument()
+  const content: RevisionContent = {
+    modelVersion: currentFlowModelVersion,
+    document,
+    modules: { code: { name: 'Code', source: 'export default () => ({})', imports: [] } },
+  }
+  const changed = removeConnectionUsage(content, 'work')
+  expect(changed.document.graph).toEqual(document.graph)
+  expect(changed.document.subflows).toEqual(document.subflows)
+  expect(changed.modules).toEqual(content.modules)
+  expect(changed.document.bindings).toEqual({})
+  expect(changed.document.tasks.send?.executor).not.toHaveProperty('connectionId')
+  expect(changed.document.tasks.unused).toEqual(document.tasks.unused)
+  expect(connectorAccessReferences(changed.document).accounts.every((use) => use.connectionId == null)).toBe(true)
+  expect(removeConnectionUsage(changed, 'work')).toEqual(changed)
+  expect(document.tasks.send?.executor).toHaveProperty('connectionId', 'work')
 })

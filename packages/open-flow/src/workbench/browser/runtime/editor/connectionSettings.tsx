@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, Sele
 import { Icon } from '../icons.tsx'
 
 const manageAccountOption = '__manage-account__'
+const removeConnectionOption = '__remove-connection__'
 
 function ConnectionAlert({
   detail,
@@ -57,7 +58,7 @@ function AccountSelect({
   readonly id: string
   readonly selectedConnection?: ConnectorConnection
   readonly selectedId?: string
-  readonly onChange: (connectionId: string) => void
+  readonly onChange: (connectionId: string | undefined) => void
   readonly onManage: (() => void) | undefined
 }): ReactElement {
   const t = useTranslate()
@@ -76,6 +77,7 @@ function AccountSelect({
       value: candidate.connectionId,
       label: `${candidate.displayName}${candidate.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}`,
     })),
+    ...(selectedId == null ? [] : [{ value: removeConnectionOption, label: t('connectionUsage.remove') }]),
     ...(onManage == null ? [] : [{ value: manageAccountOption, label: t('inspector.account.addAccount') }]),
   ]
   return (
@@ -87,7 +89,7 @@ function AccountSelect({
         onValueChange={(value) => {
           if (value == null) return
           if (value == manageAccountOption) onManage?.()
-          else onChange(value)
+          else onChange(value == removeConnectionOption ? undefined : value)
         }}
       >
         <SelectTrigger id={id} size="field" aria-label={t('inspector.account.connection')} className={fieldSelectTriggerClass}>
@@ -110,6 +112,11 @@ function AccountSelect({
               {candidate.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}
             </SelectItem>
           ))}
+          {selectedId != null && (
+            <SelectItem value={removeConnectionOption} className={selectionMenuItemClass}>
+              {t('connectionUsage.remove')}
+            </SelectItem>
+          )}
           {onManage != null && (
             <>
               <SelectSeparator className="mx-2 bg-border/50" />
@@ -201,7 +208,7 @@ export function ConnectorAccount({
           <p>{t('inspector.account.connectBeforeRun', { service: action.serviceName })}</p>
           <Button disabled={disabled || onConfigureAccess == null} onClick={onConfigureAccess} size="sm" type="button">
             <Icon data-icon="inline-start" name="plus" />
-            {t('inspector.account.manageFlowAccess')}
+            {t('inspector.account.manageAccount')}
           </Button>
         </div>
       </>
@@ -222,7 +229,7 @@ export function ConnectorAccount({
           </FieldLabel>
           <AccountSelect
             connections={available}
-            disabled={disabled || available.length == 0}
+            disabled={disabled}
             id={`${fieldIdPrefix}-connection`}
             selectedConnection={connection}
             selectedId={connectionId}
@@ -241,7 +248,7 @@ export function ConnectorAccount({
         {t(!pending && accessIssue != null ? 'inspector.account.accessTitle' : required ? 'inspector.account.required' : 'inspector.account.title')}
         {onManage != null && (
           <Button className="ml-auto" disabled={disabled} onClick={onManage} size="xs" type="button" variant="ghost">
-            {t('inspector.account.manageFlowAccess')}
+            {t('inspector.account.manageAccount')}
           </Button>
         )}
       </h3>
@@ -249,7 +256,7 @@ export function ConnectorAccount({
         {content}
         {!pending && onConfigureAccess != null && accessIssue != null && (
           <Button className="self-start" disabled={disabled} onClick={onConfigureAccess} size="sm" type="button" variant="default">
-            {t('inspector.account.configureAccess')}
+            {t('inspector.account.manageAccount')}
           </Button>
         )}
       </div>
@@ -297,7 +304,7 @@ export function TriggerConnection({
               type="button"
               variant="ghost"
             >
-              {t('inspector.account.manageFlowAccess')}
+              {t('inspector.account.manageAccount')}
             </Button>
           )}
         </h3>
@@ -321,7 +328,7 @@ export function TriggerConnection({
                 size="sm"
                 type="button"
               >
-                {t('inspector.account.manageFlowAccess')}
+                {t('inspector.account.manageAccount')}
               </Button>
             </div>
           ) : (

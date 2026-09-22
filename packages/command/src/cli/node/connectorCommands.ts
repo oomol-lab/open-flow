@@ -43,6 +43,29 @@ export async function connectorCommand(
 ): Promise<void> {
   const [operation, first, second, ...extra] = operands
   switch (operation) {
+    case 'code-access':
+    case 'candidates':
+    case 'code-allow':
+    case 'code-remove':
+    case 'remove-usage': {
+      const count = operation == 'code-access' ? 1 : operation == 'candidates' ? 2 : operation == 'remove-usage' ? 3 : 4
+      if (operands.length != count + 1) throw new CliError('cli.invalid-arguments', `Invalid arguments for connector ${operation}. See --help.`)
+      const selected = await selectedDraftFlow(client, flow!, args)
+      let result
+      if (operation == 'code-access') result = await client.getConnectorAccess(selected.flow.flowId)
+      else if (operation == 'candidates') result = await client.listProviderAccessBindingCandidates(selected.flow.flowId, [second!])
+      else {
+        const accessRevision = Number(operands.at(-1))
+        if (!Number.isSafeInteger(accessRevision) || accessRevision < 0)
+          throw new CliError('cli.invalid-arguments', 'Access revision must be a nonnegative integer.')
+        if (operation == 'remove-usage')
+          result = await client.removeConnectionUsage(selected.flow.flowId, second!, selected.draft.revisionId, accessRevision, args.idempotencyKey)
+        else if (operation == 'code-allow') result = await client.addProviderAccessBinding(selected.flow.flowId, second!, extra[0]!, accessRevision)
+        else result = await client.removeProviderAccessBinding(selected.flow.flowId, second!, extra[0]!, accessRevision)
+      }
+      write(runtime, args.json, { ...result, kind: `connector.${operation}` }, JSON.stringify(result, null, 2))
+      return
+    }
     case 'providers': {
       if (first != null) throw new CliError('cli.invalid-arguments', 'Usage: oo flow connector providers [--flow <flow>] [--json]')
       const providers = await client.listConnectorProviders(undefined, flow?.flowId)
