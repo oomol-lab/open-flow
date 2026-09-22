@@ -1,7 +1,11 @@
+import type { JsonValue, RevisionContent, TriggerKeySnapshot } from '../../flow/common/change.ts'
+import type { TriggerConfigOption } from '../../trigger/common/configOptions.ts'
+import type { ConnectorConnection, CreateEventSource, ResultInfo, PollTriggerTestResult } from './api.ts'
 import type { ProviderAccessIdentity } from './providerAccess.ts'
 
 import { dequal } from 'dequal/lite'
-import { decodeRunEvent } from './api.ts'
+import { ControlClient, decodeRunEvent } from './api.ts'
+import { allConnectorConnectionsQuery } from './connectorQueries.ts'
 
 export interface ControlApiConformanceHarness {
   readonly origin: string
@@ -60,6 +64,28 @@ function request(harness: ControlApiConformanceHarness, path: string, init: Requ
   const headers = new Headers(init.headers)
   if (init.body != null && !headers.has('content-type')) headers.set('content-type', 'application/json')
   return harness.request(new Request(new URL(path, harness.origin), { ...init, headers }))
+}
+
+function client(harness: ControlApiConformanceHarness): ControlClient {
+  return new ControlClient((path, init) => request(harness, path, init))
+}
+
+async function revalidate(harness: ControlApiConformanceHarness, path: string, locale?: string): Promise<void> {
+  const response = await request(harness, path)
+  await json(response, 200, `Read ${path}`)
+  const etag = requiredString(response.headers.get('etag'), `${path} ETag`)
+  equal(response.headers.get('cache-control'), 'private, no-cache', `${path} cache policy`)
+  const cached = await request(harness, path, { headers: { 'if-none-match': etag } })
+  equal(cached.status, 304, `${path} conditional status`)
+  equal(await cached.text(), '', `${path} conditional body`)
+  equal(cached.headers.get('etag'), etag, `${path} conditional ETag`)
+  equal(cached.headers.get('cache-control'), 'private, no-cache', `${path} conditional cache policy`)
+  if (locale != null) {
+    for (const result of [response, cached]) {
+      equal(result.headers.get('content-language'), locale, `${path} language`)
+      if (!result.headers.get('vary')?.toLowerCase().split(/,\s*/).includes('accept-language')) fail(`${path} must vary by Accept-Language.`)
+    }
+  }
 }
 
 function createFlowRequest(harness: ControlApiConformanceHarness, name: string, key: string): Promise<Response> {
@@ -369,6 +395,34 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
     },
   },
   {
+    name: 'repairs a Draft with immutable history, idempotency and Revision CAS',
+    async verify(harness) {
+      const api = client(harness)
+      const flow = await api.createFlow('Repair', 'repair-flow')
+      const before = await api.getDraft(flow.flowId)
+      const presentation = await api.getPresentation(flow.flowId)
+      const live = await api.getLive(flow.flowId)
+      const repaired = await api.repairDraft(flow.flowId, before.revisionId, 'repair-once')
+      equal(repaired.revision.parentRevisionId, before.revisionId, 'Repair parent')
+      if (repaired.revision.revisionId == before.revisionId) fail('Repair must create a child Revision.')
+      equal(await api.repairDraft(flow.flowId, before.revisionId, 'repair-once'), repaired, 'Repair replay')
+      equal(await api.getRevision(flow.flowId, before.revisionId), before, 'Original Revision remains immutable')
+      equal((await api.getEditor(flow.flowId)).draft.content, before.content, 'Repair preserves readable content')
+      equal(await api.getPresentation(flow.flowId), presentation, 'Repair preserves Presentation')
+      equal(await api.getLive(flow.flowId), live, 'Repair preserves Live')
+      await error(
+        await request(harness, `/v1/flows/${encodeURIComponent(flow.flowId)}/draft/repair`, {
+          method: 'POST',
+          headers: { 'idempotency-key': 'repair-stale' },
+          body: JSON.stringify({ expectedRevisionId: before.revisionId, version: 1 }),
+        }),
+        412,
+        'flow.revision-conflict',
+        'Stale repair',
+      )
+    },
+  },
+  {
     name: 'loads the current editor without changing Draft or Presentation',
     async verify(harness) {
       const created = await createFlow(harness, 'Editor flow', 'editor-flow')
@@ -576,6 +630,17 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
         'Second canceled Run status',
       )
       const createdAt = requiredString(run.createdAt, 'Run createdAt')
+      const api = client(harness)
+      const completeEvents = await api.getRunEvents(runId)
+      if (completeEvents.events.length < 2) fail('Canceled Run must expose multiple events for pagination.')
+      const firstEvent = await api.getRunEvents(runId, { limit: 1 })
+      equal(firstEvent.events, completeEvents.events.slice(0, 1), 'First event page')
+      const remainingEvents = await api.getRunEvents(runId, { after: firstEvent.nextAfter })
+      equal(remainingEvents.events, completeEvents.events.slice(1), 'Event continuation excludes cursor')
+      const exhausted = await api.getRunEvents(runId, { after: completeEvents.nextAfter, limit: 1 })
+      equal(exhausted.events, [], 'Exhausted event page')
+      equal(exhausted.nextAfter, completeEvents.nextAfter, 'Exhausted event cursor')
+      equal(exhausted.done, true, 'Terminal event page')
       const createdBefore = new Date(Date.parse(createdAt) + 1).toISOString()
       const filteredPage = await json(await request(harness, `/v1/flows/${flowId}/runs?limit=1&status=canceled&source=draft`), 200, 'Filter paginated Runs')
       equal(
@@ -913,6 +978,28 @@ export const publicationControlApiConformanceCases: readonly ControlApiConforman
       ).publication
       const secondPublicationId = requiredString(second.publicationId, 'Second Publication')
       await error(await liveRunRequest(harness, firstPublicationId, 'stale-live-run'), 412, 'live.conflict', 'Run stale Publication')
+      const api = client(harness)
+      const history = await api.listPublications(flowId, { limit: 1, includeTotal: true })
+      equal(history.total, 2, 'Publication total across pages')
+      equal(
+        history.publications.map((item) => item.publicationId),
+        [secondPublicationId],
+        'Newest Publication first',
+      )
+      const next = await api.listPublications(flowId, { limit: 1, cursor: requiredString(history.nextCursor, 'Publication cursor') })
+      equal(
+        next.publications.map((item) => item.publicationId),
+        [firstPublicationId],
+        'Publication continuation',
+      )
+      equal(next.nextCursor, undefined, 'End of Publication history')
+      const other = await api.createFlow('Other history', 'other-history')
+      await error(
+        await request(harness, `/v1/flows/${encodeURIComponent(other.flowId)}/publications?cursor=${encodeURIComponent(history.nextCursor!)}`),
+        400,
+        'page.invalid-cursor',
+        'Publication cursor belongs to one Flow',
+      )
       const rollback = () => rollbackRequest(harness, flowId, firstPublicationId, secondPublicationId, 'rollback-first')
       const restored = await json(await rollback(), 201, 'Rollback Flow')
       const restoredPublicationId = requiredString(restored.publicationId, 'Rollback Publication')
@@ -934,6 +1021,10 @@ export const triggerControlApiConformanceCases: readonly ControlApiConformanceCa
     async verify(harness) {
       const keys = await json(await request(harness, '/v1/trigger-keys'), 200, 'List Trigger Keys')
       const catalog = await json(await request(harness, '/v1/trigger-keys/catalog'), 200, 'List Trigger definitions')
+      const api = client(harness)
+      await api.listTriggerKeys()
+      const decoded = (await api.getTriggerCatalog('en')).data
+      equal(decoded.definitions, catalog.definitions, 'Decoded Trigger definitions')
       const summaries = list(keys.keys, 'Trigger Keys').map((value) => record(value, 'Trigger Key'))
       const definitions = list(catalog.definitions, 'Trigger definitions').map((value) => record(value, 'Trigger definition'))
       equal(
@@ -949,6 +1040,25 @@ export const triggerControlApiConformanceCases: readonly ControlApiConformanceCa
           'Trigger detail',
         )
       }
+      for (const route of ['/v1/trigger-keys', '/v1/trigger-keys/catalog']) {
+        for (const [locale, expected] of [
+          ['en', 'en'],
+          ['zh-Hant-HK', 'zh-TW'],
+          ['de', 'en'],
+        ]) {
+          await revalidate(harness, `${route}?locale=${locale}`, expected)
+          const response = await request(harness, `${route}?locale=${locale}`, { headers: { 'accept-language': 'ja' } })
+          equal(response.headers.get('content-language'), expected, 'Explicit locale precedes language header')
+        }
+        const negotiated = await request(harness, route, { headers: { 'accept-language': 'ja' } })
+        equal(negotiated.headers.get('content-language'), 'ja', 'Negotiated Trigger language')
+        await error(await request(harness, `${route}?locale=bad_tag`), 400, 'flow.invalid', 'Invalid Trigger locale')
+      }
+      const english = await api.getTriggerCatalog('en')
+      const translated = await api.getTriggerCatalog('zh-CN', english)
+      equal(translated.data.locale, 'zh-CN', 'Localized catalog')
+      equal(translated.data.definitions, english.data.definitions, 'Canonical definitions survive localization')
+      if (translated.etag == english.etag) fail('Different catalog locales must not share an ETag.')
       await error(await request(harness, '/v1/trigger-keys/conformance.missing'), 404, 'trigger-key.not-found', 'Missing Trigger Key')
     },
   },
@@ -1014,6 +1124,21 @@ export const triggerControlApiConformanceCases: readonly ControlApiConformanceCa
       await json(await state('resume'), 200, 'Resume binding after enabling Flow')
       equal((await harness.request(new Request(endpointUrl, { method: 'POST' }))).status, 200, 'Enabled Flow permits callback')
 
+      const api = client(harness)
+      const activities = await api.listFlowTriggerActivities(flowId, 'webhook')
+      if (activities.activities.length < 2) fail('Webhook fixture must record callback activities.')
+      const firstPage = await api.listFlowTriggerActivities(flowId, 'webhook', { limit: 1 })
+      equal(firstPage.activities, activities.activities.slice(0, 1), 'First Trigger activity page')
+      const cursor = requiredString(firstPage.nextCursor, 'Trigger activity cursor')
+      const nextPage = await api.listFlowTriggerActivities(flowId, 'webhook', { cursor })
+      equal(nextPage.activities, activities.activities.slice(1), 'Trigger activity continuation')
+      await error(
+        await request(harness, `${base}/cron/activities?cursor=${encodeURIComponent(cursor)}`),
+        400,
+        'page.invalid-cursor',
+        'Activity cursor belongs to one Trigger',
+      )
+
       const removed = await json(
         await changeRequest(harness, flowId, triggerRevisionId, [{ kind: 'graph.node.delete', nodeId: 'webhook', target: { kind: 'flow' } }]),
         200,
@@ -1071,6 +1196,17 @@ export const connectorControlApiConformanceCases: readonly ControlApiConformance
           'Invalid candidate provider query',
         )
       }
+      for (const method of ['PUT', 'DELETE']) {
+        await error(
+          await request(harness, `/v1/flows/${flowId}/connector-access/mail/service`, {
+            method,
+            body: JSON.stringify({ expectedAccessRevision: 0, version: 1 }),
+          }),
+          409,
+          'connector.access-unsupported',
+          'Service selection requires selectable access',
+        )
+      }
       await error(
         await request(harness, `/v1/flows/${flowId}/connector-access/mail`, {
           body: JSON.stringify({ accessBindingId: 'editors', expectedAccessRevision: 0, version: 1 }),
@@ -1094,32 +1230,72 @@ export const connectorControlApiConformanceCases: readonly ControlApiConformance
   {
     name: 'projects the deployment Connector catalog and authorized Connections',
     async verify(harness) {
-      const providers = list(
-        (await json(await request(harness, '/v1/connector/providers'), 200, 'List Connector Providers')).providers,
-        'Connector Providers',
-      ).map((value) => record(value, 'Connector Provider'))
-      const actions = list((await json(await request(harness, '/v1/connector/actions'), 200, 'List Connector Actions')).actions, 'Connector Actions').map(
-        (value) => record(value, 'Connector Action'),
+      const api = client(harness)
+      const created = await api.createFlow('Connector discovery', 'connector-discovery')
+      for (const flowId of [undefined, created.flowId]) {
+        const providers = await api.listConnectorProviders(undefined, flowId)
+        const actions = await api.listConnectorActions(undefined, undefined, flowId)
+        if (providers.length == 0 || actions.length == 0) fail('Connector conformance deployment must expose a Provider and Action in both scopes.')
+        const action = actions[0]!
+        if (!providers.some((provider) => provider.serviceId == action.serviceId)) fail('Connector Action must refer to a listed Provider.')
+        equal(await api.getConnectorAction(action.actionId, undefined, flowId), action, 'Connector Action detail')
+        const filtered = await api.listConnectorActions(action.serviceId, undefined, flowId)
+        equal(
+          filtered,
+          actions.filter((item) => item.serviceId == action.serviceId),
+          'Connector service filter',
+        )
+        const searched = await api.searchConnectorActions(action.name, undefined, flowId)
+        if (!searched.some((item) => item.actionId == action.actionId)) fail('Connector search must find the named Action.')
+        const all = await api.listAllConnectorConnections(undefined, flowId)
+        const connections = await api.listConnectorConnections(action.serviceId, undefined, flowId)
+        equal(
+          connections,
+          all.filter((item) => item.serviceId == action.serviceId),
+          'Scoped Connection views',
+        )
+        await api.createConnectorConnectionPage(action.serviceId, flowId)
+        const scope = flowId == null ? '' : `flowId=${encodeURIComponent(flowId)}&`
+        for (const path of [
+          `providers?${scope}locale=en`,
+          `actions?${scope}locale=en`,
+          `actions?${scope}service=${encodeURIComponent(action.serviceId)}&locale=en`,
+          `actions?${scope}q=${encodeURIComponent(action.name)}&locale=en`,
+          `actions/${encodeURIComponent(action.actionId)}?${scope}locale=en`,
+          `connections?${scope.slice(0, -1)}`,
+          `connections/${encodeURIComponent(action.serviceId)}?${scope.slice(0, -1)}`,
+        ])
+          await revalidate(harness, `/v1/connector/${path}`, path.startsWith('providers') ? 'en' : undefined)
+      }
+      for (const path of ['providers', 'actions', 'actions/conformance.missing', 'connections', 'connections/mail']) {
+        await error(await request(harness, `/v1/connector/${path}?flowId=conformance.missing`), 404, 'flow.not-found', 'Missing Connector scope')
+      }
+      await error(
+        await request(harness, `/v1/connector/connections/mail/page?flowId=${encodeURIComponent(created.flowId)}&teamId=team`, {
+          method: 'POST',
+          body: JSON.stringify({ version: 1 }),
+        }),
+        400,
+        'flow.invalid',
+        'Conflicting Connection page scopes',
       )
-      if (providers.length == 0 || actions.length == 0) fail('Connector conformance deployment must expose a Provider and Action.')
-      const action = actions[0]!
-      const actionId = requiredString(action.actionId, 'Connector Action id')
-      const serviceId = requiredString(action.serviceId, 'Connector Action serviceId')
-      if (!providers.some((provider) => provider.serviceId == serviceId)) fail('Connector Action must refer to a listed Provider.')
-      equal(
-        (await json(await request(harness, `/v1/connector/actions/${encodeURIComponent(actionId)}`), 200, 'Read Connector Action')).action,
-        action,
-        'Connector Action detail',
+    },
+  },
+  {
+    name: 'lists all authorized Connector Connections with optional Flow scope',
+    async verify(harness) {
+      const flow = await createFlow(harness, 'Connector Connections', 'connector-connections-create')
+      const flowId = requiredString(flow.flowId, 'Connector Connections Flow id')
+      for (const scope of [undefined, flowId]) {
+        const query = allConnectorConnectionsQuery(scope)
+        query.decode(await json(await request(harness, query.path), 200, `List all Connector Connections (${scope ?? 'unscoped'})`))
+      }
+      await error(
+        await request(harness, '/v1/connector/connections?flowId=conformance.missing'),
+        404,
+        'flow.not-found',
+        'List all Connector Connections for missing Flow',
       )
-      const connections = await json(await request(harness, `/v1/connector/connections/${encodeURIComponent(serviceId)}`), 200, 'List Connector Connections')
-      if (!Array.isArray(connections.connections)) fail('Connector Connections must be an array.')
-      const page = await json(
-        await request(harness, `/v1/connector/connections/${encodeURIComponent(serviceId)}/page`, { body: JSON.stringify({ version: 1 }), method: 'POST' }),
-        200,
-        'Create Connector Connection page',
-      )
-      const url = new URL(requiredString(page.url, 'Connector Connection page URL'))
-      if (url.protocol != 'http:' && url.protocol != 'https:') fail('Connector Connection page URL must use HTTP.')
     },
   },
   {
@@ -1142,6 +1318,37 @@ export function selectableConnectorAccessControlApiConformanceCases(
   },
 ): readonly ControlApiConformanceCase[] {
   return [
+    {
+      name: 'selects services independently and removes their access bindings atomically',
+      async verify(harness) {
+        const api = client(harness)
+        const flow = await api.createFlow('Service selection', 'service-selection')
+        const initial = await api.getConnectorAccess(flow.flowId)
+        const added = await api.setConnectorService(flow.flowId, fixture.providerId, true, initial.accessRevision)
+        equal(added.accessRevision, initial.accessRevision + 1, 'Service selection revision')
+        equal(added.providerIds, [fixture.providerId], 'Selected services')
+        equal(added.bindings, [], 'Adding a service grants no account access')
+        equal(added.providerAccessDigest, initial.providerAccessDigest, 'Service-only edits preserve authority digest')
+        equal(await api.getConnectorAccess(flow.flowId), added, 'Service selection is persisted')
+        const selected = await api.addProviderAccessBinding(flow.flowId, fixture.providerId, fixture.accessBindingId, added.accessRevision)
+        const path = `/v1/flows/${encodeURIComponent(flow.flowId)}/connector-access/${encodeURIComponent(fixture.providerId)}/service`
+        for (const method of ['PUT', 'DELETE']) {
+          await error(
+            await request(harness, path, { method, body: JSON.stringify({ version: 1, expectedAccessRevision: initial.accessRevision }) }),
+            412,
+            'connector.access-conflict',
+            'Stale service selection',
+          )
+        }
+        equal(await api.getConnectorAccess(flow.flowId), selected, 'Stale edits preserve service access')
+        const removed = await api.setConnectorService(flow.flowId, fixture.providerId, false, selected.accessRevision)
+        equal(removed.accessRevision, selected.accessRevision + 1, 'Service removal revision')
+        equal(removed.providerIds, [], 'Service removed')
+        equal(removed.bindings, [], 'Removing service revokes all its bindings')
+        if (removed.providerAccessDigest == selected.providerAccessDigest) fail('Removing bound access must change the authority digest.')
+        equal(await api.getConnectorAccess(flow.flowId), removed, 'Removed service remains removed')
+      },
+    },
     {
       name: 'selects Provider access with optimistic concurrency',
       async verify(harness) {
@@ -1289,3 +1496,293 @@ export const controlRecoveryConformanceCases: readonly {
     },
   },
 ]
+
+export function eventSourceControlApiConformanceCases(fixture: {
+  readonly connection: ConnectorConnection
+  readonly teamId: string | null
+  readonly connectionPageUrl: string
+}): readonly ControlApiConformanceCase[] {
+  return [
+    {
+      name: 'manages event sources with scoped Connections, redacted credentials and revision conflicts',
+      async verify(harness) {
+        const api = client(harness)
+        const connections = await api.listEventSourceConnections(fixture.teamId)
+        if (!connections.some((item) => item.connectionId == fixture.connection.connectionId)) fail('Event source fixture Connection is missing.')
+        const input: CreateEventSource = {
+          version: 1,
+          name: 'Conformance event source',
+          connectionId: fixture.connection.connectionId,
+          teamId: fixture.teamId,
+          verificationToken: 'conformance-verification-secret',
+          encryptKey: 'conformance-encryption-secret',
+          eventTypes: ['im.message.receive_v1'],
+          manageSubscriptions: false,
+        }
+        const source = await api.createEventSource(input)
+        equal(source.appId, fixture.connection.providerAccountId, 'Verified application identity')
+        equal(source.teamId, fixture.teamId, 'Event source Team')
+        equal(source.connectionId, input.connectionId, 'Event source Connection')
+        equal(source.verificationTokenConfigured, true, 'Verification token configured')
+        equal(source.encryptKeyConfigured, true, 'Encryption key configured')
+        const listed = await api.listEventSources()
+        equal(
+          listed.sources.find((item) => item.sourceId == source.sourceId),
+          source,
+          'Created event source is listed',
+        )
+        if (JSON.stringify(listed).includes(input.verificationToken) || JSON.stringify(listed).includes(input.encryptKey))
+          fail('Event source credentials leaked.')
+        const flow = await api.createFlow('Event source scope', 'event-source-scope')
+        const scoped = await api.listEventSources(flow.flowId)
+        if (!Object.hasOwn(scoped, 'teamId')) fail('Flow-scoped event sources must return their Team identity.')
+        if (scoped.sources.some((item) => item.teamId != scoped.teamId)) fail('Event sources crossed Flow Team scope.')
+        equal(
+          scoped.sources.some((item) => item.sourceId == source.sourceId),
+          scoped.teamId == fixture.teamId,
+          'Event source visibility follows Flow Team',
+        )
+        await error(await request(harness, '/v1/event-sources?flowId=conformance.missing'), 404, 'flow.not-found', 'Missing event source Flow')
+        const path = `/v1/event-sources/${encodeURIComponent(source.sourceId)}`
+        const update = { version: 1 as const, expectedRevision: source.revision, name: 'Renamed source', enabled: false, eventTypes: ['approval_instance'] }
+        const updated = await api.updateEventSource(source.sourceId, update)
+        equal(updated.revision, source.revision + 1, 'Event source revision advances')
+        equal(updated.name, update.name, 'Event source rename')
+        equal(updated.enabled, false, 'Event source disabled')
+        equal(updated.eventTypes, update.eventTypes, 'Event source filters')
+        for (const method of ['PUT', 'DELETE']) {
+          await error(
+            await request(harness, path, { method, body: JSON.stringify(method == 'PUT' ? update : { version: 1, expectedRevision: source.revision }) }),
+            409,
+            'event-source.conflict',
+            'Stale event source revision',
+          )
+        }
+        equal(
+          (await api.listEventSources()).sources.find((item) => item.sourceId == source.sourceId),
+          updated,
+          'Conflicts preserve source',
+        )
+        await error(
+          await request(harness, '/v1/event-sources', { method: 'POST', body: JSON.stringify({ ...input, appId: 'cli_forged' }) }),
+          400,
+          'event-source.invalid',
+          'Reject client-supplied application identity',
+        )
+        await error(
+          await request(harness, path, { method: 'PUT', body: JSON.stringify({ ...update, expectedRevision: updated.revision, eventTypes: [] }) }),
+          400,
+          'event-source.invalid',
+          'Reject empty event filters',
+        )
+        await api.deleteEventSource(source.sourceId, updated.revision)
+        if ((await api.listEventSources()).sources.some((item) => item.sourceId == source.sourceId)) fail('Deleted event source remains listed.')
+        for (const method of ['PUT', 'DELETE']) {
+          await error(
+            await request(harness, path, { method, body: JSON.stringify(method == 'PUT' ? update : { version: 1, expectedRevision: updated.revision }) }),
+            404,
+            'event-source.not-found',
+            'Missing event source',
+          )
+        }
+        equal(
+          await api.createConnectorConnectionPage(fixture.connection.serviceId, undefined, fixture.teamId ?? undefined),
+          fixture.connectionPageUrl,
+          'Connection page uses the selected Team',
+        )
+      },
+    },
+  ]
+}
+
+export function runResultControlApiConformanceCases(fixture: {
+  readonly runId: string
+  readonly otherRunId: string
+  readonly results: readonly ResultInfo[]
+  readonly resultId: string
+  readonly value: { readonly rows: readonly number[] }
+}): readonly ControlApiConformanceCase[] {
+  return [
+    {
+      name: 'pages and downloads stored tool results within their owning Run',
+      async verify(harness) {
+        if (fixture.results.length != 51 || fixture.value.rows.length < 2) fail('Result fixture needs 51 results and at least two rows.')
+        const api = client(harness)
+        const expected = fixture.results.toSorted((a, b) => (a.resultId < b.resultId ? -1 : a.resultId > b.resultId ? 1 : 0))
+        const first = await api.listRunResults(fixture.runId)
+        equal(first.runId, fixture.runId, 'Result list Run')
+        equal(first.results, expected.slice(0, 50), 'Result page order and size')
+        const after = requiredString(first.nextAfter, 'Result continuation')
+        equal(after, expected[49]!.resultId, 'Result cursor')
+        const second = await api.listRunResults(fixture.runId, after)
+        equal(second.results, expected.slice(50), 'Result continuation excludes cursor')
+        equal(second.nextAfter, undefined, 'Result end of list')
+        equal((await api.listRunResults(fixture.otherRunId)).results, [], 'Other Run has no results')
+        const full = await api.readRunResult(fixture.runId, fixture.resultId)
+        equal(full.runId, fixture.runId, 'Result read Run')
+        equal(
+          full.result,
+          expected.find((item) => item.resultId == fixture.resultId),
+          'Result metadata',
+        )
+        equal(full.page.value, fixture.value, 'Complete result')
+        const page = await api.readRunResult(fixture.runId, fixture.resultId, { pointer: '/rows', limit: 1, maxBytes: 1000 })
+        equal(
+          page.page.entries?.map((entry) => entry.value),
+          fixture.value.rows.slice(0, 1),
+          'Result member page',
+        )
+        equal(page.page.nextOffset, 1, 'Result member continuation')
+        const next = await api.readRunResult(fixture.runId, fixture.resultId, { pointer: '/rows', offset: 1, limit: 1, maxBytes: 1000 })
+        equal(
+          next.page.entries?.map((entry) => entry.value),
+          fixture.value.rows.slice(1, 2),
+          'Next result member',
+        )
+        if (new TextEncoder().encode(JSON.stringify(page.page)).byteLength > 1000) fail('Result page exceeds byte budget.')
+        const path = `/v1/runs/${encodeURIComponent(fixture.runId)}/results/${encodeURIComponent(fixture.resultId)}`
+        const content = await request(harness, `${path}/content`)
+        equal(content.status, 200, 'Result download status')
+        equal(content.headers.get('content-type')?.split(';')[0], 'application/json', 'Result download type')
+        equal(content.headers.get('cache-control'), 'no-store', 'Result download cache policy')
+        if (!content.headers.get('content-disposition')?.startsWith('attachment;')) fail('Result download must be an attachment.')
+        const bytes = new Uint8Array(await content.arrayBuffer())
+        equal(bytes.byteLength, full.result.bytes, 'Result download byte count')
+        const digest = Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', bytes)), (byte) => byte.toString(16).padStart(2, '0')).join('')
+        equal(digest, full.result.digest, 'Result download digest')
+        equal(JSON.parse(new TextDecoder().decode(bytes)), fixture.value, 'Result download content')
+        for (const query of ['pointer=invalid', 'offset=-1', 'limit=0', 'maxBytes=0', 'pointer=%2Frows&offset=999']) {
+          await error(await request(harness, `${path}?${query}`), 400, 'run.invalid', 'Invalid result page')
+        }
+        for (const suffix of ['', '/content']) {
+          await error(
+            await request(harness, `/v1/runs/${encodeURIComponent(fixture.otherRunId)}/results/${encodeURIComponent(fixture.resultId)}${suffix}`),
+            404,
+            'flow.not-found',
+            'Result cannot cross Run boundary',
+          )
+        }
+      },
+    },
+  ]
+}
+
+export function pollControlApiConformanceCases(fixture: {
+  readonly definition: TriggerKeySnapshot & { readonly type: 'poll' }
+  readonly connectionId: string
+  readonly config: Readonly<Record<string, JsonValue>>
+  readonly field: string
+  readonly options: readonly TriggerConfigOption[]
+  readonly preview: PollTriggerTestResult
+}): readonly ControlApiConformanceCase[] {
+  return [
+    {
+      name: 'reads Trigger options and previews a Poll without creating Runs or changing Live state',
+      async verify(harness) {
+        const api = client(harness)
+        const flow = await api.createFlow('Poll controls', 'poll-controls')
+        const changed = await json(
+          await changeRequest(harness, flow.flowId, flow.draftRevisionId, [
+            { kind: 'binding.create', bindingId: 'connection', binding: { kind: 'connection', target: fixture.connectionId } },
+            {
+              kind: 'graph.node.create',
+              nodeId: 'poll',
+              target: { kind: 'flow' },
+              node: {
+                kind: 'poll',
+                name: 'Poll',
+                bindingId: 'connection',
+                definition: fixture.definition,
+                config: Object.fromEntries(Object.entries(fixture.config).map(([key, value]) => [key, { kind: 'value', value }])),
+                pollTimes: [{ type: 'every', unit: 'minute', value: 5 }],
+              },
+            },
+          ]),
+          200,
+          'Create Poll',
+        )
+        const draft = await api.getDraft(flow.flowId)
+        equal(await api.listTriggerConfigOptions(flow.flowId, 'poll', fixture.field), fixture.options, 'Dynamic Trigger options')
+        equal(await api.getDraft(flow.flowId), draft, 'Reading options preserves Draft')
+        equal((await api.listFlowTriggerBindings(flow.flowId)).length, 0, 'Reading options does not create Live binding')
+        await completePublish(
+          harness,
+          await publishRequest(harness, flow.flowId, changedRevisionId(changed, 'Poll Revision'), null, 'poll-publish'),
+          202,
+          'Publish Poll',
+        )
+        const before = await api.getFlowTriggerBinding(flow.flowId, 'poll')
+        equal(await api.testFlowPollTrigger(flow.flowId, 'poll'), fixture.preview, 'Poll preview response')
+        equal(await api.testFlowPollTrigger(flow.flowId, 'poll'), fixture.preview, 'Preview does not consume events')
+        equal(await api.getFlowTriggerBinding(flow.flowId, 'poll'), before, 'Preview preserves Live binding')
+        equal((await api.listRuns(flow.flowId)).runs, [], 'Options and preview do not admit Runs')
+        const base = `/v1/flows/${encodeURIComponent(flow.flowId)}/triggers`
+        await error(await request(harness, `${base}/poll/options/conformance.missing`), 409, 'trigger-key.invalid', 'Unknown option field')
+        await error(
+          await request(harness, `${base}/missing/test`, { method: 'POST', body: JSON.stringify({ version: 1 }) }),
+          404,
+          'trigger.not-found',
+          'Missing Poll binding',
+        )
+      },
+    },
+  ]
+}
+
+export function connectorScopeControlApiConformanceCases(fixture: {
+  readonly scopes: readonly [
+    { readonly flowId: string; readonly connections: readonly ConnectorConnection[] },
+    { readonly flowId: string; readonly connections: readonly ConnectorConnection[] },
+  ]
+}): readonly ControlApiConformanceCase[] {
+  return [
+    {
+      name: 'isolates Connector Connections and conditional responses between Flows',
+      async verify(harness) {
+        const [first, second] = fixture.scopes
+        if (dequal(first.connections, second.connections)) fail('Scope fixture must expose distinct Connection lists.')
+        const api = client(harness)
+        const services = new Set(fixture.scopes.flatMap((scope) => scope.connections.map((connection) => connection.serviceId)))
+        let previousETag: string | undefined
+        for (const scope of fixture.scopes) {
+          equal(await api.listAllConnectorConnections(undefined, scope.flowId), scope.connections, 'Flow Connection authority')
+          for (const service of services) {
+            equal(
+              await api.listConnectorConnections(service, undefined, scope.flowId),
+              scope.connections.filter((connection) => connection.serviceId == service),
+              'Service Connection authority',
+            )
+          }
+          const path = `/v1/connector/connections?flowId=${encodeURIComponent(scope.flowId)}`
+          const response = await request(harness, path, { headers: previousETag == null ? {} : { 'if-none-match': previousETag } })
+          equal(response.status, 200, 'Another Flow cannot reuse a different Connection representation')
+          previousETag = requiredString(response.headers.get('etag'), 'Scoped Connection ETag')
+          await revalidate(harness, path)
+        }
+      },
+    },
+  ]
+}
+
+export function draftRepairControlApiConformanceCases(fixture: {
+  readonly flowId: string
+  readonly revisionId: string
+  readonly content: RevisionContent
+}): readonly ControlApiConformanceCase[] {
+  return [
+    {
+      name: 'repairs an unreadable Draft into the expected readable child Revision',
+      async verify(harness) {
+        const api = client(harness)
+        const presentation = await api.getPresentation(fixture.flowId)
+        const changed = await api.repairDraft(fixture.flowId, fixture.revisionId, 'repair-unreadable')
+        equal(changed.revision.parentRevisionId, fixture.revisionId, 'Unreadable repair parent')
+        const editor = await api.getEditor(fixture.flowId)
+        equal(editor.draft.revisionId, changed.revision.revisionId, 'Repaired editor Revision')
+        equal(editor.draft.content, fixture.content, 'Repaired content retains readable entries')
+        equal(editor.presentation, presentation, 'Repair preserves layout')
+        equal(await api.repairDraft(fixture.flowId, fixture.revisionId, 'repair-unreadable'), changed, 'Unreadable repair replay')
+      },
+    },
+  ]
+}

@@ -300,10 +300,11 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
       .replaceAll("'../../localization/common/languages.ts'", "'./localization.js'")
       .replaceAll("'../../control/common/triggerCatalog.ts'", "'./trigger-catalog.js'")
-    const controlApiConformanceDeclaration = (await readFile(path.join(declarationRoot, 'control/common/conformance.d.ts'), 'utf8')).replaceAll(
-      "'./providerAccess.ts'",
-      "'./providerAccess.js'",
-    )
+    const controlApiConformanceDeclaration = (await readFile(path.join(declarationRoot, 'control/common/conformance.d.ts'), 'utf8'))
+      .replaceAll("'./providerAccess.ts'", "'./providerAccess.js'")
+      .replaceAll("'./api.ts'", "'./control-api.js'")
+      .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
+      .replaceAll("'../../trigger/common/configOptions.ts'", "'./trigger-config-options.js'")
     const controlApiErrorsDeclaration = await readFile(path.join(declarationRoot, 'control/common/errors.d.ts'), 'utf8')
     const flowEncodingDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/encoding.d.ts'), 'utf8'))
       .replaceAll("'./changeSchema.ts'", "'../browser/flow-change-schema.js'")

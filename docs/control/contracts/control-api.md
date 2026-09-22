@@ -3,6 +3,24 @@
 本文记录 Open Flow Control API 跨部署成立的 HTTP 合同。数据库、认证 provider、事务实现、调度器和部署资源不属于本文。
 公共 black-box cases 由 `@oomol-lab/open-flow/control-api-conformance` 导出。
 
+部署应运行适用的完整 profile，而不仅导入公共类型或测试自身客户端 mock。cases 使用真实 HTTP transport，
+并复用公共 `ControlClient` 的响应 decoder；fixtures 只准备确定性数据和外部能力，不替代被测路由。
+
+| Profile                                                                                                    | 部署 fixture 要求                                                                                                                                              |
+| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `controlApiConformanceCases`、`publicationControlApiConformanceCases`、`triggerControlApiConformanceCases` | 每个 case 使用隔离的数据；支持 Flow、发布、Trigger 目录与 Webhook，标记 `runtime` 的 case 启动执行器                                                           |
+| `connectorControlApiConformanceCases`                                                                      | 无 scope 和新建 Flow 中均提供至少一个 Provider、Action；支持按名称搜索、授权页和条件读取；implicit access                                                      |
+| `selectableConnectorAccessControlApiConformanceCases(fixture)`                                             | selectable access；提供可添加的 Provider 和有效账号授权候选，初始 Flow 无服务选择或授权                                                                        |
+| `connectorScopeControlApiConformanceCases(fixture)`                                                        | 两个已存在 Flow，账号列表不同；提供每个 Flow 的精确 Connection 列表，至少一份非空                                                                              |
+| `eventSourceControlApiConformanceCases(fixture)`                                                           | 可创建事件源的 active `feishu_app_bot` Connection，含可信 `providerAccountId`，以及所属 `teamId` 和预期授权页 `connectionPageUrl`；该应用尚无事件源            |
+| `pollControlApiConformanceCases(fixture)`                                                                  | 已注册的 Poll definition、Connection、有效配置、动态选项及确定性 preview；发布后 baseline 就绪，preview 不推进 checkpoint；测试期间不自动调度                  |
+| `runResultControlApiConformanceCases(fixture)`                                                             | 一个 Run 保存恰好 51 项结果；另一 Run 无结果。指定一项正文为 `{ rows: number[] }` 的结果，至少两行，完整 JSON 不超过默认 15,000 bytes；提供各结果真实 metadata |
+| `draftRepairControlApiConformanceCases(fixture)`                                                           | 已存在的不可读或需升级 Draft，提供其 Flow、Revision identity 和修复后预期 content；保留可恢复条目                                                              |
+
+每个 factory 返回的 cases 都必须执行；不要因为部署缺少接口而跳过对应验证。Connector scope、事件源、Poll 和结果 profile
+分别由支持这些能力的部署准备数据。已有基础 profile 不会自动执行需要 fixture 的 factory。
+部署可以通过存储层准备历史损坏 Revision 或已保存的工具结果，但验证过程只走公共 HTTP；不要调用外部生产服务生成测试数据。
+
 ## 1. Transport
 
 - 路径以 `/v1` 开头；resource identity 放入 path segment 时使用 UTF-8 percent encoding。
@@ -25,7 +43,7 @@
 ```
 
 客户端只按稳定 `code` 分支。当前错误域包括 `authentication.*`、`authorization.*`、`flow.*`、`live.*`、`publication.*`、`run.*`、
-`trigger.*`、`trigger-key.*`、`connector.*`、`variable.*`、`binding.*`、`engine.*`、`page.*` 和 `route.*`；精确 code 集合由
+`trigger.*`、`trigger-key.*`、`connector.*`、`event-source.*`、`variable.*`、`binding.*`、`engine.*`、`page.*` 和 `route.*`；精确 code 集合由
 `@oomol-lab/open-flow/control-api` 的 `controlErrorCode` 导出。`message` 用于展示和排查，应在已知时说明请求被拒绝的直接原因，但不是稳定的机器合同，
 也不能包含 credential、请求 payload 或其他敏感值。
 
@@ -127,7 +145,7 @@ Draft sync 始终返回当前完整 snapshot，不接受 revision cursor，也�
 无法按当前模型读取但可以宽容恢复的 Draft 分别返回 `flow.upgrade-required` 或 `flow.repair-required`。客户端可以调用
 `POST /v1/flows/{flowId}/draft/repair`，body 为 `{ expectedRevisionId, version: 1 }` 并提供 `Idempotency-Key`。修复逐项保留
 当前模型可读取的资源，丢弃无法读取的 collection entry，并以旧 Draft 为 parent 创建新 Revision；原 Revision、Live、Publication、Run 和
-Presentation 不变。高于当前模型的版本、无效信封及无法解析的内容返回 `flow.invalid`。
+Presentation 不变。无法恢复任何内容时，显式 repair 创建空白子 Revision；普通读取仍按原错误返回，不会隐式修复。
 
 Draft 请求的 operations 使用 `@oomol-lab/open-flow/control-requests` 的 `DraftOperation`：包含完整 ChangeOperation，以及 `graph.trigger.create`。
 后者接受 `nodeId`、`bindingId`、Provider `key`、`config` 和可选的 `connectionId`、`name`、`schedule`。仅在根 Flow 创建 Poll/Integration；schedule 仅供 Poll 使用，默认每五分钟。
@@ -511,6 +529,40 @@ Connector credential 不进入响应、Revision 或 RunEvent。
 执行请求也不得为了该 Action 合成 Connection identity。`true` 表示执行需要有效 Connection。
 部署没有配置 Connector 时，catalog、Connection 请求和 Connector Task 运行失败返回 `connector.unconfigured`；已经配置但上游不可用或响应无效时返回
 `connector.unavailable`，客户端不能把两者合并为同一配置提示。
+
+### 事件源管理
+
+事件源是部署资源，当前创建接口支持 `feishu_app_bot` 应用。管理接口复用 Control API 认证；响应不包含 Verification Token 或 Encrypt Key。
+`teamId` 是显式 Connector Team identity；无 Team 的部署传 `null`。Flow scope 用 `flowId` 表达，不能用 Team identity 替代。
+
+| Method   | 路由                            | 请求                               | 成功响应                                                 |
+| -------- | ------------------------------- | ---------------------------------- | -------------------------------------------------------- |
+| `GET`    | `/v1/event-sources`             | 可选 `flowId` query                | `200 { version: 1, sources: EventSource[], teamId? }`    |
+| `GET`    | `/v1/event-sources/connections` | 可选 `teamId` query                | `200 { version: 1, connections: ConnectorConnection[] }` |
+| `POST`   | `/v1/event-sources`             | `CreateEventSource`                | `201 EventSource`                                        |
+| `PUT`    | `/v1/event-sources/:sourceId`   | `UpdateEventSource`                | `200 EventSource`                                        |
+| `DELETE` | `/v1/event-sources/:sourceId`   | `{ version: 1, expectedRevision }` | `200 { version: 1 }`                                     |
+
+`CreateEventSource` 为 `{ version: 1, name, connectionId, teamId: string | null, verificationToken, encryptKey, eventTypes: string[], manageSubscriptions: boolean }`。
+`UpdateEventSource` 为 `{ version: 1, expectedRevision, name, enabled: boolean, eventTypes: string[], verificationToken?, encryptKey? }`；省略 secret 时保留原值。
+更新不能修改 Connection、Team 或应用身份。创建不接受调用方传入 `appId` 或 `provider`，应用身份来自所选 active Connection。
+
+请求不接受额外字段。`name` trim 后为 1–128 字符；Connection / Team ID 为 1–256 字符；secret 为 1–256 字符。
+`eventTypes` 包含 1–200 个互不重复的值，各值匹配 `^[a-z][a-z0-9_.]{0,127}$`；`expectedRevision` 为正整数。
+非法请求返回 `400 event-source.invalid`；无法获取可信应用身份返回 `409 event-source.identity-unavailable`。
+
+`EventSource` 为 `{ version: 1, sourceId, revision, name, provider, appId, connectionId, teamId, enabled, eventTypes, manageSubscriptions,
+verificationTokenConfigured, encryptKeyConfigured, endpointUrl, verifiedAt, lastReceivedAt, updatedAt, consumers }`。
+`provider` 为 `feishu` 或 `feishu_app_bot`；`endpointUrl`、`verifiedAt`、`lastReceivedAt` 可为 `null`。
+`consumers` 为 `{ flowId, flowName, triggerNodeId }[]`。secret 只通过两个 `*Configured` boolean 投影，不回传原文。
+
+带 `flowId` 的列表先检查 Flow 存在，仅返回该 Flow 所属 Team 的事件源，并始终包含 `teamId`（可为 `null`）；
+不存在的 Flow 返回 `404 flow.not-found`。省略 `flowId` 时返回当前管理身份可见的事件源。
+连接列表使用显式 Team scope；需要选择 Team 时不能静默采用不同 Team。
+
+更新成功后递增 `revision`；过期的更新或删除返回 `409 event-source.conflict`，不得修改原状态。
+应用已有事件源、资源上限、删除仍被发布中或已发布 Trigger 使用的事件源，以及删除这些 Trigger 仍需要的事件类型，也返回该 conflict。
+不存在的事件源返回 `404 event-source.not-found`。这些管理接口不使用 `Idempotency-Key`，并发控制由 `expectedRevision` 负责。
 
 ### Provider Access Binding
 
