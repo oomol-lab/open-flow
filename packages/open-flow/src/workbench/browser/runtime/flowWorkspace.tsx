@@ -2,6 +2,7 @@ import type { ComponentProps, ReactElement } from 'react'
 import type { WorkbenchLocation, WorkbenchTheme } from './contract.ts'
 import type { AddNodeOption } from './editor/addNodeOptions.ts'
 import type { WorkbenchCanvasHandle } from './editor/workbenchCanvas.tsx'
+import type { ConnectorAccountReference } from './revisionView.ts'
 
 import { memo, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
@@ -106,6 +107,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   const variableNames = useVal(store.$.variableNames)
   const variableNamesLoaded = useVal(store.$.variableNamesLoaded)
   const variableNamesLoading = useVal(store.$.variableNamesLoading)
+  const connectorSetupPending = useVal(store.$.connectorSetupPending)
   const connectorAction = useVal(store.connectors.$.selectedAction)
   const accessState = useVal(store.connectorAccess.$)
   const connectorAccess = accessState.access
@@ -169,7 +171,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
       connectors={store.connectors}
       prepareConnectorAction={(action) => store.prepareConnectorAction(action)}
       onConfigureConnectorAccess={(serviceId) => store.connectorAccess.configure(serviceId)}
-      connectorLoading={connectorActionLoading != null || connectorConnectionLoading != null}
+      connectorLoading={connectorSetupPending || accessState.loading || connectorActionLoading != null || connectorConnectionLoading != null}
       focus={focus}
       disabled={disabled}
       revision={revision}
@@ -240,6 +242,20 @@ export function FlowEditor({
     selectedNodeIds,
     onSelectNodes: (ids) => store.selectNodes(ids),
   })
+  const [accountReference, setAccountReference] = useState<ConnectorAccountReference>()
+  useEffect(() => {
+    if (accountReference == null) return
+    if (
+      target?.kind != accountReference.target.kind ||
+      (target?.kind == 'subflow' && accountReference.target.kind == 'subflow' && target.id != accountReference.target.id)
+    ) {
+      if (!store.workspace.selectTarget(accountReference.target)) setAccountReference(undefined)
+      return
+    }
+    panel.activate([accountReference.nodeId])
+    store.workspace.locateNode(accountReference.nodeId, { preserveSelection: true })
+    setAccountReference(undefined)
+  }, [accountReference, target])
   const designerRef = useRef<WorkbenchCanvasHandle>(null)
   const accessConfiguration = useVal(store.connectorAccess.$).configuration
   useEffect(() => {
@@ -481,7 +497,7 @@ export function FlowEditor({
           title={contextPanelTitle}
         >
           <div hidden={!flowSelected} className={flowSelected ? 'flex h-full min-h-0 flex-col' : 'hidden'}>
-            <ConnectorAccessSettings onManage={onManageConnectorAccess} store={store} />
+            <ConnectorAccessSettings onManage={onManageConnectorAccess} onSelectReference={setAccountReference} store={store} />
             <div className="min-h-0 flex-1">
               <FlowNodeList key={JSON.stringify([flowId, target])} groupTriggers nodes={designer.nodes} onFocusNode={focusNode} onSelect={selectOutlineNode} />
             </div>

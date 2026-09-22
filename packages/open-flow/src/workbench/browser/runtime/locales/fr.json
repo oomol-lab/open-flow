@@ -86,7 +86,11 @@
     "defaultPolicy": "Autorisations par défaut de l’équipe",
     "reauthorize": "Nouvelle autorisation requise",
     "discardedBindings": "Certaines autorisations enregistrées sont illisibles. Configurez-les à nouveau.",
-    "usedByFlow": "Référencé par des nœuds",
+    "accountReferences": "Références du compte :",
+    "pendingAccountReferences": "Compte à choisir :",
+    "nodeReferences": "Référencé par :",
+    "moreReferences": "{{count}} de plus",
+    "dynamicCodeReferences": "Les nœuds de code peuvent utiliser les autorisations de ce Flow dynamiquement et ne figurent pas dans les références directes.",
     "noAccountSelected": "Aucun compte sélectionné",
     "removeAuthorization": "Retirer l’autorisation",
     "saving": "Enregistrement…"

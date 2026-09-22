@@ -238,7 +238,7 @@ export function ConnectorAccount({
     <section className={`connection-state ${required ? 'required' : ''}`} data-inspector-section="account">
       <h3 className="inspector-section-title">
         <Icon name="connection" size={15} />{' '}
-        {t(accessIssue != null ? 'inspector.account.accessTitle' : required ? 'inspector.account.required' : 'inspector.account.title')}
+        {t(!pending && accessIssue != null ? 'inspector.account.accessTitle' : required ? 'inspector.account.required' : 'inspector.account.title')}
         {onManage != null && (
           <Button className="ml-auto" disabled={disabled} onClick={onManage} size="xs" type="button" variant="ghost">
             {t('inspector.account.manageFlowAccess')}

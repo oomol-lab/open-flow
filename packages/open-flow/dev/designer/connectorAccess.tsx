@@ -16,11 +16,21 @@ import { createInspectorTransport } from './inspectorSession.ts'
 const content: RevisionContent = {
   document: {
     bindings: {},
-    graph: { edges: [], nodes: { mail: { inputs: {}, kind: 'task', taskId: 'mail' } } },
+    graph: {
+      edges: [],
+      nodes: {
+        mail: { inputs: {}, kind: 'task', taskId: 'mail' },
+        receipt: { inputs: {}, kind: 'task', taskId: 'mail', name: 'Send receipt' },
+        reminder: { inputs: {}, kind: 'task', taskId: 'mail', name: 'Send reminder' },
+        pending: { inputs: {}, kind: 'task', taskId: 'pending', name: 'Send notification' },
+        code: { inputs: {}, kind: 'task', name: 'Process response', task: { name: 'Process response', moduleId: 'code', inputs: [], outputs: [] } },
+      },
+    },
     subflows: {},
     tasks: {
+      pending: { executor: { action: 'mail.send', kind: 'connector' }, inputs: [], outputs: [], name: 'Send notification' },
       mail: {
-        executor: { action: 'mail.send', kind: 'connector' },
+        executor: { action: 'mail.send', kind: 'connector', connectionId: 'mail-default' },
         inputs: [],
         name: 'Send mail',
         outputs: [],
@@ -28,7 +38,7 @@ const content: RevisionContent = {
     },
   },
   modelVersion: currentFlowModelVersion,
-  modules: {},
+  modules: { code: { name: 'Process response', source: 'export default () => ({})', imports: [] } },
 }
 const emptyContent: RevisionContent = {
   document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} },
@@ -95,7 +105,7 @@ function Sample({
   readonly noAuth?: boolean
   readonly noCandidates?: boolean
   readonly configure?: boolean
-  readonly accountPending?: 'metadata' | 'connections'
+  readonly accountPending?: 'metadata' | 'connections' | 'setup'
   readonly language: UiLanguage
 }) {
   const i18n = useMemo(() => createI18n(language), [language])
@@ -122,7 +132,13 @@ function Sample({
       <h3 className="mb-2 text-sm font-medium">{label}</h3>
       <div className="grid h-[480px] overflow-hidden rounded-lg border border-border">
         <EditorContextPanel focusOnOpen={false} icon="flow" onClose={() => {}} theme={dark ? 'dark' : 'light'} title="Flow outline">
-          {store != null && <ConnectorAccessSettings onManage={(flowId) => log('connector-access.manage', flowId)} store={store} />}
+          {store != null && (
+            <ConnectorAccessSettings
+              onSelectReference={(reference) => log('connector-access.reference', reference)}
+              onManage={(flowId) => log('connector-access.manage', flowId)}
+              store={store}
+            />
+          )}
           {store != null && (noCandidates || accountPending != null || connectionStatus != null) && (
             <div className="p-3">
               <ConnectorAccount
@@ -144,11 +160,13 @@ function Sample({
                 actionId="mail.send"
                 accessError={noCandidates ? i18n.t('notice.error.connectorAccessRequired') : undefined}
                 activeConnections={
-                  accountPending != null
-                    ? undefined
-                    : connectionStatus == null
-                      ? []
-                      : [{ connectionId: 'mail-account', displayName: 'Work account', isDefault: true, serviceId: 'mail', status: connectionStatus }]
+                  accountPending == 'setup'
+                    ? []
+                    : accountPending != null
+                      ? undefined
+                      : connectionStatus == null
+                        ? []
+                        : [{ connectionId: 'mail-account', displayName: 'Work account', isDefault: true, serviceId: 'mail', status: connectionStatus }]
                 }
                 authorizationPending={false}
                 connection={undefined}
@@ -157,7 +175,7 @@ function Sample({
                 connectors={store.connectors}
                 disabled={false}
                 fieldIdPrefix="unconnected-mail"
-                loading={false}
+                loading={accountPending == 'setup'}
                 taskId="mail"
                 onConfigureAccess={() => store.connectorAccess.configure('mail')}
               />
@@ -179,8 +197,14 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
     readonly noAuth?: boolean
     readonly noCandidates?: boolean
     readonly configure?: boolean
-    readonly accountPending?: 'metadata' | 'connections'
+    readonly accountPending?: 'metadata' | 'connections' | 'setup'
   }[] = [
+    {
+      access: { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 },
+      accountPending: 'setup',
+      noCandidates: true,
+      label: 'New node: configuring account',
+    },
     ...(['metadata', 'connections'] as const).map((accountPending) => ({
       access: { accessRevision: 0, bindings: [], mode: 'implicit' as const, providerAccessDigest: 'implicit:lab', version: 1 as const },
       accountPending,
@@ -320,7 +344,7 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
 
 export const connectorAccessStory: FrontendStory = {
   description:
-    'Compact service cards using production settings, with shared framing for accounts and unconnected services: expand the multiple-Provider sample and scroll to its last connection. Account saves take 800 ms so immediate checkbox feedback and the saving status can be inspected. Covers compact summaries, bounded scrolling, long names, deployment-managed, invalid binding, empty candidate, and load failure states. Each service requiring authorization has a persistent account menu with Add account and Remove authorization; empty and expired account states retain direct recovery actions. Add service opens a searchable virtual service picker at the end of the expanded list, remains available in the empty state, and can configure GitHub even when the Flow does not reference it. Node account management and add-account entries expand Flow access and focus Mail without adding inline guidance; the empty candidate sample offers the same route before authorization.',
+    'Compact service cards with account references (first two plus expansion), pending account selection, and a dynamic code notice using production settings, with shared framing for accounts and unconnected services: expand the multiple-Provider sample and scroll to its last connection. Account saves take 800 ms so immediate checkbox feedback and the saving status can be inspected. Covers compact summaries, bounded scrolling, long names, deployment-managed, invalid binding, empty candidate, and load failure states. Each service requiring authorization has a persistent account menu with Add account and Remove authorization; empty and expired account states retain direct recovery actions. Add service opens a searchable virtual service picker at the end of the expanded list, remains available in the empty state, and can configure GitHub even when the Flow does not reference it. Node account management and add-account entries expand Flow access and focus Mail without adding inline guidance; the empty candidate sample offers the same route before authorization.',
   group: 'Workbench',
   id: 'connector-access',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,

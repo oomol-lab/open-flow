@@ -86,7 +86,11 @@
     "defaultPolicy": "팀 기본 권한",
     "reauthorize": "재승인 필요",
     "discardedBindings": "저장된 일부 권한을 읽을 수 없습니다. 다시 설정하세요.",
-    "usedByFlow": "노드에서 참조됨",
+    "accountReferences": "계정 참조:",
+    "pendingAccountReferences": "계정 선택 필요:",
+    "nodeReferences": "참조:",
+    "moreReferences": "{{count}}개 더",
+    "dynamicCodeReferences": "코드 노드는 이 Flow의 권한을 동적으로 사용할 수 있으며 직접 참조에 포함되지 않습니다.",
     "noAccountSelected": "선택한 계정 없음",
     "removeAuthorization": "권한 제거",
     "saving": "저장 중…"

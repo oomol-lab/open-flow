@@ -59,6 +59,7 @@ interface TaskNodeReference {
 const views = new WeakMap<Draft, RevisionView>()
 
 export class RevisionView {
+  public readonly connectorReferences: ReturnType<typeof connectorAccessReferences>
   public readonly connectorActionIds: ReadonlySet<string>
   public readonly connectorProviderIds: ReadonlySet<string>
   readonly #document: FlowDocument
@@ -70,6 +71,7 @@ export class RevisionView {
   public constructor(public readonly revision: Draft) {
     this.#document = revision.content.document
     this.#modules = revision.content.modules
+    this.connectorReferences = connectorAccessReferences(this.#document)
     const connectorActionIds = new Set<string>()
     const tasks = Object.fromEntries(
       [...referencedTaskIds(this.#document)].flatMap((id) => (this.#document.tasks[id] == null ? [] : [[id, this.#document.tasks[id]]])),
@@ -264,4 +266,54 @@ export function revisionView(revision: Draft): RevisionView {
     views.set(revision, view)
   }
   return view
+}
+
+export interface ConnectorAccountReference {
+  readonly providerId: string
+  readonly connectionId?: string
+  readonly nodeId: string
+  readonly name: string
+  readonly target: GraphTarget
+}
+
+function connectorAccessReferences(document: FlowDocument): { readonly accounts: readonly ConnectorAccountReference[]; readonly hasCode: boolean } {
+  const accounts: ConnectorAccountReference[] = []
+  let hasCode = false
+  const graphs = [
+    { graph: document.graph, target: { kind: 'flow' } as GraphTarget, name: '' },
+    ...Object.entries(document.subflows).map(([id, subflow]) => ({ graph: subflow.graph, target: { kind: 'subflow', id } as GraphTarget, name: subflow.name })),
+  ]
+  for (const { graph, target, name: graphName } of graphs) {
+    for (const [nodeId, node] of Object.entries(graph.nodes)) {
+      const task = node.kind == 'task' && node.taskId != null ? document.tasks[node.taskId] : undefined
+      const name = [graphName, node.name ?? task?.name ?? nodeId].filter(Boolean).join(' / ')
+      const add = (providerId: string, connectionId?: string): void => {
+        if (
+          !accounts.some(
+            (item) =>
+              item.target.kind == target.kind &&
+              (target.kind == 'flow' || (item.target.kind == 'subflow' && item.target.id == target.id)) &&
+              item.nodeId == nodeId &&
+              item.providerId == providerId &&
+              item.connectionId == connectionId,
+          )
+        ) {
+          accounts.push({ providerId, ...(connectionId == null ? {} : { connectionId }), nodeId, name, target })
+        }
+      }
+      if (node.kind == 'poll' || node.kind == 'integration') {
+        const binding = document.bindings[node.bindingId]
+        add(node.definition.provider, binding?.kind == 'connection' ? binding.target : undefined)
+      } else if (node.kind == 'task') {
+        if (node.task != null) hasCode = true
+        if (task?.executor.kind == 'connector') add(task.executor.action.split('.')[0]!, task.executor.connectionId)
+        if (task?.executor.kind == 'agent') {
+          for (const tool of task.executor.tools) add(tool.action.split('.')[0]!, tool.connectionId)
+          const notice = task.executor.notification == null ? undefined : document.tasks[task.executor.notification.taskId]?.executor
+          if (notice?.kind == 'connector') add(notice.action.split('.')[0]!, notice.connectionId)
+        }
+      }
+    }
+  }
+  return { accounts, hasCode }
 }

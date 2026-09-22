@@ -84,3 +84,12 @@ it('asks an administrator for help when the current user is denied permission', 
   expect(markup).not.toContain('重试')
   expect(markup).not.toContain('选择可用账号')
 })
+
+it('shows a neutral loading account section while a newly added node is being configured', () => {
+  const markup = renderAccount({ loading: true })
+  expect(markup).toContain(i18n.t('inspector.account.loading'))
+  expect(markup).toContain(i18n.t('inspector.account.title'))
+  expect(markup).not.toContain(i18n.t('inspector.account.accessTitle'))
+  expect(markup).not.toContain(i18n.t('notice.error.connectorAccessRequired'))
+  expect(markup).not.toContain('选择可用账号')
+})

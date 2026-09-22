@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
 import type { ConnectorAccess } from '../../../../control/common/api.ts'
 import type { RevisionView } from '../revisionView.ts'
+import type { ConnectorAccountReference } from '../revisionView.ts'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 
 import { useEffect, useId, useRef, useState } from 'react'
@@ -26,10 +27,12 @@ function connectorAccessProviderIds(revision: RevisionView | undefined, access: 
 
 export function ConnectorAccessSettings({
   onManage,
+  onSelectReference,
   store,
 }: {
   readonly onManage?: ((flowId: string) => void) | undefined
   readonly store: WorkbenchStore
+  readonly onSelectReference?: ((reference: ConnectorAccountReference) => void) | undefined
 }): ReactElement | null {
   const t = useTranslate()
   const titleId = useId()
@@ -39,6 +42,7 @@ export function ConnectorAccessSettings({
   const configurationTarget = useRef<HTMLDivElement>(null)
   const flowId = useVal(store.workspace.$.flowId)
   const revision = useVal(store.workspace.$.revision)
+  const references = revision?.connectorReferences ?? { accounts: [], hasCode: false }
   const state = useVal(store.connectorAccess.$)
   const [expandedFlowId, setExpandedFlowId] = useState<string>()
   const providers = useVal(store.workspace.catalogs.providers.get(undefined, language))
@@ -179,9 +183,13 @@ export function ConnectorAccessSettings({
                               <span className="flex min-w-0 items-center gap-2 text-xs font-medium">
                                 <ContentIcon src={provider.icon} className="size-4 shrink-0 data-[icon-kind=initials]:text-[20px]" />
                                 <span>{provider.serviceName}</span>
-                                {usedByFlow && <span className="text-[11px] font-normal text-muted-foreground">{t('connectorAccess.usedByFlow')}</span>}
                               </span>
                               <span className="text-xs text-muted-foreground">{t('connectorAccess.noAuthorization')}</span>
+                              <AccountReferences
+                                references={references.accounts.filter((item) => item.providerId == provider.serviceId)}
+                                label={t('connectorAccess.nodeReferences')}
+                                onSelect={onSelectReference}
+                              />
                             </div>
                           )
                         }
@@ -211,7 +219,6 @@ export function ConnectorAccessSettings({
                               <span className="flex min-w-0 items-center gap-2 text-xs font-medium">
                                 <ContentIcon src={provider.icon} className="size-4 shrink-0 data-[icon-kind=initials]:text-[20px]" />
                                 <span>{provider.serviceName}</span>
-                                {usedByFlow && <span className="text-[11px] font-normal text-muted-foreground">{t('connectorAccess.usedByFlow')}</span>}
                               </span>
                               <div className="ml-auto flex items-center gap-2">
                                 {saving && (
@@ -264,28 +271,46 @@ export function ConnectorAccessSettings({
                               const groupLabel = connectorAccessPermissionGroupLabel(option, t)
                               const permissionLabel = connectorAccessPermissionLabel(option, t)
                               return (
-                                <Label className="min-w-0 items-start py-1 text-xs font-normal" key={option.accessBindingId}>
-                                  <Checkbox
-                                    checked={pending?.selected ?? binding != null}
-                                    aria-busy={pending != null || undefined}
-                                    className="mt-px"
-                                    disabled={state.savingProviderId != null}
-                                    onCheckedChange={(checked) =>
-                                      void store.connectorAccess.select(provider.serviceId, option.accessBindingId, checked === true)
-                                    }
-                                  />
-                                  <span className="min-w-0 flex-1 leading-4">
-                                    <span className="block wrap-anywhere">{option.connectionDisplayName}</span>
-                                    <span className="block text-[11px] text-muted-foreground wrap-anywhere">
-                                      {permissionLabel == null ? groupLabel : `${groupLabel} · ${permissionLabel}`}
+                                <div key={option.accessBindingId}>
+                                  <Label className="min-w-0 items-start py-1 text-xs font-normal">
+                                    <Checkbox
+                                      checked={pending?.selected ?? binding != null}
+                                      aria-busy={pending != null || undefined}
+                                      className="mt-px"
+                                      disabled={state.savingProviderId != null}
+                                      onCheckedChange={(checked) =>
+                                        void store.connectorAccess.select(provider.serviceId, option.accessBindingId, checked === true)
+                                      }
+                                    />
+                                    <span className="min-w-0 flex-1 leading-4">
+                                      <span className="block wrap-anywhere">{option.connectionDisplayName}</span>
+                                      <span className="block text-[11px] text-muted-foreground wrap-anywhere">
+                                        {permissionLabel == null ? groupLabel : `${groupLabel} · ${permissionLabel}`}
+                                      </span>
                                     </span>
-                                  </span>
-                                  {binding != null && binding.status != 'active' && (
-                                    <span className="shrink-0 leading-4 text-destructive">{t('connectorAccess.status', { status: binding.status })}</span>
+                                    {binding != null && binding.status != 'active' && (
+                                      <span className="shrink-0 leading-4 text-destructive">{t('connectorAccess.status', { status: binding.status })}</span>
+                                    )}
+                                  </Label>
+                                  {option.connectionId != null && (
+                                    <div className="pl-6">
+                                      <AccountReferences
+                                        references={references.accounts.filter(
+                                          (item) => item.providerId == provider.serviceId && item.connectionId == option.connectionId,
+                                        )}
+                                        label={t('connectorAccess.accountReferences')}
+                                        onSelect={onSelectReference}
+                                      />
+                                    </div>
                                   )}
-                                </Label>
+                                </div>
                               )
                             })}
+                            <AccountReferences
+                              references={references.accounts.filter((item) => item.providerId == provider.serviceId && item.connectionId == null)}
+                              label={t('connectorAccess.pendingAccountReferences')}
+                              onSelect={onSelectReference}
+                            />
                             {loading && <p className="text-xs text-muted-foreground">{t('connectorAccess.loadingCandidates')}</p>}
                             {candidates?.length == 0 && !loading && !state.candidateErrors.includes(provider.serviceId) && (
                               <ConnectorAccessEmptyState store={store} serviceId={provider.serviceId} />
@@ -309,6 +334,7 @@ export function ConnectorAccessSettings({
                       })}
                     </div>
                     {addService}
+                    {references.hasCode && <p className="m-0 text-[11px] leading-4 text-muted-foreground">{t('connectorAccess.dynamicCodeReferences')}</p>}
                     {providers.error != null && <p className="text-xs text-destructive">{t('connectorAccess.providersFailed')}</p>}
                   </div>
                 )}
@@ -345,6 +371,43 @@ export function ConnectorAccessEmptyState({ store, serviceId }: { readonly store
       <Button onClick={() => void store.connectors.connect(serviceId)} size="xs" type="button" variant="secondary">
         {t(hasActiveAccounts ? 'inspector.account.manageAccount' : hasAccounts ? 'connectorAccess.reconnect' : 'connectorAccess.connect')}
       </Button>
+    </div>
+  )
+}
+
+function AccountReferences({
+  references,
+  label,
+  onSelect,
+}: {
+  readonly references: readonly ConnectorAccountReference[]
+  readonly label: string
+  readonly onSelect?: ((reference: ConnectorAccountReference) => void) | undefined
+}): ReactElement | null {
+  const t = useTranslate()
+  const [expanded, setExpanded] = useState(false)
+  if (references.length == 0) return null
+  return (
+    <div className="flex min-w-0 flex-wrap items-baseline gap-x-1 text-[11px] leading-4 text-muted-foreground">
+      <span>{label}</span>
+      {(expanded ? references : references.slice(0, 2)).map((reference) => (
+        <Button
+          key={JSON.stringify([reference.target, reference.nodeId])}
+          className="h-auto min-w-0 max-w-full p-0 text-left text-[11px] leading-4 font-normal whitespace-normal wrap-anywhere text-muted-foreground"
+          variant="link"
+          type="button"
+          title={reference.name}
+          disabled={onSelect == null}
+          onClick={() => onSelect?.(reference)}
+        >
+          {reference.name}
+        </Button>
+      ))}
+      {!expanded && references.length > 2 && (
+        <Button className="h-auto p-0 text-[11px] leading-4 font-normal text-muted-foreground" variant="link" type="button" onClick={() => setExpanded(true)}>
+          {t('connectorAccess.moreReferences', { count: references.length - 2 })}
+        </Button>
+      )}
     </div>
   )
 }

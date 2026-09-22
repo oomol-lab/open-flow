@@ -86,7 +86,11 @@
     "defaultPolicy": "團隊預設權限",
     "reauthorize": "需要重新授權",
     "discardedBindings": "部分已儲存的授權無法讀取，請重新設定。",
-    "usedByFlow": "已被節點引用",
+    "accountReferences": "帳號引用：",
+    "pendingAccountReferences": "待選帳號：",
+    "nodeReferences": "引用：",
+    "moreReferences": "另外 {{count}} 個",
+    "dynamicCodeReferences": "程式碼節點可動態使用此 Flow 的授權，未計入直接引用。",
     "noAccountSelected": "未選擇帳號",
     "removeAuthorization": "移除授權",
     "saving": "儲存中…"

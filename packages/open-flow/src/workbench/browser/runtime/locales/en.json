@@ -86,7 +86,11 @@
     "defaultPolicy": "Team default permissions",
     "reauthorize": "Reauthorization required",
     "discardedBindings": "Some saved authorizations could not be read. Configure them again.",
-    "usedByFlow": "Referenced by nodes",
+    "accountReferences": "Account references:",
+    "pendingAccountReferences": "Awaiting account:",
+    "nodeReferences": "Referenced by:",
+    "moreReferences": "{{count}} more",
+    "dynamicCodeReferences": "Code nodes can dynamically use this Flow’s authorizations and are not included in direct references.",
     "noAccountSelected": "No account selected",
     "removeAuthorization": "Remove authorization",
     "saving": "Saving…"

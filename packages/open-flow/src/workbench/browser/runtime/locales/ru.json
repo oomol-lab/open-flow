@@ -86,7 +86,11 @@
     "defaultPolicy": "Разрешения команды по умолчанию",
     "reauthorize": "Требуется повторная авторизация",
     "discardedBindings": "Не удалось прочитать некоторые сохранённые разрешения. Настройте их заново.",
-    "usedByFlow": "Используется узлами",
+    "accountReferences": "Ссылки на аккаунт:",
+    "pendingAccountReferences": "Ожидают выбора аккаунта:",
+    "nodeReferences": "Используется:",
+    "moreReferences": "Ещё {{count}}",
+    "dynamicCodeReferences": "Узлы кода могут динамически использовать разрешения этого Flow и не включены в прямые ссылки.",
     "noAccountSelected": "Аккаунт не выбран",
     "removeAuthorization": "Удалить авторизацию",
     "saving": "Сохранение…"

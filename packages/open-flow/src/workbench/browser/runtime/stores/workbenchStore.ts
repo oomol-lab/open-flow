@@ -36,6 +36,7 @@ import { WorkspaceStore } from './workspaceStore.ts'
 export type Busy = WorkspaceBusy | 'cancel' | 'publish' | 'rollback' | 'run' | 'trigger'
 
 export interface Workbench$ {
+  readonly connectorSetupPending: ReadonlyVal<boolean>
   readonly busy: ReadonlyVal<Busy | undefined>
   readonly diagnosticItems: ReadonlyVal<readonly DiagnosticItem[]>
   readonly diagnostics: ReadonlyVal<FlowCheck | undefined>
@@ -98,6 +99,7 @@ export class WorkbenchStore {
   readonly #variableNamesLoading = val(false)
   #variableNamesStale = true
   #variableRequest: Promise<void> | undefined
+  readonly #connectorSetups = val<readonly { readonly flowId: string; readonly target: GraphTarget; readonly actionId: string; nodeId?: string }[]>([])
   #disposed = false
   #openingCreatedFlow = false
   readonly #stopAccessReaction: () => void
@@ -211,6 +213,23 @@ export class WorkbenchStore {
     })
     const designerNodeById = derive(designer, indexNodes)
     this.$ = {
+      connectorSetupPending: compute((get) => {
+        const flowId = get(this.workspace.$.flowId)
+        const target = get(this.workspace.$.target)
+        const selection = get(this.workspace.$.selection)
+        if (
+          selection?.kind != 'task' ||
+          selection.definition == null ||
+          !('executor' in selection.definition) ||
+          selection.definition.executor.kind != 'connector'
+        )
+          return false
+        const actionId = selection.definition.executor.action
+        return get(this.#connectorSetups).some(
+          (setup) =>
+            setup.flowId == flowId && dequal(setup.target, target) && setup.actionId == actionId && (setup.nodeId == null || setup.nodeId == selection.id),
+        )
+      }),
       busy: compute((get) => {
         const workspaceBusy = get(this.workspace.$.busy)
         if (workspaceBusy != null) return workspaceBusy
@@ -361,6 +380,7 @@ export class WorkbenchStore {
   }
 
   public async addNode(option: AddNodeOption, position: Point, connection?: (nodeId: string) => Omit<DesignerEdge, 'id'>): Promise<string | undefined> {
+    let finishSetup: (() => void) | undefined
     try {
       if (option.kind == 'trigger' && 'trigger' in option && option.trigger.kind == 'connect') {
         await this.triggers.connect(option.trigger.provider)
@@ -372,15 +392,28 @@ export class WorkbenchStore {
         const { defaultConnection: _defaultConnection, ...metadata } = option.connector
         option = { ...option, connector: metadata }
       }
+      const setup =
+        option.kind == 'connector' && flowId != null && target != null
+          ? { flowId, target, actionId: option.connector.actionId, nodeId: undefined as string | undefined }
+          : undefined
+      if (setup != null) {
+        this.#connectorSetups.set([...this.#connectorSetups.value, setup])
+        finishSetup = () => this.#connectorSetups.set(this.#connectorSetups.value.filter((item) => item !== setup))
+      }
       const nodeId = await this.workspace.addNode(option, position, connection)
-      if (nodeId != null && option.kind == 'connector' && flowId != null && target != null) {
-        void this.#configureAddedConnector(flowId, target, nodeId, option.connector)
+      if (nodeId != null && option.kind == 'connector' && setup != null) {
+        setup.nodeId = nodeId
+        this.#connectorSetups.set([...this.#connectorSetups.value])
+        void this.#configureAddedConnector(setup.flowId, setup.target, nodeId, option.connector).finally(finishSetup)
+        finishSetup = undefined
       }
       if (nodeId != null && option.kind == 'trigger') void this.triggers.refresh()
       return nodeId
     } catch (error) {
       if (!this.#disposed) this.#notice.set(errorNotice(error, this.#i18n.t))
       return undefined
+    } finally {
+      finishSetup?.()
     }
   }
 

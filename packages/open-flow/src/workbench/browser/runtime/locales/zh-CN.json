@@ -86,7 +86,11 @@
     "defaultPolicy": "团队默认权限",
     "reauthorize": "需要重新授权",
     "discardedBindings": "部分已保存的授权无法读取，请重新配置。",
-    "usedByFlow": "已被节点引用",
+    "accountReferences": "账号引用：",
+    "pendingAccountReferences": "待选账号：",
+    "nodeReferences": "引用：",
+    "moreReferences": "另外 {{count}} 个",
+    "dynamicCodeReferences": "代码节点可动态使用此 Flow 的授权，未计入直接引用。",
     "noAccountSelected": "未选择账号",
     "removeAuthorization": "移除授权",
     "saving": "保存中…"

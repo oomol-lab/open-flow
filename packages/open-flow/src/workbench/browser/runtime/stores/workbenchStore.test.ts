@@ -817,3 +817,54 @@ it.each(['unchanged', 'deleted', 'account selected', 'flow switched', 'failed'] 
     }
   },
 )
+
+it.each(['connected', 'unconfigured', 'failed'] as const)('keeps new Connector account initialization pending until %s completes', async (outcome) => {
+  const { navigation, store } = catalogSession('flow-1')
+  const action = { actionId: 'mail.send', authenticated: true, description: '', inputs: {}, outputs: {}, name: 'Send', serviceId: 'mail', serviceName: 'Mail' }
+  const connection = { connectionId: 'work', displayName: 'Work', isDefault: true, serviceId: 'mail', status: 'active' as const }
+  const preparation = Promise.withResolvers<{ action: typeof action & { defaultConnection?: typeof connection }; connections: (typeof connection)[] }>()
+  const saving = Promise.withResolvers<boolean>()
+  vi.spyOn(store, 'prepareConnectorAction').mockReturnValue(preparation.promise)
+  const save = vi.spyOn(store.workspace, 'setConnectorConnection').mockReturnValue(saving.promise)
+  vi.spyOn(store.connectors, 'refresh').mockResolvedValue()
+  try {
+    await navigation.start()
+    const revision = store.workspace.$.revision.value!
+    const definition = { name: 'Send', inputs: [], outputs: [], executor: { kind: 'connector' as const, action: 'mail.send' } }
+    const node = { id: 'new', kind: 'task' as const, node: { kind: 'task' as const, taskId: 'send', inputs: {} }, definition }
+    vi.spyOn(revision, 'selection').mockImplementation((_target, id) => ({ ...node, id }))
+    vi.spyOn(revision, 'node').mockReturnValue(node)
+    vi.spyOn(revision, 'task').mockReturnValue(definition)
+    vi.spyOn(store.workspace, 'addNode').mockImplementation(async () => {
+      store.workspace.selectNodes(['new'])
+      expect(store.$.connectorSetupPending.value).toBe(true)
+      return 'new'
+    })
+    await expect(
+      store.addNode({ connector: action, description: '', id: 'mail.send', inputs: [], outputs: [], kind: 'connector', label: 'Send' }, { x: 0, y: 0 }),
+    ).resolves.toBe('new')
+    expect(store.$.connectorSetupPending.value).toBe(true)
+    store.workspace.selectNodes(['existing'])
+    expect(store.$.connectorSetupPending.value).toBe(false)
+    store.workspace.selectNodes(['new'])
+    expect(store.$.connectorSetupPending.value).toBe(true)
+    if (outcome == 'failed') preparation.reject(new Error('Authorization failed'))
+    else
+      preparation.resolve({
+        action: outcome == 'connected' ? { ...action, defaultConnection: connection } : action,
+        connections: outcome == 'connected' ? [connection] : [],
+      })
+    if (outcome == 'connected') {
+      await vi.waitFor(() => expect(save).toHaveBeenCalledWith('send', 'work'))
+      expect(store.$.connectorSetupPending.value).toBe(true)
+      saving.resolve(true)
+    }
+    await vi.waitFor(() => expect(store.$.connectorSetupPending.value).toBe(false))
+    if (outcome == 'failed') expect(store.$.notice.value?.message).toBe('Authorization failed')
+  } finally {
+    preparation.resolve({ action, connections: [] })
+    saving.resolve(true)
+    navigation.dispose()
+    store.dispose()
+  }
+})

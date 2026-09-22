@@ -86,7 +86,11 @@
     "defaultPolicy": "チームの既定の権限",
     "reauthorize": "再承認が必要です",
     "discardedBindings": "保存された一部の承認を読み込めません。再設定してください。",
-    "usedByFlow": "ノードから参照されています",
+    "accountReferences": "アカウント参照：",
+    "pendingAccountReferences": "アカウント未選択：",
+    "nodeReferences": "参照元：",
+    "moreReferences": "他 {{count}} 件",
+    "dynamicCodeReferences": "コードノードはこの Flow の認可を動的に使用できるため、直接参照には含まれません。",
     "noAccountSelected": "アカウント未選択",
     "removeAuthorization": "承認を削除",
     "saving": "保存中…"

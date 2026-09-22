@@ -78,13 +78,26 @@ export function createInspectorTransport(
       return Response.json(access)
     }
     const candidate = /\/connector-access\/([^/]+)\/candidates$/.exec(url.pathname)
-    if (candidate != null)
+    if (candidate != null) {
+      const providerId = decodeURIComponent(candidate[1]!)
       return Response.json({
-        candidates: (options.candidates ?? []).filter((item) => item.providerId == decodeURIComponent(candidate[1]!)),
+        candidates: (options.candidates ?? [])
+          .filter((item) => item.providerId == providerId)
+          .map((item) => ({
+            accessBindingId: item.accessBindingId,
+            connectionDisplayName: item.connectionDisplayName,
+            providerId: item.providerId,
+            permissionGroupName: item.permissionGroupName,
+            connectionId:
+              options.connections?.find((account) => account.service == item.providerId && account.displayName == item.connectionDisplayName)?.id ??
+              'fixture-account',
+            source: { kind: 'policy', ruleId: null },
+          })),
         mode: access.mode,
-        providerId: decodeURIComponent(candidate[1]!),
+        providerId,
         version: 1,
       })
+    }
     const mutation = /\/connector-access\/([^/]+)$/.exec(url.pathname)
     if (mutation != null && (init?.method == 'PUT' || init?.method == 'DELETE')) {
       if (options.accessSaveDelay) await new Promise((resolve) => setTimeout(resolve, options.accessSaveDelay))
@@ -100,7 +113,9 @@ export function createInspectorTransport(
             : [
                 ...access.bindings.filter((binding) => binding.providerId != providerId || binding.accessBindingId != input.accessBindingId),
                 {
-                  connectionId: 'fixture-account',
+                  connectionId:
+                    options.connections?.find((account) => account.service == providerId && account.displayName == selected?.connectionDisplayName)?.id ??
+                    'fixture-account',
                   source: { kind: 'policy' as const, ruleId: null },
                   accessBindingId: selected!.accessBindingId,
                   connectionDisplayName: selected!.connectionDisplayName,
