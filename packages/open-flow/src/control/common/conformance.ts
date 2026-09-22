@@ -1,3 +1,5 @@
+import type { ProviderAccessIdentity } from './providerAccess.ts'
+
 import { dequal } from 'dequal/lite'
 import { decodeRunEvent } from './api.ts'
 
@@ -1108,12 +1110,14 @@ export const connectorControlApiConformanceCases: readonly ControlApiConformance
   },
 ]
 
-export function selectableConnectorAccessControlApiConformanceCases(fixture: {
-  readonly accessBindingId: string
-  readonly connectionDisplayName: string
-  readonly permissionGroupName: string | null
-  readonly providerId: string
-}): readonly ControlApiConformanceCase[] {
+export function selectableConnectorAccessControlApiConformanceCases(
+  fixture: ProviderAccessIdentity & {
+    readonly accessBindingId: string
+    readonly connectionDisplayName: string
+    readonly permissionGroupName: string | null
+    readonly providerId: string
+  },
+): readonly ControlApiConformanceCase[] {
   return [
     {
       name: 'selects Provider access with optimistic concurrency',
@@ -1131,6 +1135,8 @@ export function selectableConnectorAccessControlApiConformanceCases(fixture: {
           (value) => record(value, 'Provider access candidate').accessBindingId == fixture.accessBindingId,
         )
         if (candidate == null) fail('Expected selectable Provider access candidate was not returned.')
+        equal(record(candidate, 'Provider access candidate').connectionId, fixture.connectionId, 'Provider access candidate Connection ID')
+        equal(record(candidate, 'Provider access candidate').source, fixture.source, 'Provider access candidate source')
         equal(
           record(candidate, 'Provider access candidate').connectionDisplayName,
           fixture.connectionDisplayName,
@@ -1156,6 +1162,8 @@ export function selectableConnectorAccessControlApiConformanceCases(fixture: {
           (value) => record(value, 'Selected Connector access binding').providerId == fixture.providerId,
         )
         if (binding == null) fail('Selected Provider access binding was not projected.')
+        equal(record(binding, 'Selected Connector access binding').connectionId, fixture.connectionId, 'Selected Connector access binding Connection ID')
+        equal(record(binding, 'Selected Connector access binding').source, fixture.source, 'Selected Connector access binding source')
         equal(record(binding, 'Selected Connector access binding').accessBindingId, fixture.accessBindingId, 'Selected Provider access binding ID')
         equal(
           record(binding, 'Selected Connector access binding').connectionDisplayName,

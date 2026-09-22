@@ -58,7 +58,7 @@ export interface BlockLibraryProps {
   readonly loadConnections?: (signal: AbortSignal) => Promise<void>
   readonly isOptionDisabled?: (option: AddNodeOption) => boolean
   readonly initialTab?: 'nodes' | 'triggers'
-  readonly presentation?: 'picker' | 'actions'
+  readonly presentation?: 'picker' | 'actions' | 'providers'
   readonly catalogFailed?: boolean
   readonly refreshCatalog?: () => void
 
@@ -75,7 +75,7 @@ export interface BlockLibraryProps {
   readonly provideChoices: (optionId: string, signal: AbortSignal) => ResourceSource<readonly AddNodeOption[]>
 }
 
-function menuItems(options: readonly AddNodeOption[]): LibraryMenuItem[] {
+function menuItems(options: readonly AddNodeOption[], providersOnly = false): LibraryMenuItem[] {
   const items: LibraryMenuItem[] = []
   let group: string | undefined
   for (const option of options) {
@@ -84,14 +84,16 @@ function menuItems(options: readonly AddNodeOption[]): LibraryMenuItem[] {
       items.push({ label: group, type: 'divider' })
     }
     items.push({
-      choices: option.choices?.map((choice) => ({
-        data: choice.option.id,
-        description: choice.description,
-        label: choice.label,
-      })),
+      choices: providersOnly
+        ? undefined
+        : option.choices?.map((choice) => ({
+            data: choice.option.id,
+            description: choice.description,
+            label: choice.label,
+          })),
       data: option.id,
       description: option.kind == 'connector-group' ? undefined : option.description,
-      detail: option.description,
+      detail: providersOnly ? undefined : option.description,
       icon: option.icon,
       label: option.label,
       type: option.kind,
@@ -323,7 +325,7 @@ function SidebarBlockLibrary({
   presentation,
 }: BlockLibraryProps): ReactElement {
   const t = useTranslate()
-  const searchLabel = options.length == 0 ? t('actionPicker.search') : t('contextPanel.search')
+  const searchLabel = t(presentation == 'providers' ? 'connectorAccess.searchServices' : options.length == 0 ? 'actionPicker.search' : 'contextPanel.search')
   const search = useRef<HTMLInputElement>(null)
   const active = useRef(true)
   const dynamicOptions = useRef<ReadonlyMap<string, AddNodeOption>>(new Map())
@@ -341,13 +343,13 @@ function SidebarBlockLibrary({
   const triggerGroup = t('addNode.integrationTriggers')
   const triggers = t('addNode.triggers')
   const localItems = useMemo(() => {
-    const items = menuItems(options)
+    const items = menuItems(options, presentation == 'providers')
     if (!items.some((item) => item.type == 'divider' && item.label == integrationGroup)) items.push({ type: 'divider', label: integrationGroup })
     if (items.some((item) => item.type == 'divider' && item.label == triggers) && !items.some((item) => item.type == 'divider' && item.label == triggerGroup)) {
       items.push({ type: 'divider', label: triggerGroup })
     }
     return items
-  }, [options, integrationGroup, triggerGroup, triggers])
+  }, [options, integrationGroup, triggerGroup, triggers, presentation])
   const [remoteOptions, setRemoteOptions] = useState<readonly AddNodeOption[]>([])
   const [error, setError] = useState(false)
   const [retryRequest, setRetryRequest] = useState(0)
@@ -381,9 +383,9 @@ function SidebarBlockLibrary({
     () =>
       mergeCollectionItems(
         filterCollectionItems(filterQuery, localItems),
-        menuItems(remoteOptions).map((item, index) => Object.assign({}, item, { index: localItems.length + index })),
+        menuItems(remoteOptions, presentation == 'providers').map((item, index) => Object.assign({}, item, { index: localItems.length + index })),
       ),
-    [filterQuery, localItems, remoteOptions],
+    [filterQuery, localItems, remoteOptions, presentation],
   )
   const loading = !settled
   const searching = filterQuery.trim() != ''
@@ -400,7 +402,7 @@ function SidebarBlockLibrary({
       ordered.splice(end < 0 ? ordered.length : end, 0, ...group)
     }
     const matches = filterCollectionItems('', ordered)
-    if (presentation == 'actions') return matches.filter((item) => item.type != 'divider' || item.label != integrationGroup)
+    if (presentation == 'actions' || presentation == 'providers') return matches.filter((item) => item.type != 'divider' || item.label != integrationGroup)
     if (searching) return matches
     let hidden = false
     return matches.filter((item) => {
@@ -499,7 +501,10 @@ function SidebarBlockLibrary({
       option?.kind == 'connector' || option?.kind == 'connector-group' || (option?.kind == 'trigger' && 'trigger' in option && option.trigger.kind == 'catalog')
     return (
       <div
-        className={cn(presentation == 'actions' ? 'px-0' : 'block-library-list-entry', nested && presentation != 'actions' && 'block-library-subitem')}
+        className={cn(
+          presentation == 'actions' || presentation == 'providers' ? 'px-0' : 'block-library-list-entry',
+          nested && presentation == null && 'block-library-subitem',
+        )}
         key={item.type == 'divider' ? `group:${item.label}` : (item.data ?? item.label)}
       >
         {item.type == 'divider' ? (
@@ -543,7 +548,7 @@ function SidebarBlockLibrary({
 
   return (
     <div aria-busy={adding || loading} className="block-library">
-      <div className={cn('mb-2 flex-none', presentation == 'actions' ? 'mt-1' : 'mx-3.5 mt-3')}>
+      <div className={cn('mb-2 flex-none', presentation == 'actions' || presentation == 'providers' ? 'mt-1' : 'mx-3.5 mt-3')}>
         <InputGroup>
           <span className="sr-only">{searchLabel}</span>
           <InputGroupAddon>
@@ -569,7 +574,9 @@ function SidebarBlockLibrary({
       )}
       <ScrollArea className="block-library-list" defer={false} events={{ initialized: (instance) => setViewport(instance.elements().viewport) }} tabIndex={-1}>
         {viewport == null ? (
-          items.map(renderItem)
+          presentation == 'providers' ? null : (
+            items.map(renderItem)
+          )
         ) : (
           <Virtualizer data={items} itemSize={48} keepMounted={keptItems} key={items.length} scrollRef={{ current: viewport }}>
             {renderItem}

@@ -443,7 +443,7 @@ describe('Server Connector host', () => {
           })
         }
         if (url.startsWith('https://relation-control.oomol.dev/')) {
-          return Response.json({ teams: [{ id: 'team-a', name: 'Team A', system_created: false }] })
+          return Response.json({ teams: [{ id: 'team-a', name: 'Team A', system_created: false, role: 'member', status: 'normal', deleted: false }] })
         }
         if (url.endsWith('/v1/apps') || url.endsWith('/v1/apps/services/example')) {
           return Response.json({

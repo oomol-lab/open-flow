@@ -214,6 +214,22 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       ),
     )
   })
+  for (const method of ['PUT', 'DELETE'] as const) {
+    app.on(method, '/flows/:flowId/connector-access/:providerId/service', async (context) => {
+      query(context.req.raw, [], controlErrorCode.connectorAccessInvalid)
+      const body = await decodeRequest(context.req.raw, controlErrorCode.connectorAccessInvalid, controlRequests.setConnectorService)
+      return response(
+        200,
+        await service.setConnectorService(
+          context.get('actorId'),
+          context.req.param('flowId')!,
+          connectorService(context.req.param('providerId')!),
+          method == 'PUT',
+          body.expectedAccessRevision,
+        ),
+      )
+    })
+  }
   app.put('/flows/:flowId/connector-access/:providerId', async (context) => {
     query(context.req.raw, [], controlErrorCode.connectorAccessInvalid)
     const providerId = connectorService(context.req.param('providerId'))

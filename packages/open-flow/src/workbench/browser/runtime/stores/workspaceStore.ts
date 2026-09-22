@@ -1,7 +1,7 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal } from 'value-enhancer'
 import type { EventSource } from '../../../../control/common/api.ts'
-import type { GraphTarget, ConnectorCapability } from '../../../../flow/common/change.ts'
+import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
 import type { WorkbenchClient, Draft, Flow, GraphNode, InputPort, JsonValue, Live, TriggerSchedule } from '../api.ts'
 import type { DesignerViewport, Point } from '../canvasPresentation.ts'
@@ -28,7 +28,6 @@ import { inputValue } from '../../../../flow/common/inputValue.ts'
 import { inverseFlowChanges } from '../../../../flow/common/inverseChanges.ts'
 import {
   resetInputValues,
-  setCodeActions,
   setInputSources,
   repairNodeNames,
   updateTriggerConfig,
@@ -783,14 +782,6 @@ export class WorkspaceStore {
     if (revision == null || target == null) return false
     const changes = updateTask(revision, target, nodeId, settings)
     return changes != null && (await this.#editDraft(changes)) != null
-  }
-
-  public async saveCodeActions(nodeId: string, capabilities: readonly ConnectorCapability[]): Promise<boolean> {
-    const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    const changes = setCodeActions(revision.revision.content, target, nodeId, capabilities)
-    return changes == null || (await this.#editDraft(changes)) != null
   }
 
   public async saveTaskPorts(

@@ -3,6 +3,7 @@ import type { ConnectorTeamStore } from '../storage/connector-team-store.ts'
 import type { Database } from '../storage/database.ts'
 import type { ConnectorHost } from './connector.ts'
 
+import { decodeConnectorAccess } from '@oomol-lab/open-flow/control-api'
 import { createHash } from 'node:crypto'
 import { ConnectorClient } from './connector.ts'
 
@@ -13,6 +14,7 @@ export type ConnectorAccessMutation =
   | { readonly kind: 'unsupported' }
 
 export interface ConnectorAccessHost {
+  setService(actorId: string, flowId: string, providerId: string, selected: boolean, expectedAccessRevision: number): Promise<ConnectorAccessMutation>
   delete(flowId: string): boolean
   current(flowId: string): ConnectorAccess
   listCandidates(actorId: string, flowId: string, providerId: string, signal?: AbortSignal): Promise<ConnectorAccessCandidates>
@@ -22,6 +24,16 @@ export interface ConnectorAccessHost {
 }
 
 export class ImplicitConnectorAccessHost implements ConnectorAccessHost {
+  async setService(
+    _actorId: string,
+    _flowId: string,
+    _providerId: string,
+    _selected: boolean,
+    _expectedAccessRevision: number,
+  ): Promise<ConnectorAccessMutation> {
+    return { kind: 'unsupported' }
+  }
+
   current(_flowId: string): ConnectorAccess {
     return implicitAccess()
   }
@@ -74,18 +86,21 @@ export class ConfiguredConnectorAccessHost implements ConnectorAccessHost {
     if (this.#connector() == null) return implicitAccess()
     const row = this.#database.connection
       .prepare(
-        'SELECT access_revision AS accessRevision, bindings_json AS bindings, provider_access_digest AS providerAccessDigest FROM flow_provider_access WHERE flow_id = ?',
+        'SELECT access_revision AS accessRevision, bindings_json AS bindings, provider_ids_json AS providerIds, provider_access_digest AS providerAccessDigest FROM flow_provider_access WHERE flow_id = ?',
       )
-      .get(flowId) as { readonly accessRevision: number; readonly bindings: string; readonly providerAccessDigest: string } | undefined
+      .get(flowId) as
+      | { readonly accessRevision: number; readonly bindings: string; readonly providerIds: string; readonly providerAccessDigest: string }
+      | undefined
     return row == null
       ? selectableAccess(0, [])
-      : {
+      : decodeConnectorAccess({
           accessRevision: row.accessRevision,
+          providerIds: JSON.parse(row.providerIds) as readonly string[],
           bindings: JSON.parse(row.bindings) as ConnectorAccess['bindings'],
           mode: 'selectable',
           providerAccessDigest: row.providerAccessDigest,
           version: 1,
-        }
+        })
   }
 
   delete(flowId: string): boolean {
@@ -122,7 +137,7 @@ export class ConfiguredConnectorAccessHost implements ConnectorAccessHost {
       ...current.bindings.filter((existing) => existing.providerId != providerId || existing.accessBindingId != accessBindingId),
       { ...binding, status: 'active' as const },
     ].toSorted(compareBindings)
-    return this.#save(flowId, expectedAccessRevision, bindings)
+    return this.#save(flowId, expectedAccessRevision, bindings, [...new Set([...(current.providerIds ?? []), providerId])].toSorted())
   }
 
   async remove(
@@ -140,6 +155,27 @@ export class ConfiguredConnectorAccessHost implements ConnectorAccessHost {
       flowId,
       expectedAccessRevision,
       current.bindings.filter((binding) => binding.providerId != providerId || binding.accessBindingId != accessBindingId),
+      [...new Set([...(current.providerIds ?? []), providerId])].toSorted(),
+    )
+  }
+
+  async setService(_actorId: string, flowId: string, providerId: string, selected: boolean, expectedAccessRevision: number): Promise<ConnectorAccessMutation> {
+    const connector = this.#connector()
+    if (connector == null) return { kind: 'unsupported' }
+    if (selected) {
+      const providers = await connector.listProviders(undefined, await this.#team(flowId, connector))
+      if (!providers.some((provider) => provider.serviceId == providerId && !provider.noSetup)) return { kind: 'invalid' }
+    }
+    const current = this.current(flowId)
+    if (current.accessRevision != expectedAccessRevision) return { kind: 'conflict' }
+    const providerIds = new Set(current.providerIds ?? [])
+    if (selected) providerIds.add(providerId)
+    else providerIds.delete(providerId)
+    return this.#save(
+      flowId,
+      expectedAccessRevision,
+      selected ? current.bindings : current.bindings.filter((binding) => binding.providerId != providerId),
+      [...providerIds].toSorted(),
     )
   }
 
@@ -148,19 +184,20 @@ export class ConfiguredConnectorAccessHost implements ConnectorAccessHost {
     return connector instanceof ConnectorClient && connector.teamSupported() ? connector : undefined
   }
 
-  #save(flowId: string, expectedAccessRevision: number, bindings: ConnectorAccess['bindings']): ConnectorAccessMutation {
-    const access = selectableAccess(expectedAccessRevision + 1, bindings)
+  #save(flowId: string, expectedAccessRevision: number, bindings: ConnectorAccess['bindings'], providerIds: readonly string[]): ConnectorAccessMutation {
+    const access = selectableAccess(expectedAccessRevision + 1, bindings, providerIds)
     const result = this.#database.connection
       .prepare(
-        `INSERT INTO flow_provider_access (flow_id, access_revision, bindings_json, provider_access_digest)
-         VALUES (?, ?, ?, ?)
+        `INSERT INTO flow_provider_access (flow_id, access_revision, bindings_json, provider_access_digest, provider_ids_json)
+         VALUES (?, ?, ?, ?, ?)
          ON CONFLICT (flow_id) DO UPDATE SET
            access_revision = excluded.access_revision,
            bindings_json = excluded.bindings_json,
+           provider_ids_json = excluded.provider_ids_json,
            provider_access_digest = excluded.provider_access_digest
          WHERE flow_provider_access.access_revision = ?`,
       )
-      .run(flowId, access.accessRevision, JSON.stringify(bindings), access.providerAccessDigest, expectedAccessRevision)
+      .run(flowId, access.accessRevision, JSON.stringify(bindings), access.providerAccessDigest, JSON.stringify(providerIds), expectedAccessRevision)
     return result.changes == 0 ? { kind: 'conflict' } : { access, kind: 'saved' }
   }
 
@@ -177,10 +214,11 @@ function implicitAccess(): ConnectorAccess {
   return { accessRevision: 0, bindings: [], mode: 'implicit', providerAccessDigest: 'implicit', version: 1 }
 }
 
-function selectableAccess(accessRevision: number, bindings: ConnectorAccess['bindings']): ConnectorAccess {
+function selectableAccess(accessRevision: number, bindings: ConnectorAccess['bindings'], providerIds: readonly string[] = []): ConnectorAccess {
   const payload = JSON.stringify(bindings.map((binding) => [binding.providerId, binding.accessBindingId]))
   return {
     accessRevision,
+    providerIds,
     bindings,
     mode: 'selectable',
     providerAccessDigest: `sha256:${createHash('sha256').update(payload).digest('hex')}`,

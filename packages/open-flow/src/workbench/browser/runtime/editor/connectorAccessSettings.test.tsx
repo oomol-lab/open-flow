@@ -64,12 +64,42 @@ describe('Connector access settings', () => {
     }
   })
 
+  it.each([0, 2])('offers configuring services even with %i unreadable saved records', (discardedBindingCount) => {
+    const store = {
+      connectorAccess: {
+        $: val({
+          access: { mode: 'selectable', bindings: [], discardedBindingCount },
+          candidates: {},
+          candidateErrors: [],
+          loading: false,
+          loadingCandidates: [],
+        }),
+      },
+      workspace: {
+        $: { flowId: val('empty-flow'), revision: val({ connectorProviderIds: new Set() }) },
+        catalogs: { providers: { get: () => val({ data: [{ serviceId: 'mail', serviceName: 'Mail' }] }) } },
+      },
+    } as unknown as WorkbenchStore
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <ConnectorAccessSettings store={store} />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('Add service</button>')
+    expect(markup.includes('Some saved authorizations could not be read')).toBe(discardedBindingCount > 0)
+    expect(markup).not.toContain('Unable to load')
+  })
+
   it('distinguishes a permission group from its connection', () => {
     const t = createI18n('en').t
 
-    expect(connectorAccessPermissionGroupLabel({ permissionGroupName: null }, t)).toBe('Permission group: Team default')
-    expect(connectorAccessPermissionGroupLabel({ permissionGroupName: 'Editors' }, t)).toBe('Permission group: Editors')
-    expect(connectorAccessPermissionGroupLabel({}, t)).toBe('Permission group: Saved permission group')
+    expect(connectorAccessPermissionGroupLabel({ source: null, permissionGroupName: 'Readers' }, t)).toBe('Reauthorization required')
+    expect(connectorAccessPermissionGroupLabel({ source: { kind: 'admin-delegation' }, permissionGroupName: null }, t)).toBe('Administrator authorization')
+    expect(connectorAccessPermissionGroupLabel({ source: { kind: 'policy', ruleId: null }, permissionGroupName: null }, t)).toBe('Team default permissions')
+    expect(connectorAccessPermissionGroupLabel({ source: { kind: 'policy', ruleId: 'editors' }, permissionGroupName: 'Editors' }, t)).toBe(
+      'Permission group: Editors',
+    )
+    expect(connectorAccessPermissionGroupLabel({ source: { kind: 'policy', ruleId: 'missing' } }, t)).toBe('Permission group: Saved permission group')
   })
 
   it('summarizes permission group contents without exposing its configuration', () => {
@@ -137,6 +167,8 @@ describe('Connector access settings', () => {
             accessRevision: 1,
             bindings: [
               {
+                connectionId: 'fixture-account',
+                source: { kind: 'policy' as const, ruleId: null },
                 accessBindingId: 'mail-work',
                 connectionDisplayName: 'Work Mail',
                 permissionGroupName: null,
@@ -144,6 +176,8 @@ describe('Connector access settings', () => {
                 status: 'active',
               },
               {
+                connectionId: 'fixture-account',
+                source: { kind: 'policy' as const, ruleId: 'Personal' },
                 accessBindingId: 'mail-personal',
                 connectionDisplayName: 'Personal Mail',
                 permissionGroupName: 'Personal',
@@ -151,6 +185,8 @@ describe('Connector access settings', () => {
                 status: 'active',
               },
               {
+                connectionId: 'fixture-account',
+                source: { kind: 'policy' as const, ruleId: 'Chat access' },
                 accessBindingId: 'chat-access',
                 connectionDisplayName: 'Work Slack',
                 permissionGroupName: 'Chat access',
@@ -165,8 +201,22 @@ describe('Connector access settings', () => {
           candidates: {
             mail: {
               candidates: [
-                { accessBindingId: 'mail-work', connectionDisplayName: 'Work Mail', permissionGroupName: null, providerId: 'mail' },
-                { accessBindingId: 'mail-personal', connectionDisplayName: 'Personal Mail', permissionGroupName: 'Personal', providerId: 'mail' },
+                {
+                  connectionId: 'fixture-account',
+                  source: { kind: 'policy' as const, ruleId: null },
+                  accessBindingId: 'mail-work',
+                  connectionDisplayName: 'Work Mail',
+                  permissionGroupName: null,
+                  providerId: 'mail',
+                },
+                {
+                  connectionId: 'fixture-account',
+                  source: { kind: 'policy' as const, ruleId: 'Personal' },
+                  accessBindingId: 'mail-personal',
+                  connectionDisplayName: 'Personal Mail',
+                  permissionGroupName: 'Personal',
+                  providerId: 'mail',
+                },
               ],
               mode: 'selectable',
               providerId: 'mail',
@@ -204,6 +254,7 @@ describe('Connector access settings', () => {
 
     expect(markup).toContain('Authorized accounts: 3 across 2 services')
     expect(markup).toContain('aria-expanded="false"')
+    expect(markup).not.toContain('Add service…')
     expect(markup).toContain('aria-controls=')
     expect(markup).not.toContain('Connection: Work Slack')
     expect(markup).not.toContain('Connection: Work Mail · Permission group: Team default')

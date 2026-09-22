@@ -2,6 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 
 import { Children, isValidElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import { ConnectorAccount, TriggerConnection } from './connectionSettings.tsx'
 import { NodeInspector } from './nodeInspector.tsx'
 
 vi.mock('use-value-enhancer', () => ({ useVal: (value: { value: unknown }) => value.value }))
@@ -57,8 +58,53 @@ function resolutionDefinition(
 }
 
 describe('Provider account section', () => {
+  it.each(['empty', 'invalid'] as const)('routes %s account authorization to Flow configuration', (state) => {
+    const configure = vi.fn()
+    const connect = vi.fn()
+    const rendered = ConnectorAccount({
+      action: { authenticated: true, serviceId: 'slack', serviceName: 'Slack' } as never,
+      actionError: undefined,
+      actionId: 'slack.send-message',
+      accessError: state == 'invalid' ? 'Access required' : undefined,
+      activeConnections: [],
+      authorizationPending: false,
+      connection: undefined,
+      connectionError: undefined,
+      connectionId: undefined,
+      connectors: { connect } as never,
+      disabled: false,
+      fieldIdPrefix: 'slack',
+      loading: false,
+      taskId: 'task',
+      onConfigureAccess: configure,
+    })
+    const button = find(rendered, (item) => typeof item.props.onClick == 'function')
+    ;(button!.props.onClick as () => void)()
+    expect(configure).toHaveBeenCalledOnce()
+    expect(connect).not.toHaveBeenCalled()
+  })
+
+  it('routes trigger account authorization to its provider in Flow configuration', () => {
+    const configure = vi.fn()
+    const connect = vi.fn()
+    const rendered = TriggerConnection({
+      activeConnections: [],
+      authorizationPending: false,
+      connectionLoading: false,
+      disabled: false,
+      selection: { id: 'trigger', trigger: { kind: 'integration', definition: { provider: 'slack' } } } as never,
+      triggers: { connect } as never,
+      onConfigureAccess: configure,
+    })!
+    const button = find(rendered, (item) => typeof item.props.onClick == 'function')
+    ;(button!.props.onClick as () => void)()
+    expect(configure).toHaveBeenCalledWith('slack')
+    expect(connect).not.toHaveBeenCalled()
+  })
+
   it('offers account management without passive active-connection copy', () => {
     const connect = vi.fn()
+    const configureAccess = vi.fn()
     const setConnection = vi.fn()
     const node = { inputs: {}, kind: 'task', name: 'Send message', taskId: 'provider-task' }
     const definition = {
@@ -75,6 +121,7 @@ describe('Provider account section', () => {
       connectorConnection: { connectionId: 'connection', displayName: 'Work', isDefault: true, serviceId: 'slack', status: 'active' },
       connectorLoading: false,
       connectors: { connect, setConnection } as never,
+      onConfigureConnectorAccess: configureAccess,
       disabled: false,
       revision: { graph: () => ({ nodes: { provider: node } }) } as never,
       selection: { definition, id: 'provider', kind: 'task', node } as never,
@@ -88,23 +135,26 @@ describe('Provider account section', () => {
     const account = find(element, (item) => typeof item.type == 'function' && item.type.name == 'ConnectorAccount')
     if (account == null || typeof account.type != 'function') throw new Error('Expected Provider account section.')
     const rendered = (account.type as (props: unknown) => ReactElement)(account.props)
-    const manage = find(rendered, (item) => item.props.children == 'inspector.account.manageAccount')
+    const manage = find(rendered, (item) => item.props.children == 'inspector.account.manageFlowAccess')
     const accountSelect = find(rendered, (item) => typeof item.type == 'function' && item.type.name == 'AccountSelect')
     if (accountSelect == null || typeof accountSelect.type != 'function') throw new Error('Expected account selector.')
     const renderedSelect = (accountSelect.type as (props: unknown) => ReactElement)(accountSelect.props)
     const addAccount = find(renderedSelect, (item) => item.props.children == 'inspector.account.addAccount')
     const select = find(renderedSelect, (item) => typeof item.props.onValueChange == 'function')
 
-    expect(manage?.props.children).toBe('inspector.account.manageAccount')
+    expect(manage?.props.children).toBe('inspector.account.manageFlowAccess')
     expect(addAccount?.props.children).toBe('inspector.account.addAccount')
     expect(find(rendered, (item) => item.type == 'p' && item.props.children == 'inspector.account.pinned')).toBeUndefined()
 
     ;(manage!.props.onClick as () => void)()
     ;(select!.props.onValueChange as (value: string) => void)(addAccount!.props.value as string)
 
-    expect(connect).toHaveBeenCalledTimes(2)
-    expect(connect).toHaveBeenLastCalledWith('slack')
+    expect(configureAccess).toHaveBeenCalledTimes(2)
+    expect(configureAccess).toHaveBeenLastCalledWith('slack')
+    expect(connect).not.toHaveBeenCalled()
     expect(setConnection).not.toHaveBeenCalled()
+    ;(select!.props.onValueChange as (value: string) => void)('connection')
+    expect(setConnection).toHaveBeenCalledWith('provider-task', 'connection')
   })
 })
 
@@ -272,6 +322,7 @@ describe('Node execution settings', () => {
 
 describe('Code task sections', () => {
   it('renders Code and Node settings as consecutive sections instead of tabs', () => {
+    const configureAccess = vi.fn()
     const node = {
       kind: 'task',
       name: 'Transform',
@@ -291,6 +342,7 @@ describe('Code task sections', () => {
       connectorLoading: false,
       connectors: { $: { actions: { value: {} }, connections: { value: [] } } } as never,
       disabled: false,
+      onConfigureConnectorAccess: configureAccess,
       revision: { graph: () => ({ nodes: { task: node } }) } as never,
       selection: {
         id: 'task',
@@ -315,6 +367,11 @@ describe('Code task sections', () => {
     if (task == null || typeof task.type != 'function') throw new Error('Expected task definition.')
     const rendered = (task.type as (props: unknown) => ReactElement)(task.props)
     expect(rendered.props['data-inspector-section']).toBe('module')
+    const manage = find(rendered, (item) => item.props.title == 'inspector.actions.flowAccessHint')
+    expect(manage).toBeDefined()
+    ;(manage!.props.onClick as () => void)()
+    expect(configureAccess).toHaveBeenCalledWith()
+
     expect(find(element, (item) => typeof item.type == 'function' && item.type.name == 'GeneralSettings')).toBeDefined()
     expect(find(rendered, (item) => item.props.className == 'form-actions code-actions')).toBeUndefined()
 

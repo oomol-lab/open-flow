@@ -209,6 +209,8 @@ describe('Server Connector client', () => {
       vi.fn(async (input: string | URL | Request) => {
         const url = String(input)
         requests.push(url)
+        if (url == 'https://relation-control.oomol.dev/v1/me/teams')
+          return Response.json({ teams: [{ id: 'team-1', role: 'member', status: 'normal', deleted: false }] })
         if (url == 'https://api.oomol.dev/v1/users/profile') return Response.json({ uid: 'oomol-user' })
         if (url == 'https://relation-control.oomol.dev/v1/teams/team-1/app-access') {
           return Response.json(
@@ -242,6 +244,8 @@ describe('Server Connector client', () => {
     const candidates = await connector.listProviderAccessBindingCandidates('team-1', 'example')
     expect(candidates).toEqual([
       {
+        connectionId: 'connection-work',
+        source: { kind: 'policy' as const, ruleId: 'editor' },
         accessBindingId: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
         connectionDisplayName: 'Work account',
         isDefault: true,

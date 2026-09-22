@@ -215,6 +215,6 @@ export const inspectorPanelStory: FrontendStory = {
   title: 'Properties Panel',
   standalone: true,
   description:
-    'Production editor: inspect outline and selection states. Open Code properties to check editor focus, available connections, and the action picker with compact app rows, expanded actions, and search results.',
+    'Production editor: inspect outline and selection states. Open Code properties to check editor focus and the compact Service access entry beside the Code heading, which navigates to Flow authorization in the outline.',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,
 }

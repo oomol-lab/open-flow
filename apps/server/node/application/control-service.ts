@@ -266,6 +266,16 @@ export class ControlService {
     }
   }
 
+  async setConnectorService(actorId: string, flowId: string, providerId: string, selected: boolean, expectedAccessRevision: number): Promise<ConnectorAccess> {
+    this.getFlow(flowId)
+    try {
+      return this.#accessMutation(flowId, await this.connectorAccess.setService(actorId, flowId, providerId, selected, expectedAccessRevision))
+    } catch (error) {
+      if (error instanceof ConnectorTaskError) throw new ControlError(error.code, error.message)
+      throw error
+    }
+  }
+
   async addProviderAccessBinding(
     actorId: string,
     flowId: string,

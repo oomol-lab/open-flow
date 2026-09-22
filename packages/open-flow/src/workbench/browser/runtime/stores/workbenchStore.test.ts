@@ -577,7 +577,14 @@ it.each(['no candidates', 'ambiguous candidates', 'candidate failure', 'binding 
       serviceName: 'Mail',
     }
     vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(access('flow-1'))
-    const candidate = { accessBindingId: 'mail-1', connectionDisplayName: 'Mail', permissionGroupName: null, providerId: 'mail' }
+    const candidate = {
+      connectionId: 'fixture-account',
+      source: { kind: 'policy' as const, ruleId: null },
+      accessBindingId: 'mail-1',
+      connectionDisplayName: 'Mail',
+      permissionGroupName: null,
+      providerId: 'mail',
+    }
     const candidates = vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
       candidates:
         scenario == 'no candidates' ? [] : scenario == 'ambiguous candidates' ? [candidate, { ...candidate, accessBindingId: 'mail-2' }] : [candidate],
@@ -662,6 +669,8 @@ it('prepares default Provider access without prompting', async () => {
     accessRevision: 1,
     bindings: [
       {
+        connectionId: 'fixture-account',
+        source: { kind: 'policy' as const, ruleId: null },
         accessBindingId: 'mail-read-access',
         connectionDisplayName: connection.displayName,
         permissionGroupName: null,
@@ -676,6 +685,8 @@ it('prepares default Provider access without prompting', async () => {
   vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
     candidates: [
       {
+        connectionId: 'fixture-account',
+        source: { kind: 'policy' as const, ruleId: null },
         accessBindingId: 'mail-read-access',
         connectionDisplayName: connection.displayName,
         isDefault: true,
@@ -684,6 +695,8 @@ it('prepares default Provider access without prompting', async () => {
         providerId: 'mail',
       },
       {
+        connectionId: 'fixture-account',
+        source: { kind: 'policy' as const, ruleId: 'Senders' },
         accessBindingId: 'mail-send-access',
         connectionDisplayName: 'Sending account',
         isDefault: false,
@@ -700,6 +713,8 @@ it('prepares default Provider access without prompting', async () => {
     accessRevision: 2,
     bindings: [
       {
+        connectionId: 'fixture-account',
+        source: { kind: 'policy' as const, ruleId: null },
         accessBindingId: 'mail-read-access',
         connectionDisplayName: connection.displayName,
         permissionGroupName: null,
@@ -707,6 +722,8 @@ it('prepares default Provider access without prompting', async () => {
         status: 'active',
       },
       {
+        connectionId: 'fixture-account',
+        source: { kind: 'policy' as const, ruleId: 'Senders' },
         accessBindingId: 'mail-send-access',
         connectionDisplayName: 'Sending account',
         permissionGroupName: 'Senders',

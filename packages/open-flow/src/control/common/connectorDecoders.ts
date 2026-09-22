@@ -11,6 +11,8 @@ import type {
 } from './api.ts'
 
 import { exact, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
+import { ApiError } from './errors.ts'
+import { parseProviderAccessSource } from './providerAccess.ts'
 
 function accessPermissions(value: unknown): NonNullable<ProviderAccessBindingCandidate['permissions']> {
   const source = record(value)
@@ -41,6 +43,8 @@ function accessBinding(value: unknown, candidate: boolean): ProviderAccessBindin
   const permissionGroupName = source.permissionGroupName
   exact(source, [
     'accessBindingId',
+    'connectionId',
+    'source',
     legacy ? 'displayName' : 'connectionDisplayName',
     ...(candidate && Object.hasOwn(source, 'isDefault') ? ['isDefault'] : []),
     ...(candidate && permissions != null ? ['permissions'] : []),
@@ -53,8 +57,16 @@ function accessBinding(value: unknown, candidate: boolean): ProviderAccessBindin
   if (candidate && isDefault !== undefined && typeof isDefault != 'boolean') return invalidResponse()
   if (permissionGroupName !== undefined && permissionGroupName !== null && typeof permissionGroupName != 'string') return invalidResponse()
   if (!candidate && status != 'active' && status != 'forbidden' && status != 'invalid' && status != 'missing') return invalidResponse()
+  let bindingSource
+  try {
+    bindingSource = parseProviderAccessSource(source.source)
+  } catch {
+    return invalidResponse()
+  }
   return {
     accessBindingId: string(source.accessBindingId),
+    connectionId: string(source.connectionId),
+    source: bindingSource,
     connectionDisplayName: string(legacy ? source.displayName : source.connectionDisplayName),
     ...(candidate && typeof isDefault == 'boolean' ? { isDefault } : {}),
     ...(permissions == null ? {} : { permissions }),
@@ -72,13 +84,59 @@ function accessMode(value: unknown): ConnectorAccess['mode'] {
 
 export function connectorAccess(value: unknown): ConnectorAccess {
   const source = record(value)
-  exact(source, ['accessRevision', 'bindings', 'mode', 'providerAccessDigest', 'version'])
+  exact(source, [
+    'accessRevision',
+    'bindings',
+    'mode',
+    'providerAccessDigest',
+    ...('providerIds' in source ? ['providerIds'] : []),
+    ...('discardedBindingCount' in source ? ['discardedBindingCount'] : []),
+    'version',
+  ])
   const accessRevision = integer(source.accessRevision)
   if (source.version != 1 || accessRevision < 0 || !Array.isArray(source.bindings)) return invalidResponse()
-  const bindings = source.bindings.map((binding) => accessBinding(binding, false))
+  if ('providerIds' in source && !Array.isArray(source.providerIds)) return invalidResponse()
+  const providerIds = source.providerIds == null ? undefined : (source.providerIds as unknown[]).map((id) => string(id))
+  if (providerIds != null && new Set(providerIds).size != providerIds.length) return invalidResponse()
+  let discardedBindingCount = source.discardedBindingCount == null ? 0 : integer(source.discardedBindingCount)
+  if (discardedBindingCount < 0) return invalidResponse()
+  const bindings: ProviderAccessBinding[] = []
+  for (const entry of source.bindings) {
+    try {
+      bindings.push(accessBinding(entry, false))
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.code != 'response.invalid') throw error
+      if (
+        entry != null &&
+        typeof entry == 'object' &&
+        !Array.isArray(entry) &&
+        typeof entry.accessBindingId == 'string' &&
+        entry.accessBindingId.length > 0 &&
+        typeof entry.providerId == 'string' &&
+        entry.providerId.length > 0
+      ) {
+        bindings.push({
+          accessBindingId: entry.accessBindingId,
+          providerId: entry.providerId,
+          connectionId: null,
+          source: null,
+          status: 'invalid',
+          connectionDisplayName:
+            typeof entry.connectionDisplayName == 'string' && entry.connectionDisplayName.length > 0
+              ? entry.connectionDisplayName
+              : typeof entry.displayName == 'string' && entry.displayName.length > 0
+                ? entry.displayName
+                : entry.providerId,
+          permissionGroupName: typeof entry.permissionGroupName == 'string' ? entry.permissionGroupName : null,
+        })
+      } else discardedBindingCount++
+    }
+  }
   if (new Set(bindings.map((binding) => binding.accessBindingId)).size != bindings.length) return invalidResponse()
   return {
     accessRevision,
+    ...(discardedBindingCount == 0 ? {} : { discardedBindingCount }),
+    ...(providerIds == null ? {} : { providerIds }),
     bindings,
     mode: accessMode(source.mode),
     providerAccessDigest: string(source.providerAccessDigest),

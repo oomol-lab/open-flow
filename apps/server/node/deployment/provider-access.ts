@@ -1,7 +1,7 @@
-import type { ConnectorActionMetadata, ConnectorConnection } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorActionMetadata, ConnectorConnection, ProviderAccessReference, ProviderAccessBindingCandidate } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 
-import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
+import { providerAccessBindingId } from '@oomol-lab/open-flow/control-api'
 
 const appRolePrefix = 'role::connector-app:'
 const userPrefix = 'user::'
@@ -56,64 +56,65 @@ export function providerAccessAllowsProxy(binding: { readonly accessGrant: Provi
   return binding.accessGrant.actions == null && binding.accessGrant.appAccessConfig == null
 }
 
-export async function resolveProviderAccessBinding(input: {
-  readonly accessBindingId: string
-  readonly connections: readonly ConnectorConnection[]
-  readonly policy: unknown
-  readonly policyRevision?: string
-  readonly providerId: string
-  readonly teamId: string
-}): Promise<ResolvedProviderAccessBinding | undefined> {
+export async function resolveProviderAccessBinding(
+  input: ProviderAccessReference & {
+    readonly connections: readonly ConnectorConnection[]
+    readonly policy: unknown
+    readonly policyRevision?: string
+    readonly teamId: string
+  },
+): Promise<ResolvedProviderAccessBinding | undefined> {
+  if (input.source == null || input.connectionId == null) return
+  if ((await providerAccessBindingId(input.teamId, input)) != input.accessBindingId) return
+  const connection = input.connections.find((item) => item.connectionId == input.connectionId && item.serviceId == input.providerId && item.status == 'active')
+  if (connection == null) return
+  if (input.source.kind == 'admin-delegation')
+    return { accessBindingId: input.accessBindingId, accessGrant: {}, appId: connection.connectionId, connection, providerId: input.providerId }
   if (!isObject(input.policy)) throw new TypeError('Connector access must be an object.')
-  const connections = input.connections.filter((connection) => connection.serviceId == input.providerId && connection.status == 'active')
-  for (const app of parseAppAccess(input.policy, connections)) {
-    const connection = connections.find((item) => item.connectionId == app.appId)!
-    const grants: readonly { readonly grant: ProviderAccessGrant; readonly key: string }[] = [
-      { grant: app.permissionRules.teamDefault, key: 'team-default' },
-      ...app.permissionRules.rules.map((rule) => ({ grant: rule, key: rule.id })),
-    ]
-    for (const { grant: selected, key } of grants) {
-      if ((await bindingId(input.teamId, app.appId, app.providerId, key)) != input.accessBindingId) continue
-      return {
-        accessBindingId: input.accessBindingId,
-        accessGrant: {
-          ...(selected.actions == null ? {} : { actions: selected.actions }),
-          ...(selected.appAccessConfig == null ? {} : { appAccessConfig: selected.appAccessConfig }),
-        },
-        appId: app.appId,
-        connection,
-        ...(input.policyRevision == null ? {} : { policyRevision: input.policyRevision }),
-        providerId: app.providerId,
-      }
-    }
+  const app = parseAppAccess(input.policy, [connection])[0]
+  if (app == null) return
+  const ruleId = input.source.ruleId
+  const selected = ruleId == null ? app.permissionRules.teamDefault : app.permissionRules.rules.find((rule) => rule.id == ruleId)
+  if (selected == null) return
+  return {
+    accessBindingId: input.accessBindingId,
+    accessGrant: {
+      ...(selected.actions == null ? {} : { actions: selected.actions }),
+      ...(selected.appAccessConfig == null ? {} : { appAccessConfig: selected.appAccessConfig }),
+    },
+    appId: connection.connectionId,
+    connection,
+    ...(input.policyRevision == null ? {} : { policyRevision: input.policyRevision }),
+    providerId: input.providerId,
   }
 }
 
 export async function providerAccessBindingCandidates(input: {
+  readonly teamAdmin?: boolean
   readonly actorId: string
   readonly connections: readonly ConnectorConnection[]
   readonly policy: unknown
   readonly policyRevision?: string
   readonly providerId: string
   readonly teamId: string
-}): Promise<
-  readonly {
-    readonly accessBindingId: string
-    readonly connectionDisplayName: string
-    readonly isDefault: boolean
-    readonly permissions: {
-      readonly actionIds: readonly string[]
-      readonly allActions: boolean
-      readonly configured: boolean
-      readonly proxy: boolean
-    }
-    readonly permissionGroupName: string | null
-    readonly policyRevision?: string
-    readonly providerId: string
-  }[]
-> {
+}): Promise<readonly ProviderAccessBindingCandidate[]> {
   if (!isObject(input.policy)) throw new TypeError('Connector access must be an object.')
   const connections = input.connections.filter((connection) => connection.serviceId == input.providerId)
+  if (input.teamAdmin)
+    return await Promise.all(
+      connections
+        .filter((connection) => connection.status == 'active')
+        .map(async (connection) => {
+          const identity = { connectionId: connection.connectionId, providerId: input.providerId, source: { kind: 'admin-delegation' as const } }
+          return Object.assign(identity, {
+            accessBindingId: await providerAccessBindingId(input.teamId, identity),
+            connectionDisplayName: connection.displayName,
+            isDefault: connection.isDefault,
+            permissionGroupName: null,
+            permissions: { actionIds: [], allActions: true, configured: false, proxy: true },
+          })
+        }),
+    )
   const candidates = await Promise.all(
     parseAppAccess(input.policy, connections)
       .flatMap((app) => {
@@ -123,11 +124,13 @@ export async function providerAccessBindingCandidates(input: {
         const rule = assigned == null ? undefined : app.permissionRules.rules.find((item) => item.id == assigned)
         const selected = rule ?? app.permissionRules.teamDefault
         if (selected.actions?.length == 0) return []
-        return [{ app, connection, grantKey: rule == null ? 'team-default' : rule.id, rule, selected }]
+        return [{ app, connection, source: { kind: 'policy' as const, ruleId: rule?.id ?? null }, rule, selected }]
       })
-      .map(async ({ app, connection, grantKey, rule, selected }) => {
+      .map(async ({ app, connection, source, rule, selected }) => {
         const candidate = {
-          accessBindingId: await bindingId(input.teamId, app.appId, app.providerId, grantKey),
+          accessBindingId: await providerAccessBindingId(input.teamId, { connectionId: app.appId, providerId: app.providerId, source }),
+          connectionId: app.appId,
+          source,
           connectionDisplayName: connection.displayName,
           isDefault: connection.isDefault,
           permissions: {
@@ -150,22 +153,18 @@ export async function providerAccessBindingCandidates(input: {
   )
 }
 
-async function bindingId(teamId: string, appId: string, providerId: string, grantKey: string): Promise<string> {
-  return await digestBytes(canonicalJsonBytes(['provider-access', 1, teamId, appId, providerId, grantKey]))
-}
-
 function parseAppAccess(policy: Record<string, unknown>, connections: readonly ConnectorConnection[]): readonly AppAccess[] {
   const configured = new Map<string, unknown>()
   for (const [subject, value] of Object.entries(policy)) {
     if (subject.startsWith(appRolePrefix) && subject.length > appRolePrefix.length) configured.set(subject.slice(appRolePrefix.length), value)
   }
-  return connections.map((connection) => ({
-    appId: connection.connectionId,
-    permissionRules: configured.has(connection.connectionId)
-      ? parseRole(policy, configured.get(connection.connectionId), connection.connectionId, connection.serviceId)
-      : { assignments: {}, rules: [], teamDefault: {} },
-    providerId: connection.serviceId,
-  }))
+  return connections
+    .filter((connection) => configured.has(connection.connectionId))
+    .map((connection) => ({
+      appId: connection.connectionId,
+      permissionRules: parseRole(policy, configured.get(connection.connectionId), connection.connectionId, connection.serviceId),
+      providerId: connection.serviceId,
+    }))
 }
 
 function parseRole(policy: Record<string, unknown>, value: unknown, appId: string, providerId: string): PermissionRules {

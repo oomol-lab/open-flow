@@ -124,6 +124,8 @@ describe('ControlClient Flow API', () => {
       accessRevision: 2,
       bindings: [
         {
+          connectionId: 'fixture-account',
+          source: { kind: 'policy' as const, ruleId: 'Editors' },
           accessBindingId: 'editors',
           connectionDisplayName: 'Work account',
           permissionGroupName: 'Editors',
@@ -131,6 +133,8 @@ describe('ControlClient Flow API', () => {
           status: 'active',
         },
         {
+          connectionId: 'fixture-account',
+          source: { kind: 'policy' as const, ruleId: null },
           accessBindingId: 'personal',
           connectionDisplayName: 'Personal account',
           permissionGroupName: null,
@@ -148,6 +152,8 @@ describe('ControlClient Flow API', () => {
         return Response.json({
           candidates: [
             {
+              connectionId: 'fixture-account',
+              source: { kind: 'policy' as const, ruleId: 'Editors' },
               accessBindingId: 'editors',
               connectionDisplayName: 'Work account',
               isDefault: true,
@@ -170,6 +176,8 @@ describe('ControlClient Flow API', () => {
     await expect(client.listProviderAccessBindingCandidates(flow.flowId, 'mail')).resolves.toEqual({
       candidates: [
         {
+          connectionId: 'fixture-account',
+          source: { kind: 'policy' as const, ruleId: 'Editors' },
           accessBindingId: 'editors',
           connectionDisplayName: 'Work account',
           isDefault: true,
@@ -193,6 +201,8 @@ describe('ControlClient Flow API', () => {
       Response.json({
         candidates: [
           {
+            connectionId: 'fixture-account',
+            source: { kind: 'policy' as const, ruleId: null },
             accessBindingId: 'editors',
             connectionDisplayName: 'Work account',
             permissions: { actionIds: [], allActions: false, configured: false, proxy: false },
@@ -569,4 +579,16 @@ describe('Run event contract', () => {
     )
     await expect(client.getRunEvents('run')).rejects.toMatchObject({ code: 'response.invalid' })
   })
+})
+
+it('adds and removes a Flow service independently of account bindings', async () => {
+  const access = { accessRevision: 1, providerIds: ['2chat'], bindings: [], mode: 'selectable', providerAccessDigest: 'empty', version: 1 }
+  const request = vi.fn(async () => Response.json(access))
+  const client = new ControlClient(request)
+  await expect(client.setConnectorService('flow/1', '2chat', true, 0)).resolves.toEqual(access)
+  await expect(client.setConnectorService('flow/1', '2chat', false, 1)).resolves.toEqual(access)
+  expect(request.mock.calls).toMatchObject([
+    ['/v1/flows/flow%2F1/connector-access/2chat/service', { method: 'PUT', body: JSON.stringify({ expectedAccessRevision: 0, version: 1 }) }],
+    ['/v1/flows/flow%2F1/connector-access/2chat/service', { method: 'DELETE', body: JSON.stringify({ expectedAccessRevision: 1, version: 1 }) }],
+  ])
 })

@@ -8,12 +8,13 @@ import { createI18n } from '../i18n.ts'
 import { errorNotice } from './workbenchNotice.ts'
 
 interface ConnectorAccessState {
-  readonly configuration?: { readonly providerId: string }
+  readonly configuration?: { readonly providerId?: string }
   readonly access?: ConnectorAccess
   readonly candidateErrors: readonly string[]
   readonly candidates: Readonly<Record<string, ConnectorAccessCandidates | undefined>>
   readonly loading: boolean
   readonly loadingCandidates: readonly string[]
+  readonly pendingSelection?: { readonly providerId: string; readonly accessBindingId: string; readonly selected: boolean }
   readonly savingProviderId?: string
 }
 
@@ -45,7 +46,7 @@ export class ConnectorAccessStore {
       if (!this.#disposed && generation == this.#generation) {
         const current = this.#state.value
         const latest = current.access != null && current.access.accessRevision > access.accessRevision ? current.access : access
-        this.#state.set(refreshing ? { ...current, access: latest } : { ...initialState, access: latest })
+        this.#state.set({ ...current, access: latest, loading: false })
       }
     } catch (error) {
       if (!this.#disposed && generation == this.#generation) {
@@ -59,10 +60,10 @@ export class ConnectorAccessStore {
     if (flowId == this.#flowId) void this.load(flowId)
   }
 
-  configure(providerId: string): void {
+  configure(providerId?: string): void {
     if (this.#disposed || this.#flowId == null) return
-    this.#state.set({ ...this.#state.value, configuration: { providerId } })
-    void this.loadCandidates(providerId)
+    this.#state.set({ ...this.#state.value, configuration: providerId == null ? {} : { providerId } })
+    if (providerId != null) void this.loadCandidates(providerId)
   }
 
   async loadCandidates(providerId: string): Promise<void> {
@@ -98,24 +99,56 @@ export class ConnectorAccessStore {
   async select(providerId: string, accessBindingId: string, selected = true): Promise<boolean> {
     const flowId = this.#flowId
     const access = this.#state.value.access
-    if (flowId == null || access?.mode != 'selectable' || this.#state.value.savingProviderId != null) return false
-    this.#state.set({ ...this.#state.value, savingProviderId: providerId })
+    if (this.#disposed || flowId == null || access?.mode != 'selectable' || this.#state.value.savingProviderId != null) return false
+    this.#state.set({ ...this.#state.value, savingProviderId: providerId, pendingSelection: { providerId, accessBindingId, selected } })
     try {
       const next = selected
         ? await this.client.addProviderAccessBinding(flowId, providerId, accessBindingId, access.accessRevision)
         : await this.client.removeProviderAccessBinding(flowId, providerId, accessBindingId, access.accessRevision)
       if (!this.#disposed && flowId == this.#flowId) {
-        this.#state.set({ ...this.#state.value, access: next, savingProviderId: undefined })
+        const current = this.#state.value.access
+        this.#state.set({
+          ...this.#state.value,
+          access: current != null && current.accessRevision > next.accessRevision ? current : next,
+          savingProviderId: undefined,
+          pendingSelection: undefined,
+        })
         this.onSaved(flowId)
         return true
       }
     } catch (error) {
       if (this.#disposed || flowId != this.#flowId) return false
-      this.#state.set({ ...this.#state.value, savingProviderId: undefined })
+      this.#state.set({ ...this.#state.value, savingProviderId: undefined, pendingSelection: undefined })
       this.setNotice(errorNotice(error, this.i18n.t))
       await this.load(flowId)
     }
     return false
+  }
+
+  async setService(providerId: string, selected: boolean): Promise<boolean> {
+    const flowId = this.#flowId
+    const access = this.#state.value.access
+    if (this.#disposed || flowId == null || access?.mode != 'selectable' || this.#state.value.savingProviderId != null) return false
+    this.#state.set({ ...this.#state.value, savingProviderId: providerId })
+    try {
+      const next = await this.client.setConnectorService(flowId, providerId, selected, access.accessRevision)
+      if (this.#disposed || flowId != this.#flowId) return false
+      this.#state.set({
+        ...this.#state.value,
+        access: next,
+        savingProviderId: undefined,
+        ...(!selected && this.#state.value.configuration?.providerId == providerId ? { configuration: {} } : {}),
+      })
+      this.onSaved(flowId)
+      if (selected) this.configure(providerId)
+      return true
+    } catch (error) {
+      if (this.#disposed || flowId != this.#flowId) return false
+      this.#state.set({ ...this.#state.value, savingProviderId: undefined, pendingSelection: undefined })
+      this.setNotice(errorNotice(error, this.i18n.t))
+      await this.load(flowId)
+      return false
+    }
   }
 
   dispose(): void {

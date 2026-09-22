@@ -235,8 +235,9 @@ Connector service 拥有 Provider 授权、credential、Connection lifecycle 和
 
 Provider Access Binding 是 deployment-owned Flow 状态，不属于 Revision。`selectable` 部署按 Provider 保存零个或多个 opaque Connection bindings；`implicit`
 部署不保存伪造的 binding，直接使用部署配置的 scoped Connector authority。绑定只引用 Connector 管理的权限边界，不能包含 credential，也不能演化为 Flow
-service account。Publication 和 Run 固定接受时的 binding identities；Connector 按目标 Connection 对 live policy 和 Action 做最终授权，缺失、失效或不匹配时
+service account。身份显式区分管理员委托与 policy；团队默认 grant 属于 policy，具名规则删除后不得回退默认 grant。身份的确定性编码属于公共合同，候选可分配性和实际权限解析属于部署。Publication 和 Run 固定接受时的 binding identities；Connector 按目标 Connection 对 live policy 和 Action 做最终授权，缺失、失效或不匹配时
 fail closed。Connector 目录声明为无需账号授权的 Action 不要求 Provider Access Binding，仍使用部署要求的平台身份。
+Workbench 的账号和权限统一在大纲“服务与授权”中配置，可添加尚未被节点引用的服务。Connector 节点和代码节点通过“管理 Flow 授权”进入同一配置区；代码节点不提供独立连接列表或 Action 授权选择器。
 Workbench 允许先添加 Connector 节点再配置权限。权限缺失不阻断 Draft 编辑或隐藏 Action 元数据；界面显示待配置状态，Run／Publish 准入和执行仍校验授权。
 Publish operation、Publication、Run、Wait 通知和共享事件源订阅分别持久化对应的 access snapshot；Rollback 复制来源 Publication snapshot，
 Trigger/listener/maintenance 从固定记录恢复，不能重新读取当前 Draft binding。Flow 物理删除前 deployment access owner 必须完成对应 Draft map 清理。
@@ -301,4 +302,4 @@ Callback response 不能在承载 Workbench 或 Control API 的 origin 上成为
 
 ## 浏览器目录数据
 
-Workbench 的 Providers、Actions、Connections、Triggers 数据分别由所属 Store 管理。Store 对外提供稳定的只读 Val，拥有刷新协调、ETag 和持久化；传输层保持无状态。业务访问触发刷新条件检查，消费者订阅实际数据变化，不使用 URL 缓存或 revision 通知计数。Actions 详情独立读取，不依赖按 Flow 授权过滤的服务目录；未授权仍可读取定义以编辑 Draft，连接状态在消费处组合。浏览器业务通过静态边界检查限制为从 Store 访问这些数据。存储位置与刷新间隔见 [Control API 契约](control/contracts/control-api.md)。
+Workbench 的 Providers、Actions、Connections、Triggers 数据分别由所属 Store 管理。Store 对外提供稳定的只读 Val，拥有刷新协调、ETag 和持久化；传输层保持无状态。业务访问触发刷新条件检查，消费者订阅实际数据变化，不使用 URL 缓存或 revision 通知计数。Actions 详情从按 provider 缓存的完整目录派生，浏览器目录不按 Flow 已选授权过滤；未授权仍可读取定义以编辑 Draft，连接状态在消费处组合。浏览器业务通过静态边界检查限制为从 Store 访问这些数据。存储位置与刷新间隔见 [Control API 契约](control/contracts/control-api.md)。

@@ -122,6 +122,18 @@ function selectableConnectorAccess(): ConnectorAccessHost {
   const current = (flowId: string): ConnectorAccess =>
     accesses.get(flowId) ?? { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 }
   return {
+    async setService(_actorId, flowId, providerId, selected, expectedAccessRevision) {
+      const access = current(flowId)
+      if (access.accessRevision != expectedAccessRevision) return { kind: 'conflict' }
+      const next = {
+        ...access,
+        accessRevision: access.accessRevision + 1,
+        providerIds: selected ? [...new Set([...(access.providerIds ?? []), providerId])] : (access.providerIds ?? []).filter((id) => id != providerId),
+        bindings: selected ? access.bindings : access.bindings.filter((binding) => binding.providerId != providerId),
+      }
+      accesses.set(flowId, next)
+      return { kind: 'saved', access: next }
+    },
     async remove(_actorId, flowId, providerId, accessBindingId, expectedAccessRevision) {
       const access = current(flowId)
       if (access.accessRevision != expectedAccessRevision) return { kind: 'conflict' }
@@ -143,7 +155,18 @@ function selectableConnectorAccess(): ConnectorAccessHost {
     async listCandidates(_actorId, _flowId, providerId) {
       return {
         candidates:
-          providerId == 'mail' ? [{ accessBindingId: 'editors', connectionDisplayName: 'Work account', permissionGroupName: 'Editors', providerId }] : [],
+          providerId == 'mail'
+            ? [
+                {
+                  connectionId: 'fixture-account',
+                  source: { kind: 'policy' as const, ruleId: 'Editors' },
+                  accessBindingId: 'editors',
+                  connectionDisplayName: 'Work account',
+                  permissionGroupName: 'Editors',
+                  providerId,
+                },
+              ]
+            : [],
         mode: 'selectable',
         providerId,
         version: 1,
@@ -162,6 +185,8 @@ function selectableConnectorAccess(): ConnectorAccessHost {
         bindings: [
           ...access.bindings.filter((binding) => binding.accessBindingId != accessBindingId),
           {
+            connectionId: 'fixture-account',
+            source: { kind: 'policy' as const, ruleId: 'Editors' },
             accessBindingId,
             connectionDisplayName: 'Work account',
             permissionGroupName: 'Editors',
@@ -231,6 +256,8 @@ describe('Server P3 Connector Control API conformance', () => {
 
 describe('Server selectable Connector access conformance', () => {
   for (const conformance of selectableConnectorAccessControlApiConformanceCases({
+    connectionId: 'fixture-account',
+    source: { kind: 'policy' as const, ruleId: 'Editors' },
     accessBindingId: 'editors',
     connectionDisplayName: 'Work account',
     permissionGroupName: 'Editors',

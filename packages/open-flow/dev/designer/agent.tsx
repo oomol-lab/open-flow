@@ -89,7 +89,6 @@ function createSession(language: UiLanguage, log: LogAction) {
       })
     if (url.pathname === '/v1/connector/proxy/providers')
       return Response.json({ success: true, data: [{ service: 'lab', displayName: 'Lab catalog', authTypes: ['api_key'] }] })
-    if (url.pathname === `/v1/connector/action-metadata/${action.actionId}`) return Response.json({ action, version: 1 })
     if (url.pathname === '/v1/connector/action-metadata') return Response.json({ actions: [action], version: 1 })
     if (url.pathname === '/v1/connector/proxy/actions')
       return Response.json({

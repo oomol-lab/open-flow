@@ -1,6 +1,5 @@
 import type { ReactElement } from 'react'
-import type { ConnectorAccess, ConnectorConnection } from '../api.ts'
-import type { ConnectorActionView } from '../connectionCatalog.ts'
+import type { ConnectorAccess } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { ResolvedNode } from '../revisionView.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
@@ -12,14 +11,13 @@ import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { compute } from 'value-enhancer'
 import { Button } from '../../../../ui/browser/button.tsx'
-import { CodeActions } from './codeActions.tsx'
 import { CodeEditor } from './codeEditor.tsx'
 import { codeTyping } from './codeTyping.ts'
 
 export function CodeTaskSection({
   connectorAccess,
   connectors,
-  prepareConnectorAction,
+  onConfigureAccess,
   disabled,
   focus,
   selection,
@@ -28,9 +26,7 @@ export function CodeTaskSection({
 }: {
   readonly connectorAccess?: ConnectorAccess
   readonly connectors: ConnectorStore
-  readonly prepareConnectorAction?: (
-    action: ConnectorActionView,
-  ) => Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] } | undefined>
+  readonly onConfigureAccess?: (() => void) | undefined
   readonly disabled: boolean
   readonly focus?: DiagnosticFocus
   readonly selection: Extract<ResolvedNode, { readonly kind: 'task' }>
@@ -81,18 +77,24 @@ export function CodeTaskSection({
         void store.saveModuleEditor()
       }}
     >
-      <div className="inspector-section-title">{t('inspector.task.javascriptModule')}</div>
+      <div className="inspector-section-title">
+        <span className="min-w-0 flex-1">{t('inspector.task.javascriptModule')}</span>
+        {onConfigureAccess != null && (
+          <Button
+            className="shrink-0 font-normal text-muted-foreground"
+            disabled={disabled}
+            onClick={onConfigureAccess}
+            size="xs"
+            title={t('inspector.actions.flowAccessHint')}
+            type="button"
+            variant="ghost"
+          >
+            {t('inspector.actions.flowAccess')}
+            <i aria-hidden="true" className="i-lucide-light:arrow-right size-3" />
+          </Button>
+        )}
+      </div>
       <div className="code-section-content">
-        <CodeActions
-          access={connectorAccess}
-          capabilities={task.capabilities ?? []}
-          nodeId={selection.id}
-          prepareAction={prepareConnectorAction}
-          key={`${moduleEditor.moduleId}-${selection.id}`}
-          connectors={connectors}
-          disabled={disabled || moduleEditor.status == 'saving'}
-          store={store}
-        />
         <CodeEditor
           ariaLabel={t('inspector.task.source')}
           disabled={disabled}

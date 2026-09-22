@@ -10,7 +10,7 @@ function fixture(providerAccess?: ConnectorAccess) {
   const store = new Store(database, () => 1_000)
   if (providerAccess != null)
     database.connection
-      .prepare('INSERT INTO flow_provider_access VALUES (?, ?, ?, ?)')
+      .prepare('INSERT INTO flow_provider_access (flow_id, access_revision, bindings_json, provider_access_digest) VALUES (?, ?, ?, ?)')
       .run('flow', providerAccess.accessRevision, JSON.stringify(providerAccess.bindings), providerAccess.providerAccessDigest)
   store.flows.createFlow({
     actorId: 'operator',
@@ -63,7 +63,17 @@ const selectedAccess: ConnectorAccess = {
   mode: 'selectable',
   accessRevision: 1,
   providerAccessDigest: 'selected',
-  bindings: [{ providerId: 'stripe', accessBindingId: 'binding', connectionDisplayName: 'Stripe', permissionGroupName: null, status: 'active' }],
+  bindings: [
+    {
+      connectionId: 'fixture-account',
+      source: { kind: 'policy' as const, ruleId: null },
+      providerId: 'stripe',
+      accessBindingId: 'binding',
+      connectionDisplayName: 'Stripe',
+      permissionGroupName: null,
+      status: 'active',
+    },
+  ],
 }
 
 it.each(['publish', 'acceptPublishOperation'] as const)(

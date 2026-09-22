@@ -8,14 +8,17 @@ import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
 import { Label } from '../../../../ui/browser/label.tsx'
 import { NativeScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { providerIcon } from '../providerIcon.ts'
 import { connectorAccessPermissionGroupLabel, connectorAccessPermissionLabel } from './connectorAccessPresentation.ts'
+import { ServicePicker } from './servicePicker.tsx'
 
 function connectorAccessProviderIds(revision: RevisionView | undefined, access: ConnectorAccess | undefined, requestedProviderId?: string): readonly string[] {
   const ids = new Set(access?.bindings.map((binding) => binding.providerId))
+  for (const providerId of access?.providerIds ?? []) ids.add(providerId)
   if (requestedProviderId != null) ids.add(requestedProviderId)
   for (const providerId of revision?.connectorProviderIds ?? []) ids.add(providerId)
   return [...ids].toSorted()
@@ -30,6 +33,7 @@ export function ConnectorAccessSettings({
 }): ReactElement | null {
   const t = useTranslate()
   const titleId = useId()
+  const [menuContainer, setMenuContainer] = useState<HTMLElement | null>(null)
   const contentId = useId()
   const language = useLang()
   const configurationTarget = useRef<HTMLDivElement>(null)
@@ -48,6 +52,9 @@ export function ConnectorAccessSettings({
     noSetup: providerMetadata.get(serviceId)?.noSetup === true,
     icon: providerIcon(providerMetadata.get(serviceId) ?? { serviceId, serviceName: serviceId }),
   }))
+  const availableProviders = (providers.data ?? [])
+    .filter((provider) => !provider.noSetup && !providerIds.includes(provider.serviceId))
+    .toSorted((left, right) => left.serviceName.localeCompare(right.serviceName, language))
   const requiresAuthorization = providerRows.some((provider) => !provider.noSetup)
   const providersPending = providers.data == null
   useEffect(() => {
@@ -65,9 +72,10 @@ export function ConnectorAccessSettings({
   }, [access?.mode, expanded, flowId, providerKey, providersPending, state.candidates, store])
   useEffect(() => {
     if (!expanded || providersPending || state.configuration == null) return
-    configurationTarget.current?.focus({ preventScroll: true })
-    configurationTarget.current?.scrollIntoView({ block: 'nearest' })
-  }, [expanded, providersPending, state.configuration])
+    const target = configurationTarget.current ?? menuContainer
+    target?.focus({ preventScroll: true })
+    target?.scrollIntoView({ block: 'nearest' })
+  }, [expanded, providersPending, state.configuration, menuContainer])
   if (flowId == null) return null
 
   const requiredBindings = access?.mode == 'selectable' ? access.bindings.filter((binding) => !providerMetadata.get(binding.providerId)?.noSetup) : []
@@ -76,8 +84,23 @@ export function ConnectorAccessSettings({
   const issueCount = requiredBindings.length - activeBindings.length
   const collapsible = !state.loading && !providersPending && access?.mode == 'selectable' && providerRows.length > 0
 
+  const addService =
+    access?.mode == 'selectable' && availableProviders.length > 0 ? (
+      <ServicePicker connectors={store.connectors} exclude={providerIds} onSelect={(providerId) => store.connectorAccess.setService(providerId, true)} />
+    ) : null
+
   return (
-    <section className="flex max-h-[60%] min-h-0 shrink-0 flex-col border-b border-border px-3 py-2" aria-labelledby={titleId}>
+    <section
+      tabIndex={-1}
+      ref={setMenuContainer}
+      className="flex max-h-[60%] min-h-0 shrink-0 flex-col border-b border-border px-3 py-2"
+      aria-labelledby={titleId}
+    >
+      {(access?.discardedBindingCount ?? 0) > 0 && (
+        <p role="status" className="text-xs text-destructive">
+          {t('connectorAccess.discardedBindings')}
+        </p>
+      )}
       {collapsible ? (
         <h3 className="shrink-0" id={titleId}>
           <Button
@@ -127,7 +150,10 @@ export function ConnectorAccessSettings({
       ) : (
         <div className="flex min-h-0 flex-col gap-2">
           {providerRows.length == 0 ? (
-            <p className="text-xs text-muted-foreground">{t('connectorAccess.empty')}</p>
+            <>
+              <p className="text-xs text-muted-foreground">{t('connectorAccess.empty')}</p>
+              {addService}
+            </>
           ) : (
             <>
               {issueCount > 0 && <p className="shrink-0 text-xs text-destructive">{t('connectorAccess.summaryIssues', { count: issueCount })}</p>}
@@ -141,17 +167,19 @@ export function ConnectorAccessSettings({
                 {expanded && (
                   <div className="flex flex-col gap-3 pb-1">
                     {requiresAuthorization && <p className="text-[11px] leading-4 text-muted-foreground">{t('connectorAccess.description')}</p>}
-                    <div className="flex flex-col gap-3">
+                    <div className="flex flex-col gap-2">
                       {providerRows.map((provider) => {
+                        const usedByFlow = revision?.connectorProviderIds.has(provider.serviceId) ?? false
                         if (provider.noSetup) {
                           return (
                             <div
-                              className="flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3 first:border-t-0 first:pt-0"
+                              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/40 p-2"
                               key={provider.serviceId}
                             >
                               <span className="flex min-w-0 items-center gap-2 text-xs font-medium">
                                 <ContentIcon src={provider.icon} className="size-4 shrink-0 data-[icon-kind=initials]:text-[20px]" />
                                 <span>{provider.serviceName}</span>
+                                {usedByFlow && <span className="text-[11px] font-normal text-muted-foreground">{t('connectorAccess.usedByFlow')}</span>}
                               </span>
                               <span className="text-xs text-muted-foreground">{t('connectorAccess.noAuthorization')}</span>
                             </div>
@@ -174,30 +202,74 @@ export function ConnectorAccessSettings({
                         return (
                           <div
                             aria-label={provider.serviceName}
-                            className="flex flex-col gap-1 border-t border-border/50 pt-3 outline-none first:border-t-0 first:pt-0"
+                            className="flex flex-col gap-1 rounded-lg border border-border/60 bg-background/40 p-2 outline-none"
                             key={provider.serviceId}
                             ref={configuring ? configurationTarget : undefined}
                             tabIndex={-1}
                           >
-                            <span className="flex min-w-0 items-center gap-2 text-xs font-medium">
-                              <ContentIcon src={provider.icon} className="size-4 shrink-0 data-[icon-kind=initials]:text-[20px]" />
-                              <span>{provider.serviceName}</span>
-                            </span>
-                            {configuring && candidates != null && candidates.length > 0 && !loading && !state.candidateErrors.includes(provider.serviceId) && (
-                              <p className="rounded bg-muted px-2 py-1 text-xs leading-5 text-foreground" role="status">
-                                {t('connectorAccess.configureHint')}
-                              </p>
-                            )}
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <span className="flex min-w-0 items-center gap-2 text-xs font-medium">
+                                <ContentIcon src={provider.icon} className="size-4 shrink-0 data-[icon-kind=initials]:text-[20px]" />
+                                <span>{provider.serviceName}</span>
+                                {usedByFlow && <span className="text-[11px] font-normal text-muted-foreground">{t('connectorAccess.usedByFlow')}</span>}
+                              </span>
+                              <div className="ml-auto flex items-center gap-2">
+                                {saving && (
+                                  <span role="status" className="text-[11px] text-muted-foreground">
+                                    {t('connectorAccess.saving')}
+                                  </span>
+                                )}
+                                {!saving && bindings.length == 0 && (candidates?.length ?? 0) > 0 && !loading && (
+                                  <span className="text-[11px] text-muted-foreground">{t('connectorAccess.noAccountSelected')}</span>
+                                )}
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger
+                                    render={
+                                      <Button
+                                        aria-label={t('connectorAccess.manageServiceAccounts', { service: provider.serviceName })}
+                                        className="text-muted-foreground"
+                                        size="icon-xs"
+                                        type="button"
+                                        variant="ghost"
+                                      />
+                                    }
+                                  >
+                                    <i aria-hidden="true" className="i-lucide-light:ellipsis size-4" />
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent container={menuContainer} align="end">
+                                    <DropdownMenuItem onClick={() => void store.connectors.connect(provider.serviceId)}>
+                                      {t('inspector.account.addAccount')}
+                                    </DropdownMenuItem>
+                                    {(usedByFlow
+                                      ? bindings.length > 0
+                                      : bindings.length > 0 || (access.providerIds?.includes(provider.serviceId) ?? false)) && (
+                                      <DropdownMenuItem
+                                        disabled={state.savingProviderId != null}
+                                        variant="destructive"
+                                        onClick={() => void store.connectorAccess.setService(provider.serviceId, false)}
+                                      >
+                                        {t(usedByFlow ? 'connectorAccess.removeAuthorization' : 'connectorAccess.removeService')}
+                                      </DropdownMenuItem>
+                                    )}
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
+                              </div>
+                            </div>
                             {options.map((option) => {
                               const binding = bindings.find((item) => item.accessBindingId == option.accessBindingId)
+                              const pending =
+                                state.pendingSelection?.providerId == provider.serviceId && state.pendingSelection.accessBindingId == option.accessBindingId
+                                  ? state.pendingSelection
+                                  : undefined
                               const groupLabel = connectorAccessPermissionGroupLabel(option, t)
                               const permissionLabel = connectorAccessPermissionLabel(option, t)
                               return (
                                 <Label className="min-w-0 items-start py-1 text-xs font-normal" key={option.accessBindingId}>
                                   <Checkbox
-                                    checked={binding != null}
+                                    checked={pending?.selected ?? binding != null}
+                                    aria-busy={pending != null || undefined}
                                     className="mt-px"
-                                    disabled={saving}
+                                    disabled={state.savingProviderId != null}
                                     onCheckedChange={(checked) =>
                                       void store.connectorAccess.select(provider.serviceId, option.accessBindingId, checked === true)
                                     }
@@ -236,6 +308,7 @@ export function ConnectorAccessSettings({
                         )
                       })}
                     </div>
+                    {addService}
                     {providers.error != null && <p className="text-xs text-destructive">{t('connectorAccess.providersFailed')}</p>}
                   </div>
                 )}
@@ -266,7 +339,7 @@ export function ConnectorAccessEmptyState({ store, serviceId }: { readonly store
   const hasActiveAccounts = connections.data.some((connection) => connection.status == 'active')
   return (
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <p className="text-xs leading-5 text-muted-foreground" role="status">
+      <p className="m-0 min-w-0 flex-1 basis-48 text-[11px] leading-4 text-muted-foreground" role="status">
         {t(hasActiveAccounts ? 'connectorAccess.noAvailablePermissions' : hasAccounts ? 'connectorAccess.reconnectAccount' : 'connectorAccess.noAccount')}
       </p>
       <Button onClick={() => void store.connectors.connect(serviceId)} size="xs" type="button" variant="secondary">

@@ -1,13 +1,14 @@
 import type { TFunction } from 'val-i18n'
 import type { ProviderAccessBinding, ProviderAccessBindingCandidate } from '../../../../control/common/api.ts'
 
-type PresentedPermissionGroup = Pick<ProviderAccessBinding | ProviderAccessBindingCandidate, 'permissionGroupName'>
+type PresentedPermissionGroup = Pick<ProviderAccessBinding | ProviderAccessBindingCandidate, 'permissionGroupName' | 'source'>
 type PresentedPermissions = Pick<ProviderAccessBindingCandidate, 'permissions' | 'providerId'>
 
 export function connectorAccessPermissionGroupLabel(binding: PresentedPermissionGroup, t: TFunction): string {
-  const group =
-    binding.permissionGroupName === undefined ? t('connectorAccess.savedPermissionGroup') : (binding.permissionGroupName ?? t('inspector.account.teamDefault'))
-  return t('connectorAccess.permissionGroup', { group })
+  if (binding.source == null) return t('connectorAccess.reauthorize')
+  if (binding.source.kind == 'admin-delegation') return t('connectorAccess.adminDelegation')
+  if (binding.source.ruleId == null) return t('connectorAccess.defaultPolicy')
+  return t('connectorAccess.permissionGroup', { group: binding.permissionGroupName ?? t('connectorAccess.savedPermissionGroup') })
 }
 
 export function connectorAccessPermissionLabel(candidate: PresentedPermissions, t: TFunction): string | undefined {

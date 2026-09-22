@@ -121,7 +121,7 @@ interface Props {
   readonly activeConnectorConnections?: readonly ConnectorConnection[]
   readonly connectors: ConnectorStore
   readonly connectorAccess?: ConnectorAccess
-  readonly onConfigureConnectorAccess?: (providerId: string) => void
+  readonly onConfigureConnectorAccess?: (providerId?: string) => void
   readonly prepareConnectorAction?: (
     action: ConnectorActionView,
   ) => Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] } | undefined>
@@ -212,6 +212,7 @@ export function NodeInspector({
             disabled={disabled}
             selection={selection}
             triggers={triggers}
+            onConfigureAccess={onConfigureConnectorAccess}
           />
         )}
         {connector != null && taskId != null && connectorAction?.authenticated !== false && (
@@ -519,7 +520,7 @@ export function NodeInspector({
                   {selection.module != null && (
                     <CodeTaskSection
                       connectorAccess={connectorAccess}
-                      prepareConnectorAction={prepareConnectorAction}
+                      onConfigureAccess={onConfigureConnectorAccess == null ? undefined : () => onConfigureConnectorAccess()}
                       connectors={connectors}
                       disabled={disabled}
                       focus={focus}

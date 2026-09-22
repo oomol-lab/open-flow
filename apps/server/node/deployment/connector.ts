@@ -1,4 +1,5 @@
 import type { ConnectorProxyRequest, ConnectorProxyResult } from '@oomol-lab/open-flow/connector-proxy'
+import type { ProviderAccessReference, ProviderAccessBindingCandidate } from '@oomol-lab/open-flow/control-api'
 import type { ConnectorAccess, ConnectorActionMetadata, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
 import type { ConnectorActionCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { Logger } from 'pino'
@@ -170,32 +171,20 @@ export class ConnectorClient implements ConnectorHost {
     })
   }
 
-  async listProviderAccessBindingCandidates(
-    teamId: string,
-    providerId: string,
-    signal?: AbortSignal,
-  ): Promise<
-    readonly {
-      readonly accessBindingId: string
-      readonly connectionDisplayName: string
-      readonly isDefault: boolean
-      readonly permissions: {
-        readonly actionIds: readonly string[]
-        readonly allActions: boolean
-        readonly configured: boolean
-        readonly proxy: boolean
-      }
-      readonly permissionGroupName: string | null
-      readonly policyRevision?: string
-      readonly providerId: string
-    }[]
-  > {
+  async listProviderAccessBindingCandidates(teamId: string, providerId: string, signal?: AbortSignal): Promise<readonly ProviderAccessBindingCandidate[]> {
+    if (this.#teamOrigin == null || this.#token.length == 0) throw unavailable()
+    const response = await this.#request('teams.membership', 'v1/me/teams', { method: 'GET' }, signal, { origin: this.#teamOrigin })
+    if (!response.ok || !record(response.value) || !Array.isArray(response.value.teams)) throw unavailable('The OOMOL Team membership could not be loaded.')
+    const team = response.value.teams.find((entry: unknown) => record(entry) && entry.id == teamId)
+    if (!record(team) || team.deleted !== false || team.status != 'normal') throw accessInvalid()
+    if (team.role != 'creator' && team.role != 'admin' && team.role != 'member') throw accessInvalid()
+    const teamAdmin = team.role == 'creator' || team.role == 'admin'
     const [actorId, connections, access] = await Promise.all([
-      this.#oomolUserId(signal),
+      teamAdmin ? Promise.resolve('') : this.#oomolUserId(signal),
       this.#connections(providerId, signal, teamId),
-      this.#readTeamAppAccess(teamId, signal),
+      teamAdmin ? Promise.resolve({ policy: {} }) : this.#readTeamAppAccess(teamId, signal),
     ])
-    return await providerAccessBindingCandidates({ actorId, connections, ...access, providerId, teamId })
+    return await providerAccessBindingCandidates({ actorId, connections, ...access, providerId, teamId, teamAdmin })
   }
 
   async #oomolUserId(signal?: AbortSignal): Promise<string> {
@@ -517,22 +506,23 @@ export class ConnectorClient implements ConnectorHost {
 
   async #resolveAccessBindings(
     teamId: string,
-    bindings: readonly { readonly providerId: string; readonly accessBindingId: string }[],
+    bindings: readonly ProviderAccessReference[],
     signal?: AbortSignal,
     connections?: readonly ConnectorConnection[],
   ): Promise<readonly ResolvedProviderAccessBinding[]> {
     if (bindings.length == 0) return []
-    const policy = this.#readTeamAppAccess(teamId, signal)
+    const policy = bindings.some((binding) => binding.source?.kind == 'policy') ? this.#readTeamAppAccess(teamId, signal) : Promise.resolve({ policy: {} })
     const requests = new Map<string, Promise<readonly ConnectorConnection[]>>()
     const resolved = await Promise.all(
-      bindings.map(async ({ providerId, accessBindingId }) => {
+      bindings.map(async (binding) => {
+        const { providerId } = binding
         let request = requests.get(providerId)
         if (request == null) {
           request = connections == null ? this.#connections(providerId, signal, teamId) : Promise.resolve(connections)
           requests.set(providerId, request)
         }
         const [available, access] = await Promise.all([request, policy])
-        return resolveProviderAccessBinding({ accessBindingId, providerId, teamId, connections: available, ...access })
+        return resolveProviderAccessBinding({ ...binding, teamId, connections: available, ...access })
       }),
     )
     if (resolved.some((binding) => binding == null)) throw accessInvalid()
