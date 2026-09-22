@@ -10,6 +10,11 @@ The user owns goals, scope, and consequential product choices. The agent owns ro
 decisions. Ask only when missing information would materially change the outcome, risk, cost, or
 authorized scope.
 
+When implementing or modifying code, do not keep a change artificially local by recreating, overriding,
+or correcting behavior outside its existing owner or source of truth. Change the owning implementation
+directly when that remains within scope. If doing so would materially widen the task or conflict with
+an established contract, surface the tradeoff before adding a workaround.
+
 Preserve unrelated work and staging state. Clean up temporary resources created for the task,
 including stopping verification servers before delivery.
 

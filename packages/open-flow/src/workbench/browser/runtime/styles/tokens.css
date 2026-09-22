@@ -18,6 +18,8 @@
   --warning-surface: color-mix(in srgb, var(--warning) 12%, var(--ui-background));
   --warning-border: color-mix(in srgb, var(--warning) 35%, var(--ui-border));
   --warning-foreground: color-mix(in srgb, var(--warning) 58%, var(--ui-foreground));
+  --warning-control-background: color-mix(in srgb, var(--warning) 22%, var(--ui-background));
+  --warning-control-hover-background: color-mix(in srgb, var(--warning) 30%, var(--ui-background));
   --danger-surface: color-mix(in srgb, var(--ui-destructive) 12%, var(--ui-background));
   --danger-border: color-mix(in srgb, var(--ui-destructive) 35%, var(--ui-border));
   --danger-foreground: color-mix(in srgb, var(--ui-destructive) 58%, var(--ui-foreground));

@@ -35,6 +35,49 @@
     line-height: 17px;
   }
 
+  .connection-alert {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border: 1px solid var(--warning-border);
+    border-radius: var(--ui-control-radius);
+    color: var(--warning-foreground);
+    background: var(--warning-surface);
+
+    > svg {
+      align-self: start;
+      margin-top: 1px;
+    }
+
+    > [data-slot='button'] {
+      grid-column: 3;
+      border-color: var(--warning-border);
+      color: var(--warning-foreground);
+      background: var(--warning-control-background);
+
+      &:hover {
+        background: var(--warning-control-hover-background);
+      }
+    }
+  }
+
+  .connection-alert-message {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 2px;
+
+    > p {
+      color: inherit;
+    }
+
+    > p:first-child {
+      font-weight: 500;
+    }
+  }
+
   .connection-field {
     display: flex;
     width: 100%;
@@ -60,7 +103,7 @@
     padding: 2px var(--inspector-content-inset-end) 16px var(--inspector-content-inset-start);
   }
 
-  .connection-state .connection-detail {
+  .connection-state > .connection-state-content > .connection-detail {
     color: var(--ui-muted-foreground);
   }
 

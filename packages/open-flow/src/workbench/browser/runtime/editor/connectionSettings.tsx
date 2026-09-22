@@ -15,6 +15,34 @@ import { Icon } from '../icons.tsx'
 
 const manageAccountOption = '__manage-account__'
 
+function ConnectionAlert({
+  detail,
+  disabled,
+  message,
+  onRetry,
+}: {
+  readonly detail?: string
+  readonly disabled: boolean
+  readonly message: string
+  readonly onRetry?: () => void
+}): ReactElement {
+  const t = useTranslate()
+  return (
+    <div className="connection-alert" role="alert">
+      <Icon name="alert" size={14} />
+      <div className="connection-alert-message">
+        <p>{message}</p>
+        {detail != null && <p>{detail}</p>}
+      </div>
+      {onRetry != null && (
+        <Button disabled={disabled} onClick={onRetry} size="sm" type="button" variant="secondary">
+          {t('inspector.account.retry')}
+        </Button>
+      )}
+    </div>
+  )
+}
+
 function AccountSelect({
   connections,
   disabled,
@@ -141,29 +169,26 @@ export function ConnectorAccount({
     if (action != null) onManage = () => void connectors.connect(action.serviceId)
     content = <p>{accessIssue}</p>
   } else if (actionError != null || action == null) {
+    const canRetry = actionError?.code != 'authorization.denied' && actionError?.code != 'connector.action-not-found'
     content = (
-      <>
-        <p>
-          {actionError?.code == 'authorization.denied'
+      <ConnectionAlert
+        disabled={disabled}
+        message={
+          actionError?.code == 'authorization.denied'
             ? t('inspector.account.contactAdmin')
-            : (actionError?.message ?? t('inspector.account.statusUnavailable', { action: actionId }))}
-        </p>
-        {actionError?.code != 'authorization.denied' && actionError?.code != 'connector.action-not-found' && (
-          <Button className="self-start" disabled={disabled} onClick={() => void connectors.refresh(true)} size="sm" type="button" variant="secondary">
-            {t('inspector.account.retry')}
-          </Button>
-        )}
-      </>
+            : (actionError?.message ?? t('inspector.account.statusUnavailable', { action: actionId }))
+        }
+        onRetry={canRetry ? () => void connectors.refresh(true) : undefined}
+      />
     )
   } else if (connectionError != null) {
     content = (
-      <>
-        <p>{t('inspector.account.refreshFailed')}</p>
-        <p className="connection-detail">{connectionError}</p>
-        <Button className="self-start" disabled={disabled} onClick={() => void connectors.refresh(true)} size="sm" type="button" variant="secondary">
-          {t('inspector.account.retry')}
-        </Button>
-      </>
+      <ConnectionAlert
+        detail={connectionError}
+        disabled={disabled}
+        message={t('inspector.account.refreshFailed')}
+        onRetry={() => void connectors.refresh(true)}
+      />
     )
   } else if (connectionId == null && available.length == 0) {
     content = (
@@ -284,13 +309,12 @@ export function TriggerConnection({
           {connectionLoading ? (
             <p>{t('inspector.account.loading')}</p>
           ) : connectionError != null ? (
-            <>
-              <p>{t('inspector.account.refreshFailed')}</p>
-              <p className="connection-detail">{connectionError}</p>
-              <Button disabled={disabled} onClick={() => void triggers.refresh(true)} size="sm" type="button" variant="secondary">
-                {t('inspector.account.retry')}
-              </Button>
-            </>
+            <ConnectionAlert
+              detail={connectionError}
+              disabled={disabled}
+              message={t('inspector.account.refreshFailed')}
+              onRetry={() => void triggers.refresh(true)}
+            />
           ) : (activeConnections?.length ?? 0) == 0 ? (
             <div className="connection-prompt">
               <p>{t('inspector.account.connectBeforeRun', { service: providerTrigger.definition.provider })}</p>
