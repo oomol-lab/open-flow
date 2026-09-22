@@ -3,7 +3,7 @@ import type { Logger } from 'pino'
 import type { ServerService } from '../application/service.ts'
 
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server'
-import { controlErrorCode, inspectFlowDraft } from '@oomol-lab/open-flow/control-api'
+import { controlErrorCode, inspectFlowDraft, flowInspection, actionSummary, nodeDetails, searchTriggerKeys } from '@oomol-lab/open-flow/control-api'
 import { authoringExample, authoringExamples, draftOperationsSchema, decodeDraftOperations } from '@oomol-lab/open-flow/control-requests'
 import { mcpTools, mcpProtocolVersion, mcpInstructions } from '@oomol-lab/open-flow/mcp'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
@@ -98,10 +98,17 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
     const { next, page } = control.listFlows(limit, cursor == null ? undefined : decodeFlowCursor(cursor))
     return { ...page, ...(next == null ? {} : { nextCursor: encodeFlowCursor(next) }) }
   })
-  register('flow_get', mcpTools.flow_get, async ({ flowId }) => {
+  register('flow_get', mcpTools.flow_get, async ({ flowId, full }) => {
     const metadata = control.getFlow(flowId)
     const inspected = await inspectFlowDraft(metadata, () => control.getRevision(flowId, metadata.draftRevisionId))
-    return inspected.draft == null ? inspected : { ...inspected, live: await control.getLive(flowId) }
+    return flowInspection(inspected, inspected.draft == null ? undefined : await control.getLive(flowId), full)
+  })
+  register('flow_node_get', mcpTools.flow_node_get, ({ flowId, revisionId, nodeId, subflowId }) => {
+    const draft = control.getRevision(flowId, revisionId)
+    const graph = subflowId == null ? draft.content.document.graph : draft.content.document.subflows[subflowId]?.graph
+    const node = graph?.nodes[nodeId]
+    if (node == null) throw new ControlError(controlErrorCode.flowInvalid, 'Node was not found in the selected Revision and graph.')
+    return { flowId, revisionId, ...(subflowId == null ? {} : { subflowId }), ...nodeDetails(draft.content, nodeId, node), version: 1 }
   })
   register('flow_schema', mcpTools.flow_schema, ({ kind, example }) => {
     try {
@@ -133,15 +140,12 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
   register('flow_set_enabled', mcpTools.flow_set_enabled, ({ flowId, expectedPublicationId, enabled }) =>
     control.setFlowEnabled(flowId, expectedPublicationId, enabled),
   )
-  register('flow_run', mcpTools.flow_run, async ({ source, flowId, revisionId, publicationId, trigger, inputs, idempotencyKey }) => {
-    if (source == 'draft') {
-      if (flowId == null || revisionId == null || publicationId != null)
-        throw new ControlError(controlErrorCode.runInvalid, 'Draft requires flowId and revisionId, without publicationId.')
-      return (await control.runs.createDraftRun(flowId, revisionId, currentEngineContract, inputs, idempotencyKey, trigger)).run
-    }
-    if (publicationId == null || flowId != null || revisionId != null)
-      throw new ControlError(controlErrorCode.runInvalid, 'Live requires publicationId, without flowId or revisionId.')
-    return (await control.runs.createLiveRun(publicationId, inputs, idempotencyKey, trigger)).run
+  register('flow_run', mcpTools.flow_run, async (args) => {
+    return (
+      args.source == 'draft'
+        ? await control.runs.createDraftRun(args.flowId, args.revisionId, currentEngineContract, args.inputs, args.idempotencyKey, args.trigger)
+        : await control.runs.createLiveRun(args.publicationId, args.inputs, args.idempotencyKey, args.trigger)
+    ).run
   })
   register('run_list', mcpTools.run_list, ({ flowId, status, cursor, limit, pendingWait }) => {
     const { next, page } = control.runs.listRuns(flowId, limit, {
@@ -158,18 +162,36 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
   register('run_result_read', mcpTools.run_result_read, ({ runId, resultId, ...query }) => control.runs.readRunResult(runId, resultId, query))
   register('run_resolve_wait', mcpTools.run_resolve_wait, ({ runId, waitId, action, comment }) => control.runs.resolveRunWait(runId, waitId, action, comment))
   register('run_cancel', mcpTools.run_cancel, ({ runId }) => control.runs.cancelRun(runId))
-  register('connector_teams', mcpTools.connector_teams, (_, context) => service.connectorTeams(context.mcpReq.signal))
-  register('connector_list', mcpTools.connector_list, async ({ flowId }, context) => ({
+  register('flow_code_connections', mcpTools.flow_code_connections, ({ flowId, publicationId }) => control.getConnectorAccess(actorId, flowId, publicationId))
+  register('flow_connection_candidates', mcpTools.flow_connection_candidates, ({ flowId, providerIds }, context) =>
+    control.getProviderAccessBindingCandidates(actorId, flowId, providerIds, context.mcpReq.signal),
+  )
+  register('flow_code_connection_set', mcpTools.flow_code_connection_set, ({ flowId, providerId, accessBindingId, selected, expectedAccessRevision }) =>
+    selected
+      ? control.addProviderAccessBinding(actorId, flowId, providerId, accessBindingId, expectedAccessRevision)
+      : control.removeProviderAccessBinding(actorId, flowId, providerId, accessBindingId, expectedAccessRevision),
+  )
+  register(
+    'flow_connection_usage_remove',
+    mcpTools.flow_connection_usage_remove,
+    ({ flowId, connectionId, expectedRevisionId, expectedAccessRevision, idempotencyKey }) =>
+      control.removeConnectionUsage(actorId, flowId, connectionId, expectedRevisionId, expectedAccessRevision, idempotencyKey),
+  )
+  register('connector_teams', mcpTools.connector_teams, async (_, context) => {
+    const { enabled, teams, version } = await service.connectorTeams(context.mcpReq.signal)
+    return { enabled, teams, version }
+  })
+  register('connector_providers', mcpTools.connector_providers, async ({ flowId }, context) => ({
     providers: await control.listConnectorProviders(flowId, context.mcpReq.signal),
   }))
   register('connector_search', mcpTools.connector_search, async ({ query, flowId }, context) => ({
-    actions: await control.searchConnectorActions(query, flowId, context.mcpReq.signal),
+    actions: (await control.searchConnectorActions(query, flowId, context.mcpReq.signal)).map(actionSummary),
   }))
   register('connector_get', mcpTools.connector_get, ({ actionId, flowId }, context) => control.getConnectorAction(actionId, flowId, context.mcpReq.signal))
   register('connector_connections', mcpTools.connector_connections, async ({ serviceId, flowId }, context) => ({
     connections: await control.listConnectorConnections(serviceId, flowId, context.mcpReq.signal),
   }))
-  register('trigger_list', mcpTools.trigger_list, () => ({ keys: control.listTriggerKeys() }))
+  register('trigger_search', mcpTools.trigger_search, ({ query }) => ({ keys: searchTriggerKeys(control.listTriggerKeys(), query) }))
   register('trigger_get', mcpTools.trigger_get, ({ key }) => ({
     definition: control.getTriggerKey(key),
   }))

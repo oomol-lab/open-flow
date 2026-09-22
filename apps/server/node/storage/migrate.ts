@@ -29,6 +29,7 @@ const migrationFiles = [
   '0024_event_source_application_scope.sql',
   '0025_integration_candidate_access.sql',
   '0026_flow_connector_services.sql',
+  '0027_code_connection_usage.sql',
 ] as const
 const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 

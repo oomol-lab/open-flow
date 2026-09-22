@@ -7,7 +7,7 @@ import { val } from 'value-enhancer'
 import { describe, expect, it } from 'vitest'
 import { createI18n } from '../i18n.ts'
 import { connectorAccessPermissionGroupLabel, connectorAccessPermissionLabel } from './connectorAccessPresentation.ts'
-import { ConnectorAccessEmptyState, ConnectorAccessSettings } from './connectorAccessSettings.tsx'
+import { ConnectorAccessEmptyState, CodeConnectionSettings, ConnectorAccessSettings } from './connectorAccessSettings.tsx'
 
 describe('Connector access settings', () => {
   it.each(['no-auth', 'mixed', 'loading'] as const)('handles %s provider authorization requirements', (scenario) => {
@@ -48,7 +48,7 @@ describe('Connector access settings', () => {
     } as unknown as WorkbenchStore
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
-        <ConnectorAccessSettings store={store} />
+        <CodeConnectionSettings store={store} />
       </I18nProvider>,
     )
 
@@ -77,7 +77,52 @@ describe('Connector access settings', () => {
       },
       workspace: {
         $: { flowId: val('empty-flow'), revision: val({ connectorProviderIds: new Set() }) },
-        catalogs: { providers: { get: () => val({ data: [{ serviceId: 'mail', serviceName: 'Mail' }] }) } },
+        catalogs: {
+          providers: { get: () => val({ data: [{ serviceId: 'mail', serviceName: 'Mail' }] }) },
+          connections: { get: () => val({ data: [{ connectionId: 'account', displayName: 'Work', status: 'active' }] }) },
+        },
+      },
+    } as unknown as WorkbenchStore
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <CodeConnectionSettings store={store} />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('Add service</button>')
+    expect(markup.includes('Some saved authorizations could not be read')).toBe(discardedBindingCount > 0)
+    expect(markup).not.toContain('Unable to load')
+  })
+
+  it('shows node usage separately from shared Code usage without global authorization checkboxes', () => {
+    const store = {
+      connectorAccess: {
+        $: val({
+          access: {
+            mode: 'selectable',
+            bindings: [
+              { connectionId: 'account', providerId: 'mail', connectionDisplayName: 'Work', status: 'active' },
+              { connectionId: 'second-account', providerId: 'mail', connectionDisplayName: 'Personal', status: 'active' },
+            ],
+          },
+          loading: false,
+        }),
+      },
+      connectors: { $: { connections: val([{ connectionId: 'account', displayName: 'Work' }]) } },
+      workspace: {
+        catalogs: {
+          providers: { get: () => val({ data: [{ serviceId: 'mail', serviceName: 'Mail' }] }) },
+          connections: { get: () => val({ data: [{ connectionId: 'account', displayName: 'Work', status: 'active' }] }) },
+        },
+        $: {
+          flowId: val('flow'),
+          live: val(undefined),
+          revision: val({
+            connectorReferences: {
+              accounts: [{ connectionId: 'account', providerId: 'mail', nodeId: 'send', name: 'Send mail', target: { kind: 'flow' } }],
+              hasCode: true,
+            },
+          }),
+        },
       },
     } as unknown as WorkbenchStore
     const markup = renderToStaticMarkup(
@@ -85,9 +130,17 @@ describe('Connector access settings', () => {
         <ConnectorAccessSettings store={store} />
       </I18nProvider>,
     )
-    expect(markup).toContain('Add service</button>')
-    expect(markup.includes('Some saved authorizations could not be read')).toBe(discardedBindingCount > 0)
-    expect(markup).not.toContain('Unable to load')
+    expect(markup).toContain('Connection usage')
+    expect(markup).toContain('Personal')
+    expect(markup.match(/aria-label="Mail"/g)).toHaveLength(1)
+    expect(markup).not.toContain('Current account status: Unknown')
+    expect(markup).toContain('Send mail')
+    expect(markup).toContain('Code: allowed for all Code nodes in this Flow')
+    expect(markup).toContain('2 accounts')
+    expect(markup).toContain('Actions for Personal')
+    expect(markup).toContain('Configure Code')
+    expect(markup).not.toContain('role="checkbox"')
+    expect(markup).not.toContain('Add service')
   })
 
   it('distinguishes a permission group from its connection', () => {
@@ -138,7 +191,7 @@ describe('Connector access settings', () => {
 
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
-        <ConnectorAccessSettings store={store} />
+        <CodeConnectionSettings store={store} />
       </I18nProvider>,
     )
 
@@ -147,7 +200,7 @@ describe('Connector access settings', () => {
     expect(markup).not.toContain('Loading access')
   })
 
-  it('summarizes authorized connections without listing every connection by default', () => {
+  it('shows Code accounts directly without a disclosure', () => {
     const revision = {
       connectorActionIds: new Set(['mail.send']),
       connectorProviderIds: new Set(['mail']),
@@ -248,18 +301,16 @@ describe('Connector access settings', () => {
 
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
-        <ConnectorAccessSettings store={store} />
+        <CodeConnectionSettings store={store} />
       </I18nProvider>,
     )
 
     expect(markup).toContain('Authorized accounts: 3 across 2 services')
-    expect(markup).toContain('aria-expanded="false"')
-    expect(markup).not.toContain('Add service</button>')
-    expect(markup).toContain('aria-controls=')
-    expect(markup).not.toContain('Connection: Work Slack')
-    expect(markup).not.toContain('Connection: Work Mail · Permission group: Team default')
-    expect(markup).not.toContain('Connection: Personal Mail · Permission group: Personal')
-    expect(markup).not.toContain('17TRACK')
+    expect(markup).not.toContain('aria-expanded=')
+    expect(markup).toContain('Add service</button>')
+    expect(markup).toContain('Work Slack')
+    expect(markup).toContain('Work Mail')
+    expect(markup).toContain('Personal Mail')
   })
 })
 

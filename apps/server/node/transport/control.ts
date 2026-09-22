@@ -175,7 +175,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     query(context.req.raw, [], controlErrorCode.flowInvalid)
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.createFlow)
     const name = body.name
-    const created = await service.createFlow(context.get('actorId'), name, idempotencyKey(context.req.raw, controlErrorCode.flowInvalid))
+    const created = await service.createFlow(context.get('actorId'), name, idempotencyKey(context.req.raw, controlErrorCode.flowInvalid), body.teamId)
     return response(created.created ? 201 : 200, created.flow)
   })
   app.get('/flows/:flowId', (context) => {
@@ -199,8 +199,8 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
 
   app.get('/flows/:flowId/editor', async (context) => response(200, await service.getEditor(context.req.param('flowId'))))
   app.get('/flows/:flowId/connector-access', (context) => {
-    query(context.req.raw, [], controlErrorCode.connectorAccessInvalid)
-    return response(200, service.getConnectorAccess(context.get('actorId'), context.req.param('flowId')))
+    query(context.req.raw, ['publicationId'], controlErrorCode.connectorAccessInvalid)
+    return response(200, service.getConnectorAccess(context.get('actorId'), context.req.param('flowId'), context.req.query('publicationId')))
   })
   app.post('/flows/:flowId/connector-access/candidates/query', async (context) => {
     query(context.req.raw, [], controlErrorCode.connectorAccessInvalid)
@@ -253,6 +253,21 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
         providerId,
         body.accessBindingId,
         body.expectedAccessRevision,
+      ),
+    )
+  })
+  app.post('/flows/:flowId/connection-usage/remove', async (context) => {
+    query(context.req.raw, [], controlErrorCode.connectorAccessInvalid)
+    const body = await decodeRequest(context.req.raw, controlErrorCode.connectorAccessInvalid, controlRequests.removeConnectionUsage)
+    return response(
+      200,
+      await service.removeConnectionUsage(
+        context.get('actorId'),
+        context.req.param('flowId'),
+        body.connectionId,
+        body.expectedRevisionId,
+        body.expectedAccessRevision,
+        idempotencyKey(context.req.raw, controlErrorCode.flowInvalid),
       ),
     )
   })

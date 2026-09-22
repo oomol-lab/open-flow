@@ -1,9 +1,11 @@
 import type { ConnectorAccess, ConnectorAccessCandidatesBatch } from '@oomol-lab/open-flow/control-api'
+import type { FlowDocument } from '@oomol-lab/open-flow/flow-change'
 import type { ConnectorTeamStore } from '../storage/connector-team-store.ts'
 import type { Database } from '../storage/database.ts'
 import type { ConnectorHost } from './connector.ts'
 
 import { decodeConnectorAccess } from '@oomol-lab/open-flow/control-api'
+import { connectionUsage } from '@oomol-lab/open-flow/flow-semantics'
 import { createHash } from 'node:crypto'
 import { ConnectorClient, ConnectorTaskError } from './connector.ts'
 
@@ -14,6 +16,7 @@ export type ConnectorAccessMutation =
   | { readonly kind: 'unsupported' }
 
 export interface ConnectorAccessHost {
+  removeConnection(flowId: string, connectionId: string, expectedAccessRevision: number): ConnectorAccessMutation
   setService(actorId: string, flowId: string, providerId: string, selected: boolean, expectedAccessRevision: number): Promise<ConnectorAccessMutation>
   delete(flowId: string): boolean
   current(flowId: string): ConnectorAccess
@@ -24,6 +27,10 @@ export interface ConnectorAccessHost {
 }
 
 export class ImplicitConnectorAccessHost implements ConnectorAccessHost {
+  removeConnection(_flowId: string, _connectionId: string, expectedAccessRevision: number): ConnectorAccessMutation {
+    return expectedAccessRevision == 0 ? { kind: 'saved', access: implicitAccess() } : { kind: 'conflict' }
+  }
+
   async setService(
     _actorId: string,
     _flowId: string,
@@ -176,6 +183,18 @@ export class ConfiguredConnectorAccessHost implements ConnectorAccessHost {
     )
   }
 
+  removeConnection(flowId: string, connectionId: string, expectedAccessRevision: number): ConnectorAccessMutation {
+    const current = this.current(flowId)
+    if (current.accessRevision != expectedAccessRevision) return { kind: 'conflict' }
+    if (current.mode == 'implicit') return { kind: 'saved', access: current }
+    return this.#save(
+      flowId,
+      expectedAccessRevision,
+      current.bindings.filter((binding) => binding.connectionId != connectionId),
+      current.providerIds ?? [],
+    )
+  }
+
   #connector(): ConnectorClient | undefined {
     const connector = this.#resolveConnector()
     return connector instanceof ConnectorClient && connector.teamSupported() ? connector : undefined
@@ -225,4 +244,30 @@ function selectableAccess(accessRevision: number, bindings: ConnectorAccess['bin
 
 function compareBindings(left: ConnectorAccess['bindings'][number], right: ConnectorAccess['bindings'][number]): number {
   return left.providerId.localeCompare(right.providerId) || left.accessBindingId.localeCompare(right.accessBindingId)
+}
+
+export async function captureNodeAccess(host: ConnectorAccessHost, flowId: string, document: FlowDocument, access: ConnectorAccess): Promise<ConnectorAccess> {
+  if (access.mode == 'implicit') return { ...access, nodeBindings: [] }
+  const uses = connectionUsage(document).filter((use) => use.connectionId != null)
+  const providerIds = [...new Set(uses.map((use) => use.providerId))]
+  if (providerIds.length == 0) return { ...access, nodeBindings: [] }
+  const response = await host.listCandidates('', flowId, providerIds)
+  const nodeBindings = new Map<string, ConnectorAccess['bindings'][number]>()
+  for (const providerId of providerIds) {
+    const result = response.results.find((item) => item.providerId == providerId)
+    if (result == null) throw new ConnectorTaskError('connector.unavailable', 'Connection candidates are unavailable.')
+    if ('error' in result) throw new ConnectorTaskError('connector.unavailable', result.error.message)
+    for (const use of uses.filter((item) => item.providerId == result.providerId)) {
+      const candidate = result.candidates.find(
+        (item) =>
+          item.connectionId == use.connectionId &&
+          (item.permissions == null ||
+            (use.kind == 'trigger' ? item.permissions.proxy : item.permissions.allActions || item.permissions.actionIds.includes(use.actionId!))),
+      )
+      if (candidate == null) throw new ConnectorTaskError('connector.access-invalid', `The selected connection is unavailable for ${use.name}.`)
+      const { isDefault: _, permissions: _permissions, ...binding } = candidate
+      nodeBindings.set(binding.accessBindingId, { ...binding, status: 'active' })
+    }
+  }
+  return { ...access, nodeBindings: [...nodeBindings.values()] }
 }

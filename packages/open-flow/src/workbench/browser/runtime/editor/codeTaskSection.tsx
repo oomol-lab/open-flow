@@ -36,12 +36,17 @@ export function CodeTaskSection({
 }): ReactElement | null {
   const hintedCatalog = useVal(connectors.$.actions)
   const connections = useVal(connectors.$.connections)
-  const providerIds =
-    connectorAccess?.mode == 'selectable'
-      ? connectorAccess.bindings.filter((binding) => binding.status == 'active').map((binding) => binding.providerId)
-      : connections.filter((connection) => connection.status == 'active').map((connection) => connection.serviceId)
-  const providerKey = JSON.stringify([...new Set(providerIds)].toSorted())
   const language = useLang()
+  const providers = useVal(store.catalogs.providers.get(undefined, language))
+  const providerIds = [
+    ...(connectorAccess?.mode == 'selectable'
+      ? connectorAccess.bindings.filter((binding) => binding.status == 'active').map((binding) => binding.providerId)
+      : connectorAccess?.mode == 'implicit'
+        ? connections.filter((connection) => connection.status == 'active').map((connection) => connection.serviceId)
+        : []),
+    ...(providers.data ?? []).filter((provider) => provider.noSetup).map((provider) => provider.serviceId),
+  ]
+  const providerKey = JSON.stringify([...new Set(providerIds)].toSorted())
   const flowId = useVal(store.$.flowId)
   const catalog = useMemo(
     () =>

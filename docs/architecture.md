@@ -233,12 +233,19 @@ Connector service 拥有 Provider 授权、credential、Connection lifecycle 和
 不能把 credential、token 或 Connector 数据库复制进 Revision、Browser 或 RunEvent。Connector catalog 和 Connection 是 deployment scope 资源，
 不从属于单个 Flow。
 
-Provider Access Binding 是 deployment-owned Flow 状态，不属于 Revision。`selectable` 部署按 Provider 保存零个或多个 opaque Connection bindings；`implicit`
+Provider Access Binding 是 deployment-owned Flow 状态，不属于 Revision。`selectable` 部署按 Provider 保存整个 Flow（含 Subflow）的 Code 共享连接列表；`implicit`
 部署不保存伪造的 binding，直接使用部署配置的 scoped Connector authority。绑定只引用 Connector 管理的权限边界，不能包含 credential，也不能演化为 Flow
 service account。身份显式区分管理员委托与 policy；团队默认 grant 属于 policy，具名规则删除后不得回退默认 grant。身份的确定性编码属于公共合同，候选可分配性和实际权限解析属于部署。Publication 和 Run 固定接受时的 binding identities；Connector 按目标 Connection 对 live policy 和 Action 做最终授权，缺失、失效或不匹配时
 fail closed。Connector 目录声明为无需账号授权的 Action 不要求 Provider Access Binding，仍使用部署要求的平台身份。
-Workbench 的账号和权限统一在大纲“服务与授权”中配置，可添加尚未被节点引用的服务。Connector 节点和代码节点通过“管理 Flow 授权”进入同一配置区；代码节点不提供独立连接列表或 Action 授权选择器。
-Workbench 允许先添加 Connector 节点再配置权限。权限缺失不阻断 Draft 编辑或隐藏 Action 元数据；界面显示待配置状态，Run／Publish 准入和执行仍校验授权。
+Connector、Agent 固定工具、Trigger 与通知从当前用户可用的连接中显式选择，选择不写入 Code 列表。
+Workbench 的「连接使用」按账号汇总节点来源及 Code 共享使用；Code 在独立配置页面手动管理允许使用的连接。
+从总览移除账号使用仅修改 Draft，部署在同一事务中检查图 Revision 和 accessRevision、清除所有节点选择及 Code 列表中的该账号。
+移除不删除节点、上游账号授权或其他 Flow；刷新不自动回填默认账号。节点创建时可选择适用 Action 的默认连接。
+Publication / Run 接受时从固定图的显式连接选择捕获 `nodeBindings`；`bindings` 仅允许 Code 使用。
+宿主决定调用所属范围，脚本不能选择节点权限。执行校验固定 binding 身份和当前上游权限，不能借用另一个节点的默认连接。
+旧快照缺少 `nodeBindings` 时继续按原有共享 `bindings` 执行；新快照总是提供该字段，包括空数组。
+迁移 0027 只一次性清空旧 Draft `flow_provider_access`，保留图、Publication、Run 和后台快照；不会在重新启动时清空新配置。
+Workbench 允许先添加节点再配置连接；缺失连接不阻断 Draft 编辑，Run／Publish 和实际调用仍校验使用资格。
 Publish operation、Publication、Run、Wait 通知和共享事件源订阅分别持久化对应的 access snapshot；Rollback 复制来源 Publication snapshot，
 Trigger/listener/maintenance 从固定记录恢复，不能重新读取当前 Draft binding。Flow 物理删除前 deployment access owner 必须完成对应 Draft map 清理。
 

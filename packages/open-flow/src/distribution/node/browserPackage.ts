@@ -270,11 +270,11 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
     await Promise.all(
       ['draftOperations', 'flowInspection', 'authoringExamples', 'providerAccess', 'connectorDecoders'].map(async (name) => {
         const declaration = (await readFile(path.join(declarationRoot, `control/common/${name}.d.ts`), 'utf8'))
-          .replaceAll("'./api.ts'", "'./control-api.js'")
+          .replaceAll(/(['"])\.\/api\.ts\1/g, "'./control-api.js'")
           .replaceAll("'./draftOperations.ts'", "'./draftOperations.js'")
           .replaceAll("'./providerAccess.ts'", "'./providerAccess.js'")
           .replaceAll("'./connectorDecoders.ts'", "'./connectorDecoders.js'")
-          .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
+          .replaceAll(/(['"])\.\.\/\.\.\/flow\/common\/change\.ts\1/g, "'../browser/flow-change.js'")
         await writeFile(path.join(commonOutputPath, `${name}.d.ts`), declaration)
       }),
     )
@@ -295,6 +295,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'../../connector/common/proxy.ts'", "'./connector-proxy.js'")
       .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
     const triggerCatalogDeclaration = (await readFile(path.join(declarationRoot, 'control/common/triggerCatalog.d.ts'), 'utf8'))
+      .replaceAll("'./api.ts'", "'./control-api.js'")
       .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
       .replaceAll("'../../localization/common/languages.ts'", "'./localization.js'")
     const triggerLocalizationDeclaration = (await readFile(path.join(declarationRoot, 'trigger/providers/localization.d.ts'), 'utf8'))
@@ -311,7 +312,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'./changeSchema.ts'", "'../browser/flow-change-schema.js'")
       .replaceAll("'./json.ts'", "'./flow-json.js'")
     await Promise.all(
-      ['agent', 'semantics', 'graph', 'schema', 'modules'].map(async (name) => {
+      ['agent', 'semantics', 'graph', 'schema', 'modules', 'connectionUsage'].map(async (name) => {
         const declaration = (await readFile(path.join(declarationRoot, `flow/common/${name}.d.ts`), 'utf8'))
           .replaceAll("'../../execution/common/engineContract.ts'", "'./engine-contract.js'")
           .replaceAll("'../../execution/common/runtime.ts'", "'./runtime-contract.js'")
@@ -322,6 +323,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
           .replaceAll("'./schema.ts'", "'./flow-schema.js'")
           .replaceAll("'./modules.ts'", "'./flow-modules.js'")
           .replaceAll("'./agent.ts'", "'./flow-agent.js'")
+          .replaceAll("'./connectionUsage.ts'", "'./flow-connectionUsage.js'")
         await writeFile(path.join(commonOutputPath, `flow-${name}.d.ts`), declaration)
       }),
     )

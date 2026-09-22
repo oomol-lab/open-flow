@@ -5,6 +5,7 @@ import type { LogAction } from './stories.tsx'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { applyFlowChanges } from '../../src/flow/common/change.ts'
+import { removeConnectionUsage } from '../../src/flow/common/connectionUsage.ts'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { setNodePositions } from '../../src/workbench/browser/runtime/canvasPresentation.ts'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
@@ -18,11 +19,13 @@ export function createInspectorTransport(
   log: LogAction,
   initialContent: RevisionContent,
   options: {
+    readonly published?: boolean
     readonly access?: ConnectorAccess
     readonly accessError?: boolean
     readonly accessSaveDelay?: number
     readonly actions?: readonly ConnectorActionMetadata[]
     readonly candidates?: readonly {
+      readonly connectionId?: string
       readonly accessBindingId: string
       readonly connectionDisplayName: string
       readonly permissionGroupName?: string | null
@@ -59,12 +62,44 @@ export function createInspectorTransport(
     revisionId: `r${sequence}`,
     version: 1,
   })
+  const publishedRevision = { ...revision(), content: initialContent }
+  const publication = options.published
+    ? {
+        actorId: 'lab',
+        closureDigest: 'closure',
+        createdAt: timestamp,
+        engineContract: 'open-flow-engine/v5',
+        flowId: flow.flowId,
+        modelVersion: currentFlowModelVersion,
+        operation: 'publish',
+        publicationId: 'published',
+        providerAccessDigest: access.providerAccessDigest,
+        revisionDigest: 'd1',
+        revisionId: 'r1',
+        version: 1,
+      }
+    : null
+  const publishedAccess = access
   const client = new WorkbenchClient(async (path, init) => {
     const url = new URL(path instanceof Request ? path.url : path, 'https://lab.invalid')
+    if (url.pathname.endsWith('/connection-usage/remove')) {
+      const input = JSON.parse(String(init?.body)) as { connectionId: string; expectedRevisionId: string; expectedAccessRevision: number }
+      if (input.expectedRevisionId != revision().revisionId || input.expectedAccessRevision != access.accessRevision)
+        return Response.json({ version: 1, error: { code: 'revision.conflict', message: 'Draft changed.' } }, { status: 409 })
+      content = removeConnectionUsage(content, input.connectionId)
+      access = {
+        ...access,
+        accessRevision: access.accessRevision + 1,
+        bindings: access.bindings.filter((binding) => binding.connectionId != input.connectionId),
+      }
+      sequence++
+      return Response.json({ revision: revision(), version: 1 })
+    }
     if (url.pathname.endsWith('/connector-access')) {
       if (options.accessError) return Response.json({ error: { code: 'connector.unavailable', message: 'Unavailable.' }, version: 1 }, { status: 503 })
-      return Response.json(access)
+      return Response.json(url.searchParams.has('publicationId') ? publishedAccess : access)
     }
+    if (url.pathname.endsWith('/revisions/r1')) return Response.json(publishedRevision)
     const service = /\/connector-access\/([^/]+)\/service$/.exec(url.pathname)
     if (service != null && (init?.method == 'PUT' || init?.method == 'DELETE')) {
       const providerId = decodeURIComponent(service[1]!)
@@ -90,6 +125,7 @@ export function createInspectorTransport(
               providerId: item.providerId,
               permissionGroupName: item.permissionGroupName,
               connectionId:
+                item.connectionId ??
                 options.connections?.find((account) => account.service == item.providerId && account.displayName == item.connectionDisplayName)?.id ??
                 'fixture-account',
               source: { kind: 'policy', ruleId: null },
@@ -116,6 +152,7 @@ export function createInspectorTransport(
                 ...access.bindings.filter((binding) => binding.providerId != providerId || binding.accessBindingId != input.accessBindingId),
                 {
                   connectionId:
+                    selected?.connectionId ??
                     options.connections?.find((account) => account.service == providerId && account.displayName == selected?.connectionDisplayName)?.id ??
                     'fixture-account',
                   source: { kind: 'policy' as const, ruleId: null },
@@ -178,7 +215,14 @@ export function createInspectorTransport(
         flow: { ...flow, draftRevisionId: revision().revisionId },
         draft: { ...revision(), content },
         presentation: { revision: sequence, updatedAt: timestamp, value: presentation, version: 1 },
-        live: { flowId: flow.flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 },
+        live: {
+          flowId: flow.flowId,
+          hasUnpublishedChanges: true,
+          publication,
+          revision: publication == null ? 0 : 1,
+          status: publication == null ? 'not-published' : 'runnable',
+          version: 1,
+        },
         version: 1,
       })
     if (url.pathname.endsWith('/draft/changes')) {

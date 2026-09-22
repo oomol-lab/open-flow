@@ -58,7 +58,7 @@ function resolutionDefinition(
 }
 
 describe('Provider account section', () => {
-  it.each(['empty', 'invalid'] as const)('routes %s account authorization to Flow configuration', (state) => {
+  it.each(['empty', 'invalid'] as const)('routes %s account authorization to the supplied account management entry', (state) => {
     const configure = vi.fn()
     const connect = vi.fn()
     const rendered = ConnectorAccount({
@@ -84,7 +84,7 @@ describe('Provider account section', () => {
     expect(connect).not.toHaveBeenCalled()
   })
 
-  it('routes trigger account authorization to its provider in Flow configuration', () => {
+  it('routes trigger account authorization to its provider account management entry', () => {
     const configure = vi.fn()
     const connect = vi.fn()
     const rendered = TriggerConnection({
@@ -135,23 +135,23 @@ describe('Provider account section', () => {
     const account = find(element, (item) => typeof item.type == 'function' && item.type.name == 'ConnectorAccount')
     if (account == null || typeof account.type != 'function') throw new Error('Expected Provider account section.')
     const rendered = (account.type as (props: unknown) => ReactElement)(account.props)
-    const manage = find(rendered, (item) => item.props.children == 'inspector.account.manageFlowAccess')
+    const manage = find(rendered, (item) => item.props.children == 'inspector.account.manageAccount')
     const accountSelect = find(rendered, (item) => typeof item.type == 'function' && item.type.name == 'AccountSelect')
     if (accountSelect == null || typeof accountSelect.type != 'function') throw new Error('Expected account selector.')
     const renderedSelect = (accountSelect.type as (props: unknown) => ReactElement)(accountSelect.props)
     const addAccount = find(renderedSelect, (item) => item.props.children == 'inspector.account.addAccount')
     const select = find(renderedSelect, (item) => typeof item.props.onValueChange == 'function')
 
-    expect(manage?.props.children).toBe('inspector.account.manageFlowAccess')
+    expect(manage?.props.children).toBe('inspector.account.manageAccount')
     expect(addAccount?.props.children).toBe('inspector.account.addAccount')
     expect(find(rendered, (item) => item.type == 'p' && item.props.children == 'inspector.account.pinned')).toBeUndefined()
 
     ;(manage!.props.onClick as () => void)()
     ;(select!.props.onValueChange as (value: string) => void)(addAccount!.props.value as string)
 
-    expect(configureAccess).toHaveBeenCalledTimes(2)
-    expect(configureAccess).toHaveBeenLastCalledWith('slack')
-    expect(connect).not.toHaveBeenCalled()
+    expect(configureAccess).not.toHaveBeenCalled()
+    expect(connect).toHaveBeenLastCalledWith('slack')
+    expect(connect).toHaveBeenCalledTimes(2)
     expect(setConnection).not.toHaveBeenCalled()
     ;(select!.props.onValueChange as (value: string) => void)('connection')
     expect(setConnection).toHaveBeenCalledWith('provider-task', 'connection')
@@ -376,6 +376,7 @@ describe('Code task sections', () => {
         module: { name: 'Transform', imports: [], source: 'export default () => ({})' },
       } as never,
       store: {
+        catalogs: { providers: { get: () => ({ value: { data: [] } }) } },
         $: {
           flowId: { value: 'flow' },
           moduleEditor,

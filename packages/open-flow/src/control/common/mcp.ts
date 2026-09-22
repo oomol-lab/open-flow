@@ -14,7 +14,7 @@ const pageLimit = z.int().min(1).max(100).default(50)
 const flow = id.describe('Exact Flow ID returned by flow_list or flow_create.')
 const run = id.describe('Exact Run ID returned by flow_run or run_list.')
 export const mcpInstructions =
-  'Use flow_list and flow_get to inspect a Flow. Use flow_schema to learn atomic edit operations, then flow_apply with the observed expectedRevisionId and a stable idempotencyKey. ' +
+  'Use flow_list and flow_get to inspect a Flow. Use flow_node_get with the observed revisionId for individual node schemas or code. Use flow_schema to learn atomic edit operations, then flow_apply with the observed expectedRevisionId and a stable idempotencyKey. ' +
   'Use flow_check before flow_run. Select an explicit Trigger node ID and fixed revision or publication. A new Flow has no Trigger until you add one. ' +
   'Use flow_publish to publish a fixed Revision, then poll flow_publish_status until succeeded or failed. Use flow_set_enabled to enable or disable the observed Live publication. ' +
   'flow_run returns an accepted Run, not its final result. Find Runs with run_list, poll run_get and use run_result after terminal. Resolve a waiting Run only with an explicit run_resolve_wait action allowed by run_get. ' +
@@ -52,8 +52,13 @@ export const mcpTools = {
     true,
   ),
   flow_get: tool(
-    'Read Flow metadata, the full Draft and current Live publication. Unreadable Drafts return draft=null and draftIssue; flow.live still identifies the published version. Use draft.revisionId as the base of an edit.',
-    z.strictObject({ flowId: flow }),
+    'Read a compact Draft graph with input bindings, port handles, subflows and Live status. Use full=true for complete Revision content, schemas, source code and exact before values required by complex edits. Unreadable Drafts return draft=null and draftIssue; flow.live still identifies the published version. Use draft.revisionId as the base of an edit.',
+    z.strictObject({ flowId: flow, full: z.boolean().optional() }),
+    true,
+  ),
+  flow_node_get: tool(
+    'Read one node and its Task definition or code module from a fixed Revision. Omit subflowId for the root graph. Use revisionId from flow_get; the returned node contains exact before values for edits.',
+    z.strictObject({ flowId: flow, revisionId: id, nodeId: id, subflowId: id.optional() }),
     true,
   ),
   flow_schema: tool(
@@ -104,15 +109,25 @@ export const mcpTools = {
   ),
   flow_run: tool(
     'Start a Run and return its runId. For draft supply flowId and revisionId; for live supply publicationId. Always fix the source, Trigger and idempotencyKey. Poll run_get for completion.',
-    z.strictObject({
-      source: z.enum(['draft', 'live']),
-      flowId: flow.optional(),
-      revisionId: id.optional(),
-      publicationId: id.optional(),
-      trigger: z.strictObject({ nodeId: id, outputs: z.record(z.string(), json) }),
-      inputs: z.record(z.string(), z.record(z.string(), json)).default({}),
-      idempotencyKey: mutationKey,
-    }),
+    z
+      .discriminatedUnion('source', [
+        z.strictObject({
+          source: z.literal('draft'),
+          flowId: flow,
+          revisionId: id,
+          trigger: z.strictObject({ nodeId: id, outputs: z.record(z.string(), json) }),
+          inputs: z.record(z.string(), z.record(z.string(), json)).default({}),
+          idempotencyKey: mutationKey,
+        }),
+        z.strictObject({
+          source: z.literal('live'),
+          publicationId: id,
+          trigger: z.strictObject({ nodeId: id, outputs: z.record(z.string(), json) }),
+          inputs: z.record(z.string(), z.record(z.string(), json)).default({}),
+          idempotencyKey: mutationKey,
+        }),
+      ])
+      .meta({ type: 'object' }),
     false,
   ),
   run_list: tool(
@@ -155,9 +170,33 @@ export const mcpTools = {
     z.strictObject({ runId: run }),
     false,
   ),
+  flow_code_connections: tool(
+    'Read the connections shared by all Code nodes in this Flow. With publicationId, read the fixed published snapshot; it cannot be edited.',
+    z.strictObject({ flowId: flow, publicationId: id.optional() }),
+    true,
+  ),
+  flow_connection_candidates: tool(
+    'List connections and permissions available to select. Node selections do not add shared Code usage.',
+    z.strictObject({ flowId: flow, providerIds: z.array(id).min(1) }),
+    true,
+  ),
+  flow_code_connection_set: tool(
+    'Add or remove shared Code usage in the Draft only. Does not change node selections or published versions. Use the observed accessRevision.',
+    z.strictObject({ flowId: flow, providerId: id, accessBindingId: id, selected: z.boolean(), expectedAccessRevision: z.int().nonnegative() }),
+    false,
+  ),
+  flow_connection_usage_remove: tool(
+    'Remove a connection from all node selections and shared Code usage in this Draft atomically. Keeps the account, published versions and accepted Runs. Use the observed revisionId and accessRevision.',
+    z.strictObject({ flowId: flow, connectionId: id, expectedRevisionId: id, expectedAccessRevision: z.int().nonnegative(), idempotencyKey: mutationKey }),
+    false,
+  ),
   connector_teams: tool('List OOMOL Teams available for Flow creation. An unconfigured or custom Connector may not provide Teams.', z.strictObject({}), true),
-  connector_list: tool('List Connector providers available in the Flow scope.', z.strictObject({ flowId: flow.optional() }), true),
-  connector_search: tool('Search Connector actions in the Flow scope.', z.strictObject({ query: id, flowId: flow.optional() }), true),
+  connector_providers: tool('List Connector providers available in the Flow scope.', z.strictObject({ flowId: flow.optional() }), true),
+  connector_search: tool(
+    'Search Connector action summaries in the Flow scope. Read complete schemas with connector_get after selecting an action.',
+    z.strictObject({ query: z.string().trim().min(1).max(256), flowId: flow.optional() }),
+    true,
+  ),
   connector_get: tool(
     'Read a Connector action, input/output definitions and connection requirements before authoring a node.',
     z.strictObject({ actionId: id, flowId: flow.optional() }),
@@ -168,7 +207,11 @@ export const mcpTools = {
     z.strictObject({ serviceId: id.max(256), flowId: flow.optional() }),
     true,
   ),
-  trigger_list: tool('List provider Trigger definitions. Manual, Webhook and Cron are built-in node kinds described by flow_schema.', z.strictObject({}), true),
+  trigger_search: tool(
+    'Search provider Trigger summaries; omit query to list all. Flow trigger instances are in flow_get. Manual, Webhook and Cron are built-in node kinds described by flow_schema.',
+    z.strictObject({ query: z.string().trim().min(1).max(256).optional() }),
+    true,
+  ),
   trigger_get: tool('Read a provider Trigger definition before creating its node.', z.strictObject({ key: id }), true),
 }
 

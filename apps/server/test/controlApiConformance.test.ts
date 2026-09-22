@@ -177,6 +177,18 @@ function selectableConnectorAccess(): ConnectorAccessHost {
   const current = (flowId: string): ConnectorAccess =>
     accesses.get(flowId) ?? { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 }
   return {
+    removeConnection(flowId, connectionId, expectedAccessRevision) {
+      const access = current(flowId)
+      if (access.accessRevision != expectedAccessRevision) return { kind: 'conflict' }
+      const next = {
+        ...access,
+        accessRevision: access.accessRevision + 1,
+        bindings: access.bindings.filter((binding) => binding.connectionId != connectionId),
+        providerAccessDigest: `selectable:${access.accessRevision + 1}`,
+      }
+      accesses.set(flowId, next)
+      return { kind: 'saved', access: next }
+    },
     async setService(_actorId, flowId, providerId, selected, expectedAccessRevision) {
       const access = current(flowId)
       if (access.accessRevision != expectedAccessRevision) return { kind: 'conflict' }
@@ -555,6 +567,44 @@ it('Server event source Team scope and authorization page conformance', async ()
       connectionPageUrl: 'https://console.oomol.com/team/team_a/connections/feishu_app_bot',
     }))
       await conformance.verify(harness)
+  } finally {
+    await harness.dispose()
+  }
+})
+
+it('removes Draft node and Code usage together, detects conflicts and preserves immutable revisions', async () => {
+  const host = selectableConnectorAccess()
+  const harness = await createHarness(false, host)
+  try {
+    const api = new ControlClient((route, init) => harness.request(new Request(new URL(route, harness.origin), init)))
+    const flow = await api.createFlow('Connection usage', 'usage-create')
+    const changed = await api.changeDraft(flow.flowId, flow.draftRevisionId, [
+      {
+        kind: 'task.create',
+        taskId: 'send',
+        task: { name: 'Send', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send', connectionId: 'fixture-account' } },
+      },
+      { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'send', node: { kind: 'task', taskId: 'send', name: 'Send', inputs: {} } },
+    ])
+    const added = await api.addProviderAccessBinding(flow.flowId, 'mail', 'editors', 0)
+    await expect(api.removeConnectionUsage(flow.flowId, 'fixture-account', changed.revision.revisionId, 0, 'stale-access')).rejects.toMatchObject({
+      code: 'connector.access-conflict',
+    })
+    expect((await api.getFlow(flow.flowId)).draftRevisionId).toBe(changed.revision.revisionId)
+    expect((await api.getConnectorAccess(flow.flowId)).bindings).toHaveLength(1)
+    const removed = await api.removeConnectionUsage(flow.flowId, 'fixture-account', changed.revision.revisionId, added.accessRevision, 'remove-account')
+    expect((await api.getDraft(flow.flowId)).content.document.tasks.send?.executor).toEqual({ kind: 'connector', action: 'mail.send' })
+    expect((await api.getConnectorAccess(flow.flowId)).bindings).toEqual([])
+    expect((await api.getRevision(flow.flowId, changed.revision.revisionId)).content.document.tasks.send?.executor).toHaveProperty(
+      'connectionId',
+      'fixture-account',
+    )
+    expect(await api.removeConnectionUsage(flow.flowId, 'fixture-account', changed.revision.revisionId, added.accessRevision, 'remove-account')).toEqual(
+      removed,
+    )
+    await expect(api.removeConnectionUsage(flow.flowId, 'fixture-account', changed.revision.revisionId, 2, 'stale-revision')).rejects.toMatchObject({
+      code: 'flow.revision-conflict',
+    })
   } finally {
     await harness.dispose()
   }

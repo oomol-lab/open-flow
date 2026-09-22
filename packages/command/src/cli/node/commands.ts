@@ -4,13 +4,15 @@ const edit = ['expected-revision', 'idempotency-key']
 const page = ['cursor', 'limit']
 const commands = [
   ['list', '[--cursor <cursor>] [--limit <count>]', page],
-  ['create', '<name>', ['idempotency-key']],
+  ['create', '<name> [--team <teamId>]', ['idempotency-key', 'team']],
   ['show', '<flow>', []],
-  ['inspect', '<flow> [--summary]', ['summary']],
+  ['inspect', '<flow> [--full]', ['full']],
   ['apply', '<flow> --file <path|->', [...edit, 'file']],
   ['rename', '<flow> <new-name>', []],
   ['delete', '<flow> --yes', ['yes']],
-  ['check', '<flow>', []],
+  ['check', '<flow> [--revision <revisionId>]', ['revision']],
+  ['enable', '<flow> --expected-publication <publicationId>', ['expected-publication']],
+  ['disable', '<flow> --expected-publication <publicationId>', ['expected-publication']],
   ['node list', '<flow>', []],
   ['node show', '<flow> <node>', []],
   ['node add', '<flow> <agent|code|condition|value|llm-chat|llm-json> <name>', [...edit, 'code']],
@@ -23,12 +25,18 @@ const commands = [
   ['code show', '<flow> <module>', []],
   ['code edit', '<flow> <module> --code <javascript|@file|->', [...edit, 'code']],
   ['code set', '<flow> <module> --name <name>', [...edit, 'name']],
-  ['connector list', '[--flow <flow>]', ['flow']],
+  ['connector code-access', '<flow>', []],
+  ['connector candidates', '<flow> <provider>', []],
+  ['connector code-allow', '<flow> <provider> <binding> <access-revision>', []],
+  ['connector code-remove', '<flow> <provider> <binding> <access-revision>', []],
+  ['connector remove-usage', '<flow> <connection> <access-revision>', edit],
+  ['connector providers', '[--flow <flow>]', ['flow']],
+  ['connector teams', '', []],
   ['connector search', '<query> [--flow <flow>]', ['flow']],
   ['connector show', '<action> [--flow <flow>]', ['flow']],
   ['connector connections', '<service> [--flow <flow>]', ['flow']],
   ['connector add', '<flow> <action>', [...edit, 'name', 'connection', 'set']],
-  ['connector set', '<flow> <node>', [...edit, 'name', 'connection', 'set', 'unset']],
+  ['connector set', '<flow> <node>', [...edit, 'connection', 'set', 'unset']],
   ['trigger search', '[query]', []],
   ['trigger show', '<key>', []],
   ['trigger list', '<flow>', []],
@@ -42,8 +50,8 @@ const commands = [
   ['runs resolve', '<run> <wait> <continue|approve|reject>', ['comment']],
   ['runs events', '<run>', ['after', 'limit', 'follow', 'timeout']],
   ['runs result', '<run>', []],
-  ['runs results', '<run> [<after>]', []],
-  ['runs read-result', '<run> <result> [<pointer>] [<offset>]', []],
+  ['runs results', '<run> [--after <resultId>]', ['after']],
+  ['runs read-result', '<run> <result>', ['pointer', 'offset', 'limit', 'max-bytes']],
   ['runs download-result', '<run> <result>', []],
   ['runs cancel', '<run>', []],
   ['publish', '<flow>', [...edit, 'expected-publication', 'timeout']],
@@ -61,6 +69,11 @@ const optionDetails: Record<
   string,
   { description: string; type?: string; enum?: readonly string[]; default?: string | number; minimum?: number; maximum?: number }
 > = {
+  'team': { description: 'Team ID from connector teams.', type: 'string' },
+  'revision': { description: 'Exact Revision to check; defaults to the current Draft.', type: 'string' },
+  'pointer': { description: 'JSON Pointer within the stored result; defaults to the root.', type: 'string' },
+  'offset': { description: 'Page offset at the selected pointer.', type: 'integer', minimum: 0, default: 0 },
+  'max-bytes': { description: 'Maximum result page bytes.', type: 'integer', minimum: 1, maximum: 1048576, default: 15000 },
   'expected-revision': {
     description: 'Base Revision ID from inspect. Required with an explicit idempotency key for draft edits and draft runs.',
     type: 'string',
@@ -100,7 +113,7 @@ const optionDetails: Record<
   'every': { description: 'Interval such as 5m, 1h, or 1d. Mutually exclusive with --cron.', type: 'string' },
   'wait': { description: 'Wait until terminal, waiting for an action, or the wait budget expires.' },
   'follow': { description: 'Stream event pages as NDJSON with --json; stop on terminal, Wait, or timeout.' },
-  'summary': { description: 'Compact node, trigger and execution-edge list; omit full Revision content.' },
+  'full': { description: 'Include complete Revision content, schemas, source code and revision metadata.' },
   'yes': { description: 'Confirm the requested deletion.' },
   'json': { description: 'Machine-readable JSON results and errors; NDJSON for followed events.' },
   'help': { description: 'Show this command contract without contacting the host.' },
@@ -117,11 +130,15 @@ export function commandHelp(path: readonly string[]) {
         Object.assign(
           {
             name: `--${flag}`,
-            value: !['json', 'help', 'wait', 'follow', 'summary', 'yes', 'pending-wait'].includes(flag),
+            value: !['json', 'help', 'wait', 'follow', 'full', 'yes', 'pending-wait'].includes(flag),
             repeatable: flag == 'set' || flag == 'unset',
           },
           optionDetails[flag],
           key == 'node set' && flag == 'timeout' ? { default: undefined } : {},
+          key == 'runs results' && flag == 'after'
+            ? { type: 'string', minimum: undefined, default: undefined, description: 'Result ID from nextAfter on the preceding page.' }
+            : {},
+          key == 'runs read-result' && flag == 'limit' ? { default: 20 } : {},
         ),
       ),
     }))
@@ -177,7 +194,7 @@ export function commandSchema(name = 'apply') {
 
 export const commandExamples = [
   'oo flow list --limit 20 --json',
-  'oo flow inspect FLOW_ID --summary --json',
+  'oo flow inspect FLOW_ID --json',
   'oo flow schema apply --json',
   'oo flow apply FLOW_ID --file changes.json --expected-revision REVISION_ID --idempotency-key EDIT_KEY --json',
   'oo flow connector search email --flow FLOW_ID --json',

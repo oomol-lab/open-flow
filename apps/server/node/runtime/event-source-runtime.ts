@@ -211,6 +211,7 @@ export class EventSourceRuntime {
       const result = await connector.proxy(source.provider, source.connectionId, source.sourceId, request, signal ?? AbortSignal.timeout(30_000), {
         providerAccess: stored.providerAccess,
         providerId: source.provider,
+        usage: 'node',
         purpose: 'trigger',
         source: 'publication',
         ...(source.teamId == null ? {} : { teamId: source.teamId }),
@@ -228,6 +229,7 @@ export class EventSourceRuntime {
     return {
       providerAccess: this.#connectorAccess.current(''),
       providerId,
+      usage: 'node',
       purpose: 'catalog',
       source: 'operator',
       ...(teamId == null ? {} : { teamId }),

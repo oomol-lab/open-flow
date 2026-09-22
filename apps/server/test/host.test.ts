@@ -364,6 +364,7 @@ it('fixes one OOMOL Team when each Flow is created', async () => {
   let flowId = ''
   try {
     expect((await createServerApp(service).request('/connector/teams')).status).toBe(401)
+    expect((await createServerApp(service).request('/v1/connector/teams')).status).toBe(401)
     const app = createServerApp(service, { resolveControlActor: () => 'operator' })
     expect(await (await app.request('/connector/teams')).json()).toEqual({
       bindings: [],
@@ -383,6 +384,29 @@ it('fixes one OOMOL Team when each Flow is created', async () => {
         })
       ).status,
     ).toBe(400)
+    const teamCatalog = await app.request('/v1/connector/teams')
+    expect(await teamCatalog.json()).toEqual({
+      enabled: true,
+      teams: [
+        { id: 'team-1', name: 'Engineering', systemCreated: true },
+        { id: 'team-2', name: 'Operations', systemCreated: false },
+      ],
+      version: 1,
+    })
+    const publicRequest = {
+      body: JSON.stringify({ name: 'Public Team Flow', teamId: 'team-2', version: 1 }),
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'public-team-flow' },
+      method: 'POST',
+    }
+    const publicCreated = await app.request('/v1/flows', publicRequest)
+    expect(publicCreated.status).toBe(201)
+    const publicFlow = (await publicCreated.json()) as { flowId: string }
+    expect(await (await app.request('/v1/flows', publicRequest)).json()).toEqual(publicFlow)
+    await service.control.listConnectorProviders(publicFlow.flowId)
+    expect(requests.at(-1)).toEqual({ teamId: 'team-2', url: 'https://connector.oomol.com/v1/providers' })
+    expect(
+      (await app.request('/v1/flows', { ...publicRequest, body: JSON.stringify({ name: 'Public Team Flow', teamId: 'team-1', version: 1 }) })).status,
+    ).toBe(409)
     const createdResponse = await app.request('/connector/flows', {
       body: JSON.stringify({ name: 'Team Flow', teamId: 'team-2', version: 1 }),
       headers: { 'content-type': 'application/json', 'idempotency-key': 'create-team-flow' },

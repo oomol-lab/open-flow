@@ -12,6 +12,7 @@ import { controlErrorCode, decodeRunEvent, readResult } from '@oomol-lab/open-fl
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { agentActions, prepareFlow, validateFlowInputs, validRunTrigger, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
+import { captureNodeAccess } from '../deployment/connector-access.ts'
 import { checkCodeActions } from '../deployment/connector.ts'
 import { ControlError, serverErrorCode } from '../error.ts'
 import { revisionContent, timestamp } from './control-views.ts'
@@ -64,7 +65,7 @@ export class RunControl {
     idempotencyKey: string,
     trigger: TriggerSeed,
   ): Promise<{ readonly created: boolean; readonly run: RunDetails }> {
-    const providerAccess = this.connectorAccess.current(flowId)
+    let providerAccess = this.connectorAccess.current(flowId)
     const requestDigest = await digestBytes(
       canonicalJsonBytes({
         engineContract,
@@ -84,6 +85,7 @@ export class RunControl {
     const content = revisionContent(stored)
     if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and outputs.')
     const fixed = await this.prepareRun(content, engineContract, trigger.nodeId)
+    providerAccess = await captureNodeAccess(this.connectorAccess, flowId, { ...content.document, ...fixed.flow }, providerAccess)
     await this.checkRunActions(fixed.flow, flowId, providerAccess, 'draft')
     if (validateFlowInputs(content, inputs) != 'valid') throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
     if (this.connectorAccess.current(flowId).providerAccessDigest != providerAccess.providerAccessDigest) {
@@ -350,6 +352,7 @@ export class RunControl {
       flowId,
       providerAccess,
       purpose: 'eligibility',
+      usage: 'node',
       source,
       ...(teamId == null ? {} : { teamId }),
     })

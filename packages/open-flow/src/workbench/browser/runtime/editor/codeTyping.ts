@@ -30,13 +30,16 @@ export function codeTyping(
       ...legacy.map((declaration) => declaration.action),
     ]),
   ]
-  const declarations = hintedActions.map((action) => ({
-    action,
-    connectionId:
-      access?.connectionHints?.find((hint) => hint.action == action && hint.alias == null)?.connectionId ??
-      legacy.find((declaration) => declaration.action == action)?.connectionId,
-    connections: connectionHints.filter((hint) => hint.action == action),
-  }))
+  const allowedProviders = new Set(providerIds)
+  const declarations = hintedActions
+    .filter((action) => allowedProviders.has(action.slice(0, action.indexOf('.'))))
+    .map((action) => ({
+      action,
+      connectionId:
+        access?.connectionHints?.find((hint) => hint.action == action && hint.alias == null)?.connectionId ??
+        legacy.find((declaration) => declaration.action == action)?.connectionId,
+      connections: connectionHints.filter((hint) => hint.action == action),
+    }))
   const fields: string[] = []
   const calls: string[] = []
   const providers = new Map<string, string[]>()

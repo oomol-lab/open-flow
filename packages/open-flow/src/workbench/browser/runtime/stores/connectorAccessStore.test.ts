@@ -263,7 +263,7 @@ it.each([true, false])('preserves a newer refresh while setting service selectio
   try {
     await store.load('flow-1')
     const saving = store.setService('mail', selected)
-    expect(save).toHaveBeenCalledWith('flow-1', 'mail', selected, 10)
+    await vi.waitFor(() => expect(save).toHaveBeenCalledWith('flow-1', 'mail', selected, 10))
     const newer = { ...initial, accessRevision: 12, providerIds: selected ? ['mail', 'github'] : ['github'], providerAccessDigest: 'access-12' }
     read.mockResolvedValue(newer)
     await store.load('flow-1')
@@ -370,11 +370,44 @@ it('batches missing providers, preserves successful results and retries only the
   }
 })
 
+it.each(['success', 'failure'] as const)('waits for overlapping candidate queries through %s without duplicating requests', async (outcome) => {
+  const client = new WorkbenchClient(vi.fn())
+  vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(initial)
+  const delayed = Promise.withResolvers<Awaited<ReturnType<WorkbenchClient['listProviderAccessBindingCandidates']>>>()
+  const candidates = vi
+    .spyOn(client, 'listProviderAccessBindingCandidates')
+    .mockReturnValueOnce(delayed.promise)
+    .mockResolvedValue({
+      version: 1,
+      results: [{ providerId: 'github', candidates: [], mode: 'selectable', version: 1 }],
+    })
+  const store = new ConnectorAccessStore(client, vi.fn())
+  try {
+    await store.load('flow')
+    const first = store.loadCandidates(['mail'])
+    const finished = vi.fn()
+    const second = store.loadCandidates(['mail', 'github']).then(finished)
+    await vi.waitFor(() => expect(store.$.value.candidates.github).toBeDefined())
+    expect(finished).not.toHaveBeenCalled()
+    expect(candidates).toHaveBeenCalledTimes(2)
+    expect(candidates).toHaveBeenLastCalledWith('flow', ['github'], expect.any(AbortSignal))
+    if (outcome == 'success') delayed.resolve({ version: 1, results: [{ providerId: 'mail', candidates: [], mode: 'selectable', version: 1 }] })
+    else delayed.reject(new Error('Unavailable'))
+    await Promise.all([first, second])
+    expect(finished).toHaveBeenCalledOnce()
+    expect(store.$.value.loadingCandidates).toEqual([])
+    expect(store.$.value.candidateErrors).toEqual(outcome == 'failure' ? ['mail'] : [])
+  } finally {
+    store.dispose()
+  }
+})
+
 it('cancels candidate queries when switching Flow and ignores an old response after switching back', async () => {
   const client = new WorkbenchClient(vi.fn())
   vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(initial)
   const delayed = Promise.withResolvers<Awaited<ReturnType<WorkbenchClient['listProviderAccessBindingCandidates']>>>()
-  const candidates = vi.spyOn(client, 'listProviderAccessBindingCandidates').mockReturnValueOnce(delayed.promise)
+  const current = Promise.withResolvers<Awaited<ReturnType<WorkbenchClient['listProviderAccessBindingCandidates']>>>()
+  const candidates = vi.spyOn(client, 'listProviderAccessBindingCandidates').mockReturnValueOnce(delayed.promise).mockReturnValueOnce(current.promise)
   const store = new ConnectorAccessStore(client, vi.fn())
   try {
     await store.load('a')
@@ -383,10 +416,58 @@ it('cancels candidate queries when switching Flow and ignores an old response af
     await store.load('b')
     expect(signal.aborted).toBe(true)
     await store.load('a')
+    const reloading = store.loadCandidates(['mail'])
+    expect(candidates).toHaveBeenCalledTimes(2)
     delayed.resolve({ version: 1, results: [{ providerId: 'mail', candidates: [], mode: 'selectable', version: 1 }] })
     await pending
     expect(store.$.value.candidates).toEqual({})
+    expect(store.$.value.loadingCandidates).toEqual(['mail'])
+    const joined = store.loadCandidates(['mail'])
+    expect(candidates).toHaveBeenCalledTimes(2)
+    current.resolve({ version: 1, results: [{ providerId: 'mail', candidates: [], mode: 'selectable', version: 1 }] })
+    await Promise.all([reloading, joined])
+    expect(store.$.value.candidates.mail?.candidates).toEqual([])
     expect(store.$.value.loadingCandidates).toEqual([])
+  } finally {
+    store.dispose()
+  }
+})
+
+it.each([true, false])('selects only an eligible default account when adding a service (default: %s)', async (isDefault) => {
+  const client = new WorkbenchClient(vi.fn())
+  const candidate = {
+    accessBindingId: 'work',
+    connectionId: 'work',
+    connectionDisplayName: 'Work',
+    providerId: 'mail',
+    source: { kind: 'admin-delegation' as const },
+    isDefault,
+  }
+  vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(initial)
+  vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
+    results: [{ providerId: 'mail', mode: 'selectable', candidates: [candidate], version: 1 }],
+    version: 1,
+  })
+  const add = vi.spyOn(client, 'addProviderAccessBinding').mockResolvedValue({
+    ...initial,
+    accessRevision: 1,
+    providerIds: ['mail'],
+    bindings: [{ ...candidate, status: 'active' }],
+  })
+  const service = vi.spyOn(client, 'setConnectorService').mockResolvedValue({ ...initial, accessRevision: 1, providerIds: ['mail'] })
+  const store = new ConnectorAccessStore(client, vi.fn())
+  try {
+    await store.load('flow-1')
+    expect(await store.setService('mail', true)).toBe(true)
+    if (isDefault) {
+      expect(add).toHaveBeenCalledWith('flow-1', 'mail', 'work', 0)
+      expect(service).not.toHaveBeenCalled()
+      expect(store.$.value.access?.bindings[0]?.connectionId).toBe('work')
+    } else {
+      expect(add).not.toHaveBeenCalled()
+      expect(service).toHaveBeenCalledWith('flow-1', 'mail', true, 0)
+      expect(store.$.value.access?.bindings).toEqual([])
+    }
   } finally {
     store.dispose()
   }

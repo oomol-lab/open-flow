@@ -112,26 +112,26 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   const accessState = useVal(store.connectorAccess.$)
   const connectorAccess = accessState.access
   const providerId = connectorAction?.authenticated ? connectorAction.serviceId : undefined
+  const triggerProviderId =
+    selection?.kind == 'trigger' && (selection.trigger.kind == 'poll' || selection.trigger.kind == 'integration')
+      ? selection.trigger.definition.provider
+      : undefined
   useEffect(() => {
-    if (providerId != null && connectorAccess?.mode == 'selectable' && accessState.candidates[providerId] == null) {
-      void store.connectorAccess.loadCandidates([providerId])
+    if (connectorAccess?.mode == 'selectable') {
+      const ids = [providerId, triggerProviderId].filter((id): id is string => id != null)
+      if (ids.length > 0) void store.connectorAccess.loadCandidates(ids)
     }
-  }, [providerId, connectorAccess?.mode, store])
-  const bindings = connectorAccess?.bindings.filter((binding) => binding.providerId == providerId && binding.status == 'active') ?? []
-  const candidates = providerId == null ? undefined : accessState.candidates[providerId]?.candidates
-  const accessError =
-    providerId == null || connectorAccess?.mode != 'selectable'
+  }, [providerId, triggerProviderId, connectorAccess?.mode, store])
+  const triggerCandidates =
+    triggerProviderId == null
       ? undefined
-      : bindings.length == 0
-        ? t('notice.error.connectorAccessRequired')
-        : candidates != null &&
-            !candidates.some(
-              (candidate) =>
-                bindings.some((binding) => binding.accessBindingId == candidate.accessBindingId) &&
-                (candidate.permissions == null || candidate.permissions.allActions || candidate.permissions.actionIds.includes(connectorAction!.actionId)),
-            )
-          ? t('notice.error.connectorAccessInvalid')
-          : undefined
+      : accessState.candidates[triggerProviderId]?.candidates.filter((candidate) => candidate.permissions == null || candidate.permissions.proxy)
+  const candidates = providerId == null ? undefined : accessState.candidates[providerId]?.candidates
+  const allowedCandidates = candidates?.filter(
+    (candidate) => candidate.permissions == null || candidate.permissions.allActions || candidate.permissions.actionIds.includes(connectorAction!.actionId),
+  )
+  const accessError =
+    providerId != null && connectorAccess?.mode == 'selectable' && allowedCandidates?.length == 0 ? t('connectorAccess.noAvailablePermissions') : undefined
   const connectorActionError = useVal(store.connectors.$.selectedActionError)
   const connectorActionLoading = useVal(store.connectors.$.actionLoading)
   const connectorAuthorizationPending = useVal(store.connectors.$.selectedAuthorizationPending)
@@ -165,9 +165,19 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
       connectorAccessError={accessError}
       connectorActionError={connectorActionError}
       connectorAuthorizationPending={connectorAuthorizationPending}
-      connectorConnection={connectorConnection}
+      connectorConnection={
+        connectorAccess?.mode == 'selectable' &&
+        allowedCandidates != null &&
+        !allowedCandidates.some((candidate) => candidate.connectionId == connectorConnection?.connectionId)
+          ? undefined
+          : connectorConnection
+      }
       connectorConnectionError={connectorConnectionError}
-      activeConnectorConnections={activeConnectorConnections}
+      activeConnectorConnections={
+        connectorAccess?.mode == 'selectable' && providerId != null
+          ? activeConnectorConnections?.filter((connection) => allowedCandidates?.some((candidate) => candidate.connectionId == connection.connectionId))
+          : activeConnectorConnections
+      }
       connectors={store.connectors}
       prepareConnectorAction={(action) => store.prepareConnectorAction(action)}
       onConfigureConnectorAccess={(serviceId) => store.connectorAccess.configure(serviceId)}
@@ -180,7 +190,11 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
       store={store.workspace}
       target={target}
       theme={theme}
-      triggerActiveConnections={triggerActiveConnections}
+      triggerActiveConnections={
+        connectorAccess?.mode == 'selectable'
+          ? triggerActiveConnections?.filter((connection) => triggerCandidates?.some((candidate) => candidate.connectionId == connection.connectionId))
+          : triggerActiveConnections
+      }
       triggerAuthorizationPending={triggerAuthorizationPending}
       triggerConnection={triggerConnection}
       triggerConnectionError={triggerConnectionError}
@@ -261,7 +275,6 @@ export function FlowEditor({
   useEffect(() => {
     if (accessConfiguration == null) return
     panel.openInspector()
-    panel.back()
   }, [accessConfiguration])
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent): void => {

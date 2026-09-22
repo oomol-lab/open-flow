@@ -196,6 +196,11 @@ export function createServerApp(service: ServerService, options: ServerAppOption
       forward: (configuration, resource, request, teamId) => forwardConnector(configuration, resource, request, teamId, { logger }),
     }),
   )
+  app.get('/v1/connector/teams', async (context) => {
+    await authenticate(context.req.raw)
+    const { enabled, teams, version } = await service.connectorTeams(context.req.raw.signal)
+    return json(200, { enabled, teams, version })
+  })
   app.route('/v1', createControlApp(service.control, resolveActor))
   if (options.settings != null)
     app.route(

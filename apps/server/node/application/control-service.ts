@@ -35,7 +35,7 @@ import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { resolveDraftOperations } from '@oomol-lab/open-flow/control-requests'
 import { applyFlowChanges, currentFlowModelVersion, FlowChangeError } from '@oomol-lab/open-flow/flow-change'
 import { canonicalJsonBytes, digestBytes, encodeRevision, repairRevision } from '@oomol-lab/open-flow/flow-encoding'
-import { flowClosure, validateFlow } from '@oomol-lab/open-flow/flow-semantics'
+import { flowClosure, removeConnectionUsage, validateFlow } from '@oomol-lab/open-flow/flow-semantics'
 import { triggerConfigValues } from '@oomol-lab/open-flow/integration-trigger'
 import { PermanentPollError, PollConnectionError } from '@oomol-lab/open-flow/poll-trigger'
 import { triggerDefinitions as providerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
@@ -250,8 +250,13 @@ export class ControlService {
     return await this.#connectorRequest(flowId, (connector, access) => connector.listProviders(signal, access, locale), actorId)
   }
 
-  getConnectorAccess(actorId: string, flowId: string): ConnectorAccess {
+  getConnectorAccess(actorId: string, flowId: string, publicationId?: string): ConnectorAccess {
     this.getFlow(flowId)
+    if (publicationId != null) {
+      if (this.store.publications.publication(flowId, publicationId) == null)
+        throw new ControlError(controlErrorCode.publicationNotFound, 'The Publication was not found.')
+      return this.store.publications.providerAccess(publicationId)!
+    }
     return this.connectorAccess.read(actorId, flowId)
   }
 
@@ -376,7 +381,19 @@ export class ControlService {
       flowId,
       async (connector, access) => {
         const [action, connections] = await Promise.all([connector.getAction(actionId, signal, access, locale), connector.listAllConnections(signal, access)])
-        return actionWithDefaultConnection(action, connections)
+        if (flowId == null || access.providerAccess.mode == 'implicit' || !action.authenticated) return actionWithDefaultConnection(action, connections)
+        const response = await this.connectorAccess.listCandidates(actorId ?? '', flowId, [action.serviceId], signal)
+        const result = response.results[0]
+        if (result == null || 'error' in result) throw new ConnectorTaskError('connector.unavailable', 'Connection candidates are unavailable.')
+        const allowed = new Set(
+          result.candidates
+            .filter((candidate) => candidate.permissions == null || candidate.permissions.allActions || candidate.permissions.actionIds.includes(actionId))
+            .map((candidate) => candidate.connectionId),
+        )
+        return actionWithDefaultConnection(
+          action,
+          connections.filter((connection) => allowed.has(connection.connectionId)),
+        )
       },
       actorId,
     )
@@ -444,6 +461,7 @@ export class ControlService {
       ...(actorId == null ? {} : { actorId }),
       ...(flowId == null ? {} : { flowId }),
       providerAccess: flowId != null && actorId != null ? this.connectorAccess.read(actorId, flowId) : this.connectorAccess.current(flowId ?? ''),
+      usage: 'node',
       purpose: 'catalog',
       source: flowId == null ? 'operator' : 'draft',
       ...(teamId == null ? {} : { teamId }),
@@ -552,6 +570,60 @@ export class ControlService {
   syncDraft(flowId: string): { readonly draft: Draft; readonly kind: 'snapshot'; readonly version: 1 } {
     const current = this.requireDraft(flowId)
     return { draft: draft(current), kind: 'snapshot', version: 1 }
+  }
+
+  async removeConnectionUsage(
+    actorId: string,
+    flowId: string,
+    connectionId: string,
+    expectedRevisionId: string,
+    expectedAccessRevision: number,
+    changeId: string,
+  ): Promise<DraftChange> {
+    this.requireDraft(flowId)
+    const requestDigest = await digestBytes(canonicalJsonBytes({ kind: 'connection-usage.remove', connectionId, expectedRevisionId, expectedAccessRevision }))
+    const previous = this.store.flows.change(flowId, changeId)
+    if (previous != null) {
+      if (previous.requestDigest != requestDigest) throw new ControlError(controlErrorCode.flowConflict, 'The change identity refers to another Draft change.')
+      return { revision: revisionMetadata(this.store.flows.revision(flowId, previous.revisionId)!), version: 1 }
+    }
+    const base = this.store.flows.revision(flowId, expectedRevisionId)
+    if (base == null) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
+    const bytes = encodeRevision(removeConnectionUsage(revisionContent(base), connectionId))
+    const digest = await digestBytes(bytes)
+    const stored = this.store.flows.commitRevision(
+      {
+        actorId,
+        flowId,
+        expectedRevisionId,
+        changeId,
+        requestDigest,
+        digest,
+        content: new TextDecoder().decode(bytes),
+        createdAt: this.clock(),
+        revisionId: identity('revision'),
+      },
+      () => {
+        const result = this.connectorAccess.removeConnection(flowId, connectionId, expectedAccessRevision)
+        if (result.kind != 'saved') throw new ControlError(controlErrorCode.connectorAccessConflict, 'Connection usage changed concurrently.')
+      },
+    )
+    switch (stored.kind) {
+      case 'busy':
+        throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
+      case 'conflict':
+        throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
+      case 'request-conflict':
+        throw new ControlError(controlErrorCode.flowConflict, 'The change identity refers to another Draft change.')
+      case 'not-found':
+        return notFound()
+      case 'committed':
+        this.triggersChanged()
+        this.flowCatalogChanged()
+        this.flowChanged({ kind: 'draft.changed', flowId, revisionId: stored.revision.revisionId, version: 1 })
+        this.flowChanged({ kind: 'access.changed', flowId, accessRevision: this.connectorAccess.current(flowId).accessRevision, version: 1 })
+        return { revision: revisionMetadata(stored.revision), version: 1 }
+    }
   }
 
   async changeDraft(

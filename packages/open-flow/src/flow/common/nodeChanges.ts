@@ -479,7 +479,7 @@ function bindingReferences(document: RevisionContent['document']): Map<string, n
   return references
 }
 
-export function setConnectorConnection(content: RevisionContent, taskId: string, connectionId: string): readonly ChangeOperation[] | undefined {
+export function setConnectorConnection(content: RevisionContent, taskId: string, connectionId: string | undefined): readonly ChangeOperation[] | undefined {
   const task = content.document.tasks[taskId]
   if (task == null || !('executor' in task) || task.executor.kind != 'connector') return
   if (task.executor.connectionId == connectionId) return []
@@ -585,11 +585,12 @@ export function setTriggerConnection(
   content: RevisionContent,
   _target: { readonly kind: 'flow' },
   nodeId: string,
-  connectionId: string,
+  connectionId: string | undefined,
 ): readonly ChangeOperation[] | undefined {
   const trigger = content.document.graph.nodes[nodeId]
   if (trigger == null || (trigger.kind != 'poll' && trigger.kind != 'integration')) return
   const binding = content.document.bindings[trigger.bindingId]
+  if (connectionId == null) return binding == null ? [] : [{ bindingId: trigger.bindingId, kind: 'binding.delete' }]
   if (binding == null) return [{ binding: { kind: 'connection', target: connectionId }, bindingId: trigger.bindingId, kind: 'binding.create' }]
   if (binding.kind != 'connection') return
   if (binding.target == connectionId) return []

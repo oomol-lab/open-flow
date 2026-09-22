@@ -642,3 +642,17 @@ it('posts one candidate query and preserves independent provider failures', asyn
     }),
   )
 })
+
+it('selects a Team when creating a Flow and validates the public Team catalog', async () => {
+  const catalog = { enabled: true, teams: [{ id: 'team', name: 'Engineering', systemCreated: false }], version: 1 }
+  const request = vi.fn(async (path: string, init?: RequestInit) => {
+    if (path == '/v1/connector/teams') return Response.json(catalog)
+    expect(JSON.parse(String(init?.body))).toEqual({ name: 'Main', teamId: 'team', version: 1 })
+    return Response.json(flow)
+  })
+  const client = new ControlClient(request)
+  expect(await client.listConnectorTeams()).toEqual(catalog)
+  expect(await client.createFlow('Main', 'stable', 'team')).toEqual(flow)
+  const invalid = new ControlClient(async () => Response.json({ ...catalog, teams: [{ id: 'team', name: 'Engineering', systemCreated: 'false' }] }))
+  await expect(invalid.listConnectorTeams()).rejects.toMatchObject({ code: 'response.invalid' })
+})

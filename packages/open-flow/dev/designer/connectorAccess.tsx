@@ -7,7 +7,7 @@ import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { useEffect, useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { ConnectorAccount } from '../../src/workbench/browser/runtime/editor/connectionSettings.tsx'
-import { ConnectorAccessSettings } from '../../src/workbench/browser/runtime/editor/connectorAccessSettings.tsx'
+import { CodeConnectionSettings, ConnectorAccessSettings } from '../../src/workbench/browser/runtime/editor/connectorAccessSettings.tsx'
 import { EditorContextPanel } from '../../src/workbench/browser/runtime/editor/editorContextPanel.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { WorkbenchStore } from '../../src/workbench/browser/runtime/stores/workbenchStore.ts'
@@ -49,6 +49,7 @@ const provider = { authTypes: ['oauth2'], displayName: 'Gmail', iconUrl: 'https:
 const candidates = [
   {
     connectionId: 'mail-default',
+    isDefault: true,
     source: { kind: 'policy' as const, ruleId: null },
     accessBindingId: 'sha256:a9007ef9699c9703b05df0b6f32d2fbaed5ace77b7dccffa7e8252e699bd8fe5',
     connectionDisplayName: 'lishen1635-gmail-com',
@@ -113,11 +114,22 @@ function Sample({
   useEffect(() => {
     const { client, flowId } = createInspectorTransport(log, emptyFlow ? emptyContent : content, {
       access,
+      published: label == 'Node and Code usage overview',
       accessError: loadFailed,
       accessSaveDelay: 800,
       candidates: noCandidates ? [] : candidates,
       connections:
-        connectionStatus == null ? [] : [{ id: 'mail-account', service: 'mail', displayName: 'Work account', isDefault: true, status: connectionStatus }],
+        connectionStatus == null
+          ? noCandidates
+            ? []
+            : candidates.map((candidate, index) => ({
+                id: candidate.connectionId,
+                service: candidate.providerId,
+                displayName: candidate.connectionDisplayName,
+                isDefault: index == 0,
+                status: 'active' as const,
+              }))
+          : [{ id: 'mail-account', service: 'mail', displayName: 'Work account', isDefault: true, status: connectionStatus }],
       providers: [noAuth ? { ...provider, authTypes: ['no_auth'] } : provider, { service: 'github', displayName: 'GitHub', authTypes: ['oauth2'] }],
     })
     const next = new WorkbenchStore(client, { getItem: () => null, setItem: () => {} }, undefined, i18n)
@@ -126,19 +138,22 @@ function Sample({
       if (configure) next.connectorAccess.configure('mail')
     })
     return () => next.dispose()
-  }, [access, configure, connectionStatus, emptyFlow, i18n, loadFailed, log, noAuth, noCandidates])
+  }, [access, configure, connectionStatus, emptyFlow, i18n, label, loadFailed, log, noAuth, noCandidates])
   return (
     <section>
       <h3 className="mb-2 text-sm font-medium">{label}</h3>
       <div className="grid h-[480px] overflow-hidden rounded-lg border border-border">
         <EditorContextPanel focusOnOpen={false} icon="flow" onClose={() => {}} theme={dark ? 'dark' : 'light'} title="Flow outline">
-          {store != null && (
-            <ConnectorAccessSettings
-              onSelectReference={(reference) => log('connector-access.reference', reference)}
-              onManage={(flowId) => log('connector-access.manage', flowId)}
-              store={store}
-            />
-          )}
+          {store != null &&
+            (configure ? (
+              <CodeConnectionSettings store={store} onManage={(flowId) => log('code-connections.manage', flowId)} />
+            ) : (
+              <ConnectorAccessSettings
+                onSelectReference={(reference) => log('connector-access.reference', reference)}
+                onManage={(flowId) => log('connector-access.manage', flowId)}
+                store={store}
+              />
+            ))}
           {store != null && (noCandidates || accountPending != null || connectionStatus != null) && (
             <div className="p-3">
               <ConnectorAccount
@@ -177,7 +192,7 @@ function Sample({
                 fieldIdPrefix="unconnected-mail"
                 loading={accountPending == 'setup'}
                 taskId="mail"
-                onConfigureAccess={() => store.connectorAccess.configure('mail')}
+                onConfigureAccess={() => void store.connectors.connect('mail')}
               />
             </div>
           )}
@@ -228,14 +243,14 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
         providerAccessDigest: 'selectable:2',
         version: 1,
       },
-      label: 'Authorized summary',
+      label: 'Node and Code usage overview',
     },
     {
       access: {
         accessRevision: 1,
         bindings: [
           {
-            connectionId: 'fixture-account',
+            connectionId: 'mail-default',
             source: { kind: 'policy' as const, ruleId: null },
             accessBindingId: candidates[0].accessBindingId,
             connectionDisplayName: candidates[0].connectionDisplayName,
@@ -344,10 +359,10 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
 
 export const connectorAccessStory: FrontendStory = {
   description:
-    'Compact service cards with account references (first two plus expansion), pending account selection, and a dynamic code notice using production settings, with shared framing for accounts and unconnected services: expand the multiple-Provider sample and scroll to its last connection. Account saves take 800 ms so immediate checkbox feedback and the saving status can be inspected. Covers compact summaries, bounded scrolling, long names, deployment-managed, invalid binding, empty candidate, and load failure states. Each service requiring authorization has a persistent account menu with Add account and Remove authorization; empty and expired account states retain direct recovery actions. Add service opens a searchable virtual service picker at the end of the expanded list, remains available in the empty state, and can configure GitHub even when the Flow does not reference it. Node account management and add-account entries expand Flow access and focus Mail without adding inline guidance; the empty candidate sample offers the same route before authorization.',
+    'Draft connection usage grouped by Provider with its icon and account count, collapsed initially. Expand a Provider to inspect account references and Code alongside node references and the account actions menu, and the independent shared Code connection settings without nested disclosure. Adding a service selects its eligible default account when available. Use the overview header to configure Code connections. Inspect account sources, removal confirmation, pending nodes, empty selections, failed loading, and account recovery. Code selection saves take 800 ms to expose pending feedback.',
   group: 'Workbench',
   id: 'connector-access',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,
   standalone: true,
-  title: 'Services and Authorization',
+  title: 'Connection usage and Code connections',
 }

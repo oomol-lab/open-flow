@@ -100,6 +100,7 @@ export class Maintenance {
                   flowId: notification.flowId,
                   providerAccess: notification.providerAccess,
                   providerId: notification.action.split('.')[0],
+                  usage: 'node',
                   purpose: 'execute',
                   source: 'run',
                   ...(notification.teamId == null ? {} : { teamId: notification.teamId }),

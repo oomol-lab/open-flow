@@ -152,17 +152,19 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
       return 3
     }
     case 'results': {
-      if (references.length < 1 || references.length > 2) throw new CliError('cli.invalid-arguments', 'Usage: oo flow runs results <run> [<after>]')
-      const page = await client.listRunResults(references[0]!, references[1])
+      requireCount(references, 1, 'oo flow runs results <run> [--after <resultId>]')
+      const page = await client.listRunResults(references[0]!, args.resultAfter)
       write(runtime, args.json, { kind: 'run.results', ...page }, JSON.stringify(page))
       return
     }
     case 'read-result': {
-      if (references.length < 2 || references.length > 4)
-        throw new CliError('cli.invalid-arguments', 'Usage: oo flow runs read-result <run> <result> [<pointer>] [<offset>]')
-      const offset = references[3] == null ? 0 : Number(references[3])
-      if (!Number.isSafeInteger(offset) || offset < 0) throw new CliError('cli.invalid-arguments', 'Result offset must be a non-negative integer.')
-      const page = await client.readRunResult(references[0]!, references[1]!, { pointer: references[2] ?? '', offset })
+      requireCount(references, 2, 'oo flow runs read-result <run> <result> [--pointer <pointer>] [--offset <offset>] [--limit <limit>] [--max-bytes <bytes>]')
+      const page = await client.readRunResult(references[0]!, references[1]!, {
+        pointer: args.pointer ?? '',
+        offset: args.offset ?? 0,
+        ...(args.limit == null ? {} : { limit: args.limit }),
+        ...(args.maxBytes == null ? {} : { maxBytes: args.maxBytes }),
+      })
       write(runtime, args.json, { kind: 'run.result-page', ...page }, JSON.stringify(page))
       return
     }

@@ -71,3 +71,15 @@ Wait 的提前输出端口及等待记录中的输出字段直接由 `notificati
 本次是未发布阶段的合同修订，同版本号不保证兼容此前开发快照；不提供旧名称别名、隐式转换或兼容恢复。
 旧 Wait 端口和数据引用由图语义校验拒绝，checkpoint 等待记录中的旧 `notification` 字段由严格解码拒绝，不静默丢弃或重放通知。
 历史 Revision 和 Run 不改写；Flow model、Control API 信封和隔离运行时 digest 不变。Agent 的 notification 配置仍表示实际通知，不受此次端口改名影响。
+
+## beta.39 MCP 与 CLI 读取合同升级
+
+公共包与 Command 升至 `0.1.0-beta.39`，Server 升至 `0.1.0-beta.16`。本次 beta 包含显式不兼容的工具与命令调整，客户端脚本和部署需一起升级：
+
+- MCP `flow_get` 和 CLI `inspect --json` 默认返回精简视图；完整数据使用 MCP `full: true` 或 CLI `--full`，修订内容统一位于 `draft.content`。原 CLI `--summary` 已移除。
+- MCP `connector_list` 改为 `connector_providers`，`trigger_list` 改为支持可选 query 的 `trigger_search`；CLI `connector list` 改为 `connector providers`。旧名称不保留别名。
+- Connector 搜索仅返回 Action 摘要，完整 Schema 使用 `connector_get` / `connector show`；Team 目录不再返回 Flow-Team 绑定清单。
+- CLI `connector set --name` 不再接受，改用 `node set --name`。结果列表和结果读取的旧位置参数改为 `--after`、`--pointer`、`--offset` 等命名选项。
+- MCP `flow_run` 在输入 Schema 中明确 Draft 与 Live 身份互斥，混用字段会在调用验证时拒绝。
+
+具体参数与迁移后的用法见 [CLI 命令](../../authoring/flow-command.md) 和 [MCP 接口](../../server/mcp.md)。本次不改变 Flow 持久化模型、Engine Contract 或 Run checkpoint 格式。

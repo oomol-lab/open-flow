@@ -1,6 +1,6 @@
 import { serve } from '@hono/node-server'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
-import { ControlClient } from '@oomol-lab/open-flow/control-api'
+import { ControlClient, flowInspection, inspectFlowDraft } from '@oomol-lab/open-flow/control-api'
 import { authoringExample } from '@oomol-lab/open-flow/control-requests'
 import { mcpConformanceCases } from '@oomol-lab/open-flow/mcp'
 import { once } from 'node:events'
@@ -34,6 +34,11 @@ it('shares compact trigger transactions and example discovery between MCP and RE
     definition: { key: 'gmail.on_message_received', outputs: [{ handle: 'events', jsonSchema: { type: 'array' } }] },
   })
   expect(current.content.document.bindings['mail-account']).toEqual({ kind: 'connection', target: 'CONNECTION_ID' })
+  const metadata = await control.getFlow(created.flowId)
+  const live = await control.getLive(created.flowId)
+  const inspected = await inspectFlowDraft(metadata, () => current)
+  expect(await call('flow_get', { flowId: created.flowId })).toEqual(flowInspection(inspected, live))
+  expect(await call('flow_get', { flowId: created.flowId, full: true })).toEqual(flowInspection(inspected, live, true))
   const lookup = vi.spyOn(service.control, 'getTriggerKey').mockImplementation(() => {
     throw new Error('Catalog changed')
   })
@@ -114,6 +119,11 @@ it('preserves default accounts for CLI and MCP while browser metadata stays inde
   expect((await control.searchConnectorActions('send'))[0]?.defaultConnection?.connectionId).toBe('before')
   expect(await call('connector_get', { actionId: 'mail.send' })).toMatchObject({ defaultConnection: { connectionId: 'before' } })
   expect(await call('connector_search', { query: 'send' })).toMatchObject({ actions: [{ defaultConnection: { connectionId: 'before' } }] })
+  const search = await call('connector_search', { query: 'send' })
+  expect(search).toMatchObject({ actions: [{ actionId: 'mail.send', authenticated: true }] })
+  expect(search).not.toHaveProperty('actions.0.inputs')
+  expect(search).not.toHaveProperty('actions.0.outputs')
+  expect(await call('connector_get', { actionId: 'mail.send' })).toHaveProperty('inputs')
   accountId = 'after'
   expect(await call('connector_get', { actionId: 'mail.send' })).toMatchObject({ defaultConnection: { connectionId: 'after' } })
   const before = connections.mock.calls.length
@@ -254,7 +264,7 @@ it('shares pagination cursors with the Control API and preserves invalid input a
     expect((await client.callTool({ name: 'flow_create', arguments: args })).isError).toBe(true)
   }
   expect((await client.callTool({ name: 'run_get', arguments: { runId: 'missing' } })).structuredContent).toMatchObject({ error: { code: 'run.not-found' } })
-  expect((await client.callTool({ name: 'connector_list', arguments: {} })).structuredContent).toMatchObject({ error: { code: 'connector.unconfigured' } })
+  expect((await client.callTool({ name: 'connector_providers', arguments: {} })).structuredContent).toMatchObject({ error: { code: 'connector.unconfigured' } })
 })
 
 it('keeps admitted Runs across client disconnects and exposes Wait and cancellation state', async () => {
@@ -467,12 +477,12 @@ it('cancels Connector requests on HTTP disconnect and Server shutdown', async ()
   })
   const { client, shutdown } = await fixture({ capabilities: { connector: () => connector } })
   const cancel = new AbortController()
-  const pending = client.callTool({ name: 'connector_list', arguments: {} }, { signal: cancel.signal }).catch((error: unknown) => error)
+  const pending = client.callTool({ name: 'connector_providers', arguments: {} }, { signal: cancel.signal }).catch((error: unknown) => error)
   await expect.poll(() => signals.length).toBe(1)
   cancel.abort()
   await expect.poll(() => signals[0]?.aborted).toBe(true)
   expect(await pending).toBeInstanceOf(Error)
-  const stopping = client.callTool({ name: 'connector_list', arguments: {} }).catch((error: unknown) => error)
+  const stopping = client.callTool({ name: 'connector_providers', arguments: {} }).catch((error: unknown) => error)
   await expect.poll(() => signals.length).toBe(2)
   shutdown.abort()
   await expect.poll(() => signals[1]?.aborted).toBe(true)
@@ -659,3 +669,91 @@ for (const conformance of mcpConformanceCases) {
     })
   })
 }
+
+it('reads code and subflow nodes from the requested immutable Revision after the Draft changes', async () => {
+  const { call, control, client } = await fixture()
+  const flow = await control.createFlow('Node details')
+  const changed = await control.changeDraft(
+    flow.flowId,
+    flow.draftRevisionId,
+    [
+      ...authoringExample('code').operations,
+      {
+        kind: 'subflow.create',
+        subflowId: 'child',
+        subflow: { name: 'Child', inputs: [], outputs: [], graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Nested start' } } } },
+      },
+    ],
+    'details',
+  )
+  const revisionId = changed.revision.revisionId
+  const args = { flowId: flow.flowId, revisionId, nodeId: 'format' }
+  const detail = await call('flow_node_get', args)
+  expect(detail).toMatchObject({
+    revisionId,
+    nodeId: 'format',
+    node: { task: { moduleId: 'format-module', inputs: [{ handle: 'events' }] } },
+    module: { source: expect.stringContaining('export default') },
+  })
+  expect(detail).not.toHaveProperty('task')
+  const next = await control.changeDraft(flow.flowId, revisionId, [{ kind: 'graph.node.delete', target: { kind: 'flow' }, nodeId: 'format' }], 'delete-code')
+  expect(await call('flow_node_get', args)).toEqual(detail)
+  expect(await call('flow_node_get', { flowId: flow.flowId, revisionId, subflowId: 'child', nodeId: 'start' })).toMatchObject({
+    subflowId: 'child',
+    node: { name: 'Nested start' },
+  })
+  for (const input of [
+    { ...args, revisionId: next.revision.revisionId },
+    { ...args, subflowId: 'missing' },
+  ]) {
+    expect((await client.callTool({ name: 'flow_node_get', arguments: input })).isError).toBe(true)
+  }
+})
+
+it('discovers Trigger definitions separately from Flow instances and rejects contradictory Run identities', async () => {
+  const { call, client, service } = await fixture()
+  expect(await call('connector_teams')).toEqual({ enabled: false, teams: [], version: 1 })
+  const all = await call('trigger_search')
+  expect(all).toEqual({ keys: service.control.listTriggerKeys() })
+  const filtered = await call('trigger_search', { query: 'GMAIL' })
+  expect(filtered).toEqual({
+    keys: service.control
+      .listTriggerKeys()
+      .filter((item) =>
+        [item.description, item.displayName, item.key, item.name, item.provider, item.type].some((value) => value.toLowerCase().includes('gmail')),
+      ),
+  })
+  expect(await call('trigger_search', { query: 'no-matching-trigger' })).toEqual({ keys: [] })
+  const admit = vi.spyOn(service.control.runs, 'createDraftRun')
+  const invalid = await client.callTool({
+    name: 'flow_run',
+    arguments: {
+      source: 'draft',
+      flowId: 'flow',
+      revisionId: 'revision',
+      publicationId: 'publication',
+      trigger: { nodeId: 'start', outputs: {} },
+      idempotencyKey: 'invalid',
+    },
+  })
+  expect(invalid.isError).toBe(true)
+  expect(admit).not.toHaveBeenCalled()
+})
+
+it('shares Draft account usage removal with REST and preserves its idempotent result', async () => {
+  const { call, control } = await fixture()
+  const flow = await control.createFlow('Connection usage')
+  const access = await call('flow_code_connections', { flowId: flow.flowId })
+  expect(access).toMatchObject({ mode: 'implicit', bindings: [], accessRevision: 0 })
+  const args = {
+    flowId: flow.flowId,
+    connectionId: 'account',
+    expectedRevisionId: flow.draftRevisionId,
+    expectedAccessRevision: 0,
+    idempotencyKey: 'remove-usage',
+  }
+  const removed = await call('flow_connection_usage_remove', args)
+  expect(await call('flow_connection_usage_remove', args)).toEqual(removed)
+  expect(await control.removeConnectionUsage(flow.flowId, 'account', flow.draftRevisionId, 0, 'remove-usage')).toEqual(removed)
+  expect((await control.getDraft(flow.flowId)).revisionId).not.toBe(flow.draftRevisionId)
+})

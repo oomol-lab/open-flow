@@ -7,7 +7,7 @@
 - `oo flow --help --json` 返回命令索引；`oo flow node add --help --json` 等子命令返回参数、选项、退出码和示例。Help、schema、version 不需要已配置的宿主。
 - `oo flow schema apply --json` 返回完整事务输入的 JSON Schema；`schema operations` 返回 ChangeOperation 数组的 schema；`schema graph.node.input.set` 等返回单个操作的独立 schema。
 - `schema input` 描述 Run 输入覆盖（node ID → handle → JSON value）；`schema outputs` 描述 Trigger 输出对象。节点实际端口与 Trigger 合同仍由 Revision 决定。
-- `inspect <flow> --json` 返回完整 `content`、Revision metadata 和 `revisionId`，包含 modules、tasks、subflows、bindings 和 graph。`--summary` 改为紧凑的 nodes、triggers、edges。Inspect 不执行 check。
+- `inspect <flow> --json` 默认返回与 MCP `flow_get` 相同的精简视图（CLI 另有 `kind: "flow.inspect"`）：`flow`、`draft.revisionId`、`draft.graph`、`draft.subflows`、`draft.bindings`、模块摘要与 Live 状态。节点保留输入绑定、端口 handle、未被覆盖的输入默认值和执行配置；省略完整 Schema、代码源码和审计元数据。`--full` 返回完整 `draft.content`、修订元数据和 Live 详情，供需要精确 before 值的编辑使用。原 `--summary` 已由默认行为取代。Inspect 不执行 check。
 - `check <flow> --json` 单独校验当前 Draft，返回 `valid`、`revisionId` 和 `check`。无效时退出码为 1，诊断只随 stdout 的这一份结果返回。
 - Flow 引用接受 ID 或唯一的完整名称。名称歧义返回候选 identity；保存后续调用所需的 ID 可以避免名称查找。
 - `inspect` 遇到不可读的 Draft 时返回 `flow`、`draft: null` 和 `draftIssue`（code、message、revisionId）。`flow.live` 仍保留已发布版本身份；不能从缺失内容推断流程用途。权限、网络和其他调用错误仍然报错。只需元信息时使用 `show`。
@@ -124,7 +124,7 @@ Agent 审批沿用 Run 的等待查询与决议命令。每次以当前 `waitId`
 
 ## Connector 作用域
 
-`connector list/search/show/connections --flow FLOW_ID` 按该 Flow 的 Team 查询。Connector 添加、修改及 Apply 中的 Action 与 Connection 查询自动使用目标 Flow。
+`connector providers/search/show/connections --flow FLOW_ID` 按该 Flow 的 Team 查询。Connector 添加、修改及 Apply 中的 Action 与 Connection 查询自动使用目标 Flow。
 Provider Trigger 的 Connection 选择也使用目标 Flow。Trigger Key 是部署提供的静态定义目录，不按 Team 改写。
 
 ## 执行、暂停与发布
@@ -171,3 +171,23 @@ oo flow runs download-result RUN_ID RESULT_ID > result.json
 列表存在 `nextAfter` 时，将其作为 `runs results RUN_ID NEXT_AFTER` 的最后一个参数继续读取。
 页面存在 `nextOffset` 时，用该值替换 `read-result` 的 offset。对于长字符串，offset 按 Unicode code point 计数。
 这些命令读取已有结果，不会重新调用外部工具。
+
+## 精确读取与命令入口
+
+Connector Provider 发现使用 `oo flow connector providers [--flow FLOW_ID]`，原 `connector list` 已移除。Action 搜索使用 `connector search QUERY`，返回不含完整 Schema 的摘要；`connector show ACTION_ID` 返回完整定义。两端搜索摘要包含 authenticated 与当前默认连接摘要。
+
+`trigger search [QUERY]` 搜索可用 Trigger 定义；省略 query 列出全部摘要。`trigger list FLOW_ID` 列出 Flow 内的触发器实例。`connector set` 只修改连接和输入；节点重命名统一使用 `node set FLOW_ID NODE_ID --name NAME`，不再接受被忽略的 `connector set --name`。
+
+```bash
+oo flow connector teams --json
+oo flow create "My Flow" --team TEAM_ID --json
+oo flow check FLOW_ID --revision REVISION_ID --json
+oo flow disable FLOW_ID --expected-publication PUBLICATION_ID --json
+oo flow enable FLOW_ID --expected-publication PUBLICATION_ID --json
+oo flow runs results RUN_ID --after RESULT_ID --json
+oo flow runs read-result RUN_ID RESULT_ID --pointer /items --offset 20 --limit 20 --max-bytes 15000 --json
+```
+
+Team 选择使用公共 Control API，并保留创建幂等语义。启停必须指定观察到的 publication ID；发布版本发生变化时返回冲突，不自动修改新版本。指定 `check --revision` 检查该固定版本；省略时检查当前 Draft。
+
+结果列表游标 `--after` 是结果 ID，事件命令的 `--after` 是数字序号。结果读取的 pointer/offset 已改为命名选项，旧位置参数不再接受；`limit` 默认为 20（1–100），`max-bytes` 默认为 15000（1–1048576），offset 默认为 0，pointer 默认为根。下载完整结果仍使用 `runs download-result`。

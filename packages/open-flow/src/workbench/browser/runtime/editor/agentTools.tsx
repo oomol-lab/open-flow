@@ -49,8 +49,8 @@ export function AgentTools({
 }) {
   const t = useTranslate()
   const [parameter, setParameter] = useState<string>()
-  const [pendingTool, setPendingTool] = useState<ConnectorActionView>()
-  const [approval, setApproval] = useState(false)
+  const [pendingTool, setPendingTool] = useState<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] }>()
+  const [connectionId, setConnectionId] = useState<string>()
 
   const actions = useVal(connectors.$.actions)
   const catalogs = useVal(connectors.$.catalogs)
@@ -73,10 +73,10 @@ export function AgentTools({
   const replaceTool = (tool: AgentTool, commit = true) =>
     setConfig((current) => (current.kind != 'agent' ? current : { ...current, tools: current.tools.map((item) => (item.id == tool.id ? tool : item)) }), commit)
 
-  const addTool = (action: ConnectorActionView, confirm: boolean): void => {
-    setConfig({ ...config, tools: [...config.tools, agentTool(action, confirm, crypto.randomUUID())] })
+  const addTool = (action: ConnectorActionView, accountId?: string): void => {
+    setConfig((current) => (current.kind != 'agent' ? current : { ...current, tools: [...current.tools, agentTool(action, crypto.randomUUID(), accountId)] }))
     setPendingTool(undefined)
-    setApproval(false)
+    setConnectionId(undefined)
   }
 
   return (
@@ -130,24 +130,6 @@ export function AgentTools({
                 </Button>
               </Field>
             )}
-            <Field>
-              <FieldLabel htmlFor={`${tool.id}-approval`}>{t('agent.execution')}</FieldLabel>
-              <WorkbenchSelect
-                size="sm"
-                variant="subtle"
-                id={`${tool.id}-approval`}
-                value={tool.approval ? 'confirm' : 'auto'}
-                onValueChange={(value) => replaceTool({ ...tool, approval: value == 'confirm' })}
-                ariaLabel={t('agent.execution')}
-                disabled={disabled}
-                portalRoot={portalRoot}
-                className="w-full min-w-0"
-                options={[
-                  { value: 'auto', label: t('agent.auto') },
-                  { value: 'confirm', label: t('agent.confirm') },
-                ]}
-              />
-            </Field>
             <FieldDescription>
               {tool.inputs.some((port) => port.source.kind != 'model')
                 ? t('agent.assigned', {
@@ -274,40 +256,70 @@ export function AgentTools({
           connectors={connectors}
           disabled={disabled}
           label={t('agent.addTool')}
-          prepare={prepareAction}
-          onSelect={async (action) => {
-            setPendingTool(action)
-            setApproval(false)
+          prepare={prepareAction ?? ((action) => connectors.resolveAction(action.actionId))}
+          onSelect={async (action, connections) => {
+            if (!action.authenticated) addTool(action)
+            else {
+              setPendingTool({ action, connections })
+              setConnectionId(action.defaultConnection?.connectionId)
+            }
             return true
           }}
         />
       ) : (
         <div className="inspector-disclosure-content">
           <h3>
-            {pendingTool.serviceName} · {pendingTool.name}
+            {pendingTool.action.serviceName} · {pendingTool.action.name}
           </h3>
           <Field>
-            <FieldLabel htmlFor={`${nodeId}-new-approval`}>{t('agent.execution')}</FieldLabel>
+            <FieldLabel htmlFor={`${nodeId}-new-connection`}>{t('agent.connection')}</FieldLabel>
             <WorkbenchSelect
               size="sm"
               variant="subtle"
-              id={`${nodeId}-new-approval`}
-              value={approval ? 'confirm' : 'auto'}
-              onValueChange={(value) => setApproval(value == 'confirm')}
-              ariaLabel={t('agent.execution')}
+              id={`${nodeId}-new-connection`}
+              value={connectionId ?? ''}
+              onValueChange={(value) => setConnectionId(value || undefined)}
+              ariaLabel={t('agent.connection')}
               disabled={disabled}
               portalRoot={portalRoot}
               className="w-full min-w-0"
               options={[
-                { value: 'auto', label: t('agent.auto') },
-                { value: 'confirm', label: t('agent.confirm') },
+                { value: '', label: t('agent.chooseConnection') },
+                ...pendingTool.connections
+                  .filter((connection) => connection.status == 'active')
+                  .map((connection) => ({ value: connection.connectionId, label: connection.displayName })),
               ]}
             />
-            <FieldDescription>{t('agent.executionHint')}</FieldDescription>
+            {pendingTool.connections.every((connection) => connection.status != 'active') && (
+              <FieldDescription>{t('inspector.account.connectBeforeRun', { service: pendingTool.action.serviceName })}</FieldDescription>
+            )}
+            <Button
+              type="button"
+              variant="ghost"
+              size="xs"
+              disabled={disabled}
+              className="self-start"
+              onClick={async () => {
+                try {
+                  await connectors.connect(pendingTool.action.serviceId)
+                  const next = prepareAction == null ? await connectors.resolveAction(pendingTool.action.actionId) : await prepareAction(pendingTool.action)
+                  if (next != null) setPendingTool((current) => (current == pendingTool ? next : current))
+                } catch (cause) {
+                  setError(String(cause))
+                }
+              }}
+            >
+              {t('inspector.account.manageAccount')}
+            </Button>
           </Field>
           <FieldDescription>{t('agent.newParameters')}</FieldDescription>
           <div className="form-actions">
-            <Button type="button" size="sm" onClick={() => addTool(pendingTool, approval)}>
+            <Button
+              type="button"
+              size="sm"
+              disabled={disabled || !pendingTool.connections.some((connection) => connection.connectionId == connectionId && connection.status == 'active')}
+              onClick={() => addTool(pendingTool.action, connectionId)}
+            >
               {t('agent.addTool')}
             </Button>
             <Button type="button" size="sm" variant="ghost" onClick={() => setPendingTool(undefined)}>
