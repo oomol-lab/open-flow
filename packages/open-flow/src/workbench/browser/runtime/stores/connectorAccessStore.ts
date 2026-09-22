@@ -27,6 +27,7 @@ export class ConnectorAccessStore {
   #generation = 0
   #disposed = false
   #candidatesController = new AbortController()
+  readonly #candidateRequests = new Map<string, Promise<void>>()
 
   readonly $: ReadonlyVal<ConnectorAccessState> = this.#state
 
@@ -44,6 +45,7 @@ export class ConnectorAccessStore {
     if (!refreshing) {
       this.#candidatesController.abort()
       this.#candidatesController = new AbortController()
+      this.#candidateRequests.clear()
       this.#state.set(flowId == null ? initialState : { ...initialState, loading: true })
     }
     if (flowId == null) return
@@ -76,10 +78,16 @@ export class ConnectorAccessStore {
     const flowId = this.#flowId
     const state = this.#state.value
     if (this.#disposed || flowId == null || state.access?.mode != 'selectable') return
+    const pending = providerIds.flatMap((id) => this.#candidateRequests.get(id) ?? [])
     const requested = [...new Set(providerIds)].filter(
-      (id) => !state.loadingCandidates.includes(id) && (force || (state.candidates[id] == null && !state.candidateErrors.includes(id))),
+      (id) => !this.#candidateRequests.has(id) && (force || (state.candidates[id] == null && !state.candidateErrors.includes(id))),
     )
-    if (requested.length == 0) return
+    if (requested.length == 0) {
+      await Promise.all(pending)
+      return
+    }
+    const request = Promise.withResolvers<void>()
+    for (const id of requested) this.#candidateRequests.set(id, request.promise)
     const signal = this.#candidatesController.signal
     this.#state.set({
       ...state,
@@ -113,7 +121,13 @@ export class ConnectorAccessStore {
         loadingCandidates: current.loadingCandidates.filter((id) => !requested.includes(id)),
       })
       this.setNotice(errorNotice(error, this.i18n.t))
+    } finally {
+      for (const id of requested) {
+        if (this.#candidateRequests.get(id) == request.promise) this.#candidateRequests.delete(id)
+      }
+      request.resolve()
     }
+    await Promise.all(pending)
   }
 
   async select(providerId: string, accessBindingId: string, selected = true): Promise<boolean> {
@@ -175,6 +189,7 @@ export class ConnectorAccessStore {
   dispose(): void {
     this.#disposed = true
     this.#candidatesController.abort()
+    this.#candidateRequests.clear()
     this.#generation += 1
     this.#state.dispose()
   }

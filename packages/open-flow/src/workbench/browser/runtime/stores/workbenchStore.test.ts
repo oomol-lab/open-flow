@@ -914,3 +914,47 @@ it.each(['connected', 'unconfigured', 'failed'] as const)('keeps new Connector a
     store.dispose()
   }
 })
+
+it('waits for a candidate query already started by the inspector before enabling default Connector access', async () => {
+  const { client, navigation, store } = catalogSession('flow-1')
+  const action = { actionId: 'mail.send', authenticated: true, description: '', inputs: {}, outputs: {}, name: 'Send', serviceId: 'mail', serviceName: 'Mail' }
+  const connection = { connectionId: 'mail-default', displayName: 'Work', isDefault: true, serviceId: 'mail', status: 'active' as const }
+  const binding = {
+    accessBindingId: 'default-access',
+    connectionId: connection.connectionId,
+    connectionDisplayName: connection.displayName,
+    providerId: 'mail',
+    permissionGroupName: null,
+    source: { kind: 'admin-delegation' as const },
+    status: 'active' as const,
+  }
+  vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(access('flow-1'))
+  const candidates = Promise.withResolvers<Awaited<ReturnType<WorkbenchClient['listProviderAccessBindingCandidates']>>>()
+  const lookup = vi.spyOn(client, 'listProviderAccessBindingCandidates').mockReturnValue(candidates.promise)
+  const addAccess = vi.spyOn(client, 'addProviderAccessBinding').mockResolvedValue({ ...access('flow-1'), accessRevision: 3, bindings: [binding] })
+  const resolved = { action: { ...action, defaultConnection: connection }, connections: [connection] }
+  vi.spyOn(store.connectors, 'resolveAction').mockResolvedValue(resolved)
+  try {
+    await navigation.start()
+    const loading = store.connectorAccess.loadCandidates(['mail'])
+    const preparing = store.prepareConnectorAction(action)
+    candidates.resolve({
+      version: 1,
+      results: [
+        {
+          providerId: 'mail',
+          mode: 'selectable',
+          version: 1,
+          candidates: [{ ...binding, isDefault: true, permissions: { actionIds: [], allActions: true, configured: false, proxy: true } }],
+        },
+      ],
+    })
+    await loading
+    expect(await preparing).toEqual(resolved)
+    expect(addAccess).toHaveBeenCalledWith('flow-1', 'mail', 'default-access', 2)
+    expect(lookup).toHaveBeenCalledTimes(1)
+  } finally {
+    navigation.dispose()
+    store.dispose()
+  }
+})
