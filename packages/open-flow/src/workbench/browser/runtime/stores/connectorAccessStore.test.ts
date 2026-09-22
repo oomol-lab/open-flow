@@ -250,6 +250,35 @@ it('persists an unconnected service and restores it in a new Store', async () =>
   reopened.dispose()
 })
 
+it.each([true, false])('preserves a newer refresh while setting service selection to %s', async (selected) => {
+  const client = new WorkbenchClient(vi.fn())
+  const read = vi.spyOn(client, 'getConnectorAccess').mockResolvedValue({ ...initial, accessRevision: 10, providerIds: selected ? [] : ['mail'] })
+  const pending = Promise.withResolvers<Awaited<ReturnType<WorkbenchClient['setConnectorService']>>>()
+  const save = vi.spyOn(client, 'setConnectorService').mockReturnValueOnce(pending.promise)
+  vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
+    results: [{ providerId: 'mail', candidates: [], mode: 'selectable', version: 1 }],
+    version: 1,
+  })
+  const store = new ConnectorAccessStore(client, vi.fn())
+  try {
+    await store.load('flow-1')
+    const saving = store.setService('mail', selected)
+    expect(save).toHaveBeenCalledWith('flow-1', 'mail', selected, 10)
+    const newer = { ...initial, accessRevision: 12, providerIds: selected ? ['mail', 'github'] : ['github'], providerAccessDigest: 'access-12' }
+    read.mockResolvedValue(newer)
+    await store.load('flow-1')
+    pending.resolve({ ...initial, accessRevision: 11, providerIds: selected ? ['mail'] : [], providerAccessDigest: 'access-11' })
+    await expect(saving).resolves.toBe(true)
+    expect(store.$.value.access).toEqual(newer)
+    expect(store.$.value.savingProviderId).toBeUndefined()
+    save.mockResolvedValue({ ...newer, accessRevision: 13 })
+    await expect(store.setService('mail', !selected)).resolves.toBe(true)
+    expect(save).toHaveBeenLastCalledWith('flow-1', 'mail', !selected, 12)
+  } finally {
+    store.dispose()
+  }
+})
+
 it.each([true, false])('shows pending selection %s immediately without changing authoritative access and rolls back on failure', async (selected) => {
   const binding = {
     accessBindingId: 'account',

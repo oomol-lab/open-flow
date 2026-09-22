@@ -254,7 +254,7 @@ describe('Connector access settings', () => {
 
     expect(markup).toContain('Authorized accounts: 3 across 2 services')
     expect(markup).toContain('aria-expanded="false"')
-    expect(markup).not.toContain('Add service…')
+    expect(markup).not.toContain('Add service</button>')
     expect(markup).toContain('aria-controls=')
     expect(markup).not.toContain('Connection: Work Slack')
     expect(markup).not.toContain('Connection: Work Mail · Permission group: Team default')

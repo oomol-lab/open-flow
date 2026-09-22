@@ -153,9 +153,10 @@ export class ConnectorAccessStore {
     try {
       const next = await this.client.setConnectorService(flowId, providerId, selected, access.accessRevision)
       if (this.#disposed || flowId != this.#flowId) return false
+      const current = this.#state.value.access
       this.#state.set({
         ...this.#state.value,
-        access: next,
+        access: current != null && current.accessRevision > next.accessRevision ? current : next,
         savingProviderId: undefined,
         ...(!selected && this.#state.value.configuration?.providerId == providerId ? { configuration: {} } : {}),
       })
