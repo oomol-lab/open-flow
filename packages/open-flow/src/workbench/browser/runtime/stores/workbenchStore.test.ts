@@ -274,21 +274,20 @@ describe('WorkbenchStore diagnostics', () => {
       }
       if (path.startsWith('/v1/connector/proxy/providers?'))
         return Response.json({ success: true, data: [{ service: 'amap', displayName: 'AMap', authTypes: ['api_key'], iconUrl: providerIcon }] })
-      if (path == `/v1/connector/action-metadata/amap.geocode?flowId=${flow.flowId}&locale=en`) {
+      if (path == `/v1/connector/proxy/actions?flowId=${flow.flowId}&service=amap&locale=en`) {
         await actionReady.promise
         return Response.json({
-          action: {
-            actionId: 'amap.geocode',
-            authenticated: true,
-            description: 'Geocode an address.',
-            inputs: {},
-            name: 'Geocode',
-            outputs: {},
-            serviceId: 'amap',
-            serviceName: 'AMap',
-            icon: providerIcon,
-          },
-          version: 1,
+          success: true,
+          data: [
+            {
+              id: 'amap.geocode',
+              service: 'amap',
+              description: 'Geocode an address.',
+              name: 'Geocode',
+              inputSchema: { type: 'object', properties: {} },
+              outputSchema: { type: 'object', properties: {} },
+            },
+          ],
         })
       }
       if (path.startsWith(`/v1/connector/proxy/apps?flowId=${flow.flowId}`)) {
@@ -354,13 +353,13 @@ describe('WorkbenchStore diagnostics', () => {
         expect(store.$.sourceNodeIcons.value).toBe(icons)
         const providerRequests = () => requests.filter((path) => path.startsWith('/v1/connector/proxy/providers?')).length
         const beforeRefresh = providerRequests()
-        const providers = store.workspace.catalogs.actions.detail('amap.geocode', flow.flowId, 'en', true)
+        const providers = store.workspace.catalogs.providers.get(flow.flowId, 'en', true)
         await vi.waitFor(() => expect(providerRequests()).toBeGreaterThan(beforeRefresh))
         await vi.waitFor(() => expect(providers.value.refreshing).toBe(false))
         expect(store.$.sourceNodeIcons.value).toBe(icons)
         expect(iconUpdates).not.toHaveBeenCalled()
         providerIcon = 'https://example.com/amap-updated.svg'
-        store.workspace.catalogs.actions.detail('amap.geocode', flow.flowId, 'en', true)
+        store.workspace.catalogs.providers.get(flow.flowId, 'en', true)
         await vi.waitFor(() => expect(store.$.sourceNodeIcons.value.connector).toContain(encodeURIComponent(providerIcon)))
         expect(iconUpdates).toHaveBeenCalledOnce()
       } finally {

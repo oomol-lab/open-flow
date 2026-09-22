@@ -167,7 +167,7 @@ describe('ConnectorStore', () => {
       expect(connectors.$.actions.value).toEqual({})
       expect(connectorRequests).toContain('/v1/connector/proxy/providers?locale=en')
       expect(connectorRequests).toContain('/v1/connector/proxy/actions?service=mail&locale=en')
-      expect(connectorRequests).toContain('/v1/connector/action-metadata/mail.send?flowId=flow-a&locale=en')
+      expect(connectorRequests).toContain('/v1/connector/proxy/actions?flowId=flow-a&service=mail&locale=en')
       expect(connectorRequests).toContain('/v1/connector/action-metadata?q=send&locale=en')
       expect(connectorRequests.some((path) => path.includes('flowId=flow-b'))).toBe(false)
       connectors.setLanguage('zh-CN')

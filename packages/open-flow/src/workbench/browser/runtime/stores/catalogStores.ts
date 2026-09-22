@@ -5,9 +5,10 @@ import type { WorkbenchHost } from '../contract.ts'
 import type { ProxyResponse } from './proxyCatalog.ts'
 import type { ResourceState } from './resource.ts'
 
-import { compute } from 'value-enhancer'
+import { compute, derive } from 'value-enhancer'
 import { connectorActionMetadata } from '../../../../control/common/connectorDecoders.ts'
 import { invalidResponse, record } from '../../../../control/common/decoding.ts'
+import { ApiError } from '../api.ts'
 import { action, app, provider, proxyResponse, validateAction } from './proxyCatalog.ts'
 import { Resource } from './resource.ts'
 
@@ -35,18 +36,7 @@ class ProxyStore {
     const path = `/v1/connector/proxy/${this.kind}${params.size ? `?${params}` : ''}`
     let entry = this.entries.get(path)
     if (entry == null) {
-      const decode = (value: unknown) =>
-        proxyResponse(
-          value,
-          this.kind == 'providers'
-            ? provider
-            : this.kind == 'apps'
-              ? app
-              : (item) => {
-                  validateAction(item)
-                  if (item.service != service) return invalidResponse()
-                },
-        )
+      const decode = (value: unknown) => proxyResponse(value, this.kind == 'providers' ? provider : this.kind == 'apps' ? app : undefined)
       entry = new Resource(
         (etag, signal) => this.client.readProxyCatalog({ path, decode }, etag, signal),
         this.kind == 'providers' ? 300_000 : 30_000,
@@ -156,7 +146,7 @@ export class ConnectionStore {
 export class ActionStore {
   readonly #raw: ProxyStore
   readonly #views = new Views<readonly ConnectorActionMetadata[]>()
-  readonly #details = new Map<string, Resource<ConnectorActionMetadata>>()
+  readonly #details = new Map<string, ReadonlyVal<ResourceState<ConnectorActionMetadata>>>()
   readonly #searches = new Set<Resource<readonly ConnectorActionMetadata[]>>()
   readonly #searchSessions = new WeakMap<AbortSignal, Map<string, Resource<readonly ConnectorActionMetadata[]>>>()
   constructor(
@@ -170,35 +160,38 @@ export class ActionStore {
     return this.#views.get(
       identity(flowId, serviceId, locale),
       [this.#raw.get(flowId, locale, serviceId, force), this.providers.raw.get(flowId, locale)],
-      (actions, providers) => actions.data.map((item) => action(item, providers)),
+      (actions, providers) =>
+        actions.data.flatMap((item) => {
+          try {
+            const source = record(item)
+            validateAction(source)
+            if (source.service != serviceId) return invalidResponse()
+            return [action(source, providers)]
+          } catch (error) {
+            console.warn('Could not load Connector Action.', { serviceId, actionId: item?.id, error })
+            return []
+          }
+        }),
     )
   }
   detail(actionId: string, flowId?: string, locale = 'en', force = false): ReadonlyVal<ResourceState<ConnectorActionMetadata>> {
-    const params = new URLSearchParams({ ...(flowId == null ? {} : { flowId }), locale })
-    const path = `/v1/connector/action-metadata/${encodeURIComponent(actionId)}?${params}`
-    let detail = this.#details.get(path)
+    const serviceId = actionId.split('.')[0]!
+    const source = this.get(serviceId, flowId, locale, force)
+    const key = identity(flowId, actionId, locale)
+    let detail = this.#details.get(key)
     if (detail == null) {
-      detail = new Resource(
-        (etag, signal) =>
-          this.client.readCatalog(
-            {
-              path,
-              decode: (value) => {
-                const source = record(value)
-                if (source.version != 1) return invalidResponse()
-                const metadata = connectorActionMetadata(source.action)
-                if (metadata.actionId != actionId) return invalidResponse()
-                return metadata
-              },
-            },
-            etag,
-            signal,
-          ),
-        30_000,
-      )
-      this.#details.set(path, detail)
+      const missing = new ApiError(404, 'connector.action-not-found', `Connector Action "${actionId}" was not found.`)
+      detail = derive(source, (state) => {
+        const data = state.data?.find((candidate) => candidate.actionId == actionId)
+        return {
+          data,
+          refreshing: state.refreshing,
+          error: state.error ?? (state.data != null && data == null && !state.refreshing ? missing : undefined),
+        }
+      })
+      this.#details.set(key, detail)
     }
-    return detail.get(force)
+    return detail
   }
 
   search(query: string, flowId: string | undefined, locale: string, signal: AbortSignal): Resource<readonly ConnectorActionMetadata[]> {
@@ -241,13 +234,9 @@ export class ActionStore {
   }
   retryFailed(): void {
     this.#raw.retryFailed()
-    for (const detail of this.#details.values()) if (detail.state.value.error != null) void detail.refresh()
   }
   refreshFlow(flowId: string): void {
     this.#raw.refreshFlow(flowId)
-    for (const [path, detail] of this.#details) {
-      if (new URL(path, 'https://open-flow.invalid').searchParams.get('flowId') == flowId) void detail.refresh(true)
-    }
   }
   dispose(): void {
     for (const search of this.#searches) search.dispose()

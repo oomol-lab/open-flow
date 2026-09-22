@@ -11,7 +11,7 @@ export interface ProxyResponse {
 }
 
 /** Validate the fields we consume without discarding upstream representation fields. */
-export function proxyResponse(value: unknown, validate: (item: Readonly<Record<string, unknown>>) => unknown): ProxyResponse {
+export function proxyResponse(value: unknown, validate?: (item: Readonly<Record<string, unknown>>) => unknown): ProxyResponse {
   const source = record(value)
   if (source.success === false)
     throw new ApiError(
@@ -20,7 +20,7 @@ export function proxyResponse(value: unknown, validate: (item: Readonly<Record<s
       typeof source.message == 'string' ? source.message : 'Connector request failed.',
     )
   if (source.success !== true || !Array.isArray(source.data)) return invalidResponse()
-  for (const item of source.data) validate(record(item))
+  if (validate != null) for (const item of source.data) validate(record(item))
   return source as unknown as ProxyResponse
 }
 
