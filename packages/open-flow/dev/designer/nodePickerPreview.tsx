@@ -186,9 +186,9 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
     }
   }, [session, connectors, lifetime, sampleCatalog])
   const options = useVal(session.workspace.$.addNodeOptions)
-  const connections = useVal(connectors.$.connections)
+  const connections = useVal(connectors.$.pickerConnections)
   useStoryActions([
-    { label: configuredOnly ? 'All groups' : 'Configured only', onClick: () => setConfiguredOnly(!configuredOnly) },
+    { label: configuredOnly ? 'All groups' : 'Connected only', onClick: () => setConfiguredOnly(!configuredOnly) },
     { label: largeCatalog ? 'Small catalog' : '1,000 apps', onClick: () => setLargeCatalog(!largeCatalog) },
     { label: slowAdd ? 'Instant add' : 'Slow add', onClick: () => setSlowAdd(!slowAdd) },
     { label: cancelAdd ? 'Create on selection' : 'Cancel on selection', onClick: () => setCancelAdd(!cancelAdd) },
@@ -324,6 +324,6 @@ export const nodePickerPreviewStory: FrontendStory = {
   title: 'Add Node Popover',
   standalone: true,
   description:
-    'The production empty canvas opens the centered picker on Triggers from its Add node button or the A key. Picker items support click-to-add and dragging onto the canvas. Provider details use a centered title and quiet back arrow, matching the tab height and background and show real Triggers above action categories. Gmail covers every action category; Google Drive covers a single category. Open search samples compare Provider-only and action matches, app navigation and return. Includes cached loading and 1,000-app scrolling.',
+    'The production empty canvas opens the centered picker on Triggers from its Add node button or the A key. Picker items support click-to-add and dragging onto the canvas. Provider details use a centered title and quiet back arrow, matching the tab height and background and show real Triggers above action categories. Gmail covers every action category; Google Drive covers a single category. Open search samples compare Provider-only and action matches, app navigation and return. Connected services show an inline status independently of Flow authorization. Includes cached loading and 1,000-app scrolling.',
   render: (log, dark, language) => <Preview dark={dark} language={language} log={log} />,
 }

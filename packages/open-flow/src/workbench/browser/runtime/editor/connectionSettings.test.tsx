@@ -42,6 +42,19 @@ function renderAccount(overrides: Partial<ComponentProps<typeof ConnectorAccount
   )
 }
 
+it.each(['metadata', 'connections'] as const)('shows loading while waiting for %s without a refresh call', (pending) => {
+  const markup = renderAccount({
+    ...(pending == 'metadata' ? { action: undefined } : {}),
+    accessError: undefined,
+    activeConnections: undefined,
+  })
+  expect(markup).toContain(i18n.t('inspector.account.loading'))
+  expect(markup).not.toContain('重试')
+  expect(markup).not.toContain('暂时无法获取')
+  expect(markup).not.toContain('连接 Gmail')
+  expect(markup).not.toContain('选择可用账号')
+})
+
 it.each([undefined, { message: 'Earlier request failed.' }])('directs missing access to configuration instead of retrying (%s)', (actionError) => {
   const markup = renderAccount({ actionError })
   expect(markup).toContain('运行前，请为此流程选择可用账号和权限。')

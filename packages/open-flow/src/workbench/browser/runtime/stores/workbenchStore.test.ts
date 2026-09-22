@@ -5,6 +5,7 @@ import { val } from 'value-enhancer'
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
 import { NavigationStore } from '../navigation.ts'
+import { resourceValue } from './resource.ts'
 import { WorkbenchStore } from './workbenchStore.ts'
 
 const timestamp = '2026-09-01T00:00:00.000Z'
@@ -50,6 +51,37 @@ function access(flowId: string) {
 }
 
 describe('Flow creation notifications', () => {
+  it('refreshes scoped accounts after saving and removing access without a server notification', async () => {
+    const { client, store, navigation } = catalogSession('first')
+    let connected = false
+    vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(access('first'))
+    vi.spyOn(client, 'addProviderAccessBinding').mockImplementation(async () => {
+      connected = true
+      return { ...access('first'), accessRevision: 2 }
+    })
+    vi.spyOn(client, 'removeProviderAccessBinding').mockImplementation(async () => {
+      connected = false
+      return { ...access('first'), accessRevision: 3 }
+    })
+    vi.spyOn(client, 'readProxyCatalog').mockImplementation(async () => ({
+      modified: true,
+      etag: null,
+      data: { success: true, data: connected ? [{ id: 'mail-account', service: 'mail', displayName: 'Work', status: 'active', isDefault: true }] : [] },
+    }))
+    try {
+      await navigation.start()
+      const accounts = store.workspace.catalogs.connections.get('mail', 'first')
+      expect(await resourceValue(accounts)).toEqual([])
+      await store.connectorAccess.select('mail', 'binding')
+      await vi.waitFor(() => expect(accounts.value.data?.map((account) => account.connectionId)).toEqual(['mail-account']))
+      await store.connectorAccess.select('mail', 'binding', false)
+      await vi.waitFor(() => expect(accounts.value.data).toEqual([]))
+    } finally {
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+
   it('switches access and candidate requests to the selected Flow and clears access on exit', async () => {
     const { client, store, navigation } = catalogSession('first')
     vi.spyOn(client, 'getConnectorAccess').mockImplementation(async (flowId) => access(flowId))
@@ -532,7 +564,7 @@ it('reports thrown add failures through notices without treating an empty result
 })
 
 it.each(['no candidates', 'ambiguous candidates', 'candidate failure', 'binding failure'] as const)(
-  'allows drafting an unauthorized Connector node after %s',
+  'preserves editable Connector metadata after %s',
   async (scenario) => {
     const { client, navigation, store } = catalogSession('flow-1')
     const action = {
@@ -545,7 +577,6 @@ it.each(['no candidates', 'ambiguous candidates', 'candidate failure', 'binding 
       serviceId: 'mail',
       serviceName: 'Mail',
     }
-    const option = { connector: action, description: '', id: 'connector:mail.send', inputs: [], kind: 'connector' as const, label: 'Send', outputs: [] }
     vi.spyOn(client, 'getConnectorAccess').mockResolvedValue(access('flow-1'))
     const candidate = { accessBindingId: 'mail-1', connectionDisplayName: 'Mail', permissionGroupName: null, providerId: 'mail' }
     const candidates = vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
@@ -561,8 +592,8 @@ it.each(['no candidates', 'ambiguous candidates', 'candidate failure', 'binding 
     const resolve = vi.spyOn(store.connectors, 'resolveAction')
     try {
       await navigation.start()
-      await expect(store.addNode(option, { x: 0, y: 0 })).resolves.toBe('node')
-      expect(add).toHaveBeenCalledWith(option, { x: 0, y: 0 }, undefined)
+      await expect(store.prepareConnectorAction(action)).resolves.toEqual({ action, connections: [] })
+      expect(add).not.toHaveBeenCalled()
       expect(resolve).not.toHaveBeenCalled()
       expect(store.connectorAccess.$.value.configuration).toBeUndefined()
       expect(select).toHaveBeenCalledTimes(scenario == 'binding failure' ? 1 : 0)
@@ -608,7 +639,7 @@ it('adds a no-auth Action without loading account candidates or creating a bindi
   }
 })
 
-it('adds default Provider access while creating a Connector node without prompting', async () => {
+it('prepares default Provider access without prompting', async () => {
   const { client, navigation, store } = catalogSession('flow-1')
   const discovered = {
     actionId: 'mail.send',
@@ -628,16 +659,6 @@ it('adds default Provider access while creating a Connector node without prompti
     status: 'active' as const,
   }
   const resolved = { ...discovered, defaultConnection: connection, description: 'Flow catalog' }
-  const option = {
-    connector: discovered,
-    description: discovered.description,
-    group: 'Connector Actions',
-    id: 'connector:mail.send',
-    inputs: [],
-    kind: 'connector' as const,
-    label: discovered.name,
-    outputs: [],
-  }
   vi.spyOn(client, 'getConnectorAccess').mockResolvedValue({
     accessRevision: 1,
     bindings: [
@@ -703,12 +724,80 @@ it('adds default Provider access while creating a Connector node without prompti
   try {
     await navigation.start()
 
-    await expect(store.addNode(option, { x: 0, y: 0 })).resolves.toBe('node')
+    await expect(store.prepareConnectorAction(discovered)).resolves.toEqual({ action: resolved, connections: [connection] })
     expect(addAccess).toHaveBeenCalledWith('flow-1', 'mail', 'mail-send-access', 1)
     expect(resolve).toHaveBeenCalledWith('mail.send')
-    expect(add).toHaveBeenCalledWith({ ...option, connector: resolved }, { x: 0, y: 0 }, undefined)
+    expect(add).not.toHaveBeenCalled()
   } finally {
     navigation.dispose()
     store.dispose()
   }
 })
+
+it.each(['unchanged', 'deleted', 'account selected', 'flow switched', 'failed'] as const)(
+  'adds a Connector before authorization completes and respects %s state',
+  async (scenario) => {
+    const { navigation, store } = catalogSession('flow-1')
+    const action = {
+      actionId: 'mail.send',
+      authenticated: true,
+      description: '',
+      inputs: {},
+      outputs: {},
+      name: 'Send',
+      serviceId: 'mail',
+      serviceName: 'Mail',
+    }
+    const connection = { connectionId: 'mail-default', displayName: 'Work', isDefault: true, serviceId: 'mail', status: 'active' as const }
+    let finish!: (value: { action: typeof action & { defaultConnection: typeof connection }; connections: (typeof connection)[] }) => void
+    let fail!: (error: Error) => void
+    const preparation = new Promise<{ action: typeof action & { defaultConnection: typeof connection }; connections: (typeof connection)[] }>(
+      (resolve, reject) => {
+        finish = resolve
+        fail = reject
+      },
+    )
+    vi.spyOn(store, 'prepareConnectorAction').mockReturnValue(preparation)
+    const add = vi.spyOn(store.workspace, 'addNode').mockResolvedValue('new-node')
+    const setConnection = vi.spyOn(store.workspace, 'setConnectorConnection').mockResolvedValue(true)
+    const refresh = vi.spyOn(store.connectors, 'refresh').mockResolvedValue()
+    try {
+      await navigation.start()
+      const revision = store.workspace.$.revision.value!
+      vi.spyOn(revision, 'node').mockReturnValue(
+        scenario == 'deleted' ? undefined : { id: 'new-node', kind: 'task', node: { kind: 'task', taskId: 'task-1', inputs: {} } },
+      )
+      vi.spyOn(revision, 'task').mockReturnValue({
+        name: 'Send',
+        inputs: [],
+        outputs: [],
+        executor: { kind: 'connector', action: 'mail.send', ...(scenario == 'account selected' ? { connectionId: 'chosen-by-user' } : {}) },
+      })
+      const option = {
+        connector: { ...action, defaultConnection: connection },
+        description: '',
+        id: 'connector:mail.send',
+        inputs: [],
+        kind: 'connector' as const,
+        label: 'Send',
+        outputs: [],
+      }
+      await expect(store.addNode(option, { x: 10, y: 20 })).resolves.toBe('new-node')
+      expect(add).toHaveBeenCalledWith({ ...option, connector: action }, { x: 10, y: 20 }, undefined)
+      expect(setConnection).not.toHaveBeenCalled()
+      if (scenario == 'flow switched') await store.selectFlow('second')
+      if (scenario == 'failed') fail(new Error('Authorization unavailable'))
+      else finish({ action: { ...action, defaultConnection: connection }, connections: [connection] })
+      await preparation.catch(() => {})
+      await Promise.resolve()
+      if (scenario == 'unchanged') {
+        expect(setConnection).toHaveBeenCalledWith('task-1', 'mail-default')
+        expect(refresh).toHaveBeenCalled()
+      } else expect(setConnection).not.toHaveBeenCalled()
+      if (scenario == 'failed') expect(store.$.notice.value?.message).toBe('Authorization unavailable')
+    } finally {
+      navigation.dispose()
+      store.dispose()
+    }
+  },
+)

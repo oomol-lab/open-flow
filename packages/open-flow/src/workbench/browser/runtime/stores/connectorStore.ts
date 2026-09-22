@@ -51,6 +51,7 @@ interface ConnectorTarget {
 }
 
 export interface Connector$ {
+  readonly pickerConnections: ReadonlyVal<readonly ConnectorConnection[]>
   readonly connections: ReadonlyVal<readonly ConnectorConnection[]>
   readonly actionLoading: ReadonlyVal<string | undefined>
   readonly actions: ReadonlyVal<Readonly<Record<string, ConnectorActionView>>>
@@ -253,6 +254,10 @@ export class ConnectorStore {
       }
     })
     this.$ = {
+      pickerConnections: compute((get) => {
+        const flowId = get(workspace.$.flowId)
+        return flowId == null ? [] : (get(resourceData(this.data.connections.get(undefined))) ?? [])
+      }),
       connections: compute((get) => {
         const flowId = get(workspace.$.flowId)
         return flowId == null ? [] : (get(resourceData(this.data.connections.get(undefined, flowId))) ?? [])
@@ -307,7 +312,7 @@ export class ConnectorStore {
   public readonly loadConnections = async (signal: AbortSignal): Promise<void> => {
     const flowId = this.#workspace.$.flowId.value
     if (this.#disposed || flowId == null) return
-    await resourceValue(this.data.connections.get(undefined, flowId), signal)
+    await resourceValue(this.data.connections.get(undefined), signal)
   }
 
   public readonly browseAddNodeOptions = (signal: AbortSignal) => {

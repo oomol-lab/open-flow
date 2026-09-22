@@ -129,7 +129,7 @@ export class WorkbenchStore {
     const setNotice = (notice: Notice): void => {
       if (!this.#disposed) this.#notice.set(notice)
     }
-    this.connectorAccess = new ConnectorAccessStore(client, setNotice, i18n)
+    this.connectorAccess = new ConnectorAccessStore(client, setNotice, i18n, (flowId) => this.workspace.catalogs.refreshFlow(flowId))
     this.runs = new RunStore(client, setNotice, i18n)
     this.workspace = new WorkspaceStore(
       client,
@@ -366,18 +366,38 @@ export class WorkbenchStore {
         await this.triggers.connect(option.trigger.provider)
         return
       }
+      const flowId = this.workspace.$.flowId.value
+      const target = this.workspace.$.target.value
       if (option.kind == 'connector') {
-        const prepared = await this.prepareConnectorAction(option.connector)
-        if (prepared == null) return
-        option = { ...option, connector: prepared.action }
+        const { defaultConnection: _defaultConnection, ...metadata } = option.connector
+        option = { ...option, connector: metadata }
       }
       const nodeId = await this.workspace.addNode(option, position, connection)
-      if (nodeId != null && option.kind == 'connector') void this.connectors.refresh()
+      if (nodeId != null && option.kind == 'connector' && flowId != null && target != null) {
+        void this.#configureAddedConnector(flowId, target, nodeId, option.connector)
+      }
       if (nodeId != null && option.kind == 'trigger') void this.triggers.refresh()
       return nodeId
     } catch (error) {
       if (!this.#disposed) this.#notice.set(errorNotice(error, this.#i18n.t))
       return undefined
+    }
+  }
+
+  async #configureAddedConnector(flowId: string, target: GraphTarget, nodeId: string, action: ConnectorActionView): Promise<void> {
+    try {
+      if (this.#disposed || flowId != this.workspace.$.flowId.value) return
+      const prepared = await this.prepareConnectorAction(action)
+      if (prepared == null || this.#disposed || flowId != this.workspace.$.flowId.value) return
+      const node = this.workspace.$.revision.value?.node(target, nodeId)
+      if (node?.kind != 'task' || node.node.task != null) return
+      const executor = this.workspace.$.revision.value?.task(node.node.taskId)?.executor
+      if (executor?.kind != 'connector' || executor.action != action.actionId || executor.connectionId != null) return
+      const connection = prepared.action.defaultConnection
+      if (connection != null) await this.workspace.setConnectorConnection(node.node.taskId, connection.connectionId)
+      if (!this.#disposed && flowId == this.workspace.$.flowId.value) await this.connectors.refresh()
+    } catch (error) {
+      if (!this.#disposed && flowId == this.workspace.$.flowId.value) this.#notice.set(errorNotice(error, this.#i18n.t))
     }
   }
 

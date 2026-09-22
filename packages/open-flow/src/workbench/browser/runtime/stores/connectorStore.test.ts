@@ -100,7 +100,11 @@ describe('ConnectorStore', () => {
           ],
         })
       }
-      if (path.startsWith('/v1/connector/proxy/apps')) return Response.json({ success: true, data: [] })
+      if (path.startsWith('/v1/connector/proxy/apps'))
+        return Response.json({
+          success: true,
+          data: flowId == null ? [{ id: 'mail-team', service: 'mail', displayName: 'Team account', status: 'active', isDefault: true }] : [],
+        })
       if (path.startsWith('/v1/connector/action-metadata')) {
         connectorRequests.push(path)
         const action = {
@@ -125,6 +129,10 @@ describe('ConnectorStore', () => {
 
     try {
       await workspace.start(flows[0]!.flowId)
+      await connectors.loadConnections(signal)
+      expect(connectors.$.pickerConnections.value.map((connection) => connection.connectionId)).toEqual(['mail-team'])
+      await resourceValue(workspace.catalogs.connections.get(undefined, flows[0]!.flowId))
+      expect(connectors.$.connections.value).toEqual([])
       const firstProviders = await resourceValue(connectors.browseAddNodeOptions(signal))
       const firstActions = await resourceValue(connectors.provideAddNodeOptionChoices('connector-provider:mail', signal))
 

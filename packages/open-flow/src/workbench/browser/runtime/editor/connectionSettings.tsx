@@ -129,11 +129,13 @@ export function ConnectorAccount({
   const available = activeConnections ?? []
   const accessIssue =
     accessError ?? (actionError?.code == 'connector.access-required' || actionError?.code == 'connector.access-invalid' ? actionError.message : undefined)
+  const pending = loading || (accessIssue == null && actionError == null && (action == null || (activeConnections == null && connectionError == null)))
   const required =
-    accessIssue != null || (action?.authenticated == true && (connectionId == null || (activeConnections != null && connection?.status != 'active')))
+    !pending &&
+    (accessIssue != null || (action?.authenticated == true && (connectionId == null || (activeConnections != null && connection?.status != 'active'))))
   let onManage: (() => void) | undefined
   let content: ReactElement
-  if (loading) {
+  if (pending) {
     content = <p>{t('inspector.account.loading')}</p>
   } else if (accessIssue != null) {
     if (action != null) onManage = () => void connectors.connect(action.serviceId)
@@ -217,7 +219,7 @@ export function ConnectorAccount({
       </h3>
       <div className="connection-state-content">
         {content}
-        {!loading && onConfigureAccess != null && (accessIssue != null || (action != null && actionError == null)) && (
+        {!pending && onConfigureAccess != null && (accessIssue != null || (action != null && actionError == null)) && (
           <Button
             className="self-start"
             disabled={disabled}
