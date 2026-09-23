@@ -158,6 +158,7 @@ function EditableDefinitionSample({ variables }: { variables: InputVariables }) 
 function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
   const i18n = useMemo(() => createI18n(language), [language])
   const [mapping, setMapping] = useState<InputMapping | undefined>({ kind: 'value', value: 'hello' })
+  const [arrayValue, setArrayValue] = useState<JsonValue | undefined>(null)
   const [variableName, setVariableName] = useState<string>()
   const variables = { enabled: true, names: ['API_TOKEN', 'TEAM_NAME'], loaded: true, loading: false, onOpen: () => log('Refresh names') }
   const definition = { handle: 'value', jsonSchema: { type: 'string' }, nullable: true, value: 'default' }
@@ -206,6 +207,23 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
         />
         <h3>Editable definition · no inherited reset</h3>
         <EditableDefinitionSample variables={variables} />
+        <h3>Fixed Array · read-only suffix with reset</h3>
+        <div className="editor-context-panel" style={{ width: 520, maxWidth: '100%' }}>
+          <NodeInputs
+            entries={[
+              {
+                definition: { handle: 'select', jsonSchema: { type: 'array', items: { type: 'string' } }, nullable: true },
+                value: arrayValue,
+                connected: false,
+                onReset: () => setArrayValue(null),
+              },
+            ]}
+            variables={variables}
+            disabled={false}
+            onValue={(_, value) => setArrayValue(value)}
+            onVariable={() => {}}
+          />
+        </div>
         <output aria-label="Saved input">{JSON.stringify({ mapping, variableName })}</output>
         <h3>Object fields</h3>
         <ObjectSourceSample variables={variables} />
@@ -390,7 +408,7 @@ export const nodeInputStory: FrontendStory = {
   propertyPanel: true,
   title: 'Node Input',
   description:
-    'Literal, variable and upstream sources, including fixed-schema Any fields with source + value + data type, source-free data type + value, and bound values without a data-type control. Editable definitions omit Reset; editable Any Schema types retain the generic JSON editor. Also covers whole objects, first-level fields, missing references and type mismatches.',
+    'Literal, variable and upstream sources, including fixed-schema Any fields with source + value + data type, source-free data type + value, and bound values without a data-type control. Fixed Array shows the read-only item-type suffix beside Reset. Editable definitions omit Reset; editable Any Schema types retain the generic JSON editor. Also covers whole objects, first-level fields, missing references and type mismatches.',
   standalone: true,
   render: (log, dark, language) => <NodeInputStory dark={dark} language={language} log={log} />,
 }

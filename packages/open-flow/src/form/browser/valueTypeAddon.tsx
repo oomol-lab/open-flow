@@ -36,7 +36,12 @@ export function DataTypeAddon({
 
   if (disabled || !onChange) {
     return (
-      <FieldTypeDisplay label={label} accessibleLabel={accessibleLabel} icon={<i aria-hidden="true" className={`${icon} inline-block shrink-0 text-base`} />} />
+      <FieldTypeDisplay
+        label={label}
+        accessibleLabel={accessibleLabel}
+        icon={<i aria-hidden="true" className={`${icon} inline-block shrink-0 text-base`} />}
+        addon
+      />
     )
   }
 

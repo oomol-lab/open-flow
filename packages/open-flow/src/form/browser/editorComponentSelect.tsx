@@ -88,6 +88,7 @@ export function EditorComponentSelect({
         accessibleLabel={`${t('valueEditor.type', { name })}: ${label}`}
         icon={showIcon && <EditorComponentIcon component={selectedComponent} />}
         compact={compact}
+        addon={addon}
         surface={readOnlySurface}
         disclosure={selectedComponent === 'object' ? disclosure : undefined}
       />

@@ -16,6 +16,7 @@ export function FieldTypeDisplay({
   accessibleLabel,
   icon,
   compact = true,
+  addon = false,
   surface = false,
   disclosure,
 }: {
@@ -24,11 +25,12 @@ export function FieldTypeDisplay({
   accessibleLabel: string
   icon: ReactNode
   compact?: boolean
+  addon?: boolean
   surface?: boolean
   disclosure?: FieldDisclosure
 }) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
-  const className = `flex h-[30px] w-full min-w-0 items-center gap-1.5 px-2 text-xs font-normal text-muted-foreground ${compact ? 'justify-center' : ''} ${
+  const className = `flex ${addon ? 'size-6 px-1' : 'h-[30px] w-full px-2'} min-w-0 items-center gap-1.5 text-xs font-normal text-muted-foreground ${compact ? 'justify-center' : ''} ${
     surface
       ? 'rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] dark:bg-[var(--ui-control-background,var(--ui-muted))]'
       : ''
