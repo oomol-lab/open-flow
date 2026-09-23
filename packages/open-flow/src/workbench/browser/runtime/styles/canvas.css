@@ -116,6 +116,14 @@
     transform: none;
   }
 
+  .workspace-publish-button[data-publish-status='unavailable'] {
+    color: color-mix(in srgb, var(--ui-muted-foreground) 60%, var(--ui-background));
+  }
+
+  .workspace-publish-button[data-publish-status='unavailable'] .status-dot {
+    background: currentColor;
+  }
+
   .designer-overlay {
     position: absolute;
     z-index: 5;
