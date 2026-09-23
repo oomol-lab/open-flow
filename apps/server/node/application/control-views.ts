@@ -1,6 +1,6 @@
 import type { Draft, Flow, Presentation, Publication, TriggerActivity, TriggerBinding, Variable } from '@oomol-lab/open-flow/control-api'
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
-import type { StoredFlow, StoredFlowRevision, StoredPresentation } from '../storage/flow-store.ts'
+import type { StoredChangeRevision, StoredFlow, StoredFlowRevision, StoredPresentation } from '../storage/flow-store.ts'
 import type { StoredPublication } from '../storage/publication-store.ts'
 import type { StoredTriggerActivity, StoredTriggerBinding } from '../storage/trigger-store.ts'
 
@@ -49,12 +49,12 @@ export function revisionContent(stored: { readonly content: string }): RevisionC
   }
 }
 
-export function revisionMetadata(stored: StoredFlowRevision): Omit<Draft, 'content'> {
+export function revisionMetadata(stored: StoredFlowRevision | StoredChangeRevision): Omit<Draft, 'content'> {
   return {
     actorId: stored.actorId,
     createdAt: timestamp(stored.createdAt),
     digest: stored.digest,
-    modelVersion: revisionContent(stored).modelVersion,
+    modelVersion: 'content' in stored ? revisionContent(stored).modelVersion : stored.modelVersion,
     parentRevisionId: stored.parentRevisionId,
     flowId: stored.flowId,
     revisionId: stored.revisionId,

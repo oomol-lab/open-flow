@@ -27,6 +27,7 @@ function pause(store: Store, clock: () => number, flowId: string, notify = false
     digest: 'revision',
     flowId,
     idempotencyKey: flowId,
+    modelVersion: currentFlowModelVersion,
     name: flowId,
     requestDigest: flowId,
     revisionId,
@@ -103,6 +104,85 @@ it('schedules and expires a Wait without notifications before the periodic maint
   expect(store.runViews.run(waiting.runId)).toMatchObject({ status: 'failed', result: { error: { code: 'run.wait-expired' } } })
   expect(changed).toHaveBeenCalledExactlyOnceWith('flow', waiting.runId)
   expect(maintenance.nextAt()).toBeGreaterThan(clock())
+})
+
+it('runs periodic cleanup on its own schedule despite earlier maintenance wakes', async () => {
+  const { clock, store, setTime } = fixture()
+  const drafts = vi.spyOn(store.flows, 'pruneDraftRevisions')
+  const publications = vi.spyOn(store.publications, 'prunePublishOperations')
+  const orphans = vi.spyOn(store.flows, 'collectOrphanRevisions')
+  const logger = silentLogger.child({})
+  const logged = vi.spyOn(logger, 'info')
+  const maintenance = new Maintenance(
+    store,
+    { advance: () => 'idle' },
+    clock,
+    logger,
+    () => undefined,
+    new ImplicitConnectorAccessHost(),
+    () => {},
+    () => false,
+    () => {},
+    () => {},
+    () => {},
+    await Effect.runPromise(Semaphore.make(1)),
+  )
+
+  await Effect.runPromise(maintenance.run(new Date(clock()).toISOString()))
+  expect(drafts).toHaveBeenCalledOnce()
+  expect(publications).toHaveBeenCalledOnce()
+  expect(orphans).toHaveBeenCalledOnce()
+  expect(logged).toHaveBeenCalledExactlyOnceWith(
+    { category: 'maintenance.cleanup.completed', publishOperations: 0, draftRevisions: 0, draftDeltas: 0, orphanRevisions: 0, orphanDeltas: 0 },
+    'Maintenance cleanup completed.',
+  )
+
+  setTime(clock() + 1_000)
+  maintenance.wake()
+  await Effect.runPromise(maintenance.run(new Date(clock()).toISOString()))
+  expect(drafts).toHaveBeenCalledOnce()
+  expect(publications).toHaveBeenCalledOnce()
+  expect(orphans).toHaveBeenCalledOnce()
+  expect(logged).toHaveBeenCalledTimes(1)
+  expect(maintenance.nextAt()).toBe(61_000)
+
+  setTime(61_000)
+  await Effect.runPromise(maintenance.run(new Date(clock()).toISOString()))
+  expect(drafts).toHaveBeenCalledTimes(2)
+  expect(publications).toHaveBeenCalledTimes(2)
+  expect(orphans).toHaveBeenCalledTimes(2)
+  expect(logged).toHaveBeenCalledTimes(2)
+})
+
+it('immediately continues cleanup when a batch has more work', async () => {
+  const { clock, store } = fixture()
+  vi.spyOn(store.flows, 'pruneDraftRevisions').mockReturnValueOnce(1).mockReturnValue(0)
+  const logger = silentLogger.child({})
+  const logged = vi.spyOn(logger, 'info')
+  const maintenance = new Maintenance(
+    store,
+    { advance: () => 'idle' },
+    clock,
+    logger,
+    () => undefined,
+    new ImplicitConnectorAccessHost(),
+    () => {},
+    () => false,
+    () => {},
+    () => {},
+    () => {},
+    await Effect.runPromise(Semaphore.make(1)),
+  )
+
+  await Effect.runPromise(maintenance.run(new Date(clock()).toISOString()))
+  expect(maintenance.nextAt()).toBe(clock())
+  expect(logged).toHaveBeenCalledExactlyOnceWith(
+    { category: 'maintenance.cleanup.completed', publishOperations: 0, draftRevisions: 1, draftDeltas: 0, orphanRevisions: 0, orphanDeltas: 0 },
+    'Maintenance cleanup completed.',
+  )
+  await Effect.runPromise(maintenance.run(new Date(clock()).toISOString()))
+  expect(maintenance.nextAt()).toBe(clock() + 60_000)
+  expect(logged).toHaveBeenCalledTimes(2)
 })
 
 it('drains expired Waits in bounded batches before claiming a still-valid notification', () => {

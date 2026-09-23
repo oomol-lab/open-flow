@@ -58,7 +58,7 @@ export class Store {
     // stores that report occurrences into them.
     this.integrations = new IntegrationStore(connection, transaction, (input) => this.runs.acceptTriggerOccurrence(input))
     this.polls = new PollStore(connection, transaction, (input) => this.runs.acceptTriggerOccurrence(input))
-    this.publications = new PublicationStore(connection, clock, transaction, this.integrations, this.polls, this.variables)
+    this.publications = new PublicationStore(connection, clock, transaction, this.integrations, this.polls, this.revisions, this.variables)
     this.flows = new FlowStore(connection, transaction, this.revisions)
     this.runViews = new RunViewStore(connection)
     this.runs = new RunStore(

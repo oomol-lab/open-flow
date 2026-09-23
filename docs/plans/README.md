@@ -19,5 +19,6 @@
 - [等待节点通知出口与局部等待规格草案](2026-09-15-wait-notification-branch-spec.md)
 - [等待节点通知出口与局部等待实施计划](2026-09-15-wait-notification-branch-plan.md)
 - [Flow 顶层化重置计划](flow-first-migration.md)
+- [草稿 Revision 增量存储实施计划](2026-09-23-draft-revision-delta-storage.md)
 - [前端重构后续清单](frontend-refactor-followups.md)
 - [即时协作编辑重构计划](local-first-collaboration.md)

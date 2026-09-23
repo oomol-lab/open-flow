@@ -39,6 +39,28 @@ function accessSnapshot(digest: string): string {
   return JSON.stringify({ version: 1, mode: 'implicit', accessRevision: 0, bindings: [], providerAccessDigest: digest })
 }
 
+it('backfills Revision metadata needed after old content is pruned', async () => {
+  const file = await databaseFile()
+  const database = legacyDatabase(file, 27)
+  database.prepare('INSERT INTO revisions (revision_id, digest, content) VALUES (?, ?, ?)').run('revision', 'digest', '{"modelVersion":3}')
+  database
+    .prepare(`INSERT INTO flow_revisions (revision_id, flow_id, parent_revision_id, actor_id, created_at, change_id, change_request_digest)
+              VALUES ('revision', 'flow', NULL, 'operator', 1, 'change', 'request')`)
+    .run()
+  database.close()
+
+  const upgraded = Database.open(file)
+  try {
+    expect(version(upgraded.connection)).toBe(29)
+    expect(upgraded.connection.prepare('SELECT digest, model_version AS modelVersion FROM flow_revisions WHERE revision_id = ?').get('revision')).toEqual({
+      digest: 'digest',
+      modelVersion: 3,
+    })
+  } finally {
+    upgraded.close()
+  }
+})
+
 it('backfills each candidate with its creation snapshot, including failed and retired subscriptions', async () => {
   const file = await databaseFile()
   const database = legacyDatabase(file, 24)
@@ -85,7 +107,7 @@ it('applies the Flow-first schema without foreign keys', async () => {
   Database.open(file).close()
   const database = new DatabaseSync(file)
   try {
-    expect(version(database)).toBe(27)
+    expect(version(database)).toBe(29)
     const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as {
       readonly name: string
     }[]
@@ -127,7 +149,7 @@ it('upgrades a version 1 Flow database without changing its data', async () => {
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(27)
+    expect(version(reopened)).toBe(29)
     expect(reopened.prepare('SELECT revision_id AS revisionId FROM revisions').all()).toEqual([{ revisionId: 'revision-a' }])
     expect(reopened.prepare('SELECT name FROM variables').all()).toEqual([])
   } finally {
@@ -157,7 +179,7 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(27)
+    expect(version(reopened)).toBe(29)
     expect(reopened.prepare('SELECT flow_id AS flowId, team_id AS teamId FROM flow_connector_teams').all()).toEqual([{ flowId: 'flow-a', teamId: null }])
     expect(reopened.prepare("SELECT name FROM pragma_table_info('runs') WHERE name = 'connector_team_id'").get()).toEqual({ name: 'connector_team_id' })
   } finally {
@@ -182,7 +204,7 @@ it('does not reapply the current schema', async () => {
   }
 })
 
-it('preserves an old Project schema until an explicit migration is available', async () => {
+it('rejects an unsupported old Project schema without modifying it', async () => {
   const file = await databaseFile()
   const database = new DatabaseSync(file)
   database.exec('CREATE TABLE projects (project_id TEXT PRIMARY KEY, name TEXT NOT NULL) STRICT')
@@ -190,7 +212,7 @@ it('preserves an old Project schema until an explicit migration is available', a
   database.exec('PRAGMA user_version = 9')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('Legacy application schema requires an explicit migration')
+  expect(() => Database.open(file)).toThrow('Legacy application schema is unsupported')
 
   const reset = new DatabaseSync(file)
   try {
@@ -205,13 +227,13 @@ it('rejects a newer Flow schema version without modifying it', async () => {
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
-  database.exec('PRAGMA user_version = 28')
+  database.exec('PRAGMA user_version = 30')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('SQLite schema version 28 is newer than the supported version 27.')
+  expect(() => Database.open(file)).toThrow('SQLite schema version 30 is newer than the supported version 29.')
 
   const reopened = new DatabaseSync(file)
-  expect(version(reopened)).toBe(28)
+  expect(version(reopened)).toBe(30)
   reopened.close()
 })
 
@@ -221,7 +243,7 @@ it('preserves an unversioned application schema', async () => {
   database.exec('CREATE TABLE revisions (revision_id TEXT PRIMARY KEY) STRICT')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('Legacy application schema requires an explicit migration')
+  expect(() => Database.open(file)).toThrow('Legacy application schema is unsupported')
 
   const reset = new DatabaseSync(file)
   try {
@@ -249,7 +271,7 @@ it('preserves old checkpoint bytes for explicit recovery validation', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(27)
+    expect(version(reopened)).toBe(29)
     expect(reopened.prepare('SELECT * FROM run_checkpoints').get()).toEqual({
       run_id: 'run-a',
       checkpoint_json: '{"value":42}',
@@ -282,7 +304,7 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   Database.open(file).close()
   const upgraded = new DatabaseSync(file)
   try {
-    expect(version(upgraded)).toBe(27)
+    expect(version(upgraded)).toBe(29)
     const after = tables.map((table) => upgraded.prepare('SELECT * FROM ' + table).all())
     expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
     expect(after[2]).toEqual(

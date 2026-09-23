@@ -29,6 +29,7 @@ Presentation、Publication、Live、Run 和 Trigger binding。
 Flow 有一个可变 Draft head 和不可变的 Revision 历史。Revision 是该 Flow 的 graph、Subflow、Task、binding 和 CodeModule source 的完整事实来源；
 语义修改必须以预期 Revision 为前提并使用稳定 change identity 原子提交，不能静默覆盖 stale head；幂等重放必须先于 Draft head 比较返回已经接受的
 Revision。Draft 同步只返回当前完整 Revision snapshot，不提供持久化 authoring operation history。内部索引、缓存、增量记录和存储布局不能成为第二个事实来源。
+不可变约束适用于仍保留的 Revision 内容；Server 可以将草稿正文存为基于父版本的有界增量，读取时还原并校验 digest，对外仍返回完整快照。Run 和 Publish operation 准入时将固定版本物化为完整正文。旧内容可按 Server 的保留策略清理，但 Run 结果与 Draft change 幂等记录不依赖被清理的内容。
 
 Presentation 独立保存布局、viewport 和 Comment 等展示状态；每个 Flow 或 Subflow 图只有一个画布和 viewport，节点配置由侧栏承载。Presentation
 不进入 Revision digest，也不影响 validation、Run、Publication 或 Live。
@@ -45,8 +46,8 @@ Variable 是 deployment scope 配置，不属于任何 Flow。Flow Revision 只�
 解析值隐式写入 Revision、Publication、持久化 Run input 或 `node.started`；Flow 代码显式返回、记录、发送或抛出该值时，它仍可进入用户数据流、
 RunEvent、日志或外部系统。Variable 是 Operator 可读取的 deployment configuration，不是不可导出的 Secret Manager。
 
-旧 Project schema 与 Project API 不属于当前产品合同。升级必须保留已有数据，支持的 schema 通过显式迁移转换；发现尚无转换路径的旧 schema 时，
-应停止升级并保留原始数据库，不得在启动过程中隐式重建或删除数据。
+旧 Project schema 与 Project API 不属于当前产品合同，也不再支持导入。遇到旧 schema 时应停止启动并保留原始数据库，
+不得在启动过程中隐式重建或删除数据。
 
 ### Deployment capability settings
 

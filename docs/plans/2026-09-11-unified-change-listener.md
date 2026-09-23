@@ -332,7 +332,7 @@ PR 状态字段依据 [GitHub Get a pull request](https://docs.github.com/en/res
 - 历史 Revision、Publication、Run、订阅、监听进度、Presentation 与部署设置仅完整保存在旧库备份，未转为新引擎可执行记录。
   这属于当前草稿导入，不代表完整部署迁移；其他适用 Poll 定义迁移及旧执行路径退出仍未完成。
 - 根目录 check 与 Server 424 项测试通过，包含 WAL 备份、正常转换、部分拒绝、损坏 digest、重复内容的身份隔离与拒绝覆盖目录。
-  操作与边界见 [旧 Project 草稿导入](../project-draft-import.md)。
+  此离线导入工具及其操作文档后来已随旧 Project 导入支持一并移除。
 
 ### 9.9 公共 Project 草稿转换接口
 

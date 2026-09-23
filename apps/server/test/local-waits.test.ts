@@ -18,6 +18,7 @@ function fixture() {
     digest: 'revision',
     flowId: 'flow',
     idempotencyKey: 'flow',
+    modelVersion: currentFlowModelVersion,
     name: 'Flow',
     requestDigest: 'flow',
     revisionId: 'revision',
