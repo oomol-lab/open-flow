@@ -163,6 +163,7 @@ export function variableBindings(revision: RevisionContent, bindingIds: Iterable
 export interface Diagnostic {
   readonly code: string
   readonly column: number
+  readonly fields?: readonly string[]
   readonly line: number
   readonly message: string
   readonly mismatch?: SchemaMismatch

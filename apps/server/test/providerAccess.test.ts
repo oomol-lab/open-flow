@@ -193,7 +193,7 @@ describe('configured Connector access', () => {
   })
 
   it('uses the binding for the requested Connection when a Provider has multiple bindings', async () => {
-    const aliases: (string | null)[] = []
+    const appIds: (string | null)[] = []
     vi.stubGlobal(
       'fetch',
       vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
@@ -235,7 +235,7 @@ describe('configured Connector access', () => {
           )
         }
         if (url == 'https://connector.oomol.dev/v1/actions/example.echo') {
-          aliases.push(new Headers(init?.headers).get('x-oo-connector-alias'))
+          appIds.push(new Headers(init?.headers).get('x-oo-connector-app-id'))
           return Response.json(success('ok'))
         }
         throw new Error(`Unexpected request: ${url}`)
@@ -268,7 +268,7 @@ describe('configured Connector access', () => {
     await expect(connector.listAllConnections(undefined, access)).resolves.toHaveLength(2)
     expect(requests.mock.calls.filter(([url]) => String(url).startsWith('https://connector.oomol.dev/v1/apps'))).toHaveLength(1)
     await expect(connector.execute('example.echo', 'connection-personal', {}, 'invocation-1', new AbortController().signal, access)).resolves.toBe('ok')
-    expect(aliases).toEqual(['personal'])
+    expect(appIds).toEqual(['connection-personal'])
     await expect(connector.execute('example.echo', 'connection-other', {}, 'invocation-2', new AbortController().signal, access)).rejects.toMatchObject({
       code: 'connector.access-invalid',
     })

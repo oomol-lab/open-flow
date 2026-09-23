@@ -58,6 +58,8 @@ Add production node boundary cases to `nodeStories.tsx`, layered card examples t
 
 `?story=trigger-config` 使用生产服务触发器配置组件，展示与节点输入共用的固定字段、分组、nullable、默认值和只读状态。
 
+`?story=diagnostics-panel` 展示生产诊断面板中同一节点的多条问题分组，以及独立的 Flow 级问题。
+
 `?story=webhook-editor` 使用生产 Webhook 配置组件，展示请求字段、HTTP 方法、响应配置及只读切换。
 
 `?story=condition-editor` 使用生产条件分支编辑组件，展示表达式、命名出口、默认出口和只读切换。

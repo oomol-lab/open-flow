@@ -885,6 +885,7 @@ describe('Server Connector client', () => {
 
   it('resolves the stable Connection id and executes an action with the runtime grant', async () => {
     const calls: {
+      readonly appId?: string
       readonly alias?: string
       readonly authorization?: string
       readonly body?: unknown
@@ -893,6 +894,7 @@ describe('Server Connector client', () => {
     }[] = []
     const origin = await startConnector(async (request, response) => {
       calls.push({
+        appId: request.headers['x-oo-connector-app-id'] as string | undefined,
         alias: request.headers['x-oo-connector-alias'] as string | undefined,
         authorization: request.headers.authorization,
         body: request.method == 'POST' ? await readBody(request) : undefined,
@@ -910,9 +912,10 @@ describe('Server Connector client', () => {
       status: 'completed',
     })
     expect(calls).toEqual([
-      { alias: undefined, authorization: 'Bearer runtime-token', body: undefined, idempotencyKey: undefined, path: '/v1/apps' },
+      { appId: undefined, alias: undefined, authorization: 'Bearer runtime-token', body: undefined, idempotencyKey: undefined, path: '/v1/apps' },
       {
-        alias: 'work',
+        appId: 'connection-work',
+        alias: undefined,
         authorization: 'Bearer runtime-token',
         body: { input: { message: 'hello' } },
         idempotencyKey: expect.any(String),
@@ -922,9 +925,9 @@ describe('Server Connector client', () => {
   })
 
   it('executes a public action without resolving a Connection', async () => {
-    const calls: { readonly alias?: string; readonly path: string }[] = []
+    const calls: { readonly appId?: string; readonly path: string }[] = []
     const origin = await startConnector((request, response) => {
-      calls.push({ alias: request.headers['x-oo-connector-alias'] as string | undefined, path: request.url! })
+      calls.push({ appId: request.headers['x-oo-connector-app-id'] as string | undefined, path: request.url! })
       send(response, 200, { data: { stories: [] }, success: true })
     })
     const connector = new ConnectorClient(origin, 'runtime-token')
@@ -932,7 +935,7 @@ describe('Server Connector client', () => {
     await expect(connector.execute('hacker-news.get-ask-stories', undefined, {}, 'public-action', AbortSignal.timeout(30_000))).resolves.toEqual({
       stories: [],
     })
-    expect(calls).toEqual([{ alias: undefined, path: '/v1/actions/hacker-news.get-ask-stories' }])
+    expect(calls).toEqual([{ appId: undefined, path: '/v1/actions/hacker-news.get-ask-stories' }])
   })
 
   it('preserves safe Connector input diagnostics in the Run event', async () => {
@@ -1017,6 +1020,7 @@ describe('Server Connector client', () => {
 
   it('proxies a Provider request through the resolved stable Connection', async () => {
     const calls: {
+      readonly appId?: string
       readonly alias?: string
       readonly authorization?: string
       readonly body?: unknown
@@ -1025,6 +1029,7 @@ describe('Server Connector client', () => {
     }[] = []
     const origin = await startConnector(async (request, response) => {
       calls.push({
+        appId: request.headers['x-oo-connector-app-id'] as string | undefined,
         alias: request.headers['x-oo-connector-alias'] as string | undefined,
         authorization: request.headers.authorization,
         body: request.method == 'POST' ? await readBody(request) : undefined,
@@ -1040,9 +1045,10 @@ describe('Server Connector client', () => {
       connector.proxy('example', 'connection-work', 'binding-main', { endpoint: '/items', method: 'GET', query: { limit: 2 } }, new AbortController().signal),
     ).resolves.toEqual({ data: { items: [1, 2] }, status: 200 })
     expect(calls).toEqual([
-      { alias: undefined, authorization: 'Bearer runtime-token', body: undefined, path: '/v1/apps', rateLimitId: undefined },
+      { appId: undefined, alias: undefined, authorization: 'Bearer runtime-token', body: undefined, path: '/v1/apps', rateLimitId: undefined },
       {
-        alias: 'work',
+        appId: 'connection-work',
+        alias: undefined,
         authorization: 'Bearer runtime-token',
         body: { endpoint: '/items', method: 'GET', query: { limit: 2 } },
         path: '/v1/proxy/example',
@@ -1051,7 +1057,35 @@ describe('Server Connector client', () => {
     ])
   })
 
-  it('fails closed when an alias now belongs to a different stable Connection id', async () => {
+  it('executes actions and proxy requests with a non-Latin Connection alias', async () => {
+    const requests: { readonly appId?: string; readonly alias?: string; readonly path: string }[] = []
+    const origin = await startConnector((request, response) => {
+      requests.push({
+        appId: request.headers['x-oo-connector-app-id'] as string | undefined,
+        alias: request.headers['x-oo-connector-alias'] as string | undefined,
+        path: request.url!,
+      })
+      if (request.url == '/v1/apps') return send(response, 200, { data: [{ ...app, alias: '工作' }], success: true })
+      if (request.url == '/v1/proxy/example') return send(response, 200, { data: { data: { items: [] }, status: 200 }, success: true })
+      send(response, 200, { data: { message: 'hello' }, success: true })
+    })
+    const connector = new ConnectorClient(origin, 'runtime-token')
+    const signal = new AbortController().signal
+
+    await expect(connector.execute('example.echo', 'connection-work', {}, 'invocation', signal)).resolves.toEqual({ message: 'hello' })
+    await expect(connector.proxy('example', 'connection-work', 'binding-main', { endpoint: '/items', method: 'GET' }, signal)).resolves.toEqual({
+      data: { items: [] },
+      status: 200,
+    })
+    expect(requests).toEqual([
+      { appId: undefined, alias: undefined, path: '/v1/apps' },
+      { appId: 'connection-work', alias: undefined, path: '/v1/actions/example.echo' },
+      { appId: undefined, alias: undefined, path: '/v1/apps' },
+      { appId: 'connection-work', alias: undefined, path: '/v1/proxy/example' },
+    ])
+  })
+
+  it('fails closed when the stable Connection id is no longer available', async () => {
     let actionCalls = 0
     const origin = await startConnector((request, response) => {
       if (request.url == '/v1/apps') return send(response, 200, { data: [{ ...app, id: 'connection-replacement' }], success: true })

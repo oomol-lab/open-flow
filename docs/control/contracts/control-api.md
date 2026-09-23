@@ -488,7 +488,8 @@ Trigger Key catalog 是 deployment scope 资源：
 
 `GET /v1/trigger-keys` 与 `GET /v1/trigger-keys/catalog` 接受可选 `locale` query；query 优先于
 `Accept-Language`，缺省与不支持的语言回退英文，非法 BCP 47 query 返回 400。语言映射复用公共 localization
-契约。摘要返回翻译后的名称与描述；完整 catalog 的 `display` 按 Trigger key 保存触发器以及配置、输出字段的展示文案，
+契约。摘要返回翻译后的名称与描述；完整 catalog 的 v3 `display` 按 Trigger key 保存触发器、配置字段标签与描述、输出字段描述。
+`configInputLabels` 只包含有本地化标签的字段；Workbench 在配置面板和诊断提示中复用这些标签，缺少标签时不显示内部字段 handle。
 `definitions` 始终保留原始英文定义。单条 definition、CLI 与持久化的 Flow definition 不因界面语言改变。
 
 公共 `provider-triggers` entry 的 `localizeTrigger(definition, locale)` 返回 `Promise<TriggerDisplay>`，调用方需等待
@@ -966,11 +967,10 @@ Run 取消、deadline、兄弟节点失败和节点退出沿既有执行生命�
 `ConnectorConnection` 额外投影可选 `alias`，缺省时仍可按 ID 绑定；`ConnectorAction` 额外投影可选 `inputSchema` / `outputSchema` 原始 JSON Schema。
 旧的 `inputs` / `outputs` 仍是图端口 projection。schema 的暂时缺失不移除声明，也不扩大运行权限。
 
-### 当前 Server 的上游身份限制
+### 当前 Server 的上游身份选择
 
-当前 Connector adapter 先按稳定 ID 查询账号，再用 `x-oo-connector-alias` 执行。上游需要 transport alias；账号缺少它时明确失败。
-查询和 POST 之间 alias 被重新分配的竞态尚未消除，本次实现不声称具备端到端的稳定 ID 原子执行保证。
-要完成该项验收，上游必须支持按 Connection ID 原子解析并执行，或在同一次执行请求中校验 ID 与 alias / 版本条件；重复查询 alias 不能代替该保证。
+当前 Connector adapter 先按稳定 Connection ID 查询账号状态，再用 `x-oo-connector-app-id` 执行。
+网关将该 header 转成下游的 `x-oomol-connector-app-id`；下游在执行请求中按 Team、service 和 app ID 解析账号，不依赖可变 alias。
 
 ### Draft 操作结构发现
 

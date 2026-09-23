@@ -11,7 +11,7 @@ import { Resource } from './resource.ts'
 
 export type TriggerCatalogStorage = ResourceStorage
 export function browserTriggerCatalogStorage(namespace: string, storage?: TriggerCatalogStorage): TriggerCatalogStorage {
-  const prefix = `open-flow:trigger-catalog:v3:${encodeURIComponent(namespace)}:`
+  const prefix = `open-flow:trigger-catalog:v4:${encodeURIComponent(namespace)}:`
   return {
     getItem: (key) => (storage ?? window.localStorage).getItem(prefix + key),
     setItem: (key, value) => (storage ?? window.localStorage).setItem(prefix + key, value),

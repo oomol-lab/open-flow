@@ -20,6 +20,7 @@ export function NodeInputs({
   entries,
   variables,
   disabled,
+  fieldLabels,
   onValue,
   onVariable,
   onDefinitions,
@@ -37,6 +38,7 @@ export function NodeInputs({
   title?: ReactNode
   titleIcon?: FieldSectionIcon
   entries: readonly (Group | NodeInputField)[]
+  fieldLabels?: Readonly<Record<string, string>>
   variables: InputVariables
   disabled: boolean
   onValue: (handle: string, value: JsonValue | undefined, deletion?: FieldValueDeletion) => void
@@ -61,6 +63,7 @@ export function NodeInputs({
       titleIcon={titleIcon}
       allowAddGroup={allowAddGroup}
       values={entries.map((entry) => ('group' in entry ? entry : entry.definition))}
+      fieldLabels={fieldLabels}
       disabled={disabled || onDefinitions == null}
       reservedNames={reservedNames}
       onChange={(values, deletion) => onDefinitions?.(values, deletion)}

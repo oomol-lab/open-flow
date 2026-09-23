@@ -428,7 +428,7 @@ export class ConnectorClient implements ConnectorHost {
       }
       connectionId = binding.appId
     }
-    const alias = connectionId == null ? undefined : await this.#resolveConnection(connectionId, providerId, signal, teamId)
+    if (connectionId != null) await this.#assertConnection(connectionId, providerId, signal, teamId)
 
     const actionResponse = await this.#request(
       'action.execute',
@@ -438,7 +438,7 @@ export class ConnectorClient implements ConnectorHost {
         headers: {
           'content-type': 'application/json',
           'idempotency-key': invocationId,
-          ...(alias == null ? {} : { 'x-oo-connector-alias': alias }),
+          ...(connectionId == null ? {} : { 'x-oo-connector-app-id': connectionId }),
         },
         method: 'POST',
       },
@@ -482,7 +482,7 @@ export class ConnectorClient implements ConnectorHost {
       const binding = bindings.find((candidate) => candidate.appId == connectionId && providerAccessAllowsProxy(candidate))
       if (binding == null) throw accessInvalid()
     }
-    const alias = await this.#resolveConnection(connectionId, provider, signal, teamId)
+    await this.#assertConnection(connectionId, provider, signal, teamId)
     const proxyResponse = await this.#request(
       'proxy.execute',
       `v1/proxy/${encodeURIComponent(provider)}`,
@@ -490,7 +490,7 @@ export class ConnectorClient implements ConnectorHost {
         body: JSON.stringify(request),
         headers: {
           'content-type': 'application/json',
-          'x-oo-connector-alias': alias,
+          'x-oo-connector-app-id': connectionId,
           'x-oomol-rate-limit-id': rateLimitId,
         },
         method: 'POST',
@@ -661,7 +661,7 @@ export class ConnectorClient implements ConnectorHost {
     }
   }
 
-  async #resolveConnection(connectionId: string, service: string, signal: AbortSignal, teamId?: string): Promise<string> {
+  async #assertConnection(connectionId: string, service: string, signal: AbortSignal, teamId?: string): Promise<void> {
     const fields = { connectionId, provider: service }
     const apps = await this.#get(
       'connection.resolve',
@@ -675,17 +675,10 @@ export class ConnectorClient implements ConnectorHost {
       { fields, teamId },
     )
     const connection = apps.find((value) => record(value) && value.id === connectionId)
-    if (
-      !record(connection) ||
-      connection.status !== 'active' ||
-      connection.service !== service ||
-      typeof connection.alias != 'string' ||
-      connection.alias.length == 0
-    ) {
+    if (!record(connection) || connection.status !== 'active' || connection.service !== service) {
       this.#logger.warn({ category: 'connector.connection.unavailable', ...fields }, 'Connector Connection is unavailable.')
       throw connectionRequired()
     }
-    return connection.alias
   }
 
   async #request(

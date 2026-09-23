@@ -11,6 +11,7 @@ const noVariable = () => {}
 
 export function TriggerConfigEditor({
   inputs,
+  fieldLabels,
   config,
   disabled,
   onChange,
@@ -21,6 +22,7 @@ export function TriggerConfigEditor({
   readonly onReset?: () => void | Promise<boolean>
   readonly onResetValue?: (name: string) => void
   readonly inputs: readonly (InputPort | Group)[]
+  readonly fieldLabels?: Readonly<Record<string, string>>
   readonly config: InputValues
   readonly disabled: boolean
   readonly onChange: (name: string, value: JsonValue | undefined) => void
@@ -31,6 +33,7 @@ export function TriggerConfigEditor({
   return (
     <div data-inspector-section="trigger">
       <NodeInputs
+        fieldLabels={fieldLabels}
         title={t('triggerConfig.configuration')}
         titleIcon="configuration"
         allowAddGroup={false}
@@ -39,6 +42,7 @@ export function TriggerConfigEditor({
             ? input
             : {
                 definition: input,
+                label: fieldLabels?.[input.handle],
                 connected: false,
                 fixed: true,
                 value: triggerConfigValue(input, config),

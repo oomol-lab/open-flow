@@ -32,7 +32,7 @@ import { overviewStories } from './overview.tsx'
 import { popupLayoutStory } from './popupLayout.tsx'
 import { scheduleStory } from './schedule.tsx'
 import { stories } from './stories.tsx'
-import { triggerConfigStory } from './triggerConfig.tsx'
+import { diagnosticsStory, triggerConfigStory } from './triggerConfig.tsx'
 import { triggerStories } from './triggerStories.tsx'
 import { valueEditorDangerStory } from './valueEditorDanger.tsx'
 import { additionalInputsStory, lazyFieldsStory, groupedInputsStory, outputPortsStory, valueNodeStory } from './valueNode.tsx'
@@ -97,6 +97,7 @@ export const labStories: readonly FrontendStory[] = [
   markdownStory,
   scheduleStory,
   triggerConfigStory,
+  diagnosticsStory,
   webhookStory,
   conditionEditorStory,
   variablesStory,

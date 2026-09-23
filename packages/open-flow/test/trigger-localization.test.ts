@@ -30,6 +30,7 @@ describe('Trigger localization', () => {
       configInputs: Object.fromEntries(
         snapshot.configInputs.flatMap((field) => ('handle' in field && field.description != null ? [[field.handle, field.description]] : [])),
       ),
+      configInputLabels: {},
       displayName: snapshot.displayName,
       description: snapshot.description,
       outputs: Object.fromEntries(snapshot.outputs.flatMap((field) => (field.description == null ? [] : [[field.handle, field.description]]))),

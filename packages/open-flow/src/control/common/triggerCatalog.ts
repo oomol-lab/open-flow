@@ -8,13 +8,14 @@ import { triggerKey } from './triggerDecoders.ts'
 
 export interface TriggerDisplay {
   readonly configInputs: Readonly<Record<string, string>>
+  readonly configInputLabels: Readonly<Record<string, string>>
   readonly displayName: string
   readonly description: string
   readonly outputs: Readonly<Record<string, string>>
 }
 
 export interface TriggerCatalog {
-  readonly version: 2
+  readonly version: 3
   readonly locale: UiLanguage
   readonly definitions: readonly TriggerKeySnapshot[]
   readonly display: Readonly<Record<string, TriggerDisplay>>
@@ -28,7 +29,7 @@ export interface TriggerCatalogCache {
 export function decodeTriggerCatalog(value: unknown): TriggerCatalog {
   const source = record(value)
   exact(source, ['version', 'locale', 'definitions', 'display'])
-  if (source.version != 2 || !isUiLanguage(source.locale) || !Array.isArray(source.definitions)) return invalidResponse()
+  if (source.version != 3 || !isUiLanguage(source.locale) || !Array.isArray(source.definitions)) return invalidResponse()
   const definitions = source.definitions.map(triggerKey)
   const entries = record(source.display)
   const keys = new Set(definitions.map((definition) => definition.key))
@@ -37,12 +38,16 @@ export function decodeTriggerCatalog(value: unknown): TriggerCatalog {
     definitions.map((definition) => {
       const { key } = definition
       const copy = record(entries[key])
-      exact(copy, ['configInputs', 'displayName', 'description', 'outputs'])
+      exact(copy, ['configInputs', 'configInputLabels', 'displayName', 'description', 'outputs'])
       return [
         key,
         {
           configInputs: descriptions(
             copy.configInputs,
+            definition.configInputs.flatMap((field) => ('handle' in field ? [field.handle] : [])),
+          ),
+          configInputLabels: labels(
+            copy.configInputLabels,
             definition.configInputs.flatMap((field) => ('handle' in field ? [field.handle] : [])),
           ),
           displayName: string(copy.displayName),
@@ -55,13 +60,24 @@ export function decodeTriggerCatalog(value: unknown): TriggerCatalog {
       ]
     }),
   )
-  return { version: 2, locale: source.locale, definitions, display }
+  return { version: 3, locale: source.locale, definitions, display }
 }
 
 function descriptions(value: unknown, handles: readonly string[]): Readonly<Record<string, string>> {
   const source = record(value)
   exact(source, handles)
   return Object.fromEntries(Object.entries(source).map(([handle, description]) => [handle, string(description)]))
+}
+
+function labels(value: unknown, handles: readonly string[]): Readonly<Record<string, string>> {
+  const source = record(value)
+  if (Object.keys(source).some((handle) => !handles.includes(handle))) return invalidResponse()
+  return Object.fromEntries(
+    Object.entries(source).map(([handle, label]) => {
+      const text = string(label)
+      return text.trim().length == 0 ? invalidResponse() : [handle, text]
+    }),
+  )
 }
 
 export function searchTriggerKeys(keys: readonly TriggerKeySummary[], query?: string): readonly TriggerKeySummary[] {

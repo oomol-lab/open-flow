@@ -809,10 +809,11 @@
         "module-missing": "Inline Task「{{nodeId}}」が存在しない CodeModule「{{moduleId}}」を参照しています。"
       },
       "trigger": {
-        "config-incomplete": "必須の Trigger 設定項目を入力してください：{{fields}}。",
+        "config-incomplete": "トリガーの必須設定を完了してください。",
+        "config-incomplete-fields": "トリガーの必須設定を完了してください：{{fields}}。",
         "config-invalid": "Trigger「{{triggerId}}」の設定が固定定義と一致しません。",
         "connection-invalid": "Trigger バインディング「{{bindingId}}」は Connection である必要があります。",
-        "connection-missing": "Trigger の Connection バインディング「{{bindingId}}」は存在しません。",
+        "connection-missing": "このトリガーの接続アカウントを選択してください。",
         "input-duplicate": "Webhook Trigger の入力「{{input}}」が複数回定義されています。"
       }
     },
@@ -1172,6 +1173,7 @@
     "notFound": "選択した接続ではこのソースを使用できません。",
     "conflict": "ソースが変更されたか使用中です。更新して Flow と購読を確認してください。",
     "source": "イベントソース",
+    "selectSourceFirst": "先にイベントソースを選択してください",
     "noSources": "この Flow のチームには Feishu イベントソースがありません。ここで作成できます。",
     "loadFailed": "イベントソースを読み込めませんでした。",
     "searchEvents": "イベント名または ID を検索",

@@ -15,9 +15,11 @@ import { dequal } from 'dequal'
 import { compute, derive, val } from 'value-enhancer'
 import { randomId } from '../../../../control/common/random.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
+import { resolveUiLanguage } from '../../../../localization/common/languages.ts'
 import { targetPresentation } from '../canvasPresentation.ts'
 import { actionWithConnections } from '../connectionCatalog.ts'
 import { diagnosticItems } from '../editor/diagnostics.ts'
+import { presentTriggerDiagnostics } from '../editor/triggerDiagnosticPresentation.ts'
 import { createI18n } from '../i18n.ts'
 import { PublicationStore } from '../publications/publicationStore.ts'
 import { revisionView } from '../revisionView.ts'
@@ -240,7 +242,18 @@ export class WorkbenchStore {
         if (get(this.publications.$.rollingBackPublicationId) != null) return 'rollback'
         if (get(this.publications.$.changingTriggerId) != null) return 'trigger'
       }),
-      diagnosticItems: compute((get) => diagnosticItems(get(this.workspace.$.revision), get(this.workspace.$.target), get(diagnostics))),
+      diagnosticItems: compute((get) => {
+        const revision = get(this.workspace.$.revision)
+        const target = get(this.workspace.$.target)
+        return presentTriggerDiagnostics(
+          diagnosticItems(revision, target, get(diagnostics)),
+          revision,
+          target,
+          get(this.triggers.catalog.state).data?.display,
+          resolveUiLanguage([i18n.lang]),
+          get(i18n.t$),
+        )
+      }),
       diagnostics,
       designer,
       designerNodeById,

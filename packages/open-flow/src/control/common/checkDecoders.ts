@@ -30,6 +30,7 @@ function diagnostic(value: unknown): Diagnostic {
   return {
     code: string(source.code),
     column: integer(source.column),
+    ...(source.fields === undefined ? {} : { fields: Array.isArray(source.fields) ? source.fields.map(string) : invalidResponse() }),
     line: integer(source.line),
     message: string(source.message),
     mismatch: source.mismatch == null ? undefined : schemaMismatch(source.mismatch),

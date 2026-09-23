@@ -6,13 +6,14 @@ import { SourceValueEditor } from './sourceValueEditor.tsx'
 /** Adapts a node port to the shared source/literal field composition. */
 export function NodeInputValue({
   definition,
+  label,
   ...props
-}: Omit<ComponentProps<typeof SourceValueEditor>, 'schema' | 'label' | 'nullable' | 'description'> & { definition: InputPort }) {
+}: Omit<ComponentProps<typeof SourceValueEditor>, 'schema' | 'label' | 'nullable' | 'description'> & { definition: InputPort; label?: string }) {
   return (
     <SourceValueEditor
       {...props}
       schema={definition.jsonSchema}
-      label={definition.handle}
+      label={label ?? definition.handle}
       nullable={definition.nullable}
       description={definition.description}
     />

@@ -63,7 +63,7 @@ function validateTrigger(triggerId: string, trigger: TriggerNode, document: Flow
   const binding = document.bindings[trigger.bindingId]
   if (binding == null) {
     diagnostics.push(
-      graphDiagnostic('trigger.connection-missing', `Trigger Connection binding "${trigger.bindingId}" does not exist.`, `${path}/bindingId`, {
+      graphDiagnostic('trigger.connection-missing', 'Select a connection account for this Trigger.', `${path}/bindingId`, {
         bindingId: trigger.bindingId,
       }),
     )
@@ -76,11 +76,12 @@ function validateTrigger(triggerId: string, trigger: TriggerNode, document: Flow
   }
   const missingConfig = missingTriggerConfig(trigger.definition.configInputs, trigger.config)
   if (missingConfig.length > 0) {
-    diagnostics.push(
-      graphDiagnostic('trigger.config-incomplete', `Complete the required Trigger config fields: ${missingConfig.join(', ')}.`, `${path}/config`, {
+    diagnostics.push({
+      ...graphDiagnostic('trigger.config-incomplete', `Complete the required Trigger config fields: ${missingConfig.join(', ')}.`, `${path}/config`, {
         fields: missingConfig.join(', '),
       }),
-    )
+      fields: missingConfig,
+    })
   } else {
     try {
       resolveTriggerConfig(trigger.definition.configInputs, trigger.config)

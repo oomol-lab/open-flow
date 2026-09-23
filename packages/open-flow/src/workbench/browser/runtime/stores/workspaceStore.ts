@@ -480,7 +480,7 @@ export class WorkspaceStore {
     const revision = revisionView(draft)
     let intent = addNodeIntent(option, revision, target, this.#i18n.t)
     if (intent == null) return
-    if (intent.kind == 'provider-trigger' && intent.connectionId == null && intent.definition.key != 'feishu_app_bot.on_event') {
+    if (intent.kind == 'provider-trigger' && intent.connectionId == null) {
       try {
         const connections = await resourceValue(this.catalogs.connections.get(intent.definition.provider, draft.flowId))
         intent = { ...intent, connectionId: connectionCatalog(connections).preferred?.connectionId }
@@ -841,7 +841,7 @@ export class WorkspaceStore {
       (await this.#editDraft([
         ...connectionChanges,
         ...(updateTriggerConfig(revision.revision.content, target, triggerId, 'sourceId', source.sourceId) ?? []),
-        ...(changed ? (updateTriggerConfig(revision.revision.content, target, triggerId, 'eventTypes', []) ?? []) : []),
+        ...(changed ? (updateTriggerConfig(revision.revision.content, target, triggerId, 'eventTypes', undefined) ?? []) : []),
         ...(changed ? (updateTriggerConfig(revision.revision.content, target, triggerId, 'resource', undefined) ?? []) : []),
         ...(changed ? (updateTriggerConfig(revision.revision.content, target, triggerId, 'chatIds', undefined) ?? []) : []),
       ])) != null

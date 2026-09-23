@@ -809,10 +809,11 @@
         "module-missing": "Inline Task «{{nodeId}}» ссылается на отсутствующий CodeModule «{{moduleId}}»."
       },
       "trigger": {
-        "config-incomplete": "Заполните обязательные поля конфигурации Trigger: {{fields}}.",
+        "config-incomplete": "Заполните обязательные параметры триггера.",
+        "config-incomplete-fields": "Заполните обязательные параметры триггера: {{fields}}.",
         "config-invalid": "Конфигурация Trigger «{{triggerId}}» не соответствует его фиксированному определению.",
         "connection-invalid": "Привязка Trigger «{{bindingId}}» должна быть Connection.",
-        "connection-missing": "Привязка Connection для Trigger «{{bindingId}}» не существует.",
+        "connection-missing": "Выберите подключённую учётную запись для этого триггера.",
         "input-duplicate": "Вход Webhook Trigger «{{input}}» объявлен несколько раз."
       }
     },
@@ -1172,6 +1173,7 @@
     "notFound": "Источник недоступен для выбранного подключения.",
     "conflict": "Источник изменён или используется. Обновите данные и проверьте Flow и подписки.",
     "source": "Источник событий",
+    "selectSourceFirst": "Сначала выберите источник событий",
     "noSources": "У команды этого Flow пока нет источников событий Feishu. Создайте источник здесь.",
     "loadFailed": "Не удалось загрузить источники.",
     "searchEvents": "Поиск по названию или ID",

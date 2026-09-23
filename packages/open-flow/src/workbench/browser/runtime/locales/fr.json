@@ -809,10 +809,11 @@
         "module-missing": "L’Inline Task « {{nodeId}} » référence le CodeModule manquant « {{moduleId}} »."
       },
       "trigger": {
-        "config-incomplete": "Renseignez les champs de configuration Trigger requis : {{fields}}.",
+        "config-incomplete": "Renseignez les paramètres requis du déclencheur.",
+        "config-incomplete-fields": "Renseignez les paramètres requis du déclencheur : {{fields}}.",
         "config-invalid": "La configuration du Trigger « {{triggerId}} » ne correspond pas à sa définition fixe.",
         "connection-invalid": "La liaison Trigger « {{bindingId}} » doit être une Connection.",
-        "connection-missing": "La liaison de Connection du Trigger « {{bindingId}} » n’existe pas.",
+        "connection-missing": "Sélectionnez un compte connecté pour ce déclencheur.",
         "input-duplicate": "L’entrée « {{input}} » du Webhook Trigger est déclarée plusieurs fois."
       }
     },
@@ -1172,6 +1173,7 @@
     "notFound": "Cette source n’est pas disponible pour la connexion sélectionnée.",
     "conflict": "La source a changé ou est utilisée. Actualisez et vérifiez les Flows et abonnements concernés.",
     "source": "Source d’événements",
+    "selectSourceFirst": "Sélectionnez d'abord une source d'événements",
     "noSources": "L’équipe de ce Flow ne possède aucune source Feishu. Vous pouvez en créer une ici.",
     "loadFailed": "Impossible de charger les sources.",
     "searchEvents": "Rechercher un nom ou un identifiant",

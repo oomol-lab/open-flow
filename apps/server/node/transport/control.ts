@@ -155,7 +155,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       definitions,
       display: Object.fromEntries(await Promise.all(definitions.map(async (definition) => [definition.key, await localizeTrigger(definition, locale)]))),
       locale,
-      version: 2,
+      version: 3,
     })
   })
   app.get('/trigger-keys/:key', (context) => {
