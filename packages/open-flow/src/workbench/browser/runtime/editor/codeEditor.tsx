@@ -38,6 +38,7 @@ interface Props {
   readonly location?: { readonly column: number; readonly line: number }
   readonly onBlur: () => void
   readonly onChange: (value: string) => void
+  readonly prepareCompletion?: () => Promise<string>
   readonly theme: WorkbenchTheme
   readonly typing: string
   readonly uri: string
@@ -55,6 +56,7 @@ export function CodeEditor({
   location,
   onBlur,
   onChange,
+  prepareCompletion,
   theme,
   typing,
   uri,
@@ -72,6 +74,7 @@ export function CodeEditor({
   const locationRef = useRef(location)
   const onBlurRef = useRef(onBlur)
   const onChangeRef = useRef(onChange)
+  const prepareCompletionRef = useRef(prepareCompletion)
   const typingRef = useRef(typing)
   const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -83,6 +86,7 @@ export function CodeEditor({
   locationRef.current = location
   onBlurRef.current = onBlur
   onChangeRef.current = onChange
+  prepareCompletionRef.current = prepareCompletion
   typingRef.current = typing
 
   useEffect(() => {
@@ -96,7 +100,7 @@ export function CodeEditor({
     setFailed(false)
     setLoading(true)
     const extension = import('../../typeScriptSession.ts')
-      .then(({ loadTypeScriptExtension }) => loadTypeScriptExtension(uri, typingRef.current))
+      .then(({ loadTypeScriptExtension }) => loadTypeScriptExtension(uri, typingRef.current, () => prepareCompletionRef.current?.()))
       .catch(() => undefined)
     void claimEditor(uri)
       .then((nextRelease) => {

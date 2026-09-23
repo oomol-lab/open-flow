@@ -5,7 +5,18 @@ import type { EditorView } from '@codemirror/view'
 
 import { javascript } from '@codemirror/lang-javascript'
 import { linter } from '@codemirror/lint'
-import { LSPClient, languageServerExtensions } from '@codemirror/lsp-client'
+import {
+  LSPClient,
+  serverCompletionSource,
+  hoverTooltips,
+  formatKeymap,
+  renameKeymap,
+  jumpToDefinitionKeymap,
+  findReferencesKeymap,
+  signatureHelp,
+  serverDiagnostics,
+} from '@codemirror/lsp-client'
+import { EditorState } from '@codemirror/state'
 import { activateHover, keymap } from '@codemirror/view'
 // oxlint-disable-next-line import/default
 import TypeScriptWorker from './typeScriptWorker.ts?worker&inline'
@@ -68,7 +79,18 @@ function createTransport(worker: Worker): Transport {
 async function createSession() {
   const worker = new TypeScriptWorker()
   const client = new LSPClient({
-    extensions: [...languageServerExtensions(), keymap.of([{ key: 'Mod-k Mod-i', preventDefault: true, run: showHover }])],
+    extensions: [
+      hoverTooltips(),
+      signatureHelp(),
+      serverDiagnostics(),
+      keymap.of([
+        ...formatKeymap,
+        ...renameKeymap,
+        ...jumpToDefinitionKeymap,
+        ...findReferencesKeymap,
+        { key: 'Mod-k Mod-i', preventDefault: true, run: showHover },
+      ]),
+    ],
     highlightLanguage,
     sanitizeHTML: openLinksInNewTab,
     timeout: 60_000,
@@ -77,12 +99,23 @@ async function createSession() {
   return { client, worker }
 }
 
-export async function loadTypeScriptExtension(uri: string, typing: string): Promise<Extension> {
+export async function loadTypeScriptExtension(uri: string, typing: string, prepareCompletion?: () => Promise<string> | undefined): Promise<Extension> {
   sessionPromise ??= createSession()
   const session = await sessionPromise
   session.client.notification('openFlow/typing', { typing, uri })
+  const completionData = [
+    {
+      autocomplete: async (context: import('@codemirror/autocomplete').CompletionContext) => {
+        const completionTyping = await prepareCompletion?.()
+        if (context.aborted) return null
+        if (completionTyping != null) session.client.notification('openFlow/typing', { typing: completionTyping, uri })
+        return serverCompletionSource(context)
+      },
+    },
+  ]
   return [
     session.client.plugin(uri, 'javascript'),
+    EditorState.languageData.of(() => completionData),
     linter(
       async () => {
         session.client.sync()

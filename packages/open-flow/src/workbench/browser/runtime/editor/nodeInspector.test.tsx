@@ -1,6 +1,7 @@
 import type { ReactElement, ReactNode } from 'react'
 
 import { Children, isValidElement } from 'react'
+import { val } from 'value-enhancer'
 import { describe, expect, it, vi } from 'vitest'
 import { CodeTaskSection } from './codeTaskSection.tsx'
 import { ConnectorAccount, TriggerConnection } from './connectionSettings.tsx'
@@ -346,6 +347,52 @@ describe('Node execution settings', () => {
 })
 
 describe('Code task sections', () => {
+  it.each(['shared', 'independent'] as const)('loads %s action metadata only when completion requests it', async (mode) => {
+    const data = val({ data: [{ actionId: 'public.echo', serviceId: 'public', authenticated: false }], refreshing: false, error: undefined })
+    const actions = vi.fn(() => data)
+    const rendered = CodeTaskSection({
+      connectors: { $: { actions: { value: {} }, connections: { value: [] }, catalogs: { value: {} } } } as never,
+      disabled: false,
+      selection: {
+        id: 'code',
+        kind: 'task',
+        module: { source: '' },
+        definition: { moduleId: 'code', inputs: [], outputs: [], capabilities: [{ kind: 'connector', mode, actions: [] }] },
+      } as never,
+      store: {
+        catalogs: {
+          providers: {
+            get: () => ({
+              value: {
+                data: [
+                  { serviceId: 'public', noSetup: true },
+                  { serviceId: 'other', noSetup: true },
+                ],
+              },
+            }),
+          },
+          actions: { get: actions },
+        },
+        $: { flowId: { value: 'flow' }, moduleEditor: { value: { moduleId: 'code', source: '' } } },
+      } as never,
+      theme: 'light',
+    })!
+    expect(actions).not.toHaveBeenCalled()
+    const feedback = find(rendered, (item) => typeof item.props.children == 'function')!
+    const editor = feedback.props.children(undefined)
+    expect(editor.props.value).toBe('')
+    const typing = await editor.props.prepareCompletion()
+    expect(typing).toContain('TaskContext')
+    if (mode == 'shared') {
+      expect(actions).toHaveBeenCalledTimes(2)
+      expect(actions).toHaveBeenCalledWith('public', 'flow', 'en')
+      expect(actions).toHaveBeenCalledWith('other', 'flow', 'en')
+      expect(typing).toContain('public.echo')
+      data.set({ ...data.value, data: [] })
+      expect(actions).toHaveBeenCalledTimes(2)
+    } else expect(actions).not.toHaveBeenCalled()
+  })
+
   it.each([
     {
       name: 'default',

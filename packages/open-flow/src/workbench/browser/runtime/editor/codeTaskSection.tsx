@@ -1,6 +1,7 @@
 import type { ReactElement } from 'react'
+import type { ReadonlyVal } from 'value-enhancer'
 import type { ConnectorPermissionCapability } from '../../../../flow/common/change.ts'
-import type { ConnectorAccess, ConnectorAccessCandidates, Diagnostic } from '../api.ts'
+import type { ConnectorAccess, ConnectorAccessCandidates, ConnectorActionMetadata, Diagnostic } from '../api.ts'
 import type { ConnectorConnection } from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { WorkbenchTheme } from '../contract.ts'
@@ -13,7 +14,7 @@ import { ChevronDown } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
-import { compute } from 'value-enhancer'
+import { compute, val } from 'value-enhancer'
 import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
@@ -21,6 +22,7 @@ import { Switch } from '../../../../ui/browser/switch.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { connectionCatalog } from '../connectionCatalog.ts'
 import { WorkbenchSelect } from '../shell/workbenchSelect.tsx'
+import { resourceData, resourceValue } from '../stores/resource.ts'
 import { ActionPicker } from './actionPicker.tsx'
 import { CodeEditor } from './codeEditor.tsx'
 import { codeTyping } from './codeTyping.ts'
@@ -53,6 +55,10 @@ export function CodeTaskSection({
   readonly store: WorkspaceStore
   readonly theme: WorkbenchTheme
 }): ReactElement | null {
+  const task = selection.definition
+  const savedPermission = task != null && 'moduleId' in task ? task.capabilities?.find((capability) => 'mode' in capability) : undefined
+  const [permission, setPermission] = useState<ConnectorPermissionCapability | undefined>(savedPermission)
+  const sharedPermissions = permission?.mode != 'independent'
   const hintedCatalog = useVal(connectors.$.actions)
   const connections = useVal(connectors.$.connections)
   const language = useLang()
@@ -67,41 +73,43 @@ export function CodeTaskSection({
   ]
   const providerKey = JSON.stringify([...new Set(providerIds)].toSorted())
   const flowId = useVal(store.$.flowId)
-  const catalog = useMemo(
-    () =>
-      compute((get) => {
-        const ids: string[] = JSON.parse(providerKey)
-        return Object.fromEntries(
-          ids.flatMap((id) => (get(store.catalogs.actions.get(id, flowId, language)).data ?? []).map((action) => [action.actionId, action])),
-        )
-      }),
-    [store, providerKey, language, flowId],
-  )
-  useEffect(() => () => catalog.dispose(), [catalog])
-  const sharedActionCatalog = Object.fromEntries(
-    Object.entries(useVal(catalog)).filter(
-      ([, action]) =>
-        !action.authenticated ||
-        connectorAccess?.mode == 'implicit' ||
-        connectorAccess?.bindings.some(
-          (binding) =>
-            binding.status == 'active' &&
-            binding.providerId == action.serviceId &&
-            connectorCandidates?.[action.serviceId]?.candidates.some(
-              (candidate) =>
-                candidate.accessBindingId == binding.accessBindingId &&
-                (candidate.permissions == null || candidate.permissions.allActions || candidate.permissions.actionIds.includes(action.actionId)),
-            ),
+  const completionCatalog = useMemo(() => {
+    const ids: string[] = JSON.parse(providerKey)
+    const sources = val<readonly ReadonlyVal<readonly ConnectorActionMetadata[] | undefined>[]>([])
+    const catalog = compute((get) => Object.fromEntries(get(sources).flatMap((source) => (get(source) ?? []).map((action) => [action.actionId, action]))))
+    return {
+      catalog,
+      async load() {
+        // Only completion initiates reads. Subscriptions observe the same Store-owned responses.
+        const requested = ids.map((id) => store.catalogs.actions.get(id, flowId, language))
+        if (sources.value.length === 0 && requested.length > 0) sources.set(requested.map(resourceData))
+        await Promise.all(requested.map((source) => resourceValue(source)))
+      },
+      dispose() {
+        catalog.dispose()
+        sources.dispose()
+      },
+    }
+  }, [store, providerKey, language, flowId])
+  useEffect(() => () => completionCatalog.dispose(), [completionCatalog])
+  const allowSharedAction = (action: ConnectorActionView) =>
+    !action.authenticated ||
+    connectorAccess?.mode == 'implicit' ||
+    connectorAccess?.bindings.some(
+      (binding) =>
+        binding.status == 'active' &&
+        binding.providerId == action.serviceId &&
+        connectorCandidates?.[action.serviceId]?.candidates.some(
+          (candidate) =>
+            candidate.accessBindingId == binding.accessBindingId &&
+            (candidate.permissions == null || candidate.permissions.allActions || candidate.permissions.actionIds.includes(action.actionId)),
         ),
-    ),
-  )
+    )
+  const sharedActionCatalog = Object.fromEntries(Object.entries(useVal(completionCatalog.catalog)).filter(([, action]) => allowSharedAction(action)))
   const actionCatalog = { ...hintedCatalog, ...sharedActionCatalog }
   const t = useTranslate()
-  const task = selection.definition
-  const savedPermission = task != null && 'moduleId' in task ? task.capabilities?.find((capability) => 'mode' in capability) : undefined
-  const [permission, setPermission] = useState<ConnectorPermissionCapability | undefined>(savedPermission)
-  const sharedPermissions = permission?.mode != 'independent'
   const [saveError, setSaveError] = useState<string>()
+  const [completionError, setCompletionError] = useState<string>()
   const [pending, setPending] = useState(false)
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null)
   const catalogs = useVal(connectors.$.catalogs)
@@ -157,7 +165,25 @@ export function CodeTaskSection({
   )
 
   if (task == null) return <div className="inspector-section section-error">{t('inspector.task.missing')}</div>
-  return module != null && 'moduleId' in task && moduleEditor?.moduleId == task.moduleId ? (
+  if (!('moduleId' in task)) return null
+  const typingFor = (shared: Readonly<Record<string, ConnectorActionView>>) =>
+    codeTyping(
+      task,
+      permission == null ? task.capabilities : [permission],
+      permission?.mode == 'shared' ? shared : { ...hintedCatalog, ...shared },
+      providerIds,
+    )
+  const prepareCompletion = async () => {
+    if (!sharedPermissions) return typingFor({})
+    try {
+      await completionCatalog.load()
+      setCompletionError(undefined)
+    } catch (cause) {
+      setCompletionError(cause instanceof Error ? cause.message : String(cause))
+    }
+    return typingFor(Object.fromEntries(Object.entries(completionCatalog.catalog.value).filter(([, action]) => allowSharedAction(action))))
+  }
+  return module != null && moduleEditor?.moduleId == task.moduleId ? (
     <form
       className="inspector-section inspector-titled-section inspector-form code-section"
       data-inspector-section="module"
@@ -317,9 +343,9 @@ export function CodeTaskSection({
               }}
             />
           )}
-          {saveError != null && (
+          {(saveError ?? completionError) != null && (
             <p role="alert" className="text-sm text-destructive">
-              {saveError}
+              {saveError ?? completionError}
             </p>
           )}
         </div>
@@ -342,17 +368,13 @@ export function CodeTaskSection({
               errorLabel={t('inspector.task.editorUnavailable')}
               loadingLabel={t('inspector.task.editorLoading')}
               location={moduleLocation == null ? undefined : { column: moduleLocation.column, line: moduleLocation.line }}
+              prepareCompletion={prepareCompletion}
               onBlur={() => {
                 if (store.hasUnsavedCode) void store.saveModuleEditor()
               }}
               onChange={(value) => store.updateModuleSource(value)}
               theme={theme}
-              typing={codeTyping(
-                task,
-                permission == null ? task.capabilities : [permission],
-                permission?.mode == 'shared' ? sharedActionCatalog : actionCatalog,
-                providerIds,
-              )}
+              typing={typingFor(sharedActionCatalog)}
               uri={`file:///modules/${moduleEditor.moduleId}.js`}
               value={moduleEditor.source}
             />

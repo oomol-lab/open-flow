@@ -23,6 +23,7 @@ export function createInspectorTransport(
     readonly access?: ConnectorAccess
     readonly accessError?: boolean
     readonly accessSaveDelay?: number
+    readonly actionDelay?: number
     readonly actions?: readonly ConnectorActionMetadata[]
     readonly candidates?: readonly {
       readonly connectionId?: string
@@ -175,7 +176,10 @@ export function createInspectorTransport(
         version: 1,
       })
     }
-    if (url.pathname.endsWith('/connector/proxy/actions'))
+    if (url.pathname.endsWith('/connector/proxy/actions')) {
+      log('actions.loading', { service: url.searchParams.get('service') })
+      if (options.actionDelay) await new Promise((resolve) => setTimeout(resolve, options.actionDelay))
+      log('actions.loaded', { service: url.searchParams.get('service') })
       return Response.json({
         success: true,
         data: (options.actions ?? [])
@@ -189,6 +193,7 @@ export function createInspectorTransport(
             outputSchema: action.outputSchema,
           })),
       })
+    }
     if (url.pathname.endsWith('/connector/connections'))
       return Response.json({
         version: 1,
@@ -252,8 +257,13 @@ export function createInspectorTransport(
   return { client, flowId: flow.flowId }
 }
 
-export function createInspectorSession(language: UiLanguage, log: LogAction, initialContent: RevisionContent) {
-  const { client, flowId } = createInspectorTransport(log, initialContent)
+export function createInspectorSession(
+  language: UiLanguage,
+  log: LogAction,
+  initialContent: RevisionContent,
+  options?: Parameters<typeof createInspectorTransport>[2],
+) {
+  const { client, flowId } = createInspectorTransport(log, initialContent, options)
   const i18n = createI18n(language)
   const notice = (value: unknown) => log('inspector.notice', value)
   const store = new WorkspaceStore(client, notice, undefined, i18n)

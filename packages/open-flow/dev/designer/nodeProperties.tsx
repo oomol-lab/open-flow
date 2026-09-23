@@ -28,8 +28,35 @@ const taskInputValues = Object.fromEntries(
 )
 const taskInputDefinitions = taskFields.map(({ value: _value, ...definition }) => definition)
 
-type Fixture = { id: string; group: string; node: GraphNode; content?: Partial<RevisionContent['document']> }
+type Fixture = {
+  id: string
+  group: string
+  node: GraphNode
+  content?: Partial<RevisionContent['document']>
+  transport?: Parameters<typeof createInspectorSession>[3]
+}
 const fixtures: readonly Fixture[] = [
+  {
+    id: 'code-actions-loading',
+    group: 'Task',
+    node: { kind: 'task', name: 'Code with slow services', inputs: {}, task: { name: 'Code with slow services', moduleId: 'module', inputs: [], outputs: [] } },
+    transport: {
+      actionDelay: 4000,
+      providers: ['example', 'other'].map((service) => ({ service, displayName: service, authTypes: ['no_auth'] })),
+      actions: ['example', 'other'].map((serviceId) => ({
+        actionId: `${serviceId}.echo`,
+        serviceId,
+        serviceName: serviceId,
+        name: 'Echo',
+        description: '',
+        authenticated: false,
+        inputs: {},
+        outputs: {},
+        inputSchema: { type: 'object', properties: { message: { type: 'string' } } },
+        outputSchema: { type: 'object', properties: { result: { type: 'string' } } },
+      })),
+    },
+  },
   { id: 'execution-limit', group: 'Fixed Values', node: { kind: 'value', name: 'Loop step', inputs: {}, values: [], maxExecutions: 1000 } },
   { id: 'value', group: 'Fixed Values', node: { kind: 'value', name: 'Fixed values', inputs: {}, values } },
   {
@@ -198,7 +225,7 @@ function PropertySample({
   const logRef = useRef(log)
   logRef.current = log
   useEffect(() => {
-    const next = createInspectorSession(language, (name, value) => logRef.current(name, value), contentFor(fixture))
+    const next = createInspectorSession(language, (name, value) => logRef.current(name, value), contentFor(fixture), fixture.transport)
     setSession(next)
     void next.start().then(() => next.store.selectNodes(['sample']))
     return () => next.dispose()
@@ -263,7 +290,7 @@ function PropertiesStory({ fixture, dark, language, log }: { fixture: Fixture; d
   ])
   return (
     <div className="node-properties-gallery open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'}>
-      {[true, false].map((disabled) => (
+      {(fixture.id == 'code-actions-loading' ? [false] : [true, false]).map((disabled) => (
         <PropertySample
           key={`${generation}-${disabled}`}
           fixture={fixture}
@@ -276,7 +303,7 @@ function PropertiesStory({ fixture, dark, language, log }: { fixture: Fixture; d
           mount={mount}
         />
       ))}
-      <FixedDefinitionSample key={generation} dark={dark} language={language} log={log} />
+      {fixture.id != 'code-actions-loading' && <FixedDefinitionSample key={generation} dark={dark} language={language} log={log} />}
     </div>
   )
 }
@@ -284,15 +311,17 @@ function PropertiesStory({ fixture, dark, language, log }: { fixture: Fixture; d
 export const nodePropertiesStories: readonly FrontendStory[] = fixtures.map((fixture) => ({
   group: `Node ${fixture.group}`,
   id: `node-${fixture.id}-properties`,
-  title: fixture.id == 'execution-limit' ? 'Execution limit' : 'Properties',
+  title: fixture.id == 'code-actions-loading' ? 'Code · Slow actions' : fixture.id == 'execution-limit' ? 'Execution limit' : 'Properties',
   standalone: true,
   description:
-    fixture.id == 'execution-limit'
-      ? 'Per-run node execution limits. Change the limit, test invalid values, or clear it to restore the default of 1000; reload verifies persistence.'
-      : fixture.id === 'value'
-        ? 'Editable and read-only properties, including typed dates, calendar selection, and time editing with timezone preservation. Use Sort to reorder fields and nested object properties; Done sorting restores disclosure arrows. Samples save independently.'
-        : fixture.id === 'task'
-          ? 'Editable and read-only task properties. Toggle the code issue to inspect its attached error above Node settings.'
-          : 'Editable, read-only and fixed-type value panels. Inspector samples save independently; reload verifies saved values.',
+    fixture.id == 'code-actions-loading'
+      ? 'Opening the editor makes no shared Action requests. Trigger completion with Ctrl+Space; Actions take four seconds to load while editing remains available. Reset samples to repeat.'
+      : fixture.id == 'execution-limit'
+        ? 'Per-run node execution limits. Change the limit, test invalid values, or clear it to restore the default of 1000; reload verifies persistence.'
+        : fixture.id === 'value'
+          ? 'Editable and read-only properties, including typed dates, calendar selection, and time editing with timezone preservation. Use Sort to reorder fields and nested object properties; Done sorting restores disclosure arrows. Samples save independently.'
+          : fixture.id === 'task'
+            ? 'Editable and read-only task properties. Toggle the code issue to inspect its attached error above Node settings.'
+            : 'Editable, read-only and fixed-type value panels. Inspector samples save independently; reload verifies saved values.',
   render: (log, dark, language) => <PropertiesStory fixture={fixture} dark={dark} language={language} log={log} />,
 }))
