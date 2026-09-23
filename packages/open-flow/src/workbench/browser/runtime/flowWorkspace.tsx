@@ -639,6 +639,7 @@ export default function FlowWorkspace({
   const submitting = useVal(store.runRequests.$.submitting)
   const externalRunId = useVal(store.runs.$.externalRunId)
   const draftReady = draft != null
+  const canvasReady = draftReady && !workspaceLoading
 
   useEffect(() => {
     if (view == 'runs' && flowId != null) void store.runs.load(flowId)
@@ -683,12 +684,13 @@ export default function FlowWorkspace({
     <IconifyProvider>
       <main className="workspace">
         <WorkspaceNavigationIsland
-          saveStatus={view == 'design' ? saveStatus : undefined}
+          ghost={view == 'design' && !canvasReady}
+          saveStatus={view == 'design' && canvasReady ? saveStatus : undefined}
           flowName={flow?.name ?? flow?.flowId ?? ''}
           flowsHref={hrefFor({ view: 'design' })}
           onOpenFlows={() => void navigation.openFlows()}
         />
-        {view == 'design' && (workspaceLoading || draft == null) ? (
+        {view == 'design' && !canvasReady ? (
           <div aria-label={t('workspace.design')} className="editor-grid context-panel-closed" id="workspace-panel-design" role="region" tabIndex={0}>
             <section aria-busy={!workspaceLoadFailed} className="canvas-panel workbench-canvas">
               {workspaceLoadFailed ? (

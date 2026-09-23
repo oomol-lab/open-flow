@@ -393,7 +393,8 @@ export const workflowStories: readonly FrontendStory[] = [
     group: 'Workbench',
     id: 'workspace-navigation-island',
     title: 'Workspace navigation island',
-    description: 'The navigation island sits on the canvas without a full-width header. Compare names and cycle the draft status dot beside the title.',
+    description:
+      'Compare the canvas island with the ghost style used while loading or recovering a workflow. Cycle names and the draft status dot beside the title.',
     standalone: true,
     render: (log, dark, language) => <NavigationIslandStory dark={dark} language={language} log={log} />,
   },
@@ -438,6 +439,7 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
   const [shortName, setShortName] = useState(true)
   const [publishState, setPublishState] = useState<PublishState>('ready')
   const [saveStatus, setSaveStatus] = useState<WorkspaceStatus>('saved')
+  const [ghost, setGhost] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const interactiveMode$ = useMemo(() => val<'mouse' | 'touchpad'>('mouse'), [])
   const miniMapExpanded$ = useMemo(() => val<boolean | undefined>(false), [])
@@ -448,6 +450,7 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
   const saveStatuses: readonly WorkspaceStatus[] = ['saved', 'saving', 'failed']
   const nextSaveStatus = saveStatuses[(saveStatuses.indexOf(saveStatus) + 1) % saveStatuses.length]!
   useStoryActions([
+    { label: ghost ? 'Show canvas island' : 'Show loading and recovery ghost style', onClick: () => setGhost((current) => !current) },
     { label: shortName ? 'Show long name' : 'Show short name', onClick: () => setShortName((current) => !current) },
     { label: `Show ${nextSaveStatus} draft save state`, onClick: () => setSaveStatus(nextSaveStatus) },
     { label: `Show ${nextPublishState} publish state`, onClick: () => setPublishState(nextPublishState) },
@@ -477,7 +480,8 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
             </GetPopupContainerContext.Provider>
           </div>
           <WorkspaceNavigationIsland
-            saveStatus={saveStatus}
+            ghost={ghost}
+            saveStatus={ghost ? undefined : saveStatus}
             flowName={shortName ? 'nn' : 'Quarterly customer onboarding and account follow-up workflow'}
             flowsHref="#workflows"
             onOpenFlows={() => log('flows.open')}

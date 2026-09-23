@@ -12,11 +12,13 @@ import { followWorkbenchLink } from '../navigationLink.ts'
 export function WorkspaceNavigationIsland({
   flowName,
   flowsHref,
+  ghost = false,
   onOpenFlows,
   saveStatus,
 }: {
   readonly flowName: string
   readonly flowsHref: string
+  readonly ghost?: boolean
   readonly onOpenFlows: () => void
   readonly saveStatus?: WorkspaceStatus | undefined
 }): ReactElement {
@@ -27,7 +29,11 @@ export function WorkspaceNavigationIsland({
   return (
     <nav aria-label={t('resource.workflows')} className="workspace-navigation" ref={setTooltipContainer}>
       <div
-        className="open-flow-control-island open-flow-control-island-compact open-flow-control-island-soft-shadow workspace-title-island"
+        className={
+          ghost
+            ? 'workspace-title-island workspace-title-ghost'
+            : 'open-flow-control-island open-flow-control-island-compact open-flow-control-island-soft-shadow workspace-title-island'
+        }
         data-tooltip-toolbar
       >
         <TooltipProvider delay={300}>
@@ -37,7 +43,7 @@ export function WorkspaceNavigationIsland({
               nativeButton={false}
               onClick={(event) => followWorkbenchLink(event, onOpenFlows)}
               render={<a href={flowsHref} />}
-              size="icon"
+              size={ghost ? 'icon-sm' : 'icon'}
               variant="ghost"
             >
               <Icon name="chevron-left" />

@@ -58,6 +58,20 @@
     gap: 0;
   }
 
+  .workspace-title-ghost {
+    display: flex;
+    align-items: center;
+    padding: 3px;
+  }
+
+  .workspace-title-ghost > [data-size] {
+    color: var(--ui-muted-foreground);
+  }
+
+  .workspace-title-ghost > [data-size]:is(:hover, :focus-visible) {
+    color: var(--ui-foreground);
+  }
+
   .workspace-title-island .workspace-flow-name {
     display: block;
     min-width: 0;
