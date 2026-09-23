@@ -16,6 +16,8 @@ const legacyAction: ConnectorActionCapability = {
   action: 'github.get_current_user',
   connections: [{ connectionId: 'work', alias: 'office' }, { connectionId: 'home' }],
 }
+const shared = { kind: 'connector', mode: 'shared' } as const
+const independent = { kind: 'connector', mode: 'independent', actions: [{ action: 'github.get_current_user', connectionId: 'work' }] } as const
 
 function revision(): RevisionContent {
   return applyFlowChanges(
@@ -37,6 +39,8 @@ describe('Code Connector capability', () => {
     expect(decodeConnectorCapabilities([capability])).toEqual([capability])
     expect(decodeConnectorCapabilities([hinted])).toEqual([hinted])
     expect(decodeConnectorCapabilities([legacyAction])).toEqual([legacyAction])
+    expect(decodeConnectorCapabilities([shared])).toEqual([shared])
+    expect(decodeConnectorCapabilities([independent])).toEqual([independent])
   })
 
   it.each([
@@ -47,6 +51,13 @@ describe('Code Connector capability', () => {
     [{ kind: 'connector', actionHints: null }],
     [{ kind: 'connector', actionHints: ['github'] }],
     [{ kind: 'connector', actionHints: ['github.user', 'github.user'] }],
+    [{ kind: 'connector', mode: 'shared', actions: [{ action: 'github.user', connectionId: 'work' }] }],
+    [{ kind: 'connector', mode: 'independent', actions: [{ action: 'github.user', connectionId: '' }] }],
+    [{ kind: 'connector', mode: 'shared', actions: [{ action: 'github.user' }, { action: 'github.user' }] }],
+    [{ kind: 'connector', mode: 'shared', actions: [] }],
+    [{ kind: 'connector', mode: 'shared', extra: true }],
+    [{ kind: 'connector', mode: 'independent', actions: [{ action: 'github.user' }, { action: 'github.user' }] }],
+    [{ kind: 'connector', mode: 'unknown', actions: [] }],
     [{ kind: 'connector', connectionHints: [{ action: 'github', connectionId: 'work' }] }],
     [{ kind: 'connector', connectionHints: [{ action: 'github.user', connectionId: '' }] }],
     [{ kind: 'connector', connectionHints: [{ action: 'github.user', connectionId: 'work', alias: '' }] }],
@@ -72,6 +83,10 @@ describe('Code Connector capability', () => {
     expect(saved.document.graph.nodes.code).toMatchObject({ task: { capabilities: [capability] } })
     expect(setCodeActions(saved, target, 'code', [capability])).toBeUndefined()
     expect(() => applyFlowChanges(saved, operations)).toThrow(/changed/)
+  })
+
+  it('defaults new Code nodes to shared permissions without an Action list', () => {
+    expect(revision().document.graph.nodes.code).toMatchObject({ task: { capabilities: [{ kind: 'connector', mode: 'shared' }] } })
   })
 
   it('preserves hints in canonical serialization and includes them in the digest', async () => {
@@ -164,6 +179,15 @@ describe('Code Connector calls', () => {
     expect(resolveAction([{ ...legacyAction, connectionId: 'work' }], { action: legacyAction.action, input: {} }).connectionId).toBe('work')
     expect(resolveAction([legacyAction], { action: legacyAction.action, input: {}, options: { connectionAlias: 'office' } }).connectionId).toBe('work')
     expect(resolveAction([legacyAction], { action: 'other.action', input: {}, options: { connectionId: 'outside' } }).connectionId).toBe('outside')
+  })
+
+  it('allows shared Actions dynamically and enforces independent Actions and accounts', () => {
+    expect(resolveAction([shared], { action: 'github.get_current_user', input: {}, options: { connectionId: 'work' } }).connectionId).toBe('work')
+    expect(resolveAction([shared], { action: 'github.other', input: {} })).toEqual({ action: 'github.other', input: {} })
+    expect(() => resolveAction([independent], { action: 'github.other', input: {} })).toThrow()
+    expect(resolveAction([independent], { action: 'github.get_current_user', input: {} }).connectionId).toBe('work')
+    expect(resolveAction([independent], { action: 'github.get_current_user', input: {}, options: { connectionId: 'work' } }).connectionId).toBe('work')
+    expect(() => resolveAction([independent], { action: 'github.get_current_user', input: {}, options: { connectionId: 'home' } })).toThrow()
   })
 
   it.each([

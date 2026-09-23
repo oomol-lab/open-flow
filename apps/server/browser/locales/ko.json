@@ -25,8 +25,8 @@
     "variables": "환경 변수"
   },
   "settings": {
-    "callbackKey": "Callback key",
-    "callbackKeyHint": "기존 callback key는 표시되지 않습니다. UTF-8 32바이트 이상을 사용하세요.",
+    "callbackKey": "콜백 서명 키(Open Flow에만 저장)",
+    "callbackKeyHint": "Open Flow는 이 키에서 트리거별 서명 키를 파생하고 콜백 서명을 검증하는 데 사용합니다. 이 키를 타사 서비스에 직접 전달할 필요는 없습니다. UTF-8 기준 32바이트 이상이어야 하며 저장 후에는 다시 표시되지 않습니다.",
     "cancel": "취소",
     "changed": "설정이 변경되어 현재 값을 다시 불러왔습니다.",
     "configure": "설정",
@@ -41,11 +41,11 @@
     "description": "이 deployment에서 사용할 수 있는 외부 capability입니다.",
     "edit": "편집",
     "environmentHint": "이 설정은 환경 변수로 관리되므로 여기에서 편집할 수 없습니다.",
-    "integration": "Integration callback",
+    "integration": "이벤트 수신",
     "loadFailed": "설정을 불러오지 못했습니다.",
     "loading": "설정을 불러오는 중…",
     "origin": "Origin",
-    "publicOrigin": "Public origin",
+    "publicOrigin": "Open Flow 공개 주소(Public origin)",
     "retry": "다시 시도",
     "runtime": "Runtime",
     "runtimeDescription": "Server가 Connector action을 실행할 때 사용하는 endpoint입니다.",
@@ -60,7 +60,11 @@
     "title": "설정",
     "token": "Token",
     "tokenHint": "기존 token은 표시되지 않으며 저장하면 교체됩니다.",
-    "eventSources": "이벤트 소스"
+    "eventSources": "이벤트 소스",
+    "callbackKeyStored": "서명 키는 Open Flow에 저장됩니다. 타사 서비스에 직접 제공할 필요가 없습니다.",
+    "generateSecret": "무작위 키 생성",
+    "integrationDescription": "외부 서비스가 Open Flow로 이벤트를 보낼 때 사용할 공개 주소를 설정합니다.",
+    "publicOriginHint": "Provider가 접근할 수 있는 공개 루트 주소(예: https://flows.example.com)를 입력하세요. 경로나 콜백 endpoint를 추가하지 마세요. 운영 환경에서는 HTTPS를 사용해야 합니다."
   },
   "team": {
     "createFailed": "이 Connector 팀에서 Flow를 만들지 못했습니다.",

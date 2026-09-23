@@ -72,9 +72,51 @@ const content: RevisionContent = {
         review: { kind: 'task', name: 'Review issues', inputs: {}, task: { name: 'Review', moduleId: 'review', inputs: [], outputs: [] } },
         automation: {
           kind: 'task',
-          name: 'Code with Connector access',
+          name: 'Legacy Code access',
           inputs: {},
           task: { capabilities: [{ kind: 'connector' }], name: 'Automation', moduleId: 'automation', inputs: [], outputs: [] },
+        },
+        sharedCode: {
+          kind: 'task',
+          name: 'Code · shared permissions',
+          inputs: {},
+          task: {
+            capabilities: [{ kind: 'connector', mode: 'shared' }],
+            name: 'Shared permissions',
+            moduleId: 'automation',
+            inputs: [],
+            outputs: [],
+          },
+        },
+        emptyCode: {
+          kind: 'task',
+          name: 'Code · empty actions',
+          inputs: {},
+          task: {
+            capabilities: [{ kind: 'connector', mode: 'independent', actions: [] }],
+            name: 'Empty actions',
+            moduleId: 'automation',
+            inputs: [],
+            outputs: [],
+          },
+        },
+        independentCode: {
+          kind: 'task',
+          name: 'Code · independent accounts',
+          inputs: {},
+          task: {
+            capabilities: [
+              {
+                kind: 'connector',
+                mode: 'independent',
+                actions: [{ action: 'github.get_current_user', connectionId: 'github-work' }, { action: 'slack.post_message' }],
+              },
+            ],
+            name: 'Independent account',
+            moduleId: 'automation',
+            inputs: [],
+            outputs: [],
+          },
         },
       },
       edges: [],
@@ -255,6 +297,6 @@ export const inspectorPanelStory: FrontendStory = {
   title: 'Properties Panel',
   standalone: true,
   description:
-    'Production editor: inspect outline and selection states. Hover the selected Account to clear its usage beside the dropdown arrow. Expand service authorization to navigate account references in the main graph and Follow-up subflow. Open Code properties to check editor focus and the compact Available services entry beside the Code heading, which opens shared Code connection settings. Code Action completions follow Code access, excluding actions cached by other nodes.',
+    'Inspect the compact shared Code permission row and its help tooltip, independent Code permission controls, Action removal, account selection, and switching legacy Code to independent permissions. Check collapsed Actions with account summaries, expanded Actions missing accounts, default account selection on add, empty Actions, and long labels at narrow width in both themes. The shared Code heading opens Flow connection settings.',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,
 }

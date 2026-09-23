@@ -25,8 +25,8 @@
     "variables": "Variables d’environnement"
   },
   "settings": {
-    "callbackKey": "Clé de callback",
-    "callbackKeyHint": "La clé de callback existante n’est jamais affichée. Utilisez au moins 32 octets UTF-8.",
+    "callbackKey": "Clé de signature des callbacks (conservée dans Open Flow)",
+    "callbackKeyHint": "Open Flow dérive une clé de signature distincte pour chaque déclencheur à partir de cette clé et l’utilise pour vérifier les signatures des callbacks. Vous n’avez pas besoin de fournir cette clé manuellement à un service tiers. Utilisez au moins 32 octets UTF-8. La clé n’est plus affichée après l’enregistrement.",
     "cancel": "Annuler",
     "changed": "Les paramètres ont changé. Les valeurs actuelles ont été rechargées.",
     "configure": "Configurer",
@@ -41,11 +41,11 @@
     "description": "Fonctionnalités externes disponibles pour ce déploiement.",
     "edit": "Modifier",
     "environmentHint": "Cette configuration est gérée par les variables d’environnement et ne peut pas être modifiée ici.",
-    "integration": "Callbacks d’intégration",
+    "integration": "Réception des événements",
     "loadFailed": "Impossible de charger les paramètres.",
     "loading": "Chargement des paramètres…",
     "origin": "Origin",
-    "publicOrigin": "Origin public",
+    "publicOrigin": "Adresse publique Open Flow (Public origin)",
     "retry": "Réessayer",
     "runtime": "Runtime",
     "runtimeDescription": "Point d’accès utilisé par le Server pour exécuter les actions Connector.",
@@ -60,7 +60,11 @@
     "title": "Paramètres",
     "token": "Token",
     "tokenHint": "Le token existant n’est jamais affiché. L’enregistrement le remplace.",
-    "eventSources": "Sources d’événements"
+    "eventSources": "Sources d’événements",
+    "callbackKeyStored": "Clé de signature enregistrée dans Open Flow. Vous n’avez pas besoin de la fournir manuellement à un service tiers.",
+    "generateSecret": "Générer une clé aléatoire",
+    "integrationDescription": "Définissez l’adresse publique utilisée par les services externes pour envoyer des événements à Open Flow.",
+    "publicOriginHint": "Saisissez l’adresse racine publique accessible aux Provider, par exemple https://flows.example.com. N’ajoutez ni chemin ni endpoint de callback. Utilisez HTTPS en production."
   },
   "team": {
     "createFailed": "Impossible de créer le Flow pour cette équipe du Connector.",

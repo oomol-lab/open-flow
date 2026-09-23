@@ -9,6 +9,7 @@
 - `schema input` 描述 Run 输入覆盖（node ID → handle → JSON value）；`schema outputs` 描述 Trigger 输出对象。节点实际端口与 Trigger 合同仍由 Revision 决定。
 - `inspect <flow> --json` 默认返回与 MCP `flow_get` 相同的精简视图（CLI 另有 `kind: "flow.inspect"`）：`flow`、`draft.revisionId`、`draft.graph`、`draft.subflows`、`draft.bindings`、模块摘要与 Live 状态。节点保留输入绑定、端口 handle、未被覆盖的输入默认值和执行配置；省略完整 Schema、代码源码和审计元数据。`--full` 返回完整 `draft.content`、修订元数据和 Live 详情，供需要精确 before 值的编辑使用。原 `--summary` 已由默认行为取代。Inspect 不执行 check。
 - `check <flow> --json` 单独校验当前 Draft，返回 `valid`、`revisionId` 和 `check`。无效时退出码为 1，诊断只随 stdout 的这一份结果返回。
+- `event-source list --json` 列出当前身份可见、独立于 Flow 的事件源及其 Team、Connection、事件类型和验证状态。实际使用关系见 `consumers`；给 Flow 配置 Trigger 时可对照 `connector connections <service> --flow <flow>` 的 Connection。空列表提示到 Workbench 创建并验证事件源。
 - Flow 引用接受 ID 或唯一的完整名称。名称歧义返回候选 identity；保存后续调用所需的 ID 可以避免名称查找。
 - `inspect` 遇到不可读的 Draft 时返回 `flow`、`draft: null` 和 `draftIssue`（code、message、revisionId）。`flow.live` 仍保留已发布版本身份；不能从缺失内容推断流程用途。权限、网络和其他调用错误仍然报错。只需元信息时使用 `show`。
 - `list`、`runs list`、`publications list` 一次只返回一页，支持 `--cursor` 和 `--limit`（1–100）。继续时传入 `nextCursor`，并保持同样的过滤条件。

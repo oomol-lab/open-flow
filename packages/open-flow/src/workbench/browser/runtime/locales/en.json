@@ -270,6 +270,13 @@
       "save": "Save subflow"
     },
     "task": {
+      "sharedPermissions": "Use Flow shared permission group",
+      "sharedPermissionsHint": "Use all Actions authorized by the Flow permission group. No need to add them to this node.",
+      "addAction": "Add Action",
+      "removeAction": "Remove Action",
+      "actionAccount": "Account",
+      "chooseAccount": "Choose an account",
+      "permissionSaveFailed": "Could not save Code permissions. Retry the change.",
       "chatText": "Chat text",
       "connectorAction": "Connector action",
       "definition": "Task definition",

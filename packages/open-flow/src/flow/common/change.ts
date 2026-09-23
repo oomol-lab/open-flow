@@ -268,11 +268,45 @@ export interface ConnectorActionCapability {
   readonly kind: 'connector'
 }
 
-export type ConnectorCapability = ConnectorAccessCapability | ConnectorActionCapability
+export type ConnectorPermissionCapability =
+  | { readonly kind: 'connector'; readonly mode: 'shared' }
+  | { readonly kind: 'connector'; readonly mode: 'independent'; readonly actions: readonly { readonly action: string; readonly connectionId?: string }[] }
+
+export type ConnectorCapability = ConnectorAccessCapability | ConnectorActionCapability | ConnectorPermissionCapability
 
 export function decodeConnectorCapabilities(value: unknown): readonly ConnectorCapability[] {
   if (!Array.isArray(value)) throw new TypeError('Connector capabilities must be an array.')
   if (value.length == 0) return []
+  if (value.some((item) => item != null && typeof item == 'object' && !Array.isArray(item) && Object.hasOwn(item, 'mode'))) {
+    if (value.length != 1) throw new TypeError('Connector capability is declared more than once.')
+    const source = value[0] as Record<string, unknown>
+    if (source.mode == 'shared') {
+      if (source.kind != 'connector' || Object.keys(source).some((key) => !['kind', 'mode'].includes(key)))
+        throw new TypeError('Invalid shared Connector permission capability.')
+      return [{ kind: 'connector', mode: 'shared' }]
+    }
+    if (
+      Object.keys(source).some((key) => !['kind', 'mode', 'actions'].includes(key)) ||
+      source.kind != 'connector' ||
+      source.mode != 'independent' ||
+      !Array.isArray(source.actions)
+    )
+      throw new TypeError('Invalid Connector permission capability.')
+    const actions = source.actions.map((entry: unknown) => {
+      if (entry == null || typeof entry != 'object' || Array.isArray(entry)) throw new TypeError('Invalid Connector Action.')
+      const action = entry as Record<string, unknown>
+      if (
+        Object.keys(action).some((key) => !['action', 'connectionId'].includes(key)) ||
+        typeof action.action != 'string' ||
+        !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+$/.test(action.action) ||
+        (Object.hasOwn(action, 'connectionId') && (typeof action.connectionId != 'string' || action.connectionId.length == 0))
+      )
+        throw new TypeError('Invalid Connector Action permission.')
+      return action.connectionId == null ? { action: action.action } : { action: action.action, connectionId: action.connectionId as string }
+    })
+    if (new Set(actions.map((action) => action.action)).size != actions.length) throw new TypeError('Duplicate Connector Action permission.')
+    return [{ kind: 'connector', mode: 'independent', actions }]
+  }
   if (value.some((item) => item != null && typeof item == 'object' && !Array.isArray(item) && !Object.hasOwn(item, 'action'))) {
     if (value.length != 1) throw new TypeError('Connector capability is declared more than once.')
     const item = value[0]

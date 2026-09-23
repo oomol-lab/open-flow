@@ -617,7 +617,7 @@ interface ConnectorAccess {
 | `PUT`    | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
 | `DELETE` | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
 
-`bindings` 是整个 Flow（含 Subflow）的 Code 共享允许列表。`nodeBindings` 在新 Publication / Run 快照中固定节点使用；缺失该字段的历史快照沿用旧共享列表语义，空数组则表示没有节点连接。
+`bindings` 是整个 Flow（含 Subflow）的 Code 共享允许列表。`nodeBindings` 在新 Publication / Run 快照中固定独立 Code Action 和其他节点使用；缺失该字段的历史快照沿用旧共享列表语义，空数组则表示没有节点连接。
 `GET /v1/flows/:flowId/connector-access?publicationId=...` 读取归属此 Flow 的已发布快照，只读；不带参数读取 Draft Code 配置。
 
 `POST /v1/flows/:flowId/connection-usage/remove` 接收 `{ version: 1, connectionId, expectedRevisionId, expectedAccessRevision }`，
@@ -888,11 +888,17 @@ Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 只保�
 
 当前脚本合同为 `open-flow-engine/v5`，执行调度采用每条入边到达分别执行和每节点累计次数限制；v4 及更早的 Publication / Run 不能按此合同执行，需要重新发布或新建 Run。它用 `context.actions` 替代 v1 的 `context.connector`，不提供旧名转发；
 固定为 v1 的 Publication / Run 必须由相应 Engine 执行，当前 Server 对 v1 明确返回不支持。
-Code Connector 授权由 Provider Access Binding 或部署的 implicit Connector authority 管理，不增加节点级开关或白名单。
+新 Code 节点的 Revision 保存账号模式，只有独立模式保存节点级 Action 白名单；部署的 Provider Access Binding 或 implicit Connector authority 仍是最终授权来源。
 
 ### Revision 与编辑 operation
 
-Inline Task 的 `capabilities` 可省略或为空数组。Workbench 只在需要保存非授权的 Action/Connection 编辑提示时写入声明：
+新建 Inline Code Task 默认保存以下声明；共享模式直接使用 Flow 共享账号已授权的全部 Actions，不保存节点清单。独立模式保存 `actions`，每条 Action 可保存 `connectionId`，Draft 中允许暂缺：
+
+```json
+{ "kind": "connector", "mode": "shared" }
+```
+
+`mode` 可为 `shared` 或 `independent`。独立模式的 Action ID 必须合法且不可重复；`shared` 不接受 `actions` 字段。模式、清单及账号选择参加 Revision digest。旧 Revision 的 `capabilities` 可省略或为空数组，也可包含原有提示声明：
 
 ```json
 {
@@ -900,7 +906,7 @@ Inline Task 的 `capabilities` 可省略或为空数组。Workbench 只在需要
 }
 ```
 
-声明是否存在不控制 Connector API；所有 Code Task 都可动态调用当前 Flow 可访问的 Action。严格 decoder 仍读取旧 immutable Revision 的
+没有 `mode` 的旧声明继续使用动态 Connector API，不能静默视为空白名单。严格 decoder 仍读取旧 immutable Revision 的
 `action`、`connections` 和 `connectionId` 结构，但这些字段不再授权，alias/default 仅转换为按 Action 查找的调用提示。
 新的可选 `actionHints` 只保存 Action ID 以恢复 schema typing，`connectionHints` 只保存 alias/default 解析提示；两者都不是允许集合，也不参与 Provider 授权。所有对象拒绝未知字段。
 
@@ -943,15 +949,15 @@ export default async (inputs, context) => {
 Date 等非 JSON 值在进入 transport 前失败。方法返回 Connector Action data，直接 `await` 取得；失败抛出含稳定 `code` 的 Error。
 
 第二参数可以省略，或恰为 `{ connectionId: string }` / `{ connectionAlias: string }`，两个字段互斥。空对象、空字符串、null 和未知字段返回
-`capability.invalid`。显式 `connectionId` 不经过 Revision 白名单；Connector 按固定 Provider access 独立授权。未知 alias 返回
+`capability.invalid`。新共享模式直接使用固定 Flow bindings 的账号已授权的全部 Actions，显式账号须属于该 bindings；省略账号时沿用单账号或默认账号选择。新独立模式使用清单中固定的账号，脚本传入不同账号返回 `capability.denied`。旧 Revision 的显式 `connectionId` 不经过 Revision 白名单，Connector 按固定 Provider access 独立授权。未知 alias 返回
 `capability.denied`。authenticated Action 未提供 Connection 时返回 `connector.connection-required`；伪造桥接请求仍由宿主拒绝。
 
 旧 alias/default 提示按 Revision 内的原值精确匹配并解析为固定 ID。Connector 目录中的改名、默认变更或 alias 重用不改变这份映射；
 它们不能扩大 Provider binding 的权限。每次调用都可以选择不同账号，允许循环和并发。
 
 公开 `TaskContext<Actions>` 和 `Task<Inputs, Outputs, Actions>` 接受节点对应的 Action 方法表类型；默认表为空。
-Workbench 对新声明提供动态 `call(actionId, input, options)` 类型与动态属性访问；旧声明继续使用目录 schema 提供精确迁移期提示。
-节点面板直接提供 Action 插入和有效连接查看入口，不显示 Connector Capability 开关，也不编辑 Action/Connection 白名单。
+Workbench 对共享模式使用 Flow 授权目录生成 Action 补全，对独立模式仅生成节点清单的补全；旧声明保留动态调用类型。
+节点面板提供共享权限组开关；开启时隐藏节点 Action 清单和添加按钮，关闭时逐个添加 Action 并选择固定账号。
 
 ### 调用身份、生命周期与目录投影
 

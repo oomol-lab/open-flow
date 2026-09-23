@@ -21,6 +21,40 @@ const token = 'mcp-test-operator-token-000000000001'
 const version = '2026-07-28'
 const start = { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'start', node: { kind: 'manual', name: 'Start' } }
 
+it('discovers independent Feishu event sources without exposing secrets', async () => {
+  const connector = createConnectorHost({
+    listConnections: async () => [
+      {
+        connectionId: 'connection-1',
+        providerAccountId: 'cli_test',
+        displayName: 'Feishu app',
+        serviceId: 'feishu_app_bot',
+        status: 'active',
+        isDefault: true,
+      },
+    ],
+  })
+  const { call, control } = await fixture({
+    capabilities: { connector: () => connector, integration: () => ({ callbackKey: 'key', publicOrigin: 'https://flow.example' }) },
+  })
+  expect(await call('event_source_list')).toMatchObject({ version: 1, sources: [], guidance: expect.stringContaining('Workbench') })
+  const source = await control.createEventSource({
+    version: 1,
+    name: 'Feishu app',
+    connectionId: 'connection-1',
+    teamId: null,
+    verificationToken: 'verification-secret',
+    encryptKey: 'encrypt-secret',
+    eventTypes: ['im.message.receive_v1'],
+    manageSubscriptions: false,
+  })
+  const listed = await call('event_source_list')
+  expect(listed).toMatchObject({ version: 1, sources: [{ sourceId: source.sourceId, teamId: null, connectionId: 'connection-1', verifiedAt: null }] })
+  expect(listed).not.toHaveProperty('guidance')
+  expect(JSON.stringify(listed)).not.toContain('verification-secret')
+  expect(JSON.stringify(listed)).not.toContain('encrypt-secret')
+})
+
 it('shares compact trigger transactions and example discovery between MCP and REST', async () => {
   const { call, control, service, client } = await fixture()
   expect(await call('flow_schema', { example: 'poll' })).toEqual(authoringExample('poll'))

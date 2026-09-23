@@ -270,6 +270,13 @@
       "save": "Subflow 저장"
     },
     "task": {
+      "sharedPermissions": "Flow 공유 권한 그룹 사용",
+      "sharedPermissionsHint": "Flow 공유 권한 그룹에서 승인한 모든 Action을 사용합니다. 개별적으로 추가할 필요가 없습니다.",
+      "addAction": "Action 추가",
+      "removeAction": "Action 제거",
+      "actionAccount": "계정",
+      "chooseAccount": "계정 선택",
+      "permissionSaveFailed": "Code 권한을 저장하지 못했습니다. 다시 시도하세요.",
       "chatText": "대화 텍스트",
       "connectorAction": "Connector 액션",
       "definition": "태스크 정의",

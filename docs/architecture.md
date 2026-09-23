@@ -204,9 +204,7 @@ Agent 仍可使用内联 Connector 通知，先登记等待和通知 work，再�
 部署只声明自己实现的 Engine Contract；Node 兼容合同的内存文件系统属于单次 Task invocation，不在 Task 之间共享或持久化。Capability host 必须校验当前
 Flow、Run、Task、invocation、binding 和 Run 状态；Task 或 Run 结束后旧 Capability 必须 fail closed。
 
-Code Task 默认获得动态 Connector API，不保存节点级开关或 Action/Connection 白名单。显式 `call(actionId, ...)`、分层属性与完整 Action ID 索引共享
-同一动态调用合同；Provider access 是独立的部署状态和最终授权来源。旧 Revision 中的 Connection alias 与默认
-Connection 仅作为调用解析提示，不能授权 Action 或 Connection。
+新建 Code Task 的 Connector capability 默认使用 Flow 共享权限组，不保存节点 Action 清单。共享模式直接使用固定 Flow bindings 中账号授权的全部 Actions，无需逐个添加；独立模式在节点 Revision 保存 Action 白名单及每个 Action 的固定账号。脚本不能改变模式；独立模式不能调用清单外 Action。旧 Revision 没有 `mode` 时保留原动态调用语义，旧 Connection alias 与默认 Connection 仅作为调用提示。
 每次业务调用有独立身份，用于外部幂等处理，不复用 Task invocation identity。Action 调用仍属于当前节点的生命周期，不创建图节点或独立 Run。
 普通调用错误可以被代码捕获，取消、deadline 和资源限制不能因用户捕获错误而失效。
 
@@ -238,11 +236,11 @@ Provider Access Binding 是 deployment-owned Flow 状态，不属于 Revision。
 部署不保存伪造的 binding，直接使用部署配置的 scoped Connector authority。绑定只引用 Connector 管理的权限边界，不能包含 credential，也不能演化为 Flow
 service account。身份显式区分管理员委托与 policy；团队默认 grant 属于 policy，具名规则删除后不得回退默认 grant。身份的确定性编码属于公共合同，候选可分配性和实际权限解析属于部署。Publication 和 Run 固定接受时的 binding identities；Connector 按目标 Connection 对 live policy 和 Action 做最终授权，缺失、失效或不匹配时
 fail closed。Connector 目录声明为无需账号授权的 Action 不要求 Provider Access Binding，仍使用部署要求的平台身份。
-Connector、Agent 固定工具、Trigger 与通知从当前用户可用的连接中显式选择，选择不写入 Code 列表。
-Workbench 的「连接使用」按账号汇总节点来源及 Code 共享使用；Code 在独立配置页面手动管理允许使用的连接。
-从总览移除账号使用仅修改 Draft，部署在同一事务中检查图 Revision 和 accessRevision、清除所有节点选择及 Code 列表中的该账号。
+Connector、Agent 固定工具、Trigger、通知与独立模式 Code Action 从当前用户可用的连接中显式选择。
+Workbench 的「连接使用」按账号汇总节点来源、独立 Code Action 使用及 Flow 共享使用。
+从总览移除账号使用仅修改 Draft，部署在同一事务中检查图 Revision 和 accessRevision、清除所有节点选择及共享 bindings 中的该账号；独立 Code Action 保留 Action 并清除账号选择。
 移除不删除节点、上游账号授权或其他 Flow；刷新不自动回填默认账号。节点创建时可选择适用 Action 的默认连接。
-Publication / Run 接受时从固定图的显式连接选择捕获 `nodeBindings`；`bindings` 仅允许 Code 使用。
+Publication / Run 接受时从固定图的显式连接选择捕获 `nodeBindings`；`bindings` 供共享模式 Code 和旧动态 Code 使用，`nodeBindings` 供独立模式 Code 与其他节点使用。
 宿主决定调用所属范围，脚本不能选择节点权限。执行校验固定 binding 身份和当前上游权限，不能借用另一个节点的默认连接。
 旧快照缺少 `nodeBindings` 时继续按原有共享 `bindings` 执行；新快照总是提供该字段，包括空数组。
 迁移 0027 只一次性清空旧 Draft `flow_provider_access`，保留图、Publication、Run 和后台快照；不会在重新启动时清空新配置。

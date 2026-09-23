@@ -14,10 +14,10 @@ import type { Store } from '../storage/store.ts'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { nextTriggerScheduledAt, validateTriggerSchedule } from '@oomol-lab/open-flow/cron-trigger'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
-import { agentActions } from '@oomol-lab/open-flow/flow-semantics'
+import { agentActions, codeActions } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { captureNodeAccess } from '../deployment/connector-access.ts'
-import { checkCodeActions, ConnectorTaskError } from '../deployment/connector.ts'
+import { checkCodeActions, checkCodePermissions, ConnectorTaskError } from '../deployment/connector.ts'
 import { AcceptanceError, ControlError } from '../error.ts'
 
 const batchSize = 100
@@ -162,6 +162,7 @@ export class Publisher {
       ...(this.#store.connectorTeams.get(input.flowId) == null ? {} : { teamId: this.#store.connectorTeams.get(input.flowId) }),
     }
     await checkCodeActions(agentActions(fixed.prepared), this.#resolveConnector(), connectorAccess)
+    await checkCodePermissions(codeActions(fixed.prepared), this.#resolveConnector(), { ...connectorAccess, usage: 'code' })
     const engineContract = input.engineContract ?? currentEngineContract
     if (input.revisionDigest != null && input.revisionDigest != fixed.revisionDigest) {
       throw new AcceptanceError('revision-conflict', 'The fixed Revision digest does not match its content.')

@@ -40,6 +40,13 @@ function config(value: unknown) {
   return { connector: { console, runtime }, integration, llm, revision: Number(body.revision) }
 }
 
+function randomCallbackKey(): string {
+  const bytes = globalThis.crypto.getRandomValues(new Uint8Array(32))
+  let binary = ''
+  for (const byte of bytes) binary += String.fromCharCode(byte)
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
+}
+
 function SettingItem({
   analyticsType,
   body,
@@ -53,10 +60,14 @@ function SettingItem({
   onUnauthorized,
   origin,
   originLabel,
+  originHint,
   placeholder,
   revision,
+  generateSecret = false,
   secretLabel,
+  secretHint,
   secretRequired = true,
+  summaryHint,
   source,
 }: {
   readonly analyticsType: 'connector_console' | 'connector_runtime' | 'integration' | 'llm'
@@ -71,10 +82,14 @@ function SettingItem({
   readonly onUnauthorized: () => void
   readonly origin: string
   readonly originLabel: string
+  readonly originHint?: string
   readonly placeholder: string
   readonly revision: number
+  readonly generateSecret?: boolean
   readonly secretLabel?: string
+  readonly secretHint?: string
   readonly secretRequired?: boolean
+  readonly summaryHint?: string
   readonly source: (typeof sources)[number]
 }): ReactElement {
   const [draftOrigin, setDraftOrigin] = useState(origin)
@@ -175,6 +190,7 @@ function SettingItem({
           <Label htmlFor={`${endpoint}-origin`}>{originLabel}</Label>
           <Input
             autoComplete="url"
+            aria-describedby={originHint == null ? undefined : `${endpoint}-origin-hint`}
             autoFocus
             id={`${endpoint}-origin`}
             onChange={(event) => setDraftOrigin(event.target.value)}
@@ -183,9 +199,21 @@ function SettingItem({
             type="url"
             value={draftOrigin}
           />
+          {originHint != null && (
+            <span className="settings-hint" id={`${endpoint}-origin-hint`}>
+              {originHint}
+            </span>
+          )}
           {secretLabel != null && (
             <>
-              <Label htmlFor={`${endpoint}-secret`}>{secretLabel}</Label>
+              <div className="settings-secret-label">
+                <Label htmlFor={`${endpoint}-secret`}>{secretLabel}</Label>
+                {generateSecret && (
+                  <Button variant="outline" size="sm" disabled={pending} onClick={() => setSecret(randomCallbackKey())} type="button">
+                    {t('settings.generateSecret')}
+                  </Button>
+                )}
+              </div>
               <Input
                 aria-describedby={`${endpoint}-secret-hint`}
                 aria-invalid={secretTooShort && secret != ''}
@@ -197,7 +225,7 @@ function SettingItem({
                 value={secret}
               />
               <span className="settings-hint" id={`${endpoint}-secret-hint`}>
-                {t(endpoint == '/config/integration' ? 'settings.callbackKeyHint' : 'settings.tokenHint')}
+                {secretHint ?? t(endpoint == '/config/integration' ? 'settings.callbackKeyHint' : 'settings.tokenHint')}
               </span>
             </>
           )}
@@ -218,6 +246,7 @@ function SettingItem({
       ) : configured ? (
         <div className="settings-summary">
           <code>{origin}</code>
+          {summaryHint != null && source == 'settings' && <p>{summaryHint}</p>}
           {managed && <p>{t(source == 'environment' ? 'settings.environmentHint' : 'settings.derivedHint')}</p>}
         </div>
       ) : null}
@@ -369,14 +398,19 @@ export function SettingsPage({
                 body={(publicOrigin, callbackKey) => ({ callbackKey, publicOrigin })}
                 {...current.integration}
                 endpoint="/config/integration"
+                description={t('settings.integrationDescription')}
                 name={t('settings.integration')}
                 onConflict={load}
                 onSaved={saved}
                 onUnauthorized={onUnauthorized}
                 originLabel={t('settings.publicOrigin')}
+                originHint={t('settings.publicOriginHint')}
                 placeholder="https://flows.example.com"
                 revision={current.revision}
+                generateSecret
                 secretLabel={t('settings.callbackKey')}
+                secretHint={t('settings.callbackKeyHint')}
+                summaryHint={t('settings.callbackKeyStored')}
               />
             </section>
           </>

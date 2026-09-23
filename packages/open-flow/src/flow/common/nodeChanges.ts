@@ -134,7 +134,7 @@ export function createCodeTask(
         kind: 'task',
         name,
         task: {
-          ...(ports.capabilities == null ? {} : { capabilities: ports.capabilities }),
+          capabilities: ports.capabilities ?? [{ kind: 'connector', mode: 'shared' }],
           inputs: ports.inputs,
           moduleId: identity.moduleId,
           name,

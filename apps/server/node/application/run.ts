@@ -12,13 +12,13 @@ import type { Store } from '../storage/store.ts'
 import { normalizeConnectorRuntimeInputs } from '@oomol-lab/open-flow/connector-action'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { decodeRevision, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
-import { agentActions, prepareFlow, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
+import { agentActions, codeActions, prepareFlow, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { createEventProjector } from '@oomol-lab/open-flow/run-events'
 import { resolveAction } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
 import { executeCode } from '../deployment/agent-code.ts'
 import { executeAgent } from '../deployment/agent.ts'
-import { checkCodeActions, ConnectorTaskError } from '../deployment/connector.ts'
+import { checkCodeActions, checkCodePermissions, ConnectorTaskError } from '../deployment/connector.ts'
 import { errorKind } from '../logger.ts'
 import { isolatedVmEngineDigest, IsolatedVmHost } from '../runtime/isolated-vm.ts'
 
@@ -123,6 +123,10 @@ export class RunExecutor {
       }
       yield* Effect.tryPromise({
         try: (signal) => checkCodeActions(agentActions(prepared.flow), this.#resolveConnector(), this.#connectorContext(run, 'eligibility', 'node'), signal),
+        catch: (error) => error,
+      })
+      yield* Effect.tryPromise({
+        try: (signal) => checkCodePermissions(codeActions(prepared.flow), this.#resolveConnector(), this.#connectorContext(run, 'eligibility'), signal),
         catch: (error) => error,
       })
       const projectEvent = createEventProjector(run.runId, nodeFailureCodes)
@@ -437,7 +441,10 @@ export class RunExecutor {
     }
     const connector = this.#resolveConnector()
     if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
+    const usage = capabilities.some((capability) => 'mode' in capability && capability.mode == 'independent') ? 'node' : 'code'
+    access = { ...access, usage }
     if (
+      !capabilities.some((capability) => 'mode' in capability && capability.mode == 'shared') &&
       payload.connectionId == null &&
       (await connector.getAction(payload.action, call.signal, { ...access, providerId: payload.action.split('.')[0] })).authenticated
     ) {

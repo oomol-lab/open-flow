@@ -25,8 +25,8 @@
     "variables": "环境变量"
   },
   "settings": {
-    "callbackKey": "回调密钥",
-    "callbackKeyHint": "现有回调密钥永远不会显示；请使用至少 32 个 UTF-8 字节。",
+    "callbackKey": "回调签名密钥（仅保存在 Open Flow）",
+    "callbackKeyHint": "Open Flow 会根据这把密钥为每个触发器派生独立的签名密钥，并用它校验回调签名。无需手动把这把密钥提供给第三方。密钥至少 32 个 UTF-8 字节，保存后不再显示。",
     "cancel": "取消",
     "changed": "设置已发生变化，已重新加载当前值。",
     "configure": "配置",
@@ -41,11 +41,11 @@
     "description": "当前 deployment 可使用的外部能力。",
     "edit": "编辑",
     "environmentHint": "当前配置由环境变量管理，不能在这里编辑。",
-    "integration": "Integration 回调",
+    "integration": "事件接入",
     "loadFailed": "无法加载设置。",
     "loading": "正在加载设置…",
     "origin": "Origin",
-    "publicOrigin": "公开 Origin",
+    "publicOrigin": "Open Flow 公网地址（Public origin）",
     "retry": "重试",
     "runtime": "运行时",
     "runtimeDescription": "Server 用于执行 Connector Action 的服务地址。",
@@ -60,7 +60,11 @@
     "title": "设置",
     "token": "Token",
     "tokenHint": "现有 token 永远不会显示；保存会替换它。",
-    "eventSources": "事件源"
+    "eventSources": "事件源",
+    "callbackKeyStored": "签名密钥保存在 Open Flow 中，无需手动提供给第三方。",
+    "generateSecret": "生成随机密钥",
+    "integrationDescription": "设置外部系统向 Open Flow 发送事件时使用的公网地址。",
+    "publicOriginHint": "填写 Provider 可以访问到的公网根地址，例如 https://flows.example.com。不要添加路径或具体回调地址；生产环境请使用 HTTPS。"
   },
   "team": {
     "createFailed": "无法在这个 Connector 团队中创建工作流。",

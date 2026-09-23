@@ -25,8 +25,8 @@
     "variables": "Переменные среды"
   },
   "settings": {
-    "callbackKey": "Ключ callback",
-    "callbackKeyHint": "Существующий ключ callback не отображается. Используйте не менее 32 байт UTF-8.",
+    "callbackKey": "Ключ подписи callback (хранится только в Open Flow)",
+    "callbackKeyHint": "Open Flow выводит из этого ключа отдельный ключ подписи для каждого триггера и проверяет с его помощью подписи callback. Передавать этот ключ стороннему сервису вручную не нужно. Используйте не менее 32 байт в кодировке UTF-8. После сохранения ключ не отображается.",
     "cancel": "Отмена",
     "changed": "Настройки изменились. Текущие значения загружены повторно.",
     "configure": "Настроить",
@@ -41,11 +41,11 @@
     "description": "Внешние возможности, доступные этому развёртыванию.",
     "edit": "Изменить",
     "environmentHint": "Эта конфигурация управляется переменными окружения и не может быть изменена здесь.",
-    "integration": "Callback интеграций",
+    "integration": "Приём событий",
     "loadFailed": "Не удалось загрузить настройки.",
     "loading": "Загрузка настроек…",
     "origin": "Origin",
-    "publicOrigin": "Публичный origin",
+    "publicOrigin": "Публичный адрес Open Flow (Public origin)",
     "retry": "Повторить",
     "runtime": "Runtime",
     "runtimeDescription": "Endpoint, который Server использует для выполнения действий Connector.",
@@ -60,7 +60,11 @@
     "title": "Настройки",
     "token": "Token",
     "tokenHint": "Существующий token никогда не отображается. При сохранении он заменяется.",
-    "eventSources": "Источники событий"
+    "eventSources": "Источники событий",
+    "callbackKeyStored": "Ключ подписи сохранён в Open Flow. Вручную передавать его стороннему сервису не нужно.",
+    "generateSecret": "Создать случайный ключ",
+    "integrationDescription": "Укажите публичный адрес, на который внешние сервисы будут отправлять события в Open Flow.",
+    "publicOriginHint": "Введите публичный корневой адрес, доступный Provider, например https://flows.example.com. Не добавляйте путь или endpoint callback. В production используйте HTTPS."
   },
   "team": {
     "createFailed": "Не удалось создать Flow для этой команды Connector.",

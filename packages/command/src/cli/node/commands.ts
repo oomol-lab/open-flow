@@ -35,6 +35,7 @@ const commands = [
   ['connector search', '<query> [--flow <flow>]', ['flow']],
   ['connector show', '<action> [--flow <flow>]', ['flow']],
   ['connector connections', '<service> [--flow <flow>]', ['flow']],
+  ['event-source list', '', []],
   ['connector add', '<flow> <action>', [...edit, 'name', 'connection', 'set']],
   ['connector set', '<flow> <node>', [...edit, 'connection', 'set', 'unset']],
   ['trigger search', '[query]', []],

@@ -152,7 +152,7 @@ describe('inverse canvas changes', () => {
       { kind: 'graph.node.field.set', target, nodeId: 'code', field: 'timeoutMs', value: 2000 },
       { kind: 'graph.node.field.set', target, nodeId: 'code', field: 'maxExecutions', value: 25 },
       { kind: 'graph.node.task.name.set', target, nodeId: 'code', before: 'Code', value: 'Renamed' },
-      { kind: 'graph.node.task.capabilities.set', target, nodeId: 'code', value: [] },
+      { kind: 'graph.node.task.capabilities.set', target, nodeId: 'code', before: node.task.capabilities, value: [] },
       { kind: 'graph.node.additional-inputs.set', target, nodeId: 'code', value: [{ handle: 'extra', jsonSchema: {}, nullable: false }] },
       {
         kind: 'graph.node.task.ports.set',

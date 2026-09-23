@@ -4,7 +4,7 @@ import type { FlowDocument } from '@oomol-lab/open-flow/flow-change'
 import { providerAccessBindingId } from '@oomol-lab/open-flow/control-api'
 import { afterEach, expect, it, vi } from 'vitest'
 import { captureNodeAccess, ImplicitConnectorAccessHost } from '../node/deployment/connector-access.ts'
-import { ConnectorClient } from '../node/deployment/connector.ts'
+import { checkCodePermissions, ConnectorClient } from '../node/deployment/connector.ts'
 
 const document: FlowDocument = {
   bindings: {},
@@ -61,6 +61,34 @@ it('captures only selected node connections without adding Code usage and reject
   await expect(captureNodeAccess(host, 'flow', document, access)).rejects.toMatchObject({ code: 'connector.access-invalid' })
 })
 
+it('captures independent Code connections in root graphs and Subflows', async () => {
+  const host = new ImplicitConnectorAccessHost()
+  vi.spyOn(host, 'listCandidates').mockResolvedValue({
+    version: 1,
+    results: [{ version: 1, providerId: 'mail', mode: 'selectable', candidates: [candidate] }],
+  })
+  const code = {
+    kind: 'task' as const,
+    name: 'Code',
+    inputs: {},
+    task: {
+      name: 'Code',
+      moduleId: 'code',
+      inputs: [],
+      outputs: [],
+      capabilities: [{ kind: 'connector' as const, mode: 'independent' as const, actions: [{ action: 'mail.send', connectionId: 'account' }] }],
+    },
+  }
+  const source = {
+    ...document,
+    graph: { edges: [], nodes: { code } },
+    subflows: { child: { name: 'Child', inputs: [], outputs: [], graph: { edges: [], nodes: { code } } } },
+  } as FlowDocument
+  const snapshot = await captureNodeAccess(host, 'flow', source, access)
+  expect(snapshot.bindings).toEqual([])
+  expect(snapshot.nodeBindings).toMatchObject([{ connectionId: 'account', providerId: 'mail' }])
+})
+
 it('executes nodes with fixed bindings while denying Code the same account, without resolving a new membership', async () => {
   const identity = { providerId: 'mail', connectionId: 'account', source: { kind: 'admin-delegation' as const } }
   const binding = { ...identity, accessBindingId: await providerAccessBindingId('team', identity), connectionDisplayName: 'Work', status: 'active' as const }
@@ -70,12 +98,20 @@ it('executes nodes with fixed bindings while denying Code the same account, with
     if (url.pathname == '/v1/providers') return success([{ service: 'mail', displayName: 'Mail', authTypes: ['oauth2'] }])
     if (url.pathname == '/v1/apps/services/mail' || url.pathname == '/v1/apps')
       return success([{ id: 'account', displayName: 'Work', alias: 'work', service: 'mail', status: 'active', isDefault: true }])
-    if (url.pathname == '/v1/actions/mail.send' && init?.method == 'POST') return success({ sent: true })
+    if (url.pathname == '/v1/actions/mail.send')
+      return init?.method == 'POST'
+        ? success({ sent: true })
+        : success({ id: 'mail.send', name: 'send', description: 'Send', service: 'mail', inputSchema: { type: 'object' }, outputSchema: { type: 'object' } })
     throw new Error(`Unexpected request: ${url.pathname}`)
   })
   vi.stubGlobal('fetch', request)
   const connector = new ConnectorClient('https://connector.oomol.dev', 'token')
   const context = { flowId: 'flow', teamId: 'team', providerAccess: snapshot, purpose: 'execute' as const, source: 'run' as const }
+  const independent = [{ kind: 'connector' as const, mode: 'independent' as const, actions: [{ action: 'mail.send', connectionId: 'account' }] }]
+  await expect(checkCodePermissions(independent, connector, { ...context, purpose: 'eligibility', usage: 'code' })).resolves.toBeUndefined()
+  await expect(
+    checkCodePermissions([{ kind: 'connector', mode: 'shared' }], connector, { ...context, purpose: 'eligibility', usage: 'code' }),
+  ).resolves.toBeUndefined()
   await expect(connector.execute('mail.send', 'account', {}, 'call', new AbortController().signal, { ...context, usage: 'node' })).resolves.toEqual({
     sent: true,
   })
@@ -85,7 +121,14 @@ it('executes nodes with fixed bindings while denying Code the same account, with
   await expect(
     connector.execute('mail.send', undefined, {}, 'missing-selection', new AbortController().signal, { ...context, usage: 'node' }),
   ).rejects.toMatchObject({ code: 'connector.connection-required' })
-  expect(request.mock.calls.filter(([, init]) => init?.method == 'POST')).toHaveLength(1)
+  await expect(
+    connector.execute('mail.send', undefined, {}, 'shared-call', new AbortController().signal, {
+      ...context,
+      usage: 'code',
+      providerAccess: { ...snapshot, bindings: [binding], nodeBindings: [] },
+    }),
+  ).resolves.toEqual({ sent: true })
+  expect(request.mock.calls.filter(([, init]) => init?.method == 'POST')).toHaveLength(2)
   await expect(connector.execute('mail.send', 'other', {}, 'other-call', new AbortController().signal, { ...context, usage: 'node' })).rejects.toMatchObject({
     code: 'connector.access-invalid',
   })
@@ -168,10 +211,20 @@ it('captures Agent tools, notifications and Trigger proxy usage without Code per
 it('allows actions without accounts with an empty separated snapshot', async () => {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (input: string | URL | Request) => {
+    vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
       const url = new URL(String(input))
       if (url.pathname == '/v1/providers') return success([{ service: 'utility', displayName: 'Utility', authTypes: ['no_auth'] }])
-      if (url.pathname == '/v1/actions/utility.echo') return success({ value: 'ok' })
+      if (url.pathname == '/v1/actions/utility.echo')
+        return init?.method == 'POST'
+          ? success({ value: 'ok' })
+          : success({
+              id: 'utility.echo',
+              name: 'echo',
+              description: 'Echo',
+              service: 'utility',
+              inputSchema: { type: 'object' },
+              outputSchema: { type: 'object' },
+            })
       throw new Error(`Unexpected request: ${url.pathname}`)
     }),
   )

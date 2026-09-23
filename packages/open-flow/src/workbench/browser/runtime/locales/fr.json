@@ -270,6 +270,13 @@
       "save": "Enregistrer le Subflow"
     },
     "task": {
+      "sharedPermissions": "Utiliser le groupe d’autorisations partagé du Flow",
+      "sharedPermissionsHint": "Utilisez toutes les Actions autorisées par le groupe du Flow, sans les ajouter à ce nœud.",
+      "addAction": "Ajouter une action",
+      "removeAction": "Supprimer l’action",
+      "actionAccount": "Compte",
+      "chooseAccount": "Choisir un compte",
+      "permissionSaveFailed": "Impossible d’enregistrer les autorisations Code. Réessayez.",
       "chatText": "Texte de conversation",
       "connectorAction": "Action Connector",
       "definition": "Définition de la tâche",

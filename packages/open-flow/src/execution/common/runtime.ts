@@ -481,7 +481,7 @@ export function resolveAction(
   payload: unknown,
 ): { readonly action: string; readonly connectionId?: string; readonly input: Readonly<Record<string, JsonValue>> } {
   const invalid = Object.assign(new Error('The Action request is invalid.'), { code: 'capability.invalid' })
-  const denied = Object.assign(new Error('The Connection alias is unavailable for this Action.'), { code: 'capability.denied' })
+  const denied = Object.assign(new Error('The Action or Connection is unavailable for this Code node.'), { code: 'capability.denied' })
   if (payload == null || typeof payload != 'object' || Array.isArray(payload)) throw invalid
   const source = payload as Record<string, JsonValue>
   if (
@@ -493,7 +493,11 @@ export function resolveAction(
     Array.isArray(source.input)
   )
     throw invalid
+  const permissions = declarations.find((declaration) => 'mode' in declaration)
+  const allowed = permissions?.mode == 'independent' ? permissions.actions.find((entry) => entry.action == source.action) : undefined
+  if (permissions?.mode == 'independent' && allowed == null) throw denied
   const hints = declarations.flatMap((declaration) => {
+    if ('mode' in declaration) return []
     if ('action' in declaration) {
       if (declaration.action != source.action) return []
       return [
@@ -518,5 +522,10 @@ export function resolveAction(
       if (connectionId == null) throw denied
     } else throw invalid
   }
+  if (permissions?.mode == 'independent') {
+    if (connectionId != null && connectionId != allowed?.connectionId) throw denied
+    connectionId = allowed?.connectionId
+  }
+  if (permissions?.mode == 'shared' && Object.hasOwn(source, 'options') && connectionId == null) throw denied
   return { action: source.action, input: source.input as Readonly<Record<string, JsonValue>>, ...(connectionId == null ? {} : { connectionId }) }
 }

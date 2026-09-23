@@ -1,7 +1,7 @@
 import type { ConnectorProxyRequest, ConnectorProxyResult } from '@oomol-lab/open-flow/connector-proxy'
 import type { ProviderAccessReference, ConnectorAccessCandidates } from '@oomol-lab/open-flow/control-api'
 import type { ConnectorAccess, ConnectorActionMetadata, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
-import type { ConnectorActionCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
+import type { ConnectorActionCapability, ConnectorCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { Logger } from 'pino'
 import type { ResolvedProviderAccessBinding, TeamAppAccess } from './provider-access.ts'
 
@@ -413,7 +413,13 @@ export class ConnectorClient implements ConnectorHost {
       !(await this.#providers(signal, teamId)).some((provider) => provider.serviceId == providerId && provider.noSetup)
     )
       throw connectionRequired()
-    const bindings = await this.#providerAccessBindings(access, providerId, signal, true)
+    const publicAction =
+      connectionId == null &&
+      typeof access == 'object' &&
+      access.providerAccess.mode == 'selectable' &&
+      access.providerAccess.nodeBindings != null &&
+      !(await this.getAction(action, signal, access)).authenticated
+    const bindings = publicAction ? null : await this.#providerAccessBindings(access, providerId, signal, true)
     if (bindings != null) {
       const binding =
         connectionId == null
@@ -1009,6 +1015,27 @@ export async function checkCodeActions(
         )
       )
         throw connectionRequired()
+    }
+  }
+}
+
+export async function checkCodePermissions(
+  declarations: readonly ConnectorCapability[],
+  connector: ConnectorHost | undefined,
+  access: ConnectorAccessContext,
+  signal?: AbortSignal,
+): Promise<void> {
+  const permissions = declarations.filter((declaration) => 'mode' in declaration && declaration.mode == 'independent')
+  if (permissions.every((declaration) => declaration.actions.length == 0)) return
+  if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
+  for (const permission of permissions) {
+    for (const entry of permission.actions) {
+      const scoped = { ...access, usage: 'node' as const }
+      const action = await connector.getAction(entry.action, signal, { ...scoped, providerId: entry.action.split('.')[0] })
+      if (!action.authenticated && entry.connectionId == null) continue
+      if (entry.connectionId == null) throw connectionRequired()
+      const connections = await connector.listConnections(action.serviceId, signal, scoped)
+      if (!connections.some((connection) => connection.status == 'active' && connection.connectionId == entry.connectionId)) throw connectionRequired()
     }
   }
 }

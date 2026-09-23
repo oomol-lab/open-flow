@@ -16,26 +16,31 @@ export function codeTyping(
     ports.outputs.flatMap((port) => ('handle' in port ? [{ handle: port.handle, json_schema: port.jsonSchema, nullable: port.nullable }] : [])),
   )
   const dynamicOptions = '{ connectionId?: string; connectionAlias?: string }'
-  const access = capabilities.find((capability): capability is ConnectorAccessCapability => !('action' in capability))
+  const permissions = capabilities.find((capability) => 'mode' in capability)
+  const access = capabilities.find((capability): capability is ConnectorAccessCapability => !('action' in capability) && !('mode' in capability))
   const legacy = capabilities.filter((capability) => 'action' in capability)
   const connectionHints = [
     ...(access?.connectionHints ?? []),
     ...legacy.flatMap((declaration) => declaration.connections.map((connection) => ({ action: declaration.action, ...connection }))),
   ]
-  const hintedActions = [
-    ...new Set([
-      ...Object.keys(catalog),
-      ...(access?.actionHints ?? []),
-      ...connectionHints.map((hint) => hint.action),
-      ...legacy.map((declaration) => declaration.action),
-    ]),
-  ]
+  const hintedActions =
+    permissions?.mode != 'independent'
+      ? [
+          ...new Set([
+            ...Object.keys(catalog),
+            ...(access?.actionHints ?? []),
+            ...connectionHints.map((hint) => hint.action),
+            ...legacy.map((entry) => entry.action),
+          ]),
+        ]
+      : permissions.actions.map((entry) => entry.action)
   const allowedProviders = new Set(providerIds)
   const declarations = hintedActions
-    .filter((action) => allowedProviders.has(action.slice(0, action.indexOf('.'))))
+    .filter((action) => permissions?.mode == 'independent' || allowedProviders.has(action.slice(0, action.indexOf('.'))))
     .map((action) => ({
       action,
       connectionId:
+        (permissions?.mode == 'independent' ? permissions.actions.find((entry) => entry.action == action)?.connectionId : undefined) ??
         access?.connectionHints?.find((hint) => hint.action == action && hint.alias == null)?.connectionId ??
         legacy.find((declaration) => declaration.action == action)?.connectionId,
       connections: connectionHints.filter((hint) => hint.action == action),
@@ -51,9 +56,15 @@ export function codeTyping(
     const ids = declaration.connections.map((connection) => JSON.stringify(connection.connectionId)).join(' | ') || 'never'
     const aliases = declaration.connections.flatMap((connection) => (connection.alias == null ? [] : [JSON.stringify(connection.alias)])).join(' | ') || 'never'
     const options =
-      declaration.connections.length == 0
-        ? dynamicOptions
-        : `{ connectionId: ${ids}; connectionAlias?: never } | { connectionAlias: ${aliases}; connectionId?: never }`
+      permissions?.mode == 'independent'
+        ? declaration.connectionId == null
+          ? '{ connectionId?: never }'
+          : `{ connectionId?: ${JSON.stringify(declaration.connectionId)} }`
+        : permissions?.mode == 'shared'
+          ? '{ connectionId?: string }'
+          : declaration.connections.length == 0
+            ? dynamicOptions
+            : `{ connectionId: ${ids}; connectionAlias?: never } | { connectionAlias: ${aliases}; connectionId?: never }`
     const required = declaration.connections.length > 0 && declaration.connectionId == null
     const args = required
       ? `[input: {} extends ${input} ? ${input} | undefined : ${input}, options: ${options}]`
@@ -67,12 +78,15 @@ export function codeTyping(
     methods.push(`${JSON.stringify(declaration.action.slice(separator + 1))}: ${signature}`)
     providers.set(provider, methods)
   }
-  for (const [provider, methods] of providers) fields.push(`${JSON.stringify(provider)}: { ${[...methods, '[key: string]: any'].join('; ')} }`)
+  for (const [provider, methods] of providers)
+    if (permissions == null || methods.length > 0)
+      fields.push(`${JSON.stringify(provider)}: { ${[...methods, ...(permissions == null ? ['[key: string]: any'] : [])].join('; ')} }`)
   const hinted = declarations.map((declaration) => JSON.stringify(declaration.action)).join(' | ')
   const fallback =
     hinted == ''
       ? `(actionId: string, input?: Record<string, unknown>, options?: ${dynamicOptions}): Promise<unknown>`
       : `<Action extends string>(actionId: Action extends ${hinted} ? never : Action, input?: Record<string, unknown>, options?: ${dynamicOptions}): Promise<unknown>`
-  fields.push(`call: { ${calls.join('; ')}${calls.length == 0 ? '' : '; '}${fallback} }`, '[key: string]: any')
+  fields.push(`call: { ${calls.join('; ')}${calls.length == 0 ? '' : '; '}${permissions == null ? fallback : ''} }`)
+  if (permissions == null) fields.push('[key: string]: any')
   return `${typing}/** @typedef {import("@oomol-lab/open-flow").TaskContext<{ ${fields.join('; ').replaceAll('*/', '*\\/')} }>} TaskContext */\n`
 }

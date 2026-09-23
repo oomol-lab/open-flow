@@ -27,6 +27,12 @@ const legacyCapability = z.strictObject({
 })
 const capability = z.union([
   legacyCapability,
+  z.strictObject({ kind: z.literal('connector'), mode: z.literal('shared') }),
+  z.strictObject({
+    kind: z.literal('connector'),
+    mode: z.literal('independent'),
+    actions: z.array(z.strictObject({ action: text, connectionId: text.optional() })),
+  }),
   z.strictObject({
     kind: z.literal('connector'),
     actionHints: z.array(text).optional(),

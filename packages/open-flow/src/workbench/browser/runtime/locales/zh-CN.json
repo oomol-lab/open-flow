@@ -270,6 +270,13 @@
       "save": "保存 Subflow"
     },
     "task": {
+      "sharedPermissions": "使用 Flow 共享权限组",
+      "sharedPermissionsHint": "直接使用 Flow 共享权限组已授权的全部 Actions，无需逐个添加。",
+      "addAction": "添加 Action",
+      "removeAction": "移除 Action",
+      "actionAccount": "账号",
+      "chooseAccount": "选择账号",
+      "permissionSaveFailed": "无法保存 Code 权限，请重试。",
       "chatText": "对话文本",
       "connectorAction": "连接器操作",
       "definition": "任务定义",

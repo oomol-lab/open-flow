@@ -191,6 +191,15 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
   register('connector_connections', mcpTools.connector_connections, async ({ serviceId, flowId }, context) => ({
     connections: await control.listConnectorConnections(serviceId, flowId, context.mcpReq.signal),
   }))
+  register('event_source_list', mcpTools.event_source_list, async () => {
+    const sources = await control.listEventSources()
+    return {
+      ...sources,
+      ...(sources.sources.length == 0
+        ? { guidance: 'No event sources are visible to this identity. Open Workbench to create and verify a Feishu event source, then list again.' }
+        : {}),
+    }
+  })
   register('trigger_search', mcpTools.trigger_search, ({ query }) => ({ keys: searchTriggerKeys(control.listTriggerKeys(), query) }))
   register('trigger_get', mcpTools.trigger_get, ({ key }) => ({
     definition: control.getTriggerKey(key),

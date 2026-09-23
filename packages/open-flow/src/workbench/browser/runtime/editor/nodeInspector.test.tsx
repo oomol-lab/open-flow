@@ -2,6 +2,7 @@ import type { ReactElement, ReactNode } from 'react'
 
 import { Children, isValidElement } from 'react'
 import { describe, expect, it, vi } from 'vitest'
+import { CodeTaskSection } from './codeTaskSection.tsx'
 import { ConnectorAccount, TriggerConnection } from './connectionSettings.tsx'
 import { NodeInspector } from './nodeInspector.tsx'
 
@@ -345,8 +346,61 @@ describe('Node execution settings', () => {
 })
 
 describe('Code task sections', () => {
-  it('renders Code and Node settings as consecutive sections instead of tabs', () => {
+  it.each([
+    {
+      name: 'default',
+      accounts: [
+        { connectionId: 'work', status: 'active', isDefault: true },
+        { connectionId: 'personal', status: 'active' },
+      ],
+      expected: 'work',
+    },
+    { name: 'only active account', accounts: [{ connectionId: 'work', status: 'active' }], expected: 'work' },
+    {
+      name: 'ambiguous accounts',
+      accounts: [
+        { connectionId: 'work', status: 'active' },
+        { connectionId: 'personal', status: 'active' },
+      ],
+      expected: undefined,
+    },
+    { name: 'inactive default', accounts: [{ connectionId: 'work', status: 'inactive', isDefault: true }], expected: undefined },
+  ])('adds an independent Action using the $name', async ({ accounts, expected }) => {
+    const setCodeActions = vi.fn().mockResolvedValue(true)
+    const rendered = CodeTaskSection({
+      connectors: { $: { actions: { value: {} }, connections: { value: [] }, catalogs: { value: {} } } } as never,
+      disabled: false,
+      selection: {
+        id: 'code',
+        kind: 'task',
+        module: {},
+        definition: { moduleId: 'code', inputs: [], outputs: [], capabilities: [{ kind: 'connector', mode: 'independent', actions: [] }] },
+      } as never,
+      store: {
+        setCodeActions,
+        catalogs: { providers: { get: () => ({ value: { data: [] } }) } },
+        $: { flowId: { value: 'flow' }, moduleEditor: { value: { moduleId: 'code', source: '' } } },
+      } as never,
+      theme: 'light',
+    })
+    if (rendered == null) throw new Error('Expected Code settings.')
+    const picker = find(rendered, (item) => item.props.label == 'inspector.task.addAction')
+    if (picker == null) throw new Error('Expected Action picker.')
+    await picker.props.onSelect({ actionId: 'github.read', authenticated: true }, accounts)
+    expect(setCodeActions).toHaveBeenLastCalledWith('code', [
+      {
+        kind: 'connector',
+        mode: 'independent',
+        actions: [expected == null ? { action: 'github.read' } : { action: 'github.read', connectionId: expected }],
+      },
+    ])
+    await picker.props.onSelect({ actionId: 'public.read', authenticated: false }, accounts)
+    expect(setCodeActions).toHaveBeenLastCalledWith('code', [{ kind: 'connector', mode: 'independent', actions: [{ action: 'public.read' }] }])
+  })
+
+  it('renders legacy Code with an editable permission mode and consecutive Node settings', async () => {
     const configureAccess = vi.fn()
+    const setCodeActions = vi.fn().mockResolvedValue(true)
     const node = {
       kind: 'task',
       name: 'Transform',
@@ -364,7 +418,7 @@ describe('Code task sections', () => {
       activeConnectorConnections: [],
       connectorAuthorizationPending: false,
       connectorLoading: false,
-      connectors: { $: { actions: { value: {} }, connections: { value: [] } } } as never,
+      connectors: { $: { actions: { value: {} }, connections: { value: [] }, catalogs: { value: {} } } } as never,
       disabled: false,
       onConfigureConnectorAccess: configureAccess,
       revision: { graph: () => ({ nodes: { task: node } }) } as never,
@@ -376,6 +430,7 @@ describe('Code task sections', () => {
         module: { name: 'Transform', imports: [], source: 'export default () => ({})' },
       } as never,
       store: {
+        setCodeActions,
         catalogs: { providers: { get: () => ({ value: { data: [] } }) } },
         $: {
           flowId: { value: 'flow' },
@@ -391,6 +446,11 @@ describe('Code task sections', () => {
     const task = find(element, (item) => typeof item.type == 'function' && item.type.name == 'CodeTaskSection')
     if (task == null || typeof task.type != 'function') throw new Error('Expected task definition.')
     const rendered = (task.type as (props: unknown) => ReactElement)(task.props)
+    const modeSwitch = find(rendered, (item) => item.props.id == 'task-shared-permissions')
+    expect(modeSwitch?.props.checked).toBe(true)
+    expect(setCodeActions).not.toHaveBeenCalled()
+    await modeSwitch?.props.onCheckedChange(false)
+    expect(setCodeActions).toHaveBeenCalledWith('task', [{ kind: 'connector', mode: 'independent', actions: [] }])
     expect(rendered.props['data-inspector-section']).toBe('module')
     expect(rendered.props.className).toContain('inspector-titled-section')
     expect(find(rendered, (item) => item.type == 'h3' && item.props.className == 'inspector-section-title')).toBeDefined()
