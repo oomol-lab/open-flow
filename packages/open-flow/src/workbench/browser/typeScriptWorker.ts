@@ -1,5 +1,6 @@
 import { createSystem, createVirtualTypeScriptEnvironment } from '@typescript/vfs'
 import ts, { displayPartsToString } from 'typescript-lsp'
+import { syntaxDiagnostics } from './typeScriptDiagnostics.ts'
 import { ShadowDocument } from './typeScriptShadow.ts'
 
 const compilerOptions: import('typescript-lsp').CompilerOptions = {
@@ -94,6 +95,10 @@ function handleRequest(method: string, params: any): unknown {
           textDocumentSync: 1,
         },
       }
+    case 'openFlow/syntaxDiagnostics': {
+      const document = openDocuments.get(params.uri)
+      return document == null ? [] : syntaxDiagnostics(environment.languageService, params.uri, document)
+    }
     case 'shutdown':
       return null
     case 'textDocument/completion': {

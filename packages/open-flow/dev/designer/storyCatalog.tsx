@@ -1,6 +1,6 @@
 import type { FrontendStory, LogAction } from './stories.tsx'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { ValueEditorFeedback } from '../../src/form/browser/fieldControl.tsx'
 import { Input } from '../../src/ui/browser/input.tsx'
 import { CodeEditor } from '../../src/workbench/browser/runtime/editor/codeEditor.tsx'
@@ -69,7 +69,8 @@ const codeEditorStory: FrontendStory = {
   render: (log, dark) => <CodeEditorStory dark={dark} log={log} />,
   standalone: true,
   title: 'Code Editor',
-  description: 'Compare the code editor with a standard input in both themes. Toggle the syntax issue to inspect danger styling and its message.',
+  description:
+    'Syntax and server errors keep the editor border in its danger state. Edit or reset the source to check that it clears when all errors are resolved.',
 }
 
 export const labStories: readonly FrontendStory[] = [
@@ -131,22 +132,39 @@ export const labStories: readonly FrontendStory[] = [
 
 function CodeEditorStory({ dark, log }: { readonly dark: boolean; readonly log: LogAction }) {
   const [value, setValue] = useState(codeEditorSource)
-  const [invalid, setInvalid] = useState(false)
-  useStoryActions([{ label: invalid ? 'Clear syntax issue' : 'Show syntax issue', onClick: () => setInvalid((current) => !current) }])
+  const [serverSource, setServerSource] = useState<string>()
+  useStoryActions([
+    {
+      label: serverSource == null ? 'Show server issue' : 'Clear server issue',
+      onClick: () => setServerSource((current) => (current == null ? value : undefined)),
+    },
+    { label: 'Insert syntax error', onClick: () => setValue(codeEditorSource.replace('const text =', 'const text = ; //')) },
+    { label: 'Reset source', onClick: () => setValue(codeEditorSource) },
+  ])
+  const serverMessage = 'This module cannot use context.fetch in the current engine.'
+  const diagnostics = useMemo(
+    () => ({
+      source: serverSource ?? '',
+      items: serverSource != null ? [{ line: 3, column: 25, message: serverMessage }] : [],
+    }),
+    [serverSource],
+  )
+  const serverInvalid = value == serverSource
   return (
     <div className="code-editor-story open-flow-workbench open-flow-property-panel flex flex-col gap-3 p-4" data-theme={dark ? 'dark' : 'light'}>
       <label className="flex max-w-sm flex-col gap-1 text-xs">
         Standard input
         <Input aria-label="Standard input" defaultValue="Reference surface" />
       </label>
-      <ValueEditorFeedback error={invalid ? 'CodeModule contains invalid JavaScript syntax.' : undefined}>
+      <ValueEditorFeedback error={serverInvalid ? serverMessage : undefined}>
         {(errorId) => (
           <CodeEditor
             ariaDescribedBy={errorId}
             ariaLabel="JavaScript source"
             disabled={false}
             errorLabel="Code editor unavailable"
-            invalid={invalid}
+            invalid={serverInvalid}
+            diagnostics={diagnostics}
             loadingLabel="Loading code editor"
             onBlur={() => log('code.blur', { length: value.length })}
             onChange={(source) => {

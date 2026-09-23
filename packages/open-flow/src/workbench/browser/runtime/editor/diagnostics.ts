@@ -76,7 +76,7 @@ export function deriveInspectorDiagnostics(
   diagnostics: FlowCheck | undefined,
   selection: ResolvedSelection | undefined,
 ): readonly Diagnostic[] {
-  if (revision == null || target == null || diagnostics == null) return []
+  if (revision == null || target == null || diagnostics == null || diagnostics.revisionId != revision.revision.revisionId) return []
   if (selection != null) return diagnosticsForNode(target, selection, diagnostics.diagnostics)
   const targetPath = target.kind == 'flow' ? '/document/graph' : `/document/subflows/${target.id}`
   const nodePath = target.kind == 'flow' ? '/document/graph/nodes/' : `/document/subflows/${target.id}/graph/nodes/`

@@ -1,5 +1,6 @@
 import ts from 'typescript-lsp'
 import { describe, expect, it } from 'vitest'
+import { syntaxDiagnostics } from './typeScriptDiagnostics.ts'
 import { ShadowDocument } from './typeScriptShadow.ts'
 
 function languageService(source: string) {
@@ -79,5 +80,35 @@ describe('TypeScript shadow documents', () => {
     expect(document.text).toContain('@param {import("@oomol-lab/open-flow").TaskContext} task')
     for (let offset = 0; offset <= source.length; offset++) expect(document.toSource(document.toShadow(offset))).toBe(offset)
     expect(document.positionAt(1)).toBeUndefined()
+  })
+})
+
+describe('local JavaScript syntax diagnostics', () => {
+  it('maps errors to editable source past generated typing, including UTF-16 columns', () => {
+    const source = 'export default function (inputs, context) {\n  const text = "流程🚀"; const broken = ;\n  return inputs\n}'
+    const document = new ShadowDocument(source, typing)
+    const { file, service } = languageService(document.text)
+    const errors = syntaxDiagnostics(service, file, document)
+    expect(errors).toEqual([expect.objectContaining({ from: source.indexOf(';', source.indexOf('broken')), severity: 'error' })])
+    expect(errors[0]?.message).toContain('Expression expected')
+  })
+
+  it('reports end-of-file errors and clears them for repaired source', () => {
+    const source = 'export default function (inputs) {\n  return inputs'
+    const document = new ShadowDocument(source, typing)
+    const { file, service } = languageService(document.text)
+    expect(syntaxDiagnostics(service, file, document)).toEqual([expect.objectContaining({ from: source.length, to: source.length })])
+    const repaired = new ShadowDocument(source + '\n}', typing)
+    const fixed = languageService(repaired.text)
+    expect(syntaxDiagnostics(fixed.service, fixed.file, repaired)).toEqual([])
+  })
+
+  it('does not report semantic errors or errors inside generated typing', () => {
+    const document = new ShadowDocument('export default () => missingVariable', typing)
+    const { file, service } = languageService(document.text)
+    expect(syntaxDiagnostics(service, file, document)).toEqual([])
+    const generated = new ShadowDocument('export default () => 1', 'const broken = ;\n')
+    const invalid = languageService(generated.text)
+    expect(syntaxDiagnostics(invalid.service, invalid.file, generated)).toEqual([])
   })
 })

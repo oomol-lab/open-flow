@@ -161,6 +161,7 @@ describe('Workbench Diagnostic messages', () => {
       valid: false,
       version: 1 as const,
     }
+    expect(deriveInspectorDiagnostics(revision, { kind: 'flow' }, { ...check, revisionId: 'previous' }, undefined)).toEqual([])
 
     expect(diagnosticItems(revision, { kind: 'flow' }, check)).toMatchObject([{ location: { nodeId: 'trigger', section: 'account' } }, { location: undefined }])
     expect(deriveInspectorDiagnostics(revision, { kind: 'flow' }, check, undefined)).toEqual([flowDiagnostic])

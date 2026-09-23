@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import type { CodeDiagnostics } from '../../../../ui/browser/codeDiagnostics.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 
 import { useEffect, useRef, useState } from 'react'
@@ -29,6 +30,7 @@ async function claimEditor(uri: string): Promise<() => void> {
 interface Props {
   readonly ariaDescribedBy?: string
   readonly ariaLabel: string
+  readonly diagnostics?: CodeDiagnostics
   readonly disabled: boolean
   readonly errorLabel: string
   readonly invalid?: boolean
@@ -45,6 +47,7 @@ interface Props {
 export function CodeEditor({
   ariaDescribedBy,
   ariaLabel,
+  diagnostics,
   disabled,
   errorLabel,
   invalid = false,
@@ -62,6 +65,7 @@ export function CodeEditor({
   const darkMode = useRef<ReturnType<typeof val<boolean>>>()
   const syncing = useRef(false)
   const valueRef = useRef(value)
+  const diagnosticsRef = useRef(diagnostics)
   const disabledRef = useRef(disabled)
   const describedByRef = useRef(ariaDescribedBy)
   const invalidRef = useRef(invalid)
@@ -72,6 +76,7 @@ export function CodeEditor({
   const [failed, setFailed] = useState(false)
   const [loading, setLoading] = useState(true)
   valueRef.current = value
+  diagnosticsRef.current = diagnostics
   disabledRef.current = disabled
   describedByRef.current = ariaDescribedBy
   invalidRef.current = invalid
@@ -108,6 +113,7 @@ export function CodeEditor({
             ariaDescribedBy: describedByRef.current,
             ariaLabel,
             language: 'javascript',
+            diagnostics: diagnosticsRef.current,
             invalid: invalidRef.current,
             readOnly: disabledRef.current,
             value: valueRef.current,
@@ -126,7 +132,12 @@ export function CodeEditor({
         }
         current = created
         editor.current = created
-        created.updateOptions({ ariaDescribedBy: describedByRef.current, invalid: invalidRef.current, readOnly: disabledRef.current })
+        created.updateOptions({
+          diagnostics: diagnosticsRef.current,
+          ariaDescribedBy: describedByRef.current,
+          invalid: invalidRef.current,
+          readOnly: disabledRef.current,
+        })
         if (created.getValue() != valueRef.current) created.setValue(valueRef.current)
         changeListener = created.onChange(() => {
           if (!syncing.current) onChangeRef.current(created.getValue())
@@ -167,6 +178,10 @@ export function CodeEditor({
     current.setValue(value)
     syncing.current = false
   }, [value])
+
+  useEffect(() => {
+    editor.current?.updateOptions({ diagnostics })
+  }, [diagnostics])
 
   useEffect(() => {
     editor.current?.updateOptions({ readOnly: disabled })

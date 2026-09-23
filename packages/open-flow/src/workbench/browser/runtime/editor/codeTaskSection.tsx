@@ -140,7 +140,21 @@ export function CodeTaskSection({
   const module = selection.module
   const moduleEditor = useVal(store.$.moduleEditor)
   const moduleLocation = focus?.section == 'module' ? focus.diagnostic : undefined
-  const moduleDiagnostics = diagnostics?.filter((diagnostic) => diagnostic.path == `/modules/${moduleEditor?.moduleId}/source`) ?? []
+  const moduleDiagnostics = useMemo(
+    () =>
+      moduleEditor?.source == module?.source ? (diagnostics?.filter((diagnostic) => diagnostic.path == `/modules/${moduleEditor?.moduleId}/source`) ?? []) : [],
+    [diagnostics, moduleEditor?.moduleId, moduleEditor?.source, module?.source],
+  )
+  const editorDiagnostics = useMemo(
+    () =>
+      module == null
+        ? undefined
+        : {
+            source: module.source,
+            items: moduleDiagnostics.map((diagnostic) => ({ ...diagnostic, message: diagnosticMessage(diagnostic, t) })),
+          },
+    [module?.source, moduleDiagnostics, t],
+  )
 
   if (task == null) return <div className="inspector-section section-error">{t('inspector.task.missing')}</div>
   return module != null && 'moduleId' in task && moduleEditor?.moduleId == task.moduleId ? (
@@ -323,6 +337,7 @@ export function CodeTaskSection({
               ariaDescribedBy={errorId}
               ariaLabel={t('inspector.task.source')}
               disabled={disabled}
+              diagnostics={editorDiagnostics}
               invalid={moduleDiagnostics.length > 0}
               errorLabel={t('inspector.task.editorUnavailable')}
               loadingLabel={t('inspector.task.editorLoading')}

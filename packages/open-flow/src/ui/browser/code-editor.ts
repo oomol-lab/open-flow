@@ -1,13 +1,13 @@
 import type { Extension } from '@codemirror/state'
 import type { EditorView as CodeMirrorEditorView } from '@codemirror/view'
 import type { ReadonlyVal } from 'value-enhancer'
-export interface CodeEditorOptions {
+import type { CodeEditorFeedback } from './codeDiagnostics.ts'
+export interface CodeEditorOptions extends CodeEditorFeedback {
   readonly setup?: 'basic' | 'minimal'
   readonly theme?: 'github' | 'warm'
   readonly ariaDescribedBy?: string
   readonly ariaLabel?: string
   readonly language?: string
-  readonly invalid?: boolean
   readonly readOnly?: boolean
   readonly value?: string
   readonly cursorScrollMargin?: number
@@ -17,6 +17,8 @@ export interface CodeEditorOptions {
 export type CodeMirrorLanguage = 'javascript' | 'json' | 'markdown' | 'plaintext' | 'typescript' | 'yaml'
 
 interface CodeMirrorModules {
+  readonly codeDiagnosticsExtension: typeof import('./codeDiagnostics.ts').codeDiagnosticsExtension
+  readonly updateCodeFeedback: typeof import('./codeDiagnostics.ts').updateCodeFeedback
   readonly warmCodeTheme: typeof import('./warmCodeTheme.ts').warmCodeTheme
   readonly Compartment: typeof import('@codemirror/state').Compartment
   readonly EditorState: typeof import('@codemirror/state').EditorState
@@ -108,7 +110,10 @@ async function loadCodeMirrorModules(): Promise<CodeMirrorModules> {
       import('@codemirror/commands'),
       import('@codemirror/autocomplete'),
       import('./warmCodeTheme.ts'),
-    ]).then(([codeMirror, state, view, github, javascript, json, markdown, yaml, commands, autocomplete, warm]) => ({
+      import('./codeDiagnostics.ts'),
+    ]).then(([codeMirror, state, view, github, javascript, json, markdown, yaml, commands, autocomplete, warm, diagnostics]) => ({
+      codeDiagnosticsExtension: diagnostics.codeDiagnosticsExtension,
+      updateCodeFeedback: diagnostics.updateCodeFeedback,
       warmCodeTheme: warm.warmCodeTheme,
       autocompletion: autocomplete.autocompletion,
       basicSetup: codeMirror.basicSetup,
@@ -191,6 +196,7 @@ class CodeMirrorEditor {
       doc: options.value ?? '',
       parent: layoutRoot,
       extensions: [
+        modules.codeDiagnosticsExtension,
         options.setup === 'minimal' ? modules.minimalSetup : modules.basicSetup,
         modules.EditorView.editorAttributes.of({ class: 'open-flow-code-editor' }),
         modules.EditorView.cursorScrollMargin.of(options.cursorScrollMargin ?? 5),
@@ -233,7 +239,7 @@ class CodeMirrorEditor {
         }),
       ],
     })
-    this.setInvalid(options.invalid === true)
+    this.view.dispatch({ effects: modules.updateCodeFeedback.of({ diagnostics: options.diagnostics, invalid: options.invalid }) })
     this.view.dom.dataset.uri = uri
     this.view.dom.dataset.language = this.language
     if (options.ariaDescribedBy != null) this.view.contentDOM.setAttribute('aria-describedby', options.ariaDescribedBy)
@@ -285,13 +291,14 @@ class CodeMirrorEditor {
     }
   }
 
-  private setInvalid(invalid: boolean): void {
-    this.view.contentDOM.setAttribute('aria-invalid', String(invalid))
-    this.view.dom.dataset.invalid = String(invalid)
-  }
-
   public updateOptions(options: CodeEditorOptions): void {
-    if (options.invalid != null) this.setInvalid(options.invalid)
+    if ('diagnostics' in options || options.invalid != null) {
+      const feedback: CodeEditorFeedback = {
+        ...('diagnostics' in options ? { diagnostics: options.diagnostics } : {}),
+        ...(options.invalid != null ? { invalid: options.invalid } : {}),
+      }
+      this.view.dispatch({ effects: this.modules.updateCodeFeedback.of(feedback) })
+    }
     if ('ariaDescribedBy' in options) {
       if (options.ariaDescribedBy == null) this.view.contentDOM.removeAttribute('aria-describedby')
       else this.view.contentDOM.setAttribute('aria-describedby', options.ariaDescribedBy)

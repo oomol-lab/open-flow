@@ -1,8 +1,10 @@
+import type { Diagnostic } from '@codemirror/lint'
 import type { Transport } from '@codemirror/lsp-client'
 import type { Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 
 import { javascript } from '@codemirror/lang-javascript'
+import { linter } from '@codemirror/lint'
 import { LSPClient, languageServerExtensions } from '@codemirror/lsp-client'
 import { activateHover, keymap } from '@codemirror/view'
 // oxlint-disable-next-line import/default
@@ -79,7 +81,16 @@ export async function loadTypeScriptExtension(uri: string, typing: string): Prom
   sessionPromise ??= createSession()
   const session = await sessionPromise
   session.client.notification('openFlow/typing', { typing, uri })
-  return session.client.plugin(uri, 'javascript')
+  return [
+    session.client.plugin(uri, 'javascript'),
+    linter(
+      async () => {
+        session.client.sync()
+        return await session.client.request<{ uri: string }, Diagnostic[]>('openFlow/syntaxDiagnostics', { uri })
+      },
+      { delay: 300 },
+    ),
+  ]
 }
 
 export async function updateTypeScriptTyping(uri: string, typing: string): Promise<void> {
