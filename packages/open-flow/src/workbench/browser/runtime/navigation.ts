@@ -9,14 +9,14 @@ export class NavigationStore {
   readonly #navigate: (location: WorkbenchLocation, options: WorkbenchNavigationOptions) => void
   #location: WorkbenchLocation
   readonly #store: WorkbenchStore
+  readonly #ready = val(false)
   readonly #view = val<WorkbenchView>('design')
   #change = 0
   #disposed = false
-  #ready = false
   #syncing = false
   readonly #stopReactions: (() => void)[] = []
 
-  public readonly $: { readonly view: ReadonlyVal<WorkbenchView> } = { view: this.#view }
+  public readonly $: { readonly ready: ReadonlyVal<boolean>; readonly view: ReadonlyVal<WorkbenchView> } = { ready: this.#ready, view: this.#view }
 
   public constructor(store: WorkbenchStore, location: WorkbenchLocation, navigate: (location: WorkbenchLocation, options: WorkbenchNavigationOptions) => void) {
     this.#location = location
@@ -34,12 +34,13 @@ export class NavigationStore {
     if (this.#disposed || change != this.#change) return
     this.#write(location.view, true)
     this.#syncing = false
-    this.#ready = true
+    this.#ready.set(true)
   }
 
   public dispose(): void {
     this.#disposed = true
     for (const stop of this.#stopReactions) stop()
+    this.#ready.dispose()
     this.#view.dispose()
   }
 
@@ -109,13 +110,13 @@ export class NavigationStore {
     } finally {
       if (change == this.#change) {
         this.#syncing = false
-        this.#ready = true
+        this.#ready.set(true)
       }
     }
   }
 
   readonly #sync = (): void => {
-    if (this.#ready && !this.#syncing) this.#write(this.#view.value, true)
+    if (this.#ready.value && !this.#syncing) this.#write(this.#view.value, true)
   }
 
   #write(view: WorkbenchView, replace: boolean): void {

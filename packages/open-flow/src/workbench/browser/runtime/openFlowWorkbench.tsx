@@ -297,6 +297,7 @@ function Session({
       store: workbenchStore,
     }
   })
+  const started = useVal(navigation.$.ready)
   useEffect(() => {
     void navigation.start()
     const refreshConnections = (): void => {
@@ -322,24 +323,28 @@ function Session({
     <I18nProvider i18n={i18n}>
       <div className="open-flow-theme open-flow-workbench" data-theme={theme}>
         <NotificationBridge host={host} store={store} />
-        <Workbench
-          catalogWidth={catalogWidth}
-          createFlow={createFlow}
-          createFlowDisabled={createFlowDisabled}
-          createFlowField={createFlowField}
-          flowBadges={flowBadges}
-          hostAction={hostAction}
-          hostTitle={hostTitle}
-          hrefFor={hrefFor}
-          language={language}
-          navigation={navigation}
-          onConfigureConnector={onConfigureConnector}
-          onManageConnectorAccess={onManageConnectorAccess}
-          onHostAction={onHostAction}
-          onLanguageChange={onLanguageChange}
-          store={store}
-          theme={theme}
-        />
+        {started ? (
+          <Workbench
+            catalogWidth={catalogWidth}
+            createFlow={createFlow}
+            createFlowDisabled={createFlowDisabled}
+            createFlowField={createFlowField}
+            flowBadges={flowBadges}
+            hostAction={hostAction}
+            hostTitle={hostTitle}
+            hrefFor={hrefFor}
+            language={language}
+            navigation={navigation}
+            onConfigureConnector={onConfigureConnector}
+            onManageConnectorAccess={onManageConnectorAccess}
+            onHostAction={onHostAction}
+            onLanguageChange={onLanguageChange}
+            store={store}
+            theme={theme}
+          />
+        ) : (
+          <main aria-busy="true" className="workspace" />
+        )}
       </div>
     </I18nProvider>
   )

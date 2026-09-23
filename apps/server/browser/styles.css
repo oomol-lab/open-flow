@@ -35,6 +35,13 @@ body {
   color: var(--ui-foreground);
 }
 
+.server-session-checking {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  color: var(--ui-muted-foreground);
+}
+
 .workbench-frame {
   min-width: 0;
   min-height: 0;

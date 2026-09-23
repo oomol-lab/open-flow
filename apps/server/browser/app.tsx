@@ -367,7 +367,11 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
 
   return (
     <div className="open-flow-theme server-host" data-theme={theme}>
-      {session.kind == 'signed-in' ? (
+      {session.kind == 'checking' ? (
+        <main aria-live="polite" className="server-session-checking" role="status">
+          {t('session.checking')}
+        </main>
+      ) : session.kind == 'signed-in' ? (
         <>
           <header className="server-nav">
             <div className="server-nav-title">Open Flow Server</div>
@@ -436,40 +440,36 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
       ) : (
         <OpenFlowSessionGate
           action={
-            session.kind == 'checking'
-              ? undefined
-              : session.setupRequired === true
-                ? t(session.setupAuthorized === true ? 'session.setupFinish' : 'session.setupContinue')
-                : session.configured === false || session.configured == null
-                  ? t('session.retry')
-                  : t('session.signIn')
+            session.setupRequired === true
+              ? t(session.setupAuthorized === true ? 'session.setupFinish' : 'session.setupContinue')
+              : session.configured === false || session.configured == null
+                ? t('session.retry')
+                : t('session.signIn')
           }
-          description={session.kind == 'checking' ? t('session.checking') : sessionMessage}
+          description={sessionMessage}
           error={
-            session.kind != 'signed-out' || session.error == null || session.error == 'unavailable'
+            session.error == null || session.error == 'unavailable'
               ? undefined
               : t(session.error == 'invalid' ? 'session.invalid' : session.error == 'setup-code' ? 'session.setupInvalidCode' : 'session.setupInvalidToken')
           }
           onSubmit={
-            session.kind == 'checking'
-              ? undefined
-              : session.setupRequired === true
-                ? (event) => void setup(event)
-                : session.configured === false || session.configured == null
-                  ? (event) => {
-                      event.preventDefault()
-                      void checkSession()
-                    }
-                  : (event) => void signIn(event)
+            session.setupRequired === true
+              ? (event) => void setup(event)
+              : session.configured === false || session.configured == null
+                ? (event) => {
+                    event.preventDefault()
+                    void checkSession()
+                  }
+                : (event) => void signIn(event)
           }
-          onTokenChange={session.kind == 'signed-out' && (session.configured === true || session.setupRequired === true) ? setToken : undefined}
-          pending={session.kind == 'checking' || submitting}
+          onTokenChange={session.configured === true || session.setupRequired === true ? setToken : undefined}
+          pending={submitting}
           title="Open Flow Server"
-          token={session.kind == 'signed-out' && (session.configured === true || session.setupRequired === true) ? token : undefined}
+          token={session.configured === true || session.setupRequired === true ? token : undefined}
           tokenLabel={
-            session.kind == 'signed-out' && session.setupRequired === true
+            session.setupRequired === true
               ? t(session.setupAuthorized === true ? 'session.token' : 'session.setupCode')
-              : session.kind == 'signed-out' && session.configured === true
+              : session.configured === true
                 ? t('session.token')
                 : undefined
           }
