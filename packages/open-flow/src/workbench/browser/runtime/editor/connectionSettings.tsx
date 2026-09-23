@@ -258,7 +258,6 @@ export function ConnectorAccount({
   return (
     <section className={`connection-state ${required ? 'required' : ''}`} data-inspector-section="account">
       <h3 className="inspector-section-title">
-        <Icon name="connection" size={15} />{' '}
         {t(!pending && accessIssue != null ? 'inspector.account.accessTitle' : required ? 'inspector.account.required' : 'inspector.account.title')}
         {onManage != null && (
           <Button className="ml-auto" disabled={disabled} onClick={onManage} size="xs" type="button" variant="ghost">
@@ -308,7 +307,7 @@ export function TriggerConnection({
     providerTrigger == null ? null : (
       <section className={`connection-state ${connection?.status == 'active' ? '' : 'required'}`} data-inspector-section="account">
         <h3 className="inspector-section-title">
-          <Icon name="connection" size={15} /> {t(connection?.status == 'active' ? 'inspector.account.title' : 'inspector.account.required')}
+          {t(connection?.status == 'active' ? 'inspector.account.title' : 'inspector.account.required')}
           {canManage && (
             <Button
               className="ml-auto"
