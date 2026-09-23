@@ -19,6 +19,7 @@ function fixture(providerAccess?: ConnectorAccess) {
     digest: 'digest',
     flowId: 'flow',
     idempotencyKey: 'flow',
+    modelVersion: 2,
     name: 'Flow',
     requestDigest: 'flow',
     revisionId: 'revision',

@@ -28,6 +28,7 @@ export class Maintenance {
   readonly #runChanged: (flowId: string, runId: string) => void
   readonly #signal: () => void
   readonly #store: Store
+  #cleanupAt = 0
   #maintenanceAt = 0
 
   constructor(
@@ -59,7 +60,12 @@ export class Maintenance {
   }
 
   nextAt(): number {
-    return Math.min(this.#maintenanceAt, this.#store.runs.nextMaintenanceAt() ?? Infinity, this.#store.publications.nextPublishAt() ?? Infinity)
+    return Math.min(
+      this.#cleanupAt,
+      this.#maintenanceAt,
+      this.#store.runs.nextMaintenanceAt() ?? Infinity,
+      this.#store.publications.nextPublishAt() ?? Infinity,
+    )
   }
 
   markDue(): void {
@@ -132,7 +138,9 @@ export class Maintenance {
             )
           }
         }
-        const nextDelay = Math.min(runs.more ? 0 : maintenanceIntervalMs, this.#maintain(now))
+        const publication = this.#publisher.advance(now)
+        const nextDelay = Math.min(runs.more || publication == 'more' ? 0 : maintenanceIntervalMs, this.#retireFlow(now))
+        if (this.#cleanupAt <= now) this.#cleanupAt = this.#clock() + (this.#cleanup(now) ? 0 : maintenanceIntervalMs)
         // Preserve wakes received while notification delivery was awaiting the Connector.
         this.#maintenanceAt = Math.min(this.#maintenanceAt, this.#clock() + nextDelay)
         this.#signal()
@@ -140,28 +148,33 @@ export class Maintenance {
     )
   }
 
-  #maintain(now: number): number {
-    const publication = this.#publisher.advance(now)
-    let nextDelay = publication == 'more' ? 0 : maintenanceIntervalMs
-    if (this.#store.publications.prunePublishOperations(now, maintenanceBatchSize) > 0) nextDelay = 0
+  #cleanup(now: number): boolean {
+    const publications = this.#store.publications.prunePublishOperations(now, maintenanceBatchSize)
+    const drafts = this.#store.flows.pruneDraftRevisions(maintenanceBatchSize)
+    const orphans = this.#store.flows.collectOrphanRevisions(maintenanceBatchSize)
+    this.#logger.info(
+      { category: 'maintenance.cleanup.completed', publishOperations: publications, draftRevisions: drafts, orphanRevisions: orphans },
+      'Maintenance cleanup completed.',
+    )
+    return publications > 0 || drafts > 0 || orphans > 0
+  }
+
+  #retireFlow(now: number): number {
     const flowId = this.#store.flows.claimRetiring(now)
-    if (flowId == null) {
-      if (this.#store.flows.collectOrphanRevisions(maintenanceBatchSize) > 0) nextDelay = 0
-      return nextDelay
-    }
+    if (flowId == null) return maintenanceIntervalMs
 
     const canceled = this.#store.runs.cancelByFlow(flowId, maintenanceBatchSize)
     for (const runId of canceled) this.#interrupt(runId)
     if (canceled.length > 0) return 0
     if (this.#isFlowRunning(flowId)) return maintenanceRetryMs
-    if (this.#store.flows.hasIntegrationState(flowId)) return nextDelay
+    if (this.#store.flows.hasIntegrationState(flowId)) return maintenanceIntervalMs
     if (this.#store.runs.deleteByFlow(flowId, maintenanceBatchSize) > 0) return 0
     if (!this.#connectorAccess.delete(flowId)) return maintenanceRetryMs
-    if (!this.#store.flows.delete(flowId)) return nextDelay
+    if (!this.#store.flows.delete(flowId)) return maintenanceIntervalMs
 
     this.#logger.info({ category: 'flow.deleted', flowId }, 'Retired Flow was physically deleted.')
     this.#notifyFlowCatalog()
-    if (this.#store.flows.collectOrphanRevisions(maintenanceBatchSize) > 0) return 0
-    return nextDelay
+    this.#cleanupAt = Math.min(this.#cleanupAt, now)
+    return maintenanceIntervalMs
   }
 }

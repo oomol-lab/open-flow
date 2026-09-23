@@ -23,6 +23,7 @@ for (const conformance of runLifecycleConformanceCases) {
         digest: 'revision',
         flowId: 'flow',
         idempotencyKey: 'flow',
+        modelVersion: currentFlowModelVersion,
         name: 'Lifecycle',
         requestDigest: 'flow',
         revisionId: 'revision',

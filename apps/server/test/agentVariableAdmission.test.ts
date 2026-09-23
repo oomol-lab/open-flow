@@ -54,6 +54,7 @@ describe('Agent Run admission with a deployment Variable', () => {
         digest: 'revision',
         flowId: 'flow',
         idempotencyKey: 'flow',
+        modelVersion: currentFlowModelVersion,
         name: 'Agent Variable',
         requestDigest: 'flow',
         revisionId: 'revision',

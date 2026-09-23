@@ -30,6 +30,7 @@ const migrationFiles = [
   '0025_integration_candidate_access.sql',
   '0026_flow_connector_services.sql',
   '0027_code_connection_usage.sql',
+  '0028_revision_retention.sql',
 ] as const
 const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 
@@ -38,7 +39,7 @@ export function migrate(database: Database): void {
   database.transaction(() => {
     const currentVersion = (database.connection.prepare('PRAGMA user_version').get() as { readonly user_version: number }).user_version
     if (hasApplicationTables(database) && !hasFlowSchema(database)) {
-      throw new Error('Legacy application schema requires an explicit migration; the database was not modified.')
+      throw new Error('Legacy application schema is unsupported; the database was not modified.')
     }
     if (currentVersion > migrationFiles.length) {
       throw new Error(`SQLite schema version ${currentVersion} is newer than the supported version ${migrationFiles.length}.`)

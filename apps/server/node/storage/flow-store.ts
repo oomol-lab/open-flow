@@ -26,6 +26,17 @@ export interface StoredFlowRevision {
   readonly revisionId: string
 }
 
+export interface StoredChangeRevision {
+  readonly actorId: string
+  readonly createdAt: number
+  readonly digest: string
+  readonly flowId: string
+  readonly modelVersion: number
+  readonly parentRevisionId: string | null
+  readonly requestDigest: string
+  readonly revisionId: string
+}
+
 export interface StoredPresentation {
   readonly flowId: string
   readonly revision: number
@@ -63,6 +74,7 @@ export class FlowStore {
     readonly digest: string
     readonly flowId: string
     readonly idempotencyKey: string
+    readonly modelVersion: number
     readonly name: string
     readonly requestDigest: string
     readonly revisionId: string
@@ -78,8 +90,10 @@ export class FlowStore {
 
       this.#revisions.ensure({ content: input.content, revisionDigest: input.digest, revisionId: input.revisionId })
       this.#database
-        .prepare('INSERT INTO flow_revisions (revision_id, flow_id, parent_revision_id, actor_id, created_at) VALUES (?, ?, NULL, ?, ?)')
-        .run(input.revisionId, input.flowId, input.actorId, input.createdAt)
+        .prepare(
+          'INSERT INTO flow_revisions (revision_id, flow_id, parent_revision_id, actor_id, created_at, digest, model_version) VALUES (?, ?, NULL, ?, ?, ?, ?)',
+        )
+        .run(input.revisionId, input.flowId, input.actorId, input.createdAt, input.digest, input.modelVersion)
       this.#database
         .prepare(
           `INSERT INTO flows (
@@ -231,6 +245,36 @@ export class FlowStore {
     )
   }
 
+  pruneDraftRevisions(limit: number): number {
+    return this.#transaction(() =>
+      Number(
+        this.#database
+          .prepare(
+            `DELETE FROM revisions WHERE revision_id IN (
+               SELECT revisions.revision_id FROM revisions
+               JOIN flow_revisions AS metadata USING (revision_id)
+               WHERE metadata.model_version IS NOT NULL
+                 AND NOT EXISTS (SELECT 1 FROM flows WHERE flows.draft_revision_id = revisions.revision_id)
+                 AND NOT EXISTS (SELECT 1 FROM publications WHERE publications.revision_id = revisions.revision_id)
+                 AND NOT EXISTS (SELECT 1 FROM publish_operations WHERE publish_operations.revision_id = revisions.revision_id AND status = 'pending')
+                 AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.revision_id = revisions.revision_id AND status IN ('queued', 'starting', 'running', 'waiting'))
+                 AND NOT EXISTS (
+                   SELECT 1 FROM runs AS retained
+                   WHERE retained.revision_id = revisions.revision_id AND retained.source = 'draft'
+                     AND retained.run_id IN (
+                       SELECT recent.run_id FROM runs AS recent
+                       WHERE recent.flow_id = metadata.flow_id AND recent.source = 'draft'
+                       ORDER BY recent.created_at DESC, recent.run_id DESC LIMIT 50
+                     )
+                 )
+               LIMIT ?
+             )`,
+          )
+          .run(limit).changes,
+      ),
+    )
+  }
+
   draft(flowId: string): StoredFlowRevision | undefined {
     return this.#database
       .prepare(
@@ -258,10 +302,13 @@ export class FlowStore {
       .get(flowId, revisionId) as StoredFlowRevision | undefined
   }
 
-  change(flowId: string, changeId: string): { readonly requestDigest: string; readonly revisionId: string } | undefined {
+  change(flowId: string, changeId: string): StoredChangeRevision | undefined {
     return this.#database
-      .prepare('SELECT change_request_digest AS requestDigest, revision_id AS revisionId FROM flow_revisions WHERE flow_id = ? AND change_id = ?')
-      .get(flowId, changeId) as { readonly requestDigest: string; readonly revisionId: string } | undefined
+      .prepare(`SELECT actor_id AS actorId, created_at AS createdAt, digest, flow_id AS flowId,
+               model_version AS modelVersion, parent_revision_id AS parentRevisionId,
+               change_request_digest AS requestDigest, revision_id AS revisionId
+               FROM flow_revisions WHERE flow_id = ? AND change_id = ?`)
+      .get(flowId, changeId) as StoredChangeRevision | undefined
   }
 
   commitRevision(
@@ -271,18 +318,19 @@ export class FlowStore {
       readonly content: string
       readonly createdAt: number
       readonly digest: string
+      readonly modelVersion: number
       readonly expectedRevisionId: string
       readonly flowId: string
       readonly requestDigest: string
       readonly revisionId: string
     },
     updateAccess?: () => void,
-  ): { readonly kind: 'busy' | 'conflict' | 'not-found' | 'request-conflict' } | { readonly kind: 'committed'; readonly revision: StoredFlowRevision } {
+  ): { readonly kind: 'busy' | 'conflict' | 'not-found' | 'request-conflict' } | { readonly kind: 'committed'; readonly revision: StoredChangeRevision } {
     return this.#transaction(() => {
       const existing = this.change(input.flowId, input.changeId)
       if (existing != null) {
         if (existing.requestDigest != input.requestDigest) return { kind: 'request-conflict' }
-        return { kind: 'committed', revision: this.revision(input.flowId, existing.revisionId)! }
+        return { kind: 'committed', revision: existing }
       }
 
       const flow = this.get(input.flowId)
@@ -295,12 +343,22 @@ export class FlowStore {
       this.#database
         .prepare(
           `INSERT INTO flow_revisions (
-             revision_id, flow_id, parent_revision_id, actor_id, created_at, change_id, change_request_digest
-           ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+             revision_id, flow_id, parent_revision_id, actor_id, created_at, change_id, change_request_digest, digest, model_version
+           ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run(input.revisionId, input.flowId, input.expectedRevisionId, input.actorId, input.createdAt, input.changeId, input.requestDigest)
+        .run(
+          input.revisionId,
+          input.flowId,
+          input.expectedRevisionId,
+          input.actorId,
+          input.createdAt,
+          input.changeId,
+          input.requestDigest,
+          input.digest,
+          input.modelVersion,
+        )
       this.#database.prepare('UPDATE flows SET draft_revision_id = ?, updated_at = ? WHERE flow_id = ?').run(input.revisionId, input.createdAt, input.flowId)
-      return { kind: 'committed', revision: this.revision(input.flowId, input.revisionId)! }
+      return { kind: 'committed', revision: this.change(input.flowId, input.changeId)! }
     })
   }
 

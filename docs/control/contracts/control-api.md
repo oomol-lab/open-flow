@@ -142,6 +142,10 @@ Revision 是完整 immutable snapshot。Draft change 使用 `expectedRevisionId`
 要求 `Idempotency-Key`；相同 key 与相同 batch 返回第一次提交的 Revision，相同 key 与不同 batch 返回 `flow.conflict`。幂等重放先于 Draft head CAS。
 Draft sync 始终返回当前完整 snapshot，不接受 revision cursor，也不返回 authoring operation history。
 
+Server 保留当前 Draft、Publication、待处理 Publish operation、未结束 Run 和每个 Flow 最近 50 条 Draft Run 引用的完整 Revision。
+其他旧 Revision 内容可由维护任务清理；`GET /v1/flows/:flowId/revisions/:revisionId` 对已清理的内容返回 404。
+Run 记录、终态结果与 Draft change 的幂等元数据仍保留。同一 Revision 被多次运行时，按 Run 条数计算最近 50 条。
+
 无法按当前模型读取但可以宽容恢复的 Draft 分别返回 `flow.upgrade-required` 或 `flow.repair-required`。客户端可以调用
 `POST /v1/flows/{flowId}/draft/repair`，body 为 `{ expectedRevisionId, version: 1 }` 并提供 `Idempotency-Key`。修复逐项保留
 当前模型可读取的资源，丢弃无法读取的 collection entry，并以旧 Draft 为 parent 创建新 Revision；原 Revision、Live、Publication、Run 和

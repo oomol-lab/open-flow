@@ -488,6 +488,7 @@ export class ControlService {
       createdAt,
       digest: await digestBytes(bytes),
       idempotencyKey,
+      modelVersion: content.modelVersion,
       name,
       flowId: identity('flow'),
       requestDigest: await digestBytes(canonicalJsonBytes({ connectorTeamId: connectorTeamId ?? null, name })),
@@ -585,11 +586,12 @@ export class ControlService {
     const previous = this.store.flows.change(flowId, changeId)
     if (previous != null) {
       if (previous.requestDigest != requestDigest) throw new ControlError(controlErrorCode.flowConflict, 'The change identity refers to another Draft change.')
-      return { revision: revisionMetadata(this.store.flows.revision(flowId, previous.revisionId)!), version: 1 }
+      return { revision: revisionMetadata(previous), version: 1 }
     }
     const base = this.store.flows.revision(flowId, expectedRevisionId)
     if (base == null) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
-    const bytes = encodeRevision(removeConnectionUsage(revisionContent(base), connectionId))
+    const content = removeConnectionUsage(revisionContent(base), connectionId)
+    const bytes = encodeRevision(content)
     const digest = await digestBytes(bytes)
     const stored = this.store.flows.commitRevision(
       {
@@ -599,6 +601,7 @@ export class ControlService {
         changeId,
         requestDigest,
         digest,
+        modelVersion: content.modelVersion,
         content: new TextDecoder().decode(bytes),
         createdAt: this.clock(),
         revisionId: identity('revision'),
@@ -638,7 +641,7 @@ export class ControlService {
     const previous = this.store.flows.change(flowId, changeId)
     if (previous != null) {
       if (previous.requestDigest != requestDigest) throw new ControlError(controlErrorCode.flowConflict, 'The change identity refers to another Draft change.')
-      return { revision: revisionMetadata(this.store.flows.revision(flowId, previous.revisionId)!), version: 1 }
+      return { revision: revisionMetadata(previous), version: 1 }
     }
     const base = this.store.flows.revision(flowId, expectedRevisionId)
     if (base == null) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
@@ -667,6 +670,7 @@ export class ControlService {
       content: new TextDecoder().decode(bytes),
       createdAt: this.clock(),
       digest,
+      modelVersion: content.modelVersion,
       expectedRevisionId,
       flowId,
       requestDigest,
@@ -691,6 +695,12 @@ export class ControlService {
 
   async repairDraft(actorId: string, flowId: string, expectedRevisionId: string, changeId: string = randomUUID()): Promise<DraftChange> {
     this.requireDraft(flowId)
+    const requestDigest = await digestBytes(canonicalJsonBytes({ expectedRevisionId, version: 1 }))
+    const previous = this.store.flows.change(flowId, changeId)
+    if (previous != null) {
+      if (previous.requestDigest != requestDigest) throw new ControlError(controlErrorCode.flowConflict, 'The repair identity refers to another Draft repair.')
+      return { revision: revisionMetadata(previous), version: 1 }
+    }
     const base = this.store.flows.revision(flowId, expectedRevisionId)
     if (base == null) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
     let content: RevisionContent
@@ -705,13 +715,13 @@ export class ControlService {
     }
     const bytes = encodeRevision(content)
     const digest = await digestBytes(bytes)
-    const requestDigest = await digestBytes(canonicalJsonBytes({ expectedRevisionId, version: 1 }))
     const stored = this.store.flows.commitRevision({
       actorId,
       changeId,
       content: new TextDecoder().decode(bytes),
       createdAt: this.clock(),
       digest,
+      modelVersion: content.modelVersion,
       expectedRevisionId,
       flowId,
       requestDigest,
