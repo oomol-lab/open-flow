@@ -821,6 +821,7 @@
     "notCheckedTitle": "Vérifier ce Brouillon",
     "nodeId": "ID du nœud : {{nodeId}}",
     "open": "Ouvrir les problèmes",
+    "otherIssues": "Autres problèmes",
     "pathOnly": "Chemin uniquement",
     "refresh": "Vérifier à nouveau",
     "scope": {

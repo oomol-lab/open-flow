@@ -821,6 +821,7 @@
     "notCheckedTitle": "이 초안 검사",
     "nodeId": "노드 ID: {{nodeId}}",
     "open": "문제 패널 열기",
+    "otherIssues": "기타 문제",
     "pathOnly": "경로만 표시",
     "refresh": "다시 검사",
     "scope": {

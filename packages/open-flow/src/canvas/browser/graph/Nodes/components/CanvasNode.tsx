@@ -11,7 +11,7 @@ import { NODE_HANDLE_CLASSNAME } from '../../../base/canvas.ts'
 import { CanvasTooltip } from '../../../components/tooltip.tsx'
 import { nodeCardContent } from '../../FlowCanvas/cardContent.ts'
 import { CanvasCard, CardCollapse } from './CanvasCard.tsx'
-import { iconForNodeType } from './constants.ts'
+import { CanvasNodeIcon } from './CanvasNodeIcon.tsx'
 import { NodeContentRows } from './NodeContentRows.tsx'
 import { RunChips, ImagePreview } from './RunChips.tsx'
 import { ValuePreview } from './ValuePreview.tsx'
@@ -34,7 +34,6 @@ export function CanvasNode({
   const selected = useVal(nodeStore.$.selected)
   const node = useVal(nodeStore.content$)
   const title = node.title
-  const icon = node.icon ?? (node.kind == 'wait' ? ':carbon:hourglass:' : node.kind == 'approval' ? ':carbon:stamp:' : undefined)
   const { values, summary, schedules, images, tools, inline, hidden } = nodeCardContent(node)
   const kind = node?.kind ?? 'task'
   const triggerSource =
@@ -90,7 +89,7 @@ export function CanvasNode({
         contentHidden={hidden}
         footerHidden={hidden && !runContent}
         title={title}
-        icon={<ContentIcon src={icon} fallback={<i className={iconForNodeType(nodeStore.nodeType)} />} />}
+        icon={<CanvasNodeIcon icon={node.icon} kind={node.kind} nodeType={nodeStore.nodeType} />}
         subtitle={subtitle}
         selected={selected}
         problem={(node.kind == 'task' || node.kind == 'trigger') && node.connectionRequired ? t('nodeStatus.connectionRequired') : problem}

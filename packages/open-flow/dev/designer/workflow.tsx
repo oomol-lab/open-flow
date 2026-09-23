@@ -393,7 +393,7 @@ export const workflowStories: readonly FrontendStory[] = [
     group: 'Workbench',
     id: 'workspace-navigation-island',
     title: 'Workspace navigation island',
-    description: 'Compare long and short names, cycle the draft status dot beside the title, and hover or focus it for the full status label.',
+    description: 'The navigation island sits on the canvas without a full-width header. Compare names and cycle the draft status dot beside the title.',
     standalone: true,
     render: (log, dark, language) => <NavigationIslandStory dark={dark} language={language} log={log} />,
   },
@@ -456,7 +456,6 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
     <I18nProvider i18n={i18n}>
       <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'}>
         <div className="workspace" style={{ height: 180 }}>
-          <div className="workspace-header" />
           <div className="canvas-panel" ref={stageRef}>
             <GetPopupContainerContext.Provider value={popup}>
               <ReactFlowProvider>

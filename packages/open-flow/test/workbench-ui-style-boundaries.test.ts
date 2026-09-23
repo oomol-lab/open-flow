@@ -204,10 +204,9 @@ test('keeps Workbench feature styles in their declared cascade order', async () 
 })
 
 test('keeps Resource Browser primitives on shared visual ownership', async () => {
-  const [browser, createDialog, hostMenu, dialog, select, workbenchSelect, resourceStyles, workspaceStyles] = await Promise.all([
+  const [browser, createDialog, dialog, select, workbenchSelect, resourceStyles, workspaceStyles] = await Promise.all([
     readFile(new URL('src/workbench/browser/runtime/shell/resourceBrowser.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/shell/createResourceDialog.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/shell/hostMenu.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/dialog.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/select.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/shell/workbenchSelect.tsx', packageRoot), 'utf8'),
@@ -221,10 +220,6 @@ test('keeps Resource Browser primitives on shared visual ownership', async () =>
   assert.match(createDialog, /<DialogContent container=\{portal\.current\}/)
   assert.match(createDialog, /<Field data-invalid=\{showIssue\}>/)
   assert.doesNotMatch(createDialog, /DialogOverlay|DialogPortal|resource-dialog-/)
-  assert.match(hostMenu, /from '\.\.\/\.\.\/\.\.\/\.\.\/ui\/browser\/button\.tsx'/)
-  assert.match(hostMenu, /from '\.\.\/\.\.\/\.\.\/\.\.\/ui\/browser\/dropdown-menu\.tsx'/)
-  assert.match(hostMenu, /container=\{root\}/)
-  assert.doesNotMatch(hostMenu, /pointerdown|keydown|role="dialog"|position:\s*absolute/)
   assert.match(dialog, /data-slot="dialog-overlay"/)
   assert.match(dialog, /data-slot="dialog-content"/)
   assert.match(dialog, /readonly container\?: HTMLElement \| null/)
@@ -313,9 +308,8 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
 
   assert.ok(button.includes('aria-current:bg-[var(--ui-control-hover-background,var(--ui-muted))] aria-current:text-foreground'))
   assert.match(skeleton, /motion-reduce:animate-none/)
-  assert.match(diagnostics, /className="flex flex-col gap-2\.5 p-4"/)
-  assert.match(diagnostics, /<Skeleton className="h-\[76px\]"/)
-  assert.match(diagnostics, /<Empty className="min-h-60"/)
+  assert.match(diagnostics, /<Button[\s\S]*?variant="ghost"/)
+  assert.match(diagnostics, /className="diagnostics-node-target"/)
   assert.doesNotMatch(diagnostics, /border-0/)
   assert.doesNotMatch(diagnostics, /diagnostics-(?:empty|loading)/)
   assert.doesNotMatch(resourceBrowser, /rounded-none|border-0/)
@@ -359,7 +353,7 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
   assert.doesNotMatch(publicationStyles, /\.publication-current/)
   assert.doesNotMatch(responsiveStyles, /\.diagnostics-loading/)
   assert.doesNotMatch(responsiveStyles, /\.run-history-back/)
-  const diagnosticRow = workspaceStyles.match(/\.diagnostics-list \.diagnostic-message \{([^}]*)\}/)
+  const diagnosticRow = canvasStyles.match(/\.diagnostic-message \{([^}]*)\}/)
   assert.ok(diagnosticRow)
   assert.doesNotMatch(diagnosticRow[1]!, /background:/)
   const inspectorTextarea = contextPanelStyles.match(/\.inspector-form textarea \{([^}]*)\}/)
@@ -391,15 +385,14 @@ test('keeps URL-changing Workbench navigation on real links', async () => {
   assert.match(browser, /render=\{<a href=/)
   assert.match(browser, /nativeButton=\{false\}/)
   assert.match(navigation, /render=\{<a href=\{flowsHref\}/)
-  assert.match(navigation, /render=\{<a href=\{flowHref\}/)
   assert.doesNotMatch(navigation, /<Button[^>]*onClick=\{onOpenFlow/)
 })
 
 test('keeps responsive control density on component APIs', async () => {
-  const [button, tabs, workspaceHeader, workspacePublishIsland, responsiveStyles, runStyles] = await Promise.all([
+  const [button, tabs, workspaceDiagnosticsIsland, workspacePublishIsland, responsiveStyles, runStyles] = await Promise.all([
     readFile(new URL('src/ui/browser/button.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/tabs.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/shell/workspaceHeader.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/shell/workspaceDiagnosticsIsland.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/shell/workspacePublishIsland.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/responsive.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/runs.css', packageRoot), 'utf8'),
@@ -409,7 +402,7 @@ test('keeps responsive control density on component APIs', async () => {
   assert.match(button, /data-variant=\{variant\}/)
   assert.match(tabs, /motion-reduce:transition-none/)
   assert.match(tabs, /motion-reduce:after:transition-none/)
-  assert.match(workspaceHeader, /className="validation-state"[\s\S]*?size="sm"/)
+  assert.match(workspaceDiagnosticsIsland, /render=\{<Button size="default"/)
   assert.match(workspacePublishIsland, /className="workspace-publish-button"[\s\S]*?size="default"/)
   assert.match(workspacePublishIsland, /aria-label=\{menuLabel\} size="icon"/)
   assert.doesNotMatch(responsiveStyles, /\.workspace-actions \[data-slot='button'\]/)
@@ -456,15 +449,18 @@ test('keeps Workbench feedback on semantic theme surfaces', async () => {
 })
 
 test('keeps responsive overlays aligned with the Workbench container and keyboard state', async () => {
-  const [contextPanel, contextPanelBehavior, diagnostics, runInput, workspaceStyles, contextPanelStyles, responsiveStyles] = await Promise.all([
-    readFile(new URL('src/workbench/browser/runtime/editor/contextPanel.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/editor/contextPanelBehavior.ts', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/shell/diagnosticsPanel.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/runs/runInputPanel.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/styles/workspace.css', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/styles/context-panel.css', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/styles/responsive.css', packageRoot), 'utf8'),
-  ])
+  const [contextPanel, contextPanelBehavior, diagnostics, diagnosticsIsland, runInput, workspaceStyles, canvasStyles, contextPanelStyles, responsiveStyles] =
+    await Promise.all([
+      readFile(new URL('src/workbench/browser/runtime/editor/contextPanel.tsx', packageRoot), 'utf8'),
+      readFile(new URL('src/workbench/browser/runtime/editor/contextPanelBehavior.ts', packageRoot), 'utf8'),
+      readFile(new URL('src/workbench/browser/runtime/shell/diagnosticsPanel.tsx', packageRoot), 'utf8'),
+      readFile(new URL('src/workbench/browser/runtime/shell/workspaceDiagnosticsIsland.tsx', packageRoot), 'utf8'),
+      readFile(new URL('src/workbench/browser/runtime/runs/runInputPanel.tsx', packageRoot), 'utf8'),
+      readFile(new URL('src/workbench/browser/runtime/styles/workspace.css', packageRoot), 'utf8'),
+      readFile(new URL('src/workbench/browser/runtime/styles/canvas.css', packageRoot), 'utf8'),
+      readFile(new URL('src/workbench/browser/runtime/styles/context-panel.css', packageRoot), 'utf8'),
+      readFile(new URL('src/workbench/browser/runtime/styles/responsive.css', packageRoot), 'utf8'),
+    ])
 
   assert.match(contextPanel, /closest<HTMLElement>\('\.open-flow-workbench'\)/)
   assert.match(contextPanel, /observeContextPanelOverlay\(root, setOverlay\)/)
@@ -474,13 +470,14 @@ test('keeps responsive overlays aligned with the Workbench container and keyboar
   assert.match(diagnostics, /aria-busy=\{checking\}/)
   assert.match(diagnostics, /<span aria-live="polite">/)
   assert.match(runInput, /aria-busy=\{starting\}/)
-  assert.match(workspaceStyles, /\.diagnostics-panel:focus-visible \{[\s\S]*?outline: 2px solid var\(--ui-ring\)/)
-  assert.match(workspaceStyles, /overscroll-behavior: contain/)
+  assert.match(diagnosticsIsland, /container=\{popupContainer\}/)
+  assert.match(diagnosticsIsland, /<PopoverContent/)
+  assert.match(canvasStyles, /\.diagnostics-popover\[data-slot='popover-content'\] \{[\s\S]*?background: var\(--open-flow-card\)/)
+  assert.match(canvasStyles, /overscroll-behavior: contain/)
   assert.match(contextPanelStyles, /\.context-panel:focus-visible[\s\S]*?outline: 2px solid var\(--ui-ring\)/)
   assert.match(contextPanelStyles, /overscroll-behavior: contain/)
-  assert.match(responsiveStyles, /max-height: 100dvh/)
-  assert.match(workspaceStyles, /grid-template-rows: 52px minmax\(0, 1fr\)/)
-  assert.match(workspaceStyles, /\.diagnostics-panel \{[\s\S]*?top: 52px;/)
+  assert.match(canvasStyles, /max-height: min\(600px, calc\(100dvh - 96px\), var\(--available-height\)\)/)
+  assert.match(workspaceStyles, /grid-template-rows: minmax\(0, 1fr\)/)
   assert.match(workspaceStyles, /\.run-input-popover > form \{[\s\S]*?max-height: min\(620px, calc\(100dvh - 96px\)\)/)
   for (const side of ['top', 'right', 'bottom', 'left']) assert.match(responsiveStyles, new RegExp(`padding-${side}: env\\(safe-area-inset-${side}\\)`))
 })

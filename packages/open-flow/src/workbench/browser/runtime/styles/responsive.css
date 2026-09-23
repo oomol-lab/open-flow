@@ -1,13 +1,5 @@
 .open-flow-workbench {
   @container open-flow-workbench (width <= 1100px) {
-    .workspace-actions > .saved-state {
-      display: none;
-    }
-
-    .workspace-header-context .draft-change > span:last-child {
-      display: none;
-    }
-
     .publication-overview-meta {
       grid-template-columns: repeat(2, minmax(112px, 1fr));
     }
@@ -26,17 +18,9 @@
     .runs-view {
       grid-template-columns: 240px minmax(0, 1fr);
     }
-
-    .diagnostics-panel {
-      width: min(360px, 100%);
-    }
   }
 
   @container open-flow-workbench (width <= 980px) {
-    .workspace-actions > .validation-state {
-      display: none;
-    }
-
     .trigger-binding-detail-sections {
       grid-template-columns: minmax(0, 1fr);
     }
@@ -118,33 +102,8 @@
       flex: 1;
     }
 
-    .workspace-header {
-      grid-template-columns: minmax(0, 1fr) auto;
-      gap: 4px;
-      padding: 0 8px;
-    }
-
-    .workspace-actions {
-      min-width: 0;
-    }
-
-    .workspace-header-context {
-      display: none;
-    }
-
     .workspace-navigation {
       max-width: calc(100% - 72px);
-    }
-
-    .diagnostics-panel {
-      top: 0;
-      width: 100%;
-      max-height: 100dvh;
-      padding-top: env(safe-area-inset-top);
-      padding-right: env(safe-area-inset-right);
-      padding-bottom: env(safe-area-inset-bottom);
-      padding-left: env(safe-area-inset-left);
-      border-left: 0;
     }
 
     .editor-grid > .context-panel {

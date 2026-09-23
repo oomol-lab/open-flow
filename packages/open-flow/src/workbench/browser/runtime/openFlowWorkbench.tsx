@@ -117,13 +117,10 @@ interface WorkbenchProps {
   readonly createFlowField?: OpenFlowWorkbenchProps['createFlowField']
   readonly flowBadges?: Readonly<Record<string, string>> | undefined
   readonly hrefFor: (location: WorkbenchLocation) => string
-  readonly hostAction?: string | undefined
-  readonly hostTitle?: string | undefined
   readonly language: WorkbenchLanguage
   readonly navigation: NavigationStore
   readonly onConfigureConnector?: (() => void) | undefined
   readonly onManageConnectorAccess?: ((flowId: string) => void) | undefined
-  readonly onHostAction?: (() => void) | undefined
   readonly onLanguageChange?: ((language: WorkbenchLanguage) => void) | undefined
   readonly store: WorkbenchStore
   readonly theme: WorkbenchTheme
@@ -136,13 +133,10 @@ function Workbench({
   createFlowField,
   flowBadges,
   hrefFor,
-  hostAction,
-  hostTitle,
   language,
   navigation,
   onConfigureConnector,
   onManageConnectorAccess,
-  onHostAction,
   onLanguageChange,
   store,
   theme,
@@ -157,11 +151,8 @@ function Workbench({
           createFlowField={createFlowField}
           flowBadges={flowBadges}
           hrefForFlow={(flow) => hrefFor({ flowId: flow.flowId, view: 'design' })}
-          hostAction={hostAction}
-          hostTitle={hostTitle}
           language={language}
           onCreateFlow={(name) => navigation.createFlow(name, createFlow)}
-          onHostAction={onHostAction}
           onLanguageChange={onLanguageChange}
           onSelectFlow={(flow) => void navigation.selectFlow(flow)}
           store={store}
@@ -169,13 +160,10 @@ function Workbench({
       ) : (
         <Suspense fallback={<main aria-busy="true" className="workspace" />}>
           <FlowWorkspace
-            hostAction={hostAction}
-            hostTitle={hostTitle}
             hrefFor={hrefFor}
             navigation={navigation}
             onConfigureConnector={onConfigureConnector}
             onManageConnectorAccess={onManageConnectorAccess}
-            onHostAction={onHostAction}
             store={store}
             theme={theme}
           />
@@ -237,13 +225,10 @@ export interface OpenFlowWorkbenchProps {
   readonly flowBadges?: Readonly<Record<string, string>> | undefined
   readonly host: WorkbenchHost
   readonly hrefFor: (location: WorkbenchLocation) => string
-  readonly hostAction?: string | undefined
-  readonly hostTitle?: string | undefined
   readonly language: WorkbenchLanguage
   readonly location: WorkbenchLocation
   readonly onConfigureConnector?: (() => void) | undefined
   readonly onManageConnectorAccess?: ((flowId: string) => void) | undefined
-  readonly onHostAction?: (() => void) | undefined
   readonly onLanguageChange?: ((language: WorkbenchLanguage) => void) | undefined
   readonly onNavigate: (location: WorkbenchLocation, options: WorkbenchNavigationOptions) => void
   readonly preferences: WorkbenchPreferences
@@ -261,14 +246,11 @@ function Session({
   createFlowField,
   flowBadges,
   host,
-  hostAction,
-  hostTitle,
   hrefFor,
   language,
   location,
   onConfigureConnector,
   onManageConnectorAccess,
-  onHostAction,
   onLanguageChange,
   onNavigate,
   preferences,
@@ -330,14 +312,11 @@ function Session({
             createFlowDisabled={createFlowDisabled}
             createFlowField={createFlowField}
             flowBadges={flowBadges}
-            hostAction={hostAction}
-            hostTitle={hostTitle}
             hrefFor={hrefFor}
             language={language}
             navigation={navigation}
             onConfigureConnector={onConfigureConnector}
             onManageConnectorAccess={onManageConnectorAccess}
-            onHostAction={onHostAction}
             onLanguageChange={onLanguageChange}
             store={store}
             theme={theme}

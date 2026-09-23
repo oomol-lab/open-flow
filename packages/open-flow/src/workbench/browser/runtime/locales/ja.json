@@ -821,6 +821,7 @@
     "notCheckedTitle": "このドラフトを検査",
     "nodeId": "ノード ID：{{nodeId}}",
     "open": "問題パネルを開く",
+    "otherIssues": "その他の問題",
     "pathOnly": "パスのみ表示",
     "refresh": "再検査",
     "scope": {

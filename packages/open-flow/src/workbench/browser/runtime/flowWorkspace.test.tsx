@@ -52,7 +52,25 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
       variableNamesLoaded: value(false),
       variableNamesLoading: value(false),
       diagnostics: value(invalid ? { valid: false, diagnostics: [{ code: 'trigger.connection-missing' }] } : undefined),
+      diagnosticItems: value(
+        invalid
+          ? [
+              {
+                diagnostic: {
+                  code: 'trigger.connection-missing',
+                  column: 0,
+                  line: 1,
+                  message: 'Missing account',
+                  path: '/document/graph/nodes/start/bindingId',
+                },
+                location: { nodeId: 'start', section: 'account' },
+                scope: 'node',
+              },
+            ]
+          : [],
+      ),
       designer: value({ nodes: withTrigger ? [{ id: 'start', kind: 'trigger', title: 'Start' }] : [], viewport: { x: 0, y: 0, zoom: 1 } }),
+      designerNodeById: value(new Map([['start', { kind: 'trigger', title: 'Start' }]])),
       selectedDesignerNode: value(undefined),
     },
     connectors: {
@@ -95,6 +113,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
       history$: value({ canUndo: false, canRedo: false, applying: false, failed: false }),
       $: {
         addNodeOptions: value([]),
+        checkLoading: value(false),
         diagnosticFocus: value(undefined),
         draft: value({ revisionId: 'revision' }),
         flow: value({ flowId: 'flow', name: 'Example flow' }),
@@ -105,6 +124,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
         revision: value({}),
         selectedNodeIds: value(selectedNodeIds),
         selection: value(undefined),
+        status: value('saved'),
         target: value({ kind: 'flow' }),
         targetName: value('Flow'),
         workspaceLoadFailed: value(false),
@@ -113,6 +133,8 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
         workspaceRepairing: value(false),
       },
       locateNode: vi.fn(),
+      locateDiagnostic: vi.fn(),
+      check: vi.fn(),
       repairWorkspace: vi.fn(),
     },
   } as unknown as WorkbenchStore
@@ -201,7 +223,7 @@ describe('FlowWorkspace run drawer', () => {
     const { editor, navigation, store } = renderWorkspace()
     const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
     const designer = (view.props.children as ReactElement[])[0]!
-    const publishIsland = designer.props.cornerLeading
+    const publishIsland = designer.props.cornerLeading.props.children[1]
 
     expect(publishIsland.props.state).toBe('ready')
     publishIsland.props.onPublish()
@@ -220,11 +242,23 @@ describe('FlowWorkspace run drawer', () => {
     const { editor, navigation } = renderWorkspace(undefined, true, true)
     const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
     const designer = (view.props.children as ReactElement[])[0]!
-    const publishIsland = designer.props.cornerLeading
+    const publishIsland = designer.props.cornerLeading.props.children[1]
 
     expect(publishIsland.props.state).toBe('issues')
     publishIsland.props.onOpenPublications()
     expect(navigation.open).toHaveBeenCalledWith('publications')
+  })
+
+  it('places the issue island before publishing and locates the selected node', () => {
+    const { editor, store } = renderWorkspace(undefined, true, true)
+    const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
+    const designer = (view.props.children as ReactElement[])[0]!
+    const [issues, publish] = designer.props.cornerLeading.props.children
+
+    expect(issues.props.items).toHaveLength(1)
+    expect(publish.props.state).toBe('issues')
+    issues.props.onSelectNode('start')
+    expect(store.workspace.locateNode).toHaveBeenCalledWith('start')
   })
 
   it.each([
@@ -235,7 +269,7 @@ describe('FlowWorkspace run drawer', () => {
     const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
     const designer = (view.props.children as ReactElement[])[0]!
 
-    expect(designer.props.cornerLeading.props.state).toBe(state)
+    expect(designer.props.cornerLeading.props.children[1].props.state).toBe(state)
   })
 
   it('marks an unchanged draft as current', () => {
@@ -243,7 +277,7 @@ describe('FlowWorkspace run drawer', () => {
     const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
     const designer = (view.props.children as ReactElement[])[0]!
 
-    expect(designer.props.cornerLeading.props.state).toBe('current')
+    expect(designer.props.cornerLeading.props.children[1].props.state).toBe('current')
   })
 
   it.each([

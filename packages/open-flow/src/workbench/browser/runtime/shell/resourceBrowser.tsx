@@ -22,7 +22,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/
 import { cn } from '../../../../ui/browser/utils.ts'
 import { Icon } from '../icons.tsx'
 import { followWorkbenchLink } from '../navigationLink.ts'
-import { HostMenu } from './hostMenu.tsx'
 import { WorkbenchSelect } from './workbenchSelect.tsx'
 
 const CreateResourceDialog = lazy(() => import('./createResourceDialog.tsx'))
@@ -377,10 +376,7 @@ interface FlowBrowserProps extends LanguageSelectProps {
   readonly createFlowField?: ComponentProps<typeof CreateResourceDialog>['field']
   readonly flowBadges?: Readonly<Record<string, string>> | undefined
   readonly hrefForFlow: (flow: Flow) => string
-  readonly hostAction?: string | undefined
-  readonly hostTitle?: string | undefined
   readonly onCreateFlow: (name: string) => Promise<boolean>
-  readonly onHostAction?: (() => void) | undefined
   readonly onSelectFlow: (flow: Flow) => void
   readonly store: WorkbenchStore
 }
@@ -391,11 +387,8 @@ export function FlowBrowser({
   createFlowField,
   flowBadges,
   hrefForFlow,
-  hostAction,
-  hostTitle,
   language,
   onCreateFlow,
-  onHostAction,
   onLanguageChange,
   onSelectFlow,
   store,
@@ -453,7 +446,6 @@ export function FlowBrowser({
                 <Icon data-icon="inline-start" name="plus" />
                 {t('resource.newFlow')}
               </Button>
-              {hostAction != null && hostTitle != null && onHostAction != null && <HostMenu action={hostAction} onAction={onHostAction} title={hostTitle} />}
             </div>
           </div>
           <div aria-hidden="true" className="resource-list-columns-shell">

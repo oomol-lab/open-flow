@@ -821,6 +821,7 @@
     "notCheckedTitle": "Check this Draft",
     "nodeId": "Node ID: {{nodeId}}",
     "open": "Open problems",
+    "otherIssues": "Other problems",
     "pathOnly": "Path only",
     "refresh": "Check again",
     "scope": {

@@ -29,7 +29,7 @@ import { RunDrawer } from './runs/runDrawer.tsx'
 import { RunInputPanel } from './runs/runInputPanel.tsx'
 import { RunResults } from './runs/runResults.tsx'
 import { RunsView } from './runs/runsView.tsx'
-import { WorkspaceHeader } from './shell/workspaceHeader.tsx'
+import { WorkspaceDiagnosticsIsland } from './shell/workspaceDiagnosticsIsland.tsx'
 import { WorkspaceNavigationIsland } from './shell/workspaceNavigationIsland.tsx'
 import { WorkspacePublishIsland } from './shell/workspacePublishIsland.tsx'
 import { WorkspaceRecovery } from './shell/workspaceRecovery.tsx'
@@ -243,6 +243,9 @@ export function FlowEditor({
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
   const busy = useVal(store.$.busy)
   const diagnostics = useVal(store.$.diagnostics)
+  const diagnosticItems = useVal(store.$.diagnosticItems)
+  const designerNodes = useVal(store.$.designerNodeById)
+  const checkLoading = useVal(store.workspace.$.checkLoading)
   const history = useVal(store.workspace.history$)
   const designer = useVal(store.$.designer)
   const triggers = designer.nodes.filter((node) => node.kind == 'trigger')
@@ -265,6 +268,10 @@ export function FlowEditor({
     selectedNodeIds,
     onSelectNodes: (ids) => store.selectNodes(ids),
   })
+  const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
+  useEffect(() => {
+    if (runInputRequest != null || diagnosticItems.length == 0) setDiagnosticsOpen(false)
+  }, [runInputRequest, diagnosticItems.length])
   const [accountReference, setAccountReference] = useState<ConnectorAccountReference>()
   useEffect(() => {
     if (accountReference == null) return
@@ -394,12 +401,33 @@ export function FlowEditor({
     >
       <WorkbenchCanvas
         cornerLeading={
-          <WorkspacePublishIsland
-            onOpenPublications={onOpenPublications}
-            onOpenRuns={onOpenRuns}
-            onPublish={() => void store.publications.publish()}
-            state={publishState}
-          />
+          <div className="workspace-corner-leading">
+            {diagnostics?.valid == false && diagnosticItems.length > 0 && (
+              <WorkspaceDiagnosticsIsland
+                checking={checkLoading}
+                items={diagnosticItems}
+                nodes={designerNodes}
+                onOpenChange={(open) => {
+                  if (open) store.runRequests.dismissInputs()
+                  setDiagnosticsOpen(open)
+                }}
+                onRefresh={() => void store.workspace.check()}
+                onSelect={(item) => {
+                  if (store.workspace.locateDiagnostic(item)) setDiagnosticsOpen(false)
+                }}
+                onSelectNode={(nodeId) => {
+                  if (store.workspace.locateNode(nodeId)) setDiagnosticsOpen(false)
+                }}
+                open={diagnosticsOpen}
+              />
+            )}
+            <WorkspacePublishIsland
+              onOpenPublications={onOpenPublications}
+              onOpenRuns={onOpenRuns}
+              onPublish={() => void store.publications.publish()}
+              state={publishState}
+            />
+          </div>
         }
         history={historyControls}
         ignoredNodeIds={ignoredNodeIds}
@@ -583,23 +611,17 @@ export function FlowEditor({
 }
 
 export default function FlowWorkspace({
-  hostAction,
-  hostTitle,
   hrefFor,
   navigation,
   onConfigureConnector,
   onManageConnectorAccess,
-  onHostAction,
   store,
   theme,
 }: {
-  readonly hostAction?: string | undefined
-  readonly hostTitle?: string | undefined
   readonly hrefFor: (location: WorkbenchLocation) => string
   readonly navigation: NavigationStore
   readonly onConfigureConnector?: (() => void) | undefined
   readonly onManageConnectorAccess?: ((flowId: string) => void) | undefined
-  readonly onHostAction?: (() => void) | undefined
   readonly store: WorkbenchStore
   readonly theme: WorkbenchTheme
 }): ReactElement {
@@ -665,13 +687,6 @@ export default function FlowWorkspace({
   return (
     <IconifyProvider>
       <main className="workspace">
-        <WorkspaceHeader
-          hostAction={hostAction}
-          hostTitle={hostTitle}
-          onOpenDesign={() => navigation.open('design')}
-          onHostAction={onHostAction}
-          store={store}
-        />
         <WorkspaceNavigationIsland
           saveStatus={view == 'design' ? saveStatus : undefined}
           flowName={flow?.name ?? flow?.flowId ?? ''}

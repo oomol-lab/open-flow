@@ -821,6 +821,7 @@
     "notCheckedTitle": "檢查這份草稿",
     "nodeId": "節點 ID：{{nodeId}}",
     "open": "開啟問題面板",
+    "otherIssues": "其他問題",
     "pathOnly": "僅路徑",
     "refresh": "重新檢查",
     "scope": {

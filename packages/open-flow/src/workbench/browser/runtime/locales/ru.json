@@ -821,6 +821,7 @@
     "notCheckedTitle": "Проверить черновик",
     "nodeId": "ID узла: {{nodeId}}",
     "open": "Открыть панель проблем",
+    "otherIssues": "Другие проблемы",
     "pathOnly": "Только путь",
     "refresh": "Проверить снова",
     "scope": {

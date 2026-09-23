@@ -53,13 +53,12 @@ it('groups multiple issues for one node while leaving flow issues separate', () 
   const html = renderToStaticMarkup(
     <I18nProvider i18n={createI18n('zh-CN')}>
       <DiagnosticsPanel
-        checked
         checking={false}
         items={items}
         nodes={
           new Map([
-            ['trigger', { title: 'Application Event' }],
-            ['second-trigger', { title: 'Application Event (2)' }],
+            ['trigger', { kind: 'trigger', icon: ':carbon:event:', title: 'Application Event' }],
+            ['second-trigger', { kind: 'trigger', icon: ':carbon:event:', title: 'Application Event (2)' }],
           ])
         }
         onClose={() => {}}
@@ -78,4 +77,8 @@ it('groups multiple issues for one node while leaving flow issues separate', () 
   expect(html).toContain('Flow-level issue')
   expect(html.indexOf('Application Event (2)')).toBeGreaterThan(html.indexOf('请完成触发器的必填配置：事件源和接收的事件。'))
   expect(html.indexOf('Flow-level issue')).toBeGreaterThan(html.indexOf('Application Event (2)'))
+  expect(html).toContain('在画布中定位Application Event')
+  expect(html).toContain('其他问题')
+  expect(html).not.toContain('共4个问题')
+  expect(html).not.toContain('/document/graph/nodes/')
 })

@@ -6,57 +6,14 @@
     height: 100%;
     min-width: 0;
     min-height: 0;
-    grid-template-rows: 52px minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
     background: var(--ui-background);
-  }
-
-  .workspace-header {
-    z-index: 6;
-    display: grid;
-    min-width: 0;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 12px;
-    padding: 0 12px;
-    border-bottom: 1px solid var(--ui-border);
-    background: var(--ui-background);
-  }
-
-  .workspace-header:has(.diagnostics-panel) {
-    z-index: 8;
-  }
-
-  .workspace-header-context,
-  .workspace-actions,
-  .saved-state,
-  .draft-change {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-  }
-
-  .workspace-header-context {
-    gap: 8px;
-    overflow: hidden;
-  }
-
-  .workspace-header-context strong {
-    overflow: hidden;
-    font-size: 14px;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .workspace-header-context .draft-change {
-    gap: 6px;
-    font-size: 11px;
   }
 
   .workspace-navigation {
     position: absolute;
     z-index: 7;
-    top: 67px;
+    top: 16px;
     left: 12px;
     display: flex;
     max-width: calc(100% - 24px);
@@ -119,36 +76,6 @@
 
   .workspace-title-island .workspace-flow-name:focus-visible {
     border-radius: 4px;
-    outline: 2px solid var(--ui-ring);
-    outline-offset: -2px;
-  }
-
-  .workspace-actions {
-    justify-content: flex-end;
-    gap: 4px;
-  }
-
-  .validation-state {
-    flex: none;
-  }
-
-  .diagnostics-panel {
-    position: absolute;
-    z-index: 7;
-    top: 52px;
-    right: 0;
-    bottom: 0;
-    display: flex;
-    width: 420px;
-    min-width: 0;
-    flex-direction: column;
-    overscroll-behavior: contain;
-    border-left: 1px solid var(--ui-border);
-    background: var(--ui-background);
-    outline: none;
-  }
-
-  .diagnostics-panel:focus-visible {
     outline: 2px solid var(--ui-ring);
     outline-offset: -2px;
   }
@@ -354,110 +281,5 @@
     gap: 8px;
     padding: 9px 14px;
     border-top: 1px solid var(--ui-border);
-  }
-
-  .diagnostics-panel > header {
-    display: flex;
-    min-height: 58px;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    padding: 10px 12px 10px 16px;
-    border-bottom: 1px solid var(--ui-border);
-  }
-
-  .diagnostics-panel > header > div:first-child {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 3px;
-  }
-
-  .diagnostics-panel > header strong {
-    font-size: 13px;
-    font-weight: 600;
-  }
-
-  .diagnostics-panel > header span {
-    color: var(--ui-muted-foreground);
-    font-size: 11px;
-  }
-
-  .diagnostics-panel-actions {
-    display: flex;
-    flex: none;
-    align-items: center;
-    gap: 4px;
-  }
-
-  .diagnostics-list {
-    min-height: 0;
-    margin: 0;
-    padding: 0;
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    list-style: none;
-    scrollbar-gutter: stable;
-  }
-
-  .diagnostics-list > li + li {
-    border-top: 1px solid var(--ui-border);
-  }
-
-  .diagnostics-list > li {
-    width: 100%;
-    padding: 15px 16px;
-  }
-
-  .diagnostics-list > li.diagnostics-node-group {
-    padding: 0;
-  }
-
-  .diagnostics-node-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--ui-border);
-  }
-
-  .diagnostics-node-header span {
-    flex: none;
-    color: var(--ui-muted-foreground);
-    font-size: 11px;
-  }
-
-  .diagnostics-node-items {
-    margin: 0;
-    padding: 0;
-    list-style: none;
-  }
-
-  .diagnostics-node-items li {
-    padding: 12px 16px 12px 24px;
-  }
-
-  .diagnostics-node-items li + li {
-    border-top: 1px solid var(--ui-border);
-  }
-
-  .diagnostics-list .diagnostic-message {
-    display: block;
-    width: 100%;
-    color: var(--ui-foreground);
-    font-size: 12px;
-    font-weight: 500;
-    line-height: 18px;
-    text-align: left;
-  }
-
-  .saved-state {
-    width: 112px;
-    flex: 0 0 112px;
-    gap: 5px;
-    margin-right: 4px;
-    color: var(--ui-muted-foreground);
-    font-size: 12px;
   }
 }

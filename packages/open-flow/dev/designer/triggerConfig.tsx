@@ -10,7 +10,8 @@ import { fixedInputValue, inputValues } from '../../src/flow/common/inputValue.t
 import { triggerConfigFieldLabels } from '../../src/trigger/providers/fieldLabels.ts'
 import { TriggerConfigEditor } from '../../src/workbench/browser/runtime/editor/triggerConfigEditor.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
-import { DiagnosticsPanel } from '../../src/workbench/browser/runtime/shell/diagnosticsPanel.tsx'
+import { WorkspaceDiagnosticsIsland } from '../../src/workbench/browser/runtime/shell/workspaceDiagnosticsIsland.tsx'
+import { WorkspacePublishIsland } from '../../src/workbench/browser/runtime/shell/workspacePublishIsland.tsx'
 
 const inputs: readonly (InputPort | Group)[] = [
   { handle: 'owner', jsonSchema: { type: 'string' }, nullable: false, description: 'Repository owner.' },
@@ -126,24 +127,41 @@ const diagnosticItems: readonly DiagnosticItem[] = [
 
 function DiagnosticsStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
   const i18n = useMemo(() => createI18n(language), [language])
+  const [open, setOpen] = useState(true)
   return (
     <I18nProvider i18n={i18n}>
-      <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ height: 420, maxWidth: 560, position: 'relative' }}>
-        <DiagnosticsPanel
-          checked
-          checking={false}
-          items={diagnosticItems}
-          nodes={
-            new Map([
-              ['trigger', { title: 'Application Event' }],
-              ['second-trigger', { title: 'Application Event (2)' }],
-            ])
-          }
-          onClose={() => log('Close diagnostics')}
-          onRefresh={() => log('Refresh diagnostics')}
-          onSelect={(item) => log('Select issue', item.diagnostic.code)}
-          onSelectNode={(nodeId) => log('Select node', nodeId)}
-        />
+      <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ height: 500, maxWidth: 800, position: 'relative' }}>
+        <div className="canvas-panel" style={{ height: '100%' }}>
+          <div className="workspace-corner-leading" style={{ position: 'absolute', top: 16, right: 16 }}>
+            <WorkspaceDiagnosticsIsland
+              checking={false}
+              items={diagnosticItems}
+              nodes={
+                new Map([
+                  ['trigger', { kind: 'trigger', icon: ':carbon:event:', title: 'Application Event' }],
+                  ['second-trigger', { kind: 'trigger', icon: ':carbon:event:', title: 'Application Event (2)' }],
+                ])
+              }
+              onOpenChange={setOpen}
+              onRefresh={() => log('Refresh diagnostics')}
+              onSelect={(item) => {
+                log('Select issue', item.diagnostic.code)
+                setOpen(false)
+              }}
+              onSelectNode={(nodeId) => {
+                log('Select node', nodeId)
+                setOpen(false)
+              }}
+              open={open}
+            />
+            <WorkspacePublishIsland
+              onOpenPublications={() => log('Open publications')}
+              onOpenRuns={() => log('Open runs')}
+              onPublish={() => log('Publish')}
+              state="issues"
+            />
+          </div>
+        </div>
       </div>
     </I18nProvider>
   )
@@ -153,7 +171,7 @@ export const diagnosticsStory: FrontendStory = {
   group: 'Workbench',
   id: 'diagnostics-panel',
   title: 'Diagnostics',
-  description: 'Issues are grouped by node, including two same-named Triggers and a separate Flow-level issue.',
+  description: 'The issue island sits beside publishing. Node icons match the canvas; hover a compact node row to locate it. Unrelated problems appear last.',
   standalone: true,
   render: (log, dark, language) => <DiagnosticsStory dark={dark} language={language} log={log} />,
 }
