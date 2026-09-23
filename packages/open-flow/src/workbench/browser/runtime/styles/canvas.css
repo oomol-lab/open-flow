@@ -391,6 +391,22 @@
     gap: 2px;
   }
 
+  @container open-flow-canvas-controls (width <= 900px) {
+    .canvas-add-node-button {
+      width: 32px;
+      padding-inline: 0;
+    }
+
+    .canvas-add-node-label,
+    .workspace-run-status-label {
+      display: none;
+    }
+
+    .workspace-run-status-label + i {
+      margin-left: 0;
+    }
+  }
+
   .node-icon {
     display: inline-grid;
     width: 30px;

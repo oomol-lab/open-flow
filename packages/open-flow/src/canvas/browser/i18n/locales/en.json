@@ -552,7 +552,7 @@
   },
   "zoomIn": "zoom in",
   "zoomOut": "zoom out",
-  "zoomReset": "Reset zoom to 100%",
+  "zoomReset": "Reset zoom",
   "view": "View",
   "canvasCard": {
     "waitBranch": {

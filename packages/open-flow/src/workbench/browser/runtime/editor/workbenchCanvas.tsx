@@ -459,14 +459,16 @@ export function WorkbenchCanvasActions({
         <CanvasTooltip placement="top" title={t('designer.openBlocks')}>
           <Button
             aria-expanded={pickerOpen}
-            className="pr-3 text-[13px]"
+            aria-label={t('designer.addNode')}
+            className="canvas-add-node-button pr-3 text-[13px]"
             disabled={disabled}
             onClick={(event) => onOpenNodePicker(event.currentTarget)}
             size="default"
             type="button"
             variant="ghost"
           >
-            <Icon data-icon="inline-start" name="plus" /> {t('designer.addNode')}
+            <Icon data-icon="inline-start" name="plus" />
+            <span className="canvas-add-node-label">{t('designer.addNode')}</span>
           </Button>
         </CanvasTooltip>
       )}

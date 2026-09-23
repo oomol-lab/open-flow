@@ -148,6 +148,13 @@
     transition: width 180ms ease-in-out;
   }
 
+  @container open-flow-canvas-controls (width <= 900px) {
+    .run-control-label,
+    .run-control-label > span {
+      max-width: 6rem;
+    }
+  }
+
   .run-control-segment-slot {
     width: 0;
     flex: none;

@@ -257,6 +257,7 @@
 }
 .run-control-story-stage {
   position: relative;
+  container: open-flow-canvas-controls / inline-size;
   min-width: 0;
   min-height: 220px;
   border: 1px solid var(--ui-border);
@@ -264,6 +265,14 @@
   background-color: var(--ui-background);
   background-image: radial-gradient(var(--ui-border) 0.7px, transparent 0.7px);
   background-size: 16px 16px;
+}
+.canvas-control-width-sample {
+  margin: 0 auto 20px;
+}
+.canvas-control-width-sample > h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
 }
 .run-control-story-inputs {
   display: grid;

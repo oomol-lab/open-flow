@@ -552,7 +552,7 @@
   },
   "zoomIn": "放大",
   "zoomOut": "缩小",
-  "zoomReset": "重置缩放为 100%",
+  "zoomReset": "重置缩放",
   "view": "视图",
   "canvasCard": {
     "waitBranch": {

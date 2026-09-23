@@ -552,7 +552,7 @@
   },
   "zoomIn": "zoom avant",
   "zoomOut": "zoom arrière",
-  "zoomReset": "Réinitialiser le zoom à 100 %",
+  "zoomReset": "Réinitialiser le zoom",
   "view": "Affichage",
   "canvasCard": {
     "waitBranch": {

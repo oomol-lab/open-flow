@@ -552,7 +552,7 @@
   },
   "zoomIn": "放大",
   "zoomOut": "縮小",
-  "zoomReset": "將縮放重設為 100%",
+  "zoomReset": "重設縮放",
   "view": "檢視",
   "canvasCard": {
     "waitBranch": {

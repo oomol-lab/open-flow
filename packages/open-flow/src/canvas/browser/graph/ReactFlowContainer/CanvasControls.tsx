@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { cn } from '../../../../ui/browser/utils.ts'
 import { CanvasTooltip } from '../../components/tooltip.tsx'
@@ -100,6 +101,7 @@ export function CanvasViewControls({
   readonly zoom: number
 }) {
   const t = useTranslate()
+  const [popupContainer, setPopupContainer] = useState<HTMLDivElement | null>(null)
 
   return (
     <Panel
@@ -108,33 +110,73 @@ export function CanvasViewControls({
       data-canvas-control-scope
       data-tooltip-toolbar
     >
-      <CanvasTooltip placement="top" title={t('zoomOut')}>
-        <Button aria-label={t('zoomOut')} disabled={minZoomReached} onClick={onZoomOut} size="icon" type="button" variant="ghost">
-          <i className="i-lucide-light:zoom-out" />
-        </Button>
-      </CanvasTooltip>
-      <CanvasTooltip placement="top" title={t('zoomReset')}>
-        <Button aria-label={t('zoomReset')} className={styles.zoomValue} onClick={onZoomReset} size="default" type="button" variant="ghost">
-          {Math.round(zoom * 100)}%
-        </Button>
-      </CanvasTooltip>
-      <CanvasTooltip placement="top" title={t('zoomIn')}>
-        <Button aria-label={t('zoomIn')} disabled={maxZoomReached} onClick={onZoomIn} size="icon" type="button" variant="ghost">
-          <i className="i-lucide-light:zoom-in" />
-        </Button>
-      </CanvasTooltip>
-      <CanvasTooltip placement="top" title={t('fitView')}>
-        <Button aria-label={t('fitView')} onClick={onFitView} size="icon" type="button" variant="ghost">
-          <i className="i-lucide-light:scan" />
-        </Button>
-      </CanvasTooltip>
-      {onRelayout != null && (
-        <CanvasTooltip placement="top" title={t('optimize')}>
-          <Button aria-label={t('optimize')} onClick={onRelayout} size="icon" type="button" variant="ghost">
-            <i className="i-lucide-light:layout-grid" />
+      <div className={styles.compactViewControls} ref={setPopupContainer}>
+        <DropdownMenu>
+          <CanvasTooltip placement="top" title={t('view')}>
+            <DropdownMenuTrigger
+              render={
+                <Button aria-label={`${t('view')} · ${Math.round(zoom * 100)}%`} size="default" type="button" variant="ghost">
+                  {Math.round(zoom * 100)}%
+                  <i aria-hidden="true" className="i-lucide-light:chevron-down" />
+                </Button>
+              }
+            />
+          </CanvasTooltip>
+          <DropdownMenuContent align="start" className="min-w-48" container={popupContainer} side="top" sideOffset={8}>
+            <DropdownMenuItem disabled={minZoomReached} onClick={onZoomOut}>
+              <i aria-hidden="true" className="i-lucide-light:zoom-out" />
+              {t('zoomOut')}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={maxZoomReached} onClick={onZoomIn}>
+              <i aria-hidden="true" className="i-lucide-light:zoom-in" />
+              {t('zoomIn')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onZoomReset}>
+              <i aria-hidden="true" className="i-lucide-light:rotate-ccw" />
+              {t('zoomReset')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onFitView}>
+              <i aria-hidden="true" className="i-lucide-light:scan" />
+              {t('fitView')}
+            </DropdownMenuItem>
+            {onRelayout != null && (
+              <DropdownMenuItem onClick={onRelayout}>
+                <i aria-hidden="true" className="i-lucide-light:layout-grid" />
+                {t('optimize')}
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <div className={styles.expandedViewControls}>
+        <CanvasTooltip placement="top" title={t('zoomOut')}>
+          <Button aria-label={t('zoomOut')} disabled={minZoomReached} onClick={onZoomOut} size="icon" type="button" variant="ghost">
+            <i className="i-lucide-light:zoom-out" />
           </Button>
         </CanvasTooltip>
-      )}
+        <CanvasTooltip placement="top" title={t('zoomReset')}>
+          <Button aria-label={t('zoomReset')} className={styles.zoomValue} onClick={onZoomReset} size="default" type="button" variant="ghost">
+            {Math.round(zoom * 100)}%
+          </Button>
+        </CanvasTooltip>
+        <CanvasTooltip placement="top" title={t('zoomIn')}>
+          <Button aria-label={t('zoomIn')} disabled={maxZoomReached} onClick={onZoomIn} size="icon" type="button" variant="ghost">
+            <i className="i-lucide-light:zoom-in" />
+          </Button>
+        </CanvasTooltip>
+        <CanvasTooltip placement="top" title={t('fitView')}>
+          <Button aria-label={t('fitView')} onClick={onFitView} size="icon" type="button" variant="ghost">
+            <i className="i-lucide-light:scan" />
+          </Button>
+        </CanvasTooltip>
+        {onRelayout != null && (
+          <CanvasTooltip placement="top" title={t('optimize')}>
+            <Button aria-label={t('optimize')} onClick={onRelayout} size="icon" type="button" variant="ghost">
+              <i className="i-lucide-light:layout-grid" />
+            </Button>
+          </CanvasTooltip>
+        )}
+      </div>
     </Panel>
   )
 }

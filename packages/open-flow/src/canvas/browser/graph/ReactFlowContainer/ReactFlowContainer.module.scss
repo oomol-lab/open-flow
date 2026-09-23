@@ -4,6 +4,7 @@
   width: 100%;
   height: 100%;
   position: relative;
+  container: open-flow-canvas-controls / inline-size;
 }
 
 .flow {
@@ -107,11 +108,55 @@
 }
 
 .viewDock {
-  > [data-size] > i {
+  [data-size] {
+    color: var(--ui-muted-foreground);
+  }
+
+  [data-size]:is(:hover, :focus-visible) {
+    color: var(--ui-foreground);
+  }
+
+  [data-size] > i {
     width: 16px;
     height: 16px;
     flex: none;
     font-size: 16px;
+  }
+}
+
+.expandedViewControls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+
+  > [data-size] {
+    height: 28px;
+    border-radius: 6px;
+  }
+
+  > [data-size='icon'] {
+    width: 28px;
+  }
+}
+
+.compactViewControls {
+  display: none;
+
+  [data-size] {
+    height: 28px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@container open-flow-canvas-controls (width <= 900px) {
+  .expandedViewControls {
+    display: none;
+  }
+
+  .compactViewControls {
+    display: block;
   }
 }
 
@@ -207,10 +252,6 @@
 }
 
 @container open-flow-workbench (max-width: 560px) {
-  .zoomValue {
-    display: none;
-  }
-
   .interactiveModeChoices.interactiveModeChoices {
     grid-template-columns: 1fr;
   }

@@ -1,13 +1,19 @@
 import type { ReactNode } from 'react'
 import type { DateFormat } from '../../src/form/common/dateValue.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
+import type { Run } from '../../src/workbench/browser/runtime/api.ts'
 
 import { ReactFlowProvider } from '@xyflow/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { val } from 'value-enhancer'
 import { CanvasTooltip } from '../../src/canvas/browser/components/tooltip.tsx'
-import { CanvasInteractiveMode, CanvasToolbar, CanvasViewControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CanvasControls.tsx'
+import {
+  CanvasBottomRightControls,
+  CanvasInteractiveMode,
+  CanvasToolbar,
+  CanvasViewControls,
+} from '../../src/canvas/browser/graph/ReactFlowContainer/CanvasControls.tsx'
 import { CornerControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CornerControls.tsx'
 import { GetPopupContainerContext, useGetStaticPopupContainer } from '../../src/canvas/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
 import { createI18n as createDesignerI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
@@ -31,6 +37,7 @@ import { Textarea } from '../../src/ui/browser/textarea.tsx'
 import { WorkbenchCanvasActions, WorkbenchInspectorToggle } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
 import { createI18n as createWorkbenchI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.tsx'
+import { RunStatusIsland } from '../../src/workbench/browser/runtime/runs/runStatusIsland.tsx'
 import { useStoryActions } from './storyActions.tsx'
 
 export type LogAction = (name: string, value?: unknown) => void
@@ -225,11 +232,13 @@ function ContextMenuStory({ log }: { readonly log: LogAction }) {
 }
 
 function CanvasChromeStory({
+  bottomRightTools,
   children,
   language,
   log,
   miniMapOpen,
 }: {
+  readonly bottomRightTools?: ReactNode
   readonly children: ReactNode
   readonly language: UiLanguage
   readonly log: LogAction
@@ -270,6 +279,7 @@ function CanvasChromeStory({
             />
           </I18nProvider>
           <CanvasToolbar>{children}</CanvasToolbar>
+          {bottomRightTools != null && <CanvasBottomRightControls>{bottomRightTools}</CanvasBottomRightControls>}
         </ReactFlowProvider>
       </div>
     </GetPopupContainerContext.Provider>
@@ -471,6 +481,77 @@ function RunControlStory({ dark, language, log }: { readonly dark: boolean; read
   )
 }
 
+function CanvasControlWidthsStory({ dark, language, log }: { readonly dark: boolean; readonly language: UiLanguage; readonly log: LogAction }) {
+  const i18n = useMemo(() => createWorkbenchI18n(language), [language])
+  useEffect(() => () => i18n.dispose(), [i18n])
+  const run: Run = {
+    version: 1,
+    runId: 'sample',
+    flowId: 'flow',
+    revisionId: 'revision',
+    source: 'draft',
+    status: 'completed',
+    createdAt: '2026-09-23T00:00:00Z',
+  }
+  return (
+    <I18nProvider i18n={i18n}>
+      <div className="run-control-stories open-flow-workbench" data-theme={dark ? 'dark' : 'light'}>
+        {(
+          [
+            ['Wide canvas', 1100],
+            ['Canvas beside an open panel', 780],
+          ] as const
+        ).map(([label, width]) => (
+          <section className="canvas-control-width-sample" key={label} style={{ maxWidth: width }}>
+            <h3>
+              {label} · {width}px
+            </h3>
+            <CanvasChromeStory
+              language={language}
+              log={log}
+              miniMapOpen={false}
+              bottomRightTools={
+                <RunStatusIsland
+                  onToggle={() => log('run.status.toggle')}
+                  open={false}
+                  panelId={`canvas-control-width-run-${width}`}
+                  run={run}
+                  submitting={false}
+                />
+              }
+            >
+              <WorkbenchCanvasActions
+                disabled={false}
+                pickerOpen={false}
+                onOpenNodePicker={() => log('nodePicker.open')}
+                history={{
+                  state: { canUndo: true, canRedo: true, applying: false, failed: false, undo: undefined, redo: undefined },
+                  onUndo: () => log('history.undo'),
+                  onRedo: () => log('history.redo'),
+                  onRetry: () => log('history.retry'),
+                }}
+                runControl={
+                  <RunControl
+                    disabled={false}
+                    inputOpen={false}
+                    inputStatus="none"
+                    onInputOpenChange={() => {}}
+                    onRun={() => log('run-control.run')}
+                    onSelectTrigger={() => {}}
+                    selectedTriggerId="manual"
+                    starting={false}
+                    triggers={[{ id: 'manual', title: 'Manual trigger' }]}
+                  />
+                }
+              />
+            </CanvasChromeStory>
+          </section>
+        ))}
+      </div>
+    </I18nProvider>
+  )
+}
+
 function StoryColumn({ children }: { readonly children: ReactNode }) {
   return <div className="story-column">{children}</div>
 }
@@ -521,6 +602,15 @@ export const stories: readonly FrontendStory[] = [
     id: 'context-menu',
     render: (log) => <ContextMenuStory log={log} />,
     title: 'Context Menu',
+  },
+  {
+    group: 'Workbench',
+    id: 'canvas-control-widths',
+    description:
+      'Compare view, add-node, test, and run-status controls with a wide canvas and beside an open panel. The narrow canvas keeps every action reachable from its compact controls.',
+    render: (log, dark, language) => <CanvasControlWidthsStory dark={dark} language={language} log={log} />,
+    standalone: true,
+    title: 'Canvas Control Widths',
   },
   {
     group: 'Workbench',

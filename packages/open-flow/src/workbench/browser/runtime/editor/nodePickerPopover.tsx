@@ -54,9 +54,13 @@ export function NodePickerPopover(
             render={<span style={{ position: 'fixed', left: props.anchor.x, top: props.anchor.y }} />}
           />
         ) : (
-          <PopoverTrigger disabled={props.disabled || adding} render={<Button type="button" variant="ghost" className="pr-3 text-[13px]" />}>
+          <PopoverTrigger
+            aria-label={t('designer.addNode')}
+            disabled={props.disabled || adding}
+            render={<Button type="button" variant="ghost" className="canvas-add-node-button pr-3 text-[13px]" />}
+          >
             <Icon data-icon="inline-start" name="plus" />
-            {t('designer.addNode')}
+            <span className="canvas-add-node-label">{t('designer.addNode')}</span>
           </PopoverTrigger>
         )}
         <PopoverContent
