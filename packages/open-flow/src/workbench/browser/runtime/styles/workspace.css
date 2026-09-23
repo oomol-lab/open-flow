@@ -114,7 +114,6 @@
     font-weight: 600;
     line-height: 28px;
     text-overflow: ellipsis;
-    transform: translateY(-1px);
     white-space: nowrap;
   }
 
