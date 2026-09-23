@@ -6,6 +6,24 @@ import { createI18n } from '../i18n.ts'
 import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
 
 describe('Trigger configuration editor', () => {
+  it('shows a catalog field label while retaining the configuration handle', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <TriggerConfigEditor
+          inputs={[{ handle: 'owner', nullable: false, jsonSchema: { type: 'string' } }]}
+          fieldLabels={{ owner: 'Repository owner' }}
+          config={{}}
+          disabled={false}
+          onChange={() => {}}
+        />
+      </I18nProvider>,
+    )
+
+    expect(markup).toContain('data-port="owner"')
+    expect(markup).toContain('value="Repository owner"')
+    expect(markup).toContain('aria-label="Repository owner Set value"')
+  })
+
   it('uses input defaults without saving them or offering source selection', () => {
     const onChange = vi.fn()
     const markup = renderToStaticMarkup(

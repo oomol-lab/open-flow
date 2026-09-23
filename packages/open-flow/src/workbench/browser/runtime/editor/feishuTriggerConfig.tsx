@@ -70,6 +70,7 @@ function EventSourceSelect({
 
 export function FeishuTriggerConfig({
   inputs,
+  fieldLabels,
   config: assignments,
   nodeId,
   connectionId,
@@ -77,6 +78,7 @@ export function FeishuTriggerConfig({
   store,
 }: {
   readonly inputs: readonly (InputPort | Group)[]
+  readonly fieldLabels?: Readonly<Record<string, string>>
   readonly config: InputValues
   readonly nodeId: string
   readonly connectionId?: string
@@ -113,7 +115,7 @@ export function FeishuTriggerConfig({
   const eventOptions = selectedSource?.eventTypes.map((type) => ({ value: type, label: type }))
   const selectedEvents = Array.isArray(config.eventTypes) ? config.eventTypes.filter((value): value is string => typeof value == 'string') : []
   const visibleInputs = inputs.filter((input) => {
-    if ('group' in input || input.handle === 'sourceId') return true
+    if ('group' in input || input.handle === 'sourceId' || input.handle === 'eventTypes') return true
     if (!sourceId) return false
     if (input.handle === 'chatIds') return supportsFeishuChatFilter(selectedEvents) || (Array.isArray(config.chatIds) && config.chatIds.length > 0)
     if (input.handle === 'resource') return feishuResourceKind(selectedEvents) != null || config.resource != null
@@ -126,6 +128,7 @@ export function FeishuTriggerConfig({
       }}
       onResetValue={(name) => void store.resetTriggerConfig(nodeId, [name])}
       inputs={visibleInputs}
+      fieldLabels={fieldLabels}
       config={assignments}
       disabled={disabled}
       onChange={(name, value) => void store.saveTriggerConfig(nodeId, name, value)}
@@ -138,7 +141,7 @@ export function FeishuTriggerConfig({
               </div>
             ) : options.length > 0 ? (
               <EventSourceSelect
-                label={t('eventSources.source')}
+                label={fieldLabels?.sourceId ?? t('eventSources.source')}
                 value={sourceId}
                 options={options}
                 disabled={disabled}
@@ -189,15 +192,21 @@ export function FeishuTriggerConfig({
             )}
           </div>
         ) : input.handle === 'eventTypes' ? (
-          <div className="flex flex-col gap-2">
-            <FeishuEventPicker
-              value={selectedEvents}
-              allowedEvents={(eventOptions ?? []).map((option) => option.value)}
-              disabled={disabled || eventOptions == null}
-              onChange={(value) => void store.saveTriggerConfig(nodeId, 'eventTypes', value)}
-            />
-            <p className="m-0 text-xs text-muted-foreground">{t('eventSources.sourceEventsHint')}</p>
-          </div>
+          sourceId ? (
+            <div className="flex flex-col gap-2">
+              <FeishuEventPicker
+                value={selectedEvents}
+                allowedEvents={(eventOptions ?? []).map((option) => option.value)}
+                disabled={disabled || eventOptions == null}
+                onChange={(value) => void store.saveTriggerConfig(nodeId, 'eventTypes', value)}
+              />
+              <p className="m-0 text-xs text-muted-foreground">{t('eventSources.sourceEventsHint')}</p>
+            </div>
+          ) : (
+            <div className="flex h-[30px] items-center rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] px-2 text-xs text-muted-foreground">
+              {t('eventSources.selectSourceFirst')}
+            </div>
+          )
         ) : input.handle === 'chatIds' || input.handle === 'resource' ? (
           <FeishuEventFilters
             field={input.handle}

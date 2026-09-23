@@ -251,6 +251,7 @@ export function StatusSelect({
 
 export function LinearTriggerConfig({
   inputs,
+  fieldLabels,
   config: assignments,
   nodeId,
   connectionId,
@@ -258,6 +259,7 @@ export function LinearTriggerConfig({
   store,
 }: {
   readonly inputs: readonly (InputPort | Group)[]
+  readonly fieldLabels?: Readonly<Record<string, string>>
   readonly config: InputValues
   readonly nodeId: string
   readonly connectionId?: string
@@ -277,6 +279,7 @@ export function LinearTriggerConfig({
       onReset={() => store.resetTriggerConfig(nodeId)}
       onResetValue={(name) => void store.resetTriggerConfig(nodeId, [name])}
       inputs={inputs}
+      fieldLabels={fieldLabels}
       config={assignments}
       disabled={disabled}
       onChange={(name, value) => void store.saveTriggerConfig(nodeId, name, value)}

@@ -39,6 +39,7 @@ type PortEditorProps = {
   defaultNullable?: boolean
   emptyMessage?: ReactNode
   embedded?: boolean
+  fieldLabels?: Readonly<Record<string, string>>
   reservedNames?: readonly string[]
   disabled: boolean
   allowAddGroup?: boolean
@@ -248,19 +249,20 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         <i aria-hidden="true" className="i-lucide-light:grip-vertical" />
       </Button>
     ) : undefined
+    const fieldName = props.fieldLabels?.[port.handle] ?? port.handle
     const header = (disclosure?: FieldDisclosure) => (
       <div className={styles.heading}>
-        <FieldName name={port.handle} description={port.description} className={styles.name}>
+        <FieldName name={fieldName} description={port.description} className={styles.name}>
           {tableLayout ? (
             <PortName
-              value={port.handle}
+              value={disabled ? fieldName : port.handle}
               names={[...reservedNames, ...values.flatMap((entry) => ('handle' in entry ? [entry.handle] : []))]}
               disabled={disabled}
               onChange={(handle) => update(index, { ...port, handle })}
             />
           ) : (
             <>
-              {port.handle}
+              {fieldName}
               {port.nullable ? ' ?' : ''}
             </>
           )}
@@ -305,7 +307,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
               size={tableLayout || props.output ? 'icon-sm' : 'xs'}
               variant="ghost"
               data-value-options
-              aria-label={`${port.handle} ${t('valueEditor.fieldSettings')}`}
+              aria-label={`${fieldName} ${t('valueEditor.fieldSettings')}`}
               aria-expanded={editingIndex === index}
               onClick={() => {
                 setEditingGroupIndex(undefined)
@@ -394,7 +396,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           <DefinitionField
             expansionPolicy={props.expansionPolicy}
             schema={port.jsonSchema}
-            label={port.handle}
+            label={fieldName}
             disabled={disabled}
             layout={tableLayout ? props.layout : undefined}
             header={header}
@@ -414,7 +416,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
             description={port.description}
             schema={port.jsonSchema}
             value={port.value}
-            label={port.handle}
+            label={fieldName}
             nullable={port.nullable}
             disabled={disabled}
             path={`/${index}`}

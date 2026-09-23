@@ -261,6 +261,7 @@ export function NodeInspector({
           (['feishu.on_event', 'feishu_app_bot.on_event'].includes(selection.trigger.definition.key) ? (
             <FeishuTriggerConfig
               inputs={presentProviderTriggerConfig(selection.trigger.definition.configInputs, triggerDisplays?.[selection.trigger.definition.key])}
+              fieldLabels={triggerDisplays?.[selection.trigger.definition.key]?.configInputLabels}
               config={selection.trigger.config}
               nodeId={selection.id}
               connectionId={
@@ -272,6 +273,7 @@ export function NodeInspector({
           ) : selection.trigger.definition.key === 'linear.on_issue_changed' ? (
             <LinearTriggerConfig
               inputs={presentProviderTriggerConfig(selection.trigger.definition.configInputs, triggerDisplays?.[selection.trigger.definition.key])}
+              fieldLabels={triggerDisplays?.[selection.trigger.definition.key]?.configInputLabels}
               config={selection.trigger.config}
               nodeId={selection.id}
               connectionId={
@@ -290,6 +292,7 @@ export function NodeInspector({
                 void store.resetTriggerConfig(selection.id, [name])
               }}
               inputs={presentProviderTriggerConfig(selection.trigger.definition.configInputs, triggerDisplays?.[selection.trigger.definition.key])}
+              fieldLabels={triggerDisplays?.[selection.trigger.definition.key]?.configInputLabels}
               config={selection.trigger.config}
               disabled={disabled}
               onChange={(name, value) => {

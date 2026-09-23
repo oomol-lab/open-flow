@@ -127,6 +127,7 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
         display: {
           'github.on_repo_event': {
             configInputs: {},
+            configInputLabels: {},
             displayName: language == 'en' ? 'Repository event' : '仓库事件',
             description: language == 'en' ? 'Runs when a repository changes.' : '仓库变更时运行。',
             outputs: { payload: language == 'en' ? 'Repository event payload.' : '仓库事件负载。' },
@@ -150,7 +151,7 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
             type: 'integration',
           },
         ],
-        version: 2,
+        version: 3,
       })
     }
     throw new Error(`Unexpected request: ${path}`)
@@ -257,6 +258,34 @@ describe('TriggerStore', () => {
     },
   )
 
+  it('selects the default Feishu account when adding an Application Event trigger', async () => {
+    const { client, workspace, triggers, signal } = createSetup()
+    const connection: ConnectorConnection = {
+      connectionId: 'feishu-default',
+      displayName: 'Feishu app',
+      isDefault: true,
+      serviceId: 'feishu_app_bot',
+      status: 'active',
+    }
+    const list = connectionRequests.get(client)!.mockResolvedValue([connection])
+    try {
+      await workspace.start(flow.flowId)
+      const option = (await resourceValue(triggers.browseAddNodeOptions(signal)))![0]!
+      if (option.kind != 'trigger' || !('trigger' in option) || option.trigger.kind != 'catalog') throw new Error('Expected provider Trigger.')
+      const nodeId = await workspace.addNode(
+        { ...option, trigger: { ...option.trigger, definition: { ...option.trigger.definition, key: 'feishu_app_bot.on_event', provider: 'feishu_app_bot' } } },
+        { x: 0, y: 0 },
+      )
+      const node = workspace.$.draft.value!.content.document.graph.nodes[nodeId!]!
+      if (node.kind != 'integration') throw new Error('Expected Integration Trigger.')
+      expect(workspace.$.draft.value!.content.document.bindings[node.bindingId]).toEqual({ kind: 'connection', target: 'feishu-default' })
+      expect(list).toHaveBeenCalledOnce()
+    } finally {
+      triggers.dispose()
+      workspace.dispose()
+    }
+  })
+
   it('does not create a Trigger after leaving the Flow during connection lookup', async () => {
     const { client, workspace, triggers, signal, requests } = createSetup()
     const pending = Promise.withResolvers<readonly ConnectorConnection[]>()
@@ -327,7 +356,12 @@ describe('TriggerStore', () => {
       ).toBe(true)
       const node = workspace.$.draft.value!.content.document.graph.nodes.linear!
       if (node.kind != 'integration') throw new Error('Expected integration.')
-      expect(node.config).toEqual({ ...inputValues({ sourceId: 'new-source', eventTypes: [] }), resource: { kind: 'unset' }, chatIds: { kind: 'unset' } })
+      expect(node.config).toEqual({
+        ...inputValues({ sourceId: 'new-source' }),
+        eventTypes: { kind: 'unset' },
+        resource: { kind: 'unset' },
+        chatIds: { kind: 'unset' },
+      })
       expect(workspace.$.revision.value!.binding(node.bindingId)).toMatchObject({ kind: 'connection', target: 'app-connection' })
       expect(request.mock.calls.filter(([path]) => path.endsWith('/draft/changes'))).toHaveLength(1)
       await workspace.saveTriggerConfig('linear', 'chatIds', ['chat'])
