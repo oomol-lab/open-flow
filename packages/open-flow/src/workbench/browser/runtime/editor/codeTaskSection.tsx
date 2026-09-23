@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import type { ConnectorPermissionCapability } from '../../../../flow/common/change.ts'
-import type { ConnectorAccess, ConnectorAccessCandidates } from '../api.ts'
+import type { ConnectorAccess, ConnectorAccessCandidates, Diagnostic } from '../api.ts'
 import type { ConnectorConnection } from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { WorkbenchTheme } from '../contract.ts'
@@ -14,6 +14,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { compute } from 'value-enhancer'
+import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Switch } from '../../../../ui/browser/switch.tsx'
@@ -23,6 +24,7 @@ import { WorkbenchSelect } from '../shell/workbenchSelect.tsx'
 import { ActionPicker } from './actionPicker.tsx'
 import { CodeEditor } from './codeEditor.tsx'
 import { codeTyping } from './codeTyping.ts'
+import { diagnosticMessage } from './diagnostics.ts'
 
 export function CodeTaskSection({
   connectorAccess,
@@ -31,6 +33,7 @@ export function CodeTaskSection({
   prepareAction,
   onConfigureAccess,
   disabled,
+  diagnostics,
   focus,
   selection,
   store,
@@ -44,6 +47,7 @@ export function CodeTaskSection({
   ) => Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] } | undefined>
   readonly onConfigureAccess?: (() => void) | undefined
   readonly disabled: boolean
+  readonly diagnostics?: readonly Diagnostic[]
   readonly focus?: DiagnosticFocus
   readonly selection: Extract<ResolvedNode, { readonly kind: 'task' }>
   readonly store: WorkspaceStore
@@ -136,6 +140,7 @@ export function CodeTaskSection({
   const module = selection.module
   const moduleEditor = useVal(store.$.moduleEditor)
   const moduleLocation = focus?.section == 'module' ? focus.diagnostic : undefined
+  const moduleDiagnostics = diagnostics?.filter((diagnostic) => diagnostic.path == `/modules/${moduleEditor?.moduleId}/source`) ?? []
 
   if (task == null) return <div className="inspector-section section-error">{t('inspector.task.missing')}</div>
   return module != null && 'moduleId' in task && moduleEditor?.moduleId == task.moduleId ? (
@@ -304,26 +309,40 @@ export function CodeTaskSection({
             </p>
           )}
         </div>
-        <CodeEditor
-          ariaLabel={t('inspector.task.source')}
-          disabled={disabled}
-          errorLabel={t('inspector.task.editorUnavailable')}
-          loadingLabel={t('inspector.task.editorLoading')}
-          location={moduleLocation == null ? undefined : { column: moduleLocation.column, line: moduleLocation.line }}
-          onBlur={() => {
-            if (store.hasUnsavedCode) void store.saveModuleEditor()
-          }}
-          onChange={(value) => store.updateModuleSource(value)}
-          theme={theme}
-          typing={codeTyping(
-            task,
-            permission == null ? task.capabilities : [permission],
-            permission?.mode == 'shared' ? sharedActionCatalog : actionCatalog,
-            providerIds,
+        <ValueEditorFeedback
+          error={
+            moduleDiagnostics.length > 0
+              ? moduleDiagnostics.map((diagnostic) => (
+                  <div key={`${diagnostic.path}:${diagnostic.line}:${diagnostic.column}:${diagnostic.code}`}>{diagnosticMessage(diagnostic, t)}</div>
+                ))
+              : undefined
+          }
+        >
+          {(errorId) => (
+            <CodeEditor
+              ariaDescribedBy={errorId}
+              ariaLabel={t('inspector.task.source')}
+              disabled={disabled}
+              invalid={moduleDiagnostics.length > 0}
+              errorLabel={t('inspector.task.editorUnavailable')}
+              loadingLabel={t('inspector.task.editorLoading')}
+              location={moduleLocation == null ? undefined : { column: moduleLocation.column, line: moduleLocation.line }}
+              onBlur={() => {
+                if (store.hasUnsavedCode) void store.saveModuleEditor()
+              }}
+              onChange={(value) => store.updateModuleSource(value)}
+              theme={theme}
+              typing={codeTyping(
+                task,
+                permission == null ? task.capabilities : [permission],
+                permission?.mode == 'shared' ? sharedActionCatalog : actionCatalog,
+                providerIds,
+              )}
+              uri={`file:///modules/${moduleEditor.moduleId}.js`}
+              value={moduleEditor.source}
+            />
           )}
-          uri={`file:///modules/${moduleEditor.moduleId}.js`}
-          value={moduleEditor.source}
-        />
+        </ValueEditorFeedback>
         {moduleEditor.status == 'failed' && (
           <div className="form-actions code-actions">
             <Button disabled={disabled} onClick={() => store.discardModuleChanges()} size="sm" type="button" variant="secondary">

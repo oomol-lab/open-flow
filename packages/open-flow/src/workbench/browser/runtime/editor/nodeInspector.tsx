@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
 import type { TriggerDisplay } from '../../../../control/common/triggerCatalog.ts'
 import type { GraphNode, GraphTarget } from '../../../../flow/common/change.ts'
-import type { ConnectorAccess, ConnectorAccessCandidates, ConnectorAction, ConnectorConnection, Group, InputPort } from '../api.ts'
+import type { ConnectorAccess, ConnectorAccessCandidates, ConnectorAction, ConnectorConnection, Diagnostic, Group, InputPort } from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
@@ -128,6 +128,7 @@ interface Props {
   ) => Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] } | undefined>
   readonly connectorLoading: boolean
   readonly disabled: boolean
+  readonly diagnostics?: readonly Diagnostic[]
   readonly focus?: DiagnosticFocus
   readonly revision: RevisionView
   readonly selection: ResolvedSelection | undefined
@@ -160,6 +161,7 @@ export function NodeInspector({
   prepareConnectorAction,
   connectorLoading,
   disabled,
+  diagnostics,
   focus,
   revision,
   selection,
@@ -530,6 +532,7 @@ export function NodeInspector({
                       connectors={connectors}
                       prepareAction={prepareConnectorAction}
                       disabled={disabled}
+                      diagnostics={diagnostics}
                       focus={focus}
                       selection={selection}
                       store={store}

@@ -165,7 +165,7 @@ export class WorkspaceStore {
     this.#runChanged = runChanged
     this.#flows = new FlowCatalog(client, setNotice, i18n)
     this.#model = new WorkspaceModel(i18n, this.#flows)
-    this.#modules = new ModuleEditorSession(this.#model, this.#draftSession, (changes) => this.#changeDraft(changes, false), setNotice, i18n)
+    this.#modules = new ModuleEditorSession(this.#model, this.#draftSession, (changes) => this.#saveModuleSource(changes), setNotice, i18n)
     this.#draftChanges = new DraftChanges(client, setNotice, i18n, {
       apply: (draft) => this.#applyDraft(draft, 'local'),
       beforeChange: (manageBusy) => {
@@ -932,7 +932,7 @@ export class WorkspaceStore {
   public updateModuleSource(source: string): void {
     const editor = this.#model.value.moduleEditor
     if (this.#history.applying || this.#history.failed || editor == null || editor.source == source) return
-    this.#clearHistoryForEdit()
+    this.#history.discardRedo()
     this.#modules.updateModuleSource(source)
   }
 
@@ -1045,13 +1045,13 @@ export class WorkspaceStore {
     })
   }
 
-  async #changeDraft(changes: FlowChanges, manageBusy = true, historyOwned = false): Promise<Draft | undefined> {
-    if (this.#disposed || ((this.#history.applying || this.#history.failed) && !historyOwned)) return
+  async #changeDraft(changes: FlowChanges, manageBusy = true, historyMode: 'clear' | 'canvas' | 'code' = 'clear'): Promise<Draft | undefined> {
+    if (this.#disposed || ((this.#history.applying || this.#history.failed) && historyMode != 'canvas')) return
     const flowId = this.#model.value.flowId
     const draft = this.#model.value.draft
     if (flowId == null || draft == null) return
     if (changes.length == 0 || dequal(applyFlowChanges(draft, changes).content, draft.content)) return draft
-    const cleared = !historyOwned && this.#history.clear()
+    const cleared = historyMode == 'clear' && this.#history.clear()
     const current = this.#draftSession.capture()
     this.#history.pending++
     this.#history.publish()
@@ -1065,6 +1065,18 @@ export class WorkspaceStore {
       this.#history.pending--
       if (!this.#disposed) this.#history.publish()
     }
+  }
+
+  async #saveModuleSource(changes: FlowChanges): Promise<Draft | undefined> {
+    const saved = await this.#changeDraft(changes, false, 'code')
+    if (saved != null) {
+      for (const operation of changes) {
+        if (operation.kind != 'module.source.replace') continue
+        const module = saved.content.modules[operation.moduleId]
+        if (module != null) this.#history.rebaseModuleCreation(operation.moduleId, module)
+      }
+    }
+    return saved
   }
 
   async #repairDraftNodeNames(current: () => boolean): Promise<void> {
@@ -1154,7 +1166,7 @@ export class WorkspaceStore {
     }
     const retained = this.#history.record(entry)
     try {
-      const change = changes.length == 0 ? Promise.resolve(draft) : this.#changeDraft(changes, true, true)
+      const change = changes.length == 0 ? Promise.resolve(draft) : this.#changeDraft(changes, true, 'canvas')
       const layout = update == null ? Promise.resolve(true) : this.#changePresentation(update, true)
       this.selectNodes(selection)
       if (!retained) this.#setNotice({ kind: 'success', message: this.#i18n.t('history.tooLarge') })
@@ -1180,6 +1192,7 @@ export class WorkspaceStore {
   }
 
   async #restoreHistory(redo: boolean): Promise<void> {
+    if (this.hasUnsavedCode && !(await this.saveModuleEditor())) return
     const state = this.history$.value
     if (!(redo ? state.canRedo : state.canUndo)) return
     const entry = redo ? state.redo : state.undo
@@ -1189,7 +1202,7 @@ export class WorkspaceStore {
     this.#history.publish()
     try {
       const [draft, presentation] = await Promise.all([
-        this.#changeDraft(redo ? entry.forward : entry.inverse, true, true),
+        this.#changeDraft(redo ? entry.forward : entry.inverse, true, 'canvas'),
         this.#changePresentation((value) => restoreCanvasPresentation(value, entry.target, entry.presentation, redo), true),
       ])
       if (draft != null && presentation && generation == this.#history.generation) {

@@ -229,8 +229,8 @@ describe('Workspace canvas history', () => {
     }
   })
 
-  it('keeps history for selection and no-ops, records settings, and isolates code editing', async () => {
-    const { store } = await session()
+  it('keeps earlier canvas edits through code editing and saves code before undo', async () => {
+    const { store, saved, notices } = await session()
     try {
       await store.moveNodes({ code: { x: 400, y: 0 } })
       store.selectNodes(['code'])
@@ -244,7 +244,50 @@ describe('Workspace canvas history', () => {
       expect(store.history$.value.canUndo).toBe(true)
       await store.moveNodes({ code: { x: 500, y: 0 } })
       store.updateModuleSource('export default () => ({result: 1})')
-      expect(store.history$.value.canUndo).toBe(false)
+      expect(store.history$.value.canUndo).toBe(true)
+      expect(notices.mock.calls.some(([notice]) => notice.message == 'Canvas history cleared after content editing.')).toBe(false)
+      await store.undo()
+      expect(saved().draft.content.modules.module?.source).toBe('export default () => ({result: 1})')
+      expect(designerGraph(saved().draft, target, saved().presentation.value).nodes.find((node) => node.id == 'code')?.position).toEqual({ x: 400, y: 0 })
+      expect(store.history$.value.canUndo).toBe(true)
+    } finally {
+      store.dispose()
+    }
+  })
+
+  it('redoes a newly added code node with its latest saved source', async () => {
+    const { store, saved } = await session()
+    try {
+      const option = store.$.addNodeOptions.value.find((candidate) => candidate.id == 'javascript')
+      if (option == null) throw new Error('Expected JavaScript node option')
+      const nodeId = await store.addNode(option, { x: 600, y: 0 })
+      if (nodeId == null) throw new Error('Expected added code node')
+      const node = saved().draft.content.document.graph.nodes[nodeId]
+      if (node?.kind != 'task' || node.task == null || !('moduleId' in node.task)) throw new Error('Expected code task')
+      const moduleId = node.task.moduleId
+      const source = "import dependency from './dependency.mjs'\nexport default () => ({result: dependency})"
+      store.updateModuleSource(source)
+      expect(await store.saveModuleEditor()).toBe(true)
+      await store.undo()
+      expect(saved().draft.content.modules[moduleId]).toBeUndefined()
+      await store.redo()
+      expect(saved().draft.content.modules[moduleId]).toMatchObject({ imports: ['dependency'], source })
+    } finally {
+      store.dispose()
+    }
+  })
+
+  it('discards canvas redo after a code edit without losing earlier undo', async () => {
+    const { store } = await session()
+    try {
+      await store.moveNodes({ value: { x: 100, y: 0 } })
+      await store.moveNodes({ value: { x: 200, y: 0 } })
+      await store.undo()
+      expect(store.history$.value.canRedo).toBe(true)
+      store.selectNodes(['code'])
+      store.updateModuleSource('export default () => ({result: 3})')
+      expect(store.history$.value.canRedo).toBe(false)
+      expect(store.history$.value.canUndo).toBe(true)
     } finally {
       store.dispose()
     }

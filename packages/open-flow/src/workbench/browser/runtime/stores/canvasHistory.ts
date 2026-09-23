@@ -1,4 +1,4 @@
-import type { GraphTarget } from '../../../../flow/common/change.ts'
+import type { CodeModule, GraphTarget } from '../../../../flow/common/change.ts'
 import type { CanvasPresentationChange } from '../canvasPresentation.ts'
 import type { FlowChanges } from '../editor/flowChanges.ts'
 
@@ -39,6 +39,29 @@ export class CanvasHistory {
     this.#redo.length = 0
     this.publish()
     return hadHistory
+  }
+
+  discardRedo(): void {
+    if (this.#redo.length == 0) return
+    this.#redo.length = 0
+    this.publish()
+  }
+
+  rebaseModuleCreation(moduleId: string, module: Pick<CodeModule, 'imports' | 'source'>): void {
+    for (const [index, entry] of this.#undo.entries()) {
+      if (!entry.forward.some((operation) => operation.kind == 'module.create' && operation.moduleId == moduleId)) continue
+      const forward = [...entry.forward]
+      for (const [operationIndex, operation] of forward.entries()) {
+        if (operation.kind != 'module.create' || operation.moduleId != moduleId) continue
+        forward[operationIndex] = { ...operation, module: { ...operation.module, imports: module.imports, source: module.source } }
+      }
+      this.#undo[index] = {
+        ...entry,
+        forward,
+      }
+    }
+    while (this.#undo.length > 0 && this.#bytes(this.#undo) > 10 * 1024 * 1024) this.#undo.shift()
+    this.publish()
   }
 
   record(entry: CanvasHistoryEntry): boolean {

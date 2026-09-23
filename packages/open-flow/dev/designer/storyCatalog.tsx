@@ -1,6 +1,8 @@
 import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useState } from 'react'
+import { ValueEditorFeedback } from '../../src/form/browser/fieldControl.tsx'
+import { Input } from '../../src/ui/browser/input.tsx'
 import { CodeEditor } from '../../src/workbench/browser/runtime/editor/codeEditor.tsx'
 import { agentStory } from './agent.tsx'
 import { cardStories } from './cards.tsx'
@@ -32,6 +34,7 @@ import { overviewStories } from './overview.tsx'
 import { popupLayoutStory } from './popupLayout.tsx'
 import { scheduleStory } from './schedule.tsx'
 import { stories } from './stories.tsx'
+import { useStoryActions } from './storyActions.tsx'
 import { diagnosticsStory, triggerConfigStory } from './triggerConfig.tsx'
 import { triggerStories } from './triggerStories.tsx'
 import { valueEditorDangerStory } from './valueEditorDanger.tsx'
@@ -66,6 +69,7 @@ const codeEditorStory: FrontendStory = {
   render: (log, dark) => <CodeEditorStory dark={dark} log={log} />,
   standalone: true,
   title: 'Code Editor',
+  description: 'Compare the code editor with a standard input in both themes. Toggle the syntax issue to inspect danger styling and its message.',
 }
 
 export const labStories: readonly FrontendStory[] = [
@@ -127,23 +131,35 @@ export const labStories: readonly FrontendStory[] = [
 
 function CodeEditorStory({ dark, log }: { readonly dark: boolean; readonly log: LogAction }) {
   const [value, setValue] = useState(codeEditorSource)
+  const [invalid, setInvalid] = useState(false)
+  useStoryActions([{ label: invalid ? 'Clear syntax issue' : 'Show syntax issue', onClick: () => setInvalid((current) => !current) }])
   return (
-    <div className="code-editor-story open-flow-workbench" data-theme={dark ? 'dark' : 'light'}>
-      <CodeEditor
-        ariaLabel="JavaScript source"
-        disabled={false}
-        errorLabel="Code editor unavailable"
-        loadingLabel="Loading code editor"
-        onBlur={() => log('code.blur', { length: value.length })}
-        onChange={(source) => {
-          setValue(source)
-          log('code.change', { length: source.length })
-        }}
-        theme={dark ? 'dark' : 'light'}
-        typing={codeEditorTyping}
-        uri="file:///modules/designer-lab.js"
-        value={value}
-      />
+    <div className="code-editor-story open-flow-workbench open-flow-property-panel flex flex-col gap-3 p-4" data-theme={dark ? 'dark' : 'light'}>
+      <label className="flex max-w-sm flex-col gap-1 text-xs">
+        Standard input
+        <Input aria-label="Standard input" defaultValue="Reference surface" />
+      </label>
+      <ValueEditorFeedback error={invalid ? 'CodeModule contains invalid JavaScript syntax.' : undefined}>
+        {(errorId) => (
+          <CodeEditor
+            ariaDescribedBy={errorId}
+            ariaLabel="JavaScript source"
+            disabled={false}
+            errorLabel="Code editor unavailable"
+            invalid={invalid}
+            loadingLabel="Loading code editor"
+            onBlur={() => log('code.blur', { length: value.length })}
+            onChange={(source) => {
+              setValue(source)
+              log('code.change', { length: source.length })
+            }}
+            theme={dark ? 'dark' : 'light'}
+            typing={codeEditorTyping}
+            uri="file:///modules/designer-lab.js"
+            value={value}
+          />
+        )}
+      </ValueEditorFeedback>
     </div>
   )
 }

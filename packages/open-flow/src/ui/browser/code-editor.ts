@@ -4,6 +4,7 @@ import type { ReadonlyVal } from 'value-enhancer'
 export interface CodeEditorOptions {
   readonly setup?: 'basic' | 'minimal'
   readonly theme?: 'github' | 'warm'
+  readonly ariaDescribedBy?: string
   readonly ariaLabel?: string
   readonly language?: string
   readonly invalid?: boolean
@@ -235,6 +236,7 @@ class CodeMirrorEditor {
     this.setInvalid(options.invalid === true)
     this.view.dom.dataset.uri = uri
     this.view.dom.dataset.language = this.language
+    if (options.ariaDescribedBy != null) this.view.contentDOM.setAttribute('aria-describedby', options.ariaDescribedBy)
     if (options.ariaLabel != null) this.view.contentDOM.ariaLabel = options.ariaLabel
     const updateTheme = (nextDark: boolean) =>
       this.view.dispatch({ effects: this.themeCompartment.reconfigure(createEditorTheme(this.modules, nextDark, options.theme)) })
@@ -290,6 +292,10 @@ class CodeMirrorEditor {
 
   public updateOptions(options: CodeEditorOptions): void {
     if (options.invalid != null) this.setInvalid(options.invalid)
+    if ('ariaDescribedBy' in options) {
+      if (options.ariaDescribedBy == null) this.view.contentDOM.removeAttribute('aria-describedby')
+      else this.view.contentDOM.setAttribute('aria-describedby', options.ariaDescribedBy)
+    }
     if (options.ariaLabel != null) this.view.contentDOM.ariaLabel = options.ariaLabel
     if (options.language != null) this.setLanguage(options.language)
 

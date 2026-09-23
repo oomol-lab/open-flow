@@ -205,9 +205,6 @@
   border-radius: 0;
   position: relative;
 }
-.code-editor-story .code-editor {
-  height: 100%;
-}
 .context-target {
   width: 320px;
   height: 180px;

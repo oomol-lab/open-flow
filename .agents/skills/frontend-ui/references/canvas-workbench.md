@@ -72,7 +72,8 @@ earlier history, and invalidates redo after a new edit. Cover queued saves or co
 Presentation changes when the affected operation uses them. Reusing an existing save operation
 does not require a separate history implementation in the panel.
 
-Code edits clear canvas history, as do canvas switching,
-refreshing, and external updates. After a save failure, clear history and reload the actual state.
+Code edits preserve earlier canvas history and invalidate redo. A code save updates any undoable
+node creation so redoing it restores the latest saved source. Canvas switching, refreshing, and
+external updates clear history. After a save failure, clear history and reload the actual state.
 The two save channels do not guarantee atomic commits and do not automatically compensate for
 partial success.

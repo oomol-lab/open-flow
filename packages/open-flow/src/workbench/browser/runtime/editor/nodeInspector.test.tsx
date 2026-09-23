@@ -413,6 +413,10 @@ describe('Code task sections', () => {
     } = {
       value: { moduleId: 'module', source: 'export default () => ({})', status: 'saved' },
     }
+    const diagnostics = [
+      { code: 'module.syntax', column: 1, line: 2, message: 'Invalid JavaScript syntax.', path: '/modules/module/source' },
+      { code: 'module.syntax', column: 1, line: 1, message: 'Another module is invalid.', path: '/modules/other/source' },
+    ]
     const element = NodeInspector({
       variables: { enabled: true, names: [], loaded: true, loading: false, onOpen: vi.fn() },
       activeConnectorConnections: [],
@@ -420,6 +424,7 @@ describe('Code task sections', () => {
       connectorLoading: false,
       connectors: { $: { actions: { value: {} }, connections: { value: [] }, catalogs: { value: {} } } } as never,
       disabled: false,
+      diagnostics,
       onConfigureConnectorAccess: configureAccess,
       revision: { graph: () => ({ nodes: { task: node } }) } as never,
       selection: {
@@ -446,6 +451,13 @@ describe('Code task sections', () => {
     const task = find(element, (item) => typeof item.type == 'function' && item.type.name == 'CodeTaskSection')
     if (task == null || typeof task.type != 'function') throw new Error('Expected task definition.')
     const rendered = (task.type as (props: unknown) => ReactElement)(task.props)
+    const feedback = find(rendered, (item) => typeof item.type == 'function' && item.type.name == 'ValueEditorFeedback')
+    expect(feedback?.props.error[0].props.children).toBe('Invalid JavaScript syntax.')
+    expect(feedback?.props.children('syntax-error').props).toMatchObject({ ariaDescribedBy: 'syntax-error', invalid: true })
+    const valid = (task.type as (props: unknown) => ReactElement)({ ...task.props, diagnostics: diagnostics.slice(1) })
+    const validFeedback = find(valid, (item) => typeof item.type == 'function' && item.type.name == 'ValueEditorFeedback')
+    expect(validFeedback?.props.error).toBeUndefined()
+    expect(validFeedback?.props.children(undefined).props.invalid).toBe(false)
     const modeSwitch = find(rendered, (item) => item.props.id == 'task-shared-permissions')
     expect(modeSwitch?.props.checked).toBe(true)
     expect(setCodeActions).not.toHaveBeenCalled()

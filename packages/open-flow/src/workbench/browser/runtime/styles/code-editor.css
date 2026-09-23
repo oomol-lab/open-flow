@@ -4,9 +4,15 @@
   }
 
   .code-editor {
+    --ui-danger-control-background: var(--ui-control-background, var(--ui-background));
+    --ui-danger-control-background-hover: var(--ui-control-hover-background, var(--ui-muted));
     position: relative;
     height: 280px;
     border-radius: var(--ui-radius);
+  }
+
+  .code-editor:has(.cm-content[contenteditable='false']) {
+    --ui-danger-control-background: var(--ui-control-hover-background, var(--ui-muted));
   }
 
   .code-actions {
@@ -19,10 +25,10 @@
     border-radius: inherit;
   }
 
-  .code-editor-host > .cm-editor {
+  :where(.code-editor-host > .cm-editor) {
     overflow: hidden;
-    border: 1px solid var(--ui-border);
-    background: color-mix(in srgb, var(--ui-background) 88%, var(--ui-card));
+    border: 1px solid var(--ui-input);
+    background: var(--ui-control-background, var(--ui-background));
   }
 
   .code-editor-host .cm-scroller {

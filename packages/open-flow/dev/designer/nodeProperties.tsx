@@ -181,6 +181,7 @@ function PropertySample({
   language,
   log,
   disabled,
+  showCodeIssue,
   reload,
   mount,
 }: {
@@ -189,6 +190,7 @@ function PropertySample({
   language: UiLanguage
   log: LogAction
   disabled: boolean
+  showCodeIssue: boolean
   reload: number
   mount: number
 }) {
@@ -219,6 +221,20 @@ function PropertySample({
             connectorLoading={false}
             connectors={session.connectors}
             disabled={disabled}
+            diagnostics={
+              showCodeIssue && fixture.id == 'task'
+                ? [
+                    {
+                      code: 'module.syntax',
+                      column: 1,
+                      line: 2,
+                      message: 'CodeModule "module" contains invalid JavaScript syntax.',
+                      path: '/modules/module/source',
+                      values: { moduleId: 'module' },
+                    },
+                  ]
+                : undefined
+            }
             revision={revision}
             selection={selection}
             store={session.store}
@@ -238,10 +254,12 @@ function PropertiesStory({ fixture, dark, language, log }: { fixture: Fixture; d
   const [generation, reset] = useState(0)
   const [reload, setReload] = useState(0)
   const [mount, setMount] = useState(0)
+  const [showCodeIssue, setShowCodeIssue] = useState(false)
   useStoryActions([
     { label: 'Reset samples', onClick: () => reset((value) => value + 1) },
     { label: 'Reopen panels', onClick: () => setMount((value) => value + 1) },
     { label: 'Reload saved data', onClick: () => setReload((value) => value + 1) },
+    ...(fixture.id == 'task' ? [{ label: showCodeIssue ? 'Clear code issue' : 'Show code issue', onClick: () => setShowCodeIssue((value) => !value) }] : []),
   ])
   return (
     <div className="node-properties-gallery open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'}>
@@ -253,6 +271,7 @@ function PropertiesStory({ fixture, dark, language, log }: { fixture: Fixture; d
           language={language}
           log={log}
           disabled={disabled}
+          showCodeIssue={showCodeIssue}
           reload={reload}
           mount={mount}
         />
@@ -272,6 +291,8 @@ export const nodePropertiesStories: readonly FrontendStory[] = fixtures.map((fix
       ? 'Per-run node execution limits. Change the limit, test invalid values, or clear it to restore the default of 1000; reload verifies persistence.'
       : fixture.id === 'value'
         ? 'Editable and read-only properties, including typed dates, calendar selection, and time editing with timezone preservation. Use Sort to reorder fields and nested object properties; Done sorting restores disclosure arrows. Samples save independently.'
-        : 'Editable, read-only and fixed-type value panels. Inspector samples save independently; reload verifies saved values.',
+        : fixture.id === 'task'
+          ? 'Editable and read-only task properties. Toggle the code issue to inspect its attached error above Node settings.'
+          : 'Editable, read-only and fixed-type value panels. Inspector samples save independently; reload verifies saved values.',
   render: (log, dark, language) => <PropertiesStory fixture={fixture} dark={dark} language={language} log={log} />,
 }))

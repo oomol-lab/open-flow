@@ -391,6 +391,19 @@ function HistoryCanvasActions({ session }: { session: ReturnType<typeof createSe
     { label: 'Select mixed group', onClick: () => store.selectNodes(['trigger', 'value', 'code', 'note']) },
     { label: 'Edit title (undoable)', disabled: history.failed || history.applying, onClick: () => void store.saveNodeTitle('code', 'Edited transform') },
     {
+      label: 'Edit code (keep canvas undo)',
+      disabled: history.failed || history.applying,
+      onClick: () => {
+        store.selectNodes(['code'])
+        store.updateModuleSource(
+          draft?.content.modules.module?.source == 'export default () => ({ result: 2 })'
+            ? 'export default () => ({ result: 1 })'
+            : 'export default () => ({ result: 2 })',
+        )
+        void store.saveModuleEditor()
+      },
+    },
+    {
       label: 'Delete value field',
       disabled: history.failed || history.applying || valueField == null,
       onClick: () => void store.saveValue('value', [], { target: 'field', name: valueField?.handle ?? 'value' }),
@@ -426,7 +439,7 @@ export const historyStory: FrontendStory = {
   id: 'canvas-history',
   title: 'Canvas operations',
   description:
-    'Delete Input and undo/redo: the other edge and Transform’s simulated error stay visible. Delete the value field to inspect the saved notification and Undo action. Hold saves to inspect pending changes.',
+    'Delete Input and undo/redo: the other edge and Transform’s simulated error stay visible. Edit code after a canvas action to confirm Undo remains available. Delete the value field to inspect the saved notification and Undo action. Hold saves to inspect pending changes.',
   standalone: true,
   render: (log, dark, language) => (
     <div

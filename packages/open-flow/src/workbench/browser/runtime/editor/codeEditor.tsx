@@ -27,9 +27,11 @@ async function claimEditor(uri: string): Promise<() => void> {
 }
 
 interface Props {
+  readonly ariaDescribedBy?: string
   readonly ariaLabel: string
   readonly disabled: boolean
   readonly errorLabel: string
+  readonly invalid?: boolean
   readonly loadingLabel: string
   readonly location?: { readonly column: number; readonly line: number }
   readonly onBlur: () => void
@@ -40,13 +42,29 @@ interface Props {
   readonly value: string
 }
 
-export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, location, onBlur, onChange, theme, typing, uri, value }: Props): ReactElement {
+export function CodeEditor({
+  ariaDescribedBy,
+  ariaLabel,
+  disabled,
+  errorLabel,
+  invalid = false,
+  loadingLabel,
+  location,
+  onBlur,
+  onChange,
+  theme,
+  typing,
+  uri,
+  value,
+}: Props): ReactElement {
   const host = useRef<HTMLDivElement>(null)
   const editor = useRef<Editor>()
   const darkMode = useRef<ReturnType<typeof val<boolean>>>()
   const syncing = useRef(false)
   const valueRef = useRef(value)
   const disabledRef = useRef(disabled)
+  const describedByRef = useRef(ariaDescribedBy)
+  const invalidRef = useRef(invalid)
   const locationRef = useRef(location)
   const onBlurRef = useRef(onBlur)
   const onChangeRef = useRef(onChange)
@@ -55,6 +73,8 @@ export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, loca
   const [loading, setLoading] = useState(true)
   valueRef.current = value
   disabledRef.current = disabled
+  describedByRef.current = ariaDescribedBy
+  invalidRef.current = invalid
   locationRef.current = location
   onBlurRef.current = onBlur
   onChangeRef.current = onChange
@@ -85,8 +105,10 @@ export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, loca
           container,
           uri,
           {
+            ariaDescribedBy: describedByRef.current,
             ariaLabel,
             language: 'javascript',
+            invalid: invalidRef.current,
             readOnly: disabledRef.current,
             value: valueRef.current,
             wordWrap: 'on',
@@ -104,7 +126,7 @@ export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, loca
         }
         current = created
         editor.current = created
-        created.updateOptions({ readOnly: disabledRef.current })
+        created.updateOptions({ ariaDescribedBy: describedByRef.current, invalid: invalidRef.current, readOnly: disabledRef.current })
         if (created.getValue() != valueRef.current) created.setValue(valueRef.current)
         changeListener = created.onChange(() => {
           if (!syncing.current) onChangeRef.current(created.getValue())
@@ -149,6 +171,14 @@ export function CodeEditor({ ariaLabel, disabled, errorLabel, loadingLabel, loca
   useEffect(() => {
     editor.current?.updateOptions({ readOnly: disabled })
   }, [disabled])
+
+  useEffect(() => {
+    editor.current?.updateOptions({ invalid })
+  }, [invalid])
+
+  useEffect(() => {
+    editor.current?.updateOptions({ ariaDescribedBy })
+  }, [ariaDescribedBy])
 
   useEffect(() => {
     void import('../../typeScriptSession.ts').then(({ updateTypeScriptTyping }) => updateTypeScriptTyping(uri, typing)).catch(noop)

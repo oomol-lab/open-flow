@@ -153,6 +153,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   const triggerActiveConnections = useVal(store.triggers.$.selectedActiveConnections)
   const triggerCatalog = useVal(store.triggers.catalog.state)
   const sourceNodeIcons = useVal(store.$.sourceNodeIcons)
+  const diagnostics = useVal(store.workspace.$.inspectorDiagnostics)
   useEffect(() => {
     store.triggers.catalog.get()
   }, [language, store])
@@ -192,6 +193,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
       connectorLoading={connectorSetupPending || accessState.loading || connectorActionLoading != null || connectorConnectionLoading != null}
       focus={focus}
       disabled={disabled}
+      diagnostics={diagnostics}
       revision={revision}
       selection={selection}
       sourceNodeIcons={sourceNodeIcons}
