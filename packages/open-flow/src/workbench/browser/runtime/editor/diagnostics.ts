@@ -17,6 +17,7 @@ export interface DiagnosticLocation {
 export interface DiagnosticItem {
   readonly diagnostic: Diagnostic
   readonly location?: DiagnosticLocation
+  readonly message?: string
   readonly scope: DiagnosticScope
 }
 

@@ -362,6 +362,39 @@
     padding: 15px 16px;
   }
 
+  .diagnostics-list > li.diagnostics-node-group {
+    padding: 0;
+  }
+
+  .diagnostics-node-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--ui-border);
+  }
+
+  .diagnostics-node-header span {
+    flex: none;
+    color: var(--ui-muted-foreground);
+    font-size: 11px;
+  }
+
+  .diagnostics-node-items {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .diagnostics-node-items li {
+    padding: 12px 16px 12px 24px;
+  }
+
+  .diagnostics-node-items li + li {
+    border-top: 1px solid var(--ui-border);
+  }
+
   .diagnostics-list .diagnostic-message {
     display: block;
     width: 100%;

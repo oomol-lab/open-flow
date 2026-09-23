@@ -363,9 +363,7 @@ function triggerNodeIcon(trigger: TriggerNode, providers: Readonly<Record<string
 
 function triggerDiagnostics(triggerId: string, diagnostics: readonly Diagnostic[]): readonly Diagnostic[] {
   const path = `/document/graph/nodes/${triggerId}`
-  return diagnostics.filter(
-    (diagnostic) => diagnostic.code != 'trigger.config-incomplete' && (diagnostic.path == path || diagnostic.path.startsWith(`${path}/`)),
-  )
+  return diagnostics.filter((diagnostic) => diagnostic.path == path || diagnostic.path.startsWith(`${path}/`))
 }
 
 function projectEdges(graph: { readonly edges?: unknown }, nodeIds: ReadonlySet<string>): EdgeProjection {

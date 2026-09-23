@@ -809,10 +809,11 @@
         "module-missing": "Inline Task“{{nodeId}}”引用的 CodeModule“{{moduleId}}”不存在。"
       },
       "trigger": {
-        "config-incomplete": "请填写必需的 Trigger 配置字段：{{fields}}。",
+        "config-incomplete": "请完成触发器的必填配置。",
+        "config-incomplete-fields": "请完成触发器的必填配置：{{fields}}。",
         "config-invalid": "Trigger“{{triggerId}}”的配置与固定定义不匹配。",
         "connection-invalid": "Trigger 绑定“{{bindingId}}”必须是 Connection。",
-        "connection-missing": "Trigger 的 Connection 绑定“{{bindingId}}”不存在。",
+        "connection-missing": "请选择触发器的连接账号。",
         "input-duplicate": "Webhook Trigger 输入“{{input}}”被重复声明。"
       }
     },
@@ -1166,6 +1167,7 @@
     "notFound": "所选连接账号无法使用此事件源。",
     "conflict": "事件源已变更或仍在使用，请刷新并检查相关 Flow 和订阅。",
     "source": "事件源",
+    "selectSourceFirst": "请先选择事件源",
     "noSources": "当前 Flow 所属团队暂无飞书事件源，可以在这里创建。",
     "loadFailed": "无法加载事件源。",
     "searchEvents": "搜索事件名称或标识",

@@ -23,6 +23,22 @@ interface Props {
 export function DiagnosticsPanel({ checked, checking, items, nodes, onClose, onRefresh, onSelect, onSelectNode }: Props): ReactElement {
   const t = useTranslate()
   const panel = useRef<HTMLElement>(null)
+  const groups: { nodeId?: string; items: DiagnosticItem[] }[] = []
+  const nodeGroups = new Map<string, (typeof groups)[number]>()
+  for (const item of items) {
+    const nodeId = item.location?.nodeId
+    if (nodeId == null || !nodes.has(nodeId)) {
+      groups.push({ items: [item] })
+      continue
+    }
+    let group = nodeGroups.get(nodeId)
+    if (group == null) {
+      group = { nodeId, items: [] }
+      nodeGroups.set(nodeId, group)
+      groups.push(group)
+    }
+    group.items.push(item)
+  }
 
   useEffect(() => panel.current?.focus({ preventScroll: true }), [])
 
@@ -30,6 +46,38 @@ export function DiagnosticsPanel({ checked, checking, items, nodes, onClose, onR
     if (event.key != 'Escape') return
     event.stopPropagation()
     onClose()
+  }
+
+  function issueContent(item: DiagnosticItem): ReactElement {
+    const referencedNodeId = diagnosticNodeId(item.diagnostic)
+    const referencedNode = referencedNodeId == null ? undefined : nodes.get(referencedNodeId)
+    const message = item.message ?? diagnosticMessage(item.diagnostic, t, (nodeId) => nodes.get(nodeId)?.title)
+    if (referencedNodeId != null && referencedNode != null)
+      return (
+        <Button
+          variant="link"
+          size="xs"
+          className="diagnostic-message h-auto whitespace-normal p-0 hover:underline focus-visible:underline"
+          onClick={() => onSelectNode(referencedNodeId)}
+          title={referencedNodeId}
+          type="button"
+        >
+          {message}
+        </Button>
+      )
+    if (item.location != null)
+      return (
+        <Button
+          variant="link"
+          size="xs"
+          className="diagnostic-message h-auto whitespace-normal p-0 hover:underline focus-visible:underline"
+          onClick={() => onSelect(item)}
+          type="button"
+        >
+          {message}
+        </Button>
+      )
+    return <span className="diagnostic-message">{message}</span>
   }
 
   return (
@@ -79,39 +127,30 @@ export function DiagnosticsPanel({ checked, checking, items, nodes, onClose, onR
         )
       ) : (
         <ol className="diagnostics-list">
-          {items.map((item, index) => {
-            const referencedNodeId = diagnosticNodeId(item.diagnostic)
-            const referencedNode = referencedNodeId == null ? undefined : nodes.get(referencedNodeId)
-            const message = diagnosticMessage(item.diagnostic, t, (nodeId) => nodes.get(nodeId)?.title)
-            return (
-              <li key={`${item.diagnostic.path}:${item.diagnostic.line}:${item.diagnostic.column}:${item.diagnostic.code}:${index}`}>
-                {referencedNodeId != null && referencedNode != null ? (
+          {groups.map((group, groupIndex) =>
+            group.nodeId == null ? (
+              <li key={`issue:${groupIndex}`}>{issueContent(group.items[0]!)}</li>
+            ) : (
+              <li key={`node:${group.nodeId}`} className="diagnostics-node-group">
+                <div className="diagnostics-node-header">
                   <Button
                     variant="link"
                     size="xs"
-                    className="diagnostic-message h-auto whitespace-normal p-0 hover:underline focus-visible:underline"
-                    onClick={() => onSelectNode(referencedNodeId)}
-                    title={referencedNodeId}
-                    type="button"
+                    className="h-auto min-w-0 break-words p-0 text-left font-semibold"
+                    onClick={() => onSelectNode(group.nodeId!)}
                   >
-                    {message}
+                    {nodes.get(group.nodeId)?.title}
                   </Button>
-                ) : item.location != null ? (
-                  <Button
-                    variant="link"
-                    size="xs"
-                    className="diagnostic-message h-auto whitespace-normal p-0 hover:underline focus-visible:underline"
-                    onClick={() => onSelect(item)}
-                    type="button"
-                  >
-                    {message}
-                  </Button>
-                ) : (
-                  <span className="diagnostic-message">{message}</span>
-                )}
+                  {group.items.length > 1 && <span>{t('diagnostics.summary', { count: group.items.length })}</span>}
+                </div>
+                <ol className="diagnostics-node-items">
+                  {group.items.map((item, index) => (
+                    <li key={`${item.diagnostic.path}:${item.diagnostic.code}:${index}`}>{issueContent(item)}</li>
+                  ))}
+                </ol>
               </li>
-            )
-          })}
+            ),
+          )}
         </ol>
       )}
     </aside>

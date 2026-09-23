@@ -378,7 +378,8 @@ describe('Designer port projection', () => {
       },
     ]).nodes[0]
 
-    expect(designerGraph(draft, { kind: 'flow' }, {}, []).nodes[0]).toEqual(node)
+    expect(node).toMatchObject({ diagnostics: 1, connectionRequired: false })
+    expect(designerGraph(draft, { kind: 'flow' }, {}, []).nodes[0]).toMatchObject({ diagnostics: 0, connectionRequired: false })
 
     expect(node).toMatchObject({
       icon: providerIcon({ serviceId: 'github', serviceName: 'github' }),
@@ -416,7 +417,7 @@ describe('Designer port projection', () => {
         },
       },
     }
-    expect(designerGraph(filled, { kind: 'flow' }, {}, []).nodes[0]).toEqual(node)
+    expect(designerGraph(filled, { kind: 'flow' }, {}, []).nodes[0]).toEqual({ ...node, diagnostics: 0 })
     expect(node).not.toHaveProperty('presentation.config')
   })
 })

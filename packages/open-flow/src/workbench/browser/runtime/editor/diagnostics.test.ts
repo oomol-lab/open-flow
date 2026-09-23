@@ -44,6 +44,32 @@ describe('Workbench Diagnostic messages', () => {
     i18n.dispose()
   })
 
+  it('explains a missing trigger account without exposing its binding ID', () => {
+    const i18n = createI18n('zh-CN')
+    const diagnostic: Diagnostic = {
+      ...base,
+      code: 'trigger.connection-missing',
+      message: 'Select a connection account for this Trigger.',
+      values: { bindingId: 'internal-id' },
+    }
+
+    expect(diagnosticMessage(diagnostic, i18n.t)).toBe('请选择触发器的连接账号。')
+    i18n.dispose()
+  })
+
+  it('does not expose trigger field handles without catalog labels', () => {
+    const i18n = createI18n('zh-CN')
+    const diagnostic: Diagnostic = {
+      ...base,
+      code: 'trigger.config-incomplete',
+      message: 'Complete the required Trigger config fields: sourceId, eventTypes.',
+      values: { fields: 'sourceId, eventTypes' },
+    }
+
+    expect(diagnosticMessage(diagnostic, i18n.t)).toBe('请完成触发器的必填配置。')
+    i18n.dispose()
+  })
+
   it('explains the Agent tool limit without hiding other configuration errors', () => {
     const i18n = createI18n('zh-CN')
     const diagnostic: Diagnostic = { ...base, code: 'agent.config-invalid', message: 'Declare at most 64 Agent tools.' }

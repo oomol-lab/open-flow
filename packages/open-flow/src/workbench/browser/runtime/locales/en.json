@@ -809,10 +809,11 @@
         "module-missing": "Inline Task \"{{nodeId}}\" references missing CodeModule \"{{moduleId}}\"."
       },
       "trigger": {
-        "config-incomplete": "Complete the required Trigger config fields: {{fields}}.",
+        "config-incomplete": "Complete the required trigger settings.",
+        "config-incomplete-fields": "Complete the required trigger settings: {{fields}}.",
         "config-invalid": "Trigger \"{{triggerId}}\" config does not match its fixed definition.",
         "connection-invalid": "Trigger binding \"{{bindingId}}\" must be a Connection.",
-        "connection-missing": "Trigger Connection binding \"{{bindingId}}\" does not exist.",
+        "connection-missing": "Select a connection account for this trigger.",
         "input-duplicate": "Webhook Trigger input \"{{input}}\" is declared more than once."
       }
     },
@@ -1166,6 +1167,7 @@
     "notFound": "This event source is unavailable for the selected Connection.",
     "conflict": "The source changed or is still in use. Refresh and check the affected Flows and subscriptions.",
     "source": "Event source",
+    "selectSourceFirst": "Select an event source first",
     "noSources": "This Flow’s team has no Feishu event sources yet. Create one here to continue.",
     "loadFailed": "Event sources could not be loaded.",
     "searchEvents": "Search by name or event ID",
