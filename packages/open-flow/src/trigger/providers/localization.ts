@@ -3,6 +3,7 @@ import type { TriggerKeySnapshot } from '../../flow/common/change.ts'
 import type { UiLanguage } from '../../localization/common/languages.ts'
 
 import { englishTriggerFieldDescriptions } from './fieldDescriptions.ts'
+import { triggerConfigFieldLabels } from './fieldLabels.ts'
 
 type Translations = Readonly<Record<string, Partial<TriggerDisplay>>>
 
@@ -36,6 +37,7 @@ export async function localizeTrigger(definition: TriggerKeySnapshot, locale: Ui
   const englishFields = englishTriggerFieldDescriptions[definition.key as keyof typeof englishTriggerFieldDescriptions]
   return {
     configInputs: fieldDescriptions(definition.configInputs, copy?.configInputs, englishFields?.configInputs),
+    configInputLabels: triggerConfigFieldLabels[locale][definition.key] ?? {},
     displayName: copy?.displayName ?? definition.displayName,
     description: copy?.description ?? definition.description,
     outputs: fieldDescriptions(definition.outputs, copy?.outputs, englishFields?.outputs),

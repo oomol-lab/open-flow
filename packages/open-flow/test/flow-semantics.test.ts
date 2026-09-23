@@ -7,6 +7,7 @@ import { inputValues } from '../src/flow/common/inputValue.ts'
 import { validateModules } from '../src/flow/common/modules.ts'
 import { matchesSchema } from '../src/flow/common/schema.ts'
 import { createRuntimeProgram, flowDependencies, prepareFlow, validateFlow, validateFlowInputs } from '../src/flow/common/semantics.ts'
+import { feishuEvents } from '../src/trigger/providers/feishu/on-event.ts'
 
 const engine = findEngineContract(currentEngineContract)!
 
@@ -414,6 +415,47 @@ export default () => value`,
 
     await expect(validateFlow(triggerRevision({ event: 'delete' }, { type: 'string' }), engine)).resolves.toMatchObject({
       diagnostics: [expect.objectContaining({ code: 'trigger.config-invalid', path: '/document/graph/nodes/trigger/config' })],
+      valid: false,
+    })
+  })
+
+  const feishuMissingCases: readonly { readonly config: Readonly<Record<string, JsonValue>>; readonly fields: string }[] = [
+    { config: {}, fields: 'sourceId, eventTypes' },
+    { config: { eventTypes: ['im.message.receive_v1'] }, fields: 'sourceId' },
+    { config: { sourceId: `source_${'a'.repeat(32)}` }, fields: 'eventTypes' },
+  ]
+  it.each(feishuMissingCases)('reports missing Feishu Trigger settings: $fields', async ({ config, fields }) => {
+    const source: RevisionFixture = {
+      document: {
+        bindings: { trigger: { kind: 'connection', target: 'connection-1' } },
+        graph: {
+          edges: [],
+          nodes: {
+            trigger: {
+              bindingId: 'trigger',
+              config: inputValues(config),
+              definition: feishuEvents[0]!.snapshot,
+              kind: 'integration',
+              name: 'Application Event',
+            },
+          },
+        },
+        subflows: {},
+        tasks: {},
+      },
+      modelVersion: currentFlowModelVersion,
+      modules: {},
+    }
+
+    await expect(validateFlow(source, engine)).resolves.toMatchObject({
+      diagnostics: [
+        expect.objectContaining({
+          code: 'trigger.config-incomplete',
+          path: '/document/graph/nodes/trigger/config',
+          fields: fields.split(', '),
+          values: { fields },
+        }),
+      ],
       valid: false,
     })
   })

@@ -233,13 +233,14 @@ describe('ControlClient Flow API', () => {
     await expect(client.listProviderAccessBindingCandidates(flow.flowId, ['mail'])).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
   })
 
-  it('preserves structured Diagnostic values', async () => {
+  it('preserves structured Diagnostic values and missing fields', async () => {
     const checked = {
       closureDigest: 'closure-1',
       diagnostics: [
         {
           code: 'graph.target-missing',
           column: 0,
+          fields: ['owner', 'repo'],
           line: 1,
           message: 'Task "missing" does not exist.',
           mismatch: { kind: 'keyword', keyword: 'type', path: [], source: 'string', target: 'number' },
@@ -263,6 +264,9 @@ describe('ControlClient Flow API', () => {
       Response.json({ ...checked, diagnostics: [{ ...checked.diagnostics[0], values: { taskId: true, variant: 'task' } }] }),
     )
     await expect(invalid.checkFlow(flow.flowId, flow.draftRevisionId)).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
+
+    const invalidFields = new ControlClient(async () => Response.json({ ...checked, diagnostics: [{ ...checked.diagnostics[0], fields: ['owner', 1] }] }))
+    await expect(invalidFields.checkFlow(flow.flowId, flow.draftRevisionId)).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
   })
 })
 

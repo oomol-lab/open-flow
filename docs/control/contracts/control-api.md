@@ -488,7 +488,8 @@ Trigger Key catalog 是 deployment scope 资源：
 
 `GET /v1/trigger-keys` 与 `GET /v1/trigger-keys/catalog` 接受可选 `locale` query；query 优先于
 `Accept-Language`，缺省与不支持的语言回退英文，非法 BCP 47 query 返回 400。语言映射复用公共 localization
-契约。摘要返回翻译后的名称与描述；完整 catalog 的 `display` 按 Trigger key 保存触发器以及配置、输出字段的展示文案，
+契约。摘要返回翻译后的名称与描述；完整 catalog 的 v3 `display` 按 Trigger key 保存触发器、配置字段标签与描述、输出字段描述。
+`configInputLabels` 只包含有本地化标签的字段；Workbench 在配置面板和诊断提示中复用这些标签，缺少标签时不显示内部字段 handle。
 `definitions` 始终保留原始英文定义。单条 definition、CLI 与持久化的 Flow definition 不因界面语言改变。
 
 公共 `provider-triggers` entry 的 `localizeTrigger(definition, locale)` 返回 `Promise<TriggerDisplay>`，调用方需等待

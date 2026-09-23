@@ -23,7 +23,11 @@ describe('Provider Trigger localization', () => {
       const display = await localizeTrigger(snapshot, language)
       expect(Object.keys(display.configInputs).toSorted(), `${snapshot.key} configuration`).toEqual(handles(snapshot.configInputs))
       expect(Object.keys(display.outputs).toSorted(), `${snapshot.key} outputs`).toEqual(handles(snapshot.outputs))
+      expect(Object.keys(display.configInputLabels).toSorted(), `${snapshot.key} required labels`).toEqual(
+        snapshot.configInputs.flatMap((field) => ('handle' in field && !field.nullable && field.value === undefined ? [field.handle] : [])).toSorted(),
+      )
       expect(Object.values(display.configInputs).every(Boolean)).toBe(true)
+      expect(Object.values(display.configInputLabels).every(Boolean)).toBe(true)
       expect(Object.values(display.outputs).every(Boolean)).toBe(true)
       if (language == 'en') continue
       expect(Object.keys(translations[snapshot.key]?.configInputs ?? {}).toSorted(), `${snapshot.key} translated configuration`).toEqual(
