@@ -28,7 +28,7 @@
         "sonner": "2.0.7",
         "val-i18n": "^0.1.14",
         "val-i18n-react": "^0.1.7",
-        "zod": "4.5.4",
+        "zod": "4.6.5",
       },
       "devDependencies": {
         "@modelcontextprotocol/client": "2.0.0",
@@ -56,7 +56,7 @@
         "@wopjs/cast": "^0.1.16",
         "modern-tar": "0.7.6",
         "val-i18n": "^0.1.14",
-        "zod": "4.5.4",
+        "zod": "4.6.5",
       },
       "devDependencies": {
         "@types/node": "^26.0.0",
@@ -170,7 +170,7 @@
         "vite": "8.2.1",
         "vitest": "^5.0.0",
         "yaml": "^2.9.0",
-        "zod": "4.5.4",
+        "zod": "4.6.5",
         "zustand": "^4.4.0",
       },
     },
@@ -1544,7 +1544,7 @@
 
     "youch-core": ["youch-core@0.3.3", "", { "dependencies": { "@poppinss/exception": "^1.2.2", "error-stack-parser-es": "^1.0.5" } }, "sha512-ho7XuGjLaJ2hWHoK8yFnsUGy2Y5uDpqSTq1FkHLK4/oqKtyUU1AFbOOxY4IpC9f0fTLjwYbslUz0Po5BpD1wrA=="],
 
-    "zod": ["zod@4.5.4", "", {}, "sha512-sC95tT5iHHH9gtpj6A81kh+NEaRAUFN+qlUPDUbRfOMvNf5QCBqsb3WgvnpVtK5Y+4UfA6KqufotuTvMGiTlsA=="],
+    "zod": ["zod@4.6.5", "", {}, "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q=="],
 
     "zod-from-json-schema": ["zod-from-json-schema@0.5.6", "", { "dependencies": { "zod": "^4.0.17" } }, "sha512-U33AJ7ZWS6y9XNSzMWcdy8hRAvZmWhTtpYJu0SXPT5AArbc9nq2ur7Magzmn5RF9KBV4b3FP0nCpmqqlfXlR9w=="],
 

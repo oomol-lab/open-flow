@@ -19,7 +19,7 @@
     "@wopjs/cast": "^0.1.16",
     "modern-tar": "0.7.6",
     "val-i18n": "^0.1.14",
-    "zod": "4.5.4"
+    "zod": "4.6.5"
   },
   "devDependencies": {
     "@types/node": "^26.0.0",
