@@ -124,17 +124,6 @@
     background: currentColor;
   }
 
-  .designer-overlay {
-    position: absolute;
-    z-index: 5;
-    top: 15px;
-  }
-
-  .designer-overlay.top-left {
-    left: 15px;
-    top: 62px;
-  }
-
   .designer-actions {
     display: flex;
     align-items: center;

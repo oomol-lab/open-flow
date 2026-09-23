@@ -116,7 +116,7 @@
   "designer": {
     "addNode": "노드 추가",
     "delete": "삭제",
-    "draftBadge": "{{kind}} 초안",
+    "draftSaved": "초안 저장됨",
     "executorConnectionRequired": "Connection 필요",
     "executorConnector": "Connector",
     "executorJavaScript": "JavaScript",

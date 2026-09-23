@@ -116,7 +116,7 @@
   "designer": {
     "addNode": "Add node",
     "delete": "Delete",
-    "draftBadge": "{{kind}} Draft",
+    "draftSaved": "Draft saved",
     "executorConnectionRequired": "connection required",
     "executorConnector": "connector",
     "executorJavaScript": "javascript",

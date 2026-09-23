@@ -1,4 +1,5 @@
 import type { ReactElement } from 'react'
+import type { WorkspaceStatus } from '../stores/workspaceModel.ts'
 
 import { useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
@@ -10,19 +11,19 @@ import { followWorkbenchLink } from '../navigationLink.ts'
 
 export function WorkspaceNavigationIsland({
   flowName,
-  flowHref,
   flowsHref,
-  onOpenFlow,
   onOpenFlows,
+  saveStatus,
 }: {
   readonly flowName: string
-  readonly flowHref: string
   readonly flowsHref: string
-  readonly onOpenFlow: () => void
   readonly onOpenFlows: () => void
+  readonly saveStatus?: WorkspaceStatus | undefined
 }): ReactElement {
   const t = useTranslate()
   const [tooltipContainer, setTooltipContainer] = useState<HTMLElement | null>(null)
+  const draftStatus = saveStatus == 'saved' || saveStatus == 'saving' || saveStatus == 'failed' ? saveStatus : undefined
+  const draftStatusLabel = draftStatus == null ? undefined : t(draftStatus == 'saved' ? 'designer.draftSaved' : `workspace.status.${draftStatus}`)
   return (
     <nav aria-label={t('resource.workflows')} className="workspace-navigation" ref={setTooltipContainer}>
       <div
@@ -43,17 +44,20 @@ export function WorkspaceNavigationIsland({
             </Button>
           </CanvasTooltip>
           <CanvasTooltip getPopupContainer={() => tooltipContainer ?? document.body} placement="bottom" title={flowName}>
-            <Button
-              className="workspace-flow-link"
-              nativeButton={false}
-              onClick={(event) => followWorkbenchLink(event, onOpenFlow)}
-              render={<a href={flowHref} />}
-              size="default"
-              variant="ghost"
-            >
-              <span>{flowName}</span>
-            </Button>
+            <span className="workspace-flow-name" tabIndex={0}>
+              {flowName}
+            </span>
           </CanvasTooltip>
+          {draftStatus != null && (
+            <CanvasTooltip
+              className="whitespace-nowrap"
+              getPopupContainer={() => tooltipContainer ?? document.body}
+              placement="bottom"
+              title={draftStatusLabel}
+            >
+              <span aria-label={draftStatusLabel} className="workspace-draft-indicator" data-save-status={draftStatus} role="status" tabIndex={0} />
+            </CanvasTooltip>
+          )}
         </TooltipProvider>
       </div>
     </nav>

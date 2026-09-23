@@ -116,7 +116,7 @@
   "designer": {
     "addNode": "ノードを追加",
     "delete": "削除",
-    "draftBadge": "{{kind}} ドラフト",
+    "draftSaved": "ドラフトを保存済み",
     "executorConnectionRequired": "接続が必要",
     "executorConnector": "Connector",
     "executorJavaScript": "JavaScript",

@@ -609,6 +609,7 @@ export default function FlowWorkspace({
   const handledExternalRun = useRef<string>()
   const view = useVal(navigation.$.view)
   const draft = useVal(store.workspace.$.draft)
+  const saveStatus = useVal(store.workspace.$.status)
   const flow = useVal(store.workspace.$.flow)
   const flowId = useVal(store.workspace.$.flowId)
   const workspaceLoadFailed = useVal(store.workspace.$.workspaceLoadFailed)
@@ -672,10 +673,9 @@ export default function FlowWorkspace({
           store={store}
         />
         <WorkspaceNavigationIsland
+          saveStatus={view == 'design' ? saveStatus : undefined}
           flowName={flow?.name ?? flow?.flowId ?? ''}
-          flowHref={hrefFor({ flowId: flowId!, view: 'design' })}
           flowsHref={hrefFor({ view: 'design' })}
-          onOpenFlow={() => navigation.openMainFlow()}
           onOpenFlows={() => void navigation.openFlows()}
         />
         {view == 'design' && (workspaceLoading || draft == null) ? (

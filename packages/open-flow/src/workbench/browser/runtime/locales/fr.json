@@ -116,7 +116,7 @@
   "designer": {
     "addNode": "Ajouter un nœud",
     "delete": "Supprimer",
-    "draftBadge": "Brouillon {{kind}}",
+    "draftSaved": "Brouillon enregistré",
     "executorConnectionRequired": "Connection requise",
     "executorConnector": "Connector",
     "executorJavaScript": "JavaScript",

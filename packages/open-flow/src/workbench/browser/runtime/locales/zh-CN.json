@@ -116,7 +116,7 @@
   "designer": {
     "addNode": "添加节点",
     "delete": "删除",
-    "draftBadge": "{{kind}} 草稿",
+    "draftSaved": "草稿已保存",
     "executorConnectionRequired": "需要连接",
     "executorConnector": "连接器",
     "executorJavaScript": "JavaScript",

@@ -13,7 +13,6 @@ import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useMemo, u
 import { useLang, useTranslate } from 'val-i18n-react'
 import { CanvasTooltip } from '../../../../canvas/browser/components/tooltip.tsx'
 import { FlowCanvasView } from '../../../../canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
-import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Icon } from '../icons.tsx'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
@@ -417,12 +416,6 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
           }}
         />
       )}
-      <Badge className="designer-overlay top-left" variant="secondary">
-        <span className="status-dot neutral" />
-        {t('designer.draftBadge', {
-          kind: t(target?.kind == 'subflow' ? 'common.subflow' : 'common.flow'),
-        })}
-      </Badge>
       {target != null && model.nodes.length == 0 && (
         <div className="canvas-empty">
           <Button className="canvas-empty-add" disabled={disabled} onClick={openAddNode} type="button" variant="outline">

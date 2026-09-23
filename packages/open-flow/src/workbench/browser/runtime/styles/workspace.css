@@ -60,30 +60,68 @@
     left: 12px;
     display: flex;
     max-width: calc(100% - 24px);
-    gap: 8px;
+  }
+
+  .workspace-draft-indicator {
+    display: inline-flex;
+    width: 20px;
+    height: 28px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    outline: none;
+  }
+
+  .workspace-draft-indicator::before {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--success);
+    content: '';
+  }
+
+  .workspace-draft-indicator[data-save-status='saving']::before {
+    background: var(--warning);
+  }
+
+  .workspace-draft-indicator[data-save-status='failed']::before {
+    background: var(--ui-destructive);
+  }
+
+  .workspace-draft-indicator:focus-visible {
+    border-radius: 4px;
+    outline: 2px solid var(--ui-ring);
+    outline-offset: -2px;
   }
 
   .workspace-title-island {
     min-width: 0;
+    max-width: 100%;
     flex: 0 1 auto;
     gap: 0;
   }
 
-  .workspace-title-island .workspace-flow-link {
+  .workspace-title-island .workspace-flow-name {
+    display: block;
     min-width: 0;
     max-width: 180px;
     flex: 0 1 auto;
-    justify-content: flex-start;
-    padding-inline-end: 14px;
+    height: 28px;
+    overflow: hidden;
+    padding-inline-start: 2px;
+    padding-inline-end: 5px;
     color: var(--ui-foreground);
     font-weight: 600;
+    line-height: 28px;
+    text-overflow: ellipsis;
+    transform: translateY(-1px);
+    white-space: nowrap;
   }
 
-  .workspace-title-island .workspace-flow-link span {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+  .workspace-title-island .workspace-flow-name:focus-visible {
+    border-radius: 4px;
+    outline: 2px solid var(--ui-ring);
+    outline-offset: -2px;
   }
 
   .workspace-actions {

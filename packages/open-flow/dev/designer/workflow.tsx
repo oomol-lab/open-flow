@@ -3,6 +3,7 @@ import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { Draft } from '../../src/workbench/browser/runtime/api.ts'
 import type { CanvasNodePickerRequest } from '../../src/workbench/browser/runtime/editor/nodePickerPopover.tsx'
 import type { PublishState } from '../../src/workbench/browser/runtime/shell/workspacePublishIsland.tsx'
+import type { WorkspaceStatus } from '../../src/workbench/browser/runtime/stores/workspaceModel.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
@@ -392,7 +393,7 @@ export const workflowStories: readonly FrontendStory[] = [
     group: 'Workbench',
     id: 'workspace-navigation-island',
     title: 'Workspace navigation island',
-    description: 'Compare long and short names, inspect each publish status tooltip, and open the record menu beside the canvas controls.',
+    description: 'Compare long and short names, cycle the draft status dot beside the title, and hover or focus it for the full status label.',
     standalone: true,
     render: (log, dark, language) => <NavigationIslandStory dark={dark} language={language} log={log} />,
   },
@@ -434,8 +435,9 @@ export const workflowStories: readonly FrontendStory[] = [
 
 function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean; readonly language: UiLanguage; readonly log: LogAction }) {
   const i18n = useMemo(() => createI18n(language), [language])
-  const [shortName, setShortName] = useState(false)
+  const [shortName, setShortName] = useState(true)
   const [publishState, setPublishState] = useState<PublishState>('ready')
+  const [saveStatus, setSaveStatus] = useState<WorkspaceStatus>('saved')
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const interactiveMode$ = useMemo(() => val<'mouse' | 'touchpad'>('mouse'), [])
   const miniMapExpanded$ = useMemo(() => val<boolean | undefined>(false), [])
@@ -443,8 +445,11 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
   const popup = useMemo(() => ({ default: () => stageRef.current || document.body, static: () => stageRef.current || document.body }), [])
   const publishStates: readonly PublishState[] = ['ready', 'current', 'issues', 'subflow', 'busy', 'publishing']
   const nextPublishState = publishStates[(publishStates.indexOf(publishState) + 1) % publishStates.length]!
+  const saveStatuses: readonly WorkspaceStatus[] = ['saved', 'saving', 'failed']
+  const nextSaveStatus = saveStatuses[(saveStatuses.indexOf(saveStatus) + 1) % saveStatuses.length]!
   useStoryActions([
     { label: shortName ? 'Show long name' : 'Show short name', onClick: () => setShortName((current) => !current) },
+    { label: `Show ${nextSaveStatus} draft save state`, onClick: () => setSaveStatus(nextSaveStatus) },
     { label: `Show ${nextPublishState} publish state`, onClick: () => setPublishState(nextPublishState) },
   ])
   return (
@@ -473,10 +478,9 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
             </GetPopupContainerContext.Provider>
           </div>
           <WorkspaceNavigationIsland
-            flowName={shortName ? 'Daily digest' : 'Quarterly customer onboarding and account follow-up workflow'}
-            flowHref="#design"
+            saveStatus={saveStatus}
+            flowName={shortName ? 'nn' : 'Quarterly customer onboarding and account follow-up workflow'}
             flowsHref="#workflows"
-            onOpenFlow={() => log('flow.open')}
             onOpenFlows={() => log('flows.open')}
           />
         </div>

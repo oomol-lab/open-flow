@@ -116,7 +116,7 @@
   "designer": {
     "addNode": "Добавить узел",
     "delete": "Удалить",
-    "draftBadge": "Черновик {{kind}}",
+    "draftSaved": "Черновик сохранён",
     "executorConnectionRequired": "требуется Connection",
     "executorConnector": "Connector",
     "executorJavaScript": "JavaScript",
