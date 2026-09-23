@@ -967,11 +967,10 @@ Run 取消、deadline、兄弟节点失败和节点退出沿既有执行生命�
 `ConnectorConnection` 额外投影可选 `alias`，缺省时仍可按 ID 绑定；`ConnectorAction` 额外投影可选 `inputSchema` / `outputSchema` 原始 JSON Schema。
 旧的 `inputs` / `outputs` 仍是图端口 projection。schema 的暂时缺失不移除声明，也不扩大运行权限。
 
-### 当前 Server 的上游身份限制
+### 当前 Server 的上游身份选择
 
-当前 Connector adapter 先按稳定 ID 查询账号，再用 `x-oo-connector-alias` 执行。上游需要 transport alias；账号缺少它时明确失败。
-查询和 POST 之间 alias 被重新分配的竞态尚未消除，本次实现不声称具备端到端的稳定 ID 原子执行保证。
-要完成该项验收，上游必须支持按 Connection ID 原子解析并执行，或在同一次执行请求中校验 ID 与 alias / 版本条件；重复查询 alias 不能代替该保证。
+当前 Connector adapter 先按稳定 Connection ID 查询账号状态，再用 `x-oo-connector-app-id` 执行。
+网关将该 header 转成下游的 `x-oomol-connector-app-id`；下游在执行请求中按 Team、service 和 app ID 解析账号，不依赖可变 alias。
 
 ### Draft 操作结构发现
 
