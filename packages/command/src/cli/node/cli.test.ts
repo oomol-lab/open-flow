@@ -169,6 +169,46 @@ describe('CLI', () => {
     expect(JSON.parse(output.stdout())).toEqual({ flows: [flow], kind: 'flow.list', version: 1 })
   })
 
+  it('lists independent event sources and guides an empty catalog to Workbench', async () => {
+    const source = {
+      version: 1,
+      sourceId: `source_${'a'.repeat(32)}`,
+      revision: 1,
+      name: 'Feishu app',
+      provider: 'feishu_app_bot',
+      appId: 'cli_test',
+      connectionId: 'connection-1',
+      teamId: null,
+      enabled: true,
+      eventTypes: ['im.message.receive_v1'],
+      manageSubscriptions: false,
+      verificationTokenConfigured: true,
+      encryptKeyConfigured: true,
+      endpointUrl: 'https://flow.example/v1/event-sources/source/events',
+      verifiedAt: '2026-08-14T00:00:00.000Z',
+      lastReceivedAt: null,
+      updatedAt: '2026-08-14T00:00:00.000Z',
+      consumers: [],
+    }
+    let sources: (typeof source)[] = []
+    const request = vi.fn(async (path: string) => {
+      if (path == '/v1/event-sources') return Response.json({ version: 1, sources })
+      throw new Error(path)
+    })
+    const empty = runtime()
+    await expect(runCli(['event-source', 'list', '--json'], { request }, empty.value)).resolves.toBe(0)
+    expect(JSON.parse(empty.stdout())).toMatchObject({ sources: [], guidance: expect.stringContaining('oo flow workbench') })
+    expect(JSON.parse(empty.stdout())).not.toHaveProperty('flowId')
+    sources = [source]
+    const listed = runtime()
+    await expect(runCli(['event-source', 'list'], { request }, listed.value)).resolves.toBe(0)
+    expect(listed.stdout()).toContain(`${source.sourceId}\t${source.name}\t-\t${source.connectionId}\tverified\tim.message.receive_v1`)
+    const global = runtime()
+    await expect(runCli(['event-source', 'list', '--json'], { request }, global.value)).resolves.toBe(0)
+    expect(JSON.parse(global.stdout())).toMatchObject({ sources: [{ sourceId: source.sourceId, connectionId: source.connectionId }] })
+    expect(request).toHaveBeenCalledWith('/v1/event-sources', expect.anything())
+  })
+
   it('checks the selected Flow Draft revision', async () => {
     const output = runtime()
     const request = vi.fn(async (path: string) => {

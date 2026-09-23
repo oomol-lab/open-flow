@@ -26,6 +26,31 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
       const flow = mutation ? await operandFlow(client, operands.slice(1)) : args.flow == null ? undefined : await referencedFlow(client, args.flow)
       return await connectorCommand(client, flow, operands, args, runtime)
     }
+    case 'event-source': {
+      if (operands.length != 1 || operands[0] != 'list') throw new CliError('cli.invalid-arguments', 'Usage: oo flow event-source list [--json]')
+      const sources = await client.listEventSources()
+      const guidance = 'No event sources are visible to this identity. Run "oo flow workbench" to create and verify a Feishu event source, then list again.'
+      write(
+        runtime,
+        args.json,
+        { ...sources, kind: 'event-source.list', ...(sources.sources.length == 0 ? { guidance } : {}) },
+        sources.sources.length == 0
+          ? guidance
+          : sources.sources
+              .map((source) =>
+                [
+                  source.sourceId,
+                  source.name,
+                  source.teamId ?? '-',
+                  source.connectionId,
+                  !source.enabled ? 'disabled' : source.verifiedAt == null ? 'unverified' : 'verified',
+                  source.eventTypes.join(','),
+                ].join('\t'),
+              )
+              .join('\n'),
+      )
+      return
+    }
     case 'connect':
     case 'disconnect': {
       const flow = await operandFlow(client, operands)
@@ -123,7 +148,7 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
     default:
       throw new CliError(
         'cli.invalid-arguments',
-        'Usage: oo flow <list|create|show|inspect|apply|rename|delete|check|enable|disable|node|connect|disconnect|code|connector|trigger|run|runs|publish|publications|rollback|workbench>',
+        'Usage: oo flow <list|create|show|inspect|apply|rename|delete|check|enable|disable|node|connect|disconnect|code|connector|event-source|trigger|run|runs|publish|publications|rollback|workbench>',
       )
   }
 }

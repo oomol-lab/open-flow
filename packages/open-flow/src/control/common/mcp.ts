@@ -16,6 +16,7 @@ const run = id.describe('Exact Run ID returned by flow_run or run_list.')
 export const mcpInstructions =
   'Use flow_list and flow_get to inspect a Flow. Use flow_node_get with the observed revisionId for individual node schemas or code. Use flow_schema to learn atomic edit operations, then flow_apply with the observed expectedRevisionId and a stable idempotencyKey. ' +
   'Use flow_check before flow_run. Select an explicit Trigger node ID and fixed revision or publication. A new Flow has no Trigger until you add one. ' +
+  'Before adding a Feishu Trigger, use event_source_list and compare its Connection IDs with connector_connections in the Flow scope. If no source is available, create and verify one in Workbench. ' +
   'Use flow_publish to publish a fixed Revision, then poll flow_publish_status until succeeded or failed. Use flow_set_enabled to enable or disable the observed Live publication. ' +
   'flow_run returns an accepted Run, not its final result. Find Runs with run_list, poll run_get and use run_result after terminal. Resolve a waiting Run only with an explicit run_resolve_wait action allowed by run_get. ' +
   'Use run_results and run_result_read to inspect stored Agent tool results; these are separate from the terminal Run result. ' +
@@ -205,6 +206,11 @@ export const mcpTools = {
   connector_connections: tool(
     'List Connector connections in the Flow scope. Use active connection IDs in bindings.',
     z.strictObject({ serviceId: id.max(256), flowId: flow.optional() }),
+    true,
+  ),
+  event_source_list: tool(
+    'List independent Feishu event sources, including Team, Connection, event types, enabled and verification status. Inspect consumers for Flows actually using each source.',
+    z.strictObject({}),
     true,
   ),
   trigger_search: tool(

@@ -91,6 +91,7 @@ try {
 | `connector_search`      | `query`、`flowId?`                                                    | Actions                                          |
 | `connector_get`         | `actionId`、`flowId?`                                                 | Action 端口与连接要求                            |
 | `connector_connections` | `serviceId`、`flowId?`                                                | Connection 列表                                  |
+| `event_source_list`     | 无                                                                    | 当前身份可见的独立事件源列表                     |
 | `trigger_search`        | 无                                                                    | Provider Trigger keys                            |
 | `trigger_get`           | `key`                                                                 | Provider Trigger 定义                            |
 
@@ -159,6 +160,8 @@ mutation 内部发生无法确定结果的异常时返回 `flow.mutation-outcome
 `connector_providers` 列出 Provider，替代原 `connector_list`。`connector_search` 返回 Action 摘要（身份、描述、authenticated 和默认连接摘要），不返回 inputs/outputs/inputSchema/outputSchema；通过 `connector_get` 按需读取完整定义。
 
 `trigger_search({ query? })` 替代原 `trigger_list`，省略 query 列出全部可用定义摘要，提供 query 时进行不区分大小写的匹配。Flow 中已创建的触发器实例由 `flow_get` 读取。Connector 和 Trigger 搜索 query 长度为 1–256 个字符。
+
+事件源是独立于 Flow 的部署资源。`event_source_list({})` 列出当前身份可见的事件源；实际使用关系见各项的 `consumers`。配置飞书 Trigger 时，调用 `connector_connections({ serviceId: "feishu_app_bot", flowId })` 对照 Connection。空列表附带引导信息：在 Workbench 创建并验证事件源后再查询；工具不会接收或返回事件源密钥。返回的 `sourceId`、`teamId`、`connectionId`、`eventTypes`、`enabled` 和 `verifiedAt` 用于选择和确认来源。
 
 `flow_node_get({ flowId, revisionId, nodeId, subflowId? })` 返回固定 Revision 的单个节点及其使用的 Task 定义或代码 module。省略 subflowId 读取根图；指定时仅读取对应子流程图，不回退到根图。代码 Task 定义保留在 node.task，不重复返回顶层 task。Draft 后续变化不影响历史版本详情。找不到目标时返回错误，不自动读取最新版本。
 
