@@ -11,7 +11,7 @@ import { Input } from '../../ui/browser/input.tsx'
 import { definitionFieldExpansion } from '../common/fieldExpansion.ts'
 import { objectFieldNames, renameFieldDefinition, removeFieldDefinition } from '../common/objectFields.ts'
 import { objectValue } from '../common/value.ts'
-import { EditorComponentSelect } from './editorComponentSelect.tsx'
+import { EditorComponentSelect, InlineEditorComponentDisplay } from './editorComponentSelect.tsx'
 import { FieldRow, FieldBody } from './fieldLayout.tsx'
 import { FieldName } from './fieldName.tsx'
 import { FieldSorting } from './fieldSorting.ts'
@@ -181,9 +181,9 @@ export function DefinitionField({
                       )}
                     </span>
                     {objectValue(additional) && (
-                      <div className="flex min-w-0 items-center gap-1">
+                      <div className="flex min-w-0 items-center gap-1.5">
                         <span>{t('valueEditor.additionalFieldValues')}</span>
-                        <EditorComponentSelect schema={additional} name={label} readOnly compact={false} onChange={() => {}} />
+                        <InlineEditorComponentDisplay schema={additional} name={label} />
                       </div>
                     )}
                   </div>

@@ -1,4 +1,15 @@
 .open-flow-workbench {
+  .account-select-clear {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .account-select:hover .account-select-clear,
+  .account-select-clear:focus-visible {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
   .connection-state-content:has(> .connection-prompt) {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;

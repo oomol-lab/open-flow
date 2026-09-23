@@ -153,3 +153,22 @@ export function EditorComponentSelect({
     </div>
   )
 }
+
+/** Displays a type inside explanatory copy without inheriting field-control height. */
+export function InlineEditorComponentDisplay({ schema, name }: { schema: unknown; name: string }) {
+  const t = useTranslate()
+  const selectedComponent = editorComponent(schema)
+  const label = t(`valueEditor.components.${selectedComponent}`)
+  return (
+    <span
+      role="img"
+      aria-label={`${t('valueEditor.type', { name })}: ${label}`}
+      className="relative inline-flex min-w-0 items-center pl-[22px] text-xs leading-[18px] font-normal text-muted-foreground"
+    >
+      <span aria-hidden="true" className="absolute left-0 top-1/2 flex size-4 -translate-y-1/2 items-center justify-center">
+        <EditorComponentIcon component={selectedComponent} />
+      </span>
+      <span className="min-w-0 truncate">{label}</span>
+    </span>
+  )
+}

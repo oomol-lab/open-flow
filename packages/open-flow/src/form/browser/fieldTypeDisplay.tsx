@@ -28,7 +28,7 @@ export function FieldTypeDisplay({
   disclosure?: FieldDisclosure
 }) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
-  const className = `flex h-[30px] w-full min-w-0 items-center gap-1.5 px-2 text-xs font-normal text-muted-foreground ${
+  const className = `flex h-[30px] w-full min-w-0 items-center gap-1.5 px-2 text-xs font-normal text-muted-foreground ${compact ? 'justify-center' : ''} ${
     surface
       ? 'rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] dark:bg-[var(--ui-control-background,var(--ui-muted))]'
       : ''

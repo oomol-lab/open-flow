@@ -14,7 +14,6 @@ import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, Sele
 import { Icon } from '../icons.tsx'
 
 const manageAccountOption = '__manage-account__'
-const removeConnectionOption = '__remove-connection__'
 
 function ConnectionAlert({
   detail,
@@ -77,11 +76,10 @@ function AccountSelect({
       value: candidate.connectionId,
       label: `${candidate.displayName}${candidate.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}`,
     })),
-    ...(selectedId == null ? [] : [{ value: removeConnectionOption, label: t('connectionUsage.remove') }]),
     ...(onManage == null ? [] : [{ value: manageAccountOption, label: t('inspector.account.addAccount') }]),
   ]
   return (
-    <div ref={setContainer} className="min-w-0">
+    <div ref={setContainer} className="account-select relative min-w-0">
       <Select
         disabled={disabled}
         items={items}
@@ -89,11 +87,13 @@ function AccountSelect({
         onValueChange={(value) => {
           if (value == null) return
           if (value == manageAccountOption) onManage?.()
-          else onChange(value == removeConnectionOption ? undefined : value)
+          else onChange(value)
         }}
       >
         <SelectTrigger id={id} size="field" aria-label={t('inspector.account.connection')} className={fieldSelectTriggerClass}>
-          <SelectValue placeholder={t('inspector.account.chooseAccount')}>{selectedLabel}</SelectValue>
+          <SelectValue className={selectedId != null ? 'mr-5' : undefined} placeholder={t('inspector.account.chooseAccount')}>
+            {selectedLabel}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent
           container={container}
@@ -112,11 +112,6 @@ function AccountSelect({
               {candidate.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}
             </SelectItem>
           ))}
-          {selectedId != null && (
-            <SelectItem value={removeConnectionOption} className={selectionMenuItemClass}>
-              {t('connectionUsage.remove')}
-            </SelectItem>
-          )}
           {onManage != null && (
             <>
               <SelectSeparator className="mx-2 bg-border/50" />
@@ -127,6 +122,25 @@ function AccountSelect({
           )}
         </SelectContent>
       </Select>
+      {selectedId != null && (
+        <Button
+          className="account-select-clear absolute top-1/2 right-7 -translate-y-1/2 text-muted-foreground"
+          type="button"
+          variant="ghost"
+          size="icon-xs"
+          aria-label={t('connectionUsage.remove')}
+          title={t('connectionUsage.remove')}
+          disabled={disabled}
+          onPointerDown={(event) => {
+            if (event.button == 0) onChange(undefined)
+          }}
+          onClick={(event) => {
+            if (event.detail == 0) onChange(undefined)
+          }}
+        >
+          <i aria-hidden="true" className="i-lucide-light:x" />
+        </Button>
+      )}
     </div>
   )
 }
