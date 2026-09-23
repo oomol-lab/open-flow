@@ -238,6 +238,7 @@ export class FlowStore {
              WHERE NOT EXISTS (SELECT 1 FROM flow_revisions WHERE flow_revisions.revision_id = revisions.revision_id)
                AND NOT EXISTS (SELECT 1 FROM publications WHERE publications.revision_id = revisions.revision_id)
                AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.revision_id = revisions.revision_id)
+               AND NOT EXISTS (SELECT 1 FROM revision_deltas WHERE revision_deltas.base_revision_id = revisions.revision_id)
              ORDER BY revisions.revision_id LIMIT ?
            )`,
         )
@@ -258,6 +259,7 @@ export class FlowStore {
                  AND NOT EXISTS (SELECT 1 FROM publications WHERE publications.revision_id = revisions.revision_id)
                  AND NOT EXISTS (SELECT 1 FROM publish_operations WHERE publish_operations.revision_id = revisions.revision_id AND status = 'pending')
                  AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.revision_id = revisions.revision_id AND status IN ('queued', 'starting', 'running', 'waiting'))
+                 AND NOT EXISTS (SELECT 1 FROM revision_deltas WHERE revision_deltas.base_revision_id = revisions.revision_id)
                  AND NOT EXISTS (
                    SELECT 1 FROM runs AS retained
                    WHERE retained.revision_id = revisions.revision_id AND retained.source = 'draft'
@@ -275,31 +277,69 @@ export class FlowStore {
     )
   }
 
+  pruneDraftDeltas(limit: number): number {
+    return Number(
+      this.#database
+        .prepare(
+          `DELETE FROM revision_deltas WHERE revision_id IN (
+             SELECT revision_deltas.revision_id FROM revision_deltas
+             JOIN flow_revisions AS metadata USING (revision_id)
+             WHERE NOT EXISTS (SELECT 1 FROM flows WHERE flows.draft_revision_id = revision_deltas.revision_id)
+               AND NOT EXISTS (SELECT 1 FROM publications WHERE publications.revision_id = revision_deltas.revision_id)
+               AND NOT EXISTS (SELECT 1 FROM publish_operations WHERE publish_operations.revision_id = revision_deltas.revision_id AND status = 'pending')
+               AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.revision_id = revision_deltas.revision_id AND status IN ('queued', 'starting', 'running', 'waiting'))
+               AND NOT EXISTS (
+                 SELECT 1 FROM runs AS retained
+                 WHERE retained.revision_id = revision_deltas.revision_id AND retained.source = 'draft'
+                   AND retained.run_id IN (
+                     SELECT recent.run_id FROM runs AS recent
+                     WHERE recent.flow_id = metadata.flow_id AND recent.source = 'draft'
+                     ORDER BY recent.created_at DESC, recent.run_id DESC LIMIT 50
+                   )
+               )
+               AND NOT EXISTS (SELECT 1 FROM revision_deltas AS child WHERE child.base_revision_id = revision_deltas.revision_id)
+             LIMIT ?
+           )`,
+        )
+        .run(limit).changes,
+    )
+  }
+
+  collectOrphanDeltas(limit: number): number {
+    return Number(
+      this.#database
+        .prepare(
+          `DELETE FROM revision_deltas WHERE revision_id IN (
+             SELECT revision_deltas.revision_id FROM revision_deltas
+             WHERE NOT EXISTS (SELECT 1 FROM flow_revisions WHERE flow_revisions.revision_id = revision_deltas.revision_id)
+               AND NOT EXISTS (SELECT 1 FROM publications WHERE publications.revision_id = revision_deltas.revision_id)
+               AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.revision_id = revision_deltas.revision_id)
+               AND NOT EXISTS (SELECT 1 FROM revision_deltas AS child WHERE child.base_revision_id = revision_deltas.revision_id)
+             LIMIT ?
+           )`,
+        )
+        .run(limit).changes,
+    )
+  }
+
   draft(flowId: string): StoredFlowRevision | undefined {
-    return this.#database
-      .prepare(
-        `SELECT metadata.actor_id AS actorId, revisions.content, metadata.created_at AS createdAt,
-                revisions.digest, metadata.parent_revision_id AS parentRevisionId,
-                metadata.flow_id AS flowId, metadata.revision_id AS revisionId
-         FROM flows
-         JOIN flow_revisions AS metadata ON metadata.revision_id = flows.draft_revision_id
-         JOIN revisions ON revisions.revision_id = metadata.revision_id
-         WHERE flows.flow_id = ? AND metadata.flow_id = flows.flow_id`,
-      )
-      .get(flowId) as StoredFlowRevision | undefined
+    const flow = this.get(flowId)
+    return flow == null ? undefined : this.revision(flowId, flow.draftRevisionId)
   }
 
   revision(flowId: string, revisionId: string): StoredFlowRevision | undefined {
-    return this.#database
+    const metadata = this.#database
       .prepare(
-        `SELECT metadata.actor_id AS actorId, revisions.content, metadata.created_at AS createdAt,
-                revisions.digest, metadata.parent_revision_id AS parentRevisionId,
+        `SELECT metadata.actor_id AS actorId, metadata.created_at AS createdAt,
+                metadata.parent_revision_id AS parentRevisionId,
                 metadata.flow_id AS flowId, metadata.revision_id AS revisionId
          FROM flow_revisions AS metadata
-         JOIN revisions ON revisions.revision_id = metadata.revision_id
          WHERE metadata.flow_id = ? AND metadata.revision_id = ?`,
       )
-      .get(flowId, revisionId) as StoredFlowRevision | undefined
+      .get(flowId, revisionId) as Omit<StoredFlowRevision, 'content' | 'digest'> | undefined
+    if (metadata == null) return
+    const body = this.#revisions.read(revisionId)
+    return body == null ? undefined : { ...metadata, ...body }
   }
 
   change(flowId: string, changeId: string): StoredChangeRevision | undefined {
@@ -323,6 +363,7 @@ export class FlowStore {
       readonly flowId: string
       readonly requestDigest: string
       readonly revisionId: string
+      readonly forceFull?: boolean
     },
     updateAccess?: () => void,
   ): { readonly kind: 'busy' | 'conflict' | 'not-found' | 'request-conflict' } | { readonly kind: 'committed'; readonly revision: StoredChangeRevision } {
@@ -339,7 +380,9 @@ export class FlowStore {
       if (flow.draftRevisionId != input.expectedRevisionId) return { kind: 'conflict' }
 
       updateAccess?.()
-      this.#revisions.ensure({ content: input.content, revisionDigest: input.digest, revisionId: input.revisionId })
+      const body = { content: input.content, revisionDigest: input.digest, revisionId: input.revisionId }
+      if (input.forceFull) this.#revisions.ensure(body)
+      else this.#revisions.saveDraft(body, input.expectedRevisionId)
       this.#database
         .prepare(
           `INSERT INTO flow_revisions (

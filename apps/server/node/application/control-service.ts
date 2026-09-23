@@ -694,17 +694,19 @@ export class ControlService {
   }
 
   async repairDraft(actorId: string, flowId: string, expectedRevisionId: string, changeId: string = randomUUID()): Promise<DraftChange> {
-    this.requireDraft(flowId)
+    const currentFlow = this.store.flows.get(flowId)
+    if (currentFlow == null) notFound()
     const requestDigest = await digestBytes(canonicalJsonBytes({ expectedRevisionId, version: 1 }))
     const previous = this.store.flows.change(flowId, changeId)
     if (previous != null) {
       if (previous.requestDigest != requestDigest) throw new ControlError(controlErrorCode.flowConflict, 'The repair identity refers to another Draft repair.')
       return { revision: revisionMetadata(previous), version: 1 }
     }
-    const base = this.store.flows.revision(flowId, expectedRevisionId)
-    if (base == null) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
+    if (currentFlow.draftRevisionId != expectedRevisionId) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
     let content: RevisionContent
     try {
+      const base = this.store.flows.revision(flowId, expectedRevisionId)
+      if (base == null) throw new TypeError('The stored Draft is missing.')
       const source = new TextEncoder().encode(base.content)
       if ((await digestBytes(source)) != base.digest) throw new TypeError('The stored Draft digest does not match its content.')
       content = repairRevision(source)
@@ -721,6 +723,7 @@ export class ControlService {
       content: new TextDecoder().decode(bytes),
       createdAt: this.clock(),
       digest,
+      forceFull: true,
       modelVersion: content.modelVersion,
       expectedRevisionId,
       flowId,

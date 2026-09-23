@@ -151,12 +151,21 @@ export class Maintenance {
   #cleanup(now: number): boolean {
     const publications = this.#store.publications.prunePublishOperations(now, maintenanceBatchSize)
     const drafts = this.#store.flows.pruneDraftRevisions(maintenanceBatchSize)
+    const draftDeltas = this.#store.flows.pruneDraftDeltas(maintenanceBatchSize)
     const orphans = this.#store.flows.collectOrphanRevisions(maintenanceBatchSize)
+    const orphanDeltas = this.#store.flows.collectOrphanDeltas(maintenanceBatchSize)
     this.#logger.info(
-      { category: 'maintenance.cleanup.completed', publishOperations: publications, draftRevisions: drafts, orphanRevisions: orphans },
+      {
+        category: 'maintenance.cleanup.completed',
+        publishOperations: publications,
+        draftRevisions: drafts,
+        draftDeltas,
+        orphanRevisions: orphans,
+        orphanDeltas,
+      },
       'Maintenance cleanup completed.',
     )
-    return publications > 0 || drafts > 0 || orphans > 0
+    return publications > 0 || drafts > 0 || draftDeltas > 0 || orphans > 0 || orphanDeltas > 0
   }
 
   #retireFlow(now: number): number {

@@ -89,10 +89,11 @@ it('replays an accepted Draft change after its full Revision was pruned', () => 
     revisionId: 'first',
   }
   expect(store.flows.commitRevision(first)).toMatchObject({ kind: 'committed' })
-  expect(store.flows.commitRevision({ ...first, changeId: 'change-2', expectedRevisionId: 'first', revisionId: 'second' })).toMatchObject({
+  expect(store.flows.commitRevision({ ...first, changeId: 'change-2', expectedRevisionId: 'first', revisionId: 'second', forceFull: true })).toMatchObject({
     kind: 'committed',
   })
-  expect(store.flows.pruneDraftRevisions(100)).toBe(2)
+  expect(store.flows.pruneDraftDeltas(100)).toBe(1)
+  expect(store.flows.pruneDraftRevisions(100)).toBe(1)
   expect(store.flows.revision('flow', 'first')).toBeUndefined()
   expect(store.flows.commitRevision(first)).toMatchObject({ kind: 'committed', revision: { revisionId: 'first', modelVersion: 3 } })
   expect(store.flows.commitRevision({ ...first, requestDigest: 'different' })).toEqual({ kind: 'request-conflict' })
@@ -103,13 +104,15 @@ it('returns a pruned Revision as missing while preserving Draft change replay', 
   const flow = (await service.control.createFlow('operator', 'Flow', 'create')).flow
   const firstChange = [{ kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'first', node: { kind: 'manual', name: 'First' } }] as const
   const first = await service.control.changeDraft('operator', flow.flowId, flow.draftRevisionId, firstChange, 'first-change')
-  await service.control.changeDraft(
+  const second = await service.control.changeDraft(
     'operator',
     flow.flowId,
     first.revision.revisionId,
     [{ kind: 'graph.node.delete', target: { kind: 'flow' }, nodeId: 'first' }],
     'second-change',
   )
+  await service.control.repairDraft('operator', flow.flowId, second.revision.revisionId, 'checkpoint')
+  await service.tickMaintenance()
   await service.tickMaintenance()
 
   expect(() => service.control.getRevision(flow.flowId, first.revision.revisionId)).toThrow('The Flow or Revision was not found.')

@@ -477,6 +477,13 @@ it('Server unreadable Draft repair conformance', async () => {
     const content = JSON.stringify(stored)
     const database = new DatabaseSync(harness.file)
     try {
+      const delta = database.prepare('SELECT 1 FROM revision_deltas WHERE revision_id = ?').get(changed.revision.revisionId)
+      if (delta != null) {
+        database
+          .prepare('INSERT INTO revisions (revision_id, digest, content) VALUES (?, ?, ?)')
+          .run(changed.revision.revisionId, changed.revision.digest, JSON.stringify(draft.content))
+        database.prepare('DELETE FROM revision_deltas WHERE revision_id = ?').run(changed.revision.revisionId)
+      }
       database
         .prepare('UPDATE revisions SET content = ?, digest = ? WHERE revision_id = ?')
         .run(content, await digestBytes(new TextEncoder().encode(content)), changed.revision.revisionId)

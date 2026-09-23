@@ -138,7 +138,7 @@ interface DraftSync {
 `RevisionContent`、顶层 `FlowDocument` 和 `ChangeOperation` 由 `@oomol-lab/open-flow/flow-change` 定义。顶层 graph target 固定为
 `{ kind: 'flow' }`；Subflow target 为 `{ kind: 'subflow', id }`。不存在嵌套 Flow map 或 Flow create/delete operation。
 
-Revision 是完整 immutable snapshot。Draft change 使用 `expectedRevisionId` 做 CAS；stale head 返回 `flow.revision-conflict`。每个 change batch
+Revision 在 API 上是完整 immutable snapshot；Server 可以增量存储草稿正文，读取时还原为完整内容并校验 digest。Draft Run 和 Publish operation 准入时固定完整正文。Draft change 使用 `expectedRevisionId` 做 CAS；stale head 返回 `flow.revision-conflict`。每个 change batch
 要求 `Idempotency-Key`；相同 key 与相同 batch 返回第一次提交的 Revision，相同 key 与不同 batch 返回 `flow.conflict`。幂等重放先于 Draft head CAS。
 Draft sync 始终返回当前完整 snapshot，不接受 revision cursor，也不返回 authoring operation history。
 

@@ -29,7 +29,7 @@ Presentation、Publication、Live、Run 和 Trigger binding。
 Flow 有一个可变 Draft head 和不可变的 Revision 历史。Revision 是该 Flow 的 graph、Subflow、Task、binding 和 CodeModule source 的完整事实来源；
 语义修改必须以预期 Revision 为前提并使用稳定 change identity 原子提交，不能静默覆盖 stale head；幂等重放必须先于 Draft head 比较返回已经接受的
 Revision。Draft 同步只返回当前完整 Revision snapshot，不提供持久化 authoring operation history。内部索引、缓存、增量记录和存储布局不能成为第二个事实来源。
-不可变约束适用于仍保留的 Revision 内容；旧内容可按 Server 的保留策略清理，但 Run 结果与 Draft change 幂等记录不依赖被清理的内容。
+不可变约束适用于仍保留的 Revision 内容；Server 可以将草稿正文存为基于父版本的有界增量，读取时还原并校验 digest，对外仍返回完整快照。Run 和 Publish operation 准入时将固定版本物化为完整正文。旧内容可按 Server 的保留策略清理，但 Run 结果与 Draft change 幂等记录不依赖被清理的内容。
 
 Presentation 独立保存布局、viewport 和 Comment 等展示状态；每个 Flow 或 Subflow 图只有一个画布和 viewport，节点配置由侧栏承载。Presentation
 不进入 Revision digest，也不影响 validation、Run、Publication 或 Live。

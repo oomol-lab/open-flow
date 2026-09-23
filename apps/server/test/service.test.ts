@@ -1463,6 +1463,7 @@ describe('Server application service', () => {
     const database = new DatabaseSync(file)
     try {
       database.prepare('UPDATE revisions SET content = ?, digest = ? WHERE revision_id = ?').run(content, await digestBytes(bytes), source.revisionId)
+      database.prepare('UPDATE flow_revisions SET digest = ? WHERE revision_id = ?').run(await digestBytes(bytes), source.revisionId)
 
       expect(await service.control.getEditor(source.flowId)).toMatchObject({
         draft: { content: { modelVersion: 2, document: { graph: { nodes: { approval: { kind: 'approval' } } } } } },

@@ -3,6 +3,7 @@ import type { ConnectorAccess } from '@oomol-lab/open-flow/control-api'
 import type { StoredFlow, StoredFlowRevision } from './flow-store.ts'
 import type { IntegrationPublication } from './integration-store.ts'
 import type { PollPublication } from './poll-store.ts'
+import type { RevisionStore } from './revision-store.ts'
 
 import { randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
@@ -118,6 +119,7 @@ export class PublicationStore {
   readonly #database: DatabaseSync
   readonly #integrations: IntegrationStore
   readonly #polls: PollStore
+  readonly #revisions: RevisionStore
   readonly #transaction: <Value>(operation: () => Value) => Value
   readonly #variables: VariableStore
 
@@ -127,12 +129,14 @@ export class PublicationStore {
     transaction: <Value>(operation: () => Value) => Value,
     integrations: IntegrationStore,
     polls: PollStore,
+    revisions: RevisionStore,
     variables: VariableStore,
   ) {
     this.#clock = clock
     this.#database = database
     this.#integrations = integrations
     this.#polls = polls
+    this.#revisions = revisions
     this.#transaction = transaction
     this.#variables = variables
   }
@@ -296,6 +300,7 @@ export class PublicationStore {
         return { kind: 'unsupported' }
       }
       this.#polls.createCandidates(operationId, input.flowId, input.expectedLivePublicationId, input.polls, createdAt)
+      this.#revisions.materialize(input.revisionId)
       insert(this.#database, 'publish_operations', {
         operation_id: operationId,
         flow_id: input.flowId,
@@ -746,28 +751,22 @@ export class PublicationStore {
   }
 
   #revision(flowId: string, revisionId: string): StoredFlowRevision | undefined {
-    return this.#database
+    const metadata = this.#database
       .prepare(
-        `SELECT flow_revisions.actor_id AS actorId, flow_revisions.created_at AS createdAt, revisions.content,
-                revisions.digest, flow_revisions.flow_id AS flowId, flow_revisions.parent_revision_id AS parentRevisionId,
+        `SELECT flow_revisions.actor_id AS actorId, flow_revisions.created_at AS createdAt,
+                flow_revisions.flow_id AS flowId, flow_revisions.parent_revision_id AS parentRevisionId,
                 flow_revisions.revision_id AS revisionId
          FROM flow_revisions
-         JOIN revisions USING (revision_id)
          WHERE flow_revisions.flow_id = ? AND flow_revisions.revision_id = ?`,
       )
-      .get(flowId, revisionId) as StoredFlowRevision | undefined
+      .get(flowId, revisionId) as Omit<StoredFlowRevision, 'content' | 'digest'> | undefined
+    if (metadata == null) return
+    const body = this.#revisions.read(revisionId)
+    return body == null ? undefined : { ...metadata, ...body }
   }
 
   #ensureRevision(input: { readonly content: string; readonly revisionDigest: string; readonly revisionId: string }): string {
-    const revision = this.#database.prepare('SELECT digest, content FROM revisions WHERE revision_id = ?').get(input.revisionId) as
-      | { readonly digest: string; readonly content: string }
-      | undefined
-    if (revision != null && revision.digest != input.revisionDigest) {
-      throw new AcceptanceError('revision-conflict', 'Revision identity already refers to different content.')
-    }
-    if (revision == null) {
-      this.#database.prepare('INSERT INTO revisions (revision_id, digest, content) VALUES (?, ?, ?)').run(input.revisionId, input.revisionDigest, input.content)
-    }
-    return revision?.content ?? input.content
+    this.#revisions.ensure(input)
+    return this.#revisions.read(input.revisionId)!.content
   }
 }

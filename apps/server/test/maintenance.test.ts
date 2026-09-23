@@ -133,7 +133,7 @@ it('runs periodic cleanup on its own schedule despite earlier maintenance wakes'
   expect(publications).toHaveBeenCalledOnce()
   expect(orphans).toHaveBeenCalledOnce()
   expect(logged).toHaveBeenCalledExactlyOnceWith(
-    { category: 'maintenance.cleanup.completed', publishOperations: 0, draftRevisions: 0, orphanRevisions: 0 },
+    { category: 'maintenance.cleanup.completed', publishOperations: 0, draftRevisions: 0, draftDeltas: 0, orphanRevisions: 0, orphanDeltas: 0 },
     'Maintenance cleanup completed.',
   )
 
@@ -177,7 +177,7 @@ it('immediately continues cleanup when a batch has more work', async () => {
   await Effect.runPromise(maintenance.run(new Date(clock()).toISOString()))
   expect(maintenance.nextAt()).toBe(clock())
   expect(logged).toHaveBeenCalledExactlyOnceWith(
-    { category: 'maintenance.cleanup.completed', publishOperations: 0, draftRevisions: 1, orphanRevisions: 0 },
+    { category: 'maintenance.cleanup.completed', publishOperations: 0, draftRevisions: 1, draftDeltas: 0, orphanRevisions: 0, orphanDeltas: 0 },
     'Maintenance cleanup completed.',
   )
   await Effect.runPromise(maintenance.run(new Date(clock()).toISOString()))

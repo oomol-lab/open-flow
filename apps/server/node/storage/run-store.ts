@@ -123,18 +123,18 @@ export class RunStore {
       }
       const revision = this.#database
         .prepare(
-          `SELECT flows.status, revisions.digest
+          `SELECT flows.status, metadata.digest
            FROM flows
            JOIN flow_revisions AS metadata ON metadata.flow_id = flows.flow_id
-           JOIN revisions ON revisions.revision_id = metadata.revision_id
            WHERE flows.flow_id = ? AND metadata.revision_id = ?`,
         )
         .get(input.flowId, input.revisionId) as { readonly digest: string; readonly status: 'active' | 'retiring' } | undefined
-      if (revision == null || revision.digest != input.revisionDigest) return { kind: 'not-found' }
+      if (revision == null || revision.digest != input.revisionDigest || this.#deps.revisions.read(input.revisionId) == null) return { kind: 'not-found' }
       if (revision.status != 'active') return { kind: 'busy' }
       if (!this.#deps.variables.hasAll(input.variableNames)) return { kind: 'binding-unresolved' }
       if (!this.#hasRunCapacity()) return { kind: 'overloaded' }
 
+      this.#deps.revisions.materialize(input.revisionId)
       const runId = this.#queueRun({
         ...input,
         providerAccess: input.providerAccess ?? legacyProviderAccess,
