@@ -12,6 +12,8 @@ import { applyRevisionPatch, createRevisionPatch } from './revision-delta.ts'
 const encoder = new TextEncoder()
 const maxDeltaDepth = 32
 
+export class RevisionIntegrityError extends Error {}
+
 export interface AgentSnapshot {
   readonly bindings: Readonly<Record<string, string>>
   readonly model: LlmConfig
@@ -65,9 +67,13 @@ export class RevisionStore {
         let content = full.content
         const digest = chain[0]?.digest ?? full.digest
         for (const delta of chain.toReversed()) {
-          content = new TextDecoder().decode(canonicalJsonBytes(applyRevisionPatch(content, delta.patch)))
+          try {
+            content = new TextDecoder().decode(canonicalJsonBytes(applyRevisionPatch(content, delta.patch)))
+          } catch (cause) {
+            throw new RevisionIntegrityError('Stored Revision delta is invalid.', { cause })
+          }
           if (`sha256:${createHash('sha256').update(content).digest('hex')}` != delta.digest)
-            throw new Error('Stored Revision delta does not match its digest.')
+            throw new RevisionIntegrityError('Stored Revision delta does not match its digest.')
         }
         return { content, digest }
       }
@@ -76,10 +82,10 @@ export class RevisionStore {
                   FROM revision_deltas JOIN flow_revisions AS metadata USING (revision_id) WHERE revision_deltas.revision_id = ?`)
         .get(currentId) as { readonly baseRevisionId: string; readonly digest: string | null; readonly patch: string } | undefined
       if (delta == null) {
-        if (chain.length > 0) throw new Error('Stored Revision delta is missing its base.')
+        if (chain.length > 0) throw new RevisionIntegrityError('Stored Revision delta is missing its base.')
         return
       }
-      if (delta.digest == null || chain.length >= maxDeltaDepth) throw new Error('Stored Revision delta chain is invalid.')
+      if (delta.digest == null || chain.length >= maxDeltaDepth) throw new RevisionIntegrityError('Stored Revision delta chain is invalid.')
       chain.push({ digest: delta.digest, patch: delta.patch })
       currentId = delta.baseRevisionId
     }

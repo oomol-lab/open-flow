@@ -1,6 +1,8 @@
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 
+import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { canonicalJsonBytes } from '@oomol-lab/open-flow/flow-encoding'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { createHash } from 'node:crypto'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -9,7 +11,9 @@ import { DatabaseSync } from 'node:sqlite'
 import { expect, it, onTestFinished } from 'vitest'
 import { Database } from '../node/storage/database.ts'
 import { applyRevisionPatch, createRevisionPatch } from '../node/storage/revision-delta.ts'
+import { RevisionIntegrityError } from '../node/storage/revision-store.ts'
 import { Store } from '../node/storage/store.ts'
+import { createServerApp } from '../node/transport/http.ts'
 import { closeService, openService } from './serviceFixture.ts'
 
 function body(value: JsonValue) {
@@ -199,7 +203,7 @@ it('rejects a damaged delta without accepting a Run', () => {
     revisionId: 'draft',
   })
   database.connection.prepare('UPDATE revision_deltas SET patch = \'[{"op":"replace","path":"/counter","value":2}]\' WHERE revision_id = \'draft\'').run()
-  expect(() => store.flows.draft('flow')).toThrow('Stored Revision delta does not match its digest.')
+  expect(() => store.flows.draft('flow')).toThrow(RevisionIntegrityError)
   expect(() =>
     store.runs.acceptControlRun({
       closureDigest: 'closure',
@@ -213,7 +217,7 @@ it('rejects a damaged delta without accepting a Run', () => {
       trigger: { nodeId: 'start', outputs: {} },
       variableNames: [],
     }),
-  ).toThrow('Stored Revision delta does not match its digest.')
+  ).toThrow(RevisionIntegrityError)
   expect(database.connection.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 0 })
 })
 
@@ -226,17 +230,40 @@ it('repairs an unreadable delta as a new full Revision without changing the old 
     await rm(directory, { recursive: true, force: true })
   })
   const created = await service.control.createFlow('operator', 'Flow', 'create')
-  const changed = await service.control.changeDraft(
-    'operator',
-    created.flow.flowId,
-    created.flow.draftRevisionId,
-    [{ kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'start', node: { kind: 'manual', name: 'Start' } }],
-    'change',
-  )
+  const operations = [{ kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'start', node: { kind: 'manual', name: 'Start' } }] as const
+  const changed = await service.control.changeDraft('operator', created.flow.flowId, created.flow.draftRevisionId, operations, 'change')
   const database = new DatabaseSync(file)
   try {
     database.prepare("UPDATE revision_deltas SET patch = '[]' WHERE revision_id = ?").run(changed.revision.revisionId)
     expect(database.prepare('SELECT patch FROM revision_deltas WHERE revision_id = ?').get(changed.revision.revisionId)).toEqual({ patch: '[]' })
+    const repairRequired = { code: controlErrorCode.flowRepairRequired, status: 409 }
+    const response = await createServerApp(service, { resolveControlActor: () => 'operator' }).request(
+      `http://server.local/v1/flows/${created.flow.flowId}/editor`,
+    )
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ error: { code: controlErrorCode.flowRepairRequired } })
+    expect(() => service.control.getDraft(created.flow.flowId)).toThrow(expect.objectContaining(repairRequired))
+    expect(() => service.control.syncDraft(created.flow.flowId)).toThrow(expect.objectContaining(repairRequired))
+    expect(() => service.control.getRevision(created.flow.flowId, changed.revision.revisionId)).toThrow(expect.objectContaining(repairRequired))
+    await expect(service.control.checkFlow(created.flow.flowId, changed.revision.revisionId, currentEngineContract)).rejects.toMatchObject(repairRequired)
+    await expect(service.control.changeDraft('operator', created.flow.flowId, created.flow.draftRevisionId, operations, 'change')).rejects.toMatchObject(
+      repairRequired,
+    )
+    await expect(
+      service.control.removeConnectionUsage('operator', created.flow.flowId, 'unused', changed.revision.revisionId, 0, 'remove'),
+    ).rejects.toMatchObject(repairRequired)
+    await expect(
+      service.control.publishFlow('operator', created.flow.flowId, changed.revision.revisionId, currentEngineContract, null, 'publish'),
+    ).rejects.toMatchObject(repairRequired)
+    await expect(
+      service.control.runs.createDraftRun(created.flow.flowId, changed.revision.revisionId, currentEngineContract, {}, 'run', {
+        nodeId: 'start',
+        outputs: {},
+      }),
+    ).rejects.toMatchObject(repairRequired)
+    database.prepare(`UPDATE revision_deltas SET patch = '[{"op":"invalid","path":"/"}]' WHERE revision_id = ?`).run(changed.revision.revisionId)
+    expect(() => service.control.getDraft(created.flow.flowId)).toThrow(expect.objectContaining(repairRequired))
+    database.prepare("UPDATE revision_deltas SET patch = '[]' WHERE revision_id = ?").run(changed.revision.revisionId)
     const repaired = await service.control.repairDraft('operator', created.flow.flowId, changed.revision.revisionId, 'repair')
     expect(repaired.revision.parentRevisionId).toBe(changed.revision.revisionId)
     expect(database.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(repaired.revision.revisionId)).toBeDefined()

@@ -15,7 +15,7 @@ import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/
 import { captureNodeAccess } from '../deployment/connector-access.ts'
 import { checkCodeActions } from '../deployment/connector.ts'
 import { ControlError, serverErrorCode } from '../error.ts'
-import { revisionContent, timestamp } from './control-views.ts'
+import { readRevisionOrRepair, revisionContent, timestamp } from './control-views.ts'
 
 type RunInputs = NonNullable<FlowRunOptions['inputs']>
 
@@ -80,7 +80,7 @@ export class RunControl {
     const existing = this.replayRun(idempotencyKey, requestDigest, 'draft')
     if (existing != null) return existing
     if (engineContract != currentEngineContract) throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
-    const stored = this.store.flows.revision(flowId, revisionId)
+    const stored = readRevisionOrRepair(() => this.store.flows.revision(flowId, revisionId))
     if (stored == null) notFound()
     const content = revisionContent(stored)
     if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and outputs.')
@@ -130,7 +130,7 @@ export class RunControl {
     if (findEngineContract(livePublication.engineContract) == null) {
       throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
     }
-    const stored = this.store.flows.revision(flowId, livePublication.revisionId)
+    const stored = readRevisionOrRepair(() => this.store.flows.revision(flowId, livePublication.revisionId))
     if (stored == null || stored.digest != livePublication.revisionDigest) {
       throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Revision does not match the Publication.')
     }

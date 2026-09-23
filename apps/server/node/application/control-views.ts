@@ -7,6 +7,7 @@ import type { StoredTriggerActivity, StoredTriggerBinding } from '../storage/tri
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { decodeRevision, revisionRepairKind } from '@oomol-lab/open-flow/flow-encoding'
 import { ControlError } from '../error.ts'
+import { RevisionIntegrityError } from '../storage/revision-store.ts'
 
 export function timestamp(value: number): string {
   return new Date(value).toISOString()
@@ -35,6 +36,16 @@ export function flow(stored: StoredFlow): Flow {
 
 export function variable(stored: { readonly name: string; readonly updatedAt: number; readonly value: string }): Variable {
   return { name: stored.name, updatedAt: timestamp(stored.updatedAt), value: stored.value, version: 1 }
+}
+
+export function readRevisionOrRepair(read: () => StoredFlowRevision | undefined): StoredFlowRevision | undefined {
+  try {
+    return read()
+  } catch (error) {
+    if (error instanceof RevisionIntegrityError)
+      throw new ControlError(controlErrorCode.flowRepairRequired, 'The stored Flow Revision can be repaired.', { cause: error })
+    throw error
+  }
 }
 
 export function revisionContent(stored: { readonly content: string }): RevisionContent {

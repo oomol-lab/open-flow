@@ -44,7 +44,18 @@ import { randomUUID } from 'node:crypto'
 import { ConnectorTaskError, ConnectorClient } from '../deployment/connector.ts'
 import { AcceptanceError, ControlError, serverErrorCode } from '../error.ts'
 import { Store } from '../storage/store.ts'
-import { flow, variable, revisionContent, revisionMetadata, draft, presentation, triggerBinding, triggerActivity, publication } from './control-views.ts'
+import {
+  flow,
+  variable,
+  revisionContent,
+  revisionMetadata,
+  readRevisionOrRepair,
+  draft,
+  presentation,
+  triggerBinding,
+  triggerActivity,
+  publication,
+} from './control-views.ts'
 import { RunControl } from './run-control.ts'
 
 type PublishInput = {
@@ -563,7 +574,7 @@ export class ControlService {
   }
 
   getRevision(flowId: string, revisionId: string): Draft {
-    const stored = this.store.flows.revision(flowId, revisionId)
+    const stored = readRevisionOrRepair(() => this.store.flows.revision(flowId, revisionId))
     if (stored == null) notFound()
     return draft(stored)
   }
@@ -588,7 +599,7 @@ export class ControlService {
       if (previous.requestDigest != requestDigest) throw new ControlError(controlErrorCode.flowConflict, 'The change identity refers to another Draft change.')
       return { revision: revisionMetadata(previous), version: 1 }
     }
-    const base = this.store.flows.revision(flowId, expectedRevisionId)
+    const base = readRevisionOrRepair(() => this.store.flows.revision(flowId, expectedRevisionId))
     if (base == null) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
     const content = removeConnectionUsage(revisionContent(base), connectionId)
     const bytes = encodeRevision(content)
@@ -643,7 +654,7 @@ export class ControlService {
       if (previous.requestDigest != requestDigest) throw new ControlError(controlErrorCode.flowConflict, 'The change identity refers to another Draft change.')
       return { revision: revisionMetadata(previous), version: 1 }
     }
-    const base = this.store.flows.revision(flowId, expectedRevisionId)
+    const base = readRevisionOrRepair(() => this.store.flows.revision(flowId, expectedRevisionId))
     if (base == null) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
     let content: RevisionContent
     try {
@@ -853,7 +864,7 @@ export class ControlService {
     idempotencyKey: string,
   ): Promise<PublishOperation> {
     if (engineContract != currentEngineContract) throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
-    const revision = this.store.flows.revision(flowId, revisionId)
+    const revision = readRevisionOrRepair(() => this.store.flows.revision(flowId, revisionId))
     if (revision == null) notFound()
     return await this.commitPublishOperation({
       control: { actorId, operation: 'publish' },
@@ -885,7 +896,7 @@ export class ControlService {
   ): Promise<{ readonly created: boolean; readonly publication: Publication }> {
     const source = this.store.publications.publication(flowId, sourcePublicationId)
     if (source == null) throw new ControlError(controlErrorCode.publicationNotFound, 'The Publication was not found.')
-    const revision = this.store.flows.revision(flowId, source.revisionId)
+    const revision = readRevisionOrRepair(() => this.store.flows.revision(flowId, source.revisionId))
     if (revision == null || revision.digest != source.revisionDigest) {
       throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Revision does not match the Publication.')
     }
@@ -933,7 +944,7 @@ export class ControlService {
   async checkFlow(flowId: string, revisionId: string, engineContract: string): Promise<FlowCheck> {
     const engine = findEngineContract(engineContract)
     if (engine == null) throw new ControlError(controlErrorCode.engineUnsupported, 'The Engine Contract is not supported.')
-    const stored = this.store.flows.revision(flowId, revisionId)
+    const stored = readRevisionOrRepair(() => this.store.flows.revision(flowId, revisionId))
     if (stored == null) notFound()
     const content = revisionContent(stored)
     let checked: Awaited<ReturnType<typeof validateFlow>>
@@ -1033,7 +1044,7 @@ export class ControlService {
   }
 
   private requireDraft(flowId: string): StoredFlowRevision {
-    const stored = this.store.flows.draft(flowId)
+    const stored = readRevisionOrRepair(() => this.store.flows.draft(flowId))
     if (stored == null) notFound()
     return stored
   }
