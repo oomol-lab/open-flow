@@ -25,8 +25,8 @@
     "variables": "環境變數"
   },
   "settings": {
-    "callbackKey": "回呼金鑰",
-    "callbackKeyHint": "現有回呼金鑰永遠不會顯示；請使用至少 32 個 UTF-8 位元組。",
+    "callbackKey": "回呼簽章金鑰（僅保存在 Open Flow）",
+    "callbackKeyHint": "Open Flow 會根據這把金鑰為每個觸發器衍生獨立的簽章金鑰，並用它驗證回呼簽章。無需手動將這把金鑰提供給第三方。金鑰至少需要 32 個 UTF-8 位元組，儲存後不再顯示。",
     "cancel": "取消",
     "changed": "設定已變更，已重新載入目前的值。",
     "configure": "設定",
@@ -41,11 +41,11 @@
     "description": "目前 deployment 可使用的外部能力。",
     "edit": "編輯",
     "environmentHint": "目前的設定由環境變數管理，無法在這裡編輯。",
-    "integration": "Integration 回呼",
+    "integration": "事件接入",
     "loadFailed": "無法載入設定。",
     "loading": "正在載入設定…",
     "origin": "Origin",
-    "publicOrigin": "公開 Origin",
+    "publicOrigin": "Open Flow 公開位址（Public origin）",
     "retry": "重試",
     "runtime": "執行階段",
     "runtimeDescription": "Server 用於執行 Connector Action 的服務位址。",
@@ -60,7 +60,11 @@
     "title": "設定",
     "token": "Token",
     "tokenHint": "現有 token 永遠不會顯示；儲存會取代它。",
-    "eventSources": "事件來源"
+    "eventSources": "事件來源",
+    "callbackKeyStored": "簽章金鑰保存在 Open Flow 中，無需手動提供給第三方。",
+    "generateSecret": "產生隨機金鑰",
+    "integrationDescription": "設定外部服務向 Open Flow 傳送事件時使用的公開位址。",
+    "publicOriginHint": "填寫 Provider 可以存取的公開根位址，例如 https://flows.example.com。不要加入路徑或具體回呼位址；生產環境請使用 HTTPS。"
   },
   "team": {
     "createFailed": "無法在這個 Connector 團隊中建立 Flow。",

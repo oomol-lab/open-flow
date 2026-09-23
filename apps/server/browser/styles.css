@@ -452,6 +452,18 @@ body {
   font-weight: 600;
 }
 
+.settings-form > .settings-hint {
+  margin-top: -4px;
+}
+
+.settings-secret-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .settings-form-actions {
   justify-content: flex-end;
 }

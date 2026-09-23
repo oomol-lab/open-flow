@@ -25,8 +25,8 @@
     "variables": "Env"
   },
   "settings": {
-    "callbackKey": "Callback key",
-    "callbackKeyHint": "The existing callback key is never shown. Use at least 32 UTF-8 bytes.",
+    "callbackKey": "Callback signing key (kept in Open Flow)",
+    "callbackKeyHint": "Open Flow derives a separate signing secret for each trigger from this key and uses it to verify callback signatures. You do not need to provide this key manually to a third party. Use at least 32 UTF-8 bytes. The key is not shown after saving.",
     "cancel": "Cancel",
     "changed": "Settings changed. Reloaded the current values.",
     "configure": "Configure",
@@ -41,11 +41,11 @@
     "description": "External capabilities available to this deployment.",
     "edit": "Edit",
     "environmentHint": "This configuration is managed by environment variables and cannot be edited here.",
-    "integration": "Integration callbacks",
+    "integration": "Event ingress",
     "loadFailed": "Settings could not be loaded.",
     "loading": "Loading settings…",
     "origin": "Origin",
-    "publicOrigin": "Public origin",
+    "publicOrigin": "Open Flow public address (Public origin)",
     "retry": "Retry",
     "runtime": "Runtime",
     "runtimeDescription": "Endpoint used by the Server to execute Connector actions.",
@@ -60,7 +60,11 @@
     "title": "Settings",
     "token": "Token",
     "tokenHint": "The existing token is never shown. Saving replaces it.",
-    "eventSources": "Event sources"
+    "eventSources": "Event sources",
+    "callbackKeyStored": "Signing key saved in Open Flow. You do not need to provide it manually to a third party.",
+    "generateSecret": "Generate random key",
+    "integrationDescription": "Set the public address external services use to send events to Open Flow.",
+    "publicOriginHint": "Enter the public root address that Providers can reach, such as https://flows.example.com. Do not add a path or callback endpoint. HTTPS is required in production."
   },
   "team": {
     "createFailed": "The Flow could not be created for this Connector Team.",

@@ -25,8 +25,8 @@
     "variables": "環境変数"
   },
   "settings": {
-    "callbackKey": "Callback key",
-    "callbackKeyHint": "既存の callback key は表示されません。32 UTF-8 バイト以上を使用してください。",
+    "callbackKey": "Callback 署名キー（Open Flow のみに保存）",
+    "callbackKeyHint": "このキーからトリガーごとの署名キーを導出し、callback の署名を検証します。このキーを手動で外部サービスに渡す必要はありません。UTF-8 で 32 バイト以上を指定してください。保存後、このキーは再表示されません。",
     "cancel": "キャンセル",
     "changed": "設定が変更されたため、現在の値を再読み込みしました。",
     "configure": "設定",
@@ -41,11 +41,11 @@
     "description": "この deployment で利用できる外部 capability です。",
     "edit": "編集",
     "environmentHint": "この設定は環境変数で管理されているため、ここでは編集できません。",
-    "integration": "Integration callback",
+    "integration": "イベント受信",
     "loadFailed": "設定を読み込めませんでした。",
     "loading": "設定を読み込み中…",
     "origin": "Origin",
-    "publicOrigin": "Public origin",
+    "publicOrigin": "Open Flow 公開アドレス（Public origin）",
     "retry": "再試行",
     "runtime": "Runtime",
     "runtimeDescription": "Server が Connector action を実行するために使用する endpoint です。",
@@ -60,7 +60,11 @@
     "title": "設定",
     "token": "Token",
     "tokenHint": "既存の token は表示されません。保存すると置き換えられます。",
-    "eventSources": "イベントソース"
+    "eventSources": "イベントソース",
+    "callbackKeyStored": "署名キーは Open Flow に保存されています。外部サービスに手動で渡す必要はありません。",
+    "generateSecret": "ランダムキーを生成",
+    "integrationDescription": "外部サービスから Open Flow にイベントを送信するための公開アドレスを設定します。",
+    "publicOriginHint": "Provider からアクセスできる公開ルートアドレス（例: https://flows.example.com）を入力してください。パスや callback endpoint は追加しないでください。本番環境では HTTPS を使用します。"
   },
   "team": {
     "createFailed": "この Connector チームで Flow を作成できませんでした。",
