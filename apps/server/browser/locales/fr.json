@@ -75,7 +75,6 @@
   },
   "variables": {
     "nameExists": "Une variable d’environnement portant ce nom existe déjà. Modifiez la variable d’environnement existante.",
-    "all": "Toutes",
     "cancel": "Annuler",
     "count": "Variables : {{count}} · Limite : 200",
     "create": "Nouvelle variable",

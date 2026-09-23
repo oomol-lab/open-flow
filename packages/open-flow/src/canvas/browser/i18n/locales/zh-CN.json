@@ -411,7 +411,7 @@
       "reload": "从磁盘重新加载"
     },
     "empty": {
-      "description": "添加 Flow、Subflow 或 Task 源文件，然后重新加载工作台。",
+      "description": "添加工作流、Subflow 或 Task 源文件，然后重新加载工作台。",
       "title": "当前项目还没有可运行的目标。"
     },
     "noTargets": "没有可运行的目标",

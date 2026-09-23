@@ -431,7 +431,7 @@ export function FlowBrowser({
         <section aria-labelledby="flow-list-title" className="resource-list-section rounded-lg">
           <div className="resource-list-title">
             <div className="resource-list-heading">
-              <h2 id="flow-list-title">{t('resource.all')}</h2>
+              <h2 id="flow-list-title">{t('resource.flows')}</h2>
               {!loading && <span>{t('resource.flowCount', { count: total ?? flows.length })}</span>}
             </div>
             <div className="resource-list-actions">

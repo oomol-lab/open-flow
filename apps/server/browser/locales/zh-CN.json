@@ -19,7 +19,7 @@
   },
   "shell": {
     "closeNotification": "关闭通知",
-    "flows": "Flow",
+    "flows": "工作流",
     "notifications": "通知",
     "settings": "设置",
     "variables": "环境变量"
@@ -63,25 +63,24 @@
     "eventSources": "事件源"
   },
   "team": {
-    "createFailed": "无法在这个 Connector 团队中创建 Flow。",
+    "createFailed": "无法在这个 Connector 团队中创建工作流。",
     "defaultNamed": "{{name}}（默认）",
-    "fixedHint": "Flow 创建后将始终使用这个团队。",
+    "fixedHint": "工作流创建后将始终使用这个团队。",
     "label": "OOMOL 团队",
     "loadFailed": "无法加载团队。",
     "loading": "正在加载团队…",
     "noTeams": "当前 Operator 没有可用的 OOMOL 团队。",
     "retry": "重新加载团队",
-    "selectForCreation": "选择新 Flow 使用的 Connector 团队"
+    "selectForCreation": "选择新工作流使用的 Connector 团队"
   },
   "variables": {
     "nameExists": "同名环境变量已存在，请编辑已有环境变量。",
-    "all": "全部",
     "cancel": "取消",
     "count": "{{count}} 个变量 · 上限 200 个",
     "create": "新建变量",
     "delete": "删除",
     "deleteConfirm": "删除 {{name}}？",
-    "description": "供绑定环境变量的 Flow 输入使用的 deployment 配置。",
+    "description": "供绑定环境变量的工作流输入使用的 deployment 配置。",
     "edit": "编辑",
     "empty": "尚未创建环境变量。",
     "invalidName": "名称应为 1–256 个字母、数字或下划线，以字母或下划线开头，且不能使用保留的 OO_ 前缀。",

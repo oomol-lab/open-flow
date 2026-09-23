@@ -75,7 +75,6 @@
   },
   "variables": {
     "nameExists": "An environment variable with this name already exists. Edit the existing environment variable instead.",
-    "all": "All",
     "cancel": "Cancel",
     "count": "Variables: {{count}} · Limit: 200",
     "create": "New variable",

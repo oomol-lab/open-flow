@@ -7,7 +7,7 @@
       "includeCorpusRemovals": "当某项离开变更范围时包含其可访问的文件资源。",
       "includeItemsFromAllDrives": "包含“我的云端硬盘”及共享驱动器中的项目。",
       "includeRemoved": "包含因删除或失去访问权限导致的变更。",
-      "pageSize": "一次Flow运行中包含的最大变更数。",
+      "pageSize": "一次工作流运行中包含的最大变更数。",
       "restrictToMyDrive": "将变更限制在“我的云端硬盘”层级内。"
     },
     "outputs": {
@@ -22,7 +22,7 @@
       "includeCorpusRemovals": "当某项离开变更范围时包含其可访问的文件资源。",
       "includeItemsFromAllDrives": "包含“我的云端硬盘”及共享驱动器中的项目。",
       "includeRemoved": "包含因删除或失去访问权限导致的变更。",
-      "pageSize": "一次Flow运行中包含的最大变更数。",
+      "pageSize": "一次工作流运行中包含的最大变更数。",
       "restrictToMyDrive": "将变更限制在“我的云端硬盘”层级内。"
     },
     "outputs": {

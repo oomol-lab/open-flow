@@ -690,7 +690,7 @@ export default function FlowWorkspace({
                   onRetry={() => flowId != null && void store.selectFlow(flowId)}
                 />
               ) : (
-                <Empty className="h-full rounded-none border-0">
+                <Empty className="h-full">
                   <EmptyHeader>
                     <EmptyTitle>{t('workspace.status.loading')}</EmptyTitle>
                   </EmptyHeader>

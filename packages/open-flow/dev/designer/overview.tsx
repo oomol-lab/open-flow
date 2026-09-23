@@ -7,6 +7,7 @@ import { Alert, AlertDescription, AlertTitle } from '../../src/ui/browser/alert.
 import { Badge } from '../../src/ui/browser/badge.tsx'
 import { Button } from '../../src/ui/browser/button.tsx'
 import { Checkbox } from '../../src/ui/browser/checkbox.tsx'
+import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '../../src/ui/browser/empty.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../src/ui/browser/input-group.tsx'
 import { Input } from '../../src/ui/browser/input.tsx'
 import { Label } from '../../src/ui/browser/label.tsx'
@@ -209,6 +210,25 @@ function ProductOverview({ log }: { readonly log: LogAction }) {
           </Alert>
           <Progress aria-label="Sample run progress" value={42} />
         </Sample>
+        <Sample title="Empty states">
+          <Empty className="min-h-40">
+            <EmptyHeader>
+              <EmptyTitle>No matching workflows</EmptyTitle>
+              <EmptyDescription>Try another search term.</EmptyDescription>
+            </EmptyHeader>
+          </Empty>
+          <Empty className="min-h-40">
+            <EmptyHeader>
+              <EmptyTitle>Could not load workflows</EmptyTitle>
+              <EmptyDescription>Check your connection and try again.</EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent>
+              <Button onClick={() => log('empty.retry', null)} variant="outline">
+                Retry
+              </Button>
+            </EmptyContent>
+          </Empty>
+        </Sample>
       </div>
     </div>
   )
@@ -262,7 +282,7 @@ export const overviewStories: readonly FrontendStory[] = [
     group: 'Theme Preview',
     id: 'product-controls',
     title: 'Workbench controls',
-    description: 'Text inputs use one focus ring for pointer and keyboard focus, including invalid and grouped fields.',
+    description: 'Inspect control focus states and empty messages without container borders.',
     standalone: true,
     render: (log) => <ProductOverview log={log} />,
   },

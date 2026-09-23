@@ -126,13 +126,10 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
   return (
     <main ref={portal} className="variables-page">
       <div className="variables-content">
-        <header className="variables-header">
-          <h1>{t('variables.title')}</h1>
-        </header>
         <section aria-busy={loading || pending} aria-labelledby="variables-title" className="variables-section rounded-lg">
           <div className="variables-toolbar">
             <div className="variables-heading">
-              <h2 id="variables-title">{t('variables.all')}</h2>
+              <h1 id="variables-title">{t('variables.title')}</h1>
               <span>{t('variables.count', { count: variables.length })}</span>
             </div>
             <div className="variables-actions">
@@ -196,7 +193,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
             ) : failed ? (
               <div className="variables-state" role="alert">
                 <span aria-hidden="true" className="variables-state-icon">
-                  !
+                  <i className="i-lucide-light:triangle-alert size-4" />
                 </span>
                 <strong>{t('variables.loadFailed')}</strong>
                 <span>{t('variables.description')}</span>
@@ -207,7 +204,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
             ) : visible.length == 0 ? (
               <div className="variables-state">
                 <span aria-hidden="true" className="variables-state-icon">
-                  V
+                  <i className="i-lucide-light:sliders-horizontal size-4" />
                 </span>
                 <strong>{t(filter.trim() == '' ? 'variables.empty' : 'variables.noMatch')}</strong>
                 <span>{t('variables.description')}</span>

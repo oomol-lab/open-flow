@@ -57,7 +57,7 @@ it.each(['metadata', 'connections'] as const)('shows loading while waiting for %
 
 it.each([undefined, { message: 'Earlier request failed.' }])('directs missing access to configuration instead of retrying (%s)', (actionError) => {
   const markup = renderAccount({ actionError })
-  expect(markup).toContain('运行前，请为此 Flow 选择可用账号和权限。')
+  expect(markup).toContain('运行前，请为此工作流选择可用账号和权限。')
   expect(markup).toContain('选择可用账号')
   expect(markup).toContain('管理账号')
   expect(markup).not.toContain('重试')

@@ -75,7 +75,6 @@
   },
   "variables": {
     "nameExists": "同名環境變數已存在，請編輯現有環境變數。",
-    "all": "全部",
     "cancel": "取消",
     "count": "{{count}} 個變數 · 上限 200 個",
     "create": "新增變數",

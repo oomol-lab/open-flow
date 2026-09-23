@@ -14,7 +14,7 @@ export function WorkspaceRecovery({ kind, message, repairing = false, onRepair, 
   const t = useTranslate()
   const recoverable = kind != 'failed'
   return (
-    <Empty aria-busy={repairing} className="h-full rounded-none border-0" role="alert">
+    <Empty aria-busy={repairing} className="h-full" role="alert">
       <EmptyHeader>
         <EmptyMedia className="size-12 rounded-xl" variant="icon">
           <i aria-hidden="true" className={kind == 'upgrade' ? 'i-lucide-light:wand-sparkles text-2xl' : 'i-lucide-light:file-warning text-2xl'} />

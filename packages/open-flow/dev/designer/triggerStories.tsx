@@ -180,7 +180,7 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
         </Gallery>
       </div>
     ) : (
-      <Empty className="h-full rounded-none border-0">
+      <Empty className="h-full">
         <EmptyHeader>
           <EmptyTitle>Select a node</EmptyTitle>
           <EmptyDescription>View its configuration in this sidebar.</EmptyDescription>

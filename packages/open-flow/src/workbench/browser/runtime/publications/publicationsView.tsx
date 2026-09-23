@@ -494,7 +494,7 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
         {loading ? (
           <div className="publication-history-loading">{t('publication.loading')}</div>
         ) : publications.length == 0 ? (
-          <Empty className="min-h-48 rounded-none border-0">
+          <Empty className="min-h-48">
             <EmptyHeader>
               <EmptyMedia variant="icon">
                 <Icon name="publish" />

@@ -130,18 +130,8 @@ body {
   padding: 32px 0 64px;
 }
 
-.variables-header h1 {
-  margin: 0;
-  color: var(--ui-foreground);
-  font-size: 24px;
-  font-weight: 650;
-  letter-spacing: -0.025em;
-  line-height: 32px;
-}
-
 .variables-section {
   min-width: 0;
-  margin-top: 20px;
   overflow: hidden;
   border: 1px solid var(--ui-border);
   background: var(--ui-background);
@@ -169,7 +159,7 @@ body {
   align-items: baseline;
 }
 
-.variables-heading h2 {
+.variables-heading h1 {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
@@ -264,16 +254,13 @@ body {
 
 .variables-state-icon {
   display: grid;
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   place-items: center;
   margin-bottom: 4px;
-  border: 1px solid var(--ui-border);
-  border-radius: var(--ui-radius);
-  background: var(--ui-card);
-  color: var(--ui-muted-foreground);
-  font-size: 13px;
-  font-weight: 600;
+  border-radius: 8px;
+  background: var(--ui-muted);
+  color: var(--ui-foreground);
 }
 
 .variables-state strong {

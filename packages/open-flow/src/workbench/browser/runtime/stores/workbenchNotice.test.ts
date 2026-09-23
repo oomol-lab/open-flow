@@ -36,7 +36,7 @@ describe('Workbench notices', () => {
   it('identifies the affected business object and next step', () => {
     const i18n = createI18n('zh-CN')
 
-    expect(errorNotice(new ApiError(404, 'flow.not-found', 'Missing.'), i18n.t).message).toBe('当前 Flow 或修订不存在，请重新加载 Flow 后重试。')
+    expect(errorNotice(new ApiError(404, 'flow.not-found', 'Missing.'), i18n.t).message).toBe('当前工作流或修订不存在，请重新加载工作流后重试。')
     expect(errorNotice(new ApiError(404, 'run.not-found', 'Missing.'), i18n.t).message).toBe('找不到这次 Run，请返回 Run 列表选择其他记录。')
     expect(errorNotice(new ApiError(400, 'page.invalid-cursor', 'Invalid.'), i18n.t).message).toBe('列表加载期间内容已发生变化，请重新加载列表。')
   })
