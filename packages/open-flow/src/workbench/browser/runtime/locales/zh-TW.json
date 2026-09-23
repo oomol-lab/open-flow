@@ -270,6 +270,13 @@
       "save": "儲存 Subflow"
     },
     "task": {
+      "sharedPermissions": "使用 Flow 共用權限群組",
+      "sharedPermissionsHint": "直接使用 Flow 共用權限群組已授權的所有 Actions，無需逐一新增。",
+      "addAction": "新增 Action",
+      "removeAction": "移除 Action",
+      "actionAccount": "帳號",
+      "chooseAccount": "選擇帳號",
+      "permissionSaveFailed": "無法儲存 Code 權限，請重試。",
       "chatText": "對話文字",
       "connectorAction": "Connector 操作",
       "definition": "任務定義",

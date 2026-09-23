@@ -2,7 +2,7 @@ import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
 import type { TriggerDisplay } from '../../../../control/common/triggerCatalog.ts'
 import type { GraphNode, GraphTarget } from '../../../../flow/common/change.ts'
-import type { ConnectorAccess, ConnectorAction, ConnectorConnection, Group, InputPort } from '../api.ts'
+import type { ConnectorAccess, ConnectorAccessCandidates, ConnectorAction, ConnectorConnection, Group, InputPort } from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { IconName } from '../icons.tsx'
@@ -120,6 +120,7 @@ interface Props {
   readonly connectorConnectionError?: string
   readonly activeConnectorConnections?: readonly ConnectorConnection[]
   readonly connectors: ConnectorStore
+  readonly connectorCandidates?: Readonly<Record<string, ConnectorAccessCandidates | undefined>>
   readonly connectorAccess?: ConnectorAccess
   readonly onConfigureConnectorAccess?: (providerId?: string) => void
   readonly prepareConnectorAction?: (
@@ -154,6 +155,7 @@ export function NodeInspector({
   activeConnectorConnections,
   connectors,
   connectorAccess,
+  connectorCandidates,
   onConfigureConnectorAccess,
   prepareConnectorAction,
   connectorLoading,
@@ -523,8 +525,10 @@ export function NodeInspector({
                   {selection.module != null && (
                     <CodeTaskSection
                       connectorAccess={connectorAccess}
+                      connectorCandidates={connectorCandidates}
                       onConfigureAccess={onConfigureConnectorAccess == null ? undefined : () => onConfigureConnectorAccess()}
                       connectors={connectors}
+                      prepareAction={prepareConnectorAction}
                       disabled={disabled}
                       focus={focus}
                       selection={selection}

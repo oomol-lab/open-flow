@@ -270,6 +270,13 @@
       "save": "Сохранить Subflow"
     },
     "task": {
+      "sharedPermissions": "Использовать общую группу разрешений Flow",
+      "sharedPermissionsHint": "Используйте все Actions, разрешённые общей группой Flow. Добавлять их в узел по отдельности не нужно.",
+      "addAction": "Добавить Action",
+      "removeAction": "Удалить Action",
+      "actionAccount": "Аккаунт",
+      "chooseAccount": "Выбрать аккаунт",
+      "permissionSaveFailed": "Не удалось сохранить разрешения Code. Повторите попытку.",
       "chatText": "Текст чата",
       "connectorAction": "Действие Connector",
       "definition": "Определение задачи",

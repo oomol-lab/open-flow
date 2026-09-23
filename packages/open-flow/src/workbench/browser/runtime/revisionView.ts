@@ -80,7 +80,9 @@ export class RevisionView {
     for (const task of Object.values(tasks)) if (task.executor.kind == 'connector') connectorActionIds.add(task.executor.action)
     for (const declaration of [...codeActions(this.#document), ...agentActions({ tasks })]) {
       if ('action' in declaration) connectorActionIds.add(declaration.action)
-      else {
+      else if ('mode' in declaration) {
+        if (declaration.mode == 'independent') for (const action of declaration.actions) connectorActionIds.add(action.action)
+      } else {
         for (const action of declaration.actionHints ?? []) connectorActionIds.add(action)
         for (const hint of declaration.connectionHints ?? []) connectorActionIds.add(hint.action)
       }
@@ -270,7 +272,7 @@ export function revisionView(revision: Draft): RevisionView {
 }
 
 export interface ConnectorAccountReference {
-  readonly kind?: 'connector' | 'agent' | 'trigger' | 'notification'
+  readonly kind?: 'connector' | 'agent' | 'trigger' | 'notification' | 'code'
   readonly providerId: string
   readonly connectionId?: string
   readonly nodeId: string

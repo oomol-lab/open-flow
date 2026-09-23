@@ -10,10 +10,10 @@ import type { Store } from '../storage/store.ts'
 
 import { controlErrorCode, decodeRunEvent, readResult } from '@oomol-lab/open-flow/control-api'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
-import { agentActions, prepareFlow, validateFlowInputs, validRunTrigger, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
+import { agentActions, codeActions, prepareFlow, validateFlowInputs, validRunTrigger, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { captureNodeAccess } from '../deployment/connector-access.ts'
-import { checkCodeActions } from '../deployment/connector.ts'
+import { checkCodeActions, checkCodePermissions } from '../deployment/connector.ts'
 import { ControlError, serverErrorCode } from '../error.ts'
 import { readRevisionOrRepair, revisionContent, timestamp } from './control-views.ts'
 
@@ -353,6 +353,14 @@ export class RunControl {
       providerAccess,
       purpose: 'eligibility',
       usage: 'node',
+      source,
+      ...(teamId == null ? {} : { teamId }),
+    })
+    await checkCodePermissions(codeActions(prepared), this.resolveConnector(), {
+      flowId,
+      providerAccess,
+      purpose: 'eligibility',
+      usage: 'code',
       source,
       ...(teamId == null ? {} : { teamId }),
     })

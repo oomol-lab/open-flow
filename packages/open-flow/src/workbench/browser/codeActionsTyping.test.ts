@@ -127,6 +127,30 @@ describe('Code Action editor types', () => {
     ).toEqual([])
   })
 
+  it('completes shared catalog Actions without a node Action list', () => {
+    const permissions: ConnectorCapability[] = [{ kind: 'connector', mode: 'shared' }]
+    expect(diagnostics("export default async (_, ctx) => ctx.actions.example.echo({ any: 'value' })", permissions)).toEqual([])
+    expect(diagnostics("export default async (_, ctx) => ctx.actions.call('example.echo', {}, { connectionId: 'work' })", permissions)).toEqual([])
+    expect(diagnostics("export default async (_, ctx) => ctx.actions.call('other.read', {})", permissions).length).toBeGreaterThan(0)
+  })
+
+  it('limits configured Code completions to the node Action list', () => {
+    const permissions: ConnectorCapability[] = [{ kind: 'connector', mode: 'independent', actions: [{ action: 'example.echo' }] }]
+    const source = 'export default async (_, ctx) => { ctx.actions. }'
+    const { service, text } = editorService(
+      source,
+      permissions,
+      { 'example.echo': definition, 'other.read': { ...definition, actionId: 'other.read', serviceId: 'other' } },
+      ['example', 'other'],
+    )
+    const names = service
+      .getCompletionsAtPosition('/module.js', text.indexOf('ctx.actions.') + 'ctx.actions.'.length, {})
+      ?.entries.map((entry: ts.CompletionEntry) => entry.name)
+    expect(names).toContain('example')
+    expect(names).not.toContain('other')
+    expect(diagnostics("export default async (_, ctx) => ctx.actions.call('other.read', {})", permissions).length).toBeGreaterThan(0)
+  })
+
   it('adds precise overloads for hinted Actions while keeping the dynamic fallback', () => {
     expect(
       diagnostics(

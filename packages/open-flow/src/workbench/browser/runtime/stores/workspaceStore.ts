@@ -1,7 +1,7 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal } from 'value-enhancer'
 import type { EventSource } from '../../../../control/common/api.ts'
-import type { GraphTarget } from '../../../../flow/common/change.ts'
+import type { ConnectorCapability, GraphTarget } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
 import type { WorkbenchClient, Draft, Flow, GraphNode, InputPort, JsonValue, Live, TriggerSchedule } from '../api.ts'
 import type { DesignerViewport, Point } from '../canvasPresentation.ts'
@@ -33,6 +33,7 @@ import {
   updateTriggerConfig,
   updateTriggerSchedule,
   setConnectorConnection as changeConnectorConnection,
+  setCodeActions as changeCodeActions,
   setTriggerConnection as changeTriggerConnection,
 } from '../../../../flow/common/nodeChanges.ts'
 import { feishuResourceKind, supportsFeishuChatFilter } from '../../../../trigger/providers/feishu/config.ts'
@@ -816,6 +817,14 @@ export class WorkspaceStore {
     if (revision == null) return false
     const changes = changeConnectorConnection(revision.revision.content, taskId, connectionId)
     return changes != null && (await this.#editDraft(changes)) != null
+  }
+
+  public async setCodeActions(nodeId: string, capabilities: readonly ConnectorCapability[]): Promise<boolean> {
+    const revision = this.$.revision.value
+    const target = this.#model.value.target
+    if (revision == null || target == null) return false
+    const changes = changeCodeActions(revision.revision.content, target, nodeId, capabilities)
+    return changes == null || (await this.#editDraft(changes)) != null
   }
 
   public get eventSourceClient() {

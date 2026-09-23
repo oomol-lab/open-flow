@@ -121,10 +121,16 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
       : undefined
   useEffect(() => {
     if (connectorAccess?.mode == 'selectable') {
-      const ids = [providerId, triggerProviderId].filter((id): id is string => id != null)
+      const ids = [
+        providerId,
+        triggerProviderId,
+        ...(selection?.kind == 'task' && selection.module != null
+          ? connectorAccess.bindings.filter((binding) => binding.status == 'active').map((binding) => binding.providerId)
+          : []),
+      ].filter((id): id is string => id != null)
       if (ids.length > 0) void store.connectorAccess.loadCandidates(ids)
     }
-  }, [providerId, triggerProviderId, connectorAccess?.mode, store])
+  }, [providerId, triggerProviderId, connectorAccess, selection, store])
   const triggerCandidates =
     triggerProviderId == null
       ? undefined
@@ -165,6 +171,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
       }}
       connectorAction={connectorAction}
       connectorAccess={connectorAccess}
+      connectorCandidates={accessState.candidates}
       connectorAccessError={accessError}
       connectorActionError={connectorActionError}
       connectorAuthorizationPending={connectorAuthorizationPending}

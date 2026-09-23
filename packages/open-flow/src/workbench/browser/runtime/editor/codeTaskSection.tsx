@@ -1,23 +1,34 @@
 import type { ReactElement } from 'react'
-import type { ConnectorAccess } from '../api.ts'
+import type { ConnectorPermissionCapability } from '../../../../flow/common/change.ts'
+import type { ConnectorAccess, ConnectorAccessCandidates } from '../api.ts'
+import type { ConnectorConnection } from '../api.ts'
+import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { ResolvedNode } from '../revisionView.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 import type { DiagnosticFocus } from './diagnostics.ts'
 
-import { useEffect, useMemo } from 'react'
+import { ChevronDown } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { compute } from 'value-enhancer'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
+import { Switch } from '../../../../ui/browser/switch.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
+import { connectionCatalog } from '../connectionCatalog.ts'
+import { WorkbenchSelect } from '../shell/workbenchSelect.tsx'
+import { ActionPicker } from './actionPicker.tsx'
 import { CodeEditor } from './codeEditor.tsx'
 import { codeTyping } from './codeTyping.ts'
 
 export function CodeTaskSection({
   connectorAccess,
+  connectorCandidates,
   connectors,
+  prepareAction,
   onConfigureAccess,
   disabled,
   focus,
@@ -25,8 +36,12 @@ export function CodeTaskSection({
   store,
   theme,
 }: {
+  readonly connectorCandidates?: Readonly<Record<string, ConnectorAccessCandidates | undefined>>
   readonly connectorAccess?: ConnectorAccess
   readonly connectors: ConnectorStore
+  readonly prepareAction?: (
+    action: ConnectorActionView,
+  ) => Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] } | undefined>
   readonly onConfigureAccess?: (() => void) | undefined
   readonly disabled: boolean
   readonly focus?: DiagnosticFocus
@@ -59,9 +74,65 @@ export function CodeTaskSection({
     [store, providerKey, language, flowId],
   )
   useEffect(() => () => catalog.dispose(), [catalog])
-  const actionCatalog = { ...hintedCatalog, ...useVal(catalog) }
+  const sharedActionCatalog = Object.fromEntries(
+    Object.entries(useVal(catalog)).filter(
+      ([, action]) =>
+        !action.authenticated ||
+        connectorAccess?.mode == 'implicit' ||
+        connectorAccess?.bindings.some(
+          (binding) =>
+            binding.status == 'active' &&
+            binding.providerId == action.serviceId &&
+            connectorCandidates?.[action.serviceId]?.candidates.some(
+              (candidate) =>
+                candidate.accessBindingId == binding.accessBindingId &&
+                (candidate.permissions == null || candidate.permissions.allActions || candidate.permissions.actionIds.includes(action.actionId)),
+            ),
+        ),
+    ),
+  )
+  const actionCatalog = { ...hintedCatalog, ...sharedActionCatalog }
   const t = useTranslate()
   const task = selection.definition
+  const savedPermission = task != null && 'moduleId' in task ? task.capabilities?.find((capability) => 'mode' in capability) : undefined
+  const [permission, setPermission] = useState<ConnectorPermissionCapability | undefined>(savedPermission)
+  const sharedPermissions = permission?.mode != 'independent'
+  const [saveError, setSaveError] = useState<string>()
+  const [pending, setPending] = useState(false)
+  const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null)
+  const catalogs = useVal(connectors.$.catalogs)
+  useEffect(() => setPermission(savedPermission), [savedPermission, selection.id])
+  const permissionActions = permission?.mode == 'independent' ? permission.actions.map((entry) => entry.action).join(',') : ''
+  useEffect(() => {
+    if (permissionActions == '') return
+    const controller = new AbortController()
+    void Promise.all(permissionActions.split(',').map((id) => connectors.loadCodeAction(id, controller.signal)))
+      .then(() => {
+        const services = new Set(permissionActions.split(',').map((id) => id.split('.')[0]!))
+        return Promise.all([...services].map((id) => connectors.loadCodeConnections(id, controller.signal)))
+      })
+      .catch((cause: unknown) => {
+        if (!controller.signal.aborted) setSaveError(String(cause))
+      })
+    return () => controller.abort()
+  }, [connectors, permissionActions])
+  const savePermission = async (value: ConnectorPermissionCapability) => {
+    setPermission(value)
+    setPending(true)
+    setSaveError(undefined)
+    try {
+      if (!(await store.setCodeActions(selection.id, [value]))) {
+        setSaveError(t('inspector.task.permissionSaveFailed'))
+        return false
+      }
+      return true
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : String(cause))
+      return false
+    } finally {
+      setPending(false)
+    }
+  }
   const module = selection.module
   const moduleEditor = useVal(store.$.moduleEditor)
   const moduleLocation = focus?.section == 'module' ? focus.diagnostic : undefined
@@ -105,7 +176,134 @@ export function CodeTaskSection({
           </Tooltip>
         )}
       </h3>
-      <div className="inspector-section-content" data-inset>
+      <div className="inspector-section-content" data-inset ref={(element) => setPortalRoot(element?.closest<HTMLElement>('.open-flow-workbench') ?? null)}>
+        <div className="flex flex-col gap-2" data-inspector-section="code-permissions">
+          <Field orientation="horizontal" className="justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-1">
+              <FieldLabel className="text-xs font-normal" htmlFor={`${selection.id}-shared-permissions`}>
+                {t('inspector.task.sharedPermissions')}
+              </FieldLabel>
+              <Tooltip>
+                <TooltipTrigger
+                  aria-label={t('inspector.task.sharedPermissions')}
+                  className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <i aria-hidden="true" className="i-codicon:question text-[13px]" />
+                </TooltipTrigger>
+                <TooltipContent>{t('inspector.task.sharedPermissionsHint')}</TooltipContent>
+              </Tooltip>
+              <span id={`${selection.id}-shared-permissions-hint`} className="sr-only">
+                {t('inspector.task.sharedPermissionsHint')}
+              </span>
+            </div>
+            <Switch
+              id={`${selection.id}-shared-permissions`}
+              aria-describedby={sharedPermissions ? `${selection.id}-shared-permissions-hint` : undefined}
+              size="sm"
+              checked={sharedPermissions}
+              disabled={disabled || pending}
+              onCheckedChange={(shared) =>
+                void savePermission(shared ? { kind: 'connector', mode: 'shared' } : { kind: 'connector', mode: 'independent', actions: [] })
+              }
+            />
+          </Field>
+          {permission?.mode == 'independent' && permission.actions.length > 0 && (
+            <div className="flex min-w-0 flex-col divide-y divide-border/50">
+              {permission.actions.map((entry) => {
+                const action = actionCatalog[entry.action]
+                const available = catalogs[entry.action.split('.')[0]!]?.all ?? []
+                const accountName = available.find((connection) => connection.connectionId == entry.connectionId)?.displayName ?? entry.connectionId
+                return (
+                  <details
+                    key={entry.action}
+                    className="inspector-disclosure inspector-disclosure-compact"
+                    open={action?.authenticated !== false && entry.connectionId == null}
+                  >
+                    <summary>
+                      <ChevronDown size={14} strokeWidth={1.5} />
+                      <span className="min-w-0 flex-1">{action == null ? entry.action : `${action.serviceName} · ${action.name}`}</span>
+                      {action?.authenticated !== false && (
+                        <span className="max-w-[40%] truncate text-xs font-normal text-muted-foreground" title={accountName}>
+                          {accountName ?? t('inspector.task.chooseAccount')}
+                        </span>
+                      )}
+                    </summary>
+                    <div className="inspector-disclosure-content flex flex-col gap-2">
+                      {action?.authenticated !== false && (
+                        <div className="flex min-w-0 items-center gap-2">
+                          <FieldLabel className="shrink-0 text-xs font-normal text-muted-foreground" htmlFor={`${selection.id}-${entry.action}-account`}>
+                            {t('inspector.task.actionAccount')}
+                          </FieldLabel>
+                          <WorkbenchSelect
+                            id={`${selection.id}-${entry.action}-account`}
+                            size="sm"
+                            variant="subtle"
+                            ariaLabel={t('inspector.task.actionAccount')}
+                            className="min-w-0 flex-1"
+                            disabled={disabled || pending}
+                            portalRoot={portalRoot}
+                            value={entry.connectionId ?? ''}
+                            onValueChange={(connectionId) =>
+                              void savePermission({
+                                ...permission,
+                                actions: permission.actions.map((item) =>
+                                  item.action != entry.action ? item : { action: item.action, ...(connectionId == '' ? {} : { connectionId }) },
+                                ),
+                              })
+                            }
+                            options={[
+                              { value: '', label: t('inspector.task.chooseAccount') },
+                              ...(entry.connectionId != null && !available.some((connection) => connection.connectionId == entry.connectionId)
+                                ? [{ value: entry.connectionId, label: `${entry.connectionId} (${t('inspector.account.unavailable')})`, disabled: true }]
+                                : []),
+                              ...available.map((connection) => ({
+                                value: connection.connectionId,
+                                label: connection.displayName,
+                                disabled: connection.status != 'active',
+                              })),
+                            ]}
+                          />
+                        </div>
+                      )}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="xs"
+                        className="self-start"
+                        aria-label={t('inspector.task.removeAction')}
+                        title={t('inspector.task.removeAction')}
+                        disabled={disabled || pending}
+                        onClick={() => void savePermission({ ...permission, actions: permission.actions.filter((item) => item.action != entry.action) })}
+                      >
+                        {t('inspector.task.removeAction')}
+                      </Button>
+                    </div>
+                  </details>
+                )
+              })}
+            </div>
+          )}
+          {permission?.mode == 'independent' && (
+            <ActionPicker
+              connectors={connectors}
+              disabled={disabled || pending}
+              label={t('inspector.task.addAction')}
+              exclude={permission.actions.map((item) => item.action)}
+              prepare={prepareAction ?? ((action) => connectors.resolveAction(action.actionId))}
+              onSelect={async (action, availableConnections) => {
+                const preferred = action.authenticated ? connectionCatalog(availableConnections).preferred : undefined
+                const entry = preferred == null ? { action: action.actionId } : { action: action.actionId, connectionId: preferred.connectionId }
+                const value = { ...permission, actions: [...permission.actions, entry] }
+                return await savePermission(value)
+              }}
+            />
+          )}
+          {saveError != null && (
+            <p role="alert" className="text-sm text-destructive">
+              {saveError}
+            </p>
+          )}
+        </div>
         <CodeEditor
           ariaLabel={t('inspector.task.source')}
           disabled={disabled}
@@ -117,7 +315,12 @@ export function CodeTaskSection({
           }}
           onChange={(value) => store.updateModuleSource(value)}
           theme={theme}
-          typing={codeTyping(task, task.capabilities, actionCatalog, providerIds)}
+          typing={codeTyping(
+            task,
+            permission == null ? task.capabilities : [permission],
+            permission?.mode == 'shared' ? sharedActionCatalog : actionCatalog,
+            providerIds,
+          )}
           uri={`file:///modules/${moduleEditor.moduleId}.js`}
           value={moduleEditor.source}
         />
