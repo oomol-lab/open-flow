@@ -3,6 +3,7 @@ import type { WorkbenchLocation, WorkbenchTheme } from './contract.ts'
 import type { AddNodeOption } from './editor/addNodeOptions.ts'
 import type { WorkbenchCanvasHandle } from './editor/workbenchCanvas.tsx'
 import type { ConnectorAccountReference } from './revisionView.ts'
+import type { PublishState } from './shell/workspacePublishIsland.tsx'
 
 import { memo, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
@@ -29,6 +30,8 @@ import { RunInputPanel } from './runs/runInputPanel.tsx'
 import { RunResults } from './runs/runResults.tsx'
 import { RunsView } from './runs/runsView.tsx'
 import { WorkspaceHeader } from './shell/workspaceHeader.tsx'
+import { WorkspaceNavigationIsland } from './shell/workspaceNavigationIsland.tsx'
+import { WorkspacePublishIsland } from './shell/workspacePublishIsland.tsx'
 import { WorkspaceRecovery } from './shell/workspaceRecovery.tsx'
 import { WorkbenchStore } from './stores/workbenchStore.ts'
 
@@ -210,6 +213,8 @@ export function FlowEditor({
   onRunStarted,
   onCloseRuns,
   onConfigureConnector,
+  onOpenPublications,
+  onOpenRuns,
   onManageConnectorAccess,
   onToggleRuns,
   runDrawerOpen,
@@ -221,6 +226,8 @@ export function FlowEditor({
   readonly onRunStarted: () => void
   readonly onCloseRuns: () => void
   readonly onConfigureConnector?: (() => void) | undefined
+  readonly onOpenPublications: () => void
+  readonly onOpenRuns: () => void
   readonly onManageConnectorAccess?: ((flowId: string) => void) | undefined
   readonly onToggleRuns: () => void
   readonly runDrawerOpen: boolean
@@ -235,12 +242,14 @@ export function FlowEditor({
   const [startId, setStartId] = useState<string>()
   const runInputRequest = useVal(store.runRequests.$.inputRequest)
   const busy = useVal(store.$.busy)
+  const diagnostics = useVal(store.$.diagnostics)
   const history = useVal(store.workspace.history$)
   const designer = useVal(store.$.designer)
   const triggers = designer.nodes.filter((node) => node.kind == 'trigger')
   const selectedTrigger = triggers.find((node) => node.id == startId) ?? triggers[0]
   const diagnosticFocus = useVal(store.workspace.$.diagnosticFocus)
   const draft = useVal(store.workspace.$.draft)
+  const live = useVal(store.workspace.$.live)
   const nodeFocus = useVal(store.workspace.$.nodeFocus)
   const flowId = useVal(store.workspace.$.flowId)
   const revision = useVal(store.workspace.$.revision)
@@ -307,6 +316,18 @@ export function FlowEditor({
   }, [selectedDesignerNode])
 
   const authoringDisabled = draft == null || history.applying || history.failed || (busy != null && busy != 'designer' && busy != 'run')
+  const publishState: PublishState =
+    busy == 'publish'
+      ? 'publishing'
+      : busy != null
+        ? 'busy'
+        : diagnostics?.valid == false
+          ? 'issues'
+          : target?.kind == 'subflow'
+            ? 'subflow'
+            : live?.hasUnpublishedChanges == false
+              ? 'current'
+              : 'ready'
   const closeContextPanel = (focusTarget = opener.current): void => {
     panel.close()
     focusInspectorOnOpen.current = false
@@ -365,13 +386,21 @@ export function FlowEditor({
     <CanvasHistoryScope
       history={historyControls}
       disabled={authoringDisabled || target == null}
-      aria-labelledby="workspace-tab-design"
+      aria-label={t('workspace.design')}
       className={`editor-grid ${contextPanelVisible ? '' : 'context-panel-closed'}`}
       id="workspace-panel-design"
-      role="tabpanel"
+      role="region"
       tabIndex={0}
     >
       <WorkbenchCanvas
+        cornerLeading={
+          <WorkspacePublishIsland
+            onOpenPublications={onOpenPublications}
+            onOpenRuns={onOpenRuns}
+            onPublish={() => void store.publications.publish()}
+            state={publishState}
+          />
+        }
         history={historyControls}
         ignoredNodeIds={ignoredNodeIds}
         onIgnoreNodes={onIgnoreNodes}
@@ -580,6 +609,7 @@ export default function FlowWorkspace({
   const handledExternalRun = useRef<string>()
   const view = useVal(navigation.$.view)
   const draft = useVal(store.workspace.$.draft)
+  const flow = useVal(store.workspace.$.flow)
   const flowId = useVal(store.workspace.$.flowId)
   const workspaceLoadFailed = useVal(store.workspace.$.workspaceLoadFailed)
   const workspaceLoadProblem = useVal(store.workspace.$.workspaceLoadProblem)
@@ -635,27 +665,21 @@ export default function FlowWorkspace({
     <IconifyProvider>
       <main className="workspace">
         <WorkspaceHeader
-          activeView={view}
-          flowHref={hrefFor({ flowId: flowId!, view: 'design' })}
-          flowsHref={hrefFor({ view: 'design' })}
           hostAction={hostAction}
           hostTitle={hostTitle}
           onOpenDesign={() => navigation.open('design')}
-          onOpenFlow={() => navigation.openMainFlow()}
-          onOpenFlows={() => void navigation.openFlows()}
-          onOpenPublications={() => {
-            store.runRequests.dismissInputs()
-            navigation.open('publications')
-          }}
-          onOpenRuns={() => {
-            store.runRequests.dismissInputs()
-            navigation.open('runs')
-          }}
           onHostAction={onHostAction}
           store={store}
         />
+        <WorkspaceNavigationIsland
+          flowName={flow?.name ?? flow?.flowId ?? ''}
+          flowHref={hrefFor({ flowId: flowId!, view: 'design' })}
+          flowsHref={hrefFor({ view: 'design' })}
+          onOpenFlow={() => navigation.openMainFlow()}
+          onOpenFlows={() => void navigation.openFlows()}
+        />
         {view == 'design' && (workspaceLoading || draft == null) ? (
-          <div aria-labelledby="workspace-tab-design" className="editor-grid context-panel-closed" id="workspace-panel-design" role="tabpanel" tabIndex={0}>
+          <div aria-label={t('workspace.design')} className="editor-grid context-panel-closed" id="workspace-panel-design" role="region" tabIndex={0}>
             <section aria-busy={!workspaceLoadFailed} className="canvas-panel workbench-canvas">
               {workspaceLoadFailed ? (
                 <WorkspaceRecovery
@@ -680,6 +704,14 @@ export default function FlowWorkspace({
             onRunStarted={revealRun}
             onCloseRuns={() => setRunDrawerVisible(false)}
             onConfigureConnector={onConfigureConnector}
+            onOpenPublications={() => {
+              store.runRequests.dismissInputs()
+              navigation.open('publications')
+            }}
+            onOpenRuns={() => {
+              store.runRequests.dismissInputs()
+              navigation.open('runs')
+            }}
             onManageConnectorAccess={onManageConnectorAccess}
             onToggleRuns={() => setRunDrawerOpen(!runDrawerOpen)}
             runDrawerOpen={runDrawerOpen}

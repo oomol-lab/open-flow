@@ -199,6 +199,7 @@ export interface FlowCanvasViewProps {
   readonly ignoredNodeIds: readonly string[]
   readonly onIgnoreNodes: (nodeIds: readonly string[], ignored: boolean) => void
   readonly cornerTools?: ReactNode
+  readonly cornerLeading?: ReactNode
   readonly toolbar?: ReactNode
   readonly addNodeRequest?: {
     readonly onComplete?: () => void

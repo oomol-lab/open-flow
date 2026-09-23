@@ -19,6 +19,7 @@ export interface FlowCanvasProps {
   onInspectSelection?: () => void
   onRequestAddNode?: FlowCanvasViewProps['onRequestAddNode']
   cornerTools?: React.ReactNode
+  cornerLeading?: React.ReactNode
   toolbar?: React.ReactNode
   flowCanvasStore: CanvasStore
   dark: boolean
@@ -42,6 +43,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onInspectSelection,
   onRequestAddNode,
   cornerTools,
+  cornerLeading,
   toolbar,
   dark,
   fitView,
@@ -66,6 +68,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
         <NodeMiniMapProvider value={nodeMiniMapPhase}>
           <ReactFlowContainer
             cornerTools={cornerTools}
+            cornerLeading={cornerLeading}
             toolbar={toolbar}
             editable={editable}
             className={className}

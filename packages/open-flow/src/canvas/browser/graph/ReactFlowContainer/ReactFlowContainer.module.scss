@@ -50,9 +50,6 @@
 
   :global(.react-flow__controls) {
     width: auto;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
     overflow: visible;
   }
 
@@ -104,44 +101,9 @@
   @include contextMenu.appearance;
 }
 
-.island.island {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 5px;
-  border: 1px solid var(--ui-border);
-  border-radius: 16px;
-  background: var(--ui-popover);
-  box-shadow:
-    0 4px 6px rgb(0 0 0 / 3%),
-    0 12px 36px rgb(0 0 0 / 9%);
-}
-
-.island.island > [data-size] {
-  color: var(--ui-muted-foreground);
-
-  &:is(:hover, :focus-visible) {
-    color: var(--ui-foreground);
-  }
-}
-
 .dock {
   margin-bottom: 22px;
   max-width: calc(100% - 32px);
-}
-
-.island.compactIsland {
-  padding: 3px;
-  border-radius: 10px;
-
-  > [data-size] {
-    height: 28px;
-    border-radius: 6px;
-  }
-
-  > [data-size='icon'] {
-    width: 28px;
-  }
 }
 
 .viewDock {

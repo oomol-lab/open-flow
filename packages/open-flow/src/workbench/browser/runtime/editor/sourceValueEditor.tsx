@@ -332,7 +332,7 @@ export function SourceValueEditor({
         <TooltipPrimitive.Trigger render={item} />
         <TooltipPrimitive.Portal container={sourcePortal} className="contents">
           <TooltipPrimitive.Positioner side="right" align="start" sideOffset={8} positionMethod="fixed" className="pointer-events-none isolate z-[1000]">
-            <TooltipPrimitive.Popup className="pointer-events-none max-w-64 rounded-md bg-foreground px-3 py-2 text-xs leading-5 text-background shadow-md outline-none">
+            <TooltipPrimitive.Popup className="pointer-events-none max-w-64 rounded-[6px] bg-foreground px-3 py-2 text-xs leading-5 text-background shadow-md outline-none">
               {sourceDescription}
               <TooltipPrimitive.Arrow className="size-2.5 rotate-45 rounded-[2px] bg-foreground fill-foreground data-[side=bottom]:top-1 data-[side=left]:-right-1 data-[side=right]:-left-1 data-[side=top]:-bottom-2.5" />
             </TooltipPrimitive.Popup>

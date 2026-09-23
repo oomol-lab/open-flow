@@ -154,11 +154,11 @@ export function RunsView({
 
   return (
     <section
-      aria-labelledby="workspace-tab-runs"
+      aria-label={t('workspace.runs')}
       className={`runs-view${narrow ? ' narrow' : ''}${narrowDetailOpen ? ' narrow-detail-open' : ''}`}
       id="workspace-panel-runs"
       ref={root}
-      role="tabpanel"
+      role="region"
       tabIndex={0}
     >
       <aside aria-busy={loading || refreshing} className="run-list-panel">

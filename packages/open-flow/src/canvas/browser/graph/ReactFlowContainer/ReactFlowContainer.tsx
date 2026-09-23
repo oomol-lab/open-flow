@@ -110,6 +110,7 @@ export interface ReactFlowContainerProps {
   onRequestAddNode?: FlowCanvasViewProps['onRequestAddNode']
   className?: string
   cornerTools?: React.ReactNode
+  cornerLeading?: React.ReactNode
   dark: boolean
   i18n: I18n
   miniMapExpanded$?: Val<boolean | undefined>
@@ -199,7 +200,7 @@ export const ReactFlowContainer: React.FC<ReactFlowContainerProps> = (props: Rea
 
 type FlowControlsProps = Pick<
   ReactFlowContainerProps,
-  'cornerTools' | 'toolbar' | 'miniMapExpanded$' | 'interactiveMode$' | 'onRelayout' | 'onFitView' | 'dottedBackground' | 'layoutMotion'
+  'cornerTools' | 'cornerLeading' | 'toolbar' | 'miniMapExpanded$' | 'interactiveMode$' | 'onRelayout' | 'onFitView' | 'dottedBackground' | 'layoutMotion'
 > & { onBeforeFitView?: () => void }
 
 const selector = (s: ReactFlowState) => ({
@@ -257,7 +258,11 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
         zoom={zoom}
       />
       {props.toolbar != null && <CanvasToolbar>{props.toolbar}</CanvasToolbar>}
-      <CornerControls leading={<CanvasInteractiveMode interactiveMode$={props.interactiveMode$} />} miniMapExpanded$={props.miniMapExpanded$}>
+      <CornerControls
+        before={props.cornerLeading}
+        leading={<CanvasInteractiveMode interactiveMode$={props.interactiveMode$} />}
+        miniMapExpanded$={props.miniMapExpanded$}
+      >
         {props.cornerTools}
       </CornerControls>
     </>
@@ -689,6 +694,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           )}
           <FlowControls
             cornerTools={props.cornerTools}
+            cornerLeading={props.cornerLeading}
             toolbar={props.toolbar}
             miniMapExpanded$={props.miniMapExpanded$}
             interactiveMode$={props.interactiveMode$}

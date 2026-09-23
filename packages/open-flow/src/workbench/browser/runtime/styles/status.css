@@ -12,7 +12,8 @@
     background: var(--success);
   }
 
-  .status-dot.running {
+  .status-dot.running,
+  .status-dot.warning {
     background: var(--warning);
   }
 

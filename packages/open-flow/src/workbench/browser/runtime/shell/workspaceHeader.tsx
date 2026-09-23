@@ -8,26 +8,17 @@ import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { useDelayedTrue } from '../../../../ui/browser/hooks.ts'
-import { Tabs, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Icon } from '../icons.tsx'
-import { followWorkbenchLink } from '../navigationLink.ts'
 import { DiagnosticsPanel } from './diagnosticsPanel.tsx'
 import { HostMenu } from './hostMenu.tsx'
 
 const savingStatusDelayMs = 200
 
 interface Props {
-  readonly activeView: 'design' | 'publications' | 'runs'
-  readonly flowHref: string
-  readonly flowsHref: string
   readonly hostAction?: string | undefined
   readonly hostTitle?: string | undefined
   readonly onHostAction?: (() => void) | undefined
   readonly onOpenDesign: () => void
-  readonly onOpenFlow: () => void
-  readonly onOpenFlows: () => void
-  readonly onOpenPublications: () => void
-  readonly onOpenRuns: () => void
   readonly store: WorkbenchStore
 }
 
@@ -51,28 +42,13 @@ function useDisplayedStatus(status: WorkspaceStatus): WorkspaceStatus {
   return displayed
 }
 
-export function WorkspaceHeader({
-  activeView,
-  flowHref,
-  flowsHref,
-  hostAction,
-  hostTitle,
-  onHostAction,
-  onOpenDesign,
-  onOpenFlow,
-  onOpenFlows,
-  onOpenPublications,
-  onOpenRuns,
-  store,
-}: Props): ReactElement {
+export function WorkspaceHeader({ hostAction, hostTitle, onHostAction, onOpenDesign, store }: Props): ReactElement {
   const t = useTranslate()
-  const busy = useVal(store.$.busy)
   const checkLoading = useVal(store.workspace.$.checkLoading)
   const diagnostics = useVal(store.$.diagnostics)
   const diagnosticItems = useVal(store.$.diagnosticItems)
   const designerNodes = useVal(store.$.designerNodeById)
   const draft = useVal(store.workspace.$.draft)
-  const flow = useVal(store.workspace.$.flow)
   const live = useVal(store.workspace.$.live)
   const status = useVal(store.workspace.$.status)
   const displayedStatus = useDisplayedStatus(status)
@@ -85,7 +61,6 @@ export function WorkspaceHeader({
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false)
   const invalid = diagnostics?.valid == false
   const subflow = target?.kind == 'subflow'
-  const publishUnavailable = invalid ? t('workspace.fixIssuesToPublish') : subflow ? t('workspace.subflowPublishHelp') : undefined
 
   useEffect(() => {
     if (runInputRequest != null) setDiagnosticsOpen(false)
@@ -93,35 +68,8 @@ export function WorkspaceHeader({
 
   return (
     <header className="workspace-header">
-      <div className="workspace-title">
-        <Button
-          aria-label={t('resource.workflows')}
-          nativeButton={false}
-          onClick={(event) => followWorkbenchLink(event, onOpenFlows)}
-          render={<a href={flowsHref} />}
-          size="icon-sm"
-          title={t('resource.workflows')}
-          variant="ghost"
-        >
-          <Icon name="chevron-left" />
-        </Button>
-        <Button
-          className="workspace-flow-link"
-          nativeButton={false}
-          onClick={(event) => followWorkbenchLink(event, onOpenFlow)}
-          render={<a href={flowHref} />}
-          size="default"
-          variant="ghost"
-        >
-          <Icon data-icon="inline-start" name="flow" />
-          {flow?.name ?? flow?.flowId}
-        </Button>
-        {subflow && (
-          <>
-            <span className="workspace-title-separator">/</span>
-            <strong>{targetName}</strong>
-          </>
-        )}
+      <div className="workspace-header-context">
+        {subflow && <strong>{targetName}</strong>}
         {live?.hasUnpublishedChanges && (
           <span className="draft-change" title={t('workspace.unpublishedChanges')}>
             <span className="status-dot neutral" />
@@ -129,27 +77,6 @@ export function WorkspaceHeader({
           </span>
         )}
       </div>
-      <Tabs
-        className="workspace-tabs-root"
-        onValueChange={(view) => {
-          if (view == 'design') onOpenDesign()
-          else if (view == 'runs') onOpenRuns()
-          else if (view == 'publications') onOpenPublications()
-        }}
-        value={activeView}
-      >
-        <TabsList aria-label={t('workspace.views')} className="workspace-tabs" variant="line">
-          <TabsTrigger aria-controls="workspace-panel-design" id="workspace-tab-design" value="design">
-            {t('workspace.design')}
-          </TabsTrigger>
-          <TabsTrigger aria-controls="workspace-panel-runs" id="workspace-tab-runs" value="runs">
-            {t('workspace.runs')}
-          </TabsTrigger>
-          <TabsTrigger aria-controls="workspace-panel-publications" id="workspace-tab-publications" value="publications">
-            {t('workspace.publications')}
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
       <div className="workspace-actions">
         <Button
           aria-controls="diagnostics-panel"
@@ -173,17 +100,6 @@ export function WorkspaceHeader({
             <Icon name={displayedStatus == 'failed' ? 'alert' : displayedStatus == 'saving' ? 'wait' : 'check'} size={16} />
           )}
           <span>{t(`workspace.status.${displayedStatus}`)}</span>
-        </span>
-        <span className="action-help publish-action" title={publishUnavailable}>
-          <Button
-            aria-label={t(busy == 'publish' ? 'workspace.publishing' : 'publication.publishDraft')}
-            disabled={busy != null || invalid || subflow || live?.hasUnpublishedChanges == false}
-            onClick={() => void store.publications.publish()}
-            size="default"
-          >
-            <Icon data-icon="inline-start" name="publish" />
-            <span className="publish-label">{t(busy == 'publish' ? 'workspace.publishing' : 'publication.publishDraft')}</span>
-          </Button>
         </span>
         {hostAction != null && hostTitle != null && onHostAction != null && <HostMenu action={hostAction} onAction={onHostAction} title={hostTitle} />}
       </div>

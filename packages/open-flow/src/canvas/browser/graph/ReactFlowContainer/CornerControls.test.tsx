@@ -22,6 +22,11 @@ const captured = vi.hoisted(() => ({
 }))
 
 vi.mock('@xyflow/react', () => ({
+  Panel: ({ children, className, position }: HTMLAttributes<HTMLDivElement> & { readonly position?: string }) => (
+    <div className={className} data-position={position}>
+      {children}
+    </div>
+  ),
   Controls: ({
     children,
     className,
@@ -52,10 +57,10 @@ vi.mock('../../../../ui/browser/button.tsx', () => ({
   },
 }))
 
-function render(miniMapExpanded$: Val<boolean | undefined>, children?: ReactNode, leading?: ReactNode): string {
+function render(miniMapExpanded$: Val<boolean | undefined>, children?: ReactNode, leading?: ReactNode, before?: ReactNode): string {
   return renderToStaticMarkup(
     <I18nProvider i18n={createI18n('en')}>
-      <CornerControls leading={leading} miniMapExpanded$={miniMapExpanded$}>
+      <CornerControls before={before} leading={leading} miniMapExpanded$={miniMapExpanded$}>
         {children}
       </CornerControls>
     </I18nProvider>,
@@ -114,5 +119,12 @@ describe('CornerControls', () => {
 
     expect(markup.indexOf('Interaction mode')).toBeLessThan(markup.indexOf('Mini map'))
     expect(markup.indexOf('Mini map')).toBeLessThan(markup.indexOf('Inspector'))
+  })
+
+  it('places a separate island before the existing controls', () => {
+    const markup = render(val<boolean | undefined>(false), undefined, undefined, <button aria-label="Publish" type="button" />)
+
+    expect(markup.indexOf('Publish')).toBeLessThan(markup.indexOf('Mini map'))
+    expect(markup).toContain('data-position="top-right"')
   })
 })

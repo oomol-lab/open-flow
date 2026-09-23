@@ -378,11 +378,11 @@ test('keeps Button icon sizing on the shared size variants', async () => {
 })
 
 test('keeps URL-changing Workbench navigation on real links', async () => {
-  const [button, runtime, browser, header] = await Promise.all([
+  const [button, runtime, browser, navigation] = await Promise.all([
     readFile(new URL('src/ui/browser/button.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/openFlowWorkbench.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/shell/resourceBrowser.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/shell/workspaceHeader.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/shell/workspaceNavigationIsland.tsx', packageRoot), 'utf8'),
   ])
 
   assert.match(runtime, /readonly hrefFor: \(location: WorkbenchLocation\) => string/)
@@ -390,16 +390,17 @@ test('keeps URL-changing Workbench navigation on real links', async () => {
   assert.doesNotMatch(button, /hover:underline/)
   assert.match(browser, /render=\{<a href=/)
   assert.match(browser, /nativeButton=\{false\}/)
-  assert.match(header, /render=\{<a href=\{flowsHref\}/)
-  assert.match(header, /render=\{<a href=\{flowHref\}/)
-  assert.doesNotMatch(header, /<Button[^>]*onClick=\{onOpenFlow/)
+  assert.match(navigation, /render=\{<a href=\{flowsHref\}/)
+  assert.match(navigation, /render=\{<a href=\{flowHref\}/)
+  assert.doesNotMatch(navigation, /<Button[^>]*onClick=\{onOpenFlow/)
 })
 
 test('keeps responsive control density on component APIs', async () => {
-  const [button, tabs, workspaceHeader, responsiveStyles, runStyles] = await Promise.all([
+  const [button, tabs, workspaceHeader, workspacePublishIsland, responsiveStyles, runStyles] = await Promise.all([
     readFile(new URL('src/ui/browser/button.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/ui/browser/tabs.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/shell/workspaceHeader.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/shell/workspacePublishIsland.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/responsive.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/runs.css', packageRoot), 'utf8'),
   ])
@@ -408,16 +409,14 @@ test('keeps responsive control density on component APIs', async () => {
   assert.match(button, /data-variant=\{variant\}/)
   assert.match(tabs, /motion-reduce:transition-none/)
   assert.match(tabs, /motion-reduce:after:transition-none/)
-  assert.match(workspaceHeader, /className="validation-state"[\s\S]*?size="default"/)
-  assert.match(workspaceHeader, /store\.publications\.publish\(\)[\s\S]*?size="default"/)
-  assert.match(workspaceHeader, /className="action-help publish-action"/)
-  assert.match(workspaceHeader, /className="workspace-tabs" variant="line"/)
+  assert.match(workspaceHeader, /className="validation-state"[\s\S]*?size="sm"/)
+  assert.match(workspacePublishIsland, /className="workspace-publish-button"[\s\S]*?size="default"/)
+  assert.match(workspacePublishIsland, /aria-label=\{menuLabel\} size="icon"/)
   assert.doesNotMatch(responsiveStyles, /\.workspace-actions \[data-slot='button'\]/)
   assert.doesNotMatch(responsiveStyles, /\.action-help:last-child/)
   assert.match(responsiveStyles, /@media \(pointer: coarse\)[\s\S]*?min-height: 40px;/)
   assert.match(responsiveStyles, /\[data-slot='button'\]\[data-size\^='icon'\][\s\S]*?min-width: 40px;/)
   assert.doesNotMatch(responsiveStyles, /\[data-slot='button'\] \{\s*height: 40px;/)
-  assert.doesNotMatch(responsiveStyles, /\.workspace-tabs button/)
   assert.deepEqual(
     [...responsiveStyles.matchAll(/@container open-flow-workbench \(width <= (\d+)px\)/g)].map((match) => Number(match[1])),
     [1100, 980, 720, 520],

@@ -7,12 +7,6 @@
   border-radius: var(--ui-radius);
 }
 
-.surface.surface.surface {
-  box-shadow:
-    0 2px 4px rgb(0 0 0 / 2%),
-    0 6px 18px rgb(0 0 0 / 5%);
-}
-
 .surface.surface > [data-size][aria-expanded='true'] {
   color: var(--ui-muted-foreground);
   background: transparent;
@@ -30,6 +24,14 @@
   font-size: 16px;
 }
 
-.corner.corner:global(.react-flow__panel) {
+.group.group:global(.react-flow__panel) {
   right: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.corner.corner:global(.react-flow__panel) {
+  position: static;
+  margin: 0;
 }

@@ -2,18 +2,26 @@ import type { FlowCanvasViewModel, FlowCanvasViewProps } from '../../src/canvas/
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { Draft } from '../../src/workbench/browser/runtime/api.ts'
 import type { CanvasNodePickerRequest } from '../../src/workbench/browser/runtime/editor/nodePickerPopover.tsx'
+import type { PublishState } from '../../src/workbench/browser/runtime/shell/workspacePublishIsland.tsx'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
-import { useMemo, useState } from 'react'
+import { ReactFlowProvider } from '@xyflow/react'
+import { useMemo, useRef, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
+import { val } from 'value-enhancer'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
+import { CanvasInteractiveMode } from '../../src/canvas/browser/graph/ReactFlowContainer/CanvasControls.tsx'
+import { CornerControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CornerControls.tsx'
+import { GetPopupContainerContext } from '../../src/canvas/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
 import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
 import { deriveAddNodeOptions } from '../../src/workbench/browser/runtime/editor/addNodeOptions.ts'
 import { CanvasNodePicker } from '../../src/workbench/browser/runtime/editor/nodePickerPopover.tsx'
-import { WorkbenchCanvasActions } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
+import { WorkbenchCanvasActions, WorkbenchInspectorToggle } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.tsx'
+import { WorkspaceNavigationIsland } from '../../src/workbench/browser/runtime/shell/workspaceNavigationIsland.tsx'
+import { WorkspacePublishIsland } from '../../src/workbench/browser/runtime/shell/workspacePublishIsland.tsx'
 import { useStoryActions } from './storyActions.tsx'
 
 const pickerDraft: Draft = {
@@ -381,6 +389,14 @@ const edgeColors: FlowCanvasViewModel = {
 
 export const workflowStories: readonly FrontendStory[] = [
   {
+    group: 'Workbench',
+    id: 'workspace-navigation-island',
+    title: 'Workspace navigation island',
+    description: 'Compare long and short names, inspect each publish status tooltip, and open the record menu beside the canvas controls.',
+    standalone: true,
+    render: (log, dark, language) => <NavigationIslandStory dark={dark} language={language} log={log} />,
+  },
+  {
     group: 'Theme Preview',
     id: 'edge-colors',
     title: 'Edge colors',
@@ -415,3 +431,56 @@ export const workflowStories: readonly FrontendStory[] = [
     render: (log, dark, language) => <WorkflowStory dark={dark} language={language} log={log} model={workflow} picker />,
   },
 ]
+
+function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean; readonly language: UiLanguage; readonly log: LogAction }) {
+  const i18n = useMemo(() => createI18n(language), [language])
+  const [shortName, setShortName] = useState(false)
+  const [publishState, setPublishState] = useState<PublishState>('ready')
+  const [inspectorOpen, setInspectorOpen] = useState(false)
+  const interactiveMode$ = useMemo(() => val<'mouse' | 'touchpad'>('mouse'), [])
+  const miniMapExpanded$ = useMemo(() => val<boolean | undefined>(false), [])
+  const stageRef = useRef<HTMLDivElement>(null)
+  const popup = useMemo(() => ({ default: () => stageRef.current || document.body, static: () => stageRef.current || document.body }), [])
+  const publishStates: readonly PublishState[] = ['ready', 'current', 'issues', 'subflow', 'busy', 'publishing']
+  const nextPublishState = publishStates[(publishStates.indexOf(publishState) + 1) % publishStates.length]!
+  useStoryActions([
+    { label: shortName ? 'Show long name' : 'Show short name', onClick: () => setShortName((current) => !current) },
+    { label: `Show ${nextPublishState} publish state`, onClick: () => setPublishState(nextPublishState) },
+  ])
+  return (
+    <I18nProvider i18n={i18n}>
+      <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'}>
+        <div className="workspace" style={{ height: 180 }}>
+          <div className="workspace-header" />
+          <div className="canvas-panel" ref={stageRef}>
+            <GetPopupContainerContext.Provider value={popup}>
+              <ReactFlowProvider>
+                <CornerControls
+                  before={
+                    <WorkspacePublishIsland
+                      onOpenPublications={() => log('publication.history')}
+                      onOpenRuns={() => log('run.history')}
+                      onPublish={() => log('publication.publish')}
+                      state={publishState}
+                    />
+                  }
+                  leading={<CanvasInteractiveMode interactiveMode$={interactiveMode$} />}
+                  miniMapExpanded$={miniMapExpanded$}
+                >
+                  <WorkbenchInspectorToggle label="Toggle inspector" open={inspectorOpen} onToggle={() => setInspectorOpen((current) => !current)} />
+                </CornerControls>
+              </ReactFlowProvider>
+            </GetPopupContainerContext.Provider>
+          </div>
+          <WorkspaceNavigationIsland
+            flowName={shortName ? 'Daily digest' : 'Quarterly customer onboarding and account follow-up workflow'}
+            flowHref="#design"
+            flowsHref="#workflows"
+            onOpenFlow={() => log('flow.open')}
+            onOpenFlows={() => log('flows.open')}
+          />
+        </div>
+      </div>
+    </I18nProvider>
+  )
+}

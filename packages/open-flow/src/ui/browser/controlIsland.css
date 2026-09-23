@@ -1,0 +1,40 @@
+.open-flow-control-island.open-flow-control-island {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid var(--ui-border);
+  border-radius: 16px;
+  background: var(--ui-popover);
+  box-shadow:
+    0 4px 6px rgb(0 0 0 / 3%),
+    0 12px 36px rgb(0 0 0 / 9%);
+}
+
+.open-flow-control-island > [data-size] {
+  color: var(--ui-muted-foreground);
+}
+
+.open-flow-control-island > [data-size]:is(:hover, :focus-visible) {
+  color: var(--ui-foreground);
+}
+
+.open-flow-control-island.open-flow-control-island-compact {
+  padding: 3px;
+  border-radius: 10px;
+}
+
+.open-flow-control-island.open-flow-control-island-soft-shadow {
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 2%),
+    0 6px 18px rgb(0 0 0 / 5%);
+}
+
+.open-flow-control-island.open-flow-control-island-compact > [data-size] {
+  height: 28px;
+  border-radius: 6px;
+}
+
+.open-flow-control-island.open-flow-control-island-compact > [data-size='icon'] {
+  width: 28px;
+}

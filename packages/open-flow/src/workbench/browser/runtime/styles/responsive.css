@@ -4,7 +4,7 @@
       display: none;
     }
 
-    .workspace-title .draft-change > span:last-child {
+    .workspace-header-context .draft-change > span:last-child {
       display: none;
     }
 
@@ -128,12 +128,12 @@
       min-width: 0;
     }
 
-    .workspace-title {
+    .workspace-header-context {
       display: none;
     }
 
-    .workspace-tabs-root {
-      display: flex;
+    .workspace-navigation {
+      max-width: calc(100% - 72px);
     }
 
     .diagnostics-panel {
@@ -155,7 +155,7 @@
     }
 
     .publication-view {
-      padding: 16px;
+      padding: 72px 16px 16px;
       gap: 16px;
     }
 
@@ -292,10 +292,6 @@
   }
 
   @container open-flow-workbench (width <= 520px) {
-    .publish-label {
-      display: none;
-    }
-
     .resource-item-row {
       grid-template-columns: minmax(0, 1fr);
     }

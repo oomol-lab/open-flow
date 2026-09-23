@@ -6,7 +6,7 @@
     grid-template-rows: auto auto auto;
     align-content: start;
     gap: 24px;
-    padding: 24px;
+    padding: 72px 24px 24px;
     overflow: auto;
     background: var(--ui-background);
   }

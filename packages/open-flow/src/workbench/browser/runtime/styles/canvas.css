@@ -93,6 +93,29 @@
     height: 100%;
   }
 
+  .workspace-publish-island.open-flow-control-island {
+    gap: 0;
+  }
+
+  .workspace-publish-button {
+    gap: 8px;
+    padding-inline: 6px 7px;
+  }
+
+  .workspace-publish-button:not([aria-disabled='true']) {
+    color: var(--ui-foreground);
+    font-weight: 600;
+  }
+
+  .workspace-publish-button[aria-disabled='true'] {
+    color: var(--ui-muted-foreground);
+    background: transparent;
+    opacity: 1;
+    pointer-events: auto;
+    cursor: not-allowed;
+    transform: none;
+  }
+
   .designer-overlay {
     position: absolute;
     z-index: 5;
@@ -101,6 +124,7 @@
 
   .designer-overlay.top-left {
     left: 15px;
+    top: 62px;
   }
 
   .designer-actions {

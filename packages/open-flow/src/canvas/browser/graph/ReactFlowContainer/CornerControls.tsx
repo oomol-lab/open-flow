@@ -1,8 +1,7 @@
 import styles from './CornerControls.module.scss'
-import containerStyles from './ReactFlowContainer.module.scss'
 import type { Val } from 'value-enhancer'
 
-import { Controls, MiniMap as RFMiniMap } from '@xyflow/react'
+import { Controls, MiniMap as RFMiniMap, Panel } from '@xyflow/react'
 import { memo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
@@ -11,6 +10,7 @@ import { cn } from '../../../../ui/browser/utils.ts'
 import { CanvasTooltip } from '../../components/tooltip.tsx'
 
 export interface CornerControlsProps {
+  before?: React.ReactNode
   children?: React.ReactNode
   leading?: React.ReactNode
   miniMapExpanded$?: Val<boolean | undefined>
@@ -23,35 +23,38 @@ export function MiniMapToggleIcon({ expanded }: { readonly expanded: boolean }):
 export const CornerControls: React.FC<CornerControlsProps> = /* @__PURE__ */ memo(function (props: CornerControlsProps) {
   const t = useTranslate()
   const miniMapExpanded = useVal(props.miniMapExpanded$)
-  if (props.leading == null && props.miniMapExpanded$ == null && props.children == null) return null
+  if (props.before == null && props.leading == null && props.miniMapExpanded$ == null && props.children == null) return null
 
   return (
     <>
-      <Controls
-        className={cn(containerStyles.island, containerStyles.compactIsland, styles.surface, styles.corner)}
-        orientation="horizontal"
-        position="top-right"
-        showFitView={false}
-        showInteractive={false}
-        showZoom={false}
-      >
-        {props.leading}
-        {props.miniMapExpanded$ != null && (
-          <CanvasTooltip placement="bottom" title={t('miniMap')}>
-            <Button
-              aria-label={t('miniMap')}
-              aria-expanded={miniMapExpanded === true}
-              onClick={() => props.miniMapExpanded$?.set(miniMapExpanded !== true)}
-              size="icon"
-              type="button"
-              variant="ghost"
-            >
-              <MiniMapToggleIcon expanded={miniMapExpanded === true} />
-            </Button>
-          </CanvasTooltip>
-        )}
-        {props.children}
-      </Controls>
+      <Panel className={styles.group} data-canvas-control-scope position="top-right">
+        {props.before}
+        <Controls
+          className={cn('open-flow-control-island open-flow-control-island-compact open-flow-control-island-soft-shadow', styles.surface, styles.corner)}
+          orientation="horizontal"
+          position="top-right"
+          showFitView={false}
+          showInteractive={false}
+          showZoom={false}
+        >
+          {props.leading}
+          {props.miniMapExpanded$ != null && (
+            <CanvasTooltip placement="bottom" title={t('miniMap')}>
+              <Button
+                aria-label={t('miniMap')}
+                aria-expanded={miniMapExpanded === true}
+                onClick={() => props.miniMapExpanded$?.set(miniMapExpanded !== true)}
+                size="icon"
+                type="button"
+                variant="ghost"
+              >
+                <MiniMapToggleIcon expanded={miniMapExpanded === true} />
+              </Button>
+            </CanvasTooltip>
+          )}
+          {props.children}
+        </Controls>
+      </Panel>
       {miniMapExpanded === true && <RFMiniMap ariaLabel={t('miniMap')} className={styles.miniMap} pannable position="top-right" zoomable />}
     </>
   )

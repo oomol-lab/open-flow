@@ -3,7 +3,7 @@ import type { NavigationStore } from './navigation.ts'
 import type { WorkbenchStore } from './stores/workbenchStore.ts'
 
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import FlowWorkspace from './flowWorkspace.tsx'
+import FlowWorkspace, { FlowEditor } from './flowWorkspace.tsx'
 
 const mocks = vi.hoisted(() => ({
   setOpen: vi.fn(),
@@ -38,7 +38,7 @@ vi.mock('./editor/workbenchCanvas.tsx', () => ({ WorkbenchCanvas: () => null }))
 
 const value = <T,>(current: T): { readonly value: T } => ({ value: current })
 
-function renderWorkspace(busy?: string, withTrigger = true, invalid = false, selectedNodeIds: readonly string[] = []) {
+function renderWorkspace(busy?: string, withTrigger = true, invalid = false, selectedNodeIds: readonly string[] = [], hasUnpublishedChanges = true) {
   const navigation = {
     $: { view: value('design') },
     open: vi.fn(),
@@ -79,6 +79,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
       dismissInputs: vi.fn(),
       inputStatus: vi.fn(() => 'none'),
     },
+    publications: { publish: vi.fn().mockResolvedValue(true) },
     runs: { $: { externalRunId: value(undefined) } },
     triggers: {
       catalog: { state: value({ data: undefined, refreshing: false, error: undefined }), open: vi.fn() },
@@ -96,7 +97,9 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
         addNodeOptions: value([]),
         diagnosticFocus: value(undefined),
         draft: value({ revisionId: 'revision' }),
+        flow: value({ flowId: 'flow', name: 'Example flow' }),
         flowId: value('flow'),
+        live: value({ hasUnpublishedChanges }),
         inspectorDiagnostics: value([]),
         nodeFocus: value(undefined),
         revision: value({}),
@@ -120,7 +123,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
     theme: 'light',
   })
   const main = element.props.children as ReactElement
-  const editor = (main.props.children as ReactElement[])[1]!
+  const editor = (main.props.children as ReactElement[]).find((child) => child.type == FlowEditor)!
   return { editor, navigation, store }
 }
 
@@ -192,6 +195,55 @@ describe('FlowWorkspace run drawer', () => {
     const designer = (view.props.children as ReactElement[])[0]!
 
     expect(designer.props.disabled).toBe(false)
+  })
+
+  it('publishes from the corner island and opens publication or run history from its menu', () => {
+    const { editor, navigation, store } = renderWorkspace()
+    const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
+    const designer = (view.props.children as ReactElement[])[0]!
+    const publishIsland = designer.props.cornerLeading
+
+    expect(publishIsland.props.state).toBe('ready')
+    publishIsland.props.onPublish()
+    expect(store.publications.publish).toHaveBeenCalledOnce()
+
+    publishIsland.props.onOpenPublications()
+    expect(store.runRequests.dismissInputs).toHaveBeenCalledOnce()
+    expect(navigation.open).toHaveBeenCalledWith('publications')
+
+    publishIsland.props.onOpenRuns()
+    expect(store.runRequests.dismissInputs).toHaveBeenCalledTimes(2)
+    expect(navigation.open).toHaveBeenCalledWith('runs')
+  })
+
+  it('keeps publication history available when publishing is blocked', () => {
+    const { editor, navigation } = renderWorkspace(undefined, true, true)
+    const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
+    const designer = (view.props.children as ReactElement[])[0]!
+    const publishIsland = designer.props.cornerLeading
+
+    expect(publishIsland.props.state).toBe('issues')
+    publishIsland.props.onOpenPublications()
+    expect(navigation.open).toHaveBeenCalledWith('publications')
+  })
+
+  it.each([
+    ['publish', 'publishing'],
+    ['run', 'busy'],
+  ])('identifies why publishing is unavailable during %s', (busy, state) => {
+    const { editor } = renderWorkspace(busy)
+    const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
+    const designer = (view.props.children as ReactElement[])[0]!
+
+    expect(designer.props.cornerLeading.props.state).toBe(state)
+  })
+
+  it('marks an unchanged draft as current', () => {
+    const { editor } = renderWorkspace(undefined, true, false, [], false)
+    const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
+    const designer = (view.props.children as ReactElement[])[0]!
+
+    expect(designer.props.cornerLeading.props.state).toBe('current')
   })
 
   it.each([

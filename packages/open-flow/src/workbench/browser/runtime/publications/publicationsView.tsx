@@ -197,7 +197,7 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
 
   if (flow == null)
     return (
-      <section aria-labelledby="workspace-tab-publications" className="publication-empty" id="workspace-panel-publications" role="tabpanel" tabIndex={0}>
+      <section aria-label={t('workspace.publications')} className="publication-empty" id="workspace-panel-publications" role="region" tabIndex={0}>
         {t('publication.selectFlow')}
       </section>
     )
@@ -208,10 +208,10 @@ export function PublicationsView({ store }: { readonly store: WorkbenchStore }):
   const panel = (
     <section
       aria-busy={loading || refreshing}
-      aria-labelledby="workspace-tab-publications"
+      aria-label={t('workspace.publications')}
       className="publication-view"
       id="workspace-panel-publications"
-      role="tabpanel"
+      role="region"
       tabIndex={0}
     >
       <section className="publication-summary">

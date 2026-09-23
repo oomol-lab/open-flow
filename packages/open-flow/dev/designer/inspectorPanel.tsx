@@ -234,6 +234,8 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
                 theme={dark ? 'dark' : 'light'}
                 onRun={() => {}}
                 onRunStarted={() => {}}
+                onOpenPublications={() => {}}
+                onOpenRuns={() => {}}
                 onCloseRuns={() => {}}
                 onToggleRuns={() => {}}
                 runDrawerOpen={false}

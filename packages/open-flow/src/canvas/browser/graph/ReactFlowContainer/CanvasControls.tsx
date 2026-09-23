@@ -104,7 +104,7 @@ export function CanvasViewControls({
   return (
     <Panel
       position="bottom-left"
-      className={cn(styles.island, styles.compactIsland, styles.dock, styles.viewDock)}
+      className={cn('open-flow-control-island open-flow-control-island-compact', styles.dock, styles.viewDock)}
       data-canvas-control-scope
       data-tooltip-toolbar
     >
@@ -141,7 +141,7 @@ export function CanvasViewControls({
 
 export function CanvasToolbar({ children }: { readonly children: React.ReactNode }) {
   return (
-    <Panel position="bottom-center" className={cn(styles.island, styles.dock, styles.createDock)} data-canvas-control-scope data-tooltip-toolbar>
+    <Panel position="bottom-center" className={cn('open-flow-control-island', styles.dock, styles.createDock)} data-canvas-control-scope data-tooltip-toolbar>
       <div className={styles.dockActions}>{children}</div>
     </Panel>
   )

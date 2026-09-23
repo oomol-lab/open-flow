@@ -14,7 +14,7 @@
     z-index: 6;
     display: grid;
     min-width: 0;
-    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
     gap: 12px;
     padding: 0 12px;
@@ -22,7 +22,11 @@
     background: var(--ui-background);
   }
 
-  .workspace-title,
+  .workspace-header:has(.diagnostics-panel) {
+    z-index: 8;
+  }
+
+  .workspace-header-context,
   .workspace-actions,
   .saved-state,
   .draft-change {
@@ -31,24 +35,12 @@
     align-items: center;
   }
 
-  .workspace-title {
-    gap: 4px;
+  .workspace-header-context {
+    gap: 8px;
     overflow: hidden;
   }
 
-  .workspace-flow-link {
-    min-width: 0;
-    max-width: 180px;
-    overflow: hidden;
-    font-weight: 600;
-    text-overflow: ellipsis;
-  }
-
-  .workspace-flow-link svg {
-    flex: none;
-  }
-
-  .workspace-title strong {
+  .workspace-header-context strong {
     overflow: hidden;
     font-size: 14px;
     font-weight: 600;
@@ -56,29 +48,47 @@
     white-space: nowrap;
   }
 
-  .workspace-title > span {
-    color: var(--ui-muted-foreground);
-    font-size: 14px;
-    white-space: nowrap;
-  }
-
-  .workspace-title .draft-change {
+  .workspace-header-context .draft-change {
     gap: 6px;
-    margin-left: 4px;
     font-size: 11px;
   }
 
-  .workspace-tabs-root {
-    display: contents;
+  .workspace-navigation {
+    position: absolute;
+    z-index: 7;
+    top: 67px;
+    left: 12px;
+    display: flex;
+    max-width: calc(100% - 24px);
+    gap: 8px;
+  }
+
+  .workspace-title-island {
+    min-width: 0;
+    flex: 0 1 auto;
+    gap: 0;
+  }
+
+  .workspace-title-island .workspace-flow-link {
+    min-width: 0;
+    max-width: 180px;
+    flex: 0 1 auto;
+    justify-content: flex-start;
+    padding-inline-end: 14px;
+    color: var(--ui-foreground);
+    font-weight: 600;
+  }
+
+  .workspace-title-island .workspace-flow-link span {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .workspace-actions {
     justify-content: flex-end;
     gap: 4px;
-  }
-
-  .action-help {
-    display: inline-flex;
   }
 
   .validation-state {

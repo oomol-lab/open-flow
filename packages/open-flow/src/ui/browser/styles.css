@@ -5,6 +5,7 @@
 @import 'tailwindcss/utilities.css' layer(utilities);
 @import 'tw-animate-css';
 @import './notification.css';
+@import './controlIsland.css';
 @source './';
 @source '../../canvas/browser';
 @source '../../form/browser';

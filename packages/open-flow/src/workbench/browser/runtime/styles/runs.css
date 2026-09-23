@@ -593,6 +593,7 @@
     min-width: 0;
     min-height: 0;
     grid-template-columns: 292px minmax(0, 1fr);
+    padding-top: 56px;
     background: var(--ui-background);
   }
 
