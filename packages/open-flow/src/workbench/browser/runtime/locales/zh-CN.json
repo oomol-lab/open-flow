@@ -578,7 +578,6 @@
     "cancel": "取消运行",
     "canceling": "正在取消…",
     "canceledWithoutOutput": "本次运行在产生最终输出前已取消。",
-    "close": "关闭运行详情",
     "collapse": "收起运行详情",
     "connectionRequired": "所选 Connector 连接不可用。请重新授权或选择其他连接，然后再次运行工作流。",
     "details": "运行详情",

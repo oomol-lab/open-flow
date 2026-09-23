@@ -3,12 +3,15 @@ import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
-import { useEffect, useState } from 'react'
+import { ReactFlowProvider } from '@xyflow/react'
+import { useEffect, useId, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
+import { CanvasBottomRightControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CanvasControls.tsx'
 import { normalizeWaitComment } from '../../src/execution/common/wait.ts'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { RunDrawer } from '../../src/workbench/browser/runtime/runs/runDrawer.tsx'
+import { RunStatusIsland } from '../../src/workbench/browser/runtime/runs/runStatusIsland.tsx'
 import { RunsView } from '../../src/workbench/browser/runtime/runs/runsView.tsx'
 import { WorkbenchStore } from '../../src/workbench/browser/runtime/stores/workbenchStore.ts'
 import { useStoryActions } from './storyActions.tsx'
@@ -169,14 +172,12 @@ function WaitRuns({ language, log }: { readonly language: UiLanguage; readonly l
                   if (index == 0) setPending((items) => items.filter((item) => item.waitId != waitId))
                 }}
                 onRetryObservation={() => {}}
-                onToggle={() => {}}
                 open
                 observationFailed={false}
                 result={undefined}
                 resolvingActions={new Map()}
                 run={run}
                 submitting={false}
-                visible
               />
             </div>
           </section>
@@ -194,4 +195,74 @@ export const waitRunsStory: FrontendStory = {
   description:
     'Add separate optional comments and resolve either wait while the notification branch continues. Frozen waits and ordinary notification failure are shown alongside.',
   render: (log, _dark, language) => <WaitRuns language={language} log={log} />,
+}
+
+function RunStatusSample({
+  title,
+  run,
+  submitting,
+  dark,
+}: {
+  readonly title: string
+  readonly run?: RunDetails
+  readonly submitting: boolean
+  readonly dark: boolean
+}) {
+  const [open, setOpen] = useState(false)
+  const panelId = useId()
+  return (
+    <section className="min-w-0">
+      <h3 className="mb-2 font-medium">{title}</h3>
+      <div className="open-flow-workbench open-flow-theme grid grid-rows-[minmax(0,1fr)_auto]" data-theme={dark ? 'dark' : 'light'} style={{ height: 640 }}>
+        <div className="run-control-story-stage">
+          <ReactFlowProvider>
+            <CanvasBottomRightControls>
+              <RunStatusIsland onToggle={() => setOpen((value) => !value)} open={open} panelId={panelId} run={run} submitting={submitting} />
+            </CanvasBottomRightControls>
+          </ReactFlowProvider>
+        </div>
+        <RunDrawer
+          cancelDisabled={false}
+          canceling={false}
+          events={[]}
+          eventsExpiresAt={undefined}
+          eventFilter="all"
+          eventNodes={new Map()}
+          historyComplete
+          onCancel={() => {}}
+          onClose={() => setOpen(false)}
+          onEventFilterChange={() => {}}
+          onLocateEvent={() => {}}
+          onLocateWait={() => {}}
+          onResolve={() => {}}
+          onRetryObservation={() => {}}
+          panelId={panelId}
+          observationFailed={false}
+          open={open}
+          result={undefined}
+          resolvingActions={new Map()}
+          run={run}
+          submitting={submitting}
+        />
+      </div>
+    </section>
+  )
+}
+
+export const runStatusIslandStory: FrontendStory = {
+  group: 'Workbench',
+  id: 'run-status-island',
+  title: 'Run status island',
+  standalone: true,
+  description: 'Compare the empty, running, succeeded, and failed controls. Open and close each real run log panel from its canvas corner.',
+  render: (_log, dark, language) => (
+    <I18nProvider i18n={createI18n(language)}>
+      <div className="grid gap-4 p-4 xl:grid-cols-2">
+        <RunStatusSample dark={dark} title="No run" submitting={false} />
+        <RunStatusSample dark={dark} title="Submitting" submitting />
+        <RunStatusSample dark={dark} title="Succeeded" run={{ ...base, status: 'completed', waits: [] }} submitting={false} />
+        <RunStatusSample dark={dark} title="Failed" run={{ ...base, status: 'failed', waits: [] }} submitting={false} />
+      </div>
+    </I18nProvider>
+  ),
 }

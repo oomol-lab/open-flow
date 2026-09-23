@@ -18,8 +18,9 @@ import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Tabs, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Icon } from '../icons.tsx'
 import { WorkbenchSelect } from '../shell/workbenchSelect.tsx'
-import { ActiveWait, duration, initialRunLogFilters, RunLog, RunLogButton, RunLogFilters, runLabel, statusClass } from './runDrawer.tsx'
+import { ActiveWait, initialRunLogFilters, RunLog, RunLogButton, RunLogFilters } from './runDrawer.tsx'
 import { RunResultView } from './runOutput.tsx'
+import { duration, runLabel, statusClass } from './runPresentation.ts'
 import { canCancelRun, hasRunFilter } from './runStore.ts'
 
 interface RunFilterDraft {

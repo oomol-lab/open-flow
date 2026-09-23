@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import { createI18n } from '../i18n.ts'
 import { RunDrawer } from './runDrawer.tsx'
 
-function renderFailure(status: 'failed' | 'indeterminate', events: readonly RunEvent[] = []): string {
+function renderFailure(status: 'failed' | 'indeterminate', events: readonly RunEvent[] = [], open = true): string {
   const finishedAt = '2026-08-27T10:00:01.000Z'
   const run: Run = {
     createdAt: '2026-08-27T10:00:00.000Z',
@@ -44,19 +44,21 @@ function renderFailure(status: 'failed' | 'indeterminate', events: readonly RunE
         onLocateWait={() => undefined}
         onResolve={() => undefined}
         onRetryObservation={() => undefined}
-        onToggle={() => undefined}
-        open
+        open={open}
         result={result}
         resolvingActions={new Map()}
         run={run}
         submitting={false}
-        visible
       />
     </I18nProvider>,
   )
 }
 
 describe('RunDrawer terminal result', () => {
+  it('hides the log panel completely when collapsed', () => {
+    expect(renderFailure('failed', [], false)).toBe('')
+  })
+
   it('keeps the panel height stable as logs accumulate and places the view switch in the header', () => {
     const events: RunEvent[] = Array.from({ length: 100 }, (_, sequence) => ({
       sequence,
@@ -66,8 +68,8 @@ describe('RunDrawer terminal result', () => {
     }))
     const empty = renderFailure('failed')
     const populated = renderFailure('failed', events)
-    expect(empty.match(/class="run-drawer open"[^>]*style="([^"]+)"/)?.[1]).toBe('height:360px')
-    expect(populated.match(/class="run-drawer open"[^>]*style="([^"]+)"/)?.[1]).toBe('height:360px')
+    expect(empty.match(/class="run-drawer"[^>]*style="([^"]+)"/)?.[1]).toBe('height:360px')
+    expect(populated.match(/class="run-drawer"[^>]*style="([^"]+)"/)?.[1]).toBe('height:360px')
     expect(populated.match(/<header class="run-header">[\s\S]*?<\/header>/)?.[0]).toContain('Raw events')
   })
 
@@ -124,13 +126,11 @@ describe('RunDrawer terminal result', () => {
           onLocateWait={() => undefined}
           onResolve={() => undefined}
           onRetryObservation={() => undefined}
-          onToggle={() => undefined}
           open
           result={undefined}
           resolvingActions={new Map()}
           run={run}
           submitting={false}
-          visible
         />
       </I18nProvider>,
     )
@@ -171,13 +171,11 @@ it.each(['all', 'output', 'lifecycle'] as const)('shows all final handles once i
         onLocateWait={() => undefined}
         onResolve={() => undefined}
         onRetryObservation={() => undefined}
-        onToggle={() => undefined}
         open
         result={undefined}
         resolvingActions={new Map()}
         run={undefined}
         submitting={false}
-        visible
       />
     </I18nProvider>,
   )

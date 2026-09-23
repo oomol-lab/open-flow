@@ -97,6 +97,38 @@
     gap: 0;
   }
 
+  .workspace-run-status-button {
+    gap: 6px;
+    max-width: min(220px, 40vw);
+  }
+
+  .workspace-run-status-button > i {
+    width: 16px;
+    height: 16px;
+    flex: none;
+    font-size: 16px;
+  }
+
+  .workspace-run-status-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 12px;
+  }
+
+  .workspace-run-status-label + i {
+    margin-left: 8px;
+  }
+
+  .workspace-run-status-button[data-run-status='success'] > i:first-child {
+    color: var(--success);
+  }
+
+  .workspace-run-status-button[data-run-status='danger'] > i:first-child {
+    color: var(--ui-destructive);
+  }
+
   .workspace-corner-leading {
     display: flex;
     align-items: center;

@@ -578,7 +578,6 @@
     "cancel": "Cancel run",
     "canceling": "Canceling…",
     "canceledWithoutOutput": "This run was canceled before producing a terminal output.",
-    "close": "Close run details",
     "collapse": "Collapse run details",
     "connectionRequired": "The selected Connector Connection is unavailable. Reconnect it or choose another Connection, then run the Flow again.",
     "details": "Run details",

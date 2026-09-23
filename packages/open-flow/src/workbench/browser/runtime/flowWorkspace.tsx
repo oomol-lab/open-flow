@@ -28,6 +28,7 @@ import { RunControl } from './runs/runControl.tsx'
 import { RunDrawer } from './runs/runDrawer.tsx'
 import { RunInputPanel } from './runs/runInputPanel.tsx'
 import { RunResults } from './runs/runResults.tsx'
+import { RunStatusIslandContainer } from './runs/runStatusIsland.tsx'
 import { RunsView } from './runs/runsView.tsx'
 import { WorkspaceDiagnosticsIsland } from './shell/workspaceDiagnosticsIsland.tsx'
 import { WorkspaceNavigationIsland } from './shell/workspaceNavigationIsland.tsx'
@@ -35,20 +36,18 @@ import { WorkspacePublishIsland } from './shell/workspacePublishIsland.tsx'
 import { WorkspaceRecovery } from './shell/workspaceRecovery.tsx'
 import { WorkbenchStore } from './stores/workbenchStore.ts'
 
+const RUN_LOG_PANEL_ID = 'run-logs-panel'
+
 function RunDrawerContainer({
   onClose,
   onConfigureConnector,
-  onToggle,
   open,
   store,
-  visible,
 }: {
   readonly onClose: () => void
   readonly onConfigureConnector?: (() => void) | undefined
-  readonly onToggle: () => void
   readonly open: boolean
   readonly store: WorkbenchStore
-  readonly visible: boolean
 }): ReactElement | null {
   const cancelingRunId = useVal(store.runs.$.cancelingRunId)
   const eventFilter = useVal(store.runs.$.eventFilter)
@@ -63,6 +62,7 @@ function RunDrawerContainer({
   const submitting = useVal(store.runRequests.$.submitting)
   return (
     <RunDrawer
+      panelId={RUN_LOG_PANEL_ID}
       tools={run == null ? undefined : <RunResults key={run.runId} runId={run.runId} client={store.results} />}
       cancelDisabled={cancelingRunId != null}
       canceling={cancelingRunId == run?.runId}
@@ -81,14 +81,12 @@ function RunDrawerContainer({
       }}
       onResolve={(waitId, action, comment) => void store.runs.resolve(waitId, action, comment)}
       onRetryObservation={() => store.runs.retryObservation()}
-      onToggle={onToggle}
       observationFailed={observationFailed}
       open={open}
       result={result}
       resolvingActions={resolvingActions}
       run={run}
       submitting={submitting != null}
-      visible={visible}
     />
   )
 }
@@ -225,7 +223,6 @@ export function FlowEditor({
   onManageConnectorAccess,
   onToggleRuns,
   runDrawerOpen,
-  runDrawerVisible,
   store,
   theme,
 }: {
@@ -238,7 +235,6 @@ export function FlowEditor({
   readonly onManageConnectorAccess?: ((flowId: string) => void) | undefined
   readonly onToggleRuns: () => void
   readonly runDrawerOpen: boolean
-  readonly runDrawerVisible: boolean
   readonly store: WorkbenchStore
   readonly theme: WorkbenchTheme
 }): ReactElement {
@@ -407,6 +403,7 @@ export function FlowEditor({
       tabIndex={0}
     >
       <WorkbenchCanvas
+        bottomRightTools={<RunStatusIslandContainer onToggle={onToggleRuns} open={runDrawerOpen} panelId={RUN_LOG_PANEL_ID} store={store} />}
         cornerLeading={
           <div className="workspace-corner-leading">
             {diagnostics?.valid == false && diagnosticItems.length > 0 && (
@@ -605,14 +602,7 @@ export function FlowEditor({
           )}
         </EditorContextPanel>
       )}
-      <RunDrawerContainer
-        onClose={onCloseRuns}
-        onConfigureConnector={onConfigureConnector}
-        onToggle={onToggleRuns}
-        open={runDrawerOpen}
-        store={store}
-        visible={runDrawerVisible}
-      />
+      <RunDrawerContainer onClose={onCloseRuns} onConfigureConnector={onConfigureConnector} open={runDrawerOpen} store={store} />
     </CanvasHistoryScope>
   )
 }
@@ -633,7 +623,6 @@ export default function FlowWorkspace({
   readonly theme: WorkbenchTheme
 }): ReactElement {
   const t = useTranslate()
-  const [runDrawerVisible, setRunDrawerVisible] = useState(false)
   const [runDrawerOpen, setRunDrawerOpen] = useState(false)
   const handledExternalRun = useRef<string>()
   const view = useVal(navigation.$.view)
@@ -662,7 +651,6 @@ export default function FlowWorkspace({
   useEffect(() => {
     if (submitting == null || !draftReady) return
     navigation.open('design')
-    setRunDrawerVisible(true)
     setRunDrawerOpen(false)
   }, [draftReady, navigation, submitting])
 
@@ -670,17 +658,15 @@ export default function FlowWorkspace({
     if (externalRunId == null || handledExternalRun.current == externalRunId) return
     handledExternalRun.current = externalRunId
     if (view != 'design') return
-    setRunDrawerVisible(true)
     setRunDrawerOpen(false)
   }, [externalRunId, view])
 
-  const revealRun = (open = true): void => {
+  const revealRun = (): void => {
     if (store.workspace.$.draft.value == null) {
       navigation.open('runs')
     } else {
       navigation.open('design')
-      setRunDrawerVisible(true)
-      setRunDrawerOpen(open)
+      setRunDrawerOpen(true)
     }
   }
   const run = async (triggerId?: string): Promise<void> => {
@@ -724,7 +710,7 @@ export default function FlowWorkspace({
           <FlowEditor
             onRun={(triggerId) => void run(triggerId)}
             onRunStarted={revealRun}
-            onCloseRuns={() => setRunDrawerVisible(false)}
+            onCloseRuns={() => setRunDrawerOpen(false)}
             onConfigureConnector={onConfigureConnector}
             onOpenPublications={() => {
               store.runRequests.dismissInputs()
@@ -735,9 +721,8 @@ export default function FlowWorkspace({
               navigation.open('runs')
             }}
             onManageConnectorAccess={onManageConnectorAccess}
-            onToggleRuns={() => setRunDrawerOpen(!runDrawerOpen)}
+            onToggleRuns={() => setRunDrawerOpen((open) => !open)}
             runDrawerOpen={runDrawerOpen}
-            runDrawerVisible={runDrawerVisible}
             store={store}
             theme={theme}
           />

@@ -275,6 +275,7 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
     workbenchCanvas,
     blockLibrary,
     runDrawer,
+    runStatusIsland,
     runs,
     publications,
     workspaceStyles,
@@ -292,6 +293,7 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
     readFile(new URL('src/workbench/browser/runtime/editor/workbenchCanvas.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/editor/blockLibrary.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/runs/runDrawer.tsx', packageRoot), 'utf8'),
+    readFile(new URL('src/workbench/browser/runtime/runs/runStatusIsland.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/runs/runsView.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/publications/publicationsView.tsx', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/workspace.css', packageRoot), 'utf8'),
@@ -329,7 +331,7 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
   assert.doesNotMatch(runs, /border-0/)
   assert.doesNotMatch(runs, /className="run-tabs"/)
   assert.doesNotMatch(runDrawer, /className="run-tabs"/)
-  assert.match(runDrawer, /aria-label=\{t\(open \? 'run\.collapse' : 'run\.expand'\)\}[\s\S]*?size="icon-xs"/)
+  assert.match(runStatusIsland, /<Button[\s\S]*?size=\{hasRunInfo \? 'default' : 'icon'\}[\s\S]*?variant="ghost"/)
   assert.match(runDrawer, /<Badge variant="secondary">\{t\('run\.timeline'\)\}<\/Badge>/)
   assert.match(publications, /className="m-2"[\s\S]*?size="lg"[\s\S]*?variant="outline"/)
   assert.match(publications, /<Badge variant="secondary">\{t\('publication\.current'\)\}<\/Badge>/)

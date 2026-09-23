@@ -578,7 +578,6 @@
     "cancel": "Annuler l'exécution",
     "canceling": "Annulation…",
     "canceledWithoutOutput": "Cette exécution a été annulée avant de produire une sortie finale.",
-    "close": "Fermer les détails d'exécution",
     "collapse": "Réduire les détails d'exécution",
     "connectionRequired": "La Connection Connector sélectionnée est indisponible. Reconnectez-la ou choisissez une autre Connection, puis exécutez à nouveau le Flow.",
     "details": "Détails de l'exécution",

@@ -281,7 +281,6 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
                 onCloseRuns={() => {}}
                 onToggleRuns={() => {}}
                 runDrawerOpen={false}
-                runDrawerVisible={false}
               />
             )}
           </div>

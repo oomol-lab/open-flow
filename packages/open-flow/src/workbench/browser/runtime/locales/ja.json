@@ -578,7 +578,6 @@
     "cancel": "実行をキャンセル",
     "canceling": "キャンセル中…",
     "canceledWithoutOutput": "この実行は、最終出力が生成される前にキャンセルされました。",
-    "close": "実行詳細を閉じる",
     "collapse": "実行詳細を折りたたむ",
     "connectionRequired": "選択した Connector の Connection を利用できません。再接続するか別の Connection を選択してから、もう一度 Flow を実行してください。",
     "details": "実行詳細",

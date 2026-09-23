@@ -14,7 +14,7 @@ import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Field, FieldLabel, FieldError } from '../../../../ui/browser/field.tsx'
-import { collapseAllNested, CompactValue, JSONViewer } from '../../../../ui/browser/json-viewer/index.ts'
+import { collapseAllNested, JSONViewer } from '../../../../ui/browser/json-viewer/index.ts'
 import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { Icon } from '../icons.tsx'
@@ -22,43 +22,6 @@ import { groupEvents, nodeSummary, agentSummary, eventSubject } from './runGroup
 import { downloadRunLog } from './runLogExport.ts'
 import { eventHasDetails, RunEventDetail, RunResultView } from './runOutput.tsx'
 import { canCancelRun } from './runStore.ts'
-
-export function runLabel(run: Run | undefined, t: TFunction): string {
-  if (run == null) return t('run.statusNone')
-  switch (run.status) {
-    case 'queued':
-      return t('run.statusQueued')
-    case 'starting':
-      return t('run.statusStarting')
-    case 'running':
-      return t('run.statusRunning')
-    case 'waiting':
-      return t('run.statusWaiting')
-    case 'completed':
-      return t('run.statusSucceeded')
-    case 'failed':
-      return t('run.statusFailed')
-    case 'canceled':
-      return t('run.statusCanceled')
-    case 'indeterminate':
-      return t('run.statusIndeterminate')
-  }
-}
-
-export function statusClass(run: Run | undefined): string {
-  if (run == null) return 'neutral'
-  if (run.status == 'completed') return 'success'
-  if (run.status == 'failed' || run.status == 'indeterminate') return 'danger'
-  if (run.status == 'canceled') return 'neutral'
-  return 'running'
-}
-
-export function duration(run: Run | undefined): string {
-  if (run?.startedAt == null) return '—'
-  const end = run.finishedAt == null ? Date.now() : Date.parse(run.finishedAt)
-  const milliseconds = Math.max(0, end - Date.parse(run.startedAt))
-  return milliseconds < 1000 ? `${milliseconds}ms` : `${(milliseconds / 1000).toFixed(1)}s`
-}
 
 function eventTime(createdAt: string, language: string): string {
   return new Intl.DateTimeFormat(language, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(createdAt))
@@ -88,14 +51,13 @@ interface Props {
   readonly onLocateWait: (nodeId: string) => void
   readonly onResolve: (waitId: string, action: WaitAction, comment?: string) => void
   readonly onRetryObservation: () => void
-  readonly onToggle: () => void
+  readonly panelId?: string
   readonly open: boolean
   readonly observationFailed: boolean
   readonly result: RunResult | undefined
   readonly resolvingActions: ReadonlyMap<string, WaitAction>
   readonly run: Run | RunDetails | undefined
   readonly submitting: boolean
-  readonly visible: boolean
 }
 
 type EventObservation = 'expired' | 'truncated'
@@ -328,11 +290,6 @@ function terminalOutputs(result: RunResult | undefined): JsonValue | undefined {
     if (output != null) outputs.push(output)
   }
   return outputs.length == 1 ? outputs[0] : outputs
-}
-
-function latestOutputs(events: readonly RunEvent[]): JsonValue | undefined {
-  const event = events.findLast((candidate) => candidate.kind == 'node.completed' && eventHasDetails(candidate))
-  return event?.kind == 'node.completed' ? event.payload.outputs : undefined
 }
 
 function eventSummary(event: RunEvent, t: TFunction): string {
@@ -679,14 +636,13 @@ export function RunDrawer({
   onLocateWait,
   onResolve,
   onRetryObservation,
-  onToggle,
+  panelId,
   observationFailed,
   open,
   result,
   resolvingActions,
   run,
   submitting,
-  visible,
 }: Props): ReactElement | null {
   const t = useTranslate()
   const [raw, setRaw] = useState(false)
@@ -694,7 +650,6 @@ export function RunDrawer({
   const resize = useRef<{ height: number; pointerId: number; y: number }>()
   const [resized, setResized] = useState<{ height: number; runId: string | undefined }>()
   const [filters, setFilters] = useState<readonly RunEventFilter[]>(() => initialRunLogFilters(eventFilter))
-  const summaryOutputs = terminalOutputs(result) ?? latestOutputs(events)
   const preferredHeight = resized != null && resized.runId == run?.runId ? resized.height : undefined
   const height = preferredHeight ?? defaultHeight
 
@@ -747,89 +702,68 @@ export function RunDrawer({
     changeHeight(next)
   }
 
-  if (!visible) return null
+  if (!open) return null
   return (
-    <section className={`run-drawer ${open ? 'open' : ''}`} ref={drawer} style={open ? { height } : undefined}>
-      {open && (
-        <div
-          aria-label={t('run.resize')}
-          aria-orientation="horizontal"
-          aria-valuemax={maxHeight}
-          aria-valuemin={minHeight}
-          aria-valuenow={height}
-          className="run-resize-handle"
-          onKeyDown={resizeWithKeyboard}
-          onLostPointerCapture={() => (resize.current = undefined)}
-          onPointerCancel={stopResize}
-          onPointerDown={startResize}
-          onPointerMove={moveResize}
-          onPointerUp={stopResize}
-          role="separator"
-          tabIndex={0}
-        />
-      )}
-      {open && (
-        <header className="run-header">
-          <Badge variant="secondary">{t('run.timeline')}</Badge>
-          <span className="run-header-spacer" />
-          {tools}
-          <Button aria-pressed={raw} onClick={() => setRaw(!raw)} size="sm" variant="ghost">
-            {t(raw ? 'run.groupedView' : 'run.rawView')}
-          </Button>
-          <RunLogFilters
-            container={drawer.current}
-            events={events}
-            filters={filters}
-            onChange={(next) => {
-              setFilters(next)
-              onEventFilterChange(next.length == 1 ? next[0]! : 'all')
-            }}
-          />
-          {run != null && <RunLogButton events={events} eventsExpiresAt={eventsExpiresAt} historyComplete={historyComplete} run={run} />}
-          {canCancelRun(run) && (
-            <Button disabled={cancelDisabled} onClick={onCancel} size="sm" variant="destructive">
-              {t(canceling ? 'run.canceling' : 'run.cancel')}
-            </Button>
-          )}
-          <Button aria-label={t('run.close')} onClick={onClose} size="icon-sm" variant="ghost">
-            <Icon name="trash" />
-          </Button>
-          <Button aria-label={t('run.collapse')} onClick={onToggle} size="icon-sm" variant="ghost">
-            <Icon name="chevron-down" />
-          </Button>
-        </header>
-      )}
-      {open && (
-        <div className="run-content">
-          {run != null && <ActiveWait onLocate={onLocateWait} onResolve={onResolve} resolvingActions={resolvingActions} run={run} />}
-          <RunLog
-            raw={raw}
-            events={events}
-            eventsExpiresAt={eventsExpiresAt}
-            eventNodes={eventNodes}
-            filters={filters}
-            historyComplete={historyComplete}
-            observationFailed={observationFailed}
-            onConfigureConnector={onConfigureConnector}
-            onLocateEvent={onLocateEvent}
-            onRetryObservation={onRetryObservation}
-            result={result}
-            run={run}
-            submitting={submitting}
-          />
-        </div>
-      )}
-      <div className="run-summary">
-        <span className={`status-dot ${submitting ? 'running' : statusClass(run)}`} />
-        <div className="run-summary-text">
-          <span>{events.at(-1) == null ? (submitting ? t('run.statusSubmitting') : runLabel(run, t)) : eventSummary(events.at(-1)!, t)}</span>
-          {summaryOutputs != null && <CompactValue maxDepth={2} maxEntries={4} value={summaryOutputs} />}
-        </div>
-        <span className="run-meta">{duration(run)}</span>
-        {run != null && <code className="run-id">{t('run.runId', { id: run.runId })}</code>}
-        <Button aria-label={t(open ? 'run.collapse' : 'run.expand')} onClick={onToggle} size="icon-xs" variant="ghost">
-          <Icon name={open ? 'chevron-down' : 'chevron-up'} />
+    <section className="run-drawer" id={panelId} ref={drawer} style={{ height }}>
+      <div
+        aria-label={t('run.resize')}
+        aria-orientation="horizontal"
+        aria-valuemax={maxHeight}
+        aria-valuemin={minHeight}
+        aria-valuenow={height}
+        className="run-resize-handle"
+        onKeyDown={resizeWithKeyboard}
+        onLostPointerCapture={() => (resize.current = undefined)}
+        onPointerCancel={stopResize}
+        onPointerDown={startResize}
+        onPointerMove={moveResize}
+        onPointerUp={stopResize}
+        role="separator"
+        tabIndex={0}
+      />
+      <header className="run-header">
+        <Badge variant="secondary">{t('run.timeline')}</Badge>
+        <span className="run-header-spacer" />
+        {tools}
+        <Button aria-pressed={raw} onClick={() => setRaw(!raw)} size="sm" variant="ghost">
+          {t(raw ? 'run.groupedView' : 'run.rawView')}
         </Button>
+        <RunLogFilters
+          container={drawer.current}
+          events={events}
+          filters={filters}
+          onChange={(next) => {
+            setFilters(next)
+            onEventFilterChange(next.length == 1 ? next[0]! : 'all')
+          }}
+        />
+        {run != null && <RunLogButton events={events} eventsExpiresAt={eventsExpiresAt} historyComplete={historyComplete} run={run} />}
+        {canCancelRun(run) && (
+          <Button disabled={cancelDisabled} onClick={onCancel} size="sm" variant="destructive">
+            {t(canceling ? 'run.canceling' : 'run.cancel')}
+          </Button>
+        )}
+        <Button aria-label={t('run.collapse')} onClick={onClose} size="icon-sm" variant="ghost">
+          <Icon name="chevron-down" />
+        </Button>
+      </header>
+      <div className="run-content">
+        {run != null && <ActiveWait onLocate={onLocateWait} onResolve={onResolve} resolvingActions={resolvingActions} run={run} />}
+        <RunLog
+          raw={raw}
+          events={events}
+          eventsExpiresAt={eventsExpiresAt}
+          eventNodes={eventNodes}
+          filters={filters}
+          historyComplete={historyComplete}
+          observationFailed={observationFailed}
+          onConfigureConnector={onConfigureConnector}
+          onLocateEvent={onLocateEvent}
+          onRetryObservation={onRetryObservation}
+          result={result}
+          run={run}
+          submitting={submitting}
+        />
       </div>
     </section>
   )

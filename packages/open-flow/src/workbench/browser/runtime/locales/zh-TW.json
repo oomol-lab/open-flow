@@ -578,7 +578,6 @@
     "cancel": "取消執行",
     "canceling": "正在取消…",
     "canceledWithoutOutput": "這次執行在產生最終輸出前就已取消。",
-    "close": "關閉執行詳情",
     "collapse": "收合執行詳情",
     "connectionRequired": "所選的 Connector Connection 無法使用。請重新連接或選擇其他 Connection，然後再次執行 Flow。",
     "details": "執行詳情",

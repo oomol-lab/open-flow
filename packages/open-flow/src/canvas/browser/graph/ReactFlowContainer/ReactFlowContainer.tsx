@@ -73,7 +73,7 @@ import { NodeStore } from '../../stores/node/node.store.ts'
 import { InspectSelectionButton } from '../inspectSelection.tsx'
 import { NodePlaceholder, NodePlaceholderQueue } from '../Nodes/useNodePlaceholder.ts'
 import { getPaneRect, PaneRectContext } from '../Nodes/usePaneRect.ts'
-import { CanvasInteractiveMode, CanvasToolbar, CanvasViewControls } from './CanvasControls.tsx'
+import { CanvasBottomRightControls, CanvasInteractiveMode, CanvasToolbar, CanvasViewControls } from './CanvasControls.tsx'
 import { ConnectionLine } from './ConnectingLine.tsx'
 import { CornerControls } from './CornerControls.tsx'
 import { HelperLines, useHelperLines } from './HelperLines/index.ts'
@@ -111,6 +111,7 @@ export interface ReactFlowContainerProps {
   className?: string
   cornerTools?: React.ReactNode
   cornerLeading?: React.ReactNode
+  bottomRightTools?: React.ReactNode
   dark: boolean
   i18n: I18n
   miniMapExpanded$?: Val<boolean | undefined>
@@ -200,7 +201,16 @@ export const ReactFlowContainer: React.FC<ReactFlowContainerProps> = (props: Rea
 
 type FlowControlsProps = Pick<
   ReactFlowContainerProps,
-  'cornerTools' | 'cornerLeading' | 'toolbar' | 'miniMapExpanded$' | 'interactiveMode$' | 'onRelayout' | 'onFitView' | 'dottedBackground' | 'layoutMotion'
+  | 'cornerTools'
+  | 'cornerLeading'
+  | 'bottomRightTools'
+  | 'toolbar'
+  | 'miniMapExpanded$'
+  | 'interactiveMode$'
+  | 'onRelayout'
+  | 'onFitView'
+  | 'dottedBackground'
+  | 'layoutMotion'
 > & { onBeforeFitView?: () => void }
 
 const selector = (s: ReactFlowState) => ({
@@ -258,6 +268,7 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
         zoom={zoom}
       />
       {props.toolbar != null && <CanvasToolbar>{props.toolbar}</CanvasToolbar>}
+      {props.bottomRightTools != null && <CanvasBottomRightControls>{props.bottomRightTools}</CanvasBottomRightControls>}
       <CornerControls
         before={props.cornerLeading}
         leading={<CanvasInteractiveMode interactiveMode$={props.interactiveMode$} />}
@@ -695,6 +706,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           <FlowControls
             cornerTools={props.cornerTools}
             cornerLeading={props.cornerLeading}
+            bottomRightTools={props.bottomRightTools}
             toolbar={props.toolbar}
             miniMapExpanded$={props.miniMapExpanded$}
             interactiveMode$={props.interactiveMode$}

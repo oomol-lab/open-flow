@@ -7,7 +7,7 @@ import FlowWorkspace, { FlowEditor } from './flowWorkspace.tsx'
 
 const mocks = vi.hoisted(() => ({
   setOpen: vi.fn(),
-  setVisible: vi.fn(),
+  setRunDrawerOpen: vi.fn(),
   stateCall: 0,
   stateValues: new Map<number, unknown>(),
 }))
@@ -20,7 +20,7 @@ vi.mock('react', async (importOriginal) => ({
   useState: vi.fn((initial: unknown) => {
     const call = mocks.stateCall++
     const value = mocks.stateValues.has(call) ? mocks.stateValues.get(call) : typeof initial == 'function' ? initial() : initial
-    return [value, call == 0 ? mocks.setVisible : mocks.setOpen]
+    return [value, call == 0 ? mocks.setRunDrawerOpen : mocks.setOpen]
   }),
 }))
 
@@ -152,7 +152,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
 describe('FlowWorkspace run drawer', () => {
   beforeEach(() => {
     mocks.setOpen.mockReset()
-    mocks.setVisible.mockReset()
+    mocks.setRunDrawerOpen.mockReset()
     mocks.stateCall = 0
     mocks.stateValues.clear()
   })
@@ -165,8 +165,7 @@ describe('FlowWorkspace run drawer', () => {
     designer.props.runControl.props.onRun()
     await Promise.resolve()
     expect(store.requestDraftRun).toHaveBeenCalledWith('start')
-    expect(mocks.setVisible).toHaveBeenCalledWith(true)
-    expect(mocks.setOpen).toHaveBeenCalledWith(true)
+    expect(mocks.setRunDrawerOpen).toHaveBeenCalledWith(true)
   })
 
   it('keeps the test button enabled while ordinary edits save', () => {
@@ -284,8 +283,8 @@ describe('FlowWorkspace run drawer', () => {
     { page: 'outline', selectedNodeIds: [] },
     { page: 'properties', selectedNodeIds: ['start', 'task'] },
   ])('focuses a node selected from the $page node list', ({ page, selectedNodeIds }) => {
-    mocks.stateValues.set(4, true)
-    mocks.stateValues.set(5, page)
+    mocks.stateValues.set(3, true)
+    mocks.stateValues.set(4, page)
     const { editor, store } = renderWorkspace(undefined, true, false, selectedNodeIds)
     const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
     const contextPanel = (view.props.children as ReactElement[])[1]!
@@ -302,8 +301,8 @@ describe('FlowWorkspace run drawer', () => {
     { page: 'outline', selectedNodeIds: [] },
     { page: 'properties', selectedNodeIds: ['start', 'task'] },
   ])('keeps the $page node list open when locating a node', ({ page, selectedNodeIds }) => {
-    mocks.stateValues.set(4, true)
-    mocks.stateValues.set(5, page)
+    mocks.stateValues.set(3, true)
+    mocks.stateValues.set(4, page)
     const { editor, store } = renderWorkspace(undefined, true, false, selectedNodeIds)
     const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
     const contextPanel = (view.props.children as ReactElement[])[1]!

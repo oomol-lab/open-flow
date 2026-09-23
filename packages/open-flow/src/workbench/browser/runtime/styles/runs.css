@@ -4,22 +4,16 @@
     z-index: 5;
     display: grid;
     box-sizing: border-box;
-    height: 28px;
     min-width: 0;
     margin: 0 8px 8px;
     grid-column: 1 / -1;
-    grid-template-rows: 26px;
+    grid-template-rows: 30px minmax(0, 1fr);
+    min-height: 160px;
+    max-height: min(640px, calc(100dvh - 212px));
     overflow: hidden;
     border: 1px solid var(--ui-border);
     border-radius: var(--ui-radius);
     background: var(--ui-card);
-  }
-
-  .run-drawer.open {
-    height: 360px;
-    grid-template-rows: 30px minmax(0, 1fr) 26px;
-    min-height: 160px;
-    max-height: min(640px, calc(100dvh - 212px));
   }
 
   .run-resize-handle {
@@ -91,40 +85,6 @@
   .run-content {
     min-height: 0;
     overflow: hidden;
-  }
-
-  .run-summary {
-    display: flex;
-    min-width: 0;
-    align-items: center;
-    gap: 7px;
-    padding-left: 8px;
-    overflow: hidden;
-    background: var(--ui-muted);
-    font-size: 12px;
-  }
-
-  .run-summary-text {
-    display: flex;
-    min-width: 0;
-    flex: 1;
-    align-items: center;
-    gap: 6px;
-    overflow: hidden;
-    color: var(--ui-muted-foreground);
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .run-summary-text > span {
-    flex: none;
-  }
-
-  .run-summary-text > code {
-    min-width: 0;
-    overflow: hidden;
-    color: var(--ui-muted-foreground);
-    text-overflow: ellipsis;
   }
 
   .run-log {

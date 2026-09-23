@@ -146,3 +146,16 @@ export function CanvasToolbar({ children }: { readonly children: React.ReactNode
     </Panel>
   )
 }
+
+export function CanvasBottomRightControls({ children }: { readonly children: React.ReactNode }) {
+  return (
+    <Panel
+      position="bottom-right"
+      className={cn('open-flow-control-island open-flow-control-island-compact', styles.dock)}
+      data-canvas-control-scope
+      data-tooltip-toolbar
+    >
+      {children}
+    </Panel>
+  )
+}
