@@ -6,8 +6,9 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { useEffect, useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
+import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { ConnectorAccount } from '../../src/workbench/browser/runtime/editor/connectionSettings.tsx'
-import { CodeConnectionSettings, ConnectorAccessSettings } from '../../src/workbench/browser/runtime/editor/connectorAccessSettings.tsx'
+import { CodeConnectionSettings, ConnectionUsageButton, ConnectorAccessSettings } from '../../src/workbench/browser/runtime/editor/connectorAccessSettings.tsx'
 import { EditorContextPanel } from '../../src/workbench/browser/runtime/editor/editorContextPanel.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { WorkbenchStore } from '../../src/workbench/browser/runtime/stores/workbenchStore.ts'
@@ -20,7 +21,7 @@ const content: RevisionContent = {
       edges: [],
       nodes: {
         mail: { inputs: {}, kind: 'task', taskId: 'mail' },
-        receipt: { inputs: {}, kind: 'task', taskId: 'mail', name: 'Send receipt' },
+        receipt: { inputs: {}, kind: 'task', taskId: 'mail', name: 'Send receipt', icon: ':twemoji:receipt:' },
         reminder: { inputs: {}, kind: 'task', taskId: 'mail', name: 'Send reminder' },
         pending: { inputs: {}, kind: 'task', taskId: 'pending', name: 'Send notification' },
         code: { inputs: {}, kind: 'task', name: 'Process response', task: { name: 'Process response', moduleId: 'code', inputs: [], outputs: [] } },
@@ -39,6 +40,23 @@ const content: RevisionContent = {
   },
   modelVersion: currentFlowModelVersion,
   modules: { code: { name: 'Process response', source: 'export default () => ({})', imports: [] } },
+}
+const overviewContent: RevisionContent = {
+  ...content,
+  document: {
+    ...content.document,
+    graph: {
+      ...content.document.graph,
+      nodes: {
+        ...content.document.graph.nodes,
+        issue: { inputs: {}, kind: 'task', taskId: 'issue' },
+      },
+    },
+    tasks: {
+      ...content.document.tasks,
+      issue: { name: 'Create issue', inputs: [], outputs: [], executor: { kind: 'connector', action: 'github.create_issue', connectionId: 'github-work' } },
+    },
+  },
 }
 const emptyContent: RevisionContent = {
   document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} },
@@ -112,7 +130,7 @@ function Sample({
   const i18n = useMemo(() => createI18n(language), [language])
   const [store, setStore] = useState<WorkbenchStore>()
   useEffect(() => {
-    const { client, flowId } = createInspectorTransport(log, emptyFlow ? emptyContent : content, {
+    const { client, flowId } = createInspectorTransport(log, emptyFlow ? emptyContent : label == 'Node and Code usage overview' ? overviewContent : content, {
       access,
       published: label == 'Node and Code usage overview',
       accessError: loadFailed,
@@ -122,13 +140,18 @@ function Sample({
         connectionStatus == null
           ? noCandidates
             ? []
-            : candidates.map((candidate, index) => ({
-                id: candidate.connectionId,
-                service: candidate.providerId,
-                displayName: candidate.connectionDisplayName,
-                isDefault: index == 0,
-                status: 'active' as const,
-              }))
+            : [
+                ...(label == 'Node and Code usage overview'
+                  ? [{ id: 'github-work', service: 'github', displayName: 'Engineering', isDefault: true, status: 'active' as const }]
+                  : []),
+                ...candidates.map((candidate, index) => ({
+                  id: candidate.connectionId,
+                  service: candidate.providerId,
+                  displayName: candidate.connectionDisplayName,
+                  isDefault: index == 0,
+                  status: 'active' as const,
+                })),
+              ]
           : [{ id: 'mail-account', service: 'mail', displayName: 'Work account', isDefault: true, status: connectionStatus }],
       providers: [noAuth ? { ...provider, authTypes: ['no_auth'] } : provider, { service: 'github', displayName: 'GitHub', authTypes: ['oauth2'] }],
     })
@@ -140,63 +163,87 @@ function Sample({
     return () => next.dispose()
   }, [access, configure, connectionStatus, emptyFlow, i18n, label, loadFailed, log, noAuth, noCandidates])
   return (
-    <section>
+    <section className={label == 'Node and Code usage overview' ? 'col-span-full' : undefined}>
       <h3 className="mb-2 text-sm font-medium">{label}</h3>
       <div className="grid h-[480px] overflow-hidden rounded-lg border border-border">
-        <EditorContextPanel focusOnOpen={false} icon="flow" onClose={() => {}} theme={dark ? 'dark' : 'light'} title="Flow outline">
-          {store != null &&
-            (configure ? (
-              <CodeConnectionSettings store={store} onManage={(flowId) => log('code-connections.manage', flowId)} />
-            ) : (
-              <ConnectorAccessSettings
-                onSelectReference={(reference) => log('connector-access.reference', reference)}
-                onManage={(flowId) => log('connector-access.manage', flowId)}
-                store={store}
-              />
-            ))}
-          {store != null && (noCandidates || accountPending != null || connectionStatus != null) && (
-            <div className="p-3">
-              <ConnectorAccount
-                action={
-                  accountPending == 'metadata'
-                    ? undefined
-                    : {
-                        actionId: 'mail.send',
-                        authenticated: true,
-                        description: 'Send mail',
-                        inputs: {},
-                        outputs: {},
-                        name: 'Send mail',
-                        serviceId: 'mail',
-                        serviceName: 'Mail',
-                      }
-                }
-                actionError={undefined}
-                actionId="mail.send"
-                accessError={noCandidates ? i18n.t('notice.error.connectorAccessRequired') : undefined}
-                activeConnections={
-                  accountPending == 'setup'
-                    ? []
-                    : accountPending != null
+        {label == 'Node and Code usage overview' && store != null ? (
+          <FlowCanvasView
+            identity="connection-usage"
+            dark={dark}
+            language={language}
+            editable={false}
+            ignoredNodeIds={[]}
+            onIgnoreNodes={() => {}}
+            model={{ nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } }}
+            cornerTools={<ConnectionUsageButton store={store} onSelectReference={(reference) => log('connector-access.reference', reference)} />}
+            onAddNode={() => undefined}
+            onConnect={() => {}}
+            onDisconnect={() => {}}
+            onDeleteNodes={() => {}}
+            onDuplicate={() => {}}
+            onMoveNodes={() => {}}
+            onMoveViewport={() => {}}
+            onCopy={() => {}}
+            onPaste={() => {}}
+            onSelectionChange={() => {}}
+            selectedNodeIds={[]}
+          />
+        ) : (
+          <EditorContextPanel focusOnOpen={false} icon="flow" onClose={() => {}} theme={dark ? 'dark' : 'light'} title={i18n.t('connectionUsage.title')}>
+            {store != null &&
+              (configure ? (
+                <CodeConnectionSettings store={store} onManage={(flowId) => log('code-connections.manage', flowId)} />
+              ) : (
+                <ConnectorAccessSettings
+                  onSelectReference={(reference) => log('connector-access.reference', reference)}
+                  onManage={(flowId) => log('connector-access.manage', flowId)}
+                  store={store}
+                />
+              ))}
+            {store != null && (noCandidates || accountPending != null || connectionStatus != null) && (
+              <div className="p-3">
+                <ConnectorAccount
+                  action={
+                    accountPending == 'metadata'
                       ? undefined
-                      : connectionStatus == null
-                        ? []
-                        : [{ connectionId: 'mail-account', displayName: 'Work account', isDefault: true, serviceId: 'mail', status: connectionStatus }]
-                }
-                authorizationPending={false}
-                connection={undefined}
-                connectionError={undefined}
-                connectionId={connectionStatus == null ? undefined : 'mail-account'}
-                connectors={store.connectors}
-                disabled={false}
-                fieldIdPrefix="unconnected-mail"
-                loading={accountPending == 'setup'}
-                taskId="mail"
-                onConfigureAccess={() => void store.connectors.connect('mail')}
-              />
-            </div>
-          )}
-        </EditorContextPanel>
+                      : {
+                          actionId: 'mail.send',
+                          authenticated: true,
+                          description: 'Send mail',
+                          inputs: {},
+                          outputs: {},
+                          name: 'Send mail',
+                          serviceId: 'mail',
+                          serviceName: 'Mail',
+                        }
+                  }
+                  actionError={undefined}
+                  actionId="mail.send"
+                  accessError={noCandidates ? i18n.t('notice.error.connectorAccessRequired') : undefined}
+                  activeConnections={
+                    accountPending == 'setup'
+                      ? []
+                      : accountPending != null
+                        ? undefined
+                        : connectionStatus == null
+                          ? []
+                          : [{ connectionId: 'mail-account', displayName: 'Work account', isDefault: true, serviceId: 'mail', status: connectionStatus }]
+                  }
+                  authorizationPending={false}
+                  connection={undefined}
+                  connectionError={undefined}
+                  connectionId={connectionStatus == null ? undefined : 'mail-account'}
+                  connectors={store.connectors}
+                  disabled={false}
+                  fieldIdPrefix="unconnected-mail"
+                  loading={accountPending == 'setup'}
+                  taskId="mail"
+                  onConfigureAccess={() => void store.connectors.connect('mail')}
+                />
+              </div>
+            )}
+          </EditorContextPanel>
+        )}
       </div>
     </section>
   )
@@ -214,6 +261,35 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
     readonly configure?: boolean
     readonly accountPending?: 'metadata' | 'connections' | 'setup'
   }[] = [
+    {
+      access: {
+        accessRevision: 2,
+        bindings: [
+          ...candidates.map((candidate) => ({
+            accessBindingId: candidate.accessBindingId,
+            connectionId: candidate.connectionId,
+            connectionDisplayName: candidate.connectionDisplayName,
+            permissionGroupName: candidate.permissionGroupName,
+            providerId: candidate.providerId,
+            source: candidate.source,
+            status: 'active' as const,
+          })),
+          {
+            accessBindingId: 'github-work-binding',
+            connectionId: 'github-work',
+            connectionDisplayName: 'Engineering',
+            permissionGroupName: null,
+            providerId: 'github',
+            source: { kind: 'policy', ruleId: null },
+            status: 'active',
+          },
+        ],
+        mode: 'selectable',
+        sharedAccessDigest: 'selectable:2',
+        version: 1,
+      },
+      label: 'Node and Code usage overview',
+    },
     {
       access: { accessRevision: 0, bindings: [], mode: 'selectable', sharedAccessDigest: 'selectable:0', version: 1 },
       accountPending: 'setup',
@@ -234,16 +310,6 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
     {
       access: { accessRevision: 0, bindings: [], mode: 'implicit', sharedAccessDigest: 'implicit:lab', version: 1 },
       label: 'Deployment managed',
-    },
-    {
-      access: {
-        accessRevision: 2,
-        bindings: candidates.map(({ permissions: _permissions, ...candidate }) => Object.assign(candidate, { status: 'active' as const })),
-        mode: 'selectable',
-        sharedAccessDigest: 'selectable:2',
-        version: 1,
-      },
-      label: 'Node and Code usage overview',
     },
     {
       access: {
@@ -359,10 +425,10 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
 
 export const connectorAccessStory: FrontendStory = {
   description:
-    'Draft connection usage grouped by Provider with its icon and account count, collapsed initially. Expand a Provider to inspect account references and Code alongside node references and the account actions menu, and the independent shared Code connection settings without nested disclosure. Adding a service selects its eligible default account when available. Use the overview header to configure Code connections. Inspect account sources, removal confirmation, pending nodes, empty selections, failed loading, and account recovery. Code selection saves take 800 ms to expose pending feedback.',
+    'Open Connections from the canvas control island. Compare service spacing, separate account cards, account icons and node icons, including a custom receipt icon. Provider and account links use 13px names and aligned leading icons; node names use 13px and supporting text uses 12px. Subtle curved branches connect accounts to their nodes. The panel scrollbar appears while scrolling and hides when idle. Locate each usage, switch to the read-only publication snapshot, and remove an account from the draft with confirmation. The gallery also covers missing accounts, empty drafts, loading failures, long names and independent Code connection settings. Code selection saves take 800 ms.',
   group: 'Workbench',
   id: 'connector-access',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,
   standalone: true,
-  title: 'Connection usage and Code connections',
+  title: 'Connections and Code access',
 }

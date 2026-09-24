@@ -418,13 +418,13 @@ export class ControlService {
     return await this.#connectorRequest(flowId, (connector, access) => connector.listConnections(serviceId, signal, access), actorId)
   }
 
-  async connectorConnectionPage(serviceId: string, flowId?: string, teamId?: string, signal?: AbortSignal): Promise<string> {
+  async connectorConnectionPage(serviceId: string, flowId?: string, teamId?: string, signal?: AbortSignal, connectionId?: string): Promise<string> {
     if (flowId != null && teamId != null) throw new ControlError(controlErrorCode.flowInvalid, 'Specify either a Flow or a Team for the connection page.')
     if (flowId != null) this.getFlow(flowId)
     const connector = this.resolveConnector()
     if (connector instanceof ConnectorClient && connector.teamSupported()) {
       try {
-        return await connector.hostedConnectionPage(serviceId, flowId == null ? teamId : await this.resolveConnectorScope(flowId), signal)
+        return await connector.hostedConnectionPage(serviceId, flowId == null ? teamId : await this.resolveConnectorScope(flowId), signal, connectionId)
       } catch (error) {
         if (!(error instanceof ConnectorTaskError)) throw error
         throw new ControlError(error.code, error.message)
@@ -438,7 +438,9 @@ export class ControlService {
         'Connector authorization console URL is not configured. Set OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN or configure the Connector authorization console URL in deployment Settings.',
       )
     }
-    return new URL(`providers/${encodeURIComponent(serviceId)}`, origin).href
+    const url = new URL(`providers/${encodeURIComponent(serviceId)}`, origin)
+    if (connectionId != null) url.searchParams.set('app', connectionId)
+    return url.href
   }
 
   async resolveConnectorScope(flowId?: string): Promise<string | undefined> {

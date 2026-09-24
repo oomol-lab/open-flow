@@ -176,15 +176,17 @@ export class ConnectorClient implements ConnectorHost {
     return this.#teamOrigin != null && this.#token.length > 0
   }
 
-  async hostedConnectionPage(serviceId: string, teamId?: string, signal?: AbortSignal): Promise<string> {
+  async hostedConnectionPage(serviceId: string, teamId?: string, signal?: AbortSignal, connectionId?: string): Promise<string> {
     if (!this.teamSupported()) throw unavailable()
     const teams = await this.listTeams(signal)
     const team = teamId == null ? teams.find((item) => item.systemCreated) : teams.find((item) => item.id == teamId)
     if (team == null) throw unavailable('The Connector Team for this connection page is not available.')
-    return new URL(
+    const url = new URL(
       `team/${encodeURIComponent(team.name)}/connections/${encodeURIComponent(serviceId)}`,
       `https://console.${this.#origin.hostname.slice('connector.'.length)}/`,
-    ).href
+    )
+    if (connectionId != null) url.searchParams.set('app', connectionId)
+    return url.href
   }
 
   async listTeams(signal?: AbortSignal): Promise<readonly { readonly id: string; readonly name: string; readonly systemCreated: boolean }[]> {

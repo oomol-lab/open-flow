@@ -14,7 +14,7 @@ import { Empty, EmptyHeader, EmptyTitle } from '../../../ui/browser/empty.tsx'
 import { IconifyProvider } from '../../../ui/browser/icons/iconifyContext.tsx'
 import { CanvasHistoryScope } from './editor/canvasHistoryScope.tsx'
 import { CommentInspector } from './editor/commentInspector.tsx'
-import { ConnectorAccessSettings } from './editor/connectorAccessSettings.tsx'
+import { ConnectionUsageButton } from './editor/connectorAccessSettings.tsx'
 import { EditorContextPanel } from './editor/editorContextPanel.tsx'
 import { FlowNodeList } from './editor/flowNodeList.tsx'
 import { inspectorIcon, NodeInspector } from './editor/nodeInspector.tsx'
@@ -407,6 +407,7 @@ export function FlowEditor({
       tabIndex={0}
     >
       <WorkbenchCanvas
+        connectionControl={<ConnectionUsageButton key={flowId} onManage={onManageConnectorAccess} onSelectReference={setAccountReference} store={store} />}
         topLeftTools={navigationIsland}
         bottomRightTools={<RunStatusIslandContainer onToggle={onToggleRuns} open={runDrawerOpen} panelId={RUN_LOG_PANEL_ID} store={store} />}
         cornerLeading={
@@ -576,7 +577,6 @@ export function FlowEditor({
           title={contextPanelTitle}
         >
           <div hidden={!flowSelected} className={flowSelected ? 'flex h-full min-h-0 flex-col' : 'hidden'}>
-            <ConnectorAccessSettings onManage={onManageConnectorAccess} onSelectReference={setAccountReference} store={store} />
             <div className="min-h-0 flex-1">
               <FlowNodeList key={JSON.stringify([flowId, target])} groupTriggers nodes={designer.nodes} onFocusNode={focusNode} onSelect={selectOutlineNode} />
             </div>

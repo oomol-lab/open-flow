@@ -12,7 +12,7 @@ export type ScrollAreaRef = OverlayScrollbarsComponentRef<'div'>
 export interface ScrollAreaProps {
   className?: string
   defer?: boolean
-  autoHide?: 'leave' | 'never'
+  autoHide?: 'scroll' | 'leave' | 'never'
   events?: EventListeners
   style?: React.CSSProperties
   tabIndex?: number
@@ -23,10 +23,16 @@ export interface ScrollAreaProps {
 const options: PartialOptions = {
   scrollbars: {
     theme: styles.scrollbar,
-    autoHide: 'leave',
+    autoHide: 'scroll',
+    autoHideSuspend: false,
     autoHideDelay: 300,
   },
   overflow: { x: 'hidden' },
+}
+
+const leaveOptions: PartialOptions = {
+  ...options,
+  scrollbars: { ...options.scrollbars, autoHide: 'leave' },
 }
 
 const alwaysVisibleOptions: PartialOptions = {
@@ -35,7 +41,7 @@ const alwaysVisibleOptions: PartialOptions = {
 }
 
 export const ScrollArea: React.ForwardRefExoticComponent<ScrollAreaProps & React.RefAttributes<ScrollAreaRef>> = forwardRef<ScrollAreaRef, ScrollAreaProps>(
-  ({ className, defer = true, autoHide = 'leave', events, style, tabIndex, onClick, children }, ref) => {
+  ({ className, defer = true, autoHide = 'scroll', events, style, tabIndex, onClick, children }, ref) => {
     return (
       <OverlayScrollbarsComponent
         defer={defer}
@@ -43,7 +49,7 @@ export const ScrollArea: React.ForwardRefExoticComponent<ScrollAreaProps & React
         ref={ref}
         className={clsx(styles.container, className)}
         style={style}
-        options={autoHide === 'never' ? alwaysVisibleOptions : options}
+        options={autoHide === 'never' ? alwaysVisibleOptions : autoHide === 'leave' ? leaveOptions : options}
         tabIndex={tabIndex}
         onClick={onClick}
       >

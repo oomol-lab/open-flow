@@ -80,7 +80,23 @@ export function createInspectorTransport(
         version: 1,
       }
     : null
-  const publishedAccess = access
+  const publishedBindings = access.bindings
+    .filter((binding) => binding.source != null && binding.connectionId != null)
+    .map((binding) => ({
+      accessBindingId: binding.accessBindingId,
+      connectionId: binding.connectionId,
+      providerId: binding.providerId,
+      source: binding.source,
+      connectionDisplayName: binding.connectionDisplayName,
+      permissionGroupName: binding.permissionGroupName ?? null,
+    }))
+  const publishedAccess = {
+    version: 2,
+    mode: access.mode,
+    sharedAccessDigest: access.sharedAccessDigest,
+    sharedBindings: publishedBindings,
+    selectedBindings: publishedBindings,
+  }
   const client = new WorkbenchClient(async (path, init) => {
     const url = new URL(path instanceof Request ? path.url : path, 'https://lab.invalid')
     if (url.pathname.endsWith('/connection-usage/remove')) {
@@ -193,6 +209,13 @@ export function createInspectorTransport(
             outputSchema: action.outputSchema,
           })),
       })
+    }
+    if (/\/connector\/connections\/[^/]+\/page$/.test(url.pathname)) {
+      const serviceId = url.pathname.split('/').at(-2)!
+      const page = new URL(`https://console.oomol.com/team/demo/connections/${serviceId}`)
+      const connectionId = url.searchParams.get('connectionId')
+      if (connectionId != null) page.searchParams.set('app', connectionId)
+      return Response.json({ version: 1, url: page.href })
     }
     if (url.pathname.endsWith('/connector/connections'))
       return Response.json({

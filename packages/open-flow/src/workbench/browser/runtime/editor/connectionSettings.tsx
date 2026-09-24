@@ -128,8 +128,8 @@ function AccountSelect({
           type="button"
           variant="ghost"
           size="icon-xs"
-          aria-label={t('connectionUsage.remove')}
-          title={t('connectionUsage.remove')}
+          aria-label={t('connectionUsage.stopUsing')}
+          title={t('connectionUsage.stopUsing')}
           disabled={disabled}
           onPointerDown={(event) => {
             if (event.button == 0) onChange(undefined)

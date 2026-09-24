@@ -1,20 +1,24 @@
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import type { ConnectorAccess } from '../../../../control/common/api.ts'
 import type { ConnectorAccountReference } from '../revisionView.ts'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 
-import { useCallback, useEffect, useId, useState } from 'react'
+import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
+import { CanvasTooltip } from '../../../../canvas/browser/components/tooltip.tsx'
 import { codeSharedPermissionsEnabled } from '../../../../flow/common/codePermissions.ts'
-import { Button } from '../../../../ui/browser/button.tsx'
+import { Button, buttonVariants } from '../../../../ui/browser/button.tsx'
 import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
 import { Dialog, DialogContent, DialogTitle } from '../../../../ui/browser/dialog.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
 import { Label } from '../../../../ui/browser/label.tsx'
+import { Popover, PopoverPanelContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { NativeScrollArea } from '../../../../ui/browser/scroll-area.tsx'
+import { cn } from '../../../../ui/browser/utils.ts'
 import { providerIcon } from '../providerIcon.ts'
+import { semanticNodeIcon, triggerNodeIcon } from '../workspace.ts'
 import { connectorAccessPermissionGroupLabel, connectorAccessPermissionLabel } from './connectorAccessPresentation.ts'
 import { ServicePicker } from './servicePicker.tsx'
 
@@ -23,6 +27,45 @@ function connectorAccessProviderIds(access: ConnectorAccess | undefined, request
   for (const providerId of access?.providerIds ?? []) ids.add(providerId)
   if (requestedProviderId != null) ids.add(requestedProviderId)
   return [...ids].toSorted()
+}
+
+export function ConnectionUsageButton(props: Parameters<typeof ConnectorAccessSettings>[0]): ReactElement {
+  const t = useTranslate()
+  const [open, setOpen] = useState(false)
+  const [container, setContainer] = useState<HTMLElement | null>(null)
+  const portal = useCallback((element: HTMLButtonElement | null) => {
+    setContainer(element?.closest<HTMLElement>('.open-flow-workbench') ?? null)
+  }, [])
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <CanvasTooltip placement="bottom" title={t('connectionUsage.title')}>
+        <PopoverTrigger ref={portal} render={<Button size="icon" variant="ghost" aria-label={t('connectionUsage.title')} />}>
+          <i aria-hidden="true" className="i-lucide-light:plug" data-corner-icon />
+        </PopoverTrigger>
+      </CanvasTooltip>
+      <PopoverPanelContent
+        container={container}
+        side="bottom"
+        align="end"
+        sideOffset={8}
+        title={<span className="text-[14px]">{t('connectionUsage.title')}</span>}
+        closeLabel={t('connectionUsage.close')}
+        className="w-96"
+      >
+        <ConnectorAccessSettings
+          {...props}
+          onSelectReference={
+            props.onSelectReference == null
+              ? undefined
+              : (reference) => {
+                  setOpen(false)
+                  props.onSelectReference?.(reference)
+                }
+          }
+        />
+      </PopoverPanelContent>
+    </Popover>
+  )
 }
 
 export function ConnectorAccessSettings({
@@ -45,6 +88,7 @@ export function ConnectorAccessSettings({
   const published = publishedFlow == flowId && live?.publication != null
   const [snapshot, setSnapshot] = useState<Awaited<ReturnType<WorkbenchStore['publishedConnectionUsage']>>>()
   const [snapshotError, setSnapshotError] = useState(false)
+  const [snapshotAttempt, setSnapshotAttempt] = useState(0)
   const publication = live?.publication
   useEffect(() => {
     setRemoving(undefined)
@@ -61,19 +105,20 @@ export function ConnectorAccessSettings({
       },
     )
     return () => controller.abort()
-  }, [published, flowId, publication?.publicationId, store])
+  }, [published, flowId, publication?.publicationId, store, snapshotAttempt])
   const fixedSnapshot = snapshot?.publicationId == publication?.publicationId ? snapshot : undefined
   const connectionState = useVal(store.workspace.catalogs.connections.get(undefined, flowId))
   const connections = connectionState.data ?? []
+  const actions = useVal(store.connectors.$.actions)
+  const panel = useRef<HTMLElement | null>(null)
   const [root, setRoot] = useState<HTMLElement | null>(null)
   const [removing, setRemoving] = useState<string>()
   const [pending, setPending] = useState(false)
-  const portal = useCallback(
-    (element: HTMLElement | null) =>
-      setRoot(element?.closest<HTMLElement>('.open-flow-workbench') ?? element?.closest<HTMLElement>('.open-flow-theme') ?? null),
-    [],
-  )
-  if (flowId == null || revision == null) return null
+  const portal = useCallback((element: HTMLElement | null) => {
+    panel.current = element
+    setRoot(element?.closest<HTMLElement>('.open-flow-workbench') ?? element?.closest<HTMLElement>('.open-flow-theme') ?? null)
+  }, [])
+  if (flowId == null) return null
   const displayed = published ? fixedSnapshot?.revision : revision
   const selectedAccess = published ? fixedSnapshot?.access : state.access
   const uses = displayed?.connectorReferences.accounts ?? []
@@ -99,64 +144,78 @@ export function ConnectorAccessSettings({
   const pendingUses = uses.filter(
     (use) => use.connectionId == null && !providers.data?.some((provider) => provider.serviceId == use.providerId && provider.noSetup),
   )
+  const providerMetadata = Object.fromEntries((providers.data ?? []).map((provider) => [provider.serviceId, provider]))
+  const referenceIcon = (reference: ConnectorAccountReference): string | undefined => {
+    const node = displayed?.node(reference.target, reference.nodeId)
+    if (node == null) return
+    return node.kind == 'trigger' ? triggerNodeIcon(node.trigger, providerMetadata) : semanticNodeIcon(node, actions)
+  }
   const affected = removing == null ? undefined : accounts.get(removing)
   return (
-    <section className="flex min-h-0 shrink-0 flex-col gap-2 border-b border-border px-3 py-2" ref={portal}>
-      <div className="flex items-center justify-between gap-2">
-        <h3 className="m-0 text-xs font-medium">{t('connectionUsage.title')}</h3>
-        {codeSharedPermissionsEnabled && !published && state.access?.mode == 'selectable' && (
-          <Button size="xs" variant="ghost" className="font-normal text-muted-foreground" onClick={() => store.connectorAccess.configure()}>
-            {t('connectionUsage.configureCode')}
-          </Button>
-        )}
-      </div>
+    <section className="flex min-h-0 flex-col gap-3 outline-none" tabIndex={-1} ref={portal}>
       {publication != null && (
-        <div className="flex gap-2">
-          <Button size="xs" variant={published ? 'ghost' : 'secondary'} onClick={() => setPublishedFlow(undefined)}>
+        <div className="flex gap-1" role="group" aria-label={t('connectionUsage.version')}>
+          <Button size="xs" aria-pressed={!published} variant={published ? 'ghost' : 'secondary'} onClick={() => setPublishedFlow(undefined)}>
             {t('connectionUsage.draft')}
           </Button>
-          <Button size="xs" variant={published ? 'secondary' : 'ghost'} onClick={() => setPublishedFlow(flowId)}>
+          <Button size="xs" aria-pressed={published} variant={published ? 'secondary' : 'ghost'} onClick={() => setPublishedFlow(flowId)}>
             {t('connectionUsage.published')}
           </Button>
         </div>
       )}
-      <p className="m-0 text-[11px] text-muted-foreground">{t(published ? 'connectionUsage.publishedDescription' : 'connectionUsage.description')}</p>
+      <p className="m-0 text-xs text-muted-foreground">{t(published ? 'connectionUsage.publishedDescription' : 'connectionUsage.description')}</p>
       {(published && snapshotError) || (!published && !state.loading && state.access == null) ? (
         <p role="alert">
-          {t('connectorAccess.loadFailed')}{' '}
-          {!published && (
-            <Button size="xs" variant="link" onClick={() => void store.connectorAccess.load(flowId)}>
-              {t('connectorAccess.retry')}
-            </Button>
-          )}
+          {t('connectionUsage.loadFailed')}{' '}
+          <Button size="xs" variant="link" onClick={() => (published ? setSnapshotAttempt((value) => value + 1) : void store.connectorAccess.load(flowId))}>
+            {t('connectorAccess.retry')}
+          </Button>
         </p>
-      ) : (!published && state.loading) || (published && fixedSnapshot == null) ? (
-        <p className="text-xs">{t('connectorAccess.loading')}</p>
-      ) : accounts.size == 0 ? (
-        <p className="text-xs text-muted-foreground">{t('connectionUsage.empty')}</p>
+      ) : (!published && (state.loading || revision == null)) || (published && fixedSnapshot == null) ? (
+        <p className="text-xs">{t('connectionUsage.loading')}</p>
+      ) : accounts.size == 0 && pendingUses.length == 0 ? (
+        <p className="text-xs text-muted-foreground">{t(published ? 'connectionUsage.publishedEmpty' : 'connectionUsage.empty')}</p>
       ) : (
-        <NativeScrollArea className="max-h-64">
-          <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-4">
+          {pendingUses.length > 0 && (
+            <div className="rounded-md bg-muted/50 p-2">
+              <AccountReferences
+                icon={referenceIcon}
+                references={pendingUses}
+                label={t('connectionUsage.needsConnection')}
+                onSelect={published ? undefined : onSelectReference}
+              />
+            </div>
+          )}
+          <div className="flex flex-col gap-4">
             {[...new Set([...accounts.values()].map((account) => account.providerId))].map((providerId) => {
               const provider = providers.data?.find((item) => item.serviceId == providerId) ?? { serviceId: providerId, serviceName: providerId }
               const providerAccounts = [...accounts].filter(([, account]) => account.providerId == providerId)
               return (
-                <details key={providerId} aria-label={provider.serviceName} className="group rounded-lg border border-border/60 p-2 text-xs">
-                  <summary className="flex min-w-0 cursor-pointer list-none items-center gap-2 rounded-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                    <i aria-hidden="true" className="i-lucide-light:chevron-right size-3 shrink-0 text-muted-foreground group-open:rotate-90" />
-                    <ContentIcon src={providerIcon(provider)} className="size-4 shrink-0 data-[icon-kind=initials]:text-[20px]" />
-                    <span className="min-w-0 wrap-anywhere">{provider.serviceName}</span>
-                    <span className="ml-auto shrink-0 text-[11px] font-normal text-muted-foreground">
-                      {t('connectionUsage.accountCount', { count: providerAccounts.length })}
-                    </span>
-                  </summary>
-                  <div className="mt-2 divide-y divide-border/60">
+                <section key={providerId} aria-label={provider.serviceName} className="text-xs">
+                  <div className="flex min-w-0 items-center gap-2 font-medium">
+                    <ConnectionConsoleLink key={`${flowId}:${providerId}`} store={store} flowId={flowId} providerId={providerId}>
+                      <ContentIcon src={providerIcon(provider)} className="size-4 shrink-0 data-[icon-kind=initials]:text-[20px]" />
+                      <span className="min-w-0 wrap-anywhere">{provider.serviceName}</span>
+                    </ConnectionConsoleLink>
+                    <span className="ml-auto shrink-0 text-xs font-normal text-muted-foreground">{providerAccounts.length}</span>
+                  </div>
+                  <div className="mt-2 flex flex-col gap-2">
                     {providerAccounts.map(([id, account]) => {
                       const connection = connections.find((item) => item.connectionId == id)
                       return (
-                        <div key={id} className="flex flex-col gap-1 py-2 first:pt-0 last:pb-0">
+                        <div key={id} className="flex flex-col gap-1.5 rounded-md border border-border/50 p-2.5">
                           <div className="flex items-center justify-between gap-2">
-                            <span className="min-w-0 wrap-anywhere">{account.name}</span>
+                            <ConnectionConsoleLink
+                              key={`${flowId}:${providerId}:${id}`}
+                              store={store}
+                              flowId={flowId}
+                              providerId={providerId}
+                              connectionId={id}
+                            >
+                              <i aria-hidden="true" className="i-codicon:credit-card size-3.5 shrink-0 text-sm text-muted-foreground" />
+                              <span className="min-w-0 wrap-anywhere">{account.name}</span>
+                            </ConnectionConsoleLink>
                             {!published && (
                               <DropdownMenu>
                                 <DropdownMenuTrigger
@@ -173,35 +232,37 @@ export function ConnectorAccessSettings({
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent container={root} align="end">
                                   <DropdownMenuItem variant="destructive" onClick={() => setRemoving(id)}>
-                                    {t('connectionUsage.remove')}
+                                    {t('connectionUsage.stopUsing')}
                                   </DropdownMenuItem>
                                 </DropdownMenuContent>
                               </DropdownMenu>
                             )}
                           </div>
                           {connectionState.data != null && connection?.status != 'active' && (
-                            <p className="text-[11px] text-destructive">
+                            <p className="text-xs text-destructive">
                               {t(connection == null ? 'inspector.account.unavailable' : `inspector.account.status.${connection.status}`)}
                             </p>
                           )}
                           <AccountReferences
+                            hierarchy
+                            icon={referenceIcon}
                             references={account.nodes}
                             code={account.code}
-                            label={t('connectorAccess.nodeReferences')}
+                            label={t('connectionUsage.usedBy')}
                             onSelect={published ? undefined : onSelectReference}
                           />
                         </div>
                       )
                     })}
                   </div>
-                </details>
+                </section>
               )
             })}
           </div>
-        </NativeScrollArea>
+        </div>
       )}
       {accounts.size > 0 && (connectionState.error != null || connectionState.data == null) && (
-        <p className="text-[11px] text-muted-foreground" role="status">
+        <p className="text-xs text-muted-foreground" role="status">
           {t(connectionState.error != null ? 'connectorAccess.accountsFailed' : 'inspector.account.loading')}
           {connectionState.error != null && (
             <Button size="xs" variant="link" onClick={() => store.workspace.catalogs.connections.get(undefined, flowId, true)}>
@@ -210,19 +271,17 @@ export function ConnectorAccessSettings({
           )}
         </p>
       )}
-      {pendingUses.length > 0 && (
-        <AccountReferences
-          references={pendingUses}
-          label={t('connectorAccess.pendingAccountReferences')}
-          onSelect={published ? undefined : onSelectReference}
-        />
-      )}
       {selectedAccess?.version == 1 && selectedAccess.bindings.some((binding) => binding.connectionId == null || binding.status != 'active') && (
         <div role="status" className="text-xs text-destructive">
           {t('connectorAccess.summaryIssues', {
             count: selectedAccess.bindings.filter((binding) => binding.connectionId == null || binding.status != 'active').length,
           })}
         </div>
+      )}
+      {codeSharedPermissionsEnabled && !published && state.access?.mode == 'selectable' && (
+        <Button size="xs" variant="ghost" className="self-start" onClick={() => store.connectorAccess.configure()}>
+          {t('connectionUsage.configureCode')}
+        </Button>
       )}
       <Dialog
         open={codeSharedPermissionsEnabled && state.configuration != null}
@@ -241,29 +300,35 @@ export function ConnectorAccessSettings({
           if (!open && !pending) setRemoving(undefined)
         }}
       >
-        <DialogContent container={root} closeLabel={t('contextPanel.close')}>
-          <DialogTitle>{t('connectionUsage.removeTitle')}</DialogTitle>
-          <p className="text-sm">{t('connectionUsage.removeDescription')}</p>
+        <DialogContent container={root} finalFocus={panel} className="max-h-[80dvh] overflow-y-auto" closeLabel={t('connectionUsage.cancel')}>
+          <DialogTitle>{t('connectionUsage.stopUsingTitle')}</DialogTitle>
+          <p className="text-sm">{t('connectionUsage.stopUsingDescription')}</p>
           {affected != null && (
             <>
               <p>{affected.name}</p>
-              <AccountReferences references={affected.nodes} code={affected.code} label={t('connectorAccess.nodeReferences')} onSelect={onSelectReference} />
+              <AccountReferences icon={referenceIcon} references={affected.nodes} code={affected.code} label={t('connectionUsage.usedBy')} />
             </>
           )}
-          <Button
-            disabled={pending}
-            onClick={async () => {
-              if (removing == null) return
-              setPending(true)
-              try {
-                if (await store.removeConnectionUsage(removing)) setRemoving(undefined)
-              } finally {
-                setPending(false)
-              }
-            }}
-          >
-            {t('connectionUsage.remove')}
-          </Button>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" disabled={pending} onClick={() => setRemoving(undefined)}>
+              {t('connectionUsage.cancel')}
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={pending}
+              onClick={async () => {
+                if (removing == null) return
+                setPending(true)
+                try {
+                  if (await store.removeConnectionUsage(removing)) setRemoving(undefined)
+                } finally {
+                  setPending(false)
+                }
+              }}
+            >
+              {t('connectionUsage.stopUsing')}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </section>
@@ -545,46 +610,121 @@ export function ConnectorAccessEmptyState({ store, serviceId }: { readonly store
 }
 
 function AccountReferences({
+  hierarchy = false,
+  icon,
   code = false,
   references,
   label,
   onSelect,
 }: {
+  readonly hierarchy?: boolean
+  readonly icon: (reference: ConnectorAccountReference) => string | undefined
   readonly code?: boolean
   readonly references: readonly ConnectorAccountReference[]
   readonly label: string
   readonly onSelect?: ((reference: ConnectorAccountReference) => void) | undefined
 }): ReactElement | null {
   const t = useTranslate()
-  const [expanded, setExpanded] = useState(false)
   if (references.length == 0 && !code) return null
   return (
-    <div className="flex min-w-0 flex-wrap items-baseline gap-x-1 text-[11px] leading-4 text-muted-foreground">
-      <span>{label}</span>
-      {(expanded ? references : references.slice(0, 2)).map((reference) => (
-        <Button
-          key={JSON.stringify([reference.target, reference.nodeId, reference.kind])}
-          className="h-auto min-w-0 max-w-full p-0 text-left text-[11px] leading-4 font-normal whitespace-normal wrap-anywhere text-muted-foreground"
-          variant="link"
-          type="button"
-          title={reference.name}
-          disabled={onSelect == null}
-          onClick={() => onSelect?.(reference)}
+    <div className="flex min-w-0 flex-col gap-1">
+      {(!hierarchy || references.length == 0) && (
+        <span className="text-xs text-muted-foreground">{references.length > 0 ? label : t('connectionUsage.codeAccess')}</span>
+      )}
+      {references.length > 0 && (
+        <ul
+          className="m-0 flex list-none flex-col gap-1 p-0 [--branch-radius:4px] [--branch-color:color-mix(in_srgb,var(--ui-muted-foreground)_20%,var(--ui-popover))]"
+          aria-label={label}
         >
-          {reference.kind == null ? reference.name : `${t(`connectionUsage.${reference.kind}`)} · ${reference.name}`}
-        </Button>
-      ))}
-      {code && (
-        <>
-          {references.length > 0 && <span aria-hidden="true">·</span>}
-          <span title={t('connectionUsage.codeAllowed')}>{t('connectionUsage.codeShared')}</span>
-        </>
+          {references.map((reference, index) => {
+            const content = (
+              <>
+                <ContentIcon src={icon(reference)} className="size-4 shrink-0 data-[icon-kind=initials]:text-[20px]" />
+                <span className="min-w-0 flex-1 wrap-anywhere">{reference.name}</span>
+                {reference.kind != null && <span className="shrink-0 text-xs text-muted-foreground">{t(`connectionUsage.${reference.kind}`)}</span>}
+              </>
+            )
+            return (
+              <li key={JSON.stringify([reference.target, reference.nodeId, reference.kind])} className={hierarchy ? 'relative min-w-0 pl-4' : 'min-w-0'}>
+                {hierarchy && (
+                  <>
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        'pointer-events-none absolute left-1.5 border-l border-[var(--branch-color)]',
+                        index == 0 ? '-top-1.5' : '-top-1',
+                        index == references.length - 1 ? 'bottom-[calc(50%+var(--branch-radius))]' : 'bottom-0',
+                      )}
+                    />
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute bottom-1/2 left-1.5 h-[var(--branch-radius)] w-2.5 rounded-bl-[var(--branch-radius)] border-b border-l border-[var(--branch-color)]"
+                    />
+                  </>
+                )}
+                {onSelect == null ? (
+                  <div className="flex min-h-7 items-center gap-2 px-2 py-1 text-[13px]">{content}</div>
+                ) : (
+                  <Button
+                    className="h-auto min-h-7 w-full justify-start gap-2 px-2 py-1 text-left text-[13px] font-normal whitespace-normal"
+                    variant="ghost"
+                    size="xs"
+                    type="button"
+                    onClick={() => onSelect(reference)}
+                  >
+                    {content}
+                    <i aria-hidden="true" className="i-lucide-light:arrow-up-right size-3 shrink-0 text-muted-foreground" />
+                  </Button>
+                )}
+              </li>
+            )
+          })}
+        </ul>
       )}
-      {!expanded && references.length > 2 && (
-        <Button className="h-auto p-0 text-[11px] leading-4 font-normal text-muted-foreground" variant="link" type="button" onClick={() => setExpanded(true)}>
-          {t('connectorAccess.moreReferences', { count: references.length - 2 })}
-        </Button>
-      )}
+      {code && <p className="m-0 px-2 py-1 text-xs text-muted-foreground">{t('connectionUsage.codeAllowed')}</p>}
     </div>
+  )
+}
+
+function ConnectionConsoleLink({
+  store,
+  flowId,
+  providerId,
+  connectionId,
+  children,
+}: {
+  readonly store: WorkbenchStore
+  readonly flowId: string
+  readonly providerId: string
+  readonly connectionId?: string
+  readonly children: ReactNode
+}) {
+  const [url, setUrl] = useState<string>()
+  const [error, setError] = useState<string>()
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    let current = true
+    setError(undefined)
+    void store.connectors.connectionPage(providerId, flowId, connectionId).then(
+      (value) => {
+        if (current) setUrl(value)
+      },
+      (reason: unknown) => {
+        if (current) setError(reason instanceof Error ? reason.message : String(reason))
+      },
+    )
+    return () => {
+      current = false
+    }
+  }, [store, flowId, providerId, connectionId, attempt])
+  const className = '-my-1 -ml-2 min-w-0 h-auto min-h-6 shrink justify-start gap-2 py-1 text-left text-[13px] text-foreground whitespace-normal'
+  return url == null ? (
+    <Button type="button" variant="ghost" size="xs" className={className} disabled={error == null} title={error} onClick={() => setAttempt(attempt + 1)}>
+      {children}
+    </Button>
+  ) : (
+    <a className={cn(buttonVariants({ variant: 'ghost', size: 'xs' }), className)} href={url} target="_blank" rel="noreferrer">
+      {children}
+    </a>
   )
 }

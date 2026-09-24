@@ -790,7 +790,7 @@ Workbench 已完成初始化并停留在 Flows 列表时，收到该事件自动
 Connector route 的 `flowId` 是 opaque Flow identity。提供时部署必须先确认 Flow 存在，并在该 Flow 的 Connector scope 内解析 Provider、Action 与
 Connection；客户端不能改用 Team ID、Connection owner 或其他外部 identity 代替 Flow scope。省略时使用部署的未限定 Connector catalog。
 
-授权页接口例外：`POST /v1/connector/connections/:serviceId/page` 接受可选的 `flowId` 或 `teamId`，两者不能同时提供。
+授权页接口例外：`POST /v1/connector/connections/:serviceId/page` 接受可选的 `flowId` 或 `teamId`，两者不能同时提供。可选 `connectionId` 将连接 ID 编码为返回 URL 的 `app` 查询参数，打开该账号详情；省略时打开 Provider 连接列表。
 `teamId` 供独立事件源表单使用，必须对应当前 Connector 身份可访问的团队；不会修改已有 Flow 的团队。
 对于 OOMOL 托管 Connector，Server 查询团队名称并生成 `https://console.oomol.com/team/:teamName/connections/:serviceId`（开发环境使用 `.dev`）；
 省略两者时选择当前身份的默认团队。托管入口从受支持的 runtime 域名推导，不使用自部署 Console 配置。

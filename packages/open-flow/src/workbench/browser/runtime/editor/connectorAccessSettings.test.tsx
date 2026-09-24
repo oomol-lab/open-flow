@@ -107,7 +107,7 @@ describe('Connector access settings', () => {
           loading: false,
         }),
       },
-      connectors: { $: { connections: val([{ connectionId: 'account', displayName: 'Work' }]) } },
+      connectors: { $: { actions: val({}), connections: val([{ connectionId: 'account', displayName: 'Work' }]) } },
       workspace: {
         catalogs: {
           providers: { get: () => val({ data: [{ serviceId: 'mail', serviceName: 'Mail' }] }) },
@@ -117,6 +117,7 @@ describe('Connector access settings', () => {
           flowId: val('flow'),
           live: val(undefined),
           revision: val({
+            node: () => undefined,
             connectorReferences: {
               accounts: [{ connectionId: 'account', providerId: 'mail', nodeId: 'send', name: 'Send mail', target: { kind: 'flow' } }],
               hasCode: true,
@@ -130,17 +131,45 @@ describe('Connector access settings', () => {
         <ConnectorAccessSettings store={store} />
       </I18nProvider>,
     )
-    expect(markup).toContain('Connection usage')
+    expect(markup).toContain('Accounts used by this draft')
     expect(markup).toContain('Personal')
     expect(markup.match(/aria-label="Mail"/g)).toHaveLength(1)
     expect(markup).not.toContain('Current account status: Unknown')
     expect(markup).toContain('Send mail')
-    expect(markup).toContain('Code: allowed for all Code nodes in this Flow')
-    expect(markup).toContain('2 accounts')
+    expect(markup).toContain('All Code nodes can use this account')
     expect(markup).toContain('Actions for Personal')
     expect(markup).not.toContain('Configure Code')
     expect(markup).not.toContain('role="checkbox"')
     expect(markup).not.toContain('Add service')
+  })
+
+  it.each([false, true])('distinguishes missing account selections from services that need no setup (%s)', (noSetup) => {
+    const store = {
+      connectors: { $: { actions: val({}) } },
+      connectorAccess: { $: val({ access: { version: 1, mode: 'implicit', bindings: [] }, loading: false }) },
+      workspace: {
+        $: {
+          flowId: val('flow'),
+          live: val(undefined),
+          revision: val({
+            node: () => undefined,
+            connectorReferences: { accounts: [{ providerId: 'mail', nodeId: 'send', name: 'Send mail', kind: 'connector', target: { kind: 'flow' } }] },
+          }),
+        },
+        catalogs: {
+          providers: { get: () => val({ data: [{ serviceId: 'mail', serviceName: 'Mail', noSetup }] }) },
+          connections: { get: () => val({ data: [] }) },
+        },
+      },
+    } as unknown as WorkbenchStore
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <ConnectorAccessSettings store={store} onSelectReference={() => {}} />
+      </I18nProvider>,
+    )
+    expect(markup.includes('Needs an account')).toBe(!noSetup)
+    expect(markup.includes('Send mail')).toBe(!noSetup)
+    expect(markup.includes('This draft does not use any accounts.')).toBe(noSetup)
   })
 
   it('distinguishes a permission group from its connection', () => {

@@ -1,6 +1,7 @@
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover'
 import * as React from 'react'
 import { Button } from './button.tsx'
+import { ScrollArea } from './scroll-area.tsx'
 import { cn } from './utils.ts'
 
 function Popover({ ...props }: PopoverPrimitive.Root.Props) {
@@ -99,7 +100,7 @@ function PopoverPanelContent({
       sideOffset={2}
       {...props}
       className={cn(
-        'w-80 max-w-[calc(100vw-24px)] max-h-[min(80vh,680px,var(--available-height))] gap-0 overflow-hidden bg-background p-0 text-xs [--ui-control-radius:6px]',
+        'w-80 max-w-[calc(100vw-24px)] max-h-[min(80vh,680px,var(--available-height))] gap-0 overflow-hidden bg-popover p-0 text-xs [--ui-control-radius:6px]',
         props.className,
       )}
     >
@@ -118,9 +119,9 @@ function PopoverPanelContent({
         </PopoverPrimitive.Close>
       </div>
       <div className="mx-2 h-px shrink-0 bg-border/50" />
-      <div className="min-h-0 overflow-y-auto">
+      <ScrollArea className="min-h-0 h-auto" defer={false}>
         <div className="flex flex-col gap-3 p-3">{children}</div>
-      </div>
+      </ScrollArea>
       {footer && (
         <>
           <div className="mx-2 h-px shrink-0 bg-border/50" />

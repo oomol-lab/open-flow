@@ -645,6 +645,15 @@ it('opens hosted connection pages in the Flow team or explicitly selected team',
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ version: 1, url: 'https://console.oomol.com/team/team_a/connections/feishu_app_bot' })
   }
+  const accountPage = await app.request(`/v1/connector/connections/feishu_app_bot/page?flowId=${flow.flowId}&connectionId=${encodeURIComponent('app /?#&')}`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ version: 1 }),
+  })
+  expect(accountPage.status).toBe(200)
+  const accountUrl = new URL((await accountPage.json()).url)
+  expect(accountUrl.origin + accountUrl.pathname).toBe('https://console.oomol.com/team/team_a/connections/feishu_app_bot')
+  expect(accountUrl.searchParams.get('app')).toBe('app /?#&')
   expect(await service.control.connectorConnectionPage('feishu_app_bot')).toBe('https://console.oomol.com/team/team_b/connections/feishu_app_bot')
   await expect(service.control.connectorConnectionPage('feishu_app_bot', undefined, 'unknown-team')).rejects.toThrow('Team')
   await expect(service.control.connectorConnectionPage('feishu_app_bot', flow.flowId, 'team-b-id')).rejects.toThrow('either a Flow or a Team')

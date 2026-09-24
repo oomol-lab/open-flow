@@ -66,7 +66,7 @@ interface NodeProjectionContext {
   readonly target: GraphTarget
 }
 
-function semanticNodeIcon(node: ResolvedNode, connectorActions: Readonly<Record<string, ConnectorActionView>>): string | undefined {
+export function semanticNodeIcon(node: ResolvedNode, connectorActions: Readonly<Record<string, ConnectorActionView>>): string | undefined {
   if (node.node.icon != null) return node.node.icon
   if (node.kind != 'task' || node.definition == null || !('executor' in node.definition) || node.definition.executor.kind != 'connector') return nodeIcon(node)
   const action = connectorActions[node.definition.executor.action]
@@ -355,7 +355,7 @@ function triggerIcon(trigger: TriggerNode): string {
   }
 }
 
-function triggerNodeIcon(trigger: TriggerNode, providers: Readonly<Record<string, ConnectorProvider>>): string {
+export function triggerNodeIcon(trigger: TriggerNode, providers: Readonly<Record<string, ConnectorProvider>>): string {
   if (trigger.icon != null) return trigger.icon
   if (trigger.kind != 'integration' && trigger.kind != 'poll') return triggerIcon(trigger)
   return providerIcon(providers[trigger.definition.provider] ?? { serviceId: trigger.definition.provider, serviceName: trigger.definition.provider })
