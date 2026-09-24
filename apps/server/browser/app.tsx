@@ -344,7 +344,7 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
   const defaultTeam = team.kind == 'ready' ? team.teams.find((item) => item.systemCreated) : undefined
   if (team.kind == 'ready') {
     if (defaultTeam != null) teamOptions.push({ label: t('team.defaultNamed', { name: defaultTeam.name }), value: defaultTeam.id })
-    teamOptions.push(...team.teams.filter((item) => !item.systemCreated).map((item) => ({ label: item.name, value: item.id })))
+    teamOptions.push(...team.teams.filter((item) => item.id != defaultTeam?.id).map((item) => ({ label: item.name, value: item.id })))
   }
   let flowBadges: Readonly<Record<string, string>> | undefined
   if (team.kind == 'ready') {

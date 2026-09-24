@@ -622,6 +622,43 @@ describe('Server Connector host', () => {
   })
 })
 
+it('lists default connections in the default Team and preserves the Flow Team scope', async () => {
+  const connector = new ConnectorClient('https://connector.oomol.com', 'runtime-token')
+  const teams = [
+    { id: 'flow-team', name: 'flow', systemCreated: false },
+    { id: 'default-team', name: 'default', systemCreated: true },
+  ]
+  vi.spyOn(connector, 'listTeams').mockResolvedValue(teams)
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input, init) => {
+      const url = String(input)
+      if (url.endsWith('/v1/me/teams')) {
+        return Response.json({ teams: teams.map((team) => ({ id: team.id, deleted: false, status: 'normal', role: 'admin' })) })
+      }
+      if (url.startsWith('https://connector.oomol.com/v1/apps')) {
+        const teamId = new Headers(init?.headers).get('x-oo-team-id')
+        return Response.json({
+          success: true,
+          data: [{ id: `${teamId}-account`, displayName: 'Account', service: 'example', isDefault: true, status: 'active' }],
+        })
+      }
+      throw new Error(`Unexpected request: ${url}`)
+    }),
+  )
+  const service = await open(connector)
+  const { flow } = await service.control.createFlow('operator', 'Flow', 'create-scoped-flow', 'flow-team')
+  const app = createServerApp(service, { resolveControlActor: () => 'operator' })
+  for (const [query, teamId] of [
+    ['', 'default-team'],
+    [`?flowId=${flow.flowId}`, 'flow-team'],
+  ]) {
+    const response = await app.request(`/v1/connector/connections${query}`)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ version: 1, connections: [{ connectionId: `${teamId}-account` }] })
+  }
+})
+
 it('opens hosted connection pages in the Flow team or explicitly selected team', async () => {
   const connector = new ConnectorClient('https://connector.oomol.com', 'runtime-token')
   vi.spyOn(connector, 'listTeams').mockResolvedValue([

@@ -154,17 +154,15 @@ export async function providerAccessBindingCandidates(input: {
 }
 
 function parseAppAccess(policy: Record<string, unknown>, connections: readonly ConnectorConnection[]): readonly AppAccess[] {
-  const configured = new Map<string, unknown>()
-  for (const [subject, value] of Object.entries(policy)) {
-    if (subject.startsWith(appRolePrefix) && subject.length > appRolePrefix.length) configured.set(subject.slice(appRolePrefix.length), value)
-  }
-  return connections
-    .filter((connection) => configured.has(connection.connectionId))
-    .map((connection) => ({
+  return connections.map((connection) => {
+    const role = policy[`${appRolePrefix}${connection.connectionId}`]
+    return {
       appId: connection.connectionId,
-      permissionRules: parseRole(policy, configured.get(connection.connectionId), connection.connectionId, connection.serviceId),
+      permissionRules:
+        role === undefined ? { assignments: {}, rules: [], teamDefault: {} } : parseRole(policy, role, connection.connectionId, connection.serviceId),
       providerId: connection.serviceId,
-    }))
+    }
+  })
 }
 
 function parseRole(policy: Record<string, unknown>, value: unknown, appId: string, providerId: string): PermissionRules {

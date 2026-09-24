@@ -675,6 +675,8 @@ accessRevision, version: 1 }` 通知客户端失效缓存。
 PUT/DELETE 返回 `connector.access-unsupported`；`connector.oomol.com` 和 `connector.oomol.dev` 使用 `selectable`。托管模式用配置的 OOMOL 用户 token 从
 `api.oomol.{com|dev}/v1/users/profile` 取得当前用户 UID，从 relation-control 读取 Flow Team 的 app-access，校验该用户可分配的 candidate，并只保存 opaque
 binding。app-access 投影缓存五分钟；Action、Connection、catalog、execute 和 proxy 都按同一 binding fail closed。
+账号未配置 `role::connector-app:<connectionId>` 时，沿用 Connector 的团队默认语义：全部 Action 可用，生成 `source: { kind: 'policy', ruleId: null }`。
+已配置账号严格采用其权限规则；空 Action 列表表示禁用，格式错误不得回退为全量权限。后续执行重新解析当前规则，已删除的具名权限组不得回退到团队默认。
 开源 Server 以用户 token 调用托管 Connector，因此不会伪造只允许 Team token 携带的 `accessGrant`；包含 `appAccessConfig` 的 binding 必须由具备 Team token
 transport 的托管 Flow runtime 执行，开源 Server 对这类执行返回 `connector.access-invalid`。
 

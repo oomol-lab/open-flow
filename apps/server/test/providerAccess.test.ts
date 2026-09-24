@@ -327,9 +327,37 @@ it('keeps a named team-default rule restricted and never falls back after its de
   await expect(resolveProviderAccessBinding({ ...input, ...reader!, source: defaultAccess!.source })).resolves.toBeUndefined()
   await expect(resolveProviderAccessBinding({ ...input, ...reader!, connectionId: 'other-account' })).resolves.toBeUndefined()
   await expect(resolveProviderAccessBinding({ ...input, ...reader!, teamId: 'other-team' })).resolves.toBeUndefined()
-  await expect(resolveProviderAccessBinding({ ...input, ...defaultAccess!, policy: {} })).resolves.toBeUndefined()
+  await expect(resolveProviderAccessBinding({ ...input, ...defaultAccess!, policy: {} })).resolves.toMatchObject({ accessGrant: {} })
+  await expect(resolveProviderAccessBinding({ ...input, ...reader!, policy: {} })).resolves.toBeUndefined()
   permissionRules.rules = []
   await expect(resolveProviderAccessBinding({ ...input, ...reader! })).resolves.toBeUndefined()
+})
+
+it('uses unrestricted team defaults for unconfigured accounts and applies later restrictions', async () => {
+  const input = {
+    actorId: 'member',
+    teamId: 'team-1',
+    providerId: 'example',
+    connections: [{ connectionId: 'account', displayName: 'Account', isDefault: true, serviceId: 'example', status: 'active' as const }],
+    policy: { 'user::someone-else': { connector: [{ method: 'POST', provider: '*', actions: ['*'] }] } },
+  }
+  const candidates = await providerAccessBindingCandidates(input)
+  expect(candidates).toHaveLength(1)
+  const candidate = candidates[0]!
+  expect(candidate).toMatchObject({ source: { kind: 'policy', ruleId: null }, permissions: { allActions: true, proxy: true } })
+  await expect(resolveProviderAccessBinding({ ...input, ...candidate })).resolves.toMatchObject({ accessGrant: {} })
+  await expect(providerAccessBindingCandidates({ ...input, policy: {} })).resolves.toEqual(candidates)
+  const policy = {
+    'role::connector-app:account': {
+      connector: [{ method: 'POST', provider: 'example', permissionRules: { assignments: {}, rules: [], teamDefault: { actions: [] } } }],
+    },
+  }
+  await expect(providerAccessBindingCandidates({ ...input, policy })).resolves.toEqual([])
+  const restricted = await resolveProviderAccessBinding({ ...input, ...candidate, policy })
+  expect(providerAccessAllowsAction(restricted!, { actionId: 'example.echo', serviceId: 'example' })).toBe(false)
+  expect(providerAccessAllowsProxy(restricted!)).toBe(false)
+  await expect(providerAccessBindingCandidates({ ...input, policy: { 'role::connector-app:account': null } })).rejects.toThrow()
+  await expect(resolveProviderAccessBinding({ ...input, ...candidate, connections: [] })).resolves.toBeUndefined()
 })
 
 it('reads mixed old and current saved authorization without losing valid bindings and permits removing the old one', async () => {

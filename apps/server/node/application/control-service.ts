@@ -442,9 +442,10 @@ export class ControlService {
   }
 
   async resolveConnectorScope(flowId?: string): Promise<string | undefined> {
-    if (flowId != null) this.getFlow(flowId)
-    let teamId = flowId == null ? undefined : this.store.connectorTeams.get(flowId)
-    if (flowId != null && teamId == null) {
+    if (flowId == null) return await this.resolveConnectorTeam()
+    this.getFlow(flowId)
+    let teamId = this.store.connectorTeams.get(flowId)
+    if (teamId == null) {
       const resolved = await this.resolveConnectorTeam()
       if (resolved != null) teamId = this.store.connectorTeams.bind(flowId, resolved)
     }
