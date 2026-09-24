@@ -379,7 +379,7 @@ export function RunsView({
                   <Icon name="play" />
                 </EmptyMedia>
                 <EmptyTitle>{t(filterActive ? 'run.filterEmpty' : 'run.historyEmpty')}</EmptyTitle>
-                <EmptyDescription>{t(filterActive ? 'run.filterEmptyDescription' : 'run.historyEmptyDescription')}</EmptyDescription>
+                {filterActive && <EmptyDescription>{t('run.filterEmptyDescription')}</EmptyDescription>}
               </EmptyHeader>
               {filterActive && (
                 <Button onClick={clearFilter} size="sm" variant="outline">
@@ -440,7 +440,22 @@ export function RunsView({
       </aside>
       <section className="run-detail-panel">
         {run == null ? (
-          <div className="run-detail-empty">{t('run.selectRun')}</div>
+          <Empty className="row-span-2">
+            <EmptyHeader>
+              <EmptyMedia variant="icon">
+                <Icon name="play" />
+              </EmptyMedia>
+              <EmptyTitle>{t(runs.length > 0 ? 'run.history' : filterActive ? 'run.filterEmpty' : 'run.historyEmpty')}</EmptyTitle>
+              <EmptyDescription>
+                {t(runs.length > 0 ? 'run.selectRun' : filterActive ? 'run.filterEmptyDescription' : 'run.historyEmptyDescription')}
+              </EmptyDescription>
+            </EmptyHeader>
+            {filterActive && runs.length == 0 && (
+              <Button onClick={clearFilter} size="sm" variant="outline">
+                {t('run.filterClear')}
+              </Button>
+            )}
+          </Empty>
         ) : (
           <>
             <div>
@@ -587,7 +602,15 @@ export function RunsView({
                     </div>
                   )}
                   {result == null ? (
-                    <div className="run-empty">{t('run.outputPending')}</div>
+                    <Empty>
+                      <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                          <Icon name="play" />
+                        </EmptyMedia>
+                        <EmptyTitle>{t('run.output')}</EmptyTitle>
+                        <EmptyDescription>{t('run.outputPending')}</EmptyDescription>
+                      </EmptyHeader>
+                    </Empty>
                   ) : (
                     <ScrollArea className="run-output-scroll run-content-scroll" defer={false} tabIndex={-1}>
                       <RunResultView result={result} />

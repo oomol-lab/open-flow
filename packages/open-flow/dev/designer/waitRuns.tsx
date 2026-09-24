@@ -278,7 +278,11 @@ export const runStatusIslandStory: FrontendStory = {
 function RunHistory({ language, dark, log }: { readonly language: UiLanguage; readonly dark: boolean; readonly log: LogAction }) {
   const [store, setStore] = useState<WorkbenchStore>()
   const [open, setOpen] = useState(true)
-  useStoryActions([{ label: 'Open run history', disabled: open, onClick: () => setOpen(true) }])
+  const [empty, setEmpty] = useState(false)
+  useStoryActions([
+    { label: 'Open run history', disabled: open, onClick: () => setOpen(true) },
+    { label: empty ? 'Show sample runs' : 'Show empty history', onClick: () => setEmpty(!empty) },
+  ])
   useEffect(() => {
     const samples = [
       { status: 'completed', duration: 2350 },
@@ -288,7 +292,7 @@ function RunHistory({ language, dark, log }: { readonly language: UiLanguage; re
       { status: 'completed', duration: 93_600_000 },
       { status: 'completed', duration: 128 },
     ] as const
-    const runs: RunDetails[] = Array.from(samples, (sample, index) => {
+    const runs: RunDetails[] = Array.from(empty ? [] : samples, (sample, index) => {
       const startedAt = `2026-09-${24 - Math.floor(index / 2)}T08:0${6 - index}:00Z`
       return {
         ...base,
@@ -360,7 +364,7 @@ function RunHistory({ language, dark, log }: { readonly language: UiLanguage; re
     setStore(next)
     void next.runs.load('flow')
     return () => next.dispose()
-  }, [language])
+  }, [language, empty])
   return (
     <I18nProvider i18n={createI18n(language)}>
       <div className="open-flow-workbench open-flow-theme grid h-full min-h-0" data-theme={dark ? 'dark' : 'light'}>

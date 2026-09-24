@@ -187,7 +187,7 @@ describe('RunStore', () => {
     }
   })
 
-  it('removes a selected Run from a filtered list without closing its details', async () => {
+  it('clears details when a filtered refresh removes the selected Run', async () => {
     let filteredReads = 0
     const request = vi.fn(async (path: string) => {
       if (path == '/v1/flows/flow-1/runs?limit=50') return Response.json({ flowId: 'flow-1', runs: [run], version: 1 })
@@ -215,7 +215,13 @@ describe('RunStore', () => {
       await vi.waitFor(() => expect(store.$.refreshing.value).toBe(false))
 
       expect(store.$.runs.value).toEqual([])
-      expect(store.$.run.value).toEqual(details)
+      expect(store.$.run.value).toBeUndefined()
+      expect(store.$.result.value).toBeUndefined()
+      expect(store.$.events.value).toEqual([])
+      await store.applyFilter({})
+      await vi.waitFor(() => expect(store.$.run.value).toEqual(details))
+      await store.applyFilter({ status: 'completed' })
+      expect(store.$.run.value).toBeUndefined()
     } finally {
       store.dispose()
     }

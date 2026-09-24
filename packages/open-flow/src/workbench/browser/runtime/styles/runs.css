@@ -610,8 +610,7 @@
     font-size: 11px;
   }
 
-  .run-list-empty,
-  .run-detail-empty {
+  .run-list-empty {
     display: flex;
     height: 100%;
     align-items: center;

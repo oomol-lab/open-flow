@@ -206,6 +206,7 @@ export class RunStore {
         const page = await this.#client.listRuns(flowId, { ...filter, limit: 50 })
         if (!current() || this.#state.value.target?.flowId != flowId) return
         this.#set({ ...listedRuns(this.#state.value, page.runs), nextCursor: page.nextCursor, refreshing: false })
+        this.#syncListSelection()
       } catch (error) {
         if (!current()) return
         this.#set({ refreshing: false })
@@ -228,8 +229,7 @@ export class RunStore {
       const page = await this.#client.listRuns(flowId, { ...filter, limit: 50 })
       if (!current()) return
       this.#set({ ...listedRuns(this.#state.value, page.runs), loaded: true, loadFailed: false, loading: false, nextCursor: page.nextCursor })
-      const first = page.runs[0]
-      if (first != null) this.#observe(first)
+      this.#syncListSelection()
     } catch (error) {
       if (!current()) return
       this.#set({ loadFailed: true, loading: false })
@@ -256,6 +256,7 @@ export class RunStore {
       const page = await this.#client.listRuns(target.flowId, { ...filter, limit: 50 })
       if (!current() || this.#state.value.target != nextTarget) return
       this.#set({ ...listedRuns(this.#state.value, page.runs), loaded: true, loading: false, nextCursor: page.nextCursor })
+      this.#syncListSelection()
     } catch (error) {
       if (!current() || this.#state.value.target != nextTarget) return
       this.#set({ loadFailed: true, loading: false })
@@ -431,6 +432,29 @@ export class RunStore {
     return true
   }
 
+  #syncListSelection(): void {
+    const state = this.#state.value
+    if (state.selectedRunId != null && state.runIds.includes(state.selectedRunId)) return
+    const first = state.runById.get(state.runIds[0] ?? '')
+    if (first != null) {
+      this.#observe(first)
+      return
+    }
+    this.#selection.invalidate()
+    this.#stopObservation()
+    this.#set({
+      selectedRunId: undefined,
+      externalRunId: undefined,
+      events: [],
+      eventCursor: 0,
+      eventsExpiresAt: undefined,
+      result: undefined,
+      historyComplete: true,
+      observationFailed: false,
+      resolvingActions: new Map(),
+    })
+  }
+
   #observe(run: Run): void {
     const current = this.#selection.begin()
     this.#stopObservation()
@@ -519,6 +543,7 @@ export class RunStore {
       const page = await this.#client.listRuns(target.flowId, { ...target.filter, limit: 50 })
       if (!current() || this.#state.value.target != target) return
       this.#set({ ...listedRuns(this.#state.value, page.runs), loaded: true, loadingMore: false, nextCursor: page.nextCursor, refreshing: false })
+      this.#syncListSelection()
     } catch {
       if (current() && this.#state.value.target == target) this.#set({ refreshing: false })
     }
