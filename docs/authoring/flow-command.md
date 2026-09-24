@@ -65,7 +65,6 @@ MCP 对应 `flow_schema {"example":"connector"}` 和 `flow_schema {"example":"po
 {
   "kind": "graph.trigger.create",
   "nodeId": "mail",
-  "bindingId": "mail-account",
   "key": "gmail.on_message_received",
   "connectionId": "CONNECTION_ID",
   "config": {},
@@ -73,7 +72,7 @@ MCP 对应 `flow_schema {"example":"connector"}` 和 `flow_schema {"example":"po
 }
 ```
 
-它固定作用于根 Flow。传入 connectionId 时同时创建 binding；省略时引用该批次中已存在的 bindingId。schedule 仅供 Poll 使用，省略时每五分钟轮询。Integration 不接受 schedule。
+它固定作用于根 Flow。connectionId 直接保存在 Trigger 节点，省略时表示尚未选择账号。schedule 仅供 Poll 使用，省略时每五分钟轮询。Integration 不接受 schedule。
 服务端在提交时解析 key，并将完整 definition 固定进 Revision；check 不动态替换定义。同 key、同请求重试先返回原提交结果，不再读取当前目录。一个批次仍只产生一个 Revision。需要显式固定定义时仍可使用原有 graph.node.create。
 CLI `trigger add` 也使用此操作；快速建图形式仍支持原有 Provider 配置。
 

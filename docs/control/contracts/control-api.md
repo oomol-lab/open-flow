@@ -152,8 +152,9 @@ Run 记录、终态结果与 Draft change 的幂等元数据仍保留。同一 R
 Presentation 不变。无法恢复任何内容时，显式 repair 创建空白子 Revision；普通读取仍按原错误返回，不会隐式修复。
 
 Draft 请求的 operations 使用 `@oomol-lab/open-flow/control-requests` 的 `DraftOperation`：包含完整 ChangeOperation，以及 `graph.trigger.create`。
-后者接受 `nodeId`、`bindingId`、Provider `key`、`config` 和可选的 `connectionId`、`name`、`schedule`。仅在根 Flow 创建 Poll/Integration；schedule 仅供 Poll 使用，默认每五分钟。
-提供 connectionId 时创建 Connection binding，否则引用已有 bindingId。服务端在提交时解析 Provider 定义，转换为完整 ChangeOperation 并保存定义快照；持久化 Revision 格式不变。
+后者接受 `nodeId`、Provider `key`、`config` 和可选的 `connectionId`、`name`、`schedule`。仅在根 Flow 创建 Poll/Integration；schedule 仅供 Poll 使用，默认每五分钟。
+`connectionId` 直接保存于 Trigger 节点；省略表示尚未选择账号。服务端在提交时解析 Provider 定义，转换为完整 ChangeOperation 并保存定义快照。
+Flow model 4 的 Poll/Integration 使用可选的 `connectionId`，`document.bindings` 只接受 `kind: 'variable'`。账号编辑通过 `graph.node.field.set` 的 `connectionId` 字段完成，省略 value 清除选择；不再接受 Connection binding 或 Trigger bindingId。
 幂等请求摘要按原始 DraftOperation 计算，已提交请求在解析目录之前重放，目录变更不改变重试结果。未知 key 或批次后续操作失败时，不提交部分变更。
 CLI `schema`、MCP `flow_schema` 与 REST Draft decoder 使用同一个输入合同；底层离线 `applyFlowChanges` 仍只接受已解析的 ChangeOperation。
 
@@ -252,7 +253,7 @@ interface Publication {
   modelVersion: number
   operation: 'publish' | 'rollback'
   publicationId: string
-  providerAccessDigest: string
+  sharedAccessDigest: string
   revisionDigest: string
   revisionId: string
   sourcePublicationId?: string
@@ -340,7 +341,7 @@ interface Run {
 }
 ```
 
-Run detail 增加固定的 `closureDigest`、`engineContract`、`engineDigest`、`modelVersion`、`providerAccessDigest` 和 `revisionDigest`。Live Run 增加
+Run detail 增加固定的 `closureDigest`、`engineContract`、`engineDigest`、`modelVersion`、`sharedAccessDigest` 和 `revisionDigest`。Live Run 增加
 `publicationId`；Trigger Run 增加 `publicationId`、`occurrenceId` 和 `triggerNodeId`。
 
 `RunStatus` 包含 `queued | starting | running | waiting | canceled | completed | failed | indeterminate`。所有 Run detail 必须返回待决议集合：
@@ -571,6 +572,8 @@ verificationTokenConfigured, encryptKeyConfigured, endpointUrl, verifiedAt, last
 
 ### Provider Access Binding
 
+模型分层、调用范围与生命周期说明见 [Flow 鉴权模型](../flow-authorization.md)；本节定义序列化结构与接口合同。
+
 Binding 和 candidate 都携带 `connectionId`、`providerId`、`accessBindingId` 和显式 `source`：
 `{ kind: 'admin-delegation' }` 为管理员委托；`{ kind: 'policy', ruleId: null }` 为团队默认 grant；
 `{ kind: 'policy', ruleId: string }` 为具名规则。`null` 不表示未知或尚未配置。普通规则 ID 可以为 `team-admin`、`team-default` 等任意非空字符串。
@@ -602,10 +605,8 @@ interface ConnectorAccess {
     providerId: string
     status: ProviderAccessBindingStatus
   }[]
-  // Present in new immutable snapshots: node use, separate from shared Code bindings.
-  nodeBindings?: ConnectorAccess['bindings']
   mode: ConnectorAccessMode
-  providerAccessDigest: string
+  sharedAccessDigest: string
   version: 1
 }
 ```
@@ -617,8 +618,33 @@ interface ConnectorAccess {
 | `PUT`    | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
 | `DELETE` | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
 
-`bindings` 是整个 Flow（含 Subflow）的 Code 共享允许列表。`nodeBindings` 在新 Publication / Run 快照中固定独立 Code Action 和其他节点使用；缺失该字段的历史快照沿用旧共享列表语义，空数组则表示没有节点连接。
-`GET /v1/flows/:flowId/connector-access?publicationId=...` 读取归属此 Flow 的已发布快照，只读；不带参数读取 Draft Code 配置。
+`bindings` 是整个 Flow（含 Subflow）的 Code 共享允许列表。`sharedAccessDigest` 只计算排序后的 `[providerId, accessBindingId]` 共享选择，
+用于配置变更检测、发布状态与请求身份；不包含节点选择、展示名称、上游即时权限或 Provider 展示列表，不是完整执行快照摘要。
+`GET /v1/flows/:flowId/connector-access?publicationId=...` 读取归属此 Flow 的已发布 `ConnectorAccessSnapshot`，只读；不带参数读取 Draft `ConnectorAccess` 配置。
+客户端分别使用 `getPublishedConnectorAccess` 与 `getConnectorAccess`。
+
+```ts
+interface ConnectorAccessGrant {
+  accessBindingId: string
+  connectionId: string
+  providerId: string
+  source: { kind: 'admin-delegation' } | { kind: 'policy'; ruleId: string | null }
+  connectionDisplayName: string
+  permissionGroupName?: string | null
+}
+
+interface ConnectorAccessSnapshot {
+  version: 2
+  mode: ConnectorAccessMode
+  sharedAccessDigest: string
+  sharedBindings: readonly ConnectorAccessGrant[]
+  selectedBindings: readonly ConnectorAccessGrant[]
+}
+```
+
+两个授权集合必填，分别供共享 Code 与显式选择连接的消费者使用。它们按授权身份去重，不表示节点白名单；宿主必须从固定声明建立单次调用范围。
+快照不包含 `accessRevision`、`providerIds`、`status` 或 `policyRevision`，名称仅用于历史展示。`implicit` 快照的两个集合均为空。
+Run、Publication、后台订阅与通知恢复均严格解码快照；不能将可编辑配置对象当作执行快照，也不支持通过缺失字段启用旧共享语义。
 
 `POST /v1/flows/:flowId/connection-usage/remove` 接收 `{ version: 1, connectionId, expectedRevisionId, expectedAccessRevision }`，
 通过标准 `Idempotency-Key` 固定请求身份，返回 `DraftChange`。部署在单个事务中检查两个版本并清除该账号的所有节点选择和 Code 使用。
@@ -1162,7 +1188,7 @@ Agent 声明的业务工具和审批通知仍独立执行能力检查。
 Workbench 切换连接时原子清除 Linear 的 `teamId` 与 `stateIds`；切换 Team 时原子清除 `stateIds`。
 失效的已选项必须保留并明确提示，不能自动替换或清空而扩大筛选范围。
 
-Flow 服务列表与账号授权分别保存。`ConnectorAccess.providerIds` 保存显式添加的服务，允许服务尚无账号或尚未勾选授权；旧快照没有此字段时按空列表处理，已有 bindings 仍提供其所属服务。Code 配置合并显式添加服务和 Code binding 所属服务，不混入节点引用服务；总览从节点配置与 Code binding 派生使用关系。新增服务不授予账号权限，也不改变仅由授权绑定计算的 `providerAccessDigest`。
+Flow 服务列表与账号授权分别保存。`ConnectorAccess.providerIds` 保存显式添加的服务，允许服务尚无账号或尚未勾选授权；旧快照没有此字段时按空列表处理，已有 bindings 仍提供其所属服务。Code 配置合并显式添加服务和 Code binding 所属服务，不混入节点引用服务；总览从节点配置与 Code binding 派生使用关系。新增服务不授予账号权限，也不改变仅由授权绑定计算的 `sharedAccessDigest`。
 
 `PUT /v1/flows/:flowId/connector-access/:providerId/service` 添加服务；`DELETE` 同一路径原子移除服务及其全部授权绑定。请求为 `{ version: 1, expectedAccessRevision }`，返回更新后的 `ConnectorAccess`，沿用访问版本冲突和 `access.changed` 通知。添加前校验服务存在且需要授权；服务配置持久化到 Flow，刷新或重新打开后保留。
 
