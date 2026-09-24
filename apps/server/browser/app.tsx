@@ -104,8 +104,9 @@ function connectorTeams(value: unknown):
 }
 
 function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
-  const [pathname, setPathname] = useState(() => window.location.pathname)
-  const route = useMemo(() => parseRoute(pathname), [pathname])
+  const [routeUrl, setRouteUrl] = useState(() => window.location.pathname + window.location.search)
+  const pathname = routeUrl.split('?')[0]
+  const route = useMemo(() => parseRoute(routeUrl), [routeUrl])
   const eventSourcesOpen = pathname == '/settings/event-sources'
   const settingsOpen = pathname == '/settings' || eventSourcesOpen
   const variablesOpen = pathname == '/variables'
@@ -199,20 +200,20 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
   }, [loadTeams, session.kind])
   useEffect(() => {
     const restore = (): void => {
-      setPathname(window.location.pathname)
+      setRouteUrl(window.location.pathname + window.location.search)
     }
     window.addEventListener('popstate', restore)
     return () => window.removeEventListener('popstate', restore)
   }, [])
   function navigate(next: WorkbenchLocation, options: WorkbenchNavigationOptions): void {
     const path = routePath(next)
-    if (path != window.location.pathname) window.history[options.replace ? 'replaceState' : 'pushState'](null, '', path)
-    setPathname(path)
+    if (path != window.location.pathname + window.location.search) window.history[options.replace ? 'replaceState' : 'pushState'](null, '', path)
+    setRouteUrl(path)
   }
 
   function openPage(path: '/' | '/settings' | '/settings/event-sources' | '/variables'): void {
-    if (path != window.location.pathname) window.history.pushState(null, '', path)
-    setPathname(path)
+    if (path != window.location.pathname + window.location.search) window.history.pushState(null, '', path)
+    setRouteUrl(path)
   }
 
   function followPage(event: MouseEvent<HTMLAnchorElement>, path: '/' | '/settings' | '/settings/event-sources' | '/variables'): void {

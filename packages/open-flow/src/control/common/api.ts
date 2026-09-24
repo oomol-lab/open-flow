@@ -375,7 +375,7 @@ export interface Run {
   readonly flowId: string
   readonly revisionId: string
   readonly runId: string
-  readonly source: 'draft' | 'live' | 'trigger'
+  readonly source: 'draft' | 'live'
   readonly startedAt?: string
   readonly status: RunStatus
   readonly version: 1
@@ -402,14 +402,13 @@ type RunDetailsBase = Run & {
 }
 
 export type DraftRun = RunDetailsBase & { readonly source: 'draft' }
-export type LiveRun = RunDetailsBase & { readonly publicationId: string; readonly source: 'live' }
-export type TriggerRun = RunDetailsBase & {
-  readonly occurrenceId: string
+export type LiveRun = RunDetailsBase & {
   readonly publicationId: string
-  readonly source: 'trigger'
-  readonly triggerNodeId: string
+  readonly source: 'live'
+  readonly occurrenceId?: string
+  readonly triggerNodeId?: string
 }
-export type RunDetails = DraftRun | LiveRun | TriggerRun
+export type RunDetails = DraftRun | LiveRun
 
 export interface RunPage {
   readonly flowId: string

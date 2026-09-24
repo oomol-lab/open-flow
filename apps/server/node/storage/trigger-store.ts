@@ -174,7 +174,6 @@ export type TriggerOccurrenceInput = TriggerOccurrence & {
   readonly closureDigest: string
   readonly modelVersion: number
   readonly publicationId: string
-  readonly source: 'trigger'
 }
 
 export class TriggerStore {
@@ -384,7 +383,7 @@ export class TriggerStore {
         )
       if (current == null) return
 
-      const accepted = this.#acceptTriggerOccurrence({ ...input, source: 'trigger' })
+      const accepted = this.#acceptTriggerOccurrence(input)
       if (accepted.kind == 'overloaded') return accepted
       if (accepted.kind == 'accepted' && accepted.created) {
         this.#database
@@ -474,7 +473,6 @@ export class TriggerStore {
         requestDigest: input.requestDigest,
         revisionDigest: input.revisionDigest,
         revisionId: input.revisionId,
-        source: 'trigger',
         triggerNodeId: input.triggerNodeId,
       })
       if (accepted.kind == 'overloaded') return accepted

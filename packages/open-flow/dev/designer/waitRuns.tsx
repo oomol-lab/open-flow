@@ -293,6 +293,11 @@ function RunHistory({ language, dark, log }: { readonly language: UiLanguage; re
       return {
         ...base,
         runId: `65fbbd9e-395a-4b4d-a002-635058e2589${index}`,
+        ...(index % 3 == 0
+          ? { source: 'live' as const, publicationId: 'publication', occurrenceId: `occurrence-${index}`, triggerNodeId: 'schedule' }
+          : index % 3 == 1
+            ? { source: 'live' as const, publicationId: 'publication' }
+            : {}),
         status: sample.status,
         waits: [],
         createdAt: startedAt,

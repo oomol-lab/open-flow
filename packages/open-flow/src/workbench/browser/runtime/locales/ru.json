@@ -652,7 +652,6 @@
     "selectRun": "Выберите запуск, чтобы посмотреть его хронологию и выходные данные.",
     "sourceDraft": "Черновик",
     "sourceLive": "Рабочая",
-    "sourceTrigger": "Trigger",
     "statusCanceled": "Отменено",
     "statusFailed": "Ошибка",
     "statusIndeterminate": "Неопределённо",

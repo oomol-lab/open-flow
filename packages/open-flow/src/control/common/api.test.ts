@@ -391,6 +391,22 @@ describe('ControlClient Wait API', () => {
     ],
   } as const
 
+  it.each([false, true])('decodes Live runs with occurrence metadata: %s', async (automatic) => {
+    const response = {
+      ...waiting,
+      source: 'live',
+      publicationId: 'publication',
+      ...(automatic ? { occurrenceId: 'occurrence', triggerNodeId: 'schedule' } : {}),
+    }
+    const client = new ControlClient(async () => Response.json(response))
+    await expect(client.getRun(waiting.runId)).resolves.toEqual(response)
+  })
+
+  it('rejects the removed Trigger source', async () => {
+    const client = new ControlClient(async () => Response.json({ ...waiting, source: 'trigger' }))
+    await expect(client.getRun(waiting.runId)).rejects.toMatchObject({ code: 'response.invalid' })
+  })
+
   it('decodes the active waiting projection and resolves a fixed action', async () => {
     const response = {
       action: 'approve',
@@ -438,12 +454,12 @@ it('serializes Run list filters', async () => {
     limit: 25,
     pendingWait: true,
     runId: 'run/1',
-    source: 'trigger',
+    source: 'live',
     status: 'failed',
   })
 
   expect(request).toHaveBeenCalledWith(
-    '/v1/flows/flow%2F1/runs?cursor=next+page&limit=25&status=failed&pendingWait=true&source=trigger&createdFrom=2026-09-16T00%3A00%3A00.000Z&createdBefore=2026-09-17T00%3A00%3A00.000Z&runId=run%2F1',
+    '/v1/flows/flow%2F1/runs?cursor=next+page&limit=25&status=failed&pendingWait=true&source=live&createdFrom=2026-09-16T00%3A00%3A00.000Z&createdBefore=2026-09-17T00%3A00%3A00.000Z&runId=run%2F1',
     expect.anything(),
   )
 })

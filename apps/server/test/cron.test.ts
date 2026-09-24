@@ -216,7 +216,15 @@ describe('Server Cron Trigger', () => {
         .get() as { readonly occurrenceId: string; readonly outputsJson: string }
       expect(JSON.parse(occurrence.outputsJson)).toEqual({ scheduledAt: '2026-08-21T00:01:00.000Z' })
       await expect(scheduledTriggerOccurrenceId(binding.bindingId, binding.runtimeVersion, '2026-08-21T00:01:00.000Z')).resolves.toBe(occurrence.occurrenceId)
-      expect(database.prepare('SELECT status FROM runs').get()).toEqual({ status: 'queued' })
+      expect(database.prepare('SELECT status, source FROM runs').get()).toEqual({ status: 'queued', source: 'live' })
+      const connection = Database.open(file)
+      try {
+        const views = new Store(connection).runViews
+        expect(views.listControlRuns('main', 10, { source: 'live' })).toHaveLength(1)
+        expect(views.listControlRuns('main', 10, { source: 'draft' })).toHaveLength(0)
+      } finally {
+        connection.close()
+      }
       expect(database.prepare('SELECT COUNT(*) AS count FROM work').get()).toEqual({ count: 1 })
     } finally {
       database.close()

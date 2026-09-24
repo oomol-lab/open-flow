@@ -652,7 +652,6 @@
     "selectRun": "選擇一筆執行紀錄以檢視它的時間軸與輸出。",
     "sourceDraft": "草稿",
     "sourceLive": "線上",
-    "sourceTrigger": "Trigger",
     "statusCanceled": "已取消",
     "statusFailed": "失敗",
     "statusIndeterminate": "狀態不明",

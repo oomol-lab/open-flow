@@ -591,7 +591,6 @@ export class IntegrationStore {
       requestDigest: input.requestDigest,
       revisionDigest: input.revisionDigest,
       revisionId: input.revisionId,
-      source: 'trigger',
       triggerNodeId: input.triggerNodeId,
     })
     if (accepted.kind == 'overloaded') return accepted

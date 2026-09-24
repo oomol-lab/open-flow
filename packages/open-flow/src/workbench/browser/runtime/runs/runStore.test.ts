@@ -275,3 +275,22 @@ it('aborts both pending Run reads on reset and ignores their late responses', as
     store.dispose()
   }
 })
+
+it('loads the route source on first entry and overrides an earlier source while preserving other filters', async () => {
+  const request = vi.fn(async (_path: string) => Response.json({ flowId: 'flow-1', runs: [], version: 1 }))
+  const store = new RunStore(new WorkbenchClient(request), vi.fn())
+  try {
+    await store.load('flow-1', { source: 'live' })
+    expect(request.mock.calls[0]?.[0]).toBe('/v1/flows/flow-1/runs?limit=50&source=live')
+    expect(store.$.filter.value).toEqual({ source: 'live' })
+    await store.applyFilter({ source: 'draft', status: 'failed' })
+    await store.load('flow-1', { source: 'live' })
+    expect(store.$.filter.value).toEqual({ source: 'live', status: 'failed' })
+    expect(request.mock.calls.at(-1)?.[0]).toBe('/v1/flows/flow-1/runs?limit=50&status=failed&source=live')
+    await store.load('flow-1', { source: undefined })
+    expect(store.$.filter.value.source).toBeUndefined()
+    expect(request.mock.calls.at(-1)?.[0]).toBe('/v1/flows/flow-1/runs?limit=50&status=failed')
+  } finally {
+    store.dispose()
+  }
+})

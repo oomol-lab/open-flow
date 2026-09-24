@@ -16,13 +16,20 @@ export class NavigationStore {
   #syncing = false
   readonly #stopReactions: (() => void)[] = []
 
-  public readonly $: { readonly ready: ReadonlyVal<boolean>; readonly view: ReadonlyVal<WorkbenchView> } = { ready: this.#ready, view: this.#view }
+  public readonly $: {
+    readonly ready: ReadonlyVal<boolean>
+    readonly view: ReadonlyVal<WorkbenchView>
+  } = { ready: this.#ready, view: this.#view }
 
   public constructor(store: WorkbenchStore, location: WorkbenchLocation, navigate: (location: WorkbenchLocation, options: WorkbenchNavigationOptions) => void) {
     this.#location = location
     this.#navigate = navigate
     this.#store = store
     this.#view.set(location.view)
+  }
+
+  public get runSource(): WorkbenchLocation['runSource'] {
+    return this.#location.view == 'runs' ? this.#location.runSource : undefined
   }
 
   public async start(): Promise<void> {
@@ -44,10 +51,10 @@ export class NavigationStore {
     this.#view.dispose()
   }
 
-  public open(view: WorkbenchView): void {
+  public open(view: WorkbenchView, runSource?: WorkbenchLocation['runSource']): void {
     this.#change += 1
     this.#syncing = false
-    this.#write(view, false)
+    this.#write(view, false, { runSource })
   }
 
   public async createFlow(name: string, create?: (name: string) => Promise<string>): Promise<boolean> {
@@ -119,9 +126,19 @@ export class NavigationStore {
     if (this.#ready.value && !this.#syncing) this.#write(this.#view.value, true)
   }
 
-  #write(view: WorkbenchView, replace: boolean): void {
+  #write(view: WorkbenchView, replace: boolean, options: { runSource?: WorkbenchLocation['runSource'] } = this.#location): void {
     const flowId = this.#store.workspace.$.flowId.value
-    const location: WorkbenchLocation = { flowId, view: flowId == null ? 'design' : view }
+    const { runSource } = options
+    const location: WorkbenchLocation = {
+      flowId,
+      view: flowId == null ? 'design' : view,
+      ...(flowId != null && view == 'runs' && runSource != null ? { runSource } : {}),
+    }
+    // Entering Runs loads through the view lifecycle; an in-place URL change only updates its source.
+    if (this.#ready.value && this.#view.value == 'runs' && location.view == 'runs') {
+      const filter = this.#store.runs.$.filter.value
+      if (filter.source != location.runSource) void this.#store.runs.applyFilter({ ...filter, source: location.runSource })
+    }
     if (!sameLocation(location, this.#location)) {
       this.#location = location
       this.#navigate(location, { replace })
@@ -131,5 +148,5 @@ export class NavigationStore {
 }
 
 function sameLocation(left: WorkbenchLocation, right: WorkbenchLocation): boolean {
-  return left.flowId == right.flowId && left.view == right.view
+  return left.flowId == right.flowId && left.view == right.view && left.runSource == right.runSource
 }

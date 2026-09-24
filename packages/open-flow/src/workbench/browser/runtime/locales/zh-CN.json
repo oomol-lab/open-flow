@@ -652,7 +652,6 @@
     "selectRun": "选择一条运行记录以查看时间线和输出。",
     "sourceDraft": "草稿",
     "sourceLive": "线上",
-    "sourceTrigger": "Trigger",
     "statusCanceled": "已取消",
     "statusFailed": "失败",
     "statusIndeterminate": "状态不确定",

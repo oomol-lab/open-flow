@@ -652,7 +652,6 @@
     "selectRun": "Select a run to inspect its timeline and output.",
     "sourceDraft": "Draft",
     "sourceLive": "Live",
-    "sourceTrigger": "Trigger",
     "statusCanceled": "Canceled",
     "statusFailed": "Failed",
     "statusIndeterminate": "Indeterminate",

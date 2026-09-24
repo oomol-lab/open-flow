@@ -234,7 +234,7 @@ describe('FlowWorkspace run drawer', () => {
 
     publishIsland.props.onOpenRuns()
     expect(store.runRequests.dismissInputs).toHaveBeenCalledTimes(2)
-    expect(navigation.open).toHaveBeenCalledWith('runs')
+    expect(navigation.open).toHaveBeenCalledWith('runs', 'live')
   })
 
   it('keeps publication history available when publishing is blocked', () => {

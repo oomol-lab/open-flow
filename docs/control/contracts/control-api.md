@@ -334,7 +334,7 @@ interface Run {
   flowId: string
   revisionId: string
   runId: string
-  source: 'draft' | 'live' | 'trigger'
+  source: 'draft' | 'live'
   startedAt?: string
   status: RunStatus
   version: 1
@@ -342,7 +342,7 @@ interface Run {
 ```
 
 Run detail 增加固定的 `closureDigest`、`engineContract`、`engineDigest`、`modelVersion`、`sharedAccessDigest` 和 `revisionDigest`。Live Run 增加
-`publicationId`；Trigger Run 增加 `publicationId`、`occurrenceId` 和 `triggerNodeId`。
+`publicationId`；自动触发的运行同样归类为 Live，并额外携带 `occurrenceId` 和 `triggerNodeId`。
 
 `RunStatus` 包含 `queued | starting | running | waiting | canceled | completed | failed | indeterminate`。所有 Run detail 必须返回待决议集合：
 

@@ -220,6 +220,7 @@ export class RunStore {
     const runId = this.#queueRun({
       ...input,
       idempotencyKey: `trigger:${randomUUID()}`,
+      source: 'live',
       inputs: {},
       providerAccess: this.#deps.publications.providerAccess(input.publicationId)!,
       trigger: { nodeId: input.triggerNodeId, outputs: input.outputs },
@@ -903,7 +904,7 @@ export class RunStore {
     readonly requestDigest: string
     readonly revisionDigest: string
     readonly revisionId: string
-    readonly source: 'draft' | 'live' | 'trigger'
+    readonly source: 'draft' | 'live'
     readonly trigger: TriggerSeed
   }): string {
     const runId = randomUUID()

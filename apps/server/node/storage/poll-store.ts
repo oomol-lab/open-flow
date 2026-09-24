@@ -542,7 +542,6 @@ export class PollStore {
           requestDigest: input.requestDigest,
           revisionDigest: input.target.revisionDigest,
           revisionId: input.target.revisionId,
-          source: 'trigger',
           triggerNodeId: input.target.triggerNodeId,
         })
         if (admission.kind == 'overloaded') return admission

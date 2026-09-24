@@ -652,7 +652,6 @@
     "selectRun": "実行記録を選択すると、タイムラインと出力を確認できます。",
     "sourceDraft": "ドラフト",
     "sourceLive": "本番",
-    "sourceTrigger": "Trigger",
     "statusCanceled": "キャンセル済み",
     "statusFailed": "失敗",
     "statusIndeterminate": "状態不明",

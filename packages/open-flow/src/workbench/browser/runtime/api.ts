@@ -44,7 +44,6 @@ export type {
   TriggerActivityPage,
   TriggerBinding,
   TriggerBindingDetail,
-  TriggerRun,
   TriggerKeySummary,
 } from '../../../control/common/api.ts'
 

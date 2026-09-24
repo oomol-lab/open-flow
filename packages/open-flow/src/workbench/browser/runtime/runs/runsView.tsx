@@ -1,6 +1,6 @@
 import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
-import type { Run, RunStatus, TriggerRun } from '../api.ts'
+import type { Run, RunStatus } from '../api.ts'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 import type { RunFilter } from './runStore.ts'
 
@@ -63,8 +63,6 @@ function sourceLabel(run: Run, t: TFunction): string {
       return t('run.sourceDraft')
     case 'live':
       return t('run.sourceLive')
-    case 'trigger':
-      return t('run.sourceTrigger')
   }
 }
 
@@ -78,6 +76,7 @@ export function RunsView({
   onConfigureConnector,
   onLocateEvent,
   onLocateWait,
+  onSourceChange,
   store,
 }: {
   readonly flowName: string
@@ -85,6 +84,7 @@ export function RunsView({
   readonly onConfigureConnector?: (() => void) | undefined
   readonly onLocateEvent: (sequence: number) => void
   readonly onLocateWait: (nodeId: string) => void
+  readonly onSourceChange?: (source: Run['source'] | undefined) => void
   readonly store: WorkbenchStore
 }): ReactElement {
   const language = useLang()
@@ -128,6 +128,11 @@ export function RunsView({
   const [filterContainer, setFilterContainer] = useState<HTMLElement | null>(null)
   const [filterForm, setFilterForm] = useState(() => filterDraft(filter))
   const filterTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  useEffect(() => {
+    clearTimeout(filterTimer.current)
+    filterTimer.current = undefined
+    setFilterForm((current) => ({ ...current, source: filter.source ?? '' }))
+  }, [filter.source])
   const filterActive = hasRunFilter(filter)
   const filterCount = Object.values(filter).filter((value) => value != null).length
   const filterLabel = filterActive ? t('run.filterRunsActive', { count: filterCount }) : t('run.filterRuns')
@@ -154,6 +159,7 @@ export function RunsView({
         ...(next.createdBefore == '' ? {} : { createdBefore: new Date(next.createdBefore).toISOString() }),
         ...(runId == '' ? {} : { runId }),
       })
+      if (key == 'source') onSourceChange?.(next.source == '' ? undefined : next.source)
     }
     if (key === 'runId') filterTimer.current = setTimeout(apply, 300)
     else apply()
@@ -163,6 +169,7 @@ export function RunsView({
     filterTimer.current = undefined
     setFilterForm(emptyFilterDraft)
     void store.runs.applyFilter({})
+    onSourceChange?.(undefined)
   }
   useEffect(() => () => clearTimeout(filterTimer.current), [])
 
@@ -181,11 +188,10 @@ export function RunsView({
     { label: t('run.filterAllSources'), value: '' },
     { label: t('run.sourceDraft'), value: 'draft' },
     { label: t('run.sourceLive'), value: 'live' },
-    { label: t('run.sourceTrigger'), value: 'trigger' },
   ]
-  const triggerRun = run?.source == 'trigger' && 'triggerNodeId' in run ? (run as TriggerRun) : undefined
+  const triggerRun = run?.source == 'live' && 'occurrenceId' in run && run.occurrenceId != null && run.triggerNodeId != null ? run : undefined
   const triggerName =
-    triggerRun != null && revision?.revision.revisionId == triggerRun.revisionId ? revision.trigger(triggerRun.triggerNodeId)?.name : undefined
+    triggerRun != null && revision?.revision.revisionId == triggerRun.revisionId ? revision.trigger(triggerRun.triggerNodeId!)?.name : undefined
 
   useEffect(() => {
     const element = root.current

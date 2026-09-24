@@ -645,8 +645,8 @@ export default function FlowWorkspace({
   const canvasReady = draftReady && !workspaceLoading
 
   useEffect(() => {
-    if (view == 'runs' && flowId != null) void store.runs.load(flowId)
-  }, [flowId, store, view])
+    if (view == 'runs' && flowId != null) void store.runs.load(flowId, { source: navigation.runSource })
+  }, [flowId, navigation, store, view])
 
   useEffect(() => {
     if (view == 'publications' && flowId != null) void store.publications.load(flowId)
@@ -730,7 +730,7 @@ export default function FlowWorkspace({
             }}
             onOpenRuns={() => {
               store.runRequests.dismissInputs()
-              navigation.open('runs')
+              navigation.open('runs', 'live')
             }}
             onManageConnectorAccess={onManageConnectorAccess}
             onToggleRuns={() => setRunDrawerOpen((open) => !open)}
@@ -740,6 +740,7 @@ export default function FlowWorkspace({
           />
         ) : view == 'runs' ? (
           <RunsView
+            onSourceChange={(source) => navigation.open('runs', source)}
             flowName={flow?.name ?? flow?.flowId ?? ''}
             onClose={() => navigation.open('design')}
             onConfigureConnector={onConfigureConnector}

@@ -676,6 +676,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       equal(list(excluded.runs, 'Boundary Runs'), [], 'Exclusive Run upper boundary')
       for (const invalidQuery of [
         'source=manual',
+        'source=trigger',
         'createdFrom=invalid',
         'createdFrom=2026-02-30T00%3A00%3A00Z',
         `createdFrom=${encodeURIComponent(createdBefore)}&createdBefore=${encodeURIComponent(createdAt)}`,

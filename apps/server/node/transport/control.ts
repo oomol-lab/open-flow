@@ -39,7 +39,7 @@ const maxIdempotencyKeyLength = 256
 const maxPageSize = 100
 const defaultPageSize = 50
 const runStatusSet: ReadonlySet<string> = new Set(runStatuses)
-const runSourceSet = new Set(['draft', 'live', 'trigger'])
+const runSourceSet = new Set(['draft', 'live'])
 const timestampPattern = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/
 const encoder = new TextEncoder()
 const controlDecoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false })
@@ -544,7 +544,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       ...(after == null ? {} : { after }),
       ...(status == null ? {} : { status: status as RunStatus }),
       ...(pendingWait == null ? {} : { pendingWait: pendingWait == 'true' }),
-      ...(source == null ? {} : { source: source as 'draft' | 'live' | 'trigger' }),
+      ...(source == null ? {} : { source: source as 'draft' | 'live' }),
       ...(createdFrom == null ? {} : { createdFrom }),
       ...(createdBefore == null ? {} : { createdBefore }),
       ...(runId == null ? {} : { runId }),

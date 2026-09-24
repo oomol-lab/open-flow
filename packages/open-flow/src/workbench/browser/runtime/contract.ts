@@ -37,6 +37,8 @@ export interface WorkbenchHost {
 }
 
 export interface WorkbenchLocation {
+  /** Runs-only source filter. Hosts treat unknown URL values as absent. */
+  readonly runSource?: 'draft' | 'live'
   readonly flowId?: string
   readonly view: WorkbenchView
 }

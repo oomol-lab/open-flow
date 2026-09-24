@@ -20,7 +20,7 @@ export interface RunRecord {
 export interface StoredRunRequest {
   readonly requestDigest: string
   readonly runId: string
-  readonly source: 'draft' | 'live' | 'trigger' | null
+  readonly source: 'draft' | 'live' | null
   readonly status: RunStatus
 }
 
@@ -41,7 +41,7 @@ export interface StoredControlRun {
   readonly revisionDigest: string
   readonly revisionId: string
   readonly runId: string
-  readonly source: 'draft' | 'live' | 'trigger'
+  readonly source: 'draft' | 'live'
   readonly startedAt: number | null
   readonly status: RunStatus
   readonly triggerNodeId: string | null

@@ -8,7 +8,9 @@ function decode(value: string): string | undefined {
   }
 }
 
-export function parseRoute(pathname: string): WorkbenchLocation {
+export function parseRoute(path: string): WorkbenchLocation {
+  const [pathname = '/', search] = path.split('?')
+  const source = new URLSearchParams(search).get('source')
   const parts = pathname.split('/').filter(Boolean)
   if (parts.length == 0) return { view: 'design' }
   if (parts.length != 3 || parts[0] != 'flows') return { view: 'design' }
@@ -18,7 +20,7 @@ export function parseRoute(pathname: string): WorkbenchLocation {
     case 'design':
     case 'publications':
     case 'runs':
-      return { flowId, view: parts[2] }
+      return { flowId, view: parts[2], ...(parts[2] == 'runs' && (source == 'draft' || source == 'live') ? { runSource: source } : {}) }
     default:
       return { view: 'design' }
   }
@@ -26,5 +28,6 @@ export function parseRoute(pathname: string): WorkbenchLocation {
 
 export function routePath(route: WorkbenchLocation): string {
   if (route.flowId == null) return '/'
-  return `/flows/${encodeURIComponent(route.flowId)}/${route.view}`
+  const search = route.view == 'runs' && route.runSource != null ? `?source=${route.runSource}` : ''
+  return `/flows/${encodeURIComponent(route.flowId)}/${route.view}${search}`
 }

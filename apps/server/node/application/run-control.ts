@@ -425,17 +425,12 @@ export class RunControl {
         return { ...details, source: 'draft' }
       case 'live':
         if (stored.publicationId == null) throw new Error('Live Run is missing its Publication identity.')
-        return { ...details, publicationId: stored.publicationId, source: 'live' }
-      case 'trigger':
-        if (stored.occurrenceId == null || stored.publicationId == null || stored.triggerNodeId == null) {
-          throw new Error('Trigger Run is missing its admission identity.')
-        }
+        if (stored.occurrenceId != null && stored.triggerNodeId == null) throw new Error('Live Run occurrence is missing its Trigger identity.')
         return {
           ...details,
-          occurrenceId: stored.occurrenceId,
           publicationId: stored.publicationId,
-          source: 'trigger',
-          triggerNodeId: stored.triggerNodeId,
+          source: 'live',
+          ...(stored.occurrenceId == null ? {} : { occurrenceId: stored.occurrenceId, triggerNodeId: stored.triggerNodeId! }),
         }
     }
   }

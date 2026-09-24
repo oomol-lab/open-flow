@@ -16,7 +16,7 @@ function run(value: unknown): Run {
   const kind = source.source
   const startedAt = source.startedAt
   const finishedAt = source.finishedAt
-  if (source.version != 1 || (kind != 'draft' && kind != 'live' && kind != 'trigger')) return invalidResponse()
+  if (source.version != 1 || (kind != 'draft' && kind != 'live')) return invalidResponse()
   if (startedAt != null && typeof startedAt != 'string') return invalidResponse()
   if (finishedAt != null && typeof finishedAt != 'string') return invalidResponse()
   return {
@@ -65,6 +65,7 @@ export function runDetails(value: unknown): RunDetails {
     (['completed', 'failed', 'canceled', 'indeterminate'].includes(summary.status) && waits.length > 0)
   )
     return invalidResponse()
+  if ((source.occurrenceId === undefined) != (source.triggerNodeId === undefined)) return invalidResponse()
   const state = { status: summary.status, waits }
   const details = {
     ...summary,
@@ -81,14 +82,11 @@ export function runDetails(value: unknown): RunDetails {
     case 'draft':
       return { ...details, source: 'draft' }
     case 'live':
-      return { ...details, publicationId: string(source.publicationId), source: 'live' }
-    case 'trigger':
       return {
         ...details,
-        occurrenceId: string(source.occurrenceId),
         publicationId: string(source.publicationId),
-        source: 'trigger',
-        triggerNodeId: string(source.triggerNodeId),
+        source: 'live',
+        ...(source.occurrenceId === undefined ? {} : { occurrenceId: string(source.occurrenceId), triggerNodeId: string(source.triggerNodeId) }),
       }
   }
 }
