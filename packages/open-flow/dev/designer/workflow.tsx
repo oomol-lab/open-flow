@@ -12,7 +12,7 @@ import { useMemo, useRef, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { val } from 'value-enhancer'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
-import { CanvasInteractiveMode } from '../../src/canvas/browser/graph/ReactFlowContainer/CanvasControls.tsx'
+import { CanvasInteractiveMode, CanvasTopLeftControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CanvasControls.tsx'
 import { CornerControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CornerControls.tsx'
 import { GetPopupContainerContext } from '../../src/canvas/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
 import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
@@ -455,13 +455,24 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
     { label: `Show ${nextSaveStatus} draft save state`, onClick: () => setSaveStatus(nextSaveStatus) },
     { label: `Show ${nextPublishState} publish state`, onClick: () => setPublishState(nextPublishState) },
   ])
+  const navigationIsland = (
+    <WorkspaceNavigationIsland
+      ghost={ghost}
+      saveStatus={ghost ? undefined : saveStatus}
+      flowName={shortName ? 'nn' : 'Quarterly customer onboarding and account follow-up workflow'}
+      flowsHref="#workflows"
+      onOpenFlows={() => log('flows.open')}
+    />
+  )
   return (
     <I18nProvider i18n={i18n}>
       <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'}>
         <div className="workspace" style={{ height: 180 }}>
+          {ghost && <div className="workspace-navigation-placement">{navigationIsland}</div>}
           <div className="canvas-panel" ref={stageRef}>
             <GetPopupContainerContext.Provider value={popup}>
               <ReactFlowProvider>
+                {!ghost && <CanvasTopLeftControls>{navigationIsland}</CanvasTopLeftControls>}
                 <CornerControls
                   before={
                     <WorkspacePublishIsland
@@ -479,13 +490,6 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
               </ReactFlowProvider>
             </GetPopupContainerContext.Provider>
           </div>
-          <WorkspaceNavigationIsland
-            ghost={ghost}
-            saveStatus={ghost ? undefined : saveStatus}
-            flowName={shortName ? 'nn' : 'Quarterly customer onboarding and account follow-up workflow'}
-            flowsHref="#workflows"
-            onOpenFlows={() => log('flows.open')}
-          />
         </div>
       </div>
     </I18nProvider>

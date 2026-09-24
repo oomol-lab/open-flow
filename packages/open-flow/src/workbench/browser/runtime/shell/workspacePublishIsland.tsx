@@ -76,7 +76,7 @@ export function WorkspacePublishIsland({
             }
           />
         </CanvasTooltip>
-        <DropdownMenuContent align="end" container={popupContainer} side="bottom" sideOffset={8}>
+        <DropdownMenuContent align="end" className="w-max min-w-44 max-w-(--available-width)" container={popupContainer} side="bottom" sideOffset={8}>
           <DropdownMenuItem className="gap-2 px-2 py-[5px]" onClick={onOpenPublications}>
             <i aria-hidden="true" className="i-lucide-light:cloud-upload size-4 shrink-0 text-foreground/70" />
             {historyLabel}

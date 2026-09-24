@@ -1,4 +1,4 @@
-import type { ComponentProps, ReactElement } from 'react'
+import type { ComponentProps, ReactElement, ReactNode } from 'react'
 import type { WorkbenchLocation, WorkbenchTheme } from './contract.ts'
 import type { AddNodeOption } from './editor/addNodeOptions.ts'
 import type { WorkbenchCanvasHandle } from './editor/workbenchCanvas.tsx'
@@ -216,6 +216,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
 })
 
 export function FlowEditor({
+  navigationIsland,
   onRun,
   onRunStarted,
   onCloseRuns,
@@ -228,6 +229,7 @@ export function FlowEditor({
   store,
   theme,
 }: {
+  readonly navigationIsland?: ReactNode
   readonly onRun: (triggerId?: string) => void
   readonly onRunStarted: () => void
   readonly onCloseRuns: () => void
@@ -405,6 +407,7 @@ export function FlowEditor({
       tabIndex={0}
     >
       <WorkbenchCanvas
+        topLeftTools={navigationIsland}
         bottomRightTools={<RunStatusIslandContainer onToggle={onToggleRuns} open={runDrawerOpen} panelId={RUN_LOG_PANEL_ID} store={store} />}
         cornerLeading={
           <div className="workspace-corner-leading">
@@ -680,18 +683,20 @@ export default function FlowWorkspace({
     if (store.locateRunEvent(sequence)) revealRun()
   }
 
+  const navigationIsland = (
+    <WorkspaceNavigationIsland
+      ghost={view == 'design' && !canvasReady}
+      saveStatus={view == 'design' && canvasReady ? saveStatus : undefined}
+      flowName={flow?.name ?? flow?.flowId ?? ''}
+      flowsHref={hrefFor({ view: 'design' })}
+      onOpenFlows={() => void navigation.openFlows()}
+    />
+  )
+
   return (
     <IconifyProvider>
       <main className="workspace">
-        {view != 'runs' && (
-          <WorkspaceNavigationIsland
-            ghost={view == 'design' && !canvasReady}
-            saveStatus={view == 'design' && canvasReady ? saveStatus : undefined}
-            flowName={flow?.name ?? flow?.flowId ?? ''}
-            flowsHref={hrefFor({ view: 'design' })}
-            onOpenFlows={() => void navigation.openFlows()}
-          />
-        )}
+        {view != 'runs' && !(view == 'design' && canvasReady) && <div className="workspace-navigation-placement">{navigationIsland}</div>}
         {view == 'design' && !canvasReady ? (
           <div aria-label={t('workspace.design')} className="editor-grid context-panel-closed" id="workspace-panel-design" role="region" tabIndex={0}>
             <section aria-busy={!workspaceLoadFailed} className="canvas-panel workbench-canvas">
@@ -714,6 +719,7 @@ export default function FlowWorkspace({
           </div>
         ) : view == 'design' ? (
           <FlowEditor
+            navigationIsland={navigationIsland}
             onRun={(triggerId) => void run(triggerId)}
             onRunStarted={revealRun}
             onCloseRuns={() => setRunDrawerOpen(false)}

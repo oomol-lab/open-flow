@@ -10,13 +10,18 @@
     background: var(--ui-background);
   }
 
-  .workspace-navigation {
+  .workspace-navigation-placement {
     position: absolute;
     z-index: 7;
     top: 16px;
     left: 12px;
     display: flex;
     max-width: calc(100% - 24px);
+  }
+
+  .workspace-navigation {
+    display: flex;
+    max-width: 100%;
   }
 
   .workspace-draft-indicator {

@@ -16,10 +16,11 @@ import { Input } from '../../../../ui/browser/input.tsx'
 import { Popover, PopoverPanelContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Tabs, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { Icon } from '../icons.tsx'
 import { IdTooltip } from '../shell/idTooltip.tsx'
 import { WorkbenchSelect } from '../shell/workbenchSelect.tsx'
-import { ActiveWait, initialRunLogFilters, RunLog, RunLogButton, RunLogFilters } from './runDrawer.tsx'
+import { ActiveWait, initialRunLogFilters, RunLog, RunLogButton, RunLogFilters, RunTooltipButton } from './runDrawer.tsx'
 import { RunResultView } from './runOutput.tsx'
 import { duration, runLabel, statusClass } from './runPresentation.ts'
 import { canCancelRun, hasRunFilter } from './runStore.ts'
@@ -212,9 +213,9 @@ export function RunsView({
       role="region"
       tabIndex={0}
     >
-      <Button className="absolute right-3 top-3" aria-label={t('common.close')} onClick={onClose} size="icon-sm" variant="ghost">
+      <RunTooltipButton className="absolute right-3 top-3" aria-label={t('common.close')} onClick={onClose} size="icon-sm" variant="ghost">
         <Icon name="close" />
-      </Button>
+      </RunTooltipButton>
       <aside aria-busy={loading || refreshing} className="run-list-panel">
         <header className="run-list-header">
           <h2 className="m-0 min-w-0 text-base leading-6 font-semibold">{t('run.history')}</h2>
@@ -230,25 +231,28 @@ export function RunsView({
               }}
               open={filterOpen}
             >
-              <PopoverTrigger
-                render={
-                  <Button
-                    aria-label={filterLabel}
-                    aria-pressed={filterActive}
-                    size={filterActive ? 'sm' : 'icon-sm'}
-                    title={filterLabel}
-                    type="button"
-                    variant={filterActive ? 'secondary' : 'ghost'}
-                  />
-                }
-              >
-                <i aria-hidden="true" className="i-lucide-light:funnel size-4" />
-                {filterActive && (
-                  <span aria-hidden="true" className="tabular-nums">
-                    {filterCount}
-                  </span>
-                )}
-              </PopoverTrigger>
+              <Tooltip>
+                <PopoverTrigger
+                  render={
+                    <Button
+                      render={<TooltipTrigger />}
+                      aria-label={filterLabel}
+                      aria-pressed={filterActive}
+                      size={filterActive ? 'sm' : 'icon-sm'}
+                      type="button"
+                      variant={filterActive ? 'secondary' : 'ghost'}
+                    />
+                  }
+                >
+                  <i aria-hidden="true" className="i-lucide-light:funnel size-4" />
+                  {filterActive && (
+                    <span aria-hidden="true" className="tabular-nums">
+                      {filterCount}
+                    </span>
+                  )}
+                </PopoverTrigger>
+                <TooltipContent container={root.current}>{filterLabel}</TooltipContent>
+              </Tooltip>
               <PopoverPanelContent
                 title={t('run.filterRuns')}
                 closeLabel={t('common.close')}
@@ -438,9 +442,9 @@ export function RunsView({
                 <div className="run-detail-summary">
                   {narrow && (
                     <div className="flex min-w-0 items-center gap-2">
-                      <Button aria-label={t('run.history')} onClick={closeNarrowDetail} size="icon-sm" variant="ghost">
+                      <RunTooltipButton aria-label={t('run.history')} onClick={closeNarrowDetail} size="icon-sm" variant="ghost">
                         <i aria-hidden="true" className="i-lucide-light:list size-4" />
-                      </Button>
+                      </RunTooltipButton>
                       <span className="truncate text-xs text-muted-foreground" title={flowName}>
                         {flowName}
                       </span>
@@ -518,12 +522,22 @@ export function RunsView({
                       }}
                     >
                       <TabsList aria-label={t('run.timelineView')} variant="flat" size="sm">
-                        <TabsTrigger value="steps" title={t('run.stepsViewHint')} aria-controls="run-history-timeline-panel">
-                          {t('run.stepsView')}
-                        </TabsTrigger>
-                        <TabsTrigger value="events" title={t('run.eventsViewHint')} aria-controls="run-history-timeline-panel">
-                          {t('run.eventsView')}
-                        </TabsTrigger>
+                        <Tooltip>
+                          <TabsTrigger value="steps" render={<TooltipTrigger />} aria-controls="run-history-timeline-panel">
+                            {t('run.stepsView')}
+                          </TabsTrigger>
+                          <TooltipContent container={root.current} side="top">
+                            {t('run.stepsViewHint')}
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TabsTrigger value="events" render={<TooltipTrigger />} aria-controls="run-history-timeline-panel">
+                            {t('run.eventsView')}
+                          </TabsTrigger>
+                          <TooltipContent container={root.current} side="top">
+                            {t('run.eventsViewHint')}
+                          </TooltipContent>
+                        </Tooltip>
                       </TabsList>
                     </Tabs>
                     <RunLogFilters

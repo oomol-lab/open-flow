@@ -73,7 +73,7 @@ import { NodeStore } from '../../stores/node/node.store.ts'
 import { InspectSelectionButton } from '../inspectSelection.tsx'
 import { NodePlaceholder, NodePlaceholderQueue } from '../Nodes/useNodePlaceholder.ts'
 import { getPaneRect, PaneRectContext } from '../Nodes/usePaneRect.ts'
-import { CanvasBottomRightControls, CanvasInteractiveMode, CanvasToolbar, CanvasViewControls } from './CanvasControls.tsx'
+import { CanvasBottomRightControls, CanvasTopLeftControls, CanvasInteractiveMode, CanvasToolbar, CanvasViewControls } from './CanvasControls.tsx'
 import { ConnectionLine } from './ConnectingLine.tsx'
 import { CornerControls } from './CornerControls.tsx'
 import { HelperLines, useHelperLines } from './HelperLines/index.ts'
@@ -111,6 +111,7 @@ export interface ReactFlowContainerProps {
   className?: string
   cornerTools?: React.ReactNode
   cornerLeading?: React.ReactNode
+  topLeftTools?: React.ReactNode
   bottomRightTools?: React.ReactNode
   dark: boolean
   i18n: I18n
@@ -203,6 +204,7 @@ type FlowControlsProps = Pick<
   ReactFlowContainerProps,
   | 'cornerTools'
   | 'cornerLeading'
+  | 'topLeftTools'
   | 'bottomRightTools'
   | 'toolbar'
   | 'miniMapExpanded$'
@@ -268,6 +270,7 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
         zoom={zoom}
       />
       {props.toolbar != null && <CanvasToolbar>{props.toolbar}</CanvasToolbar>}
+      {props.topLeftTools != null && <CanvasTopLeftControls>{props.topLeftTools}</CanvasTopLeftControls>}
       {props.bottomRightTools != null && <CanvasBottomRightControls>{props.bottomRightTools}</CanvasBottomRightControls>}
       <CornerControls
         before={props.cornerLeading}
@@ -706,6 +709,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           <FlowControls
             cornerTools={props.cornerTools}
             cornerLeading={props.cornerLeading}
+            topLeftTools={props.topLeftTools}
             bottomRightTools={props.bottomRightTools}
             toolbar={props.toolbar}
             miniMapExpanded$={props.miniMapExpanded$}

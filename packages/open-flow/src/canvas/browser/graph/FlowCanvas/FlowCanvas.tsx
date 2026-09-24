@@ -20,6 +20,7 @@ export interface FlowCanvasProps {
   onRequestAddNode?: FlowCanvasViewProps['onRequestAddNode']
   cornerTools?: React.ReactNode
   cornerLeading?: React.ReactNode
+  topLeftTools?: React.ReactNode
   bottomRightTools?: React.ReactNode
   toolbar?: React.ReactNode
   flowCanvasStore: CanvasStore
@@ -45,6 +46,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onRequestAddNode,
   cornerTools,
   cornerLeading,
+  topLeftTools,
   bottomRightTools,
   toolbar,
   dark,
@@ -71,6 +73,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
           <ReactFlowContainer
             cornerTools={cornerTools}
             cornerLeading={cornerLeading}
+            topLeftTools={topLeftTools}
             bottomRightTools={bottomRightTools}
             toolbar={toolbar}
             editable={editable}

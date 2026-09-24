@@ -201,3 +201,11 @@ export function CanvasBottomRightControls({ children }: { readonly children: Rea
     </Panel>
   )
 }
+
+export function CanvasTopLeftControls({ children }: { readonly children: React.ReactNode }) {
+  return (
+    <Panel position="top-left" data-canvas-control-scope>
+      {children}
+    </Panel>
+  )
+}

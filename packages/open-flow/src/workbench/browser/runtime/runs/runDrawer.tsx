@@ -1,5 +1,5 @@
 import type { EventListeners } from 'overlayscrollbars'
-import type { KeyboardEvent, PointerEvent, ReactElement } from 'react'
+import type { ComponentProps, KeyboardEvent, PointerEvent, ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
 import type { ScrollAreaRef } from '../../../../ui/browser/scroll-area.tsx'
 import type { JsonValue, Run, RunDetails, RunEvent, RunResult, WaitAction } from '../api.ts'
@@ -17,11 +17,22 @@ import { Field, FieldLabel, FieldError } from '../../../../ui/browser/field.tsx'
 import { collapseAllNested, JSONViewer } from '../../../../ui/browser/json-viewer/index.ts'
 import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { Icon } from '../icons.tsx'
 import { groupEvents, nodeSummary, agentSummary, eventSubject } from './runGroups.ts'
 import { downloadRunLog } from './runLogExport.ts'
 import { eventHasDetails, RunEventDetail, RunResultView } from './runOutput.tsx'
 import { canCancelRun } from './runStore.ts'
+
+export function RunTooltipButton({ 'aria-label': label, ...props }: ComponentProps<typeof Button> & { readonly 'aria-label': string }): ReactElement {
+  const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null)
+  return (
+    <Tooltip>
+      <TooltipTrigger ref={setAnchor} render={<Button {...props} aria-label={label} />} />
+      <TooltipContent container={anchor?.closest<HTMLElement>('.open-flow-workbench')}>{label}</TooltipContent>
+    </Tooltip>
+  )
+}
 
 function eventTime(createdAt: string, language: string): string {
   return new Intl.DateTimeFormat(language, { hour: '2-digit', minute: '2-digit', second: '2-digit' }).format(new Date(createdAt))
@@ -210,13 +221,16 @@ export function RunLogFilters({
   }
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        render={
-          <Button aria-label={t('run.filterEvents')} size="icon-sm" title={t('run.filterEvents')} type="button" variant="ghost">
-            <i aria-hidden="true" className="i-lucide-light:funnel size-4" />
-          </Button>
-        }
-      />
+      <Tooltip>
+        <DropdownMenuTrigger
+          render={
+            <Button render={<TooltipTrigger />} aria-label={t('run.filterEvents')} size="icon-sm" type="button" variant="ghost">
+              <i aria-hidden="true" className="i-lucide-light:funnel size-4" />
+            </Button>
+          }
+        />
+        <TooltipContent container={container}>{t('run.filterEvents')}</TooltipContent>
+      </Tooltip>
       <DropdownMenuContent align="end" className="run-log-filter" container={container} side="bottom">
         <DropdownMenuGroup>
           {eventCategories.map((filter) => (
@@ -248,16 +262,15 @@ export function RunLogButton({
 }): ReactElement {
   const t = useTranslate()
   return (
-    <Button
+    <RunTooltipButton
       aria-label={t('run.exportLog')}
       onClick={() => downloadRunLog(run, events, historyComplete, eventsExpiresAt)}
       size="icon-sm"
-      title={t('run.exportLog')}
       type="button"
       variant="ghost"
     >
       <Icon name="download" />
-    </Button>
+    </RunTooltipButton>
   )
 }
 
@@ -464,7 +477,7 @@ export function RunLog({
                       </span>
                       {elapsed != null && <span>{(elapsed / 1000).toFixed(1)}s</span>}
                       {eventNodes.has(event.sequence) && (
-                        <Button
+                        <RunTooltipButton
                           aria-label={t('run.locateNode', { name: subject })}
                           className="run-log-locate"
                           onClick={() => onLocateEvent(event.sequence)}
@@ -472,7 +485,7 @@ export function RunLog({
                           variant="ghost"
                         >
                           <Icon name="fit" />
-                        </Button>
+                        </RunTooltipButton>
                       )}
                     </div>
                     {terminal?.kind == 'node.failed' ? (
@@ -553,17 +566,16 @@ export function RunLog({
                     <Icon className="run-log-chevron" name="chevron-left" size={11} />
                     <span>{eventSummary(event, t)}</span>
                     {nodeId != null && (
-                      <Button
+                      <RunTooltipButton
                         aria-label={t('run.locateNode', { name: subject })}
                         className="run-log-locate"
                         onClick={() => onLocateEvent(event.sequence)}
                         size="icon-xs"
-                        title={t('run.locateNode', { name: subject })}
                         type="button"
                         variant="ghost"
                       >
                         <Icon name="fit" />
-                      </Button>
+                      </RunTooltipButton>
                     )}
                   </div>
                   <RunEventDetail event={event} onConfigureConnector={onConfigureConnector} />
@@ -743,9 +755,9 @@ export function RunDrawer({
             {t(canceling ? 'run.canceling' : 'run.cancel')}
           </Button>
         )}
-        <Button aria-label={t('run.collapse')} onClick={onClose} size="icon-sm" variant="ghost">
+        <RunTooltipButton aria-label={t('run.collapse')} onClick={onClose} size="icon-sm" variant="ghost">
           <Icon name="chevron-down" />
-        </Button>
+        </RunTooltipButton>
       </header>
       <div className="run-content">
         {run != null && <ActiveWait onLocate={onLocateWait} onResolve={onResolve} resolvingActions={resolvingActions} run={run} />}

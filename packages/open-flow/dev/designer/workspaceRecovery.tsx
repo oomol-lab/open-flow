@@ -27,7 +27,9 @@ function RecoveryStory({ dark, language, log }: { readonly dark: boolean; readon
         {states.map((state, index) => (
           <div className="open-flow-workbench h-80 bg-background" key={index}>
             <div className="workspace">
-              <WorkspaceNavigationIsland flowName="baba" flowsHref="#workflows" ghost onOpenFlows={() => log('flows.open')} />
+              <div className="workspace-navigation-placement">
+                <WorkspaceNavigationIsland flowName="baba" flowsHref="#workflows" ghost onOpenFlows={() => log('flows.open')} />
+              </div>
               {state.kind == 'loading' ? (
                 <Empty className="h-full">
                   <EmptyHeader>

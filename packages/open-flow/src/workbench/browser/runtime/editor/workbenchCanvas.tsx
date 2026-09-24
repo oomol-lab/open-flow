@@ -31,6 +31,7 @@ interface Props {
   readonly onIgnoreNodes: (nodeIds: readonly string[], ignored: boolean) => void
   readonly runControl?: ReactNode
   readonly cornerLeading?: ReactNode
+  readonly topLeftTools?: ReactNode
   readonly bottomRightTools?: ReactNode
   readonly addNodeOptions: readonly AddNodeOption[]
   readonly disabled: boolean
@@ -110,6 +111,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     onIgnoreNodes,
     runControl,
     cornerLeading,
+    topLeftTools,
     bottomRightTools,
     selectedNodeIds,
     target,
@@ -320,6 +322,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
           <WorkbenchInspectorToggle label={t('designer.toggleInspector')} open={inspectorOpen} disabled={target == null} onToggle={onToggleInspector} />
         }
         cornerLeading={cornerLeading}
+        topLeftTools={topLeftTools}
         bottomRightTools={bottomRightTools}
         toolbar={
           <WorkbenchCanvasActions
