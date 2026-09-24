@@ -71,9 +71,14 @@ jobs:
         run: |
           set -euo pipefail
 
+          package_name="$(jq -er '.name' package.json)"
           package_version="$(jq -er '.version' package.json)"
           package_tag="latest"
           if [[ "$package_version" == *-* ]]; then
             package_tag="next"
           fi
           npm publish --ignore-scripts --access public --provenance --tag "$package_tag"
+
+          printf '### Published npm package\n\n- Package: `%s@%s`\n- Tag: `%s`\n- npm: https://www.npmjs.com/package/%s/v/%s\n' \
+            "$package_name" "$package_version" "$package_tag" "$package_name" "$package_version" \
+            | tee -a "$GITHUB_STEP_SUMMARY"
