@@ -333,7 +333,7 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
   assert.doesNotMatch(runDrawer, /className="run-tabs"/)
   assert.match(runStatusIsland, /<Button[\s\S]*?size=\{hasRunInfo \? 'default' : 'icon'\}[\s\S]*?variant="ghost"/)
   assert.match(runDrawer, /<Badge variant="secondary">\{t\('run\.timeline'\)\}<\/Badge>/)
-  assert.match(publications, /className="m-2"[\s\S]*?size="lg"[\s\S]*?variant="outline"/)
+  assert.match(publications, /<Button[^>]*onClick=\{\(\) => void store\.publications\.loadMore\(\)\}[^>]*variant="outline"/)
   assert.match(publications, /<Badge variant="secondary">\{t\('publication\.current'\)\}<\/Badge>/)
   assert.doesNotMatch(workspaceStyles, /\.diagnostics-(?:empty|loading)/)
   assert.doesNotMatch(workspaceStyles, /\.run-input-error/)
@@ -414,7 +414,7 @@ test('keeps responsive control density on component APIs', async () => {
   assert.doesNotMatch(responsiveStyles, /\[data-slot='button'\] \{\s*height: 40px;/)
   assert.deepEqual(
     [...responsiveStyles.matchAll(/@container open-flow-workbench \(width <= (\d+)px\)/g)].map((match) => Number(match[1])),
-    [1100, 980, 720, 520],
+    [1100, 720, 520],
   )
   assert.doesNotMatch(responsiveStyles, /@media \(max-width:|legacy viewport|must win/)
   assert.doesNotMatch(runStyles, /@media \(max-width:/)

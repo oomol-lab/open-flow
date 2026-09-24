@@ -32,6 +32,7 @@ import { nodeStories } from './nodeStories.tsx'
 import { notificationsStory } from './notifications.tsx'
 import { overviewStories } from './overview.tsx'
 import { popupLayoutStory } from './popupLayout.tsx'
+import { publicationsStory } from './publications.tsx'
 import { scheduleStory } from './schedule.tsx'
 import { stories } from './stories.tsx'
 import { useStoryActions } from './storyActions.tsx'
@@ -75,6 +76,7 @@ const codeEditorStory: FrontendStory = {
 
 export const labStories: readonly FrontendStory[] = [
   runHistoryStory,
+  publicationsStory,
   waitRunsStory,
   runStatusIslandStory,
   notificationsStory,

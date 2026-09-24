@@ -5,7 +5,7 @@ import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it } from 'vitest'
 import { triggerBinding } from '../../../../control/common/triggerDecoders.ts'
 import { createI18n } from '../i18n.ts'
-import { ListenerHealth, TriggerStatus } from './publicationsView.tsx'
+import { ListenerHealth, TriggerStatus } from './liveTriggers.tsx'
 
 const binding: TriggerBinding = {
   flowId: 'flow',

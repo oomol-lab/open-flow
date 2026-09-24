@@ -16,7 +16,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '../../src/ui/b
 import { NodeInspector } from '../../src/workbench/browser/runtime/editor/nodeInspector.tsx'
 import { TriggerSummary } from '../../src/workbench/browser/runtime/editor/triggerSummary.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
-import { ListenerHealth, TriggerStatus } from '../../src/workbench/browser/runtime/publications/publicationsView.tsx'
+import { ListenerHealth, TriggerStatus } from '../../src/workbench/browser/runtime/publications/liveTriggers.tsx'
 import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.tsx'
 import { RunInputPanel } from '../../src/workbench/browser/runtime/runs/runInputPanel.tsx'
 import { RunRequestStore } from '../../src/workbench/browser/runtime/runs/runRequestStore.ts'

@@ -696,7 +696,7 @@ export default function FlowWorkspace({
   return (
     <IconifyProvider>
       <main className="workspace">
-        {view != 'runs' && !(view == 'design' && canvasReady) && <div className="workspace-navigation-placement">{navigationIsland}</div>}
+        {view == 'design' && !canvasReady && <div className="workspace-navigation-placement">{navigationIsland}</div>}
         {view == 'design' && !canvasReady ? (
           <div aria-label={t('workspace.design')} className="editor-grid context-panel-closed" id="workspace-panel-design" role="region" tabIndex={0}>
             <section aria-busy={!workspaceLoadFailed} className="canvas-panel workbench-canvas">
@@ -751,7 +751,7 @@ export default function FlowWorkspace({
             store={store}
           />
         ) : (
-          <PublicationsView store={store} />
+          <PublicationsView key={flowId} onClose={() => navigation.open('design')} store={store} />
         )}
       </main>
     </IconifyProvider>

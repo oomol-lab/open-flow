@@ -1,14 +1,5 @@
 .open-flow-workbench {
   @container open-flow-workbench (width <= 1100px) {
-    .publication-overview-meta {
-      grid-template-columns: repeat(2, minmax(112px, 1fr));
-    }
-
-    .trigger-binding-summary {
-      grid-template-columns: auto minmax(120px, 1fr) auto auto auto;
-    }
-
-    .trigger-binding-summary code,
     .run-id,
     .run-meta:nth-of-type(2) {
       display: none;
@@ -16,23 +7,6 @@
 
     .runs-view {
       grid-template-columns: 240px minmax(0, 1fr);
-    }
-  }
-
-  @container open-flow-workbench (width <= 980px) {
-    .trigger-binding-detail-sections {
-      grid-template-columns: minmax(0, 1fr);
-    }
-
-    .trigger-binding-detail-sections {
-      gap: 16px;
-    }
-
-    .trigger-binding-detail-sections > section + section {
-      padding-top: 16px;
-      padding-left: 0;
-      border-top: 1px solid var(--ui-border);
-      border-left: 0;
     }
   }
 
@@ -112,100 +86,6 @@
       padding-left: env(safe-area-inset-left);
     }
 
-    .publication-view {
-      padding: 72px 16px 16px;
-      gap: 16px;
-    }
-
-    .publication-summary-heading,
-    .publication-overview-heading,
-    .trigger-binding-row,
-    .publication-confirm {
-      align-items: flex-start;
-      flex-direction: column;
-      gap: 12px;
-    }
-
-    .publication-overview-actions {
-      width: 100%;
-      justify-content: space-between;
-    }
-
-    .trigger-binding-row,
-    .trigger-binding-detail {
-      padding-right: 16px;
-      padding-left: 16px;
-    }
-
-    .trigger-binding-summary {
-      grid-template-columns: auto minmax(120px, 1fr) auto auto;
-    }
-
-    .trigger-binding-kind,
-    .trigger-binding-detail-label {
-      display: none;
-    }
-
-    .publication-table {
-      table-layout: auto;
-    }
-
-    .publication-table thead {
-      position: absolute;
-      overflow: hidden;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      border: 0;
-      margin: -1px;
-      clip: rect(0, 0, 0, 0);
-      white-space: nowrap;
-    }
-
-    .publication-table tbody {
-      display: block;
-      padding: 0 16px;
-    }
-
-    .publication-table tbody > tr:not(.publication-confirm-row) {
-      display: block;
-      padding: 10px 0;
-      border-bottom: 1px solid var(--ui-border);
-    }
-
-    .publication-table tbody > tr:not(.publication-confirm-row) > td {
-      display: grid;
-      height: auto;
-      min-height: 32px;
-      grid-template-columns: 104px minmax(0, 1fr);
-      align-items: baseline;
-      gap: 4px 12px;
-      padding: 5px 0;
-      border: 0;
-      font-size: 13px;
-      text-align: left;
-    }
-
-    .publication-table td[data-label]::before {
-      grid-row: 1 / span 3;
-      color: var(--ui-muted-foreground);
-      content: attr(data-label);
-      font-size: 12px;
-    }
-
-    .publication-table td[data-label] > * {
-      grid-column: 2;
-    }
-
-    .publication-table tbody > tr:not(.publication-confirm-row) > td:last-child:empty {
-      display: none;
-    }
-
-    .publication-confirm-row,
-    .publication-confirm-row > td {
-      display: block;
-    }
-
     .runs-view.narrow {
       grid-template-columns: minmax(0, 1fr);
     }
@@ -245,14 +125,6 @@
       grid-column: 1 / -1;
       grid-row: 2;
       padding: 0 16px 12px;
-    }
-
-    .publication-summary-heading {
-      gap: 10px;
-    }
-
-    .publication-overview-meta {
-      grid-template-columns: minmax(0, 1fr);
     }
   }
 
