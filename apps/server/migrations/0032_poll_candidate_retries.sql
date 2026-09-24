@@ -1,0 +1,1 @@
+ALTER TABLE poll_candidates ADD COLUMN retry_count INTEGER NOT NULL DEFAULT 0;

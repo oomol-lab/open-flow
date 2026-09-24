@@ -35,6 +35,7 @@ const migrations = [
   '0029_revision_deltas.sql',
   migrateConnectorAccess,
   '0031_run_source.sql',
+  '0032_poll_candidate_retries.sql',
 ] as const
 const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 

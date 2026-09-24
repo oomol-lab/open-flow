@@ -25,6 +25,7 @@ export interface PollPublication {
 }
 
 export interface PollCandidate {
+  readonly retryCount: number
   readonly bindingId: string
   readonly checkpointJson: string
   readonly connectionId: string
@@ -125,7 +126,7 @@ export class PollStore {
         .prepare(
           `SELECT binding_id AS bindingId, checkpoint_json AS checkpointJson,
                   connection_id AS connectionId, flow_id AS flowId, node_id AS nodeId,
-                  operation_id AS operationId, schedule_json AS scheduleJson, status,
+                  operation_id AS operationId, retry_count AS retryCount, schedule_json AS scheduleJson, status,
                   trigger_json AS triggerJson
            FROM poll_candidates
            WHERE status = 'preparing' AND next_at <= ?
@@ -141,7 +142,7 @@ export class PollStore {
       .prepare(
         `SELECT binding_id AS bindingId, checkpoint_json AS checkpointJson,
                 connection_id AS connectionId, flow_id AS flowId, node_id AS nodeId,
-                operation_id AS operationId, schedule_json AS scheduleJson, status,
+                operation_id AS operationId, retry_count AS retryCount, schedule_json AS scheduleJson, status,
                 trigger_json AS triggerJson
          FROM poll_candidates WHERE operation_id = ? AND node_id = ?`,
       )
@@ -151,7 +152,7 @@ export class PollStore {
   retryCandidate(candidate: PollCandidate, nextAt: number, now: number): void {
     this.#database
       .prepare(
-        `UPDATE poll_candidates SET next_at = ?, updated_at = ?
+        `UPDATE poll_candidates SET next_at = ?, retry_count = retry_count + 1, updated_at = ?
          WHERE operation_id = ? AND node_id = ? AND status = 'preparing'`,
       )
       .run(nextAt, now, candidate.operationId, candidate.nodeId)

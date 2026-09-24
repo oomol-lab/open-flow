@@ -1073,6 +1073,29 @@ describe('Server Connector client', () => {
     ])
   })
 
+  it.each([
+    [{ errorCode: 'proxy_forbidden', message: 'Proxy access is disabled for this team.' }, ' [proxy_forbidden]: Proxy access is disabled for this team.'],
+    [{ errorCode: 42, message: { detail: 'invalid' } }, '.'],
+    [{ errorCode: 'proxy_forbidden', message: 'credential=provider-secret-private' }, ' [proxy_forbidden]: [Redacted]'],
+    [{ errorCode: 'proxy_forbidden', message: 'Rejected runtime-token-private' }, ' [proxy_forbidden]: Rejected [Redacted]'],
+  ])('preserves proxy failure diagnostics without exposing credentials: %j', async (failure, suffix) => {
+    const captured = captureLogger()
+    const origin = await startConnector((request, response) => {
+      if (request.url == '/v1/apps') return send(response, 200, { data: [app], success: true })
+      send(response, 403, { success: false, ...failure })
+    })
+    const connector = new ConnectorClient(origin, 'runtime-token-private', 30_000, captured.logger)
+    await expect(
+      connector.proxy('example', 'connection-work', 'binding-main', { endpoint: '/items', method: 'GET' }, new AbortController().signal),
+    ).rejects.toMatchObject({ code: 'connector.unavailable', message: `Connector proxy request failed (HTTP 403)${suffix}` })
+    const log = JSON.parse(captured.output().trim())
+    expect(log).toMatchObject({ category: 'connector.request.failed', status: 403, operation: 'proxy.execute' })
+    if (typeof failure.errorCode == 'string') expect(log.upstreamErrorCode).toBe(failure.errorCode)
+    if (typeof failure.message == 'string') expect(log.upstreamErrorMessage).toBe(suffix.split(': ')[1])
+    expect(captured.output()).not.toContain('provider-secret-private')
+    expect(captured.output()).not.toContain('runtime-token-private')
+  })
+
   it('executes actions and proxy requests with a non-Latin Connection alias', async () => {
     const requests: { readonly appId?: string; readonly alias?: string; readonly path: string }[] = []
     const origin = await startConnector((request, response) => {

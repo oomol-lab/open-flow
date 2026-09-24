@@ -334,3 +334,54 @@ it('publishes promptly when asynchronous baseline preparation finishes after mai
   baseline.resolve()
   await vi.waitFor(() => expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('succeeded'))
 })
+
+it('backs off baselines across restart and exhausts retries without replacing Live', async () => {
+  const file = await databaseFile()
+  let now = Date.parse('2026-08-31T13:00:00.000Z')
+  const startedAt = now
+  const calls: number[] = []
+  const definition: PollDefinition = {
+    buildOutputs: eventsPollOutputs,
+    snapshot,
+    async poll() {
+      calls.push(now)
+      throw new TransientPollError('Provider unavailable.')
+    },
+  }
+  const options = { capabilities: { connector: () => connector }, clock: () => now, triggerDefinitions: [definition] }
+  let service = await openService(file, options)
+  services.add(service)
+  const created = await service.control.createFlow('operator', 'Retry baseline', 'retry-baseline')
+  const initial = await service.control.publishFlow('operator', created.flow.flowId, created.flow.draftRevisionId, 'open-flow-engine/v5', null, 'initial')
+  await service.tickMaintenance(new Date(now).toISOString())
+  const live = service.control.getPublishOperation(created.flow.flowId, initial.operationId)
+  if (live.status != 'succeeded') throw new Error('Initial publication failed.')
+  const revisionId = await addPoll(service, created.flow.flowId, created.flow.draftRevisionId, 'retry')
+  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, 'open-flow-engine/v5', live.publicationId, 'retry')
+  await service.tickListeners(new Date(now).toISOString())
+  for (const delay of [1_000, 2_000, 4_000, 8_000, 16_000]) {
+    const count = calls.length
+    now += delay - 1
+    await service.tickListeners(new Date(now).toISOString())
+    expect(calls).toHaveLength(count)
+    now += 1
+    await service.tickListeners(new Date(now).toISOString())
+    expect(calls).toHaveLength(count + 1)
+    if (delay == 2_000) {
+      await closeService(service)
+      services.delete(service)
+      service = await openService(file, options)
+      services.add(service)
+    }
+  }
+  await service.tickMaintenance(new Date(now).toISOString())
+  expect(calls.map((time) => time - startedAt)).toEqual([0, 1_000, 3_000, 7_000, 15_000, 31_000])
+  expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId)).toMatchObject({
+    status: 'failed',
+    issue: { code: 'publication.retry-exhausted', nodeId: 'poll' },
+  })
+  await expect(service.control.getLive(created.flow.flowId)).resolves.toMatchObject({ publication: { publicationId: live.publicationId } })
+  now += 60_000
+  await service.tickListeners(new Date(now).toISOString())
+  expect(calls).toHaveLength(6)
+})
