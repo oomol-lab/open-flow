@@ -208,7 +208,7 @@ export function addNode(revision: RevisionView, target: GraphTarget, nodeId: str
       break
     case 'provider-trigger': {
       if (target.kind != 'flow') return
-      changes = createProviderTrigger(target, { bindingId: identity(), nodeId }, intent.definition, {
+      changes = createProviderTrigger(target, nodeId, intent.definition, {
         config: {},
         ...(intent.connectionId == null ? {} : { connectionId: intent.connectionId }),
       })

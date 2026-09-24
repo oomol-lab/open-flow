@@ -52,7 +52,7 @@ async function databaseFile(): Promise<string> {
 
 function pollNode(source: string): Extract<TriggerNode, { readonly kind: 'poll' }> {
   return {
-    bindingId: 'poll-connection',
+    connectionId: 'connection-main',
     config: inputValues({ source }),
     definition: snapshot,
     kind: 'poll',
@@ -63,7 +63,6 @@ function pollNode(source: string): Extract<TriggerNode, { readonly kind: 'poll' 
 
 async function addPoll(service: ServerService, flowId: string, revisionId: string, source: string): Promise<string> {
   const changed = await service.control.changeDraft('operator', flowId, revisionId, [
-    { binding: { kind: 'connection', target: 'connection-main' }, bindingId: 'poll-connection', kind: 'binding.create' },
     { kind: 'graph.node.create', node: pollNode(source), nodeId: 'poll', target: { kind: 'flow' } },
   ])
   return changed.revision.revisionId

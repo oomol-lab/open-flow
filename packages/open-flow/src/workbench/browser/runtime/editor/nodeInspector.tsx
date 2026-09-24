@@ -268,9 +268,7 @@ export function NodeInspector({
               fieldLabels={triggerDisplays?.[selection.trigger.definition.key]?.configInputLabels}
               config={selection.trigger.config}
               nodeId={selection.id}
-              connectionId={
-                revision.binding(selection.trigger.bindingId)?.kind === 'connection' ? revision.binding(selection.trigger.bindingId)!.target : undefined
-              }
+              connectionId={selection.trigger.connectionId}
               disabled={disabled}
               store={store}
             />
@@ -280,9 +278,7 @@ export function NodeInspector({
               fieldLabels={triggerDisplays?.[selection.trigger.definition.key]?.configInputLabels}
               config={selection.trigger.config}
               nodeId={selection.id}
-              connectionId={
-                revision.binding(selection.trigger.bindingId)?.kind === 'connection' ? revision.binding(selection.trigger.bindingId)!.target : undefined
-              }
+              connectionId={selection.trigger.connectionId}
               disabled={disabled}
               store={store}
             />

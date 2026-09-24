@@ -40,13 +40,14 @@ const snapshot = {
 function revision(config: Readonly<Record<string, JsonValue>>, connectionId: string, rules: readonly TriggerSchedule[], enabled = true): RevisionContent {
   return {
     document: {
-      bindings: enabled ? { connection: { kind: 'connection', target: connectionId } } : {},
+      bindings: {},
       graph: {
         edges: enabled ? [{ source: 'poll', target: 'task' }] : [],
         nodes: enabled
           ? {
               poll: {
-                bindingId: 'connection',
+                connectionId,
+
                 config: inputValues(config),
                 definition: snapshot,
                 kind: 'poll',

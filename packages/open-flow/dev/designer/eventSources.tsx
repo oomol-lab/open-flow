@@ -343,7 +343,7 @@ function SummarySample({ language }: { language: Parameters<FrontendStory['rende
     <I18nProvider i18n={i18n}>
       <section>
         <h2 className="text-sm font-medium">{language}</h2>
-        <TriggerSummary trigger={{ kind: 'integration', name: 'Feishu', bindingId: 'sample', definition, config: {} }} />
+        <TriggerSummary trigger={{ kind: 'integration', name: 'Feishu', definition, config: {} }} />
       </section>
     </I18nProvider>
   )

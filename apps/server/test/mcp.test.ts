@@ -67,7 +67,7 @@ it('shares compact trigger transactions and example discovery between MCP and RE
     kind: 'poll',
     definition: { key: 'gmail.on_message_received', outputs: [{ handle: 'events', jsonSchema: { type: 'array' } }] },
   })
-  expect(current.content.document.bindings['mail-account']).toEqual({ kind: 'connection', target: 'CONNECTION_ID' })
+  expect(current.content.document.graph.nodes.mail).toMatchObject({ connectionId: 'CONNECTION_ID' })
   const metadata = await control.getFlow(created.flowId)
   const live = await control.getLive(created.flowId)
   const inspected = await inspectFlowDraft(metadata, () => current)
@@ -109,12 +109,7 @@ it('does not commit partial compact trigger batches or accept unknown keys', asy
     ),
   ).rejects.toMatchObject({ code: 'flow.invalid' })
   await expect(
-    control.changeDraft(
-      created.flowId,
-      created.draftRevisionId,
-      [{ kind: 'graph.trigger.create', key: 'unknown', nodeId: 'mail', bindingId: 'account', config: {} }],
-      'unknown-key',
-    ),
+    control.changeDraft(created.flowId, created.draftRevisionId, [{ kind: 'graph.trigger.create', key: 'unknown', nodeId: 'mail', config: {} }], 'unknown-key'),
   ).rejects.toMatchObject({ code: 'trigger-key.not-found' })
   expect(await control.getDraft(created.flowId)).toMatchObject({
     revisionId: created.draftRevisionId,

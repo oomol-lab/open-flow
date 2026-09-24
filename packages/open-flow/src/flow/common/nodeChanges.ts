@@ -285,7 +285,7 @@ export function createBuiltinTrigger(
 
 export function createProviderTrigger(
   target: Extract<GraphTarget, { readonly kind: 'flow' }>,
-  identity: { readonly bindingId: string; readonly nodeId: string },
+  nodeId: string,
   definition: TriggerKeySnapshot,
   options: {
     readonly config: Readonly<Record<string, JsonValue>>
@@ -298,7 +298,7 @@ export function createProviderTrigger(
   const node: TriggerNode =
     definition.type == 'poll'
       ? {
-          bindingId: identity.bindingId,
+          ...(options.connectionId == null ? {} : { connectionId: options.connectionId }),
           config: inputValues(options.config),
           definition,
           kind: 'poll',
@@ -306,24 +306,18 @@ export function createProviderTrigger(
           pollTimes: options.schedule ?? [{ type: 'every', unit: 'minute', value: 5 }],
         }
       : {
-          bindingId: identity.bindingId,
+          ...(options.connectionId == null ? {} : { connectionId: options.connectionId }),
           config: inputValues(options.config),
           definition,
           kind: 'integration',
           name,
         }
-  return [
-    ...(options.connectionId == null
-      ? []
-      : [{ binding: { kind: 'connection' as const, target: options.connectionId }, bindingId: identity.bindingId, kind: 'binding.create' as const }]),
-    { kind: 'graph.node.create', node, nodeId: identity.nodeId, target },
-  ]
+  return [{ kind: 'graph.node.create', node, nodeId, target }]
 }
 
 export function deleteNodes(content: RevisionContent, target: GraphTarget, nodeIds: readonly string[]): readonly ChangeOperation[] {
   const nodes = graph(content, target)?.nodes
   if (nodes == null) return []
-  const removed = new Set(nodeIds)
   const operations: ChangeOperation[] = nodeIds.flatMap((nodeId) => {
     const node = nodes[nodeId]
     if (node == null) return []
@@ -335,19 +329,6 @@ export function deleteNodes(content: RevisionContent, target: GraphTarget, nodeI
   const remaining = referencedTaskIds(applyFlowChanges(content, operations).document)
   for (const taskId of referencedTaskIds(content.document)) {
     if (!remaining.has(taskId) && content.document.tasks[taskId] != null) operations.push({ kind: 'task.delete', taskId })
-  }
-  if (target.kind == 'subflow') return cleanVariableBindings(content, operations)
-  const bindingIds = new Set(
-    nodeIds.flatMap((nodeId) => {
-      const node = nodes[nodeId]
-      return node?.kind == 'poll' || node?.kind == 'integration' ? [node.bindingId] : []
-    }),
-  )
-  for (const bindingId of bindingIds) {
-    const inUse = Object.entries(content.document.graph.nodes).some(
-      ([nodeId, node]) => !removed.has(nodeId) && (node.kind == 'poll' || node.kind == 'integration') && node.bindingId == bindingId,
-    )
-    if (!inUse && content.document.bindings[bindingId] != null) operations.push({ bindingId, kind: 'binding.delete' })
   }
   return cleanVariableBindings(content, operations)
 }
@@ -467,7 +448,6 @@ function bindingReferences(document: RevisionContent['document']): Map<string, n
   }
   for (const currentGraph of [document.graph, ...Object.values(document.subflows).map((subflow) => subflow.graph)]) {
     for (const node of Object.values(currentGraph.nodes)) {
-      if (node.kind == 'poll' || node.kind == 'integration') add(node.bindingId)
       if (!('inputs' in node)) continue
       const inputs = Object.values(nodeInputMappings(node))
       for (const mapping of inputs) {
@@ -583,18 +563,14 @@ export function updateTriggerSchedule(
 
 export function setTriggerConnection(
   content: RevisionContent,
-  _target: { readonly kind: 'flow' },
+  target: { readonly kind: 'flow' },
   nodeId: string,
   connectionId: string | undefined,
 ): readonly ChangeOperation[] | undefined {
   const trigger = content.document.graph.nodes[nodeId]
   if (trigger == null || (trigger.kind != 'poll' && trigger.kind != 'integration')) return
-  const binding = content.document.bindings[trigger.bindingId]
-  if (connectionId == null) return binding == null ? [] : [{ bindingId: trigger.bindingId, kind: 'binding.delete' }]
-  if (binding == null) return [{ binding: { kind: 'connection', target: connectionId }, bindingId: trigger.bindingId, kind: 'binding.create' }]
-  if (binding.kind != 'connection') return
-  if (binding.target == connectionId) return []
-  return [{ before: binding.target, bindingId: trigger.bindingId, kind: 'binding.target.set', value: connectionId }]
+  if (trigger.connectionId == connectionId) return []
+  return [{ before: trigger.connectionId, kind: 'graph.node.field.set', field: 'connectionId', nodeId, target, value: connectionId }]
 }
 
 function graph(content: RevisionContent, target: GraphTarget) {

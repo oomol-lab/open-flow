@@ -184,7 +184,7 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
         mode: 'selectable',
         version: 1,
         accessRevision: 1,
-        providerAccessDigest: 'lab',
+        sharedAccessDigest: 'lab',
         providerIds: ['github', 'slack'],
         bindings: [
           {

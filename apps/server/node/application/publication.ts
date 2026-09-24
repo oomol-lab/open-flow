@@ -1,5 +1,5 @@
 import type { PublishOperation } from '@oomol-lab/open-flow/control-api'
-import type { ConnectorAccess } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAccess, ConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import type { RevisionContent, TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { Logger } from 'pino'
@@ -16,7 +16,7 @@ import { nextTriggerScheduledAt, validateTriggerSchedule } from '@oomol-lab/open
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { agentActions, codeActions } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
-import { captureNodeAccess } from '../deployment/connector-access.ts'
+import { captureConnectorAccess } from '../deployment/connector-access.ts'
 import { checkCodeActions, checkCodePermissions, ConnectorTaskError } from '../deployment/connector.ts'
 import { AcceptanceError, ControlError } from '../error.ts'
 
@@ -100,7 +100,7 @@ export class Publisher {
     const replay = this.#store.publications.replayPublication(
       input.flowId,
       input.idempotencyKey,
-      await this.#publicationRequestDigest(input, revisionDigest, providerAccess.providerAccessDigest),
+      await this.#publicationRequestDigest(input, revisionDigest, providerAccess.sharedAccessDigest),
     )
     if (replay != null) return replay
     const planned = await this.#publication(input, providerAccess)
@@ -115,7 +115,7 @@ export class Publisher {
     const replay = this.#store.publications.replayPublishOperation(
       input.flowId,
       input.idempotencyKey,
-      await this.#publicationRequestDigest(input, revisionDigest, providerAccess.providerAccessDigest),
+      await this.#publicationRequestDigest(input, revisionDigest, providerAccess.sharedAccessDigest),
     )
     if (replay?.kind == 'accepted') return replay.operation
     if (replay?.kind == 'conflict') {
@@ -147,22 +147,24 @@ export class Publisher {
     }
   }
 
-  async #publication(input: PublishFlowInput, providerAccess: ConnectorAccess): Promise<Parameters<PublicationStore['publish']>[0]> {
+  async #publication(input: PublishFlowInput, access: ConnectorAccess | ConnectorAccessSnapshot): Promise<Parameters<PublicationStore['publish']>[0]> {
     const fixed = await this.#validatedFlow(input.revision)
-    if (input.control?.operation != 'rollback')
-      providerAccess = await captureNodeAccess(this.#connectorAccess, input.flowId, { ...input.revision.document, ...fixed.prepared }, providerAccess)
+    const providerAccess =
+      access.version == 2
+        ? access
+        : await captureConnectorAccess(this.#connectorAccess, input.flowId, { ...input.revision.document, ...fixed.prepared }, access)
     if (Object.values(fixed.prepared.tasks).some((task) => task.executor.kind == 'agent') && !this.#agentAvailable())
       throw new ControlError(controlErrorCode.flowInvalid, 'Agent requires a configured model host.')
     const connectorAccess: ConnectorAccessContext = {
       flowId: input.flowId,
       providerAccess,
       purpose: 'eligibility',
-      usage: 'node',
+      scope: 'selected',
       source: 'publication',
       ...(this.#store.connectorTeams.get(input.flowId) == null ? {} : { teamId: this.#store.connectorTeams.get(input.flowId) }),
     }
     await checkCodeActions(agentActions(fixed.prepared), this.#resolveConnector(), connectorAccess)
-    await checkCodePermissions(codeActions(fixed.prepared), this.#resolveConnector(), { ...connectorAccess, usage: 'code' })
+    await checkCodePermissions(codeActions(fixed.prepared), this.#resolveConnector(), { ...connectorAccess, scope: 'shared' })
     const engineContract = input.engineContract ?? currentEngineContract
     if (input.revisionDigest != null && input.revisionDigest != fixed.revisionDigest) {
       throw new AcceptanceError('revision-conflict', 'The fixed Revision digest does not match its content.')
@@ -173,9 +175,9 @@ export class Publisher {
     ) {
       throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
     }
-    const requestDigest = await this.#publicationRequestDigest(input, fixed.revisionDigest, providerAccess.providerAccessDigest)
+    const requestDigest = await this.#publicationRequestDigest(input, fixed.revisionDigest, providerAccess.sharedAccessDigest)
     const publishedAt = this.#clock()
-    const integrations = this.#integration.bindings(input.revision, fixed.prepared, publishedAt)
+    const integrations = this.#integration.bindings(fixed.prepared, publishedAt)
     const connectorTasks = Object.values(fixed.prepared.tasks).flatMap((task) =>
       'executor' in task && task.executor.kind == 'connector' ? [task.executor] : [],
     )
@@ -214,12 +216,11 @@ export class Publisher {
           }
         }),
         ...providerTriggers.map(async (trigger) => {
-          const binding = input.revision.document.bindings[trigger.bindingId]
-          if (binding?.kind != 'connection') {
+          if (trigger.connectionId == null) {
             throw new ConnectorTaskError('connector.connection-required', 'The Trigger requires a Connection before it can be published.')
           }
           const available = await connections(trigger.definition.provider)
-          if (!available.some((candidate) => candidate.connectionId == binding.target && candidate.status == 'active')) {
+          if (!available.some((candidate) => candidate.connectionId == trigger.connectionId && candidate.status == 'active')) {
             throw new ConnectorTaskError('connector.connection-required', 'The selected Connector Connection must be reconnected or replaced.')
           }
         }),
@@ -257,12 +258,11 @@ export class Publisher {
         if (!this.#listeners.supports(trigger.definition.key, trigger.definition.definitionVersion)) {
           throw new AcceptanceError('trigger-invalid', 'Poll Trigger definition is not available.')
         }
-        const binding = input.revision.document.bindings[trigger.bindingId]
-        if (binding?.kind != 'connection' || binding.target.length == 0) {
+        if (trigger.connectionId == null || trigger.connectionId.length == 0) {
           throw new AcceptanceError('trigger-invalid', 'Poll Trigger Connection is unresolved.')
         }
         return {
-          connectionId: binding.target,
+          connectionId: trigger.connectionId,
           nextAt: nextTriggerScheduledAt(trigger.pollTimes, publishedAt),
           scheduleJson: JSON.stringify(trigger.pollTimes),
           triggerJson: JSON.stringify(trigger),
@@ -301,21 +301,21 @@ export class Publisher {
     }
   }
 
-  #providerAccess(input: PublishFlowInput): ConnectorAccess {
+  #providerAccess(input: PublishFlowInput): ConnectorAccess | ConnectorAccessSnapshot {
     if (input.control?.operation != 'rollback') return this.#connectorAccess.current(input.flowId)
     const source = this.#store.publications.providerAccess(input.control.sourcePublicationId)
     if (source == null) throw new ControlError(controlErrorCode.publicationNotFound, 'The rollback Publication was not found.')
     return source
   }
 
-  async #publicationRequestDigest(input: PublishFlowInput, revisionDigest: string, providerAccessDigest: string): Promise<string> {
+  async #publicationRequestDigest(input: PublishFlowInput, revisionDigest: string, sharedAccessDigest: string): Promise<string> {
     return await digestBytes(
       canonicalJsonBytes({
         engineContract: input.engineContract ?? currentEngineContract,
         expectedLivePublicationId: input.expectedLivePublicationId,
         flowId: input.flowId,
         operation: input.control?.operation ?? 'publish',
-        providerAccessDigest,
+        sharedAccessDigest,
         revisionDigest,
         ...(input.control?.operation == 'rollback' ? { sourcePublicationId: input.control.sourcePublicationId } : {}),
       }),

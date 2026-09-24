@@ -12,7 +12,6 @@ const json: z.ZodType<JsonValue> = z.json()
 const triggerCreate: z.ZodType<Extract<DraftOperation, { kind: 'graph.trigger.create' }>> = z.strictObject({
   kind: z.literal('graph.trigger.create'),
   nodeId: text,
-  bindingId: text,
   key: text,
   connectionId: text.optional(),
   name: text.optional(),
@@ -25,7 +24,6 @@ export type DraftOperation =
   | {
       readonly kind: 'graph.trigger.create'
       readonly nodeId: string
-      readonly bindingId: string
       readonly key: string
       readonly connectionId?: string
       readonly name?: string
@@ -58,6 +56,6 @@ export function resolveDraftOperations(operations: readonly DraftOperation[], de
     if (operation.kind != 'graph.trigger.create') return [operation]
     const snapshot = definition(operation.key)
     if (snapshot.type != 'poll' && operation.schedule != null) throw new Error('Only Poll triggers accept a schedule.')
-    return createProviderTrigger({ kind: 'flow' }, operation, snapshot, operation)
+    return createProviderTrigger({ kind: 'flow' }, operation.nodeId, snapshot, operation)
   })
 }

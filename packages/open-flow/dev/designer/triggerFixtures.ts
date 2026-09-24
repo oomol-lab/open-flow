@@ -94,7 +94,7 @@ export const triggerFixtures: readonly TriggerFixture[] = [
       ...Object.fromEntries(fields.map((field) => [field.handle, field.value !== undefined ? field.value : field.nullable ? null : sample(field.jsonSchema)])),
       ...examples,
     }
-    const common = { name: definition.displayName, description: definition.description, bindingId: 'account', config: inputValues(config) }
+    const common = { name: definition.displayName, description: definition.description, connectionId: 'lab-account', config: inputValues(config) }
     const trigger: TriggerNode =
       definition.type === 'poll'
         ? { ...common, kind: 'poll', definition, pollTimes: [{ type: 'every', unit: 'minute', value: 5 }] }
@@ -131,7 +131,7 @@ export function triggerDraft(trigger: TriggerNode, downstream = false): { flow: 
       modelVersion: currentFlowModelVersion,
       modules: {},
       document: {
-        bindings: { account: { kind: 'connection', target: 'lab-account' } },
+        bindings: {},
         subflows: {},
         tasks: {},
         graph: {

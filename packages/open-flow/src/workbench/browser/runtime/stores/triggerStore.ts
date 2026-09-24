@@ -51,13 +51,12 @@ export interface Trigger$ {
 const initialState: TriggerState = {}
 const optionPrefix = 'trigger:'
 
-function target(selection: ResolvedSelection | undefined, workspace: WorkspaceStore): TriggerTarget | undefined {
+function target(selection: ResolvedSelection | undefined): TriggerTarget | undefined {
   if (selection?.kind != 'trigger') return
   const trigger = selection.trigger
   if (trigger.kind != 'poll' && trigger.kind != 'integration') return
-  const binding = workspace.$.revision.value?.binding(trigger.bindingId)
   return {
-    ...(binding?.kind == 'connection' ? { connectionId: binding.target } : {}),
+    ...(trigger.connectionId == null ? {} : { connectionId: trigger.connectionId }),
     provider: trigger.definition.provider,
     triggerId: selection.id,
   }
@@ -110,7 +109,7 @@ export class TriggerStore {
     this.#workspace = workspace
     this.#selected = compute((get) => {
       const selection = get(workspace.$.selection)
-      const current = target(selection, workspace)
+      const current = target(selection)
       const state = get(this.#state)
       if (selection?.kind != 'trigger') return { authorizationPending: false }
       const trigger = selection.trigger
@@ -185,7 +184,7 @@ export class TriggerStore {
     if (this.#disposed) return
     const current = this.#refresh.begin()
     const flowId = this.#workspace.$.flowId.value
-    const selected = target(this.#workspace.$.selection.value, this.#workspace)
+    const selected = target(this.#workspace.$.selection.value)
     if (flowId == null || selected == null) {
       if (this.#state.value.connectionLoading != null) this.#set({ connectionLoading: undefined })
       return
@@ -231,7 +230,7 @@ export class TriggerStore {
     if (provider == null) return
     this.#stale.add(provider)
     this.#set({ authorizationProvider: undefined })
-    if (target(this.#workspace.$.selection.value, this.#workspace)?.provider == provider) await this.refresh(true)
+    if (target(this.#workspace.$.selection.value)?.provider == provider) await this.refresh(true)
   }
 
   #set(patch: Partial<TriggerState>): void {

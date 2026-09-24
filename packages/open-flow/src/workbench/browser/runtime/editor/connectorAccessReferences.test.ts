@@ -1,4 +1,4 @@
-import type { FlowDocument, RevisionContent } from '../../../../flow/common/change.ts'
+import type { FlowDocument, GraphNode, RevisionContent } from '../../../../flow/common/change.ts'
 import type { Draft } from '../api.ts'
 
 import { expect, it } from 'vitest'
@@ -12,7 +12,7 @@ function connectorAccessReferences(document: FlowDocument) {
 
 function flowDocument(): FlowDocument {
   return {
-    bindings: { events: { kind: 'connection', target: 'work' } },
+    bindings: {},
     tasks: {
       send: { name: 'Send mail', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send', connectionId: 'work' } },
       pending: { name: 'Pending', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send' } },
@@ -31,7 +31,7 @@ function flowDocument(): FlowDocument {
         },
         event: {
           kind: 'poll',
-          bindingId: 'events',
+          connectionId: 'work',
           name: 'New mail',
           config: {},
           pollTimes: [],
@@ -110,7 +110,8 @@ it('removes account usage across subflows and triggers while preserving graph, c
     modules: { code: { name: 'Code', source: 'export default () => ({})', imports: [] } },
   }
   const changed = removeConnectionUsage(content, 'work')
-  expect(changed.document.graph).toEqual(document.graph)
+  const { connectionId: _, ...event } = document.graph.nodes.event as Extract<GraphNode, { kind: 'poll' }>
+  expect(changed.document.graph).toEqual({ ...document.graph, nodes: { ...document.graph.nodes, event } })
   expect(changed.document.subflows).toEqual(document.subflows)
   expect(changed.modules).toEqual(content.modules)
   expect(changed.document.bindings).toEqual({})

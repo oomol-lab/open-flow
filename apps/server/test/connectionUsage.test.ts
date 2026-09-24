@@ -3,7 +3,7 @@ import type { FlowDocument } from '@oomol-lab/open-flow/flow-change'
 
 import { providerAccessBindingId } from '@oomol-lab/open-flow/control-api'
 import { afterEach, expect, it, vi } from 'vitest'
-import { captureNodeAccess, ImplicitConnectorAccessHost } from '../node/deployment/connector-access.ts'
+import { captureConnectorAccess, ImplicitConnectorAccessHost } from '../node/deployment/connector-access.ts'
 import { checkCodePermissions, ConnectorClient } from '../node/deployment/connector.ts'
 
 const document: FlowDocument = {
@@ -12,7 +12,7 @@ const document: FlowDocument = {
   graph: { edges: [], nodes: { send: { kind: 'task', taskId: 'send', name: 'Send', inputs: {} } } },
   tasks: { send: { name: 'Send', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send', connectionId: 'account' } } },
 }
-const access: ConnectorAccess = { version: 1, mode: 'selectable', accessRevision: 0, bindings: [], providerAccessDigest: 'empty' }
+const access: ConnectorAccess = { version: 1, mode: 'selectable', accessRevision: 0, bindings: [], sharedAccessDigest: 'empty' }
 const candidate = {
   providerId: 'mail',
   connectionId: 'account',
@@ -34,19 +34,18 @@ it('captures only selected node connections without adding Code usage and reject
       { version: 1, providerId: 'mail', mode: 'selectable', candidates: [candidate, { ...candidate, connectionId: 'other', accessBindingId: 'other' }] },
     ],
   })
-  const snapshot = await captureNodeAccess(host, 'flow', document, access)
-  expect(snapshot.bindings).toEqual([])
-  expect(snapshot.nodeBindings).toEqual([
+  const snapshot = await captureConnectorAccess(host, 'flow', document, access)
+  expect(snapshot.sharedBindings).toEqual([])
+  expect(snapshot.selectedBindings).toEqual([
     {
       providerId: 'mail',
       connectionId: 'account',
       accessBindingId: 'binding',
       connectionDisplayName: 'Work',
       source: { kind: 'admin-delegation' },
-      status: 'active',
     },
   ])
-  expect(access).not.toHaveProperty('nodeBindings')
+  expect(access).not.toHaveProperty('selectedBindings')
   lookup.mockResolvedValue({
     version: 1,
     results: [
@@ -58,7 +57,7 @@ it('captures only selected node connections without adding Code usage and reject
       },
     ],
   })
-  await expect(captureNodeAccess(host, 'flow', document, access)).rejects.toMatchObject({ code: 'connector.access-invalid' })
+  await expect(captureConnectorAccess(host, 'flow', document, access)).rejects.toMatchObject({ code: 'connector.access-invalid' })
 })
 
 it('captures independent Code connections in root graphs and Subflows', async () => {
@@ -84,20 +83,31 @@ it('captures independent Code connections in root graphs and Subflows', async ()
     graph: { edges: [], nodes: { code } },
     subflows: { child: { name: 'Child', inputs: [], outputs: [], graph: { edges: [], nodes: { code } } } },
   } as FlowDocument
-  const snapshot = await captureNodeAccess(host, 'flow', source, access)
-  expect(snapshot.bindings).toEqual([])
-  expect(snapshot.nodeBindings).toMatchObject([{ connectionId: 'account', providerId: 'mail' }])
+  const snapshot = await captureConnectorAccess(host, 'flow', source, access)
+  expect(snapshot.sharedBindings).toEqual([])
+  expect(snapshot.selectedBindings).toMatchObject([{ connectionId: 'account', providerId: 'mail' }])
 })
 
 it('executes nodes with fixed bindings while denying Code the same account, without resolving a new membership', async () => {
   const identity = { providerId: 'mail', connectionId: 'account', source: { kind: 'admin-delegation' as const } }
-  const binding = { ...identity, accessBindingId: await providerAccessBindingId('team', identity), connectionDisplayName: 'Work', status: 'active' as const }
-  const snapshot = { ...access, nodeBindings: [binding] }
+  const binding = { ...identity, accessBindingId: await providerAccessBindingId('team', identity), connectionDisplayName: 'Work' }
+  const otherIdentity = { ...identity, connectionId: 'other' }
+  const otherBinding = { ...otherIdentity, accessBindingId: await providerAccessBindingId('team', otherIdentity), connectionDisplayName: 'Other' }
+  const snapshot = {
+    version: 2 as const,
+    mode: 'selectable' as const,
+    sharedAccessDigest: 'empty',
+    sharedBindings: [],
+    selectedBindings: [binding, otherBinding],
+  }
   const request = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
     const url = new URL(String(input))
     if (url.pathname == '/v1/providers') return success([{ service: 'mail', displayName: 'Mail', authTypes: ['oauth2'] }])
     if (url.pathname == '/v1/apps/services/mail' || url.pathname == '/v1/apps')
-      return success([{ id: 'account', displayName: 'Work', alias: 'work', service: 'mail', status: 'active', isDefault: true }])
+      return success([
+        { id: 'account', displayName: 'Work', alias: 'work', service: 'mail', status: 'active', isDefault: true },
+        { id: 'other', displayName: 'Other', service: 'mail', status: 'active', isDefault: false },
+      ])
     if (url.pathname == '/v1/actions/mail.send')
       return init?.method == 'POST'
         ? success({ sent: true })
@@ -108,37 +118,61 @@ it('executes nodes with fixed bindings while denying Code the same account, with
   const connector = new ConnectorClient('https://connector.oomol.dev', 'token')
   const context = { flowId: 'flow', teamId: 'team', providerAccess: snapshot, purpose: 'execute' as const, source: 'run' as const }
   const independent = [{ kind: 'connector' as const, mode: 'independent' as const, actions: [{ action: 'mail.send', connectionId: 'account' }] }]
-  await expect(checkCodePermissions(independent, connector, { ...context, purpose: 'eligibility', usage: 'code' })).resolves.toBeUndefined()
+  await expect(checkCodePermissions(independent, connector, { ...context, purpose: 'eligibility', scope: 'shared' })).resolves.toBeUndefined()
   await expect(
-    checkCodePermissions([{ kind: 'connector', mode: 'shared' }], connector, { ...context, purpose: 'eligibility', usage: 'code' }),
+    checkCodePermissions([{ kind: 'connector', mode: 'shared' }], connector, { ...context, purpose: 'eligibility', scope: 'shared' }),
   ).resolves.toBeUndefined()
-  await expect(connector.execute('mail.send', 'account', {}, 'call', new AbortController().signal, { ...context, usage: 'node' })).resolves.toEqual({
+  await expect(
+    connector.execute('mail.send', 'account', {}, 'call', new AbortController().signal, {
+      ...context,
+      scope: 'action',
+      action: 'mail.send',
+      connectionId: 'account',
+    }),
+  ).resolves.toEqual({
     sent: true,
   })
-  await expect(connector.execute('mail.send', 'account', {}, 'code-call', new AbortController().signal, { ...context, usage: 'code' })).rejects.toMatchObject({
-    code: 'connector.access-required',
-  })
+  await expect(connector.execute('mail.send', 'account', {}, 'code-call', new AbortController().signal, { ...context, scope: 'shared' })).rejects.toMatchObject(
+    {
+      code: 'connector.access-required',
+    },
+  )
   await expect(
-    connector.execute('mail.send', undefined, {}, 'missing-selection', new AbortController().signal, { ...context, usage: 'node' }),
+    connector.execute('mail.send', undefined, {}, 'missing-selection', new AbortController().signal, { ...context, scope: 'action', action: 'mail.send' }),
   ).rejects.toMatchObject({ code: 'connector.connection-required' })
   await expect(
     connector.execute('mail.send', undefined, {}, 'shared-call', new AbortController().signal, {
       ...context,
-      usage: 'code',
-      providerAccess: { ...snapshot, bindings: [binding], nodeBindings: [] },
+      scope: 'shared',
+      providerAccess: { ...snapshot, sharedBindings: [binding], selectedBindings: [] },
     }),
   ).resolves.toEqual({ sent: true })
   expect(request.mock.calls.filter(([, init]) => init?.method == 'POST')).toHaveLength(2)
-  await expect(connector.execute('mail.send', 'other', {}, 'other-call', new AbortController().signal, { ...context, usage: 'node' })).rejects.toMatchObject({
+  await expect(
+    connector.execute('mail.send', 'other', {}, 'other-call', new AbortController().signal, {
+      ...context,
+      scope: 'action',
+      action: 'mail.send',
+      connectionId: 'account',
+    }),
+  ).rejects.toMatchObject({
     code: 'connector.access-invalid',
   })
   await expect(
-    connector.execute('mail.send', 'account', {}, 'legacy-call', new AbortController().signal, {
+    connector.execute('mail.send', 'account', {}, 'unscoped-call', new AbortController().signal, {
       ...context,
-      providerAccess: { ...access, bindings: [binding] },
-      usage: 'node',
+      scope: 'selected',
     }),
-  ).resolves.toEqual({ sent: true })
+  ).rejects.toMatchObject({ code: 'connector.access-invalid' })
+  await expect(
+    connector.execute('mail.delete', 'account', {}, 'wrong-action', new AbortController().signal, {
+      ...context,
+      scope: 'action',
+      action: 'mail.send',
+      connectionId: 'account',
+    }),
+  ).rejects.toMatchObject({ code: 'connector.access-invalid' })
+  expect(request.mock.calls.filter(([, init]) => init?.method == 'POST')).toHaveLength(2)
 })
 
 it('captures Agent tools, notifications and Trigger proxy usage without Code permissions', async () => {
@@ -148,7 +182,7 @@ it('captures Agent tools, notifications and Trigger proxy usage without Code per
     .mockResolvedValue({ version: 1, results: [{ version: 1, mode: 'selectable', providerId: 'mail', candidates: [candidate] }] })
   const source: FlowDocument = {
     ...document,
-    bindings: { mail: { kind: 'connection', target: 'account' } },
+    bindings: {},
     graph: {
       edges: [],
       nodes: {
@@ -156,7 +190,7 @@ it('captures Agent tools, notifications and Trigger proxy usage without Code per
         poll: {
           name: 'Received',
           kind: 'poll',
-          bindingId: 'mail',
+          connectionId: 'account',
           config: {},
           pollTimes: [],
           definition: {
@@ -191,9 +225,9 @@ it('captures Agent tools, notifications and Trigger proxy usage without Code per
       },
     },
   }
-  const captured = await captureNodeAccess(host, 'flow', source, access)
-  expect(captured.bindings).toEqual([])
-  expect(captured.nodeBindings).toHaveLength(1)
+  const captured = await captureConnectorAccess(host, 'flow', source, access)
+  expect(captured.sharedBindings).toEqual([])
+  expect(captured.selectedBindings).toHaveLength(1)
   lookup.mockResolvedValue({
     version: 1,
     results: [
@@ -205,7 +239,7 @@ it('captures Agent tools, notifications and Trigger proxy usage without Code per
       },
     ],
   })
-  await expect(captureNodeAccess(host, 'flow', source, access)).rejects.toMatchObject({ code: 'connector.access-invalid' })
+  await expect(captureConnectorAccess(host, 'flow', source, access)).rejects.toMatchObject({ code: 'connector.access-invalid' })
 })
 
 it('allows actions without accounts with an empty separated snapshot', async () => {
@@ -229,15 +263,16 @@ it('allows actions without accounts with an empty separated snapshot', async () 
     }),
   )
   const connector = new ConnectorClient('https://connector.oomol.dev', 'token')
-  for (const usage of ['node', 'code'] as const) {
+  for (const scope of ['action', 'shared'] as const) {
     await expect(
-      connector.execute('utility.echo', undefined, {}, usage, new AbortController().signal, {
+      connector.execute('utility.echo', undefined, {}, scope, new AbortController().signal, {
         flowId: 'flow',
         teamId: 'team',
-        providerAccess: { ...access, nodeBindings: [] },
+        providerAccess: { version: 2, mode: 'selectable', sharedAccessDigest: 'empty', sharedBindings: [], selectedBindings: [] },
         source: 'run',
         purpose: 'execute',
-        usage,
+        scope,
+        action: 'utility.echo',
       }),
     ).resolves.toEqual({ value: 'ok' })
   }
@@ -263,7 +298,7 @@ it('lists a new Flow’s accounts using the complete catalog even when no-auth p
     flowId: 'new-flow',
     teamId: 'team',
     providerAccess: access,
-    usage: 'node',
+    scope: 'catalog',
     purpose: 'catalog',
     source: 'draft',
   })

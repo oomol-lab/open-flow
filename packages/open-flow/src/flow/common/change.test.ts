@@ -3,13 +3,19 @@ import type { ChangeOperation, GraphNode, RevisionContent } from './change.ts'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { assert, describe, expect, it } from 'vitest'
 import { createAuthoringId } from './authoring.ts'
-import { applyFlowChanges, FlowChangeError, nextNodeName } from './change.ts'
+import { applyFlowChanges, decodeChangeOperations, FlowChangeError, nextNodeName } from './change.ts'
 import { connect } from './edgeChanges.ts'
 import { imports as moduleImports, replaceSource } from './moduleChanges.ts'
 import { createCodeTask, repairNodeNames } from './nodeChanges.ts'
 
 const port = { jsonSchema: {}, nullable: false } as const
 const target = { kind: 'flow' } as const
+
+it('distinguishes clearing a Trigger account from an empty account ID at the change boundary', () => {
+  const operation = { kind: 'graph.node.field.set', target, nodeId: 'trigger', field: 'connectionId', before: 'work' }
+  expect(decodeChangeOperations([operation])).toEqual([operation])
+  expect(() => decodeChangeOperations([{ ...operation, value: '' }])).toThrow()
+})
 
 function revision(): RevisionContent {
   return {
@@ -134,7 +140,7 @@ describe('Flow changes', () => {
     }
     const task = { executor: { kind: 'llm' as const, mode: 'chat' as const }, inputs: [], name: 'Managed', outputs: [] }
     const operations: readonly ChangeOperation[] = [
-      { binding: { kind: 'connection', target: 'connection-a' }, bindingId: 'binding', kind: 'binding.create' },
+      { binding: { kind: 'variable', target: 'connection-a' }, bindingId: 'binding', kind: 'binding.create' },
       { before: 'connection-a', bindingId: 'binding', kind: 'binding.target.set', value: 'connection-b' },
       { kind: 'module.create', module: { imports: [], name: 'Module', source: 'export default () => 1' }, moduleId: 'module' },
       {
@@ -160,7 +166,7 @@ describe('Flow changes', () => {
 
     const changed = applyFlowChanges(revision(), operations)
 
-    expect(changed.document.bindings.binding).toEqual({ kind: 'connection', target: 'connection-b' })
+    expect(changed.document.bindings.binding).toEqual({ kind: 'variable', target: 'connection-b' })
     expect(changed.modules.module).toEqual({ imports: ['helper'], name: 'Renamed module', source: 'export default () => 2' })
     expect(changed.document.subflows.child).toEqual({ graph: { edges: [], nodes: {} }, inputs: [], name: 'Renamed child', outputs: [] })
     expect(changed.document.tasks.managed).toMatchObject({ executor: { kind: 'llm', mode: 'json' }, name: 'Replaced' })

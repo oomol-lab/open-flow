@@ -1,4 +1,10 @@
-import type { ConnectorAccess, ConnectorAccessCandidatesBatch } from '@oomol-lab/open-flow/control-api'
+import type {
+  ConnectorAccess,
+  ConnectorAccessCandidatesBatch,
+  ConnectorAccessSnapshot,
+  ConnectorAccessGrant,
+  ProviderAccessBinding,
+} from '@oomol-lab/open-flow/control-api'
 import type { FlowDocument } from '@oomol-lab/open-flow/flow-change'
 import type { ConnectorTeamStore } from '../storage/connector-team-store.ts'
 import type { Database } from '../storage/database.ts'
@@ -93,10 +99,10 @@ export class ConfiguredConnectorAccessHost implements ConnectorAccessHost {
     if (this.#connector() == null) return implicitAccess()
     const row = this.#database.connection
       .prepare(
-        'SELECT access_revision AS accessRevision, bindings_json AS bindings, provider_ids_json AS providerIds, provider_access_digest AS providerAccessDigest FROM flow_provider_access WHERE flow_id = ?',
+        'SELECT access_revision AS accessRevision, bindings_json AS bindings, provider_ids_json AS providerIds, shared_access_digest AS sharedAccessDigest FROM flow_provider_access WHERE flow_id = ?',
       )
       .get(flowId) as
-      | { readonly accessRevision: number; readonly bindings: string; readonly providerIds: string; readonly providerAccessDigest: string }
+      | { readonly accessRevision: number; readonly bindings: string; readonly providerIds: string; readonly sharedAccessDigest: string }
       | undefined
     return row == null
       ? selectableAccess(0, [])
@@ -105,7 +111,7 @@ export class ConfiguredConnectorAccessHost implements ConnectorAccessHost {
           providerIds: JSON.parse(row.providerIds) as readonly string[],
           bindings: JSON.parse(row.bindings) as ConnectorAccess['bindings'],
           mode: 'selectable',
-          providerAccessDigest: row.providerAccessDigest,
+          sharedAccessDigest: row.sharedAccessDigest,
           version: 1,
         })
   }
@@ -204,16 +210,16 @@ export class ConfiguredConnectorAccessHost implements ConnectorAccessHost {
     const access = selectableAccess(expectedAccessRevision + 1, bindings, providerIds)
     const result = this.#database.connection
       .prepare(
-        `INSERT INTO flow_provider_access (flow_id, access_revision, bindings_json, provider_access_digest, provider_ids_json)
+        `INSERT INTO flow_provider_access (flow_id, access_revision, bindings_json, shared_access_digest, provider_ids_json)
          VALUES (?, ?, ?, ?, ?)
          ON CONFLICT (flow_id) DO UPDATE SET
            access_revision = excluded.access_revision,
            bindings_json = excluded.bindings_json,
            provider_ids_json = excluded.provider_ids_json,
-           provider_access_digest = excluded.provider_access_digest
+           shared_access_digest = excluded.shared_access_digest
          WHERE flow_provider_access.access_revision = ?`,
       )
-      .run(flowId, access.accessRevision, JSON.stringify(bindings), access.providerAccessDigest, JSON.stringify(providerIds), expectedAccessRevision)
+      .run(flowId, access.accessRevision, JSON.stringify(bindings), access.sharedAccessDigest, JSON.stringify(providerIds), expectedAccessRevision)
     return result.changes == 0 ? { kind: 'conflict' } : { access, kind: 'saved' }
   }
 
@@ -227,7 +233,7 @@ export class ConfiguredConnectorAccessHost implements ConnectorAccessHost {
 }
 
 function implicitAccess(): ConnectorAccess {
-  return { accessRevision: 0, bindings: [], mode: 'implicit', providerAccessDigest: 'implicit', version: 1 }
+  return { accessRevision: 0, bindings: [], mode: 'implicit', sharedAccessDigest: 'implicit', version: 1 }
 }
 
 function selectableAccess(accessRevision: number, bindings: ConnectorAccess['bindings'], providerIds: readonly string[] = []): ConnectorAccess {
@@ -237,22 +243,37 @@ function selectableAccess(accessRevision: number, bindings: ConnectorAccess['bin
     providerIds,
     bindings,
     mode: 'selectable',
-    providerAccessDigest: `sha256:${createHash('sha256').update(payload).digest('hex')}`,
+    sharedAccessDigest: `sha256:${createHash('sha256').update(payload).digest('hex')}`,
     version: 1,
   }
 }
 
-function compareBindings(left: ConnectorAccess['bindings'][number], right: ConnectorAccess['bindings'][number]): number {
+function compareBindings(
+  left: { readonly providerId: string; readonly accessBindingId: string },
+  right: { readonly providerId: string; readonly accessBindingId: string },
+): number {
   return left.providerId.localeCompare(right.providerId) || left.accessBindingId.localeCompare(right.accessBindingId)
 }
 
-export async function captureNodeAccess(host: ConnectorAccessHost, flowId: string, document: FlowDocument, access: ConnectorAccess): Promise<ConnectorAccess> {
-  if (access.mode == 'implicit') return { ...access, nodeBindings: [] }
+export async function captureConnectorAccess(
+  host: ConnectorAccessHost,
+  flowId: string,
+  document: FlowDocument,
+  access: ConnectorAccess,
+): Promise<ConnectorAccessSnapshot> {
+  const snapshot: ConnectorAccessSnapshot = {
+    version: 2,
+    mode: access.mode,
+    sharedAccessDigest: access.sharedAccessDigest,
+    sharedBindings: access.bindings.filter((binding) => binding.status == 'active').map(captureGrant),
+    selectedBindings: [],
+  }
+  if (access.mode == 'implicit') return snapshot
   const uses = connectionUsage(document).filter((use) => use.connectionId != null)
   const providerIds = [...new Set(uses.map((use) => use.providerId))]
-  if (providerIds.length == 0) return { ...access, nodeBindings: [] }
+  if (providerIds.length == 0) return snapshot
   const response = await host.listCandidates('', flowId, providerIds)
-  const nodeBindings = new Map<string, ConnectorAccess['bindings'][number]>()
+  const selectedBindings = new Map<string, ConnectorAccessGrant>()
   for (const providerId of providerIds) {
     const result = response.results.find((item) => item.providerId == providerId)
     if (result == null) throw new ConnectorTaskError('connector.unavailable', 'Connection candidates are unavailable.')
@@ -265,9 +286,21 @@ export async function captureNodeAccess(host: ConnectorAccessHost, flowId: strin
             (use.kind == 'trigger' ? item.permissions.proxy : item.permissions.allActions || item.permissions.actionIds.includes(use.actionId!))),
       )
       if (candidate == null) throw new ConnectorTaskError('connector.access-invalid', `The selected connection is unavailable for ${use.name}.`)
-      const { isDefault: _, permissions: _permissions, ...binding } = candidate
-      nodeBindings.set(binding.accessBindingId, { ...binding, status: 'active' })
+      selectedBindings.set(candidate.accessBindingId, captureGrant({ ...candidate, status: 'active' }))
     }
   }
-  return { ...access, nodeBindings: [...nodeBindings.values()] }
+  return { ...snapshot, selectedBindings: [...selectedBindings.values()].toSorted(compareBindings) }
+}
+
+function captureGrant(binding: ProviderAccessBinding): ConnectorAccessGrant {
+  if (binding.status != 'active' || binding.source == null || binding.connectionId == null)
+    throw new ConnectorTaskError('connector.access-invalid', 'The selected shared Connector access is unavailable.')
+  return {
+    accessBindingId: binding.accessBindingId,
+    connectionId: binding.connectionId,
+    providerId: binding.providerId,
+    source: binding.source,
+    connectionDisplayName: binding.connectionDisplayName,
+    ...(binding.permissionGroupName === undefined ? {} : { permissionGroupName: binding.permissionGroupName }),
+  }
 }

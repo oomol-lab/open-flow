@@ -152,6 +152,7 @@ export class EventSourceRuntime {
     const subscriptions = feishuSubscriptions(context.config, source.provider)
     if (subscriptions.length > 0 && source.manageSubscriptions != 1) throw new PermanentIntegrationError('This source does not manage resource subscriptions.')
     for (const subscription of subscriptions) {
+      if (access.scope == 'catalog') throw new PermanentIntegrationError('Resource subscriptions require a fixed access snapshot.')
       const previous = this.#store.eventSources.subscription(source.sourceId, subscription.key)
       const stored = this.#store.eventSources.demand(
         source.sourceId,
@@ -211,7 +212,8 @@ export class EventSourceRuntime {
       const result = await connector.proxy(source.provider, source.connectionId, source.sourceId, request, signal ?? AbortSignal.timeout(30_000), {
         providerAccess: stored.providerAccess,
         providerId: source.provider,
-        usage: 'node',
+        scope: 'proxy',
+        connectionId: source.connectionId,
         purpose: 'trigger',
         source: 'publication',
         ...(source.teamId == null ? {} : { teamId: source.teamId }),
@@ -229,7 +231,7 @@ export class EventSourceRuntime {
     return {
       providerAccess: this.#connectorAccess.current(''),
       providerId,
-      usage: 'node',
+      scope: 'catalog',
       purpose: 'catalog',
       source: 'operator',
       ...(teamId == null ? {} : { teamId }),

@@ -45,7 +45,7 @@ export function createInspectorTransport(
   const timestamp = '2026-09-14T00:00:00.000Z'
   let sequence = 1
   let content = initialContent
-  let access = options.access ?? { accessRevision: 0, bindings: [], mode: 'implicit', providerAccessDigest: 'implicit:lab', version: 1 }
+  let access = options.access ?? { accessRevision: 0, bindings: [], mode: 'implicit', sharedAccessDigest: 'implicit:lab', version: 1 }
 
   let presentation = setNodePositions(
     {},
@@ -74,7 +74,7 @@ export function createInspectorTransport(
         modelVersion: currentFlowModelVersion,
         operation: 'publish',
         publicationId: 'published',
-        providerAccessDigest: access.providerAccessDigest,
+        sharedAccessDigest: access.sharedAccessDigest,
         revisionDigest: 'd1',
         revisionId: 'r1',
         version: 1,
@@ -164,7 +164,7 @@ export function createInspectorTransport(
                   status: 'active',
                 },
               ],
-        providerAccessDigest: `selectable:lab:${access.accessRevision + 1}`,
+        sharedAccessDigest: `selectable:lab:${access.accessRevision + 1}`,
       }
       return Response.json(access)
     }

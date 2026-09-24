@@ -327,7 +327,6 @@ describe('Designer port projection', () => {
             edges: [],
             nodes: {
               trigger: {
-                bindingId: 'binding',
                 config: inputValues({ repo: 'open-flow' }),
                 definition: {
                   configInputs: [

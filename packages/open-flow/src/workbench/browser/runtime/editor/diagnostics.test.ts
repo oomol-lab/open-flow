@@ -101,7 +101,6 @@ describe('Workbench Diagnostic messages', () => {
             edges: [],
             nodes: {
               trigger: {
-                bindingId: 'binding',
                 config: {},
                 definition: {
                   configInputs: [],
@@ -141,9 +140,8 @@ describe('Workbench Diagnostic messages', () => {
     const diagnostic: Diagnostic = {
       ...base,
       code: 'trigger.connection-missing',
-      message: 'Trigger Connection binding "binding" does not exist.',
-      path: '/document/graph/nodes/trigger/bindingId',
-      values: { bindingId: 'binding' },
+      message: 'Select a connection account for this Trigger.',
+      path: '/document/graph/nodes/trigger/connectionId',
     }
     const flowDiagnostic: Diagnostic = {
       ...base,

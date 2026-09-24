@@ -1,4 +1,4 @@
-import type { ConnectorAccess } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAccess, ConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 
 import { expect, it, onTestFinished } from 'vitest'
 import { Database } from '../node/storage/database.ts'
@@ -10,8 +10,8 @@ function fixture(providerAccess?: ConnectorAccess) {
   const store = new Store(database, () => 1_000)
   if (providerAccess != null)
     database.connection
-      .prepare('INSERT INTO flow_provider_access (flow_id, access_revision, bindings_json, provider_access_digest) VALUES (?, ?, ?, ?)')
-      .run('flow', providerAccess.accessRevision, JSON.stringify(providerAccess.bindings), providerAccess.providerAccessDigest)
+      .prepare('INSERT INTO flow_provider_access (flow_id, access_revision, bindings_json, shared_access_digest) VALUES (?, ?, ?, ?)')
+      .run('flow', providerAccess.accessRevision, JSON.stringify(providerAccess.bindings), providerAccess.sharedAccessDigest)
   store.flows.createFlow({
     actorId: 'operator',
     content: '{"modelVersion":2}',
@@ -41,7 +41,23 @@ function fixture(providerAccess?: ConnectorAccess) {
       },
     ],
     polls: [{ connectionId: 'connection', nextAt: 2_000, scheduleJson: '[]', triggerJson: '{"kind":"poll"}', triggerNodeId: 'poll' }],
-    providerAccess,
+    providerAccess:
+      providerAccess == null
+        ? undefined
+        : ({
+            version: 2,
+            mode: providerAccess.mode,
+            sharedAccessDigest: providerAccess.sharedAccessDigest,
+            sharedBindings: providerAccess.bindings.map((binding) => ({
+              accessBindingId: binding.accessBindingId,
+              connectionId: binding.connectionId,
+              providerId: binding.providerId,
+              source: binding.source,
+              connectionDisplayName: binding.connectionDisplayName,
+              permissionGroupName: binding.permissionGroupName,
+            })),
+            selectedBindings: [],
+          } as ConnectorAccessSnapshot),
     publishedAt: 1_000,
     requestDigest: 'publish',
     revisionDigest: 'digest',
@@ -63,7 +79,7 @@ const selectedAccess: ConnectorAccess = {
   version: 1,
   mode: 'selectable',
   accessRevision: 1,
-  providerAccessDigest: 'selected',
+  sharedAccessDigest: 'selected',
   bindings: [
     {
       connectionId: 'fixture-account',
@@ -81,11 +97,11 @@ it.each(['publish', 'acceptPublishOperation'] as const)(
   'rejects stale access in the %s transaction without persisting candidates or publications',
   (method) => {
     const { database, store, input } = fixture(selectedAccess)
-    database.prepare('UPDATE flow_provider_access SET provider_access_digest = ?').run('changed')
+    database.prepare('UPDATE flow_provider_access SET shared_access_digest = ?').run('changed')
     const result = store.publications[method]({ ...input, operationId: undefined, idempotencyKey: 'stale', requestDigest: 'stale' }, () => {
       expect(database.isTransaction).toBe(true)
-      const row = database.prepare('SELECT provider_access_digest AS digest FROM flow_provider_access').get() as { digest: string }
-      return { ...selectedAccess, providerAccessDigest: row.digest }
+      const row = database.prepare('SELECT shared_access_digest AS digest FROM flow_provider_access').get() as { digest: string }
+      return { ...selectedAccess, sharedAccessDigest: row.digest }
     })
     expect(result).toEqual({ kind: 'access-conflict' })
     expect(database.prepare('SELECT COUNT(*) AS count FROM publications').get()).toEqual({ count: 0 })
@@ -96,14 +112,14 @@ it.each(['publish', 'acceptPublishOperation'] as const)(
 
 it('keeps accepted operation and cleanup snapshots fixed when Draft access changes', () => {
   const { database, store, input, poll, integration } = fixture(selectedAccess)
-  database.prepare('UPDATE flow_provider_access SET provider_access_digest = ?').run('changed')
+  database.prepare('UPDATE flow_provider_access SET shared_access_digest = ?').run('changed')
   store.polls.completeCandidate(poll, '{}', false, 1_000)
   store.integrations.markCandidateReady(integration, 1_000)
-  expect(JSON.parse(store.integrations.candidate(input.operationId, 'integration')!.providerAccessJson)).toEqual(selectedAccess)
+  expect(JSON.parse(store.integrations.candidate(input.operationId, 'integration')!.providerAccessJson)).toEqual(input.providerAccess)
   const result = store.publications.publish(input)
   expect(result.kind).toBe('published')
   if (result.kind != 'published') throw new Error('Publication was not committed.')
-  expect(store.publications.providerAccess(result.publicationId)).toEqual(selectedAccess)
+  expect(store.publications.providerAccess(result.publicationId)).toEqual(input.providerAccess)
   const rollback = store.publications.publish({
     ...input,
     operationId: undefined,

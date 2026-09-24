@@ -8,6 +8,78 @@ import { Database } from '../node/storage/database.ts'
 
 const directories: string[] = []
 
+it.each([true, false])('migrates grants without rewriting Revision content (nodeBindings present: %s)', async (hasSelected) => {
+  const file = await databaseFile()
+  const old = legacyDatabase(file, 29)
+  const grant = {
+    accessBindingId: 'shared',
+    connectionId: 'account',
+    providerId: 'mail',
+    source: { kind: 'policy', ruleId: null },
+    connectionDisplayName: 'Account',
+  }
+  const selected = { ...grant, accessBindingId: 'selected', connectionId: 'second' }
+  const snapshot = JSON.stringify({
+    version: 1,
+    mode: 'selectable',
+    providerAccessDigest: 'digest',
+    accessRevision: 7,
+    bindings: [
+      { ...grant, status: 'active', policyRevision: 'policy' },
+      { ...grant, accessBindingId: 'forbidden', status: 'forbidden' },
+    ],
+    ...(hasSelected ? { nodeBindings: [{ ...selected, status: 'active' }] } : {}),
+  })
+  old.prepare('INSERT INTO flow_provider_access VALUES (?, ?, ?, ?, ?)').run('flow', 7, '[]', 'digest', '["mail"]')
+  old.prepare("INSERT INTO revisions VALUES ('revision', 'digest', '{\"modelVersion\":3}')").run()
+  old
+    .prepare(`INSERT INTO publications (publication_id, flow_id, revision_id, revision_digest, closure_digest, engine_contract,
+    idempotency_key, request_digest, actor_id, operation, model_version, created_at, provider_access_digest, provider_access_snapshot)
+    VALUES ('publication', 'flow', 'revision', 'digest', 'closure', 'engine', 'key', 'request', 'actor', 'publish', 3, 1, 'digest', ?)`)
+    .run(snapshot)
+  old.close()
+  const upgraded = Database.open(file)
+  const expected = { version: 2, mode: 'selectable', sharedAccessDigest: 'digest', sharedBindings: [grant], selectedBindings: [hasSelected ? selected : grant] }
+  expect(JSON.parse(String(upgraded.connection.prepare('SELECT provider_access_snapshot FROM publications').get()!.provider_access_snapshot))).toEqual(expected)
+  expect(upgraded.connection.prepare('SELECT shared_access_digest, access_revision FROM flow_provider_access').get()).toEqual({
+    shared_access_digest: 'digest',
+    access_revision: 7,
+  })
+  expect(upgraded.connection.prepare('SELECT content FROM revisions').get()).toEqual({ content: '{"modelVersion":3}' })
+  upgraded.close()
+  const reopened = Database.open(file)
+  expect(JSON.parse(String(reopened.connection.prepare('SELECT provider_access_snapshot FROM publications').get()!.provider_access_snapshot))).toEqual(expected)
+  reopened.close()
+})
+
+it('rolls back column changes and the schema version when a stored grant is invalid', async () => {
+  const file = await databaseFile()
+  const old = legacyDatabase(file, 29)
+  old
+    .prepare(`INSERT INTO runs (run_id, idempotency_key, request_digest, flow_id, revision_id, revision_digest, closure_digest,
+    model_version, engine_contract, engine_digest, inputs, source, status, created_at, provider_access_snapshot)
+    VALUES ('run', 'key', 'request', 'flow', 'revision', 'digest', 'closure', 3, 'engine', 'engine', '{}', 'draft', 'completed', 1, ?)`)
+    .run(JSON.stringify({ version: 1, mode: 'selectable', providerAccessDigest: 'digest', bindings: [{ status: 'active' }] }))
+  old.close()
+  expect(() => Database.open(file)).toThrow()
+  const unchanged = new DatabaseSync(file)
+  expect(version(unchanged)).toBe(29)
+  expect(unchanged.prepare("SELECT name FROM pragma_table_info('publications') WHERE name = 'provider_access_digest'").get()).toBeDefined()
+  expect(unchanged.prepare("SELECT name FROM pragma_table_info('publications') WHERE name = 'migrated_access_snapshot'").get()).toBeUndefined()
+  unchanged.close()
+})
+
+it('accepts databases already rebuilt with the new column names and snapshot format', async () => {
+  const file = await databaseFile()
+  const database = Database.open(file)
+  database.connection.exec('PRAGMA user_version = 29')
+  database.close()
+  const upgraded = Database.open(file)
+  expect(version(upgraded.connection)).toBe(30)
+  expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
+  upgraded.close()
+})
+
 afterEach(async () => {
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { force: true, recursive: true })))
 })
@@ -51,7 +123,7 @@ it('backfills Revision metadata needed after old content is pruned', async () =>
 
   const upgraded = Database.open(file)
   try {
-    expect(version(upgraded.connection)).toBe(29)
+    expect(version(upgraded.connection)).toBe(30)
     expect(upgraded.connection.prepare('SELECT digest, model_version AS modelVersion FROM flow_revisions WHERE revision_id = ?').get('revision')).toEqual({
       digest: 'digest',
       modelVersion: 3,
@@ -89,7 +161,7 @@ it('backfills each candidate with its creation snapshot, including failed and re
   try {
     expect(
       upgraded.connection
-        .prepare(`SELECT node_id AS nodeId, json_extract(provider_access_snapshot, '$.providerAccessDigest') AS digest
+        .prepare(`SELECT node_id AS nodeId, json_extract(provider_access_snapshot, '$.sharedAccessDigest') AS digest
       FROM integration_candidates ORDER BY node_id`)
         .all(),
     ).toEqual([
@@ -107,7 +179,7 @@ it('applies the Flow-first schema without foreign keys', async () => {
   Database.open(file).close()
   const database = new DatabaseSync(file)
   try {
-    expect(version(database)).toBe(29)
+    expect(version(database)).toBe(30)
     const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as {
       readonly name: string
     }[]
@@ -149,7 +221,7 @@ it('upgrades a version 1 Flow database without changing its data', async () => {
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(29)
+    expect(version(reopened)).toBe(30)
     expect(reopened.prepare('SELECT revision_id AS revisionId FROM revisions').all()).toEqual([{ revisionId: 'revision-a' }])
     expect(reopened.prepare('SELECT name FROM variables').all()).toEqual([])
   } finally {
@@ -179,7 +251,7 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(29)
+    expect(version(reopened)).toBe(30)
     expect(reopened.prepare('SELECT flow_id AS flowId, team_id AS teamId FROM flow_connector_teams').all()).toEqual([{ flowId: 'flow-a', teamId: null }])
     expect(reopened.prepare("SELECT name FROM pragma_table_info('runs') WHERE name = 'connector_team_id'").get()).toEqual({ name: 'connector_team_id' })
   } finally {
@@ -227,13 +299,13 @@ it('rejects a newer Flow schema version without modifying it', async () => {
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
-  database.exec('PRAGMA user_version = 30')
+  database.exec('PRAGMA user_version = 31')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('SQLite schema version 30 is newer than the supported version 29.')
+  expect(() => Database.open(file)).toThrow('SQLite schema version 31 is newer than the supported version 30.')
 
   const reopened = new DatabaseSync(file)
-  expect(version(reopened)).toBe(30)
+  expect(version(reopened)).toBe(31)
   reopened.close()
 })
 
@@ -271,7 +343,7 @@ it('preserves old checkpoint bytes for explicit recovery validation', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(29)
+    expect(version(reopened)).toBe(30)
     expect(reopened.prepare('SELECT * FROM run_checkpoints').get()).toEqual({
       run_id: 'run-a',
       checkpoint_json: '{"value":42}',
@@ -304,13 +376,13 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   Database.open(file).close()
   const upgraded = new DatabaseSync(file)
   try {
-    expect(version(upgraded)).toBe(29)
+    expect(version(upgraded)).toBe(30)
     const after = tables.map((table) => upgraded.prepare('SELECT * FROM ' + table).all())
     expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
     expect(after[2]).toEqual(
       before[2]!.map((row) =>
         Object.assign({}, row, {
-          provider_access_snapshot: '{"accessRevision":0,"bindings":[],"mode":"implicit","providerAccessDigest":"legacy","version":1}',
+          provider_access_snapshot: '{"mode":"implicit","sharedAccessDigest":"implicit","sharedBindings":[],"selectedBindings":[],"version":2}',
         }),
       ),
     )
@@ -385,14 +457,26 @@ it('clears only old Draft shared access once and preserves new Code usage on reo
   old.close()
   const migrated = Database.open(file)
   expect(migrated.connection.prepare('SELECT * FROM flow_provider_access').all()).toEqual([])
-  expect(migrated.connection.prepare('SELECT provider_access_snapshot FROM publications').get()).toEqual({ provider_access_snapshot: snapshot })
-  expect(migrated.connection.prepare('SELECT provider_access_snapshot FROM runs').get()).toEqual({ provider_access_snapshot: snapshot })
+  expect(JSON.parse(String(migrated.connection.prepare('SELECT provider_access_snapshot FROM publications').get()!.provider_access_snapshot))).toEqual({
+    version: 2,
+    mode: 'implicit',
+    sharedAccessDigest: 'preserved',
+    sharedBindings: [],
+    selectedBindings: [],
+  })
+  expect(JSON.parse(String(migrated.connection.prepare('SELECT provider_access_snapshot FROM runs').get()!.provider_access_snapshot))).toEqual({
+    version: 2,
+    mode: 'implicit',
+    sharedAccessDigest: 'preserved',
+    sharedBindings: [],
+    selectedBindings: [],
+  })
   expect(migrated.connection.prepare('SELECT content FROM revisions').get()).toEqual({ content: graph })
   migrated.connection
-    .prepare('INSERT INTO flow_provider_access (flow_id, access_revision, bindings_json, provider_access_digest, provider_ids_json) VALUES (?, ?, ?, ?, ?)')
+    .prepare('INSERT INTO flow_provider_access (flow_id, access_revision, bindings_json, shared_access_digest, provider_ids_json) VALUES (?, ?, ?, ?, ?)')
     .run('flow', 1, '[]', 'new', '["mail"]')
   migrated.close()
   const reopened = Database.open(file)
-  expect(reopened.connection.prepare('SELECT provider_access_digest FROM flow_provider_access').get()).toEqual({ provider_access_digest: 'new' })
+  expect(reopened.connection.prepare('SELECT shared_access_digest FROM flow_provider_access').get()).toEqual({ shared_access_digest: 'new' })
   reopened.close()
 })

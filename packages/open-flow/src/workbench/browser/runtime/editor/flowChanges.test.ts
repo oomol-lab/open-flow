@@ -507,7 +507,7 @@ describe('Variable input changes', () => {
 })
 
 describe('Provider Trigger changes', () => {
-  it('creates an unconnected Trigger and adds its binding when a Connection is selected', () => {
+  it('creates an unconnected Trigger and stores its selected Connection directly', () => {
     const current = draft('export default () => {}\n')
     const ids = ['binding']
     const changes = addNode(
@@ -543,13 +543,11 @@ describe('Provider Trigger changes', () => {
     if (changes == null) throw new Error('Expected provider Trigger changes.')
     const added = applyFlowChanges(current, changes)
     expect(added.content.document.bindings).toEqual({})
-    expect(added.content.document.graph.nodes.trigger).toMatchObject({ bindingId: 'binding', kind: 'integration' })
+    expect(added.content.document.graph.nodes.trigger).toMatchObject({ kind: 'integration' })
 
     const connected = setTriggerConnection(added.content, { kind: 'flow' }, 'trigger', 'github-work')
     if (connected == null) throw new Error('Expected Trigger Connection changes.')
-    expect(applyFlowChanges(added, connected).content.document.bindings).toEqual({
-      binding: { kind: 'connection', target: 'github-work' },
-    })
+    expect(applyFlowChanges(added, connected).content.document.graph.nodes.trigger).toMatchObject({ connectionId: 'github-work' })
   })
 })
 

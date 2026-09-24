@@ -1,5 +1,5 @@
 import type { ConnectorProxy } from '@oomol-lab/open-flow/connector-proxy'
-import type { ConnectorAccess } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, RevisionContent, TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type {
@@ -16,6 +16,7 @@ import type { SourceDelivery } from '../storage/event-source-store.ts'
 import type { IntegrationCandidate } from '../storage/integration-store.ts'
 import type { IntegrationHealth, StoredIntegrationBinding, StoredIntegrationState, StoredIntegrationTarget } from '../storage/trigger-store.ts'
 
+import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { matchesTriggerOutputs } from '@oomol-lab/open-flow/flow-semantics'
@@ -52,7 +53,7 @@ export interface IntegrationResponse {
 interface ActiveIntegrationTarget {
   readonly connectionId: string
   readonly current: boolean
-  readonly providerAccess: ConnectorAccess
+  readonly providerAccess: ConnectorAccessSnapshot
   readonly definition: IntegrationDefinition
   readonly state: IntegrationStateContext
   readonly stored: StoredIntegrationTarget
@@ -67,7 +68,7 @@ interface CandidateIntegrationTarget {
 }
 
 interface ConnectorScope {
-  readonly providerAccess?: ConnectorAccess
+  readonly providerAccess?: ConnectorAccessSnapshot
   readonly publicationId?: string
 }
 
@@ -129,7 +130,7 @@ export class IntegrationRuntime {
     this.#runCreated = runCreated
   }
 
-  bindings(revision: RevisionContent, prepared: PreparedFlow, publishedAt: number) {
+  bindings(prepared: PreparedFlow, publishedAt: number) {
     const nodes = Object.entries(prepared.graph.nodes)
       .filter((entry): entry is [string, Extract<TriggerNode, { readonly kind: 'integration' }>] => entry[1].kind == 'integration')
       .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
@@ -141,15 +142,14 @@ export class IntegrationRuntime {
       if (definition?.snapshot.definitionVersion != trigger.definition.definitionVersion) {
         throw new AcceptanceError('trigger-invalid', 'Integration Trigger definition is not available.')
       }
-      const binding = revision.document.bindings[trigger.bindingId]
-      if (binding?.kind != 'connection' || binding.target.length == 0) {
+      if (trigger.connectionId == null || trigger.connectionId.length == 0) {
         throw new AcceptanceError('trigger-invalid', 'Integration Trigger Connection is unresolved.')
       }
       if (definition.listener != null && (!Number.isSafeInteger(definition.listener.intervalMs) || definition.listener.intervalMs <= 0)) {
         throw new AcceptanceError('trigger-invalid', 'Listener interval must be a positive integer.')
       }
       return {
-        connectionId: binding.target,
+        connectionId: trigger.connectionId,
         eventSource: definition.eventSource != null,
         listener: definition.listener != null,
         reconcileAt: publishedAt,
@@ -398,7 +398,7 @@ export class IntegrationRuntime {
             callbackSecret,
             config: resolveTriggerConfig(target.trigger.definition.configInputs, target.trigger.config),
             connector: this.#connectorProxy(target.definition, candidate.bindingId, candidate.connectionId, candidate.flowId, signal, {
-              providerAccess: JSON.parse(candidate.providerAccessJson) as ConnectorAccess,
+              providerAccess: decodeConnectorAccessSnapshot(JSON.parse(candidate.providerAccessJson)),
             }),
             signal,
             header: (name) => input.headers.get(name) ?? undefined,
@@ -444,7 +444,7 @@ export class IntegrationRuntime {
   ): Effect.Effect<IntegrationReconcileResult, unknown> {
     return Effect.tryPromise({
       try: (signal) => {
-        const connectorAccess = this.#connectorContext(definition.snapshot.provider, flowId, access)
+        const connectorAccess = this.#connectorContext(definition.snapshot.provider, connectionId, flowId, access)
         const input = { ...context, connector: this.#connectorProxy(definition, bindingId, connectionId, flowId, signal, access), signal }
         return definition.eventSource == null
           ? definition.reconcile(input)
@@ -504,7 +504,7 @@ export class IntegrationRuntime {
         current.bindingId,
         current.connectionId,
         current.flowId,
-        { providerAccess: JSON.parse(current.providerAccessJson) as ConnectorAccess },
+        { providerAccess: decodeConnectorAccessSnapshot(JSON.parse(current.providerAccessJson)) },
         {
           active,
           callbackSecret,
@@ -770,7 +770,7 @@ export class IntegrationRuntime {
             bindingId,
             request,
             connectorSignal,
-            this.#connectorContext(definition.snapshot.provider, flowId, access),
+            this.#connectorContext(definition.snapshot.provider, connectionId, flowId, access),
           )
         } catch (cause) {
           if (cause instanceof ConnectorTaskError && cause.code == 'connector.connection-required') {
@@ -782,24 +782,23 @@ export class IntegrationRuntime {
     }
   }
 
-  #connectorContext(providerId: string, flowId: string, access: ConnectorScope): ConnectorAccessContext {
-    const providerAccess =
-      access.providerAccess ??
-      (access.publicationId == null ? undefined : this.#store.publications.providerAccess(access.publicationId)) ??
-      this.#connectorAccess.current(flowId)
+  #connectorContext(providerId: string, connectionId: string, flowId: string, access: ConnectorScope): ConnectorAccessContext {
+    const providerAccess = access.providerAccess ?? (access.publicationId == null ? undefined : this.#store.publications.providerAccess(access.publicationId))
+    if (providerAccess == null && access.publicationId != null) throw new TransientIntegrationError('Integration Publication access is unavailable.')
     const teamId = this.#store.connectorTeams.get(flowId)
     return {
       flowId,
-      providerAccess,
       providerId,
-      usage: 'node',
+      ...(providerAccess == null
+        ? { providerAccess: this.#connectorAccess.current(flowId), scope: 'catalog' as const }
+        : { providerAccess, scope: 'proxy' as const, connectionId }),
       purpose: 'trigger',
       source: access.publicationId == null && access.providerAccess == null ? 'draft' : 'publication',
       ...(teamId == null ? {} : { teamId }),
     }
   }
 
-  #publicationAccess(publicationId: string): ConnectorAccess {
+  #publicationAccess(publicationId: string): ConnectorAccessSnapshot {
     const access = this.#store.publications.providerAccess(publicationId)
     if (access == null) throw new TransientIntegrationError('Integration Publication access is unavailable.')
     return access

@@ -89,7 +89,7 @@ describe('RunDrawer terminal result', () => {
       engineDigest: 'sha256:engine',
       flowId: 'flow',
       modelVersion: currentFlowModelVersion,
-      providerAccessDigest: 'implicit:test',
+      sharedAccessDigest: 'implicit:test',
       revisionDigest: 'sha256:revision',
       revisionId: 'revision',
       runId: 'run',

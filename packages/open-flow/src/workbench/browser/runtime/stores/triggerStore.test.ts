@@ -37,14 +37,15 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
           actorId: 'actor',
           content: {
             document: {
-              bindings: Object.fromEntries(['github', 'mail', 'linear'].map((provider) => [provider, { kind: 'connection', target: `${provider}-old` }])),
+              bindings: {},
               graph: {
                 edges: [],
                 nodes: Object.fromEntries(
                   ['github', 'mail', 'linear'].map((provider) => [
                     provider,
                     {
-                      bindingId: provider,
+                      connectionId: `${provider}-old`,
+
                       config: inputValues(provider == 'linear' ? { teamId: 'team-old', stateIds: ['state-old'] } : {}),
                       definition: {
                         configInputs: [],
@@ -246,9 +247,7 @@ describe('TriggerStore', () => {
         const node = workspace.$.draft.value!.content.document.graph.nodes[nodeId!]!
         if (node.kind != 'integration') throw new Error('Expected Integration Trigger.')
         const expected = scenario == 'default' ? 'preferred' : scenario == 'only' ? 'other' : scenario == 'explicit' ? 'chosen' : ''
-        expect(workspace.$.draft.value!.content.document.bindings[node.bindingId]).toEqual(
-          expected == '' ? undefined : { kind: 'connection', target: expected },
-        )
+        expect(node.connectionId).toEqual(expected || undefined)
         if (scenario == 'explicit') expect(list).not.toHaveBeenCalled()
         else expect(list).toHaveBeenCalledWith('github', flow.flowId)
       } finally {
@@ -278,7 +277,7 @@ describe('TriggerStore', () => {
       )
       const node = workspace.$.draft.value!.content.document.graph.nodes[nodeId!]!
       if (node.kind != 'integration') throw new Error('Expected Integration Trigger.')
-      expect(workspace.$.draft.value!.content.document.bindings[node.bindingId]).toEqual({ kind: 'connection', target: 'feishu-default' })
+      expect(node.connectionId).toEqual('feishu-default')
       expect(list).toHaveBeenCalledOnce()
     } finally {
       triggers.dispose()
@@ -362,7 +361,7 @@ describe('TriggerStore', () => {
         resource: { kind: 'unset' },
         chatIds: { kind: 'unset' },
       })
-      expect(workspace.$.revision.value!.binding(node.bindingId)).toMatchObject({ kind: 'connection', target: 'app-connection' })
+      expect(node.connectionId).toEqual('app-connection')
       expect(request.mock.calls.filter(([path]) => path.endsWith('/draft/changes'))).toHaveLength(1)
       await workspace.saveTriggerConfig('linear', 'chatIds', ['chat'])
       await workspace.saveTriggerConfig('linear', 'eventTypes', ['drive.file.edit_v1'])

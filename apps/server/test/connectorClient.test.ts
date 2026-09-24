@@ -285,8 +285,9 @@ describe('Server Connector client', () => {
     const connector = new ConnectorClient('https://connector.oomol.dev', 'runtime-token')
     const access: ConnectorAccessContext = {
       flowId: 'flow-1',
-      providerAccess: { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'empty', version: 1 },
+      providerAccess: { accessRevision: 0, bindings: [], mode: 'selectable', sharedAccessDigest: 'empty', version: 1 },
       purpose: 'catalog',
+      scope: 'catalog',
       source: 'draft',
       teamId: 'team-1',
     }
@@ -297,12 +298,26 @@ describe('Server Connector client', () => {
     })
     expect(request).toHaveBeenCalledTimes(2)
     request.mockClear()
-    await expect(connector.getAction('example.echo', undefined, { ...access, purpose: 'eligibility' })).rejects.toMatchObject({
+    await expect(
+      connector.getAction('example.echo', undefined, {
+        ...access,
+        purpose: 'eligibility',
+        scope: 'shared',
+        providerAccess: {
+          version: 2,
+          mode: 'selectable',
+          sharedAccessDigest: 'empty',
+          sharedBindings: [],
+          selectedBindings: [],
+        },
+      }),
+    ).rejects.toMatchObject({
       code: 'connector.access-required',
     })
+    request.mockClear()
     await expect(
       connector.execute('example.echo', undefined, {}, 'invocation-1', new AbortController().signal, { ...access, purpose: 'execute' }),
-    ).rejects.toMatchObject({ code: 'connector.access-required' })
+    ).rejects.toMatchObject({ code: 'connector.access-invalid' })
     expect(request).not.toHaveBeenCalled()
   })
 
@@ -315,13 +330,14 @@ describe('Server Connector client', () => {
       connector.execute('example.echo', 'connection-work', {}, 'invocation-1', new AbortController().signal, {
         flowId: 'flow-1',
         providerAccess: {
-          accessRevision: 0,
-          bindings: [],
+          sharedBindings: [],
+          selectedBindings: [],
           mode: 'selectable',
-          providerAccessDigest: 'empty',
-          version: 1,
+          sharedAccessDigest: 'empty',
+          version: 2,
         },
         purpose: 'execute',
+        scope: 'shared',
         source: 'draft',
         teamId: 'team-1',
       }),

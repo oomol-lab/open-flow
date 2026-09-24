@@ -622,7 +622,7 @@ describe('WorkspaceStore', () => {
       modelVersion: currentFlowModelVersion,
       operation: 'publish',
       publicationId: 'publication-1',
-      providerAccessDigest: 'implicit:1',
+      sharedAccessDigest: 'implicit:1',
       revisionDigest: draft.digest,
       revisionId: draft.revisionId,
       version: 1,

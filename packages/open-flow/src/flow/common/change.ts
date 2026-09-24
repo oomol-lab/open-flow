@@ -482,14 +482,14 @@ export type TriggerNode =
     })
   | (TriggerNodeBase & { readonly cronTimes: readonly TriggerSchedule[]; readonly kind: 'cron' })
   | (TriggerNodeBase & {
-      readonly bindingId: string
+      readonly connectionId?: string
       readonly config: InputValues
       readonly definition: TriggerKeySnapshot & { readonly type: 'poll' }
       readonly kind: 'poll'
       readonly pollTimes: readonly TriggerSchedule[]
     })
   | (TriggerNodeBase & {
-      readonly bindingId: string
+      readonly connectionId?: string
       readonly config: InputValues
       readonly definition: TriggerKeySnapshot & { readonly type: 'integration' }
       readonly kind: 'integration'
@@ -498,7 +498,7 @@ export type TriggerNode =
 export type GraphNode = ApprovalNode | ConditionNode | SubflowNode | TaskNode | TriggerNode | ValueNode | WaitNode
 
 export interface FlowDocument {
-  readonly bindings: Readonly<Record<string, { readonly kind: 'connection' | 'variable'; readonly target: string }>>
+  readonly bindings: Readonly<Record<string, { readonly kind: 'variable'; readonly target: string }>>
   readonly graph: Graph
   readonly subflows: Readonly<
     Record<
@@ -590,7 +590,7 @@ export type ChangeOperation =
   | { readonly kind: 'graph.node.delete'; readonly nodeId: string; readonly target: GraphTarget }
   | {
       readonly before?: number | string
-      readonly field: 'description' | 'icon' | 'maxExecutions' | 'name' | 'timeoutMs'
+      readonly field: 'connectionId' | 'description' | 'icon' | 'maxExecutions' | 'name' | 'timeoutMs'
       readonly kind: 'graph.node.field.set'
       readonly nodeId: string
       readonly target: GraphTarget
@@ -799,6 +799,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         const graph = selectedGraph(document, operation.target)
         const node = graph.nodes[operation.nodeId]
         if (node == null) invalid('The Node does not exist in the target graph.')
+        if (operation.field == 'connectionId' && node.kind != 'poll' && node.kind != 'integration') invalid('Only provider Triggers select a node Connection.')
         if (!dequal(Reflect.get(node, operation.field), operation.before)) invalid('The Node field changed before this operation was applied.')
         const updated = { ...node }
         if (operation.field == 'name') {

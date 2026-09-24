@@ -19,9 +19,9 @@ const revision = revisionView({
       graph: {
         edges: [],
         nodes: {
-          feishu: { kind: 'integration', name: 'Application Event', bindingId: 'binding', config: {}, definition: feishuEvents[0]!.snapshot },
-          github: { kind: 'integration', name: 'Repository Event', bindingId: 'binding', config: {}, definition: githubRepoEvent.snapshot },
-          airtable: { kind: 'poll', name: 'Record Changed', bindingId: 'binding', config: {}, definition: airtableRecordChanged.snapshot, pollTimes: [] },
+          feishu: { kind: 'integration', name: 'Application Event', config: {}, definition: feishuEvents[0]!.snapshot },
+          github: { kind: 'integration', name: 'Repository Event', config: {}, definition: githubRepoEvent.snapshot },
+          airtable: { kind: 'poll', name: 'Record Changed', config: {}, definition: airtableRecordChanged.snapshot, pollTimes: [] },
         },
       },
       subflows: {},

@@ -175,7 +175,7 @@ async function createHarness(
 function selectableConnectorAccess(): ConnectorAccessHost {
   const accesses = new Map<string, ConnectorAccess>()
   const current = (flowId: string): ConnectorAccess =>
-    accesses.get(flowId) ?? { accessRevision: 0, bindings: [], mode: 'selectable', providerAccessDigest: 'selectable:0', version: 1 }
+    accesses.get(flowId) ?? { accessRevision: 0, bindings: [], mode: 'selectable', sharedAccessDigest: 'selectable:0', version: 1 }
   return {
     removeConnection(flowId, connectionId, expectedAccessRevision) {
       const access = current(flowId)
@@ -184,7 +184,7 @@ function selectableConnectorAccess(): ConnectorAccessHost {
         ...access,
         accessRevision: access.accessRevision + 1,
         bindings: access.bindings.filter((binding) => binding.connectionId != connectionId),
-        providerAccessDigest: `selectable:${access.accessRevision + 1}`,
+        sharedAccessDigest: `selectable:${access.accessRevision + 1}`,
       }
       accesses.set(flowId, next)
       return { kind: 'saved', access: next }
@@ -197,10 +197,10 @@ function selectableConnectorAccess(): ConnectorAccessHost {
         accessRevision: access.accessRevision + 1,
         providerIds: selected ? [...new Set([...(access.providerIds ?? []), providerId])] : (access.providerIds ?? []).filter((id) => id != providerId),
         bindings: selected ? access.bindings : access.bindings.filter((binding) => binding.providerId != providerId),
-        providerAccessDigest:
+        sharedAccessDigest:
           !selected && access.bindings.some((binding) => binding.providerId == providerId)
             ? `selectable:${access.accessRevision + 1}`
-            : access.providerAccessDigest,
+            : access.sharedAccessDigest,
       }
       accesses.set(flowId, next)
       return { kind: 'saved', access: next }
@@ -213,7 +213,7 @@ function selectableConnectorAccess(): ConnectorAccessHost {
         ...access,
         accessRevision: access.accessRevision + 1,
         bindings: access.bindings.filter((binding) => binding.providerId != providerId || binding.accessBindingId != accessBindingId),
-        providerAccessDigest: `selectable:${access.accessRevision + 1}`,
+        sharedAccessDigest: `selectable:${access.accessRevision + 1}`,
       }
       accesses.set(flowId, next)
       return { access: next, kind: 'saved' }
@@ -268,7 +268,7 @@ function selectableConnectorAccess(): ConnectorAccessHost {
             status: 'active' as const,
           },
         ],
-        providerAccessDigest: `selectable:${access.accessRevision + 1}`,
+        sharedAccessDigest: `selectable:${access.accessRevision + 1}`,
       }
       accesses.set(flowId, next)
       return { access: next, kind: 'saved' }

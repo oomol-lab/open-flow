@@ -335,7 +335,7 @@ function canonicalTriggerNode(trigger: TriggerNode): JsonValue {
     case 'poll':
       return {
         ...common(trigger.kind),
-        bindingId: trigger.bindingId,
+        ...(trigger.connectionId == null ? {} : { connectionId: trigger.connectionId }),
         config: trigger.config,
         definition: canonicalTriggerDefinition(trigger.definition),
         pollTimes: trigger.pollTimes.map(canonicalTriggerSchedule),
@@ -343,7 +343,7 @@ function canonicalTriggerNode(trigger: TriggerNode): JsonValue {
     case 'integration':
       return {
         ...common(trigger.kind),
-        bindingId: trigger.bindingId,
+        ...(trigger.connectionId == null ? {} : { connectionId: trigger.connectionId }),
         config: trigger.config,
         definition: canonicalTriggerDefinition(trigger.definition),
       }

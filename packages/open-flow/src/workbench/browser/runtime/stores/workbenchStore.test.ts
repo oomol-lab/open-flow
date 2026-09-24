@@ -46,7 +46,7 @@ function access(flowId: string) {
     mode: 'selectable' as const,
     accessRevision: flowId == 'first' ? 1 : 2,
     bindings: [],
-    providerAccessDigest: flowId,
+    sharedAccessDigest: flowId,
   }
 }
 
@@ -128,11 +128,11 @@ describe('Flow creation notifications', () => {
     const add = vi.spyOn(client, 'addProviderAccessBinding').mockResolvedValue(access('second'))
     try {
       await navigation.start()
-      expect(store.connectorAccess.$.value.access?.providerAccessDigest).toBe('first')
+      expect(store.connectorAccess.$.value.access?.sharedAccessDigest).toBe('first')
       await store.connectorAccess.loadCandidates(['example'])
       await store.selectFlow('second')
       expect(store.connectorAccess.$.value.candidates).toEqual({})
-      expect(store.connectorAccess.$.value.access?.providerAccessDigest).toBe('second')
+      expect(store.connectorAccess.$.value.access?.sharedAccessDigest).toBe('second')
       await store.connectorAccess.loadCandidates(['example'])
       expect(candidates).toHaveBeenLastCalledWith('second', ['example'], expect.any(AbortSignal))
       await store.connectorAccess.select('example', 'binding')
@@ -716,7 +716,7 @@ it('selects an eligible default connection without adding shared Code usage', as
       },
     ],
     mode: 'selectable',
-    providerAccessDigest: 'access-1',
+    sharedAccessDigest: 'access-1',
     version: 1,
   })
   vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
@@ -774,7 +774,7 @@ it('selects an eligible default connection without adding shared Code usage', as
       },
     ],
     mode: 'selectable',
-    providerAccessDigest: 'access-2',
+    sharedAccessDigest: 'access-2',
     version: 1,
   })
   const resolve = vi.spyOn(store.connectors, 'resolveAction').mockResolvedValue({ action: resolved, connections: [connection] })

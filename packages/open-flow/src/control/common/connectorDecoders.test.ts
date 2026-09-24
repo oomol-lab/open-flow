@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { connectorAccess, connectorAccessCandidates } from './connectorDecoders.ts'
+import { connectorAccess, connectorAccessSnapshot, connectorAccessCandidates } from './connectorDecoders.ts'
 
 const candidate = {
   accessBindingId: 'binding',
@@ -10,6 +10,26 @@ const candidate = {
   source: { kind: 'policy', ruleId: null },
 }
 const response = (binding: unknown) => ({ candidates: [binding], mode: 'selectable', providerId: 'mail', version: 1 })
+
+const snapshot = { version: 2, mode: 'selectable', sharedAccessDigest: 'shared', sharedBindings: [], selectedBindings: [candidate] }
+
+it('decodes fixed access separately from editable shared configuration', () => {
+  expect(connectorAccessSnapshot(snapshot)).toEqual(snapshot)
+  expect(() => connectorAccess(snapshot)).toThrow()
+  expect(() => connectorAccessSnapshot({ accessRevision: 0, bindings: [], mode: 'selectable', sharedAccessDigest: 'shared', version: 1 })).toThrow()
+})
+
+it.each([
+  { ...snapshot, selectedBindings: undefined },
+  { ...snapshot, sharedBindings: undefined },
+  { ...snapshot, selectedBindings: [candidate, candidate] },
+  { ...snapshot, selectedBindings: [{ ...candidate, source: null }] },
+  { ...snapshot, selectedBindings: [{ ...candidate, status: 'active' }] },
+  { ...snapshot, selectedBindings: [{ ...candidate, connectionId: null }] },
+  { ...snapshot, mode: 'implicit' },
+])('rejects incomplete or invalid execution authority %#', (value) => {
+  expect(() => connectorAccessSnapshot(value)).toThrow()
+})
 
 it.each([{ kind: 'policy', ruleId: null }, { kind: 'policy', ruleId: 'team-admin' }, { kind: 'admin-delegation' }])(
   'preserves explicit access source %j',
@@ -34,7 +54,7 @@ it('keeps valid bindings and exposes old or malformed identities only as invalid
     version: 1,
     mode: 'selectable',
     accessRevision: 7,
-    providerAccessDigest: 'saved',
+    sharedAccessDigest: 'saved',
     bindings: [current, legacy, { ...current, accessBindingId: 'broken', source: { kind: 'admin-delegation', ruleId: 'forged' } }, null],
   })
   expect(access.bindings[0]).toEqual(current)
@@ -42,11 +62,11 @@ it('keeps valid bindings and exposes old or malformed identities only as invalid
   expect(access.bindings[2]).toMatchObject({ accessBindingId: 'broken', connectionId: null, source: null, status: 'invalid' })
   expect(access.discardedBindingCount).toBe(1)
   expect(access.accessRevision).toBe(7)
-  expect(access.providerAccessDigest).toBe('saved')
+  expect(access.sharedAccessDigest).toBe('saved')
   expect(connectorAccess(access)).toEqual(access)
 })
 
-it.each([null, { bindings: [] }, { version: 1, mode: 'selectable', accessRevision: 0, providerAccessDigest: 'saved', bindings: {} }])(
+it.each([null, { bindings: [] }, { version: 1, mode: 'selectable', accessRevision: 0, sharedAccessDigest: 'saved', bindings: {} }])(
   'still rejects invalid response envelopes',
   (envelope) => {
     expect(() => connectorAccess(envelope)).toThrow(expect.objectContaining({ code: 'response.invalid' }))

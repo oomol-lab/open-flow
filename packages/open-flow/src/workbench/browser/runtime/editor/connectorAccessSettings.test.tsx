@@ -248,7 +248,7 @@ describe('Connector access settings', () => {
               },
             ],
             mode: 'selectable',
-            providerAccessDigest: 'digest',
+            sharedAccessDigest: 'digest',
             version: 1,
           },
           candidates: {

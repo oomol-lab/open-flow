@@ -491,7 +491,7 @@ export async function inspectFlowCommand(
   const nodes = nodeEntries.map(([nodeId, node]) => inspectedNodeSummary(selected.draft.content, nodeId, node))
   const triggers = Object.entries(selected.graph.nodes)
     .filter((entry): entry is [string, TriggerNode] => !('inputs' in entry[1]))
-    .map(([triggerId, trigger]) => inspectedTriggerSummary(selected.draft.content, triggerId, trigger))
+    .map(([triggerId, trigger]) => inspectedTriggerSummary(triggerId, trigger))
   const revision = selected.draft
   const result = { ...flowInspection(inspected, await client.getLive(flow.flowId), args.full), kind: 'flow.inspect' }
   const lines = [
@@ -661,7 +661,7 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
               triggerId,
               triggerKind: definition.type,
             },
-            operations: createProviderTrigger(selected.target, { bindingId: authoringId(args, `binding:${reference}`), nodeId: triggerId }, definition, {
+            operations: createProviderTrigger(selected.target, triggerId, definition, {
               config: trigger.config,
               connectionId: connection!.connectionId,
               name,

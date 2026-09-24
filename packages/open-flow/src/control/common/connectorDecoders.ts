@@ -1,6 +1,8 @@
 import type { InputPortDefinition } from '../../flow/common/change.ts'
 import type {
   ConnectorAccess,
+  ConnectorAccessSnapshot,
+  ConnectorAccessGrant,
   ConnectorAccessCandidates,
   ConnectorAccessCandidatesBatch,
   ConnectorAction,
@@ -88,16 +90,12 @@ export function connectorAccess(value: unknown): ConnectorAccess {
   exact(source, [
     'accessRevision',
     'bindings',
-    ...('nodeBindings' in source ? ['nodeBindings'] : []),
     'mode',
-    'providerAccessDigest',
+    'sharedAccessDigest',
     ...('providerIds' in source ? ['providerIds'] : []),
     ...('discardedBindingCount' in source ? ['discardedBindingCount'] : []),
     'version',
   ])
-  if ('nodeBindings' in source && !Array.isArray(source.nodeBindings)) return invalidResponse()
-  const nodeBindings = source.nodeBindings == null ? undefined : (source.nodeBindings as unknown[]).map((entry) => accessBinding(entry, false))
-  if (nodeBindings != null && new Set(nodeBindings.map((binding) => binding.accessBindingId)).size != nodeBindings.length) return invalidResponse()
   const accessRevision = integer(source.accessRevision)
   if (source.version != 1 || accessRevision < 0 || !Array.isArray(source.bindings)) return invalidResponse()
   if ('providerIds' in source && !Array.isArray(source.providerIds)) return invalidResponse()
@@ -140,14 +138,56 @@ export function connectorAccess(value: unknown): ConnectorAccess {
   if (new Set(bindings.map((binding) => binding.accessBindingId)).size != bindings.length) return invalidResponse()
   return {
     accessRevision,
-    ...(nodeBindings == null ? {} : { nodeBindings }),
     ...(discardedBindingCount == 0 ? {} : { discardedBindingCount }),
     ...(providerIds == null ? {} : { providerIds }),
     bindings,
     mode: accessMode(source.mode),
-    providerAccessDigest: string(source.providerAccessDigest),
+    sharedAccessDigest: string(source.sharedAccessDigest),
     version: 1,
   }
+}
+
+function accessGrants(value: unknown): readonly ConnectorAccessGrant[] {
+  if (!Array.isArray(value)) return invalidResponse()
+  const bindings = value.map((candidate) => {
+    const entry = record(candidate)
+    exact(entry, [
+      'accessBindingId',
+      'connectionId',
+      'providerId',
+      'source',
+      'connectionDisplayName',
+      ...('permissionGroupName' in entry ? ['permissionGroupName'] : []),
+    ])
+    let identity
+    try {
+      identity = parseProviderAccessSource(entry.source)
+    } catch {
+      return invalidResponse()
+    }
+    if (entry.permissionGroupName != null && typeof entry.permissionGroupName != 'string') return invalidResponse()
+    return {
+      accessBindingId: string(entry.accessBindingId),
+      connectionId: string(entry.connectionId),
+      providerId: string(entry.providerId),
+      source: identity,
+      connectionDisplayName: string(entry.connectionDisplayName),
+      ...('permissionGroupName' in entry ? { permissionGroupName: entry.permissionGroupName as string | null } : {}),
+    }
+  })
+  if (new Set(bindings.map((binding) => binding.accessBindingId)).size != bindings.length) return invalidResponse()
+  return bindings
+}
+
+export function connectorAccessSnapshot(value: unknown): ConnectorAccessSnapshot {
+  const source = record(value)
+  exact(source, ['mode', 'sharedAccessDigest', 'sharedBindings', 'selectedBindings', 'version'])
+  if (source.version != 2) return invalidResponse()
+  const mode = accessMode(source.mode)
+  const sharedBindings = accessGrants(source.sharedBindings)
+  const selectedBindings = accessGrants(source.selectedBindings)
+  if (mode == 'implicit' && (sharedBindings.length > 0 || selectedBindings.length > 0)) return invalidResponse()
+  return { mode, sharedAccessDigest: string(source.sharedAccessDigest), sharedBindings, selectedBindings, version: 2 }
 }
 
 export function connectorAccessCandidates(value: unknown, providerId: string): ConnectorAccessCandidates {

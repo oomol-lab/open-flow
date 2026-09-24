@@ -24,11 +24,10 @@ export function connectionUsage(document: FlowDocument): readonly ConnectionUsag
         uses.push({ kind, providerId: actionId.split('.')[0]!, actionId, connectionId, nodeId, name, target })
       }
       if (node.kind == 'poll' || node.kind == 'integration') {
-        const binding = document.bindings[node.bindingId]
         uses.push({
           kind: 'trigger',
           providerId: node.definition.provider,
-          connectionId: binding?.kind == 'connection' ? binding.target : undefined,
+          connectionId: node.connectionId,
           nodeId,
           name,
           target,
@@ -56,7 +55,6 @@ export function removeConnectionUsage(content: RevisionContent, connectionId: st
     ...content,
     document: {
       ...document,
-      bindings: Object.fromEntries(Object.entries(document.bindings).filter(([, binding]) => binding.kind != 'connection' || binding.target != connectionId)),
       tasks: Object.fromEntries(
         Object.entries(document.tasks).map(([id, task]) => {
           const executor = task.executor
@@ -82,19 +80,23 @@ export function removeConnectionUsage(content: RevisionContent, connectionId: st
           return [id, task]
         }),
       ),
-      graph: clearCodeConnections(document.graph, connectionId),
+      graph: clearNodeConnections(document.graph, connectionId),
       subflows: Object.fromEntries(
-        Object.entries(document.subflows).map(([id, subflow]) => [id, { ...subflow, graph: clearCodeConnections(subflow.graph, connectionId) }]),
+        Object.entries(document.subflows).map(([id, subflow]) => [id, { ...subflow, graph: clearNodeConnections(subflow.graph, connectionId) }]),
       ),
     },
   }
 }
 
-function clearCodeConnections(graph: FlowDocument['graph'], connectionId: string): FlowDocument['graph'] {
+function clearNodeConnections(graph: FlowDocument['graph'], connectionId: string): FlowDocument['graph'] {
   return {
     ...graph,
     nodes: Object.fromEntries(
       Object.entries(graph.nodes).map(([id, node]) => {
+        if ((node.kind == 'poll' || node.kind == 'integration') && node.connectionId == connectionId) {
+          const { connectionId: _, ...remaining } = node
+          return [id, remaining]
+        }
         if (node.kind != 'task' || node.task == null) return [id, node]
         const capabilities = node.task.capabilities?.map((capability) => {
           if (!('mode' in capability) || capability.mode != 'independent') return capability
