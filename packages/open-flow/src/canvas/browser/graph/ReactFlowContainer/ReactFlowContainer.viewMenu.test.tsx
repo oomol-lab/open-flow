@@ -49,7 +49,7 @@ describe('CanvasInteractiveMode', () => {
 })
 
 describe('CanvasViewControls', () => {
-  it('renders the production view actions in order and invokes their callbacks', () => {
+  it('keeps fit view available beside the view menu', () => {
     captured.buttons = []
     const onFitView = vi.fn()
     const onRelayout = vi.fn()
@@ -70,14 +70,13 @@ describe('CanvasViewControls', () => {
     )
 
     const fitView = captured.buttons.findIndex((button) => button['aria-label'] == 'fit view')
-    const relayout = captured.buttons.findIndex((button) => button['aria-label'] == 'optimize layout')
+    const view = captured.buttons.findIndex((button) => button['aria-label'] == 'View')
     expect(markup).toContain('100%')
     expect(fitView).toBeGreaterThan(-1)
-    expect(relayout).toBeGreaterThan(fitView)
+    expect(view).toBeGreaterThan(fitView)
 
     captured.buttons[fitView]?.onClick?.({} as never)
-    captured.buttons[relayout]?.onClick?.({} as never)
     expect(onFitView).toHaveBeenCalledOnce()
-    expect(onRelayout).toHaveBeenCalledOnce()
+    expect(onRelayout).not.toHaveBeenCalled()
   })
 })

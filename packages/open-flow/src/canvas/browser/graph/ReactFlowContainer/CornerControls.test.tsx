@@ -73,31 +73,13 @@ describe('CornerControls', () => {
     captured.miniMap = undefined
   })
 
-  it('opens the collapsed MiniMap', () => {
-    const miniMapExpanded$ = val<boolean | undefined>(false)
-
-    const markup = render(miniMapExpanded$)
-
+  it('shows the navigable MiniMap only when enabled', () => {
+    const expanded = val<boolean | undefined>(false)
+    render(expanded)
     expect(captured.miniMap).toBeUndefined()
-    expect(captured.buttons).toHaveLength(1)
-    expect(markup).toContain('data-icon="mini-map-open"')
-
-    captured.buttons[0]?.onClick?.({} as never)
-
-    expect(miniMapExpanded$.value).toBe(true)
-  })
-
-  it('closes the expanded bottom-left MiniMap', () => {
-    const miniMapExpanded$ = val<boolean | undefined>(true)
-
-    const markup = render(miniMapExpanded$)
-
+    expanded.set(true)
+    render(expanded)
     expect(captured.miniMap).toMatchObject({ ariaLabel: 'Mini map', pannable: true, position: 'bottom-left', zoomable: true })
-    expect(captured.buttons).toHaveLength(1)
-    expect(markup).toContain('data-icon="mini-map-close"')
-
-    captured.buttons[0]?.onClick?.({} as never)
-    expect(miniMapExpanded$.value).toBe(false)
   })
 
   it('keeps publication and host tools in the top-right corner', () => {

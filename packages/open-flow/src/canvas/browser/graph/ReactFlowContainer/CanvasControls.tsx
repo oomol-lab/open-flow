@@ -21,7 +21,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { cn } from '../../../../ui/browser/utils.ts'
 import { CanvasTooltip } from '../../components/tooltip.tsx'
-import { CanvasMiniMap } from './CanvasMiniMap.tsx'
+import { CanvasMiniMap, CanvasMiniMapMenuItem, CanvasMiniMapButton } from './CanvasMiniMap.tsx'
 import { useGetStaticPopupContainer } from './useGetPopupContainer.ts'
 
 export function CanvasInteractiveMode({
@@ -101,10 +101,40 @@ function CanvasInteractiveModeMenu({ interactiveMode$ }: { readonly interactiveM
       <DropdownMenuGroup>
         <DropdownMenuLabel>{t('interactiveMode.title')}</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={mode} onValueChange={(value) => interactiveMode$.set(value as InteractiveMode)}>
-          <DropdownMenuRadioItem value="mouse">{t('interactiveMode.mouse')}</DropdownMenuRadioItem>
-          <DropdownMenuRadioItem value="touchpad">{t('interactiveMode.touchpad')}</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="mouse">
+            <i aria-hidden="true" className="i-lucide-light:mouse" />
+            {t('interactiveMode.mouse')}
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="touchpad">
+            <i aria-hidden="true" className="i-lucide-light:touchpad" />
+            {t('interactiveMode.touchpad')}
+          </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
       </DropdownMenuGroup>
+    </>
+  )
+}
+
+function CanvasOptionsMenu({
+  onRelayout,
+  miniMapExpanded$,
+  interactiveMode$,
+}: {
+  readonly onRelayout?: () => void
+  readonly miniMapExpanded$?: Val<boolean | undefined>
+  readonly interactiveMode$?: Val<InteractiveMode>
+}) {
+  const t = useTranslate()
+  return (
+    <>
+      {onRelayout != null && (
+        <DropdownMenuItem onClick={onRelayout}>
+          <i aria-hidden="true" className="i-lucide-light:layout-grid" />
+          {t('optimize')}
+        </DropdownMenuItem>
+      )}
+      {miniMapExpanded$ != null && <CanvasMiniMapMenuItem miniMapExpanded$={miniMapExpanded$} />}
+      {interactiveMode$ != null && <CanvasInteractiveModeMenu interactiveMode$={interactiveMode$} />}
     </>
   )
 }
@@ -133,6 +163,7 @@ export function CanvasViewControls({
   readonly zoom: number
 }) {
   const t = useTranslate()
+  const [optionsExpanded, setOptionsExpanded] = useState(false)
   const [popupContainer, setPopupContainer] = useState<HTMLDivElement | null>(null)
 
   return (
@@ -141,8 +172,9 @@ export function CanvasViewControls({
       className={cn('open-flow-control-island open-flow-control-island-compact', styles.dock, styles.viewDock)}
       data-canvas-control-scope
       data-tooltip-toolbar
+      ref={setPopupContainer}
     >
-      <div className={styles.compactViewControls} ref={setPopupContainer}>
+      <div className={styles.compactViewControls}>
         <DropdownMenu>
           <CanvasTooltip placement="top" title={t('view')}>
             <DropdownMenuTrigger
@@ -171,13 +203,8 @@ export function CanvasViewControls({
               <i aria-hidden="true" className="i-lucide-light:scan" />
               {t('fitView')}
             </DropdownMenuItem>
-            {onRelayout != null && (
-              <DropdownMenuItem onClick={onRelayout}>
-                <i aria-hidden="true" className="i-lucide-light:layout-grid" />
-                {t('optimize')}
-              </DropdownMenuItem>
-            )}
-            {interactiveMode$ != null && <CanvasInteractiveModeMenu interactiveMode$={interactiveMode$} />}
+            <DropdownMenuSeparator />
+            <CanvasOptionsMenu onRelayout={onRelayout} miniMapExpanded$={miniMapExpanded$} interactiveMode$={interactiveMode$} />
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -202,25 +229,40 @@ export function CanvasViewControls({
             <i className="i-lucide-light:scan" />
           </Button>
         </CanvasTooltip>
-        {onRelayout != null && (
-          <CanvasTooltip placement="top" title={t('optimize')}>
-            <Button aria-label={t('optimize')} onClick={onRelayout} size="icon" type="button" variant="ghost">
-              <i className="i-lucide-light:layout-grid" />
-            </Button>
-          </CanvasTooltip>
+        {(onRelayout != null || miniMapExpanded$ != null || interactiveMode$ != null) && (
+          <>
+            <div className={styles.viewOptions} data-expanded={optionsExpanded} aria-hidden={!optionsExpanded}>
+              <div className={styles.viewOptionsClip}>
+                <div className={styles.viewOptionButtons}>
+                  <span aria-hidden="true" className={styles.viewSeparator} />
+                  {onRelayout != null && (
+                    <CanvasTooltip placement="top" title={t('optimize')}>
+                      <Button aria-label={t('optimize')} onClick={onRelayout} size="icon" type="button" variant="ghost">
+                        <i aria-hidden="true" className="i-lucide-light:layout-grid" />
+                      </Button>
+                    </CanvasTooltip>
+                  )}
+                  {miniMapExpanded$ != null && <CanvasMiniMapButton miniMapExpanded$={miniMapExpanded$} />}
+                  {interactiveMode$ != null && <CanvasInteractiveMode interactiveMode$={interactiveMode$} />}
+                </div>
+              </div>
+            </div>
+            <CanvasTooltip placement="top" title={t('view')}>
+              <Button
+                aria-label={t('view')}
+                aria-expanded={optionsExpanded}
+                onClick={() => setOptionsExpanded((expanded) => !expanded)}
+                size="icon"
+                type="button"
+                variant="ghost"
+              >
+                <i aria-hidden="true" className={optionsExpanded ? 'i-lucide-light:chevron-left' : 'i-lucide-light:chevron-right'} />
+              </Button>
+            </CanvasTooltip>
+          </>
         )}
       </div>
-      {(miniMapExpanded$ != null || interactiveMode$ != null) && (
-        <>
-          <span aria-hidden="true" className={styles.viewSeparator} />
-          {miniMapExpanded$ != null && <CanvasMiniMap miniMapExpanded$={miniMapExpanded$} />}
-          {interactiveMode$ != null && (
-            <div className={styles.expandedViewControls}>
-              <CanvasInteractiveMode interactiveMode$={interactiveMode$} />
-            </div>
-          )}
-        </>
-      )}
+      {miniMapExpanded$ != null && <CanvasMiniMap miniMapExpanded$={miniMapExpanded$} />}
     </Panel>
   )
 }

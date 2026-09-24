@@ -130,7 +130,8 @@
   }
 }
 
-.expandedViewControls {
+.expandedViewControls,
+.viewOptionButtons {
   display: flex;
   align-items: center;
   gap: 2px;
@@ -267,13 +268,6 @@
   }
 }
 
-.viewSeparator {
-  width: 1px;
-  height: 16px;
-  margin-inline: 4px;
-  background: var(--ui-border);
-}
-
 .miniMap:global(.react-flow__panel) {
   bottom: calc(100% + 8px);
   left: 0;
@@ -282,4 +276,43 @@
   height: 150px;
   overflow: hidden;
   border-radius: var(--ui-radius);
+}
+
+.viewOptions {
+  display: grid;
+  grid-template-columns: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-columns 180ms ease,
+    opacity 180ms ease,
+    visibility 180ms;
+
+  &[data-expanded='true'] {
+    grid-template-columns: 1fr;
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+.viewOptionsClip {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.viewOptionButtons {
+  width: max-content;
+}
+
+.viewSeparator {
+  width: 1px;
+  height: 16px;
+  margin-inline: 4px;
+  background: var(--ui-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viewOptions {
+    transition: none;
+  }
 }
