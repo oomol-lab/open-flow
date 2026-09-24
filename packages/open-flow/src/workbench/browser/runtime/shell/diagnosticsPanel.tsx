@@ -34,7 +34,9 @@ export function DiagnosticsPanel({ checking, items, nodes, onClose, onRefresh, o
   }
 
   function issueContent(item: DiagnosticItem): ReactElement {
-    const message = item.message ?? diagnosticMessage(item.diagnostic, t, (nodeId) => nodes.get(nodeId)?.title)
+    const message =
+      item.message ??
+      diagnosticMessage(item.diagnostic, t, (nodeId) => nodes.get(nodeId)?.title, item.location == null ? undefined : nodes.get(item.location.nodeId)?.title)
     const referencedNodeId = diagnosticNodeId(item.diagnostic)
     const navigate =
       item.location != null ? () => onSelect(item) : referencedNodeId != null && nodes.has(referencedNodeId) ? () => onSelectNode(referencedNodeId) : undefined

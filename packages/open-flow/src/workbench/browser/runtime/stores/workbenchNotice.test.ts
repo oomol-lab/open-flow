@@ -21,7 +21,7 @@ describe('Workbench notices', () => {
       errorNotice(new ApiError(409, 'connector.connection-required', 'The Connector Task requires a Connection before it can be published.'), i18n.t),
     ).toEqual({
       kind: 'error',
-      message: '需要有效的 Connection。请连接或重新连接账号后重试。',
+      message: '缺少可用的账号连接。请连接或重新连接账号后重试。',
     })
   })
 

@@ -437,7 +437,10 @@ export function FlowEditor({
                   if (store.workspace.locateDiagnostic(item)) setDiagnosticsOpen(false)
                 }}
                 onSelectNode={(nodeId) => {
-                  if (store.workspace.locateNode(nodeId)) setDiagnosticsOpen(false)
+                  if (store.workspace.locateNode(nodeId)) {
+                    openInspector()
+                    setDiagnosticsOpen(false)
+                  }
                 }}
                 open={diagnosticsOpen}
               />

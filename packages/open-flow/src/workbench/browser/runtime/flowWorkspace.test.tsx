@@ -248,8 +248,11 @@ describe('FlowWorkspace run drawer', () => {
     expect(navigation.open).toHaveBeenCalledWith('publications')
   })
 
-  it('places the issue island before publishing and locates the selected node', () => {
+  it.each([false, true])('opens node properties when locating an issue with the sidebar open: %s', (open) => {
+    mocks.stateValues.set(3, open)
+    mocks.stateValues.set(4, 'outline')
     const { editor, store } = renderWorkspace(undefined, true, true)
+    vi.mocked(store.workspace.locateNode).mockReturnValue(true)
     const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
     const designer = (view.props.children as ReactElement[])[0]!
     const [issues, publish] = designer.props.cornerLeading.props.children
@@ -258,6 +261,23 @@ describe('FlowWorkspace run drawer', () => {
     expect(publish.props.state).toBe('issues')
     issues.props.onSelectNode('start')
     expect(store.workspace.locateNode).toHaveBeenCalledWith('start')
+    expect(mocks.setOpen).toHaveBeenCalledWith(true)
+    expect(mocks.setOpen).toHaveBeenCalledWith('properties')
+    expect(mocks.setOpen).toHaveBeenCalledWith(false)
+  })
+
+  it('keeps the sidebar and issues unchanged when the diagnostic node cannot be located', () => {
+    const { editor, store } = renderWorkspace(undefined, true, true)
+    vi.mocked(store.workspace.locateNode).mockReturnValue(false)
+    const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
+    const designer = (view.props.children as ReactElement[])[0]!
+    const issues = designer.props.cornerLeading.props.children[0]
+    mocks.setOpen.mockClear()
+
+    issues.props.onSelectNode('missing')
+
+    expect(store.workspace.locateNode).toHaveBeenCalledWith('missing')
+    expect(mocks.setOpen).not.toHaveBeenCalled()
   })
 
   it.each([

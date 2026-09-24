@@ -435,7 +435,7 @@
       "connectorAccessRequired": "运行前，请为此工作流选择可用账号和权限。",
       "connectorAccessInvalid": "当前账号的权限不允许执行此操作。请选择其他账号或调整权限。",
       "connectorActionNotFound": "所选 Connector action 已不可用。请选择其他 action。",
-      "connectorConnectionRequired": "需要有效的 Connection。请连接或重新连接账号后重试。",
+      "connectorConnectionRequired": "缺少可用的账号连接。请连接或重新连接账号后重试。",
       "connectorUnavailable": "Connector 暂时不可用，请稍后重试。",
       "engineUnavailable": "执行引擎暂时不可用，请稍后重试。",
       "engineUnsupported": "此工作流使用了不受支持的执行引擎。",
@@ -823,8 +823,8 @@
       },
       "task": {
         "capability-incomplete": "Inline Task“{{nodeId}}”的 Connector Capability 配置不完整。",
-        "connector-connection-required": "Connector Task“{{taskId}}”需要一个有效的 Connection。",
-        "connector-incomplete": "Connector Task“{{taskId}}”需要选择一个 action。",
+        "connector-connection-required": "请为连接器节点“{{taskId}}”选择连接账号。",
+        "connector-incomplete": "请为连接器任务“{{taskId}}”选择操作。",
         "missing-entry": "Inline Task 使用的 CodeModule“{{moduleId}}”必须导出 default function。",
         "module-missing": "Inline Task“{{nodeId}}”引用的 CodeModule“{{moduleId}}”不存在。"
       },

@@ -6,6 +6,40 @@ import { expect, it } from 'vitest'
 import { createI18n } from '../i18n.ts'
 import { DiagnosticsPanel } from './diagnosticsPanel.tsx'
 
+it.each(['list_tools', '列出可用工具'])('uses the connector node title %s in connection diagnostics', (title) => {
+  const i18n = createI18n('zh-CN')
+  const html = renderToStaticMarkup(
+    <I18nProvider i18n={i18n}>
+      <DiagnosticsPanel
+        checking={false}
+        items={[
+          {
+            diagnostic: {
+              code: 'task.connector-connection-required',
+              column: 0,
+              line: 1,
+              message: 'Connector Task "internal-task-id" requires an active Connection.',
+              path: '/document/tasks/internal-task-id/executor/connectionId',
+              values: { taskId: 'internal-task-id' },
+            },
+            location: { nodeId: 'connector-node', section: 'account' },
+            scope: 'task',
+          },
+        ]}
+        nodes={new Map([['connector-node', { kind: 'task', title }]])}
+        onClose={() => {}}
+        onRefresh={() => {}}
+        onSelect={() => {}}
+        onSelectNode={() => {}}
+      />
+    </I18nProvider>,
+  )
+
+  expect(html).toContain(`请为连接器节点“${title}”选择连接账号。`)
+  expect(html).not.toContain('internal-task-id')
+  i18n.dispose()
+})
+
 it('groups multiple issues for one node while leaving flow issues separate', () => {
   const items: DiagnosticItem[] = [
     {

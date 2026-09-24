@@ -31,7 +31,12 @@ export function diagnosticNodeId(diagnostic: Diagnostic): string | undefined {
   return typeof nodeId == 'string' ? nodeId : undefined
 }
 
-export function diagnosticMessage(diagnostic: Diagnostic, t: TFunction, nodeTitle?: (nodeId: string) => string | undefined): string {
+export function diagnosticMessage(
+  diagnostic: Diagnostic,
+  t: TFunction,
+  nodeTitle?: (nodeId: string) => string | undefined,
+  affectedNodeTitle?: string,
+): string {
   if (diagnostic.code == 'agent.config-invalid' && diagnostic.message == 'Declare at most 64 Agent tools.') return t('agent.toolsLimit')
   if (diagnostic.code == 'graph.source-missing' && diagnostic.values?.variant == 'field')
     return t('inspector.sources.fieldMissing', { field: JSON.stringify(diagnostic.values.field), output: diagnostic.values.output })
@@ -61,7 +66,10 @@ export function diagnosticMessage(diagnostic: Diagnostic, t: TFunction, nodeTitl
   const key = `diagnostics.messages.${diagnostic.code}${typeof variant == 'string' ? `.${variant}` : ''}`
   const nodeId = diagnosticNodeId(diagnostic)
   const title = nodeId == null ? undefined : nodeTitle?.(nodeId)
-  const values = title == null ? diagnostic.values : { ...diagnostic.values, nodeId: title }
+  let values = title == null ? diagnostic.values : { ...diagnostic.values, nodeId: title }
+  if (diagnostic.code == 'task.connector-connection-required' && affectedNodeTitle != null) {
+    values = { ...values, taskId: affectedNodeTitle }
+  }
   const translated = t(key, values)
   return translated == key ? diagnostic.message : translated
 }
