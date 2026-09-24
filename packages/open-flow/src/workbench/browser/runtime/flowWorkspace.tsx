@@ -730,7 +730,7 @@ export default function FlowWorkspace({
             }}
             onOpenRuns={() => {
               store.runRequests.dismissInputs()
-              navigation.open('runs', 'live')
+              navigation.open('runs')
             }}
             onManageConnectorAccess={onManageConnectorAccess}
             onToggleRuns={() => setRunDrawerOpen((open) => !open)}
