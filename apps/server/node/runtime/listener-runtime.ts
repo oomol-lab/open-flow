@@ -43,6 +43,7 @@ const encoder = new TextEncoder()
 const batchSize = 100
 const claimRetentionMs = 30 * 24 * 60 * 60 * 1000
 const leaseMs = 60_000
+const baselineRetryLimit = 5
 const retryMs = 1_000
 const timeoutMs = 30_000
 const admissionRetryMs = 1_000
@@ -415,13 +416,36 @@ export class ListenerRuntime {
             )
             return
           }
-          this.#store.polls.retryCandidate(candidate, now + retryMs, now)
+          const failedAt = Math.max(now, this.#clock())
+          if (candidate.retryCount >= baselineRetryLimit) {
+            this.#store.polls.failCandidate(
+              candidate,
+              'publication.retry-exhausted',
+              `The Poll Trigger baseline failed after ${baselineRetryLimit} retries. Check the Connector error logs before publishing again.`,
+              failedAt,
+            )
+            this.#logger.warn(
+              {
+                category: 'publication.poll_failed',
+                nodeId: candidate.nodeId,
+                operationId: candidate.operationId,
+                retryCount: candidate.retryCount,
+                ...errorKind(error),
+              },
+              'Poll candidate baseline exhausted its retries.',
+            )
+            this.#signal()
+            return
+          }
+          const retryAt = failedAt + retryMs * 2 ** candidate.retryCount
+          this.#store.polls.retryCandidate(candidate, retryAt, failedAt)
           this.#logger.warn(
             {
               category: 'publication.poll_retrying',
               nodeId: candidate.nodeId,
               operationId: candidate.operationId,
-              retryAt: now + retryMs,
+              retryAt,
+              retryCount: candidate.retryCount + 1,
               ...errorKind(error),
             },
             'Poll candidate baseline will be retried.',

@@ -542,7 +542,10 @@ export class ConnectorClient implements ConnectorHost {
       }
     }
     if (response.errorCode === 'connection_not_allowed' || response.errorCode === 'connection_not_found') throw connectionRequired()
-    throw unavailable()
+    const details = connectorFailureDetails(response, this.#token)
+    throw unavailable(
+      `Connector proxy request failed (HTTP ${proxyResponse.status})${details.upstreamErrorCode ? ` [${details.upstreamErrorCode}]` : ''}${details.upstreamErrorMessage ? `: ${details.upstreamErrorMessage}` : '.'}`,
+    )
   }
 
   async #accessBindings(
@@ -752,6 +755,7 @@ export class ConnectorClient implements ConnectorHost {
             category: 'connector.request.failed',
             durationMs: Math.round(performance.now() - startedAt),
             failure: 'upstream-status',
+            ...connectorFailureDetails(value, this.#token),
             method: init.method ?? 'GET',
             operation,
             status,
@@ -818,6 +822,19 @@ function actionFailure(response: Record<string, unknown>): ConnectorTaskError {
     .slice(0, 8)
   const message = details.length == 0 ? 'The Connector Action input is invalid.' : `The Connector Action input is invalid. ${details.join(' ')}`
   return new ConnectorTaskError('connector.input-invalid', message)
+}
+
+function connectorFailureDetails(value: unknown, token: string): { upstreamErrorCode?: string; upstreamErrorMessage?: string } {
+  if (!record(value)) return {}
+  const sanitize = (text: string): string => {
+    const masked = token == '' ? text : text.replaceAll(token, '[Redacted]')
+    if (/(?:authorization|cookie|credential|password|(?:access|refresh|api)[_-]?(?:token|key))\s*["']?\s*[:=]|bearer\s+\S+/i.test(masked)) return '[Redacted]'
+    return masked.slice(0, 1_000)
+  }
+  return {
+    ...(typeof value.errorCode == 'string' ? { upstreamErrorCode: sanitize(value.errorCode) } : {}),
+    ...(typeof value.message == 'string' ? { upstreamErrorMessage: sanitize(value.message) } : {}),
+  }
 }
 
 function record(value: unknown): value is Record<string, unknown> {
