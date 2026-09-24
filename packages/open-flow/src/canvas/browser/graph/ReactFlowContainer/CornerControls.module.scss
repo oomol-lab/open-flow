@@ -25,6 +25,8 @@
 }
 
 .group.group:global(.react-flow__panel) {
+  // Keep toolbar popups above the MiniMap's React Flow panel (z-index: 5).
+  z-index: 6;
   right: 0;
   display: flex;
   align-items: center;

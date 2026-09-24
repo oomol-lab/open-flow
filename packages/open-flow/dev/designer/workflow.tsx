@@ -7,7 +7,7 @@ import type { WorkspaceStatus } from '../../src/workbench/browser/runtime/stores
 import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
-import { ReactFlowProvider } from '@xyflow/react'
+import { ReactFlow } from '@xyflow/react'
 import { useMemo, useRef, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { val } from 'value-enhancer'
@@ -394,7 +394,7 @@ export const workflowStories: readonly FrontendStory[] = [
     id: 'workspace-navigation-island',
     title: 'Workspace navigation island',
     description:
-      'Compare the canvas island with the ghost style used while loading or recovering a workflow. Cycle names and the draft status dot beside the title.',
+      'Compare the canvas island with the ghost style used while loading or recovering a workflow. Cycle names and the draft status dot beside the title. Open the publish menu with the MiniMap expanded to inspect overlapping controls.',
     standalone: true,
     render: (log, dark, language) => <NavigationIslandStory dark={dark} language={language} log={log} />,
   },
@@ -442,7 +442,7 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
   const [ghost, setGhost] = useState(false)
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const interactiveMode$ = useMemo(() => val<'mouse' | 'touchpad'>('mouse'), [])
-  const miniMapExpanded$ = useMemo(() => val<boolean | undefined>(false), [])
+  const miniMapExpanded$ = useMemo(() => val<boolean | undefined>(true), [])
   const stageRef = useRef<HTMLDivElement>(null)
   const popup = useMemo(() => ({ default: () => stageRef.current || document.body, static: () => stageRef.current || document.body }), [])
   const publishStates: readonly PublishState[] = ['ready', 'current', 'issues', 'subflow', 'busy', 'publishing']
@@ -467,11 +467,11 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
   return (
     <I18nProvider i18n={i18n}>
       <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'}>
-        <div className="workspace" style={{ height: 180 }}>
+        <div className="workspace" style={{ height: 260 }}>
           {ghost && <div className="workspace-navigation-placement">{navigationIsland}</div>}
           <div className="canvas-panel" ref={stageRef}>
             <GetPopupContainerContext.Provider value={popup}>
-              <ReactFlowProvider>
+              <ReactFlow>
                 {!ghost && <CanvasTopLeftControls>{navigationIsland}</CanvasTopLeftControls>}
                 <CornerControls
                   before={
@@ -487,7 +487,7 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
                 >
                   <WorkbenchInspectorToggle label="Toggle inspector" open={inspectorOpen} onToggle={() => setInspectorOpen((current) => !current)} />
                 </CornerControls>
-              </ReactFlowProvider>
+              </ReactFlow>
             </GetPopupContainerContext.Provider>
           </div>
         </div>
