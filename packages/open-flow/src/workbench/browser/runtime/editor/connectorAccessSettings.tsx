@@ -6,6 +6,7 @@ import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 import { useCallback, useEffect, useId, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
+import { codeSharedPermissionsEnabled } from '../../../../flow/common/codePermissions.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
 import { Dialog, DialogContent, DialogTitle } from '../../../../ui/browser/dialog.tsx'
@@ -103,7 +104,7 @@ export function ConnectorAccessSettings({
     <section className="flex min-h-0 shrink-0 flex-col gap-2 border-b border-border px-3 py-2" ref={portal}>
       <div className="flex items-center justify-between gap-2">
         <h3 className="m-0 text-xs font-medium">{t('connectionUsage.title')}</h3>
-        {!published && state.access?.mode == 'selectable' && (
+        {codeSharedPermissionsEnabled && !published && state.access?.mode == 'selectable' && (
           <Button size="xs" variant="ghost" className="font-normal text-muted-foreground" onClick={() => store.connectorAccess.configure()}>
             {t('connectionUsage.configureCode')}
           </Button>
@@ -224,7 +225,7 @@ export function ConnectorAccessSettings({
         </div>
       )}
       <Dialog
-        open={state.configuration != null}
+        open={codeSharedPermissionsEnabled && state.configuration != null}
         onOpenChange={(open) => {
           if (!open) store.connectorAccess.closeConfiguration()
         }}

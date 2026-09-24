@@ -138,7 +138,7 @@ describe('Connector access settings', () => {
     expect(markup).toContain('Code: allowed for all Code nodes in this Flow')
     expect(markup).toContain('2 accounts')
     expect(markup).toContain('Actions for Personal')
-    expect(markup).toContain('Configure Code')
+    expect(markup).not.toContain('Configure Code')
     expect(markup).not.toContain('role="checkbox"')
     expect(markup).not.toContain('Add service')
   })

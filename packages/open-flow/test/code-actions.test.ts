@@ -85,8 +85,8 @@ describe('Code Connector capability', () => {
     expect(() => applyFlowChanges(saved, operations)).toThrow(/changed/)
   })
 
-  it('defaults new Code nodes to shared permissions without an Action list', () => {
-    expect(revision().document.graph.nodes.code).toMatchObject({ task: { capabilities: [{ kind: 'connector', mode: 'shared' }] } })
+  it('defaults new Code nodes to independent permissions with an empty Action list', () => {
+    expect(revision().document.graph.nodes.code).toMatchObject({ task: { capabilities: [{ kind: 'connector', mode: 'independent', actions: [] }] } })
   })
 
   it('preserves hints in canonical serialization and includes them in the digest', async () => {

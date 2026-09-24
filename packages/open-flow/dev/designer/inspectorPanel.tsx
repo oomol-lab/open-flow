@@ -296,6 +296,6 @@ export const inspectorPanelStory: FrontendStory = {
   title: 'Properties Panel',
   standalone: true,
   description:
-    'Inspect the compact shared Code permission row and its help tooltip, independent Code permission controls, Action removal, account selection, and switching legacy Code to independent permissions. Check collapsed Actions with account summaries, expanded Actions missing accounts, default account selection on add, empty Actions, and long labels at narrow width in both themes. The shared Code heading opens Flow connection settings.',
+    'Inspect independent Code Actions, Action removal, and account selection. Shared permission controls and configuration links are currently hidden; explicit shared and legacy fixtures remain for implementation coverage. Check collapsed Actions with account summaries, expanded Actions missing accounts, default account selection on add, empty Actions, and long labels at narrow width in both themes.',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,
 }

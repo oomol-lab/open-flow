@@ -15,6 +15,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { compute, val } from 'value-enhancer'
+import { codeSharedPermissionsEnabled } from '../../../../flow/common/codePermissions.ts'
 import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
@@ -201,7 +202,7 @@ export function CodeTaskSection({
     >
       <h3 className="inspector-section-title">
         <span className="min-w-0 flex-1">{t('inspector.task.javascriptModule')}</span>
-        {onConfigureAccess != null && (
+        {codeSharedPermissionsEnabled && onConfigureAccess != null && (
           <Tooltip>
             <TooltipTrigger
               render={
@@ -222,133 +223,137 @@ export function CodeTaskSection({
         )}
       </h3>
       <div className="inspector-section-content" data-inset ref={(element) => setPortalRoot(element?.closest<HTMLElement>('.open-flow-workbench') ?? null)}>
-        <div className="flex flex-col gap-2" data-inspector-section="code-permissions">
-          <Field orientation="horizontal" className="justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-1">
-              <FieldLabel className="text-xs font-normal" htmlFor={`${selection.id}-shared-permissions`}>
-                {t('inspector.task.sharedPermissions')}
-              </FieldLabel>
-              <Tooltip>
-                <TooltipTrigger
-                  aria-label={t('inspector.task.sharedPermissions')}
-                  className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <i aria-hidden="true" className="i-codicon:question text-[13px]" />
-                </TooltipTrigger>
-                <TooltipContent>{t('inspector.task.sharedPermissionsHint')}</TooltipContent>
-              </Tooltip>
-              <span id={`${selection.id}-shared-permissions-hint`} className="sr-only">
-                {t('inspector.task.sharedPermissionsHint')}
-              </span>
-            </div>
-            <Switch
-              id={`${selection.id}-shared-permissions`}
-              aria-describedby={sharedPermissions ? `${selection.id}-shared-permissions-hint` : undefined}
-              size="sm"
-              checked={sharedPermissions}
-              disabled={disabled || pending}
-              onCheckedChange={(shared) =>
-                void savePermission(shared ? { kind: 'connector', mode: 'shared' } : { kind: 'connector', mode: 'independent', actions: [] })
-              }
-            />
-          </Field>
-          {permission?.mode == 'independent' && permission.actions.length > 0 && (
-            <div className="flex min-w-0 flex-col divide-y divide-border/50">
-              {permission.actions.map((entry) => {
-                const action = actionCatalog[entry.action]
-                const available = catalogs[entry.action.split('.')[0]!]?.all ?? []
-                const accountName = available.find((connection) => connection.connectionId == entry.connectionId)?.displayName ?? entry.connectionId
-                return (
-                  <details
-                    key={entry.action}
-                    className="inspector-disclosure inspector-disclosure-compact"
-                    open={action?.authenticated !== false && entry.connectionId == null}
-                  >
-                    <summary>
-                      <ChevronDown size={14} strokeWidth={1.5} />
-                      <span className="min-w-0 flex-1">{action == null ? entry.action : `${action.serviceName} · ${action.name}`}</span>
-                      {action?.authenticated !== false && (
-                        <span className="max-w-[40%] truncate text-xs font-normal text-muted-foreground" title={accountName}>
-                          {accountName ?? t('inspector.task.chooseAccount')}
-                        </span>
-                      )}
-                    </summary>
-                    <div className="inspector-disclosure-content flex flex-col gap-2">
-                      {action?.authenticated !== false && (
-                        <div className="flex min-w-0 items-center gap-2">
-                          <FieldLabel className="shrink-0 text-xs font-normal text-muted-foreground" htmlFor={`${selection.id}-${entry.action}-account`}>
-                            {t('inspector.task.actionAccount')}
-                          </FieldLabel>
-                          <WorkbenchSelect
-                            id={`${selection.id}-${entry.action}-account`}
-                            size="sm"
-                            variant="subtle"
-                            ariaLabel={t('inspector.task.actionAccount')}
-                            className="min-w-0 flex-1"
-                            disabled={disabled || pending}
-                            portalRoot={portalRoot}
-                            value={entry.connectionId ?? ''}
-                            onValueChange={(connectionId) =>
-                              void savePermission({
-                                ...permission,
-                                actions: permission.actions.map((item) =>
-                                  item.action != entry.action ? item : { action: item.action, ...(connectionId == '' ? {} : { connectionId }) },
-                                ),
-                              })
-                            }
-                            options={[
-                              { value: '', label: t('inspector.task.chooseAccount') },
-                              ...(entry.connectionId != null && !available.some((connection) => connection.connectionId == entry.connectionId)
-                                ? [{ value: entry.connectionId, label: `${entry.connectionId} (${t('inspector.account.unavailable')})`, disabled: true }]
-                                : []),
-                              ...available.map((connection) => ({
-                                value: connection.connectionId,
-                                label: connection.displayName,
-                                disabled: connection.status != 'active',
-                              })),
-                            ]}
-                          />
-                        </div>
-                      )}
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="xs"
-                        className="self-start"
-                        aria-label={t('inspector.task.removeAction')}
-                        title={t('inspector.task.removeAction')}
-                        disabled={disabled || pending}
-                        onClick={() => void savePermission({ ...permission, actions: permission.actions.filter((item) => item.action != entry.action) })}
-                      >
-                        {t('inspector.task.removeAction')}
-                      </Button>
-                    </div>
-                  </details>
-                )
-              })}
-            </div>
-          )}
-          {permission?.mode == 'independent' && (
-            <ActionPicker
-              connectors={connectors}
-              disabled={disabled || pending}
-              label={t('inspector.task.addAction')}
-              exclude={permission.actions.map((item) => item.action)}
-              prepare={prepareAction ?? ((action) => connectors.resolveAction(action.actionId))}
-              onSelect={async (action, availableConnections) => {
-                const preferred = action.authenticated ? connectionCatalog(availableConnections).preferred : undefined
-                const entry = preferred == null ? { action: action.actionId } : { action: action.actionId, connectionId: preferred.connectionId }
-                const value = { ...permission, actions: [...permission.actions, entry] }
-                return await savePermission(value)
-              }}
-            />
-          )}
-          {(saveError ?? completionError) != null && (
-            <p role="alert" className="text-sm text-destructive">
-              {saveError ?? completionError}
-            </p>
-          )}
-        </div>
+        {(codeSharedPermissionsEnabled || permission?.mode == 'independent' || (saveError ?? completionError) != null) && (
+          <div className="flex flex-col gap-2" data-inspector-section="code-permissions">
+            {codeSharedPermissionsEnabled && (
+              <Field orientation="horizontal" className="justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-1">
+                  <FieldLabel className="text-xs font-normal" htmlFor={`${selection.id}-shared-permissions`}>
+                    {t('inspector.task.sharedPermissions')}
+                  </FieldLabel>
+                  <Tooltip>
+                    <TooltipTrigger
+                      aria-label={t('inspector.task.sharedPermissions')}
+                      className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <i aria-hidden="true" className="i-codicon:question text-[13px]" />
+                    </TooltipTrigger>
+                    <TooltipContent>{t('inspector.task.sharedPermissionsHint')}</TooltipContent>
+                  </Tooltip>
+                  <span id={`${selection.id}-shared-permissions-hint`} className="sr-only">
+                    {t('inspector.task.sharedPermissionsHint')}
+                  </span>
+                </div>
+                <Switch
+                  id={`${selection.id}-shared-permissions`}
+                  aria-describedby={sharedPermissions ? `${selection.id}-shared-permissions-hint` : undefined}
+                  size="sm"
+                  checked={sharedPermissions}
+                  disabled={disabled || pending}
+                  onCheckedChange={(shared) =>
+                    void savePermission(shared ? { kind: 'connector', mode: 'shared' } : { kind: 'connector', mode: 'independent', actions: [] })
+                  }
+                />
+              </Field>
+            )}
+            {permission?.mode == 'independent' && permission.actions.length > 0 && (
+              <div className="flex min-w-0 flex-col divide-y divide-border/50">
+                {permission.actions.map((entry) => {
+                  const action = actionCatalog[entry.action]
+                  const available = catalogs[entry.action.split('.')[0]!]?.all ?? []
+                  const accountName = available.find((connection) => connection.connectionId == entry.connectionId)?.displayName ?? entry.connectionId
+                  return (
+                    <details
+                      key={entry.action}
+                      className="inspector-disclosure inspector-disclosure-compact"
+                      open={action?.authenticated !== false && entry.connectionId == null}
+                    >
+                      <summary>
+                        <ChevronDown size={14} strokeWidth={1.5} />
+                        <span className="min-w-0 flex-1">{action == null ? entry.action : `${action.serviceName} · ${action.name}`}</span>
+                        {action?.authenticated !== false && (
+                          <span className="max-w-[40%] truncate text-xs font-normal text-muted-foreground" title={accountName}>
+                            {accountName ?? t('inspector.task.chooseAccount')}
+                          </span>
+                        )}
+                      </summary>
+                      <div className="inspector-disclosure-content flex flex-col gap-2">
+                        {action?.authenticated !== false && (
+                          <div className="flex min-w-0 items-center gap-2">
+                            <FieldLabel className="shrink-0 text-xs font-normal text-muted-foreground" htmlFor={`${selection.id}-${entry.action}-account`}>
+                              {t('inspector.task.actionAccount')}
+                            </FieldLabel>
+                            <WorkbenchSelect
+                              id={`${selection.id}-${entry.action}-account`}
+                              size="sm"
+                              variant="subtle"
+                              ariaLabel={t('inspector.task.actionAccount')}
+                              className="min-w-0 flex-1"
+                              disabled={disabled || pending}
+                              portalRoot={portalRoot}
+                              value={entry.connectionId ?? ''}
+                              onValueChange={(connectionId) =>
+                                void savePermission({
+                                  ...permission,
+                                  actions: permission.actions.map((item) =>
+                                    item.action != entry.action ? item : { action: item.action, ...(connectionId == '' ? {} : { connectionId }) },
+                                  ),
+                                })
+                              }
+                              options={[
+                                { value: '', label: t('inspector.task.chooseAccount') },
+                                ...(entry.connectionId != null && !available.some((connection) => connection.connectionId == entry.connectionId)
+                                  ? [{ value: entry.connectionId, label: `${entry.connectionId} (${t('inspector.account.unavailable')})`, disabled: true }]
+                                  : []),
+                                ...available.map((connection) => ({
+                                  value: connection.connectionId,
+                                  label: connection.displayName,
+                                  disabled: connection.status != 'active',
+                                })),
+                              ]}
+                            />
+                          </div>
+                        )}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="xs"
+                          className="self-start"
+                          aria-label={t('inspector.task.removeAction')}
+                          title={t('inspector.task.removeAction')}
+                          disabled={disabled || pending}
+                          onClick={() => void savePermission({ ...permission, actions: permission.actions.filter((item) => item.action != entry.action) })}
+                        >
+                          {t('inspector.task.removeAction')}
+                        </Button>
+                      </div>
+                    </details>
+                  )
+                })}
+              </div>
+            )}
+            {permission?.mode == 'independent' && (
+              <ActionPicker
+                connectors={connectors}
+                disabled={disabled || pending}
+                label={t('inspector.task.addAction')}
+                exclude={permission.actions.map((item) => item.action)}
+                prepare={prepareAction ?? ((action) => connectors.resolveAction(action.actionId))}
+                onSelect={async (action, availableConnections) => {
+                  const preferred = action.authenticated ? connectionCatalog(availableConnections).preferred : undefined
+                  const entry = preferred == null ? { action: action.actionId } : { action: action.actionId, connectionId: preferred.connectionId }
+                  const value = { ...permission, actions: [...permission.actions, entry] }
+                  return await savePermission(value)
+                }}
+              />
+            )}
+            {(saveError ?? completionError) != null && (
+              <p role="alert" className="text-sm text-destructive">
+                {saveError ?? completionError}
+              </p>
+            )}
+          </div>
+        )}
         <ValueEditorFeedback
           error={
             moduleDiagnostics.length > 0

@@ -1,5 +1,6 @@
 .open-flow-workbench {
   .code-section > .inspector-section-content {
+    gap: 8px;
     padding-inline: 12px;
   }
 

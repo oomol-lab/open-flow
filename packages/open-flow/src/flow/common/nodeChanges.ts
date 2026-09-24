@@ -19,6 +19,7 @@ import type {
 
 import { dequal } from 'dequal/lite'
 import { applyFlowChanges, nextNodeName, normalizeNodeName } from './change.ts'
+import { codeSharedPermissionsEnabled } from './codePermissions.ts'
 import { nodeInputMappings } from './condition.ts'
 import { fixedInputValue, inputValues } from './inputValue.ts'
 import { referencedTaskIds } from './semantics.ts'
@@ -134,7 +135,9 @@ export function createCodeTask(
         kind: 'task',
         name,
         task: {
-          capabilities: ports.capabilities ?? [{ kind: 'connector', mode: 'shared' }],
+          capabilities: ports.capabilities ?? [
+            codeSharedPermissionsEnabled ? { kind: 'connector', mode: 'shared' } : { kind: 'connector', mode: 'independent', actions: [] },
+          ],
           inputs: ports.inputs,
           moduleId: identity.moduleId,
           name,
