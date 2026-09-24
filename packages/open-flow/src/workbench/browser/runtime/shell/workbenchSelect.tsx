@@ -28,7 +28,7 @@ export function WorkbenchSelect({
   readonly onValueChange: (value: string) => void
   readonly options: readonly WorkbenchSelectOption[]
   readonly portalRoot: HTMLElement | null
-  readonly size?: 'default' | 'sm'
+  readonly size?: 'default' | 'sm' | 'field'
   readonly value: string
   readonly variant?: 'default' | 'subtle'
 }): ReactElement {

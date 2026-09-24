@@ -213,7 +213,7 @@ export function RunLogFilters({
       <DropdownMenuTrigger
         render={
           <Button aria-label={t('run.filterEvents')} size="icon-sm" title={t('run.filterEvents')} type="button" variant="ghost">
-            <Icon name="filter" />
+            <i aria-hidden="true" className="i-lucide-light:funnel size-4" />
           </Button>
         }
       />

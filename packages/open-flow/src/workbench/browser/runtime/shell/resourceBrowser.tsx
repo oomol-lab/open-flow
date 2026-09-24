@@ -22,6 +22,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/
 import { cn } from '../../../../ui/browser/utils.ts'
 import { Icon } from '../icons.tsx'
 import { followWorkbenchLink } from '../navigationLink.ts'
+import { IdTooltip } from './idTooltip.tsx'
 import { WorkbenchSelect } from './workbenchSelect.tsx'
 
 const CreateResourceDialog = lazy(() => import('./createResourceDialog.tsx'))
@@ -94,7 +95,6 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
   const t = useTranslate()
   const [mode, setMode] = useState<'delete' | 'idle' | 'rename'>('idle')
   const [name, setName] = useState(flow.name)
-  const [copied, setCopied] = useState(false)
   const [pending, setPending] = useState<'publish' | 'enabled' | undefined>()
   const changed = flow.live != null && flow.live.revisionId != flow.draftRevisionId
   const publicationStatus =
@@ -232,33 +232,13 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
           </span>
         </span>
         <span className="resource-flow-id-cell">
-          <Tooltip>
-            <TooltipTrigger render={<code className="resource-flow-id" tabIndex={0} translate="no" />}>{compactFlowId(flow.flowId)}</TooltipTrigger>
-            <TooltipContent
-              align="start"
-              alignOffset={flowIdTooltipAlignOffset}
-              className="resource-flow-id-tooltip"
-              collisionBoundary={[]}
-              container={root}
-              positionMethod="fixed"
-              side="top"
-              sideOffset={6}
-            >
-              <Button
-                aria-label={t(copied ? 'resource.flowIdCopied' : 'resource.copyFlowId')}
-                className="resource-tooltip-icon-button"
-                onClick={() => {
-                  void navigator.clipboard.writeText(flow.flowId).then(() => setCopied(true))
-                }}
-                size="icon-xs"
-                type="button"
-                variant="ghost"
-              >
-                <i aria-hidden="true" className="i-lucide-light:copy" />
-              </Button>
-              <code translate="no">{flow.flowId}</code>
-            </TooltipContent>
-          </Tooltip>
+          <IdTooltip
+            value={flow.flowId}
+            label={compactFlowId(flow.flowId)}
+            trigger={<code className="resource-flow-id" tabIndex={0} translate="no" />}
+            container={root}
+            alignOffset={flowIdTooltipAlignOffset}
+          />
         </span>
         <Tooltip>
           <TooltipTrigger render={<time className="resource-updated-at" dateTime={flow.updatedAt} tabIndex={0} />}>

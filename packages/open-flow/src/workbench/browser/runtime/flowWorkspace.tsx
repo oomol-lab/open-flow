@@ -683,13 +683,15 @@ export default function FlowWorkspace({
   return (
     <IconifyProvider>
       <main className="workspace">
-        <WorkspaceNavigationIsland
-          ghost={view == 'design' && !canvasReady}
-          saveStatus={view == 'design' && canvasReady ? saveStatus : undefined}
-          flowName={flow?.name ?? flow?.flowId ?? ''}
-          flowsHref={hrefFor({ view: 'design' })}
-          onOpenFlows={() => void navigation.openFlows()}
-        />
+        {view != 'runs' && (
+          <WorkspaceNavigationIsland
+            ghost={view == 'design' && !canvasReady}
+            saveStatus={view == 'design' && canvasReady ? saveStatus : undefined}
+            flowName={flow?.name ?? flow?.flowId ?? ''}
+            flowsHref={hrefFor({ view: 'design' })}
+            onOpenFlows={() => void navigation.openFlows()}
+          />
+        )}
         {view == 'design' && !canvasReady ? (
           <div aria-label={t('workspace.design')} className="editor-grid context-panel-closed" id="workspace-panel-design" role="region" tabIndex={0}>
             <section aria-busy={!workspaceLoadFailed} className="canvas-panel workbench-canvas">
@@ -732,6 +734,8 @@ export default function FlowWorkspace({
           />
         ) : view == 'runs' ? (
           <RunsView
+            flowName={flow?.name ?? flow?.flowId ?? ''}
+            onClose={() => navigation.open('design')}
             onConfigureConnector={onConfigureConnector}
             onLocateEvent={locateRunEvent}
             onLocateWait={(nodeId) => {

@@ -252,30 +252,6 @@
     outline: none;
   }
 
-  .resource-flow-id-tooltip {
-    max-width: min(440px, calc(100vw - 32px));
-    gap: 4px;
-    padding: 4px 8px 4px 4px;
-  }
-
-  .resource-flow-id-tooltip code {
-    min-width: 0;
-    overflow: hidden;
-    padding-left: 2px;
-    color: inherit;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .resource-tooltip-icon-button {
-    color: inherit;
-  }
-
-  .resource-tooltip-icon-button:hover {
-    background: color-mix(in srgb, currentColor 14%, transparent);
-    color: inherit;
-  }
-
   .resource-updated-at {
     display: inline-block;
     width: fit-content;

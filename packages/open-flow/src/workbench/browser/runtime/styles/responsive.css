@@ -10,8 +10,7 @@
 
     .trigger-binding-summary code,
     .run-id,
-    .run-meta:nth-of-type(2),
-    .run-detail-meta code {
+    .run-meta:nth-of-type(2) {
       display: none;
     }
 
@@ -208,17 +207,7 @@
     }
 
     .runs-view.narrow {
-      display: block;
-      overflow: auto;
-    }
-
-    .runs-view.narrow .run-list-panel,
-    .runs-view.narrow .run-detail-panel {
-      min-height: 100%;
-    }
-
-    .runs-view.narrow .run-list-panel {
-      border-right: 0;
+      grid-template-columns: minmax(0, 1fr);
     }
 
     .runs-view.narrow .run-detail-panel {
@@ -234,19 +223,8 @@
     }
 
     .run-detail-header {
-      min-height: 0;
-      align-items: flex-start;
-      flex-direction: column;
-      gap: 10px;
+      gap: 12px;
       padding: 12px;
-    }
-
-    .run-detail-header > div,
-    .run-detail-actions,
-    .run-detail-meta {
-      width: 100%;
-      flex-wrap: wrap;
-      justify-content: flex-start;
     }
   }
 

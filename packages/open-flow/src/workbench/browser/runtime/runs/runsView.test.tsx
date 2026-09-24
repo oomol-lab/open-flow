@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createI18n } from '../i18n.ts'
 import { RunsView } from './runsView.tsx'
 
-describe('RunsView timeline', () => {
+describe('RunsView output', () => {
   it.each(['failed', 'running', 'waiting'] as const)('shows actions and results for a %s run', (status) => {
     const finishedAt = '2026-08-27T10:00:01.000Z'
     const run: RunDetails = {
@@ -83,7 +83,7 @@ describe('RunsView timeline', () => {
 
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
-        <RunsView onLocateEvent={() => undefined} onLocateWait={() => undefined} store={store} />
+        <RunsView flowName="Monthly report" onClose={() => undefined} onLocateEvent={() => undefined} onLocateWait={() => undefined} store={store} />
       </I18nProvider>,
     )
 
@@ -96,6 +96,8 @@ describe('RunsView timeline', () => {
       expect(markup).toContain('>Continue<')
       expect(markup).toContain('Locate Wait node')
     }
+    expect(markup).toContain('Monthly report')
+    expect(markup).toContain('aria-label="Close"')
     expect(markup).toContain('Timeline')
     expect(markup).toContain('Output')
     expect(markup).toContain('Filter runs')

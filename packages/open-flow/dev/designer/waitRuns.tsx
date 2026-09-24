@@ -106,7 +106,15 @@ function WaitHistory({ language, log }: { readonly language: UiLanguage; readonl
     <section className="min-w-0 xl:col-span-2">
       <h3 className="mb-2 font-medium">Run history · resolve waits without opening the canvas</h3>
       <div className="open-flow-workbench grid" style={{ height: 560 }}>
-        {store != null && <RunsView store={store} onLocateEvent={() => {}} onLocateWait={(nodeId) => log('history.wait.locate', nodeId)} />}
+        {store != null && (
+          <RunsView
+            flowName="Release approval"
+            onClose={() => log('history.close')}
+            store={store}
+            onLocateEvent={() => {}}
+            onLocateWait={(nodeId) => log('history.wait.locate', nodeId)}
+          />
+        )}
       </div>
     </section>
   )
@@ -265,4 +273,115 @@ export const runStatusIslandStory: FrontendStory = {
       </div>
     </I18nProvider>
   ),
+}
+
+function RunHistory({ language, dark, log }: { readonly language: UiLanguage; readonly dark: boolean; readonly log: LogAction }) {
+  const [store, setStore] = useState<WorkbenchStore>()
+  const [open, setOpen] = useState(true)
+  useStoryActions([{ label: 'Open run history', disabled: open, onClick: () => setOpen(true) }])
+  useEffect(() => {
+    const samples = [
+      { status: 'completed', duration: 2350 },
+      { status: 'failed', duration: 192_000 },
+      { status: 'running' },
+      { status: 'canceled', duration: 3_720_000 },
+      { status: 'completed', duration: 93_600_000 },
+      { status: 'completed', duration: 128 },
+    ] as const
+    const runs: RunDetails[] = Array.from(samples, (sample, index) => {
+      const startedAt = `2026-09-${24 - Math.floor(index / 2)}T08:0${6 - index}:00Z`
+      return {
+        ...base,
+        runId: `65fbbd9e-395a-4b4d-a002-635058e2589${index}`,
+        status: sample.status,
+        waits: [],
+        createdAt: startedAt,
+        startedAt,
+        ...('duration' in sample ? { finishedAt: new Date(Date.parse(startedAt) + sample.duration).toISOString() } : {}),
+      }
+    })
+    const client = new WorkbenchClient(async (path) => {
+      const url = new URL(String(path), 'https://lab.invalid')
+      if (url.pathname == '/v1/flows/flow/runs') {
+        return Response.json({
+          version: 1,
+          flowId: 'flow',
+          runs: runs.filter(
+            (run) =>
+              ['status', 'source', 'runId'].every(
+                (key) => !url.searchParams.has(key) || url.searchParams.get(key) == run[key as 'status' | 'source' | 'runId'],
+              ) &&
+              (!url.searchParams.has('pendingWait') || url.searchParams.get('pendingWait') == 'false') &&
+              (!url.searchParams.has('createdFrom') || run.createdAt >= url.searchParams.get('createdFrom')!) &&
+              (!url.searchParams.has('createdBefore') || run.createdAt < url.searchParams.get('createdBefore')!),
+          ),
+        })
+      }
+      const run = runs.find((item) => url.pathname.includes(item.runId))!
+      if (url.pathname.endsWith('/cancel')) {
+        const canceled: RunDetails = { ...run, status: 'canceled', finishedAt: new Date(Date.parse(run.createdAt) + 3000).toISOString() }
+        runs[runs.indexOf(run)] = canceled
+        return Response.json(canceled)
+      }
+      if (url.pathname.endsWith('/events')) {
+        const payload = { executionId: 'task', scopeId: 'sample', flowId: 'flow', nodeId: 'report' }
+        const events: RunEvent[] = [{ kind: 'node.started', sequence: 1, createdAt: run.createdAt, payload }]
+        if (run.status == 'completed')
+          events.push({ kind: 'node.completed', sequence: 2, createdAt: run.finishedAt!, payload: { ...payload, outputs: { rows: 128 } } })
+        if (run.status == 'failed')
+          events.push({
+            kind: 'node.failed',
+            sequence: 2,
+            createdAt: run.finishedAt!,
+            payload: { ...payload, error: { code: 'binding.unresolved', message: 'Variable API_TOKEN could not be resolved.' } },
+          })
+        return Response.json({ runId: run.runId, events, done: true, historyComplete: true, nextAfter: events.length, version: 1 })
+      }
+      if (url.pathname.endsWith('/result'))
+        return Response.json({
+          runId: run.runId,
+          version: 1,
+          status: run.status,
+          finishedAt: run.finishedAt,
+          ...(run.status == 'completed'
+            ? { result: { report: 'September sales', rows: 128, delivered: true } }
+            : run.status == 'failed'
+              ? { error: { code: 'binding.unresolved', message: 'Variable API_TOKEN could not be resolved.' } }
+              : {}),
+        })
+      return Response.json(run)
+    })
+    const next = new WorkbenchStore(client, { getItem: () => null, setItem: () => {} }, undefined, createI18n(language))
+    setStore(next)
+    void next.runs.load('flow')
+    return () => next.dispose()
+  }, [language])
+  return (
+    <I18nProvider i18n={createI18n(language)}>
+      <div className="open-flow-workbench open-flow-theme grid h-full min-h-0" data-theme={dark ? 'dark' : 'light'}>
+        {store != null && open && (
+          <RunsView
+            flowName="Monthly sales report"
+            onClose={() => {
+              setOpen(false)
+              log('history.close')
+            }}
+            store={store}
+            onLocateEvent={(sequence) => log('history.locate', sequence)}
+            onLocateWait={() => {}}
+          />
+        )}
+      </div>
+    </I18nProvider>
+  )
+}
+
+export const runHistoryStory: FrontendStory = {
+  group: 'Workbench',
+  id: 'run-history',
+  title: 'Run history',
+  standalone: true,
+  description:
+    'Inspect results, failures, timeline, full run IDs and filters. Close and reopen the page, or narrow the viewport to switch between list and detail.',
+  render: (log, dark, language) => <RunHistory language={language} dark={dark} log={log} />,
 }
