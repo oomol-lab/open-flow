@@ -108,6 +108,12 @@
 }
 
 .viewDock {
+  z-index: 6;
+
+  > [data-size] {
+    height: 28px;
+    width: 28px;
+  }
   [data-size] {
     color: var(--ui-muted-foreground);
   }
@@ -259,4 +265,21 @@
   .interactiveModeChoice.interactiveModeChoice {
     min-height: 120px;
   }
+}
+
+.viewSeparator {
+  width: 1px;
+  height: 16px;
+  margin-inline: 4px;
+  background: var(--ui-border);
+}
+
+.miniMap:global(.react-flow__panel) {
+  bottom: calc(100% + 8px);
+  left: 0;
+  margin: 0;
+  width: 200px;
+  height: 150px;
+  overflow: hidden;
+  border-radius: var(--ui-radius);
 }

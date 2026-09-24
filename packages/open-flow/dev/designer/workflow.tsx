@@ -12,7 +12,7 @@ import { useMemo, useRef, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { val } from 'value-enhancer'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
-import { CanvasInteractiveMode, CanvasTopLeftControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CanvasControls.tsx'
+import { CanvasViewControls, CanvasTopLeftControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CanvasControls.tsx'
 import { CornerControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CornerControls.tsx'
 import { GetPopupContainerContext } from '../../src/canvas/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
 import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
@@ -482,11 +482,20 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
                       state={publishState}
                     />
                   }
-                  leading={<CanvasInteractiveMode interactiveMode$={interactiveMode$} />}
-                  miniMapExpanded$={miniMapExpanded$}
                 >
                   <WorkbenchInspectorToggle label="Toggle inspector" open={inspectorOpen} onToggle={() => setInspectorOpen((current) => !current)} />
                 </CornerControls>
+                <CanvasViewControls
+                  interactiveMode$={interactiveMode$}
+                  miniMapExpanded$={miniMapExpanded$}
+                  maxZoomReached={false}
+                  minZoomReached={false}
+                  zoom={1}
+                  onFitView={() => log('canvas.fit')}
+                  onZoomIn={() => log('canvas.zoom', 'in')}
+                  onZoomOut={() => log('canvas.zoom', 'out')}
+                  onZoomReset={() => log('canvas.zoom', 'reset')}
+                />
               </ReactFlow>
             </GetPopupContainerContext.Provider>
           </div>

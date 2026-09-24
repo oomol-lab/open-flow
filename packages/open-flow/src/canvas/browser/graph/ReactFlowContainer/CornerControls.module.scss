@@ -1,31 +1,4 @@
-.miniMap:global(.react-flow__panel) {
-  top: 52px;
-  right: 0;
-  width: 200px;
-  height: 150px;
-  overflow: hidden;
-  border-radius: var(--ui-radius);
-}
-
-.surface.surface > [data-size][aria-expanded='true'] {
-  color: var(--ui-muted-foreground);
-  background: transparent;
-}
-
-.surface.surface > [data-size][aria-expanded='true']:is(:hover, :focus-visible) {
-  color: var(--ui-foreground);
-  background: var(--ui-muted);
-}
-
-.surface [data-corner-icon] {
-  width: 16px;
-  height: 16px;
-  flex: none;
-  font-size: 16px;
-}
-
 .group.group:global(.react-flow__panel) {
-  // Keep toolbar popups above the MiniMap's React Flow panel (z-index: 5).
   z-index: 6;
   right: 0;
   display: flex;

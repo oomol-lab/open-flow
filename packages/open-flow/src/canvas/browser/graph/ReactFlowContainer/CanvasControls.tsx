@@ -7,10 +7,21 @@ import { useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+  DropdownMenuGroup,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from '../../../../ui/browser/dropdown-menu.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { cn } from '../../../../ui/browser/utils.ts'
 import { CanvasTooltip } from '../../components/tooltip.tsx'
+import { CanvasMiniMap } from './CanvasMiniMap.tsx'
 import { useGetStaticPopupContainer } from './useGetPopupContainer.ts'
 
 export function CanvasInteractiveMode({
@@ -27,7 +38,7 @@ export function CanvasInteractiveMode({
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <CanvasTooltip placement="bottom" title={t('interactiveMode.title')}>
+      <CanvasTooltip placement="top" title={t('interactiveMode.title')}>
         <PopoverTrigger
           render={
             <Button aria-label={t('interactiveMode.title')} className={styles.interactiveModeTrigger} size="icon" type="button" variant="ghost">
@@ -37,11 +48,11 @@ export function CanvasInteractiveMode({
         />
       </CanvasTooltip>
       <PopoverContent
-        align="end"
+        align="start"
         className={styles.interactiveModePanel}
         data-canvas-control-scope
         container={typeof document == 'undefined' ? undefined : getPopupContainer()}
-        side="bottom"
+        side="top"
         sideOffset={14}
       >
         <div aria-label={t('interactiveMode.title')} className={styles.interactiveModeChoices} role="radiogroup">
@@ -81,7 +92,26 @@ export function CanvasInteractiveMode({
   )
 }
 
+function CanvasInteractiveModeMenu({ interactiveMode$ }: { readonly interactiveMode$: Val<InteractiveMode> }) {
+  const t = useTranslate()
+  const mode = useVal(interactiveMode$)
+  return (
+    <>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuLabel>{t('interactiveMode.title')}</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={mode} onValueChange={(value) => interactiveMode$.set(value as InteractiveMode)}>
+          <DropdownMenuRadioItem value="mouse">{t('interactiveMode.mouse')}</DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="touchpad">{t('interactiveMode.touchpad')}</DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuGroup>
+    </>
+  )
+}
+
 export function CanvasViewControls({
+  interactiveMode$,
+  miniMapExpanded$,
   maxZoomReached,
   minZoomReached,
   onFitView,
@@ -91,6 +121,8 @@ export function CanvasViewControls({
   onZoomReset,
   zoom,
 }: {
+  readonly interactiveMode$?: Val<InteractiveMode>
+  readonly miniMapExpanded$?: Val<boolean | undefined>
   readonly maxZoomReached: boolean
   readonly minZoomReached: boolean
   readonly onFitView: () => void
@@ -145,6 +177,7 @@ export function CanvasViewControls({
                 {t('optimize')}
               </DropdownMenuItem>
             )}
+            {interactiveMode$ != null && <CanvasInteractiveModeMenu interactiveMode$={interactiveMode$} />}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -177,6 +210,17 @@ export function CanvasViewControls({
           </CanvasTooltip>
         )}
       </div>
+      {(miniMapExpanded$ != null || interactiveMode$ != null) && (
+        <>
+          <span aria-hidden="true" className={styles.viewSeparator} />
+          {miniMapExpanded$ != null && <CanvasMiniMap miniMapExpanded$={miniMapExpanded$} />}
+          {interactiveMode$ != null && (
+            <div className={styles.expandedViewControls}>
+              <CanvasInteractiveMode interactiveMode$={interactiveMode$} />
+            </div>
+          )}
+        </>
+      )}
     </Panel>
   )
 }

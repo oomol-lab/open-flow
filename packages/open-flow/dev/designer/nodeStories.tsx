@@ -405,6 +405,7 @@ function NodeContentStory({
         <FlowCanvasView
           key={generation}
           identity="lab:node-cases:value"
+          onInspectSelection={() => log('node.inspect', selected)}
           autoLayout={false}
           layoutMotion={false}
           dark={dark}
@@ -587,7 +588,7 @@ export const nodeStories: readonly FrontendStory[] = [
     id: 'node-content',
     title: 'Node content',
     description:
-      'Compare height transitions with Toggle all content or each node toolbar. Read-only, empty and Condition nodes omit the collapse action. Hover or focus Wait and Approval branch labels for their output semantics.',
+      'Compare the inspect-properties and content-toggle icons in each node toolbar. Toggle all content to inspect height transitions. Read-only, empty and Condition nodes omit the collapse action. Hover or focus Wait and Approval branch labels for their output semantics.',
     standalone: true,
     render: (log, dark, language) => <NodeContentStory dark={dark} language={language} log={log} initialModel={contentModel} initialSelection="schedule" />,
   },

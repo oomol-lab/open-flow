@@ -13,7 +13,7 @@ export function InspectSelectionButton({ className }: { readonly className?: str
   return (
     <CanvasTooltip placement="top" title={label}>
       <Button aria-label={label} className={className} onClick={onInspect} size="icon" variant="ghost">
-        <i aria-hidden="true" className="i-lucide-light:panel-right-open" />
+        <i aria-hidden="true" className="i-lucide-light:clipboard-list" />
       </Button>
     </CanvasTooltip>
   )

@@ -73,7 +73,7 @@ import { NodeStore } from '../../stores/node/node.store.ts'
 import { InspectSelectionButton } from '../inspectSelection.tsx'
 import { NodePlaceholder, NodePlaceholderQueue } from '../Nodes/useNodePlaceholder.ts'
 import { getPaneRect, PaneRectContext } from '../Nodes/usePaneRect.ts'
-import { CanvasBottomRightControls, CanvasTopLeftControls, CanvasInteractiveMode, CanvasToolbar, CanvasViewControls } from './CanvasControls.tsx'
+import { CanvasBottomRightControls, CanvasTopLeftControls, CanvasToolbar, CanvasViewControls } from './CanvasControls.tsx'
 import { ConnectionLine } from './ConnectingLine.tsx'
 import { CornerControls } from './CornerControls.tsx'
 import { HelperLines, useHelperLines } from './HelperLines/index.ts'
@@ -249,6 +249,8 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
     <>
       {props.dottedBackground && <Background id={bgId} color="var(--canvas-grid)" gap={GRID_GAP} size={2} variant={BackgroundVariant.Dots} />}
       <CanvasViewControls
+        interactiveMode$={props.interactiveMode$}
+        miniMapExpanded$={props.miniMapExpanded$}
         maxZoomReached={maxZoomReached}
         minZoomReached={minZoomReached}
         onFitView={() => {
@@ -272,13 +274,7 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
       {props.toolbar != null && <CanvasToolbar>{props.toolbar}</CanvasToolbar>}
       {props.topLeftTools != null && <CanvasTopLeftControls>{props.topLeftTools}</CanvasTopLeftControls>}
       {props.bottomRightTools != null && <CanvasBottomRightControls>{props.bottomRightTools}</CanvasBottomRightControls>}
-      <CornerControls
-        before={props.cornerLeading}
-        leading={<CanvasInteractiveMode interactiveMode$={props.interactiveMode$} />}
-        miniMapExpanded$={props.miniMapExpanded$}
-      >
-        {props.cornerTools}
-      </CornerControls>
+      <CornerControls before={props.cornerLeading}>{props.cornerTools}</CornerControls>
     </>
   )
 })

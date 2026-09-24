@@ -264,10 +264,12 @@ function CanvasChromeStory({
       <div className="run-control-story-stage" data-canvas-control-scope ref={stageRef}>
         <ReactFlowProvider>
           <I18nProvider i18n={i18n}>
-            <CornerControls leading={<CanvasInteractiveMode interactiveMode$={interactiveMode$} />} miniMapExpanded$={miniMapExpanded$}>
+            <CornerControls>
               <WorkbenchInspectorToggle label="Toggle inspector" open={inspectorOpen} onToggle={() => setInspectorOpen((open) => !open)} />
             </CornerControls>
             <CanvasViewControls
+              interactiveMode$={interactiveMode$}
+              miniMapExpanded$={miniMapExpanded$}
               maxZoomReached={false}
               minZoomReached={false}
               onFitView={() => log('canvas.fit')}
@@ -340,7 +342,7 @@ function InteractionModeSample({ label, mode }: { readonly label: string; readon
       <div className="mb-4 text-sm text-muted-foreground">{label}</div>
       {container && (
         <GetPopupContainerContext.Provider value={popup}>
-          <div className="flex justify-end">
+          <div className="absolute bottom-0 left-0">
             <CanvasInteractiveMode defaultOpen interactiveMode$={mode} />
           </div>
         </GetPopupContainerContext.Provider>
