@@ -94,12 +94,12 @@ function triggerRevision(config: Readonly<Record<string, JsonValue>>, jsonSchema
     ...source,
     document: {
       ...source.document,
-      bindings: { trigger: { kind: 'connection', target: 'connection-1' } },
+      bindings: {},
       graph: {
         edges: [{ source: 'trigger', target: 'task' }],
         nodes: {
           trigger: {
-            bindingId: 'trigger',
+            connectionId: 'connection-1',
             config: inputValues(config),
             definition: {
               configInputs: [{ handle: 'event', jsonSchema: { enum: ['push'], type: 'string' }, nullable: false }],
@@ -352,7 +352,6 @@ export default () => value`,
           edges: [],
           nodes: {
             trigger: {
-              bindingId: 'binding',
               config: {},
               definition: {
                 configInputs: [],
@@ -386,8 +385,7 @@ export default () => value`,
       diagnostics: [
         expect.objectContaining({
           code: 'trigger.connection-missing',
-          path: '/document/graph/nodes/trigger/bindingId',
-          values: { bindingId: 'binding' },
+          path: '/document/graph/nodes/trigger/connectionId',
         }),
       ],
       valid: false,
@@ -427,12 +425,12 @@ export default () => value`,
   it.each(feishuMissingCases)('reports missing Feishu Trigger settings: $fields', async ({ config, fields }) => {
     const source: RevisionFixture = {
       document: {
-        bindings: { trigger: { kind: 'connection', target: 'connection-1' } },
+        bindings: {},
         graph: {
           edges: [],
           nodes: {
             trigger: {
-              bindingId: 'trigger',
+              connectionId: 'connection-1',
               config: inputValues(config),
               definition: feishuEvents[0]!.snapshot,
               kind: 'integration',
@@ -875,12 +873,9 @@ export default () => value`,
     const numberUnion = await validateFlow(variableRevision({ type: ['number', 'null'] }), engine)
     expect(numberUnion.diagnostics).toEqual([expect.objectContaining({ code: 'graph.variable-incompatible' })])
 
-    const connection = variableRevision({ type: 'string' })
-    const connectionResult = await validateFlow(
-      { ...connection, document: { ...connection.document, bindings: { token: { kind: 'connection', target: 'connection-1' } } } },
-      engine,
-    )
-    expect(connectionResult.diagnostics).toEqual([expect.objectContaining({ code: 'graph.binding-invalid' })])
+    const missing = variableRevision({ type: 'string' })
+    const missingResult = await validateFlow({ ...missing, document: { ...missing.document, bindings: {} } }, engine)
+    expect(missingResult.diagnostics).toEqual([expect.objectContaining({ code: 'graph.binding-missing' })])
 
     const mixed = variableRevision({ type: 'string' })
     const task = mixed.document.graph.nodes.task

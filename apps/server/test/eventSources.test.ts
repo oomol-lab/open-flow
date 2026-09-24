@@ -83,7 +83,7 @@ async function publish(context: Awaited<ReturnType<typeof setup>>, name: string,
   const node: Extract<TriggerNode, { kind: 'integration' }> = {
     kind: 'integration',
     name: 'Feishu events',
-    bindingId: 'connection',
+    connectionId: input.connectionId,
     definition: definition.snapshot,
     config: inputValues({
       sourceId: source.sourceId,
@@ -92,7 +92,6 @@ async function publish(context: Awaited<ReturnType<typeof setup>>, name: string,
     }),
   }
   const draft = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
-    { kind: 'binding.create', bindingId: 'connection', binding: { kind: 'connection', target: input.connectionId } },
     { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'feishu', node },
   ])
   const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, 'open-flow-engine/v5', null, `publish-${name}`)

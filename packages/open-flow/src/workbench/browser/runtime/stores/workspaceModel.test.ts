@@ -105,7 +105,6 @@ describe('Connector providers', () => {
             nodes: {
               ...base.content.document.graph.nodes,
               watch: {
-                bindingId: 'github-connection',
                 config: {},
                 definition: {
                   configInputs: [],

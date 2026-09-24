@@ -342,7 +342,7 @@ describe('Server application service', () => {
         node: {
           kind: 'poll',
           name: 'Unconfigured',
-          bindingId: 'missing',
+
           config: {},
           pollTimes: [],
           definition: {
@@ -1354,7 +1354,7 @@ describe('Server application service', () => {
     }
   })
 
-  it('repairs an older Draft into a new Revision without changing its source', async () => {
+  it.each([1, 3])('repairs a model %s Draft into a new Revision without changing its source', async (modelVersion) => {
     const file = await databaseFile()
     const service = await openService(file)
     const created = await service.control.createFlow('test', 'Repairable', 'repairable')
@@ -1362,13 +1362,36 @@ describe('Server application service', () => {
     const legacy = JSON.stringify({
       ...source.content,
       kind: 'open-flow-flow-revision',
-      modelVersion: 1,
+      modelVersion,
       version: 1,
       document: {
         ...source.content.document,
+        bindings: { account: { kind: 'connection', target: 'connection' } },
         graph: {
           edges: [],
-          nodes: { start: { kind: 'manual', name: 'Start' }, other: { kind: 'manual', name: 'Other' }, broken: { kind: 'unknown' } },
+          nodes: {
+            start: { kind: 'manual', name: 'Start' },
+            other: { kind: 'manual', name: 'Other' },
+            broken: { kind: 'unknown' },
+            poll: {
+              kind: 'poll',
+              name: 'Mail',
+              bindingId: 'account',
+              config: {},
+              pollTimes: [],
+              definition: {
+                configInputs: [],
+                definitionVersion: 2,
+                description: '',
+                displayName: 'Mail',
+                key: 'mail.event',
+                name: 'Mail',
+                outputs: [],
+                provider: 'mail',
+                type: 'poll',
+              },
+            },
+          },
         },
       },
     })
@@ -1384,7 +1407,10 @@ describe('Server application service', () => {
       expect(await service.control.getEditor(source.flowId)).toMatchObject({
         draft: {
           revisionId: repaired.revision.revisionId,
-          content: { modelVersion: currentFlowModelVersion, document: { graph: { nodes: { start: {}, other: {} } } } },
+          content: {
+            modelVersion: currentFlowModelVersion,
+            document: { bindings: {}, graph: { nodes: { start: {}, other: {}, poll: { connectionId: 'connection' } } } },
+          },
         },
       })
       expect(database.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(source.revisionId)).toEqual({ content: legacy })

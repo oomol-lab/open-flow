@@ -1,4 +1,4 @@
-import type { ConnectorAccess } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { DatabaseSync } from 'node:sqlite'
 import type {
@@ -10,6 +10,7 @@ import type {
   TriggerOccurrenceInput,
 } from './trigger-store.ts'
 
+import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
 import { insertTriggerActivity, pruneTriggerActivities } from '../runtime/trigger-activity.ts'
 
@@ -71,7 +72,7 @@ export class IntegrationStore {
       readonly triggerNodeId: string
     }[],
     now: number,
-    providerAccess: ConnectorAccess,
+    providerAccess: ConnectorAccessSnapshot,
   ): boolean {
     const candidates = []
     for (const integration of integrations) {
@@ -719,7 +720,7 @@ export class IntegrationStore {
     binding: Pick<StoredIntegrationBinding, 'bindingId' | 'connectionId' | 'runtimeVersion' | 'triggerJson'>,
     checkpoint: JsonValue,
     subscription: Readonly<Record<string, JsonValue>>,
-    providerAccess: ConnectorAccess,
+    providerAccess: ConnectorAccessSnapshot,
     now: number,
   ): boolean {
     return (
@@ -839,7 +840,7 @@ export class IntegrationStore {
          FROM integration_states WHERE binding_id = ?`,
       )
       .get(bindingId) as (Omit<StoredIntegrationState, 'providerAccess'> & { readonly providerAccess: string }) | undefined
-    return row == null ? undefined : { ...row, providerAccess: JSON.parse(row.providerAccess) as ConnectorAccess }
+    return row == null ? undefined : { ...row, providerAccess: decodeConnectorAccessSnapshot(JSON.parse(row.providerAccess)) }
   }
 
   integrationTarget(endpointId: string): StoredIntegrationTarget | undefined {
@@ -914,7 +915,7 @@ export class IntegrationStore {
         checkpointJson: stateCheckpointJson,
         connectionId: stateConnectionId,
         reconcileAt: stateReconcileAt,
-        providerAccess: JSON.parse(stateProviderAccess) as ConnectorAccess,
+        providerAccess: decodeConnectorAccessSnapshot(JSON.parse(stateProviderAccess)),
         runtimeVersion: stateRuntimeVersion,
         subscriptionJson: stateSubscriptionJson,
         triggerJson: stateTriggerJson,

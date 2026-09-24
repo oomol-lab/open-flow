@@ -36,14 +36,15 @@ it('rejects invalid compact trigger requests in the schema and decoder', () => {
   }
 })
 
-it('rejects schedules on Integration triggers and preserves references to existing bindings', () => {
+it('rejects schedules on Integration triggers and allows an unselected account', () => {
   const operation = authoringExample('integration').operations[0]!
   expect(() => resolveDraftOperations(decodeDraftOperations([{ ...operation, schedule: [{ type: 'every', unit: 'minute', value: 1 }] }]), definitions)).toThrow(
     /Only Poll/,
   )
   const resolved = resolveDraftOperations(decodeDraftOperations([{ ...operation, connectionId: undefined }]), definitions)
   expect(resolved).toHaveLength(1)
-  expect(resolved[0]).toMatchObject({ kind: 'graph.node.create', node: { kind: 'integration', bindingId: 'telegram-account' } })
+  expect(resolved[0]).toMatchObject({ kind: 'graph.node.create', node: { kind: 'integration' } })
+  expect(resolved[0]).not.toHaveProperty('node.connectionId')
 })
 
 it.each([

@@ -322,7 +322,7 @@ it.each([
         engineContract: 'open-flow-engine/v5',
         engineDigest: 'engine',
         modelVersion: currentFlowModelVersion,
-        providerAccessDigest: 'implicit:1',
+        sharedAccessDigest: 'implicit:1',
         revisionDigest: 'digest',
       })
     }
@@ -350,7 +350,7 @@ const runFixture = {
   engineContract: 'open-flow-engine/v5',
   engineDigest: 'engine',
   modelVersion: currentFlowModelVersion,
-  providerAccessDigest: 'implicit:1',
+  sharedAccessDigest: 'implicit:1',
   revisionDigest: 'digest',
 } as const
 const revisionFixture = {

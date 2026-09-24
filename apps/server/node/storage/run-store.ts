@@ -1,5 +1,5 @@
 import type { RunEventKind } from '@oomol-lab/open-flow/control-api'
-import type { ConnectorAccess } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { RunStatus, RunTerminalStatus } from '@oomol-lab/open-flow/run-lifecycle'
@@ -14,6 +14,7 @@ import type { RunViewStore, StoredControlRun } from './run-view-store.ts'
 import type { RunAdmission, TriggerOccurrenceInput } from './trigger-store.ts'
 import type { VariableStore } from './variable-store.ts'
 
+import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { decodeFlowRunCheckpoint, normalizeWaitComment } from '@oomol-lab/open-flow/scheduler'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
@@ -30,7 +31,7 @@ export interface StoredRun {
   readonly flowId: string
   readonly inputs: RunInputs
   readonly llmConfig?: LlmConfig
-  readonly providerAccess: ConnectorAccess
+  readonly providerAccess: ConnectorAccessSnapshot
   readonly remainingMs?: number
   readonly resume?: { readonly checkpoint: FlowRunCheckpoint }
   readonly resumeUnavailable?: true
@@ -59,12 +60,12 @@ const maxEventBytes = 1024 * 1024
 const maxEventCount = 1_000
 const maxEventTotalBytes = 16 * 1024 * 1024
 const waitDurationMs = 7 * 24 * 60 * 60 * 1_000
-const legacyProviderAccess: ConnectorAccess = {
-  accessRevision: 0,
-  bindings: [],
+const implicitProviderAccess: ConnectorAccessSnapshot = {
+  sharedBindings: [],
+  selectedBindings: [],
   mode: 'implicit',
-  providerAccessDigest: 'legacy',
-  version: 1,
+  sharedAccessDigest: 'implicit',
+  version: 2,
 }
 
 /**
@@ -106,7 +107,7 @@ export class RunStore {
     readonly idempotencyKey: string
     readonly inputs: RunInputs
     readonly modelVersion: number
-    readonly providerAccess?: ConnectorAccess
+    readonly providerAccess?: ConnectorAccessSnapshot
     readonly requestDigest: string
     readonly revisionDigest: string
     readonly revisionId: string
@@ -137,7 +138,7 @@ export class RunStore {
       this.#deps.revisions.materialize(input.revisionId)
       const runId = this.#queueRun({
         ...input,
-        providerAccess: input.providerAccess ?? legacyProviderAccess,
+        providerAccess: input.providerAccess ?? implicitProviderAccess,
         source: 'draft',
       })
       return { created: true, kind: 'accepted', runId, status: 'queued' }
@@ -298,7 +299,7 @@ export class RunStore {
         engineDigest: row.engineDigest,
         flowId: row.flowId,
         inputs: JSON.parse(row.inputs) as RunInputs,
-        providerAccess: JSON.parse(row.providerAccess) as ConnectorAccess,
+        providerAccess: decodeConnectorAccessSnapshot(JSON.parse(row.providerAccess)),
         ...(resumeUnavailable
           ? { resumeUnavailable: true as const }
           : resume == null || row.remainingMs == null
@@ -795,7 +796,7 @@ export class RunStore {
         readonly input: Readonly<Record<string, JsonValue>>
         readonly invocationId: string
         readonly flowId: string
-        readonly providerAccess: ConnectorAccess
+        readonly providerAccess: ConnectorAccessSnapshot
         readonly runId: string
         readonly teamId?: string
         readonly waitId: string
@@ -859,7 +860,7 @@ export class RunStore {
       input: JSON.parse(row.inputJson) as Readonly<Record<string, JsonValue>>,
       invocationId: row.invocationId,
       flowId: row.flowId,
-      providerAccess: JSON.parse(row.providerAccess) as ConnectorAccess,
+      providerAccess: decodeConnectorAccessSnapshot(JSON.parse(row.providerAccess)),
       runId: row.runId,
       teamId: row.teamId ?? undefined,
       waitId: row.waitId,
@@ -897,7 +898,7 @@ export class RunStore {
     readonly idempotencyKey: string
     readonly inputs: RunInputs
     readonly modelVersion: number
-    readonly providerAccess: ConnectorAccess
+    readonly providerAccess: ConnectorAccessSnapshot
     readonly publicationId?: string
     readonly requestDigest: string
     readonly revisionDigest: string

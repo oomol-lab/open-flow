@@ -47,13 +47,14 @@ const snapshot = {
 function revision(fixture: IntegrationConformanceFixture, enabled = true): RevisionContent {
   return {
     document: {
-      bindings: enabled ? { connection: { kind: 'connection', target: fixture.connectionId } } : {},
+      bindings: {},
       graph: {
         edges: enabled ? [{ source: 'integration', target: 'task' }] : [],
         nodes: enabled
           ? {
               integration: {
-                bindingId: 'connection',
+                connectionId: fixture.connectionId,
+
                 config: inputValues(fixture.config),
                 definition: snapshot,
                 kind: 'integration',

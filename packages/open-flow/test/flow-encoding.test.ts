@@ -17,6 +17,45 @@ import { flowClosure } from '../src/flow/common/semantics.ts'
 const decoder = new TextDecoder()
 const port = { jsonSchema: { type: 'number' }, nullable: false } as const
 
+it('upgrades legacy trigger connection bindings without losing accounts or variable bindings', () => {
+  const definition = {
+    configInputs: [],
+    definitionVersion: 2,
+    description: '',
+    displayName: 'Mail',
+    key: 'mail.event',
+    name: 'Mail',
+    outputs: [],
+    provider: 'mail',
+    type: 'poll',
+  }
+  const poll = { kind: 'poll', name: 'Mail', bindingId: 'account', config: {}, definition, pollTimes: [] }
+  const source = {
+    kind: 'open-flow-flow-revision',
+    version: 1,
+    modelVersion: 3,
+    modules: {},
+    document: {
+      bindings: { account: { kind: 'connection', target: 'connection' }, variable: { kind: 'variable', target: 'TOKEN' } },
+      graph: { nodes: { poll, missing: { ...poll, bindingId: 'missing' }, direct: { ...poll, connectionId: 'explicit' } }, edges: [] },
+      tasks: {},
+      subflows: { child: { name: 'Child', inputs: [], outputs: [], graph: { nodes: { poll }, edges: [] } } },
+    },
+  }
+  const bytes = new TextEncoder().encode(JSON.stringify(source))
+  expect(revisionRepairKind(bytes)).toBe('upgrade')
+  const upgraded = repairRevision(bytes)
+  expect(upgraded.modelVersion).toBe(currentFlowModelVersion)
+  expect(upgraded.document.bindings).toEqual({ variable: { kind: 'variable', target: 'TOKEN' } })
+  expect(upgraded.document.graph.nodes.poll).toMatchObject({ connectionId: 'connection' })
+  expect(upgraded.document.graph.nodes.poll).not.toHaveProperty('bindingId')
+  expect(upgraded.document.graph.nodes.direct).toMatchObject({ connectionId: 'explicit' })
+  expect(upgraded.document.graph.nodes.missing).not.toHaveProperty('connectionId')
+  expect(upgraded.document.subflows.child!.graph.nodes.poll).toMatchObject({ connectionId: 'connection' })
+  expect(decodeRevision(encodeRevision(upgraded))).toEqual(upgraded)
+  expect(JSON.parse(new TextDecoder().decode(bytes))).toEqual(source)
+})
+
 function revision(reverse = false): RevisionContent {
   const nodes = {
     condition: {
@@ -122,7 +161,7 @@ describe('Flow Revision encoding', () => {
       modules: { helper: { imports: [] }, main: { imports: ['helper'] } },
       version: 1,
     })
-    await expect(digestBytes(first)).resolves.toBe('sha256:d1fa627598fc669e893463589cfa85f0e761001d2b68518d6119ae9fe7350593')
+    await expect(digestBytes(first)).resolves.toBe('sha256:2222eb1418444e47481754512050ffa752558efe633249d8cce5b1e6d7d2dae0')
   })
 
   it('changes the encoded Revision when workflow semantics change', () => {
@@ -390,7 +429,7 @@ describe('Revision decoding', () => {
       document: { bindings: {}, graph: { nodes: { valid: { kind: 'manual', name: 'Start' } }, edges: [] }, subflows: {}, tasks: {} },
       modules: {},
     })
-    for (const value of [{ ...damaged, modelVersion: 4 }, { ...damaged, kind: 'other' }, 'not json']) {
+    for (const value of [{ ...damaged, modelVersion: currentFlowModelVersion + 1 }, { ...damaged, kind: 'other' }, 'not json']) {
       const candidate = new TextEncoder().encode(typeof value == 'string' ? value : JSON.stringify(value))
       expect(revisionRepairKind(candidate)).toBeUndefined()
       expect(() => repairRevision(candidate)).toThrow()

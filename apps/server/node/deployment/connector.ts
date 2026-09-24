@@ -1,6 +1,13 @@
 import type { ConnectorProxyRequest, ConnectorProxyResult } from '@oomol-lab/open-flow/connector-proxy'
 import type { ProviderAccessReference, ConnectorAccessCandidates } from '@oomol-lab/open-flow/control-api'
-import type { ConnectorAccess, ConnectorActionMetadata, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
+import type {
+  ConnectorAccess,
+  ConnectorAccessSnapshot,
+  ConnectorAccessGrant,
+  ConnectorActionMetadata,
+  ConnectorConnection,
+  ConnectorProvider,
+} from '@oomol-lab/open-flow/control-api'
 import type { ConnectorActionCapability, ConnectorCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { Logger } from 'pino'
 import type { ResolvedProviderAccessBinding, TeamAppAccess } from './provider-access.ts'
@@ -69,15 +76,33 @@ export interface ConnectorHost {
   searchActions(query: string, signal?: AbortSignal, access?: ConnectorAccessContext, locale?: string): Promise<readonly ConnectorActionMetadata[]>
 }
 
-export interface ConnectorAccessContext {
-  readonly usage?: 'node' | 'code'
+interface ConnectorContext {
   readonly actorId?: string
   readonly flowId?: string
-  readonly providerAccess: ConnectorAccess
   readonly providerId?: string
   readonly purpose: 'catalog' | 'eligibility' | 'execute' | 'proxy' | 'trigger'
   readonly source: 'operator' | 'draft' | 'publication' | 'run'
   readonly teamId?: string
+}
+
+export type ConnectorAccessContext = ConnectorContext &
+  (
+    | { readonly scope: 'catalog'; readonly providerAccess: ConnectorAccess }
+    | { readonly scope: 'shared' | 'selected'; readonly providerAccess: ConnectorAccessSnapshot }
+    | { readonly scope: 'action'; readonly providerAccess: ConnectorAccessSnapshot; readonly action: string; readonly connectionId?: string }
+    | { readonly scope: 'proxy'; readonly providerAccess: ConnectorAccessSnapshot; readonly providerId: string; readonly connectionId: string }
+  )
+
+function selectedGrants(access: Exclude<ConnectorAccessContext, { readonly scope: 'catalog' }>): readonly ConnectorAccessGrant[] {
+  switch (access.scope) {
+    case 'shared':
+      return access.providerAccess.sharedBindings
+    case 'selected':
+      return access.providerAccess.selectedBindings
+    case 'action':
+    case 'proxy':
+      return access.providerAccess.selectedBindings.filter((binding) => binding.connectionId == access.connectionId)
+  }
 }
 
 type ConnectorClientAccess = ConnectorAccessContext | string
@@ -253,8 +278,8 @@ export class ConnectorClient implements ConnectorHost {
   async listProviders(signal?: AbortSignal, access?: ConnectorClientAccess, locale?: string): Promise<readonly ConnectorProvider[]> {
     const teamId = connectorTeamId(access)
     let providers = await this.#providers(signal, teamId, locale)
-    if (selectableAccess(access) && access.usage != 'node') {
-      const allowed = new Set(access.providerAccess.bindings.filter((binding) => binding.status == 'active').map((binding) => binding.providerId))
+    if (selectableAccess(access) && access.scope != 'catalog') {
+      const allowed = new Set(selectedGrants(access).map((binding) => binding.providerId))
       providers = providers.filter((provider) => allowed.has(provider.serviceId))
     }
     return providers.map((provider) =>
@@ -274,10 +299,7 @@ export class ConnectorClient implements ConnectorHost {
   async listActions(serviceId?: string, signal?: AbortSignal, access?: ConnectorClientAccess, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
     const teamId = connectorTeamId(access)
     if (serviceId != null) {
-      const bindings =
-        typeof access == 'object' && access.usage == 'node' && access.purpose == 'catalog'
-          ? null
-          : await this.#providerAccessBindings(access, serviceId, signal)
+      const bindings = typeof access == 'object' && access.scope == 'catalog' ? null : await this.#providerAccessBindings(access, serviceId, signal)
       if (bindings != null && bindings.length == 0) return []
       const [providers, actions] = await Promise.all([
         this.#providers(signal, teamId, locale),
@@ -286,7 +308,7 @@ export class ConnectorClient implements ConnectorHost {
       const mapped = this.#decode('actions.list', { serviceId }, () => mapActions(actions, providers))
       return bindings == null ? mapped : mapped.filter((action) => bindings.some((binding) => providerAccessAllowsAction(binding, action)))
     }
-    const bindings = typeof access == 'object' && access.usage == 'node' && access.purpose == 'catalog' ? null : await this.#accessBindings(access, signal)
+    const bindings = typeof access == 'object' && access.scope == 'catalog' ? null : await this.#accessBindings(access, signal)
     if (bindings != null && bindings.length == 0) return []
     return await Effect.runPromise(
       Effect.gen({ self: this }, function* () {
@@ -346,7 +368,7 @@ export class ConnectorClient implements ConnectorHost {
 
   async searchActions(query: string, signal?: AbortSignal, access?: ConnectorClientAccess, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
     const teamId = connectorTeamId(access)
-    const bindings = typeof access == 'object' && access.usage == 'node' && access.purpose == 'catalog' ? null : await this.#accessBindings(access, signal)
+    const bindings = typeof access == 'object' && access.scope == 'catalog' ? null : await this.#accessBindings(access, signal)
     if (bindings != null && bindings.length == 0) return []
     const [providers, actions] = await Promise.all([
       this.#providers(signal, teamId, locale),
@@ -365,7 +387,7 @@ export class ConnectorClient implements ConnectorHost {
     const separator = actionId.indexOf('.')
     if (separator <= 0) throw actionNotFound()
     const bindings =
-      typeof access == 'object' && access.purpose == 'catalog' ? null : await this.#providerAccessBindings(access, actionId.slice(0, separator), signal, true)
+      typeof access == 'object' && access.scope == 'catalog' ? null : await this.#providerAccessBindings(access, actionId.slice(0, separator), signal, true)
     const [providers, action] = await Promise.all([
       this.#providers(signal, teamId, locale),
       this.#get('actions.get', `v1/actions/${encodeURIComponent(actionId)}`, (data) => runtimeAction(runtimeData(data)), signal, {
@@ -401,14 +423,16 @@ export class ConnectorClient implements ConnectorHost {
     signal: AbortSignal,
     access?: ConnectorClientAccess,
   ): Promise<JsonValue> {
+    if (typeof access == 'object' && access.scope != 'shared' && (access.scope != 'action' || access.action != action || access.connectionId != connectionId))
+      throw accessInvalid('The Action or Connection is outside this invocation’s access scope.')
     const teamId = connectorTeamId(access)
     const separator = action.indexOf('.')
     if (separator <= 0) throw connectionRequired()
     const providerId = action.slice(0, separator)
+    if (connectionId != null && selectableAccess(access) && !selectedGrants(access).some((binding) => binding.providerId == providerId)) throw accessRequired()
     if (
       typeof access == 'object' &&
-      access.usage == 'node' &&
-      access.providerAccess.nodeBindings != null &&
+      access.scope == 'action' &&
       connectionId == null &&
       !(await this.#providers(signal, teamId)).some((provider) => provider.serviceId == providerId && provider.noSetup)
     )
@@ -417,7 +441,6 @@ export class ConnectorClient implements ConnectorHost {
       connectionId == null &&
       typeof access == 'object' &&
       access.providerAccess.mode == 'selectable' &&
-      access.providerAccess.nodeBindings != null &&
       !(await this.getAction(action, signal, access)).authenticated
     const bindings = publicAction ? null : await this.#providerAccessBindings(access, providerId, signal, true)
     if (bindings != null) {
@@ -482,6 +505,12 @@ export class ConnectorClient implements ConnectorHost {
     signal: AbortSignal,
     access?: ConnectorClientAccess,
   ): Promise<ConnectorProxyResult> {
+    if (
+      typeof access == 'object' &&
+      access.scope != 'catalog' &&
+      (access.scope != 'proxy' || access.providerId != provider || access.connectionId != connectionId)
+    )
+      throw accessInvalid('The proxy request is outside this invocation’s access scope.')
     const teamId = connectorTeamId(access)
     const bindings = await this.#providerAccessBindings(access, provider, signal, true)
     if (bindings != null) {
@@ -522,13 +551,11 @@ export class ConnectorClient implements ConnectorHost {
     connections?: readonly ConnectorConnection[],
   ): Promise<readonly ResolvedProviderAccessBinding[] | null> {
     if (!selectableAccess(access)) return null
-    if (access.usage == 'node' && access.purpose == 'catalog') {
+    if (access.scope == 'catalog') {
       const available = connections ?? (await this.#connections(undefined, signal, access.teamId))
       return this.#nodeAccessBindings(access, [...new Set(available.map((connection) => connection.serviceId))], signal, available)
     }
-    const bindings = (access.usage == 'node' ? (access.providerAccess.nodeBindings ?? access.providerAccess.bindings) : access.providerAccess.bindings).filter(
-      (binding) => binding.status == 'active',
-    )
+    const bindings = selectedGrants(access)
     if (access.teamId == null) throw accessInvalid()
     return this.#resolveAccessBindings(access.teamId, bindings, signal, connections)
   }
@@ -540,7 +567,7 @@ export class ConnectorClient implements ConnectorHost {
     required = false,
   ): Promise<readonly ResolvedProviderAccessBinding[] | null> {
     if (!selectableAccess(access)) return null
-    if (access.usage == 'node' && access.purpose == 'catalog') {
+    if (access.scope == 'catalog') {
       const bindings = await this.#nodeAccessBindings(access, [providerId], signal)
       if (bindings.length == 0 && required) {
         const providers = await this.#providers(signal, access.teamId)
@@ -549,15 +576,9 @@ export class ConnectorClient implements ConnectorHost {
       }
       return bindings
     }
-    const selected = (access.usage == 'node' ? (access.providerAccess.nodeBindings ?? access.providerAccess.bindings) : access.providerAccess.bindings).filter(
-      (binding) => binding.providerId == providerId && binding.status == 'active',
-    )
+    const selected = selectedGrants(access).filter((binding) => binding.providerId == providerId)
     if (selected.length == 0) {
-      if (
-        access.providerAccess.nodeBindings != null &&
-        (await this.#providers(signal, access.teamId)).some((provider) => provider.serviceId == providerId && provider.noSetup)
-      )
-        return null
+      if ((await this.#providers(signal, access.teamId)).some((provider) => provider.serviceId == providerId && provider.noSetup)) return null
       if (required) throw accessRequired()
       return []
     }
@@ -780,7 +801,7 @@ function accessInvalid(message = 'The Flow Provider access binding is no longer 
 }
 
 function selectableAccess(access: ConnectorClientAccess | undefined): access is ConnectorAccessContext {
-  return typeof access != 'string' && access?.flowId != null && access.providerAccess.mode == 'selectable'
+  return typeof access == 'object' && access.providerAccess.mode == 'selectable'
 }
 
 function actionNotFound(): ConnectorTaskError {
@@ -1030,7 +1051,8 @@ export async function checkCodePermissions(
   if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
   for (const permission of permissions) {
     for (const entry of permission.actions) {
-      const scoped = { ...access, usage: 'node' as const }
+      if (access.scope == 'catalog') throw accessInvalid('Code permissions require a fixed access snapshot.')
+      const scoped: ConnectorAccessContext = { ...access, scope: 'action', action: entry.action, connectionId: entry.connectionId }
       const action = await connector.getAction(entry.action, signal, { ...scoped, providerId: entry.action.split('.')[0] })
       if (!action.authenticated && entry.connectionId == null) continue
       if (entry.connectionId == null) throw connectionRequired()

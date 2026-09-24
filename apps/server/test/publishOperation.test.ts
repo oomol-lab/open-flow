@@ -38,7 +38,7 @@ async function addMarker(service: ServerService, flowId: string, revisionId: str
   return changed.revision.revisionId
 }
 
-it('does not mark an unchanged implicit legacy Publication as dirty', async () => {
+it('marks a Publication dirty when its shared access digest or graph changes', async () => {
   const file = await databaseFile()
   const service = await openService(file)
   services.add(service)
@@ -49,7 +49,10 @@ it('does not mark an unchanged implicit legacy Publication as dirty', async () =
   expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('succeeded')
   const database = new DatabaseSync(file)
   try {
-    database.exec("UPDATE publications SET provider_access_digest = 'legacy'")
+    await expect(service.control.getLive(flowId)).resolves.toMatchObject({ hasUnpublishedChanges: false })
+    database.exec("UPDATE publications SET shared_access_digest = 'different'")
+    await expect(service.control.getLive(flowId)).resolves.toMatchObject({ hasUnpublishedChanges: true })
+    database.exec("UPDATE publications SET shared_access_digest = 'implicit'")
     await expect(service.control.getLive(flowId)).resolves.toMatchObject({ hasUnpublishedChanges: false })
     await addMarker(service, flowId, created.flow.draftRevisionId, 'changed')
     await expect(service.control.getLive(flowId)).resolves.toMatchObject({ hasUnpublishedChanges: true })

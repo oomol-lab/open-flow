@@ -35,7 +35,7 @@ function graphDiagnostic(
   return { code, column: 0, line: 1, message, mismatch, path, ...(values == null ? {} : { values }) }
 }
 
-function validateTrigger(triggerId: string, trigger: TriggerNode, document: FlowDocument, path: string, diagnostics: Diagnostic[]): void {
+function validateTrigger(triggerId: string, trigger: TriggerNode, path: string, diagnostics: Diagnostic[]): void {
   const outputHandles = triggerOutputDefinitions(trigger).map((port) => port.handle)
   if (new Set(outputHandles).size !== outputHandles.length)
     diagnostics.push(graphDiagnostic('graph.port-duplicate', 'Trigger output handles must be unique.', `${path}/definition/outputs`))
@@ -60,20 +60,8 @@ function validateTrigger(triggerId: string, trigger: TriggerNode, document: Flow
     return
   }
   if (trigger.kind == 'cron' || trigger.kind == 'manual') return
-  const binding = document.bindings[trigger.bindingId]
-  if (binding == null) {
-    diagnostics.push(
-      graphDiagnostic('trigger.connection-missing', 'Select a connection account for this Trigger.', `${path}/bindingId`, {
-        bindingId: trigger.bindingId,
-      }),
-    )
-  } else if (binding.kind != 'connection') {
-    diagnostics.push(
-      graphDiagnostic('trigger.connection-invalid', `Trigger binding "${trigger.bindingId}" must be a Connection.`, `${path}/bindingId`, {
-        bindingId: trigger.bindingId,
-      }),
-    )
-  }
+  if (trigger.connectionId == null)
+    diagnostics.push(graphDiagnostic('trigger.connection-missing', 'Select a connection account for this Trigger.', `${path}/connectionId`))
   const missingConfig = missingTriggerConfig(trigger.definition.configInputs, trigger.config)
   if (missingConfig.length > 0) {
     diagnostics.push({
@@ -645,7 +633,7 @@ function validateGraph(
       if (!allowTriggers) {
         diagnostics.push(graphDiagnostic('graph.trigger-not-allowed', 'Trigger nodes are only allowed in Flows.', nodePath))
       } else {
-        validateTrigger(nodeId, node, document, nodePath, diagnostics)
+        validateTrigger(nodeId, node, nodePath, diagnostics)
       }
       continue
     }

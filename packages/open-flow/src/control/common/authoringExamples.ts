@@ -52,7 +52,7 @@ export function authoringExample(name: string): { version: 1; operations: readon
         {
           kind: 'graph.trigger.create',
           nodeId: 'mail',
-          bindingId: 'mail-account',
+
           key: 'gmail.on_message_received',
           connectionId: 'CONNECTION_ID',
           config: {},
@@ -65,7 +65,7 @@ export function authoringExample(name: string): { version: 1; operations: readon
         {
           kind: 'graph.trigger.create',
           nodeId: 'telegram',
-          bindingId: 'telegram-account',
+
           key: 'telegram.on_update',
           connectionId: 'CONNECTION_ID',
           config: { updates: ['message'] },

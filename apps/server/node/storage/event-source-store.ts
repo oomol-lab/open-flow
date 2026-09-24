@@ -1,8 +1,9 @@
-import type { ConnectorAccess, CreateEventSource, EventSource, UpdateEventSource } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAccessSnapshot, CreateEventSource, EventSource, UpdateEventSource } from '@oomol-lab/open-flow/control-api'
 import type { TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { FeishuEvent } from '@oomol-lab/open-flow/provider-triggers'
 import type { DatabaseSync } from 'node:sqlite'
 
+import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { resolveTriggerConfig } from '@oomol-lab/open-flow/integration-trigger'
 import { matchesFeishuEvent } from '@oomol-lab/open-flow/provider-triggers'
@@ -43,7 +44,7 @@ export interface SourceDelivery {
 }
 
 export interface SourceSubscription {
-  readonly providerAccess: ConnectorAccess
+  readonly providerAccess: ConnectorAccessSnapshot
   readonly sourceId: string
   readonly resourceKey: string
   readonly resourceJson: string
@@ -291,10 +292,17 @@ export class EventSourceStore {
       provider_access_snapshot AS providerAccess
       FROM source_subscriptions WHERE source_id = ? AND resource_key = ?`)
       .get(sourceId, resourceKey) as (Omit<SourceSubscription, 'providerAccess'> & { readonly providerAccess: string }) | undefined
-    return row == null ? undefined : { ...row, providerAccess: JSON.parse(row.providerAccess) as ConnectorAccess }
+    return row == null ? undefined : { ...row, providerAccess: decodeConnectorAccessSnapshot(JSON.parse(row.providerAccess)) }
   }
 
-  demand(sourceId: string, resourceKey: string, resourceJson: string, bindingId: string, providerAccess: ConnectorAccess, now: number): SourceSubscription {
+  demand(
+    sourceId: string,
+    resourceKey: string,
+    resourceJson: string,
+    bindingId: string,
+    providerAccess: ConnectorAccessSnapshot,
+    now: number,
+  ): SourceSubscription {
     return this.#transaction(() => {
       this.#database.prepare('INSERT OR IGNORE INTO source_demands VALUES (?, ?, ?)').run(sourceId, resourceKey, bindingId)
       this.#database
@@ -333,7 +341,7 @@ export class EventSourceStore {
       .all() as unknown as readonly (Omit<SourceSubscription, 'providerAccess'> & { readonly providerAccess: string })[]
     const subscriptions: SourceSubscription[] = []
     for (const { providerAccess, ...row } of rows) {
-      subscriptions.push({ ...row, providerAccess: JSON.parse(providerAccess) as ConnectorAccess })
+      subscriptions.push({ ...row, providerAccess: decodeConnectorAccessSnapshot(JSON.parse(providerAccess)) })
     }
     return subscriptions
   }

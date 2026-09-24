@@ -123,8 +123,7 @@ export class ListenerRuntime {
       if (definition?.snapshot.definitionVersion != trigger.definition.definitionVersion) {
         throw new PermanentPollError('Fixed Poll Trigger definition is not available.')
       }
-      const connection = revision.document.bindings[trigger.bindingId]
-      if (connection?.kind != 'connection' || connection.target != target.connectionId) {
+      if (trigger.connectionId != target.connectionId) {
         throw new ControlError(controlErrorCode.bindingUnresolved, 'The fixed Poll Trigger Connection is unresolved.')
       }
       const result = await this.#run(
@@ -258,7 +257,8 @@ export class ListenerRuntime {
         flowId: target.flowId,
         providerAccess,
         providerId: provider,
-        usage: 'node',
+        scope: 'proxy',
+        connectionId: target.connectionId,
         purpose: 'trigger',
         source: 'publication',
         ...(teamId == null ? {} : { teamId }),
@@ -465,8 +465,7 @@ export class ListenerRuntime {
         if (definition?.snapshot.definitionVersion != trigger.definition.definitionVersion) {
           return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger definition is not available.'))
         }
-        const connection = revision.document.bindings[trigger.bindingId]
-        if (connection?.kind != 'connection' || connection.target != target.connectionId) {
+        if (trigger.connectionId != target.connectionId) {
           return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger Connection does not match its Publication.'))
         }
         const result = yield* this.#request(target, definition, {

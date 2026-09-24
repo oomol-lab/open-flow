@@ -82,7 +82,7 @@ export function ConnectorAccessSettings({
     const connection = connections.find((item) => item.connectionId == use.connectionId)
     accounts.set(use.connectionId, {
       name:
-        selectedAccess?.nodeBindings?.find((binding) => binding.connectionId == use.connectionId)?.connectionDisplayName ??
+        (published ? fixedSnapshot?.access.selectedBindings.find((binding) => binding.connectionId == use.connectionId)?.connectionDisplayName : undefined) ??
         connection?.displayName ??
         use.connectionId,
       providerId: use.providerId,
@@ -90,7 +90,7 @@ export function ConnectorAccessSettings({
       nodes: uses.filter((item) => item.connectionId == use.connectionId),
     })
   }
-  for (const binding of selectedAccess?.bindings ?? []) {
+  for (const binding of selectedAccess == null ? [] : selectedAccess.version == 2 ? selectedAccess.sharedBindings : selectedAccess.bindings) {
     if (binding.connectionId == null) continue
     const account = accounts.get(binding.connectionId)
     accounts.set(binding.connectionId, { name: binding.connectionDisplayName, providerId: binding.providerId, code: true, nodes: account?.nodes ?? [] })
@@ -216,7 +216,7 @@ export function ConnectorAccessSettings({
           onSelect={published ? undefined : onSelectReference}
         />
       )}
-      {selectedAccess?.bindings.some((binding) => binding.connectionId == null || binding.status != 'active') && (
+      {selectedAccess?.version == 1 && selectedAccess.bindings.some((binding) => binding.connectionId == null || binding.status != 'active') && (
         <div role="status" className="text-xs text-destructive">
           {t('connectorAccess.summaryIssues', {
             count: selectedAccess.bindings.filter((binding) => binding.connectionId == null || binding.status != 'active').length,

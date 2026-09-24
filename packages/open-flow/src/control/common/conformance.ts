@@ -1169,7 +1169,7 @@ export const connectorControlApiConformanceCases: readonly ControlApiConformance
       equal(access.accessRevision, 0, 'Implicit Connector access revision')
       equal(access.bindings, [], 'Implicit Connector access bindings')
       equal(access.mode, 'implicit', 'Implicit Connector access mode')
-      if (!requiredString(access.providerAccessDigest, 'Implicit Connector access digest').startsWith('implicit')) {
+      if (!requiredString(access.sharedAccessDigest, 'Implicit Connector access digest').startsWith('implicit')) {
         fail('Implicit Connector access digest must identify the implicit authority generation.')
       }
       equal(access.version, 1, 'Implicit Connector access version')
@@ -1328,7 +1328,7 @@ export function selectableConnectorAccessControlApiConformanceCases(
         equal(added.accessRevision, initial.accessRevision + 1, 'Service selection revision')
         equal(added.providerIds, [fixture.providerId], 'Selected services')
         equal(added.bindings, [], 'Adding a service grants no account access')
-        equal(added.providerAccessDigest, initial.providerAccessDigest, 'Service-only edits preserve authority digest')
+        equal(added.sharedAccessDigest, initial.sharedAccessDigest, 'Service-only edits preserve authority digest')
         equal(await api.getConnectorAccess(flow.flowId), added, 'Service selection is persisted')
         const selected = await api.addProviderAccessBinding(flow.flowId, fixture.providerId, fixture.accessBindingId, added.accessRevision)
         const path = `/v1/flows/${encodeURIComponent(flow.flowId)}/connector-access/${encodeURIComponent(fixture.providerId)}/service`
@@ -1345,7 +1345,7 @@ export function selectableConnectorAccessControlApiConformanceCases(
         equal(removed.accessRevision, selected.accessRevision + 1, 'Service removal revision')
         equal(removed.providerIds, [], 'Service removed')
         equal(removed.bindings, [], 'Removing service revokes all its bindings')
-        if (removed.providerAccessDigest == selected.providerAccessDigest) fail('Removing bound access must change the authority digest.')
+        if (removed.sharedAccessDigest == selected.sharedAccessDigest) fail('Removing bound access must change the authority digest.')
         equal(await api.getConnectorAccess(flow.flowId), removed, 'Removed service remains removed')
       },
     },
@@ -1413,7 +1413,7 @@ export function selectableConnectorAccessControlApiConformanceCases(
           fixture.permissionGroupName,
           'Selected Provider access binding permission group name',
         )
-        const selectedDigest = requiredString(selected.providerAccessDigest, 'Selected Connector access digest')
+        const selectedDigest = requiredString(selected.sharedAccessDigest, 'Selected Connector access digest')
 
         const revisionId = await addManualTrigger(harness, flowId, requiredString(created.draftRevisionId, 'Draft Revision ID'))
         const draftRun = await json(
@@ -1425,7 +1425,7 @@ export function selectableConnectorAccessControlApiConformanceCases(
           202,
           'Admit Draft Run with selected Provider access',
         )
-        equal(draftRun.providerAccessDigest, selectedDigest, 'Draft Run Provider access snapshot')
+        equal(draftRun.sharedAccessDigest, selectedDigest, 'Draft Run Provider access snapshot')
 
         const published = await completePublish(
           harness,
@@ -1433,7 +1433,7 @@ export function selectableConnectorAccessControlApiConformanceCases(
           202,
           'Publish selected Provider access',
         )
-        equal(published.publication.providerAccessDigest, selectedDigest, 'Publication Provider access snapshot')
+        equal(published.publication.sharedAccessDigest, selectedDigest, 'Publication Provider access snapshot')
 
         await error(
           await request(harness, path, {
@@ -1463,7 +1463,7 @@ export function selectableConnectorAccessControlApiConformanceCases(
           202,
           'Admit Live Run after clearing Draft access',
         )
-        equal(liveRun.providerAccessDigest, selectedDigest, 'Live Run preserves Publication Provider access snapshot')
+        equal(liveRun.sharedAccessDigest, selectedDigest, 'Live Run preserves Publication Provider access snapshot')
       },
     },
   ]
@@ -1683,7 +1683,6 @@ export function pollControlApiConformanceCases(fixture: {
         const flow = await api.createFlow('Poll controls', 'poll-controls')
         const changed = await json(
           await changeRequest(harness, flow.flowId, flow.draftRevisionId, [
-            { kind: 'binding.create', bindingId: 'connection', binding: { kind: 'connection', target: fixture.connectionId } },
             {
               kind: 'graph.node.create',
               nodeId: 'poll',
@@ -1691,7 +1690,7 @@ export function pollControlApiConformanceCases(fixture: {
               node: {
                 kind: 'poll',
                 name: 'Poll',
-                bindingId: 'connection',
+                connectionId: fixture.connectionId,
                 definition: fixture.definition,
                 config: Object.fromEntries(Object.entries(fixture.config).map(([key, value]) => [key, { kind: 'value', value }])),
                 pollTimes: [{ type: 'every', unit: 'minute', value: 5 }],

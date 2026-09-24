@@ -62,7 +62,7 @@ describe('fixed trigger inputs', () => {
             trigger: {
               kind: 'poll' as const,
               name: 'Trigger',
-              bindingId: 'connection',
+              connectionId: 'connection',
               pollTimes: [],
               definition: { ...definition, configInputs: inputs },
               config: inputValues({ name: '', note: null }),

@@ -38,7 +38,7 @@ it('prepares and executes an entry while unrelated nodes remain invalid', async 
       other: {
         kind: 'poll',
         name: 'Unconfigured',
-        bindingId: 'missing',
+
         config: {},
         pollTimes: [],
         definition: {

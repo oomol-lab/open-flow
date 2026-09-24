@@ -3,6 +3,7 @@ import type {
   ConnectorAction,
   ConnectorActionMetadata,
   ConnectorAccess,
+  ConnectorAccessSnapshot,
   ConnectorAccessCandidatesBatch,
   ConnectorConnection,
   ConnectorProvider,
@@ -218,10 +219,9 @@ export class ControlService {
       throw new ControlError(controlErrorCode.triggerKeyNotFound, 'The Trigger was not found.')
     const definition = providerDefinitions.find((item) => item.snapshot.key == trigger.definition.key)
     if (definition != null && 'eventSource' in definition && definition.eventSource != null) {
-      const binding = currentDraft.content.document.bindings[trigger.bindingId]
-      if (binding?.kind != 'connection') throw new ControlError(serverErrorCode.connectorConnectionRequired, 'Select a Connection first.')
+      if (trigger.connectionId == null) throw new ControlError(serverErrorCode.connectorConnectionRequired, 'Select a Connection first.')
       const sources = (await this.listEventSources(flowId)).sources.filter(
-        (source) => source.connectionId == binding.target && source.provider == trigger.definition.provider,
+        (source) => source.connectionId == trigger.connectionId && source.provider == trigger.definition.provider,
       )
       if (field == 'sourceId') return sources.map((source) => ({ value: source.sourceId, label: source.name }))
       if (field == 'eventTypes')
@@ -231,8 +231,8 @@ export class ControlService {
       throw new ControlError(controlErrorCode.triggerKeyInvalid, 'Unknown event source configuration field.')
     }
     if (definition?.configOptions == null) throw new ControlError(controlErrorCode.triggerKeyInvalid, 'This Trigger has no dynamic configuration options.')
-    const binding = currentDraft.content.document.bindings[trigger.bindingId]
-    if (binding?.kind != 'connection') throw new ControlError(serverErrorCode.connectorConnectionRequired, 'Select a Connection first.')
+    const connectionId = trigger.connectionId
+    if (connectionId == null) throw new ControlError(serverErrorCode.connectorConnectionRequired, 'Select a Connection first.')
     return await this.#connectorRequest(
       flowId,
       async (connector, access) => {
@@ -242,7 +242,7 @@ export class ControlService {
             config: triggerConfigValues(trigger.definition.configInputs, trigger.config),
             signal,
             connector: {
-              execute: (request) => connector.proxy(definition.snapshot.provider, binding.target, `trigger-options:${flowId}`, request, signal, access),
+              execute: (request) => connector.proxy(definition.snapshot.provider, connectionId, `trigger-options:${flowId}`, request, signal, access),
             },
           })
         } catch (error) {
@@ -261,7 +261,7 @@ export class ControlService {
     return await this.#connectorRequest(flowId, (connector, access) => connector.listProviders(signal, access, locale), actorId)
   }
 
-  getConnectorAccess(actorId: string, flowId: string, publicationId?: string): ConnectorAccess {
+  getConnectorAccess(actorId: string, flowId: string, publicationId?: string): ConnectorAccess | ConnectorAccessSnapshot {
     this.getFlow(flowId)
     if (publicationId != null) {
       if (this.store.publications.publication(flowId, publicationId) == null)
@@ -472,7 +472,7 @@ export class ControlService {
       ...(actorId == null ? {} : { actorId }),
       ...(flowId == null ? {} : { flowId }),
       providerAccess: flowId != null && actorId != null ? this.connectorAccess.read(actorId, flowId) : this.connectorAccess.current(flowId ?? ''),
-      usage: 'node',
+      scope: 'catalog',
       purpose: 'catalog',
       source: flowId == null ? 'operator' : 'draft',
       ...(teamId == null ? {} : { teamId }),
@@ -777,9 +777,7 @@ export class ControlService {
     return {
       flowId,
       hasUnpublishedChanges:
-        draftClosure.digest != stored.publication.closureDigest ||
-        ((stored.publication.providerAccessDigest != 'legacy' || providerAccess.mode != 'implicit') &&
-          providerAccess.providerAccessDigest != stored.publication.providerAccessDigest),
+        draftClosure.digest != stored.publication.closureDigest || providerAccess.sharedAccessDigest != stored.publication.sharedAccessDigest,
       publication: publication(stored.publication),
       revision: stored.revision,
       status: currentFlow.live?.enabled == false ? 'suspended' : liveStatus(currentFlow.status, stored.publication.engineContract),

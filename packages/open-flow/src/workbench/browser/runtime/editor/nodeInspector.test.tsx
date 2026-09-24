@@ -163,7 +163,6 @@ describe('Provider account section', () => {
 describe('Provider Trigger sections', () => {
   it('shows the standard account section for Feishu App Bot triggers', () => {
     const trigger = {
-      bindingId: 'account',
       config: {},
       definition: {
         configInputs: [{ handle: 'sourceId', jsonSchema: { type: 'string' }, nullable: false }],
@@ -177,6 +176,7 @@ describe('Provider Trigger sections', () => {
       inputs: {},
       kind: 'integration',
       name: 'Application Event',
+      connectionId: 'feishu-account',
     }
     const element = NodeInspector({
       variables: { enabled: false, names: [], loaded: true, loading: false, onOpen: vi.fn() },
@@ -184,7 +184,7 @@ describe('Provider Trigger sections', () => {
       connectorLoading: false,
       connectors: {} as never,
       disabled: false,
-      revision: { binding: () => ({ kind: 'connection', target: 'feishu-account' }) } as never,
+      revision: {} as never,
       selection: { id: 'feishu-trigger', kind: 'trigger', node: trigger, trigger } as never,
       store: { $: { flowId: { value: 'flow' } } } as never,
       target: { kind: 'flow' },
@@ -204,7 +204,6 @@ describe('Provider Trigger sections', () => {
 
   it('orders Provider options before Outputs and Node settings', () => {
     const trigger = {
-      bindingId: 'connection',
       config: {},
       definition: {
         configInputs: [{ handle: 'query', jsonSchema: { type: 'string' }, nullable: true }],

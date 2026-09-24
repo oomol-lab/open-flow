@@ -81,14 +81,7 @@ export function pasteNodes(revision: RevisionView, target: GraphTarget, clipboar
   for (const [sourceId, node] of entries) {
     const nodeId = ids.get(sourceId)!
     if (!('inputs' in node)) {
-      if (node.kind == 'poll' || node.kind == 'integration') {
-        const binding = revision.binding(node.bindingId)
-        const bindingId = identity()
-        if (binding != null) operations.push({ binding, bindingId, kind: 'binding.create' })
-        operations.push({ kind: 'graph.node.create', node: { ...node, bindingId }, nodeId, target })
-      } else {
-        operations.push({ kind: 'graph.node.create', node, nodeId, target })
-      }
+      operations.push({ kind: 'graph.node.create', node, nodeId, target })
       continue
     }
     const remapInputs = (sourceInputs: Readonly<Record<string, InputMapping>>): Readonly<Record<string, InputMapping>> => {

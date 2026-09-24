@@ -266,7 +266,7 @@ export async function triggerCommand(
           triggers,
           version: 1,
         },
-        entries.map(([triggerId, trigger]) => triggerText(selected.draft.content, triggerId, trigger)).join('\n'),
+        entries.map(([triggerId, trigger]) => triggerText(triggerId, trigger)).join('\n'),
       )
       return
     }
@@ -317,7 +317,6 @@ export async function triggerCommand(
         operations = [
           {
             kind: 'graph.trigger.create',
-            bindingId: authoringId(args, 'binding'),
             nodeId: triggerId,
             key: second,
             config,
@@ -435,8 +434,7 @@ export async function triggerCommand(
       }
       if (args.connection != null && (resolved.trigger.kind == 'poll' || resolved.trigger.kind == 'integration')) {
         const connection = await preferredConnection(client, resolved.trigger.definition.provider, args.connection, undefined, true, flow?.flowId)
-        const binding = selected.draft.content.document.bindings[resolved.trigger.bindingId]
-        if (binding?.target != connection!.connectionId)
+        if (resolved.trigger.connectionId != connection!.connectionId)
           operations.push(...setTriggerConnection(selected.draft.content, selected.target, resolved.triggerId, connection!.connectionId)!)
       }
       if (operations.length == 0) {
@@ -452,7 +450,7 @@ export async function triggerCommand(
             triggerId: resolved.triggerId,
             version: 1,
           },
-          `${triggerText(selected.draft.content, resolved.triggerId, resolved.trigger)}\tunchanged\t${selected.draft.revisionId}`,
+          `${triggerText(resolved.triggerId, resolved.trigger)}\tunchanged\t${selected.draft.revisionId}`,
         )
         return
       }

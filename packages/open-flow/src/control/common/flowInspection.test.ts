@@ -27,7 +27,7 @@ const draft = {
     modelVersion: currentFlowModelVersion,
     modules: { script: { name: 'Script', imports: [], source: 'export default () => ({ limit: 20 });' } },
     document: {
-      bindings: { account: { kind: 'connection', target: 'connection' }, token: { kind: 'variable', target: 'TOKEN' } },
+      bindings: { token: { kind: 'variable', target: 'TOKEN' } },
       tasks: {
         mail: {
           name: 'Mail',
@@ -51,7 +51,7 @@ const draft = {
           poll: {
             kind: 'poll',
             name: 'Poll',
-            bindingId: 'account',
+            connectionId: 'connection',
             config: { limit: { kind: 'value', value: 10 } },
             pollTimes: [{ type: 'every', unit: 'minute', value: 5 }],
             definition: {
@@ -118,7 +118,7 @@ it('preserves editable graph relationships and defaults without catalog schemas 
           child: { subflowId: 'child', inputs: draft.content.document.graph.nodes.child!.inputs },
           poll: {
             config: { limit: { kind: 'value', value: 10 } },
-            bindingId: 'account',
+            connectionId: 'connection',
             pollTimes: [{ type: 'every', unit: 'minute', value: 5 }],
             definition: { key: 'mail.received', definitionVersion: 1 },
           },

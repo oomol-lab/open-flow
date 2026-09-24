@@ -6,7 +6,7 @@
 | ----------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
 | npm package       | package manifest 的精确版本                         | 固定实现、类型、Workbench 资产和一致性测试集。部署锁定同一版本。 |
 | Revision envelope | `kind: open-flow-flow-revision`、`version: 1`       | 固定 UTF-8 JSON 信封字段和 canonical bytes 规则。                |
-| Flow model        | `modelVersion: 2`                                   | 固定 document、modules、节点和端口的序列化结构。                 |
+| Flow model        | `modelVersion: 4`                                   | 固定 document、modules、节点和端口的序列化结构。                 |
 | Control API       | `/v1`、Run 创建请求 `version: 2`，其他 `version: 1` | 固定请求字段、响应、错误码、CAS 和幂等行为。                     |
 | Engine Contract   | `open-flow-engine/v5`                               | 固定执行、Trigger、Task 返回、Wait 和取消语义。                  |
 | MCP               | `2026-07-28`                                        | 固定 Streamable HTTP 协商；工具的产品语义复用 Control API。      |

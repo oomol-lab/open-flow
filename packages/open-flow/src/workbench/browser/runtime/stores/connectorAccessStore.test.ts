@@ -6,7 +6,7 @@ const initial = {
   accessRevision: 0,
   bindings: [],
   mode: 'selectable',
-  providerAccessDigest: 'access-0',
+  sharedAccessDigest: 'access-0',
   version: 1,
 } as const
 
@@ -53,7 +53,7 @@ describe('ConnectorAccessStore', () => {
               status: 'active',
             },
           ],
-          providerAccessDigest: 'access-1',
+          sharedAccessDigest: 'access-1',
         })
       }
       throw new Error(`Unexpected request: ${path}`)
@@ -64,7 +64,7 @@ describe('ConnectorAccessStore', () => {
     await store.loadCandidates(['mail'])
     await store.select('mail', 'editors')
 
-    expect(store.$.value.access).toMatchObject({ accessRevision: 1, providerAccessDigest: 'access-1' })
+    expect(store.$.value.access).toMatchObject({ accessRevision: 1, sharedAccessDigest: 'access-1' })
     expect(store.$.value.candidates.mail?.candidates).toEqual([
       {
         connectionId: 'fixture-account',
@@ -94,11 +94,11 @@ describe('ConnectorAccessStore', () => {
       status: 'active',
     } as const
     const second = { ...first, accessBindingId: 'work', connectionDisplayName: 'Work account', permissionGroupName: 'Editors' }
-    const selected = { ...initial, accessRevision: 2, bindings: [first, second], providerAccessDigest: 'access-2' }
+    const selected = { ...initial, accessRevision: 2, bindings: [first, second], sharedAccessDigest: 'access-2' }
     const request = vi.fn(async (path: string, init?: RequestInit) => {
       if (path == '/v1/flows/flow-1/connector-access' && init?.method == null) return Response.json(selected)
       if (path == '/v1/flows/flow-1/connector-access/mail' && init?.method == 'DELETE') {
-        return Response.json({ ...selected, accessRevision: 3, bindings: [second], providerAccessDigest: 'access-3' })
+        return Response.json({ ...selected, accessRevision: 3, bindings: [second], sharedAccessDigest: 'access-3' })
       }
       throw new Error(`Unexpected request: ${path}`)
     })
@@ -132,7 +132,7 @@ describe('ConnectorAccessStore', () => {
           status: 'active',
         },
       ],
-      providerAccessDigest: 'access-1',
+      sharedAccessDigest: 'access-1',
     } as const
     const request = vi.fn(async (path: string, init?: RequestInit) => {
       if (path == '/v1/flows/flow-1/connector-access' && init?.method == null) return reads++ == 0 ? Response.json(initial) : await refresh
@@ -158,7 +158,7 @@ describe('ConnectorAccessStore', () => {
     const request = vi.fn(async (path: string, init?: RequestInit) => {
       if (path == '/v1/flows/flow-1/connector-access' && init?.method == null) {
         reads += 1
-        return Response.json(reads == 1 ? initial : { ...initial, accessRevision: 2, providerAccessDigest: 'access-2' })
+        return Response.json(reads == 1 ? initial : { ...initial, accessRevision: 2, sharedAccessDigest: 'access-2' })
       }
       if (path == '/v1/flows/flow-1/connector-access/mail' && init?.method == 'PUT') {
         return Response.json({ error: { code: 'connector.access-conflict', message: 'Changed concurrently.' }, version: 1 }, { status: 409 })
@@ -170,7 +170,7 @@ describe('ConnectorAccessStore', () => {
     await store.load('flow-1')
     await store.select('mail', 'editors')
 
-    expect(store.$.value.access).toMatchObject({ accessRevision: 2, providerAccessDigest: 'access-2' })
+    expect(store.$.value.access).toMatchObject({ accessRevision: 2, sharedAccessDigest: 'access-2' })
     expect(notice).toHaveBeenCalledOnce()
     store.dispose()
   })
@@ -264,10 +264,10 @@ it.each([true, false])('preserves a newer refresh while setting service selectio
     await store.load('flow-1')
     const saving = store.setService('mail', selected)
     await vi.waitFor(() => expect(save).toHaveBeenCalledWith('flow-1', 'mail', selected, 10))
-    const newer = { ...initial, accessRevision: 12, providerIds: selected ? ['mail', 'github'] : ['github'], providerAccessDigest: 'access-12' }
+    const newer = { ...initial, accessRevision: 12, providerIds: selected ? ['mail', 'github'] : ['github'], sharedAccessDigest: 'access-12' }
     read.mockResolvedValue(newer)
     await store.load('flow-1')
-    pending.resolve({ ...initial, accessRevision: 11, providerIds: selected ? ['mail'] : [], providerAccessDigest: 'access-11' })
+    pending.resolve({ ...initial, accessRevision: 11, providerIds: selected ? ['mail'] : [], sharedAccessDigest: 'access-11' })
     await expect(saving).resolves.toBe(true)
     expect(store.$.value.access).toEqual(newer)
     expect(store.$.value.savingProviderId).toBeUndefined()
@@ -318,7 +318,7 @@ it.each([false, true])('clears pending feedback without applying a stale complet
   const save = new Promise<Response>((resolve) => {
     finish = resolve
   })
-  const newer = { ...initial, accessRevision: 3, providerAccessDigest: 'newer' }
+  const newer = { ...initial, accessRevision: 3, sharedAccessDigest: 'newer' }
   let reads = 0
   const request = vi.fn(async (_path: string, init?: RequestInit) => (init?.method == null ? Response.json(reads++ == 0 ? initial : newer) : await save))
   const onSaved = vi.fn()

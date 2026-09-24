@@ -34,7 +34,7 @@ async function databaseFile(): Promise<string> {
 
 function stripeNode(events: readonly string[]): Extract<TriggerNode, { readonly kind: 'integration' }> {
   return {
-    bindingId: 'stripe-connection',
+    connectionId: 'connection-stripe',
     config: inputValues({ apiVersion: '', events, includeConnectedAccounts: false }),
     definition: stripe.snapshot,
     kind: 'integration',
@@ -44,7 +44,6 @@ function stripeNode(events: readonly string[]): Extract<TriggerNode, { readonly 
 
 async function addStripe(service: ServerService, flowId: string, revisionId: string, events: readonly string[]): Promise<string> {
   const changed = await service.control.changeDraft('operator', flowId, revisionId, [
-    { binding: { kind: 'connection', target: 'connection-stripe' }, bindingId: 'stripe-connection', kind: 'binding.create' },
     { kind: 'graph.node.create', node: stripeNode(events), nodeId: 'stripe', target: { kind: 'flow' } },
   ])
   return changed.revision.revisionId
@@ -209,7 +208,7 @@ it('fails a Stripe candidate before activation, preserves old Live, and recovers
     file,
     options(
       connector(async (_provider, _connectionId, _rateLimitId, request, _signal, access) => {
-        accessDigests.push(access!.providerAccess!.providerAccessDigest)
+        accessDigests.push(access!.providerAccess!.sharedAccessDigest)
         if (request.endpoint == '/v1/webhook_endpoints' && request.method == 'GET') {
           return {
             data: { data: createdUrl == '' ? [] : [{ id: 'we_failed', url: createdUrl }], has_more: false },
@@ -248,7 +247,7 @@ it('fails a Stripe candidate before activation, preserves old Live, and recovers
   if (initialDone.status != 'succeeded') throw new Error('Initial Publish operation did not succeed.')
 
   const previous = new DatabaseSync(file)
-  previous.exec("UPDATE publications SET provider_access_snapshot = json_set(provider_access_snapshot, '$.providerAccessDigest', 'previous')")
+  previous.exec("UPDATE publications SET provider_access_snapshot = json_set(provider_access_snapshot, '$.sharedAccessDigest', 'previous')")
   previous.close()
 
   const revisionId = await addStripe(service, created.flow.flowId, created.flow.draftRevisionId, ['charge.succeeded'])

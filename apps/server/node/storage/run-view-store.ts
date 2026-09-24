@@ -36,7 +36,7 @@ export interface StoredControlRun {
   readonly modelVersion: number
   readonly occurrenceId: string | null
   readonly publicationId: string | null
-  readonly providerAccessDigest: string
+  readonly sharedAccessDigest: string
   readonly result?: unknown
   readonly revisionDigest: string
   readonly revisionId: string
@@ -262,7 +262,7 @@ export class RunViewStore {
                 runs.finished_at AS finishedAt, runs.flow_id AS flowId,
                 runs.model_version AS modelVersion, trigger_occurrences.occurrence_id AS occurrenceId, runs.result,
                 runs.publication_id AS publicationId,
-                json_extract(runs.provider_access_snapshot, '$.providerAccessDigest') AS providerAccessDigest,
+                json_extract(runs.provider_access_snapshot, '$.sharedAccessDigest') AS sharedAccessDigest,
                 runs.revision_digest AS revisionDigest, runs.revision_id AS revisionId,
                 runs.run_id AS runId, runs.source, runs.started_at AS startedAt, runs.status,
                 runs.trigger_node_id AS triggerNodeId

@@ -245,10 +245,10 @@ export async function referencedTriggerKey(client: ControlClient, reference: str
   throw new CliError('trigger-key.not-found', `Trigger Key ${JSON.stringify(reference)} was not found.`)
 }
 
-export function triggerText(content: RevisionContent, triggerId: string, trigger: TriggerNode): string {
+export function triggerText(triggerId: string, trigger: TriggerNode): string {
   const provider = trigger.kind == 'poll' || trigger.kind == 'integration' ? trigger.definition.provider : 'open-flow'
-  const binding = trigger.kind == 'poll' || trigger.kind == 'integration' ? (content.document.bindings[trigger.bindingId]?.target ?? '') : ''
-  return `${trigger.name}\t${triggerId}\t${trigger.kind}\t${provider}\t${binding}`
+  const connection = trigger.kind == 'poll' || trigger.kind == 'integration' ? (trigger.connectionId ?? '') : ''
+  return `${trigger.name}\t${triggerId}\t${trigger.kind}\t${provider}\t${connection}`
 }
 
 export function connectionText(connection: ConnectorConnection): string {
@@ -277,10 +277,9 @@ export function inspectedNodeSummary(content: RevisionContent, nodeId: string, n
   }
 }
 
-export function inspectedTriggerSummary(content: RevisionContent, triggerId: string, trigger: TriggerNode) {
-  const binding = trigger.kind == 'poll' || trigger.kind == 'integration' ? content.document.bindings[trigger.bindingId] : undefined
+export function inspectedTriggerSummary(triggerId: string, trigger: TriggerNode) {
   return {
-    ...(binding?.kind == 'connection' ? { connectionId: binding.target } : {}),
+    ...((trigger.kind == 'poll' || trigger.kind == 'integration') && trigger.connectionId != null ? { connectionId: trigger.connectionId } : {}),
     kind: trigger.kind,
     name: trigger.name,
     ...(trigger.kind == 'poll' || trigger.kind == 'integration' ? { provider: trigger.definition.provider } : {}),

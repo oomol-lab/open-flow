@@ -5,7 +5,7 @@ import { checkJsonDepth } from './json.ts'
 import { triggerScheduleSchema } from './triggerScheduleSchema.ts'
 import { webhookMethods } from './webhookMethod.ts'
 
-export const currentFlowModelVersion = 3
+export const currentFlowModelVersion = 4
 const text = z.string()
 const json = z.json()
 const strings = z.array(text)
@@ -180,7 +180,7 @@ const node = z.union([
   z.object({
     ...trigger,
     kind: z.literal('poll'),
-    bindingId: text,
+    connectionId: text.min(1).optional(),
     config: z.record(text, fixedInput),
     definition: z.object({ ...definition, type: z.literal('poll') }),
     pollTimes: triggerScheduleSchema,
@@ -188,7 +188,7 @@ const node = z.union([
   z.object({
     ...trigger,
     kind: z.literal('integration'),
-    bindingId: text,
+    connectionId: text.min(1).optional(),
     config: z.record(text, fixedInput),
     definition: z.object({ ...definition, type: z.literal('integration'), endpoint }),
   }),
@@ -198,7 +198,7 @@ const edge = z.object({ source: text, target: text, sourceHandle: text.optional(
 const at = { nodeId: text, target }
 const subflow = z.object({ name: text, inputs: z.array(input), outputs: z.array(port.extend({ sources: z.array(z.union([nodeSource, flowSource])) })) })
 const graph = z.object({ nodes: z.record(text, node), edges: z.array(edge).default([]) })
-const binding = z.object({ kind: z.enum(['connection', 'variable']), target: text })
+const binding = z.object({ kind: z.literal('variable'), target: text })
 const module = z.object({ name: text, imports: strings, source: text })
 const document = z.object({
   bindings: z.record(text, binding),
@@ -314,9 +314,17 @@ function repairTriggerNode(value: unknown): unknown {
   return candidate
 }
 
-function repairGraph(value: unknown): z.infer<typeof graph> {
+function repairGraph(value: unknown, bindings: Record<string, unknown>): z.infer<typeof graph> {
   const candidate = record(value)
-  const nodes = repairedEntries(candidate.nodes, node, repairTriggerNode)
+  const nodes = repairedEntries(candidate.nodes, node, (entry) => {
+    const repaired = record(repairTriggerNode(entry))
+    if ((repaired.kind == 'poll' || repaired.kind == 'integration') && repaired.connectionId == null && typeof repaired.bindingId == 'string') {
+      const connection = record(bindings[repaired.bindingId])
+      if (connection.kind == 'connection' && typeof connection.target == 'string' && connection.target.length > 0)
+        return { ...repaired, connectionId: connection.target }
+    }
+    return repaired
+  })
   const webhookIds = new Set(Object.entries(nodes).flatMap(([id, graphNode]) => (graphNode.kind == 'webhook' ? [id] : [])))
   for (const graphNode of Object.values(nodes)) {
     if (!('inputs' in graphNode)) continue
@@ -343,11 +351,12 @@ export function repairRevisionEnvelope(value: unknown): RevisionContent {
   const sourceDocument = record(
     envelopeSource.modelVersion == 1 || envelopeSource.modelVersion == 2 ? upgradeLegacyDocument(envelopeSource.document) : envelopeSource.document,
   )
-  const sourceGraph = repairGraph(sourceDocument.graph)
+  const bindings = record(sourceDocument.bindings)
+  const sourceGraph = repairGraph(sourceDocument.graph, bindings)
   const subflows = Object.fromEntries(
     Object.entries(record(sourceDocument.subflows)).flatMap(([id, subflowCandidate]) => {
       const legacySubflow = record(subflowCandidate)
-      const result = subflow.extend({ graph }).safeParse({ ...legacySubflow, graph: repairGraph(legacySubflow.graph) })
+      const result = subflow.extend({ graph }).safeParse({ ...legacySubflow, graph: repairGraph(legacySubflow.graph, bindings) })
       return result.success ? [[id, result.data] as const] : []
     }),
   )
@@ -390,6 +399,13 @@ const shapes = {
   'graph.node.create': { ...at, node },
   'graph.node.delete': at,
   'graph.node.field.set': z.union([
+    z.object({
+      ...at,
+      kind: z.literal('graph.node.field.set'),
+      field: z.literal('connectionId'),
+      before: text.min(1).optional(),
+      value: text.min(1).optional(),
+    }),
     z.object({
       ...at,
       kind: z.literal('graph.node.field.set'),

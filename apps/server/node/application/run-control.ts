@@ -1,4 +1,5 @@
 import type { FlowChangeEvent, ResultQuery, Run, RunCancellation, RunDetails, RunEvents, RunResult } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, RevisionContent, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
@@ -12,7 +13,7 @@ import { controlErrorCode, decodeRunEvent, readResult } from '@oomol-lab/open-fl
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { agentActions, codeActions, prepareFlow, validateFlowInputs, validRunTrigger, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
-import { captureNodeAccess } from '../deployment/connector-access.ts'
+import { captureConnectorAccess } from '../deployment/connector-access.ts'
 import { checkCodeActions, checkCodePermissions } from '../deployment/connector.ts'
 import { ControlError, serverErrorCode } from '../error.ts'
 import { readRevisionOrRepair, revisionContent, timestamp } from './control-views.ts'
@@ -65,7 +66,7 @@ export class RunControl {
     idempotencyKey: string,
     trigger: TriggerSeed,
   ): Promise<{ readonly created: boolean; readonly run: RunDetails }> {
-    let providerAccess = this.connectorAccess.current(flowId)
+    const sharedAccess = this.connectorAccess.current(flowId)
     const requestDigest = await digestBytes(
       canonicalJsonBytes({
         engineContract,
@@ -73,7 +74,7 @@ export class RunControl {
         inputs,
         trigger: { ...trigger },
         kind: 'draft',
-        providerAccessDigest: providerAccess.providerAccessDigest,
+        sharedAccessDigest: sharedAccess.sharedAccessDigest,
         revisionId,
       }),
     )
@@ -85,10 +86,10 @@ export class RunControl {
     const content = revisionContent(stored)
     if (!validRunTrigger(content, trigger)) throw new ControlError(controlErrorCode.runInvalid, 'Select a valid Trigger and outputs.')
     const fixed = await this.prepareRun(content, engineContract, trigger.nodeId)
-    providerAccess = await captureNodeAccess(this.connectorAccess, flowId, { ...content.document, ...fixed.flow }, providerAccess)
+    const providerAccess = await captureConnectorAccess(this.connectorAccess, flowId, { ...content.document, ...fixed.flow }, sharedAccess)
     await this.checkRunActions(fixed.flow, flowId, providerAccess, 'draft')
     if (validateFlowInputs(content, inputs) != 'valid') throw new ControlError(controlErrorCode.runInvalid, 'The Flow inputs are invalid.')
-    if (this.connectorAccess.current(flowId).providerAccessDigest != providerAccess.providerAccessDigest) {
+    if (this.connectorAccess.current(flowId).sharedAccessDigest != providerAccess.sharedAccessDigest) {
       throw new ControlError(controlErrorCode.connectorAccessConflict, 'Connector access changed while the Run was being accepted.')
     }
     const accepted = this.store.runs.acceptControlRun({
@@ -342,7 +343,7 @@ export class RunControl {
   private async checkRunActions(
     prepared: PreparedFlow,
     flowId: string,
-    providerAccess = this.connectorAccess.current(flowId),
+    providerAccess: ConnectorAccessSnapshot,
     source: 'draft' | 'publication' = 'draft',
   ): Promise<void> {
     if (Object.values(prepared.tasks).some((task) => task.executor.kind == 'agent') && !this.llmAvailable('agent'))
@@ -352,7 +353,7 @@ export class RunControl {
       flowId,
       providerAccess,
       purpose: 'eligibility',
-      usage: 'node',
+      scope: 'selected',
       source,
       ...(teamId == null ? {} : { teamId }),
     })
@@ -360,7 +361,7 @@ export class RunControl {
       flowId,
       providerAccess,
       purpose: 'eligibility',
-      usage: 'code',
+      scope: 'shared',
       source,
       ...(teamId == null ? {} : { teamId }),
     })
@@ -417,7 +418,7 @@ export class RunControl {
       ...(stored.eventsExpiresAt == null ? {} : { eventsExpiresAt: timestamp(stored.eventsExpiresAt) }),
       modelVersion: stored.modelVersion,
       revisionDigest: stored.revisionDigest,
-      providerAccessDigest: stored.providerAccessDigest,
+      sharedAccessDigest: stored.sharedAccessDigest,
     }
     switch (stored.source) {
       case 'draft':

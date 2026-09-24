@@ -119,7 +119,7 @@ describe('ControlClient Flow API', () => {
   })
 
   it('reads and updates deployment-neutral Provider access bindings', async () => {
-    const implicit = { accessRevision: 0, bindings: [], mode: 'implicit', providerAccessDigest: 'implicit', version: 1 } as const
+    const implicit = { accessRevision: 0, bindings: [], mode: 'implicit', sharedAccessDigest: 'implicit', version: 1 } as const
     const selectable = {
       accessRevision: 2,
       bindings: [
@@ -143,7 +143,7 @@ describe('ControlClient Flow API', () => {
         },
       ],
       mode: 'selectable',
-      providerAccessDigest: 'sha256:access',
+      sharedAccessDigest: 'sha256:access',
       version: 1,
     } as const
     const request = vi.fn(async (path: string, init?: RequestInit) => {
@@ -371,7 +371,7 @@ describe('ControlClient Wait API', () => {
     engineDigest: 'engine-1',
     flowId: flow.flowId,
     modelVersion: currentFlowModelVersion,
-    providerAccessDigest: 'implicit:1',
+    sharedAccessDigest: 'implicit:1',
     revisionDigest: 'revision-digest-1',
     revisionId: flow.draftRevisionId,
     runId: 'run-waiting',
@@ -601,7 +601,7 @@ describe('Run event contract', () => {
 })
 
 it('adds and removes a Flow service independently of account bindings', async () => {
-  const access = { accessRevision: 1, providerIds: ['2chat'], bindings: [], mode: 'selectable', providerAccessDigest: 'empty', version: 1 }
+  const access = { accessRevision: 1, providerIds: ['2chat'], bindings: [], mode: 'selectable', sharedAccessDigest: 'empty', version: 1 }
   const request = vi.fn(async () => Response.json(access))
   const client = new ControlClient(request)
   await expect(client.setConnectorService('flow/1', '2chat', true, 0)).resolves.toEqual(access)

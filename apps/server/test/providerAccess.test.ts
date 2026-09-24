@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ConfiguredConnectorAccessHost } from '../node/deployment/connector-access.ts'
+import { captureConnectorAccess, ConfiguredConnectorAccessHost } from '../node/deployment/connector-access.ts'
 import { ConnectorClient } from '../node/deployment/connector.ts'
 import {
   providerAccessBindingCandidates,
@@ -249,13 +249,14 @@ describe('configured Connector access', () => {
     const access = {
       flowId: 'flow-1',
       providerAccess: {
-        accessRevision: 1,
-        bindings: candidates.candidates.map((candidate) => Object.assign({ status: 'active' as const }, candidate)),
+        sharedBindings: candidates.candidates,
+        selectedBindings: [],
         mode: 'selectable' as const,
-        providerAccessDigest: 'multiple',
-        version: 1 as const,
+        sharedAccessDigest: 'multiple',
+        version: 2 as const,
       },
       purpose: 'execute' as const,
+      scope: 'shared' as const,
       source: 'run' as const,
       teamId: 'team-1',
     }
@@ -284,7 +285,7 @@ it('persists an unconnected service across database reopen and removes it with r
   const added = await access.setService('actor', 'flow-1', '2chat', true, 0)
   expect(added).toMatchObject({
     kind: 'saved',
-    access: { providerIds: ['2chat'], bindings: [], accessRevision: 1, providerAccessDigest: before.providerAccessDigest },
+    access: { providerIds: ['2chat'], bindings: [], accessRevision: 1, sharedAccessDigest: before.sharedAccessDigest },
   })
   storage.close()
   databases.splice(databases.indexOf(storage), 1)
@@ -346,7 +347,7 @@ it('reads mixed old and current saved authorization without losing valid binding
   }
   const old = { accessBindingId: 'old', providerId: 'example', connectionDisplayName: 'Old', status: 'active' }
   storage.connection
-    .prepare('INSERT INTO flow_provider_access (flow_id, access_revision, bindings_json, provider_access_digest) VALUES (?, ?, ?, ?)')
+    .prepare('INSERT INTO flow_provider_access (flow_id, access_revision, bindings_json, shared_access_digest) VALUES (?, ?, ?, ?)')
     .run('flow-1', 3, JSON.stringify([old, valid, null]), 'saved')
   expect(access.current('flow-1')).toMatchObject({
     accessRevision: 3,
@@ -396,7 +397,13 @@ it.each(['creator', 'admin'])('offers %s delegation without policy and retains i
   currentRole = 'member'
   await expect(access.add('operator', 'flow-1', 'example', candidate.accessBindingId, 1)).resolves.toEqual({ kind: 'invalid' })
   remote.mockClear()
-  const context = { flowId: 'flow-1', teamId: 'team-1', providerAccess: saved.access, purpose: 'execute' as const, source: 'run' as const }
+  const providerAccess = await captureConnectorAccess(
+    access,
+    'flow-1',
+    { bindings: {}, graph: { nodes: {}, edges: [] }, subflows: {}, tasks: {} },
+    saved.access,
+  )
+  const context = { flowId: 'flow-1', teamId: 'team-1', providerAccess, scope: 'shared' as const, purpose: 'execute' as const, source: 'run' as const }
   await expect(connector.listConnections('example', undefined, context)).resolves.toHaveLength(1)
   expect(remote.mock.calls.every(([url]) => String(url).endsWith('/v1/apps/services/example'))).toBe(true)
   active = false

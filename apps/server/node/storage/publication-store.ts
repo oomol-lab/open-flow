@@ -1,10 +1,11 @@
 import type { PublishOperation } from '@oomol-lab/open-flow/control-api'
-import type { ConnectorAccess } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAccess, ConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import type { StoredFlow, StoredFlowRevision } from './flow-store.ts'
 import type { IntegrationPublication } from './integration-store.ts'
 import type { PollPublication } from './poll-store.ts'
 import type { RevisionStore } from './revision-store.ts'
 
+import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import { randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { z } from 'zod'
@@ -38,7 +39,7 @@ export interface StoredPublication {
   readonly modelVersion: number
   readonly operation: 'publish' | 'rollback'
   readonly publicationId: string
-  readonly providerAccessDigest: string
+  readonly sharedAccessDigest: string
   readonly revisionDigest: string
   readonly revisionId: string
   readonly sourcePublicationId: string | null
@@ -59,7 +60,7 @@ const publicationColumns = `
   publications.model_version AS modelVersion,
   publications.operation,
   publications.publication_id AS publicationId,
-  publications.provider_access_digest AS providerAccessDigest,
+  publications.shared_access_digest AS sharedAccessDigest,
   publications.revision_digest AS revisionDigest,
   publications.revision_id AS revisionId,
   publications.source_publication_id AS sourcePublicationId`
@@ -73,12 +74,12 @@ END)`
 const publishDeadlineMs = 30 * 60 * 1_000
 const publishRetentionMs = 24 * 60 * 60 * 1_000
 const publishPending = new Error('Publish candidate activation is pending.')
-const legacyProviderAccess: ConnectorAccess = {
-  accessRevision: 0,
-  bindings: [],
+const implicitProviderAccess: ConnectorAccessSnapshot = {
+  sharedBindings: [],
+  selectedBindings: [],
   mode: 'implicit',
-  providerAccessDigest: 'legacy',
-  version: 1,
+  sharedAccessDigest: 'implicit',
+  version: 2,
 }
 
 interface PublishInput {
@@ -105,7 +106,7 @@ interface PublishInput {
       }
   readonly operationId?: string
   readonly polls: readonly PollPublication[]
-  readonly providerAccess?: ConnectorAccess
+  readonly providerAccess?: ConnectorAccessSnapshot
   readonly publishedAt: number
   readonly requestDigest: string
   readonly revisionDigest: string
@@ -161,18 +162,18 @@ export class PublicationStore {
       .get(publicationId) as StoredPublication | undefined
   }
 
-  providerAccess(publicationId: string): ConnectorAccess | undefined {
+  providerAccess(publicationId: string): ConnectorAccessSnapshot | undefined {
     const row = this.#database.prepare('SELECT provider_access_snapshot AS providerAccess FROM publications WHERE publication_id = ?').get(publicationId) as
       | { readonly providerAccess: string }
       | undefined
-    return row == null ? undefined : (JSON.parse(row.providerAccess) as ConnectorAccess)
+    return row == null ? undefined : decodeConnectorAccessSnapshot(JSON.parse(row.providerAccess))
   }
 
-  operationProviderAccess(operationId: string): ConnectorAccess | undefined {
+  operationProviderAccess(operationId: string): ConnectorAccessSnapshot | undefined {
     const row = this.#database.prepare('SELECT provider_access_snapshot AS providerAccess FROM publish_operations WHERE operation_id = ?').get(operationId) as
       | { readonly providerAccess: string }
       | undefined
-    return row == null ? undefined : (JSON.parse(row.providerAccess) as ConnectorAccess)
+    return row == null ? undefined : decodeConnectorAccessSnapshot(JSON.parse(row.providerAccess))
   }
 
   live(flowId: string): StoredLive | undefined {
@@ -294,7 +295,7 @@ export class PublicationStore {
           input.expectedLivePublicationId,
           input.integrations,
           createdAt,
-          input.providerAccess ?? legacyProviderAccess,
+          input.providerAccess ?? implicitProviderAccess,
         )
       ) {
         return { kind: 'unsupported' }
@@ -312,7 +313,7 @@ export class PublicationStore {
         idempotency_key: input.idempotencyKey,
         request_digest: input.requestDigest,
         input_json: JSON.stringify(input),
-        provider_access_snapshot: JSON.stringify(input.providerAccess ?? legacyProviderAccess),
+        provider_access_snapshot: JSON.stringify(input.providerAccess ?? implicitProviderAccess),
         status: 'pending',
         deadline_at: createdAt + publishDeadlineMs,
         created_at: createdAt,
@@ -518,7 +519,7 @@ export class PublicationStore {
   publish(input: PublishInput, currentProviderAccess?: () => ConnectorAccess): PublicationAcceptance {
     try {
       return this.#transaction(() => {
-        const providerAccess = input.providerAccess ?? legacyProviderAccess
+        const providerAccess = input.providerAccess ?? implicitProviderAccess
         const existing = this.replayPublication(input.flowId, input.idempotencyKey, input.requestDigest)
         if (existing != null) {
           if (existing.kind == 'conflict') return existing
@@ -565,7 +566,7 @@ export class PublicationStore {
               source.closureDigest != input.closureDigest ||
               source.modelVersion != input.metadata.modelVersion ||
               source.engineContract != input.engineContract ||
-              source.providerAccessDigest != providerAccess.providerAccessDigest
+              source.sharedAccessDigest != providerAccess.sharedAccessDigest
             ) {
               return { kind: 'revision-conflict' }
             }
@@ -587,7 +588,7 @@ export class PublicationStore {
         const publicationId = `publication_${randomUUID().replaceAll('-', '')}`
         insert(this.#database, 'publications', {
           publication_id: publicationId,
-          provider_access_digest: providerAccess.providerAccessDigest,
+          shared_access_digest: providerAccess.sharedAccessDigest,
           provider_access_snapshot: JSON.stringify(providerAccess),
           flow_id: input.flowId,
           revision_id: input.revisionId,
@@ -736,7 +737,7 @@ export class PublicationStore {
     return (
       input.metadata?.operation == 'rollback' ||
       currentProviderAccess == null ||
-      currentProviderAccess().providerAccessDigest == input.providerAccess?.providerAccessDigest
+      currentProviderAccess().sharedAccessDigest == input.providerAccess?.sharedAccessDigest
     )
   }
 

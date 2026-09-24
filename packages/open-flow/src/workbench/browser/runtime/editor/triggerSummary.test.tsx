@@ -20,7 +20,7 @@ it('renders Provider outputs with the standard output section', () => {
   const definition = feishuEvents[0]!.snapshot
   const html = renderToStaticMarkup(
     <I18nProvider i18n={createI18n('zh-CN')}>
-      <TriggerSummary trigger={{ kind: 'integration', name: 'Feishu', bindingId: 'app', definition, config: {} }} />
+      <TriggerSummary trigger={{ kind: 'integration', name: 'Feishu', definition, config: {} }} />
     </I18nProvider>,
   )
   expect(html).toContain('data-inspector-section="outputs"')

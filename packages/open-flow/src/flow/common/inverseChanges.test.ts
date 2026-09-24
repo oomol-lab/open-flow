@@ -4,7 +4,7 @@ import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
 import { applyFlowChanges } from './change.ts'
 import { inverseFlowChanges } from './inverseChanges.ts'
-import { createCodeTask, createValue, deleteNodes } from './nodeChanges.ts'
+import { createCodeTask, createValue, deleteNodes, setTriggerConnection } from './nodeChanges.ts'
 
 const target = { kind: 'flow' } as const
 const empty: RevisionContent = {
@@ -20,6 +20,47 @@ function roundTrip(before: RevisionContent, operations: readonly ChangeOperation
 }
 
 describe('inverse canvas changes', () => {
+  it('restores direct Trigger selections after changing, clearing and deleting a node', () => {
+    const content: RevisionContent = {
+      ...empty,
+      document: {
+        ...empty.document,
+        graph: {
+          edges: [],
+          nodes: {
+            trigger: {
+              kind: 'poll',
+              name: 'Inbox',
+              connectionId: 'work',
+              config: {},
+              pollTimes: [],
+              definition: {
+                type: 'poll',
+                provider: 'mail',
+                key: 'mail.received',
+                name: 'received',
+                displayName: 'Inbox',
+                description: '',
+                definitionVersion: 2,
+                configInputs: [],
+                outputs: [],
+              },
+            },
+          },
+        },
+      },
+    }
+    for (const connection of ['personal', undefined]) {
+      const changes = setTriggerConnection(content, target, 'trigger', connection)!
+      expect(applyFlowChanges(content, changes).document.graph.nodes.trigger).toMatchObject({ kind: 'poll' })
+      expect(Reflect.get(applyFlowChanges(content, changes).document.graph.nodes.trigger!, 'connectionId')).toBe(connection)
+      roundTrip(content, changes)
+    }
+    roundTrip(content, deleteNodes(content, target, ['trigger']))
+    expect(() =>
+      applyFlowChanges(content, [{ kind: 'graph.node.field.set', target, nodeId: 'trigger', field: 'connectionId', before: 'stale', value: 'personal' }]),
+    ).toThrow()
+  })
   it('removes only tasks losing their last reference and restores them on undo', () => {
     const task = { name: 'Mail', inputs: [], outputs: [], executor: { kind: 'connector' as const, action: 'netease_mail.list_folders' } }
     const content: RevisionContent = {
@@ -168,7 +209,7 @@ describe('inverse canvas changes', () => {
   it('restores binding targets and subflow definitions', () => {
     const definition = { name: 'Sub', inputs: [], outputs: [] }
     const content = applyFlowChanges(empty, [
-      { kind: 'binding.create', bindingId: 'connection', binding: { kind: 'connection', target: 'old' } },
+      { kind: 'binding.create', bindingId: 'connection', binding: { kind: 'variable', target: 'old' } },
       { kind: 'subflow.create', subflowId: 'sub', subflow: { ...definition, graph: { nodes: {}, edges: [] } } },
     ])
     roundTrip(content, [

@@ -483,7 +483,7 @@ export class WorkbenchStore {
 
   public async publishedConnectionUsage(flowId: string, publicationId: string, revisionId: string, signal: AbortSignal) {
     const [access, draft] = await Promise.all([
-      this.#client.getConnectorAccess(flowId, signal, publicationId),
+      this.#client.getPublishedConnectorAccess(flowId, publicationId, signal),
       this.#client.getRevision(flowId, revisionId, signal),
     ])
     return { publicationId, access, revision: revisionView(draft) }

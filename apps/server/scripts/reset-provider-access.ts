@@ -26,17 +26,17 @@ export function resetProviderAccess(database: DatabaseSync, apply: boolean): voi
     if (apply) {
       database
         .prepare(`UPDATE flow_provider_access SET bindings_json = '[]', access_revision = access_revision + 1,
-        provider_access_digest = ? WHERE bindings_json != '[]'`)
+        shared_access_digest = ? WHERE bindings_json != '[]'`)
         .run(emptyDigest)
       for (const table of ['publications', 'publish_operations', 'runs']) {
         database
           .prepare(`UPDATE ${table} SET provider_access_snapshot = json_set(provider_access_snapshot,
-          '$.bindings', json('[]'), '$.providerAccessDigest', ?)
+          '$.sharedBindings', json('[]'), '$.selectedBindings', json('[]'), '$.sharedAccessDigest', ?)
           WHERE json_extract(provider_access_snapshot, '$.mode') = 'selectable'`)
           .run(emptyDigest)
       }
       database
-        .prepare(`UPDATE publications SET provider_access_digest = ?
+        .prepare(`UPDATE publications SET shared_access_digest = ?
         WHERE json_extract(provider_access_snapshot, '$.mode') = 'selectable'`)
         .run(emptyDigest)
     }

@@ -11,7 +11,6 @@ import {
 } from './providerTriggerPresentation.ts'
 
 const trigger = {
-  bindingId: 'github',
   config: {},
   definition: githubRepoEvent.snapshot,
   kind: 'integration',

@@ -70,12 +70,12 @@ const snapshot = {
 function revision(source = 'primary', definition: PollDefinition['snapshot'] = snapshot): RevisionContent {
   return {
     document: {
-      bindings: { connection: { kind: 'connection', target: 'connection-main' } },
+      bindings: {},
       graph: {
         edges: [{ source: 'poll', target: 'task' }],
         nodes: {
           poll: {
-            bindingId: 'connection',
+            connectionId: 'connection-main',
             config: inputValues({ source }),
             definition,
             kind: 'poll',
@@ -152,7 +152,6 @@ describe('Server Poll Trigger', () => {
       const original = revision().document.graph.nodes.poll!
       if (original.kind != 'poll') throw new Error('Expected Poll fixture.')
       await service.control.changeDraft('operator', flow.flowId, flow.draftRevisionId, [
-        { kind: 'binding.create', bindingId: 'connection', binding: { kind: 'connection', target: 'connection-main' } },
         { kind: 'graph.node.create', nodeId: 'linear', target: { kind: 'flow' }, node: { ...original, definition: linear.snapshot, config: {} } },
       ])
       const before = service.control.getDraft(flow.flowId)
@@ -383,7 +382,6 @@ describe('Server Poll Trigger', () => {
       const created = await service.control.createFlow('operator', 'Poll control', 'poll-control-flow')
       const content = revision()
       const changed = await service.control.changeDraft('operator', created.flow.flowId, created.flow.draftRevisionId, [
-        { binding: { kind: 'connection', target: 'connection-main' }, bindingId: 'connection', kind: 'binding.create' },
         { kind: 'graph.node.create', node: content.document.graph.nodes.poll!, nodeId: 'poll', target: { kind: 'flow' } },
       ])
       await service.control.publishFlow('operator', created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v5', null, 'poll-control-publication')
@@ -448,7 +446,6 @@ describe('Server Poll Trigger', () => {
       const created = await service.control.createFlow('operator', 'Poll preview', 'poll-preview-flow')
       const flowId = created.flow.flowId
       const changed = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
-        { binding: { kind: 'connection', target: 'connection-main' }, bindingId: 'connection', kind: 'binding.create' },
         { kind: 'graph.node.create', node: revision().document.graph.nodes.poll!, nodeId: 'poll', target: { kind: 'flow' } },
       ])
       await service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v5', null, 'poll-preview-publication')

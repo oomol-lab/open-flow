@@ -94,12 +94,12 @@ const connector = createConnectorHost({
 function revision(mode: 'connection' | 'permanent' | 'ready' | 'transient', definition: IntegrationDefinition['snapshot'] = snapshot): RevisionContent {
   return {
     document: {
-      bindings: { connection: { kind: 'connection', target: 'connection-main' } },
+      bindings: {},
       graph: {
         edges: [{ source: 'integration', target: 'task' }],
         nodes: {
           integration: {
-            bindingId: 'connection',
+            connectionId: 'connection-main',
             config: inputValues({ mode }),
             definition,
             kind: 'integration',
@@ -186,7 +186,7 @@ describe('Server Integration reconciliation', () => {
     const accessHost = new ImplicitConnectorAccessHost()
     const original = accessHost.current('main')
     let digest = 'selected'
-    vi.spyOn(accessHost, 'current').mockImplementation(() => ({ ...original, mode: 'selectable', providerAccessDigest: digest }))
+    vi.spyOn(accessHost, 'current').mockImplementation(() => ({ ...original, mode: 'selectable', sharedAccessDigest: digest }))
     vi.spyOn(accessHost, 'listCandidates').mockResolvedValue({
       version: 1,
       results: [
@@ -494,12 +494,12 @@ describe('Server Integration callback fencing', () => {
     const accessHost = new ImplicitConnectorAccessHost()
     const original = accessHost.current('main')
     let digest = 'old'
-    vi.spyOn(accessHost, 'current').mockImplementation(() => ({ ...original, providerAccessDigest: digest }))
+    vi.spyOn(accessHost, 'current').mockImplementation(() => ({ ...original, sharedAccessDigest: digest }))
     const seen: string[] = []
     const host = createConnectorHost({
       ...connector,
       proxy: async (_provider, _connection, _binding, _request, _signal, access) => {
-        seen.push(access!.providerAccess!.providerAccessDigest)
+        seen.push(access!.providerAccess!.sharedAccessDigest)
         return { status: 200, data: {} }
       },
     })
@@ -828,7 +828,7 @@ describe('Server change listener', () => {
           modelVersion: currentFlowModelVersion,
           modules: {},
           document: {
-            bindings: { connection: { kind: 'connection', target: 'connection-main' } },
+            bindings: {},
             tasks: {},
             subflows: {},
             graph: {
@@ -837,7 +837,7 @@ describe('Server change listener', () => {
                 poll: {
                   kind: 'poll',
                   name: 'Poll reader',
-                  bindingId: 'connection',
+                  connectionId: 'connection-main',
                   config: {},
                   definition: poll.snapshot,
                   pollTimes: [{ type: 'every', unit: 'minute', value: 1 }],
@@ -1137,7 +1137,7 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
   const accessHost = new ImplicitConnectorAccessHost()
   const originalAccess = accessHost.current('main')
   let accessDigest = 'initial'
-  vi.spyOn(accessHost, 'current').mockImplementation(() => ({ ...originalAccess, providerAccessDigest: accessDigest }))
+  vi.spyOn(accessHost, 'current').mockImplementation(() => ({ ...originalAccess, sharedAccessDigest: accessDigest }))
   const stoppedWithAccess: string[] = []
   const file = await databaseFile()
   let now = 0
@@ -1163,7 +1163,7 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
       }
       if (request.endpoint == '/channels/stop') {
         stopped += 1
-        stoppedWithAccess.push(access!.providerAccess!.providerAccessDigest)
+        stoppedWithAccess.push(access!.providerAccess!.sharedAccessDigest)
         return { status: 204, data: null }
       }
       throw new Error('Unexpected Drive request')
@@ -1183,14 +1183,13 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
     const created = await service.control.createFlow('operator', 'Drive listener', 'drive-listener')
     const flowId = created.flow.flowId
     const changed = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
-      { kind: 'binding.create', bindingId: 'drive', binding: { kind: 'connection', target: 'connection-main' } },
       {
         kind: 'graph.node.create',
         nodeId: 'listen',
         target: { kind: 'flow' },
         node: {
           kind: 'integration',
-          bindingId: 'drive',
+          connectionId: 'connection-main',
           config: {},
           definition: definition.snapshot,
           name: 'Watch Drive',

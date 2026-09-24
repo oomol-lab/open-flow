@@ -1,4 +1,4 @@
-export { connectorAccess as decodeConnectorAccess } from './connectorDecoders.ts'
+export { connectorAccess as decodeConnectorAccess, connectorAccessSnapshot as decodeConnectorAccessSnapshot } from './connectorDecoders.ts'
 import type { ProviderAccessIdentity, ProviderAccessReference } from './providerAccess.ts'
 export {
   parseProviderAccessSource,
@@ -38,7 +38,7 @@ import type { RunStatus } from '../../execution/common/runLifecycle.ts'
 import type { InputPortDefinition, JsonValue, PortDefinition, RevisionContent, TriggerKeySnapshot, WaitAction } from '../../flow/common/change.ts'
 
 import { flowCheck } from './checkDecoders.ts'
-import { connection, connectorAccess, connectorAccessCandidatesBatch, connectorAction } from './connectorDecoders.ts'
+import { connection, connectorAccess, connectorAccessSnapshot, connectorAccessCandidatesBatch, connectorAction } from './connectorDecoders.ts'
 import { allConnectorConnectionsQuery, connectorActionQuery, connectorConnectionsQuery, connectorProvidersQuery } from './connectorQueries.ts'
 import { exact, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 import { flow, flowPage, variable } from './flowDecoders.ts'
@@ -220,14 +220,26 @@ export interface ProviderAccessBindingCandidate extends ProviderAccessIdentity {
 }
 
 export interface ConnectorAccess {
-  readonly nodeBindings?: readonly ProviderAccessBinding[]
   readonly discardedBindingCount?: number
   readonly providerIds?: readonly string[]
   readonly accessRevision: number
   readonly bindings: readonly ProviderAccessBinding[]
   readonly mode: ConnectorAccessMode
-  readonly providerAccessDigest: string
+  readonly sharedAccessDigest: string
   readonly version: 1
+}
+
+export type ConnectorAccessGrant = ProviderAccessIdentity & {
+  readonly connectionDisplayName: string
+  readonly permissionGroupName?: string | null
+}
+
+export interface ConnectorAccessSnapshot {
+  readonly mode: ConnectorAccessMode
+  readonly sharedAccessDigest: string
+  readonly sharedBindings: readonly ConnectorAccessGrant[]
+  readonly selectedBindings: readonly ConnectorAccessGrant[]
+  readonly version: 2
 }
 
 export interface ConnectorAccessCandidates {
@@ -280,7 +292,7 @@ export interface Publication {
   readonly modelVersion: number
   readonly operation: 'publish' | 'rollback'
   readonly publicationId: string
-  readonly providerAccessDigest: string
+  readonly sharedAccessDigest: string
   readonly revisionDigest: string
   readonly revisionId: string
   readonly sourcePublicationId?: string
@@ -384,7 +396,7 @@ type RunDetailsBase = Run & {
   readonly engineDigest: string
   readonly eventsExpiresAt?: string
   readonly modelVersion: number
-  readonly providerAccessDigest: string
+  readonly sharedAccessDigest: string
   readonly revisionDigest: string
   readonly waits: readonly RunWait[]
 }
@@ -896,10 +908,12 @@ export class ControlClient {
     )
   }
 
-  async getConnectorAccess(flowId: string, signal?: AbortSignal, publicationId?: string): Promise<ConnectorAccess> {
-    return connectorAccess(
-      await this.request(`/v1/flows/${segment(flowId)}/connector-access${publicationId == null ? '' : `?publicationId=${segment(publicationId)}`}`, { signal }),
-    )
+  async getConnectorAccess(flowId: string, signal?: AbortSignal): Promise<ConnectorAccess> {
+    return connectorAccess(await this.request(`/v1/flows/${segment(flowId)}/connector-access`, { signal }))
+  }
+
+  async getPublishedConnectorAccess(flowId: string, publicationId: string, signal?: AbortSignal): Promise<ConnectorAccessSnapshot> {
+    return connectorAccessSnapshot(await this.request(`/v1/flows/${segment(flowId)}/connector-access?publicationId=${segment(publicationId)}`, { signal }))
   }
 
   async listProviderAccessBindingCandidates(flowId: string, providerIds: readonly string[], signal?: AbortSignal): Promise<ConnectorAccessCandidatesBatch> {

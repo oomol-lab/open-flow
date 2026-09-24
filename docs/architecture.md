@@ -1,7 +1,8 @@
 # 产品与架构边界
 
-本文只记录 Open Flow 必须长期成立的产品事实、模块所有权和运行时不变量。精确字段、路由、错误码和分页属于
-[Control API 技术参考](control/contracts/control-api.md)；部署、存储和交付细节属于对应实现文档。
+本文记录 Open Flow 的产品边界、模块所有权和跨模块不变量。模型的详细解释属于专项文档；精确字段、路由、错误码和分页属于
+[Control API 技术参考](control/contracts/control-api.md)；部署配置、存储布局和升级步骤属于对应实现文档。
+架构约束在本文定义一次，其他文档引用并展开，不在此重复维护字段清单、操作步骤或迁移记录。
 
 ## 1. 产品边界
 
@@ -204,7 +205,7 @@ Agent 仍可使用内联 Connector 通知，先登记等待和通知 work，再�
 部署只声明自己实现的 Engine Contract；Node 兼容合同的内存文件系统属于单次 Task invocation，不在 Task 之间共享或持久化。Capability host 必须校验当前
 Flow、Run、Task、invocation、binding 和 Run 状态；Task 或 Run 结束后旧 Capability 必须 fail closed。
 
-新建 Code Task 的 Connector capability 默认使用 Flow 共享权限组，不保存节点 Action 清单。共享模式直接使用固定 Flow bindings 中账号授权的全部 Actions，无需逐个添加；独立模式在节点 Revision 保存 Action 白名单及每个 Action 的固定账号。脚本不能改变模式；独立模式不能调用清单外 Action。旧 Revision 没有 `mode` 时保留原动态调用语义，旧 Connection alias 与默认 Connection 仅作为调用提示。
+Code 的 Connector 调用受固定声明和宿主授权范围约束，脚本不能改变账号模式或扩大权限；详细模型见 [Flow 鉴权模型](control/flow-authorization.md)。
 每次业务调用有独立身份，用于外部幂等处理，不复用 Task invocation identity。Action 调用仍属于当前节点的生命周期，不创建图节点或独立 Run。
 普通调用错误可以被代码捕获，取消、deadline 和资源限制不能因用户捕获错误而失效。
 
@@ -228,39 +229,26 @@ current Trigger binding 与 Live pointer 共同构成 Trigger admission authorit
 都不能绕过该 authority 创建 Run；Poll baseline checkpoint 只在激活 transaction 中安装。不能使用独立候选 endpoint 安全替换的 Integration 变更必须
 fail closed，不能先修改 current provider resource 再依赖补偿恢复。
 
-Connector service 拥有 Provider 授权、credential、Connection lifecycle 和 proxy transport。Open Flow 保存稳定的 opaque Connection identity，
-不能把 credential、token 或 Connector 数据库复制进 Revision、Browser 或 RunEvent。Connector catalog 和 Connection 是 deployment scope 资源，
-不从属于单个 Flow。
+### Flow 授权
 
-Provider Access Binding 是 deployment-owned Flow 状态，不属于 Revision。`selectable` 部署按 Provider 保存整个 Flow（含 Subflow）的 Code 共享连接列表；`implicit`
-部署不保存伪造的 binding，直接使用部署配置的 scoped Connector authority。绑定只引用 Connector 管理的权限边界，不能包含 credential，也不能演化为 Flow
-service account。身份显式区分管理员委托与 policy；团队默认 grant 属于 policy，具名规则删除后不得回退默认 grant。身份的确定性编码属于公共合同，候选可分配性和实际权限解析属于部署。Publication 和 Run 固定接受时的 binding identities；Connector 按目标 Connection 对 live policy 和 Action 做最终授权，缺失、失效或不匹配时
-fail closed。Connector 目录声明为无需账号授权的 Action 不要求 Provider Access Binding，仍使用部署要求的平台身份。
-Connector、Agent 固定工具、Trigger、通知与独立模式 Code Action 从当前用户可用的连接中显式选择。
-Workbench 的「连接使用」按账号汇总节点来源、独立 Code Action 使用及 Flow 共享使用。
-从总览移除账号使用仅修改 Draft，部署在同一事务中检查图 Revision 和 accessRevision、清除所有节点选择及共享 bindings 中的该账号；独立 Code Action 保留 Action 并清除账号选择。
-移除不删除节点、上游账号授权或其他 Flow；刷新不自动回填默认账号。节点创建时可选择适用 Action 的默认连接。
-Publication / Run 接受时从固定图的显式连接选择捕获 `nodeBindings`；`bindings` 供共享模式 Code 和旧动态 Code 使用，`nodeBindings` 供独立模式 Code 与其他节点使用。
-宿主决定调用所属范围，脚本不能选择节点权限。执行校验固定 binding 身份和当前上游权限，不能借用另一个节点的默认连接。
-旧快照缺少 `nodeBindings` 时继续按原有共享 `bindings` 执行；新快照总是提供该字段，包括空数组。
-迁移 0027 只一次性清空旧 Draft `flow_provider_access`，保留图、Publication、Run 和后台快照；不会在重新启动时清空新配置。
-Workbench 允许先添加节点再配置连接；缺失连接不阻断 Draft 编辑，Run／Publish 和实际调用仍校验使用资格。
-Publish operation、Publication、Run、Wait 通知和共享事件源订阅分别持久化对应的 access snapshot；Rollback 复制来源 Publication snapshot，
-Trigger/listener/maintenance 从固定记录恢复，不能重新读取当前 Draft binding。Flow 物理删除前 deployment access owner 必须完成对应 Draft map 清理。
+Connector 拥有账号凭据、连接生命周期和上游授权；账号与目录是部署范围资源，不从属于单个 Flow。
+Flow Revision 只保存连接使用声明，部署拥有共享访问配置，并在发布和运行准入时固定授权身份；这些数据不能携带凭据或演化为 Flow service account。
 
-Code Action 可以把旧声明中的 Connector alias 与稳定 ID 解释为调用提示；alias 不能成为动态授权依据。目录改名不修改旧 Revision。
-Publish 与 Run eligibility 按固定 Provider access snapshot 检查执行 closure，具体调用仍由宿主和 Connector 检查当前外部授权状态。
-Connector adapter 必须明确自己的执行身份保证；本地按 ID 解析到 alias 不等于上游按稳定 ID 原子执行。
+可编辑配置与执行快照分离。修改 Draft 不改变已接受的执行记录；回滚和恢复使用对应记录的固定授权，不能重新读取当前 Draft 配置。
+固定授权身份不冻结上游权限；授权缺失、来源不匹配、撤权或连接失效时必须拒绝执行，不能回退到其他授权。
 
-Server 使用 OOMOL-hosted Connector 时，Operator 创建 Flow 必须选择一个具体 OOMOL Team，并由 Server 在同一个创建 operation boundary 内保存为
-不可变的 Flow metadata；选择默认 Team 也必须固定其具体 identity，不能保存为随账户默认值漂移的动态选择。Node 不拥有或覆盖 Team，既有 Flow 也不能
-原地切换 Team；需要另一个 Team 时创建新的 Flow。Connector catalog 与 Connection 查询按 Flow 解析 Team，Run admission 将 Team 固定为 Run snapshot，
-Poll 与 Integration 使用所属 Flow 的 Team；运行时 Connector 请求必须显式携带该固定作用域，不能读取部署级可变 Team。产品中立 Workbench 不拥有这项
-外部身份配置，由部署宿主扩展创建 Flow 的交互和 operation。自建或自定义 Connector 不显示 OOMOL Team 入口，也不能隐式请求 OOMOL membership 服务。
+宿主从固定声明建立单次调用范围。共享 Code 与显式选择账号的消费者不能互相借权，节点不能借用其他节点的权限，
+客户端与脚本不能扩大调用范围。编辑期可见的目录或待配置声明不构成执行授权。
 
-Server 可以显式配置独立的 LLM origin 和 token；未显式配置时，OOMOL-hosted Connector runtime 和对应 token 可以推导同一环境与授权的 OOMOL
-LLM host。自建或自定义 Connector origin 不隐含模型能力，未配置的 Connector 或 LLM capability 必须分别 fail closed；Workbench 不能把外部服务
-暂时不可用误报为部署尚未配置。
+身份作用域由部署固定，不能随默认账号或团队设置漂移，也不能由节点覆盖。Connector adapter 必须明确其执行身份保证，
+不能把本地名称解析当作上游按稳定身份执行。授权配置与后台工作的清理由各自生命周期所有者负责，不建立第二套权限来源。
+
+数据结构、消费者差异、账号使用操作和兼容升级规则见 [Flow 鉴权模型](control/flow-authorization.md)。
+
+Connector 与 LLM 是独立部署能力，未配置时分别拒绝调用；外部服务不可用不能被误报为尚未配置。
+能力配置的来源和推导规则见 [Server 容器交付](server/container-delivery.md)。
+
+### Trigger
 
 Trigger 是 Flow graph 中的 source node。每张图最多有一个 Manual Trigger，由用户显式启动，不建立外部订阅或调度 binding。Webhook、Cron、Poll 和 Integration 的确定性协议、Provider definitions、Registry 与 conformance 属于公共
 package；subscription、checkpoint、调度持久化、endpoint routing 和 admission 事务属于部署实现。
@@ -300,9 +288,11 @@ Callback response 不能在承载 Workbench 或 Control API 的 origin 上成为
 ## 5. 文档所有权
 
 - 修改产品事实、跨模块 owner、安全边界或运行时不变量时更新本文。
+- 模型分层、生命周期说明、行为示例和实现入口放在专项文档，例如 [Flow 鉴权模型](control/flow-authorization.md)；本文只保留相关架构约束和入口。
 - 修改 serialized model、HTTP、错误、分页或 conformance profile 时更新
   [Control API 技术参考](control/contracts/control-api.md)。
 - Server 容器、环境变量、SQLite、备份和运维约束写入 [Server 容器交付](server/container-delivery.md)。
+- 具体迁移编号与转换规则由迁移代码和相应兼容说明承接，不写入架构约束；已有文档覆盖的细节通过链接引用，不再重复维护。
 - 前端交互约束写入 [Workbench 与 Designer 前端注意事项](../.agents/skills/frontend-ui/SKILL.md)。
 - 实现步骤和采纳历史只保存在 Git 历史或阶段计划中，不属于当前架构合同。
 

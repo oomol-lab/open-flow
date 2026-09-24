@@ -98,8 +98,6 @@ export function flowDependencies(content: RevisionContent, triggerId?: string): 
           break
         case 'poll':
         case 'integration':
-          visitBinding(node.bindingId)
-          break
         case 'cron':
         case 'manual':
         case 'webhook':

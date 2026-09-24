@@ -1,8 +1,9 @@
 import type { Database } from './database.ts'
 
 import { readFileSync } from 'node:fs'
+import { migrateConnectorAccess } from './migrate-connector-access.ts'
 
-const migrationFiles = [
+const migrations = [
   '0001_flow.sql',
   '0002_variables.sql',
   '0003_connector_team.sql',
@@ -32,6 +33,7 @@ const migrationFiles = [
   '0027_code_connection_usage.sql',
   '0028_revision_retention.sql',
   '0029_revision_deltas.sql',
+  migrateConnectorAccess,
 ] as const
 const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 
@@ -42,11 +44,13 @@ export function migrate(database: Database): void {
     if (hasApplicationTables(database) && !hasFlowSchema(database)) {
       throw new Error('Legacy application schema is unsupported; the database was not modified.')
     }
-    if (currentVersion > migrationFiles.length) {
-      throw new Error(`SQLite schema version ${currentVersion} is newer than the supported version ${migrationFiles.length}.`)
+    if (currentVersion > migrations.length) {
+      throw new Error(`SQLite schema version ${currentVersion} is newer than the supported version ${migrations.length}.`)
     }
-    for (let index = currentVersion; index < migrationFiles.length; index += 1) {
-      database.connection.exec(readFileSync(new URL(migrationFiles[index], migrationsDirectory), 'utf8'))
+    for (let index = currentVersion; index < migrations.length; index += 1) {
+      const migration = migrations[index]!
+      if (typeof migration == 'string') database.connection.exec(readFileSync(new URL(migration, migrationsDirectory), 'utf8'))
+      else migration(database.connection)
       database.connection.exec(`PRAGMA user_version = ${index + 1}`)
     }
   })

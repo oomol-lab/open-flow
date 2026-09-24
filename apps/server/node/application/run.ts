@@ -122,7 +122,8 @@ export class RunExecutor {
         return yield* Effect.fail(new Error(`Fixed Flow Revision can no longer be prepared: ${prepared.kind}.`))
       }
       yield* Effect.tryPromise({
-        try: (signal) => checkCodeActions(agentActions(prepared.flow), this.#resolveConnector(), this.#connectorContext(run, 'eligibility', 'node'), signal),
+        try: (signal) =>
+          checkCodeActions(agentActions(prepared.flow), this.#resolveConnector(), this.#connectorContext(run, 'eligibility', 'selected'), signal),
         catch: (error) => error,
       })
       yield* Effect.tryPromise({
@@ -354,7 +355,7 @@ export class RunExecutor {
     run: StoredRun,
     report: (event: Readonly<Record<string, JsonValue>>) => Promise<void>,
   ): Promise<unknown> {
-    const access = this.#connectorContext(run, 'execute', 'node')
+    const access = this.#connectorContext(run, 'execute', 'selected')
     const task = prepared.tasks[invocation.taskId]!
     const executor = task.executor
     switch (executor.kind) {
@@ -379,7 +380,12 @@ export class RunExecutor {
               access,
               signal,
             )
-            return connector.execute(tool.action, tool.connectionId, normalizeConnectorRuntimeInputs(tool.inputs, input), callId, signal, access)
+            return connector.execute(tool.action, tool.connectionId, normalizeConnectorRuntimeInputs(tool.inputs, input), callId, signal, {
+              ...access,
+              scope: 'action',
+              action: tool.action,
+              connectionId: tool.connectionId,
+            })
           },
           report,
           {
@@ -402,7 +408,7 @@ export class RunExecutor {
           ),
           invocation.invocationId,
           invocation.signal,
-          access,
+          { ...access, scope: 'action', action: executor.action, connectionId: executor.connectionId },
         )
       case 'llm':
         const llm = this.#resolveLlm()
@@ -428,7 +434,7 @@ export class RunExecutor {
   async #invokeCapability(
     capabilities: readonly ConnectorCapability[],
     call: RuntimeCapabilityCall,
-    access: ConnectorAccessContext,
+    access: Exclude<ConnectorAccessContext, { readonly scope: 'catalog' }>,
   ): Promise<RuntimeCapabilityResponse> {
     if (call.kind != 'connector') throw new TaskHostError('capability.denied', 'The Runtime Capability is not declared for this Task.')
     let payload: ReturnType<typeof resolveAction>
@@ -441,8 +447,9 @@ export class RunExecutor {
     }
     const connector = this.#resolveConnector()
     if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
-    const usage = capabilities.some((capability) => 'mode' in capability && capability.mode == 'independent') ? 'node' : 'code'
-    access = { ...access, usage }
+    access = capabilities.some((capability) => 'mode' in capability && capability.mode == 'independent')
+      ? { ...access, scope: 'action', action: payload.action, connectionId: payload.connectionId }
+      : { ...access, scope: 'shared' }
     if (
       !capabilities.some((capability) => 'mode' in capability && capability.mode == 'shared') &&
       payload.connectionId == null &&
@@ -463,11 +470,15 @@ export class RunExecutor {
     }
   }
 
-  #connectorContext(run: StoredRun, purpose: ConnectorAccessContext['purpose'], usage: 'node' | 'code' = 'code'): ConnectorAccessContext {
+  #connectorContext(
+    run: StoredRun,
+    purpose: ConnectorAccessContext['purpose'],
+    scope: 'selected' | 'shared' = 'shared',
+  ): Exclude<ConnectorAccessContext, { readonly scope: 'catalog' }> {
     return {
       flowId: run.flowId,
       providerAccess: run.providerAccess,
-      usage,
+      scope,
       purpose,
       source: 'run',
       ...(run.connectorTeamId == null ? {} : { teamId: run.connectorTeamId }),
