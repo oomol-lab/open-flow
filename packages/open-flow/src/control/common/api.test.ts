@@ -118,17 +118,6 @@ describe('ControlClient Flow API', () => {
     await expect(client.createConnectorConnectionPage('mail', flow.flowId)).resolves.toBe('https://connector.example/providers/mail')
   })
 
-  it('encodes the connection identity when opening an account page', async () => {
-    const request = vi.fn(async (_path: string, _init?: RequestInit) =>
-      Response.json({ url: 'https://console.example/team/a/connections/mail?app=account%2F1', version: 1 }),
-    )
-    const client = new ControlClient(request)
-    await expect(client.createConnectorConnectionPage('mail', 'flow/1', undefined, 'account/1')).resolves.toBe(
-      'https://console.example/team/a/connections/mail?app=account%2F1',
-    )
-    expect(request.mock.calls[0]?.[0]).toBe('/v1/connector/connections/mail/page?flowId=flow%2F1&connectionId=account%2F1')
-  })
-
   it('reads and updates deployment-neutral Provider access bindings', async () => {
     const implicit = { accessRevision: 0, bindings: [], mode: 'implicit', sharedAccessDigest: 'implicit', version: 1 } as const
     const selectable = {

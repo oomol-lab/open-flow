@@ -383,10 +383,9 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     })
   })
   app.post('/connector/connections/:serviceId/page', async (context) => {
-    const parameters = query(context.req.raw, ['flowId', 'teamId', 'connectionId'], controlErrorCode.flowInvalid)
+    const parameters = query(context.req.raw, ['flowId', 'teamId'], controlErrorCode.flowInvalid)
     const flowId = parameters.get('flowId')
     const teamId = parameters.get('teamId')
-    const connectionId = parameters.get('connectionId')
     await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.versionOnly)
     return response(200, {
       url: await service.connectorConnectionPage(
@@ -394,7 +393,6 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
         flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid),
         teamId == null ? undefined : text(teamId, controlErrorCode.flowInvalid),
         context.req.raw.signal,
-        connectionId == null ? undefined : text(connectionId, controlErrorCode.flowInvalid),
       ),
       version: 1,
     })

@@ -436,10 +436,6 @@ export class ConnectorStore {
     this.#remember(this.#actionIds, [actionId])
   }
 
-  public connectionPage(serviceId: string, flowId: string, connectionId?: string): Promise<string> {
-    return this.#client.createConnectorConnectionPage(serviceId, flowId, undefined, connectionId)
-  }
-
   public async connect(serviceId: string): Promise<void> {
     if (this.#disposed) return
     const flowId = this.#workspace.$.flowId.value

@@ -979,11 +979,10 @@ export class ControlClient {
     return this.connectorRequest(query.path, 'connections', signal, query.decode, fresh)
   }
 
-  async createConnectorConnectionPage(serviceId: string, flowId?: string, teamId?: string, connectionId?: string): Promise<string> {
+  async createConnectorConnectionPage(serviceId: string, flowId?: string, teamId?: string): Promise<string> {
     const parameters = new URLSearchParams()
     if (flowId != null) parameters.set('flowId', flowId)
     if (teamId != null) parameters.set('teamId', teamId)
-    if (connectionId != null) parameters.set('connectionId', connectionId)
     const source = record(
       await this.request(`/v1/connector/connections/${segment(serviceId)}/page${parameters.size == 0 ? '' : `?${parameters}`}`, {
         body: JSON.stringify({ version: 1 }),

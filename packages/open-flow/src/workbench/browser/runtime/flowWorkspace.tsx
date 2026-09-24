@@ -1,4 +1,5 @@
 import type { ComponentProps, ReactElement, ReactNode } from 'react'
+import type { ConnectionHref } from './contract.ts'
 import type { WorkbenchLocation, WorkbenchTheme } from './contract.ts'
 import type { AddNodeOption } from './editor/addNodeOptions.ts'
 import type { WorkbenchCanvasHandle } from './editor/workbenchCanvas.tsx'
@@ -224,6 +225,7 @@ export function FlowEditor({
   onOpenPublications,
   onOpenRuns,
   onManageConnectorAccess,
+  connectionHref,
   onToggleRuns,
   runDrawerOpen,
   store,
@@ -236,6 +238,7 @@ export function FlowEditor({
   readonly onConfigureConnector?: (() => void) | undefined
   readonly onOpenPublications: () => void
   readonly onOpenRuns: () => void
+  readonly connectionHref?: ConnectionHref | undefined
   readonly onManageConnectorAccess?: ((flowId: string) => void) | undefined
   readonly onToggleRuns: () => void
   readonly runDrawerOpen: boolean
@@ -407,7 +410,15 @@ export function FlowEditor({
       tabIndex={0}
     >
       <WorkbenchCanvas
-        connectionControl={<ConnectionUsageButton key={flowId} onManage={onManageConnectorAccess} onSelectReference={setAccountReference} store={store} />}
+        connectionControl={
+          <ConnectionUsageButton
+            connectionHref={connectionHref}
+            key={flowId}
+            onManage={onManageConnectorAccess}
+            onSelectReference={setAccountReference}
+            store={store}
+          />
+        }
         topLeftTools={navigationIsland}
         bottomRightTools={<RunStatusIslandContainer onToggle={onToggleRuns} open={runDrawerOpen} panelId={RUN_LOG_PANEL_ID} store={store} />}
         cornerLeading={
@@ -617,12 +628,14 @@ export default function FlowWorkspace({
   navigation,
   onConfigureConnector,
   onManageConnectorAccess,
+  connectionHref,
   store,
   theme,
 }: {
   readonly hrefFor: (location: WorkbenchLocation) => string
   readonly navigation: NavigationStore
   readonly onConfigureConnector?: (() => void) | undefined
+  readonly connectionHref?: ConnectionHref | undefined
   readonly onManageConnectorAccess?: ((flowId: string) => void) | undefined
   readonly store: WorkbenchStore
   readonly theme: WorkbenchTheme
@@ -733,6 +746,7 @@ export default function FlowWorkspace({
               navigation.open('runs')
             }}
             onManageConnectorAccess={onManageConnectorAccess}
+            connectionHref={connectionHref}
             onToggleRuns={() => setRunDrawerOpen((open) => !open)}
             runDrawerOpen={runDrawerOpen}
             store={store}

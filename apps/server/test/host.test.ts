@@ -368,6 +368,7 @@ it('fixes one OOMOL Team when each Flow is created', async () => {
     const app = createServerApp(service, { resolveControlActor: () => 'operator' })
     expect(await (await app.request('/connector/teams')).json()).toEqual({
       bindings: [],
+      console: { origin: 'https://console.oomol.com/', teamScoped: true },
       enabled: true,
       teams: [
         { id: 'team-1', name: 'Engineering', systemCreated: true },
@@ -445,14 +446,23 @@ it('fixes one OOMOL Team when each Flow is created', async () => {
   }
 })
 
-it('hides OOMOL Team selection for a custom Connector', async () => {
+it.each([undefined, 'https://console.example.com/'])('hides OOMOL Team selection for a custom Connector (console: %s)', async (consoleOrigin) => {
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-custom-team-'))
   const service = await openService(path.join(directory, 'open-flow.sqlite'), {
-    capabilities: { connector: () => new ConnectorClient('https://connector.example.com', 'runtime-token') },
+    capabilities: {
+      connector: () => new ConnectorClient('https://connector.example.com', 'runtime-token'),
+      connectorConsoleOrigin: () => (consoleOrigin == null ? undefined : new URL(consoleOrigin)),
+    },
   })
   try {
     const app = createServerApp(service, { resolveControlActor: () => 'operator' })
-    expect(await (await app.request('/connector/teams')).json()).toEqual({ bindings: [], enabled: false, teams: [], version: 1 })
+    expect(await (await app.request('/connector/teams')).json()).toEqual({
+      bindings: [],
+      console: consoleOrigin == null ? null : { origin: consoleOrigin, teamScoped: false },
+      enabled: false,
+      teams: [],
+      version: 1,
+    })
   } finally {
     await closeService(service)
     await cleanup(directory)

@@ -307,6 +307,14 @@ export class ServerService {
     })
   }
 
+  connectionConsole(): { readonly origin: string; readonly teamScoped: boolean } | null {
+    const connector = this.#resolveConnector()
+    const hostedOrigin = connector instanceof ConnectorClient ? connector.hostedConsoleOrigin() : undefined
+    if (hostedOrigin != null) return { origin: hostedOrigin.href, teamScoped: true }
+    const origin = this.#resolveConnectorConsoleOrigin()
+    return origin == null ? null : { origin: origin.href, teamScoped: false }
+  }
+
   async connectorTeams(signal?: AbortSignal): Promise<{
     readonly bindings: readonly { readonly flowId: string; readonly teamId: string }[]
     readonly enabled: boolean

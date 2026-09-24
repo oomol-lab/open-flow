@@ -51,3 +51,6 @@ export interface WorkbenchPreferences {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
 }
+
+/** The host resolves deployment and Flow scope before rendering navigation links. */
+export type ConnectionHref = (flowId: string, providerId: string, connectionId?: string) => string | undefined

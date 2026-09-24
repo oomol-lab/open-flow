@@ -679,6 +679,7 @@ binding。app-access 投影缓存五分钟；Action、Connection、catalog、exe
 transport 的托管 Flow runtime 执行，开源 Server 对这类执行返回 `connector.access-invalid`。
 
 Workbench 的 `onManageConnectorAccess(flowId)` 是可选宿主导航钩子，只负责打开部署自己的权限管理界面；权限规则和 token 不进入 Workbench props。
+Workbench 的 `connectionHref(flowId, providerId, connectionId?)` 是同步宿主导航接口。宿主根据已有团队绑定和部署 Console 配置构造链接；Workbench 不请求地址，也不推断部署域名。OOMOL Console 使用 `/team/:teamName/connections/:providerId`，自部署 Console 使用 `/providers/:providerId`，无需团队信息。账号详情追加 `app=:connectionId`。未提供导航上下文时显示普通名称。Server Shell 的 `/connector/teams` 初始化响应携带 `console: { origin, teamScoped } | null`；配置由部署层解析，团队名称复用该响应的 teams 和 bindings。
 
 ### Connector 原样透传
 
@@ -790,7 +791,7 @@ Workbench 已完成初始化并停留在 Flows 列表时，收到该事件自动
 Connector route 的 `flowId` 是 opaque Flow identity。提供时部署必须先确认 Flow 存在，并在该 Flow 的 Connector scope 内解析 Provider、Action 与
 Connection；客户端不能改用 Team ID、Connection owner 或其他外部 identity 代替 Flow scope。省略时使用部署的未限定 Connector catalog。
 
-授权页接口例外：`POST /v1/connector/connections/:serviceId/page` 接受可选的 `flowId` 或 `teamId`，两者不能同时提供。可选 `connectionId` 将连接 ID 编码为返回 URL 的 `app` 查询参数，打开该账号详情；省略时打开 Provider 连接列表。
+授权页接口例外：`POST /v1/connector/connections/:serviceId/page` 接受可选的 `flowId` 或 `teamId`，两者不能同时提供。
 `teamId` 供独立事件源表单使用，必须对应当前 Connector 身份可访问的团队；不会修改已有 Flow 的团队。
 对于 OOMOL 托管 Connector，Server 查询团队名称并生成 `https://console.oomol.com/team/:teamName/connections/:serviceId`（开发环境使用 `.dev`）；
 省略两者时选择当前身份的默认团队。托管入口从受支持的 runtime 域名推导，不使用自部署 Console 配置。

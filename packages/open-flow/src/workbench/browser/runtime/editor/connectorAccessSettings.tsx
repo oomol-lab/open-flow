@@ -1,5 +1,6 @@
 import type { ReactElement, ReactNode } from 'react'
 import type { ConnectorAccess } from '../../../../control/common/api.ts'
+import type { ConnectionHref } from '../contract.ts'
 import type { ConnectorAccountReference } from '../revisionView.ts'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 
@@ -10,12 +11,12 @@ import { CanvasTooltip } from '../../../../canvas/browser/components/tooltip.tsx
 import { codeSharedPermissionsEnabled } from '../../../../flow/common/codePermissions.ts'
 import { Button, buttonVariants } from '../../../../ui/browser/button.tsx'
 import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
-import { Dialog, DialogContent, DialogTitle } from '../../../../ui/browser/dialog.tsx'
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../../ui/browser/dialog.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
 import { Label } from '../../../../ui/browser/label.tsx'
 import { Popover, PopoverPanelContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
-import { NativeScrollArea } from '../../../../ui/browser/scroll-area.tsx'
+import { NativeScrollArea, ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { cn } from '../../../../ui/browser/utils.ts'
 import { providerIcon } from '../providerIcon.ts'
 import { semanticNodeIcon, triggerNodeIcon } from '../workspace.ts'
@@ -69,10 +70,12 @@ export function ConnectionUsageButton(props: Parameters<typeof ConnectorAccessSe
 }
 
 export function ConnectorAccessSettings({
+  connectionHref,
   onManage,
   onSelectReference,
   store,
 }: {
+  readonly connectionHref?: ConnectionHref | undefined
   readonly onManage?: ((flowId: string) => void) | undefined
   readonly onSelectReference?: ((reference: ConnectorAccountReference) => void) | undefined
   readonly store: WorkbenchStore
@@ -178,11 +181,12 @@ export function ConnectorAccessSettings({
       ) : (
         <div className="flex flex-col gap-4">
           {pendingUses.length > 0 && (
-            <div className="rounded-md bg-muted/50 p-2">
+            <div className="rounded-md bg-[var(--warning-subtle-surface)] p-2 [--ui-control-hover-background:var(--warning-subtle-hover)]">
               <AccountReferences
                 icon={referenceIcon}
                 references={pendingUses}
                 label={t('connectionUsage.needsConnection')}
+                labelClassName="text-[var(--warning-foreground)]"
                 onSelect={published ? undefined : onSelectReference}
               />
             </div>
@@ -194,7 +198,7 @@ export function ConnectorAccessSettings({
               return (
                 <section key={providerId} aria-label={provider.serviceName} className="text-xs">
                   <div className="flex min-w-0 items-center gap-2 font-medium">
-                    <ConnectionConsoleLink key={`${flowId}:${providerId}`} store={store} flowId={flowId} providerId={providerId}>
+                    <ConnectionConsoleLink href={connectionHref?.(flowId, providerId)}>
                       <ContentIcon src={providerIcon(provider)} className="size-4 shrink-0 data-[icon-kind=initials]:text-[20px]" />
                       <span className="min-w-0 wrap-anywhere">{provider.serviceName}</span>
                     </ConnectionConsoleLink>
@@ -206,13 +210,7 @@ export function ConnectorAccessSettings({
                       return (
                         <div key={id} className="flex flex-col gap-1.5 rounded-md border border-border/50 p-2.5">
                           <div className="flex items-center justify-between gap-2">
-                            <ConnectionConsoleLink
-                              key={`${flowId}:${providerId}:${id}`}
-                              store={store}
-                              flowId={flowId}
-                              providerId={providerId}
-                              connectionId={id}
-                            >
+                            <ConnectionConsoleLink href={connectionHref?.(flowId, providerId, id)}>
                               <i aria-hidden="true" className="i-codicon:credit-card size-3.5 shrink-0 text-sm text-muted-foreground" />
                               <span className="min-w-0 wrap-anywhere">{account.name}</span>
                             </ConnectionConsoleLink>
@@ -300,14 +298,21 @@ export function ConnectorAccessSettings({
           if (!open && !pending) setRemoving(undefined)
         }}
       >
-        <DialogContent container={root} finalFocus={panel} className="max-h-[80dvh] overflow-y-auto" closeLabel={t('connectionUsage.cancel')}>
-          <DialogTitle>{t('connectionUsage.stopUsingTitle')}</DialogTitle>
-          <p className="text-sm">{t('connectionUsage.stopUsingDescription')}</p>
+        <DialogContent container={root} finalFocus={panel} className="flex max-h-[80dvh] flex-col" closeLabel={t('connectionUsage.cancel')}>
+          <div className="flex flex-col gap-2">
+            <DialogTitle className="pr-6 text-[14px] leading-5">{t('connectionUsage.stopUsingTitle')}</DialogTitle>
+            <DialogDescription className="m-0 text-xs leading-5">{t('connectionUsage.stopUsingDescription')}</DialogDescription>
+          </div>
           {affected != null && (
-            <>
-              <p>{affected.name}</p>
-              <AccountReferences icon={referenceIcon} references={affected.nodes} code={affected.code} label={t('connectionUsage.usedBy')} />
-            </>
+            <ScrollArea className="min-h-0 h-auto" defer={false}>
+              <div className="flex flex-col gap-1.5 rounded-md border border-border/50 p-2.5">
+                <div className="flex min-w-0 items-center gap-2 text-[13px] font-medium">
+                  <i aria-hidden="true" className="i-codicon:credit-card size-3.5 shrink-0 text-sm text-muted-foreground" />
+                  <span className="min-w-0 wrap-anywhere">{affected.name}</span>
+                </div>
+                <AccountReferences hierarchy icon={referenceIcon} references={affected.nodes} label={t('connectionUsage.usedBy')} />
+              </div>
+            </ScrollArea>
           )}
           <div className="flex justify-end gap-2">
             <Button variant="ghost" disabled={pending} onClick={() => setRemoving(undefined)}>
@@ -615,6 +620,7 @@ function AccountReferences({
   code = false,
   references,
   label,
+  labelClassName,
   onSelect,
 }: {
   readonly hierarchy?: boolean
@@ -622,6 +628,7 @@ function AccountReferences({
   readonly code?: boolean
   readonly references: readonly ConnectorAccountReference[]
   readonly label: string
+  readonly labelClassName?: string
   readonly onSelect?: ((reference: ConnectorAccountReference) => void) | undefined
 }): ReactElement | null {
   const t = useTranslate()
@@ -629,7 +636,7 @@ function AccountReferences({
   return (
     <div className="flex min-w-0 flex-col gap-1">
       {(!hierarchy || references.length == 0) && (
-        <span className="text-xs text-muted-foreground">{references.length > 0 ? label : t('connectionUsage.codeAccess')}</span>
+        <span className={cn('text-xs text-muted-foreground', labelClassName)}>{references.length > 0 ? label : t('connectionUsage.codeAccess')}</span>
       )}
       {references.length > 0 && (
         <ul
@@ -686,44 +693,15 @@ function AccountReferences({
   )
 }
 
-function ConnectionConsoleLink({
-  store,
-  flowId,
-  providerId,
-  connectionId,
-  children,
-}: {
-  readonly store: WorkbenchStore
-  readonly flowId: string
-  readonly providerId: string
-  readonly connectionId?: string
-  readonly children: ReactNode
-}) {
-  const [url, setUrl] = useState<string>()
-  const [error, setError] = useState<string>()
-  const [attempt, setAttempt] = useState(0)
-  useEffect(() => {
-    let current = true
-    setError(undefined)
-    void store.connectors.connectionPage(providerId, flowId, connectionId).then(
-      (value) => {
-        if (current) setUrl(value)
-      },
-      (reason: unknown) => {
-        if (current) setError(reason instanceof Error ? reason.message : String(reason))
-      },
-    )
-    return () => {
-      current = false
-    }
-  }, [store, flowId, providerId, connectionId, attempt])
-  const className = '-my-1 -ml-2 min-w-0 h-auto min-h-6 shrink justify-start gap-2 py-1 text-left text-[13px] text-foreground whitespace-normal'
-  return url == null ? (
-    <Button type="button" variant="ghost" size="xs" className={className} disabled={error == null} title={error} onClick={() => setAttempt(attempt + 1)}>
-      {children}
-    </Button>
+function ConnectionConsoleLink({ href, children }: { readonly href?: string; readonly children: ReactNode }) {
+  const className = cn(
+    buttonVariants({ variant: 'ghost', size: 'xs' }),
+    '-my-1 -ml-2 min-w-0 h-auto min-h-6 shrink justify-start gap-2 py-1 text-left text-[13px] text-foreground whitespace-normal',
+  )
+  return href == null ? (
+    <span className={cn(className, 'pointer-events-none')}>{children}</span>
   ) : (
-    <a className={cn(buttonVariants({ variant: 'ghost', size: 'xs' }), className)} href={url} target="_blank" rel="noreferrer">
+    <a className={className} href={href} target="_blank" rel="noreferrer">
       {children}
     </a>
   )

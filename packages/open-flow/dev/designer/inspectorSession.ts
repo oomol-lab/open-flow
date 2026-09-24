@@ -210,13 +210,6 @@ export function createInspectorTransport(
           })),
       })
     }
-    if (/\/connector\/connections\/[^/]+\/page$/.test(url.pathname)) {
-      const serviceId = url.pathname.split('/').at(-2)!
-      const page = new URL(`https://console.oomol.com/team/demo/connections/${serviceId}`)
-      const connectionId = url.searchParams.get('connectionId')
-      if (connectionId != null) page.searchParams.set('app', connectionId)
-      return Response.json({ version: 1, url: page.href })
-    }
     if (url.pathname.endsWith('/connector/connections'))
       return Response.json({
         version: 1,

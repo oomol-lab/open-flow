@@ -1,6 +1,14 @@
 export { EventSourcesPage } from './eventSources.tsx'
 import type { FormEvent, ReactElement } from 'react'
-import type { WorkbenchHost, WorkbenchLanguage, WorkbenchLocation, WorkbenchNavigationOptions, WorkbenchPreferences, WorkbenchTheme } from './contract.ts'
+import type {
+  ConnectionHref,
+  WorkbenchHost,
+  WorkbenchLanguage,
+  WorkbenchLocation,
+  WorkbenchNavigationOptions,
+  WorkbenchPreferences,
+  WorkbenchTheme,
+} from './contract.ts'
 
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
@@ -115,6 +123,7 @@ interface WorkbenchProps {
   readonly createFlow?: ((name: string) => Promise<string>) | undefined
   readonly createFlowDisabled?: boolean | undefined
   readonly createFlowField?: OpenFlowWorkbenchProps['createFlowField']
+  readonly connectionHref?: ConnectionHref | undefined
   readonly flowBadges?: Readonly<Record<string, string>> | undefined
   readonly hrefFor: (location: WorkbenchLocation) => string
   readonly language: WorkbenchLanguage
@@ -132,6 +141,7 @@ function Workbench({
   createFlowDisabled,
   createFlowField,
   flowBadges,
+  connectionHref,
   hrefFor,
   language,
   navigation,
@@ -160,6 +170,7 @@ function Workbench({
       ) : (
         <Suspense fallback={<main aria-busy="true" className="workspace" />}>
           <FlowWorkspace
+            connectionHref={connectionHref}
             hrefFor={hrefFor}
             navigation={navigation}
             onConfigureConnector={onConfigureConnector}
@@ -222,6 +233,7 @@ export interface OpenFlowWorkbenchProps {
         readonly status: string
       }
     | undefined
+  readonly connectionHref?: ConnectionHref | undefined
   readonly flowBadges?: Readonly<Record<string, string>> | undefined
   readonly host: WorkbenchHost
   readonly hrefFor: (location: WorkbenchLocation) => string
@@ -245,6 +257,7 @@ function Session({
   createFlowDisabled,
   createFlowField,
   flowBadges,
+  connectionHref,
   host,
   hrefFor,
   language,
@@ -312,6 +325,7 @@ function Session({
             createFlowDisabled={createFlowDisabled}
             createFlowField={createFlowField}
             flowBadges={flowBadges}
+            connectionHref={connectionHref}
             hrefFor={hrefFor}
             language={language}
             navigation={navigation}

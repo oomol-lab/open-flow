@@ -1302,7 +1302,7 @@
     "empty": "이 초안은 계정을 사용하지 않습니다.",
     "stopUsing": "사용 중지",
     "stopUsingTitle": "이 계정의 사용을 중지할까요?",
-    "stopUsingDescription": "아래 노드에서 계정을 다시 선택해야 합니다. Code 공유 접근도 제거됩니다. 연결된 계정, 게시된 버전 및 다른 Flow에는 영향을 주지 않습니다.",
+    "stopUsingDescription": "이 워크플로 초안에서 계정 사용을 중지합니다. 계정 연결은 유지됩니다.",
     "draft": "초안",
     "published": "게시됨",
     "publishedDescription": "이 버전을 게시할 때 선택한 계정입니다. 읽기 전용입니다.",

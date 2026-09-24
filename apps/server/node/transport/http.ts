@@ -209,7 +209,7 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     )
   app.get('/connector/teams', async (context) => {
     await authenticate(context.req.raw)
-    return json(200, await service.connectorTeams(context.req.raw.signal))
+    return json(200, { ...(await service.connectorTeams(context.req.raw.signal)), console: service.connectionConsole() })
   })
   app.post('/connector/flows', async (context) => {
     const actorId = await authenticate(context.req.raw)

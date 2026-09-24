@@ -4,7 +4,7 @@ import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { val } from 'value-enhancer'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createI18n } from '../i18n.ts'
 import { connectorAccessPermissionGroupLabel, connectorAccessPermissionLabel } from './connectorAccessPresentation.ts'
 import { ConnectorAccessEmptyState, CodeConnectionSettings, ConnectorAccessSettings } from './connectorAccessSettings.tsx'
@@ -126,11 +126,20 @@ describe('Connector access settings', () => {
         },
       },
     } as unknown as WorkbenchStore
+    const connectionHref = vi.fn(
+      (flowId: string, providerId: string, connectionId?: string) =>
+        `https://console.example/${flowId}/${providerId}${connectionId == null ? '' : `?app=${connectionId}`}`,
+    )
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
-        <ConnectorAccessSettings store={store} />
+        <ConnectorAccessSettings store={store} connectionHref={connectionHref} />
       </I18nProvider>,
     )
+    expect(connectionHref).toHaveBeenCalledWith('flow', 'mail')
+    expect(connectionHref).toHaveBeenCalledWith('flow', 'mail', 'account')
+    expect(markup).toContain('href="https://console.example/flow/mail"')
+    expect(markup).toContain('href="https://console.example/flow/mail?app=account"')
+    expect(markup).not.toContain('disabled=""')
     expect(markup).toContain('Accounts used by this draft')
     expect(markup).toContain('Personal')
     expect(markup.match(/aria-label="Mail"/g)).toHaveLength(1)

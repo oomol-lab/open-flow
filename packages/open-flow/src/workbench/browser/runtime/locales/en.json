@@ -1302,7 +1302,7 @@
     "empty": "This draft does not use any accounts.",
     "stopUsing": "Stop using",
     "stopUsingTitle": "Stop using this account?",
-    "stopUsingDescription": "Nodes listed below will need an account selected again. Shared Code access is also removed. The connected account, published versions and other flows are unchanged.",
+    "stopUsingDescription": "This workflow draft will stop using the account. The account stays connected.",
     "draft": "Draft",
     "published": "Published",
     "publishedDescription": "Accounts selected when this version was published. Read-only.",

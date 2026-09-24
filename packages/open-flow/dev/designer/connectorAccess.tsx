@@ -100,6 +100,12 @@ const candidates = [
   },
 ] as const
 
+function connectionHref(_flowId: string, providerId: string, connectionId?: string): string {
+  const url = new URL(`https://console.oomol.com/team/demo/connections/${encodeURIComponent(providerId)}`)
+  if (connectionId != null) url.searchParams.set('app', connectionId)
+  return url.href
+}
+
 function Sample({
   access,
   dark,
@@ -175,7 +181,13 @@ function Sample({
             ignoredNodeIds={[]}
             onIgnoreNodes={() => {}}
             model={{ nodes: [], edges: [], viewport: { x: 0, y: 0, zoom: 1 } }}
-            cornerTools={<ConnectionUsageButton store={store} onSelectReference={(reference) => log('connector-access.reference', reference)} />}
+            cornerTools={
+              <ConnectionUsageButton
+                connectionHref={connectionHref}
+                store={store}
+                onSelectReference={(reference) => log('connector-access.reference', reference)}
+              />
+            }
             onAddNode={() => undefined}
             onConnect={() => {}}
             onDisconnect={() => {}}
@@ -195,6 +207,7 @@ function Sample({
                 <CodeConnectionSettings store={store} onManage={(flowId) => log('code-connections.manage', flowId)} />
               ) : (
                 <ConnectorAccessSettings
+                  connectionHref={connectionHref}
                   onSelectReference={(reference) => log('connector-access.reference', reference)}
                   onManage={(flowId) => log('connector-access.manage', flowId)}
                   store={store}
@@ -425,7 +438,7 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
 
 export const connectorAccessStory: FrontendStory = {
   description:
-    'Open Connections from the canvas control island. Compare service spacing, separate account cards, account icons and node icons, including a custom receipt icon. Provider and account links use 13px names and aligned leading icons; node names use 13px and supporting text uses 12px. Subtle curved branches connect accounts to their nodes. The panel scrollbar appears while scrolling and hides when idle. Locate each usage, switch to the read-only publication snapshot, and remove an account from the draft with confirmation. The gallery also covers missing accounts, empty drafts, loading failures, long names and independent Code connection settings. Code selection saves take 800 ms.',
+    'Open Connections from the canvas control island. Compare service spacing, separate account cards, account icons and node icons, including a custom receipt icon. Provider and account links use 13px names and aligned leading icons; node names use 13px and supporting text uses 12px. Subtle curved branches connect accounts to their nodes. Missing account selections use a warning surface and label. The panel scrollbar appears while scrolling and hides when idle. Locate each usage, switch to the read-only publication snapshot, and stop using an account with a compact confirmation showing the same account and node hierarchy. The gallery also covers missing accounts, empty drafts, loading failures, long names and independent Code connection settings. Code selection saves take 800 ms.',
   group: 'Workbench',
   id: 'connector-access',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,

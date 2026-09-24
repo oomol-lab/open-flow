@@ -1,5 +1,6 @@
 import type { OpenFlowWorkbenchProps, WorkbenchLanguage, WorkbenchLocation, WorkbenchNavigationOptions, WorkbenchTheme } from '@oomol-lab/open-flow/workbench'
 import type { FormEvent, MouseEvent, ReactElement } from 'react'
+import type { ConnectionConsole } from './connectionNavigation.ts'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { Button, notificationToasterProps } from '@oomol-lab/open-flow/ui'
@@ -7,6 +8,7 @@ import { EventSourcesPage, OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { Toaster } from 'sonner'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
+import { connectionHref } from './connectionNavigation.ts'
 import { createBrowserHost } from './host.ts'
 import { createI18n } from './i18n.ts'
 import { idempotencyKey } from './idempotency.ts'
@@ -72,18 +74,33 @@ function sessionStatus(value: unknown): SessionStatus | undefined {
 }
 
 function connectorTeams(value: unknown):
-  | { readonly bindings: readonly []; readonly enabled: false; readonly teams: readonly []; readonly version: 1 }
-  | {
-      readonly bindings: readonly { readonly flowId: string; readonly teamId: string }[]
-      readonly enabled: true
-      readonly teams: readonly { readonly id: string; readonly name: string; readonly systemCreated: boolean }[]
-      readonly version: 1
-    }
+  | ({ readonly console: ConnectionConsole | undefined } & (
+      | { readonly bindings: readonly []; readonly enabled: false; readonly teams: readonly []; readonly version: 1 }
+      | {
+          readonly bindings: readonly { readonly flowId: string; readonly teamId: string }[]
+          readonly enabled: true
+          readonly teams: readonly { readonly id: string; readonly name: string; readonly systemCreated: boolean }[]
+          readonly version: 1
+        }
+    ))
   | undefined {
   if (value == null || typeof value != 'object' || Array.isArray(value)) return
   const status = value as Record<string, unknown>
   if (status.version !== 1 || typeof status.enabled != 'boolean' || !Array.isArray(status.bindings) || !Array.isArray(status.teams)) return
-  if (!status.enabled) return { bindings: [], enabled: false, teams: [], version: 1 }
+  let console: ConnectionConsole | undefined
+  if (status.console != null) {
+    if (typeof status.console != 'object' || Array.isArray(status.console)) return
+    const configuration = status.console as Record<string, unknown>
+    if (typeof configuration.origin != 'string' || typeof configuration.teamScoped != 'boolean') return
+    try {
+      const origin = new URL(configuration.origin)
+      if (origin.protocol != 'https:' && origin.protocol != 'http:') return
+      console = { origin: origin.href, teamScoped: configuration.teamScoped }
+    } catch {
+      return
+    }
+  }
+  if (!status.enabled) return { bindings: [], enabled: false, teams: [], version: 1, console }
   const bindings: { readonly flowId: string; readonly teamId: string }[] = []
   for (const item of status.bindings) {
     if (item == null || typeof item != 'object' || Array.isArray(item)) return
@@ -100,7 +117,7 @@ function connectorTeams(value: unknown):
     }
     teams.push({ id: team.id, name: team.name, systemCreated: team.systemCreated })
   }
-  return { bindings, enabled: true, teams, version: 1 }
+  return { bindings, enabled: true, teams, version: 1, console }
 }
 
 function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
@@ -111,6 +128,7 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
   const settingsOpen = pathname == '/settings' || eventSourcesOpen
   const variablesOpen = pathname == '/variables'
   const [session, setSession] = useState<Session>({ kind: 'checking' })
+  const [connectionConsole, setConnectionConsole] = useState<ConnectionConsole>()
   const [token, setToken] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [team, setTeam] = useState<
@@ -141,6 +159,7 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
       }
       const status = connectorTeams(await response.json())
       if (!response.ok || status == null) throw new Error('Invalid Connector Team response.')
+      setConnectionConsole(status.console)
       setTeam((current) => {
         if (!status.enabled) return { kind: 'hidden' }
         const selectedTeamId =
@@ -424,6 +443,11 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
                 createFlowDisabled={team.kind != 'hidden' && (team.kind != 'ready' || team.selectedTeamId == null)}
                 createFlowField={createFlowField}
                 flowBadges={flowBadges}
+                connectionHref={(flowId, providerId, connectionId) => {
+                  const binding = team.kind == 'ready' ? team.bindings.find((item) => item.flowId == flowId) : undefined
+                  const teamName = team.kind == 'ready' ? team.teams.find((item) => item.id == binding?.teamId)?.name : undefined
+                  return connectionHref(connectionConsole, teamName, providerId, connectionId)
+                }}
                 hrefFor={routePath}
                 host={host}
                 language={language}

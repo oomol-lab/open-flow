@@ -1302,7 +1302,7 @@
     "empty": "Ce brouillon n’utilise aucun compte.",
     "stopUsing": "Ne plus utiliser",
     "stopUsingTitle": "Ne plus utiliser ce compte ?",
-    "stopUsingDescription": "Les nœuds ci-dessous nécessiteront une nouvelle sélection de compte. L’accès partagé Code sera aussi retiré. Le compte connecté, les versions publiées et les autres Flows restent inchangés.",
+    "stopUsingDescription": "Ce brouillon de workflow n’utilisera plus ce compte. Le compte restera connecté.",
     "draft": "Brouillon",
     "published": "Publié",
     "publishedDescription": "Comptes sélectionnés à la publication de cette version. Lecture seule.",

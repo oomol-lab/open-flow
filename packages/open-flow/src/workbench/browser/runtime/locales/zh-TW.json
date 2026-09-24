@@ -1302,7 +1302,7 @@
     "empty": "目前草稿尚未使用帳號。",
     "stopUsing": "停止使用",
     "stopUsingTitle": "停止使用此帳號？",
-    "stopUsingDescription": "下列節點需要重新選擇帳號，Code 共用存取也會移除。已連線的帳號、已發佈版本和其他工作流程不受影響。",
+    "stopUsingDescription": "此工作流程草稿將不再使用此帳號，帳號本身會保留。",
     "draft": "草稿",
     "published": "已發布",
     "publishedDescription": "此版本發佈時選用的帳號，僅供檢視。",

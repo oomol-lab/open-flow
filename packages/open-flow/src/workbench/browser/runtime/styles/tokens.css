@@ -16,6 +16,8 @@
   --success-foreground: color-mix(in srgb, var(--success) 72%, var(--ui-foreground));
   --warning: #d97706;
   --warning-surface: color-mix(in srgb, var(--warning) 12%, var(--ui-background));
+  --warning-subtle-surface: light-dark(#faf9f7, color-mix(in srgb, var(--warning) 6%, var(--ui-popover)));
+  --warning-subtle-hover: light-dark(#f3f1ed, color-mix(in srgb, var(--warning) 12%, var(--ui-popover)));
   --warning-border: color-mix(in srgb, var(--warning) 35%, var(--ui-border));
   --warning-foreground: color-mix(in srgb, var(--warning) 58%, var(--ui-foreground));
   --warning-control-background: color-mix(in srgb, var(--warning) 22%, var(--ui-background));

@@ -1302,7 +1302,7 @@
     "empty": "当前草稿尚未使用账号。",
     "stopUsing": "停止使用",
     "stopUsingTitle": "停止使用此账号？",
-    "stopUsingDescription": "下列节点需要重新选择账号，Code 共享访问也会移除。已连接的账号、已发布版本和其他工作流不受影响。",
+    "stopUsingDescription": "此工作流草稿将不再使用该账号，账号本身会保留。",
     "draft": "草稿",
     "published": "已发布",
     "publishedDescription": "此版本发布时选用的账号，仅供查看。",
