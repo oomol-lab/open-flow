@@ -260,6 +260,21 @@ export function NodeInspector({
             }}
           />
         )}
+        {selection?.kind === 'task' && selection.module != null && (
+          <CodeTaskSection
+            connectorAccess={connectorAccess}
+            connectorCandidates={connectorCandidates}
+            onConfigureAccess={onConfigureConnectorAccess == null ? undefined : () => onConfigureConnectorAccess()}
+            connectors={connectors}
+            prepareAction={prepareConnectorAction}
+            disabled={disabled}
+            diagnostics={diagnostics}
+            focus={focus}
+            selection={selection}
+            store={store}
+            theme={theme}
+          />
+        )}
         {selection?.kind === 'trigger' &&
           (selection.trigger.kind === 'integration' || selection.trigger.kind === 'poll') &&
           (['feishu.on_event', 'feishu_app_bot.on_event'].includes(selection.trigger.definition.key) ? (
@@ -520,21 +535,6 @@ export function NodeInspector({
               ) : (
                 <>
                   {isLlm && <LlmTaskSection selection={selection} disabled={disabled} store={store} />}
-                  {selection.module != null && (
-                    <CodeTaskSection
-                      connectorAccess={connectorAccess}
-                      connectorCandidates={connectorCandidates}
-                      onConfigureAccess={onConfigureConnectorAccess == null ? undefined : () => onConfigureConnectorAccess()}
-                      connectors={connectors}
-                      prepareAction={prepareConnectorAction}
-                      disabled={disabled}
-                      diagnostics={diagnostics}
-                      focus={focus}
-                      selection={selection}
-                      store={store}
-                      theme={theme}
-                    />
-                  )}
                   <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
                 </>
               )
