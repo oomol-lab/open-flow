@@ -1,10 +1,13 @@
 .open-flow-control-island.open-flow-control-island {
+  --ui-control-radius: 12px;
+
   display: flex;
   align-items: center;
   gap: 2px;
   padding: 5px;
   border: 1px solid var(--ui-border);
-  border-radius: 16px;
+  /* Keep concentric corners across the 5px padding and 1px border. */
+  border-radius: calc(var(--ui-control-radius) + 6px);
   background: var(--ui-popover);
   box-shadow:
     0 4px 6px rgb(0 0 0 / 3%),
@@ -20,8 +23,10 @@
 }
 
 .open-flow-control-island.open-flow-control-island-compact {
+  --ui-control-radius: 8px;
+
   padding: 3px;
-  border-radius: 10px;
+  border-radius: calc(var(--ui-control-radius) + 4px);
 }
 
 .open-flow-control-island.open-flow-control-island-soft-shadow {
@@ -32,7 +37,6 @@
 
 .open-flow-control-island.open-flow-control-island-compact > [data-size] {
   height: 28px;
-  border-radius: 6px;
 }
 
 .open-flow-control-island.open-flow-control-island-compact > [data-size='icon'] {

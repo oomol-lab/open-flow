@@ -117,7 +117,7 @@
 
   .run-control-group {
     color: var(--ui-primary-foreground);
-    border-radius: var(--ui-radius);
+    border-radius: var(--ui-control-radius, var(--ui-radius));
     background: var(--ui-primary);
   }
 

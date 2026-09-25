@@ -92,6 +92,7 @@
 }
 
 .floatBar {
+  --ui-control-radius: 8px;
   --ui-popover: var(--open-flow-popover, var(--widget-popup-background));
 
   display: flex;
@@ -101,7 +102,7 @@
   gap: 2px;
   padding: 3px;
   border: 1px solid var(--node-border-color);
-  border-radius: 10px;
+  border-radius: calc(var(--ui-control-radius) + 4px);
   background: var(--ui-popover);
   color: var(--ui-muted-foreground);
   box-shadow: var(--floating-control-shadow);
@@ -110,7 +111,6 @@
 }
 
 .floatBarButton {
-  border-radius: var(--ui-radius);
   font-size: var(--icon-font-size);
 
   &[data-danger]:is(:hover, :focus-visible) {
