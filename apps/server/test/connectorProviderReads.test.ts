@@ -59,3 +59,37 @@ describe('upstream Provider reads', () => {
     await expect(client.listProviders(controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
   })
 })
+
+it('propagates sprite metadata through Provider and Action search representations', async () => {
+  const { fetcher, client } = setup()
+  const iconSprite = {
+    version: 'v1',
+    pixelRatio: 2,
+    iconSize: 48,
+    bleed: 2,
+    width: 104,
+    height: 52,
+    lightUrl: 'https://example.com/light.png',
+    darkUrl: 'https://example.com/dark.png',
+  }
+  const iconSpritePosition = { x: 54, y: 2 }
+  fetcher.mockResolvedValue(Response.json({ ...body(), meta: { iconSprite }, data: [{ ...body().data[0], iconSpritePosition }] }))
+  expect(await client.listProviders()).toEqual([{ serviceId: 'mail', serviceName: 'Mail', iconSprite, iconSpritePosition }])
+  fetcher.mockImplementation(async (url) =>
+    String(url).includes('/actions/search')
+      ? Response.json({
+          success: true,
+          data: [
+            {
+              service: 'mail',
+              name: 'send',
+              description: '',
+              inputSchema: { type: 'object', properties: {} },
+              outputSchema: { type: 'object', properties: {} },
+            },
+          ],
+        })
+      : Response.json({ ...body(), meta: { iconSprite }, data: [{ ...body().data[0], iconSpritePosition }] }),
+  )
+  expect(await client.searchActions('send')).toEqual([expect.objectContaining({ actionId: 'mail.send', iconSprite, iconSpritePosition })])
+})

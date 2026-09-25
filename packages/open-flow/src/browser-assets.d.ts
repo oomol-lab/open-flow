@@ -14,6 +14,7 @@ declare module '*.svg' {
 }
 declare module 'virtual:uno.css'
 declare module 'virtual:oomol-provider-icons' {
+  export const spriteCatalog: import('./control/common/providerIconSprite.ts').ProviderIconSpriteCatalog | null
   const iconUrls: Readonly<Record<string, string>>
   export default iconUrls
 }

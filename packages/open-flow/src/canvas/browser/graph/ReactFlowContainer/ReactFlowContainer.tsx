@@ -60,6 +60,7 @@ import { shallowPlainObjectEqual } from '../../../../base/common/equality.ts'
 import { getAddItemId } from '../../../../canvas/browser/addItemDrag.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
+import { IconThemeContext } from '../../../../ui/browser/icons/iconTheme.ts'
 import { TooltipProvider } from '../../../../ui/browser/tooltip.tsx'
 import { CANVAS_CLASSNAME } from '../../base/canvas.ts'
 import { getScriptletType, getSharedBlockPath, getTriggerType, isWithCommentType, isWithConditionType, isWithValueType } from '../../base/dragNDrop.ts'
@@ -179,24 +180,26 @@ export const ReactFlowContainer: React.FC<ReactFlowContainerProps> = (props: Rea
   }, [])
 
   return (
-    <div
-      className={clsx(props.className, 'open-flow-canvas-root', styles.container, 'open-flow-theme')}
-      data-surface="canvas"
-      data-theme={props.dark ? 'dark' : 'light'}
-      ref={wrapperRef}
-    >
-      <GetPopupContainerContext.Provider value={context}>
-        <I18nProvider i18n={props.i18n}>
-          <TooltipProvider delay={300}>
-            <ReactFlowProvider>
-              <HandleContextProvider Handle={Handle as HandleImpl}>
-                <ReactFlowContainerInner {...props} />
-              </HandleContextProvider>
-            </ReactFlowProvider>
-          </TooltipProvider>
-        </I18nProvider>
-      </GetPopupContainerContext.Provider>
-    </div>
+    <IconThemeContext.Provider value={props.dark ? 'dark' : 'light'}>
+      <div
+        className={clsx(props.className, 'open-flow-canvas-root', styles.container, 'open-flow-theme')}
+        data-surface="canvas"
+        data-theme={props.dark ? 'dark' : 'light'}
+        ref={wrapperRef}
+      >
+        <GetPopupContainerContext.Provider value={context}>
+          <I18nProvider i18n={props.i18n}>
+            <TooltipProvider delay={300}>
+              <ReactFlowProvider>
+                <HandleContextProvider Handle={Handle as HandleImpl}>
+                  <ReactFlowContainerInner {...props} />
+                </HandleContextProvider>
+              </ReactFlowProvider>
+            </TooltipProvider>
+          </I18nProvider>
+        </GetPopupContainerContext.Provider>
+      </div>
+    </IconThemeContext.Provider>
   )
 }
 

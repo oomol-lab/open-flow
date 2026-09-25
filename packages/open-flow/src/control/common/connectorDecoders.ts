@@ -16,6 +16,7 @@ import type {
 import { exact, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 import { ApiError } from './errors.ts'
 import { parseProviderAccessSource } from './providerAccess.ts'
+import { providerIconAppearance } from './providerIconSprite.ts'
 
 function accessPermissions(value: unknown): NonNullable<ProviderAccessBindingCandidate['permissions']> {
   const source = record(value)
@@ -283,6 +284,8 @@ export function connectorActionMetadata(value: unknown): ConnectorActionMetadata
     'description',
     ...(homepageUrl == null ? [] : ['homepageUrl']),
     ...(icon == null ? [] : ['icon']),
+    ...('iconSprite' in source ? ['iconSprite'] : []),
+    ...('iconSpritePosition' in source ? ['iconSpritePosition'] : []),
     'inputs',
     'name',
     'outputs',
@@ -299,6 +302,7 @@ export function connectorActionMetadata(value: unknown): ConnectorActionMetadata
     description: typeof source.description == 'string' ? source.description : invalidResponse(),
     ...(homepageUrl == null ? {} : { homepageUrl }),
     ...(icon == null ? {} : { icon }),
+    ...providerIconAppearance(source.iconSprite, source.iconSpritePosition),
     inputs: ports(source.inputs, inputPort),
     name: string(source.name),
     outputs: ports(source.outputs, port),
@@ -328,11 +332,14 @@ export function connectorProvider(value: unknown): ConnectorProvider {
     'serviceName',
     ...(homepageUrl == null ? [] : ['homepageUrl']),
     ...(icon == null ? [] : ['icon']),
+    ...('iconSprite' in source ? ['iconSprite'] : []),
+    ...('iconSpritePosition' in source ? ['iconSpritePosition'] : []),
   ])
   if ((homepageUrl != null && typeof homepageUrl != 'string') || (icon != null && typeof icon != 'string')) return invalidResponse()
   return {
     ...(homepageUrl == null ? {} : { homepageUrl }),
     ...(icon == null ? {} : { icon }),
+    ...providerIconAppearance(source.iconSprite, source.iconSpritePosition),
     serviceId: string(source.serviceId),
     serviceName: string(source.serviceName),
     ...(source.noSetup === undefined ? {} : { noSetup: source.noSetup }),

@@ -1,13 +1,21 @@
-import providerIconUrls from 'virtual:oomol-provider-icons'
-import { imageIcon, initialsIcon } from '../../../ui/browser/icons/ContentIcon.tsx'
+import type { ProviderIconAppearance } from '../../../control/common/providerIconSprite.ts'
+
+import providerIconUrls, { spriteCatalog } from 'virtual:oomol-provider-icons'
+import { providerIconAppearance } from '../../../control/common/providerIconSprite.ts'
+import { imageIcon, initialsIcon, spriteIcon } from '../../../ui/browser/icons/ContentIcon.tsx'
 
 export function providerIcon(
-  provider: { readonly homepageUrl?: string; readonly icon?: string; readonly serviceId: string; readonly serviceName: string },
+  provider: ProviderIconAppearance & { readonly homepageUrl?: string; readonly icon?: string; readonly serviceId: string; readonly serviceName: string },
   catalogIconUrls: Readonly<Record<string, string>> = providerIconUrls,
 ): string {
   const fallback = initialsIcon(providerInitials(provider.serviceName))
   const source = providerIconSource(provider, catalogIconUrls)
-  return source == null ? fallback : imageIcon(source, fallback)
+  const original = source == null ? fallback : imageIcon(source, fallback)
+  const live = providerIconAppearance(provider.iconSprite, provider.iconSpritePosition)
+  const appearance = live.iconSprite ? live : { iconSprite: spriteCatalog?.iconSprite, iconSpritePosition: spriteCatalog?.positions[provider.serviceId] }
+  return appearance?.iconSprite && appearance.iconSpritePosition
+    ? spriteIcon({ iconSprite: appearance.iconSprite, iconSpritePosition: appearance.iconSpritePosition }, original)
+    : original
 }
 
 export function providerIconSource(

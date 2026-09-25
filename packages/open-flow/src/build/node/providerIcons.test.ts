@@ -33,7 +33,7 @@ describe('providerIconsPlugin', () => {
       }),
     )
 
-    await expect(load(providerIconsPlugin())).resolves.toBe('export default {};')
+    await expect(load(providerIconsPlugin())).resolves.toBe('export const spriteCatalog = null;export default {};')
     expect(timeout).toHaveBeenCalledWith(5_000)
   })
 
@@ -42,7 +42,7 @@ describe('providerIconsPlugin', () => {
       'fetch',
       vi.fn(async () =>
         Response.json({
-          items: [
+          data: [
             { iconUrl: 'https://static.oomol.com/example.svg', service: 'example' },
             { iconUrl: '', service: 'missing' },
           ],
@@ -50,16 +50,18 @@ describe('providerIconsPlugin', () => {
       ),
     )
 
-    await expect(load(providerIconsPlugin())).resolves.toBe('export default {"example":"https://static.oomol.com/example.svg"};')
+    await expect(load(providerIconsPlugin())).resolves.toBe(
+      'export const spriteCatalog = null;export default {"example":"https://static.oomol.com/example.svg"};',
+    )
   })
 
   it('uses an empty catalog for invalid responses', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn(async () => Response.json({ items: null })),
+      vi.fn(async () => Response.json({ data: null })),
     )
 
-    await expect(load(providerIconsPlugin())).resolves.toBe('export default {};')
+    await expect(load(providerIconsPlugin())).resolves.toBe('export const spriteCatalog = null;export default {};')
   })
 
   it('uses an empty catalog when the catalog is unavailable', async () => {
@@ -68,6 +70,38 @@ describe('providerIconsPlugin', () => {
       vi.fn(async () => new Response(null, { status: 503 })),
     )
 
-    await expect(load(providerIconsPlugin())).resolves.toBe('export default {};')
+    await expect(load(providerIconsPlugin())).resolves.toBe('export const spriteCatalog = null;export default {};')
   })
+})
+
+it('bundles sprite-only entries and keeps image fallbacks', async () => {
+  const iconSprite = {
+    version: 'v1',
+    pixelRatio: 2,
+    iconSize: 48,
+    bleed: 2,
+    width: 104,
+    height: 52,
+    lightUrl: 'https://example.com/light.png',
+    darkUrl: 'https://example.com/dark.png',
+  }
+  const iconSpritePosition = { x: 54, y: 2 }
+  const fetcher = vi.fn(async () =>
+    Response.json({
+      success: true,
+      meta: { iconSprite },
+      data: [
+        { service: 'sprite-only', iconSpritePosition },
+        { service: 'second', iconSpritePosition: { x: 2, y: 2 } },
+        { service: 'invalid', iconSpritePosition: { x: 200, y: 2 }, iconUrl: 'https://example.com/invalid.svg' },
+        { service: 'legacy', iconUrl: 'https://example.com/icon.svg' },
+      ],
+    }),
+  )
+  vi.stubGlobal('fetch', fetcher)
+  const result = await load(providerIconsPlugin())
+  expect(fetcher).toHaveBeenCalledWith('https://connector.oomol.com/public/v1/apps', { signal: expect.any(AbortSignal) })
+  expect(result).toBe(
+    `export const spriteCatalog = ${JSON.stringify({ iconSprite, positions: { 'sprite-only': iconSpritePosition, 'second': { x: 2, y: 2 } } })};export default ${JSON.stringify({ invalid: 'https://example.com/invalid.svg', legacy: 'https://example.com/icon.svg' })};`,
+  )
 })

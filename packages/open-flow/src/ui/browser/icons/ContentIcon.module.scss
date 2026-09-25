@@ -25,3 +25,19 @@
     line-height: 1;
   }
 }
+
+.sprite {
+  display: inline-block;
+  position: relative;
+  overflow: hidden;
+  width: 1em;
+  height: 1em;
+  flex-shrink: 0;
+  vertical-align: middle;
+  pointer-events: none;
+  > span {
+    position: absolute;
+    background-size: 100% 100%;
+    background-repeat: no-repeat;
+  }
+}

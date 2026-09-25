@@ -2,6 +2,7 @@ import type { ConnectorActionMetadata, ConnectorProvider } from '../api.ts'
 
 import { connectorActionPorts } from '../../../../connector/common/actionSchema.ts'
 import { invalidResponse, jsonValue, record, string } from '../../../../control/common/decoding.ts'
+import { providerIconAppearance } from '../../../../control/common/providerIconSprite.ts'
 import { ApiError } from '../api.ts'
 
 export interface ProxyResponse {
@@ -24,9 +25,10 @@ export function proxyResponse(value: unknown, validate?: (item: Readonly<Record<
   return source as unknown as ProxyResponse
 }
 
-export function provider(source: Readonly<Record<string, unknown>>): ConnectorProvider {
+export function provider(source: Readonly<Record<string, unknown>>, metadata?: unknown): ConnectorProvider {
   if (!Array.isArray(source.authTypes) || source.authTypes.some((item) => typeof item != 'string')) return invalidResponse()
   return {
+    ...providerIconAppearance(metadata, source.iconSpritePosition),
     serviceId: string(source.service),
     serviceName: string(source.displayName),
     noSetup: source.authTypes.length == 1 && source.authTypes[0] == 'no_auth',
@@ -55,10 +57,11 @@ function port(item: ReturnType<typeof connectorActionPorts>['inputs'][number]) {
 export function action(source: Readonly<Record<string, unknown>>, providers: ProxyResponse): ConnectorActionMetadata {
   const owner = providers.data.find((item) => item.service == source.service)
   if (owner == null) return invalidResponse()
-  const display = provider(owner)
+  const display = provider(owner, (providers.meta as { iconSprite?: unknown } | undefined)?.iconSprite)
   const ports = connectorActionPorts(source.inputSchema, source.outputSchema)
 
   return {
+    ...(display.iconSprite == null ? {} : { iconSprite: display.iconSprite, iconSpritePosition: display.iconSpritePosition }),
     serviceId: display.serviceId,
     serviceName: display.serviceName,
     ...(display.icon == null ? {} : { icon: display.icon }),

@@ -7,6 +7,7 @@ import { createI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
 import { defaultUiLanguage, uiLanguageNames, uiLanguages } from '../../src/localization/common/languages.ts'
 import { Button } from '../../src/ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '../../src/ui/browser/dropdown-menu.tsx'
+import { IconThemeContext } from '../../src/ui/browser/icons/iconTheme.ts'
 import { Input } from '../../src/ui/browser/input.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../../src/ui/browser/tooltip.tsx'
 import { StoryActions, StoryActionsProvider } from './storyActions.tsx'
@@ -261,11 +262,11 @@ export function FrontendLab() {
                   data-property-panel={story.propertyPanel || undefined}
                   key={story.id}
                 >
-                  {story.render(log, dark, language)}
+                  <IconThemeContext.Provider value={dark ? 'dark' : 'light'}>{story.render(log, dark, language)}</IconThemeContext.Provider>
                 </div>
               ) : (
                 <StoryStage dark={dark} i18n={i18n} key={story.id}>
-                  {story.render(log, dark, language)}
+                  <IconThemeContext.Provider value={dark ? 'dark' : 'light'}>{story.render(log, dark, language)}</IconThemeContext.Provider>
                 </StoryStage>
               )}
             </div>

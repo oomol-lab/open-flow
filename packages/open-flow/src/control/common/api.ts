@@ -1,3 +1,6 @@
+import type { ProviderIconAppearance } from './providerIconSprite.ts'
+export { providerIconAppearance } from './providerIconSprite.ts'
+export type { ProviderIconAppearance, ProviderIconSprite, ProviderIconSpriteCatalog } from './providerIconSprite.ts'
 export { connectorAccess as decodeConnectorAccess, connectorAccessSnapshot as decodeConnectorAccessSnapshot } from './connectorDecoders.ts'
 import type { ProviderAccessIdentity, ProviderAccessReference } from './providerAccess.ts'
 export {
@@ -162,7 +165,7 @@ export interface ConnectorConnection {
 }
 
 /** Action metadata independent of account availability and selection. */
-export interface ConnectorActionMetadata {
+export interface ConnectorActionMetadata extends ProviderIconAppearance {
   /** Upstream operation classification; unknown values remain uncategorized. */
   readonly operationType?: string
   readonly inputSchema?: JsonValue
@@ -184,7 +187,7 @@ export interface ConnectorAction extends ConnectorActionMetadata {
   readonly defaultConnection?: ConnectorConnection
 }
 
-export interface ConnectorProvider {
+export interface ConnectorProvider extends ProviderIconAppearance {
   readonly noSetup?: boolean
   readonly homepageUrl?: string
   readonly icon?: string

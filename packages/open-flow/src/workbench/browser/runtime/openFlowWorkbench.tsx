@@ -1,3 +1,4 @@
+import { IconThemeContext } from '../../../ui/browser/icons/iconTheme.ts'
 export { EventSourcesPage } from './eventSources.tsx'
 import type { FormEvent, ReactElement } from 'react'
 import type {
@@ -315,31 +316,33 @@ function Session({
     if (i18n.lang != language) void i18n.switchLang(language)
   }, [i18n, language, store])
   return (
-    <I18nProvider i18n={i18n}>
-      <div className="open-flow-theme open-flow-workbench" data-theme={theme}>
-        <NotificationBridge host={host} store={store} />
-        {started ? (
-          <Workbench
-            catalogWidth={catalogWidth}
-            createFlow={createFlow}
-            createFlowDisabled={createFlowDisabled}
-            createFlowField={createFlowField}
-            flowBadges={flowBadges}
-            connectionHref={connectionHref}
-            hrefFor={hrefFor}
-            language={language}
-            navigation={navigation}
-            onConfigureConnector={onConfigureConnector}
-            onManageConnectorAccess={onManageConnectorAccess}
-            onLanguageChange={onLanguageChange}
-            store={store}
-            theme={theme}
-          />
-        ) : (
-          <main aria-busy="true" className="workspace" />
-        )}
-      </div>
-    </I18nProvider>
+    <IconThemeContext.Provider value={theme}>
+      <I18nProvider i18n={i18n}>
+        <div className="open-flow-theme open-flow-workbench" data-theme={theme}>
+          <NotificationBridge host={host} store={store} />
+          {started ? (
+            <Workbench
+              catalogWidth={catalogWidth}
+              createFlow={createFlow}
+              createFlowDisabled={createFlowDisabled}
+              createFlowField={createFlowField}
+              flowBadges={flowBadges}
+              connectionHref={connectionHref}
+              hrefFor={hrefFor}
+              language={language}
+              navigation={navigation}
+              onConfigureConnector={onConfigureConnector}
+              onManageConnectorAccess={onManageConnectorAccess}
+              onLanguageChange={onLanguageChange}
+              store={store}
+              theme={theme}
+            />
+          ) : (
+            <main aria-busy="true" className="workspace" />
+          )}
+        </div>
+      </I18nProvider>
+    </IconThemeContext.Provider>
   )
 }
 

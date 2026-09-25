@@ -13,6 +13,7 @@ import type { Logger } from 'pino'
 import type { ResolvedProviderAccessBinding, TeamAppAccess } from './provider-access.ts'
 
 import { connectorActionPorts } from '@oomol-lab/open-flow/connector-action'
+import { providerIconAppearance } from '@oomol-lab/open-flow/control-api'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import { errorKind, silentLogger } from '../logger.ts'
@@ -290,12 +291,19 @@ export class ConnectorClient implements ConnectorHost {
         provider.noSetup ? { noSetup: true } : {},
         provider.homepageUrl == null ? {} : { homepageUrl: provider.homepageUrl },
         provider.icon == null ? {} : { icon: provider.icon },
+        provider.iconSprite == null ? {} : { iconSprite: provider.iconSprite, iconSpritePosition: provider.iconSpritePosition },
       ),
     )
   }
 
   async #providers(signal?: AbortSignal, teamId?: string, locale?: string) {
-    return this.#get('providers.list', 'v1/providers', (data) => runtimeList(runtimeData(data), runtimeProvider), signal, { teamId, locale })
+    return this.#get(
+      'providers.list',
+      'v1/providers',
+      (data) => runtimeList(runtimeData(data), (item) => runtimeProvider(item, record(data) && record(data.meta) ? data.meta.iconSprite : undefined)),
+      signal,
+      { teamId, locale },
+    )
   }
 
   async listActions(serviceId?: string, signal?: AbortSignal, access?: ConnectorClientAccess, locale?: string): Promise<readonly ConnectorActionMetadata[]> {
@@ -892,7 +900,7 @@ function runtimeList<Value>(value: unknown, decode: (value: unknown) => Value): 
   return value.map(decode)
 }
 
-function runtimeProvider(value: unknown) {
+function runtimeProvider(value: unknown, metadata?: unknown) {
   const source = record(value) ? value : undefined
   if (source == null) throw unavailable('Connector Provider must be an object.')
   if (!Array.isArray(source.authTypes) || source.authTypes.some((authType) => typeof authType != 'string')) {
@@ -901,6 +909,7 @@ function runtimeProvider(value: unknown) {
   if (source.homepageUrl != null && typeof source.homepageUrl != 'string') throw unavailable('Connector Provider homepageUrl must be a string.')
   if (source.iconUrl != null && typeof source.iconUrl != 'string') throw unavailable('Connector Provider iconUrl must be a string.')
   return {
+    ...providerIconAppearance(metadata, source.iconSpritePosition),
     authenticated: !source.authTypes.includes('no_auth'),
     noSetup: source.authTypes.length == 1 && source.authTypes[0] == 'no_auth',
     ...(source.homepageUrl == null || source.homepageUrl.length == 0 ? {} : { homepageUrl: source.homepageUrl }),
@@ -986,6 +995,7 @@ function mapAction(action: RuntimeAction, providers: readonly ReturnType<typeof 
     description: action.description,
     ...(provider.homepageUrl == null ? {} : { homepageUrl: provider.homepageUrl }),
     ...(provider.icon == null ? {} : { icon: provider.icon }),
+    ...(provider.iconSprite == null ? {} : { iconSprite: provider.iconSprite, iconSpritePosition: provider.iconSpritePosition }),
     inputs: Object.fromEntries(
       ports.inputs.map((port) => {
         if (port.nullable == null) throw unavailable('Connector Action input schema did not declare nullability.')

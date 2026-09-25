@@ -106,7 +106,9 @@ export class ProviderStore {
     this.raw = new ProxyStore(client, 'providers', options)
   }
   get(flowId?: string, locale = 'en', force = false): ReadonlyVal<ResourceState<readonly ConnectorProvider[]>> {
-    return this.#views.get(identity(flowId, locale), [this.raw.get(flowId, locale, undefined, force)], (response) => response.data.map(provider))
+    return this.#views.get(identity(flowId, locale), [this.raw.get(flowId, locale, undefined, force)], (response) =>
+      response.data.map((item) => provider(item, (response.meta as { iconSprite?: unknown } | undefined)?.iconSprite)),
+    )
   }
   retryFailed(): void {
     this.raw.retryFailed()

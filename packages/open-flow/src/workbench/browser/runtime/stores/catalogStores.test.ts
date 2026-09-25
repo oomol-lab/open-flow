@@ -484,3 +484,36 @@ it('restores scoped Connections and revalidates with their own validator', async
     restored.dispose()
   }
 })
+
+it('preserves sprite metadata in raw caches and derives it for Providers and Actions after restoration', async () => {
+  const test = setup()
+  const iconSprite = {
+    version: 'v1',
+    pixelRatio: 2,
+    iconSize: 48,
+    bleed: 2,
+    width: 104,
+    height: 52,
+    lightUrl: 'https://example.com/light.png',
+    darkUrl: 'https://example.com/dark.png',
+  }
+  const iconSpritePosition = { x: 54, y: 2 }
+  const original = test.request.getMockImplementation()!
+  test.request.mockImplementation(async (path, init) => {
+    const response = await original(path, init)
+    if (!String(path).includes('/providers')) return response
+    const body = await response.json()
+    body.meta = { iconSprite }
+    body.data[0].iconSpritePosition = iconSpritePosition
+    return Response.json(body, { headers: response.headers })
+  })
+  const first = test.create()
+  expect((await resourceValue(first.providers.get()))![0]).toMatchObject({ iconSprite, iconSpritePosition })
+  expect((await resourceValue(first.actions.get('mail')))![0]).toMatchObject({ iconSprite, iconSpritePosition })
+  first.dispose()
+  test.request.mockImplementation(async () => new Response(null, { status: 304 }))
+  const second = test.create()
+  expect((await resourceValue(second.providers.get()))![0]).toMatchObject({ iconSprite, iconSpritePosition })
+  expect((await resourceValue(second.actions.get('mail')))![0]).toMatchObject({ iconSprite, iconSpritePosition })
+  second.dispose()
+})

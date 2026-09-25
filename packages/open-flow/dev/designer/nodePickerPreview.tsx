@@ -14,6 +14,7 @@ import { WorkbenchCanvas, WorkbenchCanvasActions } from '../../src/workbench/bro
 import { CatalogStores } from '../../src/workbench/browser/runtime/stores/catalogStores.ts'
 import { ConnectorStore } from '../../src/workbench/browser/runtime/stores/connectorStore.ts'
 import { combineSources, mapSource } from '../../src/workbench/browser/runtime/stores/optionSource.ts'
+import { sampleSprite } from './fixtures/providerSprite.ts'
 import { useStoryActions } from './storyActions.tsx'
 import { triggerFixtures } from './triggerFixtures.ts'
 import { createTriggerSession } from './triggerSession.ts'
@@ -58,6 +59,7 @@ const sampleProviders = [
       displayName: action.serviceName,
       authTypes: ['oauth2'],
       iconUrl: action.icon,
+      iconSpritePosition: { x: action.serviceId == 'gmail' ? 2 : 54, y: 2 },
     })),
   { service: 'feishu', displayName: '飞书', authTypes: ['oauth2'] },
   { service: 'wecom', displayName: '企业微信', authTypes: ['oauth2'] },
@@ -84,7 +86,14 @@ function sampleActionData(path: string, cached = false) {
           (!url.searchParams.get('service') || action.serviceId == url.searchParams.get('service')) &&
           (!url.searchParams.get('q') || `${action.name} ${action.description}`.toLowerCase().includes(url.searchParams.get('q')!.toLowerCase())),
       )
-      .map((action) => Object.assign({}, action, { operationType: action.operationType || undefined }, cached ? { name: `${action.name} (cached)` } : {})),
+      .map((action) =>
+        Object.assign(
+          {},
+          action,
+          { operationType: action.operationType || undefined, iconSprite: sampleSprite, iconSpritePosition: { x: action.serviceId == 'gmail' ? 2 : 54, y: 2 } },
+          cached ? { name: `${action.name} (cached)` } : {},
+        ),
+      ),
   }
 }
 
@@ -141,7 +150,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
       if (url.pathname.endsWith('/apps')) return Response.json({ success: true, data: sampleConnections })
       if (url.pathname.endsWith('/providers')) {
         await new Promise((resolve) => setTimeout(resolve, 1500))
-        return Response.json({ success: true, data: providers })
+        return Response.json({ success: true, data: providers, meta: { iconSprite: sampleSprite } })
       }
       await new Promise((resolve) => setTimeout(resolve, 1500))
       return Response.json(url.pathname.endsWith('/actions') ? proxyActions(String(path)) : sampleActionData(String(path)))
