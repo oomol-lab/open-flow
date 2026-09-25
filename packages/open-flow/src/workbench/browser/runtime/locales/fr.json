@@ -823,6 +823,7 @@
       },
       "task": {
         "capability-incomplete": "L’Inline Task « {{nodeId}} » possède une Connector Capability incomplète.",
+        "action-connection-required": "L’action « {{action}} » nécessite un compte pour être exécutée.",
         "connector-connection-required": "La Connector Task « {{taskId}} » nécessite une Connection active.",
         "connector-incomplete": "La Connector Task « {{taskId}} » nécessite une action.",
         "missing-entry": "Le CodeModule « {{moduleId}} » utilisé par une Inline Task doit exporter une fonction par défaut.",
@@ -975,9 +976,26 @@
     "codeHint": "Let the Agent use JavaScript to process inputs and tool results without accessing external apps."
   },
   "actionPicker": {
+    "preparing": "Préparation de l’action…",
+    "description": "Choisissez les actions que ce nœud peut appeler et sélectionnez un compte pour celles qui nécessitent une autorisation.",
+    "triggerLabel": "Actions",
+    "account": "Compte",
     "title": "Choisir une application et une action",
-    "failed": "L’action n’a pas été ajoutée. Réessayez.",
-    "search": "Rechercher une application ou une action…"
+    "failed": "Impossible de préparer cette action. Réessayez.",
+    "search": "Rechercher une application ou une action…",
+    "configureActions": "Actions des services",
+    "selected": "Sélection · {{count}}",
+    "empty": "Ajoutez des actions depuis le catalogue.",
+    "noAccount": "Aucun compte requis",
+    "refresh": "Actualiser les comptes",
+    "browse": "Services",
+    "back": "Retour aux services",
+    "searchActions": "Rechercher une action…",
+    "noResults": "Aucune action ni aucun service correspondant.",
+    "remove": "Retirer {{action}}",
+    "details": "Paramètres et instructions",
+    "chooseAccounts": "Choisissez un compte pour chaque action.",
+    "accountFor": "Compte pour {{action}}"
   },
   "triggerSchedule": {
     "title": "Planification du déclencheur",

@@ -148,6 +148,14 @@ describe('ConnectorStore', () => {
 
       const choice = firstActions?.[0]
       if (choice?.kind != 'connector') throw new Error('Expected a Connector choice.')
+      await connectors.loadCodeConnections('mail', signal)
+      const connectionReads = () => request.mock.calls.filter(([path]) => path.startsWith('/v1/connector/connections')).length
+      const cachedReads = connectionReads()
+      await connectors.loadCodeConnections('mail', signal)
+      expect(connectionReads()).toBe(cachedReads)
+      await connectors.loadCodeConnections('mail', signal, true)
+      expect(connectionReads()).toBe(cachedReads + 1)
+
       const lateConnections = Promise.withResolvers<Response>()
       request.mockImplementationOnce(() => lateConnections.promise)
       workspace.catalogs.connections.get('mail', flows[0]!.flowId, true)

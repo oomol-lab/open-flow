@@ -45,6 +45,7 @@ import { randomUUID } from 'node:crypto'
 import { ConnectorTaskError, ConnectorClient } from '../deployment/connector.ts'
 import { AcceptanceError, ControlError, serverErrorCode } from '../error.ts'
 import { Store } from '../storage/store.ts'
+import { actionAccountDiagnostics } from './action-account-diagnostics.ts'
 import {
   flow,
   variable,
@@ -952,6 +953,12 @@ export class ControlService {
     } catch (error) {
       throw new ControlError(controlErrorCode.flowInvalid, 'The stored Flow Revision is not structurally valid.', { cause: error })
     }
+    const connector = this.resolveConnector()
+    const accountDiagnostics = await actionAccountDiagnostics(content, checked.closure.dependencies, async (actionId) => {
+      if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
+      const teamId = await this.resolveConnectorScope(flowId)
+      return connector.getAction(actionId, undefined, this.#connectorContext(flowId, teamId))
+    })
     const llmDiagnostics = [...checked.closure.dependencies.tasks].toSorted().flatMap((taskId) => {
       const kind = content.document.tasks[taskId]?.executor.kind
       if ((kind != 'llm' && kind != 'agent') || this.llmAvailable(kind == 'agent' ? 'agent' : undefined)) return []
@@ -968,13 +975,13 @@ export class ControlService {
     })
     return {
       closureDigest: checked.closure.digest,
-      diagnostics: [...checked.diagnostics, ...llmDiagnostics],
+      diagnostics: [...checked.diagnostics, ...llmDiagnostics, ...accountDiagnostics],
       engineContract,
       flowId,
       modelVersion: content.modelVersion,
       revisionDigest: stored.digest,
       revisionId,
-      valid: checked.valid && llmDiagnostics.length == 0,
+      valid: checked.valid && llmDiagnostics.length == 0 && accountDiagnostics.length == 0,
       version: 1,
     }
   }

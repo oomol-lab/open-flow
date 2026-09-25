@@ -11,6 +11,7 @@ import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../f
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '../../../../ui/browser/select.tsx'
+import { Tooltip, TooltipTrigger, TooltipContent } from '../../../../ui/browser/tooltip.tsx'
 import { Icon } from '../icons.tsx'
 
 const manageAccountOption = '__manage-account__'
@@ -43,10 +44,50 @@ function ConnectionAlert({
   )
 }
 
-function AccountSelect({
+export function AccountControlButton({
+  disabled,
+  status,
+  label,
+  hint,
+  onClick,
+}: {
+  readonly disabled: boolean
+  readonly status: 'warning' | 'danger'
+  readonly label: string
+  readonly hint?: string
+  readonly onClick?: () => void
+}): ReactElement {
+  return (
+    <Tooltip>
+      <TooltipTrigger
+        render={
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="account-control justify-between font-normal"
+            data-status={status}
+            disabled={disabled}
+            onClick={onClick}
+          >
+            <span className="truncate">{label}</span>
+            <i aria-hidden="true" className={status === 'warning' ? 'i-lucide-light:plus size-3.5' : 'i-lucide-light:rotate-cw size-3.5'} />
+          </Button>
+        }
+      />
+      <TooltipContent>{hint ?? label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+export function AccountSelect({
   connections,
   disabled,
   id,
+  invalid,
+  warning,
+  addWhenEmpty,
+  label,
   selectedConnection,
   selectedId,
   onChange,
@@ -54,7 +95,11 @@ function AccountSelect({
 }: {
   readonly connections: readonly ConnectorConnection[]
   readonly disabled: boolean
-  readonly id: string
+  readonly id?: string
+  readonly warning?: boolean
+  readonly addWhenEmpty?: boolean
+  readonly invalid?: boolean
+  readonly label?: string
   readonly selectedConnection?: ConnectorConnection
   readonly selectedId?: string
   readonly onChange: (connectionId: string | undefined) => void
@@ -78,6 +123,9 @@ function AccountSelect({
     })),
     ...(onManage == null ? [] : [{ value: manageAccountOption, label: t('inspector.account.addAccount') }]),
   ]
+  if (addWhenEmpty && connections.length === 0 && selectedId == null) {
+    return <AccountControlButton disabled={disabled} status="warning" onClick={onManage} label={t('inspector.account.addAccount')} />
+  }
   return (
     <div ref={setContainer} className="account-select relative min-w-0">
       <Select
@@ -90,7 +138,14 @@ function AccountSelect({
           else onChange(value)
         }}
       >
-        <SelectTrigger id={id} size="field" aria-label={t('inspector.account.connection')} className={fieldSelectTriggerClass}>
+        <SelectTrigger
+          id={id}
+          size="field"
+          aria-label={label ?? t('inspector.account.connection')}
+          aria-invalid={invalid || undefined}
+          data-status={invalid ? 'danger' : warning ? 'warning' : undefined}
+          className={`${fieldSelectTriggerClass} account-control`}
+        >
           <SelectValue className={selectedId != null ? 'mr-5' : undefined} placeholder={t('inspector.account.chooseAccount')}>
             {selectedLabel}
           </SelectValue>

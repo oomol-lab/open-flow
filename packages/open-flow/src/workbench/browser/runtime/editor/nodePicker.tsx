@@ -1,4 +1,4 @@
-import styles from './nodePicker.module.scss'
+import styles from '../../../../ui/browser/navigation-page.module.scss'
 import type { DragEvent as ReactDragEvent, ReactElement } from 'react'
 import type { AddNodeOption } from './addNodeOptions.ts'
 import type { BlockLibraryProps } from './blockLibrary.tsx'
@@ -15,7 +15,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../../ui/browser
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../../../ui/browser/tooltip.tsx'
 import { Icon } from '../icons.tsx'
 import { observeResource } from '../stores/resource.ts'
-import { comparePickerApps, pickerConnectionPriorities } from './nodePickerApps.ts'
+import { comparePickerApps, pickerConnectionPriorities, pickerAppGroups, pickerAppPriority } from './nodePickerApps.ts'
+import { ProviderAppIcon } from './providerAppIcon.tsx'
+import { ProviderGroupHeading } from './providerGroupHeading.tsx'
 
 interface App {
   id: string
@@ -124,7 +126,7 @@ export function NodePickerContent({
           id: item.serviceId,
           label: item.label,
           icon: item.icon,
-          priority: Math.min(priorities.get(item.serviceId) ?? 3, item.noSetup ? 2 : 3),
+          priority: pickerAppPriority(item.serviceId, item.noSetup, priorities),
           directory: item,
           triggers: [],
         })
@@ -189,7 +191,7 @@ export function NodePickerContent({
         className={`group/app h-auto justify-start whitespace-normal font-normal flex min-w-0 items-start gap-2.5 rounded-lg px-2.5 py-1.5 text-left outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${compact ? '' : '[&>span:first-child]:translate-y-[2px]'}`}
       >
         {item.kind == 'connector' || (item.kind == 'trigger' && 'trigger' in item && (item.trigger.kind == 'catalog' || item.trigger.kind == 'connect')) ? (
-          <AppIcon src={item.icon} />
+          <ProviderAppIcon src={item.icon} />
         ) : (
           <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-muted">
             <ContentIcon src={item.icon} className="size-[18px] data-[icon-kind=initials]:text-[20px]" />
@@ -269,7 +271,7 @@ export function NodePickerContent({
       onClick={() => navigateApp(item.id)}
       className="group/app h-auto justify-start whitespace-normal font-normal flex min-w-0 items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-[13px] outline-none hover:bg-accent focus-visible:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
     >
-      <AppIcon src={item.icon} />
+      <ProviderAppIcon src={item.icon} />
       <span className="min-w-0 flex-1 py-1 text-[13px] font-normal leading-5">
         <span className="block truncate">{item.label}</span>
         {description && <span className="mt-1 block text-xs text-muted-foreground">{t('nodePicker.browseNodes')}</span>}
@@ -411,27 +413,12 @@ export function NodePickerContent({
                   local.filter((item) => item.kind != 'trigger'),
                   true,
                 )}
-                {(['configured', 'builtInAccount', 'noSetup', 'needsSetup'] as const).map((group, priority) => {
+                {pickerAppGroups.map((group, priority) => {
                   const items = apps.filter((item) => item.directory != null && (item.priority ?? 3) == priority)
                   if (items.length == 0) return null
                   return (
                     <section key={group} className="mb-3">
-                      <div className="flex items-center gap-1 px-2.5 pb-1 text-muted-foreground">
-                        <h3 style={{ margin: 0 }} className="text-xs font-medium">
-                          {t(`nodePicker.${group}`)}
-                        </h3>
-                        <Tooltip>
-                          <TooltipTrigger
-                            aria-label={t(`nodePicker.${group}`)}
-                            className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          >
-                            <i aria-hidden="true" className="i-codicon:question text-[13px]" />
-                          </TooltipTrigger>
-                          <TooltipContent container={root} side="top" align="start">
-                            {t(`nodePicker.${group}Description`)}
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
+                      <ProviderGroupHeading group={group} container={root} />
                       <AppDirectory viewport={list.current}>{items.map((item) => appRow(item))}</AppDirectory>
                     </section>
                   )
@@ -443,14 +430,6 @@ export function NodePickerContent({
         </div>
       </TabsContent>
     </Tabs>
-  )
-}
-
-function AppIcon({ src }: { src?: string }) {
-  return (
-    <span className="flex size-7 shrink-0 items-center justify-center rounded-[9px] bg-popover border border-[color-mix(in_srgb,var(--ui-foreground)_9%,var(--ui-popover))] text-[16px] group-hover/app:border-[color-mix(in_srgb,var(--ui-foreground)_14%,var(--ui-popover))] group-focus-visible/app:border-[color-mix(in_srgb,var(--ui-foreground)_14%,var(--ui-popover))] [--content-icon-initials-background:transparent]">
-      <ContentIcon src={src} loading="eager" decoding="sync" className="size-4 data-[icon-kind=initials]:text-[20px]" />
-    </span>
   )
 }
 

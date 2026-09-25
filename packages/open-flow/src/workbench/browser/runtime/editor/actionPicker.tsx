@@ -1,104 +1,236 @@
-import type { ReactElement } from 'react'
-import type { ConnectorConnection } from '../api.ts'
+import styles from '../../../../ui/browser/navigation-page.module.scss'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
+import type { ResourceState } from '../stores/resource.ts'
 import type { AddNodeOption } from './addNodeOptions.ts'
 
-import { Plus } from 'lucide-react'
-import { useCallback, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
+import { Virtualizer } from 'virtua'
 import { Button } from '../../../../ui/browser/button.tsx'
-import { Dialog, DialogContent, DialogTitle, DialogTrigger } from '../../../../ui/browser/dialog.tsx'
-import { FieldError } from '../../../../ui/browser/field.tsx'
-import { mapSource } from '../stores/optionSource.ts'
-import { BlockLibrary } from './blockLibrary.tsx'
+import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
+import { useDebouncedValue } from '../../../../ui/browser/hooks.ts'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '../../../../ui/browser/input-group.tsx'
+import { Label } from '../../../../ui/browser/label.tsx'
+import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
+import { Spinner } from '../../../../ui/browser/spinner.tsx'
+import { Tooltip, TooltipTrigger, TooltipContent } from '../../../../ui/browser/tooltip.tsx'
+import { observeResource } from '../stores/resource.ts'
+import { comparePickerApps, pickerConnectionPriorities, pickerAppGroups, pickerAppPriority } from './nodePickerApps.ts'
+import { ProviderAppIcon } from './providerAppIcon.tsx'
+import { ProviderGroupHeading } from './providerGroupHeading.tsx'
 
-const empty: readonly AddNodeOption[] = []
+type ProviderOption = Extract<AddNodeOption, { kind: 'connector-group' }>
 
-export function ActionPicker({
-  connectors,
-  disabled,
-  label,
-  exclude = [],
-  onSelect,
-  prepare,
-}: {
+interface ActionPickerProps {
+  readonly portalRoot?: HTMLElement | null
   readonly connectors: ConnectorStore
   readonly disabled: boolean
-  readonly label: string
-  readonly exclude?: readonly string[]
-  readonly onSelect: (action: ConnectorActionView, connections: readonly ConnectorConnection[]) => Promise<boolean>
-  readonly prepare?: (
-    action: ConnectorActionView,
-  ) => Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] } | undefined>
-}): ReactElement {
-  const t = useTranslate()
-  const [open, setOpen] = useState(false)
-  const [root, setRoot] = useState<HTMLElement | null>(null)
-  const portal = useCallback((element: HTMLDivElement | null) => setRoot(element?.closest<HTMLElement>('.open-flow-workbench') ?? null), [])
-  const [error, setError] = useState<string>()
-  const excluded = exclude.join(',')
-  const choices = useCallback(
-    (id: string, signal: AbortSignal) =>
-      mapSource(connectors.provideAddNodeOptionChoices(id, signal), signal, (options) =>
-        options.filter((option) => option.kind != 'connector' || !excluded.split(',').includes(option.connector.actionId)),
-      ),
-    [connectors, excluded],
-  )
-  const search = useCallback(
-    (query: string, signal: AbortSignal) =>
-      mapSource(connectors.provideAddNodeOptions(query, signal), signal, (options) =>
-        options.filter((option) => option.kind != 'connector' || !excluded.split(',').includes(option.connector.actionId)),
-      ),
-    [connectors, excluded],
-  )
+  readonly selected: readonly string[]
+  readonly onToggle: (action: ConnectorActionView) => void
+}
+
+/** Selection UI consumes the catalog without inheriting the node library's insertion semantics. */
+export function ActionPicker(props: ActionPickerProps) {
+  const [provider, setProvider] = useState<ProviderOption>()
+  const [navigation, setNavigation] = useState<'forward' | 'back'>()
+  // Navigation replaces the search and resource scope together, including any pending debounce.
   return (
-    <div ref={portal}>
-      <Dialog
-        open={open}
-        onOpenChange={(value) => {
-          setOpen(value)
-          setError(undefined)
-        }}
-      >
-        <DialogTrigger disabled={disabled} render={<Button type="button" variant="outline" size="xs" />}>
-          <Plus />
-          {label}
-        </DialogTrigger>
-        <DialogContent container={root} closeLabel={t('contextPanel.close')} className="flex h-[min(560px,80dvh)] flex-col gap-3 overflow-hidden sm:max-w-lg">
-          <DialogTitle>{t('actionPicker.title')}</DialogTitle>
-          {open && (
-            <BlockLibrary
-              presentation="actions"
-              refreshCatalog={connectors.retryCatalog}
-              browseOptions={connectors.browseAddNodeOptions}
-              searchOptions={search}
-              provideChoices={choices}
-              disabled={disabled}
-              draggable={false}
-              focusRequest={0}
-              options={empty}
-              onAdd={async (option) => {
-                if (option.kind != 'connector') return
-                setError(undefined)
-                try {
-                  const prepared = prepare == null ? { action: option.connector, connections: [] } : await prepare(option.connector)
-                  if (prepared == null) return
-                  if (!(await onSelect(prepared.action, prepared.connections))) {
-                    setError(t('actionPicker.failed'))
-                    return
-                  }
-                  setOpen(false)
-                  return option.connector.actionId
-                } catch (cause) {
-                  setError(cause instanceof Error ? cause.message : String(cause))
+    <ActionPickerPage
+      key={provider?.id ?? 'providers'}
+      {...props}
+      provider={provider}
+      navigation={navigation}
+      onNavigate={(next) => {
+        setNavigation(next == null ? 'back' : 'forward')
+        setProvider(next)
+      }}
+    />
+  )
+}
+
+function ActionPickerPage({
+  portalRoot,
+  connectors,
+  disabled,
+  selected,
+  onToggle,
+  provider,
+  onNavigate,
+  navigation,
+}: ActionPickerProps & {
+  readonly navigation: 'forward' | 'back' | undefined
+  readonly provider: ProviderOption | undefined
+  readonly onNavigate: (provider: ProviderOption | undefined) => void
+}) {
+  const t = useTranslate()
+  const id = useId()
+  const [query, setQuery] = useState('')
+  const [viewport, setViewport] = useState<HTMLElement | null>(null)
+  const search = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    search.current?.focus()
+  }, [])
+  const term = useDebouncedValue(query.trim(), 100)
+  const [attempt, setAttempt] = useState(0)
+  const [state, setState] = useState<ResourceState<readonly AddNodeOption[]>>({ data: undefined, refreshing: true, error: undefined })
+  // Read cached snapshots before paint so navigation never flashes a synthetic loading state.
+  useLayoutEffect(() => {
+    const controller = new AbortController()
+    setState({ data: undefined, refreshing: true, error: undefined })
+    const source =
+      provider != null
+        ? connectors.provideAddNodeOptionChoices(provider.id, controller.signal)
+        : term == ''
+          ? connectors.browseAddNodeOptions(controller.signal)
+          : connectors.provideAddNodeOptions(term, controller.signal)
+    observeResource(source, controller.signal, setState)
+    return () => controller.abort()
+  }, [connectors, provider?.id, provider == null ? term : '', attempt])
+  const connections = useVal(connectors.$.pickerConnections)
+  const items = useMemo(
+    () =>
+      (state.data ?? []).filter(
+        (item) =>
+          provider == null ||
+          term == '' ||
+          `${item.label} ${item.kind == 'connector' ? item.connector.description : ''}`.toLocaleLowerCase().includes(term.toLocaleLowerCase()),
+      ),
+    [state.data, provider, term],
+  )
+  const rows = useMemo(() => {
+    if (provider != null || term != '') return items
+    const priorities = pickerConnectionPriorities(connections)
+    const providers = items
+      .filter((item): item is ProviderOption => item.kind == 'connector-group')
+      .map((item) => ({ item, label: item.label, priority: pickerAppPriority(item.serviceId, item.noSetup, priorities) }))
+      .toSorted(comparePickerApps)
+    const result: (AddNodeOption | { kind: 'provider-heading'; group: (typeof pickerAppGroups)[number] })[] = []
+    pickerAppGroups.forEach((group, priority) => {
+      const members = providers.filter((entry) => entry.priority == priority)
+      if (members.length > 0) {
+        result.push({ kind: 'provider-heading', group })
+        result.push(...members.map((entry) => entry.item))
+      }
+    })
+    return result
+  }, [items, connections, provider, term])
+  return (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+      <div className="flex shrink-0 items-center gap-2 px-4">
+        <InputGroup>
+          <InputGroupAddon>
+            <i aria-hidden="true" className="i-lucide-light:search size-4" />
+          </InputGroupAddon>
+          <InputGroupInput
+            ref={search}
+            className="text-[13px]"
+            aria-label={t(provider == null ? 'actionPicker.search' : 'actionPicker.searchActions')}
+            placeholder={t(provider == null ? 'actionPicker.search' : 'actionPicker.searchActions')}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+          />
+        </InputGroup>
+      </div>
+      <div className={`${styles.page} gap-3`} data-navigation={navigation}>
+        {provider != null && (
+          <div className="mx-4 grid h-8 shrink-0 grid-cols-[28px_minmax(0,1fr)_28px] items-center gap-2 rounded-lg bg-[color-mix(in_srgb,var(--ui-foreground)_4%,var(--ui-popover))] px-1.5">
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button type="button" variant="ghost" size="icon-sm" aria-label={t('actionPicker.back')} onClick={() => onNavigate(undefined)}>
+                    <i aria-hidden="true" className="i-lucide-light:chevron-left size-4" />
+                  </Button>
                 }
-              }}
-            />
+              />
+              <TooltipContent container={portalRoot}>{t('actionPicker.back')}</TooltipContent>
+            </Tooltip>
+            <span className="min-w-0 truncate text-center text-[13px] font-semibold" title={provider.label}>
+              {provider.label}
+            </span>
+          </div>
+        )}
+        <ScrollArea className="min-h-0 flex-1" defer={false} events={{ initialized: (instance) => setViewport(instance.elements().viewport) }}>
+          <div className="flex flex-col gap-1 px-4">
+            {state.refreshing && state.data == null && (
+              <div role="status" className="flex items-center gap-2 px-2 py-3 text-muted-foreground">
+                <Spinner />
+                {t('contextPanel.loading')}
+              </div>
+            )}
+            {state.error != null && (
+              <div role="alert" className="flex items-center justify-between gap-2 px-2 py-3 text-muted-foreground">
+                {t('contextPanel.loadFailed')}
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="text-[13px] font-normal"
+                  onClick={() => {
+                    connectors.retryCatalog()
+                    setAttempt((value) => value + 1)
+                  }}
+                >
+                  {t('contextPanel.retry')}
+                </Button>
+              </div>
+            )}
+            {state.data != null && items.length == 0 && <p className="m-0 px-2 py-3 text-muted-foreground">{t('actionPicker.noResults')}</p>}
+          </div>
+          {viewport != null && (
+            <Virtualizer data={rows} itemSize={provider == null && term == '' ? 44 : 76} scrollRef={{ current: viewport }}>
+              {(item) => (
+                <div className="px-4 pb-1">
+                  {item.kind == 'provider-heading' ? (
+                    <div className="pt-2">
+                      <ProviderGroupHeading group={item.group} container={portalRoot} />
+                    </div>
+                  ) : item.kind == 'connector-group' ? (
+                    <Button
+                      key={item.id}
+                      type="button"
+                      variant="ghost"
+                      size="lg"
+                      className="group/app h-auto min-w-0 w-full justify-start gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] font-normal hover:bg-accent focus-visible:bg-accent"
+                      onClick={() => onNavigate(item)}
+                    >
+                      <ProviderAppIcon src={item.icon} />
+                      <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>
+                      <i aria-hidden="true" className="i-lucide-light:chevron-right size-4 text-muted-foreground" />
+                    </Button>
+                  ) : item.kind == 'connector' ? (
+                    <Label
+                      key={item.id}
+                      className="group/app flex cursor-pointer text-[13px] font-normal items-start gap-2.5 rounded-lg px-2.5 py-1.5 hover:bg-accent has-[:focus-visible]:bg-accent has-data-disabled:cursor-default has-data-disabled:opacity-50"
+                    >
+                      <ProviderAppIcon src={item.icon} />
+                      <span className="flex min-w-0 flex-1 flex-col gap-1 py-1 leading-5">
+                        <span id={`${id}-${item.id}`} className="truncate font-medium" title={item.connector.name}>
+                          {item.connector.name}
+                        </span>
+                        {provider == null && <span className="truncate text-muted-foreground">{item.connector.serviceName}</span>}
+                        {item.connector.description && (
+                          <span className="line-clamp-2 text-xs leading-[18px] text-muted-foreground" title={item.connector.description}>
+                            {item.connector.description}
+                          </span>
+                        )}
+                      </span>
+                      <Checkbox
+                        className="mt-1.5 shrink-0"
+                        checked={selected.includes(item.connector.actionId)}
+                        disabled={disabled}
+                        onCheckedChange={() => onToggle(item.connector)}
+                        aria-labelledby={`${id}-${item.id}`}
+                      />
+                    </Label>
+                  ) : null}
+                </div>
+              )}
+            </Virtualizer>
           )}
-          {error != null && <FieldError>{error}</FieldError>}
-        </DialogContent>
-      </Dialog>
+        </ScrollArea>
+      </div>
     </div>
   )
 }

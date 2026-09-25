@@ -823,6 +823,7 @@
       },
       "task": {
         "capability-incomplete": "Inline Task ‘{{nodeId}}’의 Connector Capability 구성이 완료되지 않았습니다.",
+        "action-connection-required": "도구 \"{{action}}\"을 실행하려면 계정을 선택하세요.",
         "connector-connection-required": "Connector Task ‘{{taskId}}’에는 활성 Connection이 필요합니다.",
         "connector-incomplete": "Connector Task ‘{{taskId}}’에는 action이 필요합니다.",
         "missing-entry": "Inline Task에서 사용하는 CodeModule ‘{{moduleId}}’은(는) default function을 export해야 합니다.",
@@ -975,9 +976,26 @@
     "codeHint": "Let the Agent use JavaScript to process inputs and tool results without accessing external apps."
   },
   "actionPicker": {
+    "preparing": "도구 준비 중…",
+    "description": "이 노드에서 호출할 도구를 선택하고, 인증이 필요한 도구에는 계정을 지정하세요.",
+    "triggerLabel": "도구",
+    "account": "계정",
     "title": "앱 및 작업 선택",
-    "failed": "작업을 추가하지 못했습니다. 다시 시도하세요.",
-    "search": "앱 또는 작업 검색…"
+    "failed": "도구를 준비하지 못했습니다. 다시 시도하세요.",
+    "search": "앱 또는 작업 검색…",
+    "configureActions": "서비스 작업",
+    "selected": "선택됨 · {{count}}",
+    "empty": "목록에서 작업을 추가하세요.",
+    "noAccount": "계정 불필요",
+    "refresh": "계정 새로고침",
+    "browse": "서비스",
+    "back": "서비스 목록으로 돌아가기",
+    "searchActions": "작업 검색…",
+    "noResults": "일치하는 작업이나 서비스가 없습니다.",
+    "remove": "{{action}} 제거",
+    "details": "매개변수 및 설명",
+    "chooseAccounts": "각 작업에 사용할 계정을 선택하세요.",
+    "accountFor": "{{action}} 계정"
   },
   "triggerSchedule": {
     "title": "트리거 일정",

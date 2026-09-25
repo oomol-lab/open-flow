@@ -823,6 +823,7 @@
       },
       "task": {
         "capability-incomplete": "Inline Task「{{nodeId}}」の Connector Capability が未設定です。",
+        "action-connection-required": "ツール「{{action}}」を実行するにはアカウントを選択してください。",
         "connector-connection-required": "Connector Task「{{taskId}}」には有効な Connection が必要です。",
         "connector-incomplete": "Connector Task「{{taskId}}」には action が必要です。",
         "missing-entry": "Inline Task で使用する CodeModule「{{moduleId}}」は default function を export する必要があります。",
@@ -975,9 +976,26 @@
     "codeHint": "Let the Agent use JavaScript to process inputs and tool results without accessing external apps."
   },
   "actionPicker": {
+    "preparing": "ツールを準備中…",
+    "description": "このノードから呼び出せるツールを選び、認証が必要なツールにはアカウントを指定します。",
+    "triggerLabel": "ツール",
+    "account": "アカウント",
     "title": "アプリとアクションを選択",
-    "failed": "アクションを追加できませんでした。再試行してください。",
-    "search": "アプリやアクションを検索…"
+    "failed": "ツールを準備できませんでした。もう一度お試しください。",
+    "search": "アプリやアクションを検索…",
+    "configureActions": "サービス操作",
+    "selected": "選択済み · {{count}}",
+    "empty": "一覧から操作を追加してください。",
+    "noAccount": "アカウント不要",
+    "refresh": "アカウントを更新",
+    "browse": "サービス",
+    "back": "サービス一覧に戻る",
+    "searchActions": "操作を検索…",
+    "noResults": "一致する操作やサービスがありません。",
+    "remove": "{{action}} を削除",
+    "details": "パラメーターと説明",
+    "chooseAccounts": "各操作のアカウントを選択してください。",
+    "accountFor": "{{action}} のアカウント"
   },
   "triggerSchedule": {
     "title": "トリガースケジュール",

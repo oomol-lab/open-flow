@@ -68,7 +68,7 @@ Add production node boundary cases to `nodeStories.tsx`, layered card examples t
 
 `?story=node-picker` 使用生产添加节点面板，进入时直接展示。右键画布或将执行连线空放，在鼠标附近打开同一面板；覆盖双向连接、不兼容项、搜索、边缘避让及只读状态。选择节点会记录创建位置和连接，只使用确定性数据。
 
-`?story=agent-tools` uses production AgentSettings, WorkspaceStore and ConnectorStore. Its HTTP fixture provides tools and active/expired accounts, and applies draft changes with the production reducer. It covers parameter sources, approval, validation and read-only controls without external requests.
+`?story=agent-tools` uses production AgentSettings, WorkspaceStore and ConnectorStore. Its HTTP fixture provides tools and active/expired accounts, and applies draft changes with the production reducer. It covers the action/account dialog, parameter sources, validation, Save/Cancel and read-only controls without external requests. `?story=code-actions` exercises the same selection UI through production CodeTaskSection and WorkspaceStore.
 
 ## Trigger galleries
 

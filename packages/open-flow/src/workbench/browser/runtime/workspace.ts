@@ -550,7 +550,12 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
   const connectionId = connector?.connectionId
   const selectedConnection = connectionId == null ? undefined : connections?.byId.get(connectionId)
   const connectionRequired =
-    connectorAction?.authenticated == true && (connector?.connectionId == null || (connections != null && selectedConnection?.status != 'active'))
+    (connectorAction?.authenticated == true && (connector?.connectionId == null || (connections != null && selectedConnection?.status != 'active'))) ||
+    nodeDiagnosticCount(
+      context.target,
+      resolved,
+      context.diagnostics.filter((diagnostic) => diagnostic.code === 'task.action-connection-required'),
+    ) > 0
   const nodeRun = context.runNodes.get(nodeId)
   const common = {
     description: node.description,

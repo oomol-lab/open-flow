@@ -7,6 +7,40 @@ import { providerIcon } from './providerIcon.ts'
 import { designerGraph } from './workspace.ts'
 
 describe('Designer port projection', () => {
+  it('uses the disconnected state only for the Code node with an account diagnostic', () => {
+    const code = { kind: 'task' as const, inputs: {}, task: { name: 'Code', moduleId: 'module', inputs: [], outputs: [] } }
+    const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
+      actorId: 'actor',
+      createdAt: '2026-09-25T00:00:00.000Z',
+      digest: 'digest',
+      flowId: 'flow',
+      modelVersion: currentFlowModelVersion,
+      parentRevisionId: null,
+      revisionId: 'revision',
+      version: 1,
+      content: {
+        modelVersion: currentFlowModelVersion,
+        modules: { module: { name: 'Code', source: 'export default () => ({})', imports: [] } },
+        document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: { code, other: code } } },
+      },
+    }
+    const issue = {
+      code: 'task.action-connection-required',
+      path: '/document/graph/nodes/code/task/capabilities/0/actions/0/connectionId',
+      message: 'Choose an account.',
+      line: 0,
+      column: 0,
+    }
+    const nodes = designerGraph(draft, { kind: 'flow' }, {}, [issue]).nodes
+    expect(nodes.find((node) => node.id === 'code')).toMatchObject({ connectionRequired: true, diagnostics: 1 })
+    expect(nodes.find((node) => node.id === 'other')).toMatchObject({ connectionRequired: false, diagnostics: 0 })
+    expect(designerGraph(draft, { kind: 'flow' }, {}, [{ ...issue, code: 'module.syntax', path: '/modules/module/source' }]).nodes[0]).toMatchObject({
+      connectionRequired: false,
+      diagnostics: 1,
+    })
+    expect(designerGraph(draft, { kind: 'flow' }, {}, []).nodes[0]).toMatchObject({ connectionRequired: false, diagnostics: 0 })
+  })
+
   it('ignores malformed remote edges instead of throwing', () => {
     const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
       actorId: 'actor',

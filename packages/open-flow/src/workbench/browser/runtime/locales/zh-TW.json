@@ -823,6 +823,7 @@
       },
       "task": {
         "capability-incomplete": "Inline Task「{{nodeId}}」的 Connector Capability 設定不完整。",
+        "action-connection-required": "工具「{{action}}」需要選擇帳號後才能執行。",
         "connector-connection-required": "請為連接器節點「{{taskId}}」選擇連線帳號。",
         "connector-incomplete": "請為連接器任務「{{taskId}}」選擇操作。",
         "missing-entry": "Inline Task 使用的 CodeModule「{{moduleId}}」必須匯出 default function。",
@@ -975,9 +976,26 @@
     "codeHint": "允許 Agent 使用 JavaScript 處理輸入和工具結果，不存取外部應用程式。"
   },
   "actionPicker": {
+    "preparing": "正在準備工具…",
+    "description": "選擇此節點可呼叫的工具，並為需要授權的工具選擇帳號。",
+    "triggerLabel": "工具",
+    "account": "帳號",
     "title": "選擇應用程式和動作",
-    "failed": "未能新增此動作，請重試。",
-    "search": "搜尋應用程式或動作…"
+    "failed": "工具準備失敗，請重試。",
+    "search": "搜尋應用程式或動作…",
+    "configureActions": "服務操作",
+    "selected": "已選 · {{count}}",
+    "empty": "從清單中新增操作。",
+    "noAccount": "無需帳號",
+    "refresh": "重新整理帳號",
+    "browse": "服務",
+    "back": "返回服務清單",
+    "searchActions": "搜尋操作…",
+    "noResults": "沒有符合的操作或服務。",
+    "remove": "移除 {{action}}",
+    "details": "參數與說明",
+    "chooseAccounts": "請為每個操作選擇帳號。",
+    "accountFor": "{{action}} 的帳號"
   },
   "triggerSchedule": {
     "title": "觸發排程",

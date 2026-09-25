@@ -823,6 +823,7 @@
       },
       "task": {
         "capability-incomplete": "Inline Task «{{nodeId}}» содержит незавершенную Connector Capability.",
+        "action-connection-required": "Для запуска действия «{{action}}» выберите аккаунт.",
         "connector-connection-required": "Для Connector Task «{{taskId}}» требуется активная Connection.",
         "connector-incomplete": "Для Connector Task «{{taskId}}» требуется action.",
         "missing-entry": "CodeModule «{{moduleId}}», используемый Inline Task, должен экспортировать default function.",
@@ -975,9 +976,26 @@
     "codeHint": "Let the Agent use JavaScript to process inputs and tool results without accessing external apps."
   },
   "actionPicker": {
+    "preparing": "Подготовка действия…",
+    "description": "Выберите действия, которые может вызывать этот узел, и укажите аккаунт для действий, требующих авторизации.",
+    "triggerLabel": "Действия",
+    "account": "Аккаунт",
     "title": "Выберите приложение и действие",
-    "failed": "Не удалось добавить действие. Повторите попытку.",
-    "search": "Поиск приложений и действий…"
+    "failed": "Не удалось подготовить действие. Повторите попытку.",
+    "search": "Поиск приложений и действий…",
+    "configureActions": "Действия сервисов",
+    "selected": "Выбрано · {{count}}",
+    "empty": "Добавьте действия из каталога.",
+    "noAccount": "Аккаунт не требуется",
+    "refresh": "Обновить аккаунты",
+    "browse": "Сервисы",
+    "back": "Назад к сервисам",
+    "searchActions": "Поиск действий…",
+    "noResults": "Нет подходящих действий или сервисов.",
+    "remove": "Удалить {{action}}",
+    "details": "Параметры и инструкции",
+    "chooseAccounts": "Выберите аккаунт для каждого действия.",
+    "accountFor": "Аккаунт для {{action}}"
   },
   "triggerSchedule": {
     "title": "Расписание триггера",

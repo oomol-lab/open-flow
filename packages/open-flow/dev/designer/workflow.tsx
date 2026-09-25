@@ -47,7 +47,7 @@ const workflowPositions = {
 }
 const stateViewport = { x: 45, y: 100, zoom: 0.9 }
 const statePositions = Object.fromEntries(
-  ['idle', 'selected', 'waiting', 'running', 'success', 'error'].map((id, index) => [id, { x: (index % 3) * 400, y: Math.floor(index / 3) * 240 }]),
+  ['idle', 'selected', 'waiting', 'running', 'success', 'error', 'account'].map((id, index) => [id, { x: (index % 3) * 400, y: Math.floor(index / 3) * 240 }]),
 )
 
 const workflow: FlowCanvasViewModel = {
@@ -223,13 +223,15 @@ const states: FlowCanvasViewModel = {
         run: { status: 'success', progress: 100, successCount: 3 },
       },
       { id: 'error', title: 'Send the campaign', run: { status: 'error' } },
+      { id: 'account', title: 'Code · Missing account', run: { status: 'idle' } },
     ] as const
   ).map((node) => ({
     id: node.id,
     title: node.title,
     run: { ...node.run, runId: 'lab-run-042' },
     executorName: 'JavaScript',
-    diagnostics: node.id == 'error' ? 1 : undefined,
+    diagnostics: node.id == 'error' || node.id == 'account' ? 1 : undefined,
+    connectionRequired: node.id == 'account',
     kind: 'task',
     reference: 'lab/status',
     position: statePositions[node.id],
@@ -419,7 +421,7 @@ export const workflowStories: readonly FrontendStory[] = [
     group: 'Theme Preview',
     id: 'node-states',
     title: 'Node states',
-    description: 'Select nodes to compare outlines and execution states. Interactions appear in the status below.',
+    description: 'Select nodes to compare outlines, execution states and the Code missing-account icon. Interactions appear in the status below.',
     standalone: true,
     render: (log, dark, language) => <WorkflowStory dark={dark} language={language} log={log} model={states} initialSelectedNodeId="selected" />,
   },

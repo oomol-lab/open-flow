@@ -478,6 +478,7 @@ export const historyKeyboardStory: FrontendStory = {
   id: 'canvas-history-keyboard',
   title: 'Keyboard scope',
   standalone: true,
-  description: 'Two independent editors exercise removed controls, inspector focus, text undo, dialogs, and host isolation.',
+  description:
+    'Two independent editors exercise removed controls, inspector focus, text undo, dialogs, and host isolation. Check dialog fades and focus restoration on close.',
   render: (log, dark, language) => <HistoryKeyboardStory log={log} dark={dark} language={language} />,
 }

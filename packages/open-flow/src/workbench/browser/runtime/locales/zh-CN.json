@@ -823,6 +823,7 @@
       },
       "task": {
         "capability-incomplete": "Inline Task“{{nodeId}}”的 Connector Capability 配置不完整。",
+        "action-connection-required": "工具“{{action}}”需要选择账号后才能运行。",
         "connector-connection-required": "请为连接器节点“{{taskId}}”选择连接账号。",
         "connector-incomplete": "请为连接器任务“{{taskId}}”选择操作。",
         "missing-entry": "Inline Task 使用的 CodeModule“{{moduleId}}”必须导出 default function。",
@@ -975,9 +976,26 @@
     "codeHint": "允许 Agent 使用 JavaScript 处理输入和工具结果，不访问外部应用。"
   },
   "actionPicker": {
+    "preparing": "正在准备工具…",
+    "description": "选择此节点可调用的工具，并为需要授权的工具选择账号。",
+    "triggerLabel": "工具",
+    "account": "账号",
     "title": "选择应用和动作",
-    "failed": "未能添加此动作，请重试。",
-    "search": "搜索应用或动作…"
+    "failed": "工具准备失败，请重试。",
+    "search": "搜索应用或动作…",
+    "configureActions": "服务操作",
+    "selected": "已选 · {{count}}",
+    "empty": "从列表中添加操作。",
+    "noAccount": "无需账号",
+    "refresh": "刷新账号",
+    "browse": "服务",
+    "back": "返回服务列表",
+    "searchActions": "搜索操作…",
+    "noResults": "没有匹配的操作或服务。",
+    "remove": "移除 {{action}}",
+    "details": "参数与说明",
+    "chooseAccounts": "请为每个操作选择账号。",
+    "accountFor": "{{action}} 的账号"
   },
   "triggerSchedule": {
     "title": "触发计划",

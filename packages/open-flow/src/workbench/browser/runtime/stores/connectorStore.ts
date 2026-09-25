@@ -419,10 +419,12 @@ export class ConnectorStore {
     }
   }
 
-  public async loadCodeConnections(serviceId: string, signal: AbortSignal): Promise<void> {
+  public async loadCodeConnections(serviceId: string, signal: AbortSignal, force = false): Promise<void> {
     const flowId = this.#workspace.$.flowId.value
     if (flowId == null || this.#disposed) return
-    await resourceValue(this.data.connections.get(serviceId, flowId), signal)
+    const source = this.data.connections.get(serviceId, flowId, force)
+    await Promise.resolve()
+    await resourceValue(source, signal, force)
     if (signal.aborted || this.#disposed || flowId != this.#workspace.$.flowId.value) return
     this.#remember(this.#services, [serviceId])
   }

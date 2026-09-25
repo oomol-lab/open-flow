@@ -1299,6 +1299,84 @@ describe('Server application service', () => {
     expect(service.run(accepted.runId)).toMatchObject({ status: 'completed' })
   })
 
+  it.each([
+    ['code', true, undefined, true],
+    ['code', false, undefined, false],
+    ['code', true, 'work', false],
+    ['agent', true, undefined, true],
+    ['agent', false, undefined, false],
+    ['agent', true, 'work', false],
+  ] as const)('checks missing action accounts for %s (authenticated=%s, account=%s)', async (kind, authenticated, connectionId, missing) => {
+    const getAction = vi.fn(async () => ({
+      actionId: 'mail.send',
+      serviceId: 'mail',
+      serviceName: 'Mail',
+      name: 'Send',
+      description: '',
+      authenticated,
+      inputs: {},
+      outputs: {},
+    }))
+    const service = await openService(await databaseFile(), { capabilities: { connector: () => createConnectorHost({ getAction }) } })
+    const source = fullFlow()
+    const increment = source.document.graph.nodes.increment!
+    if (increment.kind !== 'task' || increment.task == null) throw new Error('Missing fixture task')
+    const entry = { action: 'mail.send', ...(connectionId == null ? {} : { connectionId }) }
+    const revision: RevisionContent =
+      kind === 'code'
+        ? {
+            ...source,
+            document: {
+              ...source.document,
+              graph: {
+                ...source.document.graph,
+                nodes: {
+                  ...source.document.graph.nodes,
+                  increment: { ...increment, task: { ...increment.task, capabilities: [{ kind: 'connector', mode: 'independent', actions: [entry] }] } },
+                },
+              },
+            },
+          }
+        : {
+            ...source,
+            document: {
+              ...source.document,
+              tasks: {
+                ...source.document.tasks,
+                agent: {
+                  name: 'Agent',
+                  inputs: [],
+                  outputs: [{ handle: 'output', nullable: false, jsonSchema: { type: 'string' } }],
+                  executor: {
+                    kind: 'agent',
+                    model: 'fixture',
+                    system: '',
+                    prompt: { kind: 'value', value: 'Go' },
+                    maxRounds: 3,
+                    tools: [{ ...entry, id: 'send', name: 'send', description: '', approval: false, inputs: [] }],
+                  },
+                },
+              },
+              graph: { ...source.document.graph, nodes: { ...source.document.graph.nodes, agent: { kind: 'task', taskId: 'agent', inputs: {} } } },
+            },
+          }
+    const stored = await storeRevision(service, revision, `account-check-${kind}-${authenticated}-${connectionId}`)
+    const check = await service.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v5')
+    const diagnostics = check.diagnostics.filter((item) => item.code === 'task.action-connection-required')
+    expect(diagnostics).toHaveLength(missing ? 1 : 0)
+    if (missing) {
+      expect(check.valid).toBe(false)
+      expect(diagnostics[0]).toMatchObject({
+        path:
+          kind === 'code'
+            ? '/document/graph/nodes/increment/task/capabilities/0/actions/0/connectionId'
+            : '/document/tasks/agent/executor/tools/0/connectionId',
+        values: { action: 'mail.send' },
+      })
+    }
+    expect(getAction).toHaveBeenCalledTimes(connectionId == null ? 1 : 0)
+  })
+
   it('reports LLM Tasks when the deployment has no LLM host', async () => {
     const unavailable = await openService(await databaseFile())
     const stored = await storeRevision(unavailable, llmFlow(), 'llm-check-unavailable')

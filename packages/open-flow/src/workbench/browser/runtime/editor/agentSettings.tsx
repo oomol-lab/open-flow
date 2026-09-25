@@ -67,29 +67,31 @@ export function AgentSettings({
     renderConfig(changes.value)
   }, [changes, task.executor])
   const invalidDrafts = useRef(new Set<string>())
-  const save = () => {
+  const save = async (): Promise<boolean> => {
     const value = changes.value
     const notification = value.kind === 'agent' && value.notification != null ? store.$.revision.value?.task(value.notification.taskId) : undefined
     const notificationInputs = notification?.inputs.filter((port): port is InputPort => 'handle' in port) ?? []
     if (invalidDrafts.current.size > 0 || !agentFixedValuesValid(value, notificationInputs)) {
       setSaveError(t('agent.invalidValues'))
-      return
+      return false
     }
     setSaveError(undefined)
-    void changes
-      .save()
-      .then((saved) => {
-        if (!saved) setSaveError(t('agent.saveFailed'))
-      })
-      .catch((cause: unknown) => setSaveError(cause instanceof Error ? cause.message : String(cause)))
+    try {
+      const saved = await changes.save()
+      if (!saved) setSaveError(t('agent.saveFailed'))
+      return saved
+    } catch (cause) {
+      setSaveError(cause instanceof Error ? cause.message : String(cause))
+      return false
+    }
   }
+
   const setConfig = (value: SetStateAction<ManagedTaskExecutor>, commit = true) => {
     changes.value = typeof value == 'function' ? value(changes.value) : value
     renderConfig(changes.value)
     if (commit) save()
   }
   const [invalid, setInvalid] = useState<ReadonlySet<string>>(new Set())
-  const [error, setError] = useState<string>()
   const revision = useVal(store.$.revision)
   if (config.kind != 'agent' || revision == null) return null
   const inputs = task.inputs.filter((port): port is InputPort => 'handle' in port)
@@ -171,17 +173,20 @@ export function AgentSettings({
         </Field>
         <AgentTools
           config={config}
-          setConfig={setConfig}
           disabled={disabled}
-          portalRoot={portalRoot}
           inputs={inputs}
           theme={theme}
-          validity={validity}
-          save={save}
-          nodeId={nodeId}
           connectors={connectors}
           prepareAction={prepareAction}
-          setError={setError}
+          onSave={async (tools) => {
+            const before = changes.value
+            if (before.kind != 'agent') return false
+            changes.value = { ...before, tools }
+            const saved = await save()
+            if (!saved) changes.value = before
+            renderConfig(changes.value)
+            return saved
+          }}
         />
         <details className="inspector-disclosure inspector-disclosure-compact">
           <summary>
@@ -238,7 +243,6 @@ export function AgentSettings({
           </div>
         </details>
         {invalid.size > 0 && saveError !== t('agent.invalidValues') && <FieldError>{t('agent.invalidValues')}</FieldError>}
-        {error != null && <FieldError>{error}</FieldError>}
         {saveError != null && (
           <FieldError>
             {saveError}

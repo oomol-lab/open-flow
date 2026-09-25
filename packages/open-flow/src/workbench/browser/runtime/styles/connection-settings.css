@@ -1,4 +1,24 @@
 .open-flow-workbench {
+  .account-control {
+    width: 100%;
+    height: 30px;
+    min-width: 0;
+    padding-inline: 8px;
+    border-radius: var(--ui-control-radius);
+    font-size: 12px;
+    background: var(--ui-control-background);
+
+    &[data-status='warning'] {
+      border-color: var(--warning-border);
+      background: var(--warning-surface);
+    }
+
+    &[data-status='danger'] {
+      border-color: var(--ui-destructive);
+      background: var(--ui-danger-control-background-default);
+    }
+  }
+
   .account-select-clear {
     opacity: 0;
     pointer-events: none;

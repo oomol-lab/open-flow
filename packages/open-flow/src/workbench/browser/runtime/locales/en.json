@@ -823,6 +823,7 @@
       },
       "task": {
         "capability-incomplete": "Inline Task \"{{nodeId}}\" has an incomplete Connector Capability.",
+        "action-connection-required": "Action \"{{action}}\" requires an account before running.",
         "connector-connection-required": "Connector Task \"{{taskId}}\" requires an active Connection.",
         "connector-incomplete": "Connector Task \"{{taskId}}\" requires an action.",
         "missing-entry": "CodeModule \"{{moduleId}}\" used by an Inline Task must export a default function.",
@@ -975,9 +976,26 @@
     "codeHint": "Let the Agent use JavaScript to process inputs and tool results without accessing external apps."
   },
   "actionPicker": {
+    "preparing": "Preparing action…",
+    "description": "Choose the actions this node can call, and select an account for actions that require authorization.",
+    "triggerLabel": "Actions",
+    "account": "Account",
     "title": "Choose an action",
-    "failed": "The action was not added. Try again.",
-    "search": "Search apps or actions…"
+    "failed": "Could not prepare this action. Try again.",
+    "search": "Search apps or actions…",
+    "configureActions": "Service actions",
+    "selected": "Selected · {{count}}",
+    "empty": "Choose actions from the catalog.",
+    "noAccount": "No account required",
+    "refresh": "Refresh accounts",
+    "browse": "Services",
+    "back": "Back to services",
+    "searchActions": "Search actions…",
+    "noResults": "No matching actions or services.",
+    "remove": "Remove {{action}}",
+    "details": "Parameters and instructions",
+    "chooseAccounts": "Choose an account for each action.",
+    "accountFor": "Account for {{action}}"
   },
   "triggerSchedule": {
     "title": "Trigger schedule",

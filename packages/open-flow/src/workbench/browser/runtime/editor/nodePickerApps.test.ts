@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { comparePickerApps, pickerConnectionPriorities } from './nodePickerApps.ts'
+import { comparePickerApps, pickerConnectionPriorities, pickerAppPriority } from './nodePickerApps.ts'
 
 const account = (serviceId: string, connectionId: string, builtInAccount = false, status: 'active' | 'disconnected' = 'active') => ({
   serviceId,
@@ -45,4 +45,16 @@ it('classifies active accounts independently of response order', () => {
       .toSorted(comparePickerApps)
       .map((item) => item.label),
   ).toEqual(['Z connected', '内置', '免配置', '未配置'])
+})
+
+it('uses the same provider groups for catalog metadata and active accounts', () => {
+  const priorities = pickerConnectionPriorities([
+    account('personal', 'own'),
+    account('hosted', 'built-in', true),
+    account('offline', 'old', false, 'disconnected'),
+  ])
+  expect(pickerAppPriority('personal', true, priorities)).toBe(0)
+  expect(pickerAppPriority('hosted', false, priorities)).toBe(1)
+  expect(pickerAppPriority('public', true, priorities)).toBe(2)
+  expect(pickerAppPriority('offline', false, priorities)).toBe(3)
 })

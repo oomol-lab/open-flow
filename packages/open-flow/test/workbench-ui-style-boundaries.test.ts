@@ -224,7 +224,7 @@ test('keeps Resource Browser primitives on shared visual ownership', async () =>
   assert.match(dialog, /data-slot="dialog-content"/)
   assert.match(dialog, /readonly container\?: HTMLElement \| null/)
   assert.match(dialog, /bg-popover/)
-  assert.match(dialog, /motion-reduce:animate-none/)
+  assert.match(dialog, /motion-reduce:transition-none/)
   assert.match(select, /readonly container\?: HTMLElement \| null/)
   assert.match(select, /bg-popover/)
   assert.match(select, /z-50/)

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { ValueEditorFeedback } from '../../src/form/browser/fieldControl.tsx'
 import { Input } from '../../src/ui/browser/input.tsx'
 import { CodeEditor } from '../../src/workbench/browser/runtime/editor/codeEditor.tsx'
-import { agentStory } from './agent.tsx'
+import { agentStory, codeActionsStory } from './agent.tsx'
 import { cardStories } from './cards.tsx'
 import { commentPropertiesStory } from './commentProperties.tsx'
 import { conditionEditorStory } from './conditionEditor.tsx'
@@ -99,6 +99,7 @@ export const labStories: readonly FrontendStory[] = [
   libraryStory,
   nodePickerPreviewStory,
   agentStory,
+  codeActionsStory,
   llmStory,
   metadataStory,
   inspectorPanelStory,

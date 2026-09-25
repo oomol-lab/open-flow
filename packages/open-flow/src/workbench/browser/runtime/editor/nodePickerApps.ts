@@ -19,3 +19,9 @@ export function comparePickerApps(left: { label: string; priority?: number }, ri
     (left.priority ?? 3) - (right.priority ?? 3) || Number(han.test(right.label)) - Number(han.test(left.label)) || collator.compare(left.label, right.label)
   )
 }
+
+export const pickerAppGroups = ['configured', 'builtInAccount', 'noSetup', 'needsSetup'] as const
+
+export function pickerAppPriority(serviceId: string, noSetup: boolean | undefined, priorities: ReadonlyMap<string, number>): number {
+  return Math.min(priorities.get(serviceId) ?? 3, noSetup ? 2 : 3)
+}

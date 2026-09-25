@@ -392,26 +392,7 @@ describe('Code task sections', () => {
     } else expect(actions).not.toHaveBeenCalled()
   })
 
-  it.each([
-    {
-      name: 'default',
-      accounts: [
-        { connectionId: 'work', status: 'active', isDefault: true },
-        { connectionId: 'personal', status: 'active' },
-      ],
-      expected: 'work',
-    },
-    { name: 'only active account', accounts: [{ connectionId: 'work', status: 'active' }], expected: 'work' },
-    {
-      name: 'ambiguous accounts',
-      accounts: [
-        { connectionId: 'work', status: 'active' },
-        { connectionId: 'personal', status: 'active' },
-      ],
-      expected: undefined,
-    },
-    { name: 'inactive default', accounts: [{ connectionId: 'work', status: 'inactive', isDefault: true }], expected: undefined },
-  ])('adds an independent Action using the $name', async ({ accounts, expected }) => {
+  it.each(['independent', 'shared', 'missing'] as const)('saves selected action/account pairs from %s Code configuration', async (mode) => {
     const setCodeActions = vi.fn().mockResolvedValue(true)
     const rendered = CodeTaskSection({
       connectors: { $: { actions: { value: {} }, connections: { value: [] }, catalogs: { value: {} } } } as never,
@@ -420,7 +401,7 @@ describe('Code task sections', () => {
         id: 'code',
         kind: 'task',
         module: {},
-        definition: { moduleId: 'code', inputs: [], outputs: [], capabilities: [{ kind: 'connector', mode: 'independent', actions: [] }] },
+        definition: { moduleId: 'code', inputs: [], outputs: [], capabilities: mode == 'missing' ? [] : [{ kind: 'connector', mode, actions: [] }] },
       } as never,
       store: {
         setCodeActions,
@@ -430,18 +411,14 @@ describe('Code task sections', () => {
       theme: 'light',
     })
     if (rendered == null) throw new Error('Expected Code settings.')
-    const picker = find(rendered, (item) => item.props.label == 'inspector.task.addAction')
-    if (picker == null) throw new Error('Expected Action picker.')
-    await picker.props.onSelect({ actionId: 'github.read', authenticated: true }, accounts)
-    expect(setCodeActions).toHaveBeenLastCalledWith('code', [
-      {
-        kind: 'connector',
-        mode: 'independent',
-        actions: [expected == null ? { action: 'github.read' } : { action: 'github.read', connectionId: expected }],
-      },
-    ])
-    await picker.props.onSelect({ actionId: 'public.read', authenticated: false }, accounts)
-    expect(setCodeActions).toHaveBeenLastCalledWith('code', [{ kind: 'connector', mode: 'independent', actions: [{ action: 'public.read' }] }])
+    const picker = find(rendered, (item) => item.props.title == 'actionPicker.configureActions')
+    if (picker == null) throw new Error('Expected Action selection dialog.')
+    expect(setCodeActions).not.toHaveBeenCalled()
+    const selected = [{ action: 'github.read', connectionId: 'work' }, { action: 'public.read' }]
+    expect(await picker.props.onSave(selected)).toBe(true)
+    expect(setCodeActions).toHaveBeenLastCalledWith('code', [{ kind: 'connector', mode: 'independent', actions: selected }])
+    setCodeActions.mockResolvedValue(false)
+    expect(await picker.props.onSave([])).toBe(false)
   })
 
   it('renders legacy Code with an editable permission mode and consecutive Node settings', async () => {
@@ -497,6 +474,22 @@ describe('Code task sections', () => {
     const task = find(element, (item) => typeof item.type == 'function' && item.type.name == 'CodeTaskSection')
     if (task == null || typeof task.type != 'function') throw new Error('Expected task definition.')
     const rendered = (task.type as (props: unknown) => ReactElement)(task.props)
+    const actionsButton = (section: ReactElement) =>
+      find(section, (item) => typeof item.type == 'function' && item.type.name == 'ActionSelectionDialog')?.props.trigger
+    expect(actionsButton(rendered)?.props.variant).toBe('ghost')
+    const actionError = (task.type as (props: unknown) => ReactElement)({
+      ...task.props,
+      diagnostics: [
+        {
+          code: 'task.action-connection-required',
+          path: '/document/graph/nodes/task/task/capabilities/0/actions/0/connectionId',
+          line: 0,
+          column: 0,
+          message: 'Choose an account.',
+        },
+      ],
+    })
+    expect(actionsButton(actionError)?.props).toMatchObject({ 'variant': 'destructive', 'aria-invalid': true })
     const feedback = find(rendered, (item) => typeof item.type == 'function' && item.type.name == 'ValueEditorFeedback')
     expect(feedback?.props.error[0].props.children).toBe('Invalid JavaScript syntax.')
     expect(feedback?.props.children('syntax-error').props).toMatchObject({ ariaDescribedBy: 'syntax-error', invalid: true })
