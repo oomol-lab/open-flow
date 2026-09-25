@@ -226,6 +226,7 @@
       "connectService": "Connect {{service}}",
       "connection": "Connection",
       "loading": "Loading connections…",
+      "oomolBuiltIn": "OOMOL Built-in",
       "missing": "This pinned Connection no longer exists. Choose another account or add a Connection.",
       "refreshFailed": "Connections could not be refreshed.",
       "retry": "Retry",
@@ -1317,6 +1318,7 @@
   },
   "connectionUsage": {
     "title": "Connections",
+    "needsAttention": "Connections need attention",
     "description": "Accounts used by this draft. Publish to update the live Flow.",
     "empty": "This draft does not use any accounts.",
     "stopUsing": "Stop using",

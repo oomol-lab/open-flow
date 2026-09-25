@@ -1,5 +1,5 @@
 import type { ReactElement, ReactNode } from 'react'
-import type { ConnectorAccess } from '../../../../control/common/api.ts'
+import type { ConnectorAccess, ConnectorAccessSnapshot, ConnectorConnection, ConnectorProvider } from '../../../../control/common/api.ts'
 import type { ConnectionHref } from '../contract.ts'
 import type { ConnectorAccountReference } from '../revisionView.ts'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
@@ -20,6 +20,7 @@ import { NativeScrollArea, ScrollArea } from '../../../../ui/browser/scroll-area
 import { cn } from '../../../../ui/browser/utils.ts'
 import { providerIcon } from '../providerIcon.ts'
 import { semanticNodeIcon, triggerNodeIcon } from '../workspace.ts'
+import { AccountName, accountDisplayName } from './accountName.tsx'
 import { connectorAccessPermissionGroupLabel, connectorAccessPermissionLabel } from './connectorAccessPresentation.ts'
 import { ServicePicker } from './servicePicker.tsx'
 
@@ -30,8 +31,41 @@ function connectorAccessProviderIds(access: ConnectorAccess | undefined, request
   return [...ids].toSorted()
 }
 
+function pendingConnectionUses(
+  uses: readonly ConnectorAccountReference[],
+  providers: readonly ConnectorProvider[] | undefined,
+): readonly ConnectorAccountReference[] {
+  if (providers == null) return []
+  return uses.filter((use) => use.connectionId == null && !providers.some((provider) => provider.serviceId == use.providerId && provider.noSetup))
+}
+
+function hasConnectionUsageIssue(
+  uses: readonly ConnectorAccountReference[],
+  access: ConnectorAccess | ConnectorAccessSnapshot | undefined,
+  providers: readonly ConnectorProvider[] | undefined,
+  connections: readonly ConnectorConnection[] | undefined,
+): boolean {
+  if (pendingConnectionUses(uses, providers).length > 0) return true
+  if (access?.version == 1 && access.bindings.some((binding) => binding.connectionId == null || binding.status != 'active')) return true
+  if (connections == null) return false
+
+  const connectionIds = new Set(uses.flatMap((use) => (use.connectionId == null ? [] : [use.connectionId])))
+  for (const binding of access == null ? [] : access.version == 2 ? access.sharedBindings : access.bindings) {
+    if (binding.connectionId != null) connectionIds.add(binding.connectionId)
+  }
+  return [...connectionIds].some((id) => connections.find((connection) => connection.connectionId == id)?.status != 'active')
+}
+
 export function ConnectionUsageButton(props: Parameters<typeof ConnectorAccessSettings>[0]): ReactElement {
   const t = useTranslate()
+  const language = useLang()
+  const flowId = useVal(props.store.workspace.$.flowId)
+  const revision = useVal(props.store.workspace.$.revision)
+  const access = useVal(props.store.connectorAccess.$).access
+  const providers = useVal(props.store.workspace.catalogs.providers.get(undefined, language)).data
+  const connections = useVal(props.store.workspace.catalogs.connections.get(undefined, flowId)).data
+  const hasIssue = flowId != null && hasConnectionUsageIssue(revision?.connectorReferences.accounts ?? [], access, providers, connections)
+  const label = t(hasIssue ? 'connectionUsage.needsAttention' : 'connectionUsage.title')
   const [open, setOpen] = useState(false)
   const [container, setContainer] = useState<HTMLElement | null>(null)
   const portal = useCallback((element: HTMLButtonElement | null) => {
@@ -39,9 +73,9 @@ export function ConnectionUsageButton(props: Parameters<typeof ConnectorAccessSe
   }, [])
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <CanvasTooltip placement="bottom" title={t('connectionUsage.title')}>
-        <PopoverTrigger ref={portal} render={<Button size="icon" variant="ghost" aria-label={t('connectionUsage.title')} />}>
-          <i aria-hidden="true" className="i-lucide-light:plug" data-corner-icon />
+      <CanvasTooltip placement="bottom" title={label}>
+        <PopoverTrigger ref={portal} render={<Button size="icon" variant="ghost" aria-label={label} />}>
+          <i aria-hidden="true" className="i-lucide-light:plug" data-corner-icon style={hasIssue ? { color: 'var(--warning-foreground)' } : undefined} />
         </PopoverTrigger>
       </CanvasTooltip>
       <PopoverPanelContent
@@ -112,6 +146,7 @@ export function ConnectorAccessSettings({
   const fixedSnapshot = snapshot?.publicationId == publication?.publicationId ? snapshot : undefined
   const connectionState = useVal(store.workspace.catalogs.connections.get(undefined, flowId))
   const connections = connectionState.data ?? []
+  const builtInName = t('inspector.account.oomolBuiltIn')
   const actions = useVal(store.connectors.$.actions)
   const panel = useRef<HTMLElement | null>(null)
   const [root, setRoot] = useState<HTMLElement | null>(null)
@@ -144,9 +179,7 @@ export function ConnectorAccessSettings({
     const account = accounts.get(binding.connectionId)
     accounts.set(binding.connectionId, { name: binding.connectionDisplayName, providerId: binding.providerId, code: true, nodes: account?.nodes ?? [] })
   }
-  const pendingUses = uses.filter(
-    (use) => use.connectionId == null && !providers.data?.some((provider) => provider.serviceId == use.providerId && provider.noSetup),
-  )
+  const pendingUses = pendingConnectionUses(uses, providers.data)
   const providerMetadata = Object.fromEntries((providers.data ?? []).map((provider) => [provider.serviceId, provider]))
   const referenceIcon = (reference: ConnectorAccountReference): string | undefined => {
     const node = displayed?.node(reference.target, reference.nodeId)
@@ -212,7 +245,7 @@ export function ConnectorAccessSettings({
                           <div className="flex items-center justify-between gap-2">
                             <ConnectionConsoleLink href={connectionHref?.(flowId, providerId, id)}>
                               <i aria-hidden="true" className="i-codicon:credit-card size-3.5 shrink-0 text-sm text-muted-foreground" />
-                              <span className="min-w-0 wrap-anywhere">{account.name}</span>
+                              <AccountName name={accountDisplayName(connection, account.name, builtInName)} builtIn={connection?.builtInAccount} />
                             </ConnectionConsoleLink>
                             {!published && (
                               <DropdownMenu>
@@ -222,7 +255,7 @@ export function ConnectorAccessSettings({
                                       size="icon-xs"
                                       variant="ghost"
                                       className="shrink-0 text-muted-foreground"
-                                      aria-label={t('connectionUsage.accountActions', { account: account.name })}
+                                      aria-label={t('connectionUsage.accountActions', { account: accountDisplayName(connection, account.name, builtInName) })}
                                     />
                                   }
                                 >
@@ -308,7 +341,14 @@ export function ConnectorAccessSettings({
               <div className="flex flex-col gap-1.5 rounded-md border border-border/50 p-2.5">
                 <div className="flex min-w-0 items-center gap-2 text-[13px] font-medium">
                   <i aria-hidden="true" className="i-codicon:credit-card size-3.5 shrink-0 text-sm text-muted-foreground" />
-                  <span className="min-w-0 wrap-anywhere">{affected.name}</span>
+                  <AccountName
+                    name={accountDisplayName(
+                      connections.find((connection) => connection.connectionId == removing),
+                      affected.name,
+                      builtInName,
+                    )}
+                    builtIn={connections.some((connection) => connection.connectionId == removing && connection.builtInAccount)}
+                  />
                 </div>
                 <AccountReferences hierarchy icon={referenceIcon} references={affected.nodes} label={t('connectionUsage.usedBy')} />
               </div>
@@ -354,6 +394,8 @@ export function CodeConnectionSettings({
   const flowId = useVal(store.workspace.$.flowId)
   const state = useVal(store.connectorAccess.$)
   const providers = useVal(store.workspace.catalogs.providers.get(undefined, language))
+  const connections = useVal(store.workspace.catalogs.connections.get(undefined, flowId)).data ?? []
+  const builtInName = t('inspector.account.oomolBuiltIn')
   const access = state.access
   const providerMetadata = new Map(providers.data?.map((provider) => [provider.serviceId, provider]))
   const providerIds = connectorAccessProviderIds(access, state.configuration?.providerId)
@@ -520,6 +562,7 @@ export function CodeConnectionSettings({
                             </div>
                           </div>
                           {options.map((option) => {
+                            const optionConnection = connections.find((connection) => connection.connectionId == option.connectionId)
                             const binding = bindings.find((item) => item.accessBindingId == option.accessBindingId)
                             const pending =
                               state.pendingSelection?.providerId == provider.serviceId && state.pendingSelection.accessBindingId == option.accessBindingId
@@ -540,7 +583,12 @@ export function CodeConnectionSettings({
                                     }
                                   />
                                   <span className="min-w-0 flex-1 leading-4">
-                                    <span className="block wrap-anywhere">{option.connectionDisplayName}</span>
+                                    <span className="block wrap-anywhere">
+                                      <AccountName
+                                        name={accountDisplayName(optionConnection, option.connectionDisplayName, builtInName)}
+                                        builtIn={optionConnection?.builtInAccount}
+                                      />
+                                    </span>
                                     <span className="block text-[11px] text-muted-foreground wrap-anywhere">
                                       {permissionLabel == null ? groupLabel : `${groupLabel} · ${permissionLabel}`}
                                     </span>

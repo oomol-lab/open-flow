@@ -226,6 +226,7 @@
       "connectService": "{{service}} を接続",
       "connection": "Connection",
       "loading": "Connection を読み込み中…",
+      "oomolBuiltIn": "OOMOL 組み込みアカウント",
       "missing": "固定されていた Connection は存在しません。別のアカウントを選択するか、Connection を追加してください。",
       "refreshFailed": "Connection を更新できませんでした。",
       "retry": "再試行",
@@ -1317,6 +1318,7 @@
   },
   "connectionUsage": {
     "title": "接続",
+    "needsAttention": "接続に対応が必要です",
     "description": "この下書きで使用するアカウント。公開すると稼働中の Flow に反映されます。",
     "empty": "この下書きではアカウントを使用していません。",
     "stopUsing": "使用を停止",

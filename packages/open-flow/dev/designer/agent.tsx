@@ -53,6 +53,14 @@ const actions: readonly ConnectorAction[] = [
   },
   {
     ...action,
+    actionId: 'hosted.generate',
+    serviceId: 'hosted',
+    serviceName: 'Hosted tools',
+    name: 'Generate sample',
+    description: 'Use the OOMOL built-in account.',
+  },
+  {
+    ...action,
     actionId: 'public.echo',
     serviceId: 'public',
     serviceName: 'Public tools',
@@ -166,7 +174,7 @@ function createSession(language: UiLanguage, log: LogAction) {
       return Response.json({
         connections: [
           { connectionId: 'lab-active', serviceId: 'lab', displayName: 'sellersprite-mcp-9b2448-production-team', isDefault: true, status: 'active' },
-          { connectionId: 'hosted-default', serviceId: 'hosted', displayName: 'Built-in account', builtInAccount: true, isDefault: true, status: 'active' },
+          { connectionId: 'hosted-default', serviceId: 'hosted', displayName: 'OOMOL Marketplace', builtInAccount: true, isDefault: true, status: 'active' },
           { connectionId: 'lab-other', serviceId: 'lab', displayName: 'Second account', isDefault: false, status: 'active' },
           { connectionId: 'lab-expired', serviceId: 'lab', displayName: 'Expired account', isDefault: false, status: 'reauth_required' },
         ],
@@ -259,7 +267,7 @@ function AgentSession({ session, dark, code }: { session: ReturnType<typeof crea
 
 export const agentStory: FrontendStory = {
   description:
-    'Browse services, check actions without removing them from the list, and choose accounts in the selected rows. Use slow preparation and failure controls to check immediate selection, independent row loading, removal and retry. Expand a tool parameter and remove an earlier tool to check that the editor stays open. Compare parameter drafts, Save, Cancel and read-only controls.',
+    'Browse services, check actions without removing them from the list, and choose accounts in the selected rows. Select Hosted tools to check the localized OOMOL Built-in account name and verification icon. Use slow preparation and failure controls to check immediate selection, independent row loading, removal and retry. Expand a tool parameter and remove an earlier tool to check that the editor stays open. Compare parameter drafts, Save, Cancel and read-only controls.',
   group: 'Node Agent',
   id: 'agent-tools',
   propertyPanel: true,

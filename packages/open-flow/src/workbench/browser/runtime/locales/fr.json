@@ -226,6 +226,7 @@
       "connectService": "Connecter {{service}}",
       "connection": "Connection",
       "loading": "Chargement des Connections…",
+      "oomolBuiltIn": "Compte intégré OOMOL",
       "missing": "Cette Connection épinglée n'existe plus. Choisissez un autre compte ou ajoutez une Connection.",
       "refreshFailed": "Impossible d'actualiser les Connections.",
       "retry": "Réessayer",
@@ -1317,6 +1318,7 @@
   },
   "connectionUsage": {
     "title": "Connexions",
+    "needsAttention": "Connexions à vérifier",
     "description": "Comptes utilisés par ce brouillon. Publiez pour mettre à jour le Flow en ligne.",
     "empty": "Ce brouillon n’utilise aucun compte.",
     "stopUsing": "Ne plus utiliser",

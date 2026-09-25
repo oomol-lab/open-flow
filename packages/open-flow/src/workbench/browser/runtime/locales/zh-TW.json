@@ -226,6 +226,7 @@
       "connectService": "連接 {{service}}",
       "connection": "Connection",
       "loading": "正在載入 Connection…",
+      "oomolBuiltIn": "OOMOL 內建帳號",
       "missing": "這個固定的 Connection 已不存在。請選擇其他帳號或新增 Connection。",
       "refreshFailed": "無法重新整理 Connection。",
       "retry": "重試",
@@ -1317,6 +1318,7 @@
   },
   "connectionUsage": {
     "title": "連線",
+    "needsAttention": "連線需要處理",
     "description": "目前草稿使用的帳號。發佈後更新線上工作流程。",
     "empty": "目前草稿尚未使用帳號。",
     "stopUsing": "停止使用",

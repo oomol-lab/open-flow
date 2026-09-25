@@ -226,6 +226,7 @@
       "connectService": "连接 {{service}}",
       "connection": "连接",
       "loading": "正在加载连接…",
+      "oomolBuiltIn": "OOMOL 内置账号",
       "missing": "此节点固定的 Connection 已不存在，请选择其他账号或添加连接。",
       "refreshFailed": "无法刷新 Connection。",
       "retry": "重试",
@@ -1317,6 +1318,7 @@
   },
   "connectionUsage": {
     "title": "连接",
+    "needsAttention": "连接需要处理",
     "description": "当前草稿使用的账号。发布后更新线上工作流。",
     "empty": "当前草稿尚未使用账号。",
     "stopUsing": "停止使用",

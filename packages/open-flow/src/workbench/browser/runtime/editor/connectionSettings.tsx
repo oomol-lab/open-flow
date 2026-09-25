@@ -14,6 +14,7 @@ import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, Sele
 import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../../../ui/browser/tooltip.tsx'
 import { Icon } from '../icons.tsx'
+import { AccountName, accountDisplayName } from './accountName.tsx'
 
 const manageAccountOption = '__manage-account__'
 
@@ -111,18 +112,20 @@ export function AccountSelect({
   const t = useTranslate()
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const selected = selectedConnection ?? connections.find((candidate) => candidate.connectionId == selectedId)
+  const builtInName = t('inspector.account.oomolBuiltIn')
+  const displayName = (connection: ConnectorConnection) => accountDisplayName(connection, connection.displayName, builtInName)
   const selectedLabel =
     selected == null
       ? selectedId == null
         ? undefined
         : `${selectedId} (${t('inspector.account.unavailable')})`
-      : `${selected.displayName}${selected.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}`
+      : `${displayName(selected)}${selected.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}`
   const missingSelected = selectedId != null && !connections.some((candidate) => candidate.connectionId == selectedId)
   const items = [
     ...(missingSelected ? [{ value: selectedId, label: selectedLabel!, disabled: true }] : []),
     ...connections.map((candidate) => ({
       value: candidate.connectionId,
-      label: `${candidate.displayName}${candidate.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}`,
+      label: `${displayName(candidate)}${candidate.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}`,
     })),
     ...(onManage == null ? [] : [{ value: manageAccountOption, label: t('inspector.account.addAccount') }]),
   ]
@@ -156,8 +159,13 @@ export function AccountSelect({
                 <Spinner />
                 <span className="truncate">{t('inspector.account.loading')}</span>
               </span>
-            ) : (
+            ) : selected == null ? (
               selectedLabel
+            ) : (
+              <>
+                <AccountName name={displayName(selected)} builtIn={selected.builtInAccount} truncate />
+                {selected.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}
+              </>
             )}
           </SelectValue>
         </SelectTrigger>
@@ -174,7 +182,7 @@ export function AccountSelect({
           )}
           {connections.map((candidate) => (
             <SelectItem key={candidate.connectionId} value={candidate.connectionId} className={selectionMenuItemClass}>
-              {candidate.displayName}
+              <AccountName name={displayName(candidate)} builtIn={candidate.builtInAccount} truncate />
               {candidate.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}
             </SelectItem>
           ))}

@@ -118,6 +118,7 @@ function Sample({
   connectionStatus,
   configure = false,
   accountPending,
+  canvasControl = false,
   language,
 }: {
   readonly access: ConnectorAccess
@@ -131,6 +132,7 @@ function Sample({
   readonly noCandidates?: boolean
   readonly configure?: boolean
   readonly accountPending?: 'metadata' | 'connections' | 'setup'
+  readonly canvasControl?: boolean
   readonly language: UiLanguage
 }) {
   const i18n = useMemo(() => createI18n(language), [language])
@@ -169,10 +171,10 @@ function Sample({
     return () => next.dispose()
   }, [access, configure, connectionStatus, emptyFlow, i18n, label, loadFailed, log, noAuth, noCandidates])
   return (
-    <section className={label == 'Node and Code usage overview' ? 'col-span-full' : undefined}>
+    <section className={canvasControl ? 'col-span-full' : undefined}>
       <h3 className="mb-2 text-sm font-medium">{label}</h3>
       <div className="grid h-[480px] overflow-hidden rounded-lg border border-border">
-        {label == 'Node and Code usage overview' && store != null ? (
+        {canvasControl && store != null ? (
           <FlowCanvasView
             identity="connection-usage"
             dark={dark}
@@ -273,6 +275,7 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
     readonly noCandidates?: boolean
     readonly configure?: boolean
     readonly accountPending?: 'metadata' | 'connections' | 'setup'
+    readonly canvasControl?: boolean
   }[] = [
     {
       access: {
@@ -301,7 +304,14 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
         sharedAccessDigest: 'selectable:2',
         version: 1,
       },
+      canvasControl: true,
       label: 'Node and Code usage overview',
+    },
+    {
+      access: { accessRevision: 0, bindings: [], mode: 'selectable', sharedAccessDigest: 'selectable:0', version: 1 },
+      canvasControl: true,
+      emptyFlow: true,
+      label: 'Connections control without issues',
     },
     {
       access: { accessRevision: 0, bindings: [], mode: 'selectable', sharedAccessDigest: 'selectable:0', version: 1 },
@@ -438,7 +448,7 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
 
 export const connectorAccessStory: FrontendStory = {
   description:
-    'Open Connections from the canvas control island. Compare service spacing, separate account cards, account icons and node icons, including a custom receipt icon. Provider and account links use 13px names and aligned leading icons; node names use 13px and supporting text uses 12px. Subtle curved branches connect accounts to their nodes. Missing account selections use a warning surface and label. The panel scrollbar appears while scrolling and hides when idle. Locate each usage, switch to the read-only publication snapshot, and stop using an account with a compact confirmation showing the same account and node hierarchy. The gallery also covers missing accounts, empty drafts, loading failures, long names and independent Code connection settings. Code selection saves take 800 ms.',
+    'Compare the Connections control with an issue and without one. The plug icon uses a subtle warning color when the draft needs connection attention. Open Connections from the canvas control island. Compare service spacing, separate account cards, account icons and node icons, including a custom receipt icon. Provider and account links use 13px names and aligned leading icons; node names use 13px and supporting text uses 12px. Subtle curved branches connect accounts to their nodes. Missing account selections use a warning surface and label. The panel scrollbar appears while scrolling and hides when idle. Locate each usage, switch to the read-only publication snapshot, and stop using an account with a compact confirmation showing the same account and node hierarchy. The gallery also covers missing accounts, empty drafts, loading failures, long names and independent Code connection settings. Code selection saves take 800 ms.',
   group: 'Workbench',
   id: 'connector-access',
   render: (log, dark, language) => <Gallery dark={dark} language={language} log={log} />,

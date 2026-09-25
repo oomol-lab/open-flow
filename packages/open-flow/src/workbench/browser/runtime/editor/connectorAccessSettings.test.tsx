@@ -30,6 +30,7 @@ describe('Connector access settings', () => {
           revision: val({ connectorProviderIds: new Set(['oomol_rag', ...(scenario == 'mixed' ? ['mail'] : [])]) }),
         },
         catalogs: {
+          connections: { get: () => val({ data: [] }) },
           providers: {
             get: () =>
               val({
@@ -223,7 +224,7 @@ describe('Connector access settings', () => {
       },
       workspace: {
         $: { flowId: val('flow-1'), revision: val(undefined) },
-        catalogs: { providers: { get: () => val({ data: [], refreshing: false }) } },
+        catalogs: { providers: { get: () => val({ data: [], refreshing: false }) }, connections: { get: () => val({ data: [] }) } },
       },
     } as unknown as WorkbenchStore
 
@@ -322,6 +323,7 @@ describe('Connector access settings', () => {
       workspace: {
         $: { flowId: val('flow-1'), revision: val(revision) },
         catalogs: {
+          connections: { get: () => val({ data: [] }) },
           providers: {
             get: () =>
               val({

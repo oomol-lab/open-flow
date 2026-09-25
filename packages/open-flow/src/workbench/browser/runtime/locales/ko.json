@@ -226,6 +226,7 @@
       "connectService": "{{service}} 연결",
       "connection": "Connection",
       "loading": "Connection 불러오는 중…",
+      "oomolBuiltIn": "OOMOL 기본 제공 계정",
       "missing": "이 블록에 고정된 Connection이 더 이상 존재하지 않습니다. 다른 계정을 선택하거나 Connection을 추가하세요.",
       "refreshFailed": "Connection을 새로 고치지 못했습니다.",
       "retry": "다시 시도",
@@ -1317,6 +1318,7 @@
   },
   "connectionUsage": {
     "title": "연결",
+    "needsAttention": "연결에 확인이 필요합니다",
     "description": "이 초안에서 사용하는 계정입니다. 게시하면 운영 중인 Flow에 반영됩니다.",
     "empty": "이 초안은 계정을 사용하지 않습니다.",
     "stopUsing": "사용 중지",

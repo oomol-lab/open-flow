@@ -226,6 +226,7 @@
       "connectService": "Подключить {{service}}",
       "connection": "Connection",
       "loading": "Загрузка Connection…",
+      "oomolBuiltIn": "Встроенный аккаунт OOMOL",
       "missing": "Закреплённый Connection больше не существует. Выберите другой аккаунт или добавьте Connection.",
       "refreshFailed": "Не удалось обновить Connection.",
       "retry": "Повторить",
@@ -1317,6 +1318,7 @@
   },
   "connectionUsage": {
     "title": "Подключения",
+    "needsAttention": "Подключения требуют внимания",
     "description": "Аккаунты этого черновика. Опубликуйте его, чтобы обновить действующий Flow.",
     "empty": "В этом черновике аккаунты не используются.",
     "stopUsing": "Не использовать",

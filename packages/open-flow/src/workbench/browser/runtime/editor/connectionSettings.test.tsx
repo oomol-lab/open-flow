@@ -5,7 +5,7 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { expect, it, vi } from 'vitest'
 import { createI18n } from '../i18n.ts'
-import { ConnectorAccount } from './connectionSettings.tsx'
+import { AccountSelect, ConnectorAccount } from './connectionSettings.tsx'
 
 const i18n = createI18n('zh-CN')
 function renderAccount(overrides: Partial<ComponentProps<typeof ConnectorAccount>> = {}) {
@@ -92,4 +92,27 @@ it('shows a neutral loading account section while a newly added node is being co
   expect(markup).not.toContain(i18n.t('inspector.account.accessTitle'))
   expect(markup).not.toContain(i18n.t('notice.error.connectorAccessRequired'))
   expect(markup).not.toContain('选择可用账号')
+})
+
+it.each([
+  ['en', 'OOMOL Built-in'],
+  ['zh-CN', 'OOMOL 内置账号'],
+] as const)('shows the localized OOMOL name and badge for a built-in account in %s', (language, name) => {
+  const localized = createI18n(language)
+  const markup = renderToStaticMarkup(
+    <I18nProvider i18n={localized}>
+      <AccountSelect
+        connections={[
+          { connectionId: 'hosted', serviceId: 'hosted', displayName: 'OOMOL Marketplace', builtInAccount: true, isDefault: false, status: 'active' },
+        ]}
+        selectedId="hosted"
+        disabled={false}
+        onChange={() => {}}
+        onManage={undefined}
+      />
+    </I18nProvider>,
+  )
+  expect(markup).toContain(name)
+  expect(markup).toContain('i-lucide-light:badge-check')
+  expect(markup).not.toContain('OOMOL Marketplace')
 })
