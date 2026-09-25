@@ -112,7 +112,14 @@ export class CanvasStore {
   #runStatus: Val<FlowRunStatus>
   #selectedNodeIds = new Set<string>()
 
-  public constructor(model: FlowCanvasViewModel, editable: boolean, language: string, callbacks: ViewCallbacks, autoLayout = false) {
+  public constructor(
+    model: FlowCanvasViewModel,
+    editable: boolean,
+    language: string,
+    callbacks: ViewCallbacks,
+    autoLayout = false,
+    interactiveMode$?: Val<InteractiveMode>,
+  ) {
     this.#callbacks = callbacks
     this.#language = this.dispose.add(val(language))
     this.lang$ = this.#language
@@ -136,7 +143,7 @@ export class CanvasStore {
       editable: this.dispose.add(val(editable)),
       miniMapExpanded: this.dispose.add(val<boolean | undefined>()),
       viewport: viewport,
-      interactiveMode: this.dispose.add(val<InteractiveMode>('touchpad')),
+      interactiveMode: interactiveMode$ ?? this.dispose.add(val<InteractiveMode>('touchpad')),
       nodes,
       commentNodes,
     }

@@ -2,6 +2,7 @@ import type { NodeId } from '../../../../schema/index.ts'
 import type { FlowCanvasProps } from './FlowCanvas.tsx'
 import type { FlowCanvasViewCommentNode, FlowCanvasViewModel, FlowCanvasViewProps, FlowCanvasViewTaskNode, FlowCanvasViewValueNode } from './model.ts'
 
+import { val } from 'value-enhancer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { FlowCanvasView } from './FlowCanvasView.tsx'
 
@@ -151,6 +152,18 @@ describe('FlowCanvasView model synchronization', () => {
     hooks.memoDependencies = undefined
     hooks.refIndex = 0
     hooks.refs = []
+  })
+
+  it('keeps a host-owned interaction mode when the canvas identity changes', () => {
+    const interactiveMode$ = val<'mouse' | 'touchpad'>('mouse')
+    const first = FlowCanvasView(props(model([]), { interactiveMode$ })) as React.ReactElement<FlowCanvasProps>
+    expect(first.props.flowCanvasStore.$$.interactiveMode).toBe(interactiveMode$)
+    const second = FlowCanvasView(props(model([]), { identity: 'flow:next', interactiveMode$ })) as React.ReactElement<FlowCanvasProps>
+    expect(second.props.flowCanvasStore.$$.interactiveMode).toBe(interactiveMode$)
+    second.props.flowCanvasStore.dispose()
+    interactiveMode$.set('touchpad')
+    expect(interactiveMode$.value).toBe('touchpad')
+    interactiveMode$.dispose()
   })
 
   it('reads ignored state from the owner and sends changes without mutating the graph', () => {

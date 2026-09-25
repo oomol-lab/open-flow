@@ -410,6 +410,7 @@ export function FlowEditor({
       tabIndex={0}
     >
       <WorkbenchCanvas
+        interactiveMode$={store.interactiveMode$}
         connectionControl={
           <ConnectionUsageButton
             connectionHref={connectionHref}

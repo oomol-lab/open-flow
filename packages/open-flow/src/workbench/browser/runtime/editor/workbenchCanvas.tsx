@@ -36,6 +36,7 @@ interface Props {
   readonly bottomRightTools?: ReactNode
   readonly addNodeOptions: readonly AddNodeOption[]
   readonly disabled: boolean
+  readonly interactiveMode$?: FlowCanvasViewProps['interactiveMode$']
   readonly theme: WorkbenchTheme
   readonly focusNodeRequest?: {
     readonly nodeId: string
@@ -87,6 +88,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     addNodeOptions,
     history,
     disabled,
+    interactiveMode$,
     focusNodeRequest,
     inspectorOpen,
     model,
@@ -317,6 +319,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
         editable={!disabled}
         focusNodeRequest={readyFocusNodeRequest}
         identity={target == null ? 'empty' : target.kind == 'flow' ? 'flow' : `subflow:${target.id}`}
+        interactiveMode$={interactiveMode$}
         isValidConnection={isValidConnection}
         language={language}
         model={model}

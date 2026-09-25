@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react'
+import type { Val } from 'value-enhancer'
 import type { GroupDividerDef } from '../../../../schema/index.ts'
+import type { InteractiveMode } from '../../stores/canvas/canvas.store.ts'
 
 export interface FlowCanvasViewSource {
   readonly nodeId: string
@@ -227,6 +229,8 @@ export interface FlowCanvasViewProps {
     readonly requestId: number
   }
   readonly identity: string
+  /** A host-owned setting shared by canvases; standalone canvases use their local default. */
+  readonly interactiveMode$?: Val<InteractiveMode>
   readonly isValidConnection?: (edge: Omit<FlowCanvasViewEdge, 'id'>) => boolean
   readonly language?: string
   readonly layoutMotion?: boolean

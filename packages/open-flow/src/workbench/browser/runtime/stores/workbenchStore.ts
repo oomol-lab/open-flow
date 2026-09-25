@@ -1,5 +1,6 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
+import type { InteractiveMode } from '../../../../canvas/browser/stores/canvas/canvas.store.ts'
 import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { ConnectorConnection, WorkbenchClient, Draft, FlowCheck, Run, RunEvent } from '../api.ts'
 import type { Point } from '../canvasPresentation.ts'
@@ -26,6 +27,7 @@ import { revisionView } from '../revisionView.ts'
 import { RunRequestStore } from '../runs/runRequestStore.ts'
 import { RunStore } from '../runs/runStore.ts'
 import { designerGraph } from '../workspace.ts'
+import { readCanvasInteractiveMode, writeCanvasInteractiveMode } from './canvasInteractiveMode.ts'
 import { CatalogStores } from './catalogStores.ts'
 import { ConnectorAccessStore } from './connectorAccessStore.ts'
 import { ConnectorStore } from './connectorStore.ts'
@@ -109,6 +111,7 @@ export class WorkbenchStore {
   #accessLoading: Promise<void> = Promise.resolve()
 
   public readonly preferences: WorkbenchPreferences
+  public readonly interactiveMode$: Val<InteractiveMode>
   public readonly $: Workbench$
   public readonly connectors: ConnectorStore
   public readonly connectorAccess: ConnectorAccessStore
@@ -127,6 +130,8 @@ export class WorkbenchStore {
     variables = true,
   ) {
     this.preferences = preferences
+    this.interactiveMode$ = val(readCanvasInteractiveMode(preferences))
+    this.interactiveMode$.reaction((mode) => writeCanvasInteractiveMode(preferences, mode), true)
     this.#client = client
     this.results = client
     this.#i18n = i18n
@@ -277,6 +282,7 @@ export class WorkbenchStore {
   public dispose(): void {
     this.#disposed = true
     this.#stopAccessReaction()
+    this.interactiveMode$.dispose()
     this.#externalRuns.invalidate()
     for (const value of Object.values(this.$)) value.dispose()
     this.connectors.dispose()

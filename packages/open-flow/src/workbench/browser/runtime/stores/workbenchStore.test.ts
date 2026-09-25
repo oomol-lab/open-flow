@@ -5,10 +5,54 @@ import { val } from 'value-enhancer'
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
 import { NavigationStore } from '../navigation.ts'
+import { canvasInteractiveModePreferenceKey } from './canvasInteractiveMode.ts'
 import { resourceValue } from './resource.ts'
 import { WorkbenchStore } from './workbenchStore.ts'
 
 const timestamp = '2026-09-01T00:00:00.000Z'
+
+describe('canvas interaction preference', () => {
+  it('shares the selected mode across Workbench instances and restores it on reopening', () => {
+    const saved = new Map<string, string>()
+    const preferences = {
+      getItem: (key: string) => saved.get(key) ?? null,
+      setItem: (key: string, value: string) => saved.set(key, value),
+    }
+    const create = () => new WorkbenchStore(new WorkbenchClient(vi.fn()), preferences)
+    const first = create()
+    expect(first.interactiveMode$.value).toBe('touchpad')
+    expect(saved.size).toBe(0)
+    first.interactiveMode$.set('mouse')
+    expect(saved.get(canvasInteractiveModePreferenceKey)).toBe('mouse')
+    first.dispose()
+
+    const second = create()
+    expect(second.interactiveMode$.value).toBe('mouse')
+    second.interactiveMode$.set('touchpad')
+    expect(saved.get(canvasInteractiveModePreferenceKey)).toBe('touchpad')
+    second.dispose()
+  })
+
+  it('uses the default for invalid or unavailable preferences and remains usable', () => {
+    const unavailable = {
+      getItem: () => {
+        throw new Error('unavailable')
+      },
+      setItem: () => {
+        throw new Error('unavailable')
+      },
+    }
+    const store = new WorkbenchStore(new WorkbenchClient(vi.fn()), unavailable)
+    expect(store.interactiveMode$.value).toBe('touchpad')
+    expect(() => store.interactiveMode$.set('mouse')).not.toThrow()
+    expect(store.interactiveMode$.value).toBe('mouse')
+    store.dispose()
+
+    const invalid = new WorkbenchStore(new WorkbenchClient(vi.fn()), { getItem: () => 'unknown', setItem: () => {} })
+    expect(invalid.interactiveMode$.value).toBe('touchpad')
+    invalid.dispose()
+  })
+})
 
 function catalogSession(initialFlowId?: string) {
   let emit: ((event?: FlowCatalogEvent) => void) | undefined

@@ -29,7 +29,7 @@ function callbacksFromProps(props: FlowCanvasViewProps): ViewCallbacks {
 
 export function FlowCanvasView(props: FlowCanvasViewProps): ReactElement {
   const store = useMemo(
-    () => new CanvasStore(props.model, props.editable, props.language ?? 'en', callbacksFromProps(props), props.autoLayout),
+    () => new CanvasStore(props.model, props.editable, props.language ?? 'en', callbacksFromProps(props), props.autoLayout, props.interactiveMode$),
     [props.identity],
   )
   const previousStore = useRef(store)
