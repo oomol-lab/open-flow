@@ -129,7 +129,7 @@ function CanvasOptionsMenu({
     <>
       {onRelayout != null && (
         <DropdownMenuItem onClick={onRelayout}>
-          <i aria-hidden="true" className="i-lucide-light:layout-grid" />
+          <i aria-hidden="true" className="i-carbon:template" />
           {t('optimize')}
         </DropdownMenuItem>
       )}
@@ -238,7 +238,7 @@ export function CanvasViewControls({
                   {onRelayout != null && (
                     <CanvasTooltip placement="top" title={t('optimize')}>
                       <Button aria-label={t('optimize')} onClick={onRelayout} size="icon" type="button" variant="ghost">
-                        <i aria-hidden="true" className="i-lucide-light:layout-grid" />
+                        <i aria-hidden="true" className="i-carbon:template" />
                       </Button>
                     </CanvasTooltip>
                   )}
