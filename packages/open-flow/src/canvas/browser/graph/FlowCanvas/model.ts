@@ -258,6 +258,8 @@ export interface FlowCanvasViewProps {
   readonly onSelectionEnd?: (nodeIds: readonly string[]) => void
   /** Omit to hide the node and multi-selection toolbar entry. */
   readonly onInspectSelection?: () => void
+  /** Whether the selection property panel is open. */
+  readonly inspectorOpen?: boolean
   readonly selectedNodeIds: readonly string[]
 }
 

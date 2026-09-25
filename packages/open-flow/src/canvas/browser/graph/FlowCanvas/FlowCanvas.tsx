@@ -17,6 +17,7 @@ export interface FlowCanvasProps {
   onSelectionStart?: () => void
   onSelectionEnd?: () => void
   onInspectSelection?: () => void
+  inspectorOpen?: boolean
   onRequestAddNode?: FlowCanvasViewProps['onRequestAddNode']
   cornerTools?: React.ReactNode
   cornerLeading?: React.ReactNode
@@ -43,6 +44,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   onSelectionStart,
   onSelectionEnd,
   onInspectSelection,
+  inspectorOpen = false,
   onRequestAddNode,
   cornerTools,
   cornerLeading,
@@ -67,7 +69,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   useEffect(flowCanvasStore.setupForceDelete, [])
 
   return (
-    <InspectSelectionContext.Provider value={onInspectSelection}>
+    <InspectSelectionContext.Provider value={{ onInspect: onInspectSelection, expanded: inspectorOpen }}>
       <CanvasStoreProvider value={flowCanvasStore} dark={dark}>
         <NodeMiniMapProvider value={nodeMiniMapPhase}>
           <ReactFlowContainer

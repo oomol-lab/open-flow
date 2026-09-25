@@ -18,6 +18,7 @@ import { nodeCardContent } from '../../FlowCanvas/cardContent.ts'
 import { InspectSelectionButton } from '../../inspectSelection.tsx'
 import { useGetStaticPopupContainer } from '../../ReactFlowContainer/useGetPopupContainer.ts'
 import { useNodeStore } from '../NodeStoreContext.tsx'
+import { useShowNodeError } from './useShowNodeError.ts'
 
 export function NodeHeadMoreMenu(): React.ReactElement {
   const canvasStore = useCanvasStore()
@@ -149,6 +150,7 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
     nodeStore,
     onDelete: editable && canvasStore.canDeleteNodes ? () => canvasStore.deleteNodes([nodeStore]) : undefined,
   })
+  const showError = useShowNodeError(nodeStore)
   const content = useVal(NodeStore.to(nodeStore)?.content$)
   const comment = CommentNodeStore.is(nodeStore) ? nodeStore : undefined
   const commentBody = useVal(comment?.$.content)
@@ -172,7 +174,7 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
 
   return (
     <NodeToolbar data-tooltip-toolbar className={styles.floatBar} offset={12 - 8 * zoom}>
-      <InspectSelectionButton className={styles.floatBarButton} />
+      <InspectSelectionButton className={styles.floatBarButton} danger={showError} />
       {floatBarItems.map((item) => {
         return (
           <CanvasTooltip

@@ -54,14 +54,13 @@ interface Props {
   readonly onDuplicate: (positions?: Readonly<Record<string, Point>>, offset?: Point) => void
   readonly onMoveNodes: (positions: Readonly<Record<string, Point>>) => void
   readonly onMoveViewport: (viewport: DesignerViewport) => void
-  readonly onOpenInspector: () => void
   readonly onPaste: () => void
   readonly provideAddNodeOptions: (searchTerm: string, signal: AbortSignal) => ResourceSource<readonly AddNodeOption[]>
   readonly onActivateSelection?: FlowCanvasViewProps['onActivateSelection']
   readonly onSelectionStart?: FlowCanvasViewProps['onSelectionStart']
   readonly onSelectionEnd?: FlowCanvasViewProps['onSelectionEnd']
   readonly onSelectNodes: (nodeIds: readonly string[]) => void
-  readonly onToggleInspector: (opener: HTMLButtonElement) => void
+  readonly onToggleInspector: (opener?: HTMLButtonElement) => void
   readonly selectedNodeIds: readonly string[]
   readonly target: GraphTarget | undefined
 }
@@ -102,7 +101,6 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     onDuplicate,
     onMoveNodes,
     onMoveViewport,
-    onOpenInspector,
     onPaste,
     provideAddNodeOptions,
     onSelectNodes,
@@ -269,7 +267,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     if (addingRecommended.current) return
     addingRecommended.current = true
     try {
-      if ((await requestAddNode(option)) != null) onOpenInspector()
+      await requestAddNode(option)
     } finally {
       addingRecommended.current = false
     }
@@ -390,14 +388,11 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
         onActivateSelection={onActivateSelection}
         onSelectionStart={onSelectionStart}
         onSelectionEnd={onSelectionEnd}
-        onInspectSelection={
-          inspectorOpen
-            ? undefined
-            : () => {
-                canvas.current?.focus({ preventScroll: true })
-                onOpenInspector()
-              }
-        }
+        inspectorOpen={inspectorOpen}
+        onInspectSelection={() => {
+          canvas.current?.focus({ preventScroll: true })
+          onToggleInspector()
+        }}
         selectedNodeIds={selectedNodeIds}
       />
       {pickerRequest && !disabled && (

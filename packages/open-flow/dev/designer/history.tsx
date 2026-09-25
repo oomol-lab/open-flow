@@ -364,7 +364,6 @@ function HistorySession({
               onMoveNodes={(positions) => void store.moveNodes(positions)}
               onMoveViewport={(viewport) => void store.moveViewport(viewport)}
               onSelectNodes={(ids) => store.selectNodes(ids)}
-              onOpenInspector={() => {}}
               onToggleInspector={() => {}}
               provideAddNodeOptions={async () => options}
             />

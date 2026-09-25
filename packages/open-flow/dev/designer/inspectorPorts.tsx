@@ -184,7 +184,6 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
             selectedNodeIds={selected}
             onSelectNodes={(ids) => {
               session.store.selectNodes(ids)
-              if (ids.length > 0) setOpen(true)
             }}
             onConnect={(edge) => {
               void session.store.connect(edge)
@@ -201,8 +200,7 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
             onCopy={() => {}}
             onPaste={() => {}}
             onDuplicate={() => {}}
-            onOpenInspector={() => setOpen(true)}
-            onToggleInspector={() => setOpen(!open)}
+            onToggleInspector={() => setOpen((value) => !value)}
           />
           {open && (
             <InspectorSamplePanel

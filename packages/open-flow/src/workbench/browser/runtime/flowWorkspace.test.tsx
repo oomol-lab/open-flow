@@ -176,7 +176,7 @@ describe('FlowWorkspace run drawer', () => {
     expect(designer.props.runControl.props.starting).toBe(false)
   })
 
-  it.each(['new-node', undefined])('opens node details only after a successful addition: %s', async (nodeId) => {
+  it.each(['new-node', undefined])('preserves inspector state when adding a node: %s', async (nodeId) => {
     const { editor, store } = renderWorkspace()
     vi.mocked(store.addNode).mockResolvedValue(nodeId)
     const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
@@ -187,8 +187,7 @@ describe('FlowWorkspace run drawer', () => {
 
     expect(await designer.props.onAddNode(option, position)).toBe(nodeId)
     expect(store.addNode).toHaveBeenCalledWith(option, position, undefined)
-    if (nodeId == null) expect(mocks.setOpen).not.toHaveBeenCalled()
-    else expect(mocks.setOpen).toHaveBeenCalledWith('properties')
+    expect(mocks.setOpen).not.toHaveBeenCalled()
   })
 
   it('hides execution when the graph has no trigger', () => {

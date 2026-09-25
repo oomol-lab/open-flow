@@ -129,6 +129,7 @@ export function FlowCanvasView(props: FlowCanvasViewProps): ReactElement {
       onSelectionStart={props.onSelectionStart}
       onSelectionEnd={() => propsRef.current.onSelectionEnd?.(selectionIds())}
       onInspectSelection={props.onInspectSelection}
+      inspectorOpen={props.inspectorOpen}
     />
   )
 }

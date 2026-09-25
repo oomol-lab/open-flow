@@ -285,7 +285,6 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
                 onIgnoreNodes={() => {}}
                 onMoveNodes={() => {}}
                 onMoveViewport={() => {}}
-                onOpenInspector={() => {}}
                 onPaste={() => {}}
                 onSelectNodes={() => {}}
                 onToggleInspector={() => {}}

@@ -345,7 +345,7 @@ export function FlowEditor({
             : live?.hasUnpublishedChanges == false
               ? 'current'
               : 'ready'
-  const closeContextPanel = (focusTarget = opener.current): void => {
+  const closeContextPanel = (focusTarget?: HTMLElement): void => {
     panel.close()
     focusInspectorOnOpen.current = false
     opener.current = undefined
@@ -359,13 +359,13 @@ export function FlowEditor({
     focusInspectorOnOpen.current = false
     panel.openInspector()
   }
-  const toggleInspector = (button: HTMLButtonElement): void => {
+  const toggleInspector = (button?: HTMLButtonElement): void => {
     if (panel.open) {
       closeContextPanel(button)
       return
     }
     opener.current = button
-    focusInspectorOnOpen.current = true
+    focusInspectorOnOpen.current = button != null
     panel.openInspector()
   }
   const addFromPicker = async (option: AddNodeOption): Promise<string | undefined> => {
@@ -512,11 +512,7 @@ export function FlowEditor({
         focusNodeRequest={diagnosticFocus ?? nodeFocus}
         inspectorOpen={contextPanelVisible}
         model={designer}
-        onAddNode={async (option, position, connection) => {
-          const nodeId = await store.addNode(option, position, connection)
-          if (nodeId != null) openInspector()
-          return nodeId
-        }}
+        onAddNode={(option, position, connection) => store.addNode(option, position, connection)}
         onConnect={(edge) => void store.workspace.connect(edge)}
         onChangeNodeContentHidden={(nodeId, hidden) => void store.workspace.saveNodeContentHidden(nodeId, hidden)}
         onChangeComment={(nodeId, value) => void store.workspace.saveComment(nodeId, value)}
@@ -526,7 +522,6 @@ export function FlowEditor({
         onDuplicate={(positions, offset) => void store.workspace.duplicateSelectedNodes(positions, offset)}
         onMoveNodes={(positions) => void store.workspace.moveNodes(positions)}
         onMoveViewport={(viewport) => void store.workspace.moveViewport(viewport)}
-        onOpenInspector={openInspector}
         onPaste={() => void store.workspace.pasteNodes()}
         provideAddNodeOptions={store.provideAddNodeOptions}
         onSelectNodes={panel.select}
@@ -587,7 +582,7 @@ export function FlowEditor({
           }
           focusOnOpen={focusInspectorOnOpen.current}
           icon={contextPanelIcon}
-          onClose={() => closeContextPanel()}
+          onClose={() => closeContextPanel(opener.current)}
           theme={theme}
           title={contextPanelTitle}
         >

@@ -205,9 +205,19 @@ function CommentStory({ dark, language, log }: { readonly dark: boolean; readonl
   const [model, setModel] = useState(commentModel)
   const [selected, setSelected] = useState<readonly string[]>(['notes'])
   const [editable, setEditable] = useState(true)
+  const [inspectorOpen, setInspectorOpen] = useState(false)
   useStoryActions([
     { label: 'Single selection', onClick: () => setSelected(['notes']) },
     { label: 'Multiple selection', onClick: () => setSelected(['notes', 'long']) },
+    {
+      label: 'Toggle node errors',
+      onClick: () =>
+        setModel((value) => ({
+          ...value,
+          nodes: value.nodes.map((node) => (node.kind === 'comment' ? node : { ...node, diagnostics: node.diagnostics ? 0 : 1 })),
+        })),
+    },
+    { label: inspectorOpen ? 'Close properties' : 'Open properties', onClick: () => setInspectorOpen((value) => !value) },
     { label: editable ? 'Switch to read-only' : 'Enable editing', onClick: () => setEditable((value) => !value) },
     {
       label: 'Reset nodes',
@@ -380,6 +390,7 @@ function NodeContentStory({
   const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(initialSelection)
   const [selected, setSelected] = useState<readonly string[]>([initialSelection])
   const [editable, setEditable] = useState(true)
+  const [inspectorOpen, setInspectorOpen] = useState(false)
   const [model, setModel] = useState(initialModel)
   const [generation, setGeneration] = useState(0)
   useStoryActions([
@@ -387,12 +398,22 @@ function NodeContentStory({
       label: 'Toggle all content',
       onClick: () => setModel((value) => ({ ...value, nodes: value.nodes.map((node) => ({ ...node, contentHidden: !node.contentHidden })) })),
     },
+    {
+      label: 'Toggle node errors',
+      onClick: () =>
+        setModel((value) => ({
+          ...value,
+          nodes: value.nodes.map((node) => (node.kind === 'comment' ? node : { ...node, diagnostics: node.diagnostics ? 0 : 1 })),
+        })),
+    },
+    { label: inspectorOpen ? 'Close properties' : 'Open properties', onClick: () => setInspectorOpen((value) => !value) },
     { label: editable ? 'Switch to read-only' : 'Enable editing', onClick: () => setEditable((value) => !value) },
     {
       label: 'Reset samples',
       onClick: () => {
         setSelected([initialSelection])
         setEditable(true)
+        setInspectorOpen(false)
         setModel(initialModel)
         onIgnoreNodes(ignoredNodeIds, false)
         setGeneration((value) => value + 1)
@@ -405,7 +426,11 @@ function NodeContentStory({
         <FlowCanvasView
           key={generation}
           identity="lab:node-cases:value"
-          onInspectSelection={() => log('node.inspect', selected)}
+          inspectorOpen={inspectorOpen}
+          onInspectSelection={() => {
+            setInspectorOpen((value) => !value)
+            log('node.inspect', selected)
+          }}
           autoLayout={false}
           layoutMotion={false}
           dark={dark}
