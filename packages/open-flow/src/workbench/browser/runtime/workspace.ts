@@ -18,6 +18,7 @@ import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionVi
 import { resolutionOutputPorts } from '../../../flow/common/graph.ts'
 import { sourceOutputLabel } from '../../../flow/common/sourceField.ts'
 import { triggerOutputPorts } from '../../../trigger/common/contract.ts'
+import { actionSummary } from './actionSummary.ts'
 import { savedPositions, savedOrder, savedViewport, savedComments, savedHiddenNodeContent } from './canvasPresentation.ts'
 import { providerIcon } from './providerIcon.ts'
 import { revisionView } from './revisionView.ts'
@@ -334,10 +335,10 @@ function runProjection(
 
 function executorName(task: TaskDefinition | undefined, providerName: string | undefined, t?: TFunction): string | undefined {
   if (task == null) return
-  if ('moduleId' in task) return t?.('designer.executorJavaScript') ?? 'javascript'
+  if ('moduleId' in task) return t?.('designer.executorJavaScript') ?? 'JavaScript'
   if (task.executor.kind == 'agent') return 'Agent'
-  if (task.executor.kind == 'llm') return t?.('designer.executorLlm') ?? 'llm'
-  return `${t?.('designer.executorConnector') ?? 'connector'} · ${providerName ?? task.executor.action.split('.')[0]}`
+  if (task.executor.kind == 'llm') return t?.('designer.executorLlm') ?? 'LLM'
+  return `${t?.('designer.executorConnector') ?? 'Connector'} · ${providerName ?? task.executor.action.split('.')[0]}`
 }
 
 function triggerIcon(trigger: TriggerNode): string {
@@ -598,6 +599,15 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
         }),
         kind: node.kind,
         executorName: executorName(task, connectorAction?.serviceName, context.t),
+        ...(task != null && 'moduleId' in task
+          ? {
+              actionSummary: actionSummary(
+                (task.capabilities ?? []).flatMap((capability) => ('mode' in capability && capability.mode === 'independent' ? capability.actions : [])),
+                context.connectorActions,
+                Object.values(context.providers),
+              ),
+            }
+          : {}),
         connectionRequired,
         ...(task != null && 'executor' in task && task.executor.kind == 'agent'
           ? {

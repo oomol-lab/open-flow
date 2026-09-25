@@ -555,6 +555,7 @@
   "zoomReset": "ズームをリセット",
   "view": "表示",
   "canvasCard": {
+    "actionSummary": "ツール: {{actions}} · サービス: {{providers}}",
     "waitBranch": {
       "pending": "確認待ち",
       "approve": "承認",

@@ -18,10 +18,10 @@ import { codeSharedPermissionsEnabled } from '../../../../flow/common/codePermis
 import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
-import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
+import { IconStack } from '../../../../ui/browser/icon-stack.tsx'
 import { Switch } from '../../../../ui/browser/switch.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
-import { providerIcon } from '../providerIcon.ts'
+import { actionSummary } from '../actionSummary.ts'
 import { resourceData, resourceValue } from '../stores/resource.ts'
 import { ActionSelectionDialog } from './actionSelectionDialog.tsx'
 import { CodeEditor } from './codeEditor.tsx'
@@ -165,6 +165,7 @@ export function CodeTaskSection({
   if (task == null) return <div className="inspector-section section-error">{t('inspector.task.missing')}</div>
   if (!('moduleId' in task)) return null
   const selectedActions = permission?.mode == 'independent' ? permission.actions : []
+  const summary = actionSummary(selectedActions, hintedCatalog, providers.data ?? [])
   const actionIssue =
     saveError != null ||
     diagnostics?.some((item) => item.path.includes('/task/capabilities')) ||
@@ -232,6 +233,11 @@ export function CodeTaskSection({
         <ActionSelectionDialog
           key={selection.id}
           title={t('actionPicker.configureActions')}
+          triggerHint={
+            selectedActions.length > 0
+              ? t('actionPicker.selectionSummary', { actions: selectedActions.length, providers: summary.providers.length })
+              : undefined
+          }
           trigger={
             <Button
               type="button"
@@ -247,26 +253,7 @@ export function CodeTaskSection({
                   {t('actionPicker.triggerLabel')}
                 </>
               ) : (
-                <>
-                  <span aria-hidden="true" className="flex items-center -space-x-2">
-                    {selectedActions.slice(0, 3).map((entry) => {
-                      const action = hintedCatalog[entry.action]
-                      const serviceId = action?.serviceId ?? entry.action.split('.')[0]!
-                      const provider = providers.data?.find((item) => item.serviceId == serviceId)
-                      return (
-                        <span
-                          key={entry.action}
-                          className="relative flex size-6 shrink-0 items-center justify-center rounded-full border border-border/50 bg-popover"
-                        >
-                          <ContentIcon src={providerIcon(action ?? provider ?? { serviceId, serviceName: serviceId })} className="size-4" />
-                        </span>
-                      )
-                    })}
-                    <span className="relative flex size-6 shrink-0 items-center justify-center rounded-full border border-border/50 bg-muted text-[10px] font-medium tabular-nums text-foreground">
-                      +{selectedActions.length}
-                    </span>
-                  </span>
-                </>
+                <IconStack icons={summary.providers} count={summary.count} />
               )}
             </Button>
           }

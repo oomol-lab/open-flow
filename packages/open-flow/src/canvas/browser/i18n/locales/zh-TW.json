@@ -555,6 +555,7 @@
   "zoomReset": "重設縮放",
   "view": "檢視",
   "canvasCard": {
+    "actionSummary": "{{actions}} 個工具 · {{providers}} 個服務",
     "waitBranch": {
       "pending": "待確認",
       "approve": "通過",

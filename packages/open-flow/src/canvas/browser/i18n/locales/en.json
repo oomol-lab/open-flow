@@ -555,6 +555,7 @@
   "zoomReset": "Reset zoom",
   "view": "View",
   "canvasCard": {
+    "actionSummary": "Actions: {{actions}} · Services: {{providers}}",
     "waitBranch": {
       "pending": "Pending",
       "approve": "Approved",

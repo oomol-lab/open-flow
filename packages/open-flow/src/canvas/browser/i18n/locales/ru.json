@@ -555,6 +555,7 @@
   "zoomReset": "Сбросить масштаб",
   "view": "Вид",
   "canvasCard": {
+    "actionSummary": "Действия: {{actions}} · Сервисы: {{providers}}",
     "waitBranch": {
       "pending": "Ожидает подтверждения",
       "approve": "Одобрено",

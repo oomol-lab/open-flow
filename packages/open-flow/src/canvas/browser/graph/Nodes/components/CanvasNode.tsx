@@ -6,6 +6,7 @@ import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { cronDescription, cronLabel } from '../../../../../trigger/browser/cronDescription.ts'
 import { timeZoneLabel } from '../../../../../trigger/browser/timeZones.ts'
+import { IconStack } from '../../../../../ui/browser/icon-stack.tsx'
 import { ContentIcon } from '../../../../../ui/browser/icons/ContentIcon.tsx'
 import { NODE_HANDLE_CLASSNAME } from '../../../base/canvas.ts'
 import { CanvasTooltip } from '../../../components/tooltip.tsx'
@@ -33,6 +34,8 @@ export function CanvasNode({
   const language = useLang()
   const selected = useVal(nodeStore.$.selected)
   const node = useVal(nodeStore.content$)
+  const actions = node.kind === 'task' ? node.actionSummary : undefined
+  const actionLabel = actions == null ? undefined : t('canvasCard.actionSummary', { actions: actions.count, providers: actions.providers.length })
   const title = node.title
   const { values, summary, schedules, images, tools, inline, hidden } = nodeCardContent(node)
   const kind = node?.kind ?? 'task'
@@ -91,6 +94,15 @@ export function CanvasNode({
         title={title}
         icon={<CanvasNodeIcon icon={node.icon} kind={node.kind} nodeType={nodeStore.nodeType} />}
         subtitle={subtitle}
+        subtitleAccessory={
+          actions != null && actions.count > 0 ? (
+            <CanvasTooltip placement="top" title={actionLabel}>
+              <span className="inline-flex shrink-0" tabIndex={0} role="img" aria-label={actionLabel}>
+                <IconStack icons={actions.providers} count={actions.count} limit={5} size="sm" countClassName="font-normal text-inherit" />
+              </span>
+            </CanvasTooltip>
+          ) : undefined
+        }
         selected={selected}
         problem={(node.kind == 'task' || node.kind == 'trigger') && node.connectionRequired ? t('nodeStatus.connectionRequired') : problem}
         problemIcon={

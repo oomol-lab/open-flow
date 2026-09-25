@@ -555,6 +555,7 @@
   "zoomReset": "확대/축소 재설정",
   "view": "보기",
   "canvasCard": {
+    "actionSummary": "도구: {{actions}} · 서비스: {{providers}}",
     "waitBranch": {
       "pending": "확인 대기",
       "approve": "승인",

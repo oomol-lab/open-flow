@@ -976,6 +976,7 @@
     "codeHint": "允許 Agent 使用 JavaScript 處理輸入和工具結果，不存取外部應用程式。"
   },
   "actionPicker": {
+    "selectionSummary": "{{actions}} 個工具 · {{providers}} 個服務",
     "preparing": "正在準備工具…",
     "description": "選擇此節點可呼叫的工具，並為需要授權的工具選擇帳號。",
     "triggerLabel": "工具",

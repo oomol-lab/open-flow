@@ -976,6 +976,7 @@
     "codeHint": "Let the Agent use JavaScript to process inputs and tool results without accessing external apps."
   },
   "actionPicker": {
+    "selectionSummary": "Actions : {{actions}} · Services : {{providers}}",
     "preparing": "Préparation de l’action…",
     "description": "Choisissez les actions que ce nœud peut appeler et sélectionnez un compte pour celles qui nécessitent une autorisation.",
     "triggerLabel": "Actions",

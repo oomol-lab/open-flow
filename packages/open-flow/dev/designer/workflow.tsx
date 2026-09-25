@@ -20,6 +20,7 @@ import { deriveAddNodeOptions } from '../../src/workbench/browser/runtime/editor
 import { CanvasNodePicker } from '../../src/workbench/browser/runtime/editor/nodePickerPopover.tsx'
 import { WorkbenchCanvasActions, WorkbenchInspectorToggle } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
+import { providerIcon } from '../../src/workbench/browser/runtime/providerIcon.ts'
 import { RunControl } from '../../src/workbench/browser/runtime/runs/runControl.tsx'
 import { WorkspaceNavigationIsland } from '../../src/workbench/browser/runtime/shell/workspaceNavigationIsland.tsx'
 import { WorkspacePublishIsland } from '../../src/workbench/browser/runtime/shell/workspacePublishIsland.tsx'
@@ -230,6 +231,17 @@ const states: FlowCanvasViewModel = {
     title: node.title,
     run: { ...node.run, runId: 'lab-run-042' },
     executorName: 'JavaScript',
+    actionSummary:
+      node.id === 'idle'
+        ? undefined
+        : {
+            count: node.id === 'selected' ? 3 : 9,
+            providers: (node.id === 'selected' ? ['slack'] : ['slack', 'github', 'notion', 'google-drive', 'feishu', 'airtable']).map((id) => ({
+              id,
+              icon: providerIcon({ serviceId: id, serviceName: id }),
+              label: id,
+            })),
+          },
     diagnostics: node.id == 'error' || node.id == 'account' ? 1 : undefined,
     connectionRequired: node.id == 'account',
     kind: 'task',
@@ -421,7 +433,8 @@ export const workflowStories: readonly FrontendStory[] = [
     group: 'Theme Preview',
     id: 'node-states',
     title: 'Node states',
-    description: 'Select nodes to compare outlines, execution states and the Code missing-account icon. Interactions appear in the status below.',
+    description:
+      'Compare Code nodes with no actions, one provider with multiple actions, and more than five providers. Check the stack beside JavaScript, long titles, execution states and the missing-account icon. Interactions appear in the status below.',
     standalone: true,
     render: (log, dark, language) => <WorkflowStory dark={dark} language={language} log={log} model={states} initialSelectedNodeId="selected" />,
   },

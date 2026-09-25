@@ -8,7 +8,23 @@ import { designerGraph } from './workspace.ts'
 
 describe('Designer port projection', () => {
   it('uses the disconnected state only for the Code node with an account diagnostic', () => {
-    const code = { kind: 'task' as const, inputs: {}, task: { name: 'Code', moduleId: 'module', inputs: [], outputs: [] } }
+    const code = {
+      kind: 'task' as const,
+      inputs: {},
+      task: {
+        name: 'Code',
+        moduleId: 'module',
+        inputs: [],
+        outputs: [],
+        capabilities: [
+          {
+            kind: 'connector' as const,
+            mode: 'independent' as const,
+            actions: [{ action: 'slack.send' }, { action: 'slack.read' }, { action: 'github.read' }],
+          },
+        ],
+      },
+    }
     const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
       actorId: 'actor',
       createdAt: '2026-09-25T00:00:00.000Z',
@@ -32,7 +48,18 @@ describe('Designer port projection', () => {
       column: 0,
     }
     const nodes = designerGraph(draft, { kind: 'flow' }, {}, [issue]).nodes
-    expect(nodes.find((node) => node.id === 'code')).toMatchObject({ connectionRequired: true, diagnostics: 1 })
+    expect(nodes.find((node) => node.id === 'code')).toMatchObject({
+      connectionRequired: true,
+      diagnostics: 1,
+      executorName: 'JavaScript',
+      actionSummary: {
+        count: 3,
+        providers: [
+          { id: 'slack', icon: expect.any(String) },
+          { id: 'github', icon: expect.any(String) },
+        ],
+      },
+    })
     expect(nodes.find((node) => node.id === 'other')).toMatchObject({ connectionRequired: false, diagnostics: 0 })
     expect(designerGraph(draft, { kind: 'flow' }, {}, [{ ...issue, code: 'module.syntax', path: '/modules/module/source' }]).nodes[0]).toMatchObject({
       connectionRequired: false,
@@ -250,7 +277,7 @@ describe('Designer port projection', () => {
       serviceName: 'Hacker News',
     }
 
-    expect(designerGraph(draft, { kind: 'flow' }, {}, []).nodes[0]).toMatchObject({ executorName: 'connector · hacker-news' })
+    expect(designerGraph(draft, { kind: 'flow' }, {}, []).nodes[0]).toMatchObject({ executorName: 'Connector · hacker-news' })
 
     const publicNode = designerGraph(draft, { kind: 'flow' }, {}, [], { [action.actionId]: action }).nodes[0]
     const authenticatedNode = designerGraph(
@@ -273,10 +300,10 @@ describe('Designer port projection', () => {
     expect(publicNode).toMatchObject({
       additionalInputs: [{ handle: 'start', jsonSchema: {}, nullable: false }],
       diagnostics: 0,
-      executorName: 'connector · Hacker News',
+      executorName: 'Connector · Hacker News',
       connectionRequired: false,
     })
-    expect(authenticatedNode).toMatchObject({ diagnostics: 1, executorName: 'connector · Hacker News', connectionRequired: true })
+    expect(authenticatedNode).toMatchObject({ diagnostics: 1, executorName: 'Connector · Hacker News', connectionRequired: true })
   })
 
   it.each([

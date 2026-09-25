@@ -12,6 +12,7 @@ export function CanvasCard({
   titleContent,
   icon,
   subtitle,
+  subtitleAccessory,
   children,
   preview,
   branches,
@@ -34,6 +35,7 @@ export function CanvasCard({
   readonly title: string
   readonly icon?: ReactNode
   readonly subtitle?: string
+  readonly subtitleAccessory?: ReactNode
   readonly children?: ReactNode
   readonly preview?: ReactNode
   readonly branches?: ReactNode
@@ -74,7 +76,12 @@ export function CanvasCard({
         <span className={styles.icon}>{icon}</span>
         <div className={styles.identity}>
           <strong title={title}>{titleContent ?? title}</strong>
-          {subtitle && <span>{subtitle}</span>}
+          {subtitle && (
+            <span className={styles.subtitle}>
+              <span>{subtitle}</span>
+              {subtitleAccessory}
+            </span>
+          )}
         </div>
         {statusIndicator}
         {actions}

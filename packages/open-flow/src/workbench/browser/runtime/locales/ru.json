@@ -976,6 +976,7 @@
     "codeHint": "Let the Agent use JavaScript to process inputs and tool results without accessing external apps."
   },
   "actionPicker": {
+    "selectionSummary": "Действия: {{actions}} · Сервисы: {{providers}}",
     "preparing": "Подготовка действия…",
     "description": "Выберите действия, которые может вызывать этот узел, и укажите аккаунт для действий, требующих авторизации.",
     "triggerLabel": "Действия",

@@ -976,6 +976,7 @@
     "codeHint": "Let the Agent use JavaScript to process inputs and tool results without accessing external apps."
   },
   "actionPicker": {
+    "selectionSummary": "도구: {{actions}} · 서비스: {{providers}}",
     "preparing": "도구 준비 중…",
     "description": "이 노드에서 호출할 도구를 선택하고, 인증이 필요한 도구에는 계정을 지정하세요.",
     "triggerLabel": "도구",

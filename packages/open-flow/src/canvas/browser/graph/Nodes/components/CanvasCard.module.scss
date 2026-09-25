@@ -266,3 +266,17 @@
 .value.compactContent .singleContent {
   border-radius: 6px;
 }
+
+.subtitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+
+  > span:first-child {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}

@@ -976,6 +976,7 @@
     "codeHint": "Let the Agent use JavaScript to process inputs and tool results without accessing external apps."
   },
   "actionPicker": {
+    "selectionSummary": "ツール: {{actions}} · サービス: {{providers}}",
     "preparing": "ツールを準備中…",
     "description": "このノードから呼び出せるツールを選び、認証が必要なツールにはアカウントを指定します。",
     "triggerLabel": "ツール",

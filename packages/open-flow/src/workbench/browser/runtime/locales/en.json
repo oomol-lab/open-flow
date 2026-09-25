@@ -118,9 +118,9 @@
     "delete": "Delete",
     "draftSaved": "Draft saved",
     "executorConnectionRequired": "connection required",
-    "executorConnector": "connector",
-    "executorJavaScript": "javascript",
-    "executorLlm": "llm",
+    "executorConnector": "Connector",
+    "executorJavaScript": "JavaScript",
+    "executorLlm": "LLM",
     "flowCanvas": "Flow Designer",
     "openBlocks": "Browse blocks",
     "quickAddHint": "Press A to add quickly",
@@ -976,6 +976,7 @@
     "codeHint": "Let the Agent use JavaScript to process inputs and tool results without accessing external apps."
   },
   "actionPicker": {
+    "selectionSummary": "Actions: {{actions}} · Services: {{providers}}",
     "preparing": "Preparing action…",
     "description": "Choose the actions this node can call, and select an account for actions that require authorization.",
     "triggerLabel": "Actions",

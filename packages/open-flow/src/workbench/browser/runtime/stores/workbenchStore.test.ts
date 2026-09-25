@@ -378,8 +378,8 @@ describe('WorkbenchStore diagnostics', () => {
         }),
       ])
       expect(store.$.diagnosticItems.value).toEqual([expect.objectContaining({ location: { nodeId: 'connector', section: 'account' }, scope: 'task' })])
-      expect(store.$.designerNodeById.value.get('connector')).toMatchObject({ diagnostics: 1, executorName: 'connector · AMap', connectionRequired: true })
-      expect(store.$.designerNodeById.value.get('connected')).toMatchObject({ diagnostics: 0, executorName: 'connector · AMap' })
+      expect(store.$.designerNodeById.value.get('connector')).toMatchObject({ diagnostics: 1, executorName: 'Connector · AMap', connectionRequired: true })
+      expect(store.$.designerNodeById.value.get('connected')).toMatchObject({ diagnostics: 0, executorName: 'Connector · AMap' })
       const icons = store.$.sourceNodeIcons.value
       expect(icons.connector).toContain(encodeURIComponent(providerIcon))
       const iconUpdates = vi.fn()

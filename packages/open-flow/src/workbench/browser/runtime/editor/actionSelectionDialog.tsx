@@ -43,7 +43,9 @@ export function ActionSelectionDialog<T extends SelectedAction>({
   onSave,
   renderDetails,
   trigger,
+  triggerHint,
 }: {
+  readonly triggerHint?: string
   readonly trigger?: ReactElement<{ children?: ReactNode }>
   readonly title: string
   readonly entries: readonly T[]
@@ -83,9 +85,7 @@ export function ActionSelectionDialog<T extends SelectedAction>({
               </DialogTrigger>
             }
           />
-          <TooltipContent container={root}>
-            {title} · {entries.length}
-          </TooltipContent>
+          <TooltipContent container={root}>{triggerHint ?? `${title} · ${entries.length}`}</TooltipContent>
         </Tooltip>
         <DialogContent
           container={root}
