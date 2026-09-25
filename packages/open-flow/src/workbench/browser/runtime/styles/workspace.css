@@ -299,6 +299,8 @@
   }
 
   .run-input-popover > form > footer {
+    --ui-control-radius: initial;
+
     display: flex;
     min-height: 52px;
     flex: none;

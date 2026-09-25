@@ -90,7 +90,7 @@ function Form({
         <Button disabled={starting} onClick={close} type="button" variant="secondary">
           {t('common.close')}
         </Button>
-        <Button disabled={starting || request.triggerId == null} type="submit">
+        <Button className="pr-3" disabled={starting || request.triggerId == null} type="submit">
           {starting ? <Spinner data-icon="inline-start" /> : <Icon data-icon="inline-start" name="play" />}
           {t(starting ? 'workspace.starting' : 'runInput.startTest')}
         </Button>
