@@ -3,6 +3,7 @@
     "agent": "AI Agent",
     "agentDescription": "완료하려는 작업을 설명하세요. AI Agent가 노드 입력과 추가한 도구를 사용해 작업을 수행합니다.",
     "blocks": "블록",
+    "humanInTheLoop": "Human in the loop",
     "codeTaskName": "코드 태스크 {{number}}",
     "comment": "주석",
     "commentCopy": "{{title}} 사본",

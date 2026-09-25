@@ -3,6 +3,7 @@
     "agent": "AI Agent",
     "agentDescription": "Décrivez la tâche à accomplir. L’AI Agent utilisera les entrées du nœud et les outils ajoutés pour la réaliser.",
     "blocks": "Blocs",
+    "humanInTheLoop": "Human in the loop",
     "codeTaskName": "Tâche de code {{number}}",
     "comment": "Commentaire",
     "commentCopy": "{{title}} (copie)",

@@ -176,7 +176,7 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
     ...options,
     {
       description: t('addNode.approvalDescription'),
-      group: t('addNode.blocks'),
+      group: t('addNode.humanInTheLoop'),
       id: 'approval',
       icon: ':carbon:stamp:',
       inputs: [{ handle: 'value', jsonSchema: {} }],
@@ -189,7 +189,7 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
     },
     {
       description: t('addNode.waitDescription'),
-      group: t('addNode.blocks'),
+      group: t('addNode.humanInTheLoop'),
       id: 'wait',
       icon: ':carbon:hourglass:',
       inputs: [{ handle: 'value', jsonSchema: {} }],

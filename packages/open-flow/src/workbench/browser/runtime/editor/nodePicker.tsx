@@ -256,6 +256,10 @@ export function NodePickerContent({
     })
   const local = options.filter((item) => !term || `${item.label} ${item.description}`.toLowerCase().includes(term.toLowerCase()))
   const matches = [...new Map([...local, ...results].filter((item) => item.kind != 'connector-group').map((item) => [item.id, item])).values()]
+  const humanInTheLoop = t('addNode.humanInTheLoop')
+  const builtInNodeItems = (items: readonly AddNodeOption[]) =>
+    items.filter((item) => item.kind != 'trigger' && item.kind != 'connector' && item.group != humanInTheLoop)
+  const humanInTheLoopItems = (items: readonly AddNodeOption[]) => items.filter((item) => item.group == humanInTheLoop)
   const matchedApps = apps.filter((item) => `${item.label} ${item.id}`.toLowerCase().includes(term.toLowerCase()))
   const filterAppOptions = (items: readonly AddNodeOption[]) =>
     items.filter((item) => `${item.label} ${item.description}`.toLowerCase().includes(appQuery.trim().toLowerCase()))
@@ -387,7 +391,11 @@ export function NodePickerContent({
                 )}
                 {section(
                   t('addNode.blocks'),
-                  matches.filter((item) => item.kind != 'trigger' && item.kind != 'connector'),
+                  builtInNodeItems(matches),
+                )}
+                {section(
+                  humanInTheLoop,
+                  humanInTheLoopItems(matches),
                 )}
                 {actionSections(matches)}
                 {!loading && !catalogLoading && !failed && !catalogError && !catalogFailed && matchedApps.length == 0 && matches.length == 0 && (
@@ -410,7 +418,12 @@ export function NodePickerContent({
               <>
                 {section(
                   t('nodePicker.builtInNodes'),
-                  local.filter((item) => item.kind != 'trigger'),
+                  builtInNodeItems(local),
+                  true,
+                )}
+                {section(
+                  humanInTheLoop,
+                  humanInTheLoopItems(local),
                   true,
                 )}
                 {pickerAppGroups.map((group, priority) => {

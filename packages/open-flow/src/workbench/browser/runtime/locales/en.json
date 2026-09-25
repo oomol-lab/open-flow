@@ -3,6 +3,7 @@
     "agent": "AI Agent",
     "agentDescription": "Describe the task. The AI Agent can use node inputs and the tools you add to complete it.",
     "blocks": "Blocks",
+    "humanInTheLoop": "Human in the loop",
     "codeTaskName": "Code task {{number}}",
     "comment": "Comment",
     "commentCopy": "{{title}} copy",

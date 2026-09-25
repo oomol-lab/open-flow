@@ -49,8 +49,14 @@ it('offers a manual trigger again after the existing one is removed', () => {
   expect(designerGraph(draft, { kind: 'flow' }).nodes).toEqual([expect.objectContaining({ id: 'start', outputs: [] })])
   const t = createI18n('en').t
   const options = deriveAddNodeOptions(draft, { kind: 'flow' }, t)
-  expect(options.find((option) => option.id == 'wait')).toMatchObject({ kind: 'wait', label: 'Wait', outputs: [{ handle: 'continue' }] })
+  expect(options.find((option) => option.id == 'wait')).toMatchObject({
+    group: 'Human in the loop',
+    kind: 'wait',
+    label: 'Wait',
+    outputs: [{ handle: 'continue' }],
+  })
   expect(options.find((option) => option.id == 'approval')).toMatchObject({
+    group: 'Human in the loop',
     kind: 'approval',
     label: 'Approval',
     outputs: [{ handle: 'approve' }, { handle: 'reject' }],

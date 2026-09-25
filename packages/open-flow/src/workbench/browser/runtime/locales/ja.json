@@ -3,6 +3,7 @@
     "agent": "AI Agent",
     "agentDescription": "実行したいタスクを説明してください。AI Agent はノードの入力と追加したツールを使ってタスクを完了します。",
     "blocks": "ノード",
+    "humanInTheLoop": "Human in the loop",
     "codeTaskName": "コードタスク {{number}}",
     "comment": "コメント",
     "commentCopy": "{{title}} のコピー",

@@ -3,6 +3,7 @@
     "agent": "AI Agent",
     "agentDescription": "Опишите задачу. AI Agent выполнит её, используя входные данные узла и добавленные вами инструменты.",
     "blocks": "Узлы",
+    "humanInTheLoop": "Human in the loop",
     "codeTaskName": "Задача с кодом {{number}}",
     "comment": "Комментарий",
     "commentCopy": "Копия {{title}}",

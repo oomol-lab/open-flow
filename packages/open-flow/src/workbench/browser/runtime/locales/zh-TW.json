@@ -3,6 +3,7 @@
     "agent": "AI Agent",
     "agentDescription": "描述要完成的任務。AI Agent 會使用節點輸入和你新增的工具來完成。",
     "blocks": "節點",
+    "humanInTheLoop": "人類介入",
     "codeTaskName": "程式碼任務 {{number}}",
     "comment": "註解",
     "commentCopy": "{{title}} 副本",
