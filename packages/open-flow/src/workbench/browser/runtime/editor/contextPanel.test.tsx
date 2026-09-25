@@ -7,6 +7,7 @@ import { createI18n } from '../i18n.ts'
 import { indexAddNodeOptions } from './addNodeOptions.ts'
 import { BlockLibrary } from './blockLibrary.tsx'
 import { ContextPanel } from './contextPanel.tsx'
+import { NodePickerContent } from './nodePicker.tsx'
 
 const connector: AddNodeOption = {
   connector: {
@@ -49,7 +50,8 @@ describe('Context Panel', () => {
     const renderPicker = (disabled: boolean) =>
       renderToStaticMarkup(
         <I18nProvider i18n={createI18n('en')}>
-          <BlockLibrary
+          <NodePickerContent
+            initialQuery="issue"
             browseOptions={async () => []}
             searchOptions={async () => []}
             disabled={disabled}
@@ -57,14 +59,15 @@ describe('Context Panel', () => {
             onAdd={async () => undefined}
             onRegisterDragOption={() => undefined}
             options={[connector]}
-            presentation="picker"
             provideChoices={async () => []}
           />
         </I18nProvider>,
       )
 
     expect(renderPicker(false)).toContain('draggable="true"')
-    expect(renderPicker(true)).not.toContain('draggable="true"')
+    expect(renderPicker(true)).toContain('Create issue')
+    expect(renderPicker(true)).toContain('draggable="false"')
+    expect(renderPicker(true)).toContain('disabled=""')
   })
 
   it('can open the picker on the triggers tab', () => {

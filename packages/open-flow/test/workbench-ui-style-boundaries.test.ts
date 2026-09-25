@@ -522,11 +522,21 @@ test('owns product and canvas surface tokens in one theme entry', async () => {
     readFile(new URL('src/ui/browser/theme.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/tokens.css', packageRoot), 'utf8'),
   ])
-  const controlSources = uiSources.filter((_, index) => !uiPaths[index]!.pathname.endsWith('/theme.css')).join('\n')
+  // Locally declared overrides need no fallback; inherited optional overrides do.
+  const controlSources = uiSources.flatMap((source, index) => {
+    const path = uiPaths[index]!.pathname
+    if (path.endsWith('/theme.css')) return []
+    return path.endsWith('.css') ? source.split('{').map((block) => block.split('}')[0]!) : [source]
+  })
   for (const token of controlOverrideTokens) {
-    const references = [...controlSources.matchAll(new RegExp(`var\\(${token}([,)])`, 'g'))]
-    assert.ok(references.length > 0, `${token} must be consumed by shared controls.`)
-    for (const reference of references) assert.equal(reference[1], ',', `${token} requires a fallback outside property panels.`)
+    let referenceCount = 0
+    for (const source of controlSources) {
+      const references = source.split('var(' + token).slice(1)
+      referenceCount += references.length
+      if (token in declarations(source, '--ui-')) continue
+      for (const reference of references) assert.equal(reference[0], ',', token + ' requires a fallback unless declared in the same rule.')
+    }
+    assert.ok(referenceCount > 0, token + ' must be consumed by shared controls.')
   }
   const themeTokens = declarations(theme, '--ui-')
   for (const token of [...sharedUiTokens, ...controlOverrideTokens]) assert.ok(token in themeTokens, `${token} must be declared by the shared theme.`)

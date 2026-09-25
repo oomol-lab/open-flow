@@ -989,7 +989,7 @@
     "title": "Choose an action",
     "failed": "Could not prepare this action. Try again.",
     "search": "Search apps or actions…",
-    "configureActions": "Service actions",
+    "configureActions": "Select tools",
     "selected": "Selected · {{count}}",
     "empty": "Choose actions from the catalog.",
     "noAccount": "No account required",

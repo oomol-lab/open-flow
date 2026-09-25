@@ -20,6 +20,7 @@ import { useStoryActions } from './storyActions.tsx'
 
 const action: ConnectorAction = {
   actionId: 'lab.lookup',
+  operationType: 'read',
   serviceId: 'lab',
   serviceName: 'Lab catalog',
   name: 'Find records',
@@ -41,6 +42,7 @@ const actions: readonly ConnectorAction[] = [
       name: `${operation} records`,
       description: `${operation} the selected records.`,
       inputs: {},
+      operationType: operation == 'Delete' ? 'destructive' : operation == 'Export' ? 'read' : operation == 'Validate' ? undefined : 'write',
     }),
   ),
   {
@@ -162,6 +164,7 @@ function createSession(language: UiLanguage, log: LogAction) {
           .filter((item) => !url.searchParams.has('service') || url.searchParams.get('service') == item.serviceId)
           .map((item) => ({
             id: item.actionId,
+            operationType: item.operationType,
             service: item.serviceId,
             name: item.name,
             description: item.description,
@@ -279,9 +282,9 @@ export const agentStory: FrontendStory = {
 export const codeActionsStory: FrontendStory = {
   ...agentStory,
   description:
-    'Open Actions from the plus button in the Code heading; saved selections show up to three distinct overlapping provider icons with the total action count as the final circle. Select multiple actions from one service to check icon deduplication and the tooltip counts. Browse services grouped by connected, built-in account, no setup and not connected, then check actions. Selected rows use an unlabeled account selector aligned with the action title in the middle column, leaving the delete button in its own column, with the property panel control surface; the header refreshes accounts and trash buttons remove actions. Icon buttons have tooltips. Use slow preparation and failure controls to check immediate selection, concurrent rows, removal and retry. Check opening with 1,000 sample services, the centered empty state, text-only provider header, shared node-picker icons, selected action hierarchy, overlay scrolling, 13px type, saving without accounts, danger on the Code Actions button for account issues, warning account controls, an Add account button for empty accounts, issues sorted first only on initial load, stable order while editing, original selection order preserved on Save, Cancel and account-free actions.',
+    'Open Actions from the plus button in the Code heading; saved selections show up to three distinct overlapping provider icons with the total action count as the final circle. Select multiple actions from one service to check icon deduplication and the tooltip counts. Browse services grouped by connected, built-in account, no setup and not connected, then check tools grouped by read, write, high-risk and other. Lab catalog covers all four categories, including filtered and empty results. Scroll provider and action lists to check sticky group headings and transitions between groups. Click a heading or activate it with Enter or Space to scroll smoothly to its group start, or instantly with reduced motion enabled; provider help stays independent. Selected rows use an unlabeled account selector aligned with the action title in the middle column, leaving the delete button in its own column, with the property panel control surface; the header refreshes accounts and trash buttons remove actions. Icon buttons have tooltips. Use slow preparation and failure controls to check immediate selection, concurrent rows, removal and retry. Check opening with 1,000 sample services, the centered empty state, text-only provider header, shared node-picker icons, selected action hierarchy, overlay scrolling, 13px type, saving without accounts, danger on the Code Actions button for account issues, warning account controls, an Add account button for empty accounts, issues sorted first only on initial load, stable order while editing, original selection order preserved on Save, Cancel and account-free actions.',
   group: 'Node Task',
   id: 'code-actions',
-  title: 'Service actions',
+  title: 'Select tools',
   render: (log, dark, language) => <AgentStory dark={dark} language={language} log={log} code />,
 }

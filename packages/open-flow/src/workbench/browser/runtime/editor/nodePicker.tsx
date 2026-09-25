@@ -1,5 +1,5 @@
 import styles from '../../../../ui/browser/navigation-page.module.scss'
-import type { DragEvent as ReactDragEvent, ReactElement } from 'react'
+import type { DragEvent as ReactDragEvent, ReactElement, MouseEvent as ReactMouseEvent } from 'react'
 import type { AddNodeOption } from './addNodeOptions.ts'
 import type { BlockLibraryProps } from './blockLibrary.tsx'
 
@@ -15,7 +15,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../../../ui/browser
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../../../ui/browser/tooltip.tsx'
 import { Icon } from '../icons.tsx'
 import { observeResource } from '../stores/resource.ts'
+import { groupActionOptions } from './actionGroups.ts'
 import { comparePickerApps, pickerConnectionPriorities, pickerAppGroups, pickerAppPriority } from './nodePickerApps.ts'
+import { PickerGroupButton } from './pickerGroupButton.tsx'
 import { ProviderAppIcon } from './providerAppIcon.tsx'
 import { ProviderGroupHeading } from './providerGroupHeading.tsx'
 
@@ -236,24 +238,26 @@ export function NodePickerContent({
       </div>
     )
   }
+  const scrollToGroup = (event: ReactMouseEvent<HTMLButtonElement>) => {
+    const section = event.currentTarget.closest('section')
+    const viewport = list.current
+    if (section && viewport)
+      viewport.scrollTo({
+        top: viewport.scrollTop + section.getBoundingClientRect().top - viewport.getBoundingClientRect().top,
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+      })
+  }
   const section = (title: string, items: readonly AddNodeOption[], compact = false, appLabel?: string) =>
     items.length > 0 && (
       <section className={appLabel ? 'mb-1' : 'mb-3'}>
-        <h3 style={{ margin: 0 }} className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">
-          {title}
+        <h3 style={{ margin: 0 }} className="sticky top-0 z-10 bg-popover px-2.5 pb-1 pt-2 text-xs font-medium text-muted-foreground">
+          <PickerGroupButton onClick={scrollToGroup}>{title}</PickerGroupButton>
         </h3>
         <div className={compact ? 'grid grid-cols-2 gap-x-2' : 'grid'}>{items.map((item, index) => row(item, compact, index))}</div>
       </section>
     )
   const actionSections = (items: readonly AddNodeOption[]) =>
-    (['read', 'write', 'destructive', 'other'] as const).map((type) => {
-      const grouped = items.filter((item) => {
-        if (item.kind != 'connector') return false
-        const operation = item.connector.operationType
-        return type == 'other' ? !['read', 'write', 'destructive'].includes(operation ?? '') : operation == type
-      })
-      return <div key={type}>{section(t(`nodePicker.actionGroups.${type}`), grouped)}</div>
-    })
+    groupActionOptions(items).map(({ type, items: members }) => <div key={type}>{section(t(`nodePicker.actionGroups.${type}`), members)}</div>)
   const local = options.filter((item) => !term || `${item.label} ${item.description}`.toLowerCase().includes(term.toLowerCase()))
   const matches = [...new Map([...local, ...results].filter((item) => item.kind != 'connector-group').map((item) => [item.id, item])).values()]
   const humanInTheLoop = t('addNode.humanInTheLoop')
@@ -355,7 +359,7 @@ export function NodePickerContent({
           )}
           <div
             ref={list}
-            className="min-h-0 flex-1 overflow-y-scroll overscroll-contain px-2 py-2"
+            className="min-h-0 flex-1 overflow-y-scroll overscroll-contain px-2 pb-2"
             onKeyDown={(event) => {
               if (event.key != 'ArrowDown' && event.key != 'ArrowUp') return
               const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')]
@@ -375,8 +379,8 @@ export function NodePickerContent({
               <>
                 {matchedApps.length > 0 && (
                   <section className="mb-3">
-                    <h3 style={{ margin: 0 }} className="px-2.5 pb-1 text-xs font-medium text-muted-foreground">
-                      {t('nodePicker.apps')}
+                    <h3 style={{ margin: 0 }} className="sticky top-0 z-10 bg-popover px-2.5 pb-1 pt-2 text-xs font-medium text-muted-foreground">
+                      <PickerGroupButton onClick={scrollToGroup}>{t('nodePicker.apps')}</PickerGroupButton>
                     </h3>
                     {matchedApps.length == 1 ? (
                       <div className="grid">{matchedApps.map((item) => appRow(item, true))}</div>
@@ -389,14 +393,8 @@ export function NodePickerContent({
                   t('addNode.triggers'),
                   matches.filter((item) => item.kind == 'trigger'),
                 )}
-                {section(
-                  t('addNode.blocks'),
-                  builtInNodeItems(matches),
-                )}
-                {section(
-                  humanInTheLoop,
-                  humanInTheLoopItems(matches),
-                )}
+                {section(t('addNode.blocks'), builtInNodeItems(matches))}
+                {section(humanInTheLoop, humanInTheLoopItems(matches))}
                 {actionSections(matches)}
                 {!loading && !catalogLoading && !failed && !catalogError && !catalogFailed && matchedApps.length == 0 && matches.length == 0 && (
                   <PickerStatus />
@@ -416,22 +414,14 @@ export function NodePickerContent({
               </>
             ) : (
               <>
-                {section(
-                  t('nodePicker.builtInNodes'),
-                  builtInNodeItems(local),
-                  true,
-                )}
-                {section(
-                  humanInTheLoop,
-                  humanInTheLoopItems(local),
-                  true,
-                )}
+                {section(t('nodePicker.builtInNodes'), builtInNodeItems(local), true)}
+                {section(humanInTheLoop, humanInTheLoopItems(local), true)}
                 {pickerAppGroups.map((group, priority) => {
                   const items = apps.filter((item) => item.directory != null && (item.priority ?? 3) == priority)
                   if (items.length == 0) return null
                   return (
                     <section key={group} className="mb-3">
-                      <ProviderGroupHeading group={group} container={root} />
+                      <ProviderGroupHeading group={group} container={root} onClick={scrollToGroup} />
                       <AppDirectory viewport={list.current}>{items.map((item) => appRow(item))}</AppDirectory>
                     </section>
                   )

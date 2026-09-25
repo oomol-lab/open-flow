@@ -51,6 +51,16 @@ sampleActions.push(
   { ...sampleActions[0]!, actionId: 'gmail.legacy', name: 'Legacy action', description: 'An action without a recognized operation type.', operationType: '' },
 )
 
+sampleActions.push(
+  ...Array.from({ length: 12 }, (_, index) => ({
+    ...sampleActions[0]!,
+    actionId: 'gmail.read-sample-' + index,
+    name: 'Read mailbox ' + (index + 1),
+    description: 'Read messages from a sample mailbox.',
+    operationType: 'read',
+  })),
+)
+
 const sampleProviders = [
   ...sampleActions
     .filter((action, index) => sampleActions.findIndex((candidate) => candidate.serviceId == action.serviceId) == index)
@@ -330,6 +340,6 @@ export const nodePickerPreviewStory: FrontendStory = {
   title: 'Add Node Popover',
   standalone: true,
   description:
-    'The production empty canvas opens the centered picker on Triggers from its Add node button or the A key. Picker items support click-to-add and dragging onto the canvas. Provider details use a centered title and quiet back arrow, matching the tab height and background and show real Triggers above action categories. Gmail covers every action category; Google Drive covers a single category. Open search samples compare Provider-only and action matches, app navigation and return. Connected services show an inline status independently of Flow authorization. Includes cached loading and 1,000-app scrolling.',
+    'The production empty canvas opens the centered picker on Triggers from its Add node button or the A key. Picker items support click-to-add and dragging onto the canvas. Provider details use a centered title and quiet back arrow, matching the tab height and background and show real Triggers above action categories. Gmail covers every action category; Google Drive covers a single category. Open search samples compare Provider-only and action matches, app navigation and return. Connected services show an inline status independently of Flow authorization. Includes cached loading and 1,000-app scrolling. Scroll provider and action lists to check sticky group headings and transitions between groups. Click a heading or activate it with Enter or Space to scroll smoothly to its group start, or instantly with reduced motion enabled; provider help stays independent.',
   render: (log, dark, language) => <Preview dark={dark} language={language} log={log} />,
 }

@@ -989,7 +989,7 @@
     "title": "アプリとアクションを選択",
     "failed": "ツールを準備できませんでした。もう一度お試しください。",
     "search": "アプリやアクションを検索…",
-    "configureActions": "サービス操作",
+    "configureActions": "ツールを選択",
     "selected": "選択済み · {{count}}",
     "empty": "一覧から操作を追加してください。",
     "noAccount": "アカウント不要",

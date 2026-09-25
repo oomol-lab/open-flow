@@ -1,14 +1,24 @@
+import type { MouseEventHandler } from 'react'
 import type { pickerAppGroups } from './nodePickerApps.ts'
 
 import { useTranslate } from 'val-i18n-react'
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../../../ui/browser/tooltip.tsx'
+import { PickerGroupButton } from './pickerGroupButton.tsx'
 
-export function ProviderGroupHeading({ group, container }: { group: (typeof pickerAppGroups)[number]; container?: HTMLElement | null }) {
+export function ProviderGroupHeading({
+  group,
+  container,
+  onClick,
+}: {
+  onClick: MouseEventHandler<HTMLButtonElement>
+  group: (typeof pickerAppGroups)[number]
+  container?: HTMLElement | null
+}) {
   const t = useTranslate()
   return (
-    <div className="flex items-center gap-1 px-2.5 pb-1 text-muted-foreground">
+    <div className="sticky top-0 z-10 flex items-center gap-1 bg-popover px-2.5 pb-1 pt-2 text-muted-foreground">
       <h3 style={{ margin: 0 }} className="text-xs font-medium">
-        {t(`nodePicker.${group}`)}
+        <PickerGroupButton onClick={onClick}>{t(`nodePicker.${group}`)}</PickerGroupButton>
       </h3>
       <Tooltip>
         <TooltipTrigger
