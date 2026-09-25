@@ -321,7 +321,7 @@ function ActionSelectionEditor<T extends SelectedAction>({
               <div className="flex flex-col divide-y divide-border/50 px-4">
                 {sortedEntries.map(({ entry, index }) => {
                   const resolved = prepared[entry.action]
-                  const action = resolved?.action ?? discovered.current.get(entry.action)
+                  const action = resolved?.action ?? discovered.current.get(entry.action) ?? connectors.$.actions.value[entry.action]
                   const accounts = resolved?.connections ?? []
                   const selected = accounts.find((account) => account.connectionId == entry.connectionId)
                   const accountInvalid = action?.authenticated && entry.connectionId != null && selected?.status != 'active'
@@ -331,8 +331,8 @@ function ActionSelectionEditor<T extends SelectedAction>({
                       className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-x-2.5 gap-y-1 py-4 first:pt-1 last:pb-1"
                     >
                       <div className="contents">
-                        {action != null && <ProviderAppIcon src={providerIcon(action)} />}
-                        <div className="col-start-2 min-w-0">
+                        <ProviderAppIcon src={action == null ? undefined : providerIcon(action)} />
+                        <div className="col-start-2 min-h-10 min-w-0">
                           <h4 className="m-0 truncate text-[13px] font-medium" title={action?.name ?? entry.action}>
                             {action?.name ?? entry.action}
                           </h4>
@@ -359,7 +359,7 @@ function ActionSelectionEditor<T extends SelectedAction>({
                           <TooltipContent container={portalRoot}>{t('actionPicker.remove', { action: action?.name ?? entry.action })}</TooltipContent>
                         </Tooltip>
                       </div>
-                      <div className="open-flow-property-panel col-start-2 min-w-0">
+                      <div className="open-flow-property-panel col-start-2 flex min-h-[30px] min-w-0 items-center [&>*]:w-full">
                         {resolved == null ? (
                           preparationErrors[entry.action] != null ? (
                             <AccountControlButton
@@ -370,10 +370,7 @@ function ActionSelectionEditor<T extends SelectedAction>({
                               onClick={() => setAttempt((value) => value + 1)}
                             />
                           ) : (
-                            <div role="status" className="flex items-center gap-2 text-muted-foreground">
-                              <Spinner />
-                              {t(action?.authenticated ? 'inspector.account.loading' : 'actionPicker.preparing')}
-                            </div>
+                            <AccountSelect loading connections={[]} disabled={disabled} onChange={() => {}} onManage={undefined} />
                           )
                         ) : !resolved.action.authenticated ? (
                           <div className="text-muted-foreground">{t('actionPicker.noAccount')}</div>
@@ -395,6 +392,7 @@ function ActionSelectionEditor<T extends SelectedAction>({
                           />
                         )}
                       </div>
+                      {renderDetails != null && resolved == null && <div aria-hidden="true" className="col-span-3 h-7" />}
                       {renderDetails != null && resolved != null && (
                         <details className="group/action-details col-span-3">
                           <summary className="flex cursor-pointer list-none items-center gap-1 rounded-md py-1 text-muted-foreground outline-none hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">

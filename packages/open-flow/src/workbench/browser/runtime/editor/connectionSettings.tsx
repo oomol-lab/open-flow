@@ -11,6 +11,7 @@ import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../f
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '../../../../ui/browser/select.tsx'
+import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../../../ui/browser/tooltip.tsx'
 import { Icon } from '../icons.tsx'
 
@@ -83,6 +84,7 @@ export function AccountControlButton({
 export function AccountSelect({
   connections,
   disabled,
+  loading = false,
   id,
   invalid,
   warning,
@@ -94,6 +96,7 @@ export function AccountSelect({
   onManage,
 }: {
   readonly connections: readonly ConnectorConnection[]
+  readonly loading?: boolean
   readonly disabled: boolean
   readonly id?: string
   readonly warning?: boolean
@@ -123,13 +126,13 @@ export function AccountSelect({
     })),
     ...(onManage == null ? [] : [{ value: manageAccountOption, label: t('inspector.account.addAccount') }]),
   ]
-  if (addWhenEmpty && connections.length === 0 && selectedId == null) {
+  if (!loading && addWhenEmpty && connections.length === 0 && selectedId == null) {
     return <AccountControlButton disabled={disabled} status="warning" onClick={onManage} label={t('inspector.account.addAccount')} />
   }
   return (
     <div ref={setContainer} className="account-select relative min-w-0">
       <Select
-        disabled={disabled}
+        disabled={disabled || loading}
         items={items}
         value={selectedId ?? null}
         onValueChange={(value) => {
@@ -142,12 +145,20 @@ export function AccountSelect({
           id={id}
           size="field"
           aria-label={label ?? t('inspector.account.connection')}
+          aria-busy={loading || undefined}
           aria-invalid={invalid || undefined}
           data-status={invalid ? 'danger' : warning ? 'warning' : undefined}
           className={`${fieldSelectTriggerClass} account-control`}
         >
-          <SelectValue className={selectedId != null ? 'mr-5' : undefined} placeholder={t('inspector.account.chooseAccount')}>
-            {selectedLabel}
+          <SelectValue className={!loading && selectedId != null ? 'mr-5' : undefined} placeholder={t('inspector.account.chooseAccount')}>
+            {loading ? (
+              <span role="status" className="flex min-w-0 items-center gap-2 text-muted-foreground">
+                <Spinner />
+                <span className="truncate">{t('inspector.account.loading')}</span>
+              </span>
+            ) : (
+              selectedLabel
+            )}
           </SelectValue>
         </SelectTrigger>
         <SelectContent
@@ -177,7 +188,7 @@ export function AccountSelect({
           )}
         </SelectContent>
       </Select>
-      {selectedId != null && (
+      {!loading && selectedId != null && (
         <Button
           className="account-select-clear absolute top-1/2 right-7 -translate-y-1/2 text-muted-foreground"
           type="button"
