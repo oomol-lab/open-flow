@@ -1,3 +1,5 @@
+import type { ProxyResponse } from './proxyCatalog.ts'
+
 import { expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
 import { actionWithConnections } from '../connectionCatalog.ts'
@@ -27,7 +29,14 @@ function storage() {
   }
 }
 function setup() {
-  const localStorage = storage()
+  const entries = new Map<string, { data: ProxyResponse; etag: string | null }>()
+  const cache = {
+    entries,
+    get: async (key: string): Promise<unknown> => entries.get(key),
+    set: async (key: string, value: unknown): Promise<void> => {
+      entries.set(key, value as { data: ProxyResponse; etag: string | null })
+    },
+  }
   const sessionStorage = storage()
   const request = vi.fn(async (path: RequestInfo | URL, _init?: RequestInit): Promise<Response> => {
     const url = new URL(String(path), 'https://test.invalid')
@@ -51,11 +60,11 @@ function setup() {
       headers: { etag: '"one"' },
     })
   })
-  const create = () => new CatalogStores(new WorkbenchClient(request), { namespace: 'test', localStorage, sessionStorage })
-  return { create, localStorage, sessionStorage, request }
+  const create = () => new CatalogStores(new WorkbenchClient(request), { storage: cache }, { storage: sessionStorage })
+  return { create, cache, sessionStorage, request }
 }
 
-it('stores Providers and Action lists locally, Connections in session storage, and no connection snapshots in Actions', async () => {
+it('persists Provider and Action response objects, Connections in session storage, and no connection snapshots in Actions', async () => {
   const test = setup()
   const stores = test.create()
   await resourceValue(stores.providers.get('flow', 'en'))
@@ -65,11 +74,12 @@ it('stores Providers and Action lists locally, Connections in session storage, a
   expect(detail).toBe(stores.actions.detail('mail.send', 'flow', 'en'))
   expect(await resourceValue(detail)).not.toHaveProperty('defaultConnection')
   expect(test.request).toHaveBeenCalledTimes(3)
-  expect(test.localStorage.entries.size).toBe(2)
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  expect(test.cache.entries.size).toBe(2)
   expect(test.sessionStorage.entries.size).toBe(1)
-  const persisted = [...test.localStorage.entries].find(([key]) => key.includes(':actions:'))![1]
-  expect(persisted).not.toContain('defaultConnection')
-  expect(persisted).not.toContain('account')
+  const persisted = [...test.cache.entries].find(([key]) => key.startsWith('actions:'))![1]
+  expect(JSON.stringify(persisted)).not.toContain('defaultConnection')
+  expect(JSON.stringify(persisted)).not.toContain('account')
   stores.dispose()
 })
 
@@ -77,6 +87,7 @@ it('isolates locales, services and scopes and restores the matching validator ac
   const test = setup()
   const first = test.create()
   for (const flow of ['a', 'b']) for (const locale of ['en', 'zh-CN']) await resourceValue(first.providers.get(flow, locale))
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
   first.dispose()
   test.request.mockImplementation(async (_path, init) => {
     expect(new Headers(init?.headers).get('if-none-match')).toBe('"one"')
@@ -84,15 +95,16 @@ it('isolates locales, services and scopes and restores the matching validator ac
   })
   const second = test.create()
   const state = second.providers.get('a', 'zh-CN')
+  await vi.waitFor(() => expect(state.value.data).toBeDefined())
   expect(state.value.data?.[0]?.serviceName).toBe('zh-CN')
-  await vi.waitFor(() => expect([...test.localStorage.entries.values()].some((raw) => JSON.parse(raw).etag == 'W/"two"')).toBe(true))
+  await vi.waitFor(() => expect([...test.cache.entries.values()].some((raw) => raw.etag == 'W/"two"')).toBe(true))
   test.request.mockImplementation(async (_path, init) => {
     expect(new Headers(init?.headers).get('if-none-match')).toBe('W/"two"')
     return Response.json({ success: true, data: [] })
   })
   second.providers.get('a', 'zh-CN', true)
   await vi.waitFor(() => expect(state.value.data).toEqual([]))
-  expect([...test.localStorage.entries.values()].some((raw) => JSON.parse(raw).etag === null)).toBe(true)
+  expect([...test.cache.entries.values()].some((raw) => raw.etag === null)).toBe(true)
   second.dispose()
 })
 
@@ -108,7 +120,8 @@ it('keeps searches transient and connection refresh independent of Action data',
   await resourceValue(stores.connections.get('mail', 'flow'))
   await resourceValue(stores.connections.get(undefined, 'flow'))
   expect(list.value.data).toBe(before)
-  expect(test.localStorage.entries.size).toBe(2)
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  expect(test.cache.entries.size).toBe(2)
   expect(test.sessionStorage.entries.size).toBe(1)
   controller.abort()
   stores.dispose()
@@ -116,8 +129,8 @@ it('keeps searches transient and connection refresh independent of Action data',
 
 it('ignores invalid stored data and tolerates unavailable storage', async () => {
   const test = setup()
-  test.localStorage.getItem = () => '{broken'
-  test.localStorage.setItem = () => {
+  test.cache.get = async () => ({ invalid: true })
+  test.cache.set = async () => {
     throw new Error('quota')
   }
   const stores = test.create()
@@ -135,14 +148,15 @@ it('updates the selected account from Connections without changing Action metada
   // Let the initial request finish before changing the account in this scenario.
   await new Promise<void>((resolve) => setTimeout(resolve, 0))
   expect(actionWithConnections(metadata[0]!, initial).defaultConnection?.connectionId).toBe('account')
-  const persisted = [...test.localStorage.entries]
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  const persisted = [...test.cache.entries]
   test.request.mockImplementation(async () => Response.json({ version: 1, connections: [{ ...connection, connectionId: 'new-account' }] }))
   stores.connections.get('mail', 'flow', true)
   await vi.waitFor(() => expect(source.value.data?.[0]?.connectionId).toBe('new-account'))
   expect(actionWithConnections(metadata[0]!, source.value.data).defaultConnection?.connectionId).toBe('new-account')
   expect(stores.actions.get('mail', 'flow', 'en').value.data).toBe(metadata)
   expect(metadata[0]).not.toHaveProperty('defaultConnection')
-  expect([...test.localStorage.entries]).toEqual(persisted)
+  expect([...test.cache.entries]).toEqual(persisted)
   expect(actionWithConnections(metadata[0]!, []).defaultConnection).toBeUndefined()
   expect(actionWithConnections({ ...metadata[0]!, authenticated: false }, source.value.data).defaultConnection).toBeUndefined()
   stores.dispose()
@@ -153,18 +167,8 @@ it('rejects old Flow envelopes at Proxy endpoints', async () => {
   test.request.mockImplementation(async () => Response.json({ version: 1, actions: [{ ...action, defaultConnection: connection }] }))
   const stores = test.create()
   await expect(resourceValue(stores.actions.get('mail', 'flow', 'en'))).rejects.toThrow()
-  expect(test.localStorage.entries.size).toBe(0)
-  stores.dispose()
-})
-
-it('does not reuse the old combined Action validator for the metadata endpoint', async () => {
-  const test = setup()
-  test.localStorage.setItem('open-flow:actions:v2:test:["flow","mail","en"]', JSON.stringify({ data: [action], etag: '"combined"' }))
-  const stores = test.create()
-  await resourceValue(stores.actions.get('mail', 'flow', 'en'))
-  expect(String(test.request.mock.calls[0]?.[0])).toBe('/v1/connector/proxy/actions?flowId=flow&service=mail&locale=en')
-  expect(new Headers(test.request.mock.calls[0]?.[1]?.headers).has('if-none-match')).toBe(false)
-  expect([...test.localStorage.entries.keys()].some((key) => key.startsWith('open-flow:proxy:actions:v1:'))).toBe(true)
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  expect(test.cache.entries.size).toBe(0)
   stores.dispose()
 })
 
@@ -172,7 +176,8 @@ it('preserves upstream response fields in storage and shares one scoped Connecti
   const test = setup()
   const stores = test.create()
   await resourceValue(stores.providers.get('flow', 'en'))
-  const persisted = JSON.parse([...test.localStorage.entries.values()][0]!).data
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  const persisted = [...test.cache.entries.values()][0]!.data
   expect(persisted).toMatchObject({ success: true, data: [{ extra: 'preserved', authTypes: ['oauth2'] }] })
   const all = stores.connections.get(undefined, 'flow')
   const mail = stores.connections.get('mail', 'flow')
@@ -208,7 +213,8 @@ it('requests repeated searches without validators or persistence', async () => {
     expect(path).toBe('/v1/connector/action-metadata?flowId=flow&q=send&locale=en')
     expect(new Headers(init?.headers).has('if-none-match')).toBe(false)
   }
-  expect(test.localStorage.entries.size).toBe(0)
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  expect(test.cache.entries.size).toBe(0)
   expect(test.sessionStorage.entries.size).toBe(0)
   stores.dispose()
 })
@@ -222,7 +228,8 @@ it.each([
   test.request.mockImplementation(async () => Response.json(body, { status }))
   const stores = test.create()
   await expect(resourceValue(stores.providers.get('flow', 'en'))).rejects.toMatchObject({ code })
-  expect(test.localStorage.entries.size).toBe(0)
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  expect(test.cache.entries.size).toBe(0)
   stores.dispose()
 })
 
@@ -253,7 +260,8 @@ it('derives Action ports and authentication from independent Proxy responses', a
     outputs: { sent: { nullable: false } },
   })
   expect(item).not.toHaveProperty('noSetup')
-  const persisted = JSON.parse([...test.localStorage.entries].find(([key]) => key.includes(':actions:'))![1]).data
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
+  const persisted = [...test.cache.entries].find(([key]) => key.startsWith('actions:'))![1].data
   expect(persisted.data[0]).not.toHaveProperty('authenticated')
   expect(persisted.data[0]).not.toHaveProperty('serviceName')
   expect(persisted.data[0]).toHaveProperty('inputSchema')
@@ -264,9 +272,10 @@ it('preserves operation types through proxy lists, cached responses and metadata
   const test = setup()
   const first = test.create()
   expect(await resourceValue(first.actions.get('mail', 'flow', 'en'))).toMatchObject([{ operationType: 'write' }])
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
   first.dispose()
   const restored = test.create()
-  expect(restored.actions.get('mail', 'flow', 'en').value.data).toMatchObject([{ operationType: 'write' }])
+  expect(await resourceValue(restored.actions.get('mail', 'flow', 'en'))).toMatchObject([{ operationType: 'write' }])
   const controller = new AbortController()
   const search = restored.actions.search('Send', 'flow', 'en', controller.signal)
   expect(await resourceValue(search.get())).toMatchObject([{ operationType: 'write' }])
@@ -303,7 +312,8 @@ it('reuses search responses within one panel and refreshes them without hiding c
     stores.actions.search('send', 'flow', 'en', panel.signal)
     await vi.waitFor(() => expect(repeated.state.value.error).toBeInstanceOf(Error))
     expect(repeated.state.value.data?.[0]?.name).toBe('Updated')
-    expect(test.localStorage.entries.size).toBe(0)
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    expect(test.cache.entries.size).toBe(0)
   } finally {
     panel.abort()
     stores.dispose()
@@ -381,11 +391,11 @@ it('keeps Action detail scopes and locales independent and retries a failed prov
   })
   const stores = test.create()
   expect((await resourceValue(stores.actions.detail('mail.send', 'a', 'en'))).description).toBe('a:en')
-  expect((await resourceValue(stores.actions.detail('mail.send', 'b', 'en'))).description).toBe('b:en')
+  expect((await resourceValue(stores.actions.detail('mail.send', 'b', 'en'), undefined, true)).description).toBe('b:en')
   expect((await resourceValue(stores.actions.detail('mail.send', 'a', 'zh-CN'))).description).toBe('a:zh-CN')
   test.request.mockResolvedValueOnce(Response.json({ error: { code: 'connector.unavailable', message: 'Unavailable.' }, version: 1 }, { status: 502 }))
   const failed = stores.actions.detail('mail.send', 'c', 'en')
-  await expect(resourceValue(failed)).rejects.toMatchObject({ code: 'connector.unavailable' })
+  await expect(resourceValue(failed, undefined, true)).rejects.toMatchObject({ code: 'connector.unavailable' })
   stores.actions.detail('mail.send', 'c', 'en', true)
   await vi.waitFor(() => expect(failed.value.data?.description).toBe('c:en'))
   expect(failed.value.error).toBeUndefined()
@@ -435,13 +445,6 @@ it('uses only Flow-authorized accounts for selection and defaults, and refreshes
   const unauthorized = { ...connection, connectionId: 'unauthorized', isDefault: true }
   const authorized = { ...connection, isDefault: false }
   let revoked = false
-  test.sessionStorage.setItem(
-    'open-flow:proxy:apps:v1:test:/v1/connector/proxy/apps?flowId=flow',
-    JSON.stringify({
-      data: { success: true, data: [{ id: 'unauthorized', service: 'mail', displayName: 'Account', status: 'active', isDefault: true }] },
-      etag: '"old"',
-    }),
-  )
   test.request.mockImplementation(async (path) => {
     const url = new URL(String(path), 'https://test.invalid')
     if (url.pathname != '/v1/connector/connections') throw new Error(`Unexpected account source: ${path}`)
@@ -469,6 +472,7 @@ it('restores scoped Connections and revalidates with their own validator', async
   const test = setup()
   const first = test.create()
   await resourceValue(first.connections.get('mail', 'flow'))
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
   first.dispose()
   test.request.mockImplementation(async (_path, init) => {
     expect(new Headers(init?.headers).get('if-none-match')).toBe('"one"')
@@ -477,7 +481,7 @@ it('restores scoped Connections and revalidates with their own validator', async
   const restored = test.create()
   try {
     const source = restored.connections.get('mail', 'flow')
-    expect(source.value.data).toEqual([connection])
+    await vi.waitFor(() => expect(source.value.data).toEqual([connection]))
     await vi.waitFor(() => expect(test.request).toHaveBeenCalledTimes(2))
     expect(await resourceValue(source, undefined, true)).toEqual([connection])
   } finally {
@@ -510,10 +514,51 @@ it('preserves sprite metadata in raw caches and derives it for Providers and Act
   const first = test.create()
   expect((await resourceValue(first.providers.get()))![0]).toMatchObject({ iconSprite, iconSpritePosition })
   expect((await resourceValue(first.actions.get('mail')))![0]).toMatchObject({ iconSprite, iconSpritePosition })
+  await new Promise<void>((resolve) => setTimeout(resolve, 0))
   first.dispose()
   test.request.mockImplementation(async () => new Response(null, { status: 304 }))
   const second = test.create()
   expect((await resourceValue(second.providers.get()))![0]).toMatchObject({ iconSprite, iconSpritePosition })
   expect((await resourceValue(second.actions.get('mail')))![0]).toMatchObject({ iconSprite, iconSpritePosition })
   second.dispose()
+})
+
+it('shares persisted catalogs across Flows while preserving Flow-scoped requests and memory resources', async () => {
+  const values = new Map<string, unknown>()
+  const cache = {
+    storage: {
+      get: async (key: string) => values.get(key),
+      set: async (key: string, value: unknown) => {
+        values.set(key, value)
+      },
+    },
+  }
+  const provider = { service: 'mail', displayName: 'Mail', authTypes: ['oauth2'] }
+  const metadata = { id: 'mail.send', service: 'mail', name: 'Send', description: 'Send mail', inputSchema: {}, outputSchema: {} }
+  const request = vi.fn(async (path: RequestInfo | URL, init?: RequestInit) => {
+    if (String(path).includes('flowId=b')) {
+      expect(new Headers(init?.headers).get('if-none-match')).toBe('"catalog"')
+      return new Response(null, { status: 304 })
+    }
+    return Response.json({ success: true, data: [String(path).includes('/providers?') ? provider : metadata] }, { headers: { etag: '"catalog"' } })
+  })
+  const stores = new CatalogStores(new WorkbenchClient(request), cache)
+  try {
+    const first = stores.actions.get('mail', 'a', 'en')
+    await resourceValue(first, undefined, true)
+    await vi.waitFor(() => expect(values.size).toBe(2))
+    const second = stores.actions.get('mail', 'b', 'en')
+    expect(second).not.toBe(first)
+    expect(await resourceValue(second, undefined, true)).toEqual(first.value.data)
+    expect(request.mock.calls.map(([path]) => String(path)).toSorted()).toEqual([
+      '/v1/connector/proxy/actions?flowId=a&service=mail&locale=en',
+      '/v1/connector/proxy/actions?flowId=b&service=mail&locale=en',
+      '/v1/connector/proxy/providers?flowId=a&locale=en',
+      '/v1/connector/proxy/providers?flowId=b&locale=en',
+    ])
+    expect(values.size).toBe(2)
+    expect([...values.keys()].every((key) => !key.includes('flowId'))).toBe(true)
+  } finally {
+    stores.dispose()
+  }
 })

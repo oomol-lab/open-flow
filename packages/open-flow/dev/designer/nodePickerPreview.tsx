@@ -155,25 +155,23 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
       await new Promise((resolve) => setTimeout(resolve, 1500))
       return Response.json(url.pathname.endsWith('/actions') ? proxyActions(String(path)) : sampleActionData(String(path)))
     })
-    const entries = new Map<string, string>()
+    const entries = new Map<string, unknown>()
     const data = new CatalogStores(client, {
-      namespace: 'lab-node-picker',
-      localStorage: {
-        getItem: (key) => {
+      storage: {
+        get: async (key) => {
           const stored = entries.get(key)
           if (stored != null) return stored
-          if (key.includes(':providers:')) return JSON.stringify({ data: { success: true, data: providers.slice(0, 1) }, etag: '"cached"' })
-          if (key.includes(':actions:')) {
-            const path = key.slice(key.indexOf('/v1/'))
-            return JSON.stringify({ data: proxyActions(path, true), etag: null })
+          if (key.startsWith('providers:')) return { data: { success: true, data: providers.slice(0, 1) }, etag: '"cached"' }
+          if (key.startsWith('actions:')) {
+            const path = `/v1/connector/proxy/actions?${key.split(':').at(-1)}`
+            return { data: proxyActions(path, true), etag: null }
           }
           return null
         },
-        setItem: (key, value) => {
+        set: async (key, value) => {
           entries.set(key, value)
         },
       },
-      sessionStorage: { getItem: () => null, setItem: () => {} },
     })
     const store = new ConnectorStore(client, session.workspace, (notice) => log('notice', notice), { openExternalPage: async () => false }, session.i18n, data)
     return { store, data }

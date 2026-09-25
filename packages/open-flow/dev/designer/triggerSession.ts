@@ -24,7 +24,7 @@ export function createTriggerSession(
   create = false,
   catalog?: {
     request: (url: URL, init?: RequestInit) => Promise<Response>
-    cache: WorkbenchHost['triggerCatalogCache']
+    cache: WorkbenchHost['catalogCache']
   },
   eventSources?: readonly EventSource[],
 ) {
@@ -177,7 +177,7 @@ export function createTriggerSession(
   })
   const notice = (value: unknown) => log('trigger.notice', value)
   const host = {
-    triggerCatalogCache: catalog?.cache,
+    catalogCache: catalog?.cache,
     openExternalPage: async () => {
       log('trigger.connect')
       return false

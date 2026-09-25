@@ -126,7 +126,7 @@ export class WorkbenchStore {
     preferences: WorkbenchPreferences,
     identity: () => string = randomId,
     i18n: I18n = createI18n(),
-    host: Pick<WorkbenchHost, 'openExternalPage' | 'connectorCache' | 'triggerCatalogCache'> = blockedExternalPages,
+    host: Pick<WorkbenchHost, 'openExternalPage' | 'connectionCache' | 'catalogCache'> = blockedExternalPages,
     variables = true,
   ) {
     this.preferences = preferences
@@ -150,7 +150,7 @@ export class WorkbenchStore {
         if (event.kind == 'run.created') void this.#followExternalRun(client, event)
         else this.runs.changed(event.runId)
       },
-      new CatalogStores(client, host.connectorCache),
+      new CatalogStores(client, host.catalogCache, host.connectionCache),
       (flowId) => void this.#openCreatedFlow(flowId),
       (flowId) => {
         this.connectorAccess.changed(flowId)

@@ -499,8 +499,7 @@ Trigger Key catalog 是 deployment scope 资源：
 这两个接口返回 `Content-Language`、`Vary: Accept-Language`、`Cache-Control: private, no-cache` 与根据最终响应
 生成的 `ETag`。匹配 `If-None-Match` 时返回无 body 的 304，并保留语言与缓存响应头。翻译更新也会使 ETag 失效。
 
-WorkbenchHost 可通过 `triggerCatalogCache: { namespace, storage? }` 启用持久化 catalog 缓存。namespace 必须标识
-部署；可选 storage 实现 `getItem` / `setItem`，缺省使用 localStorage，所有存储 key 都带缓存版本、部署和语言。
+WorkbenchHost 可通过 `catalogCache: { storage? }` 启用持久化 catalog 缓存。可选 storage 实现异步对象 KV `get` / `set`，缺省使用 IndexedDB（idb-keyval），所有存储 key 都带缓存版本和语言。
 未提供配置的宿主仅使用内存。列表先显示有效缓存，再用 ETag 刷新；后台失败保留缓存并显示重试提示。
 
 成功 Publication 为 Flow graph 中每个 Trigger node 提交 Live binding：
@@ -813,18 +812,26 @@ Provider 仅描述应用目录；面板独立加载 Connections，并根据 acti
 Connector Provider、Action（列表、搜索和详情）及 Connection GET 响应使用 `Cache-Control: private, no-cache` 和内容生成的
 `ETag`。服务端在完成当前身份、Flow scope 校验及数据读取后比较 `If-None-Match`；匹配时返回无 body 的 304。
 
-WorkbenchHost 可通过 `connectorCache: { namespace, localStorage?, sessionStorage? }` 配置持久化；namespace 标识部署。
-Providers 和 Actions 使用 localStorage，Connections 使用 sessionStorage；Triggers 通过 `triggerCatalogCache` 使用 localStorage。
-各数据 Store 持有稳定的 `ReadonlyVal<{ data, refreshing, error }>`，底层请求仅负责传输和解码，不保存缓存。
-存储键包含版本、部署及业务标识：Providers 为 Flow scope 和语言，Actions 为 Flow scope、service 和语言，
-Connections 为 Flow scope，服务列表从同一份响应派生，Triggers 为语言。使用新版本键，不读取旧 URL 缓存。
+WorkbenchHost 通过 `catalogCache: { storage? }` 配置 Providers、Actions、Triggers 的 IndexedDB 持久化，由浏览器 origin 隔离。
+可注入的 storage 提供 `get(key): Promise<unknown>` 和 `set(key, value): Promise<void>`，值为完整 `{ data, etag }` 对象。
+Connections 使用独立的 `connectionCache: { storage? }` 配置，storage 为同步 `getItem` / `setItem` 接口，默认使用 sessionStorage。
+各数据 Store 独立持有稳定的 `ReadonlyVal<{ data, refreshing, error }>`，请求只负责传输和解码。
 
-Actions 按 Flow scope、service 和语言缓存并持久化完整的 provider 列表响应。画布、节点面板与代码节点所需的单个 Action 从同一份列表派生，不再发起独立详情请求。浏览器 proxy 列表按团队范围读取，不按 Flow 已选授权过滤；成功加载完整列表后才能判断 Action 不存在。默认连接与当前连接状态从独立的 Connections Store 组合。
+目录存于 `open-flow-cache` 数据库的 `responses` object store。持久化键包含资源类型和格式版本：Providers 按语言，Actions 按 service 和语言，Triggers 按语言；不含 Flow 或 Team。
+请求仍携带原来的 flowId，内存资源仍按原有请求范围独立管理。相同目录的不同 Flow 请求共用一份持久化响应及 ETag，不做跨资源请求合并。
+Connections 持久化键仍包含 Flow scope，各服务视图从同一份响应派生。
+
+首次访问异步恢复目录并校验数据，再以 ETag 进行条件请求。缓存读取最多等待一秒，失败或超时按未命中处理；迟到的恢复结果不会覆盖新数据。
+网络数据先发布到内存，持久化写入不阻塞调用方，同 key 写入按顺序执行。存储超时后当前页面停用该后端，其他缓存故障同样不影响正常请求。
+不设 LRU 或定时过期清理。
+
+Actions 保存完整 service 列表响应；画布、节点面板与代码节点所需的单个 Action 从该列表派生。
+浏览器 proxy 列表不按 Flow 已选授权过滤；成功加载完整列表后才能判断 Action 不存在。默认连接与连接状态从独立的 Connections Store 组合。
 Action metadata 保留上游可选的 `operationType` 字段（`read`、`write`、`destructive`）；缺失或未知值在节点面板显示为其他接口。
 
 元数据接口 `/v1/connector/action-metadata`（可选 `service` 或 `q`）及其 `/:actionId` 详情接口继续可用；浏览器仅在搜索时使用 `q` 入口。它们接受 `flowId` 和 `locale`，
 遵循相同鉴权、语言协商及条件请求规则。响应分别为 `{ version: 1, actions: ConnectorActionMetadata[] }` 和 `{ version: 1, action: ConnectorActionMetadata }`，
-不包含 `defaultConnection`，读取时不查询 Connections。Action 持久化键升级为 v3，避免复用旧组合响应的 ETag。
+不包含 `defaultConnection`，读取时不查询 Connections。
 Workbench 使用独立的 `ConnectorActionView` 表示组合后的展示数据。
 CLI 和 MCP 继续使用原 `/v1/connector/actions` 对应的组合接口；它们在响应时选择 active 默认账号或唯一 active 账号，
 保留 `ConnectorAction.defaultConnection`。这些组合响应的 ETag 仍随账号变化，浏览器不使用它们作为 Action 缓存。

@@ -18,16 +18,12 @@ export interface WorkbenchNotification {
 }
 
 export interface WorkbenchHost {
-  /** A stable deployment identity enables persistent Trigger metadata caching. */
-  readonly triggerCatalogCache?: {
-    readonly namespace: string
-    readonly storage?: { getItem(key: string): string | null; setItem(key: string, value: string): void }
+  /** Shared, optional persistent catalog responses, isolated by browser origin. */
+  readonly catalogCache?: {
+    readonly storage?: CatalogCacheStorage
   }
-  /** Deployment identity for Connector caches. Cached representations display immediately and revalidate in the background. */
-  readonly connectorCache?: {
-    readonly namespace: string
-    readonly localStorage?: WorkbenchPreferences
-    readonly sessionStorage?: WorkbenchPreferences
+  readonly connectionCache?: {
+    readonly storage?: WorkbenchPreferences
   }
   notify(notification: WorkbenchNotification | undefined): void
   openExternalPage(resolveUrl: () => Promise<string>): Promise<boolean>
@@ -54,3 +50,9 @@ export interface WorkbenchPreferences {
 
 /** The host resolves deployment and Flow scope before rendering navigation links. */
 export type ConnectionHref = (flowId: string, providerId: string, connectionId?: string) => string | undefined
+
+/** Object values are complete response/ETag records; implementations must reject failures. */
+export interface CatalogCacheStorage {
+  get(key: string): Promise<unknown>
+  set(key: string, value: unknown): Promise<void>
+}

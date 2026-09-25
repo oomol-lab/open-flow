@@ -7,7 +7,7 @@ import { I18nProvider } from 'val-i18n-react'
 import snapshots from 'virtual:lab-trigger-snapshots'
 import { localizeTrigger } from '../../src/trigger/providers/localization.ts'
 import { BlockLibrary } from '../../src/workbench/browser/runtime/editor/blockLibrary.tsx'
-import { browserTriggerCatalogStorage } from '../../src/workbench/browser/runtime/stores/triggerCatalog.ts'
+import { catalogPersistence } from '../../src/workbench/browser/runtime/stores/catalogStorage.ts'
 import { useStoryActions } from './storyActions.tsx'
 import { triggerFixtures } from './triggerFixtures.ts'
 import { createTriggerSession } from './triggerSession.ts'
@@ -29,21 +29,21 @@ function Sample({
     const data = async (count: number) => {
       const definitions = snapshots.slice(0, count)
       return {
-        version: 2,
+        version: 3,
         locale: language,
         definitions,
         display: Object.fromEntries(await Promise.all(definitions.map(async (definition) => [definition.key, await localizeTrigger(definition, language)]))),
       }
     }
-    const values = new Map<string, string>()
+    const values = new Map<string, unknown>()
     const storage = {
-      getItem: (key: string) => values.get(key) ?? null,
-      setItem: (key: string, value: string) => {
+      get: async (key: string) => values.get(key) ?? null,
+      set: async (key: string, value: unknown) => {
         values.set(key, value)
       },
     }
     const sampleSession = createTriggerSession(triggerFixtures[0]!.trigger, language, log, 'sample', false, {
-      cache: { namespace: 'lab', storage },
+      cache: { storage },
       request: async (_url, init) => {
         log('catalog.request', { language, etag: new Headers(init?.headers).get('if-none-match') })
         if (mode == 'failed') return Response.json({ error: { code: 'request.failed', message: 'Sample offline response.' } }, { status: 503 })
@@ -59,7 +59,10 @@ function Sample({
     return {
       ...sampleSession,
       prepare: async () => {
-        browserTriggerCatalogStorage('lab', storage).setItem(language, JSON.stringify({ data: await data(mode == 'ready' ? 20 : 4), etag: '"cached"' }))
+        await storage.set(catalogPersistence({ storage }, 'triggers', language)!.key, {
+          data: await data(mode == 'ready' ? 20 : 4),
+          etag: '"cached"',
+        })
       },
     }
   }, [language, mode, log])

@@ -1,7 +1,9 @@
 import type { ReadonlyVal } from 'value-enhancer'
 import type { ConditionalResult } from '../../../../control/common/api.ts'
+import type { CatalogCacheStorage } from '../contract.ts'
 
 import { derive, val } from 'value-enhancer'
+import { optionalStorage } from './resourceStorage.ts'
 
 export interface ResourceState<T> {
   readonly data: T | undefined
@@ -20,9 +22,10 @@ export function resourceData<T>(source: ReadonlyVal<ResourceState<T>>): Readonly
   return data as ReadonlyVal<T | undefined>
 }
 
-export interface ResourceStorage {
-  getItem(key: string): string | null
-  setItem(key: string, value: string): void
+interface ResourcePersistence<T> {
+  readonly key: string
+  readonly storage: CatalogCacheStorage
+  readonly decode: (data: unknown) => T
 }
 
 /** Refresh coordination for one Store-owned business value. Has no URL or query registry. */
@@ -36,43 +39,39 @@ export class Resource<T> {
   #disposed = false
   #restored = false
   readonly #controller = new AbortController()
+  private readonly persistence?: ResourcePersistence<T>
 
   constructor(
     private readonly read: (etag: string | null, signal: AbortSignal) => Promise<ConditionalResult<T>>,
     private readonly interval: number,
-    persistence?: { key: string; storage: () => ResourceStorage; decode: (data: unknown) => T },
+    persistence?: ResourcePersistence<T>,
   ) {
-    this.persistence = persistence
+    this.persistence = persistence == null ? undefined : { ...persistence, storage: optionalStorage(persistence.storage) }
   }
 
-  #restore(): void {
-    if (this.#restored) return
+  async #restore(): Promise<void> {
     this.#restored = true
     const persistence = this.persistence
+    if (persistence == null) return
     try {
-      const raw = persistence?.storage().getItem(persistence.key)
-      if (raw != null) {
-        const entry = JSON.parse(raw)
-        if (entry != null && (entry.etag === null || typeof entry.etag == 'string')) {
-          const data = persistence!.decode(entry.data)
+      const entry = await persistence.storage.get(persistence.key)
+      if (!this.#disposed && entry != null && typeof entry === 'object' && 'etag' in entry && 'data' in entry) {
+        if (entry.etag === null || typeof entry.etag == 'string') {
+          const data = persistence.decode(entry.data)
           this.#etag = entry.etag
-          this.#state.set({ data, refreshing: false, error: undefined })
+          this.#state.set({ data, refreshing: true, error: undefined })
         }
       }
     } catch {
       /* Invalid or unavailable storage is a miss. */
     }
   }
-  private readonly persistence?: { key: string; storage: () => ResourceStorage; decode: (data: unknown) => T }
-
   get(force = false): ReadonlyVal<ResourceState<T>> {
-    this.#restore()
     if (!this.#disposed && (force || Date.now() >= this.#nextCheck)) void this.refresh(force)
     return this.state
   }
 
   refresh(force = false): Promise<void> {
-    this.#restore()
     if (this.#disposed) return Promise.resolve()
     if (this.#pending != null) {
       if (force) this.#refreshAgain = true
@@ -81,6 +80,8 @@ export class Resource<T> {
     // Publish asynchronously so accessing a resource inside a computed Val is safe.
     const pending = Promise.resolve()
       .then(async () => {
+        if (this.#disposed) return
+        if (!this.#restored && this.persistence != null) await this.#restore()
         if (this.#disposed) return
         this.#state.set({ ...this.#state.value, refreshing: true })
         do {
@@ -95,14 +96,10 @@ export class Resource<T> {
             const previousEtag = this.#etag
             this.#etag = result.modified ? result.etag : (result.etag ?? this.#etag)
             this.#nextCheck = Date.now() + this.interval
-            try {
-              if (this.persistence != null && (result.modified || this.#etag !== previousEtag)) {
-                this.persistence.storage().setItem(this.persistence.key, JSON.stringify({ data, etag: this.#etag }))
-              }
-            } catch {
-              /* Storage is optional. */
-            }
             this.#state.set({ data, refreshing: false, error: undefined })
+            if (this.persistence != null && (result.modified || this.#etag !== previousEtag)) {
+              void this.persistence.storage.set(this.persistence.key, { data, etag: this.#etag })
+            }
           } catch (error) {
             if (!this.#disposed && !this.#refreshAgain) {
               this.#nextCheck = Date.now() + 30_000

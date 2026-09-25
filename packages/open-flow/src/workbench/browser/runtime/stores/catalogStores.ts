@@ -10,6 +10,7 @@ import { connection, connectorActionMetadata } from '../../../../control/common/
 import { allConnectorConnectionsQuery } from '../../../../control/common/connectorQueries.ts'
 import { invalidResponse, record } from '../../../../control/common/decoding.ts'
 import { ApiError } from '../api.ts'
+import { catalogPersistence } from './catalogStorage.ts'
 import { action, provider, proxyResponse, validateAction } from './proxyCatalog.ts'
 import { Resource } from './resource.ts'
 
@@ -26,7 +27,7 @@ class ProxyStore {
   constructor(
     private readonly client: WorkbenchClient,
     private readonly kind: 'providers' | 'actions',
-    private readonly options?: WorkbenchHost['connectorCache'],
+    private readonly options?: WorkbenchHost['catalogCache'],
   ) {}
   get(flowId?: string, locale?: string, service?: string, force = false): ReadonlyVal<ResourceState<ProxyResponse>> {
     const params = new URLSearchParams({
@@ -38,16 +39,13 @@ class ProxyStore {
     let entry = this.entries.get(path)
     if (entry == null) {
       const decode = (value: unknown) => proxyResponse(value, this.kind == 'providers' ? provider : undefined)
+      const cacheParams = new URLSearchParams(params)
+      cacheParams.delete('flowId')
+      const persistence = catalogPersistence(this.options, this.kind, cacheParams.toString())
       entry = new Resource(
         (etag, signal) => this.client.readProxyCatalog({ path, decode }, etag, signal),
         this.kind == 'providers' ? 300_000 : 30_000,
-        this.options == null
-          ? undefined
-          : {
-              key: `open-flow:proxy:${this.kind}:v1:${encodeURIComponent(this.options.namespace)}:${path}`,
-              storage: () => this.options!.localStorage ?? window.localStorage,
-              decode,
-            },
+        persistence == null ? undefined : { ...persistence, decode },
       )
       this.entries.set(path, entry)
     }
@@ -102,7 +100,7 @@ class Views<T> {
 export class ProviderStore {
   readonly raw: ProxyStore
   readonly #views = new Views<readonly ConnectorProvider[]>()
-  constructor(client: WorkbenchClient, options?: WorkbenchHost['connectorCache']) {
+  constructor(client: WorkbenchClient, options?: WorkbenchHost['catalogCache']) {
     this.raw = new ProxyStore(client, 'providers', options)
   }
   get(flowId?: string, locale = 'en', force = false): ReadonlyVal<ResourceState<readonly ConnectorProvider[]>> {
@@ -123,11 +121,21 @@ export class ProviderStore {
 }
 
 export class ConnectionStore {
+  readonly #storage = {
+    get: async (key: string): Promise<unknown> => {
+      const raw = (this.options?.storage ?? window.sessionStorage).getItem(key)
+      return raw == null ? undefined : JSON.parse(raw)
+    },
+    set: async (key: string, value: unknown): Promise<void> => {
+      const storage = this.options?.storage ?? window.sessionStorage
+      storage.setItem(key, JSON.stringify(value))
+    },
+  }
   readonly #entries = new Map<string | undefined, Resource<readonly ConnectorConnection[]>>()
   readonly #views = new Map<string, ReadonlyVal<ResourceState<readonly ConnectorConnection[]>>>()
   constructor(
     private readonly client: WorkbenchClient,
-    private readonly options?: WorkbenchHost['connectorCache'],
+    private readonly options?: WorkbenchHost['connectionCache'],
   ) {}
   get(serviceId: string | undefined, flowId?: string, force = false): ReadonlyVal<ResourceState<readonly ConnectorConnection[]>> {
     let entry = this.#entries.get(flowId)
@@ -139,8 +147,8 @@ export class ConnectionStore {
         this.options == null
           ? undefined
           : {
-              key: `open-flow:connections:v1:${encodeURIComponent(this.options.namespace)}:${query.path}`,
-              storage: () => this.options!.sessionStorage ?? window.sessionStorage,
+              key: `open-flow:connections:v1:${query.path}`,
+              storage: this.#storage,
               decode: (value) => {
                 if (!Array.isArray(value)) return invalidResponse()
                 return value.map(connection)
@@ -182,7 +190,7 @@ export class ActionStore {
   constructor(
     private readonly client: WorkbenchClient,
     private readonly providers: ProviderStore,
-    options?: WorkbenchHost['connectorCache'],
+    options?: WorkbenchHost['catalogCache'],
   ) {
     this.#raw = new ProxyStore(client, 'actions', options)
   }
@@ -282,10 +290,10 @@ export class CatalogStores {
   readonly providers: ProviderStore
   readonly actions: ActionStore
   readonly connections: ConnectionStore
-  constructor(client: WorkbenchClient, options?: WorkbenchHost['connectorCache']) {
+  constructor(client: WorkbenchClient, options?: WorkbenchHost['catalogCache'], connections?: WorkbenchHost['connectionCache']) {
     this.providers = new ProviderStore(client, options)
     this.actions = new ActionStore(client, this.providers, options)
-    this.connections = new ConnectionStore(client, options)
+    this.connections = new ConnectionStore(client, connections)
   }
   dispose(): void {
     this.actions.dispose()

@@ -14,10 +14,11 @@ it.each(['200', '304', 'error'])('waits for a post-invalidation read after an ol
     .mockResolvedValueOnce({ modified: true, data: ['cached'], etag: '"cached"' })
     .mockReturnValueOnce(old.promise)
     .mockReturnValueOnce(fresh.promise)
-  const storage = { getItem: () => null, setItem: vi.fn() }
-  const resource = new Resource(read, 30_000, { key: 'test', storage: () => storage, decode: (data) => data as string[] })
+  const storage = { get: async () => null, set: vi.fn(async (_key: string, _value: unknown) => {}) }
+  const resource = new Resource(read, 30_000, { key: 'test', storage, decode: (data) => data as string[] })
   await resource.refresh()
-  storage.setItem.mockClear()
+  await vi.waitFor(() => expect(storage.set).toHaveBeenCalled())
+  storage.set.mockClear()
   const pending = resource.refresh()
   await Promise.resolve()
   const state = resource.get(true)
@@ -32,13 +33,14 @@ it.each(['200', '304', 'error'])('waits for a post-invalidation read after an ol
   await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(3))
   expect(settled).toBe(false)
   expect(state.value).toMatchObject({ data: ['cached'], refreshing: true, error: undefined })
-  expect(storage.setItem).not.toHaveBeenCalled()
+  expect(storage.set).not.toHaveBeenCalled()
   expect(read.mock.calls[2]).toEqual(['"cached"', expect.any(AbortSignal)])
   fresh.resolve({ modified: true, data: ['new-account'], etag: '"new"' })
   expect(await value).toEqual(['new-account'])
   await pending
   expect(read).toHaveBeenCalledTimes(3)
-  expect(JSON.parse(storage.setItem.mock.calls[0]![1])).toEqual({ data: ['new-account'], etag: '"new"' })
+  await vi.waitFor(() => expect(storage.set).toHaveBeenCalled())
+  expect(storage.set.mock.calls[0]![1]).toEqual({ data: ['new-account'], etag: '"new"' })
   resource.dispose()
 })
 
@@ -117,15 +119,15 @@ it('rejects a cold 304 and prevents late writes after disposal', async () => {
   expect(resource.state.value.error).toBeInstanceOf(Error)
   resource.dispose()
   const pending = Promise.withResolvers<{ modified: true; data: string[]; etag: null }>()
-  const storage = { getItem: () => null, setItem: vi.fn() }
-  const late = new Resource(() => pending.promise, 30_000, { key: 'one', storage: () => storage, decode: (value) => value as string[] })
+  const storage = { get: async () => null, set: vi.fn(async (_key: string, _value: unknown) => {}) }
+  const late = new Resource(() => pending.promise, 30_000, { key: 'one', storage, decode: (value) => value as string[] })
   const request = late.refresh()
   await Promise.resolve()
   late.get(true)
   late.dispose()
   pending.resolve({ modified: true, data: ['late'], etag: null })
   await request
-  expect(storage.setItem).not.toHaveBeenCalled()
+  expect(storage.set).not.toHaveBeenCalled()
 })
 
 it('isolates data computations from refresh status, errors and unchanged responses', async () => {
@@ -185,21 +187,90 @@ it('does not subscribe when cached data already satisfies the consumer', async (
 })
 
 it('skips persistence for unchanged 304 responses but saves a replacement ETag', async () => {
-  const storage = { getItem: () => null, setItem: vi.fn() }
+  const storage = { get: async () => null, set: vi.fn(async (_key: string, _value: unknown) => {}) }
   const read = vi
     .fn<() => Promise<ConditionalResult<string[]>>>()
     .mockResolvedValueOnce({ modified: true, data: ['one'], etag: '"one"' })
     .mockResolvedValueOnce({ modified: false, etag: '"one"' })
     .mockResolvedValueOnce({ modified: false, etag: '"two"' })
-  const resource = new Resource(read, 30_000, { key: 'test', storage: () => storage, decode: (data) => data as string[] })
+  const resource = new Resource(read, 30_000, { key: 'test', storage, decode: (data) => data as string[] })
   try {
     await resource.refresh()
-    storage.setItem.mockClear()
+    await vi.waitFor(() => expect(storage.set).toHaveBeenCalled())
+    storage.set.mockClear()
     await resource.refresh()
-    expect(storage.setItem).not.toHaveBeenCalled()
+    expect(storage.set).not.toHaveBeenCalled()
     await resource.refresh()
-    expect(storage.setItem).toHaveBeenCalledExactlyOnceWith('test', JSON.stringify({ data: ['one'], etag: '"two"' }))
+    await vi.waitFor(() => expect(storage.set).toHaveBeenCalledExactlyOnceWith('test', { data: ['one'], etag: '"two"' }))
   } finally {
+    resource.dispose()
+  }
+})
+
+it('bounds cache restoration and ignores its late result while the network remains usable', async () => {
+  vi.useFakeTimers()
+  const restored = Promise.withResolvers<unknown>()
+  const storage = { get: vi.fn(() => restored.promise), set: vi.fn(async () => {}) }
+  const read = vi.fn(async () => ({ modified: true as const, data: ['network'], etag: '"network"' }))
+  const resource = new Resource(read, 30_000, { key: 'key', storage, decode: (value) => value as string[] })
+  try {
+    const pending = resource.refresh()
+    resource.get()
+    await vi.advanceTimersByTimeAsync(999)
+    expect(read).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(1)
+    await pending
+    expect(read).toHaveBeenCalledExactlyOnceWith(null, expect.any(AbortSignal))
+    expect(resource.state.value).toMatchObject({ data: ['network'], error: undefined })
+    restored.resolve({ data: ['stale'], etag: '"stale"' })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(resource.state.value.data).toEqual(['network'])
+    expect(storage.get).toHaveBeenCalledOnce()
+    expect(storage.set).not.toHaveBeenCalled()
+  } finally {
+    resource.dispose()
+    vi.useRealTimers()
+  }
+})
+
+it('publishes network results without waiting for a stuck persistence write', async () => {
+  vi.useFakeTimers()
+  const storage = { get: async () => undefined, set: vi.fn(() => new Promise<void>(() => {})) }
+  const resource = new Resource(async () => ({ modified: true as const, data: ['network'], etag: null }), 30_000, {
+    key: 'key',
+    storage,
+    decode: (value) => value as string[],
+  })
+  try {
+    await resource.refresh()
+    expect(resource.state.value).toMatchObject({ data: ['network'], refreshing: false, error: undefined })
+    await vi.advanceTimersByTimeAsync(1_000)
+    await resource.refresh()
+    expect(storage.set).toHaveBeenCalledOnce()
+    expect(resource.state.value.error).toBeUndefined()
+  } finally {
+    resource.dispose()
+    vi.useRealTimers()
+  }
+})
+
+it.each(['refresh', 'dispose'] as const)('handles %s during cache restoration', async (operation) => {
+  const restored = Promise.withResolvers<unknown>()
+  const storage = { get: vi.fn(() => restored.promise), set: vi.fn(async () => {}) }
+  const read = vi.fn(async () => ({ modified: false as const, etag: '"cached"' }))
+  const resource = new Resource(read, 30_000, { key: 'key', storage, decode: (value) => value as string[] })
+  const pending = resource.refresh()
+  await vi.waitFor(() => expect(storage.get).toHaveBeenCalledOnce())
+  if (operation === 'dispose') resource.dispose()
+  else expect(resource.refresh(true)).toBe(pending)
+  restored.resolve({ data: ['cached'], etag: '"cached"' })
+  await pending
+  if (operation === 'dispose') {
+    expect(read).not.toHaveBeenCalled()
+    expect(resource.state.value.data).toBeUndefined()
+  } else {
+    expect(read).toHaveBeenCalledExactlyOnceWith('"cached"', expect.any(AbortSignal))
+    expect(resource.state.value.data).toEqual(['cached'])
     resource.dispose()
   }
 })

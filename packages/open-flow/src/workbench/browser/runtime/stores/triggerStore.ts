@@ -98,7 +98,7 @@ export class TriggerStore {
     client: WorkbenchClient,
     workspace: WorkspaceStore,
     setNotice: SetNotice,
-    host: Pick<WorkbenchHost, 'openExternalPage' | 'triggerCatalogCache'>,
+    host: Pick<WorkbenchHost, 'openExternalPage' | 'catalogCache'>,
     i18n: I18n = createI18n(),
   ) {
     this.catalog = new TriggerCatalogStore(client, resolveUiLanguage([i18n.lang]), host)
