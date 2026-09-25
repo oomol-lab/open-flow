@@ -340,9 +340,6 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
       mounted.current = false
     }
   }, [])
-  // https://github.com/xyflow/xyflow/issues/4263
-  const [rfFocused, setRfFocused] = useState(true)
-
   const [helperLineHorizontal, helperLineVertical, onBeforeApplyNodesChanges] = useHelperLines()
 
   const [edgeContextMenu, setEdgeContextMenu] = useState<EdgeContextMenuData | null>(null)
@@ -529,8 +526,6 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
 
   const propFocused = useVal(props.focused$)
 
-  const focused = propFocused === undefined ? rfFocused : propFocused
-
   useEffect(() => {
     if (fittingView) {
       // Keep the class until measurement and fitView have completed.
@@ -605,8 +600,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
             if ((event.key === 'Enter' || event.key === ' ') && event.target instanceof Element && event.target.matches('.react-flow__node')) {
               props.onActivateSelection?.()
             }
-            if (!editable || event.defaultPrevented || event.nativeEvent.isComposing || !(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey)
-              return
+            if (!editable || event.defaultPrevented || event.nativeEvent.isComposing) return
             if (!(event.target instanceof Element) || !event.currentTarget.contains(event.target)) return
             if (
               event.target.closest(
@@ -614,6 +608,22 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
               )
             )
               return
+            // Handle each press in the canvas scope. Toggling React Flow's global
+            // delete listener on blur can miss keyup when the focused node is removed.
+            if (event.key === 'Backspace' || event.key === 'Delete') {
+              if (propFocused === false || props.canDeleteNodes === false || event.repeat || event.metaKey || event.ctrlKey || event.altKey || event.shiftKey)
+                return
+              event.preventDefault()
+              event.stopPropagation()
+              const state = flowState.getState()
+              void rf.deleteElements({
+                nodes: state.nodes.filter((node) => node.selected),
+                edges: state.edges.filter((edge) => edge.selected),
+              })
+              flowState.setState({ nodesSelectionActive: false })
+              return
+            }
+            if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) return
             const nodeIds = selectedNodes.flatMap((node) => (node.data.store ? [node.data.store.nodeId] : []))
             const key = event.key.toLowerCase()
             const action =
@@ -683,9 +693,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
             if (event.target instanceof Element && event.target.closest('button, input, textarea, a, [contenteditable="true"]')) return
             props.onActivateSelection?.()
           }}
-          onFocus={(event) => setRfFocused(event.currentTarget.contains(event.target))}
-          onBlur={() => setRfFocused(false)}
-          deleteKeyCode={editable && focused && (props.canDeleteNodes ?? true) ? ['Backspace', 'Delete'] : null}
+          deleteKeyCode={null}
           /* React Flow can leave the Meta key active after the browser releases it. */
           zoomActivationKeyCode={null}
           zoomOnDoubleClick={false}

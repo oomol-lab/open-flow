@@ -438,7 +438,7 @@ export const historyStory: FrontendStory = {
   id: 'canvas-history',
   title: 'Canvas operations',
   description:
-    'Delete Input and undo/redo: the other edge and Transform’s simulated error stay visible. Edit code after a canvas action to confirm Undo remains available. Delete the value field to inspect the saved notification and Undo action. Hold saves to inspect pending changes.',
+    'Delete Input, select Transform and press Backspace once: each node is removed on its first press. Undo/redo restores nodes and edges. Edit code after a canvas action to confirm Undo remains available. Delete the value field to inspect the saved notification and Undo action. Hold saves to inspect pending changes.',
   standalone: true,
   render: (log, dark, language) => (
     <div
