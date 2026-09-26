@@ -512,7 +512,11 @@ export function FlowEditor({
         focusNodeRequest={diagnosticFocus ?? nodeFocus}
         inspectorOpen={contextPanelVisible}
         model={designer}
-        onAddNode={(option, position, connection) => store.addNode(option, position, connection)}
+        onAddNode={async (option, position, connection) => {
+          const nodeId = await store.addNode(option, position, connection)
+          if (nodeId != null && panel.open) panel.activate([nodeId])
+          return nodeId
+        }}
         onConnect={(edge) => void store.workspace.connect(edge)}
         onChangeNodeContentHidden={(nodeId, hidden) => void store.workspace.saveNodeContentHidden(nodeId, hidden)}
         onChangeComment={(nodeId, value) => void store.workspace.saveComment(nodeId, value)}

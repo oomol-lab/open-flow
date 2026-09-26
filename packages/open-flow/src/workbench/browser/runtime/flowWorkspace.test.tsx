@@ -190,6 +190,22 @@ describe('FlowWorkspace run drawer', () => {
     expect(mocks.setOpen).not.toHaveBeenCalled()
   })
 
+  it('switches an open inspector to the added node properties', async () => {
+    mocks.stateValues.set(3, true)
+    mocks.stateValues.set(4, 'outline')
+    const { editor, store } = renderWorkspace()
+    const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
+    const designer = (view.props.children as ReactElement[])[0]!
+    const option = { kind: 'new-task', executor: 'llm' }
+    const position = { x: 92, y: 92 }
+
+    mocks.setOpen.mockClear()
+    expect(await designer.props.onAddNode(option, position)).toBe('new-node')
+
+    expect(store.selectNodes).toHaveBeenCalledWith(['new-node'])
+    expect(mocks.setOpen).toHaveBeenCalledWith('properties')
+  })
+
   it('hides execution when the graph has no trigger', () => {
     const { editor } = renderWorkspace(undefined, false)
     const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
