@@ -497,7 +497,6 @@ const contentModel: FlowCanvasViewModel = {
       position: { x: 760, y: 0 },
       reference: 'sample',
       description: 'Summarize the latest report.\nInclude findings, sources and follow-up actions.',
-      tools: [{ id: 'search', label: 'Search', icon: ':lucide:search:' }],
       run: { status: 'success' },
     },
     {

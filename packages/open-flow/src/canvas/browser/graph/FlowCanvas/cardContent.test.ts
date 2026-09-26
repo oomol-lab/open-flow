@@ -134,7 +134,7 @@ describe('Collapsible card content', () => {
       { ...base, kind: 'value' as const, values: [{ handle: 'null', value: null }] },
       { ...base, kind: 'trigger' as const, presentation: { kind: 'cron' as const, schedules: [{ type: 'every' as const, value: 1, unit: 'day' as const }] } },
       { ...base, kind: 'task' as const, reference: 'task', description: 'Task description' },
-      { ...base, kind: 'task' as const, reference: 'task', tools: [{ id: 'search', label: 'Search', icon: ':lucide:search:' }] },
+      { ...base, kind: 'task' as const, reference: 'task', description: 'Task tools are summarized in the header.' },
       { ...base, kind: 'subflow' as const, reference: 'sub', description: 'Subflow description' },
       { ...base, kind: 'wait' as const, notice: { text: 'Approve the report' } },
       { ...base, kind: 'task' as const, reference: 'task', run: { status: 'success' as const, outputs: { image: 'https://example.com/image.png' } } },

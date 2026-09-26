@@ -608,21 +608,10 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
               ),
             }
           : {}),
-        connectionRequired,
         ...(task != null && 'executor' in task && task.executor.kind == 'agent'
-          ? {
-              tools: task.executor.tools.map((tool) => {
-                const action = context.connectorActions[tool.action]
-                const serviceId = action?.serviceId ?? tool.action.split('.')[0]!
-                const serviceName = action?.serviceName ?? serviceId
-                return {
-                  id: tool.id,
-                  icon: providerIcon(action ?? { serviceId, serviceName }),
-                  label: `${serviceName} · ${action?.name ?? tool.action.slice(tool.action.indexOf('.') + 1)}`,
-                }
-              }),
-            }
+          ? { actionSummary: actionSummary(task.executor.tools, context.connectorActions, Object.values(context.providers)) }
           : {}),
+        connectionRequired,
         reference: node.task != null ? node.task.moduleId : node.taskId,
       }
     case 'value':

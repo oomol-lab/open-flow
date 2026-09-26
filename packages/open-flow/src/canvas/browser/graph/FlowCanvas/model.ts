@@ -108,7 +108,6 @@ export interface FlowCanvasViewTaskNode extends FlowCanvasViewNodeBase {
     readonly count: number
     readonly providers: readonly { readonly id: string; readonly icon: string; readonly label: string }[]
   }
-  readonly tools?: readonly { readonly id: string; readonly icon: string; readonly label: string }[]
   readonly additionalInputs?: readonly FlowCanvasViewInput[]
   readonly connectionRequired?: boolean
   readonly executorName?: string

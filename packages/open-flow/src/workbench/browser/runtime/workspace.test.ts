@@ -664,7 +664,7 @@ describe('Canvas run records', () => {
   })
 })
 
-it('projects Agent tool icons with action labels and preserves separate actions from the same app', () => {
+it('projects Agent tools through the shared action summary', () => {
   const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
     actorId: 'actor',
     createdAt: '2026-09-09T00:00:00.000Z',
@@ -703,10 +703,7 @@ it('projects Agent tool icons with action labels and preserves separate actions 
   }
   const first = designerGraph(draft, { kind: 'flow' }).nodes[0]
   expect(first).toMatchObject({
-    tools: [
-      { id: 'fetch', label: 'gmail · fetch_emails', icon: providerIcon({ serviceId: 'gmail', serviceName: 'gmail' }) },
-      { id: 'send', label: 'gmail · send_email', icon: providerIcon({ serviceId: 'gmail', serviceName: 'gmail' }) },
-    ],
+    actionSummary: { count: 2, providers: [{ id: 'gmail', icon: expect.any(String), label: 'gmail' }] },
   })
   const agent = draft.content.document.tasks.agent!
   if (agent.executor.kind != 'agent') throw new Error('Expected Agent.')
@@ -717,7 +714,7 @@ it('projects Agent tool icons with action labels and preserves separate actions 
       document: { ...draft.content.document, tasks: { agent: { ...agent, executor: { ...agent.executor, code: true, tools: [] } } } },
     },
   }
-  expect(designerGraph(removed, { kind: 'flow' }).nodes[0]).toMatchObject({ tools: [] })
+  expect(designerGraph(removed, { kind: 'flow' }).nodes[0]).toMatchObject({ actionSummary: { count: 0, providers: [] } })
 })
 
 describe('Value content visibility scope', () => {

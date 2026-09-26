@@ -7,11 +7,10 @@ import { useLang, useTranslate } from 'val-i18n-react'
 import { cronDescription, cronLabel } from '../../../../../trigger/browser/cronDescription.ts'
 import { timeZoneLabel } from '../../../../../trigger/browser/timeZones.ts'
 import { IconStack } from '../../../../../ui/browser/icon-stack.tsx'
-import { ContentIcon } from '../../../../../ui/browser/icons/ContentIcon.tsx'
 import { NODE_HANDLE_CLASSNAME } from '../../../base/canvas.ts'
 import { CanvasTooltip } from '../../../components/tooltip.tsx'
 import { nodeCardContent } from '../../FlowCanvas/cardContent.ts'
-import { CanvasCard, CardCollapse } from './CanvasCard.tsx'
+import { CanvasCard } from './CanvasCard.tsx'
 import { CanvasNodeIcon } from './CanvasNodeIcon.tsx'
 import { NodeContentRows } from './NodeContentRows.tsx'
 import { RunChips, ImagePreview } from './RunChips.tsx'
@@ -37,7 +36,7 @@ export function CanvasNode({
   const actions = node.kind === 'task' ? node.actionSummary : undefined
   const actionLabel = actions == null ? undefined : t('canvasCard.actionSummary', { actions: actions.count, providers: actions.providers.length })
   const title = node.title
-  const { values, summary, schedules, images, tools, inline, hidden } = nodeCardContent(node)
+  const { values, summary, schedules, images, inline, hidden } = nodeCardContent(node)
   const kind = node?.kind ?? 'task'
   const triggerSource =
     node.kind == 'trigger'
@@ -52,36 +51,6 @@ export function CanvasNode({
       : node.kind == 'trigger' && triggerSource
         ? `${t('canvasCard.kind.trigger')} · ${triggerSource}`
         : t(`canvasCard.kind.${kind}`)
-  const toolContent = tools != null && tools.length > 0 && (
-    <div className={styles.tools}>
-      <span className={styles.toolsLabel}>{t('canvasCard.tools')}</span>
-      <div className={styles.toolItems}>
-        {tools.slice(0, 6).map((tool) => (
-          <CanvasTooltip key={tool.id} placement="top" title={tool.label}>
-            <span className={styles.tool} aria-label={tool.label} tabIndex={0}>
-              <ContentIcon src={tool.icon} />
-            </span>
-          </CanvasTooltip>
-        ))}
-        {tools.length > 6 && (
-          <CanvasTooltip
-            placement="top"
-            title={
-              <div>
-                {tools.slice(6).map((tool) => (
-                  <div key={tool.id}>{tool.label}</div>
-                ))}
-              </div>
-            }
-          >
-            <span className={styles.moreTools} tabIndex={0}>
-              +{tools.length - 6}
-            </span>
-          </CanvasTooltip>
-        )}
-      </div>
-    </div>
-  )
   const runContent = node?.run == null || node.run.status == 'idle' ? undefined : <RunChips run={node.run} />
   return (
     <div className={NODE_HANDLE_CLASSNAME}>
@@ -109,21 +78,7 @@ export function CanvasNode({
           (node.kind == 'task' || node.kind == 'trigger') && node.connectionRequired ? <i aria-hidden="true" className="i-lucide-light:unplug" /> : undefined
         }
         branches={branches}
-        footer={
-          toolContent || runContent ? (
-            <div className={styles.footer}>
-              {toolContent &&
-                (runContent ? (
-                  <CardCollapse hidden={hidden}>
-                    <div className={styles.toolsAboveRun}>{toolContent}</div>
-                  </CardCollapse>
-                ) : (
-                  toolContent
-                ))}
-              {runContent}
-            </div>
-          ) : undefined
-        }
+        footer={runContent ? <div className={styles.footer}>{runContent}</div> : undefined}
         preview={
           (values.length > 0 || Boolean(schedules?.length) || (node?.run != null && images.length > 0)) && (
             <>

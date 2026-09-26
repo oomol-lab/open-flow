@@ -1,5 +1,3 @@
-@use '../../../../../ui/browser/focus.scss' as focus;
-
 .summary {
   margin: 0;
   white-space: pre-line;
@@ -12,54 +10,6 @@
 .footer {
   display: flex;
   flex-direction: column;
-}
-
-.toolsAboveRun {
-  padding-bottom: 6px;
-}
-
-.tools {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 0 2px;
-}
-
-.toolsLabel {
-  flex: none;
-  color: var(--text-2);
-  font-size: 11px;
-  line-height: 24px;
-}
-
-.toolItems {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.tool,
-.moreTools {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 24px;
-  height: 24px;
-  color: var(--text-2);
-  font-size: 11px;
-  line-height: 16px;
-
-  &:focus-visible {
-    @include focus.compact-focus;
-  }
-}
-
-.tool > :where(img, svg) {
-  width: 16px;
-  height: 16px;
-  object-fit: contain;
 }
 
 .interval {
