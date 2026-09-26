@@ -1,6 +1,8 @@
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { InvokeLlmTask, LlmTaskResult } from '@oomol-lab/open-flow/runtime-contract'
 
+import { renderPrompt } from '@oomol-lab/open-flow/flow-semantics'
+
 export interface LlmConfig {
   readonly origin: string
   readonly token: string
@@ -77,7 +79,7 @@ function requestBody(input: Readonly<Record<string, JsonValue>>, mode: 'chat' | 
   const messages = [
     ...(mode == 'json' ? [{ content: 'Respond with a valid JSON object. Do not include Markdown or text outside the JSON object.', role: 'system' }] : []),
     ...(input.messages == null ? [] : chatMessages(input.messages, (content) => content)),
-    ...chatMessages(input.template, (content) => render(content, input)),
+    ...chatMessages(input.template, (content) => renderPrompt(content, input)),
   ]
   const body: Record<string, unknown> = {
     messages,
@@ -113,14 +115,6 @@ function chatMessages(value: unknown, transform: (content: string) => string): r
     }
     if (typeof message.content != 'string') throw new TypeError('Invalid LLM message content.')
     return { content: transform(message.content), role }
-  })
-}
-
-function render(template: string, input: Readonly<Record<string, JsonValue>>): string {
-  return template.replace(/\{\{\s*([^{}\s]+)\s*\}\}/g, (match, name: string) => {
-    if (!Object.hasOwn(input, name)) return match
-    const value = input[name]!
-    return typeof value == 'string' ? value : JSON.stringify(value)
   })
 }
 

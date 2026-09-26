@@ -23,6 +23,7 @@ function PopoverContent({
   collisionAvoidance,
   positionMethod,
   container,
+  keepMounted,
   side = 'bottom',
   sideOffset = 4,
   ...props
@@ -31,12 +32,13 @@ function PopoverContent({
     PopoverPrimitive.Positioner.Props,
     'collisionBoundary' | 'collisionAvoidance' | 'positionMethod' | 'anchor' | 'align' | 'alignOffset' | 'side' | 'sideOffset'
   > & {
+    keepMounted?: boolean
     container?: HTMLElement | null
     positionerClassName?: string
     positionerStyle?: React.CSSProperties
   }) {
   return (
-    <PopoverPrimitive.Portal container={container} className="contents">
+    <PopoverPrimitive.Portal container={container} keepMounted={keepMounted} className="contents">
       <PopoverPrimitive.Positioner
         collisionBoundary={collisionBoundary}
         collisionAvoidance={collisionAvoidance}

@@ -44,8 +44,7 @@ it('preserves an Agent declaration through the Command apply boundary', () => {
     executor: {
       kind: 'agent',
       model: 'fixture',
-      system: 'Help.',
-      prompt: { kind: 'value', value: 'Find a record.' },
+      prompt: 'Find a record.',
       maxRounds: 4,
       tools: [
         {

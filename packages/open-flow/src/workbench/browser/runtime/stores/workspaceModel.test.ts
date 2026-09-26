@@ -65,8 +65,7 @@ describe('Connector providers', () => {
               executor: {
                 kind: 'agent',
                 model: 'test',
-                prompt: { kind: 'value', value: '' },
-                system: '',
+                prompt: '',
                 maxRounds: 10,
                 tools: [{ id: 'user', name: 'User', description: '', approval: false, inputs: [], action: 'github.get_current_user' }],
               },

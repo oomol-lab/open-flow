@@ -56,6 +56,8 @@ collections, definitions, and field, node, or group settings. Also read the
   the item position as null because the persisted JSON array cannot contain undefined. Multiline
   text items instead retain an empty string; JSON editors keep their existing clearing semantics.
 
+Agent tool parameters may opt into a shared unset policy: show “由 Agent 填写” without a required-value error, including nullable parameters. Clearing the whole parameter restores Agent ownership. Fixed null, empty values and nested fields retain normal value and validation semantics; this policy does not propagate to collection children.
+
 ## Validation lifecycle
 
 - All validation initiated by node property-panel editors must run asynchronously, even when the

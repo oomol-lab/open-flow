@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import type { ResolvedNode } from '../revisionView.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 
@@ -9,11 +9,15 @@ import { Input } from '../../../../ui/browser/input.tsx'
 import { Icon } from '../icons.tsx'
 
 export function GeneralSettings({
+  title,
+  children,
   disabled,
   node,
   nodeId,
   store,
 }: {
+  readonly title?: string
+  readonly children?: ReactNode
   readonly disabled: boolean
   readonly node: ResolvedNode['node']
   readonly nodeId: string
@@ -67,11 +71,12 @@ export function GeneralSettings({
       <summary>
         <Icon name="chevron-down" size={14} />
         <span className="inspector-disclosure-summary">
-          <strong className="inspector-section-title-text">{t('inspector.node.title')}</strong>
+          <strong className="inspector-section-title-text">{title ?? t('inspector.node.title')}</strong>
         </span>
       </summary>
       <div className="inspector-disclosure-content node-settings">
         <FieldGroup>
+          {children}
           <Field data-invalid={limitError != null}>
             <FieldLabel htmlFor={`node-${nodeId}-limit`}>{t('inspector.node.maxExecutions')}</FieldLabel>
             <Input

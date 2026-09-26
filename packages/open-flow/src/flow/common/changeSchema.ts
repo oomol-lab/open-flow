@@ -52,8 +52,7 @@ const managed = z.object({
       kind: z.literal('agent'),
       code: z.boolean().optional(),
       model: text,
-      prompt: agentValue,
-      system: text,
+      prompt: text,
       maxRounds: z.number(),
       tools: z.array(
         z.object({

@@ -371,6 +371,9 @@ $feedback-focus: ':has(#{$feedback-targets})';
   z-index: var(--value-editor-control-layer);
   color: var(--ui-muted-foreground);
 }
+.clearValue[data-danger] {
+  --ui-control-hover-background: var(--ui-danger-control-background-hover);
+}
 .resetValue,
 .unsetValue > i {
   transition-property: opacity;

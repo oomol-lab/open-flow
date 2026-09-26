@@ -3,7 +3,7 @@ import type { ManagedTaskExecutor } from '../../../../flow/common/change.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { AgentChanges, agentFixedValuesValid } from './agentChanges.ts'
 
-const initial: ManagedTaskExecutor = { kind: 'agent', model: 'test', system: '', prompt: { kind: 'value', value: '' }, maxRounds: 10, tools: [] }
+const initial: ManagedTaskExecutor = { kind: 'agent', model: 'test', prompt: '', maxRounds: 10, tools: [] }
 
 describe('Agent automatic saving', () => {
   it('serializes committed edits and leaves unfinished text out of the next write', async () => {
@@ -47,7 +47,7 @@ describe('Agent automatic saving', () => {
     else write.mockResolvedValueOnce(false)
     write.mockResolvedValue(true)
     const changes = new AgentChanges(initial, write)
-    const edited = { ...initial, system: 'Keep this text' }
+    const edited = { ...initial, prompt: 'Keep this text' }
     changes.value = edited
     if (failure == 'network') await expect(changes.save()).rejects.toThrow('offline')
     else expect(await changes.save()).toBe(false)
@@ -56,6 +56,34 @@ describe('Agent automatic saving', () => {
     expect(write).toHaveBeenCalledTimes(1)
     expect(await changes.save()).toBe(true)
     expect(write).toHaveBeenLastCalledWith(initial, edited)
+  })
+
+  it('preserves prompt, tools and advanced settings across queued saves', async () => {
+    let finish!: (saved: boolean) => void
+    const write = vi
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<boolean>((resolve) => {
+            finish = resolve
+          }),
+      )
+      .mockResolvedValue(true)
+    const changes = new AgentChanges(initial, write)
+    changes.value = { ...initial, prompt: 'Summarize {{request}}' }
+    const first = changes.save()
+    if (changes.value.kind != 'agent') throw new Error('Expected Agent')
+    changes.value = {
+      ...changes.value,
+      code: true,
+      maxRounds: 5,
+      tools: [{ id: 'lookup', action: 'search.find', name: 'find', description: 'Search', approval: false, inputs: [] }],
+    }
+    void changes.save()
+    finish(true)
+    expect(await first).toBe(true)
+    expect(write).toHaveBeenLastCalledWith({ ...initial, prompt: 'Summarize {{request}}' }, changes.value)
+    expect(changes.value).toMatchObject({ prompt: 'Summarize {{request}}', code: true, maxRounds: 5, tools: [{ id: 'lookup' }] })
   })
 
   it('does not drop an edit immediately after an unchanged blur', async () => {

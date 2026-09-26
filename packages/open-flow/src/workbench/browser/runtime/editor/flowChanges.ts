@@ -37,6 +37,7 @@ import {
   setInputValue as setGraphInputValue,
   setInputVariable as setGraphInputVariable,
 } from '../../../../flow/common/nodeChanges.ts'
+import { renamePromptInput } from '../../../../flow/common/promptTemplate.ts'
 import { valueForEditor } from '../../../../form/common/editorComponent.ts'
 
 export type FlowChanges = readonly ChangeOperation[]
@@ -80,7 +81,7 @@ export interface SubflowSettings {
 }
 
 export type AddNodeIntent =
-  | { readonly kind: 'agent'; readonly name: string }
+  | { readonly kind: 'agent'; readonly name: string; readonly prompt?: string; readonly outputDescription?: string }
   | { readonly kind: 'approval'; readonly name: string }
   | { readonly kind: 'code'; readonly name: string; readonly ports?: TaskPorts }
   | { readonly action: ConnectorActionView; readonly kind: 'connector' }
@@ -164,7 +165,7 @@ export function addNode(revision: RevisionView, target: GraphTarget, nodeId: str
       changes = createCodeTask(target, { moduleId: nodeId, nodeId }, intent.name, undefined, intent.ports)
       break
     case 'agent':
-      changes = target.kind == 'flow' ? createAgentTask(target, { nodeId, taskId: identity() }, intent.name) : undefined
+      changes = target.kind == 'flow' ? createAgentTask(target, { nodeId, taskId: identity() }, intent.name, intent) : undefined
       break
     case 'llm':
       changes = createLlmTask(target, { nodeId, taskId: identity() }, intent.name, intent.mode, intent.outputDescription)
@@ -597,7 +598,7 @@ function replaceTaskPorts(
       if (inputRename != null && value.input == inputRename[0]) return { kind: 'input', input: inputRename[1] }
       return inputNames.has(value.input) ? value : { kind: 'value', value: null }
     }
-    const prompt = source(config.prompt)
+    const prompt = inputRename == null ? config.prompt : renamePromptInput(config.prompt, inputRename[0], inputRename[1])
     const value = {
       ...task,
       executor: {

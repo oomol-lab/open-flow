@@ -33,7 +33,7 @@ function task(tools: readonly AgentTool[] = [tool]): ManagedTaskDefinition {
     name: 'Agent',
     inputs: [{ handle: 'email', jsonSchema: { type: 'string' }, nullable: false }],
     outputs: [{ handle: 'output', jsonSchema: { type: 'string' }, nullable: false }],
-    executor: { kind: 'agent', model: 'test', prompt: { kind: 'value', value: 'Handle this request.' }, system: 'Help the customer.', maxRounds: 10, tools },
+    executor: { kind: 'agent', model: 'test', prompt: 'Handle this request.', maxRounds: 10, tools },
   }
 }
 

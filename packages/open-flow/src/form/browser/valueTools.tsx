@@ -51,6 +51,7 @@ export function ValueTools({
             className={styles.clearValue}
             type="button"
             variant="ghost"
+            data-danger={danger || undefined}
             size="icon-xs"
             aria-label={`${t('valueEditor.clear')} ${label}`}
             onClick={onClear}

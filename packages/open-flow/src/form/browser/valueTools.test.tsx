@@ -14,6 +14,16 @@ describe('Value tools', () => {
     expect(markup).toContain('data-variant="destructive-ghost"')
   })
 
+  it('keeps clear neutral while marking the invalid field surface', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <ValueTools label="payload" container={null} raw={false} danger onClear={vi.fn()} />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('data-variant="ghost"')
+    expect(markup).toContain('data-danger="true"')
+  })
+
   it('places reset before every other inline action', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>

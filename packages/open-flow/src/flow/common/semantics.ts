@@ -1,3 +1,4 @@
+export { renderPrompt } from './promptTemplate.ts'
 export { connectionUsage, removeConnectionUsage } from './connectionUsage.ts'
 import { matchesTriggerOutputs } from '../../trigger/common/contract.ts'
 import { nodeInputMappings } from './condition.ts'
@@ -23,7 +24,7 @@ import { compareDiagnostics, validateModuleGraph } from './modules.ts'
 import { hasRetiredRef } from './schema.ts'
 export { availableOutputs, graphOrder, nodeInputPorts } from './graph.ts'
 export { validateModules } from './modules.ts'
-export { matchesSchema, variableInputCompatible } from './schema.ts'
+export { matchesSchema, schemaValidationErrors, variableInputCompatible } from './schema.ts'
 export { agentInput, agentToolInput, agentToolSchema } from './agent.ts'
 
 export interface SemanticClosure {

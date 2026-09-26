@@ -80,7 +80,7 @@ export function authoringExample(name: string): { version: 1; operations: readon
           name: 'Agent',
           inputs: [{ handle: 'input', jsonSchema: { type: 'string' }, nullable: false, value: 'Summarize the current input.' }],
           outputs: [{ handle: 'output', jsonSchema: { type: 'string' }, nullable: false }],
-          executor: { kind: 'agent', code: true, model: 'deepseek-v4-flash', system: '', prompt: { kind: 'input', input: 'input' }, maxRounds: 10, tools: [] },
+          executor: { kind: 'agent', code: true, model: 'deepseek-v4-flash', prompt: '{{input}}', maxRounds: 10, tools: [] },
         },
       )
       break

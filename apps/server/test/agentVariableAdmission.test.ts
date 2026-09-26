@@ -22,7 +22,7 @@ function revision(): RevisionContent {
           name: 'Agent',
           inputs: [{ handle: 'email', jsonSchema: { type: 'string' }, nullable: false }],
           outputs: [{ handle: 'output', jsonSchema: { type: 'string' }, nullable: false }],
-          executor: { kind: 'agent', model: 'fixture', prompt: { kind: 'value', value: 'Go.' }, system: 'Help.', maxRounds: 3, tools: [] },
+          executor: { kind: 'agent', model: 'fixture', prompt: 'Go.', maxRounds: 3, tools: [] },
         },
       },
       graph: {

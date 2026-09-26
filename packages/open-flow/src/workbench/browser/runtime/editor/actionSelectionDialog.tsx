@@ -8,6 +8,7 @@ import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '../../../../ui/browser/dialog.tsx'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '../../../../ui/browser/empty.tsx'
+import { Popover, PopoverTrigger, PopoverPanelContent } from '../../../../ui/browser/popover.tsx'
 import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../../../ui/browser/tooltip.tsx'
@@ -25,12 +26,16 @@ export interface SelectedAction {
 export type PreparedAction = { readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] }
 export type PrepareAction = (action: ConnectorActionView) => Promise<PreparedAction | undefined>
 
-export interface ActionDetailsProps<T> {
+export interface ActionSettingsProps<T> {
   readonly entry: T
   readonly onChange: (entry: T) => void
   readonly disabled: boolean
-  readonly portalRoot: HTMLElement | null
   readonly onValidChange: (key: string, valid: boolean) => void
+}
+
+interface ActionSettings<T> {
+  readonly title: string
+  readonly render: (props: ActionSettingsProps<T>) => ReactNode
 }
 
 export function ActionSelectionDialog<T extends SelectedAction>({
@@ -41,7 +46,7 @@ export function ActionSelectionDialog<T extends SelectedAction>({
   disabled,
   createEntry,
   onSave,
-  renderDetails,
+  settings,
   trigger,
   triggerHint,
 }: {
@@ -54,7 +59,7 @@ export function ActionSelectionDialog<T extends SelectedAction>({
   readonly disabled: boolean
   readonly createEntry: (action: ConnectorActionView) => T
   readonly onSave: (entries: readonly T[]) => Promise<boolean>
-  readonly renderDetails?: (props: ActionDetailsProps<T>) => ReactNode
+  readonly settings?: ActionSettings<T>
 }) {
   const t = useTranslate()
   const [open, setOpen] = useState(false)
@@ -90,7 +95,7 @@ export function ActionSelectionDialog<T extends SelectedAction>({
         <DialogContent
           container={root}
           closeLabel={t('common.close')}
-          className="flex h-[min(640px,85dvh)] flex-col gap-0 overflow-hidden p-0 text-[13px] leading-5 font-normal sm:max-w-[min(46rem,calc(100%-2rem))]"
+          className="flex h-[min(640px,85dvh)] flex-col gap-0 p-0 text-[13px] leading-5 font-normal sm:max-w-[min(46rem,calc(100%-2rem))]"
           showCloseButton={!pending}
         >
           <DialogTitle className="px-4 py-3 text-[13px] leading-5 font-medium">{title}</DialogTitle>
@@ -102,7 +107,7 @@ export function ActionSelectionDialog<T extends SelectedAction>({
             prepareAction={prepareAction}
             disabled={disabled || pending}
             createEntry={createEntry}
-            renderDetails={renderDetails}
+            settings={settings}
             onCancel={() => setOpen(false)}
             onSave={async (next) => {
               setPending(true)
@@ -129,7 +134,7 @@ function ActionSelectionEditor<T extends SelectedAction>({
   createEntry,
   onSave,
   onCancel,
-  renderDetails,
+  settings,
 }: {
   readonly entries: readonly T[]
   readonly connectors: ConnectorStore
@@ -138,7 +143,7 @@ function ActionSelectionEditor<T extends SelectedAction>({
   readonly createEntry: (action: ConnectorActionView) => T
   readonly onSave: (entries: readonly T[]) => Promise<boolean>
   readonly onCancel: () => void
-  readonly renderDetails?: (props: ActionDetailsProps<T>) => ReactNode
+  readonly settings?: ActionSettings<T>
 }) {
   const t = useTranslate()
   const [draft, setDraft] = useState(entries)
@@ -236,7 +241,13 @@ function ActionSelectionEditor<T extends SelectedAction>({
   const sortedEntries = draft
     .map((entry, index) => ({ entry, index }))
     .toSorted((a, b) => (ranks.get(a.entry.action) ?? Infinity) - (ranks.get(b.entry.action) ?? Infinity))
-  const remove = (index: number) => setDraft((current) => current.filter((_, i) => i != index))
+  const remove = (index: number) => {
+    const entry = draft[index]!
+    const prefix = `${entry.id ?? entry.action}:`
+    setInvalid((current) => new Set([...current].filter((key) => !key.startsWith(prefix))))
+    setDraft((current) => current.filter((_, i) => i != index))
+    selectedHeading.current?.focus()
+  }
   const refresh = async () => {
     setDisplayOrder((current) => current ?? draft.map((entry) => entry.action))
     setRefreshing(true)
@@ -338,26 +349,71 @@ function ActionSelectionEditor<T extends SelectedAction>({
                           </h4>
                           {action != null && <div className="truncate text-xs leading-5 text-muted-foreground">{action.serviceName}</div>}
                         </div>
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <Button
-                                type="button"
-                                size="icon-sm"
-                                variant="ghost"
-                                disabled={disabled}
-                                aria-label={t('actionPicker.remove', { action: action?.name ?? entry.action })}
-                                onClick={() => {
-                                  remove(index)
-                                  selectedHeading.current?.focus()
-                                }}
-                              >
-                                <i aria-hidden="true" className="i-lucide-light:trash-2 size-4 text-muted-foreground" />
-                              </Button>
-                            }
-                          />
-                          <TooltipContent container={portalRoot}>{t('actionPicker.remove', { action: action?.name ?? entry.action })}</TooltipContent>
-                        </Tooltip>
+                        {settings ? (
+                          <Popover>
+                            <PopoverTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  size="icon-sm"
+                                  variant="ghost"
+                                  disabled={disabled}
+                                  aria-label={`${settings.title} · ${action?.name ?? entry.action}`}
+                                />
+                              }
+                            >
+                              <i aria-hidden="true" className="i-lucide-light:settings size-4 text-muted-foreground" />
+                            </PopoverTrigger>
+                            <PopoverPanelContent
+                              keepMounted
+                              container={portalRoot}
+                              title={settings.title}
+                              closeLabel={t('common.close')}
+                              className="open-flow-property-panel w-96"
+                              footer={
+                                <Button type="button" size="field" variant="destructive" className="ml-auto" disabled={disabled} onClick={() => remove(index)}>
+                                  {t('valueEditor.remove')}
+                                </Button>
+                              }
+                            >
+                              {settings.render({
+                                entry,
+                                onChange: (next) => replace(index, next),
+                                disabled: disabled || resolved == null,
+                                onValidChange: (key, value) =>
+                                  setInvalid((current) => {
+                                    const identity = `${entry.id ?? entry.action}:${key}`
+                                    if (current.has(identity) === !value) return current
+                                    const next = new Set(current)
+                                    if (value) next.delete(identity)
+                                    else next.add(identity)
+                                    return next
+                                  }),
+                              })}
+                            </PopoverPanelContent>
+                          </Popover>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  size="icon-sm"
+                                  variant="ghost"
+                                  disabled={disabled}
+                                  aria-label={t('actionPicker.remove', { action: action?.name ?? entry.action })}
+                                  onClick={() => {
+                                    remove(index)
+                                    selectedHeading.current?.focus()
+                                  }}
+                                >
+                                  <i aria-hidden="true" className="i-lucide-light:trash-2 size-4 text-muted-foreground" />
+                                </Button>
+                              }
+                            />
+                            <TooltipContent container={portalRoot}>{t('actionPicker.remove', { action: action?.name ?? entry.action })}</TooltipContent>
+                          </Tooltip>
+                        )}
                       </div>
                       <div className="open-flow-property-panel col-start-2 flex min-h-[30px] min-w-0 items-center [&>*]:w-full">
                         {resolved == null ? (
@@ -392,30 +448,6 @@ function ActionSelectionEditor<T extends SelectedAction>({
                           />
                         )}
                       </div>
-                      {renderDetails != null && resolved == null && <div aria-hidden="true" className="col-span-3 h-7" />}
-                      {renderDetails != null && resolved != null && (
-                        <details className="group/action-details col-span-3">
-                          <summary className="flex cursor-pointer list-none items-center gap-1 rounded-md py-1 text-muted-foreground outline-none hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring [&::-webkit-details-marker]:hidden">
-                            <i aria-hidden="true" className="i-lucide-light:chevron-right size-3.5 group-open/action-details:rotate-90" />
-                            {t('actionPicker.details')}
-                          </summary>
-                          <div className="pt-2">
-                            {renderDetails({
-                              entry,
-                              onChange: (next) => replace(index, next),
-                              disabled,
-                              portalRoot,
-                              onValidChange: (key, value) =>
-                                setInvalid((current) => {
-                                  const next = new Set(current)
-                                  if (value) next.delete(key)
-                                  else next.add(key)
-                                  return next
-                                }),
-                            })}
-                          </div>
-                        </details>
-                      )}
                     </section>
                   )
                 })}
@@ -444,7 +476,7 @@ function ActionSelectionEditor<T extends SelectedAction>({
             if (!valid) return
             setError(undefined)
             try {
-              if (!(await onSave(draft))) setError(t('inspector.task.permissionSaveFailed'))
+              if (!(await onSave(draft))) setError(t('actionPicker.saveFailed'))
             } catch (cause) {
               setError(cause instanceof Error ? cause.message : String(cause))
             }

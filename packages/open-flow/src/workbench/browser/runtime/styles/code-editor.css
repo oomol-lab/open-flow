@@ -203,3 +203,9 @@
     color: var(--ui-destructive);
   }
 }
+
+.open-flow-workbench .prompt-input-reference {
+  color: var(--open-flow-primary);
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  border-radius: 2px;
+}

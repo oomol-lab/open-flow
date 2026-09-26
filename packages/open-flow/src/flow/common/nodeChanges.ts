@@ -171,13 +171,31 @@ export function createManagedTask(
   ]
 }
 
-export function createAgentTask(target: GraphTarget, identity: { readonly nodeId: string; readonly taskId: string }, name: string): readonly ChangeOperation[] {
+export function createAgentTask(
+  target: GraphTarget,
+  identity: { readonly nodeId: string; readonly taskId: string },
+  name: string,
+  defaults: { readonly prompt?: string; readonly outputDescription?: string } = {},
+): readonly ChangeOperation[] {
   if (target.kind != 'flow') throw new Error('Agent nodes are only supported in the root Flow.')
   return createManagedTask(target, identity, {
     name,
     inputs: [{ handle: 'input', jsonSchema: { type: 'string' }, nullable: false, value: '' }],
-    outputs: [{ handle: 'output', jsonSchema: { type: 'string' }, nullable: false }],
-    executor: { kind: 'agent', model: 'deepseek-v4-flash', system: '', prompt: { kind: 'value', value: '' }, maxRounds: 10, tools: [] },
+    outputs: [
+      {
+        handle: 'output',
+        jsonSchema: { type: 'string' },
+        nullable: false,
+        description: defaults.outputDescription ?? 'The final result produced by the Agent.',
+      },
+    ],
+    executor: {
+      kind: 'agent',
+      model: 'deepseek-v4-flash',
+      prompt: defaults.prompt ?? 'Summarize the following content, highlighting key points and next steps.\n\n{{input}}',
+      maxRounds: 10,
+      tools: [],
+    },
   })
 }
 

@@ -216,7 +216,7 @@ export function agentConfigIssues(task: ManagedTaskDefinition, tasks: Readonly<R
   }
   if (config.model.trim().length == 0) issues.push('Choose an Agent model.')
   if (!Number.isSafeInteger(config.maxRounds) || config.maxRounds < 1 || config.maxRounds > 100) issues.push('Agent maxRounds must be between 1 and 100.')
-  if (sourceIssue(config.prompt, { jsonSchema: { type: 'string' }, nullable: false })) issues.push('Agent prompt must resolve to a string input or value.')
+  if (typeof config.prompt != 'string') issues.push('Agent prompt must be a string template.')
   const outputs = task.outputs.filter((port) => 'handle' in port)
   if (outputs.length != 1 || outputs[0]?.handle != 'output' || outputs[0].nullable || schemaIssue(outputs[0].jsonSchema) != null) {
     issues.push('Agent requires one non-nullable output named output with a supported JSON schema.')

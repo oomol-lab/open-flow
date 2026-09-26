@@ -4,8 +4,10 @@ import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { expect, it } from 'vitest'
 import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
 import { createI18n } from '../i18n.ts'
+import { RevisionView } from '../revisionView.ts'
 import { designerGraph } from '../workspace.ts'
-import { deriveAddNodeOptions } from './addNodeOptions.ts'
+import { addNodeIntent, deriveAddNodeOptions } from './addNodeOptions.ts'
+import { addNode } from './flowChanges.ts'
 
 function emptyDraft(): Draft {
   return {
@@ -129,4 +131,23 @@ it.each([
     { id: 'javascript', label: javascriptLabel, description: javascriptDescription },
     { id: 'agent', label: 'AI Agent', description: agentDescription },
   ])
+})
+
+it.each(['en', 'zh-CN', 'zh-TW', 'fr', 'ja', 'ko', 'ru'] as const)('creates a usable localized Agent prompt and output description in %s', (language) => {
+  const i18n = createI18n(language)
+  const draft = emptyDraft()
+  const view = new RevisionView(draft)
+  const target = { kind: 'flow' } as const
+  const option = deriveAddNodeOptions(draft, target, i18n.t).find((item) => item.kind == 'agent')!
+  const intent = addNodeIntent(option, view, target, i18n.t)!
+  const changes = addNode(view, target, 'agent', intent, () => 'agent-task')!
+  const created = changes.find((operation) => operation.kind == 'task.create')
+  if (created?.kind != 'task.create' || !('executor' in created.task) || created.task.executor.kind != 'agent') throw new Error('Expected Agent creation.')
+  expect(created.task.executor.prompt).toContain('{{input}}')
+  expect(created.task.executor.prompt).toBe(i18n.t('agent.defaultPrompt', { input: '{{input}}' }))
+  const output = created.task.outputs[0]
+  if (output == null || !('handle' in output)) throw new Error('Expected output port.')
+  expect(output.description).toBe(i18n.t('agent.defaultOutputDescription'))
+  expect(output.description?.length).toBeGreaterThan(0)
+  i18n.dispose()
 })

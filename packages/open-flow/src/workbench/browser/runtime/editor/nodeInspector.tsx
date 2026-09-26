@@ -19,7 +19,7 @@ import { useTranslate } from 'val-i18n-react'
 import { nodeInputMappings } from '../../../../flow/common/condition.ts'
 import { inputValue } from '../../../../flow/common/inputValue.ts'
 import { NativeScrollArea } from '../../../../ui/browser/scroll-area.tsx'
-import { AgentSettings } from './agentSettings.tsx'
+import { AgentSettingsProvider, AgentPrompt, AgentAdvancedSettings } from './agentSettings.tsx'
 import { presentBuiltInOutputDescription, presentBuiltInSourceCandidates, presentResolutionOutputs } from './builtInOutputPresentation.ts'
 import { CodeTaskSection } from './codeTaskSection.tsx'
 import { ConditionBranchesEditor } from './conditionBranchesEditor.tsx'
@@ -203,7 +203,7 @@ export function NodeInspector({
     return () => globalThis.clearTimeout(timer)
   }, [focus, selection?.id, selection?.kind])
 
-  return (
+  const panel = (
     <NativeScrollArea className="inspector-scroll" tabIndex={-1}>
       <div className="inspector-content" ref={content}>
         {selection?.kind == 'trigger' && (
@@ -238,18 +238,6 @@ export function NodeInspector({
             taskId={taskId}
           />
         )}
-        {selection?.kind == 'task' && selection.definition != null && 'executor' in selection.definition && selection.definition.executor.kind == 'agent' && (
-          <AgentSettings
-            key={JSON.stringify([store.$.flowId.value, selection.id])}
-            task={selection.definition}
-            nodeId={selection.id}
-            store={store}
-            connectors={connectors}
-            prepareAction={prepareConnectorAction}
-            disabled={disabled}
-            theme={theme}
-          />
-        )}
         {selection != null && (
           <NodeDescription
             key={`description:${selection.id}`}
@@ -260,6 +248,7 @@ export function NodeInspector({
             }}
           />
         )}
+        {isAgent && <AgentPrompt />}
         {selection?.kind === 'task' && selection.module != null && (
           <CodeTaskSection
             connectorAccess={connectorAccess}
@@ -535,7 +524,9 @@ export function NodeInspector({
               ) : (
                 <>
                   {isLlm && <LlmTaskSection selection={selection} disabled={disabled} store={store} />}
-                  <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
+                  <GeneralSettings title={isAgent ? t('agent.more') : undefined} disabled={disabled} node={selection.node} nodeId={selection.id} store={store}>
+                    {isAgent && <AgentAdvancedSettings />}
+                  </GeneralSettings>
                 </>
               )
             ) : selection.kind == 'approval' || selection.kind == 'wait' ? (
@@ -554,5 +545,21 @@ export function NodeInspector({
         )}
       </div>
     </NativeScrollArea>
+  )
+  return selection?.kind == 'task' && task != null && 'executor' in task && task.executor.kind == 'agent' ? (
+    <AgentSettingsProvider
+      key={JSON.stringify([store.$.flowId.value, selection.id])}
+      task={task}
+      nodeId={selection.id}
+      store={store}
+      connectors={connectors}
+      prepareAction={prepareConnectorAction}
+      disabled={disabled}
+      theme={theme}
+    >
+      {panel}
+    </AgentSettingsProvider>
+  ) : (
+    panel
   )
 }

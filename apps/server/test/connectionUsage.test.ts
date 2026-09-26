@@ -216,8 +216,7 @@ it('captures Agent tools, notifications and Trigger proxy usage without Code per
         executor: {
           kind: 'agent',
           model: 'model',
-          prompt: { kind: 'value', value: '' },
-          system: '',
+          prompt: '',
           maxRounds: 1,
           tools: [{ id: 'send', action: 'mail.send', name: 'Send', connectionId: 'account', inputs: [], approval: false, description: '' }],
           notification: { taskId: 'send', messageHandle: 'message', inputs: {} },

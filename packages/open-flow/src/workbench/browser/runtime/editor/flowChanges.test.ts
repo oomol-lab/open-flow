@@ -571,9 +571,8 @@ describe('Agent input editing', () => {
               executor: {
                 kind: 'agent',
                 model: 'test',
-                system: '',
                 maxRounds: 10,
-                prompt: { kind: 'input', input: 'request' },
+                prompt: '{{request}}',
                 tools: [
                   {
                     id: 'tool',
@@ -597,7 +596,7 @@ describe('Agent input editing', () => {
     expect(changed.content.document.graph.nodes.agent).toMatchObject({ inputs: { question: { kind: 'value', value: 'Hello' } } })
     expect(changed.content.document.tasks.agent).toMatchObject({
       executor: {
-        prompt: { kind: 'input', input: 'question' },
+        prompt: '{{question}}',
         tools: [{ inputs: [{ source: { kind: 'input', input: 'question' } }] }],
         notification: { inputs: { subject: { kind: 'input', input: 'question' } } },
       },

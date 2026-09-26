@@ -228,8 +228,7 @@ export type ManagedTaskExecutor =
       readonly kind: 'agent'
       readonly code?: boolean
       readonly model: string
-      readonly prompt: Exclude<AgentInput, { readonly kind: 'model' }>
-      readonly system: string
+      readonly prompt: string
       readonly maxRounds: number
       readonly tools: readonly AgentTool[]
       readonly notification?: {

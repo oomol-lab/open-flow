@@ -20,10 +20,12 @@ export function FieldSelect({
   icons,
   displayValue,
   showTooltip,
+  variant,
   'aria-label': label,
   'aria-invalid': invalid,
   'aria-describedby': describedBy,
 }: {
+  'variant'?: 'addon'
   'id'?: string
   'value': string | number
   'onChange': (value: string) => void
@@ -51,6 +53,7 @@ export function FieldSelect({
   if (readOnly && icons?.[value]) {
     return (
       <FieldTypeDisplay
+        addon={variant === 'addon'}
         id={id}
         label={selected?.label}
         accessibleLabel={`${label}: ${selected?.label ?? value}`}
@@ -62,13 +65,14 @@ export function FieldSelect({
     <SelectTrigger
       id={id}
       size="field"
+      variant={variant}
       aria-label={label}
       aria-invalid={invalid || danger}
       aria-describedby={describedBy}
       data-field-prompt={danger || undefined}
-      className={fieldSelectTriggerClass}
+      className={variant === 'addon' ? undefined : fieldSelectTriggerClass}
     >
-      <SelectValue>
+      <SelectValue className={variant === 'addon' ? 'flex-none justify-center' : undefined}>
         {displayValue ??
           (icons?.[value] ? (
             <>

@@ -18,9 +18,10 @@ Within a selected node's property-panel body, render applicable sections in this
 
 1. Warnings
 2. Purpose
-3. Port configuration
-4. Node-specific settings
-5. Node settings
+3. Code or Agent prompt editor, immediately after Purpose
+4. Port configuration
+5. Node-specific settings
+6. Node settings (Advanced settings for Agent, with model, code computation, and execution rounds before the common fields)
 
 Omit sections that do not apply without leaving placeholders, while preserving the relative order
 of the remaining sections. A feature may define the order of multiple sections within one category,

@@ -157,8 +157,7 @@ const fixtures: readonly Fixture[] = [
           executor: {
             kind: 'agent',
             model: 'example-model',
-            prompt: { kind: 'input', input: 'request' },
-            system: 'Check facts and keep the response concise.',
+            prompt: 'Check facts and keep the response concise.\n\n{{request}}',
             maxRounds: 8,
             tools: [],
           },

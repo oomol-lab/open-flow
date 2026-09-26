@@ -105,8 +105,7 @@ describe('inverse canvas changes', () => {
             executor: {
               kind: 'agent',
               model: 'test',
-              prompt: { kind: 'value', value: '' },
-              system: '',
+              prompt: '',
               maxRounds: 10,
               tools: [],
               notification: { taskId: 'mail', messageHandle: 'message', inputs: {} },

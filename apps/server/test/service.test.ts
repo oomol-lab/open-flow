@@ -1350,8 +1350,7 @@ describe('Server application service', () => {
                   executor: {
                     kind: 'agent',
                     model: 'fixture',
-                    system: '',
-                    prompt: { kind: 'value', value: 'Go' },
+                    prompt: 'Go',
                     maxRounds: 3,
                     tools: [{ ...entry, id: 'send', name: 'send', description: '', approval: false, inputs: [] }],
                   },

@@ -82,8 +82,7 @@ it('distinguishes agent tools and notifications using the same account', () => {
         executor: {
           kind: 'agent',
           model: 'model',
-          prompt: { kind: 'value', value: '' },
-          system: '',
+          prompt: '',
           maxRounds: 1,
           tools: [{ id: 'send', action: 'mail.send', name: 'Send', connectionId: 'work', inputs: [], approval: false, description: '' }],
           notification: { taskId: 'send', messageHandle: 'message', inputs: {} },

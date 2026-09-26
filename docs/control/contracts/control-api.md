@@ -1035,8 +1035,7 @@ Agent 使用 Managed Task：`executor.kind: "agent"`，只能由根 Flow 的 Tas
   "executor": {
     "kind": "agent",
     "model": "deepseek-v4-flash",
-    "system": "Help the customer. Report rejected calls accurately.",
-    "prompt": { "kind": "value", "value": "Write a reply to this customer." },
+    "prompt": "Help the customer. Report rejected calls accurately. Write a reply to {{email}}.",
     "maxRounds": 10,
     "tools": [
       {
@@ -1056,12 +1055,13 @@ Agent 使用 Managed Task：`executor.kind: "agent"`，只能由根 Flow 的 Tas
 }
 ```
 
-`model` 为部署模型网关的模型 ID；无 fallback。`maxRounds` 是 1–100 的整数，Connector 工具数最多 64；至少声明一个工具或启用 `code: true`。
+`model` 为部署模型网关的模型 ID；无 fallback。`maxRounds` 是 1–100 的整数，Connector 工具数最多 64；可以不配置工具或代码计算。
 工具 `id` 非空且在 Task 内唯一；`name` 在 Task 内唯一并匹配 `[A-Za-z][A-Za-z0-9_-]{0,63}`。
+最终输出的 `jsonSchema` 和 `description` 会提供给模型。最终答案的 JSON 解析或 schema 校验失败时，模型收到具体错误并修正答案；修正阶段不提供工具，不重放已执行操作，并计入 `maxRounds`。
 `read_result` 与 `run_code` 为保留名称。可选 `executor.code` 默认为 false，随 Revision 固定。
 Action 与 Connection 固定在 Revision；无需认证的 Action 可以省略 `connectionId`。工具输入不能再声明端口 `value`，
 只能通过 `source` 声明 `{ kind: "value", value }`、`{ kind: "input", input }` 或 `{ kind: "model" }`。
-`prompt` 只接受前两种来源，解析结果必须是字符串。
+`prompt` 是字符串模板，使用 `{{输入名称}}` 引用节点输入。字符串原样插入，其他 JSON 值序列化；未知引用保留原文，不递归展开输入值。渲染结果作为用户消息发送，宿主执行约束保留在系统消息中。
 
 工具输入与最终输出接受布尔 schema，以及下列 JSON Schema 写法：
 

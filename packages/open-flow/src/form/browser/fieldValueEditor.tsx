@@ -35,6 +35,8 @@ import { ValueTools } from './valueTools.tsx'
 import { DataTypeAddon } from './valueTypeAddon.tsx'
 
 export interface FieldValueEditorProps extends ValueControlProps, FieldRowPresentation {
+  /** Override only this field’s unset presentation and requiredness, never its children. */
+  readonly unset?: { readonly label: string; readonly required: boolean }
   readonly expansionPolicy?: FieldExpansionPolicy
   readonly compact?: boolean
   readonly onDefinitionChange?: (schema: unknown, value: unknown, deletion?: FieldValueDeletion) => void
@@ -89,17 +91,19 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
   }, [])
   const needsValidation = !draftInvalid && presence === 'value' && props.editor === undefined
   const issues = useValueIssues(schema, value, language, needsValidation)
+  const customUnset = presence === 'unset' && props.unset != null && props.editor === undefined
   const showUnset =
-    type !== 'boolean' &&
-    !enumeration &&
-    !choiceOptions &&
-    !complex &&
-    !shape.collection &&
-    !jsonMode &&
-    source['ui:widget'] !== 'text' &&
-    state.display === 'unset' &&
-    props.editor === undefined &&
-    valueEditable
+    customUnset ||
+    (type !== 'boolean' &&
+      !enumeration &&
+      !choiceOptions &&
+      !complex &&
+      !shape.collection &&
+      !jsonMode &&
+      source['ui:widget'] !== 'text' &&
+      state.display === 'unset' &&
+      props.editor === undefined &&
+      valueEditable)
   const optionLabels = objectValue(source['ui:options'])?.labels
   const array = Array.isArray(value) ? value : []
   const canChooseType = source.type == null || Array.isArray(source.type)
@@ -113,7 +117,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
   const hasExpandedContent = expandable && !uncreatedText && !(structured && type === 'object' && presence !== 'value')
   // Keep the complete error set authoritative for both control state and feedback.
   const errors =
-    draftInvalid || props.editor !== undefined
+    draftInvalid || props.editor !== undefined || (customUnset && !props.unset!.required)
       ? []
       : choiceOptions?.length === 0
         ? [{ instancePath: '', message: t('valueEditor.noOptions') }]
@@ -121,7 +125,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
           ? [{ instancePath: '', message: t('valueEditor.invalidSchema') }]
           : invalidNull
             ? [{ instancePath: '', message: t('valueEditor.notNullableDescription') }]
-            : missing
+            : missing || (customUnset && props.unset!.required)
               ? [{ instancePath: '', message: t('valueEditor.required') }]
               : (issues?.errors ?? []).map((error) => ({ instancePath: error.instancePath, message: error.message ?? t('valueEditor.schema') }))
   if (!errors.length && props.validationError && !draftInvalid && props.editor === undefined) errors.push({ instancePath: '', message: props.validationError })
@@ -347,7 +351,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
           data-field-control
           aria-invalid={invalid || undefined}
           aria-label={`${label} ${t('valueEditor.setValue')}`}
-          disabled={disabled}
+          disabled={disabled || !valueEditable}
           onClick={() => {
             const next = getDefaultValue(typeOfSchema(schema), schema)
             focusCreatedValue.current = true
@@ -355,7 +359,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
             if (type === 'object' || type === 'array' || source['ui:widget'] === 'text') setExpanded(true)
           }}
         >
-          <span>{t('valueEditor.setValue')}</span>
+          <span>{customUnset ? props.unset!.label : t('valueEditor.setValue')}</span>
           <i aria-hidden="true" className="i-lucide-light:pencil" />
         </Button>
       ) : valueEditable && (jsonMode || complex) ? (
@@ -534,7 +538,7 @@ export function FieldValueEditor(props: FieldValueEditorProps) {
         label={label}
         container={container}
         raw={jsonMode}
-        danger={canReset && showUnset && invalid}
+        danger={invalid}
         disclosure={inlineExpansion && hasExpandedContent ? { controls: `${id}-body`, expanded, onToggle: toggleExpanded, disabled: sorting } : undefined}
         onReset={canReset ? props.onReset : undefined}
         onClear={canClear ? clearValue : undefined}

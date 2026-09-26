@@ -9,7 +9,7 @@ import type { ResultHost } from './agent-tools.ts'
 import { Mastra } from '@mastra/core'
 import { Agent } from '@mastra/core/agent'
 import { InMemoryStore } from '@mastra/core/storage'
-import { agentInput, agentToolInput, matchesSchema } from '@oomol-lab/open-flow/flow-semantics'
+import { renderPrompt, agentToolInput, schemaValidationErrors } from '@oomol-lab/open-flow/flow-semantics'
 import { z } from 'zod'
 import { compactResults } from './agent-results.ts'
 import { createAgentTools } from './agent-tools.ts'
@@ -76,9 +76,11 @@ export async function executeAgent(
     !Array.isArray(outputPort.jsonSchema) &&
     'type' in outputPort.jsonSchema &&
     outputPort.jsonSchema.type == 'string'
-  const instructions = textOutput
-    ? config.system
-    : `${config.system}\nReturn only a JSON value matching this schema: ${JSON.stringify(outputPort.jsonSchema)}. Do not include Markdown fences.`
+  const instructions = [
+    textOutput ? 'Return the final answer as plain text, without JSON quotes.' : 'Return only a JSON value. Do not include Markdown fences.',
+    `The final output must match this JSON schema: ${JSON.stringify(outputPort.jsonSchema)}.`,
+    ...(outputPort.description ? [`Output purpose: ${outputPort.description}`] : []),
+  ].join('\n')
   const definition = new Agent({
     id: invocation.invocationId,
     name: task.name,
@@ -149,7 +151,7 @@ export async function executeAgent(
     })
   let stream: Awaited<ReturnType<typeof agent.stream>>
   if (invocation.resume == null) {
-    stream = await agent.stream(String(agentInput(config.prompt, invocation.input)), options)
+    stream = await agent.stream(renderPrompt(config.prompt, invocation.input), options)
   } else if (invocation.resume.action == 'approve') {
     stream = await agent.approveToolCall<undefined>({ ...options, toolCallId: providerId })
   } else {
@@ -159,39 +161,58 @@ export async function executeAgent(
       reason: 'The reviewer rejected this call. Do not report it as executed.',
     })
   }
-  const result = await stream.getFullOutput().catch((error: unknown) => {
-    throw fatal ?? error
-  })
-  if (fatal != null) throw fatal
-  signal.throwIfAborted()
-  if (result.finishReason == 'suspended') {
-    const pending = z.object({ toolCallId: z.string(), toolName: z.string(), args: z.unknown() }).parse(result.suspendPayload)
-    const tool = config.tools.find((item) => item.name == pending.toolName)
-    if (tool == null || !tool.approval) throw new Error('Agent suspended an undeclared approval.')
-    const input = agentToolInput(tool, invocation.input, pending.args)
-    await report({ kind: 'tool', status: 'approval', callId: `${invocation.invocationId}:${rounds}:${pending.toolCallId}`, toolId: tool.id, input })
-    const snapshots = (await workflows.listWorkflowRuns()).runs.map((run) => ({
-      workflowName: run.workflowName,
-      snapshot: JSON.parse(JSON.stringify(run.snapshot)) as JsonValue,
-    }))
-    return {
-      kind: 'suspended',
-      checkpoint: {
-        callId: `${invocation.invocationId}:${rounds}:${pending.toolCallId}`,
-        toolId: tool.id,
-        input,
-        rounds,
-        version: 1,
-        state: {
-          framework: 'mastra/1.64.0',
-          results: [...references].map(([resultId, digest]) => ({ resultId, digest })),
-          snapshots: compactResults(snapshots, new Set(references.keys())),
+  while (true) {
+    const result = await stream.getFullOutput().catch((error: unknown) => {
+      throw fatal ?? error
+    })
+    if (fatal != null) throw fatal
+    signal.throwIfAborted()
+    if (result.finishReason == 'suspended') {
+      const pending = z.object({ toolCallId: z.string(), toolName: z.string(), args: z.unknown() }).parse(result.suspendPayload)
+      const tool = config.tools.find((item) => item.name == pending.toolName)
+      if (tool == null || !tool.approval) throw new Error('Agent suspended an undeclared approval.')
+      const input = agentToolInput(tool, invocation.input, pending.args)
+      await report({ kind: 'tool', status: 'approval', callId: `${invocation.invocationId}:${rounds}:${pending.toolCallId}`, toolId: tool.id, input })
+      const snapshots = (await workflows.listWorkflowRuns()).runs.map((run) => ({
+        workflowName: run.workflowName,
+        snapshot: JSON.parse(JSON.stringify(run.snapshot)) as JsonValue,
+      }))
+      return {
+        kind: 'suspended',
+        checkpoint: {
+          callId: `${invocation.invocationId}:${rounds}:${pending.toolCallId}`,
+          toolId: tool.id,
+          input,
+          rounds,
+          version: 1,
+          state: {
+            framework: 'mastra/1.64.0',
+            results: [...references].map(([resultId, digest]) => ({ resultId, digest })),
+            snapshots: compactResults(snapshots, new Set(references.keys())),
+          },
         },
-      },
+      }
     }
+    if (result.finishReason != 'stop') throw new Error('Agent did not return a final answer.')
+    let output: JsonValue | undefined
+    let errors: readonly string[]
+    try {
+      output = textOutput ? result.text : z.json().parse(JSON.parse(result.text))
+      errors = schemaValidationErrors(output, outputPort.jsonSchema)
+    } catch {
+      errors = ['The response is not valid JSON. Return a single JSON value without Markdown fences.']
+    }
+    if (errors.length == 0 && output !== undefined) return { kind: 'completed', output }
+    if (rounds >= config.maxRounds) throw new Error(`Agent final output is invalid and the model round limit was reached: ${errors.join('; ')}`)
+    stream = await agent.stream(
+      [
+        ...result.messages,
+        {
+          role: 'user',
+          content: `Correct the final answer to satisfy the output requirements. Validation errors:\n${errors.join('\n')}\nUse the existing conversation and results. Do not repeat any actions. Return only the corrected final answer.`,
+        },
+      ],
+      { ...options, activeTools: [], toolChoice: 'none' },
+    )
   }
-  if (result.finishReason != 'stop') throw new Error('Agent did not return a final answer.')
-  const output = textOutput ? result.text : z.json().parse(JSON.parse(result.text))
-  if (!matchesSchema(output, outputPort.jsonSchema)) throw new Error('Agent final output does not match its schema.')
-  return { kind: 'completed', output }
 }

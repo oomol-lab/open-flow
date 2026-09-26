@@ -212,7 +212,14 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, tar
       return { kind: 'code', name }
     }
     case 'agent':
-      return target.kind == 'flow' ? { kind: 'agent', name: t('addNode.agent') } : undefined
+      return target.kind == 'flow'
+        ? {
+            kind: 'agent',
+            name: t('addNode.agent'),
+            prompt: t('agent.defaultPrompt', { input: '{{input}}' }),
+            outputDescription: t('agent.defaultOutputDescription'),
+          }
+        : undefined
     case 'llm': {
       const mode = option.id == 'llm:json' ? 'json' : 'chat'
       return {

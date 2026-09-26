@@ -688,8 +688,7 @@ it('projects Agent tool icons with action labels and preserves separate actions 
             executor: {
               kind: 'agent',
               model: 'test',
-              prompt: { kind: 'value', value: 'Read mail' },
-              system: '',
+              prompt: 'Read mail',
               maxRounds: 10,
               tools: [
                 { id: 'fetch', name: 'fetch', description: 'Fetch mail', action: 'gmail.fetch_emails', approval: false, inputs: [] },

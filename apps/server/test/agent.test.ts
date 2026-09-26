@@ -70,8 +70,7 @@ const task: ManagedTaskDefinition = {
   executor: {
     kind: 'agent',
     model: 'fixture',
-    prompt: { kind: 'value', value: 'Send the messages.' },
-    system: 'Help.',
+    prompt: 'Send the messages.',
     maxRounds: 3,
     tools: [
       {
@@ -88,6 +87,7 @@ const task: ManagedTaskDefinition = {
 
 function fixture(batches: readonly (string | readonly { id: string; input: string; toolName?: string }[])[]) {
   const prompts: unknown[] = []
+  const toolOptions: unknown[] = []
   const model: MastraModelConfig = {
     specificationVersion: 'v2',
     provider: 'fixture',
@@ -96,7 +96,8 @@ function fixture(batches: readonly (string | readonly { id: string; input: strin
     doGenerate: async () => {
       throw new Error('Expected streaming.')
     },
-    doStream: async ({ prompt }) => {
+    doStream: async ({ prompt, tools, toolChoice }) => {
+      toolOptions.push({ tools, toolChoice })
       const batch = batches[prompts.length]
       prompts.push(prompt)
       if (batch == null) throw new Error('Unexpected model request.')
@@ -121,7 +122,7 @@ function fixture(batches: readonly (string | readonly { id: string; input: strin
       }
     },
   }
-  return { model, prompts }
+  return { model, prompts, toolOptions }
 }
 
 function checkpoint(result: AgentResult) {
@@ -166,6 +167,92 @@ it('logs rejected model tool calls before execution and the subsequent recovery'
 const invocation = { invocationId: 'invocation', input: {}, signal: new AbortController().signal }
 
 describe('Agent streaming adapter', () => {
+  it.each<{ schema: JsonValue; invalid: string; valid: string; output: JsonValue }>([
+    {
+      schema: { type: 'object', properties: { count: { type: 'integer', description: 'Number of records.' } }, required: ['count'] },
+      invalid: 'not JSON',
+      valid: '{"count":2}',
+      output: { count: 2 },
+    },
+    {
+      schema: { type: 'object', properties: { count: { type: 'integer' } }, required: ['count'] },
+      invalid: '{"count":"two"}',
+      valid: '{"count":2}',
+      output: { count: 2 },
+    },
+    { schema: { type: 'string', minLength: 3, maxLength: 5 }, invalid: 'x', valid: 'done', output: 'done' },
+  ])('corrects invalid output using schema and purpose: $invalid', async ({ schema, invalid, valid, output }) => {
+    if (task.executor.kind != 'agent') throw new Error('Expected Agent.')
+    const source: ManagedTaskDefinition = {
+      ...task,
+      outputs: [{ handle: 'output', nullable: false, jsonSchema: schema, description: 'Final result for the customer.' }],
+      executor: { ...task.executor, tools: [] },
+    }
+    const { model, prompts, toolOptions } = fixture([invalid, valid])
+    const events: Readonly<Record<string, JsonValue>>[] = []
+    await expect(
+      executeAgent(source, invocation, model, vi.fn(), async (event) => {
+        events.push(event)
+      }),
+    ).resolves.toEqual({ kind: 'completed', output })
+    expect(JSON.stringify(prompts[0])).toContain('Final result for the customer.')
+    expect(JSON.stringify(prompts[0])).toContain(JSON.stringify(schema).replaceAll('"', '\\"'))
+    expect(JSON.stringify(prompts[1])).toContain('Validation errors:')
+    expect(toolOptions[1]).toMatchObject({ tools: undefined, toolChoice: { type: 'none' } })
+    expect(events.filter((event) => event.kind == 'model').map((event) => event.round)).toEqual([1, 2])
+  })
+
+  it('stops correction when the shared execution round limit is exhausted', async () => {
+    if (task.executor.kind != 'agent') throw new Error('Expected Agent.')
+    const source = { ...task, executor: { ...task.executor, tools: [], maxRounds: 2 } }
+    const { model, prompts } = fixture(['', ''])
+    await expect(executeAgent(source, invocation, model, vi.fn())).rejects.toThrow('model round limit was reached')
+    expect(prompts).toHaveLength(2)
+  })
+
+  it('corrects an answer after approval without repeating the approved tool', async () => {
+    const { model, prompts, toolOptions } = fixture([[{ id: 'send-once', input: '{"body":"hello"}' }], '', 'done'])
+    const execute = vi.fn(async () => ({ sent: true }))
+    const pending = await executeAgent(task, invocation, model, execute)
+    await expect(executeAgent(task, { ...invocation, resume: { action: 'approve', checkpoint: checkpoint(pending) } }, model, execute)).resolves.toEqual({
+      kind: 'completed',
+      output: 'done',
+    })
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(prompts).toHaveLength(3)
+    expect(JSON.stringify(prompts[2])).toContain('sent')
+    expect(toolOptions[2]).toMatchObject({ tools: undefined, toolChoice: { type: 'none' } })
+  })
+
+  it('does not execute a tool requested by a model during output correction', async () => {
+    if (task.executor.kind != 'agent') throw new Error('Expected Agent.')
+    const source: ManagedTaskDefinition = {
+      ...task,
+      executor: { ...task.executor, maxRounds: 4, tools: task.executor.tools.map((tool) => ({ ...tool, approval: false })) },
+    }
+    const { model, prompts } = fixture([[{ id: 'original', input: '{"body":"hello"}' }], '', [{ id: 'repeated', input: '{"body":"hello"}' }], 'done'])
+    const execute = vi.fn(async () => ({ sent: true }))
+    // A provider that ignores toolChoice may fail or return a corrected answer, but must never repeat the operation.
+    await executeAgent(source, invocation, model, execute).catch(() => undefined)
+    expect(prompts.length).toBeGreaterThanOrEqual(3)
+    expect(execute).toHaveBeenCalledTimes(1)
+  })
+
+  it('renders prompt references only in the user message', async () => {
+    if (task.executor.kind != 'agent') throw new Error('Expected Agent.')
+    const source: ManagedTaskDefinition = { ...task, executor: { ...task.executor, prompt: 'Summarize {{request}}: {{data}}', tools: [] } }
+    const { model, prompts } = fixture(['done'])
+    await expect(executeAgent(source, { ...invocation, input: { request: 'UNTRUSTED {{data}}', data: [1, 2] } }, model, vi.fn())).resolves.toEqual({
+      kind: 'completed',
+      output: 'done',
+    })
+    const messages = prompts[0] as { role: string; content: unknown }[]
+    expect(messages.filter((message) => message.role == 'user')).toMatchObject([
+      { role: 'user', content: [{ type: 'text', text: 'Summarize UNTRUSTED {{data}}: [1,2]' }] },
+    ])
+    expect(JSON.stringify(messages.filter((message) => message.role == 'system'))).not.toContain('UNTRUSTED')
+  })
+
   it.each<{ jsonSchema: JsonValue; response: string; output: JsonValue }>([
     { jsonSchema: { type: 'string' }, response: 'Hello', output: 'Hello' },
     { jsonSchema: { type: 'object', properties: { answer: { type: 'number' } }, required: ['answer'] }, response: '{"answer":42}', output: { answer: 42 } },

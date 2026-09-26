@@ -30,9 +30,13 @@ export function schemaList(value: JsonValue | undefined): readonly JsonValue[] |
 const validators = new WeakMap<object, Validator>()
 
 export function matchesSchema(value: JsonValue, schema: JsonValue): boolean {
-  if (typeof schema == 'boolean') return schema
+  return schemaValidationErrors(value, schema).length == 0
+}
+
+export function schemaValidationErrors(value: JsonValue, schema: JsonValue): readonly string[] {
+  if (typeof schema == 'boolean') return schema ? [] : ['The schema does not allow any value.']
   const source = schemaObject(schema)
-  if (source == null || (source.properties != null && schemaObject(source.properties) == null)) return false
+  if (source == null || (source.properties != null && schemaObject(source.properties) == null)) return ['Invalid output schema.']
   try {
     let validator = validators.get(source)
     if (validator == null) {
@@ -48,9 +52,10 @@ export function matchesSchema(value: JsonValue, schema: JsonValue): boolean {
       validator = new Validator(structuredClone(source) as Schema, draft)
       validators.set(source, validator)
     }
-    return validator.validate(value).valid
+    const result = validator.validate(value)
+    return result.valid ? [] : result.errors.map((issue) => `${issue.instanceLocation || '/'}: ${issue.error}`)
   } catch {
-    return false
+    return ['Output schema validation failed.']
   }
 }
 
