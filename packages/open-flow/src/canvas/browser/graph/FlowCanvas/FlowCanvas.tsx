@@ -105,6 +105,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             onNodeDragStop={onNodeDragStop}
             onSelectionChange={onSelectionChange}
             onActivateSelection={onActivateSelection}
+            onInspectSelection={onInspectSelection}
             onSelectionStart={onSelectionStart}
             onSelectionEnd={onSelectionEnd}
             isValidConnection={isValidConnection}

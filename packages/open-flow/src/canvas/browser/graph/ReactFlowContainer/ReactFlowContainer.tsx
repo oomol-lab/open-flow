@@ -95,6 +95,10 @@ const PRO_OPTIONS = { hideAttribution: true }
 const LAYOUT_TRANSITION_DURATION = 200
 const LAYOUT_REFLOW_DELAY = LAYOUT_TRANSITION_DURATION + 100
 
+function isNodeInteractiveTarget(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest('button, input, textarea, a, [contenteditable="true"]') != null
+}
+
 const GET_SIZE = (s: ReactFlowState): Dimensions => ({
   width: s.width,
   height: s.height,
@@ -106,6 +110,7 @@ const isRectEqual = (a: Rect, b: Rect) => isSizeEqual(a, b) && a.x === b.x && a.
 
 export interface ReactFlowContainerProps {
   onActivateSelection?: () => void
+  onInspectSelection?: () => void
   onSelectionStart?: () => void
   onSelectionEnd?: () => void
   onRequestAddNode?: FlowCanvasViewProps['onRequestAddNode']
@@ -690,8 +695,12 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           }}
           onSelectionEnd={endSelection}
           onNodeClick={(event) => {
-            if (event.target instanceof Element && event.target.closest('button, input, textarea, a, [contenteditable="true"]')) return
+            if (isNodeInteractiveTarget(event.target)) return
             props.onActivateSelection?.()
+          }}
+          onNodeDoubleClick={(event) => {
+            if (isNodeInteractiveTarget(event.target)) return
+            props.onInspectSelection?.()
           }}
           deleteKeyCode={null}
           /* React Flow can leave the Meta key active after the browser releases it. */
