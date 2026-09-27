@@ -74,6 +74,7 @@
   },
   "cancel": "Annuler",
   "comment": {
+    "resize": "Redimensionner le commentaire",
     "preview": "Aperçu",
     "source": "Afficher la source"
   },

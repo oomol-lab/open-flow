@@ -15,9 +15,13 @@ import { toRFNodeId } from '../../base/rfHelpers.ts'
 import { NODE_TYPE } from './constants.ts'
 import { createNodeInteraction } from './nodeInteraction.ts'
 
+const minimumSize: Size = { width: 350, height: 160 }
+const defaultSize: Size = { width: 350, height: 260 }
+
 const dragHandle = `.${NODE_HANDLE_CLASSNAME}`
 
 export interface CommentNodeStore$$ {
+  readonly size: Val<Size>
   readonly rfNode: Val<RFNode>
   readonly selected: Val<boolean | undefined>
   readonly position: Val<XYPosition>
@@ -67,19 +71,17 @@ export class CommentNodeStore {
     this.saveContent = props.onSaveContent
 
     const interaction = (this.interaction = this.dispose.add(
-      createNodeInteraction(
-        {
-          id: this.rfNodeId,
-          type: this.nodeType,
-          position: props.position,
-          dragHandle,
-          data: Object.freeze({ store: this }),
-        },
-        350,
-      ),
+      createNodeInteraction({
+        id: this.rfNodeId,
+        type: this.nodeType,
+        position: props.position,
+        dragHandle,
+        data: Object.freeze({ store: this }),
+      }),
     ))
 
     this.$$ = {
+      size: this.dispose.add(val<Size>(defaultSize)),
       rfNode: interaction.rfNode,
       selected: interaction.selected,
       position: interaction.position,
@@ -94,6 +96,10 @@ export class CommentNodeStore {
       empty: this.dispose.add(derive(this.$$.content, (content) => !content?.trim())),
       measured: interaction.measured,
     }
+  }
+
+  public readonly resize = ({ width, height }: Size): void => {
+    this.$$.size.set({ width: Math.max(minimumSize.width, width), height: Math.max(minimumSize.height, height) })
   }
 
   public readonly togglePreview = (): void => {

@@ -280,3 +280,18 @@
     white-space: nowrap;
   }
 }
+
+// A sized card owns its header and gives the remaining space to its preview.
+.fill {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+
+  > .singleContent,
+  .collapse,
+  .collapseInner,
+  .preview {
+    min-height: 0;
+    height: 100%;
+  }
+}

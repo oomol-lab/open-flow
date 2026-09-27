@@ -2,6 +2,7 @@ import styles from './CommentNodeContent.module.scss'
 import type { Components } from 'react-markdown'
 import type { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 
+import { useStoreApi } from '@xyflow/react'
 import { clsx } from 'clsx'
 import { useContext, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
@@ -45,7 +46,7 @@ export function CommentNodeContent({ store }: { store: CommentNodeStore }): JSX.
   }, [selected, composing, editable, store])
 
   return (
-    <div className={`${styles.body} nopan`}>
+    <div className={`${styles.body} nopan nowheel`}>
       <div className={clsx(styles.container, showCode && styles.sourceCode, !showCode && NODE_HANDLE_CLASSNAME)}>
         {showCode ? (
           <Textarea
@@ -58,8 +59,8 @@ export function CommentNodeContent({ store }: { store: CommentNodeStore }): JSX.
             }}
             disabled={!editable}
             className={clsx(
-              'min-h-30 resize-y rounded-none border-0 bg-transparent p-0 text-inherit shadow-none focus-visible:outline-none',
-              focused && 'nowheel nodrag',
+              'h-full min-h-0 field-sizing-fixed resize-none rounded-none border-0 bg-transparent p-0 text-inherit shadow-none focus-visible:outline-none',
+              focused && 'nodrag',
             )}
             value={content ?? ''}
             onCompositionStart={() => setComposing(true)}
@@ -77,6 +78,48 @@ export function CommentNodeContent({ store }: { store: CommentNodeStore }): JSX.
           <MarkdownPreview components={markdownComponents} unstyled contentClassName={styles.markdown} content={content ?? ''} dark={dark} draggable />
         )}
       </div>
+      {editable && <CommentResizeButton store={store} />}
     </div>
+  )
+}
+
+function CommentResizeButton({ store }: { readonly store: CommentNodeStore }) {
+  const t = useTranslate()
+  const reactFlow = useStoreApi()
+  const drag = useRef<{ x: number; y: number; width: number; height: number; zoom: number } | null>(null)
+  return (
+    <button
+      type="button"
+      className={`${styles.resizeButton} nodrag nopan`}
+      aria-label={t('comment.resize')}
+      title={t('comment.resize')}
+      onDoubleClick={(event) => event.stopPropagation()}
+      onPointerDown={(event) => {
+        if (!event.isPrimary || event.button !== 0) return
+        event.stopPropagation()
+        event.currentTarget.setPointerCapture(event.pointerId)
+        drag.current = { x: event.clientX, y: event.clientY, ...store.$.size.value, zoom: reactFlow.getState().transform[2] }
+      }}
+      onPointerMove={(event) => {
+        const start = drag.current
+        if (!start || !event.currentTarget.hasPointerCapture(event.pointerId)) return
+        store.resize({ width: start.width + (event.clientX - start.x) / start.zoom, height: start.height + (event.clientY - start.y) / start.zoom })
+      }}
+      // Pointer capture ends on release or cancellation, including outside the button.
+      onLostPointerCapture={() => {
+        drag.current = null
+      }}
+      onKeyDown={(event) => {
+        const step = event.shiftKey ? 40 : 10
+        const delta = ({ ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] } as const)[event.key]
+        if (!delta) return
+        event.preventDefault()
+        event.stopPropagation()
+        const size = store.$.size.value
+        store.resize({ width: size.width + delta[0], height: size.height + delta[1] })
+      }}
+    >
+      <i aria-hidden="true" className="i-mdi:resize-bottom-right" />
+    </button>
   )
 }

@@ -89,31 +89,6 @@
   height: 32px;
 }
 
-.resizeHandle {
-  user-select: none;
-  -webkit-touch-callout: none;
-  -webkit-user-select: none;
-  position: absolute;
-  z-index: 1;
-  touch-action: none;
-}
-
-.resizeHandleW {
-  width: 7px;
-  height: 100%;
-  left: -8px;
-  top: 0;
-  cursor: w-resize;
-}
-
-.resizeHandleE {
-  width: 7px;
-  height: 100%;
-  right: -8px;
-  top: 0;
-  cursor: e-resize;
-}
-
 .executionHead {
   position: relative;
 

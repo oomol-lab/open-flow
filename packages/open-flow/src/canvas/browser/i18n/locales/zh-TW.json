@@ -74,6 +74,7 @@
   },
   "cancel": "取消",
   "comment": {
+    "resize": "調整註解尺寸",
     "preview": "預覽",
     "source": "檢視原始文字"
   },

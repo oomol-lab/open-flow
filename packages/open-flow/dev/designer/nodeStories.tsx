@@ -217,6 +217,10 @@ function CommentStory({ dark, language, log }: { readonly dark: boolean; readonl
           nodes: value.nodes.map((node) => (node.kind === 'comment' ? node : { ...node, diagnostics: node.diagnostics ? 0 : 1 })),
         })),
     },
+    {
+      label: 'Toggle comment content',
+      onClick: () => setModel((value) => ({ ...value, nodes: value.nodes.map((node) => ({ ...node, contentHidden: !node.contentHidden })) })),
+    },
     { label: inspectorOpen ? 'Close properties' : 'Open properties', onClick: () => setInspectorOpen((value) => !value) },
     { label: editable ? 'Switch to read-only' : 'Enable editing', onClick: () => setEditable((value) => !value) },
     {
@@ -627,7 +631,8 @@ export const nodeStories: readonly FrontendStory[] = [
   {
     group: 'Node Comment',
     id: 'node-comment',
-    description: 'Comment cards · Markdown, tables and empty content. Select text in the focused source editor; drag the title to move the card.',
+    description:
+      'Comment cards · Drag the content’s bottom-right button to resize; arrow keys resize when the button is focused. Long content scrolls within the card. Editing and preview share the same size.',
     title: 'Node States',
     standalone: true,
     render: (log, dark, language) => <CommentStory dark={dark} language={language} log={log} />,

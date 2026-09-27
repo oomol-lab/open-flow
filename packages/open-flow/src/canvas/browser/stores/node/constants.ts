@@ -17,6 +17,4 @@ export enum NODE_STATUS {
   Error = 'error',
 }
 
-export const MIN_NODE_WIDTH = 350
-export const DEFAULT_NODE_WIDTH = 420
 export const FITTING_VIEW_CLASSNAME = 'open-flow-canvas-fitting-view'

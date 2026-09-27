@@ -74,6 +74,7 @@
   },
   "cancel": "キャンセル",
   "comment": {
+    "resize": "コメントのサイズを変更",
     "preview": "プレビュー",
     "source": "ソースを表示"
   },

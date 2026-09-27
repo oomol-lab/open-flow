@@ -1,21 +1,18 @@
 import styles from './NodeLayout.module.scss'
 import type { CSSProperties } from 'react'
 import type { TFunction } from 'val-i18n'
-import type { Val } from 'value-enhancer'
 import type { HandleName } from '../../../../../schema/index.ts'
-import type { RFNodeId } from '../../../base/rfHelpers.ts'
 import type { HandleProps } from '../../../components/handle.tsx'
 import type { CanvasStore } from '../../../stores/canvas/canvas.store.ts'
 import type { FlowCanvasViewConditionCase, FlowCanvasViewConditionOperand } from '../../FlowCanvas/model.ts'
 
-import { useConnection, useNodeConnections, useStore, useStoreApi } from '@xyflow/react'
+import { useConnection, useNodeConnections, useStore } from '@xyflow/react'
 import { clsx } from 'clsx'
 import { Zap } from 'lucide-react'
-import { memo, useCallback, useEffect, useRef, useState } from 'react'
+import { memo, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { ContentIcon } from '../../../../../ui/browser/icons/ContentIcon.tsx'
-import { DEFAULT_POSITION } from '../../../base/canvas.ts'
 import { toRFHandleName } from '../../../base/rfHelpers.ts'
 import { Handle } from '../../../components/handle.tsx'
 import { NodeMiniMapPhase, NodeMiniMapProvider, useNodeMiniMapPhase } from '../../../components/minimap.tsx'
@@ -23,7 +20,7 @@ import { CanvasTooltip } from '../../../components/tooltip.tsx'
 import { waitBranchDescription } from '../../../i18n/waitBranchLocales.ts'
 import { NODE_MINIMAP_PHASE1_CLASSNAME, NODE_MINIMAP_PHASE2_CLASSNAME } from '../../../stores/canvas/nodeMiniMap.ts'
 import { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
-import { DEFAULT_NODE_WIDTH, FITTING_VIEW_CLASSNAME, MIN_NODE_WIDTH, NODE_TYPE } from '../../../stores/node/constants.ts'
+import { FITTING_VIEW_CLASSNAME, NODE_TYPE } from '../../../stores/node/constants.ts'
 import { NodeStore } from '../../../stores/node/node.store.ts'
 import { conditionBranchSummary, conditionCaseHasExpressions, conditionGroupNeedsParentheses, conditionOperatorSummary } from '../../FlowCanvas/cardContent.ts'
 import { NodeStoreContext } from '../NodeStoreContext.tsx'
@@ -76,7 +73,6 @@ function ConditionRule({ item, t }: { readonly item: FlowCanvasViewConditionCase
 }
 
 export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ canvasStore, nodeStore, visible }) => {
-  const containerRef = useRef<HTMLDivElement | null>(null)
   const t = useTranslate()
   const modelNode = useVal(NodeStore.to(nodeStore)?.content$)
 
@@ -86,7 +82,6 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
       : undefined
   const executionInput = modelNode != null && modelNode.kind != 'trigger' && modelNode.kind != 'value'
   const editable = useVal(canvasStore.$.editable)
-  const contentWidth$ = nodeStore.interaction.contentWidth
   const selected = useVal(nodeStore.$.selected)
   const showError = useShowNodeError(nodeStore)
   const problem = showError ? t('nodeStatus.hasError') : modelNode?.run?.status == 'error' ? t('canvasCard.status.error') : undefined
@@ -108,18 +103,15 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
   const compactContent = useStore((state) => state.transform[2] <= 0.25)
   const nodeMiniMapPhase = cardStore ? NodeMiniMapPhase.None : visible ? canvasMiniMapPhase : selected ? NodeMiniMapPhase.None : NodeMiniMapPhase.Phase2
 
-  const handleTrack = useHandleTrack(nodeStore.rfNodeId, MIN_NODE_WIDTH, contentWidth$, containerRef, DEFAULT_NODE_WIDTH)
-
   const initialized = useVal(canvasStore.$.initialized)
   const animateEntry = useRef(initialized).current
 
-  const contentWidth = useVal(contentWidth$)
   const executionPortColor = useVal(cardStore?.$.executionPortColor)
   const problemColor = problem ? 'var(--accent-red-1)' : undefined
   const conditionNode = modelNode?.kind == 'condition' ? modelNode : undefined
 
   const containerStyle: CSSProperties = {
-    width: cardStore ? CARD_WIDTH : Math.max(contentWidth || DEFAULT_NODE_WIDTH, MIN_NODE_WIDTH),
+    width: cardStore ? CARD_WIDTH : undefined,
     ['--node-selected-border-color' as any]: problemColor,
     ['--execution-port-color' as any]: executionPortColor,
     ['--execution-port-active-color' as any]: problemColor,
@@ -196,7 +188,6 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
           <div className={clsx(styles.offsetContainer, skip && styles.skipOuter)}>
             <NodeFloatBar canvasStore={canvasStore} nodeStore={nodeStore} />
             <NodeMinimap />
-            {!cardStore && <div data-pos="w" className={`${styles.resizeHandle} ${styles.resizeHandleW}`} onPointerDown={handleTrack} />}
             <main
               onPointerEnter={(event) => {
                 if (event.pointerType !== 'touch') {
@@ -204,7 +195,6 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
                 }
               }}
               onPointerLeave={() => setHovered(false)}
-              ref={containerRef}
               className={clsx(
                 styles.container,
                 styles.cardContainer,
@@ -229,7 +219,6 @@ export const NodeLayout: React.FC<NodeLayoutProps> = /* @__PURE__ */ memo(({ can
                 )}
               </div>
             </main>
-            {!cardStore && <div data-pos="e" className={`${styles.resizeHandle} ${styles.resizeHandleE}`} onPointerDown={handleTrack} />}
           </div>
         </div>
       </NodeStoreContext.Provider>
@@ -278,98 +267,5 @@ function ExecutionHandle({ id, type, isConnectable, hintRequested }: Pick<Handle
         </span>
       )}
     </Handle>
-  )
-}
-
-function useHandleTrack(
-  rfNodeId: RFNodeId,
-  minWidth: number,
-  width$: Val<number | undefined>,
-  containerRef: React.RefObject<HTMLDivElement | null>,
-  defaultWidth: number,
-) {
-  const reactFlowStore = useStoreApi()
-
-  return useCallback(
-    (event: React.PointerEvent<HTMLDivElement>): void => {
-      if (!event.isPrimary || event.target !== event.currentTarget || (event.button != null && event.button !== 0)) {
-        return
-      }
-
-      const isW = event.currentTarget.dataset.pos === 'w'
-      const deltaDirection = isW ? -1 : 1
-
-      const reactFlowState = reactFlowStore.getState()
-      const node = reactFlowState.nodeLookup.get(rfNodeId)
-      if (isW && !node) {
-        return
-      }
-
-      event.preventDefault()
-      event.stopPropagation()
-
-      const startPointerX = event.clientX
-
-      const scale = reactFlowState.transform[2]
-
-      const { x: startNodeX, y: startNodeY } = node?.position || DEFAULT_POSITION
-      const startWidth = width$.value !== undefined ? Math.max(minWidth, width$.value) : defaultWidth
-
-      const mask = document.createElement('div')
-      mask.className = styles.mask
-      if (reactFlowState.domNode) {
-        reactFlowState.domNode.append(mask)
-      }
-
-      function handleTrackMove(pointerEvent: PointerEvent): void {
-        if (!pointerEvent.isPrimary) {
-          return
-        }
-
-        if (pointerEvent.buttons <= 0) {
-          handleTrackEnd()
-          return
-        }
-
-        pointerEvent.preventDefault()
-        pointerEvent.stopPropagation()
-
-        const nodeDeltaX = ((pointerEvent.clientX - startPointerX) / scale) * deltaDirection
-
-        const width = Math.max(minWidth, startWidth + nodeDeltaX)
-
-        width$.set(width)
-        containerRef.current?.style.setProperty('width', `${width}px`)
-
-        if (isW && node) {
-          reactFlowState.triggerNodeChanges([
-            {
-              type: 'position',
-              id: rfNodeId,
-              position: {
-                x: Math.min(startNodeX - nodeDeltaX, startNodeX + startWidth - minWidth),
-                y: startNodeY,
-              },
-            },
-          ])
-        }
-      }
-
-      function handleTrackEnd(): void {
-        mask.remove()
-        window.removeEventListener('pointermove', handleTrackMove)
-        window.removeEventListener('pointerup', handleTrackEnd)
-        window.removeEventListener('pointercancel', handleTrackEnd)
-        window.removeEventListener('blur', handleTrackEnd)
-      }
-
-      window.addEventListener('pointermove', handleTrackMove)
-      window.addEventListener('pointerup', handleTrackEnd, { passive: true })
-      window.addEventListener('pointercancel', handleTrackEnd, {
-        passive: true,
-      })
-      window.addEventListener('blur', handleTrackEnd, { passive: true })
-    },
-    [rfNodeId, minWidth, width$, reactFlowStore, defaultWidth],
   )
 }

@@ -21,11 +21,13 @@ export function CanvasCard({
   problem,
   problemIcon,
   selected,
+  fill = false,
   compact = false,
   compactContent = false,
   contentHidden = false,
   footerHidden = false,
 }: {
+  readonly fill?: boolean
   readonly compact?: boolean
   readonly compactContent?: boolean
   readonly contentHidden?: boolean
@@ -59,6 +61,7 @@ export function CanvasCard({
     <article
       className={clsx(
         styles.card,
+        fill && styles.fill,
         compact && styles.compact,
         compactContent && styles.compactContent,
         tone && styles[tone],

@@ -74,6 +74,7 @@
   },
   "cancel": "취소",
   "comment": {
+    "resize": "주석 크기 조절",
     "preview": "미리 보기",
     "source": "원본 보기"
   },

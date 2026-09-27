@@ -17,10 +17,13 @@ export function CommentCard({ store }: { readonly store: CommentNodeStore }) {
   const selected = useVal(store.$.selected)
   const hidden = useVal(store.$.contentHidden)
   const editing = useVal(store.$.sourceCode)
+  const size = useVal(store.$.size)
+  const collapsed = hidden && !editing
   const editable = useVal(canvasStore.$.editable)
   return (
     <div
       className={NODE_HANDLE_CLASSNAME}
+      style={{ width: size.width, height: collapsed ? undefined : size.height }}
       onDoubleClick={(event) => {
         if (!editable || !(event.target instanceof Element)) return
         if (event.target.closest('input, textarea, button, a, select, [role="checkbox"], [contenteditable="true"]')) return
@@ -30,6 +33,7 @@ export function CommentCard({ store }: { readonly store: CommentNodeStore }) {
     >
       <CanvasCard
         tone="comment"
+        fill={!collapsed}
         title={title}
         titleContent={
           <NodeHeadContextMenu canvasStore={canvasStore}>
@@ -40,7 +44,7 @@ export function CommentCard({ store }: { readonly store: CommentNodeStore }) {
         icon={<i className="i-codicon:note" />}
         selected={selected}
         actions={<CommentNodeActions canvasStore={canvasStore} nodeStore={store} />}
-        contentHidden={hidden && !editing}
+        contentHidden={collapsed}
         preview={<CommentNodeContent store={store} />}
       />
     </div>

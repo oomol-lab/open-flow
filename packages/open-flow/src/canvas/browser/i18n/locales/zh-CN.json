@@ -74,6 +74,7 @@
   },
   "cancel": "取消",
   "comment": {
+    "resize": "调整注释尺寸",
     "preview": "预览",
     "source": "显示源文本"
   },
