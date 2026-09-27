@@ -140,7 +140,7 @@ export const cardStories: readonly FrontendStory[] = [
     group: 'Canvas',
     id: 'canvas-cards',
     description:
-      'Identity, plain text and framed previews. Empty content takes no space. Open status, results, logs, files and images to compare metadata, long IDs and content in both themes.',
+      'Identity, plain text and framed previews. Empty content takes no space. Open status, results, logs, files and images to compare metadata, long IDs and content in both themes. Hover or focus a Run ID for the copy hint; click or press Enter to copy it.',
     title: 'Cards · Content & records',
     standalone: true,
     render: (_log, dark, language) => (
@@ -204,7 +204,7 @@ export const cardStories: readonly FrontendStory[] = [
             title="Create the weekly report"
             subtitle="JavaScript"
             icon={<i className="i-carbon:chart-column" />}
-            footer={<RunChips run={completed} />}
+            footer={<RunChips run={{ ...completed, finishedAt: '2026-09-05T02:02:00Z' }} />}
             preview={<ReportPreview />}
           >
             <p>A summary of this week’s customer activity.</p>
@@ -231,7 +231,15 @@ export const cardStories: readonly FrontendStory[] = [
             icon={<i className="i-carbon:email" />}
             footer={
               <RunChips
-                run={{ status: 'error', runId: completed.runId, error: { code: 'connector.connection-required', message: 'Reconnect the sending account.' } }}
+                run={{
+                  ...completed,
+                  status: 'error',
+                  finishedAt: '2026-09-05T01:00:00.028Z',
+                  outputs: undefined,
+                  logs: undefined,
+                  artifacts: undefined,
+                  error: { code: 'connector.connection-required', message: 'Reconnect the sending account.' },
+                }}
               />
             }
           >

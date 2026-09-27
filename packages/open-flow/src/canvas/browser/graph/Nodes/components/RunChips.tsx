@@ -5,9 +5,11 @@ import type { FlowCanvasViewNodeRun } from '../../FlowCanvas/model.ts'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslate } from 'val-i18n-react'
+import { formatDuration } from '../../../../../base/common/formatDuration.ts'
 import { collapseAllNested, JSONViewer } from '../../../../../ui/browser/json-viewer/index.ts'
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../../../../../ui/browser/popover.tsx'
 import { NativeScrollArea } from '../../../../../ui/browser/scroll-area.tsx'
+import { CanvasTooltip } from '../../../components/tooltip.tsx'
 import { useGetStaticPopupContainer } from '../../ReactFlowContainer/useGetPopupContainer.ts'
 
 function RecordChip({
@@ -25,6 +27,7 @@ function RecordChip({
 }) {
   const t = useTranslate()
   const getContainer = useGetStaticPopupContainer()
+  const popupContainer = getContainer()
   const runId = run.runId
   return (
     <Popover>
@@ -42,7 +45,7 @@ function RecordChip({
         <span>{label}</span>
       </PopoverTrigger>
       <PopoverContent
-        container={getContainer()}
+        container={popupContainer}
         side="bottom"
         align="start"
         className={`${styles.popup} ${status ? styles.statusPopup : ''} nokey`}
@@ -72,22 +75,23 @@ function RecordChip({
               <div>
                 <dt>{t('canvasCard.runId')}</dt>
                 <dd>
-                  <button
-                    aria-label={`${t('copy')} ${runId}`}
-                    className={styles.runId}
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(runId)
-                      } catch {
-                        return
-                      }
-                      toast.success(t('copied'))
-                    }}
-                    title={`${t('copy')} ${runId}`}
-                    type="button"
-                  >
-                    <code>{runId}</code>
-                  </button>
+                  <CanvasTooltip getPopupContainer={() => popupContainer} title={t('copy')}>
+                    <button
+                      aria-label={`${t('copy')} ${runId}`}
+                      className={styles.runId}
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(runId)
+                        } catch {
+                          return
+                        }
+                        toast.success(t('copied'))
+                      }}
+                      type="button"
+                    >
+                      <code>{runId}</code>
+                    </button>
+                  </CanvasTooltip>
                 </dd>
               </div>
             )}
@@ -137,7 +141,7 @@ export function RunChips({ run }: { readonly run: FlowCanvasViewNodeRun }) {
   const label = t(`canvasCard.status.${run.status}`)
   const progress =
     run.status == 'running' && run.progress != null && Number.isFinite(run.progress) ? ` · ${Math.round(Math.min(100, Math.max(0, run.progress)))}%` : ''
-  const status = `${label}${progress}${elapsed != null && Number.isFinite(elapsed) && elapsed >= 0 ? ` · ${(elapsed / 1000).toFixed(1)} s` : ''}`
+  const status = `${label}${progress}${elapsed != null && Number.isFinite(elapsed) && elapsed >= 0 ? ` · ${formatDuration(elapsed)}` : ''}`
   const state = run.status
   const icon =
     state == 'running'
