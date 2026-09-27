@@ -80,7 +80,7 @@ export class CanvasStore {
   public readonly dispose: DisposableStore = disposableStore()
   public readonly ignoredNodeIds = this.dispose.add(val<readonly string[]>([]))
   public readonly ignoreNodes = (nodeIds: readonly string[], ignored: boolean): void => {
-    this.#callbacks.onIgnoreNodes(nodeIds, ignored)
+    if (this.$.editable.value) this.#callbacks.onIgnoreNodes?.(nodeIds, ignored)
   }
 
   public get canChangeNodeContentHidden(): boolean {
@@ -208,6 +208,7 @@ export class CanvasStore {
 
   /** Deletes nodes programmatically, such as from a menu action. */
   public async deleteNodes(nodes: readonly (NodeStore | CommentNodeStore)[], skipConfirm?: boolean): Promise<void> {
+    if (!this.$.editable.value) return
     const payload = {
       nodes: nodes.map((e) => e.$.rfNode.value),
       edges: [],
@@ -255,7 +256,8 @@ export class CanvasStore {
 
     const { source, target, sourceHandle, targetHandle } = rfConnection as RFConnection
 
-    this.#callbacks.onConnect({
+    if (!this.$.editable.value) return
+    this.#callbacks.onConnect?.({
       source: toManifestNodeId(source),
       sourceHandle: toManifestHandleName(sourceHandle),
       target: toManifestNodeId(target),
@@ -392,8 +394,8 @@ export class CanvasStore {
       this.pendingNodeDeletes.clear()
       this.pendingDisconnects.clear()
       // The host owns removal of a node and all incident connections.
-      if (nodes.length) this.#callbacks.onDeleteNodes(nodes.map((node) => node.nodeId))
-      for (const edge of connections) this.#callbacks.onDisconnect(toViewEdge(edge.source, edge.sourceHandle, edge.target, edge.targetHandle))
+      if (nodes.length) this.#callbacks.onDeleteNodes?.(nodes.map((node) => node.nodeId))
+      for (const edge of connections) this.#callbacks.onDisconnect?.(toViewEdge(edge.source, edge.sourceHandle, edge.target, edge.targetHandle))
     }, 0)
   }
 
@@ -460,7 +462,8 @@ export class CanvasStore {
     position: FlowCanvasViewPosition,
     connection?: (nodeId: string) => Omit<FlowCanvasViewEdge, 'id'>,
   ): Promise<string | undefined> {
-    const nodeId = await (connection == null ? this.#callbacks.onAddNode(itemId, position) : this.#callbacks.onAddNode(itemId, position, connection))
+    if (!this.$.editable.value) return
+    const nodeId = await (connection == null ? this.#callbacks.onAddNode?.(itemId, position) : this.#callbacks.onAddNode?.(itemId, position, connection))
     if (nodeId == null) return
     void this.#selectNode(nodeId)
     return nodeId
@@ -565,13 +568,16 @@ export class CanvasStore {
     )) as NodeId | undefined
 
   public onDuplicate = async (nodeIds: NodeId[], offset?: XYPosition): Promise<void> => {
+    if (!this.$.editable.value) return
     const copies = nodeIds.flatMap((nodeId) => {
       const node = this.$.nodes.get(nodeId) ?? this.$.commentNodes?.get(nodeId)
       return node == null ? [] : [node]
     })
     if (!copies.length) return
-    this.#callbacks.onDuplicate(nodeIds, offset ?? { x: 24, y: 24 }, Object.fromEntries(copies.map((node) => [node.nodeId, node.$.position.value])))
+    this.#callbacks.onDuplicate?.(nodeIds, offset ?? { x: 24, y: 24 }, Object.fromEntries(copies.map((node) => [node.nodeId, node.$.position.value])))
   }
-  public onCopy = (nodeIds: NodeId[]): void => this.#callbacks.onCopy(nodeIds)
-  public onPaste = (position?: XYPosition): void => this.#callbacks.onPaste(position)
+  public onCopy = (nodeIds: NodeId[]): void => this.#callbacks.onCopy?.(nodeIds)
+  public onPaste = (position?: XYPosition): void => {
+    if (this.$.editable.value) this.#callbacks.onPaste?.(position)
+  }
 }

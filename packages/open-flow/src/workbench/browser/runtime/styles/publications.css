@@ -43,7 +43,7 @@
     line-height: 24px;
   }
 
-  .publication-live-link {
+  .publication-draft-link {
     padding: 0 8px 12px;
     border-bottom: 1px solid var(--ui-border);
   }
@@ -111,9 +111,9 @@
 
   .publication-detail-meta {
     grid-column: 1 / -1;
-    gap: 8px 24px;
+    gap: 6px 20px;
     color: var(--ui-muted-foreground);
-    font-size: 11px;
+    font-size: 12px;
   }
 
   .publication-back {
@@ -125,25 +125,20 @@
     overflow: hidden;
   }
 
-  .publication-live-content,
+  .publication-draft-content,
   .publication-version {
     display: flex;
-    min-height: 100%;
+    height: 100%;
+    min-height: 0;
     flex-direction: column;
   }
 
-  .publication-overview {
-    padding: 20px 18px;
-  }
-
-  .publication-overview h3,
-  .publication-triggers h2 {
+  .publication-triggers h3 {
     margin: 0;
     font-size: 13px;
     font-weight: 600;
   }
 
-  .publication-description,
   .publication-confirm p {
     margin: 6px 0 0;
     color: var(--ui-muted-foreground);
@@ -151,43 +146,17 @@
     line-height: 18px;
   }
 
-  .publication-technical {
-    margin-top: 16px;
-    color: var(--ui-muted-foreground);
-    font-size: 12px;
-  }
-
-  .publication-technical summary {
-    cursor: pointer;
-  }
-
-  .publication-metadata {
+  .publication-detail-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 16px 24px;
-    margin: 0;
-    padding: 18px;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .publication-draft-issue {
+    margin: 16px 18px;
+    color: var(--ui-destructive);
     font-size: 12px;
-  }
-
-  .publication-technical .publication-metadata {
-    padding: 12px 0 0;
-  }
-
-  .publication-metadata dt {
-    color: var(--ui-muted-foreground);
-  }
-
-  .publication-metadata dd {
-    margin: 4px 0 0;
-    color: var(--ui-foreground);
-  }
-
-  .publication-snapshot {
-    flex: 1;
-    min-height: 320px;
-    border-top: 1px solid var(--ui-border);
-    border-radius: 0;
   }
 
   .publication-progress {
@@ -242,7 +211,11 @@
   }
 
   .publication-triggers {
-    border-top: 1px solid var(--ui-border);
+    container: live-triggers / inline-size;
+  }
+
+  .trigger-list-header {
+    margin-bottom: 12px;
   }
 
   .publication-empty {
@@ -257,89 +230,61 @@
     text-align: center;
   }
 
-  .publication-triggers > header {
-    display: flex;
-    min-width: 0;
-    min-height: 56px;
-    align-items: center;
-    padding: 16px 20px;
-  }
-
-  .publication-triggers > header > div {
-    display: flex;
-    min-width: 0;
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 3px;
-  }
-
-  .publication-triggers > header span {
-    max-width: 72ch;
-    color: var(--ui-muted-foreground);
-    font-size: 12px;
-    line-height: 17px;
-  }
-
   .publication-trigger-empty {
-    padding: 20px;
-    border-top: 1px solid var(--ui-border);
+    margin: 0;
     color: var(--ui-muted-foreground);
     font-size: 12px;
   }
 
   .trigger-binding-list {
+    max-height: 180px;
     overflow: auto;
-    border-top: 1px solid var(--ui-border);
-    scrollbar-gutter: stable;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius);
   }
 
   .trigger-binding-row {
     display: grid;
-    min-width: 0;
-    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     align-items: center;
     gap: 12px;
-    min-height: 44px;
-    padding: 0 16px 0 24px;
-    border-bottom: 1px solid var(--ui-border);
-  }
-
-  .trigger-binding-summary {
-    display: grid;
-    min-width: 0;
-    grid-template-columns: auto minmax(120px, 1fr) auto minmax(76px, auto) auto auto;
-    align-items: center;
-    gap: 10px;
-    text-align: left;
-  }
-
-  .trigger-binding-summary strong,
-  .trigger-binding-summary code,
-  .trigger-binding-summary > span:not(.status-dot) {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .trigger-binding-summary strong {
-    color: var(--ui-foreground);
-    font-size: 13px;
-    font-weight: 600;
-  }
-
-  .trigger-binding-summary code {
-    color: var(--ui-muted-foreground);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    font-size: 11px;
-  }
-
-  .trigger-binding-summary > span:not(.status-dot) {
-    color: var(--ui-muted-foreground);
+    padding: 8px;
     font-size: 12px;
   }
 
-  .trigger-binding-detail-label {
-    text-align: right;
+  .trigger-binding-row + .trigger-binding-row {
+    border-top: 1px solid var(--ui-border);
+  }
+
+  .trigger-binding-open {
+    min-width: 0;
+    justify-content: start;
+  }
+
+  .trigger-binding-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .trigger-binding-kind {
+    color: var(--ui-muted-foreground);
+    font-size: 11px;
+  }
+
+  @container live-triggers (width <= 480px) {
+    .trigger-binding-row {
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 4px 8px;
+    }
+    .trigger-binding-open {
+      grid-column: 1 / -1;
+    }
+    .trigger-binding-row > .trigger-binding-state {
+      padding-inline: 8px;
+    }
   }
 
   .trigger-binding-state {
@@ -359,15 +304,14 @@
   }
 
   .trigger-binding-detail {
-    padding: 14px 24px 16px 44px;
-    border-bottom: 1px solid var(--ui-border);
-    background: var(--ui-card);
+    min-height: 0;
+    overflow: auto;
   }
 
   .trigger-binding-detail > dl {
     display: grid;
     min-width: 0;
-    grid-template-columns: repeat(auto-fit, minmax(128px, 180px));
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
     margin: 0;
     gap: 16px 24px;
   }
@@ -390,17 +334,8 @@
   }
 
   .trigger-binding-detail dd {
-    overflow: hidden;
-    max-width: 520px;
     color: var(--ui-foreground);
-    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .trigger-binding-detail dd code {
-    color: var(--ui-muted-foreground);
-    font-size: 11px;
+    overflow-wrap: anywhere;
   }
 
   .trigger-recovery {
@@ -413,22 +348,20 @@
   .trigger-webhook {
     display: grid;
     min-width: 0;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: center;
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
-    margin-top: 12px;
+    margin-top: 16px;
     color: var(--ui-muted-foreground);
     font-size: 12px;
   }
 
   .trigger-webhook code {
     flex: 1;
-    overflow: hidden;
+    min-width: 0;
     color: var(--ui-foreground);
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
     font-size: 12px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
   }
 
   .trigger-webhook > div {
@@ -444,9 +377,8 @@
 
   .trigger-binding-detail-sections {
     display: grid;
-    max-width: 1240px;
-    grid-template-columns: minmax(280px, 2fr) minmax(360px, 3fr);
-    gap: 24px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
     margin-top: 16px;
     padding-top: 16px;
     border-top: 1px solid var(--ui-border);
@@ -457,12 +389,8 @@
   }
 
   .trigger-binding-detail-sections > section + section {
-    padding-left: 24px;
-    border-left: 1px solid var(--ui-border);
-  }
-
-  .trigger-binding-detail-sections > section:only-child {
-    grid-column: 1 / -1;
+    padding-top: 16px;
+    border-top: 1px solid var(--ui-border);
   }
 
   .trigger-test > header {
@@ -493,16 +421,11 @@
 
   .trigger-test > header p,
   .trigger-test-result > p,
-  .trigger-activities-description,
   .trigger-activities-empty {
     margin: 0;
     color: var(--ui-muted-foreground);
     font-size: 12px;
     line-height: 17px;
-  }
-
-  .trigger-activities-description {
-    margin-bottom: 8px;
   }
 
   .trigger-test-result {
@@ -541,7 +464,7 @@
   .trigger-activity {
     display: grid;
     min-width: 0;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: start;
     gap: 8px;
     padding: 8px 0;
@@ -558,10 +481,12 @@
   .trigger-activity strong,
   .trigger-activity code,
   .trigger-activity time {
-    overflow: hidden;
     font-size: 12px;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+  }
+
+  .trigger-activity time {
+    grid-column: 2;
   }
 
   .trigger-activity strong {
@@ -587,40 +512,12 @@
   }
 
   @container publications (width <= 1100px) {
-    .trigger-binding-summary {
-      grid-template-columns: auto minmax(120px, 1fr) auto auto auto;
-    }
-    .trigger-binding-kind {
-      display: none;
-    }
     .publication-layout {
       grid-template-columns: 240px minmax(0, 1fr);
     }
   }
 
-  @container publications (width <= 980px) {
-    .trigger-binding-detail-sections {
-      grid-template-columns: minmax(0, 1fr);
-      gap: 16px;
-    }
-
-    .trigger-binding-detail-sections > section + section {
-      padding-top: 16px;
-      padding-left: 0;
-      border-top: 1px solid var(--ui-border);
-      border-left: 0;
-    }
-  }
-
   @container publications (width <= 720px) {
-    .trigger-binding-detail-label {
-      display: none;
-    }
-    .trigger-binding-detail {
-      padding-right: 16px;
-      padding-left: 16px;
-    }
-
     .publication-layout {
       grid-template-columns: minmax(0, 1fr);
     }
@@ -650,19 +547,13 @@
     .publication-detail-actions {
       grid-column: 1 / -1;
     }
-    .trigger-binding-row {
-      grid-template-columns: minmax(0, 1fr);
-      padding: 8px 16px;
-      gap: 4px;
-    }
-    .trigger-binding-row > button:last-child:not(:first-child) {
-      justify-self: end;
-    }
-    .trigger-binding-summary {
-      grid-template-columns: auto minmax(0, 1fr) auto auto;
-    }
-    .trigger-webhook {
-      grid-template-columns: minmax(0, 1fr);
-    }
+  }
+}
+
+.open-flow-workbench {
+  .publication-live-triggers {
+    flex-shrink: 0;
+    padding: 12px 18px 18px;
+    border-bottom: 1px solid var(--ui-border);
   }
 }

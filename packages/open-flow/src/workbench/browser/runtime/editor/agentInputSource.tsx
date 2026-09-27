@@ -9,12 +9,14 @@ import { Field, FieldLabel, FieldDescription } from '../../../../ui/browser/fiel
 
 export function AgentInputSource({
   disabled,
+  readOnly,
   source,
   port,
   inputs,
   onChange,
   onValidChange,
 }: {
+  readonly readOnly?: boolean
   readonly disabled: boolean
   readonly source: AgentInput
   readonly port: InputPort
@@ -69,6 +71,7 @@ export function AgentInputSource({
       {port.description && <FieldDescription className="text-xs">{port.description}</FieldDescription>}
 
       <FieldValueEditor
+        readOnly={readOnly}
         layout="ports"
         valueAddon={sourceControl}
         schema={port.jsonSchema}

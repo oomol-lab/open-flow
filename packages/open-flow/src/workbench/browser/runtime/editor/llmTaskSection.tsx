@@ -13,7 +13,7 @@ export function LlmTaskSection({
 }: {
   readonly selection: Extract<ResolvedNode, { readonly kind: 'task' }>
   readonly disabled: boolean
-  readonly store: WorkspaceStore
+  readonly store?: WorkspaceStore
 }): ReactElement | null {
   const t = useTranslate()
   const task = selection.definition
@@ -33,7 +33,7 @@ export function LlmTaskSection({
               onChange={(event) => {
                 const mode = event.target.value
                 if ((mode == 'chat' || mode == 'json') && mode != llm.mode) {
-                  void store.saveTaskSettings(selection.id, { kind: 'llm', mode, name: task.name })
+                  void store?.saveTaskSettings(selection.id, { kind: 'llm', mode, name: task.name })
                 }
               }}
               value={llm.mode}

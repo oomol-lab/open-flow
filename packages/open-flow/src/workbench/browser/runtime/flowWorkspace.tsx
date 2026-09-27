@@ -776,7 +776,7 @@ export default function FlowWorkspace({
             store={store}
           />
         ) : (
-          <PublicationsView key={flowId} onClose={() => navigation.open('design')} store={store} />
+          <PublicationsView theme={theme} key={flowId} onClose={() => navigation.open('design')} store={store} />
         )}
       </main>
     </IconifyProvider>

@@ -1,3 +1,4 @@
+import type { ComponentProps } from 'react'
 import type { AgentTool, InputPort, ManagedTaskExecutor } from '../../../../flow/common/change.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { ActionSettingsProps, PrepareAction } from './actionSelectionDialog.tsx'
@@ -9,6 +10,7 @@ import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { IconStack } from '../../../../ui/browser/icon-stack.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { PopoverDescription } from '../../../../ui/browser/popover.tsx'
+import { Popover, PopoverTrigger, PopoverContent } from '../../../../ui/browser/popover.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { actionSummary } from '../actionSummary.ts'
 import { ActionSelectionDialog } from './actionSelectionDialog.tsx'
@@ -16,7 +18,7 @@ import { agentFixedValuesValid } from './agentChanges.ts'
 import { AgentInputSource } from './agentInputSource.tsx'
 import { agentTool } from './flowChanges.ts'
 
-export function AgentTools({
+function EditableAgentTools({
   config,
   disabled,
   inputs,
@@ -70,21 +72,23 @@ function AgentToolSettings({
   disabled,
   onValidChange,
   inputs,
-}: ActionSettingsProps<AgentTool> & {
+}: Omit<ActionSettingsProps<AgentTool>, 'onChange' | 'onValidChange'> & {
+  readonly onChange?: ActionSettingsProps<AgentTool>['onChange']
+  readonly onValidChange?: ActionSettingsProps<AgentTool>['onValidChange']
   readonly inputs: readonly InputPort[]
 }) {
   const t = useTranslate()
   return (
-    <fieldset disabled={disabled} className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
+    <fieldset className="m-0 flex min-w-0 flex-col gap-4 border-0 p-0">
       <PopoverDescription className="m-0 text-xs leading-5">{t('agent.toolSettingsHint')}</PopoverDescription>
       <Field className="gap-1.5">
         <FieldLabel className="text-xs font-normal text-muted-foreground">{t('agent.toolName')}</FieldLabel>
         <Input
           controlSize="field"
-          disabled={disabled}
+          readOnly={disabled}
           aria-label={t('agent.toolName')}
           value={tool.name}
-          onChange={(event) => onChange({ ...tool, name: event.target.value })}
+          onChange={(event) => onChange?.({ ...tool, name: event.target.value })}
         />
       </Field>
       <Field className="gap-1.5">
@@ -92,24 +96,50 @@ function AgentToolSettings({
         <Textarea
           rows={2}
           className="min-h-16 max-h-40 resize-y text-xs md:text-xs"
-          disabled={disabled}
+          readOnly={disabled}
           aria-label={t('inspector.node.description')}
           value={tool.description}
-          onChange={(event) => onChange({ ...tool, description: event.target.value })}
+          onChange={(event) => onChange?.({ ...tool, description: event.target.value })}
         />
       </Field>
       {tool.inputs.length > 0 && <div className="h-px bg-border/50" />}
       {tool.inputs.map((port) => (
         <AgentInputSource
+          readOnly={onChange == null}
           key={port.handle}
           disabled={disabled}
           port={port}
           inputs={inputs}
           source={port.source}
-          onValidChange={(key, valid) => onValidChange(`${port.handle}:${key}`, valid)}
-          onChange={(source) => onChange({ ...tool, inputs: tool.inputs.map((input) => (input.handle === port.handle ? { ...input, source } : input)) })}
+          onValidChange={(key, valid) => onValidChange?.(`${port.handle}:${key}`, valid)}
+          onChange={(source) => onChange?.({ ...tool, inputs: tool.inputs.map((input) => (input.handle === port.handle ? { ...input, source } : input)) })}
         />
       ))}
     </fieldset>
+  )
+}
+
+export function AgentTools(props: Omit<ComponentProps<typeof EditableAgentTools>, 'connectors'> & { readonly connectors?: ConnectorStore }) {
+  const t = useTranslate()
+  if (props.connectors != null) return <EditableAgentTools {...props} connectors={props.connectors} />
+  if (props.config.tools.length === 0) return null
+  return (
+    <Popover>
+      <PopoverTrigger render={<Button type="button" variant="ghost" size="sm" />}>{t('agent.tools')}</PopoverTrigger>
+      <PopoverContent>
+        <div className="grid max-h-96 gap-4 overflow-auto">
+          {props.config.tools.map((tool) => (
+            <details key={tool.id}>
+              <summary>{tool.name || tool.action}</summary>
+              <p className="reference-value">
+                {tool.action}
+                {tool.connectionId == null ? '' : ` · ${tool.connectionId}`}
+              </p>
+              <AgentToolSettings entry={tool} disabled inputs={props.inputs} />
+            </details>
+          ))}
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }

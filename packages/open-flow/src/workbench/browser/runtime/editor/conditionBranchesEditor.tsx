@@ -105,6 +105,7 @@ const toggle = (key: string, set: React.Dispatch<React.SetStateAction<ReadonlySe
 export function ConditionBranchesEditor({
   value: configuration,
   disabled,
+  readOnly,
   onChange,
   renderSource,
   variables = noVariables,
@@ -112,6 +113,7 @@ export function ConditionBranchesEditor({
   onVariable,
   sourceType,
 }: {
+  readonly readOnly?: boolean
   readonly value: ConditionSettings
   readonly disabled: boolean
   readonly onChange: (value: ConditionSettings, deletion?: PropertyDeletion) => void
@@ -409,6 +411,7 @@ export function ConditionBranchesEditor({
                                 return (
                                   <div className="condition-operand">
                                     <SourceValueEditor
+                                      readOnly={readOnly}
                                       embedded
                                       validationError={side === 'right' && rightInvalid ? t('conditionEditor.incompatibleRight') : undefined}
                                       onInvalidChange={(operandInvalid) => {

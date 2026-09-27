@@ -124,6 +124,7 @@ export interface ReactFlowContainerProps {
   miniMapExpanded$?: Val<boolean | undefined>
   interactiveMode$: Val<InteractiveMode>
   editable: boolean
+  nodesDraggable?: boolean
   nodeTypes?: NodeTypes
   edgeTypes?: EdgeTypes
   nodes$: ReadonlyVal<RFGraph['nodes']>
@@ -673,6 +674,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           onViewportChange={onViewportChange}
           maxZoom={3}
           minZoom={0.1}
+          nodesDraggable={props.nodesDraggable ?? props.editable}
           nodesConnectable={editable && props.onConnect != null}
           onEdgeContextMenu={(event, edge) => (event.preventDefault(), setEdgeContextMenu({ edge, event }))}
           onSelectionContextMenu={(event, selectionNodes) => (event.preventDefault(), setSelectionContextMenu({ nodes: selectionNodes, event }))}
@@ -763,7 +765,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
                 onDelete={() => props.onEdgesChange([{ type: 'remove', id: edgeContextMenu.edge.id }])}
               />
             )}
-            {(props.canDeleteNodes ?? true) && selectionContextMenu && selectionContextMenuPosition && (
+            {editable && (props.canDeleteNodes ?? true) && selectionContextMenu && selectionContextMenuPosition && (
               <SelectionContextMenu
                 position={selectionContextMenuPosition}
                 nodes={selectionContextMenu.nodes}
@@ -932,7 +934,7 @@ function SelectionFloatBar(props: Pick<SelectionContextMenuProps, 'nodes' | 'onD
     <NodeToolbar data-tooltip-toolbar className={nodeHeadStyles.floatBar} isVisible nodeId={props.nodes.map((node) => node.id)} offset={12 - 8 * zoom}>
       <InspectSelectionButton className={nodeHeadStyles.floatBarButton} />
       {items
-        .filter((item) => props.editable || (item.key !== '$delete' && item.key !== '$duplicate'))
+        .filter(() => props.editable)
         .map((item) => (
           <CanvasTooltip key={item.key} placement="top" title={item.key === '$delete' ? `${item.label} (Backspace / Delete)` : item.label}>
             <Button

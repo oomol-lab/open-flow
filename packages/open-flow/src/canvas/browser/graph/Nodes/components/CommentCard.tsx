@@ -35,11 +35,7 @@ export function CommentCard({ store }: { readonly store: CommentNodeStore }) {
         tone="comment"
         fill={!collapsed}
         title={title}
-        titleContent={
-          <NodeHeadContextMenu canvasStore={canvasStore}>
-            <CommentTitle store={store} />
-          </NodeHeadContextMenu>
-        }
+        titleContent={<NodeHeadContextMenu canvasStore={canvasStore}>{editable ? <CommentTitle store={store} /> : <span>{title}</span>}</NodeHeadContextMenu>}
         subtitle={t('addNode.comment')}
         icon={<i className="i-codicon:note" />}
         selected={selected}

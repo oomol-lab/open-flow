@@ -72,6 +72,11 @@ export interface Flow {
   readonly version: 1
 }
 
+export interface PublicationPresentation {
+  readonly version: 1
+  readonly presentation: Presentation | null
+}
+
 export interface Presentation {
   readonly revision: number
   readonly updatedAt: string
@@ -287,6 +292,7 @@ export interface DraftSync {
 }
 
 export interface Publication {
+  readonly liveEnd?: { readonly enabled: boolean; readonly endedAt: string }
   readonly actorId: string
   readonly closureDigest: string
   readonly createdAt: string
@@ -842,6 +848,12 @@ export class ControlClient {
     if (result.flow.flowId != flowId || result.draft.flowId != flowId || result.live.flowId != flowId || result.flow.draftRevisionId != result.draft.revisionId)
       return invalidResponse()
     return result
+  }
+
+  async getPublicationPresentation(flowId: string, publicationId: string, signal?: AbortSignal): Promise<PublicationPresentation> {
+    const source = record(await this.request(`/v1/flows/${segment(flowId)}/publications/${segment(publicationId)}/presentation`, { signal }))
+    if (source.version != 1) return invalidResponse()
+    return { version: 1, presentation: source.presentation === null ? null : presentation(source.presentation) }
   }
 
   async getPresentation(flowId: string): Promise<Presentation> {

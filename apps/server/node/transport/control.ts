@@ -460,6 +460,9 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   app.get('/flows/:flowId/publish-operations/:operationId', (context) =>
     response(200, service.getPublishOperation(context.req.param('flowId'), context.req.param('operationId'))),
   )
+  app.get('/flows/:flowId/publications/:publicationId/presentation', (context) =>
+    response(200, service.getPublicationPresentation(context.req.param('flowId'), context.req.param('publicationId'))),
+  )
   app.get('/flows/:flowId/presentation', (context) => response(200, service.getPresentation(context.req.param('flowId'))))
   app.put('/flows/:flowId/presentation', async (context) => {
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.updatePresentation)

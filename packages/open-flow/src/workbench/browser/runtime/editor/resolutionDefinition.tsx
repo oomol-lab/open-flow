@@ -14,7 +14,7 @@ export function ResolutionDefinition({
 }: {
   readonly disabled: boolean
   readonly selection: Extract<ResolvedNode, { readonly kind: 'approval' | 'wait' }>
-  readonly store: WorkspaceStore
+  readonly store?: WorkspaceStore
 }): ReactElement {
   const t = useTranslate()
   const node = selection.node
@@ -25,13 +25,14 @@ export function ResolutionDefinition({
     setError(undefined)
   }, [node])
   const save = async (text = prompt): Promise<void> => {
+    if (disabled || store == null) return
     const value = text.trim()
     if (value.length == 0 || [...value].length > 1000) {
       setError(t('inspector.wait.promptError'))
       return
     }
     setError(undefined)
-    await store.saveResolution(selection.id, { name: node.name, prompt: value })
+    await store?.saveResolution(selection.id, { name: node.name, prompt: value })
   }
   return (
     <form

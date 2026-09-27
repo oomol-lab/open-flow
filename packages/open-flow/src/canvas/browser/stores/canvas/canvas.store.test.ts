@@ -307,3 +307,47 @@ describe('CanvasStore layout', () => {
     setup.dispose()
   })
 })
+
+it('allows inspection and temporary movement while rejecting all read-only graph mutations', async () => {
+  const write = vi.fn()
+  const store = new CanvasStore(
+    {
+      nodes: [{ id: 'value', kind: 'value', title: 'Value', inputs: [], outputs: [], values: [], position: { x: 10, y: 20 } }],
+      edges: [],
+      viewport: { x: 0, y: 0, zoom: 1 },
+    },
+    false,
+    'en',
+    {
+      onMoveNodes: vi.fn(),
+      onAddNode: write,
+      onDeleteNodes: write,
+      onConnect: write,
+      onDisconnect: write,
+      onDuplicate: write,
+      onIgnoreNodes: write,
+      onPaste: write,
+      onChangeComment: write,
+      onChangeNodeContentHidden: write,
+    },
+  )
+  try {
+    const node = store.$.nodes.get('value' as NodeId)!
+    await store.handleNodesChange([
+      { type: 'select', id: node.rfNodeId, selected: true },
+      { type: 'position', id: node.rfNodeId, position: { x: 100, y: 200 } },
+    ])
+    expect(node.$.selected.value).toBe(true)
+    expect(node.$.position.value).toEqual({ x: 100, y: 200 })
+    await store.deleteNodes([node], true)
+    await store.onDuplicate(['value' as NodeId])
+    await store.addNode('value', { x: 0, y: 0 })
+    store.onPaste()
+    store.ignoreNodes(['value'], true)
+    store.changeNodeContentHidden('value', true)
+    expect(store.$.nodes.has('value' as NodeId)).toBe(true)
+    expect(write).not.toHaveBeenCalled()
+  } finally {
+    store.dispose()
+  }
+})

@@ -3,9 +3,13 @@ import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { val } from 'value-enhancer'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createI18n } from '../i18n.ts'
 import { PublicationsView } from './publicationsView.tsx'
+
+vi.mock('../editor/revisionCanvas.tsx', () => ({
+  RevisionCanvas: ({ draft, label }: { draft: { revisionId: string }; label: string }) => <section aria-label={label} data-revision={draft.revisionId} />,
+}))
 
 function renderState({ failedLoad = false, failedPublish = false, published = false, loading = false, initial = false } = {}) {
   const publication = { publicationId: 'publication-current', revisionId: 'revision-published' }
@@ -16,6 +20,7 @@ function renderState({ failedLoad = false, failedPublish = false, published = fa
         flowId: val('flow'),
         targetFlow: val({ flowId: 'flow', name: 'Customer onboarding', status: 'active' }),
         draft: val({ revisionId: 'revision-draft' }),
+        presentation: val({ revision: 1, value: {}, version: 1 }),
         revision: val(undefined),
       },
     },
@@ -62,6 +67,20 @@ function renderState({ failedLoad = false, failedPublish = false, published = fa
 }
 
 describe('PublicationsView state semantics', () => {
+  it('keeps publishing guidance in Draft without exposing Live operations', () => {
+    const markup = renderState({ published: true })
+    expect(markup).toContain('Draft</h2>')
+    expect(markup).toContain('Edit draft')
+    expect(markup).toContain('aria-label="Publish preview"')
+    expect(markup).toContain('data-revision="revision-draft"')
+    expect(markup).not.toContain('View current publication')
+    expect(markup).toContain('Publish to Live')
+    expect(markup).toContain('Unpublished changes')
+    expect(markup).not.toContain('Live Triggers')
+    expect(markup).not.toContain('role="switch"')
+    expect(markup).not.toContain('Current Live</h2>')
+  })
+
   it('distinguishes history load failure from an unpublished flow', () => {
     const markup = renderState({ failedLoad: true })
     expect(markup).toContain('could not be loaded')

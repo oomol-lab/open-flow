@@ -1,6 +1,7 @@
 import type { ConnectorAccess, ConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 
 import { expect, it, onTestFinished } from 'vitest'
+import { publication as publicationView } from '../node/application/control-views.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 
@@ -212,4 +213,103 @@ it('preserves explicit publication model version metadata', () => {
   store.integrations.markCandidateReady(integration, 1_000)
   expect(store.publications.publish({ ...input, metadata: { actorId: 'operator', operation: 'publish', modelVersion: 7 } }).kind).toBe('published')
   expect(store.publications.live('flow')?.publication.modelVersion).toBe(7)
+})
+
+it('freezes the presentation at acceptance, including replay and asynchronous activation', () => {
+  const { store, database, input, poll, integration } = fixture()
+  const acceptedInput = JSON.parse(
+    String(database.prepare('SELECT input_json FROM publish_operations WHERE operation_id = ?').get(input.operationId)!.input_json),
+  )
+  expect(acceptedInput.presentationSnapshot).toEqual({ version: 1, revision: 1, updatedAt: new Date(1_000).toISOString(), value: {} })
+  store.flows.updatePresentation('flow', 1, { changed: true }, 2_000)
+  expect(store.publications.acceptPublishOperation(input).kind).toBe('accepted')
+  expect(
+    JSON.parse(String(database.prepare('SELECT input_json FROM publish_operations WHERE operation_id = ?').get(input.operationId)!.input_json))
+      .presentationSnapshot,
+  ).toEqual(acceptedInput.presentationSnapshot)
+  store.integrations.markCandidateReady(integration, 2_000)
+  store.polls.completeCandidate(poll, '{}', false, 2_000)
+  const result = store.publications.publish(input)
+  expect(result.kind).toBe('published')
+  if (result.kind !== 'published') throw new Error('Not published')
+  expect(store.publications.presentation('flow', result.publicationId)).toEqual(acceptedInput.presentationSnapshot)
+  database.prepare('UPDATE publications SET presentation_snapshot = NULL WHERE publication_id = ?').run(result.publicationId)
+  expect(store.publications.presentation('flow', result.publicationId)).toBeNull()
+})
+
+it.each(['saved', 'null', 'missing'] as const)('uses the durable %s presentation snapshot when activating an operation', (snapshot) => {
+  const { store, database, input, poll, integration } = fixture()
+  const accepted = JSON.parse(String(database.prepare('SELECT input_json FROM publish_operations WHERE operation_id = ?').get(input.operationId)!.input_json))
+  const expected = snapshot === 'saved' ? accepted.presentationSnapshot : null
+  if (snapshot === 'null') accepted.presentationSnapshot = null
+  if (snapshot === 'missing') delete accepted.presentationSnapshot
+  database.prepare('UPDATE publish_operations SET input_json = ? WHERE operation_id = ?').run(JSON.stringify(accepted), input.operationId)
+  store.flows.updatePresentation('flow', 1, { changed: true }, 2_000)
+  store.integrations.markCandidateReady(integration, 2_000)
+  store.polls.completeCandidate(poll, '{}', false, 2_000)
+  // Even a stale deserialized payload cannot replace the operation's frozen layout.
+  const activation = { ...input, presentationSnapshot: { version: 1, revision: 99, updatedAt: '', value: { stale: true } } }
+  const result = store.publications.publish(activation)
+  if (result.kind !== 'published') throw new Error('Not published')
+  expect(store.publications.presentation('flow', result.publicationId)).toEqual(expected)
+})
+
+it.each([true, false])('inherits the rollback source presentation without changing Draft (legacy=%s)', (legacy) => {
+  const { store, database, input } = fixture()
+  const direct = { ...input, operationId: undefined, integrations: [], polls: [] }
+  store.flows.updatePresentation('flow', 1, { original: true }, 2_000)
+  const first = store.publications.publish(direct)
+  if (first.kind !== 'published') throw new Error('Not published')
+  if (legacy) database.prepare('UPDATE publications SET presentation_snapshot = NULL WHERE publication_id = ?').run(first.publicationId)
+  const source = store.publications.presentation('flow', first.publicationId)
+  expect(source?.value ?? null).toEqual(legacy ? null : { original: true })
+  store.flows.updatePresentation('flow', 2, { changed: true }, 3_000)
+  const draft = store.flows.presentation('flow')
+  const rollback = store.publications.publish({
+    ...direct,
+    expectedLivePublicationId: first.publicationId,
+    idempotencyKey: 'rollback-layout',
+    requestDigest: 'rollback-layout',
+    metadata: { actorId: 'operator', modelVersion: 2, operation: 'rollback', sourcePublicationId: first.publicationId },
+  })
+  if (rollback.kind !== 'published') throw new Error('Rollback failed')
+  expect(store.publications.presentation('flow', rollback.publicationId)).toEqual(source)
+  expect(store.flows.presentation('flow')).toEqual(draft)
+})
+
+it.each([true, false])('records Live end state atomically for publish and rollback (enabled=%s)', (enabled) => {
+  const { database, store, input, poll, integration } = fixture()
+  store.polls.completeCandidate(poll, '{}', false, 1_000)
+  store.integrations.markCandidateReady(integration, 1_000)
+  const seed = { ...input, operationId: undefined, polls: [], integrations: [], idempotencyKey: 'first', requestDigest: 'first' }
+  const first = store.publications.publish(input)
+  if (first.kind != 'published') throw new Error('First publication failed')
+  expect(store.publications.publication('flow', first.publicationId)).toMatchObject({ liveEndedAt: null, liveEnabledAtEnd: null })
+  const next = { ...seed, expectedLivePublicationId: first.publicationId, idempotencyKey: 'next', requestDigest: 'next', publishedAt: 2_000 }
+  const accepted = store.publications.acceptPublishOperation(next)
+  if (accepted.kind != 'accepted') throw new Error('Next publication not accepted')
+  database.prepare('UPDATE flow_live SET enabled = ? WHERE flow_id = ?').run(Number(enabled), 'flow')
+  database.exec(`CREATE TRIGGER fail_live BEFORE UPDATE ON flow_live BEGIN SELECT RAISE(ABORT, 'rejected'); END`)
+  expect(() => store.publications.publish({ ...next, operationId: accepted.operation.operationId })).toThrow('rejected')
+  expect(store.publications.publication('flow', first.publicationId)).toMatchObject({ liveEndedAt: null, liveEnabledAtEnd: null })
+  database.exec('DROP TRIGGER fail_live')
+  const second = store.publications.publish({ ...next, operationId: accepted.operation.operationId })
+  if (second.kind != 'published') throw new Error('Next publication failed')
+  expect(store.publications.publication('flow', first.publicationId)).toMatchObject({ liveEndedAt: 2_000, liveEnabledAtEnd: Number(enabled) })
+  expect(publicationView(store.publications.publication('flow', first.publicationId)!).liveEnd).toEqual({ enabled, endedAt: new Date(2_000).toISOString() })
+  database.prepare('UPDATE flow_live SET enabled = ? WHERE flow_id = ?').run(Number(!enabled), 'flow')
+  const rollback = store.publications.publish({
+    ...seed,
+    expectedLivePublicationId: second.publicationId,
+    idempotencyKey: 'back',
+    requestDigest: 'back',
+    publishedAt: 3_000,
+    metadata: { actorId: 'operator', modelVersion: 2, operation: 'rollback', sourcePublicationId: first.publicationId },
+  })
+  if (rollback.kind != 'published') throw new Error('Rollback failed')
+  expect(store.publications.publication('flow', second.publicationId)).toMatchObject({ liveEndedAt: 3_000, liveEnabledAtEnd: Number(!enabled) })
+  expect(store.publications.publication('flow', rollback.publicationId)).toMatchObject({ liveEndedAt: null, liveEnabledAtEnd: null })
+  store.publications.publish({ ...next, operationId: accepted.operation.operationId, publishedAt: 4_000 })
+  expect(store.publications.publication('flow', first.publicationId)).toMatchObject({ liveEndedAt: 2_000, liveEnabledAtEnd: Number(enabled) })
+  expect(store.publications.publication('flow', second.publicationId)).toMatchObject({ liveEndedAt: 3_000, liveEnabledAtEnd: Number(!enabled) })
 })

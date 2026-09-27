@@ -4,12 +4,12 @@ import type { TriggerActivityKind, TriggerBinding } from '../api.ts'
 import type { RevisionView } from '../revisionView.ts'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 
-import { Fragment, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { Dialog, DialogContent, DialogTitle } from '../../../../ui/browser/dialog.tsx'
 import { collapseAllNested, JSONViewer } from '../../../../ui/browser/json-viewer/index.ts'
-import { Icon } from '../icons.tsx'
 
 function triggerLabel(binding: TriggerBinding, t: TFunction): string {
   if (binding.currentPublicationId == null) return t('publication.retired')
@@ -110,197 +110,218 @@ export function LiveTriggers({ store }: { readonly store: WorkbenchStore }): Rea
   const revision = useVal(store.workspace.$.revision)
   const [copiedEndpoint, setCopiedEndpoint] = useState<string>()
   useEffect(() => setCopiedEndpoint(undefined), [detail?.binding.endpointUrl])
+  const [root, setRoot] = useState<HTMLElement | null>(null)
+  const opener = useRef<HTMLButtonElement | null>(null)
+  const portal = useCallback((element: HTMLElement | null) => setRoot(element?.closest<HTMLElement>('.open-flow-workbench') ?? null), [])
+  useEffect(() => () => store.publications.closeTrigger(), [store])
+  const selected = bindings.find((binding) => binding.triggerNodeId == selectedTriggerId)
   return (
-    <section className="publication-triggers">
-      <header>
-        <div>
-          <h2>{t('publication.triggers')}</h2>
-          <span>{t('publication.triggerDescription')}</span>
-        </div>
+    <section className="publication-triggers" ref={portal} aria-label={t('publication.triggers')}>
+      <header className="trigger-list-header">
+        <h3>{t('publication.triggers')}</h3>
       </header>
       {bindings.length == 0 ? (
-        <div className="publication-trigger-empty">{t('publication.triggerEmpty')}</div>
+        <p className="publication-trigger-empty">{t('publication.triggerEmpty')}</p>
       ) : (
-        <div className="trigger-binding-list">
+        <ul className="trigger-binding-list">
           {bindings.map((binding) => {
             const changing = changingTriggerId == binding.triggerNodeId
-            const selected = selectedTriggerId == binding.triggerNodeId
             const resumable = binding.operatorState == 'paused'
             return (
-              <Fragment key={binding.triggerNodeId}>
-                <div className="trigger-binding-row">
-                  <Button
-                    aria-expanded={selected}
-                    className="trigger-binding-summary"
-                    onClick={() => (selected ? store.publications.closeTrigger() : void store.publications.openTrigger(binding.triggerNodeId))}
-                    type="button"
-                    variant="ghost"
-                  >
-                    <span className={`status-dot ${triggerClass(binding)}`} />
-                    <strong title={binding.triggerNodeId}>{triggerName(binding, revision)}</strong>
-                    <TriggerStatus binding={binding} />
-                    <code className="trigger-binding-kind">{binding.kind}</code>
-                    <span className="trigger-binding-detail-label">{t(selected ? 'publication.hideTriggerDetails' : 'publication.triggerDetails')}</span>
-                    <Icon name={selected ? 'chevron-up' : 'chevron-down'} />
+              <li className="trigger-binding-row" key={binding.triggerNodeId}>
+                <Button
+                  className="trigger-binding-open"
+                  aria-haspopup="dialog"
+                  onClick={(event) => {
+                    opener.current = event.currentTarget
+                    void store.publications.openTrigger(binding.triggerNodeId)
+                  }}
+                  variant="ghost"
+                  size="sm"
+                >
+                  <span className={`status-dot mr-1 ${triggerClass(binding)}`} />
+                  <span className="trigger-binding-name" title={binding.triggerNodeId}>
+                    {triggerName(binding, revision)}
+                  </span>
+                  <span className="trigger-binding-kind">{binding.kind}</span>
+                </Button>
+                <TriggerStatus binding={binding} />
+                {binding.currentPublicationId != null && (
+                  <Button disabled={busy != null} onClick={() => void store.publications.toggleTrigger(binding)} size="sm" variant="outline">
+                    {t(
+                      changing
+                        ? resumable
+                          ? 'publication.resumingTrigger'
+                          : 'publication.pausingTrigger'
+                        : resumable
+                          ? 'publication.resumeTrigger'
+                          : 'publication.pauseTrigger',
+                    )}
                   </Button>
-                  {binding.currentPublicationId != null && (
-                    <Button disabled={busy != null} onClick={() => void store.publications.toggleTrigger(binding)} size="sm" variant="outline">
-                      {t(
-                        changing
-                          ? resumable
-                            ? 'publication.resumingTrigger'
-                            : 'publication.pausingTrigger'
-                          : resumable
-                            ? 'publication.resumeTrigger'
-                            : 'publication.pauseTrigger',
-                      )}
-                    </Button>
-                  )}
-                </div>
-                {selected && (
-                  <div className="trigger-binding-detail">
-                    {detailLoading ? (
-                      <div className="publication-trigger-empty">{t('publication.loadingTrigger')}</div>
-                    ) : detail != null ? (
-                      <>
-                        <dl>
-                          <div>
-                            <dt>{t('publication.triggerKind')}</dt>
-                            <dd>{detail.binding.kind}</dd>
-                          </div>
-                          <div>
-                            <dt>{t('publication.runtimeVersion')}</dt>
-                            <dd>{detail.binding.runtimeVersion}</dd>
-                          </div>
-                          <div>
-                            <dt>{t('publication.triggerHealth')}</dt>
-                            <dd>{triggerLabel(detail.binding, t)}</dd>
-                          </div>
-                          <div>
-                            <dt>{t('publication.operatorState')}</dt>
-                            <dd>
-                              <span>{t(detail.binding.operatorState == 'paused' ? 'publication.suspended' : 'publication.active')}</span>{' '}
-                              <code>{detail.binding.operatorState}</code>
-                            </dd>
-                          </div>
-                          <div>
-                            <dt>{t('publication.updatedAt')}</dt>
-                            <dd>{new Date(detail.binding.updatedAt).toLocaleString(language)}</dd>
-                          </div>
-                          {detail.binding.lastErrorCode != null && (
-                            <div>
-                              <dt>{t('publication.lastError')}</dt>
-                              <dd>{detail.binding.lastErrorCode}</dd>
-                            </div>
-                          )}
-                        </dl>
-                        <ListenerHealth binding={detail.binding} />
-                        {detail.binding.health == 'needs_reauth' && <p className="trigger-recovery">{t('publication.needsReauthDescription')}</p>}
-                        {detail.binding.endpointUrl != null && (
-                          <div className="trigger-webhook">
-                            <span>{t('publication.webhookUrl')}</span>
-                            <div>
-                              <code title={detail.binding.endpointUrl}>{detail.binding.endpointUrl}</code>
-                              <Button
-                                onClick={async () => {
-                                  await navigator.clipboard.writeText(detail.binding.endpointUrl!)
-                                  setCopiedEndpoint(detail.binding.endpointUrl)
-                                }}
-                                size="sm"
-                                variant="outline"
-                              >
-                                {t(copiedEndpoint == detail.binding.endpointUrl ? 'publication.webhookCopied' : 'publication.webhookCopy')}
-                              </Button>
-                            </div>
-                          </div>
-                        )}
-                        <div className="trigger-binding-detail-sections">
-                          {detail.binding.kind == 'poll' && detail.binding.currentPublicationId != null && (
-                            <section className="trigger-test">
-                              <header>
-                                <div>
-                                  <h3>{t('publication.pollTest')}</h3>
-                                  <p>{t('publication.pollTestDescription')}</p>
-                                </div>
-                                <Button disabled={testingTriggerId != null} onClick={() => void store.publications.testTrigger()} size="sm" variant="outline">
-                                  {t(testingTriggerId == detail.binding.triggerNodeId ? 'publication.pollTesting' : 'publication.pollTest')}
-                                </Button>
-                              </header>
-                              {testResult != null && (
-                                <div className="trigger-test-result">
-                                  <strong>{t('publication.pollTestResult')}</strong>
-                                  <div className="trigger-test-summary">
-                                    <span>{t('publication.pollTestEvents', { count: testResult.events.length })}</span>
-                                    <span>{t('publication.pollTestFiltered', { count: testResult.filtered })}</span>
-                                    {testResult.hasMore && <span>{t('publication.pollTestHasMore')}</span>}
-                                  </div>
-                                  {testResult.events.length == 0 ? (
-                                    <p>{t('publication.pollTestNoEvents')}</p>
-                                  ) : (
-                                    <div className="trigger-test-events">
-                                      <JSONViewer data={testResult.events} shouldExpandNode={collapseAllNested} />
-                                    </div>
-                                  )}
-                                </div>
-                              )}
-                            </section>
-                          )}
-                          <section className="trigger-activities">
-                            <h3>{t('publication.activities')}</h3>
-                            <p className="trigger-activities-description">{t('publication.activitiesDescription')}</p>
-                            {activitiesLoading ? (
-                              <div className="trigger-activities-empty">{t('publication.loadingTriggerActivities')}</div>
-                            ) : activities.length == 0 ? (
-                              <div className="trigger-activities-empty">
-                                {t(activitiesLoadFailed ? 'publication.activitiesLoadFailed' : 'publication.activitiesEmpty')}
-                              </div>
-                            ) : (
-                              <div className="trigger-activity-list">
-                                {activities.map((activity) => (
-                                  <div className="trigger-activity" key={activity.activityId}>
-                                    <span className="status-dot neutral" />
-                                    <div>
-                                      <strong>{activityLabel(activity.kind, t)}</strong>
-                                      {activity.errorCode != null && <code>{activity.errorCode}</code>}
-                                      {activity.errorMessage != null && <p className="trigger-activity-message">{activity.errorMessage}</p>}
-                                    </div>
-                                    <time dateTime={activity.createdAt}>{new Date(activity.createdAt).toLocaleString(language)}</time>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-                            {(activitiesNextCursor != null || activitiesLoadFailed) && !activitiesLoading && (
-                              <Button
-                                className="trigger-activities-more"
-                                disabled={activitiesLoadingMore}
-                                onClick={() =>
-                                  void (activitiesNextCursor == null
-                                    ? store.publications.openTrigger(detail.binding.triggerNodeId)
-                                    : store.publications.loadMoreTriggerActivities())
-                                }
-                                size="sm"
-                                variant="outline"
-                              >
-                                {t(
-                                  activitiesLoadingMore
-                                    ? 'publication.loadingTriggerActivities'
-                                    : activitiesLoadFailed
-                                      ? 'empty.retry'
-                                      : 'publication.loadMoreActivities',
-                                )}
-                              </Button>
-                            )}
-                          </section>
-                        </div>
-                      </>
-                    ) : null}
-                  </div>
                 )}
-              </Fragment>
+              </li>
             )
           })}
-        </div>
+        </ul>
       )}
+      <Dialog
+        open={selectedTriggerId != null}
+        onOpenChange={(open) => {
+          if (!open) store.publications.closeTrigger()
+        }}
+      >
+        <DialogContent
+          container={root}
+          finalFocus={opener}
+          closeLabel={t('common.close')}
+          className="flex max-h-[85dvh] flex-col overflow-hidden sm:max-w-[min(42rem,calc(100%-2rem))]"
+        >
+          <DialogTitle className="pr-8 break-words">{selected == null ? selectedTriggerId : triggerName(selected, revision)}</DialogTitle>
+          <div className="trigger-binding-detail">
+            {detailLoading ? (
+              <p role="status">{t('publication.loadingTrigger')}</p>
+            ) : detail != null ? (
+              <>
+                <dl>
+                  <div>
+                    <dt>{t('publication.triggerKind')}</dt>
+                    <dd>{detail.binding.kind}</dd>
+                  </div>
+                  <div>
+                    <dt>{t('publication.runtimeVersion')}</dt>
+                    <dd>{detail.binding.runtimeVersion}</dd>
+                  </div>
+                  <div>
+                    <dt>{t('publication.triggerHealth')}</dt>
+                    <dd>{triggerLabel(detail.binding, t)}</dd>
+                  </div>
+                  <div>
+                    <dt>{t('publication.operatorState')}</dt>
+                    <dd>{t(detail.binding.operatorState == 'paused' ? 'publication.suspended' : 'publication.active')}</dd>
+                  </div>
+                  <div>
+                    <dt>{t('publication.updatedAt')}</dt>
+                    <dd>{new Date(detail.binding.updatedAt).toLocaleString(language)}</dd>
+                  </div>
+                  {detail.binding.lastErrorCode != null && (
+                    <div>
+                      <dt>{t('publication.lastError')}</dt>
+                      <dd>{detail.binding.lastErrorCode}</dd>
+                    </div>
+                  )}
+                </dl>
+                <ListenerHealth binding={detail.binding} />
+                {detail.binding.health == 'needs_reauth' && <p className="trigger-recovery">{t('publication.needsReauthDescription')}</p>}
+                {detail.binding.endpointUrl != null && (
+                  <div className="trigger-webhook">
+                    <span>{t('publication.webhookUrl')}</span>
+                    <div>
+                      <code title={detail.binding.endpointUrl}>{detail.binding.endpointUrl}</code>
+                      <Button
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(detail.binding.endpointUrl!)
+                          setCopiedEndpoint(detail.binding.endpointUrl)
+                        }}
+                        size="sm"
+                        variant="outline"
+                      >
+                        {t(copiedEndpoint == detail.binding.endpointUrl ? 'publication.webhookCopied' : 'publication.webhookCopy')}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                <div className="trigger-binding-detail-sections">
+                  {detail.binding.kind == 'poll' && detail.binding.currentPublicationId != null && (
+                    <section className="trigger-test">
+                      <header>
+                        <div>
+                          <h3>{t('publication.pollTest')}</h3>
+                          <p>{t('publication.pollTestDescription')}</p>
+                        </div>
+                        <Button disabled={testingTriggerId != null} onClick={() => void store.publications.testTrigger()} size="sm" variant="outline">
+                          {t(testingTriggerId == detail.binding.triggerNodeId ? 'publication.pollTesting' : 'publication.pollTest')}
+                        </Button>
+                      </header>
+                      {testResult != null && (
+                        <div className="trigger-test-result">
+                          <strong>{t('publication.pollTestResult')}</strong>
+                          <div className="trigger-test-summary">
+                            <span>{t('publication.pollTestEvents', { count: testResult.events.length })}</span>
+                            <span>{t('publication.pollTestFiltered', { count: testResult.filtered })}</span>
+                            {testResult.hasMore && <span>{t('publication.pollTestHasMore')}</span>}
+                          </div>
+                          {testResult.events.length == 0 ? (
+                            <p>{t('publication.pollTestNoEvents')}</p>
+                          ) : (
+                            <div className="trigger-test-events">
+                              <JSONViewer data={testResult.events} shouldExpandNode={collapseAllNested} />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </section>
+                  )}
+                  <section className="trigger-activities">
+                    <h3>{t('publication.activities')}</h3>
+                    {activitiesLoading ? (
+                      <div className="trigger-activities-empty">{t('publication.loadingTriggerActivities')}</div>
+                    ) : activities.length == 0 ? (
+                      <div className="trigger-activities-empty">
+                        {t(activitiesLoadFailed ? 'publication.activitiesLoadFailed' : 'publication.activitiesEmpty')}
+                      </div>
+                    ) : (
+                      <div className="trigger-activity-list">
+                        {activities.map((activity) => (
+                          <div className="trigger-activity" key={activity.activityId}>
+                            <span className="status-dot neutral" />
+                            <div>
+                              <strong>{activityLabel(activity.kind, t)}</strong>
+                              {activity.errorCode != null && <code>{activity.errorCode}</code>}
+                              {activity.errorMessage != null && <p className="trigger-activity-message">{activity.errorMessage}</p>}
+                            </div>
+                            <time dateTime={activity.createdAt}>{new Date(activity.createdAt).toLocaleString(language)}</time>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {(activitiesNextCursor != null || activitiesLoadFailed) && !activitiesLoading && (
+                      <Button
+                        className="trigger-activities-more"
+                        disabled={activitiesLoadingMore}
+                        onClick={() =>
+                          void (activitiesNextCursor == null
+                            ? store.publications.openTrigger(detail.binding.triggerNodeId)
+                            : store.publications.loadMoreTriggerActivities())
+                        }
+                        size="sm"
+                        variant="outline"
+                      >
+                        {t(
+                          activitiesLoadingMore
+                            ? 'publication.loadingTriggerActivities'
+                            : activitiesLoadFailed
+                              ? 'empty.retry'
+                              : 'publication.loadMoreActivities',
+                        )}
+                      </Button>
+                    )}
+                  </section>
+                </div>
+              </>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (selectedTriggerId != null) void store.publications.openTrigger(selectedTriggerId)
+                }}
+              >
+                {t('empty.retry')}
+              </Button>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   )
 }

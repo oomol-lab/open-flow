@@ -33,7 +33,7 @@ Revision。Draft 同步只返回当前完整 Revision snapshot，不提供持久
 不可变约束适用于仍保留的 Revision 内容；Server 可以将草稿正文存为基于父版本的有界增量，读取时还原并校验 digest，对外仍返回完整快照。Run 和 Publish operation 准入时将固定版本物化为完整正文。旧内容可按 Server 的保留策略清理，但 Run 结果与 Draft change 幂等记录不依赖被清理的内容。
 
 Presentation 独立保存布局、viewport 和 Comment 等展示状态；每个 Flow 或 Subflow 图只有一个画布和 viewport，节点配置由侧栏承载。Presentation
-不进入 Revision digest，也不影响 validation、Run、Publication 或 Live。
+不进入 Revision digest，也不影响 validation、Run 或 Live 的执行语义。Publication 在首次接受发布操作时固定已保存的 Presentation，随异步操作持久化，成功后作为不可变展示快照提供独立读取；回滚继承来源 Publication 的快照而不修改草稿布局。旧 Publication 缺少快照时，历史查看使用自动布局。历史查看的节点移动和视口只属于查看会话，不进入保存与撤销历史。
 Task 的端口分组随有序端口定义保存在 Revision 并参与 digest；分组不创建语义端口，也不参与连接、validation 或 Run。
 Revision 不保存 credential、Run、Engine IR、Provider 状态或部署缓存。
 
@@ -303,3 +303,5 @@ Callback response 不能在承载 Workbench 或 Control API 的 origin 上成为
 ## 浏览器目录数据
 
 Workbench 的 Providers、Actions、Connections、Triggers 数据分别由所属 Store 管理。Store 对外提供稳定的只读 Val，拥有刷新协调、ETag 和持久化；传输层保持无状态。业务访问触发刷新条件检查，消费者订阅实际数据变化，不使用 URL 缓存或 revision 通知计数。Actions 详情从按 provider 缓存的完整目录派生，浏览器目录不按 Flow 已选授权过滤；未授权仍可读取定义以编辑 Draft，连接状态在消费处组合。浏览器业务通过静态边界检查限制为从 Store 访问这些数据。存储位置与刷新间隔见 [Control API 契约](control/contracts/control-api.md)。
+
+Publication 被替换时，在切换 Live 的事务中固定 `liveEnd`（结束时间与切换前启用状态）。它不包含 Trigger 健康状态；当前版本和迁移前未记录的历史版本无此快照。回滚创建独立 Publication，其结束状态从空值开始。

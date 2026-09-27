@@ -32,6 +32,15 @@ function find(element: ReactElement, predicate: (item: ReactElement) => boolean)
   }
 }
 
+function renderCodeSection(props: Parameters<typeof CodeTaskSection>[0]): ReactElement {
+  let element = CodeTaskSection(props)
+  while (element != null && typeof element.type === 'function' && ['EditableCodeTaskSection', 'CodeTaskFrame'].includes(element.type.name)) {
+    element = (element.type as (props: unknown) => ReactElement)(element.props)
+  }
+  if (element == null) throw new Error('Expected Code section.')
+  return element
+}
+
 function resolutionDefinition(
   node: { readonly kind: 'approval' | 'wait' } & Readonly<Record<string, unknown>>,
   revision: unknown,
@@ -349,7 +358,7 @@ describe('Code task sections', () => {
   it.each(['shared', 'independent'] as const)('loads %s action metadata only when completion requests it', async (mode) => {
     const data = val({ data: [{ actionId: 'public.echo', serviceId: 'public', authenticated: false }], refreshing: false, error: undefined })
     const actions = vi.fn(() => data)
-    const rendered = CodeTaskSection({
+    const rendered = renderCodeSection({
       connectors: { $: { actions: { value: {} }, connections: { value: [] }, catalogs: { value: {} } } } as never,
       disabled: false,
       selection: {
@@ -394,7 +403,7 @@ describe('Code task sections', () => {
 
   it.each(['independent', 'shared', 'missing'] as const)('saves selected action/account pairs from %s Code configuration', async (mode) => {
     const setCodeActions = vi.fn().mockResolvedValue(true)
-    const rendered = CodeTaskSection({
+    const rendered = renderCodeSection({
       connectors: { $: { actions: { value: {} }, connections: { value: [] }, catalogs: { value: {} } } } as never,
       disabled: false,
       selection: {
@@ -473,11 +482,11 @@ describe('Code task sections', () => {
     })
     const task = find(element, (item) => typeof item.type == 'function' && item.type.name == 'CodeTaskSection')
     if (task == null || typeof task.type != 'function') throw new Error('Expected task definition.')
-    const rendered = (task.type as (props: unknown) => ReactElement)(task.props)
+    const rendered = renderCodeSection(task.props)
     const actionsButton = (section: ReactElement) =>
       find(section, (item) => typeof item.type == 'function' && item.type.name == 'ActionSelectionDialog')?.props.trigger
     expect(actionsButton(rendered)?.props.variant).toBe('ghost')
-    const actionError = (task.type as (props: unknown) => ReactElement)({
+    const actionError = renderCodeSection({
       ...task.props,
       diagnostics: [
         {
@@ -493,7 +502,7 @@ describe('Code task sections', () => {
     const feedback = find(rendered, (item) => typeof item.type == 'function' && item.type.name == 'ValueEditorFeedback')
     expect(feedback?.props.error[0].props.children).toBe('Invalid JavaScript syntax.')
     expect(feedback?.props.children('syntax-error').props).toMatchObject({ ariaDescribedBy: 'syntax-error', invalid: true })
-    const valid = (task.type as (props: unknown) => ReactElement)({ ...task.props, diagnostics: diagnostics.slice(1) })
+    const valid = renderCodeSection({ ...task.props, diagnostics: diagnostics.slice(1) })
     const validFeedback = find(valid, (item) => typeof item.type == 'function' && item.type.name == 'ValueEditorFeedback')
     expect(validFeedback?.props.error).toBeUndefined()
     expect(validFeedback?.props.children(undefined).props.invalid).toBe(false)
@@ -511,7 +520,7 @@ describe('Code task sections', () => {
     expect(find(rendered, (item) => item.props.className == 'form-actions code-actions')).toBeUndefined()
 
     moduleEditor.value = { ...moduleEditor.value, status: 'failed' }
-    const failed = (task.type as (props: unknown) => ReactElement)(task.props)
+    const failed = renderCodeSection(task.props)
     expect(find(failed, (item) => item.props.className == 'form-actions code-actions')).toBeDefined()
     expect(find(failed, (item) => item.props.role == 'status')).toBeUndefined()
   })

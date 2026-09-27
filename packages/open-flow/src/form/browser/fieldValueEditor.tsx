@@ -35,6 +35,8 @@ import { ValueTools } from './valueTools.tsx'
 import { DataTypeAddon } from './valueTypeAddon.tsx'
 
 export interface FieldValueEditorProps extends ValueControlProps, FieldRowPresentation {
+  /** Inspect values without mutation affordances; disclosure and copying remain available. */
+  readonly readOnly?: boolean
   /** Override only this field’s unset presentation and requiredness, never its children. */
   readonly unset?: { readonly label: string; readonly required: boolean }
   readonly expansionPolicy?: FieldExpansionPolicy
@@ -59,8 +61,9 @@ export interface FieldValueEditorProps extends ValueControlProps, FieldRowPresen
 }
 
 /** Controlled JSON value editing. It has no graph, port, persistence, or theme context. */
-export function FieldValueEditor(props: FieldValueEditorProps) {
+export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
   const sorting = useContext(FieldSorting)
+  const props = suppliedProps.readOnly ? { ...suppliedProps, disabled: true } : suppliedProps
   const { schema, value, onChange, label, nullable, disabled, onDraftIssue, depth = 0 } = props
   const t = useTranslate()
   const id = useId()

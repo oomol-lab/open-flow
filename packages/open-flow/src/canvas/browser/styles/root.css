@@ -67,3 +67,8 @@
   /* Let a connection drag finish over a disabled field. */
   pointer-events: none;
 }
+
+/* Snapshot lock texture belongs to the canvas surface, outside the transformed viewport. */
+.open-flow-canvas-root.open-flow-canvas-locked .react-flow {
+  background-image: repeating-linear-gradient(135deg, transparent 0 6px, var(--canvas-lock-stripe) 6px 8px);
+}

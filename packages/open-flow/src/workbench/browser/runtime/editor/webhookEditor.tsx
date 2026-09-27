@@ -199,12 +199,14 @@ export function WebhookEditor({
   method,
   options,
   disabled,
+  readOnly,
   outputSection,
   onChange,
 }: {
   readonly bodyFields: readonly InputPort[]
   readonly method: WebhookMethod
   readonly options: WebhookOptions
+  readonly readOnly?: boolean
   readonly disabled: boolean
   readonly outputSection?: ReactNode
   readonly onChange: (settings: WebhookSettings, deletion?: PropertyDeletion) => void
@@ -254,6 +256,7 @@ export function WebhookEditor({
           </Field>
           {webhookSupportsBody(method) && (
             <PortDefinitionEditor
+              readOnly={readOnly}
               layout="ports"
               title={t('webhookEditor.webhookBodyFields')}
               emptyMessage={t('webhookEditor.webhookNoBodyFields')}

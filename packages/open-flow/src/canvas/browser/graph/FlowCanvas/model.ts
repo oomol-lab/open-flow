@@ -202,7 +202,7 @@ export interface FlowCanvasViewProps {
     readonly connection?: (nodeId: string) => Omit<FlowCanvasViewEdge, 'id'>
   }) => void
   readonly ignoredNodeIds: readonly string[]
-  readonly onIgnoreNodes: (nodeIds: readonly string[], ignored: boolean) => void
+  readonly onIgnoreNodes?: (nodeIds: readonly string[], ignored: boolean) => void
   readonly cornerTools?: ReactNode
   readonly cornerLeading?: ReactNode
   readonly topLeftTools?: ReactNode
@@ -223,6 +223,9 @@ export interface FlowCanvasViewProps {
   readonly className?: string
   readonly dark?: boolean
   readonly editable: boolean
+  /** Allows session-local movement independently of content editing. Defaults to editable. */
+  readonly nodesDraggable?: boolean
+  readonly fitView?: boolean
   readonly focusNodeRequest?: {
     readonly nodeId: string
     readonly requestId: number
@@ -234,21 +237,21 @@ export interface FlowCanvasViewProps {
   readonly language?: string
   readonly layoutMotion?: boolean
   readonly model: FlowCanvasViewModel
-  readonly onAddNode: (
+  readonly onAddNode?: (
     itemId: string,
     position: FlowCanvasViewPosition,
     connection?: (nodeId: string) => Omit<FlowCanvasViewEdge, 'id'>,
   ) => Promise<string | undefined> | string | undefined
-  readonly onConnect: (edge: Omit<FlowCanvasViewEdge, 'id'>) => void
+  readonly onConnect?: (edge: Omit<FlowCanvasViewEdge, 'id'>) => void
   readonly onChangeNodeContentHidden?: (nodeId: string, hidden: boolean) => void
   readonly onChangeComment?: (nodeId: string, value: { readonly content: string; readonly title: string }) => void
-  readonly onDeleteNodes: (nodeIds: readonly string[]) => void
-  readonly onDisconnect: (edge: FlowCanvasViewEdge) => void
-  readonly onDuplicate: (nodeIds: readonly string[], offset?: FlowCanvasViewPosition, positions?: Readonly<Record<string, FlowCanvasViewPosition>>) => void
+  readonly onDeleteNodes?: (nodeIds: readonly string[]) => void
+  readonly onDisconnect?: (edge: FlowCanvasViewEdge) => void
+  readonly onDuplicate?: (nodeIds: readonly string[], offset?: FlowCanvasViewPosition, positions?: Readonly<Record<string, FlowCanvasViewPosition>>) => void
   readonly onMoveNodes: (positions: Readonly<Record<string, FlowCanvasViewPosition>>) => void
   readonly onMoveViewport: (viewport: FlowCanvasViewViewport) => void
-  readonly onCopy: (nodeIds: readonly string[]) => void
-  readonly onPaste: (position?: FlowCanvasViewPosition) => void
+  readonly onCopy?: (nodeIds: readonly string[]) => void
+  readonly onPaste?: (position?: FlowCanvasViewPosition) => void
   readonly onSelectionChange: (nodeIds: readonly string[], edge: FlowCanvasViewEdge | undefined) => void
   /** Explicit activation also fires when clicking an already selected node. */
   readonly onActivateSelection?: (nodeIds: readonly string[]) => void
@@ -263,17 +266,17 @@ export interface FlowCanvasViewProps {
 }
 
 export interface ViewCallbacks {
-  readonly onIgnoreNodes: FlowCanvasViewProps['onIgnoreNodes']
+  readonly onIgnoreNodes?: FlowCanvasViewProps['onIgnoreNodes']
   readonly onMoveNodes: FlowCanvasViewProps['onMoveNodes']
-  readonly onAddNode: FlowCanvasViewProps['onAddNode']
-  readonly onConnect: FlowCanvasViewProps['onConnect']
+  readonly onAddNode?: FlowCanvasViewProps['onAddNode']
+  readonly onConnect?: FlowCanvasViewProps['onConnect']
   readonly onChangeNodeContentHidden?: FlowCanvasViewProps['onChangeNodeContentHidden']
   readonly onChangeComment: FlowCanvasViewProps['onChangeComment']
-  readonly onDeleteNodes: FlowCanvasViewProps['onDeleteNodes']
-  readonly onDisconnect: FlowCanvasViewProps['onDisconnect']
-  readonly onDuplicate: FlowCanvasViewProps['onDuplicate']
-  readonly onCopy: FlowCanvasViewProps['onCopy']
-  readonly onPaste: FlowCanvasViewProps['onPaste']
+  readonly onDeleteNodes?: FlowCanvasViewProps['onDeleteNodes']
+  readonly onDisconnect?: FlowCanvasViewProps['onDisconnect']
+  readonly onDuplicate?: FlowCanvasViewProps['onDuplicate']
+  readonly onCopy?: FlowCanvasViewProps['onCopy']
+  readonly onPaste?: FlowCanvasViewProps['onPaste']
 }
 
 export function toViewEdge(source: string, sourceHandle: string, target: string, targetHandle: string): FlowCanvasViewEdge {

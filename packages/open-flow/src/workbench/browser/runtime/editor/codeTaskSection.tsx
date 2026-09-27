@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import type { ComponentProps, ReactElement, ReactNode } from 'react'
 import type { ReadonlyVal } from 'value-enhancer'
 import type { ConnectorPermissionCapability } from '../../../../flow/common/change.ts'
 import type { ConnectorAccess, ConnectorAccessCandidates, ConnectorActionMetadata, Diagnostic } from '../api.ts'
@@ -19,6 +19,7 @@ import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { IconStack } from '../../../../ui/browser/icon-stack.tsx'
+import { JSONViewer } from '../../../../ui/browser/json-viewer/JSONViewer.tsx'
 import { Switch } from '../../../../ui/browser/switch.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { actionSummary } from '../actionSummary.ts'
@@ -28,7 +29,7 @@ import { CodeEditor } from './codeEditor.tsx'
 import { codeTyping } from './codeTyping.ts'
 import { diagnosticMessage } from './diagnostics.ts'
 
-export function CodeTaskSection({
+function EditableCodeTaskSection({
   connectorAccess,
   connectorCandidates,
   connectors,
@@ -194,9 +195,7 @@ export function CodeTaskSection({
     return typingFor(Object.fromEntries(Object.entries(completionCatalog.catalog.value).filter(([, action]) => allowSharedAction(action))))
   }
   return module != null && moduleEditor?.moduleId == task.moduleId ? (
-    <form
-      className="inspector-section inspector-titled-section inspector-form code-section"
-      data-inspector-section="module"
+    <CodeTaskFrame
       onKeyDown={(event) => {
         if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() == 's') {
           event.preventDefault()
@@ -208,147 +207,191 @@ export function CodeTaskSection({
         event.preventDefault()
         void store.saveModuleEditor()
       }}
+      actions={
+        <>
+          {codeSharedPermissionsEnabled && onConfigureAccess != null && (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    className="shrink-0 font-normal text-muted-foreground"
+                    disabled={disabled}
+                    onClick={onConfigureAccess}
+                    size="xs"
+                    type="button"
+                    variant="ghost"
+                  />
+                }
+              >
+                {t('inspector.actions.flowAccess')}
+              </TooltipTrigger>
+              <TooltipContent>{t('inspector.actions.flowAccessHint')}</TooltipContent>
+            </Tooltip>
+          )}
+          <ActionSelectionDialog
+            key={selection.id}
+            title={t('actionPicker.configureActions')}
+            triggerHint={
+              selectedActions.length > 0
+                ? t('actionPicker.selectionSummary', { actions: selectedActions.length, providers: summary.providers.length })
+                : undefined
+            }
+            trigger={
+              <Button
+                type="button"
+                variant={actionIssue ? 'destructive' : 'ghost'}
+                size="sm"
+                aria-invalid={actionIssue || undefined}
+                className={actionIssue ? 'gap-1.5 font-normal' : 'gap-1.5 font-normal text-muted-foreground'}
+              >
+                {actionIssue && <i aria-hidden="true" data-icon="inline-start" className="i-lucide-light:unplug size-3.5" />}
+                {selectedActions.length === 0 ? (
+                  <>
+                    {!actionIssue && <i aria-hidden="true" data-icon="inline-start" className="i-lucide-light:plus size-3.5" />}
+                    {t('actionPicker.triggerLabel')}
+                  </>
+                ) : (
+                  <IconStack icons={summary.providers} count={summary.count} />
+                )}
+              </Button>
+            }
+            entries={selectedActions}
+            connectors={connectors}
+            prepareAction={prepareAction}
+            disabled={disabled || pending}
+            createEntry={(action) => ({ action: action.actionId })}
+            onSave={(actions) => savePermission({ kind: 'connector', mode: 'independent', actions })}
+          />
+        </>
+      }
     >
+      {(codeSharedPermissionsEnabled || (saveError ?? completionError) != null) && (
+        <div className="flex flex-col gap-2" data-inspector-section="code-permissions">
+          {codeSharedPermissionsEnabled && (
+            <Field orientation="horizontal" className="justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-1">
+                <FieldLabel className="text-xs font-normal" htmlFor={`${selection.id}-shared-permissions`}>
+                  {t('inspector.task.sharedPermissions')}
+                </FieldLabel>
+                <Tooltip>
+                  <TooltipTrigger
+                    aria-label={t('inspector.task.sharedPermissions')}
+                    className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <i aria-hidden="true" className="i-codicon:question text-[13px]" />
+                  </TooltipTrigger>
+                  <TooltipContent>{t('inspector.task.sharedPermissionsHint')}</TooltipContent>
+                </Tooltip>
+                <span id={`${selection.id}-shared-permissions-hint`} className="sr-only">
+                  {t('inspector.task.sharedPermissionsHint')}
+                </span>
+              </div>
+              <Switch
+                id={`${selection.id}-shared-permissions`}
+                aria-describedby={sharedPermissions ? `${selection.id}-shared-permissions-hint` : undefined}
+                size="sm"
+                checked={sharedPermissions}
+                disabled={disabled || pending}
+                onCheckedChange={(shared) =>
+                  void savePermission(shared ? { kind: 'connector', mode: 'shared' } : { kind: 'connector', mode: 'independent', actions: [] })
+                }
+              />
+            </Field>
+          )}
+
+          {(saveError ?? completionError) != null && (
+            <p role="alert" className="text-sm text-destructive">
+              {saveError ?? completionError}
+            </p>
+          )}
+        </div>
+      )}
+      <ValueEditorFeedback
+        error={
+          moduleDiagnostics.length > 0
+            ? moduleDiagnostics.map((diagnostic) => (
+                <div key={`${diagnostic.path}:${diagnostic.line}:${diagnostic.column}:${diagnostic.code}`}>{diagnosticMessage(diagnostic, t)}</div>
+              ))
+            : undefined
+        }
+      >
+        {(errorId) => (
+          <CodeEditor
+            ariaDescribedBy={errorId}
+            ariaLabel={t('inspector.task.source')}
+            disabled={disabled}
+            diagnostics={editorDiagnostics}
+            invalid={moduleDiagnostics.length > 0}
+            errorLabel={t('inspector.task.editorUnavailable')}
+            loadingLabel={t('inspector.task.editorLoading')}
+            location={moduleLocation == null ? undefined : { column: moduleLocation.column, line: moduleLocation.line }}
+            prepareCompletion={prepareCompletion}
+            onBlur={() => {
+              if (store.hasUnsavedCode) void store.saveModuleEditor()
+            }}
+            onChange={(value) => store.updateModuleSource(value)}
+            theme={theme}
+            typing={typingFor(sharedActionCatalog)}
+            uri={`file:///modules/${moduleEditor.moduleId}.js`}
+            value={moduleEditor.source}
+          />
+        )}
+      </ValueEditorFeedback>
+      {moduleEditor.status == 'failed' && (
+        <div className="form-actions code-actions">
+          <Button disabled={disabled} onClick={() => store.discardModuleChanges()} size="sm" type="button" variant="secondary">
+            {t('inspector.task.discardCode')}
+          </Button>
+          <Button disabled={disabled} size="sm" type="submit">
+            {t('inspector.task.retrySave')}
+          </Button>
+        </div>
+      )}
+    </CodeTaskFrame>
+  ) : null
+}
+
+function CodeTaskFrame({ actions, children, ...props }: ComponentProps<'form'> & { readonly actions?: ReactNode }) {
+  const t = useTranslate()
+  return (
+    <form {...props} className="inspector-section inspector-titled-section inspector-form code-section" data-inspector-section="module">
       <h3 className="inspector-section-title">
         <span className="min-w-0 flex-1">{t('inspector.task.javascriptModule')}</span>
-        {codeSharedPermissionsEnabled && onConfigureAccess != null && (
-          <Tooltip>
-            <TooltipTrigger
-              render={
-                <Button
-                  className="shrink-0 font-normal text-muted-foreground"
-                  disabled={disabled}
-                  onClick={onConfigureAccess}
-                  size="xs"
-                  type="button"
-                  variant="ghost"
-                />
-              }
-            >
-              {t('inspector.actions.flowAccess')}
-            </TooltipTrigger>
-            <TooltipContent>{t('inspector.actions.flowAccessHint')}</TooltipContent>
-          </Tooltip>
-        )}
-        <ActionSelectionDialog
-          key={selection.id}
-          title={t('actionPicker.configureActions')}
-          triggerHint={
-            selectedActions.length > 0
-              ? t('actionPicker.selectionSummary', { actions: selectedActions.length, providers: summary.providers.length })
-              : undefined
-          }
-          trigger={
-            <Button
-              type="button"
-              variant={actionIssue ? 'destructive' : 'ghost'}
-              size="sm"
-              aria-invalid={actionIssue || undefined}
-              className={actionIssue ? 'gap-1.5 font-normal' : 'gap-1.5 font-normal text-muted-foreground'}
-            >
-              {actionIssue && <i aria-hidden="true" data-icon="inline-start" className="i-lucide-light:unplug size-3.5" />}
-              {selectedActions.length === 0 ? (
-                <>
-                  {!actionIssue && <i aria-hidden="true" data-icon="inline-start" className="i-lucide-light:plus size-3.5" />}
-                  {t('actionPicker.triggerLabel')}
-                </>
-              ) : (
-                <IconStack icons={summary.providers} count={summary.count} />
-              )}
-            </Button>
-          }
-          entries={selectedActions}
-          connectors={connectors}
-          prepareAction={prepareAction}
-          disabled={disabled || pending}
-          createEntry={(action) => ({ action: action.actionId })}
-          onSave={(actions) => savePermission({ kind: 'connector', mode: 'independent', actions })}
-        />
+        {actions}
       </h3>
       <div className="inspector-section-content" data-inset>
-        {(codeSharedPermissionsEnabled || (saveError ?? completionError) != null) && (
-          <div className="flex flex-col gap-2" data-inspector-section="code-permissions">
-            {codeSharedPermissionsEnabled && (
-              <Field orientation="horizontal" className="justify-between gap-3">
-                <div className="flex min-w-0 items-center gap-1">
-                  <FieldLabel className="text-xs font-normal" htmlFor={`${selection.id}-shared-permissions`}>
-                    {t('inspector.task.sharedPermissions')}
-                  </FieldLabel>
-                  <Tooltip>
-                    <TooltipTrigger
-                      aria-label={t('inspector.task.sharedPermissions')}
-                      className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      <i aria-hidden="true" className="i-codicon:question text-[13px]" />
-                    </TooltipTrigger>
-                    <TooltipContent>{t('inspector.task.sharedPermissionsHint')}</TooltipContent>
-                  </Tooltip>
-                  <span id={`${selection.id}-shared-permissions-hint`} className="sr-only">
-                    {t('inspector.task.sharedPermissionsHint')}
-                  </span>
-                </div>
-                <Switch
-                  id={`${selection.id}-shared-permissions`}
-                  aria-describedby={sharedPermissions ? `${selection.id}-shared-permissions-hint` : undefined}
-                  size="sm"
-                  checked={sharedPermissions}
-                  disabled={disabled || pending}
-                  onCheckedChange={(shared) =>
-                    void savePermission(shared ? { kind: 'connector', mode: 'shared' } : { kind: 'connector', mode: 'independent', actions: [] })
-                  }
-                />
-              </Field>
-            )}
-
-            {(saveError ?? completionError) != null && (
-              <p role="alert" className="text-sm text-destructive">
-                {saveError ?? completionError}
-              </p>
-            )}
-          </div>
-        )}
-        <ValueEditorFeedback
-          error={
-            moduleDiagnostics.length > 0
-              ? moduleDiagnostics.map((diagnostic) => (
-                  <div key={`${diagnostic.path}:${diagnostic.line}:${diagnostic.column}:${diagnostic.code}`}>{diagnosticMessage(diagnostic, t)}</div>
-                ))
-              : undefined
-          }
-        >
-          {(errorId) => (
-            <CodeEditor
-              ariaDescribedBy={errorId}
-              ariaLabel={t('inspector.task.source')}
-              disabled={disabled}
-              diagnostics={editorDiagnostics}
-              invalid={moduleDiagnostics.length > 0}
-              errorLabel={t('inspector.task.editorUnavailable')}
-              loadingLabel={t('inspector.task.editorLoading')}
-              location={moduleLocation == null ? undefined : { column: moduleLocation.column, line: moduleLocation.line }}
-              prepareCompletion={prepareCompletion}
-              onBlur={() => {
-                if (store.hasUnsavedCode) void store.saveModuleEditor()
-              }}
-              onChange={(value) => store.updateModuleSource(value)}
-              theme={theme}
-              typing={typingFor(sharedActionCatalog)}
-              uri={`file:///modules/${moduleEditor.moduleId}.js`}
-              value={moduleEditor.source}
-            />
-          )}
-        </ValueEditorFeedback>
-        {moduleEditor.status == 'failed' && (
-          <div className="form-actions code-actions">
-            <Button disabled={disabled} onClick={() => store.discardModuleChanges()} size="sm" type="button" variant="secondary">
-              {t('inspector.task.discardCode')}
-            </Button>
-            <Button disabled={disabled} size="sm" type="submit">
-              {t('inspector.task.retrySave')}
-            </Button>
-          </div>
-        )}
+        {children}
       </div>
     </form>
-  ) : null
+  )
+}
+
+export function CodeTaskSection(
+  props: Omit<ComponentProps<typeof EditableCodeTaskSection>, 'store' | 'connectors'> & {
+    readonly readOnly?: boolean
+    readonly store?: WorkspaceStore
+    readonly connectors?: ConnectorStore
+  },
+) {
+  const t = useTranslate()
+  if (!props.readOnly && props.store != null && props.connectors != null)
+    return <EditableCodeTaskSection {...props} store={props.store} connectors={props.connectors} />
+  const { selection, theme } = props
+  const task = selection.definition
+  if (task == null || !('moduleId' in task) || selection.module == null) return null
+  return (
+    <CodeTaskFrame>
+      <CodeEditor
+        ariaLabel={t('inspector.task.source')}
+        disabled
+        theme={theme}
+        typing=""
+        uri={`publication:modules/${task.moduleId}.js`}
+        value={selection.module.source}
+        loadingLabel={t('inspector.task.editorLoading')}
+        errorLabel={t('inspector.task.editorUnavailable')}
+      />
+      {task.capabilities != null && <JSONViewer data={task.capabilities} />}
+    </CodeTaskFrame>
+  )
 }

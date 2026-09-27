@@ -11,17 +11,19 @@ import { Icon } from '../icons.tsx'
 export function GeneralSettings({
   title,
   children,
-  disabled,
+  disabled = false,
+  readOnly = false,
   node,
   nodeId,
   store,
 }: {
   readonly title?: string
   readonly children?: ReactNode
-  readonly disabled: boolean
+  readonly disabled?: boolean
+  readonly readOnly?: boolean
   readonly node: ResolvedNode['node']
   readonly nodeId: string
-  readonly store: WorkspaceStore
+  readonly store?: WorkspaceStore
 }): ReactElement {
   const t = useTranslate()
   const [timeout, setTimeoutValue] = useState(node.timeoutMs == null ? '' : String(node.timeoutMs))
@@ -41,6 +43,7 @@ export function GeneralSettings({
   }, [node.maxExecutions, nodeId])
 
   function saveLimit(source: string): void {
+    if (disabled || readOnly || store == null) return
     const value = source.trim() == '' ? undefined : Number(source)
     if (value != null && (!Number.isSafeInteger(value) || value < 1)) {
       setLimitError(t('inspector.node.maxExecutionsError'))
@@ -52,6 +55,7 @@ export function GeneralSettings({
   }
 
   function save(source: string): void {
+    if (disabled || readOnly || store == null) return
     const value = source.trim() == '' ? undefined : Number(source)
     if (value != null && (!Number.isInteger(value) || value < 1)) {
       setError(t('inspector.node.timeoutError'))
@@ -81,7 +85,7 @@ export function GeneralSettings({
             <FieldLabel htmlFor={`node-${nodeId}-limit`}>{t('inspector.node.maxExecutions')}</FieldLabel>
             <Input
               aria-invalid={limitError != null}
-              readOnly={disabled}
+              readOnly={disabled || readOnly}
               id={`node-${nodeId}-limit`}
               min="1"
               step="1"
@@ -98,7 +102,7 @@ export function GeneralSettings({
               <FieldLabel htmlFor={inputId}>{t('inspector.node.timeout')}</FieldLabel>
               <Input
                 aria-invalid={error != null}
-                readOnly={disabled}
+                readOnly={disabled || readOnly}
                 id={inputId}
                 min="1"
                 onChange={(event) => setTimeoutValue(event.target.value)}

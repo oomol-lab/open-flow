@@ -676,3 +676,18 @@ it('selects a Team when creating a Flow and validates the public Team catalog', 
   const invalid = new ControlClient(async () => Response.json({ ...catalog, teams: [{ id: 'team', name: 'Engineering', systemCreated: 'false' }] }))
   await expect(invalid.listConnectorTeams()).rejects.toMatchObject({ code: 'response.invalid' })
 })
+
+it('reads a publication presentation snapshot with cancellation and validates nullable responses', async () => {
+  const signal = new AbortController().signal
+  let response: unknown = { version: 1, presentation: { version: 1, revision: 3, updatedAt: '2026-09-28T00:00:00Z', value: { positions: {} } } }
+  const fetcher = vi.fn(async () => Response.json(response))
+  const client = new ControlClient(fetcher)
+  expect(await client.getPublicationPresentation('flow/1', 'publication/1', signal)).toEqual(response)
+  expect(fetcher).toHaveBeenCalledWith('/v1/flows/flow%2F1/publications/publication%2F1/presentation', expect.objectContaining({ signal }))
+  response = { version: 1, presentation: null }
+  expect(await client.getPublicationPresentation('flow', 'old')).toEqual(response)
+  for (const invalid of [{ version: 2, presentation: null }, { version: 1 }, { version: 1, presentation: { version: 1, revision: 0, value: {} } }]) {
+    response = invalid
+    await expect(client.getPublicationPresentation('flow', 'bad')).rejects.toMatchObject({ code: 'response.invalid' })
+  }
+})

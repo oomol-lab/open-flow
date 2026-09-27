@@ -37,7 +37,7 @@ import { LlmInputEditor, supportsLlmInput } from './llmInputEditor.tsx'
 import { schemaMismatchMessage } from './schemaMismatchMessage.ts'
 import { useInputSourceQuery } from './useInputSourceQuery.ts'
 
-export type InputVariables = Pick<VariablePickerProps, 'enabled' | 'loaded' | 'loading' | 'names' | 'onOpen'>
+export type InputVariables = Pick<VariablePickerProps, 'enabled' | 'loaded' | 'loading' | 'names'> & { readonly onOpen?: () => void }
 export interface NodeInputUpstreamSources {
   readonly query?: InputSourceQuery
   readonly describeGroups?: (outputs: Readonly<Record<string, readonly InputSourceCandidate[]>>) => NodeInputUpstreamSources['groups']
@@ -56,7 +56,7 @@ export interface NodeInputUpstreamSources {
     readonly nodeName: string
     readonly outputs: readonly InputSourceCandidate[]
   }[]
-  readonly onChange: (source: { readonly nodeId: string; readonly output: string; readonly field?: string }) => void
+  readonly onChange?: (source: { readonly nodeId: string; readonly output: string; readonly field?: string }) => void
 }
 const draftIssue = () => {}
 const variableSource = (name: string) => JSON.stringify(['variable', name])
@@ -86,6 +86,7 @@ function inputSourceIssue(check: InputSourceCheck | undefined, source: NodeInput
 }
 function SelectedSourceValue({
   bound,
+  readOnly,
   connected,
   sourceMissing,
   onInvalidChange,
@@ -95,6 +96,7 @@ function SelectedSourceValue({
   variableName,
   variables,
 }: {
+  readonly readOnly?: boolean
   readonly bound: boolean
   readonly connected: boolean
   readonly validationError?: string
@@ -117,7 +119,7 @@ function SelectedSourceValue({
     }
   }
   const current = upstream?.query == null ? upstream?.current : upstream.current.map((source, index) => ({ ...source, check: checks?.sources[index] }))
-  const missingVariable = variableName != null && (!variables.enabled || (variables.loaded && !variables.names.includes(variableName)))
+  const missingVariable = !readOnly && variableName != null && (!variables.enabled || (variables.loaded && !variables.names.includes(variableName)))
   const invalidUpstream = connected ? current?.find((source) => source.check != null && source.check.kind != 'available') : undefined
   const sourceIssue = sourceMissing
     ? t('inspector.sources.sourceMissing')
@@ -220,6 +222,7 @@ export function SourceValueEditor({
   variableName,
   variables,
   disabled,
+  readOnly,
   onValue,
   onVariable,
   onReset,
@@ -257,6 +260,7 @@ export function SourceValueEditor({
   readonly sourceMissing?: boolean
   readonly variableName?: string
   readonly variables: InputVariables
+  readonly readOnly?: boolean
   readonly disabled: boolean
   readonly onValue: (value: JsonValue | undefined, deletion?: FieldValueDeletion) => void
   readonly onVariable: (name: string | undefined) => void
@@ -343,7 +347,7 @@ export function SourceValueEditor({
   }
   const selectUpstream = (next: string) => {
     const [, nodeId, output, field] = JSON.parse(next) as [string, string, string, string | null]
-    upstream?.onChange({ nodeId, output, ...(field == null ? {} : { field }) })
+    upstream?.onChange?.({ nodeId, output, ...(field == null ? {} : { field }) })
   }
   const sourceControl =
     disabled || fixed ? undefined : (
@@ -351,7 +355,7 @@ export function SourceValueEditor({
         <DropdownMenu
           onOpenChange={(open) => {
             setSourceOpen(open)
-            if (open && variables.enabled) variables.onOpen()
+            if (open && variables.enabled) variables.onOpen?.()
           }}
         >
           <Tooltip disabled={sourceOpen}>
@@ -537,6 +541,7 @@ export function SourceValueEditor({
   const editor =
     connected || bound || sourceMissing ? (
       <SelectedSourceValue
+        readOnly={readOnly}
         validationError={validationError}
         onInvalidChange={onInvalidChange}
         bound={bound}
@@ -548,12 +553,22 @@ export function SourceValueEditor({
         variables={variables}
       />
     ) : llm ? (
-      <LlmInputEditor addon={sourceControl} schema={schema} value={value} disabled={disabled} handleNames={handleNames} label={fieldLabel} onChange={onValue} />
+      <LlmInputEditor
+        readOnly={readOnly}
+        addon={sourceControl}
+        schema={schema}
+        value={value}
+        disabled={disabled}
+        handleNames={handleNames}
+        label={fieldLabel}
+        onChange={onValue}
+      />
     ) : undefined
   return (
     <Field className={embedded ? 'gap-0' : 'p-3'}>
       {!embedded && <FieldLabel>{fieldLabel}</FieldLabel>}
       <FieldValueEditor
+        readOnly={readOnly}
         {...presentation}
         validationError={validationError}
         onInvalidChange={connected || bound || sourceMissing ? undefined : onInvalidChange}

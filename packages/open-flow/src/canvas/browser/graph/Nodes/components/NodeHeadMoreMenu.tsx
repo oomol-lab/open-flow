@@ -47,8 +47,8 @@ function InFlowCanvas({ canvasStore }: SharedProps) {
       container={container()}
       align="start"
       ignored={ignored ?? false}
-      onIgnore={semantic?.setIgnored}
-      onDuplicate={nodeStore.duplicateNode}
+      onIgnore={editable ? semantic?.setIgnored : undefined}
+      onDuplicate={editable ? nodeStore.duplicateNode : undefined}
       onDelete={editable ? () => canvasStore.deleteNodes([nodeStore]) : undefined}
     />
   )
@@ -70,6 +70,7 @@ export function NodeHeadContextMenu({ canvasStore, children }: NodeHeadContextMe
   const items = useNodeMenuItems({
     t,
     nodeStore,
+    editable,
     onDelete,
   })
 
@@ -94,6 +95,7 @@ export function NodeHeadContextMenu({ canvasStore, children }: NodeHeadContextMe
 }
 
 interface Params {
+  readonly editable: boolean
   readonly t: TFunction
   readonly nodeStore: NodeStore | CommentNodeStore
   readonly onDelete?: () => void
@@ -111,23 +113,25 @@ interface ContextMenuActionItem {
 
 type ContextMenuItem = ContextMenuActionItem | false | undefined
 
-function useNodeMenuItems({ t, nodeStore, onDelete }: Params): ContextMenuItem[] {
+function useNodeMenuItems({ t, nodeStore, onDelete, editable }: Params): ContextMenuItem[] {
   const skip = useVal(NodeStore.to(nodeStore)?.ignore)
   const { duplicateNode } = nodeStore
 
   return coalesce<ContextMenuItem>([
-    duplicateNode && {
-      label: t('nodeActions.duplicate'),
-      key: '$duplicate',
-      icon: <i className="i-codicon:copy" />,
-      onClick: () => duplicateNode(),
-    },
-    toTrue(NodeStore.is(nodeStore)) && {
-      label: skip ? t('nodeActions.skipDisable') : t('nodeActions.skipEnable'),
-      key: '$skip',
-      icon: <i className={skip ? 'i-carbon:view-off' : 'i-carbon:view'} />,
-      onClick: () => NodeStore.to(nodeStore)?.setIgnored(!skip),
-    },
+    editable &&
+      duplicateNode && {
+        label: t('nodeActions.duplicate'),
+        key: '$duplicate',
+        icon: <i className="i-codicon:copy" />,
+        onClick: () => duplicateNode(),
+      },
+    editable &&
+      toTrue(NodeStore.is(nodeStore)) && {
+        label: skip ? t('nodeActions.skipDisable') : t('nodeActions.skipEnable'),
+        key: '$skip',
+        icon: <i className={skip ? 'i-carbon:view-off' : 'i-carbon:view'} />,
+        onClick: () => NodeStore.to(nodeStore)?.setIgnored(!skip),
+      },
     onDelete && {
       label: t('nodeActions.delete'),
       key: '$delete',
@@ -148,6 +152,7 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
   const items = useNodeMenuItems({
     t,
     nodeStore,
+    editable,
     onDelete: editable && canvasStore.canDeleteNodes ? () => canvasStore.deleteNodes([nodeStore]) : undefined,
   })
   const showError = useShowNodeError(nodeStore)

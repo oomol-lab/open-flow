@@ -4,12 +4,15 @@ import { exact, integer, invalidResponse, record, string } from './decoding.ts'
 
 export function publication(value: unknown): Publication {
   const source = record(value)
+  const liveEnd = source.liveEnd == null ? undefined : record(source.liveEnd)
+  if (liveEnd != null && typeof liveEnd.enabled != 'boolean') return invalidResponse()
   const operation = source.operation
   const sourcePublicationId = source.sourcePublicationId
   if (source.version != 1) return invalidResponse()
   if (operation != 'publish' && operation != 'rollback') return invalidResponse()
   if (sourcePublicationId != null && typeof sourcePublicationId != 'string') return invalidResponse()
   return {
+    ...(liveEnd == null ? {} : { liveEnd: { enabled: liveEnd.enabled as boolean, endedAt: string(liveEnd.endedAt) } }),
     actorId: string(source.actorId),
     closureDigest: string(source.closureDigest),
     createdAt: string(source.createdAt),

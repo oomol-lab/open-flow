@@ -20,6 +20,7 @@ export function NodeInputs({
   entries,
   variables,
   disabled,
+  readOnly,
   fieldLabels,
   onValue,
   onVariable,
@@ -40,6 +41,7 @@ export function NodeInputs({
   entries: readonly (Group | NodeInputField)[]
   fieldLabels?: Readonly<Record<string, string>>
   variables: InputVariables
+  readOnly?: boolean
   disabled: boolean
   onValue: (handle: string, value: JsonValue | undefined, deletion?: FieldValueDeletion) => void
   onVariable: (handle: string, name: string | undefined) => void
@@ -49,6 +51,7 @@ export function NodeInputs({
   const handleNames = entries.flatMap((entry) => ('group' in entry ? [] : [entry.definition.handle]))
   return (
     <PortDefinitionEditor
+      readOnly={readOnly}
       key={resetVersion}
       groups
       onReset={
@@ -73,6 +76,7 @@ export function NodeInputs({
         return (
           <>
             <NodeInputValue
+              readOnly={readOnly}
               key={port.handle}
               {...entry}
               onReset={inheritedDefaultReset(entry.onReset, definitionsEditable)}

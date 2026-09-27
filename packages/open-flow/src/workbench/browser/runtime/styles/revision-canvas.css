@@ -1,0 +1,57 @@
+.open-flow-workbench {
+  .revision-viewer {
+    display: flex;
+    flex: 1;
+    min-height: 0;
+    min-width: 0;
+    flex-direction: column;
+  }
+  .revision-viewer-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px 12px;
+    padding: 6px 16px;
+    border-bottom: 1px solid var(--ui-border);
+    font-size: 12px;
+    line-height: 24px;
+  }
+  .revision-viewer-hint {
+    flex: 1;
+    color: var(--ui-muted-foreground);
+    font-size: 11px;
+  }
+  .revision-viewer-body {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    flex: 1;
+    min-height: 0;
+  }
+  .revision-viewer.inspector-open .revision-viewer-body {
+    grid-template-columns: minmax(0, 1fr) 380px;
+  }
+  .revision-viewer-canvas {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+  }
+  .revision-viewer-canvas > .open-flow-canvas-root {
+    height: 100%;
+  }
+  .revision-viewer-empty {
+    position: absolute;
+    inset: 45% 16px auto;
+    text-align: center;
+    color: var(--ui-muted-foreground);
+    pointer-events: none;
+  }
+  .revision-viewer.inspector-open .revision-viewer-body:has(> .context-panel[data-overlay]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .revision-viewer .context-panel[data-overlay] {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+  }
+}

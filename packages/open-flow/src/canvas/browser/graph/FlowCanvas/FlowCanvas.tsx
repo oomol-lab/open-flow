@@ -26,6 +26,7 @@ export interface FlowCanvasProps {
   toolbar?: React.ReactNode
   flowCanvasStore: CanvasStore
   dark: boolean
+  nodesDraggable?: boolean
   fitView?: boolean
   layoutMotion?: boolean
   className?: string
@@ -53,6 +54,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   toolbar,
   dark,
   fitView,
+  nodesDraggable,
   layoutMotion,
   className,
   addNodeRequest,
@@ -79,10 +81,11 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             bottomRightTools={bottomRightTools}
             toolbar={toolbar}
             editable={editable}
+            nodesDraggable={nodesDraggable ?? editable}
             className={className}
             i18n={flowCanvasStore.i18n}
             dark={dark}
-            dottedBackground
+            dottedBackground={editable}
             fitView={fitView ?? !editable}
             fitViewOptions={fitViewOptions}
             layoutMotion={layoutMotion}
@@ -110,7 +113,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             onSelectionEnd={onSelectionEnd}
             isValidConnection={isValidConnection}
             onDropAddItem={onDropAddItem}
-            onRelayout={flowCanvasStore.onRelayout}
+            onRelayout={editable ? flowCanvasStore.onRelayout : undefined}
             onLayoutMeasured={flowCanvasStore.completeLayout}
             onInstance={flowCanvasStore.rfCommand.onRFInstance}
             onInit={flowCanvasStore.onInit}

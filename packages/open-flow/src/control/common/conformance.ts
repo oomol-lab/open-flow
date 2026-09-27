@@ -963,10 +963,34 @@ export const publicationControlApiConformanceCases: readonly ControlApiConforman
       const flow = await createFlow(harness, 'Rollback flow', 'rollback-flow')
       const flowId = requiredString(flow.flowId, 'Rollback Flow flowId')
       const firstRevisionId = await addManualTrigger(harness, flowId, requiredString(flow.draftRevisionId, 'Rollback Flow revisionId'))
+      const layoutApi = client(harness)
+      const initialLayout = await layoutApi.getPresentation(flowId)
+      const publishedLayout = await json(
+        await request(harness, `/v1/flows/${flowId}/presentation`, {
+          method: 'PUT',
+          body: JSON.stringify({ version: 1, expectedRevision: initialLayout.revision, value: { historical: 'first' } }),
+        }),
+        200,
+        'Save first layout',
+      )
       const first = (
         await completePublish(harness, await publishRequest(harness, flowId, firstRevisionId, null, 'publish-first'), 202, 'Publish first Revision')
       ).publication
       const firstPublicationId = requiredString(first.publicationId, 'First Publication')
+      equal((await layoutApi.getPublicationPresentation(flowId, firstPublicationId)).presentation, publishedLayout, 'Publication fixes its layout')
+      const currentLayout = await json(
+        await request(harness, `/v1/flows/${flowId}/presentation`, {
+          method: 'PUT',
+          body: JSON.stringify({ version: 1, expectedRevision: publishedLayout.revision, value: { historical: 'second' } }),
+        }),
+        200,
+        'Save second layout',
+      )
+      equal(
+        (await layoutApi.getPublicationPresentation(flowId, firstPublicationId)).presentation,
+        publishedLayout,
+        'Draft movement cannot change published layout',
+      )
       const changed = await json(await addValueNode(harness, flowId, firstRevisionId), 200, 'Change Draft')
       const secondRevisionId = changedRevisionId(changed, 'Second Revision')
       const second = (
@@ -1006,6 +1030,14 @@ export const publicationControlApiConformanceCases: readonly ControlApiConforman
       const restoredPublicationId = requiredString(restored.publicationId, 'Rollback Publication')
       equal(restored.operation, 'rollback', 'Rollback operation')
       equal(restored.sourcePublicationId, firstPublicationId, 'Rollback source')
+      equal((await api.getPublicationPresentation(flowId, restoredPublicationId)).presentation, publishedLayout, 'Rollback inherits source layout')
+      equal(await api.getPresentation(flowId), currentLayout, 'Rollback does not change draft layout')
+      await error(
+        await request(harness, `/v1/flows/${other.flowId}/publications/${firstPublicationId}/presentation`),
+        404,
+        'publication.not-found',
+        'Snapshot belongs to one Flow',
+      )
       equal(await json(await rollback(), 200, 'Replay Rollback'), restored, 'Replayed Rollback')
       const run = await json(await liveRunRequest(harness, restoredPublicationId, 'rollback-run'), 202, 'Create Live Run')
       equal(run.flowId, flowId, 'Live Run flowId')

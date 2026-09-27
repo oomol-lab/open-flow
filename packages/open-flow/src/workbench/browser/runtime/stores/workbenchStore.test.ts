@@ -998,3 +998,48 @@ it('waits for a candidate query already started by the inspector before selectin
     store.dispose()
   }
 })
+
+it('loads immutable publication content without replacing or writing the active draft', async () => {
+  const { client, store, navigation } = catalogSession()
+  const publication = {
+    actorId: 'actor',
+    createdAt: timestamp,
+    flowId: 'history',
+    publicationId: 'published',
+    revisionId: 'fixed',
+    revisionDigest: 'digest',
+    closureDigest: 'closure',
+    sharedAccessDigest: 'implicit',
+    engineContract: 'engine',
+    modelVersion: currentFlowModelVersion,
+    operation: 'publish' as const,
+    version: 1 as const,
+  }
+  const fixed = (await client.getEditor('history')).draft
+  const getRevision = vi.spyOn(client, 'getRevision').mockResolvedValue({ ...fixed, revisionId: 'fixed' })
+  const snapshot = { version: 1 as const, revision: 2, updatedAt: timestamp, value: { saved: true } }
+  const getSnapshot = vi.spyOn(client, 'getPublicationPresentation').mockResolvedValue({ version: 1, presentation: snapshot })
+  const write = vi.spyOn(client, 'updatePresentation')
+  const signal = new AbortController().signal
+  try {
+    await store.workspace.start('current')
+    const draft = store.workspace.$.draft.value
+    const presentation = store.workspace.$.presentation.value
+    const result = await store.publicationSnapshot(publication, signal)
+    expect(result.draft.revisionId).toBe('fixed')
+    expect(result.presentation).toBe(snapshot)
+    expect(getRevision).toHaveBeenCalledWith('history', 'fixed', signal)
+    expect(getSnapshot).toHaveBeenCalledWith('history', 'published', signal)
+    expect(store.workspace.$.draft.value).toBe(draft)
+    expect(store.workspace.$.presentation.value).toBe(presentation)
+    expect(write).not.toHaveBeenCalled()
+    getRevision.mockRejectedValueOnce(new Error('Unavailable'))
+    await expect(store.publicationSnapshot(publication, signal)).rejects.toThrow('Unavailable')
+    expect(store.workspace.$.draft.value).toBe(draft)
+    getRevision.mockResolvedValueOnce({ ...fixed, revisionId: 'wrong' })
+    await expect(store.publicationSnapshot(publication, signal)).rejects.toThrow('Publication revision mismatch')
+  } finally {
+    navigation.dispose()
+    store.dispose()
+  }
+})

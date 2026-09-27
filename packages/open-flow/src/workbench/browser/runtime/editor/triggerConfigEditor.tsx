@@ -14,6 +14,7 @@ export function TriggerConfigEditor({
   fieldLabels,
   config,
   disabled,
+  readOnly,
   onChange,
   onReset,
   onResetValue,
@@ -24,6 +25,7 @@ export function TriggerConfigEditor({
   readonly inputs: readonly (InputPort | Group)[]
   readonly fieldLabels?: Readonly<Record<string, string>>
   readonly config: InputValues
+  readonly readOnly?: boolean
   readonly disabled: boolean
   readonly onChange: (name: string, value: JsonValue | undefined) => void
   readonly renderEditor?: (input: InputPort) => ReactNode
@@ -33,6 +35,7 @@ export function TriggerConfigEditor({
   return (
     <div data-inspector-section="trigger">
       <NodeInputs
+        readOnly={readOnly}
         fieldLabels={fieldLabels}
         title={t('triggerConfig.configuration')}
         titleIcon="configuration"

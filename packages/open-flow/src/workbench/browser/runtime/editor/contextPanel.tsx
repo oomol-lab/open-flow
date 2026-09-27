@@ -10,6 +10,8 @@ import { Icon } from '../icons.tsx'
 import { cycleContextPanelFocus, observeContextPanelOverlay } from './contextPanelBehavior.ts'
 
 interface ContextPanelProps {
+  /** Container whose available width determines overlay behavior. Defaults to Workbench. */
+  readonly layoutRoot?: RefObject<HTMLElement | null>
   readonly className?: string
   readonly resizable?: boolean
   readonly leading?: ReactNode
@@ -24,20 +26,21 @@ interface ContextPanelProps {
   readonly title: string
 }
 
-function useOverlayPanel(panel: RefObject<HTMLElement | null>): boolean {
+function useOverlayPanel(panel: RefObject<HTMLElement | null>, layoutRoot?: RefObject<HTMLElement | null>): boolean {
   const [overlay, setOverlay] = useState(false)
 
   useEffect(() => {
-    const root = panel.current?.closest<HTMLElement>('.open-flow-workbench')
+    const root = layoutRoot?.current ?? panel.current?.closest<HTMLElement>('.open-flow-workbench')
     if (root == null) return
     return observeContextPanelOverlay(root, setOverlay)
-  }, [panel])
+  }, [panel, layoutRoot])
 
   return overlay
 }
 
 export function ContextPanel({
   className,
+  layoutRoot,
   children,
   focusOnOpen,
   actions,
@@ -52,7 +55,7 @@ export function ContextPanel({
 }: ContextPanelProps): ReactElement {
   const t = useTranslate()
   const panel = useRef<HTMLElement>(null)
-  const overlay = useOverlayPanel(panel)
+  const overlay = useOverlayPanel(panel, layoutRoot)
   const titleId = useId()
   const [width, setWidth] = useState<number>()
   const [availableWidth, setAvailableWidth] = useState(0)
@@ -123,6 +126,7 @@ export function ContextPanel({
         aria-labelledby={titleId}
         aria-modal={overlay || undefined}
         className={cn('context-panel', className)}
+        data-overlay={overlay || undefined}
         data-theme={theme}
         data-tooltip-portal
         ref={panel}

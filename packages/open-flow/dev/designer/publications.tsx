@@ -9,6 +9,7 @@ import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 import { PublicationsView } from '../../src/workbench/browser/runtime/publications/publicationsView.tsx'
 import { WorkbenchStore } from '../../src/workbench/browser/runtime/stores/workbenchStore.ts'
+import { publicationFixture } from './publicationFixture.ts'
 import { useStoryActions } from './storyActions.tsx'
 
 type Scenario = 'published' | 'empty' | 'failed' | 'pending' | 'stopped' | 'load-error'
@@ -17,6 +18,7 @@ function createSession(language: UiLanguage, scenario: Scenario, log: LogAction)
   const timestamp = '2026-09-24T09:00:00.000Z'
   const flowId = 'publication-lab'
   let entries: Publication[] = Array.from({ length: 12 }, (_, index) => ({
+    ...(index > 0 && index < 4 ? { liveEnd: { enabled: index != 2, endedAt: new Date(Date.parse(timestamp) - (index - 1) * 14_400_000).toISOString() } } : {}),
     actorId: index % 2 == 0 ? 'user-alex-7a36e201' : 'user-sam-3f920d54',
     closureDigest: 'closure',
     createdAt: new Date(Date.parse(timestamp) - index * 14_400_000).toISOString(),
@@ -111,7 +113,10 @@ function createSession(language: UiLanguage, scenario: Scenario, log: LogAction)
       operation: source == null ? 'publish' : 'rollback',
       ...(source == null ? {} : { sourcePublicationId: source.publicationId }),
     }
-    entries = [next, ...entries]
+    entries = [
+      next,
+      ...entries.map((entry) => (entry.publicationId == current?.publicationId ? { ...entry, liveEnd: { enabled, endedAt: next.createdAt } } : entry)),
+    ]
     current = next
     bindings = bindings.map((binding) => ({ ...binding, currentPublicationId: next.publicationId, currentRevisionId: next.revisionId }))
     return next
@@ -123,21 +128,16 @@ function createSession(language: UiLanguage, scenario: Scenario, log: LogAction)
     if (route.endsWith('/editor'))
       return Response.json({
         flow: flow(),
-        draft: {
-          actorId: 'lab',
-          createdAt: timestamp,
-          digest: 'draft',
-          flowId,
-          modelVersion: currentFlowModelVersion,
-          parentRevisionId: null,
-          revisionId: 'revision-draft',
-          version: 1,
-          content: { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] }, subflows: {}, tasks: {} } },
-        },
+        draft: publicationFixture(flowId, 'revision-draft').draft,
         live: live(),
-        presentation: { revision: 1, updatedAt: timestamp, value: {}, version: 1 },
+        presentation: publicationFixture(flowId, 'revision-draft').presentation,
         version: 1,
       })
+    if (route.includes('/publications/') && route.endsWith('/presentation')) {
+      const id = route.split('/').at(-2)!
+      return Response.json({ version: 1, presentation: id.endsWith('01') ? null : publicationFixture(flowId, 'published').presentation })
+    }
+    if (/\/revisions\/[^/]+$/.test(route)) return Response.json(publicationFixture(flowId, route.split('/').at(-1)!).draft)
     if (route.endsWith('/check'))
       return Response.json({
         closureDigest: 'closure',
@@ -197,16 +197,39 @@ function createSession(language: UiLanguage, scenario: Scenario, log: LogAction)
     }
     if (route.includes('/triggers/')) {
       const id = route.split('/triggers/')[1]!.split('/')[0]!
-      if (route.endsWith('/activities')) return Response.json({ flowId, triggerNodeId: id, activities: [], version: 1 })
+      if (route.endsWith('/activities'))
+        return Response.json({
+          activities:
+            id == 'check-accounts'
+              ? [
+                  {
+                    activityId: 'activity-reauth',
+                    createdAt: timestamp,
+                    kind: 'health.needs_reauth',
+                    errorCode: 'connection.expired',
+                    errorMessage: 'The saved connection has expired. Reconnect the account before polling for new customers.',
+                  },
+                ]
+              : [],
+          version: 1,
+        })
       if (route.endsWith('/pause') || route.endsWith('/resume')) {
         bindings = bindings.map((binding) =>
           binding.triggerNodeId == id ? { ...binding, operatorState: route.endsWith('/pause') ? 'paused' : 'active' } : binding,
         )
         log('trigger.toggle', id)
+        return Response.json(bindings.find((binding) => binding.triggerNodeId == id))
       }
       if (route.endsWith('/test')) {
         log('trigger.test', id)
-        return Response.json({ flowId, triggerNodeId: id, events: [], filtered: 0, hasMore: false, version: 1 })
+        return Response.json({
+          flowId,
+          triggerNodeId: id,
+          events: [{ customerId: 'customer-42', name: 'Sample customer', status: 'active' }],
+          filtered: 2,
+          hasMore: false,
+          version: 1,
+        })
       }
       return Response.json({ binding: bindings.find((binding) => binding.triggerNodeId == id), version: 1 })
     }
@@ -230,14 +253,20 @@ function createSession(language: UiLanguage, scenario: Scenario, log: LogAction)
   const stopNotice = store.$.notice.reaction((notice) => {
     if (notice != null) log('publication.notice', notice)
   })
+  let disposed = false
   return {
     store,
     i18n,
-    async start() {
-      await store.workspace.start(flowId)
+    async publishElsewhere() {
+      publish('revision-draft')
       await store.publications.load(flowId)
     },
+    async start() {
+      await store.workspace.start(flowId)
+      if (!disposed) await store.publications.load(flowId)
+    },
     dispose() {
+      disposed = true
       stopNotice()
       store.dispose()
       i18n.dispose()
@@ -261,6 +290,7 @@ function PublicationsStory({ language, dark, log }: { readonly language: UiLangu
       },
     })),
     { label: 'Refresh publications', disabled: session == null, onClick: () => void session?.store.publications.load('publication-lab') },
+    { label: 'Publish elsewhere', disabled: session == null, onClick: () => void session?.publishElsewhere() },
     { label: 'Reopen', disabled: open, onClick: () => setOpen(true) },
   ])
   useEffect(() => {
@@ -274,6 +304,7 @@ function PublicationsStory({ language, dark, log }: { readonly language: UiLangu
       {session != null && open && (
         <I18nProvider i18n={session.i18n}>
           <PublicationsView
+            theme={dark ? 'dark' : 'light'}
             key={`${scenario}-${language}`}
             store={session.store}
             onClose={() => {
@@ -293,6 +324,6 @@ export const publicationsStory: FrontendStory = {
   title: 'Publications',
   standalone: true,
   description:
-    'Browse publication history, confirm a rollback, and inspect current triggers. Compare unpublished, pending, failed, stopped and retry states in both themes and narrow layouts.',
+    'Browse publication history, inspect a read-only graph and properties, drag and restore nodes, open subflows, and confirm a rollback. Publish elsewhere updates Live end metadata while preserving the viewed graph. The oldest version has no saved layout. Live includes trigger status, pause/resume, Webhook URL copying, polling tests and activity details. Compare unpublished, pending, failed, stopped and retry states in both themes and narrow layouts.',
   render: (log, dark, language) => <PublicationsStory language={language} dark={dark} log={log} />,
 }

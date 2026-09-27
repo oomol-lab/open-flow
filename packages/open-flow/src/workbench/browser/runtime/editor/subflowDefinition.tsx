@@ -29,7 +29,7 @@ export function SubflowDefinition({
 }: {
   readonly definition: NonNullable<ReturnType<RevisionView['subflow']>>
   readonly disabled: boolean
-  readonly store: WorkspaceStore
+  readonly store?: WorkspaceStore
   readonly subflowId: string
 }): ReactElement {
   const t = useTranslate()
@@ -50,11 +50,12 @@ export function SubflowDefinition({
       className="inspector-section inspector-form"
       onSubmit={(event) => {
         event.preventDefault()
+        if (disabled || store == null) return
         try {
           const nextInputs = arrayValue<SubflowSettings['inputs']>(inputs, t('inspector.subflow.inputPorts'), t)
           const nextOutputs = arrayValue<SubflowSettings['outputs']>(outputs, t('inspector.subflow.outputPorts'), t)
           setError(undefined)
-          void store.saveSubflowSettings(subflowId, { inputs: nextInputs, name: name.trim(), outputs: nextOutputs })
+          void store?.saveSubflowSettings(subflowId, { inputs: nextInputs, name: name.trim(), outputs: nextOutputs })
         } catch (parseError) {
           setError(parseError instanceof TypeError ? parseError.message : t('inspector.errors.portDefinitions'))
         }
@@ -90,11 +91,13 @@ export function SubflowDefinition({
         </Field>
         {error != null && <FieldError>{error}</FieldError>}
       </FieldGroup>
-      <div className="form-actions">
-        <Button disabled={disabled || name.trim() == ''} size="sm" type="submit" variant="secondary">
-          {t('inspector.subflow.save')}
-        </Button>
-      </div>
+      {!disabled && (
+        <div className="form-actions">
+          <Button disabled={disabled || name.trim() == ''} size="sm" type="submit" variant="secondary">
+            {t('inspector.subflow.save')}
+          </Button>
+        </div>
+      )}
     </form>
   )
 }

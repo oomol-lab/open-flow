@@ -487,6 +487,15 @@ export class WorkbenchStore {
     return prepared
   }
 
+  public async publicationSnapshot(publication: Pick<import('../api.ts').Publication, 'flowId' | 'publicationId' | 'revisionId'>, signal: AbortSignal) {
+    const [draft, snapshot] = await Promise.all([
+      this.#client.getRevision(publication.flowId, publication.revisionId, signal),
+      this.#client.getPublicationPresentation(publication.flowId, publication.publicationId, signal),
+    ])
+    if (draft.flowId !== publication.flowId || draft.revisionId !== publication.revisionId) throw new Error('Publication revision mismatch')
+    return { draft, presentation: snapshot.presentation }
+  }
+
   public async publishedConnectionUsage(flowId: string, publicationId: string, revisionId: string, signal: AbortSignal) {
     const [access, draft] = await Promise.all([
       this.#client.getPublishedConnectorAccess(flowId, publicationId, signal),

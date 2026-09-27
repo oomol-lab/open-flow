@@ -1,6 +1,6 @@
-import type { PublishOperation } from '@oomol-lab/open-flow/control-api'
+import type { Presentation, PublishOperation } from '@oomol-lab/open-flow/control-api'
 import type { ConnectorAccess, ConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
-import type { StoredFlow, StoredFlowRevision } from './flow-store.ts'
+import type { FlowStore, StoredFlow, StoredFlowRevision } from './flow-store.ts'
 import type { IntegrationPublication } from './integration-store.ts'
 import type { PollPublication } from './poll-store.ts'
 import type { RevisionStore } from './revision-store.ts'
@@ -10,6 +10,7 @@ import { randomUUID } from 'node:crypto'
 import { DatabaseSync } from 'node:sqlite'
 import { z } from 'zod'
 import { AcceptanceError } from '../error.ts'
+import { presentationView } from './flow-store.ts'
 import { insert } from './insert.ts'
 import { IntegrationStore } from './integration-store.ts'
 import { PollStore } from './poll-store.ts'
@@ -31,6 +32,8 @@ export type PublicationAcceptance =
     }
 
 export interface StoredPublication {
+  readonly liveEndedAt: number | null
+  readonly liveEnabledAtEnd: number | null
   readonly actorId: string
   readonly closureDigest: string
   readonly createdAt: number
@@ -52,6 +55,8 @@ export interface StoredLive {
 }
 
 const publicationColumns = `
+  publications.live_ended_at AS liveEndedAt,
+  publications.live_enabled_at_end AS liveEnabledAtEnd,
   publications.actor_id AS actorId,
   publications.closure_digest AS closureDigest,
   publications.created_at AS createdAt,
@@ -116,6 +121,7 @@ interface PublishInput {
 }
 
 export class PublicationStore {
+  readonly #flows: FlowStore
   readonly #clock: () => number
   readonly #database: DatabaseSync
   readonly #integrations: IntegrationStore
@@ -132,7 +138,9 @@ export class PublicationStore {
     polls: PollStore,
     revisions: RevisionStore,
     variables: VariableStore,
+    flows: FlowStore,
   ) {
+    this.#flows = flows
     this.#clock = clock
     this.#database = database
     this.#integrations = integrations
@@ -160,6 +168,26 @@ export class PublicationStore {
          WHERE publications.publication_id = ?`,
       )
       .get(publicationId) as StoredPublication | undefined
+  }
+
+  presentation(flowId: string, publicationId: string): Presentation | null {
+    const row = this.#database
+      .prepare('SELECT presentation_snapshot AS snapshot FROM publications WHERE flow_id = ? AND publication_id = ?')
+      .get(flowId, publicationId) as { readonly snapshot: string | null } | undefined
+    return row?.snapshot == null ? null : (JSON.parse(row.snapshot) as Presentation | null)
+  }
+
+  #presentationSnapshot(input: PublishInput): Presentation | null {
+    if (input.metadata?.operation == 'rollback') return this.presentation(input.flowId, input.metadata.sourcePublicationId)
+    // Old pending operations have no snapshot; never replace their missing history with today's layout.
+    if (input.operationId != null) {
+      const operation = this.#database.prepare('SELECT input_json AS input FROM publish_operations WHERE operation_id = ?').get(input.operationId) as
+        | { readonly input: string }
+        | undefined
+      return operation == null ? null : ((JSON.parse(operation.input) as { readonly presentationSnapshot?: Presentation | null }).presentationSnapshot ?? null)
+    }
+    const stored = this.#flows.presentation(input.flowId)
+    return stored == null ? null : presentationView(stored)
   }
 
   providerAccess(publicationId: string): ConnectorAccessSnapshot | undefined {
@@ -312,7 +340,7 @@ export class PublicationStore {
         expected_live_publication_id: input.expectedLivePublicationId,
         idempotency_key: input.idempotencyKey,
         request_digest: input.requestDigest,
-        input_json: JSON.stringify(input),
+        input_json: JSON.stringify({ ...input, presentationSnapshot: this.#presentationSnapshot(input) }),
         provider_access_snapshot: JSON.stringify(input.providerAccess ?? implicitProviderAccess),
         status: 'pending',
         deadline_at: createdAt + publishDeadlineMs,
@@ -587,6 +615,7 @@ export class PublicationStore {
         const modelVersion = input.metadata?.modelVersion ?? z.object({ modelVersion: z.number().int().positive() }).parse(JSON.parse(content)).modelVersion
         const publicationId = `publication_${randomUUID().replaceAll('-', '')}`
         insert(this.#database, 'publications', {
+          presentation_snapshot: JSON.stringify(this.#presentationSnapshot(input)),
           publication_id: publicationId,
           shared_access_digest: providerAccess.sharedAccessDigest,
           provider_access_snapshot: JSON.stringify(providerAccess),
@@ -603,6 +632,14 @@ export class PublicationStore {
           model_version: modelVersion,
           created_at: input.publishedAt,
         })
+        this.#database
+          .prepare(`
+          UPDATE publications SET live_ended_at = ?,
+            live_enabled_at_end = (SELECT enabled FROM flow_live WHERE flow_id = ?)
+          WHERE publication_id = (SELECT publication_id FROM flow_live WHERE flow_id = ?)
+            AND live_ended_at IS NULL
+        `)
+          .run(input.publishedAt, input.flowId, input.flowId)
         this.#database
           .prepare(
             `INSERT INTO flow_live (flow_id, publication_id, revision, updated_at) VALUES (?, ?, 1, ?)

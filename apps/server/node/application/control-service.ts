@@ -921,6 +921,14 @@ export class ControlService {
     return result
   }
 
+  getPublicationPresentation(flowId: string, publicationId: string): { readonly version: 1; readonly presentation: Presentation | null } {
+    this.getFlow(flowId)
+    if (this.store.publications.publication(flowId, publicationId) == null) {
+      throw new ControlError(controlErrorCode.publicationNotFound, 'The Publication was not found.')
+    }
+    return { version: 1, presentation: this.store.publications.presentation(flowId, publicationId) }
+  }
+
   getPresentation(flowId: string): Presentation {
     const stored = this.store.flows.presentation(flowId)
     if (stored == null) notFound()

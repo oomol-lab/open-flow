@@ -36,8 +36,8 @@ interface Props {
   readonly invalid?: boolean
   readonly loadingLabel: string
   readonly location?: { readonly column: number; readonly line: number }
-  readonly onBlur: () => void
-  readonly onChange: (value: string) => void
+  readonly onBlur?: () => void
+  readonly onChange?: (value: string) => void
   readonly prepareCompletion?: () => Promise<string>
   readonly theme: WorkbenchTheme
   readonly typing: string
@@ -144,7 +144,7 @@ export function CodeEditor({
         })
         if (created.getValue() != valueRef.current) created.setValue(valueRef.current)
         changeListener = created.onChange(() => {
-          if (!syncing.current) onChangeRef.current(created.getValue())
+          if (!syncing.current) onChangeRef.current?.(created.getValue())
         })
         const position = locationRef.current
         if (position != null) created.revealPosition?.(position.line, position.column)
@@ -159,7 +159,7 @@ export function CodeEditor({
         }
       })
     return () => {
-      if (current != null) onBlurRef.current()
+      if (current != null) onBlurRef.current?.()
       disposed = true
       changeListener?.()
       current?.dispose()
@@ -211,7 +211,7 @@ export function CodeEditor({
     <div
       className="code-editor"
       onBlur={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget)) onBlur()
+        if (!event.currentTarget.contains(event.relatedTarget)) onBlur?.()
       }}
     >
       <div className="code-editor-host" ref={host} />

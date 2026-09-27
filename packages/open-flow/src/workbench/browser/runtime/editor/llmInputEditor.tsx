@@ -30,6 +30,7 @@ export function LlmInputEditor({
   addon,
   value,
   disabled,
+  readOnly,
   handleNames,
   label: fieldLabel,
   onChange,
@@ -37,6 +38,7 @@ export function LlmInputEditor({
   schema: unknown
   addon?: ReactNode
   value: JsonValue | undefined
+  readOnly?: boolean
   disabled: boolean
   handleNames: readonly string[]
   label: string
@@ -70,20 +72,22 @@ export function LlmInputEditor({
                   ))}
                 </NativeSelect>
               </ValueControl>
-              <Button
-                aria-label={t('llmEditor.deleteMessage')}
-                disabled={disabled || messages.length <= minimum}
-                size="icon-xs"
-                variant="ghost"
-                onClick={() =>
-                  onChange(
-                    messages.filter((_, i) => i !== index),
-                    { target: 'arrayItem', name: `${fieldLabel}.${index}` },
-                  )
-                }
-              >
-                <i className="i-codicon:trash" />
-              </Button>
+              {!readOnly && (
+                <Button
+                  aria-label={t('llmEditor.deleteMessage')}
+                  disabled={disabled || messages.length <= minimum}
+                  size="icon-xs"
+                  variant="ghost"
+                  onClick={() =>
+                    onChange(
+                      messages.filter((_, i) => i !== index),
+                      { target: 'arrayItem', name: `${fieldLabel}.${index}` },
+                    )
+                  }
+                >
+                  <i className="i-codicon:trash" />
+                </Button>
+              )}
             </div>
             <SimpleCodeEditor
               aria-label={`${t('llmEditor.messagePlaceholder')} / ${index + 1}`}
@@ -98,11 +102,13 @@ export function LlmInputEditor({
             />
           </div>
         ))}
-        <ValueControl addon={messages.length === 0 ? addon : undefined}>
-          <Button disabled={disabled} variant="outline" onClick={() => onChange([...messages, { role: nextRole, content: '' }])}>
-            {t('llmEditor.addMessage')}
-          </Button>
-        </ValueControl>
+        {!readOnly && (
+          <ValueControl addon={messages.length === 0 ? addon : undefined}>
+            <Button disabled={disabled} variant="outline" onClick={() => onChange([...messages, { role: nextRole, content: '' }])}>
+              {t('llmEditor.addMessage')}
+            </Button>
+          </ValueControl>
+        )}
       </div>
     )
   }

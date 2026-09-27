@@ -18,12 +18,13 @@ import { useEffect, useRef } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { nodeInputMappings } from '../../../../flow/common/condition.ts'
 import { inputValue } from '../../../../flow/common/inputValue.ts'
+import { Button } from '../../../../ui/browser/button.tsx'
 import { NativeScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { AgentSettingsProvider, AgentPrompt, AgentAdvancedSettings } from './agentSettings.tsx'
 import { presentBuiltInOutputDescription, presentBuiltInSourceCandidates, presentResolutionOutputs } from './builtInOutputPresentation.ts'
 import { CodeTaskSection } from './codeTaskSection.tsx'
 import { ConditionBranchesEditor } from './conditionBranchesEditor.tsx'
-import { ConnectorAccount, TriggerConnection } from './connectionSettings.tsx'
+import { ConnectorAccount, TriggerConnection, SavedConnectionReference } from './connectionSettings.tsx'
 import { FeishuTriggerConfig } from './feishuTriggerConfig.tsx'
 import { GeneralSettings } from './generalSettings.tsx'
 import { LinearTriggerConfig } from './linearTriggerConfig.tsx'
@@ -104,79 +105,102 @@ function inputUpstreamSources({
           outputs: node == null ? outputs : presentProviderSourceCandidates(node, presentBuiltInSourceCandidates(node, outputs, t), providerDisplay(node)),
         }
       }),
-    onChange: (source) => {
-      void store.setInputSource(selection.id, handleName, source)
-    },
+    onChange:
+      store == null
+        ? undefined
+        : (source) => {
+            void store.setInputSource(selection.id, handleName, source)
+          },
   }
 }
 
 interface Props {
-  readonly variables: InputVariables
+  readonly readOnly?: boolean
+  readonly onOpenSubflow?: (id: string) => void
+  readonly variables?: InputVariables
   readonly connectorAction?: ConnectorAction
   readonly connectorActionError?: ConnectorActionError
   readonly connectorAccessError?: string
-  readonly connectorAuthorizationPending: boolean
+  readonly connectorAuthorizationPending?: boolean
   readonly connectorConnection?: ConnectorConnection
   readonly connectorConnectionError?: string
   readonly activeConnectorConnections?: readonly ConnectorConnection[]
-  readonly connectors: ConnectorStore
+  readonly connectors?: ConnectorStore
   readonly connectorCandidates?: Readonly<Record<string, ConnectorAccessCandidates | undefined>>
   readonly connectorAccess?: ConnectorAccess
   readonly onConfigureConnectorAccess?: (providerId?: string) => void
   readonly prepareConnectorAction?: (
     action: ConnectorActionView,
   ) => Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] } | undefined>
-  readonly connectorLoading: boolean
-  readonly disabled: boolean
+  readonly connectorLoading?: boolean
+  readonly disabled?: boolean
   readonly diagnostics?: readonly Diagnostic[]
   readonly focus?: DiagnosticFocus
   readonly revision: RevisionView
   readonly selection: ResolvedSelection | undefined
   readonly sourceNodeIcons?: Readonly<Record<string, string | undefined>>
-  readonly store: WorkspaceStore
+  readonly store?: WorkspaceStore
   readonly theme: WorkbenchTheme
   readonly target: GraphTarget
   readonly triggerActiveConnections?: readonly ConnectorConnection[]
-  readonly triggerAuthorizationPending: boolean
+  readonly triggerAuthorizationPending?: boolean
   readonly triggerConnection?: ConnectorConnection
   readonly triggerConnectionError?: string
-  readonly triggerConnectionLoading: boolean
+  readonly triggerConnectionLoading?: boolean
   readonly triggerDisplays?: Readonly<Record<string, TriggerDisplay>>
-  readonly triggers: TriggerStore
+  readonly triggers?: TriggerStore
 }
 
+type InspectorProps = Props &
+  (
+    | { readonly readOnly: true; readonly store?: never; readonly connectors?: never; readonly triggers?: never; readonly variables?: never }
+    | {
+        readonly readOnly?: false
+        readonly store: WorkspaceStore
+        readonly connectors: ConnectorStore
+        readonly triggers: TriggerStore
+        readonly variables: InputVariables
+      }
+  )
+
 export function NodeInspector({
-  variables,
+  variables = { enabled: false, loaded: false, loading: false, names: [], onOpen: undefined },
+  readOnly = false,
+  onOpenSubflow,
   connectorAction,
   connectorActionError,
   connectorAccessError,
-  connectorAuthorizationPending,
+  connectorAuthorizationPending = false,
   connectorConnection,
   connectorConnectionError,
   activeConnectorConnections,
-  connectors,
+  connectors: liveConnectors,
   connectorAccess,
   connectorCandidates,
   onConfigureConnectorAccess,
   prepareConnectorAction,
-  connectorLoading,
-  disabled,
+  connectorLoading = false,
+  disabled: temporarilyDisabled = false,
   diagnostics,
   focus,
   revision,
   selection,
   sourceNodeIcons,
-  store,
+  store: writableStore,
   theme,
   target,
   triggerActiveConnections,
-  triggerAuthorizationPending,
+  triggerAuthorizationPending = false,
   triggerConnection,
   triggerConnectionError,
-  triggerConnectionLoading,
+  triggerConnectionLoading = false,
   triggerDisplays,
-  triggers,
-}: Props): ReactElement {
+  triggers: liveTriggers,
+}: InspectorProps): ReactElement {
+  const store = readOnly ? undefined : writableStore
+  const connectors = readOnly ? undefined : liveConnectors
+  const triggers = readOnly ? undefined : liveTriggers
+  const disabled = readOnly || temporarilyDisabled || store == null
   const t = useTranslate()
   const content = useRef<HTMLDivElement>(null)
   const task = selection?.kind == 'task' ? selection.definition : undefined
@@ -206,7 +230,11 @@ export function NodeInspector({
   const panel = (
     <NativeScrollArea className="inspector-scroll" tabIndex={-1}>
       <div className="inspector-content" ref={content}>
-        {selection?.kind == 'trigger' && (
+        {readOnly && connector != null && <SavedConnectionReference action={connector.action} connectionId={connector.connectionId} />}
+        {readOnly && selection?.kind === 'trigger' && (selection.trigger.kind === 'poll' || selection.trigger.kind === 'integration') && (
+          <SavedConnectionReference action={selection.trigger.definition.key} connectionId={selection.trigger.connectionId} />
+        )}
+        {!readOnly && triggers != null && selection?.kind == 'trigger' && (
           <TriggerConnection
             activeConnections={triggerActiveConnections}
             authorizationPending={triggerAuthorizationPending}
@@ -219,7 +247,7 @@ export function NodeInspector({
             onConfigureAccess={(providerId) => void triggers.connect(providerId)}
           />
         )}
-        {connector != null && taskId != null && connectorAction?.authenticated !== false && (
+        {!readOnly && connectors != null && connector != null && taskId != null && connectorAction?.authenticated !== false && (
           <ConnectorAccount
             action={connectorAction}
             actionError={connectorActionError}
@@ -244,13 +272,14 @@ export function NodeInspector({
             value={selection.node.description}
             disabled={disabled}
             onSave={(description) => {
-              void store.saveNodeDescription(selection.id, description)
+              void store?.saveNodeDescription(selection.id, description)
             }}
           />
         )}
         {isAgent && <AgentPrompt />}
         {selection?.kind === 'task' && selection.module != null && (
           <CodeTaskSection
+            readOnly={readOnly}
             connectorAccess={connectorAccess}
             connectorCandidates={connectorCandidates}
             onConfigureAccess={onConfigureConnectorAccess == null ? undefined : () => onConfigureConnectorAccess()}
@@ -266,7 +295,7 @@ export function NodeInspector({
         )}
         {selection?.kind === 'trigger' &&
           (selection.trigger.kind === 'integration' || selection.trigger.kind === 'poll') &&
-          (['feishu.on_event', 'feishu_app_bot.on_event'].includes(selection.trigger.definition.key) ? (
+          (!readOnly && store != null && ['feishu.on_event', 'feishu_app_bot.on_event'].includes(selection.trigger.definition.key) ? (
             <FeishuTriggerConfig
               inputs={presentProviderTriggerConfig(selection.trigger.definition.configInputs, triggerDisplays?.[selection.trigger.definition.key])}
               fieldLabels={triggerDisplays?.[selection.trigger.definition.key]?.configInputLabels}
@@ -276,7 +305,7 @@ export function NodeInspector({
               disabled={disabled}
               store={store}
             />
-          ) : selection.trigger.definition.key === 'linear.on_issue_changed' ? (
+          ) : !readOnly && store != null && selection.trigger.definition.key === 'linear.on_issue_changed' ? (
             <LinearTriggerConfig
               inputs={presentProviderTriggerConfig(selection.trigger.definition.configInputs, triggerDisplays?.[selection.trigger.definition.key])}
               fieldLabels={triggerDisplays?.[selection.trigger.definition.key]?.configInputLabels}
@@ -288,19 +317,20 @@ export function NodeInspector({
             />
           ) : (
             <TriggerConfigEditor
+              readOnly={readOnly}
               key={`config:${selection.id}`}
               onReset={() => {
-                return store.resetTriggerConfig(selection.id)
+                return store?.resetTriggerConfig(selection.id)
               }}
               onResetValue={(name) => {
-                void store.resetTriggerConfig(selection.id, [name])
+                void store?.resetTriggerConfig(selection.id, [name])
               }}
               inputs={presentProviderTriggerConfig(selection.trigger.definition.configInputs, triggerDisplays?.[selection.trigger.definition.key])}
               fieldLabels={triggerDisplays?.[selection.trigger.definition.key]?.configInputLabels}
               config={selection.trigger.config}
               disabled={disabled}
               onChange={(name, value) => {
-                void store.saveTriggerConfig(selection.id, name, value)
+                void store?.saveTriggerConfig(selection.id, name, value)
               }}
             />
           ))}
@@ -314,6 +344,7 @@ export function NodeInspector({
         )}
         {selection?.kind === 'trigger' && selection.trigger.kind === 'webhook' && (
           <WebhookEditor
+            readOnly={readOnly}
             key={`webhook:${selection.id}`}
             bodyFields={selection.trigger.bodyFields}
             method={selection.trigger.method}
@@ -321,7 +352,7 @@ export function NodeInspector({
             disabled={disabled}
             outputSection={<TriggerSummary trigger={selection.trigger} />}
             onChange={(settings, deletion) => {
-              void store.saveWebhook(selection.id, settings, deletion)
+              void store?.saveWebhook(selection.id, settings, deletion)
             }}
           />
         )}
@@ -332,7 +363,7 @@ export function NodeInspector({
             disabled={disabled}
             collapsible={selection.trigger.kind === 'poll'}
             onChange={(schedule) => {
-              void store.saveTriggerSchedule(selection.id, schedule)
+              void store?.saveTriggerSchedule(selection.id, schedule)
             }}
           />
         )}
@@ -357,19 +388,20 @@ export function NodeInspector({
               return {
                 definition,
                 value: inputValue(mapping, definition.value),
-                onReset: definition.value !== undefined && mapping != null ? () => void store.resetInputs(selection.id, [definition.handle]) : undefined,
+                onReset: definition.value !== undefined && mapping != null ? () => void store?.resetInputs(selection.id, [definition.handle]) : undefined,
                 connected: mapping?.kind === 'sources' && binding?.kind !== 'variable',
                 variableName: binding?.kind === 'variable' ? binding.target : undefined,
               }
             })
             const fields = (
               <NodeInputs
+                readOnly={readOnly}
                 key={`inputs:${selection.id}`}
                 allowAddGroup={selection.kind !== 'wait' && selection.kind !== 'approval'}
                 title={t('inspector.ports.inputsTitle')}
                 entries={entries}
                 onReset={() => {
-                  return store.resetInputs(
+                  return store?.resetInputs(
                     selection.id,
                     entries.flatMap((entry) => ('group' in entry ? [] : [entry.definition.handle])),
                   )
@@ -377,11 +409,11 @@ export function NodeInspector({
                 onDefinitions={
                   selection.kind === 'task' && selection.definition != null && (selection.node.task != null || isAgent)
                     ? (inputs, deletion, values) => {
-                        void store.saveTaskPorts(selection.id, { inputs, outputs: selection.definition!.outputs }, deletion, values)
+                        void store?.saveTaskPorts(selection.id, { inputs, outputs: selection.definition!.outputs }, deletion, values)
                       }
                     : selection.kind === 'wait' || selection.kind === 'approval'
                       ? (inputs, deletion, values) => {
-                          void store.saveResolution(
+                          void store?.saveResolution(
                             selection.id,
                             {
                               name: selection.node.name,
@@ -398,10 +430,10 @@ export function NodeInspector({
                 variables={variables}
                 disabled={disabled}
                 onValue={(handle, value, deletion) => {
-                  void store.setInputValue(selection.id, handle, value, deletion)
+                  void store?.setInputValue(selection.id, handle, value, deletion)
                 }}
                 onVariable={(handle, name) => {
-                  void store.setInputVariable(selection.id, handle, name)
+                  void store?.setInputVariable(selection.id, handle, name)
                 }}
               />
             )
@@ -411,6 +443,7 @@ export function NodeInspector({
                 {selection.kind === 'task' && selection.definition != null && selection.node.task == null && isLlm && (
                   <section className="inspector-nested-port-section">
                     <NodeInputs
+                      readOnly={readOnly}
                       key={`additional:${selection.id}`}
                       title={t('inspector.task.additionalInputs')}
                       allowAddGroup={false}
@@ -422,7 +455,7 @@ export function NodeInspector({
                           definition,
                           value: inputValue(mapping, definition.value),
                           onReset:
-                            definition.value !== undefined && mapping != null ? () => void store.resetInputs(selection.id, [definition.handle]) : undefined,
+                            definition.value !== undefined && mapping != null ? () => void store?.resetInputs(selection.id, [definition.handle]) : undefined,
                           connected: mapping?.kind === 'sources' && binding?.kind !== 'variable',
                           variableName: binding?.kind === 'variable' ? binding.target : undefined,
                         }
@@ -431,7 +464,7 @@ export function NodeInspector({
                       disabled={disabled}
                       reservedNames={selection.definition.inputs.flatMap((port) => ('handle' in port ? [port.handle] : []))}
                       onDefinitions={(inputs, deletion, values) => {
-                        void store.saveTaskAdditionalInputs(
+                        void store?.saveTaskAdditionalInputs(
                           selection.id,
                           inputs.filter((port): port is InputPort => 'handle' in port),
                           deletion,
@@ -439,10 +472,10 @@ export function NodeInspector({
                         )
                       }}
                       onValue={(handle, value, deletion) => {
-                        void store.setInputValue(selection.id, handle, value, deletion)
+                        void store?.setInputValue(selection.id, handle, value, deletion)
                       }}
                       onVariable={(handle, name) => {
-                        void store.setInputVariable(selection.id, handle, name)
+                        void store?.setInputVariable(selection.id, handle, name)
                       }}
                       renderSource={(handle) =>
                         inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t, triggerDisplays })
@@ -455,6 +488,7 @@ export function NodeInspector({
           })()}
         {selection?.kind === 'condition' && (
           <ConditionBranchesEditor
+            readOnly={readOnly}
             key={`condition:${selection.id}`}
             value={selection.node}
             disabled={disabled}
@@ -463,21 +497,22 @@ export function NodeInspector({
             variableName={(source) => (source.kind === 'binding' ? revision.binding(source.bindingId)?.target : undefined)}
             sourceType={(source) => revision.sourceType(target, source)}
             onVariable={(handle, name) => {
-              void store.setInputVariable(selection.id, handle, name)
+              void store?.setInputVariable(selection.id, handle, name)
             }}
             onChange={(settings, deletion) => {
-              void store.saveCondition(selection.id, settings, deletion)
+              void store?.saveCondition(selection.id, settings, deletion)
             }}
           />
         )}
         {selection?.kind === 'value' && (
           <div className="inspector-values-section">
             <PortDefinitionEditor
+              readOnly={readOnly}
               layout="values"
               values={selection.node.values}
               disabled={disabled}
               onChange={(values, deletion) => {
-                void store.saveValue(selection.id, values, deletion)
+                void store?.saveValue(selection.id, values, deletion)
               }}
             />
           </div>
@@ -485,6 +520,7 @@ export function NodeInspector({
         {selection?.kind === 'task' && selection.definition != null && (
           <section className="inspector-port-section">
             <PortDefinitionEditor
+              readOnly={readOnly}
               groups
               layout="ports"
               title={t('inspector.ports.outputsTitle')}
@@ -492,7 +528,7 @@ export function NodeInspector({
               values={selection.definition.outputs}
               disabled={disabled || !(selection.node.task != null || isAgent)}
               onChange={(outputs, deletion) => {
-                void store.saveTaskPorts(selection.id, { inputs: selection.definition!.inputs, outputs }, deletion)
+                void store?.saveTaskPorts(selection.id, { inputs: selection.definition!.inputs, outputs }, deletion)
               }}
             />
           </section>
@@ -500,6 +536,7 @@ export function NodeInspector({
         {(selection?.kind === 'subflow' || selection?.kind === 'approval' || selection?.kind === 'wait') && (
           <section className="inspector-port-section">
             <PortDefinitionEditor
+              readOnly={readOnly}
               groups
               layout="ports"
               title={t('inspector.ports.outputsTitle')}
@@ -524,7 +561,14 @@ export function NodeInspector({
               ) : (
                 <>
                   {isLlm && <LlmTaskSection selection={selection} disabled={disabled} store={store} />}
-                  <GeneralSettings title={isAgent ? t('agent.more') : undefined} disabled={disabled} node={selection.node} nodeId={selection.id} store={store}>
+                  <GeneralSettings
+                    readOnly={readOnly}
+                    title={isAgent ? t('agent.more') : undefined}
+                    disabled={disabled}
+                    node={selection.node}
+                    nodeId={selection.id}
+                    store={store}
+                  >
                     {isAgent && <AgentAdvancedSettings />}
                   </GeneralSettings>
                 </>
@@ -533,12 +577,17 @@ export function NodeInspector({
               <ResolutionDefinition disabled={disabled} selection={selection} store={store} />
             ) : null}
             {selection.kind != 'trigger' && selection.kind != 'task' && (
-              <GeneralSettings disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
+              <GeneralSettings readOnly={readOnly} disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
             )}
             {selection.kind == 'subflow' && (
               <section className="inspector-section">
                 <h3>{t('inspector.subflow.referenced')}</h3>
                 <p className="reference-value">{selection.definition?.name ?? selection.node.subflowId}</p>
+                {onOpenSubflow != null && selection.definition != null && (
+                  <Button className="self-start" size="sm" variant="outline" onClick={() => onOpenSubflow(selection.node.subflowId)}>
+                    {t('inspector.subflow.open')}
+                  </Button>
+                )}
               </section>
             )}
           </>
@@ -548,7 +597,8 @@ export function NodeInspector({
   )
   return selection?.kind == 'task' && task != null && 'executor' in task && task.executor.kind == 'agent' ? (
     <AgentSettingsProvider
-      key={JSON.stringify([store.$.flowId.value, selection.id])}
+      readOnly={readOnly}
+      key={JSON.stringify([revision.revision.flowId, selection.id])}
       task={task}
       nodeId={selection.id}
       store={store}

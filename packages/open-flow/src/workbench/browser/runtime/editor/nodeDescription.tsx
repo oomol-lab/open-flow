@@ -5,12 +5,13 @@ import { Textarea } from '../../../../ui/browser/textarea.tsx'
 
 interface Props {
   readonly value: string | undefined
-  readonly disabled: boolean
-  readonly onSave: (value: string | undefined) => void
+  readonly disabled?: boolean
+  readonly readOnly?: boolean
+  readonly onSave?: (value: string | undefined) => void
 }
 
 /** The draft belongs to this field; the product revision owns the saved description. */
-export function NodeDescription({ value, disabled, onSave }: Props) {
+export function NodeDescription({ value, disabled = false, readOnly = false, onSave }: Props) {
   const t = useTranslate()
   const id = useId()
   const [draft, setDraft] = useState(value ?? '')
@@ -22,12 +23,12 @@ export function NodeDescription({ value, disabled, onSave }: Props) {
       </FieldLabel>
       <Textarea
         id={id}
-        readOnly={disabled}
+        readOnly={disabled || readOnly}
         placeholder={t('inspector.node.describe')}
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
         onBlur={() => {
-          if (!disabled && draft !== (value ?? '')) onSave(draft === '' ? undefined : draft)
+          if (!disabled && !readOnly && draft !== (value ?? '')) onSave?.(draft === '' ? undefined : draft)
         }}
       />
     </Field>

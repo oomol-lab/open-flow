@@ -1,3 +1,4 @@
+import type { Presentation } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { DatabaseSync } from 'node:sqlite'
 import type { RevisionStore } from './revision-store.ts'
@@ -42,6 +43,10 @@ export interface StoredPresentation {
   readonly revision: number
   readonly updatedAt: number
   readonly value: Readonly<Record<string, JsonValue>>
+}
+
+export function presentationView(stored: StoredPresentation): Presentation {
+  return { revision: stored.revision, updatedAt: new Date(stored.updatedAt).toISOString(), value: stored.value, version: 1 }
 }
 
 const flowColumns = `(SELECT enabled FROM flow_live WHERE flow_live.flow_id = flows.flow_id) AS liveEnabled,

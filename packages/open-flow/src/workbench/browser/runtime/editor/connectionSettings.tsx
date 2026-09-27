@@ -10,6 +10,7 @@ import { fieldSelectTriggerClass } from '../../../../form/browser/fieldSelect.ts
 import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../form/browser/selectionMenuStyles.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
+import { Input } from '../../../../ui/browser/input.tsx'
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '../../../../ui/browser/select.tsx'
 import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent } from '../../../../ui/browser/tooltip.tsx'
@@ -441,4 +442,23 @@ export function TriggerConnection({
     )
 
   return connectionSection
+}
+
+/** A persisted reference has no live account health or authorization state. */
+export function SavedConnectionReference({ action, connectionId }: { readonly action: string; readonly connectionId?: string }) {
+  const t = useTranslate()
+  return (
+    <section className="connection-state" data-inspector-section="account">
+      <h3 className="inspector-section-title">{t('inspector.account.title')}</h3>
+      <div className="connection-state-content">
+        <p className="reference-value">{action}</p>
+        {connectionId != null && (
+          <Field>
+            <FieldLabel>{t('inspector.account.connection')}</FieldLabel>
+            <Input aria-label={t('inspector.account.connection')} readOnly value={connectionId} />
+          </Field>
+        )}
+      </div>
+    </section>
+  )
 }

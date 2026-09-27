@@ -116,7 +116,8 @@ export function FlowCanvasView(props: FlowCanvasViewProps): ReactElement {
       addNodeRequest={props.addNodeRequest}
       className={props.className}
       dark={props.dark ?? false}
-      fitView={false}
+      fitView={props.fitView ?? false}
+      nodesDraggable={props.nodesDraggable ?? props.editable}
       flowCanvasStore={store}
       isValidConnection={isValidConnection}
       key={props.identity}

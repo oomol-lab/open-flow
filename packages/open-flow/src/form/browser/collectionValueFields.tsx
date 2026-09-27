@@ -42,6 +42,7 @@ function childFields(props: FieldValueEditorProps) {
     >,
   ) => (
     <FieldValueEditor
+      readOnly={props.readOnly}
       layout={props.layout}
       expansionPolicy={props.expansionPolicy}
       schema={childSchema}
@@ -187,7 +188,7 @@ export function ObjectValueFields(props: CollectionProps) {
                     </div>
                   </>
                 ),
-                actions: (
+                actions: !props.readOnly && (
                   <>
                     <Button
                       type="button"
@@ -273,7 +274,7 @@ export function ArrayValueFields(props: CollectionProps) {
                         )
                     : undefined,
                 hideOptions: true,
-                actions: (
+                actions: !props.readOnly && (
                   <>
                     <Button
                       type="button"

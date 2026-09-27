@@ -41,7 +41,8 @@ type PortEditorProps = {
   embedded?: boolean
   fieldLabels?: Readonly<Record<string, string>>
   reservedNames?: readonly string[]
-  disabled: boolean
+  disabled?: boolean
+  readOnly?: boolean
   allowAddGroup?: boolean
   output?: boolean
   renderValue?: (
@@ -55,21 +56,23 @@ type PortEditorProps = {
   | {
       groups: true
       values: readonly (InputPort | Group)[]
-      onChange: (values: readonly (InputPort | Group)[], deletion?: PropertyDeletion) => void
+      onChange?: (values: readonly (InputPort | Group)[], deletion?: PropertyDeletion) => void
     }
   | {
       groups?: false
       values: readonly InputPort[]
-      onChange: (values: readonly InputPort[], deletion?: PropertyDeletion) => void
+      onChange?: (values: readonly InputPort[], deletion?: PropertyDeletion) => void
     }
 )
 
 export function PortDefinitionEditor(props: PortEditorProps) {
-  const { defaultNullable = true, reservedNames = [], values, disabled } = props
+  const { defaultNullable = true, reservedNames = [], values } = props
+  const disabled = props.readOnly || props.disabled || false
   const onChange = (next: readonly (InputPort | Group)[], deletion?: PropertyDeletion) => {
-    if (props.groups) props.onChange(next, deletion)
+    if (disabled) return
+    if (props.groups) props.onChange?.(next, deletion)
     else
-      props.onChange(
+      props.onChange?.(
         next.filter((port): port is InputPort => 'handle' in port),
         deletion,
       )
@@ -407,6 +410,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
           />
         ) : (
           <FieldValueEditor
+            readOnly={props.readOnly}
             expansionPolicy={props.expansionPolicy}
             leadingControl={leadingControl}
             layout={tableLayout ? props.layout : undefined}

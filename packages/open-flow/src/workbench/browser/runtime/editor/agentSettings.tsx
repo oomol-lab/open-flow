@@ -1,4 +1,4 @@
-import type { ReactElement, ReactNode, SetStateAction } from 'react'
+import type { ComponentProps, ReactElement, ReactNode, SetStateAction } from 'react'
 import type { InputPort, ManagedTaskDefinition, ManagedTaskExecutor } from '../../../../flow/common/change.ts'
 import type { ConnectorConnection } from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
@@ -30,7 +30,7 @@ export function AgentAdvancedSettings() {
   return useContext(AgentSettingsContext)?.advanced
 }
 
-export function AgentSettingsProvider({
+function EditableAgentSettingsProvider({
   children,
   task,
   nodeId,
@@ -101,6 +101,49 @@ export function AgentSettingsProvider({
   }
   const revision = useVal(store.$.revision)
   if (config.kind != 'agent' || revision == null) return <>{children}</>
+  return (
+    <AgentSettingsContent
+      children={children}
+      task={task}
+      config={config}
+      nodeId={nodeId}
+      connectors={connectors}
+      prepareAction={prepareAction}
+      disabled={disabled}
+      theme={theme}
+      saveError={saveError}
+      setConfig={setConfig}
+      save={save}
+    />
+  )
+}
+
+function AgentSettingsContent({
+  children,
+  task,
+  config,
+  nodeId,
+  connectors,
+  prepareAction,
+  disabled,
+  theme,
+  saveError,
+  setConfig,
+  save,
+}: {
+  readonly children: ReactNode
+  readonly task: ManagedTaskDefinition
+  readonly config: Extract<ManagedTaskExecutor, { kind: 'agent' }>
+  readonly nodeId: string
+  readonly connectors?: ConnectorStore
+  readonly prepareAction?: ComponentProps<typeof AgentTools>['prepareAction']
+  readonly disabled: boolean
+  readonly theme: WorkbenchTheme
+  readonly saveError?: string
+  readonly setConfig?: (value: SetStateAction<ManagedTaskExecutor>, commit?: boolean) => void
+  readonly save?: () => Promise<boolean>
+}) {
+  const t = useTranslate()
   const inputs = task.inputs.filter((port): port is InputPort => 'handle' in port)
   const promptSection = (
     <section className="inspector-section inspector-titled-section code-section" data-inspector-section="task">
@@ -113,11 +156,11 @@ export function AgentSettingsProvider({
           connectors={connectors}
           prepareAction={prepareAction}
           onSave={async (tools) => {
-            const previous = changes.value.kind == 'agent' ? changes.value.tools : []
-            setConfig((before) => (before.kind == 'agent' ? { ...before, tools } : before), false)
-            const saved = await save()
-            if (!saved) setConfig((before) => (before.kind == 'agent' && before.tools === tools ? { ...before, tools: previous } : before), false)
-            return saved
+            const previous = config.tools
+            setConfig?.((before) => (before.kind == 'agent' ? { ...before, tools } : before), false)
+            const saved = await save?.()
+            if (!saved) setConfig?.((before) => (before.kind == 'agent' && before.tools === tools ? { ...before, tools: previous } : before), false)
+            return saved ?? false
           }}
         />
       </h3>
@@ -131,14 +174,14 @@ export function AgentSettingsProvider({
               inputs={inputs.map((port) => port.handle)}
               disabled={disabled}
               theme={theme}
-              onChange={(prompt) => setConfig((before) => (before.kind == 'agent' ? { ...before, prompt } : before), false)}
-              onSave={() => void save()}
+              onChange={(prompt) => setConfig?.((before) => (before.kind == 'agent' ? { ...before, prompt } : before), false)}
+              onSave={() => void save?.()}
             />
           )}
         </ValueEditorFeedback>
         {saveError != null && (
           <div className="form-actions code-actions">
-            <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => void save()}>
+            <Button type="button" variant="outline" size="sm" disabled={disabled} onClick={() => void save?.()}>
               {t('inspector.task.retrySave')}
             </Button>
           </div>
@@ -149,7 +192,7 @@ export function AgentSettingsProvider({
   const modelError = config.model.trim() ? undefined : t('agent.modelRequired')
   const roundsError = Number.isSafeInteger(config.maxRounds) && config.maxRounds >= 1 && config.maxRounds <= 100 ? undefined : t('agent.roundsInvalid')
   const advanced = (
-    <fieldset disabled={disabled} className="grid gap-4 border-0 p-0 m-0">
+    <fieldset className="grid gap-4 border-0 p-0 m-0">
       <Field>
         <FieldLabel htmlFor={`${nodeId}-model`}>{t('agent.model')}</FieldLabel>
         <ValueEditorFeedback error={modelError}>
@@ -158,9 +201,10 @@ export function AgentSettingsProvider({
               aria-describedby={errorId}
               aria-invalid={modelError != null}
               id={`${nodeId}-model`}
+              readOnly={disabled}
               value={config.model}
-              onBlur={() => void save()}
-              onChange={(event) => setConfig({ ...config, model: event.target.value }, false)}
+              onBlur={() => void save?.()}
+              onChange={(event) => setConfig?.({ ...config, model: event.target.value }, false)}
             />
           )}
         </ValueEditorFeedback>
@@ -176,7 +220,7 @@ export function AgentSettingsProvider({
           aria-describedby={`${nodeId}-code-description`}
           size="sm"
           checked={config.code == true}
-          onCheckedChange={(code) => setConfig({ ...config, code })}
+          onCheckedChange={(code) => setConfig?.({ ...config, code })}
         />
       </Field>
       <Field>
@@ -191,9 +235,10 @@ export function AgentSettingsProvider({
               min={1}
               max={100}
               step={1}
+              readOnly={disabled}
               value={config.maxRounds}
-              onBlur={() => void save()}
-              onChange={(event) => setConfig({ ...config, maxRounds: Number(event.target.value) }, false)}
+              onBlur={() => void save?.()}
+              onChange={(event) => setConfig?.({ ...config, maxRounds: Number(event.target.value) }, false)}
             />
           )}
         </ValueEditorFeedback>
@@ -202,4 +247,21 @@ export function AgentSettingsProvider({
     </fieldset>
   )
   return <AgentSettingsContext.Provider value={{ prompt: promptSection, advanced }}>{children}</AgentSettingsContext.Provider>
+}
+
+export function AgentSettingsProvider(
+  props: Omit<ComponentProps<typeof EditableAgentSettingsProvider>, 'store' | 'connectors'> & {
+    readonly readOnly?: boolean
+    readonly store?: WorkspaceStore
+    readonly connectors?: ConnectorStore
+  },
+) {
+  if (!props.readOnly && props.store != null && props.connectors != null)
+    return <EditableAgentSettingsProvider {...props} store={props.store} connectors={props.connectors} />
+  if (props.task.executor.kind !== 'agent') return <>{props.children}</>
+  return (
+    <AgentSettingsContent task={props.task} config={props.task.executor} nodeId={props.nodeId} disabled theme={props.theme}>
+      {props.children}
+    </AgentSettingsContent>
+  )
 }

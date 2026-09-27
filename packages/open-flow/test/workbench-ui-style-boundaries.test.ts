@@ -18,6 +18,7 @@ const workbenchStyleImports = [
   "@import './styles/connection-settings.css';",
   "@import './styles/runs.css';",
   "@import './styles/publications.css';",
+  "@import './styles/revision-canvas.css';",
   "@import './styles/responsive.css';",
 ] as const
 
@@ -333,7 +334,7 @@ test('keeps Workbench feature CSS from reclaiming shared primitive visuals', asy
   assert.doesNotMatch(runDrawer, /className="run-tabs"/)
   assert.match(runStatusIsland, /<Button[\s\S]*?size=\{hasRunInfo \? 'default' : 'icon'\}[\s\S]*?variant="ghost"/)
   assert.match(publications, /<Button[^>]*onClick=\{\(\) => void store\.publications\.loadMore\(\)\}[^>]*variant="outline"/)
-  assert.match(publications, /<Badge variant="secondary">\{t\('publication\.current'\)\}<\/Badge>/)
+  assert.match(publications, /<Badge variant="secondary"[^>]*>[\s\S]*?\{t\('publication\.current'\)\}[\s\S]*?<\/Badge>/)
   assert.doesNotMatch(workspaceStyles, /\.diagnostics-(?:empty|loading)/)
   assert.doesNotMatch(workspaceStyles, /\.run-input-error/)
   assert.doesNotMatch(workspaceStyles, /\.workspace-title button|\.validation-state:(?:hover|focus)|\.validation-state\.(?:invalid|active)/)

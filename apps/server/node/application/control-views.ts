@@ -7,6 +7,7 @@ import type { StoredTriggerActivity, StoredTriggerBinding } from '../storage/tri
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { decodeRevision, revisionRepairKind } from '@oomol-lab/open-flow/flow-encoding'
 import { ControlError } from '../error.ts'
+import { presentationView } from '../storage/flow-store.ts'
 import { RevisionIntegrityError } from '../storage/revision-store.ts'
 
 export function timestamp(value: number): string {
@@ -78,7 +79,7 @@ export function draft(stored: StoredFlowRevision): Draft {
 }
 
 export function presentation(stored: StoredPresentation): Presentation {
-  return { revision: stored.revision, updatedAt: timestamp(stored.updatedAt), value: stored.value, version: 1 }
+  return presentationView(stored)
 }
 
 export function triggerBinding(stored: StoredTriggerBinding, endpointOrigin?: string): TriggerBinding {
@@ -115,6 +116,9 @@ export function triggerActivity(stored: StoredTriggerActivity): TriggerActivity 
 
 export function publication(stored: StoredPublication): Publication {
   return {
+    ...(stored.liveEndedAt == null || stored.liveEnabledAtEnd == null
+      ? {}
+      : { liveEnd: { enabled: stored.liveEnabledAtEnd == 1, endedAt: timestamp(stored.liveEndedAt) } }),
     actorId: stored.actorId,
     closureDigest: stored.closureDigest,
     createdAt: timestamp(stored.createdAt),
