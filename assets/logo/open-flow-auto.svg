@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100" role="img" aria-label="Open Flow">
+  <style>
+    @media (prefers-color-scheme: dark) {
+      .of-auto-port { fill: #a9adb5; }
+      .of-auto-shell { fill: #36383d; }
+      .of-auto-title { fill: #9499a2; }
+      .of-auto-content { fill: #55585f; }
+    }
+  </style>
+  <rect class="of-auto-port" x="6" y="29" width="8" height="16" rx="0.96" ry="1.92" fill="#56585c"/>
+  <rect class="of-auto-port" x="86" y="58" width="8" height="16" rx="0.96" ry="1.92" fill="#56585c"/>
+  <rect class="of-auto-shell" x="11" y="11" width="78" height="78" rx="19" fill="#dedfe1"/>
+  <rect class="of-auto-title" x="36.5" y="25" width="27" height="5" rx="2.5" fill="#a1a3a7"/>
+  <rect class="of-auto-content" x="20" y="40" width="60" height="40" rx="11" fill="#ffffff"/>
+</svg>

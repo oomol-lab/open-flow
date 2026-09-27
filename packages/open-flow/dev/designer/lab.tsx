@@ -9,6 +9,7 @@ import { Button } from '../../src/ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '../../src/ui/browser/dropdown-menu.tsx'
 import { IconThemeContext } from '../../src/ui/browser/icons/iconTheme.ts'
 import { Input } from '../../src/ui/browser/input.tsx'
+import { ScrollArea } from '../../src/ui/browser/scroll-area.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../../src/ui/browser/tooltip.tsx'
 import { StoryActions, StoryActionsProvider } from './storyActions.tsx'
 import { labStories } from './storyCatalog.tsx'
@@ -232,21 +233,23 @@ export function FrontendLab() {
             }}
           />
         </div>
-        <nav className="lab-navigation" aria-label="Stories">
-          {visibleSections.length === 0 && (
-            <p className="lab-search-empty" role="status">
-              No stories found.
-            </p>
-          )}
-          {visibleSections.map((section) => (
-            <div key={section.name} className="lab-nav-section">
-              <div className="lab-nav-section-label">{section.name}</div>
-              {section.groups.map((group) => (
-                <StoryGroup key={group.name} {...group} selected={story} onSelect={selectStory} search={query} />
-              ))}
-            </div>
-          ))}
-        </nav>
+        <ScrollArea className="lab-navigation-scroll">
+          <nav className="lab-navigation" aria-label="Stories">
+            {visibleSections.length === 0 && (
+              <p className="lab-search-empty" role="status">
+                No stories found.
+              </p>
+            )}
+            {visibleSections.map((section) => (
+              <div key={section.name} className="lab-nav-section">
+                <div className="lab-nav-section-label">{section.name}</div>
+                {section.groups.map((group) => (
+                  <StoryGroup key={group.name} {...group} selected={story} onSelect={selectStory} search={query} />
+                ))}
+              </div>
+            ))}
+          </nav>
+        </ScrollArea>
       </aside>
       <StoryActionsProvider key={story.id}>
         <main className="lab-content" aria-label={story.title}>
