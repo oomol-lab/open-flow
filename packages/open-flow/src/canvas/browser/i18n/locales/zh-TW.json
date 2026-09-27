@@ -578,6 +578,8 @@
     "files": "檔案 {{count}}",
     "images": "圖片 {{count}}",
     "started": "開始時間",
+    "finished": "結束時間",
+    "runId": "執行 ID",
     "previewUnavailable": "無法預覽",
     "artifactMetadata": "目前記錄包含檔案中繼資料，未提供下載位址。",
     "description": "用途說明",

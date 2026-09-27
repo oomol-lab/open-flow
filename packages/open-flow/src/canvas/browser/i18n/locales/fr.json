@@ -578,6 +578,8 @@
     "files": "Fichiers ({{count}})",
     "images": "Images ({{count}})",
     "started": "Début",
+    "finished": "Fin",
+    "runId": "ID d’exécution",
     "previewUnavailable": "Aperçu indisponible",
     "artifactMetadata": "Seules les métadonnées sont disponibles. Aucune adresse de téléchargement n’a été fournie.",
     "description": "Objectif",

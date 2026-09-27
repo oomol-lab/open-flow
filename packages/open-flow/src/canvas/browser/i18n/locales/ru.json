@@ -578,6 +578,8 @@
     "files": "Файлы ({{count}})",
     "images": "Изображения ({{count}})",
     "started": "Начало",
+    "finished": "Завершено",
+    "runId": "ID запуска",
     "previewUnavailable": "Предпросмотр недоступен",
     "artifactMetadata": "Доступны метаданные файла. Адрес загрузки не предоставлен.",
     "description": "Назначение",

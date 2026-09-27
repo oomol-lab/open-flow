@@ -578,6 +578,8 @@
     "files": "文件 {{count}}",
     "images": "图片 {{count}}",
     "started": "开始时间",
+    "finished": "结束时间",
+    "runId": "运行 ID",
     "previewUnavailable": "预览不可用",
     "artifactMetadata": "当前记录包含文件元数据，未提供下载地址。",
     "description": "用途说明",

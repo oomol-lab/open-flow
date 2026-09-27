@@ -578,6 +578,8 @@
     "files": "파일 {{count}}",
     "images": "이미지 {{count}}",
     "started": "시작 시간",
+    "finished": "종료 시간",
+    "runId": "실행 ID",
     "previewUnavailable": "미리 보기 불가",
     "artifactMetadata": "파일 메타데이터만 있습니다. 다운로드 주소가 제공되지 않았습니다.",
     "description": "목적",

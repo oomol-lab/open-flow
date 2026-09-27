@@ -578,6 +578,8 @@
     "files": "Files ({{count}})",
     "images": "Images ({{count}})",
     "started": "Started",
+    "finished": "Finished",
+    "runId": "Run ID",
     "previewUnavailable": "Preview unavailable",
     "artifactMetadata": "File metadata is available. A download address has not been provided.",
     "description": "Purpose",

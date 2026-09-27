@@ -931,28 +931,26 @@ function SelectionFloatBar(props: Pick<SelectionContextMenuProps, 'nodes' | 'onD
   const items = useSelectionItems(props)
   const { zoom } = useViewport()
 
-  if (props.nodes.length < 2) return null
+  if (!props.editable || props.nodes.length < 2) return null
 
   return (
     <NodeToolbar data-tooltip-toolbar className={nodeHeadStyles.floatBar} isVisible nodeId={props.nodes.map((node) => node.id)} offset={12 - 8 * zoom}>
       <InspectSelectionButton className={nodeHeadStyles.floatBarButton} />
-      {items
-        .filter(() => props.editable)
-        .map((item) => (
-          <CanvasTooltip key={item.key} placement="top" title={item.key === '$delete' ? `${item.label} (Backspace / Delete)` : item.label}>
-            <Button
-              aria-label={item.label}
-              className={nodeHeadStyles.floatBarButton}
-              data-danger={item.key === '$delete' || undefined}
-              disabled={item.disabled}
-              onClick={item.onClick}
-              size="icon"
-              variant="ghost"
-            >
-              {item.icon}
-            </Button>
-          </CanvasTooltip>
-        ))}
+      {items.map((item) => (
+        <CanvasTooltip key={item.key} placement="top" title={item.key === '$delete' ? `${item.label} (Backspace / Delete)` : item.label}>
+          <Button
+            aria-label={item.label}
+            className={nodeHeadStyles.floatBarButton}
+            data-danger={item.key === '$delete' || undefined}
+            disabled={item.disabled}
+            onClick={item.onClick}
+            size="icon"
+            variant="ghost"
+          >
+            {item.icon}
+          </Button>
+        </CanvasTooltip>
+      ))}
     </NodeToolbar>
   )
 }

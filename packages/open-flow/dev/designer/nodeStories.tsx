@@ -616,7 +616,7 @@ export const nodeStories: readonly FrontendStory[] = [
     id: 'node-content',
     title: 'Node content',
     description:
-      'Compare the inspect-properties and content-toggle icons in each node toolbar. Toggle all content to inspect height transitions. Read-only, empty and Condition nodes omit the collapse action. Hover or focus Wait and Approval branch labels for their output semantics.',
+      'Compare the inspect-properties and content-toggle icons in each editable node toolbar. Toggle all content to inspect height transitions. Read-only nodes show no floating toolbar; empty and Condition nodes omit the collapse action. Hover or focus Wait and Approval branch labels for their output semantics.',
     standalone: true,
     render: (log, dark, language) => <NodeContentStory dark={dark} language={language} log={log} initialModel={contentModel} initialSelection="schedule" />,
   },

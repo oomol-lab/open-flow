@@ -3,7 +3,7 @@ import type { TFunction } from 'val-i18n'
 import type { CanvasStore } from '../../../stores/canvas/canvas.store.ts'
 
 import { NodeToolbar, useStore, useViewport } from '@xyflow/react'
-import { memo } from 'react'
+import { memo, useContext } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { NodeActions } from '../../../../../canvas/browser/nodeActions.tsx'
@@ -15,7 +15,7 @@ import { CommentNodeStore } from '../../../stores/node/commentNode.store.ts'
 import { NodeStore } from '../../../stores/node/node.store.ts'
 import { useCanvasStore } from '../../CanvasStoreContext.tsx'
 import { nodeCardContent } from '../../FlowCanvas/cardContent.ts'
-import { InspectSelectionButton } from '../../inspectSelection.tsx'
+import { InspectSelectionButton, InspectSelectionContext } from '../../inspectSelection.tsx'
 import { useGetStaticPopupContainer } from '../../ReactFlowContainer/useGetPopupContainer.ts'
 import { useNodeStore } from '../NodeStoreContext.tsx'
 import { useShowNodeError } from './useShowNodeError.ts'
@@ -155,6 +155,8 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
     editable,
     onDelete: editable && canvasStore.canDeleteNodes ? () => canvasStore.deleteNodes([nodeStore]) : undefined,
   })
+  const { onInspect } = useContext(InspectSelectionContext)
+  const showInspect = editable && onInspect != null
   const showError = useShowNodeError(nodeStore)
   const content = useVal(NodeStore.to(nodeStore)?.content$)
   const comment = CommentNodeStore.is(nodeStore) ? nodeStore : undefined
@@ -177,9 +179,11 @@ export const NodeFloatBar: React.FC<NodeFloatBarProps> = /* @__PURE__ */ memo(fu
     })
   }
 
+  if (!showInspect && floatBarItems.length === 0) return null
+
   return (
     <NodeToolbar data-tooltip-toolbar className={styles.floatBar} offset={12 - 8 * zoom}>
-      <InspectSelectionButton className={styles.floatBarButton} danger={showError} />
+      {showInspect && <InspectSelectionButton className={styles.floatBarButton} danger={showError} />}
       {floatBarItems.map((item) => {
         return (
           <CanvasTooltip

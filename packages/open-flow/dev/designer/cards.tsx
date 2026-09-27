@@ -7,7 +7,7 @@ import { useRef, useMemo } from 'react'
 import { Toaster } from 'sonner'
 import { I18nProvider } from 'val-i18n-react'
 import { CanvasCard } from '../../src/canvas/browser/graph/Nodes/components/CanvasCard.tsx'
-import { RunChips } from '../../src/canvas/browser/graph/Nodes/components/RunChips.tsx'
+import { ImagePreview, RunChips } from '../../src/canvas/browser/graph/Nodes/components/RunChips.tsx'
 import { GetPopupContainerContext } from '../../src/canvas/browser/graph/ReactFlowContainer/useGetPopupContainer.ts'
 import { createI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
 import { ContentIcon, initialsIcon } from '../../src/ui/browser/icons/ContentIcon.tsx'
@@ -23,7 +23,11 @@ const completed: FlowCanvasViewNodeRun = {
   startedAt: '2026-09-05T01:00:00Z',
   finishedAt: '2026-09-05T01:00:08.200Z',
   outputs: { customers: 128, qualified: 42 },
-  logs: [{ time: '2026-09-05T01:00:06Z', level: 'info', message: '42 customers matched the criteria.' }],
+  logs: [
+    { time: '2026-09-05T01:00:06Z', level: 'info', message: '42 customers matched the criteria.' },
+    { time: '2026-09-05T01:00:07Z', level: 'warn', message: 'Skipped a customer with missing contact details.\nReview the source record before retrying.' },
+  ],
+  artifacts: [{ name: 'qualified-customers.csv', contentType: 'text/csv', size: 2048 }],
 }
 
 function ReportPreview() {
@@ -135,7 +139,8 @@ export const cardStories: readonly FrontendStory[] = [
   {
     group: 'Canvas',
     id: 'canvas-cards',
-    description: 'Identity, plain text and framed previews. Empty content takes no space. Open results and logs from the status row.',
+    description:
+      'Identity, plain text and framed previews. Empty content takes no space. Open status, results, logs, files and images to compare metadata, long IDs and content in both themes.',
     title: 'Cards · Content & records',
     standalone: true,
     render: (_log, dark, language) => (
@@ -204,6 +209,11 @@ export const cardStories: readonly FrontendStory[] = [
           >
             <p>A summary of this week’s customer activity.</p>
           </CanvasCard>
+          <CanvasCard
+            title="Provider images"
+            subtitle="Image previews"
+            preview={<ImagePreview images={[sheetsAppIcon, trackingAppIcon]} run={completed} title="Provider images" />}
+          />
           <CanvasCard
             title="Enrich company profiles"
             subtitle="Research"

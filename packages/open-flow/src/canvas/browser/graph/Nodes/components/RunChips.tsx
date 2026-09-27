@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { useTranslate } from 'val-i18n-react'
 import { collapseAllNested, JSONViewer } from '../../../../../ui/browser/json-viewer/index.ts'
 import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../../../../../ui/browser/popover.tsx'
+import { NativeScrollArea } from '../../../../../ui/browser/scroll-area.tsx'
 import { useGetStaticPopupContainer } from '../../ReactFlowContainer/useGetPopupContainer.ts'
 
 function RecordChip({
@@ -15,14 +16,12 @@ function RecordChip({
   children,
   icon,
   status,
-  compactHeader = false,
 }: {
   readonly label: string
   readonly run: FlowCanvasViewNodeRun
-  readonly children: ReactNode
+  readonly children?: ReactNode
   readonly icon?: string
   readonly status?: string
-  readonly compactHeader?: boolean
 }) {
   const t = useTranslate()
   const getContainer = useGetStaticPopupContainer()
@@ -50,29 +49,56 @@ function RecordChip({
         data-canvas-control-scope
         onClick={(event) => event.stopPropagation()}
       >
-        {!compactHeader && <PopoverTitle>{label}</PopoverTitle>}
-        <p className={styles.origin}>
-          {run.finishedAt && <time>{new Date(run.finishedAt).toLocaleString()}</time>}
-          {runId != null && (
-            <button
-              aria-label={`${t('copy')} ${runId}`}
-              className={styles.runId}
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(runId)
-                } catch {
-                  return
-                }
-                toast.success(t('copied'))
-              }}
-              title={runId}
-              type="button"
-            >
-              <code>{runId}</code>
-            </button>
-          )}
-        </p>
-        <div className={`${styles.record} nowheel nodrag nopan`}>{children}</div>
+        <PopoverTitle className={styles.heading}>{label}</PopoverTitle>
+        {(run.startedAt || run.finishedAt || runId != null) && (
+          <dl className={styles.metadata}>
+            {run.startedAt && (
+              <div>
+                <dt>{t('canvasCard.started')}</dt>
+                <dd>
+                  <time dateTime={run.startedAt}>{new Date(run.startedAt).toLocaleString()}</time>
+                </dd>
+              </div>
+            )}
+            {run.finishedAt && (
+              <div>
+                <dt>{t('canvasCard.finished')}</dt>
+                <dd>
+                  <time dateTime={run.finishedAt}>{new Date(run.finishedAt).toLocaleString()}</time>
+                </dd>
+              </div>
+            )}
+            {runId != null && (
+              <div>
+                <dt>{t('canvasCard.runId')}</dt>
+                <dd>
+                  <button
+                    aria-label={`${t('copy')} ${runId}`}
+                    className={styles.runId}
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(runId)
+                      } catch {
+                        return
+                      }
+                      toast.success(t('copied'))
+                    }}
+                    title={`${t('copy')} ${runId}`}
+                    type="button"
+                  >
+                    <code>{runId}</code>
+                  </button>
+                </dd>
+              </div>
+            )}
+          </dl>
+        )}
+        {children && (
+          <>
+            <div className={styles.separator} />
+            <NativeScrollArea className={`${styles.record} nowheel nodrag nopan`}>{children}</NativeScrollArea>
+          </>
+        )}
       </PopoverContent>
     </Popover>
   )
@@ -127,15 +153,10 @@ export function RunChips({ run }: { readonly run: FlowCanvasViewNodeRun }) {
     <div className={styles.row}>
       <RecordChip label={status} run={run} icon={icon} status={state}>
         {run.error != null && <JSONViewer data={run.error} shouldExpandNode={collapseAllNested} />}
-        {run.startedAt && (
-          <p>
-            {t('canvasCard.started')} · {new Date(run.startedAt).toLocaleString()}
-          </p>
-        )}
       </RecordChip>
       <div className={styles.links}>
         {run.outputs !== undefined && (
-          <RecordChip compactHeader label={t('canvasCard.result')} run={run} icon="i-codicon:output">
+          <RecordChip label={t('canvasCard.result')} run={run} icon="i-codicon:output">
             <JSONViewer data={run.outputs} shouldExpandNode={collapseAllNested} />
           </RecordChip>
         )}

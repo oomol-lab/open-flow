@@ -27,61 +27,103 @@
 
 .popup.popup {
   width: min(520px, calc(100vw - 32px));
-  padding: 18px;
-  gap: 12px;
-  > h2 {
-    margin: 0;
-    font-size: 14px;
-    line-height: 20px;
-  }
-  p {
-    margin: 0;
-  }
+  max-width: var(--available-width);
+  max-height: min(640px, calc(100dvh - 32px), var(--available-height));
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
 }
 .statusPopup.statusPopup {
-  width: min(320px, calc(100vw - 32px));
+  width: min(360px, calc(100vw - 32px));
 }
-.origin {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
+.heading {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 12px 12px 8px;
+  font-size: 13px;
+  line-height: 20px;
+}
+.metadata {
+  display: grid;
+  grid-template-columns: minmax(64px, max-content) minmax(0, 1fr);
+  gap: 6px 12px;
+  flex-shrink: 0;
+  margin: 0;
+  padding: 0 12px 12px;
   font-size: 11px;
-  color: var(--text-2);
-  overflow-wrap: anywhere;
+  line-height: 16px;
+  user-select: text;
+  > div {
+    display: contents;
+  }
+  dt {
+    color: var(--ui-muted-foreground);
+  }
+  dd {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
 }
 .runId {
-  min-width: 0;
+  display: block;
+  width: 100%;
   padding: 0;
   border: 0;
   border-radius: 3px;
   background: transparent;
-  color: inherit;
+  color: var(--ui-muted-foreground);
   cursor: pointer;
   font: inherit;
+  text-align: start;
+  overflow-wrap: anywhere;
   &:hover {
-    color: var(--text-4);
+    color: var(--ui-foreground);
   }
   &:focus-visible {
     @include focus.compact-focus;
   }
 }
+.separator {
+  flex-shrink: 0;
+  height: 1px;
+  margin: 0 8px;
+  background: color-mix(in srgb, var(--ui-border) 50%, transparent);
+}
 .record {
+  height: auto;
+  min-height: 0;
   max-height: min(480px, 65dvh);
+  padding: 12px;
   overflow: auto;
   font-size: 12px;
   line-height: 1.6;
   user-select: text;
+  > p {
+    margin: 0 0 8px;
+    color: var(--ui-muted-foreground);
+  }
 }
 .log {
   padding: 10px 0;
-  border-bottom: 1px solid var(--node-border-color);
+  & + & {
+    border-top: 1px solid color-mix(in srgb, var(--ui-border) 50%, transparent);
+  }
+  &:first-child {
+    padding-top: 0;
+  }
+  &:last-child {
+    padding-bottom: 0;
+  }
   small {
-    color: var(--text-2);
+    color: var(--ui-muted-foreground);
   }
   pre {
     white-space: pre-wrap;
     overflow-wrap: anywhere;
-    margin-top: 5px;
+    margin: 4px 0 0;
+    font: inherit;
+    font-family: monospace;
   }
 }
 .preview {
