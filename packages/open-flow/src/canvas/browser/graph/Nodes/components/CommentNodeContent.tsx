@@ -59,7 +59,7 @@ export function CommentNodeContent({ store }: { store: CommentNodeStore }): JSX.
             }}
             disabled={!editable}
             className={clsx(
-              'h-full min-h-0 field-sizing-fixed resize-none rounded-none border-0 bg-transparent p-0 text-inherit shadow-none focus-visible:outline-none',
+              'h-full min-h-0 field-sizing-fixed resize-none rounded-none border-0 bg-transparent px-3.5 py-3 text-inherit shadow-none focus-visible:outline-none',
               focused && 'nodrag',
             )}
             value={content ?? ''}

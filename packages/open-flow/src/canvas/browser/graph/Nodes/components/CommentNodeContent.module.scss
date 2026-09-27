@@ -2,7 +2,6 @@
   position: relative;
   height: 100%;
   min-height: 0;
-  padding: 12px 14px 28px;
 }
 
 .container {
@@ -36,7 +35,6 @@
   &:hover,
   &:active {
     color: var(--text-4);
-    background: color-mix(in srgb, var(--comment-selected-border) 12%, transparent);
   }
 
   &:focus-visible {
@@ -54,6 +52,7 @@
 }
 
 .markdown {
+  padding: 12px 14px;
   font-size: 13px;
   line-height: 1.65;
   overflow-wrap: anywhere;
