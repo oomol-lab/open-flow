@@ -140,10 +140,12 @@ export function LiveTriggers({ store }: { readonly store: WorkbenchStore }): Rea
                   size="sm"
                 >
                   <span className={`status-dot mr-1 ${triggerClass(binding)}`} />
-                  <span className="trigger-binding-name" title={binding.triggerNodeId}>
-                    {triggerName(binding, revision)}
+                  <span className="trigger-binding-label">
+                    <span className="trigger-binding-name" title={binding.triggerNodeId}>
+                      {triggerName(binding, revision)}
+                    </span>
+                    <span className="trigger-binding-kind">{binding.kind}</span>
                   </span>
-                  <span className="trigger-binding-kind">{binding.kind}</span>
                 </Button>
                 <TriggerStatus binding={binding} />
                 {binding.currentPublicationId != null && (

@@ -155,6 +155,7 @@ function DiagnosticsStory({ dark, language, log }: { dark: boolean; language: Ui
               open={open}
             />
             <WorkspacePublishIsland
+              hasPublications={false}
               onOpenPublications={() => log('Open publications')}
               onOpenRuns={() => log('Open runs')}
               onPublish={() => log('Publish')}

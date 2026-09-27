@@ -450,6 +450,7 @@ export function FlowEditor({
               />
             )}
             <WorkspacePublishIsland
+              hasPublications={live == null ? undefined : live.publication != null}
               onOpenPublications={onOpenPublications}
               onOpenRuns={onOpenRuns}
               onPublish={() => void store.publications.publish()}

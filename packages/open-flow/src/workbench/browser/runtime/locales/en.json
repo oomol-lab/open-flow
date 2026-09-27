@@ -498,6 +498,7 @@
     "activityOperatorPaused": "Paused by an operator",
     "activityOperatorResumed": "Resumed by an operator",
     "actor": "Published by",
+    "restoredBy": "Restored by",
     "createdAt": "Created",
     "current": "Current Live",
     "failed": "Failed",
@@ -568,7 +569,7 @@
     "publishFailed": "Publishing failed",
     "stillUnpublished": "This flow has not been published.",
     "liveUnchanged": "The current Live publication is unchanged.",
-    "rollbackSource": "Restored from version",
+    "rollbackSource": "Restored from",
     "rollbackToVersion": "Roll back to this version",
     "snapshot": "Workflow snapshot",
     "snapshotUnavailable": "Workflow snapshot previews are not available yet.",
@@ -576,9 +577,6 @@
     "enabled": "Enabled",
     "disabled": "Disabled",
     "versionTitle": "Publication",
-    "endedEnabled": "Enabled when replaced",
-    "endedDisabled": "Disabled when replaced",
-    "endUnknown": "End state not recorded",
     "preview": "Publish preview"
   },
   "run": {
@@ -1352,7 +1350,7 @@
     "loadFailed": "Could not load connections."
   },
   "snapshot": {
-    "readOnly": "Read-only version",
+    "title": "Snapshot",
     "restore": "Restore layout",
     "missingLayout": "This version has no saved layout. Nodes are arranged automatically.",
     "loading": "Loading version…",

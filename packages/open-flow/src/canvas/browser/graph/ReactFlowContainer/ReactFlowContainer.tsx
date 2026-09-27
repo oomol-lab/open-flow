@@ -211,6 +211,7 @@ export const ReactFlowContainer: React.FC<ReactFlowContainerProps> = (props: Rea
 
 type FlowControlsProps = Pick<
   ReactFlowContainerProps,
+  | 'editable'
   | 'cornerTools'
   | 'cornerLeading'
   | 'topLeftTools'
@@ -258,6 +259,7 @@ const FlowControls = /*#__PURE__*/ memo((props: FlowControlsProps) => {
     <>
       {props.dottedBackground && <Background id={bgId} color="var(--canvas-grid)" gap={GRID_GAP} size={2} variant={BackgroundVariant.Dots} />}
       <CanvasViewControls
+        readOnly={!props.editable}
         interactiveMode$={props.interactiveMode$}
         miniMapExpanded$={props.miniMapExpanded$}
         maxZoomReached={maxZoomReached}
@@ -725,6 +727,7 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
             <SelectionFloatBar editable={!!editable} nodes={selectedNodes} onDelete={deleteSelectedNodes} duplicateNodes={props.duplicateNodes} />
           )}
           <FlowControls
+            editable={props.editable}
             cornerTools={props.cornerTools}
             cornerLeading={props.cornerLeading}
             topLeftTools={props.topLeftTools}

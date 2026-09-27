@@ -12,10 +12,10 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from '../../../../ui
 import { Label } from '../../../../ui/browser/label.tsx'
 import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { Switch } from '../../../../ui/browser/switch.tsx'
-import { RevisionCanvas } from '../editor/revisionCanvas.tsx'
 import { Icon } from '../icons.tsx'
 import { IdTooltip } from '../shell/idTooltip.tsx'
 import { LiveTriggers } from './liveTriggers.tsx'
+import { PublicationActor } from './publicationActor.tsx'
 import { PublicationSnapshot } from './publicationSnapshot.tsx'
 
 function compactId(value: string): string {
@@ -53,9 +53,6 @@ export function PublicationsView({
   const language = useLang()
   const t = useTranslate()
   const busy = useVal(store.$.busy)
-  const diagnostics = useVal(store.$.diagnostics)
-  const draft = useVal(store.workspace.$.draft)
-  const presentation = useVal(store.workspace.$.presentation)
   const flow = useVal(store.workspace.$.targetFlow)
   const live = useVal(store.publications.$.live)
   const loadFailed = useVal(store.publications.$.loadFailed)
@@ -64,17 +61,14 @@ export function PublicationsView({
   const loadMoreFailed = useVal(store.publications.$.loadMoreFailed)
   const loadingMore = useVal(store.publications.$.loadingMore)
   const nextCursor = useVal(store.publications.$.nextCursor)
-  const operation = useVal(store.publications.$.operation)
   const publications = useVal(store.publications.$.publications)
   const flowId = useVal(store.workspace.$.flowId)
   const refreshing = useVal(store.publications.$.refreshing)
   const rollingBackPublicationId = useVal(store.publications.$.rollingBackPublicationId)
-  const revision = useVal(store.workspace.$.revision)
-  const total = useVal(store.publications.$.total)
   const [confirming, setConfirming] = useState<string>()
   // Keep the viewed version across pagination, while refreshing its Live end metadata.
   const [selection, setSelected] = useState<Publication>()
-  const selected = publications.find((publication) => publication.publicationId === selection?.publicationId) ?? selection
+  const selected = publications.find((publication) => publication.publicationId === selection?.publicationId) ?? selection ?? publications[0]
   const [detailOpen, setDetailOpen] = useState(false)
   const [changingEnabled, setChangingEnabled] = useState(false)
   const root = useRef<HTMLElement>(null)
@@ -94,7 +88,7 @@ export function PublicationsView({
     if (group == null) groups.set(date, [publication])
     else group.push(publication)
   }
-  const select = (publication: Publication | undefined, button: HTMLButtonElement): void => {
+  const select = (publication: Publication, button: HTMLButtonElement): void => {
     opener.current = button
     setSelected(publication)
     setConfirming(undefined)
@@ -104,35 +98,6 @@ export function PublicationsView({
     if (detailOpen) heading.current?.focus({ preventScroll: true })
     else if (opener.current != null) (opener.current.isConnected ? opener.current : sidebarHeading.current)?.focus({ preventScroll: true })
   }, [selected?.publicationId, detailOpen])
-
-  let operationClass = 'neutral'
-  let operationDetail: ReactElement | undefined
-  let operationLabel = ''
-  switch (operation?.status) {
-    case 'pending':
-      operationClass = 'running'
-      operationDetail = <span>{t('publication.publishingDescription')}</span>
-      operationLabel = t('workspace.publishing')
-      break
-    case 'failed': {
-      operationClass = 'danger'
-      const nodeId = operation.issue.nodeId
-      const nodeTitle = nodeId == null ? undefined : revision?.node({ kind: 'flow' }, nodeId)?.node.name
-      operationDetail = (
-        <>
-          <span>{operation.issue.message}</span>
-          <span className="publication-progress-meta">
-            <code>{operation.issue.code}</code>
-            {nodeId != null && <code title={nodeId}>{t('publication.failureNode', { id: nodeTitle ?? nodeId })}</code>}
-          </span>
-        </>
-      )
-      operationLabel = t('publication.publishFailed')
-      break
-    }
-    case undefined:
-      break
-  }
 
   useEffect(() => setConfirming(undefined), [live?.publication?.publicationId])
 
@@ -146,7 +111,6 @@ export function PublicationsView({
       </section>
     )
 
-  const invalid = diagnostics?.valid == false
   const currentPublicationId = live?.publication?.publicationId
 
   const disabled = busy != null || loading || loadFailed || refreshing || changingEnabled
@@ -164,7 +128,7 @@ export function PublicationsView({
       <span className="sr-only" role="status">
         {loading || refreshing ? t('publication.loading') : ''}
       </span>
-      <div className={`publication-layout${detailOpen ? ' detail-open' : ''}`}>
+      <div className={`publication-layout${detailOpen ? ' detail-open' : ''}${selected == null ? ' history-only' : ''}`}>
         <Button className="publication-close" aria-label={t('common.close')} onClick={onClose} size="icon-sm" variant="ghost">
           <Icon name="close" />
         </Button>
@@ -178,29 +142,7 @@ export function PublicationsView({
               <span className="truncate">{flow.name}</span>
             </div>
           </header>
-          <div className="publication-draft-link">
-            <Button
-              aria-current={selected == null ? 'true' : undefined}
-              className="publication-list-item"
-              onClick={(event) => select(undefined, event.currentTarget)}
-              variant="ghost"
-            >
-              <span className="status-dot warning" />
-              <span className="text-xs font-medium">{t('resource.draft')}</span>
-              <span className="publication-list-meta col-start-2">
-                {loading
-                  ? t('publication.loading')
-                  : loadFailed || live == null
-                    ? '—'
-                    : t(live.hasUnpublishedChanges ? 'workspace.unpublishedChanges' : 'publication.upToDate')}
-              </span>
-            </Button>
-          </div>
           <ScrollArea className="publication-list" defer={false} tabIndex={-1}>
-            <h3 className="publication-list-heading">
-              {t('publication.history')}
-              {!loading && !loadFailed && <span>{total ?? publications.length}</span>}
-            </h3>
             {loading ? (
               <p className="publication-empty">{t('publication.loading')}</p>
             ) : loadFailed ? (
@@ -217,7 +159,7 @@ export function PublicationsView({
               </Empty>
             ) : (
               Array.from(groups, ([date, items]) => (
-                <section key={date} className="mb-3">
+                <section key={date} className="pb-3">
                   <h3 className="publication-date">
                     <time dateTime={items[0]!.createdAt}>
                       {new Date(items[0]!.createdAt).toLocaleDateString(language, { year: 'numeric', month: 'long', day: 'numeric' })}
@@ -233,27 +175,23 @@ export function PublicationsView({
                     >
                       <span
                         aria-hidden="true"
-                        className={`status-dot ${publication.publicationId == currentPublicationId ? (live?.status == 'runnable' ? 'success' : 'neutral') : publication.liveEnd == null ? 'neutral' : publication.liveEnd.enabled ? 'success opacity-40' : 'neutral opacity-40'}`}
+                        className={`status-dot ${publication.publicationId == currentPublicationId && live?.status == 'runnable' ? 'success' : 'neutral'}`}
                         title={
                           publication.publicationId == currentPublicationId
                             ? t(live?.status == 'runnable' ? 'publication.enabled' : 'publication.disabled')
-                            : t(
-                                publication.liveEnd == null
-                                  ? 'publication.endUnknown'
-                                  : publication.liveEnd.enabled
-                                    ? 'publication.endedEnabled'
-                                    : 'publication.endedDisabled',
-                              )
+                            : undefined
                         }
                       />
-                      <span className="flex min-w-0 items-center justify-between gap-2 text-xs font-medium">
+                      <span className="flex min-w-0 items-baseline justify-between gap-2 text-xs font-medium">
                         <span>{t(publication.operation == 'publish' ? 'publication.published' : 'publication.rolledBack')}</span>
-                        {publication.publicationId == currentPublicationId && <CurrentLiveBadge enabled={live?.status == 'runnable'} />}
-                      </span>
-                      <span className="publication-list-meta col-start-2 flex justify-between gap-2">
-                        <time dateTime={publication.createdAt}>
+                        {publication.publicationId == currentPublicationId && (
+                          <span className="sr-only">{t('publication.current')}</span>
+                        )}
+                        <time className="publication-list-meta shrink-0 font-normal" dateTime={publication.createdAt}>
                           {new Date(publication.createdAt).toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' })}
                         </time>
+                      </span>
+                      <span className="publication-list-meta col-start-2 font-normal">
                         <CompactId value={publication.publicationId} />
                       </span>
                     </Button>
@@ -268,109 +206,68 @@ export function PublicationsView({
             </Button>
           )}
         </aside>
-        <section className="publication-detail">
-          <header className="publication-detail-header">
-            <Button className="publication-back" onClick={() => setDetailOpen(false)} size="sm" variant="ghost">
-              <Icon name="chevron-left" />
-              {t('publication.history')}
-            </Button>
-            <div className="publication-detail-title">
-              <h2 ref={heading} tabIndex={-1} className="flex flex-wrap items-center gap-2">
-                {selected == null ? (
-                  t('resource.draft')
-                ) : (
-                  <>
-                    {t('publication.versionTitle')} {identifier(selected.publicationId)}
-                  </>
+        {selected != null && (
+          <section className="publication-detail">
+            <header className="publication-detail-header">
+              <Button className="publication-back" onClick={() => setDetailOpen(false)} size="sm" variant="ghost">
+                <Icon name="chevron-left" />
+                {t('publication.history')}
+              </Button>
+              <div className="publication-detail-title">
+                <h2 ref={heading} tabIndex={-1} className="flex flex-wrap items-center gap-2">
+                  {t('publication.versionTitle')} {identifier(selected.publicationId)}
+                </h2>
+                {selected.publicationId == currentPublicationId && <CurrentLiveBadge enabled={live?.status == 'runnable'} />}
+              </div>
+              <div className="publication-detail-actions">
+                {selected.publicationId == currentPublicationId && flow.live != null && (
+                  <Label className="text-xs">
+                    <Switch
+                      aria-label={t('resource.enableFlow', { name: flow.name })}
+                      checked={flow.live.enabled}
+                      disabled={disabled || flow.status != 'active'}
+                      size="sm"
+                      onCheckedChange={async (enabled) => {
+                        setChangingEnabled(true)
+                        try {
+                          await store.workspace.setFlowEnabled(flow, enabled)
+                          await store.publications.load(flow.flowId)
+                        } finally {
+                          setChangingEnabled(false)
+                        }
+                      }}
+                    />
+                    {t(flow.live.enabled ? 'publication.enabled' : 'publication.disabled')}
+                  </Label>
                 )}
-              </h2>
-              {selected != null && selected.publicationId == currentPublicationId && <CurrentLiveBadge enabled={live?.status == 'runnable'} />}
-              {selected == null && !loading && !loadFailed && live != null && (
-                <Badge variant="secondary">
-                  {t(
-                    currentPublicationId == null
-                      ? 'publication.notPublished'
-                      : live.hasUnpublishedChanges
-                        ? 'workspace.unpublishedChanges'
-                        : 'publication.upToDate',
-                  )}
-                </Badge>
-              )}
-            </div>
-            <div className="publication-detail-actions">
-              {selected == null && (
-                <Button size="xs" variant="outline" onClick={onClose}>
-                  {t('publication.editDraft')}
-                </Button>
-              )}
-              {selected != null && selected.publicationId == currentPublicationId && flow.live != null && (
-                <Label className="text-xs">
-                  <Switch
-                    aria-label={t('resource.enableFlow', { name: flow.name })}
-                    checked={flow.live.enabled}
-                    disabled={disabled || flow.status != 'active'}
-                    size="sm"
-                    onCheckedChange={async (enabled) => {
-                      setChangingEnabled(true)
-                      try {
-                        await store.workspace.setFlowEnabled(flow, enabled)
-                        await store.publications.load(flow.flowId)
-                      } finally {
-                        setChangingEnabled(false)
-                      }
-                    }}
-                  />
-                  {t(flow.live.enabled ? 'publication.enabled' : 'publication.disabled')}
-                </Label>
-              )}
-              {selected == null ? (
-                <Button
-                  disabled={disabled || invalid || draft == null || flow.status != 'active' || live?.hasUnpublishedChanges == false}
-                  onClick={async () => {
-                    if (await store.publications.publish()) {
-                      setSelected(store.publications.$.live.value?.publication ?? undefined)
-                      setDetailOpen(true)
-                    }
-                  }}
-                  size="xs"
-                >
-                  {t(busy == 'publish' ? 'workspace.publishing' : 'publication.publishDraft')}
-                </Button>
-              ) : selected.publicationId != currentPublicationId && currentPublicationId != null ? (
-                <Button
-                  ref={rollbackButton}
-                  aria-expanded={confirming == selected.publicationId}
-                  aria-controls={confirming == selected.publicationId ? confirmationId : undefined}
-                  disabled={disabled}
-                  onClick={() => setConfirming(selected.publicationId)}
-                  size="xs"
-                  variant="outline"
-                >
-                  {t('publication.rollbackToVersion')}
-                </Button>
-              ) : null}
-            </div>
-            {selected != null && (
+                {selected.publicationId != currentPublicationId && currentPublicationId != null && (
+                  <Button
+                    ref={rollbackButton}
+                    aria-expanded={confirming == selected.publicationId}
+                    aria-controls={confirming == selected.publicationId ? confirmationId : undefined}
+                    disabled={disabled}
+                    onClick={() => setConfirming(selected.publicationId)}
+                    size="xs"
+                    variant="outline"
+                  >
+                    {t('publication.rollbackToVersion')}
+                  </Button>
+                )}
+              </div>
               <div className="publication-detail-meta">
                 {selected.sourcePublicationId != null && (
                   <span>
                     {t('publication.rollbackSource')} {identifier(selected.sourcePublicationId)}
                   </span>
                 )}
-                {selected.publicationId != currentPublicationId && selected.liveEnd != null && (
-                  <span title={new Date(selected.liveEnd.endedAt).toLocaleString(language)}>
-                    {t(selected.liveEnd.enabled ? 'publication.endedEnabled' : 'publication.endedDisabled')}
-                  </span>
-                )}
                 <time dateTime={selected.createdAt}>{new Date(selected.createdAt).toLocaleString(language, { dateStyle: 'medium', timeStyle: 'short' })}</time>
-                <span>
-                  {t('publication.actor')}: {identifier(selected.actorId)}
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  <span>{t(selected.operation === 'rollback' ? 'publication.restoredBy' : 'publication.actor')}:</span>
+                  <PublicationActor key={selected.actorId} actorId={selected.actorId} store={store.actors} />
                 </span>
               </div>
-            )}
-          </header>
-          <div className="publication-content">
-            {selected != null ? (
+            </header>
+            <div className="publication-content">
               <div className="publication-version">
                 {confirming == selected.publicationId && (
                   <div id={confirmationId} className="publication-confirm" role="group" aria-label={t('publication.rollback')}>
@@ -396,7 +293,9 @@ export function PublicationsView({
                         onClick={async () => {
                           if (await store.publications.rollback(selected)) {
                             setSelected((viewed) =>
-                              viewed?.publicationId == selected.publicationId ? (store.publications.$.live.value?.publication ?? undefined) : viewed,
+                              viewed == null || viewed.publicationId == selected.publicationId
+                                ? (store.publications.$.live.value?.publication ?? undefined)
+                                : viewed,
                             )
                             setConfirming(undefined)
                           }
@@ -416,46 +315,9 @@ export function PublicationsView({
                 )}
                 <PublicationSnapshot key={selected.publicationId} publication={selected} store={store} theme={theme} />
               </div>
-            ) : loading ? (
-              <div className="publication-empty">{t('publication.loading')}</div>
-            ) : loadFailed ? (
-              <div className="publication-empty">
-                <p>{t('publication.loadFailed')}</p>
-                {retry}
-              </div>
-            ) : (
-              <div className="publication-draft-content">
-                {operation != null && operation.status != 'succeeded' && (
-                  <div className={`publication-progress ${operation.status}`} role={operation.status == 'failed' ? 'alert' : 'status'}>
-                    <span className={`status-dot ${operationClass}`} />
-                    <div>
-                      <strong>{operationLabel}</strong>
-                      {operationDetail}
-                      {operation.status == 'failed' && (
-                        <span>{t(currentPublicationId == null ? 'publication.stillUnpublished' : 'publication.liveUnchanged')}</span>
-                      )}
-                    </div>
-                  </div>
-                )}
-                {live?.hasUnpublishedChanges && invalid && (
-                  <p className="publication-draft-issue" role="status">
-                    {t('workspace.fixIssuesToPublish')}
-                  </p>
-                )}
-                {draft != null && presentation != null && (
-                  <RevisionCanvas
-                    key={`${draft.revisionId}:${presentation.revision}`}
-                    draft={draft}
-                    presentation={presentation}
-                    theme={theme}
-                    label={t('publication.preview')}
-                    interactiveMode$={store.interactiveMode$}
-                  />
-                )}
-              </div>
-            )}
-          </div>
-        </section>
+            </div>
+          </section>
+        )}
       </div>
     </section>
   )

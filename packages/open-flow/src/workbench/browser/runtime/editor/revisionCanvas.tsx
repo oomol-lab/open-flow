@@ -68,11 +68,11 @@ export function RevisionCanvas({
     setInspectorOpen(true)
   }
   return (
-    <section ref={root} className={`revision-viewer${inspectorOpen ? ' inspector-open' : ''}`} aria-label={label ?? t('snapshot.readOnly')}>
+    <section ref={root} className={`revision-viewer${inspectorOpen ? ' inspector-open' : ''}`} aria-label={label ?? t('snapshot.title')}>
       <header className="revision-viewer-toolbar">
         <span className="inline-flex items-center gap-1.5 font-medium">
           <i aria-hidden="true" className="i-lucide-light:lock-keyhole" />
-          {label ?? t('snapshot.readOnly')}
+          {label ?? t('snapshot.title')}
         </span>
         {target.kind === 'subflow' && (
           <Button size="xs" variant="ghost" onClick={() => navigate({ kind: 'flow' })}>

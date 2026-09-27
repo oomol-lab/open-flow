@@ -27,6 +27,7 @@ import { revisionView } from '../revisionView.ts'
 import { RunRequestStore } from '../runs/runRequestStore.ts'
 import { RunStore } from '../runs/runStore.ts'
 import { designerGraph } from '../workspace.ts'
+import { ActorStore } from './actorStore.ts'
 import { readCanvasInteractiveMode, writeCanvasInteractiveMode } from './canvasInteractiveMode.ts'
 import { CatalogStores } from './catalogStores.ts'
 import { ConnectorAccessStore } from './connectorAccessStore.ts'
@@ -115,6 +116,7 @@ export class WorkbenchStore {
   public readonly $: Workbench$
   public readonly connectors: ConnectorStore
   public readonly connectorAccess: ConnectorAccessStore
+  public readonly actors: ActorStore
   public readonly publications: PublicationStore
   public readonly runRequests: RunRequestStore
   public readonly runs: RunStore
@@ -126,9 +128,10 @@ export class WorkbenchStore {
     preferences: WorkbenchPreferences,
     identity: () => string = randomId,
     i18n: I18n = createI18n(),
-    host: Pick<WorkbenchHost, 'openExternalPage' | 'connectionCache' | 'catalogCache'> = blockedExternalPages,
+    host: Pick<WorkbenchHost, 'openExternalPage' | 'connectionCache' | 'catalogCache' | 'resolveActor'> = blockedExternalPages,
     variables = true,
   ) {
+    this.actors = new ActorStore(host.resolveActor)
     this.preferences = preferences
     this.interactiveMode$ = val(readCanvasInteractiveMode(preferences))
     this.interactiveMode$.reaction((mode) => writeCanvasInteractiveMode(preferences, mode), true)
@@ -287,6 +290,7 @@ export class WorkbenchStore {
     for (const value of Object.values(this.$)) value.dispose()
     this.connectors.dispose()
     this.connectorAccess.dispose()
+    this.actors.dispose()
     this.publications.dispose()
     this.runRequests.dispose()
     this.runs.dispose()

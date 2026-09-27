@@ -140,6 +140,7 @@ function CanvasOptionsMenu({
 }
 
 export function CanvasViewControls({
+  readOnly = false,
   interactiveMode$,
   miniMapExpanded$,
   maxZoomReached,
@@ -153,6 +154,7 @@ export function CanvasViewControls({
 }: {
   readonly interactiveMode$?: Val<InteractiveMode>
   readonly miniMapExpanded$?: Val<boolean | undefined>
+  readonly readOnly?: boolean
   readonly maxZoomReached: boolean
   readonly minZoomReached: boolean
   readonly onFitView: () => void
@@ -170,6 +172,7 @@ export function CanvasViewControls({
     <Panel
       position="bottom-left"
       className={cn('open-flow-control-island open-flow-control-island-compact', styles.dock, styles.viewDock)}
+      data-readonly={readOnly}
       data-canvas-control-scope
       data-tooltip-toolbar
       ref={setPopupContainer}

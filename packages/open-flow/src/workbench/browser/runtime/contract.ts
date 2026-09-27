@@ -17,7 +17,16 @@ export interface WorkbenchNotification {
   }
 }
 
+/** Display data for an actor in the host's identity namespace. */
+export interface WorkbenchActor {
+  readonly name: string
+  readonly avatarUrl?: string
+}
+
 export interface WorkbenchHost {
+  /** Optional deployment-owned identity lookup. Return null for an unknown actor. */
+  readonly resolveActor?: (actorId: string, signal: AbortSignal) => Promise<WorkbenchActor | null>
+
   /** Shared, optional persistent catalog responses, isolated by browser origin. */
   readonly catalogCache?: {
     readonly storage?: CatalogCacheStorage

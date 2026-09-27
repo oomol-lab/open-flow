@@ -305,3 +305,5 @@ Callback response 不能在承载 Workbench 或 Control API 的 origin 上成为
 Workbench 的 Providers、Actions、Connections、Triggers 数据分别由所属 Store 管理。Store 对外提供稳定的只读 Val，拥有刷新协调、ETag 和持久化；传输层保持无状态。业务访问触发刷新条件检查，消费者订阅实际数据变化，不使用 URL 缓存或 revision 通知计数。Actions 详情从按 provider 缓存的完整目录派生，浏览器目录不按 Flow 已选授权过滤；未授权仍可读取定义以编辑 Draft，连接状态在消费处组合。浏览器业务通过静态边界检查限制为从 Store 访问这些数据。存储位置与刷新间隔见 [Control API 契约](control/contracts/control-api.md)。
 
 Publication 被替换时，在切换 Live 的事务中固定 `liveEnd`（结束时间与切换前启用状态）。它不包含 Trigger 健康状态；当前版本和迁移前未记录的历史版本无此快照。回滚创建独立 Publication，其结束状态从空值开始。
+
+Workbench 的发布者展示资料由可选的 `WorkbenchHost.resolveActor` 按宿主身份空间解析。OOMOL Console 适配用户 summaries API；其它宿主可提供自己的解析器，未提供时展示记录中的 actorId。独立的会话级 ActorStore 用 LRU 缓存完整资料响应，不向 Publication 快照写入或合并用户资料；会话结束时清空并取消在途请求。

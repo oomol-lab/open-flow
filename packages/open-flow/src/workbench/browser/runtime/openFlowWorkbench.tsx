@@ -185,7 +185,7 @@ function Workbench({
   )
 }
 
-export type { CatalogCacheStorage } from './contract.ts'
+export type { CatalogCacheStorage, WorkbenchActor } from './contract.ts'
 
 export type {
   FlowCatalogEvent,

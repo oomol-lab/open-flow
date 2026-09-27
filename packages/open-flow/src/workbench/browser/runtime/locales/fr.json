@@ -498,6 +498,7 @@
     "activityOperatorPaused": "Mis en pause par un opérateur",
     "activityOperatorResumed": "Repris par un opérateur",
     "actor": "Publié par",
+    "restoredBy": "Restauré par",
     "createdAt": "Créé le",
     "current": "Version en ligne actuelle",
     "failed": "Échec",
@@ -568,7 +569,7 @@
     "publishFailed": "Échec de la publication",
     "stillUnpublished": "Ce workflow n’a pas encore été publié.",
     "liveUnchanged": "La version en ligne reste inchangée.",
-    "rollbackSource": "Restaurée depuis la version",
+    "rollbackSource": "Restauré depuis",
     "rollbackToVersion": "Restaurer cette version",
     "snapshot": "Instantané du workflow",
     "snapshotUnavailable": "L’aperçu des instantanés n’est pas encore disponible.",
@@ -576,9 +577,6 @@
     "enabled": "Activé",
     "disabled": "Désactivé",
     "versionTitle": "Version publiée",
-    "endedEnabled": "Activée au remplacement",
-    "endedDisabled": "Désactivée au remplacement",
-    "endUnknown": "État final non enregistré",
     "preview": "Aperçu de publication"
   },
   "run": {
@@ -1352,7 +1350,7 @@
     "loadFailed": "Impossible de charger les connexions."
   },
   "snapshot": {
-    "readOnly": "Version en lecture seule",
+    "title": "Instantané",
     "restore": "Rétablir la disposition",
     "missingLayout": "Aucune disposition enregistrée. Les nœuds sont placés automatiquement.",
     "loading": "Chargement de la version…",

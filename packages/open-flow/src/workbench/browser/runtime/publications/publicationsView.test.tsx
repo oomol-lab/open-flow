@@ -7,12 +7,22 @@ import { describe, expect, it, vi } from 'vitest'
 import { createI18n } from '../i18n.ts'
 import { PublicationsView } from './publicationsView.tsx'
 
-vi.mock('../editor/revisionCanvas.tsx', () => ({
-  RevisionCanvas: ({ draft, label }: { draft: { revisionId: string }; label: string }) => <section aria-label={label} data-revision={draft.revisionId} />,
+vi.mock('./publicationSnapshot.tsx', () => ({
+  PublicationSnapshot: ({ publication }: { publication: { revisionId: string } }) => (
+    <section aria-label="Publication snapshot">{publication.revisionId}</section>
+  ),
 }))
 
-function renderState({ failedLoad = false, failedPublish = false, published = false, loading = false, initial = false } = {}) {
-  const publication = { publicationId: 'publication-current', revisionId: 'revision-published' }
+function renderState({ failedLoad = false, published = false, loading = false, initial = false, restored = false } = {}) {
+  const publication = {
+    publicationId: 'publication-current',
+    revisionId: 'revision-published',
+    createdAt: '2026-09-24T09:00:00.000Z',
+    actorId: 'operator',
+    operation: restored ? 'rollback' : 'publish',
+    sourcePublicationId: restored ? 'publication-source' : undefined,
+    liveEnd: { enabled: false, endedAt: '2026-09-25T09:00:00.000Z' },
+  }
   const store = {
     $: { busy: val(undefined), diagnostics: val(undefined) },
     workspace: {
@@ -29,7 +39,7 @@ function renderState({ failedLoad = false, failedPublish = false, published = fa
         live: val(
           initial ? undefined : { status: published ? 'runnable' : 'not-published', publication: published ? publication : null, hasUnpublishedChanges: true },
         ),
-        publications: val([]),
+        publications: val(published ? [publication] : []),
         total: val(0),
         loadFailed: val(failedLoad),
         loading: val(loading),
@@ -38,7 +48,6 @@ function renderState({ failedLoad = false, failedPublish = false, published = fa
         loadMoreFailed: val(false),
         nextCursor: val(undefined),
         rollingBackPublicationId: val(undefined),
-        operation: val(failedPublish ? { status: 'failed', issue: { code: 'publication.deadline-exceeded', message: 'Preparation timed out.' } } : undefined),
         changingTriggerId: val(undefined),
         bindings: val([]),
         detail: val(undefined),
@@ -67,18 +76,34 @@ function renderState({ failedLoad = false, failedPublish = false, published = fa
 }
 
 describe('PublicationsView state semantics', () => {
-  it('keeps publishing guidance in Draft without exposing Live operations', () => {
+  it('opens the latest publication without Draft navigation or a redundant history heading', () => {
     const markup = renderState({ published: true })
-    expect(markup).toContain('Draft</h2>')
-    expect(markup).toContain('Edit draft')
-    expect(markup).toContain('aria-label="Publish preview"')
-    expect(markup).toContain('data-revision="revision-draft"')
-    expect(markup).not.toContain('View current publication')
-    expect(markup).toContain('Publish to Live')
-    expect(markup).toContain('Unpublished changes')
-    expect(markup).not.toContain('Live Triggers')
-    expect(markup).not.toContain('role="switch"')
-    expect(markup).not.toContain('Current Live</h2>')
+    expect(markup).toContain('revision-published')
+    expect(markup).toContain('Current Live')
+    expect(markup).toContain('Live Triggers')
+    expect(markup).not.toContain('Draft')
+    expect(markup).not.toContain('Edit draft')
+    expect(markup).not.toContain('Publish to Live')
+    expect(markup).not.toMatch(/<h[1-6][^>]*>Publication history/)
+  })
+
+  it.each([false, true])('attributes publication actions correctly (restored=%s)', (restored) => {
+    const markup = renderState({ published: true, restored })
+    expect(markup).toContain(restored ? 'Restored by' : 'Published by')
+    expect(markup).not.toContain(restored ? 'Published by' : 'Restored by')
+    if (restored) {
+      expect(markup).toContain('Restored from')
+      expect(markup).not.toContain('Restored from version')
+    }
+    expect(markup).not.toContain('Disabled when replaced')
+    expect(markup).not.toContain('Enabled when replaced')
+  })
+
+  it('shows the empty history without a Draft preview', () => {
+    const markup = renderState()
+    expect(markup).toContain('No publications yet')
+    expect(markup).not.toContain('Publication snapshot')
+    expect(markup).not.toContain('Draft')
   })
 
   it('distinguishes history load failure from an unpublished flow', () => {
@@ -87,14 +112,6 @@ describe('PublicationsView state semantics', () => {
     expect(markup).toContain('Retry')
     expect(markup).not.toContain('No publications yet')
     expect(markup).not.toContain('No Trigger bindings')
-  })
-
-  it.each([true, false])('scopes a failed publish to the operation when published=%s', (published) => {
-    const markup = renderState({ failedPublish: true, published })
-    expect(markup).toContain('Publishing failed')
-    expect(markup).toContain('Preparation timed out.')
-    expect(markup).toContain(published ? 'The current Live publication is unchanged.' : 'This flow has not been published.')
-    expect(markup).not.toContain(published ? 'This flow has not been published.' : 'The current Live publication is unchanged.')
   })
 
   it.each([true, false])('does not announce empty history before Live is available (initial=%s)', (initial) => {

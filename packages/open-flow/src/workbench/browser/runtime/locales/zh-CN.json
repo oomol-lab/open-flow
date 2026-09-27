@@ -498,6 +498,7 @@
     "activityOperatorPaused": "已由操作者暂停",
     "activityOperatorResumed": "已由操作者恢复",
     "actor": "发布人",
+    "restoredBy": "恢复人",
     "createdAt": "创建时间",
     "current": "当前线上",
     "failed": "失败",
@@ -568,7 +569,7 @@
     "publishFailed": "发布失败",
     "stillUnpublished": "此工作流尚未发布。",
     "liveUnchanged": "当前线上版本未改变。",
-    "rollbackSource": "恢复自版本",
+    "rollbackSource": "恢复自",
     "rollbackToVersion": "回滚到此版本",
     "snapshot": "工作流快照",
     "snapshotUnavailable": "工作流快照预览暂未提供。",
@@ -576,9 +577,6 @@
     "enabled": "已启用",
     "disabled": "已停用",
     "versionTitle": "发布版本",
-    "endedEnabled": "结束时已启用",
-    "endedDisabled": "结束时已停用",
-    "endUnknown": "未记录结束时状态",
     "preview": "发布预览"
   },
   "run": {
@@ -1352,7 +1350,7 @@
     "loadFailed": "无法加载连接。"
   },
   "snapshot": {
-    "readOnly": "只读版本",
+    "title": "快照",
     "restore": "恢复布局",
     "missingLayout": "此版本未保存布局，已自动排列",
     "loading": "正在加载版本…",

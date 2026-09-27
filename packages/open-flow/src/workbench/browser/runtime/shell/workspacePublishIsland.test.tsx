@@ -16,7 +16,7 @@ it.each<readonly [PublishState, string]>([
 ])('explains the %s publish state to assistive technology', (state, description) => {
   const markup = renderToStaticMarkup(
     <I18nProvider i18n={createI18n('zh-CN')}>
-      <WorkspacePublishIsland onOpenPublications={() => {}} onOpenRuns={() => {}} onPublish={() => {}} state={state} />
+      <WorkspacePublishIsland hasPublications onOpenPublications={() => {}} onOpenRuns={() => {}} onPublish={() => {}} state={state} />
     </I18nProvider>,
   )
 

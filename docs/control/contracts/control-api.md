@@ -329,6 +329,13 @@ interface PublicationPresentation {
 首次接受发布操作的事务固定已保存的 Presentation，异步完成和幂等重放不重新读取布局。Rollback 继承来源快照且不写入草稿 Presentation。
 旧记录和升级前的 pending operation 没有快照时返回 `null`；不得用当前 Presentation 代替。Publication 不存在或不属于指定 Flow 时返回 `publication.not-found`。
 
+发布者头像和名称不属于 Publication 快照。Workbench 通过可选的宿主接口
+`resolveActor(actorId, signal): Promise<{ name: string; avatarUrl?: string } | null>` 读取展示资料。
+宿主负责身份空间与上游接口映射；OOMOL Console 使用 `GET /v1/users/summaries?user_ids=...`，
+把 `nickname || username` 映射为名称、`url` 映射为头像。未接入解析器、用户不存在或请求失败时显示原始 actorId。
+独立 ActorStore 按 actorId 缓存完整响应（包括 null），每个 Workbench 会话最多 128 项、有效期 24 小时；
+读取命中更新 LRU 次序，同一身份的在途请求合并，失败不缓存。会话销毁清空缓存并取消请求，不持久化用户资料。
+
 Publication list 按 `createdAt`、`publicationId` 逆序稳定分页：
 
 ```ts

@@ -425,7 +425,7 @@ export const workflowStories: readonly FrontendStory[] = [
     id: 'workflow',
     title: 'Workflow components',
     description:
-      'Right-click the canvas for Add node and Paste. Add node opens the current picker; Paste logs its canvas position. Switch to read-only to inspect disabled actions.',
+      'Right-click the canvas for Add node and Paste. Add node opens the current picker; Paste logs its canvas position. Switch to read-only to inspect disabled actions and the expanded view controls, including below 900px.',
     standalone: true,
     render: (log, dark, language) => <WorkflowStory dark={dark} language={language} log={log} model={workflow} />,
   },
@@ -452,6 +452,7 @@ export const workflowStories: readonly FrontendStory[] = [
 function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean; readonly language: UiLanguage; readonly log: LogAction }) {
   const i18n = useMemo(() => createI18n(language), [language])
   const [shortName, setShortName] = useState(true)
+  const [hasPublications, setHasPublications] = useState<boolean | undefined>(true)
   const [publishState, setPublishState] = useState<PublishState>('ready')
   const [saveStatus, setSaveStatus] = useState<WorkspaceStatus>('saved')
   const [ghost, setGhost] = useState(false)
@@ -468,6 +469,10 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
     { label: ghost ? 'Show canvas island' : 'Show loading and recovery ghost style', onClick: () => setGhost((current) => !current) },
     { label: shortName ? 'Show long name' : 'Show short name', onClick: () => setShortName((current) => !current) },
     { label: `Show ${nextSaveStatus} draft save state`, onClick: () => setSaveStatus(nextSaveStatus) },
+    {
+      label: `History: ${hasPublications == null ? 'loading' : hasPublications ? 'published' : 'unpublished'}`,
+      onClick: () => setHasPublications((value) => (value === true ? false : value === false ? undefined : true)),
+    },
     { label: `Show ${nextPublishState} publish state`, onClick: () => setPublishState(nextPublishState) },
   ])
   const navigationIsland = (
@@ -491,6 +496,7 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
                 <CornerControls
                   before={
                     <WorkspacePublishIsland
+                      hasPublications={hasPublications}
                       onOpenPublications={() => log('publication.history')}
                       onOpenRuns={() => log('run.history')}
                       onPublish={() => log('publication.publish')}

@@ -498,6 +498,7 @@
     "activityOperatorPaused": "已由操作者暫停",
     "activityOperatorResumed": "已由操作者恢復",
     "actor": "發布者",
+    "restoredBy": "還原者",
     "createdAt": "建立時間",
     "current": "目前線上",
     "failed": "失敗",
@@ -568,7 +569,7 @@
     "publishFailed": "發布失敗",
     "stillUnpublished": "此工作流尚未發布。",
     "liveUnchanged": "目前線上版本未變更。",
-    "rollbackSource": "還原自版本",
+    "rollbackSource": "還原自",
     "rollbackToVersion": "還原至此版本",
     "snapshot": "工作流快照",
     "snapshotUnavailable": "工作流快照預覽尚未提供。",
@@ -576,9 +577,6 @@
     "enabled": "已啟用",
     "disabled": "已停用",
     "versionTitle": "發布版本",
-    "endedEnabled": "結束時已啟用",
-    "endedDisabled": "結束時已停用",
-    "endUnknown": "未記錄結束時狀態",
     "preview": "發布預覽"
   },
   "run": {
@@ -1352,7 +1350,7 @@
     "loadFailed": "無法載入連線。"
   },
   "snapshot": {
-    "readOnly": "唯讀版本",
+    "title": "快照",
     "restore": "還原佈局",
     "missingLayout": "此版本未儲存佈局，已自動排列",
     "loading": "正在載入版本…",

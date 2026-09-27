@@ -498,6 +498,7 @@
     "activityOperatorPaused": "운영자가 일시 중지함",
     "activityOperatorResumed": "운영자가 재개함",
     "actor": "게시자",
+    "restoredBy": "복원자",
     "createdAt": "생성 시간",
     "current": "현재 라이브",
     "failed": "실패",
@@ -568,7 +569,7 @@
     "publishFailed": "게시 실패",
     "stillUnpublished": "이 워크플로는 아직 게시되지 않았습니다.",
     "liveUnchanged": "현재 라이브 버전은 변경되지 않았습니다.",
-    "rollbackSource": "복원한 원본 버전",
+    "rollbackSource": "복원 원본",
     "rollbackToVersion": "이 버전으로 되돌리기",
     "snapshot": "워크플로 스냅샷",
     "snapshotUnavailable": "스냅샷 미리 보기는 아직 제공되지 않습니다.",
@@ -576,9 +577,6 @@
     "enabled": "활성화됨",
     "disabled": "비활성화됨",
     "versionTitle": "게시 버전",
-    "endedEnabled": "교체 시 활성화됨",
-    "endedDisabled": "교체 시 비활성화됨",
-    "endUnknown": "종료 상태 미기록",
     "preview": "게시 미리보기"
   },
   "run": {
@@ -1352,7 +1350,7 @@
     "loadFailed": "연결을 불러올 수 없습니다."
   },
   "snapshot": {
-    "readOnly": "읽기 전용 버전",
+    "title": "스냅샷",
     "restore": "배치 복원",
     "missingLayout": "저장된 배치가 없어 자동으로 정렬했습니다.",
     "loading": "버전 불러오는 중…",

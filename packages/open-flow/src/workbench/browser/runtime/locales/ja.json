@@ -498,6 +498,7 @@
     "activityOperatorPaused": "オペレーターが一時停止",
     "activityOperatorResumed": "オペレーターが再開",
     "actor": "公開者",
+    "restoredBy": "復元者",
     "createdAt": "作成日時",
     "current": "現在の本番",
     "failed": "失敗",
@@ -568,7 +569,7 @@
     "publishFailed": "公開に失敗しました",
     "stillUnpublished": "このワークフローはまだ公開されていません。",
     "liveUnchanged": "現在の公開バージョンは変更されていません。",
-    "rollbackSource": "復元元のバージョン",
+    "rollbackSource": "復元元",
     "rollbackToVersion": "このバージョンに戻す",
     "snapshot": "ワークフローのスナップショット",
     "snapshotUnavailable": "スナップショットのプレビューはまだ利用できません。",
@@ -576,9 +577,6 @@
     "enabled": "有効",
     "disabled": "無効",
     "versionTitle": "公開バージョン",
-    "endedEnabled": "切替時は有効",
-    "endedDisabled": "切替時は無効",
-    "endUnknown": "終了時の状態は未記録",
     "preview": "公開プレビュー"
   },
   "run": {
@@ -1352,7 +1350,7 @@
     "loadFailed": "接続を読み込めませんでした。"
   },
   "snapshot": {
-    "readOnly": "読み取り専用バージョン",
+    "title": "スナップショット",
     "restore": "配置を復元",
     "missingLayout": "保存された配置がないため、自動で配置しました。",
     "loading": "バージョンを読み込み中…",

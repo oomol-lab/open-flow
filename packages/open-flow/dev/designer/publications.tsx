@@ -249,6 +249,15 @@ function createSession(language: UiLanguage, scenario: Scenario, log: LogAction)
     },
     undefined,
     i18n,
+    {
+      openExternalPage: async () => false,
+      resolveActor: async (actorId) => ({
+        name: actorId.includes('alex') ? 'Alex Chen' : 'Sam Lee',
+        avatarUrl: actorId.includes('alex')
+          ? `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40"><rect width="40" height="40" fill="#426a5a"/><text x="20" y="27" text-anchor="middle" font-family="sans-serif" font-size="24" fill="white">A</text></svg>')}`
+          : undefined,
+      }),
+    },
   )
   const stopNotice = store.$.notice.reaction((notice) => {
     if (notice != null) log('publication.notice', notice)
@@ -324,6 +333,6 @@ export const publicationsStory: FrontendStory = {
   title: 'Publications',
   standalone: true,
   description:
-    'Browse publication history, inspect a read-only graph and properties, drag and restore nodes, open subflows, and confirm a rollback. Publish elsewhere updates Live end metadata while preserving the viewed graph. The oldest version has no saved layout. Live includes trigger status, pause/resume, Webhook URL copying, polling tests and activity details. Compare unpublished, pending, failed, stopped and retry states in both themes and narrow layouts.',
+    'Open the latest publication, browse history, inspect a read-only graph and properties, drag and restore nodes, open subflows, and confirm a rollback. Publish elsewhere replaces Live while preserving the viewed graph. The oldest version has no saved layout. Live includes trigger status, pause/resume, Webhook URL copying, polling tests and activity details. Compare unpublished, pending, failed, stopped and retry states in both themes and narrow layouts.',
   render: (log, dark, language) => <PublicationsStory language={language} dark={dark} log={log} />,
 }
