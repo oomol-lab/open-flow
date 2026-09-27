@@ -1,28 +1,41 @@
-import type { EventListeners } from 'overlayscrollbars'
 import type { ComponentProps, KeyboardEvent, PointerEvent, ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
-import type { ScrollAreaRef } from '../../../../ui/browser/scroll-area.tsx'
-import type { JsonValue, Run, RunDetails, RunEvent, RunResult, WaitAction } from '../api.ts'
-import type { IconName } from '../icons.tsx'
+import type { VListHandle, CustomItemComponentProps } from 'virtua'
+import type { Run, RunDetails, RunEvent, RunResult, WaitAction } from '../api.ts'
+import type { RunResultsClient } from './runResults.tsx'
 import type { RunEventFilter } from './runStore.ts'
 
-import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { forwardRef, useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { waitCommentSchema } from '../../../../execution/common/wait.ts'
 import { Alert, AlertDescription, AlertTitle } from '../../../../ui/browser/alert.tsx'
-import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
-import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuTrigger,
+} from '../../../../ui/browser/dropdown-menu.tsx'
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../../ui/browser/empty.tsx'
 import { Field, FieldLabel, FieldError } from '../../../../ui/browser/field.tsx'
-import { collapseAllNested, JSONViewer } from '../../../../ui/browser/json-viewer/index.ts'
-import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
+import { ScrollArea, VirtualScrollArea } from '../../../../ui/browser/scroll-area.tsx'
+import { Tabs, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { Icon } from '../icons.tsx'
-import { groupEvents, nodeSummary, agentSummary, eventSubject } from './runGroups.ts'
+import { continuesLog, executionKey, executionOverview, agentSummary, eventSubject, savedToolResults } from './runGroups.ts'
 import { downloadRunLog } from './runLogExport.ts'
-import { eventHasDetails, RunEventDetail, RunResultView } from './runOutput.tsx'
+import { eventHasDetails, RunEventDetail, RunResultContent, RunText } from './runOutput.tsx'
+import { duration } from './runPresentation.ts'
+import { RunResults } from './runResults.tsx'
 import { canCancelRun } from './runStore.ts'
+
+const RunVirtualItem = forwardRef<HTMLDivElement, CustomItemComponentProps>(function RunVirtualItem({ index, ...props }, ref) {
+  return <div {...props} role="listitem" aria-posinset={index + 1} ref={ref} />
+})
 
 export function RunTooltipButton({ 'aria-label': label, ...props }: ComponentProps<typeof Button> & { readonly 'aria-label': string }): ReactElement {
   const [anchor, setAnchor] = useState<HTMLButtonElement | null>(null)
@@ -46,7 +59,7 @@ const resizeStep = 24
 const eventFollowThreshold = 32
 
 interface Props {
-  readonly tools?: ReactElement
+  readonly resultClient?: RunResultsClient | undefined
   readonly cancelDisabled: boolean
   readonly canceling: boolean
   readonly events: readonly RunEvent[]
@@ -56,6 +69,7 @@ interface Props {
   readonly historyComplete: boolean
   readonly onCancel: () => void
   readonly onClose: () => void
+  readonly onOpenRuns: () => void
   readonly onConfigureConnector?: (() => void) | undefined
   readonly onEventFilterChange: (filter: RunEventFilter) => void
   readonly onLocateEvent: (sequence: number) => void
@@ -192,7 +206,9 @@ function eventCategory(event: RunEvent): EventCategory {
 
 function filterEventsBy(events: readonly RunEvent[], filters: readonly RunEventFilter[]): readonly RunEvent[] {
   return events.filter(
-    (event) => filters.includes(eventCategory(event)) || (filters.includes('output') && event.kind == 'node.completed' && eventHasDetails(event)),
+    (event) =>
+      filters.includes(eventCategory(event)) ||
+      (filters.includes('output') && (event.kind == 'node.completed' || event.kind == 'run.completed') && eventHasDetails(event)),
   )
 }
 
@@ -203,47 +219,59 @@ export function initialRunLogFilters(filter: RunEventFilter): readonly RunEventF
 export function RunLogFilters({
   container,
   events,
-  filters,
+  presentation,
   onChange,
 }: {
   readonly container: HTMLElement | null
   readonly events: readonly RunEvent[]
-  readonly filters: readonly RunEventFilter[]
+  readonly presentation: LogPresentation
   readonly onChange: (filters: readonly RunEventFilter[]) => void
 }): ReactElement | null {
   const t = useTranslate()
+  const { view, filters, statusFilter, setStatusFilter } = presentation
+  const label = t(view == 'overview' ? 'run.executionStatus' : 'run.filterEvents')
   if (events.length == 0) return null
   const counts = new Map<EventCategory, number>()
   for (const event of events) {
     const category = eventCategory(event)
     counts.set(category, (counts.get(category) ?? 0) + 1)
-    if (event.kind == 'node.completed' && eventHasDetails(event)) counts.set('output', (counts.get('output') ?? 0) + 1)
+    if ((event.kind == 'node.completed' || event.kind == 'run.completed') && eventHasDetails(event)) counts.set('output', (counts.get('output') ?? 0) + 1)
   }
   return (
     <DropdownMenu>
       <Tooltip>
         <DropdownMenuTrigger
           render={
-            <Button render={<TooltipTrigger />} aria-label={t('run.filterEvents')} size="icon-sm" type="button" variant="ghost">
+            <Button render={<TooltipTrigger />} aria-label={label} size="icon-sm" type="button" variant="ghost">
               <i aria-hidden="true" className="i-lucide-light:funnel size-4" />
             </Button>
           }
         />
-        <TooltipContent container={container}>{t('run.filterEvents')}</TooltipContent>
+        <TooltipContent container={container}>{label}</TooltipContent>
       </Tooltip>
       <DropdownMenuContent align="end" className="run-log-filter" container={container} side="bottom">
-        <DropdownMenuGroup>
-          {eventCategories.map((filter) => (
-            <DropdownMenuCheckboxItem
-              checked={filters.includes(filter)}
-              key={filter}
-              onCheckedChange={(checked) => onChange(checked ? [...filters, filter] : filters.filter((candidate) => candidate != filter))}
-            >
-              <span>{t(`run.filter.${filter}`)}</span>
-              <span className="run-log-filter-count">{counts.get(filter) ?? 0}</span>
-            </DropdownMenuCheckboxItem>
-          ))}
-        </DropdownMenuGroup>
+        {view == 'overview' ? (
+          <DropdownMenuRadioGroup value={statusFilter} onValueChange={setStatusFilter}>
+            {['all', 'running', 'waiting', 'completed', 'failed', 'unknown'].map((status) => (
+              <DropdownMenuRadioItem key={status} value={status}>
+                {t(`run.executionStatusLabels.${status}`)}
+              </DropdownMenuRadioItem>
+            ))}
+          </DropdownMenuRadioGroup>
+        ) : (
+          <DropdownMenuGroup>
+            {eventCategories.map((filter) => (
+              <DropdownMenuCheckboxItem
+                checked={filters.includes(filter)}
+                key={filter}
+                onCheckedChange={(checked) => onChange(checked ? [...filters, filter] : filters.filter((candidate) => candidate != filter))}
+              >
+                <span>{t(`run.filter.${filter}`)}</span>
+                <span className="run-log-filter-count">{counts.get(filter) ?? 0}</span>
+              </DropdownMenuCheckboxItem>
+            ))}
+          </DropdownMenuGroup>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   )
@@ -274,35 +302,38 @@ export function RunLogButton({
   )
 }
 
-function eventIcon(event: RunEvent): IconName {
-  if (event.kind.includes('failed')) return 'alert'
-  return event.kind.startsWith('node.') ? 'task' : 'flow'
+function eventIcon(event: RunEvent): string {
+  switch (event.kind) {
+    case 'node.started':
+    case 'run.started':
+    case 'run.resolved':
+      return 'i-lucide-light:play'
+    case 'node.completed':
+    case 'run.completed':
+      return 'i-lucide-light:check'
+    case 'node.failed':
+    case 'run.failed':
+      return 'i-lucide-light:circle-x'
+    case 'wait.created':
+    case 'run.waiting':
+      return 'i-lucide-light:pause'
+    case 'node.progress':
+    case 'run.progress':
+      return 'i-lucide-light:loader-circle'
+    case 'run.canceled':
+      return 'i-lucide-light:ban'
+    case 'run.queued':
+    case 'run.indeterminate':
+      return 'i-lucide-light:ellipsis'
+    default:
+      return 'i-lucide-light:text'
+  }
 }
 
 function eventTone(event: RunEvent): string {
   if (event.kind.includes('failed') || event.kind == 'run.indeterminate') return 'danger'
   if (event.kind == 'node.completed' || event.kind == 'run.completed') return 'success'
   return 'neutral'
-}
-
-function jsonRecord(value: unknown): Readonly<Record<string, JsonValue>> | undefined {
-  if (value == null || typeof value != 'object' || Array.isArray(value)) return undefined
-  return value as Readonly<Record<string, JsonValue>>
-}
-
-function terminalOutputs(result: RunResult | undefined): JsonValue | undefined {
-  if (result?.status != 'completed') return undefined
-  const value = jsonRecord(result.result)
-  if (value?.kind == 'function-outputs') return jsonRecord(value.outputs)
-  if (value?.kind != 'node-results' || !Array.isArray(value.nodes)) return undefined
-  const outputs: JsonValue[] = []
-  for (const nodeValue of value.nodes) {
-    const node = jsonRecord(nodeValue)
-    if (node?.status != 'completed') continue
-    const output = jsonRecord(node.outputs)
-    if (output != null) outputs.push(output)
-  }
-  return outputs.length == 1 ? outputs[0] : outputs
 }
 
 function eventSummary(event: RunEvent, t: TFunction): string {
@@ -324,7 +355,7 @@ function eventSummary(event: RunEvent, t: TFunction): string {
     case 'node.artifact':
       return t('run.eventArtifact')
     case 'node.log':
-      return t('run.eventLog')
+      return t('run.nodeLog', { level: event.payload.level })
     case 'node.completed':
     case 'run.completed':
       return t('run.eventCompleted')
@@ -342,24 +373,80 @@ function eventSummary(event: RunEvent, t: TFunction): string {
 
 function nodeTitleIndex(events: readonly RunEvent[]): ReadonlyMap<string, string> {
   const titles = new Map<string, string>()
+  const ambiguous = new Set<string>()
   for (const event of events) {
     if (event.kind != 'node.started') continue
     const title = event.payload.nodeTitle
     if (typeof title != 'string') continue
     const executionId = event.payload.executionId
     const nodeId = event.payload.nodeId
-    titles.set(executionId, title)
+    if (titles.has(nodeId) && titles.get(nodeId) != title) ambiguous.add(nodeId)
     titles.set(nodeId, title)
+    titles.set(executionId, title)
+    titles.set(JSON.stringify([event.payload.scopeId, nodeId]), title)
   }
+  for (const nodeId of ambiguous) titles.delete(nodeId)
   return titles
 }
 
+export type RunLogView = 'timeline' | 'overview'
+
+export function useRunLogPresentation(filter: RunEventFilter, runId: string | undefined) {
+  const panelId = useId()
+  const [view, setView] = useState<RunLogView>('timeline')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [filters, setFilters] = useState<readonly RunEventFilter[]>(() => initialRunLogFilters(filter))
+  const [target, setTarget] = useState<{ runId: string | undefined; key: string; sequence: number }>()
+  const focus = target?.runId == runId ? target : undefined
+  useEffect(() => setTarget(undefined), [runId])
+  function inspect(events: readonly RunEvent[]) {
+    const first = events[0]!
+    setFilters([...new Set([...initialRunLogFilters('all'), ...events.map(eventCategory)])])
+    setTarget({ runId, key: executionKey(first)!, sequence: first.sequence })
+    setView('timeline')
+  }
+  return { panelId, view, setView, statusFilter, setStatusFilter, filters, setFilters, focus, inspect, clearFocus: () => setTarget(undefined) }
+}
+
+type LogPresentation = ReturnType<typeof useRunLogPresentation>
+
+export function RunLogClearHighlight({ presentation }: { readonly presentation: LogPresentation }): ReactElement | null {
+  const t = useTranslate()
+  if (presentation.view != 'timeline' || presentation.focus == null) return null
+  return (
+    <Button size="xs" variant="ghost" onClick={presentation.clearFocus}>
+      {t('run.clearHighlight')}
+    </Button>
+  )
+}
+
+export function RunLogViewSwitch({ presentation }: { readonly presentation: LogPresentation }): ReactElement {
+  const t = useTranslate()
+  return (
+    <Tabs
+      value={presentation.view}
+      onValueChange={(value) => {
+        if (value == 'timeline' || value == 'overview') presentation.setView(value)
+      }}
+    >
+      <TabsList aria-label={t('run.timelineView')} variant="flat" size="sm">
+        <TabsTrigger aria-controls={presentation.panelId} value="timeline">
+          {t('run.timeline')}
+        </TabsTrigger>
+        <TabsTrigger aria-controls={presentation.panelId} value="overview">
+          {t('run.overview')}
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
+  )
+}
+
 export function RunLog({
-  raw,
+  presentation,
+  resultClient,
   events,
   eventsExpiresAt,
   eventNodes,
-  filters,
   historyComplete,
   observationFailed,
   onConfigureConnector,
@@ -370,6 +457,7 @@ export function RunLog({
   submitting,
 }: Pick<
   Props,
+  | 'resultClient'
   | 'events'
   | 'eventsExpiresAt'
   | 'eventNodes'
@@ -382,50 +470,289 @@ export function RunLog({
   | 'run'
   | 'submitting'
 > & {
-  readonly filters: readonly RunEventFilter[]
-  readonly raw: boolean
+  readonly presentation: LogPresentation
 }): ReactElement {
   const language = useLang()
   const t = useTranslate()
-  const eventList = useRef<ScrollAreaRef>(null)
+  const virtualList = useRef<VListHandle>(null)
   const followedRun = useRef<string>()
   const followEvents = useRef(true)
+  const manualScroll = useRef(false)
   const nodeTitles = useMemo(() => nodeTitleIndex(events), [events])
+  const { view, filters, focus, statusFilter } = presentation
   const observation = eventObservation(events, historyComplete)
-  const visibleEvents = filterEventsBy(events, filters)
-  const visible = new Set(visibleEvents.map((event) => event.sequence))
-  const groups = groupEvents(events).filter((group) => group.events.some((event) => visible.has(event.sequence)))
+  const visibleEvents = useMemo(() => filterEventsBy(events, filters), [events, filters])
+  const previousEvents = useMemo(() => new Map(events.map((event, index) => [event.sequence, events[index - 1]])), [events])
+  const overview = useMemo(() => (view == 'overview' ? executionOverview(events, run?.status) : []), [events, run?.status, view])
+  const executions = useMemo(() => overview.filter((item) => statusFilter == 'all' || item.status == statusFilter), [overview, statusFilter])
+  const focusElement = useRef<HTMLDivElement>(null)
+  const located = useRef<typeof focus>()
+  const sources = useMemo(() => new Map(events.filter((event) => event.kind == 'run.started').map((event) => [event.payload.scopeId, event.payload])), [events])
   const lastEventSequence = events.at(-1)?.sequence
-  const outputs = terminalOutputs(result)
-  const eventScrollbarEvents = useMemo<EventListeners>(
-    () => ({
-      initialized(instance) {
-        const list = instance.elements().scrollOffsetElement
-        list.scrollTop = list.scrollHeight
-      },
-      scroll(instance) {
-        const list = instance.elements().scrollOffsetElement
-        followEvents.current = list.scrollHeight - list.scrollTop - list.clientHeight <= eventFollowThreshold
-      },
-    }),
-    [],
+  const completedEvent = events.findLast((event) => event.kind == 'run.completed')
+  const emptyTitle = t(run == null ? 'run.historyEmpty' : events.length == 0 ? 'run.eventsEmpty' : 'run.noFilteredEvents')
+  const emptyMessage = submitting
+    ? t('run.submitting')
+    : run == null
+      ? t('run.timelineEmpty')
+      : events.length == 0 && result == null
+        ? t('run.waiting')
+        : (view == 'timeline' ? visibleEvents.length : executions.length) == 0 && result == null
+          ? t('run.noFilteredEvents')
+          : undefined
+  const hasResult = (view == 'overview' && completedEvent != null) || (completedEvent == null && result != null)
+  type Row =
+    | { kind: 'event'; event: RunEvent; index: number }
+    | { kind: 'execution'; group: (typeof executions)[number] }
+    | { kind: 'notice' | 'result' | 'empty' }
+  const rows = useMemo<Row[]>(
+    () => [
+      ...(observation != null ? [{ kind: 'notice' as const }] : []),
+      ...(view == 'overview'
+        ? executions.map((group) => ({ kind: 'execution' as const, group }))
+        : visibleEvents.map((event, index) => ({ kind: 'event' as const, event, index }))),
+      ...(hasResult ? [{ kind: 'result' as const }] : []),
+      ...(emptyMessage != null ? [{ kind: 'empty' as const }] : []),
+    ],
+    [observation, view, executions, visibleEvents, hasResult, emptyMessage],
   )
+  const focusIndex = focus == null ? -1 : rows.findIndex((row) => row.kind == 'event' && row.event.sequence == focus.sequence)
 
   useEffect(() => {
+    if (focus == null || view == 'overview') located.current = undefined
     if (followedRun.current != run?.runId) {
       followedRun.current = run?.runId
       followEvents.current = true
     }
-    const instance = eventList.current?.osInstance()
-    if (followEvents.current && instance != null) {
-      instance.update()
-      const list = instance.elements().scrollOffsetElement
-      list.scrollTop = list.scrollHeight
+    if (view == 'timeline' && focus != null && located.current != focus && focusIndex >= 0) {
+      located.current = focus
+      manualScroll.current = false
+      followEvents.current = false
+      virtualList.current?.scrollToIndex(focusIndex, { align: 'start' })
+      focusElement.current?.focus({ preventScroll: true })
+      return
     }
-  }, [filters, historyComplete, lastEventSequence, result, run?.runId, raw])
+    if (view == 'timeline' && followEvents.current && rows.length > 0) {
+      virtualList.current?.scrollToIndex(rows.length - 1, { align: 'end' })
+    }
+  }, [filters, historyComplete, lastEventSequence, result, run?.runId, view, focus, focusIndex, rows.length])
+
+  useEffect(() => {
+    if (view == 'overview') virtualList.current?.scrollTo(0)
+  }, [view, run?.runId, statusFilter])
+
+  function beginManualScroll(): void {
+    manualScroll.current = true
+    followEvents.current = false
+  }
+
+  function renderRow(row: Row): ReactElement {
+    if (row.kind == 'notice')
+      return (
+        <div aria-live="polite" className="run-log-notice">
+          <Icon name="alert" size={14} />
+          <span>
+            {observation == 'expired'
+              ? t('run.historyExpired')
+              : eventsExpiresAt == null
+                ? t('run.eventsTruncatedNotice')
+                : t('run.eventsTruncatedUntil', { date: new Date(eventsExpiresAt).toLocaleString(language) })}
+          </span>
+        </div>
+      )
+    if (row.kind == 'execution') {
+      const group = row.group
+      const event = group.events[0]!
+      const subject = eventSubject(group.started ?? event, t, nodeTitles)
+      const source = sources.get(String(event.payload.scopeId))
+      return (
+        <div
+          className={`run-log-event run-execution ${group.status == 'failed' ? 'danger' : group.status == 'completed' ? 'success' : 'neutral'}`}
+          key={group.key}
+        >
+          <span className="run-log-icon">
+            <i
+              aria-hidden="true"
+              className={
+                group.status == 'completed'
+                  ? 'i-lucide-light:check'
+                  : group.status == 'failed'
+                    ? 'i-lucide-light:circle-x'
+                    : group.status == 'waiting'
+                      ? 'i-lucide-light:pause'
+                      : group.status == 'running'
+                        ? 'i-lucide-light:loader-circle'
+                        : 'i-lucide-light:ellipsis'
+              }
+            />
+          </span>
+          <div className="run-log-main">
+            <div className="run-log-title">
+              <strong>{subject}</strong>
+              <span>{t(observation == null ? 'run.executionNumber' : 'run.recordedExecutionNumber', { count: group.count })}</span>
+              <span>{t(`run.executionStatusLabels.${group.status}`)}</span>
+              <span className="run-execution-time" title={`${group.started?.createdAt ?? '?'} → ${group.terminal?.createdAt ?? '?'}`}>
+                {duration(
+                  group.started == null || (group.terminal == null && group.status == 'unknown')
+                    ? undefined
+                    : { startedAt: group.started.createdAt, finishedAt: group.terminal?.createdAt },
+                )}
+              </span>
+              <div className="run-log-actions">
+                {eventNodes.has(event.sequence) && (
+                  <RunTooltipButton
+                    aria-label={t('run.locateNode', { name: subject })}
+                    onClick={() => onLocateEvent(event.sequence)}
+                    size="icon-xs"
+                    variant="ghost"
+                  >
+                    <Icon name="fit" />
+                  </RunTooltipButton>
+                )}
+                <RunTooltipButton size="icon-xs" variant="ghost" aria-label={t('run.inspectExecution')} onClick={() => presentation.inspect(group.events)}>
+                  <i aria-hidden="true" className="i-lucide-light:list-ordered" />
+                </RunTooltipButton>
+              </div>
+            </div>
+            {(source?.parentScopeId != null || source == null) && (
+              <p className="run-source" title={`${source?.parentScopeId ?? '?'} / ${event.payload.scopeId}`}>
+                {String(event.payload.flowId)} · {String(event.payload.scopeId).slice(-8)}
+              </p>
+            )}
+            {group.terminal != null ? (
+              <RunEventDetail event={group.terminal} onConfigureConnector={onConfigureConnector} />
+            ) : (
+              group.latest != null && (
+                <RunText
+                  text={agentSummary(group.latest, t) ?? (group.latest.kind == 'node.log' ? group.latest.payload.message : eventSummary(group.latest, t))}
+                />
+              )
+            )}
+            {(group.completedCalls > 0 || group.toolResults.length > 0) && (
+              <div className="flex flex-wrap items-center gap-1">
+                {group.agent && group.completedCalls > 0 && <span className="run-source">{t('run.agentCompletedCalls', { count: group.completedCalls })}</span>}
+                {resultClient != null && run != null && <RunResults key={run.runId} client={resultClient} runId={run.runId} results={group.toolResults} />}
+              </div>
+            )}
+          </div>
+        </div>
+      )
+    }
+    if (row.kind == 'event') {
+      const { event, index } = row
+      const subject = eventSubject(event, t, nodeTitles)
+      const continuation = continuesLog(event, visibleEvents[index - 1]) && previousEvents.get(event.sequence) == visibleEvents[index - 1]
+      const highlighted = focus != null && executionKey(event) == focus.key
+      return (
+        <div
+          className={`run-log-event ${eventTone(event)}${continuation ? ' is-continuation' : ''}${highlighted ? ' is-highlighted' : ''}`}
+          key={event.sequence}
+          ref={focus?.sequence == event.sequence ? focusElement : undefined}
+          tabIndex={-1}
+        >
+          <time dateTime={event.createdAt} title={new Date(event.createdAt).toLocaleString(language)}>
+            {eventTime(event.createdAt, language)}
+          </time>
+          <span className="run-log-icon" title={event.kind}>
+            <i aria-hidden="true" className={eventIcon(event)} />
+          </span>
+          <div className="run-log-main">
+            {!continuation && (
+              <div className="run-log-title">
+                <strong>{subject}</strong>
+                <span>{agentSummary(event, t) ?? eventSummary(event, t)}</span>
+                <div className="run-log-actions">
+                  {resultClient != null && run != null && (
+                    <RunResults key={run.runId} client={resultClient} runId={run.runId} results={savedToolResults([event])} />
+                  )}
+                  {eventNodes.has(event.sequence) && (
+                    <RunTooltipButton
+                      aria-label={t('run.locateNode', { name: subject })}
+                      onClick={() => onLocateEvent(event.sequence)}
+                      size="icon-xs"
+                      variant="ghost"
+                    >
+                      <Icon name="fit" />
+                    </RunTooltipButton>
+                  )}
+                </div>
+              </div>
+            )}
+            <RunEventDetail event={event} onConfigureConnector={onConfigureConnector} />
+          </div>
+        </div>
+      )
+    }
+    if (row.kind == 'result')
+      return (
+        <div
+          className={`run-log-event run-log-result ${view == 'overview' ? 'run-execution' : ''} ${completedEvent != null || result?.status == 'completed' ? 'success' : result?.status == 'canceled' ? 'neutral' : 'danger'}`}
+        >
+          {view == 'timeline' && result != null && (
+            <time dateTime={result.finishedAt} title={new Date(result.finishedAt).toLocaleString(language)}>
+              {eventTime(result.finishedAt, language)}
+            </time>
+          )}
+          <span className="run-log-icon">
+            <i
+              aria-hidden="true"
+              className={
+                completedEvent != null || result?.status == 'completed'
+                  ? 'i-lucide-light:check'
+                  : result?.status == 'canceled'
+                    ? 'i-lucide-light:ban'
+                    : 'i-lucide-light:circle-x'
+              }
+            />
+          </span>
+          <div className="run-log-main">
+            <div className="run-log-title">
+              <strong>{t('run.flowSubject')}</strong>
+              <span>
+                {t(
+                  completedEvent != null || result?.status == 'completed'
+                    ? 'run.eventCompleted'
+                    : result?.status == 'canceled'
+                      ? 'run.statusCanceled'
+                      : result?.status == 'indeterminate'
+                        ? 'run.statusIndeterminate'
+                        : 'run.statusFailed',
+                )}
+              </span>
+              {view == 'overview' && (
+                <span className="run-execution-time" title={`${run?.startedAt ?? '?'} → ${completedEvent?.createdAt ?? result?.finishedAt ?? '?'}`}>
+                  {duration({ startedAt: run?.startedAt, finishedAt: completedEvent?.createdAt ?? result?.finishedAt })}
+                </span>
+              )}
+            </div>
+            {completedEvent != null ? (
+              <RunEventDetail event={completedEvent} />
+            ) : result != null ? (
+              <div className="event-detail">
+                <strong>{t('run.terminalResult')}</strong>
+                <RunResultContent result={result} />
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )
+    return (
+      <div className="run-log-empty" aria-live="polite">
+        <Empty>
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <i aria-hidden="true" className="i-lucide-light:workflow size-5" />
+            </EmptyMedia>
+            <EmptyTitle>{emptyTitle}</EmptyTitle>
+            {emptyMessage != emptyTitle && <EmptyDescription>{emptyMessage}</EmptyDescription>}
+          </EmptyHeader>
+        </Empty>
+      </div>
+    )
+  }
 
   return (
-    <div className="run-log" tabIndex={0}>
+    <div className="run-log" id={presentation.panelId} role="tabpanel" aria-label={t(view == 'timeline' ? 'run.timeline' : 'run.overview')} tabIndex={0}>
       {observationFailed && (
         <div className="run-observation-error" role="alert">
           <span>{t('run.observationFailed')}</span>
@@ -434,205 +761,52 @@ export function RunLog({
           </Button>
         </div>
       )}
-      <ScrollArea className="run-log-scroll run-content-scroll" defer={false} events={eventScrollbarEvents} ref={eventList} tabIndex={-1}>
-        <ol className="run-log-list">
-          {observation != null && (
-            <li aria-live="polite" className="run-log-notice">
-              <Icon name="alert" size={14} />
-              <span>
-                {observation == 'expired'
-                  ? t('run.historyExpired')
-                  : eventsExpiresAt == null
-                    ? t('run.eventsTruncatedNotice')
-                    : t('run.eventsTruncatedUntil', { date: new Date(eventsExpiresAt).toLocaleString(language) })}
-              </span>
-            </li>
-          )}
-          {(raw ? visibleEvents.map((event) => ({ key: String(event.sequence), node: false, events: [event] })) : groups).map((group) => {
-            const event = group.events[0]!
-            if (group.node) {
-              const { latest, terminal, agent, completedCalls, elapsed, rows } = nodeSummary(group.events, visible)
-              const subject = eventSubject(event, t, nodeTitles)
-              return (
-                <li className={`run-log-event ${terminal == null ? 'neutral' : eventTone(terminal)}`} key={group.key}>
-                  <span className="run-log-icon" title={terminal?.kind ?? event.kind}>
-                    <Icon name={terminal == null ? 'task' : eventIcon(terminal)} size={14} />
-                  </span>
-                  <time dateTime={event.createdAt}>{eventTime(event.createdAt, language)}</time>
-                  <div className="run-log-main">
-                    <div className="run-log-title">
-                      <strong>{subject}</strong>
-                      <span>
-                        {terminal != null
-                          ? eventSummary(terminal, t)
-                          : t(
-                              run?.status == 'waiting'
-                                ? 'run.statusWaiting'
-                                : run?.status == 'canceled'
-                                  ? 'run.statusCanceled'
-                                  : run?.status == 'failed' || run?.status == 'indeterminate'
-                                    ? 'run.statusIndeterminate'
-                                    : 'run.statusRunning',
-                            )}
-                      </span>
-                      {elapsed != null && <span>{(elapsed / 1000).toFixed(1)}s</span>}
-                      {eventNodes.has(event.sequence) && (
-                        <RunTooltipButton
-                          aria-label={t('run.locateNode', { name: subject })}
-                          className="run-log-locate"
-                          onClick={() => onLocateEvent(event.sequence)}
-                          size="icon-xs"
-                          variant="ghost"
-                        >
-                          <Icon name="fit" />
-                        </RunTooltipButton>
-                      )}
-                    </div>
-                    {terminal?.kind == 'node.failed' ? (
-                      <RunEventDetail event={terminal} onConfigureConnector={onConfigureConnector} />
-                    ) : (
-                      latest != null && (
-                        <p className="run-node-summary">
-                          {agent
-                            ? (agentSummary(latest, t) ?? eventSummary(latest, t))
-                            : latest.kind == 'node.log'
-                              ? latest.payload.message
-                              : eventSummary(latest, t)}
-                        </p>
-                      )
-                    )}
-                    {agent && completedCalls > 0 && <p className="run-node-summary">{t('run.agentCompletedCalls', { count: completedCalls })}</p>}
-                    <details className="run-steps">
-                      <summary>
-                        <Icon name="chevron-left" size={12} />
-                        {t('run.executionSteps', { count: rows.length })}
-                      </summary>
-                      <ol className="run-step-list">
-                        {rows.map(({ events: row, last, seconds }) => {
-                          const text = agent ? agentSummary(last, t) : undefined
-                          const heading = (
-                            <>
-                              <time dateTime={last.createdAt}>{eventTime(last.createdAt, language)}</time>
-                              <span className="run-step-text">
-                                {text ?? eventSummary(last, t)}
-                                {seconds != null && <span className="run-step-duration">{seconds.toFixed(1)}s</span>}
-                              </span>
-                            </>
-                          )
-                          return (
-                            <li className="run-step" key={row[0]!.sequence}>
-                              {text != null && row.some(eventHasDetails) ? (
-                                <details className="run-step-details">
-                                  <summary className="run-step-line">
-                                    {heading}
-                                    <span className="run-step-toggle">
-                                      {t('run.eventDetails')}
-                                      <Icon name="chevron-left" size={12} />
-                                    </span>
-                                  </summary>
-                                  {row.map((item) => (
-                                    <RunEventDetail key={item.sequence} event={item} onConfigureConnector={onConfigureConnector} />
-                                  ))}
-                                </details>
-                              ) : (
-                                <>
-                                  <div className="run-step-line">{heading}</div>
-                                  <RunEventDetail event={last} onConfigureConnector={onConfigureConnector} />
-                                </>
-                              )}
-                            </li>
-                          )
-                        })}
-                      </ol>
-                    </details>
-                  </div>
-                </li>
-              )
-            }
 
-            const subject = eventSubject(event, t, nodeTitles)
-            const nodeId = eventNodes.get(event.sequence)
-            return (
-              <li className={`run-log-event ${eventTone(event)}`} key={event.sequence}>
-                <span className="run-log-icon" title={event.kind}>
-                  <Icon name={eventIcon(event)} size={14} />
-                </span>
-                <time dateTime={event.createdAt} title={new Date(event.createdAt).toLocaleString(language)}>
-                  {eventTime(event.createdAt, language)}
-                </time>
-                <div className="run-log-main">
-                  <div className="run-log-title">
-                    <strong>{subject}</strong>
-                    <Icon className="run-log-chevron" name="chevron-left" size={11} />
-                    <span>{eventSummary(event, t)}</span>
-                    {nodeId != null && (
-                      <RunTooltipButton
-                        aria-label={t('run.locateNode', { name: subject })}
-                        className="run-log-locate"
-                        onClick={() => onLocateEvent(event.sequence)}
-                        size="icon-xs"
-                        type="button"
-                        variant="ghost"
-                      >
-                        <Icon name="fit" />
-                      </RunTooltipButton>
-                    )}
-                  </div>
-                  <RunEventDetail event={event} onConfigureConnector={onConfigureConnector} />
-                </div>
+      {emptyMessage != null && rows.every((row) => row.kind == 'empty' || row.kind == 'notice') ? (
+        <ScrollArea className="run-log-scroll run-content-scroll">
+          <ol className="run-log-list run-log-empty-list">
+            {rows.map((row) => (
+              <li key={row.kind} className={row.kind == 'empty' ? 'run-log-empty' : undefined}>
+                {renderRow(row)}
               </li>
-            )
-          })}
-          {outputs != null && result != null && (
-            <li className="run-log-event run-log-result success">
-              <span className="run-log-icon">
-                <Icon name="check" size={14} />
-              </span>
-              <time dateTime={result.finishedAt} title={new Date(result.finishedAt).toLocaleString(language)}>
-                {eventTime(result.finishedAt, language)}
-              </time>
-              <div className="run-log-main">
-                <div className="run-log-title">
-                  <strong>{t('run.terminalResult')}</strong>
-                </div>
-                <div className="run-log-outputs">
-                  <JSONViewer data={outputs} shouldExpandNode={collapseAllNested} />
-                </div>
-              </div>
-            </li>
-          )}
-          {outputs == null && result != null && (
-            <li className={`run-log-event run-log-result ${result.status == 'completed' ? 'success' : result.status == 'canceled' ? 'neutral' : 'danger'}`}>
-              <span className="run-log-icon">
-                <Icon name={result.status == 'completed' ? 'check' : result.status == 'canceled' ? 'flow' : 'alert'} size={14} />
-              </span>
-              <time dateTime={result.finishedAt} title={new Date(result.finishedAt).toLocaleString(language)}>
-                {eventTime(result.finishedAt, language)}
-              </time>
-              <div className="run-log-main">
-                <RunResultView result={result} />
-              </div>
-            </li>
-          )}
-          {submitting ? (
-            <li aria-live="polite" className="run-log-empty">
-              {t('run.submitting')}
-            </li>
-          ) : run == null ? (
-            <li className="run-log-empty">{t('run.timelineEmpty')}</li>
-          ) : events.length == 0 && result == null ? (
-            <li className="run-log-empty">{t('run.waiting')}</li>
-          ) : visibleEvents.length == 0 && result == null ? (
-            <li className="run-log-empty">{t('run.noFilteredEvents')}</li>
-          ) : null}
-        </ol>
-      </ScrollArea>
+            ))}
+          </ol>
+        </ScrollArea>
+      ) : (
+        <VirtualScrollArea
+          key={`${run?.runId ?? 'empty'}:${view}:${view == 'timeline' ? filters.join(',') : statusFilter}`}
+          className="run-log-scroll run-content-scroll"
+          listRef={virtualList}
+          role="list"
+          tabIndex={-1}
+          data={rows}
+          item={RunVirtualItem}
+          ssrCount={Math.min(20, rows.length)}
+          keepMounted={focusIndex >= 0 ? [focusIndex] : []}
+          onScrollIntent={beginManualScroll}
+          onKeyDown={(event) => {
+            if (event.target == event.currentTarget && (event.key == 'Home' || event.key == 'End') && rows.length > 0) {
+              event.preventDefault()
+              virtualList.current?.scrollToIndex(event.key == 'Home' ? 0 : rows.length - 1, { align: event.key == 'Home' ? 'start' : 'end' })
+            }
+          }}
+          onScrollEnd={() => {
+            const list = virtualList.current
+            if (list != null && manualScroll.current) {
+              followEvents.current = list.scrollSize - list.scrollOffset - list.viewportSize <= eventFollowThreshold
+              manualScroll.current = false
+            }
+          }}
+        >
+          {renderRow}
+        </VirtualScrollArea>
+      )}
     </div>
   )
 }
 
 export function RunDrawer({
-  tools,
+  resultClient,
   cancelDisabled,
   canceling,
   events,
@@ -642,6 +816,7 @@ export function RunDrawer({
   historyComplete,
   onCancel,
   onClose,
+  onOpenRuns,
   onConfigureConnector,
   onEventFilterChange,
   onLocateEvent,
@@ -657,11 +832,10 @@ export function RunDrawer({
   submitting,
 }: Props): ReactElement | null {
   const t = useTranslate()
-  const [raw, setRaw] = useState(false)
+  const presentation = useRunLogPresentation(eventFilter, run?.runId)
   const drawer = useRef<HTMLElement>(null)
   const resize = useRef<{ height: number; pointerId: number; y: number }>()
   const [resized, setResized] = useState<{ height: number; runId: string | undefined }>()
-  const [filters, setFilters] = useState<readonly RunEventFilter[]>(() => initialRunLogFilters(eventFilter))
   const preferredHeight = resized != null && resized.runId == run?.runId ? resized.height : undefined
   const height = preferredHeight ?? defaultHeight
 
@@ -734,18 +908,18 @@ export function RunDrawer({
         tabIndex={0}
       />
       <header className="run-header">
-        <Badge variant="secondary">{t('run.timeline')}</Badge>
+        <RunLogViewSwitch presentation={presentation} />
         <span className="run-header-spacer" />
-        {tools}
-        <Button aria-pressed={raw} onClick={() => setRaw(!raw)} size="sm" variant="ghost">
-          {t(raw ? 'run.groupedView' : 'run.rawView')}
-        </Button>
+        <RunTooltipButton aria-label={t('run.history')} onClick={onOpenRuns} size="icon-sm" variant="ghost">
+          <i aria-hidden="true" className="i-lucide-light:history size-4" />
+        </RunTooltipButton>
+        <RunLogClearHighlight presentation={presentation} />
         <RunLogFilters
           container={drawer.current}
           events={events}
-          filters={filters}
+          presentation={presentation}
           onChange={(next) => {
-            setFilters(next)
+            presentation.setFilters(next)
             onEventFilterChange(next.length == 1 ? next[0]! : 'all')
           }}
         />
@@ -762,11 +936,11 @@ export function RunDrawer({
       <div className="run-content">
         {run != null && <ActiveWait onLocate={onLocateWait} onResolve={onResolve} resolvingActions={resolvingActions} run={run} />}
         <RunLog
-          raw={raw}
+          presentation={presentation}
+          resultClient={resultClient}
           events={events}
           eventsExpiresAt={eventsExpiresAt}
           eventNodes={eventNodes}
-          filters={filters}
           historyComplete={historyComplete}
           observationFailed={observationFailed}
           onConfigureConnector={onConfigureConnector}

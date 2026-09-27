@@ -1,5 +1,8 @@
 import type { TFunction } from 'val-i18n'
+import type { ResultInfo } from '../../../../control/common/results.ts'
 import type { RunEvent } from '../api.ts'
+
+import { decodeResultList } from '../../../../control/common/results.ts'
 
 export interface EventGroup {
   readonly key: string
@@ -11,11 +14,11 @@ export function groupEvents(events: readonly RunEvent[]): readonly EventGroup[] 
   const groups: EventGroup[] = []
   const nodes = new Map<string, EventGroup>()
   for (const event of events) {
-    if (!event.kind.startsWith('node.') || !('executionId' in event.payload)) {
+    const key = executionKey(event)
+    if (key == null) {
       groups.push({ key: `event:${event.sequence}`, node: false, events: [event] })
       continue
     }
-    const key = JSON.stringify([event.payload.scopeId, event.payload.nodeId, event.payload.executionId])
     let group = nodes.get(key)
     if (group == null) {
       group = { key, node: true, events: [] }
@@ -61,50 +64,6 @@ export function agentLog(event: RunEvent): Record<string, unknown> | undefined {
   } catch {
     return
   }
-}
-
-export function toolRows(events: readonly RunEvent[], agent: boolean): readonly (readonly RunEvent[])[] {
-  const rows: RunEvent[][] = []
-  const calls = new Map<string, RunEvent[]>()
-  for (const event of events) {
-    const log = agent ? agentLog(event) : undefined
-    if (log?.kind != 'tool') {
-      rows.push([event])
-      continue
-    }
-    const id = String(log.callId)
-    let row = calls.get(id)
-    if (row == null) {
-      row = []
-      calls.set(id, row)
-      rows.push(row)
-    }
-    row.push(event)
-  }
-  return rows
-}
-
-export function nodeSummary(events: readonly RunEvent[], visible: ReadonlySet<number>) {
-  const latest = events.findLast((event) => event.kind == 'node.log' || event.kind == 'node.progress')
-  const started = events.find((event) => event.kind == 'node.started')
-  const terminal = events.findLast((event) => event.kind == 'node.failed' || event.kind == 'node.completed')
-  const agent = events.some((event) => event.kind == 'node.started' && event.payload.nodeKind == 'agent')
-  const calls = new Set<unknown>()
-  for (const event of events) {
-    const log = agentLog(event)
-    if (log?.kind == 'tool' && log.status == 'completed') calls.add(log.callId)
-  }
-  const elapsed = terminal == null || started == null ? undefined : Math.max(0, Date.parse(terminal.createdAt) - Date.parse(started.createdAt))
-  const rows = toolRows(
-    events.filter((event) => visible.has(event.sequence)),
-    agent,
-  ).map((row) => {
-    const last = row.at(-1)!
-    const start = row.find((event) => agentLog(event)?.status == 'started')
-    const seconds = start == null || row.length < 2 ? undefined : Math.max(0, Date.parse(last.createdAt) - Date.parse(start.createdAt)) / 1000
-    return { events: row, last, seconds }
-  })
-  return { latest, terminal, agent, completedCalls: calls.size, elapsed, rows }
 }
 
 export function agentSummary(event: RunEvent, t: TFunction): string | undefined {
@@ -162,6 +121,92 @@ export function eventSubject(event: RunEvent, t?: TFunction, nodeTitles?: Readon
     if (executionTitle != null) return executionTitle
   }
   const nodeId = event.payload.nodeId
-  if (typeof nodeId == 'string') return nodeTitles?.get(nodeId) ?? nodeId
+  if (typeof nodeId == 'string')
+    return nodeTitles?.get(JSON.stringify([event.payload.scopeId, nodeId])) ?? (event.payload.scopeId == null ? nodeTitles?.get(nodeId) : undefined) ?? nodeId
   return event.kind.startsWith('run.') ? (t?.('run.flowSubject') ?? 'Flow run') : (t?.('run.nodeSubject') ?? 'Node')
+}
+
+export function executionKey(event: RunEvent): string | undefined {
+  if (!event.kind.startsWith('node.') || !('executionId' in event.payload)) return
+  return JSON.stringify([event.payload.scopeId, event.payload.nodeId, event.payload.executionId])
+}
+
+export type ExecutionStatus = 'running' | 'waiting' | 'completed' | 'failed' | 'unknown'
+
+export function executionOverview(events: readonly RunEvent[], runStatus: string | undefined) {
+  const counts = new Map<string, number>()
+  return groupEvents(events)
+    .filter((group) => group.node)
+    .map((group) => {
+      const first = group.events[0]!
+      const identity = JSON.stringify([first.payload.scopeId, first.payload.nodeId])
+      const count = (counts.get(identity) ?? 0) + 1
+      counts.set(identity, count)
+      const started = group.events.find((event) => event.kind == 'node.started')
+      const terminal = group.events.findLast((event) => event.kind == 'node.completed' || event.kind == 'node.failed')
+      const latest = group.events.findLast((event) => event.kind == 'node.log' || event.kind == 'node.progress')
+      const lastLog = group.events.findLast((event) => event.kind == 'node.log')
+      const agent = started?.payload.nodeKind == 'agent'
+      const completedCalls = new Set(
+        group.events.flatMap((event) => {
+          const log = agentLog(event)
+          return log?.kind == 'tool' && log.status == 'completed' ? [log.callId] : []
+        }),
+      ).size
+      // Wait receipts have no execution identity. Never assign a run-level wait to a node instance.
+      const status: ExecutionStatus =
+        terminal?.kind == 'node.completed'
+          ? 'completed'
+          : terminal?.kind == 'node.failed'
+            ? 'failed'
+            : started == null || !['running', 'waiting'].includes(runStatus ?? '')
+              ? 'unknown'
+              : lastLog != null && agentLog(lastLog)?.status == 'approval'
+                ? 'waiting'
+                : runStatus == 'waiting' || started.payload.nodeKind == 'wait' || started.payload.nodeKind == 'approval'
+                  ? 'unknown'
+                  : 'running'
+      return {
+        key: group.key,
+        events: group.events,
+        count,
+        started,
+        terminal,
+        latest,
+        agent,
+        completedCalls,
+        status,
+        toolResults: savedToolResults(group.events),
+      }
+    })
+}
+
+export function continuesLog(event: RunEvent, previous: RunEvent | undefined): boolean {
+  return (
+    event.kind == 'node.log' &&
+    previous?.kind == 'node.log' &&
+    agentLog(event) == null &&
+    agentLog(previous) == null &&
+    executionKey(event) == executionKey(previous) &&
+    event.payload.level == previous.payload.level
+  )
+}
+
+export function savedToolResults(events: readonly RunEvent[]): readonly ResultInfo[] {
+  const results = new Map<string, ResultInfo>()
+  for (const event of events) {
+    const log = agentLog(event)
+    if (log?.kind != 'tool' || log.status != 'completed') continue
+    const output = log.output
+    if (output == null || typeof output != 'object' || Array.isArray(output)) continue
+    const stored = output as Record<string, unknown>
+    if (stored.kind != 'stored-result') continue
+    try {
+      const result = decodeResultList({ version: 1, runId: '', results: [stored.result] }).results[0]!
+      if (result.callId == log.callId && result.toolId == log.toolId) results.set(result.resultId, result)
+    } catch {
+      // Older or incomplete logs may not contain a usable saved-result reference.
+    }
+  }
+  return [...results.values()]
 }

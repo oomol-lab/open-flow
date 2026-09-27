@@ -2,10 +2,13 @@ import type { ReactElement } from 'react'
 import type { NavigationStore } from './navigation.ts'
 import type { WorkbenchStore } from './stores/workbenchStore.ts'
 
+import { useEffect } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FlowWorkspace, { FlowEditor } from './flowWorkspace.tsx'
+import { runDrawerPreferenceKey } from './runs/runDrawerPreference.ts'
 
 const mocks = vi.hoisted(() => ({
+  preferences: new Map<string, string>(),
   setOpen: vi.fn(),
   setRunDrawerOpen: vi.fn(),
   stateCall: 0,
@@ -16,7 +19,7 @@ vi.mock('react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('react')>()),
   useEffect: vi.fn(),
   useCallback: (callback: unknown) => callback,
-  useRef: vi.fn(() => ({ current: undefined })),
+  useRef: vi.fn((initial) => ({ current: initial })),
   useState: vi.fn((initial: unknown) => {
     const call = mocks.stateCall++
     const value = mocks.stateValues.has(call) ? mocks.stateValues.get(call) : typeof initial == 'function' ? initial() : initial
@@ -46,6 +49,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
     openMainFlow: vi.fn(),
   } as unknown as NavigationStore
   const store = {
+    preferences: { getItem: (key: string) => mocks.preferences.get(key) ?? null, setItem: (key: string, stored: string) => mocks.preferences.set(key, stored) },
     $: {
       busy: value(busy),
       variableNames: value([]),
@@ -151,6 +155,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
 
 describe('FlowWorkspace run drawer', () => {
   beforeEach(() => {
+    mocks.preferences.clear()
     mocks.setOpen.mockReset()
     mocks.setRunDrawerOpen.mockReset()
     mocks.stateCall = 0
@@ -166,6 +171,67 @@ describe('FlowWorkspace run drawer', () => {
     await Promise.resolve()
     expect(store.requestDraftRun).toHaveBeenCalledWith('start')
     expect(mocks.setRunDrawerOpen).toHaveBeenCalledWith(true)
+  })
+
+  it.each([false, true])('preserves drawer visibility while a run is submitting (open: %s)', (open) => {
+    const { navigation, store } = renderWorkspace()
+    Object.assign(store.runRequests.$.submitting, { value: 'draft' })
+    mocks.stateCall = 0
+    mocks.stateValues.set(0, open)
+    mocks.setRunDrawerOpen.mockClear()
+    vi.mocked(useEffect).mockClear()
+
+    FlowWorkspace({ hrefFor: () => '/', navigation, store, theme: 'light' })
+    for (const [effect] of vi.mocked(useEffect).mock.calls) effect()
+
+    expect(navigation.open).toHaveBeenCalledWith('design')
+    expect(mocks.setRunDrawerOpen).not.toHaveBeenCalled()
+  })
+
+  it.each([false, true])('restores the shared explicit drawer preference %s without auto-opening', (open) => {
+    mocks.preferences.set(runDrawerPreferenceKey, String(open))
+    const { editor } = renderWorkspace()
+    expect(editor.props.runDrawerOpen).toBe(open)
+    editor.props.onRunStarted()
+    expect(mocks.setRunDrawerOpen).not.toHaveBeenCalled()
+  })
+
+  it('persists manual closing across workspace mounts and suppresses an in-flight run reveal', () => {
+    const { editor } = renderWorkspace()
+    editor.props.onCloseRuns()
+    expect(mocks.preferences.get(runDrawerPreferenceKey)).toBe('false')
+    mocks.setRunDrawerOpen.mockClear()
+    editor.props.onRunStarted()
+    expect(mocks.setRunDrawerOpen).not.toHaveBeenCalled()
+    mocks.stateCall = 0
+    expect(renderWorkspace().editor.props.runDrawerOpen).toBe(false)
+  })
+
+  it('persists manual opening across workspace mounts', () => {
+    const { editor } = renderWorkspace()
+    editor.props.onToggleRuns()
+    expect(mocks.preferences.get(runDrawerPreferenceKey)).toBe('true')
+    mocks.stateCall = 0
+    expect(renderWorkspace().editor.props.runDrawerOpen).toBe(true)
+  })
+
+  it.each([undefined, false, true])('handles external runs with preference %s', (preference) => {
+    if (preference != null) mocks.preferences.set(runDrawerPreferenceKey, String(preference))
+    const { navigation, store } = renderWorkspace()
+    Object.assign(store.runs.$.externalRunId, { value: 'external-run' })
+    mocks.stateCall = 0
+    vi.mocked(useEffect).mockClear()
+    FlowWorkspace({ hrefFor: () => '/', navigation, store, theme: 'light' })
+    for (const [effect] of vi.mocked(useEffect).mock.calls) effect()
+    if (preference == null) expect(mocks.setRunDrawerOpen).toHaveBeenCalledWith(true)
+    else expect(mocks.setRunDrawerOpen).not.toHaveBeenCalled()
+  })
+
+  it('does not persist automatic opening', () => {
+    const { editor } = renderWorkspace()
+    editor.props.onRunStarted()
+    expect(mocks.setRunDrawerOpen).toHaveBeenCalledWith(true)
+    expect(mocks.preferences.has(runDrawerPreferenceKey)).toBe(false)
   })
 
   it('keeps the test button enabled while ordinary edits save', () => {

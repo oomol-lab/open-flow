@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { decodeRunEvent } from '../../../../control/common/api.ts'
 import { createI18n } from '../i18n.ts'
-import { agentLog, agentSummary, groupEvents, nodeSummary, toolRows } from './runGroups.ts'
+import { agentLog, agentSummary, groupEvents, executionOverview, continuesLog, savedToolResults } from './runGroups.ts'
 
 function log(sequence: number, executionId: string, message: string, scopeId = 'root') {
   return decodeRunEvent({
@@ -11,6 +11,8 @@ function log(sequence: number, executionId: string, message: string, scopeId = '
     payload: { flowId: 'flow', scopeId, nodeId: 'agent', executionId, level: 'info', message },
   })
 }
+
+const node = (executionId: string, nodeId = 'agent', scopeId = 'root') => ({ executionId, nodeId, scopeId, flowId: 'flow' })
 
 describe('execution log grouping', () => {
   it('groups interleaved logs by execution and scope without mixing repeated nodes', () => {
@@ -25,36 +27,61 @@ describe('execution log grouping', () => {
       [false, 1],
     ])
   })
-  it('merges one tool call while preserving distinct calls and original detail events', () => {
-    const event = (sequence: number, callId: string, status: string) => log(sequence, 'a', JSON.stringify({ kind: 'tool', callId, toolId: 'mail', status }))
-    const events = [event(1, 'one', 'started'), event(2, 'two', 'started'), event(3, 'one', 'completed'), event(4, 'two', 'failed')]
-    expect(toolRows(events, true).map((row) => row.map((item) => item.sequence))).toEqual([
-      [1, 3],
-      [2, 4],
-    ])
-    expect(toolRows(events, false)).toHaveLength(4)
-  })
-  it('keeps node status and call counts when filtering steps, without inventing a missing call duration', () => {
-    const payload = { flowId: 'flow', scopeId: 'root', nodeId: 'agent', executionId: 'a' }
-    const started = decodeRunEvent({ sequence: 1, createdAt: '2026-09-09T00:00:00Z', kind: 'node.started', payload: { ...payload, nodeKind: 'agent' } })
-    const call = (sequence: number, status: string, createdAt: string) => ({
-      ...log(sequence, 'a', JSON.stringify({ kind: 'tool', callId: 'one', toolId: 'mail', status })),
-      createdAt,
+  it('keeps concurrent executions separate and prefers each terminal output', () => {
+    const started = (sequence: number, executionId: string, scopeId = 'root') =>
+      decodeRunEvent({
+        sequence,
+        createdAt: '2026-09-09T00:00:00Z',
+        kind: 'node.started',
+        payload: { ...node(executionId, 'agent', scopeId), nodeKind: 'agent' },
+      })
+    const completed = decodeRunEvent({
+      sequence: 4,
+      createdAt: '2026-09-09T00:00:01Z',
+      kind: 'node.completed',
+      payload: { ...node('b'), outputs: { answer: 42 } },
     })
-    const completed = decodeRunEvent({ sequence: 4, createdAt: '2026-09-09T00:00:10Z', kind: 'node.completed', payload: { ...payload, outputs: {} } })
-    const events = [started, call(2, 'started', '2026-09-09T00:00:02Z'), call(3, 'completed', '2026-09-09T00:00:05Z'), completed]
-    const summary = nodeSummary(events, new Set([2, 3]))
-    expect(summary.terminal).toBe(completed)
-    expect(summary.agent).toBe(true)
-    expect(summary.elapsed).toBe(10_000)
-    expect(summary.completedCalls).toBe(1)
-    expect(summary.rows).toHaveLength(1)
-    expect(summary.rows[0]?.seconds).toBe(3)
-    expect(summary.rows[0]?.events.map((event) => event.sequence)).toEqual([2, 3])
-    const filtered = nodeSummary(events, new Set([3]))
-    expect(filtered.terminal).toBe(completed)
-    expect(filtered.completedCalls).toBe(1)
-    expect(filtered.rows[0]?.seconds).toBeUndefined()
+    const events = [
+      started(1, 'a'),
+      started(2, 'b'),
+      log(3, 'a', JSON.stringify({ kind: 'tool', callId: 'call', toolId: 'mail', status: 'completed' })),
+      completed,
+      started(5, 'a', 'child'),
+    ]
+    const overview = executionOverview(events, 'running')
+    expect(overview.map(({ count, status }) => [count, status])).toEqual([
+      [1, 'running'],
+      [2, 'completed'],
+      [1, 'running'],
+    ])
+    expect(overview[0]?.completedCalls).toBe(1)
+    expect(overview[1]?.terminal).toBe(completed)
+    expect(events.map((event) => event.sequence)).toEqual([1, 2, 3, 4, 5])
+  })
+  it('does not infer an instance wait from a receipt or a missing terminal event', () => {
+    const started = decodeRunEvent({
+      sequence: 1,
+      createdAt: '2026-09-09T00:00:00Z',
+      kind: 'node.started',
+      payload: { executionId: 'a', nodeId: 'wait', scopeId: 'root', flowId: 'flow', nodeKind: 'wait' },
+    })
+    const waiting = decodeRunEvent({
+      sequence: 2,
+      createdAt: '2026-09-09T00:00:00Z',
+      kind: 'wait.created',
+      payload: { nodeId: 'wait', waitId: 'receipt', waitingSince: '2026-09-09T00:00:00Z', expiresAt: '2026-09-10T00:00:00Z' },
+    })
+    expect(executionOverview([started, waiting, log(3, 'notification', 'sending')], 'running').map((item) => item.status)).toEqual(['unknown', 'unknown'])
+    expect(executionOverview([started], 'completed')[0]?.status).toBe('unknown')
+    expect(executionOverview([log(1, 'a', 'history starts here')], 'running')[0]?.started).toBeUndefined()
+  })
+  it('only compacts consecutive ordinary logs with matching instance and severity', () => {
+    const a = log(1, 'a', 'one')
+    expect(continuesLog(log(2, 'a', 'two'), a)).toBe(true)
+    expect(continuesLog(log(2, 'b', 'two'), a)).toBe(false)
+    expect(continuesLog(log(2, 'a', 'two', 'child'), a)).toBe(false)
+    expect(continuesLog(log(2, 'a', JSON.stringify({ kind: 'model', round: 1 })), a)).toBe(false)
+    expect(continuesLog(a, undefined)).toBe(false)
   })
   it('leaves unrecognized and malformed logs as ordinary messages', () => {
     for (const message of [
@@ -85,8 +112,40 @@ describe('execution log grouping', () => {
       '第 1 轮结束',
     ])
     expect(events.map(agentLog)).toEqual(entries)
-    const summary = nodeSummary(events, new Set(events.map((event) => event.sequence)))
+    const summary = executionOverview(events, 'running')[0]!
     expect(summary.completedCalls).toBe(0)
-    expect(summary.rows.map((row) => row.events)).toEqual(events.map((event) => [event]))
   })
+})
+
+it('keeps saved tool results attached to their exact execution and ignores invalid references', () => {
+  const tool = (id: string, execution: string, scope = 'root', valid = true) =>
+    log(
+      1,
+      execution,
+      JSON.stringify({
+        kind: 'tool',
+        status: 'completed',
+        callId: id,
+        toolId: 'search',
+        output: {
+          kind: 'stored-result',
+          result: {
+            resultId: id,
+            callId: valid ? id : 'mismatch',
+            toolId: 'search',
+            source: { kind: 'connector', action: 'search' },
+            bytes: 20,
+            digest: 'a'.repeat(64),
+            createdAt: '2026-09-09T00:00:00Z',
+          },
+        },
+      }),
+      scope,
+    )
+  const first = tool('first', 'a')
+  const events = [first, tool('second', 'b'), tool('nested', 'a', 'child'), first, tool('bad', 'a', 'root', false)]
+  expect(executionOverview(events, 'running').map((group) => group.toolResults.map((result) => result.resultId))).toEqual([['first'], ['second'], ['nested']])
+  expect(
+    savedToolResults([log(1, 'a', '{"kind":"tool","status":"completed","callId":"x","toolId":"search","output":{"kind":"stored-result","result":{}}}')]),
+  ).toEqual([])
 })

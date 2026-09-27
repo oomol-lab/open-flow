@@ -7,6 +7,8 @@ import { ReactFlowProvider } from '@xyflow/react'
 import { useEffect, useId, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { CanvasBottomRightControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CanvasControls.tsx'
+import { decodeRunEvent } from '../../src/control/common/api.ts'
+import { readResult } from '../../src/control/common/results.ts'
 import { normalizeWaitComment } from '../../src/execution/common/wait.ts'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
@@ -163,6 +165,7 @@ function WaitRuns({ language, log }: { readonly language: UiLanguage; readonly l
             <h3 className="mb-2 font-medium">{title}</h3>
             <div className="open-flow-workbench" style={{ height: 360 }}>
               <RunDrawer
+                onOpenRuns={() => log('open run history')}
                 cancelDisabled={false}
                 canceling={false}
                 events={events}
@@ -206,11 +209,13 @@ export const waitRunsStory: FrontendStory = {
 }
 
 function RunStatusSample({
+  log,
   title,
   run,
   submitting,
   dark,
 }: {
+  readonly log: LogAction
   readonly title: string
   readonly run?: RunDetails
   readonly submitting: boolean
@@ -230,6 +235,7 @@ function RunStatusSample({
           </ReactFlowProvider>
         </div>
         <RunDrawer
+          onOpenRuns={() => log('open run history')}
           cancelDisabled={false}
           canceling={false}
           events={[]}
@@ -263,13 +269,13 @@ export const runStatusIslandStory: FrontendStory = {
   title: 'Run status island',
   standalone: true,
   description: 'Compare the empty, running, succeeded, and failed controls. Open and close each real run log panel from its canvas corner.',
-  render: (_log, dark, language) => (
+  render: (log, dark, language) => (
     <I18nProvider i18n={createI18n(language)}>
       <div className="grid gap-4 p-4 xl:grid-cols-2">
-        <RunStatusSample dark={dark} title="No run" submitting={false} />
-        <RunStatusSample dark={dark} title="Submitting" submitting />
-        <RunStatusSample dark={dark} title="Succeeded" run={{ ...base, status: 'completed', waits: [] }} submitting={false} />
-        <RunStatusSample dark={dark} title="Failed" run={{ ...base, status: 'failed', waits: [] }} submitting={false} />
+        <RunStatusSample log={log} dark={dark} title="No run" submitting={false} />
+        <RunStatusSample log={log} dark={dark} title="Submitting" submitting />
+        <RunStatusSample log={log} dark={dark} title="Succeeded" run={{ ...base, status: 'completed', waits: [] }} submitting={false} />
+        <RunStatusSample log={log} dark={dark} title="Failed" run={{ ...base, status: 'failed', waits: [] }} submitting={false} />
       </div>
     </I18nProvider>
   ),
@@ -393,4 +399,175 @@ export const runHistoryStory: FrontendStory = {
   description:
     'Inspect results, failures, timeline, full run IDs and filters. Close and reopen the page, or narrow the viewport to switch between list and detail.',
   render: (log, dark, language) => <RunHistory language={language} dark={dark} log={log} />,
+}
+
+const node = (nodeId: string, executionId = nodeId, scopeId = 'root') => ({
+  nodeId,
+  executionId,
+  scopeId,
+  flowId: scopeId == 'root' ? 'flow' : 'Extract metadata',
+})
+
+function ExecutionLogs({ language, dark, log }: { readonly language: UiLanguage; readonly dark: boolean; readonly log: LogAction }) {
+  const toolOutput = { documents: [{ title: 'Quarterly report', score: 0.98 }], count: 24 }
+  const savedResult = {
+    resultId: 'report-search',
+    callId: 'one',
+    toolId: 'search',
+    source: { kind: 'connector' as const, action: 'Search documents' },
+    bytes: JSON.stringify(toolOutput).length,
+    digest: 'a'.repeat(64),
+    createdAt: base.createdAt,
+  }
+  const secondOutput = { summary: '24 documents indexed', indexed: true }
+  const secondResult = {
+    ...savedResult,
+    resultId: 'report-index',
+    callId: 'two',
+    toolId: 'index',
+    source: { kind: 'connector' as const, action: 'Index documents' },
+    bytes: JSON.stringify(secondOutput).length,
+  }
+  const [large, setLarge] = useState(false)
+  const [appended, setAppended] = useState(0)
+  const [empty, setEmpty] = useState(false)
+  const [complete, setComplete] = useState(false)
+  const [partial, setPartial] = useState(false)
+  const [generation, setGeneration] = useState(0)
+  useStoryActions([
+    {
+      label: large ? 'Small sample' : '10,000 events',
+      onClick: () => {
+        setLarge(!large)
+        setAppended(0)
+      },
+    },
+    { label: 'Append logs', onClick: () => setAppended((value) => value + 30) },
+    { label: complete ? 'Resume sample' : 'Finish sample', onClick: () => setComplete(!complete) },
+    { label: partial ? 'Full history' : 'Partial history', onClick: () => setPartial(!partial) },
+    { label: empty ? 'Show events' : 'Empty state', onClick: () => setEmpty(!empty) },
+    { label: 'Switch run', onClick: () => setGeneration((value) => value + 1) },
+  ])
+  const time = (seconds: number) => new Date(Date.parse(base.createdAt) + seconds * 1000).toISOString()
+  const events: RunEvent[] = []
+  const add = (kind: RunEvent['kind'], seconds: number, payload: Record<string, unknown>) => {
+    events.push(decodeRunEvent({ kind, sequence: events.length + 1, createdAt: time(seconds), payload }))
+  }
+  add('run.started', 0, { flowId: 'flow', scopeId: 'root' })
+  add('node.started', 0.2, { ...node('report'), nodeTitle: 'Generate report', nodeKind: 'agent' })
+  add('node.started', 0.3, { ...node('fetch'), nodeTitle: 'Fetch sources', nodeKind: 'javascript' })
+  add('node.log', 0.4, { ...node('fetch'), level: 'info', message: 'Requesting source documents' })
+  add('node.log', 0.5, { ...node('fetch'), level: 'info', message: 'Received 24 documents' })
+  add('node.completed', 1.5, { ...node('fetch'), outputs: { count: 24, metadata: { format: 'markdown', cached: true } } })
+  add('node.started', 1.6, { ...node('fetch', 'fetch-2'), nodeTitle: 'Fetch sources', nodeKind: 'javascript' })
+  add('node.completed', 1.8, { ...node('fetch', 'fetch-2'), outputs: { count: 12 } })
+  add('node.started', 2, { ...node('subflow'), nodeTitle: 'Extract metadata', nodeKind: 'subflow' })
+  add('run.started', 2.1, { flowId: 'Extract metadata', scopeId: 'nested-scope', parentScopeId: 'root' })
+  add('node.started', 2.2, { ...node('fetch', 'inner', 'nested-scope'), nodeTitle: 'Fetch sources', nodeKind: 'javascript' })
+  add('node.completed', 2.4, { ...node('fetch', 'inner', 'nested-scope'), outputs: { title: 'Quarterly report' } })
+  add('node.completed', 2.5, { ...node('subflow'), outputs: { title: 'Quarterly report' } })
+  add('node.started', 3, { ...node('wait'), nodeKind: 'wait', nodeTitle: 'Review report' })
+  add('wait.created', 3.1, { nodeId: 'wait', waitId: 'review', waitingSince: time(3.1), expiresAt: time(300) })
+  add('node.started', 3.2, { ...node('notify'), nodeKind: 'connector', nodeTitle: 'Send notification' })
+  add('node.failed', 3.4, {
+    ...node('notify'),
+    error: {
+      code: 'connector.unavailable',
+      message:
+        'Notification delivery failed.\nThe connection could not be reached.\nRequest: send-report\nAttempts: 3\nResponse: upstream service unavailable\nCheck the connection and try again.',
+    },
+  })
+  add('node.log', 4, {
+    ...node('report'),
+    level: 'info',
+    message: JSON.stringify({
+      kind: 'tool',
+      callId: 'one',
+      toolId: 'search',
+      status: 'completed',
+      action: 'Search documents',
+      output: { kind: 'stored-result', result: savedResult },
+    }),
+  })
+  add('node.log', 4.1, {
+    ...node('report'),
+    level: 'info',
+    message: JSON.stringify({ kind: 'tool', callId: 'two', toolId: 'index', status: 'completed', output: { kind: 'stored-result', result: secondResult } }),
+  })
+  add('node.log', 4.2, { ...node('report'), level: 'info', message: JSON.stringify({ kind: 'model', round: 2 }) })
+  if (large) {
+    for (let index = 0; index < 3334; index++) {
+      const identity = node(`worker-${index % 3}`, `batch-${index}`)
+      add('node.started', 5 + index, { ...identity, nodeTitle: `Worker ${(index % 3) + 1}`, nodeKind: 'javascript' })
+      add('node.log', 5.1 + index, {
+        ...identity,
+        level: 'info',
+        message: `Batch ${index}: processed source documents.\n${'Detailed progress information. '.repeat(index % 4 == 0 ? 30 : 1)}`,
+      })
+      add('node.completed', 5.2 + index, { ...identity, outputs: { batch: index, records: [{ title: 'Report', score: 0.98 }] } })
+    }
+  }
+  for (let index = 0; index < appended; index++) {
+    add('node.log', 3340 + index, { ...node('report'), level: 'info', message: `Live log ${index + 1}` })
+  }
+  if (complete) {
+    const outputs = { summary: '24 documents reviewed', sections: ['Overview', 'Findings'] }
+    add('node.completed', 10, { ...node('report'), outputs })
+    add('run.completed', 10.1, { result: { kind: 'function-outputs', outputs } })
+  }
+  const run = { ...base, runId: `sample-${generation}`, waits: [] }
+  return (
+    <I18nProvider i18n={createI18n(language)}>
+      <div className="open-flow-workbench open-flow-theme grid h-full min-h-0 content-start" data-theme={dark ? 'dark' : 'light'}>
+        <RunDrawer
+          onOpenRuns={() => log('open run history')}
+          resultClient={{
+            readRunResult: async (runId, resultId, query) => {
+              log('read tool result', resultId)
+              return {
+                version: 1,
+                runId,
+                result: resultId == secondResult.resultId ? secondResult : savedResult,
+                page: readResult(resultId == secondResult.resultId ? secondOutput : toolOutput, query),
+              }
+            },
+            downloadRunResult: async (_runId, resultId) => {
+              log('download tool result', resultId)
+              return new Blob([JSON.stringify(resultId == secondResult.resultId ? secondOutput : toolOutput)], { type: 'application/json' })
+            },
+          }}
+          cancelDisabled={false}
+          canceling={false}
+          events={empty ? [] : partial ? events.slice(4) : events}
+          eventsExpiresAt={undefined}
+          eventFilter="all"
+          eventNodes={new Map(events.filter((event) => typeof event.payload.nodeId == 'string').map((event) => [event.sequence, String(event.payload.nodeId)]))}
+          historyComplete={empty || !partial}
+          onCancel={() => log('cancel')}
+          onClose={() => log('close')}
+          onEventFilterChange={(value) => log('filter', value)}
+          onLocateEvent={(value) => log('locate', value)}
+          onLocateWait={() => {}}
+          onResolve={() => {}}
+          onRetryObservation={() => {}}
+          open
+          observationFailed={false}
+          result={undefined}
+          resolvingActions={new Map()}
+          run={empty ? undefined : run}
+          submitting={false}
+        />
+      </div>
+    </I18nProvider>
+  )
+}
+
+export const executionLogsStory: FrontendStory = {
+  group: 'Workbench',
+  id: 'execution-logs',
+  title: 'Execution logs',
+  standalone: true,
+  description:
+    'Compare interleaved events and execution summaries, repeated nodes, nested scopes and long errors. Locate an execution, filter states and switch runs to clear highlighting.',
+  render: (log, dark, language) => <ExecutionLogs language={language} dark={dark} log={log} />,
 }

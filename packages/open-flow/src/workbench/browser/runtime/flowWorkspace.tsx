@@ -27,8 +27,8 @@ import { NavigationStore } from './navigation.ts'
 import { PublicationsView } from './publications/publicationsView.tsx'
 import { RunControl } from './runs/runControl.tsx'
 import { RunDrawer } from './runs/runDrawer.tsx'
+import { readRunDrawerOpen, writeRunDrawerOpen } from './runs/runDrawerPreference.ts'
 import { RunInputPanel } from './runs/runInputPanel.tsx'
-import { RunResults } from './runs/runResults.tsx'
 import { RunStatusIslandContainer } from './runs/runStatusIsland.tsx'
 import { RunsView } from './runs/runsView.tsx'
 import { WorkspaceDiagnosticsIsland } from './shell/workspaceDiagnosticsIsland.tsx'
@@ -40,11 +40,13 @@ import { WorkbenchStore } from './stores/workbenchStore.ts'
 const RUN_LOG_PANEL_ID = 'run-logs-panel'
 
 function RunDrawerContainer({
+  onOpenRuns,
   onClose,
   onConfigureConnector,
   open,
   store,
 }: {
+  readonly onOpenRuns: () => void
   readonly onClose: () => void
   readonly onConfigureConnector?: (() => void) | undefined
   readonly open: boolean
@@ -64,7 +66,7 @@ function RunDrawerContainer({
   return (
     <RunDrawer
       panelId={RUN_LOG_PANEL_ID}
-      tools={run == null ? undefined : <RunResults key={run.runId} runId={run.runId} client={store.results} />}
+      resultClient={store.results}
       cancelDisabled={cancelingRunId != null}
       canceling={cancelingRunId == run?.runId}
       eventFilter={eventFilter}
@@ -74,6 +76,7 @@ function RunDrawerContainer({
       historyComplete={historyComplete}
       onCancel={() => void store.runs.cancel()}
       onClose={onClose}
+      onOpenRuns={onOpenRuns}
       onConfigureConnector={onConfigureConnector}
       onEventFilterChange={(filter) => store.runs.setEventFilter(filter)}
       onLocateEvent={(sequence) => store.locateRunEvent(sequence)}
@@ -621,7 +624,7 @@ export function FlowEditor({
           )}
         </EditorContextPanel>
       )}
-      <RunDrawerContainer onClose={onCloseRuns} onConfigureConnector={onConfigureConnector} open={runDrawerOpen} store={store} />
+      <RunDrawerContainer onOpenRuns={onOpenRuns} onClose={onCloseRuns} onConfigureConnector={onConfigureConnector} open={runDrawerOpen} store={store} />
     </CanvasHistoryScope>
   )
 }
@@ -644,7 +647,13 @@ export default function FlowWorkspace({
   readonly theme: WorkbenchTheme
 }): ReactElement {
   const t = useTranslate()
-  const [runDrawerOpen, setRunDrawerOpen] = useState(false)
+  const [runDrawerOpen, setRunDrawerOpen] = useState(() => readRunDrawerOpen(store.preferences) ?? false)
+  const runDrawerPreference = useRef(readRunDrawerOpen(store.preferences))
+  const changeRunDrawerOpen = (open: boolean): void => {
+    runDrawerPreference.current = open
+    setRunDrawerOpen(open)
+    writeRunDrawerOpen(store.preferences, open)
+  }
   const handledExternalRun = useRef<string>()
   const view = useVal(navigation.$.view)
   const draft = useVal(store.workspace.$.draft)
@@ -673,14 +682,13 @@ export default function FlowWorkspace({
   useEffect(() => {
     if (submitting == null || !draftReady) return
     navigation.open('design')
-    setRunDrawerOpen(false)
   }, [draftReady, navigation, submitting])
 
   useEffect(() => {
     if (externalRunId == null || handledExternalRun.current == externalRunId) return
     handledExternalRun.current = externalRunId
     if (view != 'design') return
-    setRunDrawerOpen(false)
+    if (runDrawerPreference.current == null) setRunDrawerOpen(true)
   }, [externalRunId, view])
 
   const revealRun = (): void => {
@@ -688,7 +696,7 @@ export default function FlowWorkspace({
       navigation.open('runs')
     } else {
       navigation.open('design')
-      setRunDrawerOpen(true)
+      if (runDrawerPreference.current == null) setRunDrawerOpen(true)
     }
   }
   const run = async (triggerId?: string): Promise<void> => {
@@ -738,7 +746,7 @@ export default function FlowWorkspace({
             navigationIsland={navigationIsland}
             onRun={(triggerId) => void run(triggerId)}
             onRunStarted={revealRun}
-            onCloseRuns={() => setRunDrawerOpen(false)}
+            onCloseRuns={() => changeRunDrawerOpen(false)}
             onConfigureConnector={onConfigureConnector}
             onOpenPublications={() => {
               store.runRequests.dismissInputs()
@@ -750,7 +758,7 @@ export default function FlowWorkspace({
             }}
             onManageConnectorAccess={onManageConnectorAccess}
             connectionHref={connectionHref}
-            onToggleRuns={() => setRunDrawerOpen((open) => !open)}
+            onToggleRuns={() => changeRunDrawerOpen(!runDrawerOpen)}
             runDrawerOpen={runDrawerOpen}
             store={store}
             theme={theme}

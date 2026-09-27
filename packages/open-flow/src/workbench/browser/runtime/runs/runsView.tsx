@@ -20,7 +20,16 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/
 import { Icon } from '../icons.tsx'
 import { IdTooltip } from '../shell/idTooltip.tsx'
 import { WorkbenchSelect } from '../shell/workbenchSelect.tsx'
-import { ActiveWait, initialRunLogFilters, RunLog, RunLogButton, RunLogFilters, RunTooltipButton } from './runDrawer.tsx'
+import {
+  ActiveWait,
+  useRunLogPresentation,
+  RunLogViewSwitch,
+  RunLog,
+  RunLogButton,
+  RunLogFilters,
+  RunLogClearHighlight,
+  RunTooltipButton,
+} from './runDrawer.tsx'
 import { RunResultView } from './runOutput.tsx'
 import { duration, runLabel, statusClass } from './runPresentation.ts'
 import { canCancelRun, hasRunFilter } from './runStore.ts'
@@ -122,8 +131,7 @@ export function RunsView({
   const [narrow, setNarrow] = useState(false)
   const [narrowDetailOpen, setNarrowDetailOpen] = useState(false)
   const [tab, setTab] = useState<'output' | 'timeline'>('output')
-  const [raw, setRaw] = useState(false)
-  const [filters, setFilters] = useState(() => initialRunLogFilters(eventFilter))
+  const presentation = useRunLogPresentation(eventFilter, run?.runId)
   const [filterOpen, setFilterOpen] = useState(false)
   const [filterContainer, setFilterContainer] = useState<HTMLElement | null>(null)
   const [filterForm, setFilterForm] = useState(() => filterDraft(filter))
@@ -536,37 +544,14 @@ export function RunsView({
                 </Tabs>
                 {tab == 'timeline' && (
                   <div className="run-toolbar-actions">
-                    <Tabs
-                      value={raw ? 'events' : 'steps'}
-                      onValueChange={(value) => {
-                        if (value != null) setRaw(value === 'events')
-                      }}
-                    >
-                      <TabsList aria-label={t('run.timelineView')} variant="flat" size="sm">
-                        <Tooltip>
-                          <TabsTrigger value="steps" render={<TooltipTrigger />} aria-controls="run-history-timeline-panel">
-                            {t('run.stepsView')}
-                          </TabsTrigger>
-                          <TooltipContent container={root.current} side="top">
-                            {t('run.stepsViewHint')}
-                          </TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TabsTrigger value="events" render={<TooltipTrigger />} aria-controls="run-history-timeline-panel">
-                            {t('run.eventsView')}
-                          </TabsTrigger>
-                          <TooltipContent container={root.current} side="top">
-                            {t('run.eventsViewHint')}
-                          </TooltipContent>
-                        </Tooltip>
-                      </TabsList>
-                    </Tabs>
+                    <RunLogViewSwitch presentation={presentation} />
+                    <RunLogClearHighlight presentation={presentation} />
                     <RunLogFilters
                       container={root.current}
                       events={events}
-                      filters={filters}
+                      presentation={presentation}
                       onChange={(next) => {
-                        setFilters(next)
+                        presentation.setFilters(next)
                         store.runs.setEventFilter(next.length == 1 ? next[0]! : 'all')
                       }}
                     />
@@ -576,11 +561,11 @@ export function RunsView({
               {tab == 'timeline' ? (
                 <div aria-labelledby="run-history-timeline-tab" className="run-tab-panel" id="run-history-timeline-panel" role="tabpanel" tabIndex={0}>
                   <RunLog
-                    raw={raw}
+                    resultClient={store.results}
+                    presentation={presentation}
                     events={events}
                     eventsExpiresAt={eventsExpiresAt}
                     eventNodes={eventNodes}
-                    filters={filters}
                     historyComplete={historyComplete}
                     observationFailed={observationFailed}
                     onConfigureConnector={onConfigureConnector}

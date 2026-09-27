@@ -77,6 +77,10 @@
   --open-flow-ring: #b4b4b4;
 }
 
+.open-flow-workbench :is(.run-drawer, .runs-view) {
+  --ui-control-radius: 6px;
+}
+
 .open-flow-property-panel {
   --ui-control-radius: 6px;
   --ui-disabled-opacity: 1;

@@ -2,10 +2,12 @@ import 'overlayscrollbars/overlayscrollbars.css'
 import styles from './scroll-area.module.scss'
 import type { EventListeners, PartialOptions } from 'overlayscrollbars'
 import type { OverlayScrollbarsComponentRef } from 'overlayscrollbars-react'
+import type { VListProps, VListHandle } from 'virtua'
 
 import { clsx } from 'clsx'
-import { OverlayScrollbarsComponent } from 'overlayscrollbars-react'
-import { forwardRef } from 'react'
+import { OverlayScrollbarsComponent, useOverlayScrollbars } from 'overlayscrollbars-react'
+import { forwardRef, useEffect, useRef } from 'react'
+import { VList } from 'virtua'
 
 export type ScrollAreaRef = OverlayScrollbarsComponentRef<'div'>
 
@@ -62,3 +64,48 @@ export const ScrollArea: React.ForwardRefExoticComponent<ScrollAreaProps & React
 export const NativeScrollArea = forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
   <div {...props} ref={ref} className={clsx(styles.container, styles.native, className)} />
 ))
+
+/** Decorate the virtual list's own viewport without inserting a second scrolling element. */
+export function VirtualScrollArea<T>({
+  listRef,
+  className,
+  onScrollIntent,
+  onWheel,
+  onKeyDown,
+  ...props
+}: VListProps<T> & {
+  readonly listRef: React.Ref<VListHandle>
+  /** Called for user scroll gestures, excluding programmatic positioning and nested controls. */
+  readonly onScrollIntent?: () => void
+}) {
+  const root = useRef<HTMLDivElement>(null)
+  const [initialize] = useOverlayScrollbars({ options })
+  useEffect(() => {
+    const target = root.current
+    if (target?.firstElementChild instanceof HTMLElement) initialize({ target, elements: { viewport: target.firstElementChild } })
+  }, [initialize])
+  return (
+    <div
+      ref={root}
+      data-overlayscrollbars-initialize=""
+      className={clsx(styles.container, className)}
+      onPointerDown={(event) => {
+        if (event.target instanceof Element && event.target.closest('.os-scrollbar') != null) onScrollIntent?.()
+      }}
+      onTouchStart={onScrollIntent}
+    >
+      <VList
+        {...props}
+        ref={listRef}
+        onWheel={(event) => {
+          onScrollIntent?.()
+          onWheel?.(event)
+        }}
+        onKeyDown={(event) => {
+          if (event.target == event.currentTarget && ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(event.key)) onScrollIntent?.()
+          onKeyDown?.(event)
+        }}
+      />
+    </div>
+  )
+}

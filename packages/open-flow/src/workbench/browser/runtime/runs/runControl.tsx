@@ -71,7 +71,7 @@ export function RunControl({
           <Button
             aria-controls={inputStatus == 'none' ? undefined : 'run-input-popover'}
             aria-expanded={inputStatus == 'none' ? undefined : inputOpen}
-            className="run-control-main text-[13px]"
+            className="run-control-main text-[13px] leading-5"
             data-standalone={inputStatus == 'none' && triggers.length <= 1}
             disabled={disabled || starting}
             onClick={onRun}
