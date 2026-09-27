@@ -110,13 +110,15 @@ export function ContextPanel({
         'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [href], [tabindex]:not([tabindex="-1"])',
       ),
     ].filter((element) => element.getClientRects().length > 0)
-    if (cycleContextPanelFocus(current, focusable, current.ownerDocument.activeElement, event.shiftKey)) event.preventDefault()
+    const root = current.getRootNode()
+    const activeElement = root instanceof ShadowRoot ? root.activeElement : current.ownerDocument.activeElement
+    if (cycleContextPanelFocus(current, focusable, activeElement, event.shiftKey)) event.preventDefault()
   }
 
   useEffect(() => {
     const current = panel.current
-    current?.ownerDocument.addEventListener('keydown', keyDown)
-    return () => current?.ownerDocument.removeEventListener('keydown', keyDown)
+    current?.addEventListener('keydown', keyDown)
+    return () => current?.removeEventListener('keydown', keyDown)
   }, [onClose, overlay])
 
   return (

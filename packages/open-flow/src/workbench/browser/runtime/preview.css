@@ -1,0 +1,15 @@
+@import '../../../ui/browser/public.css';
+@import '../../../canvas/browser/styles/root.css';
+@import './styles/tokens.css';
+@import './styles/canvas.css';
+@import './styles/context-panel.css';
+@import './styles/code-editor.css';
+@import './styles/connection-settings.css';
+@import './styles/revision-canvas.css';
+
+.open-flow-preview {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
+  flex-direction: column;
+}

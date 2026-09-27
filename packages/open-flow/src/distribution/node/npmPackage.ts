@@ -109,6 +109,8 @@ function createManifest(version: string): object {
         import: './dist/common/webhook-trigger.js',
       },
       './workbench-host-conformance': { types: './dist/browser/host-conformance.d.ts', import: './dist/browser/host-conformance.js' },
+      './preview': { types: './dist/browser/preview.d.ts', import: './dist/browser/preview.js' },
+      './preview.css': { types: './dist/browser/preview.css.d.ts', default: './dist/browser/preview.css' },
       './workbench': {
         types: './dist/browser/workbench.d.ts',
         import: './dist/browser/workbench.js',
@@ -143,6 +145,15 @@ function renderReadme(): string {
   return `# @oomol-lab/open-flow
 
 TypeScript contracts and Browser runtime for Open Flow.
+
+The offline Publications viewer is available as \`OpenFlowPreview\` from
+\`@oomol-lab/open-flow/preview\`, with standalone \`@oomol-lab/open-flow/preview.css\`.
+Supply \`draft\`, \`presentation\` (or null), \`language\` and \`theme\`; the entry also exports
+\`Draft\`, \`Presentation\` and \`OpenFlowPreviewProps\` types. Give its parent an explicit height.
+It supports temporary node movement, restore layout, read-only properties and subflows without
+fetching or saving a workflow. Use a new React key to reset the session when switching examples.
+A Shadow DOM host must load the stylesheet inside its shadow root before mounting the component;
+Vite hosts can import \`@oomol-lab/open-flow/preview.css?url\` for the stylesheet URL.
 
 Install the Task contracts as a development dependency:
 

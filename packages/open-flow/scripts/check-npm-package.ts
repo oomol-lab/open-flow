@@ -54,6 +54,10 @@ for (const expected of [
   'package/dist/browser/workbench-contract.d.ts',
   'package/dist/browser/theme.css',
   'package/dist/browser/theme.css.d.ts',
+  'package/dist/browser/preview.js',
+  'package/dist/browser/preview.d.ts',
+  'package/dist/browser/preview.css',
+  'package/dist/browser/preview.css.d.ts',
   'package/dist/browser/ui.js',
   'package/dist/browser/ui.d.ts',
   'package/dist/browser/ui-input.d.ts',
@@ -236,6 +240,8 @@ assert.deepEqual(packedManifest.exports, {
     import: './dist/common/webhook-trigger.js',
     types: './dist/common/webhook-trigger.d.ts',
   },
+  './preview': { import: './dist/browser/preview.js', types: './dist/browser/preview.d.ts' },
+  './preview.css': { types: './dist/browser/preview.css.d.ts', default: './dist/browser/preview.css' },
   './workbench': {
     import: './dist/browser/workbench.js',
     types: './dist/browser/workbench.d.ts',
@@ -251,6 +257,17 @@ for (const forbidden of ['bin', 'dependencies', 'devDependencies', 'main', 'modu
   assert.equal(Object.hasOwn(packedManifest, forbidden), false)
 }
 
+const previewStyleEntry = entries.find((entry) => entry.header.name == 'package/dist/browser/preview.css')
+assert.ok(previewStyleEntry?.data)
+const previewStyle = new TextDecoder().decode(previewStyleEntry.data)
+for (const token of sharedUiTokens) assert.ok(previewStyle.includes(`${token}:`), `Missing ${token} from the published preview CSS.`)
+assert.doesNotMatch(previewStyle, /data:font\//)
+for (const [, asset] of previewStyle.matchAll(/url\((?:["'])?(\.\/assets\/[^)"']+)/g)) {
+  assert.ok(
+    entries.some((entry) => entry.header.name == `package/dist/browser/${asset!.slice(2)}`),
+    `Missing preview asset ${asset}`,
+  )
+}
 const workbenchStyleEntry = entries.find((entry) => entry.header.name == 'package/dist/browser/workbench.css')
 assert.ok(workbenchStyleEntry?.data)
 const workbenchStyle = new TextDecoder().decode(workbenchStyleEntry.data)
@@ -334,6 +351,13 @@ async function verifyConsumer(): Promise<void> {
         "import { webhookEndpointId } from '@oomol-lab/open-flow/webhook-trigger'",
         "import type { WorkbenchHost, WorkbenchLocation } from '@oomol-lab/open-flow/workbench'",
         "import { OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'",
+        "import { OpenFlowPreview, type OpenFlowPreviewProps, type Draft, type Presentation } from '@oomol-lab/open-flow/preview'",
+        "import '@oomol-lab/open-flow/preview.css'",
+        'declare const previewDraft: Draft',
+        'declare const previewPresentation: Presentation | null',
+        "const previewProps: OpenFlowPreviewProps = { draft: previewDraft, presentation: previewPresentation, language: 'en', theme: 'light' }",
+        'const preview = <OpenFlowPreview {...previewProps} />',
+        'void preview',
         "import { createElement } from 'react'",
         "import '@oomol-lab/open-flow/workbench.css'",
         "import { Button, Input, Label, Textarea } from '@oomol-lab/open-flow/ui'",

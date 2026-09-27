@@ -132,3 +132,11 @@ JSON 值编辑器支持通过右下角手柄调整高度，宽度跟随面板；
 高级设置使用原生折叠，不执行高度动画。展开后面板保持定位并限制可用高度，长内容由面板统一滚动；编辑器保持挂载，收起后不进入 Tab 顺序。
 
 Node and Trigger **Properties** galleries include a **Fixed types · editable values** card using production `NodeInputs`. It compares all shared value editors, empty fixed/open objects, missing choices, nested definitions and array limits without granting schema-editing callbacks. These card edits stay local and Reset samples resets the node-gallery card. Comment has no typed fields.
+
+## Public preview
+
+`?story=preview` and `?story=preview-shadow` use the public `OpenFlowPreview` entry with the
+Publications fixture. Test temporary movement/restoration, properties, subflows, theme/language,
+missing layout, and a narrow host. The Shadow DOM host is Lab-only and copies the loaded Lab
+stylesheets, including production CSS modules; independent published-CSS verification must use
+the packaged `preview.css` without Lab styles.

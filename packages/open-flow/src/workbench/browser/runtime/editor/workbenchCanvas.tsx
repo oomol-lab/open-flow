@@ -19,6 +19,7 @@ import { indexAddNodeOptions } from './addNodeOptions.ts'
 import { CanvasHistoryControls } from './canvasHistoryControls.tsx'
 import { NodePickerDragSession } from './nodePickerDrag.ts'
 import { CanvasNodePicker } from './nodePickerPopover.tsx'
+import { WorkbenchInspectorToggle } from './workbenchInspectorToggle.tsx'
 
 interface Props {
   readonly nodePicker?: Pick<
@@ -487,33 +488,5 @@ export function WorkbenchCanvasActions({
         </CanvasTooltip>
       )}
     </div>
-  )
-}
-
-export function WorkbenchInspectorToggle({
-  label,
-  open,
-  disabled = false,
-  onToggle,
-}: {
-  readonly label: string
-  readonly open: boolean
-  readonly disabled?: boolean
-  readonly onToggle: (opener: HTMLButtonElement) => void
-}) {
-  return (
-    <CanvasTooltip placement="bottom" title={label}>
-      <Button
-        aria-label={label}
-        aria-expanded={open}
-        disabled={disabled}
-        onClick={(event) => onToggle(event.currentTarget)}
-        size="icon"
-        type="button"
-        variant="ghost"
-      >
-        <i aria-hidden="true" className={open ? 'i-lucide-light:panel-right-close' : 'i-lucide-light:panel-right-open'} data-corner-icon />
-      </Button>
-    </CanvasTooltip>
   )
 }

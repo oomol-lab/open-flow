@@ -15,7 +15,7 @@ import { ContextPanel } from './contextPanel.tsx'
 import { FlowNodeList } from './flowNodeList.tsx'
 import { inspectorIcon, NodeInspector } from './nodeInspector.tsx'
 import { changeRevisionCanvasSession } from './revisionCanvasSession.ts'
-import { WorkbenchInspectorToggle } from './workbenchCanvas.tsx'
+import { WorkbenchInspectorToggle } from './workbenchInspectorToggle.tsx'
 
 /** The parent keys this session by snapshot identity. All movement is disposable view state. */
 export function RevisionCanvas({
@@ -24,8 +24,10 @@ export function RevisionCanvas({
   theme,
   interactiveMode$,
   label,
+  striped = true,
 }: {
   readonly label?: string
+  readonly striped?: boolean
   readonly draft: Draft
   readonly presentation: Presentation | null
   readonly theme: WorkbenchTheme
@@ -102,7 +104,7 @@ export function RevisionCanvas({
             editable={false}
             nodesDraggable
             fitView={session?.viewport == null}
-            className="open-flow-canvas-locked"
+            className={striped ? 'open-flow-canvas-locked' : undefined}
             dark={theme === 'dark'}
             language={language}
             interactiveMode$={interactiveMode$}

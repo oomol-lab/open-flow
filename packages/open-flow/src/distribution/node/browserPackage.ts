@@ -39,6 +39,8 @@ const localizationEntryPath = 'src/localization/common/languages.ts'
 const hostConformanceEntryPath = 'src/workbench/browser/runtime/hostConformance.ts'
 const uiEntryPath = 'src/distribution/browser/ui.ts'
 const uiDeclarationEntryPath = 'src/ui/browser/public.ts'
+const previewEntryPath = 'src/distribution/browser/preview.ts'
+const previewDeclarationEntryPath = 'src/workbench/browser/runtime/openFlowPreview.tsx'
 const workbenchEntryPath = 'src/distribution/browser/workbench.ts'
 const workbenchDeclarationEntryPath = 'src/workbench/browser/runtime/openFlowWorkbench.tsx'
 
@@ -73,6 +75,7 @@ export async function buildBrowserPackage(options: BuildBrowserPackageOptions): 
   await buildRuntime(options, browserOutputPath, hostConformanceEntryPath, 'host-conformance', false)
   await buildRuntime(options, browserOutputPath, flowAuthoringEntryPath, 'flow-authoring', false)
   await buildRuntime(options, browserOutputPath, uiEntryPath, 'ui', false)
+  await buildRuntime(options, browserOutputPath, previewEntryPath, 'preview', false)
   await buildRuntime(options, browserOutputPath, workbenchEntryPath, 'workbench', false)
   await copyFile(path.join(options.sourceRoot, 'src/ui/browser/theme.css'), path.join(browserOutputPath, 'theme.css'))
   await writeDeclarations(options, browserOutputPath, commonOutputPath)
@@ -122,7 +125,7 @@ async function buildRuntime(
     ],
     root: options.sourceRoot,
   })
-  if (entryPath == workbenchEntryPath) await extractFonts(path.join(outputPath, `${outputName}.css`), outputPath)
+  if (entryPath == workbenchEntryPath || entryPath == previewEntryPath) await extractFonts(path.join(outputPath, `${outputName}.css`), outputPath)
 }
 
 async function extractFonts(cssPath: string, outputPath: string): Promise<void> {
@@ -201,6 +204,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         path.join(options.sourceRoot, flowChangeEntryPath),
         path.join(options.sourceRoot, hostConformanceEntryPath),
         path.join(options.sourceRoot, workbenchDeclarationEntryPath),
+        path.join(options.sourceRoot, previewDeclarationEntryPath),
         path.join(options.sourceRoot, uiDeclarationEntryPath),
       ],
       { cwd: options.sourceRoot },
@@ -231,6 +235,11 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'./textarea.tsx'", "'./ui-textarea.js'")
     await writeFile(path.join(browserOutputPath, 'ui.d.ts'), uiDeclaration)
     await writeFile(path.join(browserOutputPath, 'ui.css.d.ts'), 'export {}\n')
+    const previewDeclaration = (await readFile(path.join(declarationRoot, 'workbench/browser/runtime/openFlowPreview.d.ts'), 'utf8'))
+      .replaceAll("'../../../control/common/api.ts'", "'../common/control-api.js'")
+      .replaceAll("'../../../localization/common/languages.ts'", "'../common/localization.js'")
+    await writeFile(path.join(browserOutputPath, 'preview.d.ts'), previewDeclaration)
+    await writeFile(path.join(browserOutputPath, 'preview.css.d.ts'), 'export {}\n')
     const workbenchDeclaration = await readFile(path.join(declarationRoot, 'workbench/browser/runtime/openFlowWorkbench.d.ts'), 'utf8')
     const workbenchContract = (await readFile(path.join(declarationRoot, 'workbench/browser/runtime/contract.d.ts'), 'utf8'))
       .replaceAll("'../../../control/common/flowNotifications.ts'", "'./flow-notifications.js'")

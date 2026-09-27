@@ -62,7 +62,7 @@ export function publicationFixture(flowId: string, revisionId: string): { draft:
             nested: { kind: 'subflow', name: 'Delivery', inputs: {}, subflowId: 'delivery' },
           },
           edges: [
-            { source: 'start', target: 'customer' },
+            { source: 'start', target: 'prepare' },
             { source: 'customer', target: 'prepare' },
             { source: 'prepare', target: 'review' },
             { source: 'review', sourceHandle: 'approve', target: 'nested' },

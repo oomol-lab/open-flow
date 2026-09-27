@@ -51,7 +51,9 @@
     "./workbench-host-conformance": "./src/workbench/browser/runtime/hostConformance.ts",
     "./ui": "./src/ui/browser/public.ts",
     "./ui.css": "./src/ui/browser/public.css",
-    "./trigger-locales-plugin": "./src/build/node/triggerLocales.ts"
+    "./trigger-locales-plugin": "./src/build/node/triggerLocales.ts",
+    "./preview": "./src/workbench/browser/runtime/openFlowPreview.tsx",
+    "./preview.css": "./src/workbench/browser/runtime/preview.css"
   },
   "scripts": {
     "build": "bun scripts/build.ts",
