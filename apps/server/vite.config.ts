@@ -7,6 +7,7 @@ import { triggerLocalesPlugin } from '@oomol-lab/open-flow/trigger-locales-plugi
 import tailwindcss from '@tailwindcss/vite'
 import UnoCSS from '@unocss/vite'
 import react from '@vitejs/plugin-react'
+import path from 'node:path'
 import { defineConfig } from 'vite'
 import { serverPaths } from './node/transport/server-paths.ts'
 import { developmentBackendAgent, developmentBackendPlugin } from './scripts/dev.ts'
@@ -14,6 +15,7 @@ import { developmentBackendAgent, developmentBackendPlugin } from './scripts/dev
 const serverPathPattern = `^(?:${serverPaths.join('|')})(?:/|$)`
 
 export default defineConfig(({ command }) => ({
+  publicDir: path.resolve(import.meta.dirname, '../../assets/logo'),
   build: { outDir: 'dist/public' },
   css: { modules: { generateScopedName } },
   plugins: [

@@ -13,6 +13,7 @@ import { triggerDefinitions } from '../../src/trigger/providers/definitions.ts'
 
 export default defineConfig({
   root: import.meta.dirname,
+  publicDir: path.resolve(import.meta.dirname, '../../../../assets/logo'),
   css: { modules: { generateScopedName } },
   plugins: [
     triggerLocalesPlugin(),
