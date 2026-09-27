@@ -34,7 +34,7 @@ export function OpenFlowPreview({ draft, presentation, language, theme, label, c
       <IconifyProvider>
         <I18nProvider i18n={i18n}>
           <div className={cn('open-flow-theme open-flow-workbench open-flow-preview', className)} data-theme={theme}>
-            <RevisionCanvas draft={draft} presentation={presentation} theme={theme} label={label} striped={false} />
+            <RevisionCanvas draft={draft} presentation={presentation} theme={theme} label={label} striped={false} showHeader={false} />
           </div>
         </I18nProvider>
       </IconifyProvider>

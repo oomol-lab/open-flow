@@ -59,6 +59,9 @@ using the existing control API contracts. They can be constructed locally; no se
 `WorkbenchHost` is required. Pass `null` for an absent presentation to use the Publications viewer's
 existing missing-layout behavior. These are workflow definitions, not React Flow nodes.
 
+The preview has no title bar. Its optional `label` names the accessible region; subflow navigation
+and layout restoration appear as canvas controls when needed.
+
 The host owns container dimensions, language and light/dark theme. Theme and language can change
 without resetting temporary node positions. Movement never writes back to the supplied objects.
 Use a new React `key` when switching examples to reset selection, subflow navigation and layout.

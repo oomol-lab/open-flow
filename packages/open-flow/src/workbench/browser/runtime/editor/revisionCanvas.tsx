@@ -25,9 +25,11 @@ export function RevisionCanvas({
   interactiveMode$,
   label,
   striped = true,
+  showHeader = true,
 }: {
   readonly label?: string
   readonly striped?: boolean
+  readonly showHeader?: boolean
   readonly draft: Draft
   readonly presentation: Presentation | null
   readonly theme: WorkbenchTheme
@@ -69,13 +71,9 @@ export function RevisionCanvas({
     setSelected(ids)
     setInspectorOpen(true)
   }
-  return (
-    <section ref={root} className={`revision-viewer${inspectorOpen ? ' inspector-open' : ''}`} aria-label={label ?? t('snapshot.title')}>
-      <header className="revision-viewer-toolbar">
-        <span className="inline-flex items-center gap-1.5 font-medium">
-          <i aria-hidden="true" className="i-lucide-light:lock-keyhole" />
-          {label ?? t('snapshot.title')}
-        </span>
+  const navigation =
+    target.kind === 'subflow' || presentation == null || moved ? (
+      <>
         {target.kind === 'subflow' && (
           <Button size="xs" variant="ghost" onClick={() => navigate({ kind: 'flow' })}>
             {t('snapshot.root')}
@@ -94,7 +92,19 @@ export function RevisionCanvas({
             {t('snapshot.restore')}
           </Button>
         )}
-      </header>
+      </>
+    ) : undefined
+  return (
+    <section ref={root} className={`revision-viewer${inspectorOpen ? ' inspector-open' : ''}`} aria-label={label ?? t('snapshot.title')}>
+      {showHeader && (
+        <header className="revision-viewer-toolbar">
+          <span className="inline-flex items-center gap-1.5 font-medium">
+            <i aria-hidden="true" className="i-lucide-light:lock-keyhole" />
+            {label ?? t('snapshot.title')}
+          </span>
+          {navigation}
+        </header>
+      )}
       <div className="revision-viewer-body">
         <div className="revision-viewer-canvas">
           <FlowCanvasView
@@ -117,6 +127,7 @@ export function RevisionCanvas({
             onActivateSelection={inspect}
             onInspectSelection={() => setInspectorOpen(true)}
             inspectorOpen={inspectorOpen}
+            toolbar={showHeader ? undefined : navigation}
             cornerTools={
               <WorkbenchInspectorToggle
                 label={t('designer.toggleInspector')}
