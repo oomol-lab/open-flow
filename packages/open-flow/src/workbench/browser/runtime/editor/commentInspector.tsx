@@ -9,22 +9,25 @@ const MarkdownContent = lazy(() => import('../../../../ui/browser/markdown/markd
 export function CommentInspector({
   title,
   content,
-  disabled,
+  disabled = false,
+  readOnly,
   dark,
   onSave,
 }: {
   readonly title: string
   readonly content: string
-  readonly disabled: boolean
+  readonly disabled?: boolean
   readonly dark: boolean
-  readonly onSave: (comment: { title: string; content: string }) => void
-}) {
+} & (
+  | { readonly readOnly: true; readonly onSave?: never }
+  | { readonly readOnly?: false; readonly onSave: (comment: { title: string; content: string }) => void }
+)) {
   const t = useTranslate()
   const [draftContent, setDraftContent] = useState(content)
   const [source, setSource] = useState(false)
   useEffect(() => setDraftContent(content), [content])
   const save = () => {
-    if (!disabled && draftContent !== content) onSave({ title, content: draftContent })
+    if (!readOnly && !disabled && draftContent !== content) onSave({ title, content: draftContent })
   }
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col p-3">
@@ -38,6 +41,7 @@ export function CommentInspector({
             aria-label={t('inspector.comment.source')}
             className="min-h-0 flex-1 resize-none field-sizing-fixed"
             disabled={disabled}
+            readOnly={readOnly}
             value={draftContent}
             onChange={(event) => setDraftContent(event.target.value)}
             onBlur={save}

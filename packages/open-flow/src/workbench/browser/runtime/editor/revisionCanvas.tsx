@@ -8,9 +8,9 @@ import { useMemo, useRef, useState } from 'react'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { FlowCanvasView } from '../../../../canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
-import { JSONViewer } from '../../../../ui/browser/json-viewer/JSONViewer.tsx'
 import { revisionView } from '../revisionView.ts'
 import { designerGraph } from '../workspace.ts'
+import { CommentInspector } from './commentInspector.tsx'
 import { ContextPanel } from './contextPanel.tsx'
 import { FlowNodeList } from './flowNodeList.tsx'
 import { inspectorIcon, NodeInspector } from './nodeInspector.tsx'
@@ -145,7 +145,7 @@ export function RevisionCanvas({
             className="open-flow-property-panel"
             theme={theme}
             title={selection?.node.name ?? comment?.title ?? t('inspector.title')}
-            icon={inspectorIcon(selection, target)}
+            icon={comment?.kind === 'comment' ? 'comment' : inspectorIcon(selection, target)}
             focusOnOpen
             onClose={() => setInspectorOpen(false)}
           >
@@ -160,9 +160,7 @@ export function RevisionCanvas({
                 onOpenSubflow={(id) => navigate({ kind: 'subflow', id })}
               />
             ) : comment?.kind === 'comment' ? (
-              <div className="inspector-content">
-                <JSONViewer data={{ title: comment.title, content: comment.content }} />
-              </div>
+              <CommentInspector key={comment.id} title={comment.title} content={comment.content ?? ''} dark={theme === 'dark'} readOnly />
             ) : (
               <FlowNodeList
                 nodes={selected.length > 1 ? model.nodes.filter((node) => selected.includes(node.id)) : model.nodes}

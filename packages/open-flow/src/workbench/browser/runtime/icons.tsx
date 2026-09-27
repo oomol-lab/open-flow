@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode, SVGProps } from 'react'
 
-import { Network } from 'lucide-react'
+import { Network, StickyNote } from 'lucide-react'
 
 export type IconName =
   | 'alert'
@@ -9,6 +9,7 @@ export type IconName =
   | 'chevron-left'
   | 'chevron-up'
   | 'close'
+  | 'comment'
   | 'condition'
   | 'connection'
   | 'download'
@@ -225,6 +226,9 @@ function glyph(name: IconName): ReactNode {
 }
 
 export function Icon({ name, size = 18, ...props }: { readonly name: IconName; readonly size?: number } & SVGProps<SVGSVGElement>): ReactElement {
+  if (name === 'comment') {
+    return <StickyNote aria-hidden="true" size={size} strokeWidth={1.5} {...props} />
+  }
   if (name === 'flow') {
     return <Network aria-hidden="true" size={size} strokeWidth={1.5} {...props} />
   }

@@ -44,11 +44,14 @@ function CommentCase({ sample, dark, log }: { sample: (typeof cases)[number]; da
         <CommentInspector
           {...value}
           dark={dark}
-          disabled={sample.disabled}
-          onSave={(next) => {
-            setValue(next)
-            log('comment.saved', { sample: sample.label, ...next })
-          }}
+          {...(sample.disabled
+            ? { readOnly: true as const }
+            : {
+                onSave: (next: { title: string; content: string }) => {
+                  setValue(next)
+                  log('comment.saved', { sample: sample.label, ...next })
+                },
+              })}
         />
       </EditorContextPanel>
     </section>
