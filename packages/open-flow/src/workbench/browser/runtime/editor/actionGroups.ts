@@ -4,7 +4,7 @@ const actionGroupTypes = ['read', 'write', 'destructive', 'other'] as const
 export type ActionGroupType = (typeof actionGroupTypes)[number]
 type ActionOption = Extract<AddNodeOption, { kind: 'connector' }>
 
-export function groupActionOptions(items: readonly AddNodeOption[]) {
+export function groupActionOptions(items: readonly AddNodeOption[]): { type: ActionGroupType; items: ActionOption[] }[] {
   const groups: Record<ActionGroupType, ActionOption[]> = { read: [], write: [], destructive: [], other: [] }
   for (const item of items) {
     if (item.kind != 'connector') continue

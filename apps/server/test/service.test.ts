@@ -814,6 +814,50 @@ describe('Server application service', () => {
     await closeService(service)
   })
 
+  it('reads independent previous snapshots in an isolate and keeps Subflow roots isolated', async () => {
+    const source = fullFlow()
+    const revision: RevisionContent = {
+      ...source,
+      modules: {
+        ...source.modules,
+        increment: {
+          ...source.modules.increment!,
+          source: `export default async (inputs, context) => {
+  const previous = await context.getPrevious()
+  if (previous.id !== 'value' || previous.outputs.value !== inputs.value) throw new Error('Previous output is incorrect.')
+  if (previous.outputDefs[0].handle !== 'value' || previous.outputDefs[0].nullable !== false || 'value' in previous.outputDefs[0]) throw new Error('Previous schema is incorrect.')
+  previous.outputs.value = 'changed'
+  previous.outputDefs[0].jsonSchema.changed = true
+  const again = await context.getPrevious()
+  if (again.outputs.value !== inputs.value || again.outputDefs[0].jsonSchema.changed) throw new Error('Previous reads share mutable state.')
+  return { value: inputs.value + 1 }
+}`,
+        },
+        double: {
+          ...source.modules.double!,
+          source: `export default async ({ value }, context) => {
+  if (await context.getPrevious() !== null) throw new Error('Subflow root has a previous node.')
+  return { value: value * 2 }
+}`,
+        },
+      },
+    }
+    const service = await openService(await databaseFile())
+    await startService(service)
+    const accepted = await acceptRun(service, {
+      flowId: 'main',
+      idempotencyKey: 'previous',
+      revision,
+      revisionId: 'revision-previous',
+    })
+    if (accepted.kind !== 'accepted') throw new Error('Run was not accepted.')
+    await service.waitForIdle()
+    expect(service.run(accepted.runId)).toMatchObject({
+      status: 'completed',
+      result: { nodes: [{ nodeId: 'nested', outputs: { value: 6 } }] },
+    })
+  })
+
   it('executes a fixed full Flow through Scheduler and isolated-vm and persists public events', async () => {
     const service = await openService(await databaseFile())
     await startService(service)

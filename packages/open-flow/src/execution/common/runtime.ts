@@ -377,9 +377,12 @@ export default () => fs.readFileSync('/etc/passwd', 'utf8')`,
         },
         input: null,
         invocationId: 'final-outputs',
-        program: program(harness, `export default (_input, context) => ({ available: typeof context.outputs, value: 1 })`),
+        program: program(
+          harness,
+          `export default async (_input, context) => ({ available: typeof context.outputs, previous: await context.getPrevious(), value: 1 })`,
+        ),
       })
-      equal(value, { available: 'undefined', value: 1 }, 'Final Task outputs')
+      equal(value, { available: 'undefined', previous: null, value: 1 }, 'Final Task outputs')
     },
   },
   {

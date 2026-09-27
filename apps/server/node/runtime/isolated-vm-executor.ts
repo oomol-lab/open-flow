@@ -40,6 +40,8 @@ function remote(result: Effect.Effect<CapabilityResult, Error>): Effect.Effect<u
 
 // Executor code runs in a child process outside Vitest coverage collection.
 /* v8 ignore start */
+type BridgeResponse = RuntimeCapabilityResponse | ReturnType<Extract<TaskInvocation, { moduleId: string }>['getPrevious']>
+
 const capabilitySource = `const call = globalThis.__openFlowCapability
 const cancelTimer = globalThis.__openFlowClearTimeout
 const cloneValue = globalThis.__openFlowClone
@@ -197,6 +199,7 @@ async function invoke(kind, payload) {
 }
 const createActions = ${createActions.toString()}
 export const capability = Object.freeze({
+  getPrevious: () => invoke('previous', null),
   actions: createActions((payload) => invoke('connector', payload)),
   artifact: Object.freeze({
     open: (reference) => invoke('artifact.open', reference),
@@ -209,7 +212,7 @@ function installGlobals(
   ivm: typeof IsolatedVM,
   context: IsolatedVM.Context,
   request: { readonly invocationId: string; readonly limits: IsolatedVmLimits },
-  call: (invocationId: string, capabilities: readonly ConnectorCapability[], kind: string, payload: JsonValue) => Promise<RuntimeCapabilityResponse>,
+  call: (invocationId: string, capabilities: readonly ConnectorCapability[], kind: string, payload: JsonValue) => Promise<BridgeResponse>,
   capabilities: readonly ConnectorCapability[],
   log?: (level: 'debug' | 'error' | 'info' | 'warn', message: string) => Promise<void>,
 ): { readonly close: () => boolean; readonly failure: () => unknown; readonly flush: () => Promise<void> } {
@@ -457,7 +460,7 @@ function readResult(
 async function execute(
   request: InvokeRequest,
   canceled: AbortSignal,
-  call: (invocationId: string, capabilities: readonly ConnectorCapability[], kind: string, payload: JsonValue) => Promise<RuntimeCapabilityResponse>,
+  call: (invocationId: string, capabilities: readonly ConnectorCapability[], kind: string, payload: JsonValue) => Promise<BridgeResponse>,
   capabilities: readonly ConnectorCapability[] = [],
   preserveCapabilityFailure = false,
   log?: (level: 'debug' | 'error' | 'info' | 'warn', message: string) => Promise<void>,
@@ -521,18 +524,13 @@ async function execute(
 
 function executeEffect(
   request: InvokeRequest,
-  call: (
-    invocationId: string,
-    capabilities: readonly ConnectorCapability[],
-    kind: string,
-    payload: JsonValue,
-  ) => Effect.Effect<RuntimeCapabilityResponse, Error>,
+  call: (invocationId: string, capabilities: readonly ConnectorCapability[], kind: string, payload: JsonValue) => Effect.Effect<BridgeResponse, Error>,
   capabilities: readonly ConnectorCapability[] = [],
   preserveCapabilityFailure = false,
   log?: (level: 'debug' | 'error' | 'info' | 'warn', message: string) => Effect.Effect<void, Error>,
 ): Effect.Effect<JsonValue | undefined, Error, Scope.Scope> {
   return Effect.gen(function* () {
-    const run = yield* FiberSet.makeRuntimePromise<never, RuntimeCapabilityResponse, Error>()
+    const run = yield* FiberSet.makeRuntimePromise<never, BridgeResponse, Error>()
     const emit = yield* FiberSet.makeRuntimePromise<never, void, Error>()
     return yield* Effect.tryPromise({
       try: (signal) =>
@@ -561,7 +559,7 @@ function executeFlow(
           readonly type: 'capability'
         }
       | { readonly event: SchedulerEvent; readonly type: 'event' }
-      | { readonly invocation: TaskInvocation; readonly type: 'task' }
+      | { readonly invocation: Extract<TaskInvocation, { readonly taskId: string }>; readonly type: 'task' }
       | { readonly operation: WaitOperation; readonly type: 'wait' },
   ) => Effect.Effect<CapabilityResult, Error>,
 ): Effect.Effect<FlowRunOutcome, Error> {
@@ -613,6 +611,7 @@ function executeFlow(
                 type: 'invoke',
               },
               (invocationId, capabilities, kind, payload) => {
+                if (kind == 'previous') return Effect.sync(invocation.getPrevious)
                 return remote(call({ capabilities, invocationId, kind, payload, type: 'capability' })).pipe(
                   Effect.map((response) => response as RuntimeCapabilityResponse),
                 )
@@ -662,7 +661,7 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
           readonly type: 'capability'
         }
       | { readonly event: SchedulerEvent; readonly type: 'event' }
-      | { readonly invocation: TaskInvocation; readonly type: 'task' }
+      | { readonly invocation: Extract<TaskInvocation, { readonly taskId: string }>; readonly type: 'task' }
       | { readonly operation: WaitOperation; readonly type: 'wait' },
   ): Effect.Effect<CapabilityResult, Error> =>
     Effect.gen(function* () {
@@ -691,6 +690,7 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
           request,
           (invocationId, capabilities, kind, payload) =>
             Effect.gen(function* () {
+              if (kind == 'previous') return null
               const response = yield* call({ capabilities, invocationId, kind, payload, type: 'capability' })
               if (!response.ok)
                 return yield* Effect.fail(Object.assign(new Error(response.error ?? 'Capability call failed.'), { schedulerCode: response.code }))

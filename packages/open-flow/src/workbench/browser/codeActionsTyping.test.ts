@@ -61,6 +61,23 @@ function diagnostics(source: string, declarations = [declaration], catalog: Read
 }
 
 describe('Code Action editor types', () => {
+  it('resolves previous node outputs and definitions through public Task types', () => {
+    expect(
+      diagnostics(`export default async (_, context) => {
+      const previous = await context.getPrevious();
+      if (!previous) return {};
+      const definition = previous.outputDefs.find(def => def.handle === 'items');
+      return { value: previous.outputs.items, schema: definition?.jsonSchema, name: previous.name };
+    }`),
+    ).toEqual([])
+    expect(
+      diagnostics(`export default async (_, context) => {
+      const previous = await context.getPrevious();
+      return { value: previous.outputs.items };
+    }`).some((message: string) => message.includes('possibly')),
+    ).toBe(true)
+  })
+
   it('completes every available Provider without requiring inserted Action hints', () => {
     const { service, text } = editorService('export default async (_, ctx) => { ctx.actions. }', [], {}, ['github', 'gmail', 'sheets'])
     const position = text.indexOf('ctx.actions.') + 'ctx.actions.'.length

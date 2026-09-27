@@ -56,7 +56,20 @@ describe('Repeated node executions', () => {
       }),
     )
     const events: SchedulerEvent[] = []
-    await expect(Effect.runPromise(runFlow(prepared, options(events)))).rejects.toThrow(`maximum execution count (${limit ?? 1000})`)
+    let count = 0
+    await expect(
+      Effect.runPromise(
+        runFlow(prepared, {
+          ...options(events),
+          invokeTask: (call) =>
+            Effect.sync(() => {
+              if (!('moduleId' in call)) throw new Error('Expected Code')
+              expect(call.getPrevious()).toMatchObject(count === 0 ? { id: 'start', outputs: {} } : { id: 'counter', outputs: { count } })
+              return { count: ++count }
+            }),
+        }),
+      ),
+    ).rejects.toThrow(`maximum execution count (${limit ?? 1000})`)
     const completed = events.filter((event) => event.type == 'node.completed')
     expect(completed).toHaveLength(limit ?? 1000)
     expect(completed.at(-1)?.outputs).toEqual({ count: limit ?? 1000 })
@@ -103,7 +116,21 @@ describe('Repeated node executions', () => {
       }),
     )
     const events: SchedulerEvent[] = []
-    const result = await Effect.runPromise(runFlow(prepared, options(events)))
+    const result = await Effect.runPromise(
+      runFlow(prepared, {
+        ...options(events),
+        invokeTask: (call) =>
+          Effect.sync(() => {
+            if (!('moduleId' in call)) throw new Error('Expected Code')
+            expect(call.getPrevious()).toMatchObject({
+              id: call.input.previous == null ? 'start' : 'choose',
+              outputs: {},
+              outputDefs: [],
+            })
+            return { count: Number(call.input.previous ?? 0) + 1 }
+          }),
+      }),
+    )
     expect(
       events
         .filter((event) => event.type == 'node.completed')
@@ -215,7 +242,15 @@ describe('Repeated node executions', () => {
     const decisions: Record<string, WaitAction> = {}
     const config = {
       ...options(events),
-      invokeTask: () => Effect.succeed({}),
+      invokeTask: (call: Parameters<FlowRunOptions['invokeTask']>[0]) =>
+        Effect.sync(() => {
+          if (!('moduleId' in call)) throw new Error('Expected Code')
+          const previous = call.getPrevious()
+          expect(previous?.id).toBe('pause')
+          expect(Object.keys(previous!.outputs)).toEqual(['pending'])
+          expect(previous?.outputDefs.map((definition) => definition.handle)).toEqual(['pending', 'approve', 'reject'])
+          return {}
+        }),
       waits: {
         ...waitHost(decisions),
         create: (request: WaitRequest) =>

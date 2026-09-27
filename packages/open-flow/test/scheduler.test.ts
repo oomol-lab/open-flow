@@ -97,6 +97,88 @@ function waitForever(_invocation: TaskInvocation): Effect.Effect<never> {
 }
 
 describe('revision graph scheduler', () => {
+  it('reads each direct arrival, including Trigger and independent branches', async () => {
+    const source = revision(
+      {
+        bindings: {},
+        tasks: {},
+        subflows: {},
+        graph: {
+          nodes: {
+            left: { name: 'Left', kind: 'task', inputs: {}, task: task('left', [], ['value']) },
+            right: { name: 'Right', kind: 'task', inputs: {}, task: task('right', [], ['value']) },
+            sink: { name: 'Sink', kind: 'task', inputs: {}, task: task('sink', [], []) },
+          },
+          edges: [
+            { source: 'left', target: 'sink' },
+            { source: 'right', target: 'sink' },
+          ],
+        },
+      },
+      ['run'],
+    )
+    const prepared = await prepareFlow(source, 'main', engine)
+    const seen: unknown[] = []
+    await runFlow(prepared, {
+      runId: 'previous',
+      emit: () => Effect.void,
+      invokeTask: (invocation) =>
+        Effect.sync(() => {
+          if (!('moduleId' in invocation)) throw new Error('Expected Code')
+          const previous = invocation.getPrevious()
+          if (invocation.nodeId === 'sink') seen.push(previous)
+          else expect(previous).toEqual({ id: 'start', name: 'Start', outputs: {}, outputDefs: [] })
+          return invocation.nodeId === 'sink' ? {} : { value: invocation.nodeId }
+        }),
+    })
+    expect(seen).toHaveLength(2)
+    for (const id of ['left', 'right'])
+      expect(seen).toContainEqual({
+        id,
+        name: id === 'left' ? 'Left' : 'Right',
+        outputs: { value: id },
+        outputDefs: [{ handle: 'value', ...port }],
+      })
+  })
+
+  it('exposes only the declared Subflow boundary', async () => {
+    const prepared = await prepareFlow(
+      revision(
+        {
+          bindings: {},
+          tasks: {},
+          subflows: {
+            nested: {
+              name: 'Nested',
+              inputs: [],
+              outputs: [{ handle: 'result', ...port, sources: [{ kind: 'node', nodeId: 'inner', output: 'value' }] }],
+              graph: { edges: [], nodes: { inner: { kind: 'value', inputs: {}, values: [{ handle: 'value', ...port, value: 42 }] } } },
+            },
+          },
+          graph: {
+            nodes: {
+              nested: { kind: 'subflow', subflowId: 'nested', inputs: {} },
+              sink: { kind: 'task', inputs: {}, task: task('sink', [], []) },
+            },
+            edges: [{ source: 'nested', target: 'sink' }],
+          },
+        },
+        ['run'],
+      ),
+      'main',
+      engine,
+    )
+    await runFlow(prepared, {
+      runId: 'nested-previous',
+      invokeTask: (invocation) =>
+        Effect.sync(() => {
+          if (!('moduleId' in invocation)) throw new Error('Expected Code')
+          expect(invocation.getPrevious()).toEqual({ id: 'nested', name: 'Nested', outputs: { result: 42 }, outputDefs: [{ handle: 'result', ...port }] })
+          return {}
+        }),
+    })
+  })
+
   it('injects a Variable once without projecting it into node.started inputs', async () => {
     const source = revision(
       {
@@ -391,11 +473,7 @@ describe('revision graph scheduler', () => {
     const first = await runOutcome(prepared, {
       bindingValues: { token: '' },
       emit: (event) => Effect.sync(() => void events.push(event)),
-      invokeTask: (invocation) =>
-        Effect.sync(() => {
-          invocations.push(invocation)
-          return { result: invocation.input }
-        }),
+      invokeTask: () => Effect.fail(new Error('Downstream must not run before the Wait resolves.')),
       runId: 'run-wait',
     })
 
@@ -424,6 +502,12 @@ describe('revision graph scheduler', () => {
       invokeTask: (invocation) =>
         Effect.sync(() => {
           invocations.push(invocation)
+          if ('moduleId' in invocation) {
+            const previous = invocation.getPrevious()
+            expect(previous?.id).toBe('wait')
+            expect(previous?.outputs.continue).toEqual(decisionOutput('continue', { id: 42 }))
+            expect(previous?.outputDefs.map((definition) => definition.handle)).toContain('pending')
+          }
           return { result: invocation.input }
         }),
       resume: { checkpoint: JSON.parse(JSON.stringify(first.checkpoint)) },
@@ -695,6 +779,7 @@ describe('revision graph scheduler', () => {
         return Effect.sync(() => {
           invoked.push(invocation.nodeId)
           if (invocation.nodeId == 'source') return { value: invocation.input.value }
+          if (invocation.nodeId == 'double' && 'moduleId' in invocation) expect(invocation.getPrevious()).toBeNull()
           if (invocation.nodeId == 'double') return { value: (invocation.input.value as number) * 2 }
           return { value: 'low' }
         })

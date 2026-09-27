@@ -1,3 +1,22 @@
+export type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue }
+
+export interface PortDefinition {
+  readonly description?: string
+  readonly jsonSchema: JsonValue
+  readonly nullable: boolean
+}
+
+export interface Port extends PortDefinition {
+  readonly handle: string
+}
+
+export interface PreviousNode {
+  readonly id: string
+  readonly name: string
+  readonly outputs: Readonly<Record<string, JsonValue>>
+  readonly outputDefs: readonly Port[]
+}
+
 export interface ArtifactRef {
   readonly kind: 'artifact'
   readonly id: string
@@ -70,6 +89,8 @@ export interface TaskContext<Actions extends object = Record<string, never>> {
   readonly artifact: ArtifactCapability
   readonly fetch: typeof fetch
   readonly logger: TaskLogger
+  /** Reads the node that triggered this invocation, or null for a graph root. */
+  getPrevious(): Promise<PreviousNode | null>
   preview(payload: PreviewPayload, id?: string): Promise<void>
   reportProgress(progress: number): Promise<void>
 }

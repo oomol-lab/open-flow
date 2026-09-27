@@ -1,3 +1,4 @@
+import type { JsonValue, Port, PortDefinition } from '../../types/index.ts'
 export { fixedInputValue, inputValue, inputValues } from './inputValue.ts'
 import type { WebhookMethod } from './webhookMethod.ts'
 
@@ -8,7 +9,7 @@ import { nodeInputMappings, setConditionInput } from './condition.ts'
 export { changeOperationsSchema, currentFlowModelVersion, decodeChangeOperations } from './changeSchema.ts'
 export type { WebhookMethod }
 
-export type JsonValue = null | boolean | number | string | readonly JsonValue[] | { readonly [key: string]: JsonValue }
+export type { JsonValue, Port, PortDefinition } from '../../types/index.ts'
 
 export type SchemaKeyword =
   | 'const'
@@ -81,18 +82,8 @@ export function validVariableName(value: string): boolean {
   return value.length <= 256 && /^[A-Za-z_][A-Za-z0-9_]*$/.test(value) && value.slice(0, 3).toUpperCase() != 'OO_'
 }
 
-export interface PortDefinition {
-  readonly description?: string
-  readonly jsonSchema: JsonValue
-  readonly nullable: boolean
-}
-
 export interface InputPortDefinition extends PortDefinition {
   readonly value?: JsonValue
-}
-
-export interface Port extends PortDefinition {
-  readonly handle: string
 }
 
 export interface InputPort extends InputPortDefinition {

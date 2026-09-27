@@ -149,6 +149,10 @@ Subflow 的输入和最终输出保持显式声明，不能越过图边界直接
 Task 仅通过返回对象一次性提交最终 output，全部声明和可序列化性校验成功后才向下游提供结果。已声明但缺失或为 `undefined` 的 output 补为 `null` 后按端口声明校验；整个返回值为 `undefined` 时按空对象处理，显式 `null` 等非对象返回值仍非法。
 归一化仅作用于端口值，不改写内部对象字段或数组元素；Condition、Wait 未选中的控制分支不补输出。普通 Flow 数据在 Runtime invocation、Scheduler、Subflow、RunEvent 和 terminal result 边界保持可序列化。
 脚本 `context` 提供取消、日志、进度、Artifact、网络、Connector 等宿主能力、只读运行身份，以及与第一个参数相同的 `inputs`。
+`context.getPrevious()` 按需返回触发本次执行的直接前驱 `{ id, name, outputs, outputDefs }`，无前驱时返回 `null`。
+outputs 来自本次到达的路径快照，outputDefs 复用固定 Revision 的输出端口声明（handle、jsonSchema、nullable 与可选 description）；声明不保证本次产生该端口值。
+Condition 返回空 outputs 和 outputDefs；Subflow 不跨图暴露内部节点。读取时才复制数据进入代码隔离环境，各次返回值互不影响。
+例如 `const previous = await context.getPrevious(); const value = previous?.outputs.items`。
 `context` 不提供运行中的 output 提交、跨节点的动态 Run store、Variable 查询或任意节点输出查询。部署可以为调度、调试和恢复私有保存 Run value，
 但不能把内部存储变成第二条用户数据通道。节点最终结果与成功完成通过同一个完成事件发布，先于完成阶段释放的下游节点启动；Wait 的 pending 分支在等待建立后即可执行。
 

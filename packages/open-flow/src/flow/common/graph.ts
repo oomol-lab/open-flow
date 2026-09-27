@@ -142,7 +142,7 @@ export function resolutionOutputPorts(node: Extract<GraphNode, { readonly kind: 
   }
 }
 
-export function nodeOutputPorts(document: FlowDocument, node: GraphNode): Readonly<Record<string, PortDefinition>> {
+export function nodeOutputPorts(document: Pick<FlowDocument, 'tasks' | 'subflows'>, node: GraphNode): Readonly<Record<string, PortDefinition>> {
   switch (node.kind) {
     case 'condition':
       return {}

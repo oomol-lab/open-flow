@@ -2,6 +2,7 @@ import type * as Cause from 'effect/Cause'
 import type { AgentConfig } from '../../flow/common/agent.ts'
 import type { ConnectorCapability, Graph, GraphNode, InputMapping, InputPortDefinition, JsonValue, TriggerNode, WaitAction } from '../../flow/common/change.ts'
 import type { PreparedFlow } from '../../flow/common/semantics.ts'
+import type { PreviousNode } from '../../types/index.ts'
 import type { AgentCheckpoint, AgentResult } from './runtime.ts'
 
 import * as Clock from 'effect/Clock'
@@ -13,7 +14,7 @@ import { z } from 'zod'
 import { agentInput } from '../../flow/common/agent.ts'
 import { portsByHandle } from '../../flow/common/change.ts'
 import { conditionInputPorts, nodeInputMappings, selectConditionBranches } from '../../flow/common/condition.ts'
-import { isResolutionNode, resolutionActions, resolutionOutputPorts } from '../../flow/common/graph.ts'
+import { isResolutionNode, nodeOutputPorts, resolutionActions, resolutionOutputPorts } from '../../flow/common/graph.ts'
 import { inputValue } from '../../flow/common/inputValue.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'
 import { matchesTriggerOutputs } from '../../trigger/common/contract.ts'
@@ -193,7 +194,10 @@ interface TaskInvocationBase {
 }
 
 export type TaskInvocation = TaskInvocationBase &
-  ({ readonly capabilities: readonly ConnectorCapability[]; readonly moduleId: string } | { readonly taskId: string })
+  (
+    | { readonly capabilities: readonly ConnectorCapability[]; readonly moduleId: string; readonly getPrevious: () => PreviousNode | null }
+    | { readonly taskId: string }
+  )
 
 export interface TriggerSeed {
   readonly nodeId: string
@@ -700,13 +704,13 @@ function runGraph(
             dispatch(nodeId, releasedHandles, frame)
           }),
         )
-      const ready: { nodeId: string; frame: Readonly<Record<string, Readonly<Record<string, JsonValue>>>> }[] = []
-      const scheduleReady = (nodeId: string, frame: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>) => {
-        ready.push({ nodeId, frame })
+      const ready: { nodeId: string; previousId?: string; frame: Readonly<Record<string, Readonly<Record<string, JsonValue>>>> }[] = []
+      const scheduleReady = (nodeId: string, frame: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>, previousId?: string) => {
+        ready.push({ nodeId, frame, previousId })
       }
       const dispatch = (nodeId: string, releasedHandles: readonly string[], frame: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>) => {
         for (const edge of outgoing.get(nodeId) ?? []) {
-          if (edge.sourceHandle == null || releasedHandles.includes(edge.sourceHandle)) scheduleReady(edge.target, frame)
+          if (edge.sourceHandle == null || releasedHandles.includes(edge.sourceHandle)) scheduleReady(edge.target, frame, nodeId)
         }
       }
       const executeNode = (
@@ -715,6 +719,7 @@ function runGraph(
         jobId: string,
         nodeInputs: Readonly<Record<string, JsonValue>>,
         resolution?: 'approve' | 'reject',
+        previousId?: string,
       ): Effect.Effect<NodeResult, Error> => {
         const config = agentConfig(context.prepared, node)
         const saved = agents[jobId]
@@ -765,6 +770,7 @@ function runGraph(
               break
             }
             case 'task': {
+              const frame = frames[jobId]!
               const additional = new Set((node.additionalInputs ?? []).map((port) => port.handle))
               const result = yield* context.invokeTask({
                 additionalInputs: Object.fromEntries(Object.entries(nodeInputs).filter(([handle]) => additional.has(handle))),
@@ -776,7 +782,31 @@ function runGraph(
                 jobId,
                 nodeId,
                 runId,
-                ...(node.task != null ? { capabilities: node.task.capabilities ?? [], moduleId: node.task.moduleId } : { taskId: node.taskId }),
+                ...(node.task != null
+                  ? {
+                      capabilities: node.task.capabilities ?? [],
+                      moduleId: node.task.moduleId,
+                      getPrevious: () => {
+                        if (previousId == null) return null
+                        const previous = target.graph.nodes[previousId]!
+                        return {
+                          id: previousId,
+                          name: previous.name ?? ('inputs' in previous ? nodeTitle(context.prepared, previous) : undefined) ?? previousId,
+                          outputs: frame[previousId]!,
+                          outputDefs: Object.entries(nodeOutputPorts(context.prepared, previous)).map(([handle, definition]) =>
+                            Object.assign(
+                              {
+                                handle,
+                                jsonSchema: definition.jsonSchema,
+                                nullable: definition.nullable,
+                              },
+                              definition.description == null ? {} : { description: definition.description },
+                            ),
+                          ),
+                        }
+                      },
+                    }
+                  : { taskId: node.taskId }),
               })
               if (config != null) {
                 const response: AgentResult = agentResultSchema.parse(result)
@@ -868,7 +898,7 @@ function runGraph(
             }),
           ),
         )
-      const executeReady = (nodeId: string, frame: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>) => {
+      const executeReady = (nodeId: string, frame: Readonly<Record<string, Readonly<Record<string, JsonValue>>>>, previousId?: string) => {
         if (firstCause != null) return
         const node = target.graph.nodes[nodeId]!
         if (!('inputs' in node)) return
@@ -912,7 +942,7 @@ function runGraph(
                 yield* createWait(nodeId, jobId, nodeInputs)
                 return
               }
-              const result = yield* executeNode(nodeId, node, jobId, nodeInputs)
+              const result = yield* executeNode(nodeId, node, jobId, nodeInputs, undefined, previousId)
               yield* settleNode(nodeId, jobId, result)
             }),
           ).pipe(Effect.ensuring(Queue.offer(changes, undefined))),
@@ -984,7 +1014,7 @@ function runGraph(
             ),
             now,
           )
-        for (const arrival of ready.splice(0)) executeReady(arrival.nodeId, arrival.frame)
+        for (const arrival of ready.splice(0)) executeReady(arrival.nodeId, arrival.frame, arrival.previousId)
         const running = yield* FiberSet.size(active)
         if (firstCause != null) continue
         if (running == 0 && pendingWaits.size == 0 && ready.length == 0) break
