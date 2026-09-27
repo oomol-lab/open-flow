@@ -306,4 +306,4 @@ Workbench 的 Providers、Actions、Connections、Triggers 数据分别由所属
 
 Publication 被替换时，在切换 Live 的事务中固定 `liveEnd`（结束时间与切换前启用状态）。它不包含 Trigger 健康状态；当前版本和迁移前未记录的历史版本无此快照。回滚创建独立 Publication，其结束状态从空值开始。
 
-Workbench 的发布者展示资料由可选的 `WorkbenchHost.resolveActor` 按宿主身份空间解析。OOMOL Console 适配用户 summaries API；其它宿主可提供自己的解析器，未提供时展示记录中的 actorId。独立的会话级 ActorStore 用 LRU 缓存完整资料响应，不向 Publication 快照写入或合并用户资料；会话结束时清空并取消在途请求。
+Workbench 的发布者展示资料在浏览器会话入口确定身份解析器：优先使用可选的 `WorkbenchHost.resolveActor`；未提供时，仅在 `https://console.oomol.com` 与 `https://console.oomol.dev` 上启用内置 OOMOL 适配，直接请求同环境的 `api.oomol.com` / `api.oomol.dev` 用户 summaries API，不经过 Console 代码或 Control API。其它来源（包括 localhost）不自动查询 OOMOL，展示记录中的 actorId；不得根据 actorId 格式猜测身份空间。独立的会话级 ActorStore 用 LRU 缓存完整资料响应，不向 Publication 快照写入或合并用户资料；会话结束时清空并取消在途请求。

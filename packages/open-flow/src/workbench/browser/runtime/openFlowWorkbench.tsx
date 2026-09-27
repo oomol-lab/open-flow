@@ -19,6 +19,7 @@ import { Button } from '../../../ui/browser/button.tsx'
 import { Field, FieldError, FieldGroup, FieldLabel } from '../../../ui/browser/field.tsx'
 import { Input } from '../../../ui/browser/input.tsx'
 import { Spinner } from '../../../ui/browser/spinner.tsx'
+import { actorResolver } from './actorResolver.ts'
 import { WorkbenchClient } from './api.ts'
 import { createI18n } from './i18n.ts'
 import { NavigationStore } from './navigation.ts'
@@ -286,7 +287,12 @@ function Session({
       preferences,
       randomId,
       workbenchI18n,
-      host,
+      {
+        openExternalPage: (resolveUrl) => host.openExternalPage(resolveUrl),
+        catalogCache: host.catalogCache,
+        connectionCache: host.connectionCache,
+        resolveActor: actorResolver(host, globalThis.location?.origin),
+      },
       variables,
     )
     return {

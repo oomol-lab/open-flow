@@ -331,8 +331,10 @@ interface PublicationPresentation {
 
 发布者头像和名称不属于 Publication 快照。Workbench 通过可选的宿主接口
 `resolveActor(actorId, signal): Promise<{ name: string; avatarUrl?: string } | null>` 读取展示资料。
-宿主负责身份空间与上游接口映射；OOMOL Console 使用 `GET /v1/users/summaries?user_ids=...`，
-把 `nickname || username` 映射为名称、`url` 映射为头像。未接入解析器、用户不存在或请求失败时显示原始 actorId。
+显式宿主解析器优先。浏览器会话入口仅在 `https://console.oomol.com` / `https://console.oomol.dev` 来源下默认启用 OOMOL 解析器，
+直接请求对应 `https://api.oomol.com` / `https://api.oomol.dev` 的 `GET /v1/users/summaries?user_ids=...`，携带上游 Cookie 和取消信号，
+把 `nickname || username` 映射为名称、`url` 映射为头像。此请求不经过宿主的 Control API request，也不附带 Flow / Team 请求头。
+其它来源不默认查询 OOMOL；未接入解析器、用户不存在或请求失败时显示原始 actorId。
 独立 ActorStore 按 actorId 缓存完整响应（包括 null），每个 Workbench 会话最多 128 项、有效期 24 小时；
 读取命中更新 LRU 次序，同一身份的在途请求合并，失败不缓存。会话销毁清空缓存并取消请求，不持久化用户资料。
 
