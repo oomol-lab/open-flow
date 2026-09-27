@@ -184,9 +184,7 @@ export function PublicationsView({
                       />
                       <span className="flex min-w-0 items-baseline justify-between gap-2 text-xs font-medium">
                         <span>{t(publication.operation == 'publish' ? 'publication.published' : 'publication.rolledBack')}</span>
-                        {publication.publicationId == currentPublicationId && (
-                          <span className="sr-only">{t('publication.current')}</span>
-                        )}
+                        {publication.publicationId == currentPublicationId && <span className="sr-only">{t('publication.current')}</span>}
                         <time className="publication-list-meta shrink-0 font-normal" dateTime={publication.createdAt}>
                           {new Date(publication.createdAt).toLocaleTimeString(language, { hour: '2-digit', minute: '2-digit' })}
                         </time>
