@@ -85,7 +85,7 @@ export function RevisionCanvas({
           <Button
             className="ml-auto"
             size="xs"
-            variant="outline"
+            variant="ghost"
             onClick={() => setSessions((current) => changeRevisionCanvasSession(current, graphId, { kind: 'restore' }))}
           >
             <i aria-hidden="true" className="i-lucide-light:rotate-ccw" />
