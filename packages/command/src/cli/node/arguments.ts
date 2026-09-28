@@ -149,8 +149,10 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       argument == '--set' ||
       argument == '--unset'
     ) {
-      const value = inlineValue ?? args[++index]
-      if (value == null || value.length == 0) throw new CliError('cli.invalid-arguments', `${argument} requires a value.`)
+      const value = inlineValue ?? args[index + 1]
+      if (value == null || value.length == 0 || (inlineValue == null && value.startsWith('-') && value != '-'))
+        throw new CliError('cli.invalid-arguments', `${argument} requires a value.`)
+      if (inlineValue == null) index++
       if (argument == '--idempotency-key') idempotencyKey = value
       else if (argument == '--expected-publication') expectedPublication = value
       else if (argument == '--team') team = value

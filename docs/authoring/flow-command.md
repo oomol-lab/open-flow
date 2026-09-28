@@ -15,6 +15,7 @@
 - `list`、`runs list`、`publications list` 一次只返回一页，支持 `--cursor` 和 `--limit`（1–100）。继续时传入 `nextCursor`，并保持同样的过滤条件。
 
 有值的选项统一支持 `--option value` 和 `--option=value`。不支持的选项及重复的单值选项会报错；`--set`、`--unset` 可以重复。
+有值选项后紧跟另一个 flag 时，报告缺少值且不发送请求。以 `-` 开头的值使用 `--option=value` 显式传入；单独的 `-` 仍可作为 stdin 参数。
 指定 `--json` 后，参数解析错误和宿主缺失错误也使用 JSON。普通结果写 stdout，调用错误写 stderr；事件跟随输出 NDJSON。
 
 ## 编辑与重试

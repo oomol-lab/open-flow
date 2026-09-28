@@ -7,6 +7,7 @@ import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { applyFlowChanges, decodeChangeOperations } from '@oomol-lab/open-flow/flow-change'
 import { uiLanguages } from '@oomol-lab/open-flow/localization'
 import { describe, expect, it, vi } from 'vitest'
+import { parseArguments } from './arguments.ts'
 import { runCli } from './cli.ts'
 import { locales } from './i18n.ts'
 
@@ -487,6 +488,24 @@ describe('agent command contract', () => {
     expect(request).not.toHaveBeenCalled()
   })
 
+  it.each([
+    { command: ['node', 'show', 'flow-1', 'start'], option: '--subflow', next: '--json' },
+    { command: ['connector', 'code-access', 'flow-1'], option: '--publication', next: '--json' },
+    { command: ['node', 'show', 'flow-1', 'start'], option: '--revision', next: '--subflow=child' },
+    { command: ['create', 'Main'], option: '--team', next: '-x' },
+  ])('reports a missing value before consuming a flag: $option $next', async ({ command, option, next }) => {
+    const output = runtime()
+    const request = vi.fn()
+    expect(await runCli(['--json', ...command, option, next], { request }, output.value)).toBe(1)
+    expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'cli.invalid-arguments', message: `${option} requires a value.` } })
+    expect(request).not.toHaveBeenCalled()
+  })
+
+  it('preserves stdin operands and explicit flag-like values', () => {
+    expect(parseArguments(['apply', 'flow-1', '--file', '-'])).toMatchObject({ file: '-' })
+    expect(parseArguments(['node', 'set', 'flow-1', 'start', '--name=--json'])).toMatchObject({ name: '--json', json: false })
+  })
+
   it('provides command-specific machine help without a host', async () => {
     const output = runtime()
     const request = vi.fn()
@@ -860,6 +879,9 @@ it.each([
   { node: 'start', subflow: 'missing' },
   { node: 'start', subflow: 'empty' },
   { node: 'missing', subflow: undefined },
+  { node: '__proto__', subflow: undefined },
+  { node: 'constructor', subflow: 'empty' },
+  { node: 'toString', subflow: undefined },
 ])('does not fall back to the root graph or another node: %j', async ({ node, subflow }) => {
   const content = applyFlowChanges(revisionFixture.content, [
     { kind: 'subflow.create', subflowId: 'empty', subflow: { name: 'Empty', inputs: [], outputs: [], graph: { edges: [], nodes: {} } } },
@@ -872,6 +894,23 @@ it.each([
   const output = runtime()
   expect(await runCli(['node', 'show', 'flow-1', node, ...(subflow == null ? [] : ['--subflow', subflow]), '--json'], { request }, output.value)).toBe(1)
   expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'node.not-found' } })
+})
+
+it.each([true, false])('resolves prototype-like node names and gives own IDs precedence (own ID=%s)', async (ownId) => {
+  const reference = ownId ? 'constructor' : '__proto__'
+  const nodes = {
+    named: { kind: 'manual', name: reference },
+    ...(ownId ? { [reference]: { kind: 'manual', name: 'Own node' } } : {}),
+  }
+  const content = { ...revisionFixture.content, document: { ...revisionFixture.content.document, graph: { edges: [], nodes } } }
+  const request = async (path: string) => {
+    if (path == '/v1/flows/flow-1') return Response.json(flow)
+    if (path == '/v1/flows/flow-1/revisions/revision-1') return Response.json({ ...revisionFixture, content })
+    throw new Error(path)
+  }
+  const output = runtime()
+  expect(await runCli(['node', 'show', 'flow-1', reference, '--json'], { request }, output.value), output.stderr()).toBe(0)
+  expect(JSON.parse(output.stdout())).toMatchObject({ nodeId: ownId ? reference : 'named', node: { name: ownId ? 'Own node' : reference } })
 })
 
 it('preserves fixed Revision failures without reading the current Draft', async () => {

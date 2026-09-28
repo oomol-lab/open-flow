@@ -240,7 +240,7 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
     const draft = await client.getRevision(flow.flowId, args.revision ?? flow.draftRevisionId)
     const graph = args.subflow == null ? draft.content.document.graph : draft.content.document.subflows[args.subflow]?.graph
     if (graph == null) throw new CliError('node.not-found', 'The selected subflow was not found in this Revision.')
-    const byId = graph.nodes[nodeReference]
+    const byId = Object.hasOwn(graph.nodes, nodeReference) ? graph.nodes[nodeReference] : undefined
     const matches = byId == null ? Object.entries(graph.nodes).filter(([, node]) => node.name == nodeReference) : [[nodeReference, byId] as const]
     if (matches.length == 0) throw new CliError('node.not-found', `Node ${JSON.stringify(nodeReference)} was not found in the selected Revision and graph.`)
     if (matches.length > 1)
