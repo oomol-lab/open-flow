@@ -387,8 +387,8 @@
       "chooseAccounts": "アカウントを管理"
     },
     "comment": {
-      "source": "ソースコード",
-      "preview": "Markdown"
+      "markdown": "Markdown",
+      "preview": "プレビュー"
     },
     "ports": {
       "reorder": "{{name}} の順序を変更",

@@ -75,7 +75,7 @@ export const commentPropertiesStory: FrontendStory = {
   group: 'Node Comment',
   id: 'comment-properties',
   title: 'Properties',
-  description: 'Comment previews share the node’s warm surround; compare short, empty, scrolling and read-only content in both themes.',
+  description: 'Compare Markdown and Preview tabs, matching panel corners, and short, empty, scrolling and read-only content in both themes.',
   standalone: true,
   render: (log, dark, language) => <CommentProperties dark={dark} language={language} log={log} />,
 }

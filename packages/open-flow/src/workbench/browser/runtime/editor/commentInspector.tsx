@@ -31,14 +31,14 @@ export function CommentInspector({
   }
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col p-3">
-      <Tabs className="min-h-0 flex-1" value={source ? 'source' : 'markdown'} onValueChange={(value) => setSource(value === 'source')}>
+      <Tabs className="min-h-0 flex-1" value={source ? 'markdown' : 'preview'} onValueChange={(value) => setSource(value === 'markdown')}>
         <TabsList aria-label={t('inspector.title')} variant="flat" className="w-full shrink-0">
-          <TabsTrigger value="source">{t('inspector.comment.source')}</TabsTrigger>
-          <TabsTrigger value="markdown">{t('inspector.comment.preview')}</TabsTrigger>
+          <TabsTrigger value="markdown">{t('inspector.comment.markdown')}</TabsTrigger>
+          <TabsTrigger value="preview">{t('inspector.comment.preview')}</TabsTrigger>
         </TabsList>
-        <TabsContent value="source" className="flex min-h-0 flex-1 flex-col">
+        <TabsContent value="markdown" className="flex min-h-0 flex-1 flex-col">
           <Textarea
-            aria-label={t('inspector.comment.source')}
+            aria-label={t('inspector.comment.markdown')}
             className="min-h-0 flex-1 resize-none field-sizing-fixed"
             disabled={disabled}
             readOnly={readOnly}
@@ -48,15 +48,13 @@ export function CommentInspector({
           />
         </TabsContent>
         <TabsContent
-          value="markdown"
-          className="flex min-h-0 flex-1 flex-col rounded-[20px] border border-[var(--open-flow-comment-border)] bg-[var(--open-flow-comment-surface)] p-2"
+          value="preview"
+          className="min-h-0 flex-1 overflow-auto rounded-[var(--ui-control-radius,calc(var(--ui-radius)_+_2px))] border border-[var(--open-flow-comment-border)] bg-[var(--open-flow-comment-content)] px-2.5 py-2"
         >
-          <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-[color-mix(in_srgb,var(--open-flow-comment-border)_45%,transparent)] bg-[var(--open-flow-comment-content)] p-3">
-            <div className="markdown-body min-w-0" onDoubleClick={() => setSource(true)}>
-              <Suspense fallback={null}>
-                <MarkdownContent dark={dark} text={draftContent} mermaid />
-              </Suspense>
-            </div>
+          <div className="markdown-body min-w-0" onDoubleClick={() => setSource(true)}>
+            <Suspense fallback={null}>
+              <MarkdownContent dark={dark} text={draftContent} mermaid />
+            </Suspense>
           </div>
         </TabsContent>
       </Tabs>

@@ -387,8 +387,8 @@
       "chooseAccounts": "管理账号"
     },
     "comment": {
-      "source": "源码",
-      "preview": "Markdown"
+      "markdown": "Markdown",
+      "preview": "预览"
     },
     "ports": {
       "reorder": "调整 {{name}} 的顺序",

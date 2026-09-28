@@ -387,8 +387,8 @@
       "chooseAccounts": "管理帳號"
     },
     "comment": {
-      "source": "原始碼",
-      "preview": "Markdown"
+      "markdown": "Markdown",
+      "preview": "預覽"
     },
     "ports": {
       "reorder": "調整 {{name}} 的順序",

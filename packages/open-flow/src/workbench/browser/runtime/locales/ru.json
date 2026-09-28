@@ -387,8 +387,8 @@
       "chooseAccounts": "Управление аккаунтами"
     },
     "comment": {
-      "source": "Исходный код",
-      "preview": "Markdown"
+      "markdown": "Markdown",
+      "preview": "Предпросмотр"
     },
     "ports": {
       "reorder": "Изменить порядок {{name}}",

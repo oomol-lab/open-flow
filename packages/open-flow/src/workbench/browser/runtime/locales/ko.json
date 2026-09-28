@@ -387,8 +387,8 @@
       "chooseAccounts": "계정 관리"
     },
     "comment": {
-      "source": "소스",
-      "preview": "Markdown"
+      "markdown": "Markdown",
+      "preview": "미리보기"
     },
     "ports": {
       "reorder": "{{name}} 순서 변경",

@@ -387,8 +387,8 @@
       "chooseAccounts": "Gérer les comptes"
     },
     "comment": {
-      "source": "Source",
-      "preview": "Markdown"
+      "markdown": "Markdown",
+      "preview": "Aperçu"
     },
     "ports": {
       "reorder": "Réordonner {{name}}",
