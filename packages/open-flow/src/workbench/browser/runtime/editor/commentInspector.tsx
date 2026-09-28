@@ -49,12 +49,14 @@ export function CommentInspector({
         </TabsContent>
         <TabsContent
           value="markdown"
-          className="min-h-0 flex-1 overflow-auto rounded-xl border border-[color-mix(in_srgb,var(--open-flow-comment-border)_45%,transparent)] bg-[var(--open-flow-comment-content)] p-3"
+          className="flex min-h-0 flex-1 flex-col rounded-[20px] border border-[var(--open-flow-comment-border)] bg-[var(--open-flow-comment-surface)] p-2"
         >
-          <div className="markdown-body min-w-0" onDoubleClick={() => setSource(true)}>
-            <Suspense fallback={null}>
-              <MarkdownContent dark={dark} text={draftContent} mermaid />
-            </Suspense>
+          <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-[color-mix(in_srgb,var(--open-flow-comment-border)_45%,transparent)] bg-[var(--open-flow-comment-content)] p-3">
+            <div className="markdown-body min-w-0" onDoubleClick={() => setSource(true)}>
+              <Suspense fallback={null}>
+                <MarkdownContent dark={dark} text={draftContent} mermaid />
+              </Suspense>
+            </div>
           </div>
         </TabsContent>
       </Tabs>
