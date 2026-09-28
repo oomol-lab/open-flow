@@ -1,9 +1,11 @@
 import { glob, readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import { timeZoneLocales } from '../../src/canvas/browser/i18n/timeZoneLocales.ts'
+import { waitBranchLocales } from '../../src/canvas/browser/i18n/waitBranchLocales.ts'
+import { uiLanguages } from '../../src/localization/common/languages.ts'
 
-/** The shipped UI languages, pinned here so an unbuilt locale file fails loudly instead of silently. */
-const uiLanguageTags = ['en', 'zh-CN', 'zh-TW', 'ja', 'ko', 'ru', 'fr'] as const
+// Iterating the shipped UI languages keeps an unbuilt locale file failing loudly instead of silently.
+const uiLanguageTags = uiLanguages
 
 type LocaleMap = ReadonlyMap<string, string>
 
@@ -51,10 +53,12 @@ async function loadBundle(
 
 const shared = 'src/ui/browser/locales'
 const form = 'src/form/browser/locales'
+// Mirrors the production workbench merge in `src/workbench/browser/runtime/i18n.ts`.
+const workbenchSupplemental = Object.fromEntries(uiLanguages.map((language) => [language, { ...waitBranchLocales[language], ...timeZoneLocales[language] }]))
 const bundles: readonly LocaleBundle[] = [
   await loadBundle('canvas', ['src/canvas/browser/i18n/locales', shared], 'src/canvas/browser/**/*.{ts,tsx}'),
   await loadBundle('IconPicker', ['src/ui/browser/icons/picker/locales'], 'src/ui/browser/icons/picker/**/*.{ts,tsx}'),
-  await loadBundle('workbench', ['src/workbench/browser/runtime/locales', shared, form], 'src/workbench/browser/**/*.{ts,tsx}', timeZoneLocales),
+  await loadBundle('workbench', ['src/workbench/browser/runtime/locales', shared, form], 'src/workbench/browser/**/*.{ts,tsx}', workbenchSupplemental),
   await loadBundle('shared UI', [shared], 'src/ui/browser/**/*.{ts,tsx}'),
   await loadBundle('form', [shared, form], 'src/form/browser/**/*.{ts,tsx}'),
 ]

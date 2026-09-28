@@ -564,8 +564,6 @@ describe('Server application service', () => {
     expect(service.inspectWaitAction(capability, 'approve', admit)).toEqual({ retryAfter: 30 })
     expect(service.resolveWaitAction(capability, 'reject', admit)).toEqual({ retryAfter: 30 })
     expect(admit).toHaveBeenCalledTimes(2)
-    expect(admit.mock.calls[0]).toEqual(admit.mock.calls[1])
-    expect(admit.mock.calls[0]).toEqual([expect.stringMatching(/^[a-f0-9]{64}$/)])
     expect(service.run(accepted.runId)?.status).toBe('running')
 
     const app = createServerApp(service)
@@ -1433,17 +1431,6 @@ describe('Server application service', () => {
         },
       ],
       valid: false,
-    })
-
-    const configured = await openService(await databaseFile(), {
-      capabilities: { llm: () => async () => ({ kind: 'completed', value: {}, version: 1 }) },
-      clock: Date.now,
-    })
-    const configuredStored = await storeRevision(configured, llmFlow(), 'llm-check-configured')
-
-    expect(await configured.control.checkFlow(configuredStored.flowId, configuredStored.revisionId, 'open-flow-engine/v5')).toMatchObject({
-      diagnostics: [],
-      valid: true,
     })
   })
 

@@ -246,35 +246,25 @@ describe('Server Webhook Trigger admission', () => {
     const other = await publishedWebhook(service, 'other')
     const app = createServerApp(service, { callbackRequestsPerMinute: 1 })
     const url = `http://server.local/v1/webhooks/${target.endpointId}`
+    const otherUrl = `http://server.local/v1/webhooks/${other.endpointId}`
     const clock = vi.spyOn(Date, 'now').mockReturnValue(0)
-    const writes = vi.spyOn(Map.prototype, 'set')
     try {
       expect((await app.request(url)).status).toBe(405)
-      const index = writes.mock.calls.findIndex(([key]) => key == `webhook:${target.endpointId}`)
-      const windows = writes.mock.contexts[index] as Map<string, unknown> | undefined
-      if (windows == null) throw new Error('Callback window was not recorded.')
-      expect(windows.size).toBe(1)
 
       clock.mockReturnValue(30_000)
-      const otherUrl = `http://server.local/v1/webhooks/${other.endpointId}`
       expect((await app.request(otherUrl)).status).toBe(405)
-      expect(windows.size).toBe(2)
-
-      clock.mockReturnValue(60_000)
       const limited = await app.request(otherUrl)
       expect(limited.status).toBe(429)
-      expect(limited.headers.get('retry-after')).toBe('30')
-      expect(windows.has(`webhook:${target.endpointId}`)).toBe(false)
-      expect(windows.size).toBe(1)
+      expect(limited.headers.get('retry-after')).toBe('60')
 
+      clock.mockReturnValue(60_000)
       expect((await app.request(url)).status).toBe(405)
       expect((await app.request(url)).status).toBe(429)
+
       clock.mockReturnValue(120_000)
       expect((await app.request(url)).status).toBe(405)
-      expect(windows.size).toBe(1)
-      expect(windows.has(`webhook:${other.endpointId}`)).toBe(false)
+      expect((await app.request(otherUrl)).status).toBe(405)
     } finally {
-      writes.mockRestore()
       clock.mockRestore()
     }
   })

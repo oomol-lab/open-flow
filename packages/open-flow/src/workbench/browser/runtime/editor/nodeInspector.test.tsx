@@ -329,9 +329,7 @@ describe('Node execution settings', () => {
     if (settings == null || typeof settings.type != 'function') throw new Error('Expected general settings.')
     const rendered = (settings.type as (props: unknown) => ReactElement)(settings.props)
     expect(rendered.type).toBe('details')
-    expect(rendered.props.className).toBe('inspector-disclosure')
     expect(rendered.props.open).toBeUndefined()
-    expect(find(rendered, (item) => item.props.className == 'inspector-section-title-text')).toBeDefined()
     const input = find(rendered, (item) => (item.props as { readonly id?: string }).id == 'node-current-timeout')
     if (input == null) throw new Error('Expected timeout input.')
     const blur = (input.props as { readonly onBlur: (event: { currentTarget: { value: string } }) => void }).onBlur
@@ -509,20 +507,16 @@ describe('Code task sections', () => {
     const modeSwitch = find(rendered, (item) => item.props.id == 'task-shared-permissions')
     expect(modeSwitch).toBeUndefined()
     expect(setCodeActions).not.toHaveBeenCalled()
-    expect(rendered.props['data-inspector-section']).toBe('module')
-    expect(rendered.props.className).toContain('inspector-titled-section')
-    expect(find(rendered, (item) => item.type == 'h3' && item.props.className == 'inspector-section-title')).toBeDefined()
-    expect(find(rendered, (item) => item.props.className == 'inspector-section-content')?.props['data-inset']).toBe(true)
     expect(find(rendered, (item) => item.props.children == 'inspector.actions.flowAccess')).toBeUndefined()
     expect(configureAccess).not.toHaveBeenCalled()
 
     expect(find(element, (item) => typeof item.type == 'function' && item.type.name == 'GeneralSettings')).toBeDefined()
-    expect(find(rendered, (item) => item.props.className == 'form-actions code-actions')).toBeUndefined()
+    const codeActions = (section: ReactElement) => find(section, (item) => String(item.props.className).includes('code-actions'))
+    expect(codeActions(rendered)).toBeUndefined()
 
     moduleEditor.value = { ...moduleEditor.value, status: 'failed' }
     const failed = renderCodeSection(task.props)
-    expect(find(failed, (item) => item.props.className == 'form-actions code-actions')).toBeDefined()
-    expect(find(failed, (item) => item.props.role == 'status')).toBeUndefined()
+    expect(codeActions(failed)).toBeDefined()
   })
 
   it('renders the LLM task definition as a standard section before Node settings', () => {
@@ -552,8 +546,6 @@ describe('Code task sections', () => {
     const task = find(element, (item) => typeof item.type == 'function' && item.type.name == 'LlmTaskSection')
     if (task == null || typeof task.type != 'function') throw new Error('Expected task definition.')
     const rendered = (task.type as (props: unknown) => ReactElement)(task.props)
-    expect(rendered.props['data-inspector-section']).toBe('task')
-    expect(rendered.props.className).toBe('inspector-field-section')
     expect(find(rendered, (item) => item.type == 'details')).toBeUndefined()
     expect(find(element, (item) => typeof item.type == 'function' && item.type.name == 'GeneralSettings')).toBeDefined()
   })

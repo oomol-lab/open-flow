@@ -1,18 +1,21 @@
 import { parse } from '@babel/parser'
 import traverseModule from '@babel/traverse'
 import { glob, readFile } from 'node:fs/promises'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { expect, test } from 'vitest'
+import { IconPicker } from '../../src/ui/browser/icons/picker/IconPicker.tsx'
 
 const traverse = ((traverseModule as unknown as { readonly default?: typeof traverseModule }).default ?? traverseModule) as typeof traverseModule
 
-test('keeps Icon Picker controls named and stateful', async () => {
-  const source = await readFile('src/ui/browser/icons/picker/IconPicker.tsx', 'utf8')
+test('keeps Icon Picker controls named and stateful', () => {
+  const markup = renderToStaticMarkup(createElement(IconPicker, { locale: 'en', defaultColor: '#CC3E44' }))
 
-  expect(source).toMatch(/aria-label=\{t\('random'\)\}/)
-  expect(source).toMatch(/aria-expanded=\{colorsPanel\}/)
-  expect(source).toMatch(/aria-pressed=\{selectedColor === color\}/)
-  expect(source).toMatch(/aria-label=\{t\('filter'\)\}/)
-  expect(source).toMatch(/aria-label=\{icon\}/)
+  expect(markup).toContain('aria-label="Random"')
+  expect(markup).toContain('aria-label="Filter..."')
+  expect(markup).toContain('aria-expanded="false"')
+  expect(markup).toContain('aria-label="Color: #CC3E44"')
+  expect(markup).toContain('aria-pressed="true"')
 })
 
 test('keeps JSON expansion on semantic controls', async () => {
