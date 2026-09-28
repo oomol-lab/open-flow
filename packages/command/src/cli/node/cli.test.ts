@@ -1,10 +1,10 @@
 import type { ChangeOperation, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { UiLanguage } from '@oomol-lab/open-flow/localization'
 
-import { flowInspection, inspectFlowDraft } from '@oomol-lab/open-flow/control-api'
+import { flowInspection, inspectFlowDraft, nodeDetails } from '@oomol-lab/open-flow/control-api'
 import { authoringExample } from '@oomol-lab/open-flow/control-requests'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
-import { applyFlowChanges } from '@oomol-lab/open-flow/flow-change'
+import { applyFlowChanges, decodeChangeOperations } from '@oomol-lab/open-flow/flow-change'
 import { uiLanguages } from '@oomol-lab/open-flow/localization'
 import { describe, expect, it, vi } from 'vitest'
 import { runCli } from './cli.ts'
@@ -476,6 +476,9 @@ describe('agent command contract', () => {
     ['list', '--limit=0', '--json'],
     ['run', 'flow-1', '--timeout=1', '--json'],
     ['node', 'add', 'flow-1', 'code', 'Code', '--idempotency-key=edit', '--json'],
+    ['node', 'set', 'flow-1', 'start', '--revision=historical', '--name=Changed', '--json'],
+    ['node', 'show', 'flow-1', 'start', '--subflow=', '--json'],
+    ['connector', 'code-allow', 'flow-1', 'mail', 'binding', '0', '--publication=published', '--json'],
   ])('reports argument errors as JSON before contacting the host: %j', async (...args) => {
     const output = runtime()
     const request = vi.fn()
@@ -792,9 +795,9 @@ it('discovers Provider and Trigger summaries and creates a Flow in the chosen Te
   }
   for (const [command, expected] of [
     [['connector', 'providers'], { providers: [{ serviceId: 'mail', serviceName: 'Mail' }] }],
-    [['trigger', 'search'], { definitions: [trigger] }],
-    [['trigger', 'search', 'MAIL'], { definitions: [trigger] }],
-    [['trigger', 'search', 'absent'], { definitions: [] }],
+    [['trigger', 'search'], { keys: [trigger] }],
+    [['trigger', 'search', 'MAIL'], { keys: [trigger] }],
+    [['trigger', 'search', 'absent'], { keys: [] }],
     [['connector', 'teams'], teams],
     [['create', 'Main', '--team', 'team'], { flow }],
   ] as const) {
@@ -802,6 +805,124 @@ it('discovers Provider and Trigger summaries and creates a Flow in the chosen Te
     expect(await runCli([...command, '--json'], { request }, io.value), io.stderr()).toBe(0)
     expect(JSON.parse(io.stdout())).toMatchObject(expected)
   }
+})
+
+it.each([
+  { reference: 'format', nodeId: 'format', revision: 'historical' },
+  { reference: 'Start', nodeId: 'start', revision: 'historical' },
+  { reference: 'start', nodeId: 'start', revision: 'historical', subflow: 'child' },
+  { reference: 'start', nodeId: 'start' },
+])('reads the same node detail shape as MCP from the selected graph: %j', async ({ reference, nodeId, subflow, revision }) => {
+  const content = applyFlowChanges(revisionFixture.content, [
+    ...decodeChangeOperations(authoringExample('code').operations),
+    {
+      kind: 'subflow.create',
+      subflowId: 'child',
+      subflow: { name: 'Child', inputs: [], outputs: [], graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Nested start' } } } },
+    },
+  ])
+  const request = vi.fn(async (path: string) => {
+    if (path == '/v1/flows/flow-1') return Response.json({ ...flow, draftRevisionId: 'new-head' })
+    if (path == `/v1/flows/flow-1/revisions/${revision ?? 'new-head'}`)
+      return Response.json({ ...revisionFixture, revisionId: revision ?? 'new-head', content })
+    throw new Error(`Unexpected request: ${path}`)
+  })
+  const output = runtime()
+  expect(
+    await runCli(
+      [
+        'node',
+        'show',
+        'flow-1',
+        reference,
+        ...(revision == null ? [] : ['--revision', revision]),
+        ...(subflow == null ? [] : ['--subflow', subflow]),
+        '--json',
+      ],
+      { request },
+      output.value,
+    ),
+    output.stderr(),
+  ).toBe(0)
+  const graph = subflow == null ? content.document.graph : content.document.subflows[subflow]!.graph
+  expect(JSON.parse(output.stdout())).toEqual({
+    ...nodeDetails(content, nodeId, graph.nodes[nodeId]!),
+    flowId: flow.flowId,
+    revisionId: revision ?? 'new-head',
+    ...(subflow == null ? {} : { subflowId: subflow }),
+    kind: 'node.show',
+    version: 1,
+  })
+  expect(request).toHaveBeenCalledTimes(2)
+})
+
+it.each([
+  { node: 'start', subflow: 'missing' },
+  { node: 'start', subflow: 'empty' },
+  { node: 'missing', subflow: undefined },
+])('does not fall back to the root graph or another node: %j', async ({ node, subflow }) => {
+  const content = applyFlowChanges(revisionFixture.content, [
+    { kind: 'subflow.create', subflowId: 'empty', subflow: { name: 'Empty', inputs: [], outputs: [], graph: { edges: [], nodes: {} } } },
+  ])
+  const request = async (path: string) => {
+    if (path == '/v1/flows/flow-1') return Response.json(flow)
+    if (path == '/v1/flows/flow-1/revisions/revision-1') return Response.json({ ...revisionFixture, content })
+    throw new Error(path)
+  }
+  const output = runtime()
+  expect(await runCli(['node', 'show', 'flow-1', node, ...(subflow == null ? [] : ['--subflow', subflow]), '--json'], { request }, output.value)).toBe(1)
+  expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'node.not-found' } })
+})
+
+it('preserves fixed Revision failures without reading the current Draft', async () => {
+  const request = vi.fn(async (path: string) => {
+    if (path == '/v1/flows/flow-1') return Response.json(flow)
+    if (path == '/v1/flows/flow-1/revisions/missing')
+      return Response.json({ error: { code: 'flow.not-found', message: 'Revision not found.' } }, { status: 404 })
+    throw new Error(path)
+  })
+  const output = runtime()
+  expect(await runCli(['node', 'show', 'flow-1', 'start', '--revision', 'missing', '--json'], { request }, output.value)).toBe(1)
+  expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'flow.not-found' } })
+  expect(request).toHaveBeenCalledTimes(2)
+})
+
+it.each([false, true])('reads Code connections without requiring a readable Draft (published=%s)', async (published) => {
+  const access = published
+    ? { mode: 'implicit', sharedAccessDigest: 'implicit:1', sharedBindings: [], selectedBindings: [], version: 2 }
+    : { mode: 'implicit', sharedAccessDigest: 'implicit:1', bindings: [], accessRevision: 0, version: 1 }
+  const request = vi.fn(async (path: string) => {
+    if (path == '/v1/flows/flow-1') return Response.json(flow)
+    if (path == `/v1/flows/flow-1/connector-access${published ? '?publicationId=published%2F1' : ''}`) return Response.json(access)
+    throw new Error(`Draft must not be read: ${path}`)
+  })
+  const output = runtime()
+  expect(
+    await runCli(['connector', 'code-access', 'flow-1', ...(published ? ['--publication', 'published/1'] : []), '--json'], { request }, output.value),
+    output.stderr(),
+  ).toBe(0)
+  expect(JSON.parse(output.stdout())).toEqual({ ...access, kind: 'connector.code-access' })
+  expect(request).toHaveBeenCalledTimes(2)
+})
+
+it('queries multiple connection Providers in one request and preserves individual failures', async () => {
+  const result = {
+    version: 1,
+    results: [
+      { providerId: 'mail', candidates: [], mode: 'selectable', version: 1 },
+      { providerId: 'github', error: { code: 'connector.unavailable', message: 'Unavailable' } },
+    ],
+  }
+  const request = vi.fn(async (path: string, init?: RequestInit) => {
+    if (path == '/v1/flows/flow-1') return Response.json(flow)
+    expect(path).toBe('/v1/flows/flow-1/connector-access/candidates/query')
+    expect(JSON.parse(String(init?.body))).toEqual({ providerIds: ['mail', 'github'], version: 1 })
+    return Response.json(result)
+  })
+  const output = runtime()
+  expect(await runCli(['connector', 'candidates', 'flow-1', 'mail', 'github', '--json'], { request }, output.value), output.stderr()).toBe(0)
+  expect(JSON.parse(output.stdout())).toEqual({ ...result, kind: 'connector.candidates' })
+  expect(request).toHaveBeenCalledTimes(2)
 })
 
 it('checks a fixed Revision and changes only the observed Live publication enablement', async () => {

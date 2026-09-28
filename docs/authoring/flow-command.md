@@ -164,11 +164,11 @@ Run 固定一个 Trigger。图中仅有一个 Manual Trigger 时自动选择，�
 
 ```bash
 oo flow runs results RUN_ID --json
-oo flow runs read-result RUN_ID RESULT_ID /emails 0 --json
+oo flow runs read-result RUN_ID RESULT_ID --pointer /emails --offset 0 --json
 oo flow runs download-result RUN_ID RESULT_ID > result.json
 ```
 
-列表存在 `nextAfter` 时，将其作为 `runs results RUN_ID NEXT_AFTER` 的最后一个参数继续读取。
+列表存在 `nextAfter` 时，将其作为 `runs results RUN_ID --after NEXT_AFTER` 的游标参数继续读取。
 页面存在 `nextOffset` 时，用该值替换 `read-result` 的 offset。对于长字符串，offset 按 Unicode code point 计数。
 这些命令读取已有结果，不会重新调用外部工具。
 
@@ -191,3 +191,32 @@ oo flow runs read-result RUN_ID RESULT_ID --pointer /items --offset 20 --limit 2
 Team 选择使用公共 Control API，并保留创建幂等语义。启停必须指定观察到的 publication ID；发布版本发生变化时返回冲突，不自动修改新版本。指定 `check --revision` 检查该固定版本；省略时检查当前 Draft。
 
 结果列表游标 `--after` 是结果 ID，事件命令的 `--after` 是数字序号。结果读取的 pointer/offset 已改为命名选项，旧位置参数不再接受；`limit` 默认为 20（1–100），`max-bytes` 默认为 15000（1–1048576），offset 默认为 0，pointer 默认为根。下载完整结果仍使用 `runs download-result`。
+
+### 固定版本节点与连接读取
+
+```bash
+oo flow node show FLOW_ID NODE_ID --revision REVISION_ID --json
+oo flow node show FLOW_ID NODE_ID --revision REVISION_ID --subflow SUBFLOW_ID --json
+oo flow connector code-access FLOW_ID --publication PUBLICATION_ID --json
+oo flow connector candidates FLOW_ID PROVIDER_ID OTHER_PROVIDER_ID --json
+```
+
+`node show` 对应 MCP `flow_node_get`，支持普通节点和 Trigger，引用可以是 ID 或无歧义的完整名称。
+省略 `--revision` 使用当前 Draft；省略 `--subflow` 使用根图。指定子流程时只在该图查找，节点、子流程或 Revision
+不存在时返回错误，不回退根图或当前 Draft。结果顶层为 `flowId`、`revisionId`、`subflowId?`、`nodeId`、`node`、`task?`、`module?`，
+与 MCP 相同，CLI 另有 `kind: "node.show"`。代码 Task 保留在 `node.task`，不重复返回顶层 task。
+
+`connector code-access` 省略 `--publication` 时读取 Draft 共享 Code 连接；指定时读取不可编辑的发布快照。
+该读取和 `connector candidates` 都不要求 Draft 内容可读。Candidates 接受一个或多个 Provider ID，一次请求返回各 Provider
+的候选项或独立错误，与 MCP `flow_connection_candidates.providerIds` 对应。
+
+### CLI 与 MCP 的结果合同
+
+`trigger search --json` 与 MCP `trigger_search` 都返回 `keys`；原 CLI `definitions` 字段已移除。
+`node show --json` 的详情字段展开到顶层，原 `node.node`、`node.nodeId`、`node.task`（Task 定义）、`node.module` 路径应分别迁移到
+`node`、`nodeId`、`task`、`module`。内联代码 Task 的 `node.task` 仍是节点自身的数据。
+
+CLI 保留 `kind/version` 和命令输出包装，例如 `runs show` 的 `run`、`connector show` 的 `action`、`check` 的 `check`；
+对应 MCP 工具直接返回业务对象。CLI 的等待结果、退出码、stdout/stderr 与 MCP 的 `isError` 也各遵循自身传输合同。
+Flow/Run/事件分页默认 CLI 为 100、MCP 为 50。CLI 的名称解析、自动幂等 key、当前版本默认值及发布等待仍保留；
+自动化重试应显式固定 key 和版本。
