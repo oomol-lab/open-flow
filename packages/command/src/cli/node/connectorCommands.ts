@@ -49,19 +49,22 @@ export async function connectorCommand(
     case 'code-remove':
     case 'remove-usage': {
       const count = operation == 'code-access' ? 1 : operation == 'candidates' ? 2 : operation == 'remove-usage' ? 3 : 4
-      if (operands.length != count + 1) throw new CliError('cli.invalid-arguments', `Invalid arguments for connector ${operation}. See --help.`)
-      const selected = await selectedDraftFlow(client, flow!, args)
+      if (operation == 'candidates' ? operands.length < count + 1 : operands.length != count + 1)
+        throw new CliError('cli.invalid-arguments', `Invalid arguments for connector ${operation}. See --help.`)
+      const flowId = requiredFlowId(flow)
       let result
-      if (operation == 'code-access') result = await client.getConnectorAccess(selected.flow.flowId)
-      else if (operation == 'candidates') result = await client.listProviderAccessBindingCandidates(selected.flow.flowId, [second!])
+      if (operation == 'code-access')
+        result = args.publication == null ? await client.getConnectorAccess(flowId) : await client.getPublishedConnectorAccess(flowId, args.publication)
+      else if (operation == 'candidates') result = await client.listProviderAccessBindingCandidates(flowId, operands.slice(2))
       else {
         const accessRevision = Number(operands.at(-1))
         if (!Number.isSafeInteger(accessRevision) || accessRevision < 0)
           throw new CliError('cli.invalid-arguments', 'Access revision must be a nonnegative integer.')
-        if (operation == 'remove-usage')
-          result = await client.removeConnectionUsage(selected.flow.flowId, second!, selected.draft.revisionId, accessRevision, args.idempotencyKey)
-        else if (operation == 'code-allow') result = await client.addProviderAccessBinding(selected.flow.flowId, second!, extra[0]!, accessRevision)
-        else result = await client.removeProviderAccessBinding(selected.flow.flowId, second!, extra[0]!, accessRevision)
+        if (operation == 'remove-usage') {
+          const selected = await selectedDraftFlow(client, flow!, args)
+          result = await client.removeConnectionUsage(flowId, second!, selected.draft.revisionId, accessRevision, args.idempotencyKey)
+        } else if (operation == 'code-allow') result = await client.addProviderAccessBinding(flowId, second!, extra[0]!, accessRevision)
+        else result = await client.removeProviderAccessBinding(flowId, second!, extra[0]!, accessRevision)
       }
       write(runtime, args.json, { ...result, kind: `connector.${operation}` }, JSON.stringify(result, null, 2))
       return
@@ -241,8 +244,8 @@ export async function triggerCommand(
       const query = first?.trim().toLowerCase()
       if (query != null && (query.length == 0 || query.length > 256))
         throw new CliError('cli.invalid-arguments', 'Trigger search query must contain 1–256 characters.')
-      const definitions = searchTriggerKeys(await client.listTriggerKeys(), query)
-      write(runtime, args.json, { definitions, kind: 'trigger.search', query, version: 1 }, definitions.map(triggerKeyText).join('\n'))
+      const keys = searchTriggerKeys(await client.listTriggerKeys(), query)
+      write(runtime, args.json, { keys, kind: 'trigger.search', query, version: 1 }, keys.map(triggerKeyText).join('\n'))
       return
     }
     case 'show': {

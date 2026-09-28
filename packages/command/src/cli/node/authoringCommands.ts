@@ -234,6 +234,35 @@ export async function edgeCommand(
 export async function nodeCommand(client: ControlClient, flow: Flow, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<void> {
   const [operation, flowReference, nodeReference, ...extra] = operands
   if (flowReference == null) throw new CliError('cli.invalid-arguments', 'Usage: oo flow node <list|show|add|set|input|remove> <flow> ...')
+  if (operation == 'show') {
+    if (nodeReference == null || extra.length > 0)
+      throw new CliError('cli.invalid-arguments', 'Usage: oo flow node show <flow> <node> [--revision <revisionId>] [--subflow <subflowId>] [--json]')
+    const draft = await client.getRevision(flow.flowId, args.revision ?? flow.draftRevisionId)
+    const graph = args.subflow == null ? draft.content.document.graph : draft.content.document.subflows[args.subflow]?.graph
+    if (graph == null) throw new CliError('node.not-found', 'The selected subflow was not found in this Revision.')
+    const byId = graph.nodes[nodeReference]
+    const matches = byId == null ? Object.entries(graph.nodes).filter(([, node]) => node.name == nodeReference) : [[nodeReference, byId] as const]
+    if (matches.length == 0) throw new CliError('node.not-found', `Node ${JSON.stringify(nodeReference)} was not found in the selected Revision and graph.`)
+    if (matches.length > 1)
+      throw new CliError('node.ambiguous', `Node name ${JSON.stringify(nodeReference)} is ambiguous.`, {
+        candidates: matches.map(([nodeId, node]) => ({ name: node.name, nodeId })),
+      })
+    const [nodeId, node] = matches[0]!
+    write(
+      runtime,
+      args.json,
+      {
+        flowId: flow.flowId,
+        kind: 'node.show',
+        ...nodeDetails(draft.content, nodeId, node),
+        revisionId: draft.revisionId,
+        ...(args.subflow == null ? {} : { subflowId: args.subflow }),
+        version: 1,
+      },
+      nodeText(nodeId, node),
+    )
+    return
+  }
   const selected = await selectedDraftFlow(client, flow, args)
 
   switch (operation) {
@@ -252,23 +281,6 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
           version: 1,
         },
         entries.map(([nodeId, node]) => nodeText(nodeId, node)).join('\n'),
-      )
-      return
-    }
-    case 'show': {
-      if (nodeReference == null || extra.length > 0) throw new CliError('cli.invalid-arguments', 'Usage: oo flow node show <flow> <node> [--json]')
-      const resolved = exactNode(selected.graph.nodes, nodeReference)
-      write(
-        runtime,
-        args.json,
-        {
-          flowId: selected.flow.flowId,
-          kind: 'node.show',
-          node: nodeDetails(selected.draft.content, resolved.nodeId, resolved.node),
-          revisionId: selected.draft.revisionId,
-          version: 1,
-        },
-        nodeText(resolved.nodeId, resolved.node),
       )
       return
     }

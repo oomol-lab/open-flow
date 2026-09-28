@@ -83,3 +83,13 @@ Wait 的提前输出端口及等待记录中的输出字段直接由 `notificati
 - MCP `flow_run` 在输入 Schema 中明确 Draft 与 Live 身份互斥，混用字段会在调用验证时拒绝。
 
 具体参数与迁移后的用法见 [CLI 命令](../../authoring/flow-command.md) 和 [MCP 接口](../../server/mcp.md)。本次不改变 Flow 持久化模型、Engine Contract 或 Run checkpoint 格式。
+
+## beta.47 CLI 与 MCP 精确读取对齐
+
+公共包与 Command 同步升至 `0.1.0-beta.47`。CLI `node show` 新增 `--revision` 和 `--subflow`，
+`connector code-access` 新增 `--publication`，`connector candidates` 支持多个 Provider。
+
+本次预发布包含两处 CLI JSON 断点：`trigger search` 的 `definitions` 改为 `keys`；`node show` 的
+`nodeId`、`node`、`task?`、`module?` 从原来的 `node` 包装中展开到结果顶层。旧字段和嵌套不保留别名，
+消费方需按 [CLI 结果合同](../../authoring/flow-command.md#cli-与-mcp-的结果合同) 更新读取路径。
+MCP 工具合同、Flow model 和 Engine Contract 不变。
