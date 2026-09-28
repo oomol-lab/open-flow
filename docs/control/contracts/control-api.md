@@ -675,7 +675,7 @@ Run、Publication、后台订阅与通知恢复均严格解码快照；不能将
 重试同一幂等请求返回原结果；不同请求不得复用 key。移除之后可以保存待配置 Draft，不能靠默认连接自动恢复使用。
 
 MCP 提供 `flow_code_connections`、`flow_connection_candidates`、`flow_code_connection_set` 和 `flow_connection_usage_remove`，复用上述业务操作。
-CLI 对应 `oo flow connector code-access <flow>`、`candidates <flow> <provider>`、`code-allow|code-remove <flow> <provider> <binding> <access-revision>`，
+CLI 对应 `oo flow connector code-access <flow> [--publication <publicationId>]`、`candidates <flow> <provider> [provider ...]`、`code-allow|code-remove <flow> <provider> <binding> <access-revision>`，
 以及 `remove-usage <flow> <connection> <access-revision>`（沿用编辑命令的 Revision 和幂等参数）。所有修改仅作用于 Draft。
 
 候选查询按需批量提交非空、无重复的 `providerIds`（单个 ID 长度不超过 256）。响应为 `{ results, version: 1 }`，每个请求的 Provider 恰好对应一个结果：

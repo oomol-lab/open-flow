@@ -11,6 +11,8 @@ export interface ParsedArguments {
   readonly outputs?: string
   readonly team?: string
   readonly revision?: string
+  readonly subflow?: string
+  readonly publication?: string
   readonly pointer?: string
   readonly offset?: number
   readonly maxBytes?: number
@@ -56,6 +58,8 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
   let outputs: string | undefined
   let team: string | undefined
   let revision: string | undefined
+  let subflow: string | undefined
+  let publication: string | undefined
   let pointer: string | undefined
   let offset: number | undefined
   let maxBytes: number | undefined
@@ -117,6 +121,8 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       argument == '--expected-publication' ||
       argument == '--team' ||
       argument == '--revision' ||
+      argument == '--subflow' ||
+      argument == '--publication' ||
       argument == '--pointer' ||
       argument == '--offset' ||
       argument == '--max-bytes' ||
@@ -149,6 +155,8 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       else if (argument == '--expected-publication') expectedPublication = value
       else if (argument == '--team') team = value
       else if (argument == '--revision') revision = value
+      else if (argument == '--subflow') subflow = value
+      else if (argument == '--publication') publication = value
       else if (argument == '--pointer') pointer = value
       else if (argument == '--after') rawAfter = value
       else if (argument == '--code') code = value
@@ -211,6 +219,8 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     ...(offset == null ? {} : { offset }),
     ...(pointer == null ? {} : { pointer }),
     ...(revision == null ? {} : { revision }),
+    ...(subflow == null ? {} : { subflow }),
+    ...(publication == null ? {} : { publication }),
     ...(team == null ? {} : { team }),
     ...(comment == null ? {} : { comment }),
     ...(expectedPublication == null ? {} : { expectedPublication }),
