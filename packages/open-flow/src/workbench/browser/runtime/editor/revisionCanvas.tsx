@@ -24,11 +24,11 @@ export function RevisionCanvas({
   theme,
   interactiveMode$,
   label,
-  striped = true,
+  background = 'striped',
   showHeader = true,
 }: {
   readonly label?: string
-  readonly striped?: boolean
+  readonly background?: 'dotted' | 'striped'
   readonly showHeader?: boolean
   readonly draft: Draft
   readonly presentation: Presentation | null
@@ -112,9 +112,10 @@ export function RevisionCanvas({
             identity={graphId}
             model={model}
             editable={false}
+            dottedBackground={background === 'dotted'}
             nodesDraggable
             fitView={session?.viewport == null}
-            className={striped ? 'open-flow-canvas-locked' : undefined}
+            className={background === 'striped' ? 'open-flow-canvas-locked' : undefined}
             dark={theme === 'dark'}
             language={language}
             interactiveMode$={interactiveMode$}

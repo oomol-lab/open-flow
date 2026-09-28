@@ -26,6 +26,7 @@ export interface FlowCanvasProps {
   toolbar?: React.ReactNode
   flowCanvasStore: CanvasStore
   dark: boolean
+  dottedBackground?: boolean
   nodesDraggable?: boolean
   fitView?: boolean
   layoutMotion?: boolean
@@ -53,6 +54,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
   bottomRightTools,
   toolbar,
   dark,
+  dottedBackground,
   fitView,
   nodesDraggable,
   layoutMotion,
@@ -85,7 +87,7 @@ export const FlowCanvas: React.FC<FlowCanvasProps> = ({
             className={className}
             i18n={flowCanvasStore.i18n}
             dark={dark}
-            dottedBackground={editable}
+            dottedBackground={dottedBackground ?? editable}
             fitView={fitView ?? !editable}
             fitViewOptions={fitViewOptions}
             layoutMotion={layoutMotion}

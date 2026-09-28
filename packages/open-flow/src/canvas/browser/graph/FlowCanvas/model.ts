@@ -222,6 +222,8 @@ export interface FlowCanvasViewProps {
   readonly autoLayout?: boolean
   readonly className?: string
   readonly dark?: boolean
+  /** Defaults to editable; read-only consumers can opt into the canvas grid. */
+  readonly dottedBackground?: boolean
   readonly editable: boolean
   /** Allows session-local movement independently of content editing. Defaults to editable. */
   readonly nodesDraggable?: boolean

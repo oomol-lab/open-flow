@@ -22,7 +22,7 @@ export interface OpenFlowPreviewProps {
   readonly className?: string
 }
 
-/** Offline publication preview. Use a React key to start a new layout/selection session. */
+/** Offline workflow preview. Use a React key to start a new layout/selection session. */
 export function OpenFlowPreview({ draft, presentation, language, theme, label, className }: OpenFlowPreviewProps): ReactElement {
   const [i18n] = useState(() => createI18n(language))
   useEffect(() => {
@@ -34,7 +34,7 @@ export function OpenFlowPreview({ draft, presentation, language, theme, label, c
       <IconifyProvider>
         <I18nProvider i18n={i18n}>
           <div className={cn('open-flow-theme open-flow-workbench open-flow-preview', className)} data-theme={theme}>
-            <RevisionCanvas draft={draft} presentation={presentation} theme={theme} label={label} striped={false} showHeader={false} />
+            <RevisionCanvas draft={draft} presentation={presentation} theme={theme} label={label} background="dotted" showHeader={false} />
           </div>
         </I18nProvider>
       </IconifyProvider>
