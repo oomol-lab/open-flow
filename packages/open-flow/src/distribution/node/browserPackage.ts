@@ -102,6 +102,8 @@ async function buildRuntime(
         formats: ['es'],
       },
       license: { fileName: 'licenses.md' },
+      // Let consumers minify: pre-minified loop declarations can break Rollup when shared chunks are re-bundled.
+      minify: false,
       outDir: outputPath,
       rolldownOptions: {
         external: entryPath == providerTriggersEntryPath ? [...sharedTriggerPaths.keys()] : undefined,

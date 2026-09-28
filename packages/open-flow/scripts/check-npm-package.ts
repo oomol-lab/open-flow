@@ -312,6 +312,8 @@ async function verifyConsumer(): Promise<void> {
           devDependencies: {
             '@types/react': manifest.devDependencies['@types/react'],
             '@types/react-dom': manifest.devDependencies['@types/react-dom'],
+            // Exercise the Rollup consumer pipeline as well as our Rolldown package build.
+            'vite': '7.3.6',
           },
           private: true,
           type: 'module',
@@ -450,6 +452,9 @@ async function verifyConsumer(): Promise<void> {
     const runtimePath = path.join(directory, 'consumer.mjs')
     await copyFile(path.join(rootPath, 'scripts/npm-package-consumer.mjs'), runtimePath)
     await execFileAsync(process.execPath, [runtimePath], { cwd: directory })
+    const browserPath = path.join(directory, 'browser-consumer.mjs')
+    await copyFile(path.join(rootPath, 'scripts/npm-package-browser-consumer.mjs'), browserPath)
+    await execFileAsync(process.execPath, [browserPath], { cwd: directory })
   } finally {
     await rm(directory, { force: true, recursive: true })
   }
