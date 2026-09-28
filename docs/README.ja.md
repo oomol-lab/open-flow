@@ -14,126 +14,77 @@
 
 </div>
 
-Open Flow は、AI Agent と人が同じ Flow を共同で構築できる、オープンソースのワークフロー自動化プラットフォームです。Codex、Claude Code、または他のターミナル Agent に
-[`oo flow`](https://github.com/oomol-lab/oo-cli) を通じて型付きワークフローを作成、検査、実行、公開させ、その同じ Flow を Workbench で視覚的に確認し、編集できます。
+**AI エージェントと自動化をつくる。実行する内容を、自分の目で確かめる。**
 
-型付きノードで構造を定義し、カスタムロジックは JavaScript として保ち、OOMOL Hosted または自分で管理するインフラストラクチャ上で自動化を実行できます。
-グラフは理解しやすいまま、コードはコードのまま、そしてデプロイメントは自分の管理下に残ります。
+Open Flow は、AI による構築の速さと、視覚的なワークフローのわかりやすさを両立するオープンソースのワークフロープラットフォームです。Codex、Claude Code などのエージェントに Flow の作成を依頼し、Workbench で開いて、同じワークフローを一緒に改善できます。
 
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
-    <img alt="Codex が Open Flow で Gmail から Feishu へのワークフローを構築して実行するデモを見る" src="assets/open-flow-demo-video.jpg" width="100%">
-  </a>
-</p>
+JavaScript、アプリ連携、AI、条件分岐、人による承認を一つのキャンバスで組み合わせます。入力を確認し、実行を追跡し、どのバージョンを本番で動かすかを決められます。OOMOL Hosted でも、自分で管理するインフラでも実行できます。
 
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM"><strong>▶ 1 分間の Open Flow デモを見る</strong></a>
-</p>
+[インタラクティブデモを試す](https://openflow.run) · [OOMOL Hosted を使う](https://oomol.com) · [Docker でセルフホストする](#自分に合った実行環境を選ぶ)
+
+![現在の Open Flow Workbench で表示した顧客オンボーディングフロー。顧客データ、JavaScript、承認、サブフローを明示](assets/readme-workbench.png)
 
 > [!IMPORTANT]
-> Open Flow は現在 Beta 段階です。公開されている契約（contract）はバージョン管理されていますが、プロダクトとしての最初の安定版はまだリリースされていません。
+> Open Flow はベータ版です。製品とバージョン管理された契約は、引き続き進化しています。
 
-## AI Agent でワークフローを構築する
+## エージェントが構築し、あなたが判断する
 
-`oo flow` は、作成ライフサイクルをバージョン管理された機械可読コマンドとして公開します。ターミナルを使用できる Agent は次の操作ができます。
+必要な仕事を伝えてください。
 
-- 正確な Connector Action と Provider Trigger を探索する。
-- 型付き Node、Edge、Code Task、Trigger binding を作成および編集する。
-- Draft を検査して実行し、結果を確認する。
-- 明示的に依頼された場合に Live へ公開するか、同じ Flow を Workbench で開く。
+> 「新しいサポートメールを読み、問い合わせを分類して返信を下書きし、送信前に私の承認を求めてください。」
 
-> **依頼の例：**「未読の Gmail メッセージを読み、整形して Feishu に送信するワークフローを構築して。」
+ターミナルを使えるエージェントは、[`oo flow`](https://github.com/oomol-lab/oo-cli) を通じて連携先を調べ、ノードを作成・編集し、ドラフトを検証・実行して結果を確認し、指示に応じて公開できます。変更は、あなたがグラフの確認やコードの編集に使う同じ Workbench に反映されます。AI が生成した別のプロジェクトを変換したり、同期したりする必要はありません。
 
-Agent が作成するのは、使い捨てのローカル設定ではなく、選択した Open Flow デプロイメント内の実際の Draft です。CLI と Workbench は同じ Control API を使用するため、AI が作成した変更は同じビジュアルグラフに表示され、人と Agent のどちらも編集を続けられます。
+Server は、対応クライアント向けの [MCP 編集・実行ツール](server/mcp.md) も提供します。どちらのインターフェースも、選択したデプロイ環境に保存された Flow、リビジョン、実行記録を操作します。
 
-<p align="center">
-  <img alt="Open Flow Workbench で正常に実行された Gmail から Feishu へのワークフロー" src="assets/workbench-overview.png">
-</p>
+繰り返しの接続作業はエージェントに任せ、重要な判断は見える場所に残しましょう。
 
-[Codex、Claude Code、または他のターミナル Agent から Open Flow を作成するために `oo` CLI をインストールします。](https://github.com/oomol-lab/oo-cli)
+## すべてのステップを確認できる形に
 
-自分で動かしている Open Flow を使う場合は、Agent を実行するシェルで `OO_OPEN_FLOW_URL` と `OO_OPEN_FLOW_TOKEN` を設定してください。
-詳細は [OpenConnector と oo CLI で Open Flow を使う](server/self-hosted-stack/README.ja.md) を参照してください。
+ワークフローを作ったときの会話がなくても、その仕組みを理解できることが大切です。
 
-## Open Flow の実行方法を選ぶ
+- **正確な処理は JavaScript で。** Code Task でデータ変換、メッセージ整形、独自ロジックを記述できます。入力と出力には名前と型があります。
+- **入力元を明示。** 値の出所をプロパティパネルで確認できます。制御接続は次に何を実行するかを、入力マッピングは各ステップがどのデータを受け取るかを決めます。
+- **条件分岐と再利用できるサブフロー。** 条件に応じて処理を振り分け、繰り返し使うロジックに明確なインターフェースを設けられます。
+- **処理のそばに説明を。** 判断の理由をキャンバスに直接書き残し、次に触れる人に意図を伝えられます。
 
-どの対応パスでも、同じ Open Flow プロダクトと Workbench を利用できます。
+![現在の Code Task プロパティパネル。JavaScript、顧客入力の参照元、型付きのメッセージ出力を表示](assets/readme-code.png)
 
-<table>
-  <tr>
-    <td width="33%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
-    <td width="33%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
-    <td width="33%" align="center"><strong>Fly.io Self-hosted</strong></td>
-  </tr>
-  <tr>
-    <td width="33%" valign="top">サーバーの準備、更新、監視なしですぐに利用できます。OOMOL がデプロイメントを運用し、対応する連携にはマネージド OAuth App を提供するため、固定のサーバー費用や個別の OAuth App 設定が不要です。</td>
-    <td width="33%" valign="top">同梱の Docker イメージを使って自分のインフラストラクチャで実行します。デプロイ、ストレージ、バックアップ、アップグレード、ネットワーク、Connector または OAuth App の設定を自分で管理します。</td>
-    <td width="33%" valign="top">同じ Docker イメージを Fly.io で実行でき、サーバーを自分で運用する必要はありません。Fly がイメージのビルド、TLS 終端、永続 volume 上の SQLite を担当し、secret、バックアップ、アップグレード、Connector または OAuth App の設定は自分で管理します。</td>
-  </tr>
-  <tr>
-    <td width="33%" align="center">🚀 <a href="https://oomol.com"><strong>OOMOL Hosted を使う</strong></a></td>
-    <td width="33%" align="center"><a href="#クイックスタート"><strong>Docker でセルフホストする</strong></a></td>
-    <td width="33%" align="center"><a href="server/fly-io/README.ja.md"><strong>Fly.io にデプロイする</strong></a></td>
-  </tr>
-</table>
+## AI の仕事と範囲を決める
 
-## Open Flow を選ぶ理由
+分類、抽出、要約には LLM Task を使い、複数のツール呼び出しが必要な仕事には Agent Task を使えます。予測可能な動作が必要な部分には、通常のコード、条件、承認を組み合わせます。
 
-- **AI Agent で構築する。** Codex、Claude Code、または他のターミナル Agent から `oo flow` を使用して、Workbench に表示される同じ Flow を作成、検査、実行、公開できます。
-- **データ依存関係を明示する。** すべての Task は、名前と型を持つ入力と出力を宣言します。各エッジは特定の出力値を特定の入力に結び付けるため、グラフがランタイムで使用されるデータ依存モデルになります。
-- **ビジュアルで設計し、必要なときにコードを追加する。** キャンバス上で型付きノードを組み合わせ、カスタム JavaScript には Code Task を使います。コードはフォーム項目に隠されず、常に見える状態に保たれます。
-- **実行とデバッグを一か所で。** 実行前に入力と Flow の構造を検証し、各ノードの進行状況と出力を確認し、すべての Run の完全なイベント履歴を追跡できます。
-- **長時間動作する自動化を公開する。** Flow は手動で開始できるほか、Cron スケジュール、Webhook、ポーリングソース、Provider のイベントから起動できます。
-- **運用状態をまとめて管理する。** Flow、不変の Revision、Publication、Live バージョン、Run、Trigger の状態は、ローカルファイルと隠れたサービスに
-  分散することなく、選択された一つのデプロイメントに属します。
-- **信頼できないコードを安全に実行する。** Server は、長時間稼働する Executor プロセス内で、コードの Task ごとに新しい V8 isolate を作成し、
-  その Task が宣言した Capability だけを公開します。
-- **実行場所を選べる。** OOMOL Hosted を利用するか、同梱の Server を Docker で自分のインフラストラクチャ上に実行できます。
+Agent Task には、設定済みのモデル、明示されたツール、実行上限があります。ツール設定によって、モデルが利用できる操作、アカウント、承認ポリシーが決まります。ツール呼び出しに人の承認を必須としたり、ワークフローに Approval ノードを置いて後続処理を承認待ちにしたりできます。
 
-Open Flow は、ノーコードのプロトタイプでは収まらなくなったものの、不透明なスクリプトとインフラの寄せ集めにはしたくないワークフローのために作られています。
+Approval と Wait ノードは待機状態を永続化します。判断が下された後は、その実行ですでに完了したステップをやり直さずに続行できます。
 
-## グラフはランタイム契約そのもの
+## 実行を確かめ、公開するバージョンを選ぶ
 
-すべての Task は、名前と型を持つ入力と出力を宣言します。エッジは特定の出力から特定の入力へ値を運び、入力の準備が整うとランタイムがノードを起動します。
+選択したトリガーからドラフトをテストし、Workbench で実行を追跡できます。最後のメッセージだけから処理を推測することなく、ノードの結果、ログ、エラー、承認待ちを確認できます。実行履歴には、実行とその元になったリビジョンの関係が残ります。
 
-グラフには、ランタイムが実際に使用するデータ依存関係がそのまま現れます。通常の Flow データを、隠れたランタイムストア経由で任意のノードから取得することはできません。独立したブランチは並行して実行でき、キャンバス上の位置が実行動作を変えることもありません。
+![Open Flow Workbench で人の承認を待っている顧客オンボーディングのテスト実行](assets/readme-approval.png)
 
-### 型付きビジュアルオーサリング
+公開すると、Live の自動化で使うバージョン付きスナップショットが作成されます。公開済みのバージョンを動かしながらドラフトを編集し、過去の Publication を確認し、必要に応じてロールバックできます。
 
-詳細ビューでは、各入力、出力、型、nullable 制約、接続がキャンバス上に明示されます。
+手動、スケジュール、Webhook、対応サービスのイベントやポーリングから処理を開始できます。同じデプロイ環境が、ワークフロー、Live バージョン、実行状態を管理します。
 
-<p align="center">
-  <img src="assets/typed-node-details.jpg" alt="Typed input and output handles in the Open Flow Workbench detailed view">
-</p>
+## 認証情報をグラフに入れずにアプリを接続
 
-### 必要な場所にコードを書く
+Open Flow は [OpenConnector](https://github.com/oomol-lab/open-connector) などの Connector ランタイムを使い、Gmail、Slack、GitHub、Notion などの操作を検索・実行します。アカウントの認証情報は Connector が保持し、ワークフローは Connection の識別子を参照します。
 
-Code Task では、カスタム JavaScript をグラフ内に直接配置し、型付きの入力と出力を維持できます。
+OOMOL Hosted は、対応する連携向けにマネージド OAuth アプリを提供します。セルフホストでは、Connector の配置先を選び、必要なサービス設定とアカウント認可を管理します。ワークフローのロジックとアカウントへのアクセスは、それぞれ独立しています。
 
-<p align="center">
-  <img src="assets/code-task-editor.jpg" alt="Editing a custom Code Task in the Open Flow Workbench">
-</p>
+アカウントの認可から最初の Flow の作成までの設定手順は、[OpenConnector と oo CLI で Open Flow を使う](server/self-hosted-stack/README.ja.md)を参照してください。
 
-## 仕組み
+## 自分に合った実行環境を選ぶ
 
-```mermaid
-flowchart LR
-  Workbench["Workbench"] -->|"Control API"| Server["Open Flow"]
-  CLI["oo flow CLI"] -->|"Control API"| Server
-  Server -. "任意" .-> Connector["Connector ランタイム"]
-  Connector --> Providers["サードパーティ Provider"]
-  Server --> Store["SQLite：Flow、Revision、Publication、Run"]
-  Server --> Triggers["Trigger スケジューラ：Cron、Webhook、Poll、Integration"]
-  Server --> Runtime["分離された JavaScript ランタイム"]
-```
+| 選択肢           | 自分で管理するもの                                                                     | はじめる                                     |
+| ---------------- | -------------------------------------------------------------------------------------- | -------------------------------------------- |
+| **OOMOL Hosted** | ワークフローと接続アカウント。デプロイ環境は OOMOL が運用します。                      | [OOMOL を開く](https://oomol.com)            |
+| **Docker**       | デプロイ、ストレージ、バックアップ、アップグレード、連携。                             | 下記のコマンド                               |
+| **Fly.io**       | Fly のインフラ上のアプリ、永続ボリューム、シークレット、バックアップ、アップグレード。 | [デプロイガイド](server/fly-io/README.ja.md) |
 
-Workbench と CLI は、バージョン管理された Control API を通じて、選択された一つのデプロイメントとだけ通信します。デプロイメント側が検証、実行、永続化、
-Trigger の受け入れを担当します。Provider の認証情報が Open Flow に入ることはありません。Connector を利用する Action、Provider Trigger、proxy は
-[OpenConnector](https://github.com/oomol-lab/open-connector) のような Connector ランタイムを経由し、Open Flow は不透明な Connection の識別子だけを保存します。
-
-## クイックスタート
-
-[Docker](https://docs.docker.com/get-docker/) と OpenSSL が必要です。リポジトリをクローンし、オペレーター Token を作成して、セルフホストの Server を起動します。
+ローカルでセルフホストするには、Docker と OpenSSL をインストールして実行します。
 
 ```bash
 git clone https://github.com/oomol-lab/open-flow.git
@@ -148,104 +99,32 @@ docker run --rm \
   open-flow-server:dev
 ```
 
-[http://127.0.0.1:3000](http://127.0.0.1:3000) を開き、`OPEN_FLOW_TOKEN` の値でサインインします。同じ値は、Control API を利用するマシンクライアントの
-Bearer Token としても使えます。Flow と Run の履歴は `open-flow-data` Docker volume に永続化されます。
+[http://127.0.0.1:3000](http://127.0.0.1:3000) を開き、`OPEN_FLOW_TOKEN` でサインインします。Flow と実行履歴は Docker ボリュームに保存されます。同じ管理者トークンを CLI と API の認証にも使います。
 
-ビルドを省略するには、ビルド済みのマルチアーキテクチャイメージ `ghcr.io/oomol-lab/open-flow` を pull するか、リポジトリルートの
-`docker-compose.yml` で起動してください。Tag (`latest`、Release バージョン) とアップグレード手順は
-[Docker イメージガイド](server/docker-ghcr/README.ja.md) を参照してください。
+ビルド済みイメージを使う場合は、[GHCR イメージガイド](server/docker-ghcr/README.ja.md)に従い、ベータ期間中は明示的なリリースタグを選んでください。`latest` タグは安定版用です。
 
-Server は外部サービスなしでも利用できます。Connector を利用する Action、Provider Trigger、LLM Task は、対応するホストの Capability が設定されるまで
-フェイルクローズで動作し、非公開のサービスにフォールバックすることはありません。
+Connector の操作や LLM Task には、対応するサービスの設定が必要です。Server が別のプロバイダーへ黙って切り替えることはありません。インターネットに公開する前に、[デプロイガイド](server/container-delivery.md)と[セキュリティ強化チェックリスト](../SECURITY.md#hardening-your-deployment)を確認してください。
 
-本番環境の設定、TLS、ヘルスチェック、永続化、バックアップ、リソース制限については、[Server デプロイガイド](server/container-delivery.md) と
-[SECURITY.md](../SECURITY.md#hardening-your-deployment) の強化チェックリストを参照してください。
+## Open Flow を基盤に開発する
 
-## Fly.io にデプロイする
+Open Flow は Apache-2.0 ライセンスで公開されています。このリポジトリには、ワークフローの契約とランタイム、Workbench、CLI コマンドパッケージ、セルフホスト用 Server が含まれます。バージョン管理された Control API により、クライアントはデプロイ環境のストレージや実行の実装に依存しません。
 
-同じイメージは Fly.io でも動作します。リポジトリに含まれる `fly.toml` は `apps/server/Dockerfile` でイメージをビルドし、Cron と Poll Trigger
-を動かすために 1 台の machine を常時起動し、SQLite を Fly volume に永続化します。Fly app の作成、volume、secret、デプロイ、custom
-domain、スケーリングの制限については [Fly.io へのデプロイ](server/fly-io/README.ja.md) を参照してください。
-
-## Connector を接続する
-
-GitHub、Gmail、Slack、Notion などのサービスに対して Action や Provider Trigger を実行するには、Server を Connector ランタイムに向けます。
-セルフホストの [OpenConnector](https://github.com/oomol-lab/open-connector) と OOMOL がホストする Connector のどちらも、必要なランタイム API を提供しています。
-
-<p align="center">
-  <img src="assets/connector-actions.jpg" alt="Browsing Gmail Provider Triggers and Actions in the Open Flow Workbench">
-</p>
-
-```dotenv
-OPEN_FLOW_CONNECTOR_ORIGIN=http://open-connector:3000
-OPEN_FLOW_CONNECTOR_TOKEN=replace-with-a-scoped-runtime-token
-OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN=https://connector.example.com
-```
-
-runtime origin は Server が Connector に到達するためのアドレスで、console origin はユーザーのブラウザがアカウント認可のために Connector Console を開く
-アドレスです。Provider Trigger の定義は Open Flow に同梱されており、登録は不要です。Integration callback の設定と各 origin の制約については
-[設定リファレンス](server/container-delivery.md#4-配置) を参照してください。
-
-OpenConnector と Open Flow を一緒に起動し、runtime token を作成し、アカウントを認可して、`oo flow` で最初の Flow を作る手順は
-[OpenConnector と oo CLI で Open Flow を使う](server/self-hosted-stack/README.ja.md) を参照してください。
-
-## 一つのプロダクト、ポータブルなデプロイメント
-
-Workbench と CLI は、特定のデータベースやクラウドランタイムに依存するのではなく、バージョン管理された Control API で通信します。デプロイメントが実行と
-永続化を所有し、クライアントは第二のローカルなワークフロー形式を作ったり、暗黙のうちに別のバックエンドへ切り替えたりしません。
-
-このリポジトリには次が含まれます。
-
-- [`packages/open-flow`](../packages/open-flow)：公開 npm パッケージ `@oomol-lab/open-flow`。Authoring、Execution、Trigger、Control API、Conformance、
-  Workbench Runtime の各エントリを提供します。
-- [`packages/command`](../packages/command)：`oo flow` コマンドのランタイムと、[oo CLI](https://github.com/oomol-lab/oo-cli) が利用する不変の
-  Command Artifact。
-- [`apps/server`](../apps/server)：セルフホスト可能な Workbench、Control API、SQLite 永続化、Trigger スケジューラ、分離された JavaScript ランタイム。
-
-永続的なモデルについては[プロダクトとアーキテクチャの境界](architecture.md)を、HTTP の契約については
-[Control API リファレンス](control/contracts/control-api.md)を参照してください。
-
-## ソースから開発する
-
-Open Flow はワークスペースに [Bun](https://bun.sh/) を、Server に Node.js を使用します。`.bun-version` と `.node-version` で固定されたバージョンを使ってください。
+`.bun-version` と `.node-version` に固定された Bun と Node.js のバージョンを使ってください。
 
 ```bash
 bun install --frozen-lockfile
 bun run dev
 ```
 
-開発用の Workbench は [http://localhost:5174](http://localhost:5174) で開きます。Control API リクエストは開発用バックエンドのポート (`OPEN_FLOW_PORT`、既定値 `3001`) にプロキシされます。プロキシ先は Vite に `OPEN_FLOW_DEV_API_ORIGIN` として渡されます。Connector を利用する Action は `OPEN_FLOW_CONNECTOR_ORIGIN` を設定するまで利用できません。Connector Token は引き続き任意です。
+開発用 Workbench は [http://localhost:5174](http://localhost:5174) で開けます。初回起動時に `apps/server/.open-flow-dev/operator-token` に管理者トークンが作成されます。設定、チェック、コンポーネント Lab については [CONTRIBUTING.md](../CONTRIBUTING.md) を参照してください。
 
-初回の開発実行時に、オペレーター Token が `apps/server/.open-flow-dev/operator-token` に作成されます。以降の実行ではこの Token が再利用されるため、
-開発サーバーを再起動しても現在の Workbench セッションは無効になりません。明示的な Token を使いたい場合は `OPEN_FLOW_TOKEN` を設定してください。
-
-変更を提出する前に、次を実行してください。
-
-```bash
-bun run check
-bun run test
-bun run build
-```
-
-公開パッケージや CLI に触れる場合は `bun run test:package` を追加し、Docker が利用できる場合は `bun run test:docker` を実行して、リリースイメージ、
-分離ランタイム、Workbench、graceful shutdown、SQLite volume の復旧を検証してください。リポジトリのルートで `bun test` を直接実行しないでください。
-ワークスペースのテストスクリプトを迂回してしまいます。開発ルールの全文は [CONTRIBUTING.md](../CONTRIBUTING.md) を参照してください。
-
-## ドキュメント
-
-[ドキュメント索引](README.md)から始めてください。特によく参照されるものは次のとおりです。
-
-- [プロダクトとアーキテクチャの境界](architecture.md)
-- [Control API](control/contracts/control-api.md)
-- [Command Artifact の配布契約](distribution/command-artifact.md)
-- [Workbench と Designer のフロントエンドに関する注意](../.agents/skills/frontend-ui/SKILL.md)
-- [Server のデプロイ](server/container-delivery.md)
-- [Docker イメージ (GHCR)](server/docker-ghcr/README.ja.md)
-- [Fly.io へのデプロイ](server/fly-io/README.ja.md)
-- [OpenConnector と oo CLI で Open Flow を使う](server/self-hosted-stack/README.ja.md)
-- [コントリビューション](../CONTRIBUTING.md)
-- [行動規範](../CODE_OF_CONDUCT.md)
-- [セキュリティ](../SECURITY.md)
+| 詳しく知る                                 | 参考資料                                                                                                                  |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- |
+| 製品モデルとランタイムの境界               | [アーキテクチャ](architecture.md)                                                                                         |
+| 独自クライアントの連携                     | [Control API](control/contracts/control-api.md) · [MCP](server/mcp.md)                                                    |
+| デプロイと運用                             | [Server](server/container-delivery.md) · [Docker](server/docker-ghcr/README.ja.md) · [Fly.io](server/fly-io/README.ja.md) |
+| アプリと AI コーディングエージェントの接続 | [OpenConnector + oo CLI](server/self-hosted-stack/README.ja.md)                                                           |
+| すべてのドキュメント                       | [ドキュメント索引](README.md)                                                                                             |
 
 ## 関連プロジェクト
 

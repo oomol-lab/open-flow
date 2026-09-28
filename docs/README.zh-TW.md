@@ -14,123 +14,77 @@
 
 </div>
 
-Open Flow 是一個開源工作流程自動化平台，AI Agent 和人可以在其中共同建立同一個 Flow。讓 Codex、Claude Code 或其他終端
-Agent 透過 [`oo flow`](https://github.com/oomol-lab/oo-cli) 建立、檢查、執行和發布類型化工作流程，然後在 Workbench 中以視覺化方式檢視並繼續編輯同一個 Flow。
+**和 AI Agent 一起建立自動化，讓每一步執行清楚可見。**
 
-使用類型化節點定義結構，將自訂邏輯保留為 JavaScript，並在 OOMOL Hosted 或自己掌控的基礎設施上執行最終的自動化流程。流程圖始終容易理解，程式碼始終是程式碼，部署也始終由你掌控。
+Open Flow 是一個開源工作流程平台，結合 AI 輔助建構的速度與視覺化工作流程的清晰結構。讓 Codex、Claude Code 或其他 Agent 建立一個 Flow，在 Workbench 中開啟，再一起持續完善同一個工作流程。
 
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
-    <img alt="觀看 Codex 使用 Open Flow 建立並執行 Gmail 到飛書工作流程的示範" src="assets/open-flow-demo-video.jpg" width="100%">
-  </a>
-</p>
+在一張畫布上組合 JavaScript、應用程式整合、AI、條件分支和人工核准。檢視輸入、追蹤執行，並決定哪個版本正式上線。可以使用 OOMOL Hosted，也可以部署到自己的基礎設施。
 
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM"><strong>▶ 觀看 1 分鐘 Open Flow 示範</strong></a>
-</p>
+[體驗互動示範](https://openflow.run) · [使用 OOMOL Hosted](https://oomol.com) · [用 Docker 自行部署](#選擇適合你的執行方式)
+
+![新版 Open Flow Workbench 中的客戶入門流程，包含明確的客戶資料、JavaScript、核准和子流程](assets/readme-workbench.png)
 
 > [!IMPORTANT]
-> Open Flow 目前處於 Beta 階段。公開協定有版本管理，但產品尚未發布第一個穩定版本。
+> Open Flow 目前處於 Beta 階段，產品及其版本化契約仍在持續演進。
 
-## 使用 AI Agent 建立工作流程
+## Agent 負責建構，由你掌控
 
-`oo flow` 將完整的創作生命週期開放為有版本、機器可讀的命令。能夠使用終端的 Agent 可以：
+描述你需要完成的工作：
 
-- 探索準確的 Connector Action 和 Provider Trigger；
-- 建立和編輯類型化 Node、Edge、Code Task 和 Trigger binding；
-- 檢查 Draft、執行它並讀取結果；
-- 在你明確要求時發布到 Live，或在 Workbench 中開啟同一個 Flow。
+> 「讀取新的客服郵件，將請求分類，草擬回覆，並在寄出前請我核准。」
 
-> **範例請求：**「建立一個工作流程，讀取未讀 Gmail 郵件，整理格式後傳送到飛書。」
+終端機 Agent 可以透過 [`oo flow`](https://github.com/oomol-lab/oo-cli) 探索整合、建立和編輯節點、檢查草稿、執行流程、檢視結果，並在你要求時發佈。它的變更會出現在你用來檢視流程圖和編輯程式碼的同一個 Workbench 中，無須轉換或同步另一套 AI 產生的專案。
 
-Agent 建立的是所選 Open Flow 部署中的真實 Draft，而不是用完即棄的本機設定。CLI 和 Workbench 使用同一個 Control API，因此 AI 建立的變更會立即出現在同一個視覺化流程圖中，並且人和 Agent 都可以繼續編輯。
+Server 也為相容的用戶端提供 [MCP 編排與執行工具](server/mcp.md)。兩種介面都操作所選部署中儲存的 Flow、修訂版本和執行紀錄。
 
-<p align="center">
-  <img alt="在 Open Flow Workbench 中成功執行的 Gmail 到飛書工作流程" src="assets/workbench-overview.png">
-</p>
+把重複的連線工作交給 Agent，讓重要的決策始終清楚可見。
 
-[安裝 `oo` CLI](https://github.com/oomol-lab/oo-cli)，即可透過 Codex、Claude Code 或其他終端 Agent 創作 Open Flow。
+## 每一步都能看清楚
 
-使用自己部署的 Open Flow 時，請在執行 Agent 的 shell 中設定 `OO_OPEN_FLOW_URL` 和 `OO_OPEN_FLOW_TOKEN`，見
-[用 OpenConnector 和 oo CLI 執行 Open Flow](server/self-hosted-stack/README.zh-TW.md)。
+即使建立工作流程時的對話早已結束，工作流程本身也應該容易理解。
 
-## 選擇 Open Flow 的執行方式
+- **用 JavaScript 完成精確的工作。** 在 Code Task 中轉換資料、格式化訊息或撰寫自訂邏輯，輸入和輸出都有明確的名稱與型別。
+- **明確宣告輸入來源。** 在屬性面板中檢視值從哪裡來。控制連線決定接下來執行什麼，輸入對應決定每一步接收什麼資料。
+- **條件分支與可重用的子流程。** 透過條件分派工作，為重複使用的邏輯定義清楚的介面。
+- **把說明留在工作旁邊。** 直接在畫布上解釋某個決策，讓接手的人理解意圖。
 
-三種支援的方式使用同一套 Open Flow 產品和 Workbench。
+![新版 Code Task 屬性面板，展示 JavaScript、客戶輸入來源和帶型別的訊息輸出](assets/readme-code.png)
 
-<table>
-  <tr>
-    <td width="33%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
-    <td width="33%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
-    <td width="33%" align="center"><strong>Fly.io Self-hosted</strong></td>
-  </tr>
-  <tr>
-    <td width="33%" valign="top">無需準備、更新或監控伺服器，開啟即可使用。OOMOL 負責執行部署，並為支援的整合提供託管 OAuth App，省去固定伺服器成本和另外設定 OAuth App 的工作。</td>
-    <td width="33%" valign="top">使用內建 Docker 映像檔在自己的基礎設施中執行。部署、儲存、備份、升級、網路以及 Connector 或 OAuth App 設定均由你管理。</td>
-    <td width="33%" valign="top">在 Fly.io 上執行同一個 Docker 映像檔，無需自己維護伺服器。Fly 負責建置映像檔、終止 TLS 並把 SQLite 保存在持久化 volume 上；secret、備份、升級以及 Connector 或 OAuth App 設定均由你管理。</td>
-  </tr>
-  <tr>
-    <td width="33%" align="center">🚀 <a href="https://oomol.com"><strong>使用 OOMOL Hosted</strong></a></td>
-    <td width="33%" align="center"><a href="#快速開始"><strong>使用 Docker 自行部署</strong></a></td>
-    <td width="33%" align="center"><a href="server/fly-io/README.zh-TW.md"><strong>部署到 Fly.io</strong></a></td>
-  </tr>
-</table>
+## 給 AI 明確的任務和邊界
 
-## 為什麼選擇 Open Flow
+用 LLM Task 完成分類、擷取或摘要；需要多次工具呼叫時，使用 Agent Task。在需要可預測行為的地方，搭配一般程式碼、條件和核准。
 
-- **使用 AI Agent 建立。** 在 Codex、Claude Code 或其他終端 Agent 中使用 `oo flow`，建立、檢查、執行和發布 Workbench 中的同一個 Flow。
-- **明確呈現資料相依關係。** 每個 Task 都宣告具名、類型化的輸入和輸出。每條邊將一個特定輸出值綁定到一個特定輸入，因此流程圖就是執行階段使用的資料相依模型。
-- **視覺化設計，需要時加入程式碼。** 在畫布上組合類型化節點，並使用 Code Task 撰寫自訂 JavaScript。程式碼始終清晰可見，不會隱藏在表單欄位中。
-- **執行和偵錯在同一處。** 執行前檢查輸入和 Flow 結構，執行時查看每個節點的進度、輸出和完整事件記錄。
-- **發布為長期執行的自動化。** Flow 可以手動啟動，也可以由 Cron、Webhook、輪詢資料來源或 Provider Event 觸發。
-- **執行狀態集中管理。** Flow、不可變的 Revision、Publication、Live 版本、Run 和 Trigger 狀態都由目前的部署管理，不會散落在本機檔案和隱藏服務中。
-- **安全地執行使用者程式碼。** Server 在常駐的 Executor 程序中為每次程式碼 Task 呼叫建立全新的 V8 isolate，只開放該 Task 明確宣告的 Capability。
-- **自由選擇執行環境。** 可以直接使用 OOMOL Hosted，也可以透過 Docker 在自己的基礎設施上執行儲存庫內建的 Server。
+Agent Task 使用已設定的模型、明確宣告的工具和執行限制。工具設定規定模型可以使用哪些操作、帳號和核准政策。你可以要求某次工具呼叫經過人工核准，也可以在工作流程中加入 Approval 節點，讓後續步驟等待核准。
 
-Open Flow 適合已經超出簡單無程式碼原型，但又不想變成一堆腳本和基礎設施的工作流程。
+Approval 和 Wait 節點會持久化等待狀態。作出決定後，流程可以繼續執行，無須重跑這次執行中已完成的步驟。
 
-## 流程圖就是執行階段契約
+## 看清執行過程，決定哪個版本上線
 
-每個 Task 都宣告具名、類型化的輸入和輸出。每條邊將一個特定輸出值傳遞給一個特定輸入；當節點的輸入就緒時，執行階段才會啟動該節點。
+從選定的觸發器測試草稿，在 Workbench 中追蹤執行。檢視節點結果、記錄、錯誤和待核准項目，無須只憑最後一則訊息猜測整個過程。執行歷史保留執行紀錄與對應修訂版本之間的關聯。
 
-流程圖呈現的正是執行階段實際使用的資料相依關係：一般 Flow 資料不能透過隱藏的執行階段儲存空間從任意節點讀取。彼此獨立的分支可以並行執行，節點在畫布上的位置永遠不會改變執行行為。
+![Open Flow Workbench 中等待人工核准的客戶入門測試流程](assets/readme-approval.png)
 
-### 類型化視覺編排
+發佈會為 Live 自動化建立帶版本的快照。已發佈版本持續執行時，你可以繼續編輯草稿、檢視歷史 Publication，並在需要時回復先前版本。
 
-詳細檢視會在畫布上明確顯示每個輸入、輸出、類型、可為空限制和連接關係。
+手動啟動流程，或透過排程、Webhook、支援的服務事件與輪詢資料來源觸發。同一個部署管理工作流程、Live 版本和執行狀態。
 
-<p align="center">
-  <img src="assets/typed-node-details.jpg" alt="Typed input and output handles in the Open Flow Workbench detailed view">
-</p>
+## 連接應用程式，憑證不進入流程圖
 
-### 在合適的位置撰寫程式碼
+Open Flow 透過 [OpenConnector](https://github.com/oomol-lab/open-connector) 等 Connector 執行環境探索和執行 Gmail、Slack、GitHub、Notion 等服務的操作。帳號憑證由 Connector 保管，工作流程只參照 Connection 識別碼。
 
-Code Task 將自訂 JavaScript 直接放在流程圖中，並保留類型化的輸入和輸出。
+OOMOL Hosted 為支援的整合提供託管 OAuth 應用程式。自行部署時，你選擇 Connector 的部署方式，並管理所需的服務設定和帳號授權。工作流程邏輯與帳號存取權限各自獨立。
 
-<p align="center">
-  <img src="assets/code-task-editor.jpg" alt="Editing a custom Code Task in the Open Flow Workbench">
-</p>
+完整設定步驟，包括授權帳號和建立第一個 Flow，請見[搭配 OpenConnector 和 oo CLI 使用 Open Flow](server/self-hosted-stack/README.zh-TW.md)。
 
-## 運作方式
+## 選擇適合你的執行方式
 
-```mermaid
-flowchart LR
-  Workbench["Workbench"] -->|"Control API"| Server["Open Flow"]
-  CLI["oo flow CLI"] -->|"Control API"| Server
-  Server -. "選用" .-> Connector["Connector 執行環境"]
-  Connector --> Providers["第三方 Provider"]
-  Server --> Store["SQLite：Flow、Revision、Publication、Run"]
-  Server --> Triggers["Trigger 排程：Cron、Webhook、Poll、Integration"]
-  Server --> Runtime["隔離的 JavaScript 執行環境"]
-```
+| 方式             | 你需要管理什麼                                             | 開始使用                                  |
+| ---------------- | ---------------------------------------------------------- | ----------------------------------------- |
+| **OOMOL Hosted** | 工作流程和已連接的帳號；OOMOL 負責維運部署。               | [開啟 OOMOL](https://oomol.com)           |
+| **Docker**       | 部署、儲存、備份、升級和整合。                             | 下方指令                                  |
+| **Fly.io**       | Fly 基礎設施上的應用程式、持久化磁碟區、密鑰、備份和升級。 | [部署指南](server/fly-io/README.zh-TW.md) |
 
-Workbench 和 CLI 只透過有版本的 Control API 與目前選定的一個部署通訊。部署端負責 validation、執行、持久化和 Trigger 准入。Provider
-憑證不會進入 Open Flow：Connector Action、Provider Trigger 和 proxy 都經由
-[OpenConnector](https://github.com/oomol-lab/open-connector) 這類 Connector 執行環境完成，Open Flow 只保存不透明的 Connection 識別。
-
-## 快速開始
-
-準備好 [Docker](https://docs.docker.com/get-docker/) 和 OpenSSL，然後複製儲存庫、產生管理員 Token 並啟動 Server：
+若要在本機自行部署，請安裝 Docker 和 OpenSSL，然後執行：
 
 ```bash
 git clone https://github.com/oomol-lab/open-flow.git
@@ -145,101 +99,32 @@ docker run --rm \
   open-flow-server:dev
 ```
 
-開啟 [http://127.0.0.1:3000](http://127.0.0.1:3000)，使用 `OPEN_FLOW_TOKEN` 的值登入。同一個值也可以作為 Control API 的 Bearer Token
-供機器用戶端使用。Flow 和 Run 歷史會儲存在 `open-flow-data` Docker volume 中。
+開啟 [http://127.0.0.1:3000](http://127.0.0.1:3000)，使用 `OPEN_FLOW_TOKEN` 登入。Flow 和執行歷史儲存在 Docker 磁碟區中。這個管理員權杖也用於 CLI 和 API 驗證。
 
-如果不想自行建置，可以直接拉取預先建置的多架構映像 `ghcr.io/oomol-lab/open-flow`，或用儲存庫根目錄的 `docker-compose.yml` 啟動。
-Tag 方案 (`latest` 和 Release 版本) 與升級步驟請參閱 [Docker 映像文件](server/docker-ghcr/README.zh-TW.md)。
+想使用預先建置的映像檔？請參閱 [GHCR 映像檔指南](server/docker-ghcr/README.zh-TW.md)，並在 Beta 階段選擇明確的發佈標籤。`latest` 標籤保留給穩定版本。
 
-不接外部服務時，Server 仍然可以獨立使用。Connector Action、Provider Trigger 和 LLM Task 在沒有設定對應 Host Capability
-時會拒絕執行，不會退回到來源不明的服務。
+Connector 操作和 LLM Task 需要設定對應的服務。Server 不會暗中切換到其他服務供應商。將部署開放至公網前，請遵循[部署指南](server/container-delivery.md)和[強化安全清單](../SECURITY.md#hardening-your-deployment)。
 
-正式環境所需的設定、TLS、健康檢查、資料持久化、備份和資源限制，請參閱
-[Server 部署文件](server/container-delivery.md) 和 [SECURITY.md](../SECURITY.md#hardening-your-deployment) 中的強化清單。
+## 以 Open Flow 為基礎開發
 
-## 部署到 Fly.io
+Open Flow 採用 Apache-2.0 授權。儲存庫包含工作流程契約與執行環境、Workbench、CLI 指令套件和可自行部署的 Server。版本化的 Control API 讓用戶端不依賴部署內部的儲存和執行實作。
 
-同一個映像也可以部署到 Fly.io。儲存庫內建的 `fly.toml` 使用 `apps/server/Dockerfile` 建置映像，保持一台 machine 常駐以執行 Cron 和 Poll
-Trigger，並把 SQLite 持久化到 Fly volume。Fly app 建立、volume、secret、部署、自訂網域和擴縮容限制請參閱 [Fly.io 部署](server/fly-io/README.zh-TW.md)。
-
-## 接入 Connector
-
-要對 GitHub、Gmail、Slack、Notion 等服務執行 Action 和 Provider Trigger，需要把 Server 指向一個 Connector 執行環境。自行部署的
-[OpenConnector](https://github.com/oomol-lab/open-connector) 和 OOMOL 託管的 Connector 都提供所需的執行環境 API。
-
-<p align="center">
-  <img src="assets/connector-actions.jpg" alt="Browsing Gmail Provider Triggers and Actions in the Open Flow Workbench">
-</p>
-
-```dotenv
-OPEN_FLOW_CONNECTOR_ORIGIN=http://open-connector:3000
-OPEN_FLOW_CONNECTOR_TOKEN=replace-with-a-scoped-runtime-token
-OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN=https://connector.example.com
-```
-
-runtime origin 是 Server 存取 Connector 的位址，console origin 是使用者瀏覽器開啟 Connector Console 授權帳號的位址。Provider Trigger
-定義隨 Open Flow 內建，不需要額外註冊。Integration callback 的設定和各 origin 的限制請參閱
-[設定說明](server/container-delivery.md#4-配置)。
-
-要同時啟動 OpenConnector 和 Open Flow、建立 runtime token、授權帳號並用 `oo flow` 建立第一個 Flow，見
-[用 OpenConnector 和 oo CLI 執行 Open Flow](server/self-hosted-stack/README.zh-TW.md)。
-
-## 一套產品，多種部署
-
-Workbench 和 CLI 透過有版本的 Control API 運作，不依賴特定資料庫或雲端執行環境。部署端負責執行和持久化；用戶端不會建立第二套本機
-工作流程格式，也不會在請求失敗時暗中切換後端。
-
-儲存庫主要包含：
-
-- [`packages/open-flow`](../packages/open-flow)：公開的 `@oomol-lab/open-flow` npm 套件，提供 Authoring、Execution、Trigger、Control
-  API、Conformance 和 Workbench Runtime 進入點；
-- [`packages/command`](../packages/command)：`oo flow` 命令執行環境和交付給 [oo CLI](https://github.com/oomol-lab/oo-cli) 的不可變
-  Command Artifact；
-- [`apps/server`](../apps/server)：可自行部署的 Workbench、Control API、SQLite 儲存、Trigger Scheduler 和隔離的 JavaScript Runtime。
-
-長期成立的產品模型記錄在[產品與架構邊界](architecture.md)中，HTTP 介面定義請參閱
-[Control API 文件](control/contracts/control-api.md)。
-
-## 從原始碼開發
-
-Open Flow 的工作區使用 [Bun](https://bun.sh/)，Server 執行在 Node.js 上。請使用 `.bun-version` 和 `.node-version` 中固定的版本。
+請使用 `.bun-version` 和 `.node-version` 中固定的 Bun 與 Node.js 版本：
 
 ```bash
 bun install --frozen-lockfile
 bun run dev
 ```
 
-開發環境的 Workbench 位於 [http://localhost:5174](http://localhost:5174)，Control API 請求會代理到開發後端埠（`OPEN_FLOW_PORT`，預設 `3001`；代理目標透過 `OPEN_FLOW_DEV_API_ORIGIN` 傳給 Vite）。在設定 `OPEN_FLOW_CONNECTOR_ORIGIN` 之前，Connector Action 無法使用；Connector token 仍然為選用。
+開發環境的 Workbench 位於 [http://localhost:5174](http://localhost:5174)。首次執行會在 `apps/server/.open-flow-dev/operator-token` 中產生管理員權杖。設定、檢查和元件 Lab 的說明請見 [CONTRIBUTING.md](../CONTRIBUTING.md)。
 
-第一次啟動開發環境時，Server 會把管理員 Token 寫入 `apps/server/.open-flow-dev/operator-token`，後續啟動繼續使用同一個
-Token，因此重新啟動開發服務不會讓目前的 Workbench 登入狀態失效。如果需要指定 Token，可以設定 `OPEN_FLOW_TOKEN`。
-
-提交程式碼前請執行：
-
-```bash
-bun run check
-bun run test
-bun run build
-```
-
-修改發布套件或 CLI 時加跑 `bun run test:package`；本機有 Docker 時執行 `bun run test:docker`，檢查發布映像檔、隔離執行環境、Workbench、正常結束和
-SQLite volume 復原。不要在儲存庫根目錄直接執行 `bun test`，它會繞過各工作區的測試腳本。完整的開發規則請參閱 [CONTRIBUTING.md](../CONTRIBUTING.md)。
-
-## 文件
-
-可以從[文件索引](README.md)開始，常用內容包括：
-
-- [產品與架構邊界](architecture.md)
-- [Control API](control/contracts/control-api.md)
-- [Command Artifact 發布合約](distribution/command-artifact.md)
-- [Workbench 與 Designer 前端注意事項](../.agents/skills/frontend-ui/SKILL.md)
-- [Server 部署](server/container-delivery.md)
-- [Docker 映像 (GHCR)](server/docker-ghcr/README.zh-TW.md)
-- [Fly.io 部署](server/fly-io/README.zh-TW.md)
-- [用 OpenConnector 和 oo CLI 執行 Open Flow](server/self-hosted-stack/README.zh-TW.md)
-- [參與貢獻](../CONTRIBUTING.md)
-- [行為準則](../CODE_OF_CONDUCT.md)
-- [安全政策](../SECURITY.md)
+| 深入了解                         | 參考資料                                                                                                                        |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 產品模型與執行環境邊界           | [架構](architecture.md)                                                                                                         |
+| 整合自己的用戶端                 | [Control API](control/contracts/control-api.md) · [MCP](server/mcp.md)                                                          |
+| 部署與維運                       | [Server](server/container-delivery.md) · [Docker](server/docker-ghcr/README.zh-TW.md) · [Fly.io](server/fly-io/README.zh-TW.md) |
+| 連接應用程式和 AI 程式設計 Agent | [OpenConnector + oo CLI](server/self-hosted-stack/README.zh-TW.md)                                                              |
+| 瀏覽全部文件                     | [文件索引](README.md)                                                                                                           |
 
 ## 相關專案
 

@@ -14,132 +14,77 @@
 
 </div>
 
-Open Flow는 AI Agent와 사람이 동일한 Flow를 함께 구축하는 오픈소스 워크플로 자동화 플랫폼입니다. Codex, Claude Code 또는 다른 터미널
-Agent에게 [`oo flow`](https://github.com/oomol-lab/oo-cli)를 통해 타입이 지정된 워크플로를 생성, 검사, 실행, 게시하도록 요청한 다음, 바로 그 Flow를 Workbench에서 시각적으로 확인하고 계속 편집할 수 있습니다.
+**AI 에이전트와 자동화를 만들고, 무엇이 실행될지 직접 확인하세요.**
 
-타입이 지정된 노드로 구조를 정의하고, 사용자 정의 로직은 JavaScript로 유지하며, OOMOL Hosted 또는 직접 관리하는 인프라에서 자동화를 실행할 수 있습니다.
-그래프는 계속 이해할 수 있는 상태로, 코드는 계속 코드로, 배포는 계속 여러분의 통제 아래 남습니다.
+Open Flow는 AI로 빠르게 구축하면서도 시각적인 워크플로로 구조를 명확하게 파악할 수 있는 오픈 소스 워크플로 플랫폼입니다. Codex, Claude Code 또는 다른 에이전트에게 Flow 생성을 요청하고, Workbench에서 열어 같은 워크플로를 함께 개선하세요.
 
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
-    <img alt="Codex가 Open Flow에서 Gmail-Feishu 워크플로를 만들고 실행하는 데모 보기" src="assets/open-flow-demo-video.jpg" width="100%">
-  </a>
-</p>
+하나의 캔버스에서 JavaScript, 앱 연동, AI, 조건 분기, 사람의 승인을 조합합니다. 입력을 확인하고 실행을 추적하며 어떤 버전을 실제로 운영할지 결정할 수 있습니다. OOMOL Hosted나 직접 관리하는 인프라에서 실행하세요.
 
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM"><strong>▶ 1분 Open Flow 데모 보기</strong></a>
-</p>
+[인터랙티브 데모 체험](https://openflow.run) · [OOMOL Hosted 사용](https://oomol.com) · [Docker로 직접 호스팅](#원하는-환경에서-실행)
+
+![현재 Open Flow Workbench의 고객 온보딩 워크플로. 명시적인 고객 데이터, JavaScript, 승인, 하위 흐름을 표시](assets/readme-workbench.png)
 
 > [!IMPORTANT]
-> Open Flow는 현재 알파 단계입니다. 공개 계약은 버전 관리되지만, 제품은 아직 첫 안정 버전에 도달하지 않았습니다.
+> Open Flow는 베타 단계입니다. 제품과 버전 관리되는 계약은 계속 발전하고 있습니다.
 
-## AI Agent로 워크플로 구축
+## 에이전트가 만들고, 결정은 내가
 
-`oo flow`는 작성 수명 주기를 버전이 지정된 기계 판독 가능 명령으로 제공합니다. 터미널을 사용할 수 있는 Agent는 다음 작업을 수행할 수 있습니다.
+필요한 작업을 설명하세요.
 
-- 정확한 Connector Action과 Provider Trigger 탐색
-- 타입이 지정된 Node, Edge, Code Task 및 Trigger binding 생성과 편집
-- Draft 검사, 실행 및 결과 확인
-- 명시적으로 요청된 경우 Live에 게시하거나 동일한 Flow를 Workbench에서 열기
+> “새 고객 지원 이메일을 읽고, 요청을 분류하고, 답장 초안을 작성한 뒤 보내기 전에 내 승인을 받아 줘.”
 
-> **요청 예시:** “읽지 않은 Gmail 메시지를 읽고, 형식을 정리한 다음 Feishu로 보내는 워크플로를 만들어 줘.”
+터미널 에이전트는 [`oo flow`](https://github.com/oomol-lab/oo-cli)를 통해 연동 기능을 찾고, 노드를 생성·편집하고, 초안을 검증·실행하고, 결과를 확인하며, 요청에 따라 게시할 수 있습니다. 변경 사항은 그래프를 검토하고 코드를 편집하는 바로 그 Workbench에 나타납니다. AI가 만든 별도 프로젝트를 변환하거나 동기화할 필요가 없습니다.
 
-Agent는 일회용 로컬 설정이 아니라 선택한 Open Flow 배포 안에 실제 Draft를 만듭니다. CLI와 Workbench는 동일한 Control API를 사용하므로 AI가 만든 변경 사항은 동일한 시각적 그래프에 표시되며 사람과 Agent 모두 계속 편집할 수 있습니다.
+Server는 호환 클라이언트를 위한 [MCP 작성 및 실행 도구](server/mcp.md)도 제공합니다. 두 인터페이스 모두 선택한 배포 환경에 저장된 Flow, 리비전, 실행 기록을 다룹니다.
 
-<p align="center">
-  <img alt="Open Flow Workbench에서 성공적으로 실행된 Gmail-Feishu 워크플로" src="assets/workbench-overview.png">
-</p>
+반복적인 연결 작업은 에이전트에게 맡기고, 중요한 결정은 눈에 보이는 곳에 두세요.
 
-[Codex, Claude Code 또는 다른 터미널 Agent에서 Open Flow를 작성하려면 `oo` CLI를 설치하세요.](https://github.com/oomol-lab/oo-cli)
+## 모든 단계를 확인할 수 있게
 
-직접 실행 중인 Open Flow를 사용한다면 Agent를 실행하는 셸에 `OO_OPEN_FLOW_URL`과 `OO_OPEN_FLOW_TOKEN`을 설정하세요.
-[OpenConnector와 oo CLI로 Open Flow 사용하기](server/self-hosted-stack/README.ko.md)를 참고하세요.
+워크플로를 만들 때 나눈 대화가 없어져도 워크플로 자체는 이해할 수 있어야 합니다.
 
-## Open Flow 실행 방식 선택
+- **정확한 작업은 JavaScript로.** 이름과 타입이 명확한 입력·출력을 갖춘 Code Task에서 데이터를 변환하고 메시지를 구성하거나 사용자 정의 로직을 작성하세요.
+- **명시적인 입력 출처.** 속성 패널에서 값이 어디에서 오는지 확인합니다. 제어 연결은 다음에 실행할 작업을, 입력 매핑은 각 단계가 받을 데이터를 결정합니다.
+- **분기와 재사용 가능한 하위 흐름.** 조건에 따라 작업을 나누고 반복되는 로직에 명확한 인터페이스를 정의하세요.
+- **작업 옆에 남기는 설명.** 캔버스에 결정 이유를 직접 적어 다음 사람이 의도를 이해할 수 있게 하세요.
 
-지원되는 세 방식 모두 동일한 Open Flow 제품과 Workbench를 사용합니다.
+![현재 Code Task 속성 패널의 JavaScript, 고객 입력 출처, 타입이 지정된 메시지 출력](assets/readme-code.png)
 
-<table>
-  <tr>
-    <td width="33%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
-    <td width="33%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
-    <td width="33%" align="center"><strong>Fly.io Self-hosted</strong></td>
-  </tr>
-  <tr>
-    <td width="33%" valign="top">서버를 준비하거나 패치하고 모니터링할 필요 없이 바로 사용할 수 있습니다. OOMOL이 배포를 운영하고 지원되는 연동에 관리형 OAuth App을 제공하므로 고정 서버 비용과 별도의 OAuth App 설정을 줄일 수 있습니다.</td>
-    <td width="33%" valign="top">포함된 Docker 이미지로 자체 인프라에서 실행합니다. 배포, 스토리지, 백업, 업그레이드, 네트워크와 Connector 또는 OAuth App 설정을 직접 관리합니다.</td>
-    <td width="33%" valign="top">같은 Docker 이미지를 Fly.io에서 실행하며 서버를 직접 운영할 필요가 없습니다. Fly가 이미지 빌드, TLS 종료, 영구 volume의 SQLite를 담당하고, secret, 백업, 업그레이드와 Connector 또는 OAuth App 설정은 직접 관리합니다.</td>
-  </tr>
-  <tr>
-    <td width="33%" align="center">🚀 <a href="https://oomol.com"><strong>OOMOL Hosted 사용</strong></a></td>
-    <td width="33%" align="center"><a href="#빠른-시작"><strong>Docker로 셀프 호스팅</strong></a></td>
-    <td width="33%" align="center"><a href="server/fly-io/README.ko.md"><strong>Fly.io에 배포</strong></a></td>
-  </tr>
-</table>
+## AI에게 명확한 작업과 경계 부여
 
-## 왜 Open Flow인가
+분류, 추출, 요약에는 LLM Task를 사용하고 여러 도구 호출이 필요한 작업에는 Agent Task를 사용하세요. 예측 가능한 동작이 필요한 곳에는 일반 코드, 조건, 승인을 함께 배치할 수 있습니다.
 
-- **AI Agent로 구축합니다.** Codex, Claude Code 또는 다른 터미널 Agent에서 `oo flow`를 사용해 Workbench에 표시되는 동일한 Flow를 생성, 검사, 실행, 게시할 수 있습니다.
-- **데이터 의존성을 명시적으로 표현합니다.** 모든 Task는 이름과 타입이 있는 입력과 출력을 선언합니다. 각 에지는 특정 출력값을 특정 입력에 연결하므로 그래프가 런타임에서 사용하는 데이터 의존성 모델이 됩니다.
-- **시각적으로 설계하고, 필요할 때 코드를 추가합니다.** 캔버스에서 타입이 지정된 노드를 조합하고 사용자 정의 JavaScript에는 Code Task를 사용합니다. 코드는 폼 필드에 숨겨지지 않고 항상 보이는 상태로 유지됩니다.
-- **한 곳에서 실행하고 디버깅합니다.** 실행 전에 입력과 Flow 구조를 검증하고, 노드의 진행 상황과 출력을 확인하며,
-  모든 Run의 전체 이벤트 이력을 따라갈 수 있습니다.
-- **장기 실행 자동화를 게시합니다.** Flow는 수동으로 시작할 수도 있고 Cron 일정, Webhook, 폴링 소스, Provider
-  이벤트로 시작할 수도 있습니다.
-- **운영 상태를 한데 모읍니다.** Flow, 불변 Revision, Publication, Live 버전, Run, Trigger 상태는 로컬 파일과
-  숨겨진 서비스에 흩어지지 않고 선택된 하나의 배포에 속합니다.
-- **신뢰할 수 없는 코드를 안전하게 실행합니다.** Server는 오래 유지되는 Executor 프로세스 안에서 코드 Task마다 새
-  V8 isolate를 만들고, 해당 Task가 선언한 Capability만 제공합니다.
-- **실행 위치를 직접 선택합니다.** OOMOL Hosted를 사용하거나, 포함된 Server를 Docker로 자체 인프라에서 실행할 수
-  있습니다.
+Agent Task에는 설정된 모델, 명시적으로 선언된 도구, 실행 제한이 있습니다. 도구 설정은 모델이 사용할 수 있는 작업, 계정, 승인 정책을 정합니다. 도구 호출에 사람의 승인을 요구하거나 워크플로에 Approval 노드를 배치해 다음 단계가 승인 후 진행되도록 할 수 있습니다.
 
-Open Flow는 노코드 프로토타입 수준을 넘어섰지만 불투명한 스크립트와 인프라 더미가 되어서는 안 되는 워크플로를
-위해 만들어졌습니다.
+Approval과 Wait 노드는 대기 상태를 영구 저장합니다. 결정이 내려지면 해당 실행에서 이미 완료된 단계를 반복하지 않고 이어서 진행할 수 있습니다.
 
-## 그래프가 곧 런타임 계약입니다
+## 실행을 확인하고 운영 버전을 선택
 
-모든 Task는 이름과 타입이 있는 입력과 출력을 선언합니다. 에지는 특정 출력에서 특정 입력으로 값을 전달하며, 입력이 준비되면 런타임이 노드를 시작합니다.
+선택한 트리거에서 초안을 테스트하고 Workbench에서 실행을 추적하세요. 마지막 메시지만 보고 과정을 추측하는 대신 노드 결과, 로그, 오류, 승인 대기 항목을 살펴볼 수 있습니다. 실행 기록은 각 실행과 그 실행에 사용된 리비전의 관계를 유지합니다.
 
-그래프에는 런타임이 실제로 사용하는 데이터 의존성이 그대로 나타납니다. 일반 Flow 데이터는 숨겨진 런타임 저장소를 통해 임의의 노드에서 가져올 수 없습니다. 서로 독립적인 브랜치는 동시에 실행할 수 있으며, 캔버스에서 노드의 위치가 실행 동작을 바꾸지 않습니다.
+![Open Flow Workbench에서 사람의 승인을 기다리는 고객 온보딩 테스트 실행](assets/readme-approval.png)
 
-### 타입이 명확한 시각적 작성
+게시하면 Live 자동화에 사용할 버전 스냅샷이 생성됩니다. 게시된 버전이 실행되는 동안 초안을 계속 편집하고, 이전 Publication을 검토하고, 필요할 때 롤백할 수 있습니다.
 
-상세 보기에서는 각 입력, 출력, 타입, nullable 제약 조건과 연결 관계를 캔버스에 명확하게 표시합니다.
+수동으로 시작하거나 일정, 웹훅, 지원되는 서비스 이벤트와 폴링 소스로 작업을 시작하세요. 같은 배포 환경이 워크플로, Live 버전, 실행 상태를 관리합니다.
 
-<p align="center">
-  <img src="assets/typed-node-details.jpg" alt="Typed input and output handles in the Open Flow Workbench detailed view">
-</p>
+## 자격 증명을 그래프에 넣지 않고 앱 연결
 
-### 필요한 곳에 작성하는 코드
+Open Flow는 [OpenConnector](https://github.com/oomol-lab/open-connector) 같은 Connector 런타임을 통해 Gmail, Slack, GitHub, Notion 등의 작업을 검색하고 실행합니다. 계정 자격 증명은 Connector가 보관하고, 워크플로는 Connection 식별자를 참조합니다.
 
-Code Task는 사용자 정의 JavaScript를 그래프에 직접 배치하고 타입이 지정된 입력과 출력을 유지합니다.
+OOMOL Hosted는 지원되는 연동에 관리형 OAuth 앱을 제공합니다. 직접 호스팅할 때는 Connector 배포 환경을 선택하고 필요한 서비스 설정과 계정 권한 부여를 관리합니다. 워크플로 로직과 계정 접근 권한은 각각 독립적으로 다룹니다.
 
-<p align="center">
-  <img src="assets/code-task-editor.jpg" alt="Editing a custom Code Task in the Open Flow Workbench">
-</p>
+계정 권한 부여부터 첫 Flow 생성까지의 전체 설정은 [OpenConnector 및 oo CLI와 함께 Open Flow 사용](server/self-hosted-stack/README.ko.md)을 참고하세요.
 
-## 동작 방식
+## 원하는 환경에서 실행
 
-```mermaid
-flowchart LR
-  Workbench["Workbench"] -->|"Control API"| Server["Open Flow"]
-  CLI["oo flow CLI"] -->|"Control API"| Server
-  Server -. "선택 사항" .-> Connector["Connector 런타임"]
-  Connector --> Providers["서드파티 Provider"]
-  Server --> Store["SQLite: Flow, Revision, Publication, Run"]
-  Server --> Triggers["Trigger 스케줄러: Cron, Webhook, Poll, Integration"]
-  Server --> Runtime["격리된 JavaScript 런타임"]
-```
+| 방식             | 직접 관리하는 항목                                      | 시작하기                                  |
+| ---------------- | ------------------------------------------------------- | ----------------------------------------- |
+| **OOMOL Hosted** | 워크플로와 연결된 계정. 배포 환경은 OOMOL이 운영합니다. | [OOMOL 열기](https://oomol.com)           |
+| **Docker**       | 배포, 스토리지, 백업, 업그레이드, 연동.                 | 아래 명령어                               |
+| **Fly.io**       | Fly 인프라의 앱, 영구 볼륨, 비밀값, 백업, 업그레이드.   | [배포 가이드](server/fly-io/README.ko.md) |
 
-Workbench와 CLI는 버전 관리되는 Control API를 통해 선택된 하나의 배포와만 통신합니다. 배포는 검증, 실행, 영속화,
-Trigger 승인을 담당합니다. Provider 자격 증명은 Open Flow에 들어오지 않습니다. Connector 기반 Action, Provider
-Trigger, 프록시는 [OpenConnector](https://github.com/oomol-lab/open-connector) 같은 Connector 런타임을 거치며,
-Open Flow는 불투명한 Connection 식별자만 저장합니다.
-
-## 빠른 시작
-
-[Docker](https://docs.docker.com/get-docker/)와 OpenSSL이 필요합니다. 저장소를 클론하고, 운영자 토큰을 만든 뒤,
-자체 호스팅 Server를 시작합니다.
+로컬에서 직접 호스팅하려면 Docker와 OpenSSL을 설치하고 실행하세요.
 
 ```bash
 git clone https://github.com/oomol-lab/open-flow.git
@@ -154,111 +99,32 @@ docker run --rm \
   open-flow-server:dev
 ```
 
-[http://127.0.0.1:3000](http://127.0.0.1:3000)을 열고 `OPEN_FLOW_TOKEN` 값으로 로그인합니다. 같은 값은 Control
-API의 머신 클라이언트를 위한 Bearer 토큰으로도 사용할 수 있습니다. Flow와 Run 이력은 `open-flow-data` Docker
-볼륨에 저장됩니다.
+[http://127.0.0.1:3000](http://127.0.0.1:3000)을 열고 `OPEN_FLOW_TOKEN`으로 로그인하세요. Flow와 실행 기록은 Docker 볼륨에 저장됩니다. 같은 운영자 토큰을 CLI와 API 인증에도 사용합니다.
 
-빌드를 건너뛰려면 미리 빌드된 멀티 아키텍처 이미지 `ghcr.io/oomol-lab/open-flow`를 pull하거나 저장소 루트의 `docker-compose.yml`로
-시작하세요. Tag (`latest`, Release 버전)와 업그레이드 절차는 [Docker 이미지 가이드](server/docker-ghcr/README.ko.md)를
-참고하세요.
+미리 빌드된 이미지를 사용하려면 [GHCR 이미지 가이드](server/docker-ghcr/README.ko.md)를 따르고, 베타 기간에는 명시적인 릴리스 태그를 선택하세요. `latest` 태그는 안정 버전용입니다.
 
-Server는 외부 서비스 없이도 유용하게 사용할 수 있습니다. Connector 기반 Action, Provider Trigger, LLM Task는 해당
-호스트 Capability가 구성될 때까지 실행을 거부하며, 어떤 것도 공개되지 않은 서비스로 대체되지 않습니다.
+Connector 작업과 LLM Task는 해당 서비스를 설정해야 사용할 수 있습니다. Server는 다른 제공자로 몰래 전환하지 않습니다. 외부에 공개하기 전에 [배포 가이드](server/container-delivery.md)와 [보안 강화 체크리스트](../SECURITY.md#hardening-your-deployment)를 따르세요.
 
-프로덕션 구성, TLS, 헬스 체크, 영속화, 백업, 리소스 제한은 [Server 배포 가이드](server/container-delivery.md)와
-[SECURITY.md](../SECURITY.md#hardening-your-deployment)의 강화 체크리스트를 참고하세요.
+## Open Flow를 기반으로 개발
 
-## Fly.io에 배포
+Open Flow는 Apache-2.0 라이선스로 제공됩니다. 저장소에는 워크플로 계약과 런타임, Workbench, CLI 명령 패키지, 직접 호스팅할 수 있는 Server가 포함됩니다. 버전 관리되는 Control API 덕분에 클라이언트는 배포 환경의 스토리지 및 실행 구현에 종속되지 않습니다.
 
-같은 이미지를 Fly.io에서도 실행할 수 있습니다. 저장소에 포함된 `fly.toml`은 `apps/server/Dockerfile`로 이미지를 빌드하고, Cron과 Poll
-Trigger를 위해 machine 한 대를 항상 실행 상태로 유지하며, SQLite를 Fly volume에 영속화합니다. Fly app 생성, volume, secret, 배포,
-custom domain, 스케일링 제한은 [Fly.io 배포](server/fly-io/README.ko.md)를 참고하세요.
-
-## Connector 연결
-
-GitHub, Gmail, Slack, Notion 같은 서비스에 대해 Action과 Provider Trigger를 실행하려면 Server가 Connector 런타임을
-가리키도록 설정합니다. 자체 호스팅한 [OpenConnector](https://github.com/oomol-lab/open-connector)와 OOMOL이 호스팅하는
-Connector 모두 필요한 런타임 API를 제공합니다.
-
-<p align="center">
-  <img src="assets/connector-actions.jpg" alt="Browsing Gmail Provider Triggers and Actions in the Open Flow Workbench">
-</p>
-
-```dotenv
-OPEN_FLOW_CONNECTOR_ORIGIN=http://open-connector:3000
-OPEN_FLOW_CONNECTOR_TOKEN=replace-with-a-scoped-runtime-token
-OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN=https://connector.example.com
-```
-
-runtime origin은 Server가 Connector에 접근하는 주소이고, console origin은 사용자의 브라우저가 계정을 승인하기 위해
-Connector Console을 여는 주소입니다. Provider Trigger 정의는 Open Flow에 내장되어 있으므로 별도 등록이 필요 없습니다.
-Integration 콜백 설정과 각 origin의 제약은 [구성 참조](server/container-delivery.md#4-配置)를 참고하세요.
-
-OpenConnector와 Open Flow를 함께 시작하고, runtime token을 만들고, 계정을 연결한 뒤, `oo flow`로 첫 Flow를
-만드는 방법은 [OpenConnector와 oo CLI로 Open Flow 사용하기](server/self-hosted-stack/README.ko.md)를 참고하세요.
-
-## 하나의 제품, 이식 가능한 배포
-
-Workbench와 CLI는 특정 데이터베이스나 클라우드 런타임에 의존하지 않고 버전 관리되는 Control API로 통신합니다.
-배포가 실행과 영속화를 담당하며, 클라이언트는 두 번째 로컬 워크플로 형식을 만들거나 다른 백엔드로 조용히 전환하지
-않습니다.
-
-이 저장소에는 다음이 포함되어 있습니다.
-
-- [`packages/open-flow`](../packages/open-flow): Authoring, Execution, Trigger, Control API, Conformance,
-  Workbench Runtime 진입점을 제공하는 공개 `@oomol-lab/open-flow` npm 패키지
-- [`packages/command`](../packages/command): `oo flow` 명령 런타임과
-  [oo CLI](https://github.com/oomol-lab/oo-cli)가 사용하는 불변 Command Artifact
-- [`apps/server`](../apps/server): 자체 호스팅 가능한 Workbench, Control API, SQLite 영속화, Trigger 스케줄러,
-  격리된 JavaScript 런타임
-
-지속되는 제품 모델은 [제품 및 아키텍처 경계](architecture.md)에서, HTTP 계약은
-[Control API 참조](control/contracts/control-api.md)에서 확인할 수 있습니다.
-
-## 소스에서 개발하기
-
-Open Flow는 워크스페이스에 [Bun](https://bun.sh/)을, Server에 Node.js를 사용합니다. `.bun-version`과
-`.node-version`에 고정된 버전을 사용하세요.
+`.bun-version`과 `.node-version`에 고정된 Bun 및 Node.js 버전을 사용하세요.
 
 ```bash
 bun install --frozen-lockfile
 bun run dev
 ```
 
-개발용 Workbench는 [http://localhost:5174](http://localhost:5174)에서 열 수 있습니다. Control API 요청은 개발 백엔드 포트(`OPEN_FLOW_PORT`, 기본값 `3001`)로 프록시되며, 프록시 대상은 Vite에 `OPEN_FLOW_DEV_API_ORIGIN`으로 전달됩니다. Connector 기반 Action은 `OPEN_FLOW_CONNECTOR_ORIGIN`을 설정할 때까지 사용할 수 없습니다. Connector 토큰은 계속 선택 사항입니다.
+개발용 Workbench는 [http://localhost:5174](http://localhost:5174)에서 열 수 있습니다. 처음 실행하면 `apps/server/.open-flow-dev/operator-token`에 운영자 토큰이 생성됩니다. 설정, 검사, 컴포넌트 Lab은 [CONTRIBUTING.md](../CONTRIBUTING.md)를 참고하세요.
 
-첫 개발 실행 시 운영자 토큰이 `apps/server/.open-flow-dev/operator-token`에 생성됩니다. 이후 실행에서는 같은 토큰을
-재사용하므로 개발 서버를 재시작해도 현재 Workbench 세션이 무효화되지 않습니다. 명시적인 토큰을 사용하려면
-`OPEN_FLOW_TOKEN`을 설정하세요.
-
-변경 사항을 제출하기 전에 다음을 실행합니다.
-
-```bash
-bun run check
-bun run test
-bun run build
-```
-
-게시되는 패키지나 CLI를 수정할 때는 `bun run test:package`를 추가로 실행하고, Docker를 사용할 수 있다면
-`bun run test:docker`로 릴리스 이미지, 격리 런타임, Workbench, 정상 종료, SQLite 볼륨 복구를 검증하세요. 저장소
-루트에서 `bun test`를 직접 실행하지 마세요. 워크스페이스 테스트 스크립트를 우회하게 됩니다. 전체 개발 규칙은
-[CONTRIBUTING.md](../CONTRIBUTING.md)를 참고하세요.
-
-## 문서
-
-[문서 색인](README.md)에서 시작하세요. 가장 유용한 참조는 다음과 같습니다.
-
-- [제품 및 아키텍처 경계](architecture.md)
-- [Control API](control/contracts/control-api.md)
-- [Command Artifact 배포 계약](distribution/command-artifact.md)
-- [Workbench 및 Designer 프런트엔드 참고 사항](../.agents/skills/frontend-ui/SKILL.md)
-- [Server 배포](server/container-delivery.md)
-- [GHCR의 Docker 이미지](server/docker-ghcr/README.ko.md)
-- [Fly.io 배포](server/fly-io/README.ko.md)
-- [OpenConnector와 oo CLI로 Open Flow 사용하기](server/self-hosted-stack/README.ko.md)
-- [기여 안내](../CONTRIBUTING.md)
-- [행동 강령](../CODE_OF_CONDUCT.md)
-- [보안 정책](../SECURITY.md)
+| 더 알아보기                | 참고 자료                                                                                                                 |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| 제품 모델과 런타임 경계    | [아키텍처](architecture.md)                                                                                               |
+| 자체 클라이언트 연동       | [Control API](control/contracts/control-api.md) · [MCP](server/mcp.md)                                                    |
+| 배포와 운영                | [Server](server/container-delivery.md) · [Docker](server/docker-ghcr/README.ko.md) · [Fly.io](server/fly-io/README.ko.md) |
+| 앱과 AI 코딩 에이전트 연결 | [OpenConnector + oo CLI](server/self-hosted-stack/README.ko.md)                                                           |
+| 전체 문서 탐색             | [문서 색인](README.md)                                                                                                    |
 
 ## 관련 프로젝트
 

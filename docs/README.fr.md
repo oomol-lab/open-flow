@@ -14,145 +14,77 @@
 
 </div>
 
-Open Flow est une plateforme open source d'automatisation de workflows où les Agents IA et les
-personnes construisent le même Flow. Demandez à Codex, Claude Code ou à un autre Agent de terminal de
-créer, vérifier, exécuter et publier un workflow typé avec [`oo flow`](https://github.com/oomol-lab/oo-cli),
-puis consultez et modifiez visuellement ce Flow précis dans le Workbench.
+**Créez vos automatisations avec votre agent IA. Voyez exactement ce qui sera exécuté.**
 
-Utilisez des nœuds typés pour structurer le workflow, conservez la logique personnalisée sous forme de
-JavaScript et exécutez l'automatisation sur OOMOL Hosted ou sur une infrastructure que vous
-contrôlez. Le graphe reste compréhensible, le code reste du code, et le déploiement reste sous votre
-contrôle.
+Open Flow est une plateforme de workflows open source qui associe la rapidité de la création assistée par IA à la clarté d'un workflow visuel. Demandez à Codex, Claude Code ou à un autre agent de créer un Flow, ouvrez-le dans le Workbench et continuez à améliorer ensemble ce même workflow.
 
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM">
-    <img alt="Regarder Codex créer et exécuter un workflow Gmail vers Feishu avec Open Flow" src="assets/open-flow-demo-video.jpg" width="100%">
-  </a>
-</p>
+Combinez JavaScript, applications connectées, IA, embranchements et validation humaine sur un même canevas. Inspectez les entrées, suivez l'exécution et choisissez la version à mettre en production. Utilisez OOMOL Hosted ou votre propre infrastructure.
 
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=CIF5I11VpLM"><strong>▶ Regarder la démo Open Flow d’une minute</strong></a>
-</p>
+[Explorer la démo interactive](https://openflow.run) · [Utiliser OOMOL Hosted](https://oomol.com) · [Auto-héberger avec Docker](#exécutez-open-flow-où-vous-voulez)
+
+![Un workflow d'accueil client dans le Workbench actuel, avec des données client explicites, du JavaScript, une validation et un sous-flux](assets/readme-workbench.png)
 
 > [!IMPORTANT]
-> Open Flow est en phase bêta. Ses contrats sont versionnés, mais le produit n'a pas encore atteint
-> sa première version stable.
+> Open Flow est en bêta. Le produit et ses contrats versionnés continuent d'évoluer.
 
-## Créer des workflows avec un Agent IA
+## Votre agent construit. Vous gardez la main.
 
-`oo flow` expose le cycle de création sous forme de commandes versionnées et lisibles par une machine. Un Agent capable d'utiliser un terminal peut :
+Décrivez le travail à accomplir :
 
-- découvrir les Connector Actions et Provider Triggers exacts ;
-- créer et modifier des Nodes, Edges, Code Tasks et Trigger bindings typés ;
-- vérifier un Draft, l'exécuter et consulter son résultat ;
-- le publier en Live ou ouvrir le même Flow dans le Workbench lorsque vous le demandez.
+> « Lis les nouveaux e-mails du support, classe chaque demande, rédige une réponse et demande mon accord avant de l'envoyer. »
 
-> **Exemple de demande :** « Crée un workflow qui lit les messages Gmail non lus, les met en forme et les envoie dans Feishu. »
+Avec [`oo flow`](https://github.com/oomol-lab/oo-cli), un agent disposant d'un terminal peut découvrir les intégrations, créer et modifier des nœuds, vérifier un brouillon, l'exécuter, examiner les résultats et le publier à votre demande. Ses modifications apparaissent dans le même Workbench que vous utilisez pour examiner le graphe et modifier le code. Aucun projet distinct généré par l'IA n'est à convertir ou à synchroniser.
 
-L'Agent crée un véritable Draft dans le déploiement Open Flow sélectionné, et non une configuration locale jetable. La CLI et le Workbench utilisent la même Control API : une modification créée par l'IA apparaît donc dans le même graphe visuel et reste modifiable par les personnes comme par les Agents.
+Le Server expose aussi des [outils MCP de création et d'exécution](server/mcp.md) pour les clients compatibles. Les deux interfaces agissent sur les Flows, révisions et exécutions enregistrés dans le déploiement sélectionné.
 
-<p align="center">
-  <img alt="Un workflow Gmail vers Feishu exécuté avec succès dans Open Flow Workbench" src="assets/workbench-overview.png">
-</p>
+Confiez les raccordements répétitifs à l'agent. Gardez les décisions importantes bien visibles.
 
-[Installez la CLI `oo`](https://github.com/oomol-lab/oo-cli) pour créer des Open Flow depuis Codex, Claude Code ou un autre Agent de terminal.
+## Rendez chaque étape inspectable
 
-Pour utiliser votre propre Open Flow, définissez `OO_OPEN_FLOW_URL` et `OO_OPEN_FLOW_TOKEN` dans le
-shell qui exécute l'Agent ; consultez
-[Utiliser Open Flow avec OpenConnector et oo CLI](server/self-hosted-stack/README.fr.md).
+Un workflow doit rester compréhensible même quand la conversation qui l'a créé a disparu.
 
-## Choisir comment exécuter Open Flow
+- **JavaScript pour les traitements précis.** Transformez des données, formatez des messages ou écrivez votre logique dans des Code Tasks aux entrées et sorties nommées et typées.
+- **Des sources d'entrée explicites.** Voyez d'où vient une valeur dans le panneau de propriétés. Les connexions de contrôle déterminent ce qui s'exécute ensuite ; les mappings d'entrée déterminent les données reçues par chaque étape.
+- **Des branches et des sous-flux réutilisables.** Aiguillez le travail à l'aide de conditions et donnez une interface claire aux traitements récurrents.
+- **Des notes à côté du travail.** Expliquez une décision directement sur le canevas pour que la personne suivante en comprenne l'intention.
 
-Les trois options prises en charge utilisent le même produit Open Flow et le même Workbench.
+![Le panneau de propriétés actuel d'une Code Task, avec le JavaScript, la source des données client et une sortie message typée](assets/readme-code.png)
 
-<table>
-  <tr>
-    <td width="33%" align="center"><strong>☁️ OOMOL Hosted</strong></td>
-    <td width="33%" align="center"><strong>🐳 Docker Self-hosted</strong></td>
-    <td width="33%" align="center"><strong>Fly.io Self-hosted</strong></td>
-  </tr>
-  <tr>
-    <td width="33%" valign="top">Prêt à l'emploi sans préparer, mettre à jour ou superviser un serveur. OOMOL exploite le déploiement et fournit des OAuth Apps gérées pour les intégrations compatibles, ce qui évite les coûts fixes d'un serveur et la configuration séparée des OAuth Apps.</td>
-    <td width="33%" valign="top">Exécutez Open Flow sur votre propre infrastructure avec l'image Docker incluse. Vous gérez le déploiement, le stockage, les sauvegardes, les mises à niveau, le réseau et la configuration du Connector ou des OAuth Apps.</td>
-    <td width="33%" valign="top">Exécutez la même image Docker sur Fly.io sans exploiter vous-même un serveur. Fly construit l'image, termine le TLS et conserve SQLite sur un volume persistant ; vous gérez les secrets, les sauvegardes, les mises à niveau et la configuration du Connector ou des OAuth Apps.</td>
-  </tr>
-  <tr>
-    <td width="33%" align="center">🚀 <a href="https://oomol.com"><strong>Utiliser OOMOL Hosted</strong></a></td>
-    <td width="33%" align="center"><a href="#démarrage-rapide"><strong>S'auto-héberger avec Docker</strong></a></td>
-    <td width="33%" align="center"><a href="server/fly-io/README.fr.md"><strong>Déployer sur Fly.io</strong></a></td>
-  </tr>
-</table>
+## Donnez à l'IA une mission bien délimitée
 
-## Pourquoi Open Flow
+Utilisez les LLM Tasks pour classer, extraire ou résumer. Choisissez les Agent Tasks pour les travaux qui nécessitent plusieurs appels d'outils. Ajoutez du code classique, des conditions et des validations là où vous avez besoin d'un comportement prévisible.
 
-- **Créez avec un Agent IA.** Utilisez `oo flow` depuis Codex, Claude Code ou un autre Agent de terminal pour créer, vérifier, exécuter et publier le même Flow que celui affiché dans le Workbench.
-- **Rendez les dépendances de données explicites.** Chaque Task déclare des entrées et des sorties nommées et typées. Chaque arête lie une valeur de sortie précise à une entrée précise : le graphe est donc le modèle de dépendances utilisé par le runtime.
-- **Concevez visuellement, ajoutez du code lorsque c'est nécessaire.** Composez des nœuds typés sur le canevas et utilisez une Code Task pour le JavaScript personnalisé. Le code reste visible au lieu d'être caché dans des champs de formulaire.
-- **Exécutez et déboguez au même endroit.** Validez les entrées et la structure du Flow avant
-  l'exécution, inspectez la progression et les sorties de chaque nœud, et suivez l'historique complet
-  des événements de chaque Run.
-- **Publiez des automatisations de longue durée.** Démarrez les Flows manuellement ou à partir de
-  planifications Cron, de Webhooks, de sources de polling et d'événements de Provider.
-- **Gardez l'état opérationnel au même endroit.** Les Flows, les Revisions immuables, les
-  Publications, les versions Live, les Runs et l'état des Triggers appartiennent à un seul déploiement
-  sélectionné, au lieu d'être répartis entre des fichiers locaux et des services cachés.
-- **Exécutez du code non fiable en toute sécurité.** Le Server exécute chaque Task de code dans un
-  isolate V8 neuf, au sein d'un processus Executor de longue durée, avec uniquement les Capabilities
-  déclarées par cette Task.
-- **Choisissez où cela s'exécute.** Utilisez OOMOL Hosted ou exécutez le Server inclus avec Docker
-  sur votre propre infrastructure.
+Une Agent Task dispose d'un modèle configuré, d'outils déclarés et de limites d'exécution. La configuration des outils définit les actions, les comptes et la politique d'approbation à la disposition du modèle. Vous pouvez exiger une approbation humaine pour un appel d'outil, ou placer un nœud Approval dans le workflow avant de laisser la suite s'exécuter.
 
-Open Flow est conçu pour les workflows qui dépassent le stade du prototype no-code mais ne doivent
-pas devenir un ensemble opaque de scripts et d'infrastructure.
+Les nœuds Approval et Wait conservent leur état d'attente de façon persistante. Après une décision, le travail peut reprendre sans rejouer les étapes déjà terminées dans cette exécution.
 
-## Le graphe est le contrat du runtime
+## Comprenez l'exécution. Choisissez ce qui passe en production.
 
-Chaque Task déclare des entrées et des sorties nommées et typées. Une arête transporte une valeur d'une sortie précise vers une entrée précise, et le runtime démarre un nœud lorsque ses entrées sont prêtes.
+Testez un brouillon à partir d'un déclencheur choisi et suivez son exécution dans le Workbench. Inspectez les résultats des nœuds, les logs, les erreurs et les approbations en attente, sans devoir reconstituer le déroulement à partir du seul message final. L'historique relie chaque exécution à la révision qui l'a produite.
 
-Le graphe montre les dépendances de données réellement utilisées par le runtime : les données ordinaires d'un Flow ne peuvent pas être récupérées depuis un nœud arbitraire au moyen d'un stockage runtime caché. Les branches indépendantes peuvent s'exécuter en parallèle, et la position d'un nœud sur le canevas ne modifie jamais le comportement d'exécution.
+![Un test du workflow d'accueil client en attente d'approbation humaine dans le Workbench](assets/readme-approval.png)
 
-### Création visuelle typée
+La publication crée un instantané versionné pour l'automatisation Live. Continuez à modifier le brouillon pendant que la version publiée s'exécute, consultez les anciennes Publications et revenez à une version précédente si nécessaire.
 
-La vue détaillée rend explicites sur le canevas chaque entrée, sortie, type, contrainte nullable et
-connexion.
+Démarrez les workflows manuellement, selon un calendrier, par webhook ou à partir des événements et sources de polling pris en charge. Le même déploiement gère le workflow, sa version Live et son état d'exécution.
 
-<p align="center">
-  <img src="assets/typed-node-details.jpg" alt="Typed input and output handles in the Open Flow Workbench detailed view">
-</p>
+## Connectez vos applications sans mettre les identifiants dans le graphe
 
-### Du code là où il est nécessaire
+Open Flow utilise un runtime Connector tel qu'[OpenConnector](https://github.com/oomol-lab/open-connector) pour découvrir et exécuter les actions de services comme Gmail, Slack, GitHub et Notion. Les identifiants des comptes restent dans le Connector ; les workflows font référence à des identifiants de Connection.
 
-Les Code Tasks placent le JavaScript personnalisé directement dans le graphe, avec des entrées et
-sorties typées.
+OOMOL Hosted fournit des applications OAuth gérées pour les intégrations prises en charge. En auto-hébergement, vous choisissez le déploiement du Connector et gérez la configuration des services ainsi que les autorisations des comptes. La logique du workflow et l'accès aux comptes restent distincts.
 
-<p align="center">
-  <img src="assets/code-task-editor.jpg" alt="Editing a custom Code Task in the Open Flow Workbench">
-</p>
+Consultez [Open Flow avec OpenConnector et le CLI oo](server/self-hosted-stack/README.fr.md) pour la configuration complète, y compris l'autorisation d'un compte et la création d'un premier Flow.
 
-## Fonctionnement
+## Exécutez Open Flow où vous voulez
 
-```mermaid
-flowchart LR
-  Workbench["Workbench"] -->|"Control API"| Server["Open Flow"]
-  CLI["oo flow CLI"] -->|"Control API"| Server
-  Server -. "optionnel" .-> Connector["Runtime Connector"]
-  Connector --> Providers["Providers tiers"]
-  Server --> Store["SQLite : Flows, Revisions, Publications, Runs"]
-  Server --> Triggers["Ordonnanceur de Triggers : Cron, Webhook, Poll, Integration"]
-  Server --> Runtime["Runtime JavaScript isolé"]
-```
+| Option           | Ce que vous gérez                                                                                | Pour démarrer                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------- |
+| **OOMOL Hosted** | Vos workflows et comptes connectés ; OOMOL exploite le déploiement.                              | [Ouvrir OOMOL](https://oomol.com)                  |
+| **Docker**       | Déploiement, stockage, sauvegardes, mises à niveau et intégrations.                              | Commandes ci-dessous                               |
+| **Fly.io**       | Application, volume persistant, secrets, sauvegardes et mises à niveau sur l'infrastructure Fly. | [Guide de déploiement](server/fly-io/README.fr.md) |
 
-Le Workbench et la CLI ne communiquent qu'avec un seul déploiement sélectionné, via la Control API
-versionnée. Le déploiement est responsable de la validation, de l'exécution, de la persistance et de
-l'admission des Triggers. Les identifiants des Providers n'entrent jamais dans Open Flow : les Actions
-adossées à un Connector, les Triggers de Provider et les proxys passent par un runtime Connector tel
-que [OpenConnector](https://github.com/oomol-lab/open-connector), et Open Flow ne conserve que des
-identités de Connection opaques.
-
-## Démarrage rapide
-
-Vous avez besoin de [Docker](https://docs.docker.com/get-docker/) et d'OpenSSL. Clonez le dépôt, créez
-un token opérateur et démarrez le Server auto-hébergé :
+Pour une instance auto-hébergée en local, installez Docker et OpenSSL, puis exécutez :
 
 ```bash
 git clone https://github.com/oomol-lab/open-flow.git
@@ -167,128 +99,32 @@ docker run --rm \
   open-flow-server:dev
 ```
 
-Ouvrez [http://127.0.0.1:3000](http://127.0.0.1:3000) et connectez-vous avec la valeur de
-`OPEN_FLOW_TOKEN`. La même valeur sert de Bearer token pour les clients machine de la Control API.
-Les Flows et l'historique des Runs sont persistés dans le volume Docker `open-flow-data`.
+Ouvrez [http://127.0.0.1:3000](http://127.0.0.1:3000) et connectez-vous avec `OPEN_FLOW_TOKEN`. Les Flows et l'historique d'exécution sont stockés dans le volume Docker. Le jeton opérateur sert aussi à authentifier les accès CLI et API.
 
-Pour éviter la construction, téléchargez l'image multi-architecture préconstruite `ghcr.io/oomol-lab/open-flow` ou démarrez-la avec
-le `docker-compose.yml` à la racine du dépôt. Les tags (`latest` et les versions de Release) et les étapes de mise
-à niveau sont dans le [guide de l'image Docker](server/docker-ghcr/README.fr.md).
+Vous préférez une image préconstruite ? Suivez le [guide des images GHCR](server/docker-ghcr/README.fr.md) et choisissez un tag de version explicite pendant la bêta. Le tag `latest` est réservé aux versions stables.
 
-Le Server est utile sans services externes. Les Actions adossées à un Connector, les Triggers de
-Provider et les Tasks LLM échouent de manière sûre (fail closed) tant que la capacité hôte
-correspondante n'est pas configurée ; rien ne bascule vers un service non déclaré.
+Les actions Connector et les LLM Tasks nécessitent la configuration des services correspondants. Le Server ne bascule pas silencieusement vers un autre fournisseur. Avant d'exposer un déploiement sur Internet, suivez le [guide de déploiement](server/container-delivery.md) et la [liste de vérification de sécurité](../SECURITY.md#hardening-your-deployment).
 
-Pour la configuration de production, TLS, les health checks, la persistance, les sauvegardes et les
-limites de ressources, consultez le [guide de déploiement du Server](server/container-delivery.md) et
-la liste de durcissement dans [SECURITY.md](../SECURITY.md#hardening-your-deployment).
+## Développez avec Open Flow
 
-## Déployer sur Fly.io
+Open Flow est distribué sous licence Apache-2.0. Ce dépôt comprend les contrats et le runtime des workflows, le Workbench, le package de commandes CLI et le Server auto-hébergeable. Le Control API versionné rend les clients indépendants de l'implémentation du stockage et de l'exécution du déploiement.
 
-La même image fonctionne sur Fly.io. Le dépôt fournit un `fly.toml` qui construit
-`apps/server/Dockerfile`, garde une machine en marche pour les Triggers Cron et Poll, et persiste
-SQLite sur un volume Fly. Consultez [Déploiement sur Fly.io](server/fly-io/README.fr.md) pour la création de l'app, le
-volume, les secrets, le déploiement, les domaines personnalisés et les limites de mise à
-l'échelle.
-
-## Connecter un Connector
-
-Pour exécuter des Actions et des Triggers de Provider auprès de services tels que GitHub, Gmail, Slack
-ou Notion, pointez le Server vers un runtime Connector. Un
-[OpenConnector](https://github.com/oomol-lab/open-connector) auto-hébergé comme le Connector hébergé
-par OOMOL exposent tous deux l'API runtime requise.
-
-<p align="center">
-  <img src="assets/connector-actions.jpg" alt="Browsing Gmail Provider Triggers and Actions in the Open Flow Workbench">
-</p>
-
-```dotenv
-OPEN_FLOW_CONNECTOR_ORIGIN=http://open-connector:3000
-OPEN_FLOW_CONNECTOR_TOKEN=replace-with-a-scoped-runtime-token
-OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN=https://connector.example.com
-```
-
-L'origine runtime est l'adresse à laquelle le Server joint le Connector ; l'origine console est celle
-que les navigateurs des utilisateurs ouvrent pour autoriser des comptes dans la Connector Console. Les
-définitions de Triggers de Provider sont livrées avec Open Flow et ne nécessitent aucun
-enregistrement. Consultez la [référence de configuration](server/container-delivery.md#4-配置) pour
-les paramètres de callback d'Integration et les contraintes applicables à chaque origine.
-
-Pour démarrer OpenConnector et Open Flow ensemble, créer un runtime token, autoriser un compte et
-construire un premier Flow avec `oo flow`, consultez
-[Utiliser Open Flow avec OpenConnector et oo CLI](server/self-hosted-stack/README.fr.md).
-
-## Un seul produit, des déploiements portables
-
-Le Workbench et la CLI parlent une Control API versionnée plutôt que de dépendre d'une base de données
-ou d'un runtime cloud particulier. Un déploiement est responsable de l'exécution et de la
-persistance ; les clients ne créent pas de second format de projet local et ne basculent pas
-silencieusement vers un autre backend.
-
-Ce dépôt contient :
-
-- [`packages/open-flow`](../packages/open-flow) : le paquet npm public `@oomol-lab/open-flow`, avec
-  les points d'entrée d'authoring, d'exécution, de Trigger, de Control API, de conformité et de
-  runtime Workbench ;
-- [`packages/command`](../packages/command) : le runtime de la commande `oo flow` et le Command
-  Artifact immuable consommé par la [oo CLI](https://github.com/oomol-lab/oo-cli) ;
-- [`apps/server`](../apps/server) : le Workbench auto-hébergé, la Control API, la persistance SQLite,
-  l'ordonnanceur de Triggers et le runtime JavaScript isolé.
-
-Lisez les [limites du produit et de l'architecture](architecture.md) pour le modèle durable, ou la
-[référence de la Control API](control/contracts/control-api.md) pour le contrat HTTP.
-
-## Développer à partir des sources
-
-Open Flow utilise [Bun](https://bun.sh/) pour l'espace de travail et Node.js pour le Server. Utilisez
-les versions épinglées dans `.bun-version` et `.node-version`.
+Utilisez les versions de Bun et Node.js fixées dans `.bun-version` et `.node-version` :
 
 ```bash
 bun install --frozen-lockfile
 bun run dev
 ```
 
-Ouvrez le Workbench de développement à l'adresse
-[http://localhost:5174](http://localhost:5174). Ses requêtes Control API sont relayées vers le port du
-backend de développement (`OPEN_FLOW_PORT`, par défaut `3001` ; la cible du proxy est transmise à
-Vite sous le nom `OPEN_FLOW_DEV_API_ORIGIN`). Les Actions adossées à un Connector restent
-indisponibles tant que `OPEN_FLOW_CONNECTOR_ORIGIN` n'est pas configuré. Le token Connector reste
-facultatif.
+Le Workbench de développement est accessible sur [http://localhost:5174](http://localhost:5174). Le premier lancement crée un jeton opérateur dans `apps/server/.open-flow-dev/operator-token`. Consultez [CONTRIBUTING.md](../CONTRIBUTING.md) pour la configuration, les vérifications et le Lab de composants.
 
-Le premier lancement en développement crée un token opérateur dans
-`apps/server/.open-flow-dev/operator-token`. Les lancements suivants le réutilisent, de sorte que
-redémarrer le serveur de développement n'invalide pas la session Workbench en cours. Définissez
-`OPEN_FLOW_TOKEN` pour utiliser un token explicite à la place.
-
-Avant de soumettre une modification, exécutez :
-
-```bash
-bun run check
-bun run test
-bun run build
-```
-
-Ajoutez `bun run test:package` lorsque vous touchez au paquet publié ou à la CLI, et
-`bun run test:docker` lorsque Docker est disponible, afin de vérifier l'image de release, le runtime
-isolé, le Workbench, l'arrêt propre et la récupération du volume SQLite. N'exécutez pas `bun test` à
-la racine du dépôt : cela contourne les scripts de test de l'espace de travail. Consultez
-[CONTRIBUTING.md](../CONTRIBUTING.md) pour l'ensemble des règles de développement.
-
-## Documentation
-
-Commencez par l'[index de la documentation](README.md). Les références les plus utiles sont :
-
-- [Limites du produit et de l'architecture](architecture.md)
-- [Control API](control/contracts/control-api.md)
-- [Distribution du Command Artifact](distribution/command-artifact.md)
-- [Notes sur le frontend du Workbench et du Designer](../.agents/skills/frontend-ui/SKILL.md)
-- [Déploiement du Server](server/container-delivery.md)
-- [Image Docker sur GHCR](server/docker-ghcr/README.fr.md)
-- [Déploiement sur Fly.io](server/fly-io/README.fr.md)
-- [Utiliser Open Flow avec OpenConnector et oo CLI](server/self-hosted-stack/README.fr.md)
-- [Contribuer](../CONTRIBUTING.md)
-- [Code de conduite](../CODE_OF_CONDUCT.md)
-- [Sécurité](../SECURITY.md)
+| Pour en savoir plus                                        | Référence                                                                                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Modèle du produit et limites du runtime                    | [Architecture](architecture.md)                                                                                           |
+| Intégrer vos propres clients                               | [Control API](control/contracts/control-api.md) · [MCP](server/mcp.md)                                                    |
+| Déployer et exploiter une instance                         | [Server](server/container-delivery.md) · [Docker](server/docker-ghcr/README.fr.md) · [Fly.io](server/fly-io/README.fr.md) |
+| Connecter des applications et un agent de programmation IA | [OpenConnector + CLI oo](server/self-hosted-stack/README.fr.md)                                                           |
+| Parcourir toute la documentation                           | [Index de la documentation](README.md)                                                                                    |
 
 ## Projets liés
 
