@@ -642,6 +642,14 @@ export class WorkspaceStore {
     await this.pasteNodes(positions, offset)
   }
 
+  public async saveErrorSources(nodeId: string, value: readonly string[]): Promise<boolean> {
+    const node = this.$.revision.value?.graph({ kind: 'flow' })?.nodes[nodeId]
+    if (node?.kind != 'error' || dequal(node.sourceFlowIds ?? [], value)) return false
+    return (
+      (await this.#editDraft([{ kind: 'graph.trigger.sources.set', nodeId, before: node.sourceFlowIds, value: value.length == 0 ? undefined : value }])) != null
+    )
+  }
+
   public async saveNodeSettings(nodeId: string, settings: NodeSettings): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target

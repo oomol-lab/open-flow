@@ -595,7 +595,8 @@
     "triggerSource": {
       "manual": "Вручную",
       "cron": "Расписание",
-      "webhook": "Webhook"
+      "webhook": "Webhook",
+      "error": "Триггер ошибки"
     },
     "kind": {
       "task": "Задача",

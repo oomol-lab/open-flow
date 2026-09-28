@@ -1,7 +1,10 @@
 import type { Presentation } from '@oomol-lab/open-flow/control-api'
+import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { DatabaseSync } from 'node:sqlite'
 import type { RevisionStore } from './revision-store.ts'
+
+import { requireErrorSources } from './trigger-store.ts'
 
 export interface StoredFlow {
   readonly liveEnabled: number | null
@@ -212,16 +215,19 @@ export class FlowStore {
           `DELETE FROM trigger_activities WHERE binding_id IN (
              SELECT endpoint_id FROM webhook_bindings WHERE flow_id = ?
              UNION SELECT binding_id FROM cron_bindings WHERE flow_id = ?
+             UNION SELECT binding_id FROM error_bindings WHERE flow_id = ?
              UNION SELECT binding_id FROM poll_bindings WHERE flow_id = ?
              UNION SELECT binding_id FROM integration_bindings WHERE flow_id = ?
            )`,
         )
-        .run(flowId, flowId, flowId, flowId)
+        .run(flowId, flowId, flowId, flowId, flowId)
       this.#database.prepare('DELETE FROM poll_claims WHERE binding_id IN (SELECT binding_id FROM poll_bindings WHERE flow_id = ?)').run(flowId)
       this.#database.prepare('DELETE FROM poll_event_dedupe WHERE binding_id IN (SELECT binding_id FROM poll_bindings WHERE flow_id = ?)').run(flowId)
       this.#database.prepare('DELETE FROM listener_work WHERE binding_id IN (SELECT binding_id FROM integration_bindings WHERE flow_id = ?)').run(flowId)
       this.#database.prepare('DELETE FROM integration_states WHERE binding_id IN (SELECT binding_id FROM integration_bindings WHERE flow_id = ?)').run(flowId)
       this.#database.prepare('DELETE FROM webhook_bindings WHERE flow_id = ?').run(flowId)
+      this.#database.prepare('DELETE FROM error_bindings WHERE flow_id = ?').run(flowId)
+      this.#database.prepare('DELETE FROM error_subscriptions WHERE handler_flow_id = ? OR source_flow_id = ?').run(flowId, flowId)
       this.#database.prepare('DELETE FROM cron_bindings WHERE flow_id = ?').run(flowId)
       this.#database.prepare('DELETE FROM poll_bindings WHERE flow_id = ?').run(flowId)
       this.#database.prepare('DELETE FROM integration_bindings WHERE flow_id = ?').run(flowId)
@@ -384,6 +390,20 @@ export class FlowStore {
       if (flow.status != 'active') return { kind: 'busy' }
       if (flow.draftRevisionId != input.expectedRevisionId) return { kind: 'conflict' }
 
+      const next = (JSON.parse(input.content) as Partial<RevisionContent>).document?.graph.nodes ?? {}
+      const previous = input.forceFull
+        ? {}
+        : ((JSON.parse(this.#revisions.read(input.expectedRevisionId)!.content) as Partial<RevisionContent>).document?.graph.nodes ?? {})
+      for (const [nodeId, node] of Object.entries(next)) {
+        if (node.kind != 'error') continue
+        const old = previous[nodeId]
+        const oldSources = old?.kind == 'error' ? (old.sourceFlowIds ?? []) : []
+        requireErrorSources(
+          this.#database,
+          input.flowId,
+          (node.sourceFlowIds ?? []).filter((id) => !oldSources.includes(id)),
+        )
+      }
       updateAccess?.()
       const body = { content: input.content, revisionDigest: input.digest, revisionId: input.revisionId }
       if (input.forceFull) this.#revisions.ensure(body)

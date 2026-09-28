@@ -595,7 +595,8 @@
     "triggerSource": {
       "manual": "Manuel",
       "cron": "Planification",
-      "webhook": "Webhook"
+      "webhook": "Webhook",
+      "error": "Déclencheur d’erreur"
     },
     "kind": {
       "task": "Tâche",

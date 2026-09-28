@@ -100,6 +100,7 @@ export function flowDependencies(content: RevisionContent, triggerId?: string): 
         case 'poll':
         case 'integration':
         case 'cron':
+        case 'error':
         case 'manual':
         case 'webhook':
           break

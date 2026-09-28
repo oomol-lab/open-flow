@@ -40,7 +40,7 @@ export function CanvasNode({
   const kind = node?.kind ?? 'task'
   const triggerSource =
     node.kind == 'trigger'
-      ? node.presentation?.kind == 'manual' || node.presentation?.kind == 'cron' || node.presentation?.kind == 'webhook'
+      ? node.presentation?.kind == 'error' || node.presentation?.kind == 'manual' || node.presentation?.kind == 'cron' || node.presentation?.kind == 'webhook'
         ? t(`canvasCard.triggerSource.${node.presentation.kind}`)
         : node.presentation?.source
       : undefined

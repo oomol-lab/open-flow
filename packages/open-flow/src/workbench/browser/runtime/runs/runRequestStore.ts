@@ -10,6 +10,7 @@ import type { RunStore } from './runStore.ts'
 import { compute, derive, val } from 'value-enhancer'
 import { randomId } from '../../../../control/common/random.ts'
 import { portsByHandle } from '../../../../flow/common/change.ts'
+import { sampleErrorOutputs } from '../../../../trigger/common/contract.ts'
 import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
@@ -102,6 +103,7 @@ function inputSpecs(draft: Draft, triggerId: string) {
         return [
           {
             definitions: triggerOutputDefinitions(resolved.trigger),
+            samples: resolved.trigger.kind == 'error' ? sampleErrorOutputs : undefined,
             nodeId,
             title: resolved.trigger.name,
           },
@@ -113,7 +115,7 @@ function inputSpecs(draft: Draft, triggerId: string) {
         .map(([handle, port]) =>
           Object.assign({ handle, jsonSchema: port.jsonSchema, nullable: port.nullable }, port.description == null ? {} : { description: port.description }),
         )
-      return definitions.length == 0 ? [] : [{ definitions, nodeId, title: nodeTitle(resolved) }]
+      return definitions.length == 0 ? [] : [{ definitions, samples: undefined, nodeId, title: nodeTitle(resolved) }]
     })
 }
 
@@ -131,7 +133,8 @@ async function inputGroups(
   const { FlowRunInputEditorStore } = await import('../../flowRunInputEditorStore.ts')
   return specs.map((group) => {
     const editor = new FlowRunInputEditorStore(group.definitions, language)
-    if (values?.[group.nodeId] != null) editor.replaceValues(values[group.nodeId])
+    const initial = values?.[group.nodeId] ?? group.samples
+    if (initial != null) editor.replaceValues(initial)
     return { editor, nodeId: group.nodeId, title: group.title }
   })
 }
@@ -142,6 +145,7 @@ function groupValues(groups: readonly RunInputGroup[]): Readonly<Record<string, 
 
 function testOutputs(revision: Draft, triggerId: string): Readonly<Record<string, JsonValue>> {
   const node = revisionView(revision).graph({ kind: 'flow' })?.nodes[triggerId]
+  if (node?.kind == 'error') return sampleErrorOutputs
   return node?.kind === 'cron' ? { scheduledAt: new Date().toISOString() } : {}
 }
 

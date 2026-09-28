@@ -282,13 +282,15 @@ function RunSample({ fixture, dark, language, log, state, downstream = false, la
       if (state !== 'closed' && state !== 'direct' && state !== 'disabled') {
         await store.editDraft(flow, draft, 'trigger')
         if (disposed) return
-        for (const group of state === 'empty' ? [] : (store.$.inputRequest.value?.groups ?? [])) {
+        for (const group of store.$.inputRequest.value?.groups ?? []) {
           group.editor.replaceValues(
-            group.nodeId === 'trigger'
-              ? state === 'invalid'
-                ? Object.fromEntries(Object.keys(fixture.outputs).map((handle) => [handle, null]))
-                : fixture.outputs
-              : { message: state === 'invalid' ? 123 : 'Test message' },
+            state === 'empty'
+              ? {}
+              : group.nodeId === 'trigger'
+                ? state === 'invalid'
+                  ? Object.fromEntries(Object.keys(fixture.outputs).map((handle) => [handle, null]))
+                  : fixture.outputs
+                : { message: state === 'invalid' ? 123 : 'Test message' },
           )
         }
         if (state === 'invalid' || state === 'starting') void store.confirmInputs()
@@ -383,6 +385,7 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
   logRef.current = log
   useEffect(() => {
     let trigger: TriggerNode = fixture.trigger
+    if (trigger.kind === 'error' && state !== 'unconfigured') trigger = { ...trigger, sourceFlowIds: ['orders', 'billing'] }
     if (state === 'description')
       trigger = {
         ...trigger,
@@ -667,9 +670,11 @@ export const triggerStories: readonly FrontendStory[] = [
         id: `trigger-${fixture.id}-sidebar`,
         title: 'Properties',
         description:
-          fixture.trigger.kind === 'manual'
-            ? 'Manual · Read-only and editable properties share a fixed No outputs state. Changes stay in this Lab session.'
-            : `${fixture.trigger.name} · Node properties in display and edit states. Changes stay in this Lab session.`,
+          fixture.trigger.kind === 'error'
+            ? 'Error Trigger · Verify upstream multi-selection above Outputs in editable and read-only panels, including localized text wrapping.'
+            : fixture.trigger.kind === 'manual'
+              ? 'Manual · Read-only and editable properties share a fixed No outputs state. Changes stay in this Lab session.'
+              : `${fixture.trigger.name} · Node properties in display and edit states. Changes stay in this Lab session.`,
         standalone: true,
         render: (log, dark, language) => <SidebarStory fixture={fixture} log={log} dark={dark} language={language} />,
       },

@@ -464,6 +464,7 @@ interface TriggerNodeBase {
 
 export type TriggerNode =
   | (TriggerNodeBase & { readonly kind: 'manual' })
+  | (TriggerNodeBase & { readonly kind: 'error'; readonly sourceFlowIds?: readonly string[] })
   | (TriggerNodeBase & {
       readonly bodyFields: readonly WebhookBodyField[]
       readonly kind: 'webhook'
@@ -512,7 +513,7 @@ export interface CodeModule {
 
 export interface RevisionContent {
   readonly document: FlowDocument
-  readonly modelVersion: 2 | typeof currentFlowModelVersion
+  readonly modelVersion: 2 | 4 | typeof currentFlowModelVersion
   readonly modules: Readonly<Record<string, CodeModule>>
 }
 
@@ -557,6 +558,7 @@ export type ChangeOperation =
       readonly target: GraphTarget
       readonly value?: readonly ConnectorCapability[]
     }
+  | { readonly kind: 'graph.trigger.sources.set'; readonly nodeId: string; readonly before?: readonly string[]; readonly value?: readonly string[] }
   | { readonly binding: FlowDocument['bindings'][string]; readonly bindingId: string; readonly kind: 'binding.create' }
   | { readonly bindingId: string; readonly kind: 'binding.delete' }
   | { readonly before: string; readonly bindingId: string; readonly kind: 'binding.target.set'; readonly value: string }
@@ -698,6 +700,16 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
   const modules = { ...content.modules }
   for (const operation of operations) {
     switch (operation.kind) {
+      case 'graph.trigger.sources.set': {
+        const graph = document.graph
+        const node = graph.nodes[operation.nodeId]
+        if (node?.kind != 'error') invalid('The Error Trigger does not exist.')
+        if (!dequal(node.sourceFlowIds, operation.before)) invalid('The Error Trigger sources changed before this operation was applied.')
+        const { sourceFlowIds: _, ...base } = node
+        const updated = operation.value == null ? base : { ...base, sourceFlowIds: operation.value }
+        document.graph = { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } }
+        break
+      }
       case 'binding.create':
         if (document.bindings[operation.bindingId] != null) invalid('A Binding with this ID already exists.')
         document.bindings = { ...document.bindings, [operation.bindingId]: operation.binding }
@@ -757,6 +769,8 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         const graph = selectedGraph(document, operation.target)
         if (graph.nodes[operation.nodeId] != null) invalid('A Node with this ID already exists in the target graph.')
         if (operation.target.kind == 'subflow' && !('inputs' in operation.node)) invalid('Trigger Nodes cannot be created inside a Subflow.')
+        if (operation.node.kind == 'error' && Object.values(graph.nodes).some((node) => node.kind == 'error'))
+          invalid('A graph can contain only one Error Trigger.')
         if (operation.node.kind == 'manual' && Object.values(graph.nodes).some((node) => node.kind == 'manual')) {
           invalid('A graph can contain only one manual Trigger.')
         }

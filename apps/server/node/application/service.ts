@@ -195,6 +195,7 @@ export class ServerService {
       (flowId, runId) => this.#runChanged(flowId, runId),
       () => this.#supervisor.signal(),
       maintenanceLock,
+      (flowId, runId) => this.#runCreated(flowId, runId),
     )
     this.#cron = new CronDriver(
       store,

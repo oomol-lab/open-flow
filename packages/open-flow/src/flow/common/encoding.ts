@@ -321,6 +321,8 @@ function canonicalTriggerNode(trigger: TriggerNode): JsonValue {
     name: trigger.name,
   })
   switch (trigger.kind) {
+    case 'error':
+      return { ...common(trigger.kind), ...(trigger.sourceFlowIds == null ? {} : { sourceFlowIds: [...trigger.sourceFlowIds] }) }
     case 'manual':
       return common(trigger.kind)
     case 'webhook':

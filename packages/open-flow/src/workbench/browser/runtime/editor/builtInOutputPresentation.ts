@@ -17,6 +17,8 @@ function withDescriptions(ports: readonly Port[], descriptionFor: (handle: strin
 export function presentBuiltInTriggerOutputs(trigger: TriggerNode, t: TFunction): readonly Port[] {
   const ports = triggerOutputDefinitions(trigger)
   switch (trigger.kind) {
+    case 'error':
+      return withDescriptions(ports, (handle) => t(`errorWorkflow.${handle}`))
     case 'cron':
       return withDescriptions(ports, (handle) => (handle === 'scheduledAt' ? t('inspector.ports.builtIn.cron.scheduledAt') : undefined))
     case 'webhook':
@@ -50,6 +52,7 @@ function presentedBuiltInOutputs(node: GraphNode, t: TFunction): readonly Port[]
     case 'approval':
     case 'wait':
       return presentResolutionOutputs(node, t)
+    case 'error':
     case 'cron':
     case 'webhook':
       return presentBuiltInTriggerOutputs(node, t)

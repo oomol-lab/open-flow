@@ -1356,5 +1356,27 @@
     "loading": "正在加载版本…",
     "failed": "无法加载此版本，其内容可能已不可用。",
     "root": "主流程"
+  },
+  "errorWorkflow": {
+    "trigger": "错误触发器",
+    "description": "其他工作流失败时运行。",
+    "empty": "暂无可选的已发布工作流。",
+    "unavailable": "不可用，可取消选择",
+    "retry": "重试",
+    "more": "加载更多",
+    "pending": "等待错误处理",
+    "dispatched": "错误处理运行",
+    "failed": "无法启动错误处理",
+    "source": "来源运行",
+    "workflow": "发生错误的工作流。",
+    "execution": "失败运行及其最终状态。",
+    "error": "错误消息及可用的节点位置。",
+    "setupHint": "可多选已发布的其他工作流。发布并启用当前工作流后生效，仅监听自动运行失败。",
+    "sources": "监听的上游工作流",
+    "search": "搜索上游工作流",
+    "noMatches": "没有匹配的工作流",
+    "choose": "选择上游工作流",
+    "done": "完成",
+    "clear": "清空选择"
   }
 }

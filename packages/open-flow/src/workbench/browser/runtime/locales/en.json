@@ -1356,5 +1356,27 @@
     "loading": "Loading version…",
     "failed": "This version could not be loaded. Its content may no longer be available.",
     "root": "Main flow"
+  },
+  "errorWorkflow": {
+    "trigger": "Error Trigger",
+    "description": "Runs when another workflow fails.",
+    "empty": "No published workflows available.",
+    "unavailable": "Unavailable; you can deselect it",
+    "retry": "Retry",
+    "more": "Load more",
+    "pending": "Waiting for error handling",
+    "dispatched": "Error handling run",
+    "failed": "Error handling could not start",
+    "source": "Source run",
+    "workflow": "Workflow that failed.",
+    "execution": "Failed execution and its final status.",
+    "error": "Error message and available node location.",
+    "setupHint": "Choose published workflows. Publish and enable this workflow to listen for failures in their automatic runs.",
+    "sources": "Upstream workflows",
+    "search": "Search upstream workflows",
+    "noMatches": "No matching workflows",
+    "choose": "Select upstream workflows",
+    "done": "Done",
+    "clear": "Clear selection"
   }
 }

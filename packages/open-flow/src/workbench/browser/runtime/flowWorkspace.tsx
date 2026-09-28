@@ -25,6 +25,7 @@ import { WorkbenchCanvas } from './editor/workbenchCanvas.tsx'
 import { Icon } from './icons.tsx'
 import { NavigationStore } from './navigation.ts'
 import { PublicationsView } from './publications/publicationsView.tsx'
+import { RunLinkContext } from './runs/errorHandling.tsx'
 import { RunControl } from './runs/runControl.tsx'
 import { RunDrawer } from './runs/runDrawer.tsx'
 import { readRunDrawerOpen, writeRunDrawerOpen } from './runs/runDrawerPreference.ts'
@@ -671,7 +672,7 @@ export default function FlowWorkspace({
   const canvasReady = draftReady && !workspaceLoading
 
   useEffect(() => {
-    if (view == 'runs' && flowId != null) void store.runs.load(flowId, { source: navigation.runSource })
+    if (view == 'runs' && flowId != null) void store.runs.load(flowId, { source: navigation.runSource, runId: navigation.runId })
   }, [flowId, navigation, store, view])
 
   useEffect(() => {
@@ -720,66 +721,68 @@ export default function FlowWorkspace({
 
   return (
     <IconifyProvider>
-      <main className="workspace">
-        {view == 'design' && !canvasReady && <div className="workspace-navigation-placement">{navigationIsland}</div>}
-        {view == 'design' && !canvasReady ? (
-          <div aria-label={t('workspace.design')} className="editor-grid context-panel-closed" id="workspace-panel-design" role="region" tabIndex={0}>
-            <section aria-busy={!workspaceLoadFailed} className="canvas-panel workbench-canvas">
-              {workspaceLoadFailed ? (
-                <WorkspaceRecovery
-                  kind={workspaceLoadProblem?.kind ?? 'failed'}
-                  message={workspaceLoadProblem?.message}
-                  repairing={workspaceRepairing}
-                  onRepair={() => void store.workspace.repairWorkspace()}
-                  onRetry={() => flowId != null && void store.selectFlow(flowId)}
-                />
-              ) : (
-                <Empty className="h-full">
-                  <EmptyHeader>
-                    <EmptyTitle>{t('workspace.status.loading')}</EmptyTitle>
-                  </EmptyHeader>
-                </Empty>
-              )}
-            </section>
-          </div>
-        ) : view == 'design' ? (
-          <FlowEditor
-            navigationIsland={navigationIsland}
-            onRun={(triggerId) => void run(triggerId)}
-            onRunStarted={revealRun}
-            onCloseRuns={() => changeRunDrawerOpen(false)}
-            onConfigureConnector={onConfigureConnector}
-            onOpenPublications={() => {
-              store.runRequests.dismissInputs()
-              navigation.open('publications')
-            }}
-            onOpenRuns={() => {
-              store.runRequests.dismissInputs()
-              navigation.open('runs')
-            }}
-            onManageConnectorAccess={onManageConnectorAccess}
-            connectionHref={connectionHref}
-            onToggleRuns={() => changeRunDrawerOpen(!runDrawerOpen)}
-            runDrawerOpen={runDrawerOpen}
-            store={store}
-            theme={theme}
-          />
-        ) : view == 'runs' ? (
-          <RunsView
-            onSourceChange={(source) => navigation.open('runs', source)}
-            flowName={flow?.name ?? flow?.flowId ?? ''}
-            onClose={() => navigation.open('design')}
-            onConfigureConnector={onConfigureConnector}
-            onLocateEvent={locateRunEvent}
-            onLocateWait={(nodeId) => {
-              if (store.locateRunWait(nodeId)) navigation.open('design')
-            }}
-            store={store}
-          />
-        ) : (
-          <PublicationsView theme={theme} key={flowId} onClose={() => navigation.open('design')} store={store} />
-        )}
-      </main>
+      <RunLinkContext.Provider value={hrefFor}>
+        <main className="workspace">
+          {view == 'design' && !canvasReady && <div className="workspace-navigation-placement">{navigationIsland}</div>}
+          {view == 'design' && !canvasReady ? (
+            <div aria-label={t('workspace.design')} className="editor-grid context-panel-closed" id="workspace-panel-design" role="region" tabIndex={0}>
+              <section aria-busy={!workspaceLoadFailed} className="canvas-panel workbench-canvas">
+                {workspaceLoadFailed ? (
+                  <WorkspaceRecovery
+                    kind={workspaceLoadProblem?.kind ?? 'failed'}
+                    message={workspaceLoadProblem?.message}
+                    repairing={workspaceRepairing}
+                    onRepair={() => void store.workspace.repairWorkspace()}
+                    onRetry={() => flowId != null && void store.selectFlow(flowId)}
+                  />
+                ) : (
+                  <Empty className="h-full">
+                    <EmptyHeader>
+                      <EmptyTitle>{t('workspace.status.loading')}</EmptyTitle>
+                    </EmptyHeader>
+                  </Empty>
+                )}
+              </section>
+            </div>
+          ) : view == 'design' ? (
+            <FlowEditor
+              navigationIsland={navigationIsland}
+              onRun={(triggerId) => void run(triggerId)}
+              onRunStarted={revealRun}
+              onCloseRuns={() => changeRunDrawerOpen(false)}
+              onConfigureConnector={onConfigureConnector}
+              onOpenPublications={() => {
+                store.runRequests.dismissInputs()
+                navigation.open('publications')
+              }}
+              onOpenRuns={() => {
+                store.runRequests.dismissInputs()
+                navigation.open('runs')
+              }}
+              onManageConnectorAccess={onManageConnectorAccess}
+              connectionHref={connectionHref}
+              onToggleRuns={() => changeRunDrawerOpen(!runDrawerOpen)}
+              runDrawerOpen={runDrawerOpen}
+              store={store}
+              theme={theme}
+            />
+          ) : view == 'runs' ? (
+            <RunsView
+              onSourceChange={(source) => navigation.open('runs', source)}
+              flowName={flow?.name ?? flow?.flowId ?? ''}
+              onClose={() => navigation.open('design')}
+              onConfigureConnector={onConfigureConnector}
+              onLocateEvent={locateRunEvent}
+              onLocateWait={(nodeId) => {
+                if (store.locateRunWait(nodeId)) navigation.open('design')
+              }}
+              store={store}
+            />
+          ) : (
+            <PublicationsView theme={theme} key={flowId} onClose={() => navigation.open('design')} store={store} />
+          )}
+        </main>
+      </RunLinkContext.Provider>
     </IconifyProvider>
   )
 }

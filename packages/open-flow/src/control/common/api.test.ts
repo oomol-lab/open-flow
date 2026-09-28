@@ -402,6 +402,23 @@ describe('ControlClient Wait API', () => {
     await expect(client.getRun(waiting.runId)).resolves.toEqual(response)
   })
 
+  it('decodes multiple error dispatches and rejects incomplete handler results', async () => {
+    const response = {
+      ...waiting,
+      status: 'failed',
+      waits: [],
+      errorDispatches: [
+        { status: 'pending', flowId: 'first' },
+        { status: 'dispatched', flowId: 'second', runId: 'handler-run' },
+        { status: 'failed', flowId: 'third', message: 'Unavailable' },
+      ],
+    }
+    const client = new ControlClient(async () => Response.json(response))
+    await expect(client.getRun(waiting.runId)).resolves.toEqual(response)
+    response.errorDispatches = [{ status: 'dispatched', flowId: 'second' }]
+    await expect(client.getRun(waiting.runId)).rejects.toMatchObject({ code: 'response.invalid' })
+  })
+
   it('rejects the removed Trigger source', async () => {
     const client = new ControlClient(async () => Response.json({ ...waiting, source: 'trigger' }))
     await expect(client.getRun(waiting.runId)).rejects.toMatchObject({ code: 'response.invalid' })

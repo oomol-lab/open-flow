@@ -26,6 +26,7 @@ import { Tabs, TabsList, TabsTrigger } from '../../../../ui/browser/tabs.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { Icon } from '../icons.tsx'
+import { ErrorHandling } from './errorHandling.tsx'
 import { continuesLog, executionKey, executionOverview, agentSummary, eventSubject, savedToolResults } from './runGroups.ts'
 import { downloadRunLog } from './runLogExport.ts'
 import { eventHasDetails, RunEventDetail, RunResultContent, RunText } from './runOutput.tsx'
@@ -934,6 +935,7 @@ export function RunDrawer({
         </RunTooltipButton>
       </header>
       <div className="run-content">
+        <ErrorHandling run={run} />
         {run != null && <ActiveWait onLocate={onLocateWait} onResolve={onResolve} resolvingActions={resolvingActions} run={run} />}
         <RunLog
           presentation={presentation}

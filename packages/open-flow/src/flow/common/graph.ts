@@ -59,7 +59,7 @@ function validateTrigger(triggerId: string, trigger: TriggerNode, path: string, 
     }
     return
   }
-  if (trigger.kind == 'cron' || trigger.kind == 'manual') return
+  if (trigger.kind == 'error' || trigger.kind == 'cron' || trigger.kind == 'manual') return
   if (trigger.connectionId == null)
     diagnostics.push(graphDiagnostic('trigger.connection-missing', 'Select a connection account for this Trigger.', `${path}/connectionId`))
   const missingConfig = missingTriggerConfig(trigger.definition.configInputs, trigger.config)
@@ -97,6 +97,7 @@ export function nodeInputPorts(document: FlowDocument, node: GraphNode): Readonl
     case 'cron':
     case 'integration':
     case 'poll':
+    case 'error':
     case 'manual':
     case 'webhook':
       return {}
@@ -158,6 +159,7 @@ export function nodeOutputPorts(document: Pick<FlowDocument, 'tasks' | 'subflows
     case 'cron':
     case 'integration':
     case 'poll':
+    case 'error':
     case 'manual':
     case 'webhook':
       return triggerOutputPorts(node)
@@ -596,6 +598,10 @@ function validateGraph(
   diagnostics: Diagnostic[],
 ): void {
   const analysis = graphPaths(graph)
+  const errorTriggers = Object.entries(graph.nodes).filter(([, node]) => node.kind == 'error')
+  if (errorTriggers.length > 1)
+    for (const [nodeId] of errorTriggers)
+      diagnostics.push(graphDiagnostic('graph.error-trigger-duplicate', 'A graph can contain only one Error Trigger.', `${path}/nodes/${nodeId}`))
   const manualTriggers = Object.entries(graph.nodes).filter(([, node]) => node.kind == 'manual')
   if (manualTriggers.length > 1) {
     for (const [nodeId] of manualTriggers) {

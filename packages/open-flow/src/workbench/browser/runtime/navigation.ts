@@ -28,6 +28,10 @@ export class NavigationStore {
     this.#view.set(location.view)
   }
 
+  public get runId(): string | undefined {
+    return this.#location.view == 'runs' ? this.#location.runId : undefined
+  }
+
   public get runSource(): WorkbenchLocation['runSource'] {
     return this.#location.view == 'runs' ? this.#location.runSource : undefined
   }
@@ -126,18 +130,22 @@ export class NavigationStore {
     if (this.#ready.value && !this.#syncing) this.#write(this.#view.value, true)
   }
 
-  #write(view: WorkbenchView, replace: boolean, options: { runSource?: WorkbenchLocation['runSource'] } = this.#location): void {
+  #write(view: WorkbenchView, replace: boolean, options: { runSource?: WorkbenchLocation['runSource']; runId?: string } = this.#location): void {
     const flowId = this.#store.workspace.$.flowId.value
-    const { runSource } = options
+    const { runSource, runId } = options
     const location: WorkbenchLocation = {
       flowId,
       view: flowId == null ? 'design' : view,
       ...(flowId != null && view == 'runs' && runSource != null ? { runSource } : {}),
+      ...(flowId != null && view == 'runs' && runId != null ? { runId } : {}),
     }
     // Entering Runs loads through the view lifecycle; an in-place URL change only updates its source.
     if (this.#ready.value && this.#view.value == 'runs' && location.view == 'runs') {
       const filter = this.#store.runs.$.filter.value
-      if (filter.source != location.runSource) void this.#store.runs.applyFilter({ ...filter, source: location.runSource })
+      if (filter.source != location.runSource || filter.runId != location.runId)
+        void this.#store.runs.applyFilter(
+          location.runId != filter.runId ? { source: location.runSource, runId: location.runId } : { ...filter, source: location.runSource },
+        )
     }
     if (!sameLocation(location, this.#location)) {
       this.#location = location
@@ -148,5 +156,5 @@ export class NavigationStore {
 }
 
 function sameLocation(left: WorkbenchLocation, right: WorkbenchLocation): boolean {
-  return left.flowId == right.flowId && left.view == right.view && left.runSource == right.runSource
+  return left.flowId == right.flowId && left.view == right.view && left.runSource == right.runSource && left.runId == right.runId
 }

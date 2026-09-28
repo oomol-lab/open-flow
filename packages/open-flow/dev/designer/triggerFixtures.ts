@@ -54,6 +54,7 @@ export interface TriggerFixture {
 }
 
 const builtins: readonly TriggerNode[] = [
+  { kind: 'error', name: 'Error Trigger' },
   { kind: 'manual', name: 'Manual' },
   {
     kind: 'cron',

@@ -80,11 +80,11 @@ it('accepts databases already rebuilt with the new column names and snapshot for
   const file = await databaseFile()
   const database = Database.open(file)
   database.connection.exec(
-    'ALTER TABLE publications DROP COLUMN live_enabled_at_end; ALTER TABLE publications DROP COLUMN live_ended_at; ALTER TABLE poll_candidates DROP COLUMN retry_count; ALTER TABLE publications DROP COLUMN presentation_snapshot; PRAGMA user_version = 29',
+    'DROP TABLE error_subscriptions; DROP TABLE error_bindings; DROP TABLE error_dispatches; ALTER TABLE runs DROP COLUMN failure_detail; ALTER TABLE runs DROP COLUMN error_source_run_id; ALTER TABLE runs DROP COLUMN error_source_flow_id; ALTER TABLE publications DROP COLUMN live_enabled_at_end; ALTER TABLE publications DROP COLUMN live_ended_at; ALTER TABLE poll_candidates DROP COLUMN retry_count; ALTER TABLE publications DROP COLUMN presentation_snapshot; PRAGMA user_version = 29',
   )
   database.close()
   const upgraded = Database.open(file)
-  expect(version(upgraded.connection)).toBe(34)
+  expect(version(upgraded.connection)).toBe(36)
   expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
   upgraded.close()
 })
@@ -107,11 +107,12 @@ function legacyDatabase(file: string, schemaVersion: number): DatabaseSync {
   const database = new DatabaseSync(file)
   const directory = new URL('../migrations/', import.meta.url)
   for (const name of readdirSync(directory)
-    .filter((fileName) => fileName.endsWith('.sql'))
-    .toSorted()
-    .slice(0, schemaVersion)) {
+    .filter((fileName) => fileName.endsWith('.sql') && Number.parseInt(fileName, 10) <= schemaVersion)
+    .toSorted()) {
+    if (name.startsWith('0031')) migrateConnectorAccess(database)
     database.exec(readFileSync(new URL(name, directory), 'utf8'))
   }
+  if (schemaVersion == 30) migrateConnectorAccess(database)
   database.exec(`PRAGMA user_version = ${schemaVersion}`)
   return database
 }
@@ -132,7 +133,7 @@ it('backfills Revision metadata needed after old content is pruned', async () =>
 
   const upgraded = Database.open(file)
   try {
-    expect(version(upgraded.connection)).toBe(34)
+    expect(version(upgraded.connection)).toBe(36)
     expect(upgraded.connection.prepare('SELECT digest, model_version AS modelVersion FROM flow_revisions WHERE revision_id = ?').get('revision')).toEqual({
       digest: 'digest',
       modelVersion: 3,
@@ -188,7 +189,7 @@ it('applies the Flow-first schema without foreign keys', async () => {
   Database.open(file).close()
   const database = new DatabaseSync(file)
   try {
-    expect(version(database)).toBe(34)
+    expect(version(database)).toBe(36)
     const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as {
       readonly name: string
     }[]
@@ -230,7 +231,7 @@ it('upgrades a version 1 Flow database without changing its data', async () => {
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(34)
+    expect(version(reopened)).toBe(36)
     expect(reopened.prepare('SELECT revision_id AS revisionId FROM revisions').all()).toEqual([{ revisionId: 'revision-a' }])
     expect(reopened.prepare('SELECT name FROM variables').all()).toEqual([])
   } finally {
@@ -260,7 +261,7 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(34)
+    expect(version(reopened)).toBe(36)
     expect(reopened.prepare('SELECT flow_id AS flowId, team_id AS teamId FROM flow_connector_teams').all()).toEqual([{ flowId: 'flow-a', teamId: null }])
     expect(reopened.prepare("SELECT name FROM pragma_table_info('runs') WHERE name = 'connector_team_id'").get()).toEqual({ name: 'connector_team_id' })
   } finally {
@@ -308,13 +309,13 @@ it('rejects a newer Flow schema version without modifying it', async () => {
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
-  database.exec('PRAGMA user_version = 35')
+  database.exec('PRAGMA user_version = 37')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('SQLite schema version 35 is newer than the supported version 34.')
+  expect(() => Database.open(file)).toThrow('SQLite schema version 37 is newer than the supported version 36.')
 
   const reopened = new DatabaseSync(file)
-  expect(version(reopened)).toBe(35)
+  expect(version(reopened)).toBe(37)
   reopened.close()
 })
 
@@ -352,7 +353,7 @@ it('preserves old checkpoint bytes for explicit recovery validation', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(34)
+    expect(version(reopened)).toBe(36)
     expect(reopened.prepare('SELECT * FROM run_checkpoints').get()).toEqual({
       run_id: 'run-a',
       checkpoint_json: '{"value":42}',
@@ -385,7 +386,7 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   Database.open(file).close()
   const upgraded = new DatabaseSync(file)
   try {
-    expect(version(upgraded)).toBe(34)
+    expect(version(upgraded)).toBe(36)
     const after = tables.map((table) => upgraded.prepare('SELECT * FROM ' + table).all())
     expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
     expect(after[2]).toEqual(
@@ -512,6 +513,9 @@ it('classifies existing automatic runs as Live while preserving their execution 
       original.map((run) =>
         Object.assign({}, run, {
           source: run.source == 'trigger' ? 'live' : run.source,
+          failure_detail: null,
+          error_source_run_id: null,
+          error_source_flow_id: null,
         }),
       ),
     )
@@ -523,9 +527,7 @@ it('classifies existing automatic runs as Live while preserving their execution 
 
 it('leaves migrated Publication end states unknown without deriving them from current Live', async () => {
   const file = await databaseFile()
-  Database.open(file).close()
-  const old = new DatabaseSync(file)
-  old.exec('ALTER TABLE publications DROP COLUMN live_enabled_at_end; ALTER TABLE publications DROP COLUMN live_ended_at; PRAGMA user_version = 33')
+  const old = legacyDatabase(file, 33)
   old.exec(`INSERT INTO publications (publication_id, flow_id, revision_id, revision_digest, closure_digest, engine_contract, idempotency_key, request_digest, actor_id, operation, model_version, created_at)
     VALUES ('old', 'flow', 'revision', 'digest', 'closure', 'engine', 'key', 'request', 'actor', 'publish', 2, 1)`)
   old.close()

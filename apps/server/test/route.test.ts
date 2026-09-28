@@ -30,3 +30,9 @@ it('ignores unsupported sources and keeps source scoped to Runs', () => {
 it.each(['', 'trigger', 'unknown', 'LIVE', '%E0%A4%A'])('treats unrecognized source=%s as absent', (source) => {
   expect(parseRoute(`/flows/main/runs?source=${source}`)).toEqual({ flowId: 'main', view: 'runs' })
 })
+
+it('round-trips error handling Run links and scopes the Run filter to Runs', () => {
+  const location = { flowId: 'handler/flow', view: 'runs' as const, runId: 'run/id', runSource: 'live' as const }
+  expect(parseRoute(routePath(location))).toEqual(location)
+  expect(parseRoute('/flows/main/design?runId=ignored')).toEqual({ flowId: 'main', view: 'design' })
+})

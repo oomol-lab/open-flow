@@ -87,6 +87,7 @@ export type AddNodeIntent =
   | { readonly action: ConnectorActionView; readonly kind: 'connector' }
   | { readonly kind: 'condition'; readonly name: string }
   | { readonly kind: 'manual'; readonly name: string }
+  | { readonly kind: 'error'; readonly name: string }
   | { readonly kind: 'cron'; readonly name: string }
   | { readonly kind: 'llm'; readonly mode: 'chat' | 'json'; readonly name: string; readonly outputDescription: string }
   | { readonly kind: 'provider-trigger'; readonly connectionId?: string; readonly definition: TriggerKeySnapshot }
@@ -191,6 +192,9 @@ export function addNode(revision: RevisionView, target: GraphTarget, nodeId: str
       changes = createSubflowNode(target, nodeId, intent.subflowId, subflow.inputs)
       break
     }
+    case 'error':
+      changes = target.kind == 'flow' ? createBuiltinTrigger(target, nodeId, { kind: 'error', name: intent.name }) : undefined
+      break
     case 'manual':
       changes = target.kind == 'flow' ? createBuiltinTrigger(target, nodeId, { kind: 'manual', name: intent.name }) : undefined
       break
@@ -243,7 +247,7 @@ export function updateNodeIcon(revision: RevisionView, target: GraphTarget, node
 
 export function updateNodeName(revision: RevisionView, target: GraphTarget, nodeId: string, name: string | undefined): FlowChanges | undefined {
   const node = revision.node(target, nodeId)?.node
-  if (node == null || node.kind == 'manual') return
+  if (node == null || node.kind == 'manual' || node.kind == 'error') return
   const value = !('inputs' in node) ? (name ?? node.name) : name
   if (node.name == value) return []
   return [{ before: node.name, field: 'name', kind: 'graph.node.field.set', nodeId, target, value }]

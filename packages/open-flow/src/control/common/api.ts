@@ -114,7 +114,7 @@ export interface TriggerBinding {
   readonly endpointUrl?: string
   readonly flowId: string
   readonly health: 'failed' | 'healthy' | 'initializing' | 'needs_reauth' | 'suspended'
-  readonly kind: 'cron' | 'integration' | 'poll' | 'webhook'
+  readonly kind: 'error' | 'cron' | 'integration' | 'poll' | 'webhook'
   readonly lastErrorCode?: string
   readonly operatorState: 'active' | 'paused'
   readonly runtimeVersion: number
@@ -399,7 +399,14 @@ export interface RunWait {
   readonly waitingSince: string
 }
 
+export type ErrorDispatch =
+  | { readonly status: 'pending'; readonly flowId: string }
+  | { readonly status: 'dispatched'; readonly flowId: string; readonly runId: string }
+  | { readonly status: 'failed'; readonly flowId: string; readonly message: string }
+
 type RunDetailsBase = Run & {
+  readonly errorDispatches?: readonly ErrorDispatch[]
+  readonly errorSource?: { readonly flowId: string; readonly runId: string }
   readonly closureDigest: string
   readonly engineContract: string
   readonly engineDigest: string
@@ -446,10 +453,18 @@ export interface RunCancellation {
   readonly version: 1
 }
 
+export interface RunFailure {
+  readonly code: string
+  readonly message: string
+  readonly nodeId?: string
+  readonly jobId?: string
+  readonly path?: readonly string[]
+}
+
 export type RunResult =
   | { readonly finishedAt: string; readonly result: JsonValue; readonly runId: string; readonly status: 'completed'; readonly version: 1 }
   | {
-      readonly error: { readonly code: string; readonly message: string }
+      readonly error: RunFailure
       readonly finishedAt: string
       readonly runId: string
       readonly status: 'failed' | 'indeterminate'

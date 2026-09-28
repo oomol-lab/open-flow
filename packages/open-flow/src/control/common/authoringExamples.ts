@@ -14,6 +14,7 @@ import {
 const target = { kind: 'flow' } as const
 const descriptions = {
   'manual': 'A Manual start node.',
+  'error': 'An Error Trigger. Publish and enable this Flow before selecting it as another Flow’s error workflow.',
   'webhook': 'A Webhook start node.',
   'cron': 'An hourly scheduled start node.',
   'poll': 'Gmail polling by key; replace CONNECTION_ID with an active Gmail connection.',
@@ -38,6 +39,9 @@ export const authoringExamples = authoringExampleNames.map((name) => ({ name, de
 export function authoringExample(name: string): { version: 1; operations: readonly DraftOperation[] } {
   let operations: readonly DraftOperation[]
   switch (name) {
+    case 'error':
+      operations = createBuiltinTrigger(target, 'error', { kind: 'error', name: 'Error Trigger' })
+      break
     case 'manual':
       operations = createBuiltinTrigger(target, 'start', { kind: 'manual', name: 'Start' })
       break

@@ -1356,5 +1356,27 @@
     "loading": "Chargement de la version…",
     "failed": "Impossible de charger cette version. Son contenu est peut-être indisponible.",
     "root": "Flux principal"
+  },
+  "errorWorkflow": {
+    "trigger": "Déclencheur d’erreur",
+    "description": "Exécute ce workflow lorsqu’un autre échoue.",
+    "empty": "Aucun workflow publié disponible.",
+    "unavailable": "Indisponible ; vous pouvez le désélectionner",
+    "retry": "Réessayer",
+    "more": "Charger plus",
+    "pending": "En attente de gestion des erreurs",
+    "dispatched": "Exécution de gestion des erreurs",
+    "failed": "Impossible de démarrer la gestion des erreurs",
+    "source": "Exécution source",
+    "workflow": "Workflow ayant échoué.",
+    "execution": "Exécution en échec et son état final.",
+    "error": "Message d’erreur et emplacement du nœud, si disponible.",
+    "setupHint": "Choisissez des workflows publiés. Publiez et activez ce workflow pour traiter les échecs de leurs exécutions automatiques.",
+    "sources": "Workflows en amont",
+    "search": "Rechercher des workflows en amont",
+    "noMatches": "Aucun workflow correspondant",
+    "choose": "Sélectionner les workflows en amont",
+    "done": "Terminé",
+    "clear": "Effacer la sélection"
   }
 }

@@ -327,6 +327,7 @@ export class RunExecutor {
         ? { error: { code: 'run.timeout', message: 'The Run exceeded its execution deadline.' } }
         : { error: { code: 'run.failed', message: 'The Flow could not be completed.' } }
     if (!this.#store.runs.commit(run.runId, indeterminate ? 'indeterminate' : 'failed', result)) return
+    this.#wakeMaintenance()
     this.#runChanged(run.flowId, run.runId)
     this.#logger.error(
       {

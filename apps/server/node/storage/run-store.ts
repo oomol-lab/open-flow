@@ -15,10 +15,14 @@ import type { RunAdmission, TriggerOccurrenceInput } from './trigger-store.ts'
 import type { VariableStore } from './variable-store.ts'
 
 import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
+import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
+import { flowDependencies, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { decodeFlowRunCheckpoint, normalizeWaitComment } from '@oomol-lab/open-flow/scheduler'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { AcceptanceError } from '../error.ts'
 import { isolatedVmEngineDigest } from '../runtime/isolated-vm.ts'
+import { errorWorkflowTarget } from './trigger-store.ts'
 
 type RunInputs = NonNullable<FlowRunOptions['inputs']>
 
@@ -377,6 +381,11 @@ export class RunStore {
         readonly status: RunStatus
       }
       if (run.status != 'running') return
+      if (event.kind == 'node.failed' && event.payload.terminal === true) {
+        const error = { ...(event.payload.error as object), nodeId: event.payload.nodeId, jobId: event.payload.executionId, path: event.payload.path ?? [] }
+        this.#database.prepare('UPDATE runs SET failure_detail = ? WHERE run_id = ? AND failure_detail IS NULL').run(JSON.stringify(error), runId)
+        return
+      }
       const bytes = encoder.encode(JSON.stringify(event)).byteLength
       if (bytes > maxEventBytes || run.eventCount >= maxEventCount || run.eventBytes + bytes > maxEventTotalBytes) {
         this.#database.prepare('UPDATE runs SET events_truncated = 1 WHERE run_id = ?').run(runId)
@@ -717,6 +726,7 @@ export class RunStore {
         this.#database.prepare('DELETE FROM wait_receipts WHERE run_id = ?').run(runId)
         this.#database.prepare('DELETE FROM work WHERE run_id = ?').run(runId)
         this.#database.prepare('DELETE FROM run_results WHERE run_id = ?').run(runId)
+        this.#database.prepare('DELETE FROM error_dispatches WHERE source_run_id = ?').run(runId)
         this.#database.prepare('DELETE FROM runs WHERE run_id = ?').run(runId)
       }
       return runs.length
@@ -727,6 +737,8 @@ export class RunStore {
     const row = this.#database
       .prepare(
         `SELECT MIN(dueAt) AS dueAt FROM (
+           SELECT MIN(retry_at) AS dueAt FROM error_dispatches WHERE status = 'pending'
+           UNION ALL
            SELECT MIN(wait_receipts.expires_at) AS dueAt
            FROM wait_receipts JOIN runs USING (run_id)
            WHERE runs.status IN ('running', 'waiting', 'queued', 'starting') AND wait_receipts.action IS NULL
@@ -747,8 +759,73 @@ export class RunStore {
       const expiredWaits = this.#expireWaits(now, limit)
       const prunedEvents = this.#pruneExpiredEvents(now, limit)
       const notification = this.#claimWaitNotification(now, notificationLeaseMs)
-      return { expiredWaits, more: expiredWaits.length == limit || prunedEvents > 0, notification }
+      const errorDispatches = this.#dispatchErrors(now, limit)
+      return { errorDispatches, expiredWaits, more: expiredWaits.length == limit || prunedEvents > 0, notification }
     })
+  }
+
+  #dispatchErrors(now: number, limit: number) {
+    const pending = this.#database
+      .prepare(`SELECT source_run_id AS sourceRunId, source_flow_id AS sourceFlowId,
+      target_flow_id AS targetFlowId, outputs FROM error_dispatches WHERE status = 'pending' AND retry_at <= ? ORDER BY retry_at, source_run_id LIMIT ?`)
+      .all(now, limit) as { sourceRunId: string; sourceFlowId: string; targetFlowId: string; outputs: string }[]
+    const changed: { flowId: string; runId: string; created?: { flowId: string; runId: string } }[] = []
+    for (const item of pending) {
+      const target = item.targetFlowId == item.sourceFlowId ? undefined : errorWorkflowTarget(this.#database, item.targetFlowId)
+      let reason: string | undefined
+      if (this.#deps.flows.get(item.sourceFlowId)?.status != 'active') reason = 'The source workflow is retiring.'
+      else if (
+        this.#database
+          .prepare('SELECT 1 FROM error_subscriptions WHERE handler_flow_id = ? AND source_flow_id = ?')
+          .get(item.targetFlowId, item.sourceFlowId) == null
+      )
+        reason = 'The Error Trigger no longer listens to this upstream Flow.'
+      else if (target == null) reason = 'The error workflow is unavailable. It must be published, enabled and have an active Error Trigger.'
+      else {
+        const revision = decodeRevision(encoder.encode(target.content))
+        const names = Object.values(variableBindings(revision, flowDependencies(revision, target.triggerNodeId).inputBindings))
+        if (!this.#deps.variables.hasAll(names)) reason = 'The error workflow requires an unavailable Variable.'
+      }
+      if (reason == null && target != null) {
+        // The savepoint keeps a rejected admission from partially creating a Run.
+        this.#database.exec('SAVEPOINT error_admission')
+        try {
+          const accepted = this.acceptTriggerOccurrence({
+            ...target,
+            flowId: item.targetFlowId,
+            occurrenceId: `error:${item.sourceRunId}:${item.targetFlowId}`,
+            outputs: JSON.parse(item.outputs),
+            requestDigest: createHash('sha256').update(`${item.sourceRunId}:${target.publicationId}:${item.outputs}`).digest('hex'),
+          })
+          if (accepted.kind == 'overloaded') {
+            this.#database
+              .prepare('UPDATE error_dispatches SET retry_at = ? WHERE source_run_id = ? AND target_flow_id = ?')
+              .run(now + 1_000, item.sourceRunId, item.targetFlowId)
+          } else if (accepted.kind == 'accepted') {
+            this.#database
+              .prepare('UPDATE runs SET error_source_run_id = ?, error_source_flow_id = ? WHERE run_id = ?')
+              .run(item.sourceRunId, item.sourceFlowId, accepted.runId)
+            this.#database
+              .prepare("UPDATE error_dispatches SET status = 'dispatched', run_id = ? WHERE source_run_id = ? AND target_flow_id = ?")
+              .run(accepted.runId, item.sourceRunId, item.targetFlowId)
+            changed.push({ flowId: item.sourceFlowId, runId: item.sourceRunId, created: { flowId: item.targetFlowId, runId: accepted.runId } })
+          } else throw new Error('Error occurrence identity conflicts with an existing Run.')
+          this.#database.exec('RELEASE error_admission')
+        } catch (error) {
+          this.#database.exec('ROLLBACK TO error_admission')
+          this.#database.exec('RELEASE error_admission')
+          if (!(error instanceof AcceptanceError)) throw error
+          reason = error.message
+        }
+      }
+      if (reason != null) {
+        this.#database
+          .prepare("UPDATE error_dispatches SET status = 'failed', error_message = ? WHERE source_run_id = ? AND target_flow_id = ?")
+          .run(reason, item.sourceRunId, item.targetFlowId)
+        changed.push({ flowId: item.sourceFlowId, runId: item.sourceRunId })
+      }
+    }
+    return changed
   }
 
   #expireWaits(now: number, limit: number): readonly { readonly flowId: string; readonly runId: string }[] {
@@ -962,10 +1039,49 @@ export class RunStore {
   }
 
   #finishRun(runId: string, status: RunTerminalStatus, result: unknown, condition: string, finishedAt: number, ...conditionParams: readonly string[]): boolean {
+    if (status == 'failed') {
+      const failure = this.#database.prepare('SELECT failure_detail AS detail FROM runs WHERE run_id = ?').get(runId) as { detail: string | null } | undefined
+      const error = (result as { error?: { code?: string } }).error
+      if (failure?.detail != null && error?.code == 'run.failed') result = { error: JSON.parse(failure.detail) }
+    }
     const changed = this.#database
       .prepare(`UPDATE runs SET status = ?, result = ?, finished_at = ?, events_expires_at = ? WHERE run_id = ? AND ${condition}`)
       .run(status, JSON.stringify(result), finishedAt, finishedAt + this.#runEventRetentionMs, runId, ...conditionParams)
     if (changed.changes != 1) return false
+    if (status == 'failed' || status == 'indeterminate') {
+      const source = this.#database
+        .prepare(`SELECT runs.flow_id AS flowId, flows.name, runs.revision_id AS revisionId,
+        runs.publication_id AS publicationId, runs.started_at AS startedAt
+        FROM runs JOIN flows USING (flow_id)
+        WHERE runs.run_id = ? AND runs.error_source_run_id IS NULL AND flows.status = 'active'
+          AND EXISTS (SELECT 1 FROM trigger_occurrences WHERE trigger_occurrences.run_id = runs.run_id)`)
+        .get(runId) as { flowId: string; name: string; revisionId: string; publicationId: string | null; startedAt: number | null } | undefined
+      if (source != null) {
+        const targets = this.#database
+          .prepare(`SELECT s.handler_flow_id AS flowId FROM error_subscriptions s
+          JOIN error_bindings b ON b.flow_id = s.handler_flow_id
+          JOIN flow_live l ON l.flow_id = b.flow_id AND l.publication_id = b.current_publication_id
+          JOIN flows f ON f.flow_id = l.flow_id
+          WHERE s.source_flow_id = ? AND f.status = 'active' AND l.enabled = 1 AND b.operator_state = 'active'
+          ORDER BY s.handler_flow_id`)
+          .all(source.flowId) as { flowId: string }[]
+        for (const target of targets) {
+          const outputs = {
+            workflow: { flowId: source.flowId, name: source.name, revisionId: source.revisionId, publicationId: source.publicationId },
+            execution: {
+              runId,
+              status,
+              startedAt: source.startedAt == null ? null : new Date(source.startedAt).toISOString(),
+              finishedAt: new Date(finishedAt).toISOString(),
+            },
+            error: (result as { error: unknown }).error,
+          }
+          this.#database
+            .prepare('INSERT INTO error_dispatches (source_run_id, source_flow_id, target_flow_id, outputs, retry_at) VALUES (?, ?, ?, ?, ?)')
+            .run(runId, source.flowId, target.flowId, JSON.stringify(outputs), finishedAt)
+        }
+      }
+    }
     this.#database.prepare('UPDATE run_checkpoints SET checkpoint_json = NULL WHERE run_id = ?').run(runId)
     this.#database.prepare('DELETE FROM wait_notifications WHERE run_id = ?').run(runId)
     this.#insertEvent(runId, `run.${status}`, { result })

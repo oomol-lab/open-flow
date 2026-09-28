@@ -69,6 +69,7 @@ export function runDetails(value: unknown): RunDetails {
   const state = { status: summary.status, waits }
   const details = {
     ...summary,
+    ...errorHandling(source),
     closureDigest: string(source.closureDigest),
     engineContract: string(source.engineContract),
     engineDigest: string(source.engineDigest),
@@ -160,11 +161,47 @@ export function runResult(value: unknown): RunResult {
   if (status == 'canceled') return { ...base, status: 'canceled' }
   if (status == 'failed') {
     const error = record(source.error)
-    return { ...base, error: { code: string(error.code), message: string(error.message) }, status: 'failed' }
+    return { ...base, error: runFailure(error), status: 'failed' }
   }
   if (status == 'indeterminate') {
     const error = record(source.error)
-    return { ...base, error: { code: string(error.code), message: string(error.message) }, status: 'indeterminate' }
+    return { ...base, error: runFailure(error), status: 'indeterminate' }
   }
   return invalidResponse()
+}
+
+function errorHandling(source: Record<string, unknown>): Pick<RunDetails, 'errorDispatches' | 'errorSource'> {
+  const errorSource = source.errorSource == null ? undefined : record(source.errorSource)
+  if (source.errorDispatches != null && !Array.isArray(source.errorDispatches)) return invalidResponse()
+  return {
+    ...(errorSource == null ? {} : { errorSource: { flowId: string(errorSource.flowId), runId: string(errorSource.runId) } }),
+    ...(source.errorDispatches == null
+      ? {}
+      : {
+          errorDispatches: (source.errorDispatches as unknown[]).map((value) => {
+            const dispatch = record(value)
+            const flowId = string(dispatch.flowId)
+            switch (dispatch.status) {
+              case 'pending':
+                return { status: 'pending' as const, flowId }
+              case 'dispatched':
+                return { status: 'dispatched' as const, flowId, runId: string(dispatch.runId) }
+              case 'failed':
+                return { status: 'failed' as const, flowId, message: string(dispatch.message) }
+              default:
+                return invalidResponse()
+            }
+          }),
+        }),
+  }
+}
+
+export function runFailure(error: Record<string, unknown>) {
+  return {
+    code: string(error.code),
+    message: string(error.message),
+    ...(error.nodeId === undefined ? {} : { nodeId: string(error.nodeId) }),
+    ...(error.jobId === undefined ? {} : { jobId: string(error.jobId) }),
+    ...(error.path === undefined ? {} : { path: (Array.isArray(error.path) ? error.path : invalidResponse()).map(string) }),
+  }
 }

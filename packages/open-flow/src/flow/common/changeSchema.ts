@@ -5,7 +5,7 @@ import { checkJsonDepth } from './json.ts'
 import { triggerScheduleSchema } from './triggerScheduleSchema.ts'
 import { webhookMethods } from './webhookMethod.ts'
 
-export const currentFlowModelVersion = 4
+export const currentFlowModelVersion = 5
 const text = z.string()
 const json = z.json()
 const strings = z.array(text)
@@ -148,6 +148,7 @@ const endpoint = z.object({
   methods: z.array(z.enum(['DELETE', 'GET', 'HEAD', 'PATCH', 'POST', 'PUT'])),
   successStatus: z.number(),
 })
+const sourceFlowIds = z.array(text.min(1)).refine((ids) => new Set(ids).size === ids.length, 'Duplicate source Flow ID.')
 const trigger = { name: text, description: text.optional(), icon: text.optional() }
 const base = {
   maxExecutions: z.number().int().positive().max(Number.MAX_SAFE_INTEGER).optional(),
@@ -174,6 +175,7 @@ const node = z.union([
   z.strictObject({ ...base, kind: z.literal('approval'), ...wait }).omit({ timeoutMs: true }),
   z.strictObject({ ...base, kind: z.literal('wait'), ...wait }).omit({ timeoutMs: true }),
   z.object({ ...trigger, kind: z.literal('manual') }),
+  z.strictObject({ ...trigger, kind: z.literal('error'), sourceFlowIds: sourceFlowIds.optional() }),
   z.object({ ...trigger, kind: z.literal('webhook'), ...webhook }),
   z.object({ ...trigger, kind: z.literal('cron'), cronTimes: triggerScheduleSchema }),
   z.object({
@@ -205,7 +207,11 @@ const document = z.object({
   subflows: z.record(text, subflow.extend({ graph })),
   tasks: z.record(text, managed),
 })
-const revision = z.object({ modelVersion: z.union([z.literal(2), z.literal(currentFlowModelVersion)]), document, modules: z.record(text, module) })
+const revision = z.object({
+  modelVersion: z.union([z.literal(2), z.literal(4), z.literal(currentFlowModelVersion)]),
+  document,
+  modules: z.record(text, module),
+})
 const envelope = revision.extend({ kind: z.literal('open-flow-flow-revision'), version: z.literal(1) })
 
 function record(value: unknown): Record<string, unknown> {
@@ -378,7 +384,9 @@ export function decodeFlowDocument(value: unknown): FlowDocument {
 
 export function decodeRevisionContent(value: unknown): RevisionContent {
   checkJsonDepth(value)
-  return revision.parse(value) as RevisionContent
+  const content = revision.parse(value) as RevisionContent
+  checkErrorModelVersion(content)
+  return content
 }
 
 export function decodeRevisionEnvelope(value: unknown): RevisionContent {
@@ -386,10 +394,12 @@ export function decodeRevisionEnvelope(value: unknown): RevisionContent {
   const revisionSource = record(value)
   const candidate = revisionSource.modelVersion == 2 ? { ...revisionSource, document: upgradeLegacyDocument(revisionSource.document) } : value
   const content = envelope.parse(candidate) as RevisionContent
+  checkErrorModelVersion(content)
   return { modelVersion: content.modelVersion, document: content.document, modules: content.modules }
 }
 
 const shapes = {
+  'graph.trigger.sources.set': { nodeId: text, before: sourceFlowIds.optional(), value: sourceFlowIds.optional() },
   'binding.create': { bindingId: text, binding },
   'binding.delete': { bindingId: text },
   'binding.target.set': { bindingId: text, before: text, value: text },
@@ -487,4 +497,14 @@ export function changeOperationsSchema(kind?: string): JsonValue {
   const schema = kind == null ? operations : variants.get(kind)
   if (schema == null) throw new TypeError(`Unknown operation ${JSON.stringify(kind)}.`)
   return z.toJSONSchema(schema, { io: 'input' }) as JsonValue
+}
+
+function checkErrorModelVersion(content: RevisionContent): void {
+  if (
+    content.modelVersion < 5 &&
+    [content.document.graph, ...Object.values(content.document.subflows).map((item) => item.graph)].some((item) =>
+      Object.values(item.nodes).some((itemNode) => itemNode.kind == 'error'),
+    )
+  )
+    throw new TypeError('Error workflows require Flow model version 5.')
 }

@@ -3,6 +3,8 @@ import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { RunAcceptance } from '@oomol-lab/open-flow/run-lifecycle'
 import type { DatabaseSync } from 'node:sqlite'
 
+import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
+import { ControlError } from '../error.ts'
 import { insertTriggerActivity, pruneTriggerActivities } from '../runtime/trigger-activity.ts'
 
 export type TriggerActivityKind =
@@ -31,7 +33,7 @@ export interface StoredTriggerBinding {
   readonly endpointId: string | null
   readonly flowId: string
   readonly health: 'failed' | 'healthy' | 'initializing' | 'needs_reauth'
-  readonly kind: 'cron' | 'integration' | 'poll' | 'webhook'
+  readonly kind: 'error' | 'cron' | 'integration' | 'poll' | 'webhook'
   readonly lastErrorCode: string | null
   readonly operatorState: 'active' | 'paused'
   readonly runtimeVersion: number
@@ -232,10 +234,17 @@ export class TriggerStore {
            FROM integration_bindings AS bindings
            LEFT JOIN publications ON publications.publication_id = bindings.current_publication_id
            WHERE bindings.flow_id = ?
+           UNION ALL
+           SELECT bindings.binding_id, bindings.current_publication_id, publications.revision_id,
+                  NULL, bindings.flow_id, 'healthy', 'error', NULL, bindings.operator_state,
+                  bindings.runtime_version, bindings.trigger_node_id, bindings.updated_at
+           FROM error_bindings AS bindings
+           LEFT JOIN publications ON publications.publication_id = bindings.current_publication_id
+           WHERE bindings.flow_id = ?
          ) AS listed LEFT JOIN listener_work AS work ON listed.kind = 'integration' AND work.binding_id = listed.bindingId AND work.runtime_version = listed.runtimeVersion
          ORDER BY triggerNodeId`,
       )
-      .all(flowId, flowId, flowId, flowId) as unknown as readonly StoredTriggerBinding[]
+      .all(flowId, flowId, flowId, flowId, flowId) as unknown as readonly StoredTriggerBinding[]
   }
 
   triggerBinding(flowId: string, triggerNodeId: string): StoredTriggerBinding | undefined {
@@ -253,6 +262,11 @@ export class TriggerStore {
       if (current?.currentPublicationId == null) return
       if (current.operatorState == operatorState) return current
       switch (current.kind) {
+        case 'error':
+          this.#database
+            .prepare('UPDATE error_bindings SET operator_state = ?, runtime_version = runtime_version + 1, updated_at = ? WHERE binding_id = ?')
+            .run(operatorState, updatedAt, current.bindingId)
+          break
         case 'webhook':
           this.#database
             .prepare(
@@ -596,4 +610,40 @@ export class TriggerStore {
         .get(flowId, triggerNodeId) as { readonly endpointId: string } | undefined
     )?.endpointId
   }
+}
+
+export function errorWorkflowTarget(database: DatabaseSync, flowId: string) {
+  return database
+    .prepare(`SELECT b.trigger_node_id AS triggerNodeId, p.publication_id AS publicationId,
+      p.revision_id AS revisionId, p.revision_digest AS revisionDigest, p.closure_digest AS closureDigest,
+      p.model_version AS modelVersion, p.engine_contract AS engineContract, r.content
+    FROM error_bindings b JOIN flow_live l ON l.flow_id = b.flow_id AND l.publication_id = b.current_publication_id
+    JOIN flows f ON f.flow_id = l.flow_id
+    JOIN publications p ON p.publication_id = l.publication_id JOIN revisions r ON r.revision_id = p.revision_id
+    WHERE f.flow_id = ? AND f.status = 'active' AND l.enabled = 1 AND b.operator_state = 'active'`)
+    .get(flowId) as
+    | {
+        triggerNodeId: string
+        publicationId: string
+        revisionId: string
+        revisionDigest: string
+        closureDigest: string
+        modelVersion: number
+        engineContract: string
+        content: string
+      }
+    | undefined
+}
+
+export function errorSourcesAvailable(database: DatabaseSync, flowId: string, sources: readonly string[]): boolean {
+  return sources.every(
+    (source) =>
+      source != flowId &&
+      database.prepare(`SELECT 1 FROM flows f JOIN flow_live l ON l.flow_id = f.flow_id WHERE f.flow_id = ? AND f.status = 'active'`).get(source) != null,
+  )
+}
+
+export function requireErrorSources(database: DatabaseSync, flowId: string, sources: readonly string[]): void {
+  if (!errorSourcesAvailable(database, flowId, sources))
+    throw new ControlError(controlErrorCode.flowInvalid, 'Select published upstream Flows other than this Flow.')
 }
