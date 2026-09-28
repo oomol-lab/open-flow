@@ -89,6 +89,6 @@ export const previewStories: readonly FrontendStory[] = [false, true].map((shado
   title: shadow ? 'Preview · Shadow DOM' : 'Preview',
   standalone: true,
   description:
-    'Public offline preview with the standard dotted canvas and no title bar: select one or multiple nodes without floating toolbars; double-click to inspect properties. Browse subflows, move nodes temporarily and restore layout. Compare themes, missing layout and narrow containers. No publication API or persistence.',
+    'Public offline preview with the standard dotted canvas and no title bar: click a node to replace selection, or box-select multiple nodes without floating toolbars. The properties panel starts closed; double-click a node or use the panel toggle to open or close it. Browse subflows, move nodes temporarily and restore layout. Compare themes, missing layout and narrow containers. No publication API or persistence.',
   render: (_log, dark, language) => <PreviewStory dark={dark} language={language} shadow={shadow} />,
 }))

@@ -67,10 +67,6 @@ export function RevisionCanvas({
   }
   const selection = selected.length === 1 ? revision.node(target, selected[0]!) : undefined
   const comment = selected.length === 1 ? model.nodes.find((node) => node.id === selected[0] && node.kind === 'comment') : undefined
-  const inspect = (ids: readonly string[]) => {
-    setSelected(ids)
-    setInspectorOpen(true)
-  }
   const navigation =
     target.kind === 'subflow' || presentation == null || moved ? (
       <>
@@ -125,8 +121,7 @@ export function RevisionCanvas({
             onMoveNodes={(positions) => setSessions((current) => changeRevisionCanvasSession(current, graphId, { kind: 'move', positions }))}
             onMoveViewport={(viewport) => setSessions((current) => changeRevisionCanvasSession(current, graphId, { kind: 'viewport', viewport }))}
             onSelectionChange={setSelected}
-            onActivateSelection={inspect}
-            onInspectSelection={() => setInspectorOpen(true)}
+            onInspectSelection={() => setInspectorOpen((open) => !open)}
             inspectorOpen={inspectorOpen}
             toolbar={showHeader ? undefined : navigation}
             cornerTools={
@@ -165,7 +160,7 @@ export function RevisionCanvas({
             ) : (
               <FlowNodeList
                 nodes={selected.length > 1 ? model.nodes.filter((node) => selected.includes(node.id)) : model.nodes}
-                onSelect={(id) => inspect([id])}
+                onSelect={(id) => setSelected([id])}
                 onFocusNode={(nodeId) => {
                   setSelected([nodeId])
                   setFocus({ nodeId, requestId: (focus?.requestId ?? 0) + 1 })

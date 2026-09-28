@@ -709,6 +709,8 @@ const ReactFlowContainerInner = (props: ReactFlowContainerProps) => {
           deleteKeyCode={null}
           /* React Flow can leave the Meta key active after the browser releases it. */
           zoomActivationKeyCode={null}
+          /* Read-only canvases use area selection for multiple nodes; clicks always replace the selection. */
+          multiSelectionKeyCode={editable ? undefined : null}
           zoomOnDoubleClick={false}
           /* Keep clicks valid until the default 1px drag threshold is exceeded. */
           nodeClickDistance={1}

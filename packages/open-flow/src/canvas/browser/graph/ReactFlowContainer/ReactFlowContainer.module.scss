@@ -11,7 +11,7 @@
   position: relative;
   outline: none !important;
   scrollbar-color: rgba(121, 121, 121, 0.4) transparent;
-  background-color: var(--flow-bg);
+  --xy-background-color: var(--flow-bg);
 
   &:global(.react-flow.open-flow-canvas) {
     // Connected edge lines.
