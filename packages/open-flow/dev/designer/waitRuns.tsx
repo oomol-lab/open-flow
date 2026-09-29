@@ -442,6 +442,7 @@ function ExecutionLogs({ language, dark, log }: { readonly language: UiLanguage;
     bytes: JSON.stringify(secondOutput).length,
   }
   const [large, setLarge] = useState(false)
+  const [shortRun, setShortRun] = useState(false)
   const [appended, setAppended] = useState(0)
   const [empty, setEmpty] = useState(false)
   const [complete, setComplete] = useState(false)
@@ -451,15 +452,34 @@ function ExecutionLogs({ language, dark, log }: { readonly language: UiLanguage;
     {
       label: large ? 'Small sample' : '10,000 events',
       onClick: () => {
+        setShortRun(false)
         setLarge(!large)
         setAppended(0)
       },
     },
-    { label: 'Append logs', onClick: () => setAppended((value) => value + 30) },
-    { label: complete ? 'Resume sample' : 'Finish sample', onClick: () => setComplete(!complete) },
+    { label: 'Append logs', onClick: () => setAppended((value) => value + (shortRun ? 2 : 30)) },
+    {
+      label: complete ? 'Resume sample' : 'Finish sample',
+      onClick: () => {
+        setShortRun(false)
+        setComplete(!complete)
+      },
+    },
     { label: partial ? 'Full history' : 'Partial history', onClick: () => setPartial(!partial) },
     { label: empty ? 'Show events' : 'Empty state', onClick: () => setEmpty(!empty) },
     { label: 'Switch run', onClick: () => setGeneration((value) => value + 1) },
+    {
+      label: 'Start short run',
+      onClick: () => {
+        setShortRun(true)
+        setLarge(false)
+        setEmpty(false)
+        setPartial(false)
+        setComplete(false)
+        setAppended(0)
+        setGeneration((value) => value + 1)
+      },
+    },
   ])
   const time = (seconds: number) => new Date(Date.parse(base.createdAt) + seconds * 1000).toISOString()
   const events: RunEvent[] = []
@@ -551,7 +571,7 @@ function ExecutionLogs({ language, dark, log }: { readonly language: UiLanguage;
           }}
           cancelDisabled={false}
           canceling={false}
-          events={empty ? [] : partial ? events.slice(4) : events}
+          events={empty ? [] : shortRun ? events.slice(0, 2 + appended) : partial ? events.slice(4) : events}
           eventsExpiresAt={undefined}
           eventFilter="all"
           eventNodes={new Map(events.filter((event) => typeof event.payload.nodeId == 'string').map((event) => [event.sequence, String(event.payload.nodeId)]))}
@@ -581,6 +601,6 @@ export const executionLogsStory: FrontendStory = {
   title: 'Execution logs',
   standalone: true,
   description:
-    'Compare interleaved events and execution summaries, repeated nodes, nested scopes and long errors. Locate an execution, filter states and switch runs to clear highlighting.',
+    'Compare interleaved events and execution summaries. Start short run mounts two events; Append logs and Finish sample verify updates before the list can scroll. Locate an execution, filter states and switch runs to clear highlighting.',
   render: (log, dark, language) => <ExecutionLogs language={language} dark={dark} log={log} />,
 }

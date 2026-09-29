@@ -782,7 +782,8 @@ export function RunLog({
           tabIndex={-1}
           data={rows}
           item={RunVirtualItem}
-          ssrCount={Math.min(20, rows.length)}
+          // Client-only lists must measure immediately, even before they are large enough to scroll.
+          ssrCount={typeof window == 'undefined' ? Math.min(20, rows.length) : undefined}
           keepMounted={focusIndex >= 0 ? [focusIndex] : []}
           onScrollIntent={beginManualScroll}
           onKeyDown={(event) => {
