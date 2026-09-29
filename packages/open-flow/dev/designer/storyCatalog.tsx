@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { ValueEditorFeedback } from '../../src/form/browser/fieldControl.tsx'
 import { Input } from '../../src/ui/browser/input.tsx'
 import { CodeEditor } from '../../src/workbench/browser/runtime/editor/codeEditor.tsx'
+import { CodeEditorPlaceholder } from '../../src/workbench/browser/runtime/editor/codeEditorPlaceholder.tsx'
 import { agentStory, codeActionsStory } from './agent.tsx'
 import { cardStories } from './cards.tsx'
 import { commentPropertiesStory } from './commentProperties.tsx'
@@ -75,7 +76,7 @@ const codeEditorStory: FrontendStory = {
   standalone: true,
   title: 'Code Editor',
   description:
-    'Syntax and server errors keep the editor border in its danger state. Edit or reset the source to check that it clears when all errors are resolved.',
+    'The static loading placeholder preserves the editor surface and gutter in both themes. Syntax and server errors keep the editor border in its danger state. Edit or reset the source to check that it clears when all errors are resolved.',
 }
 
 export const labStories: readonly FrontendStory[] = [
@@ -169,6 +170,12 @@ function CodeEditorStory({ dark, log }: { readonly dark: boolean; readonly log: 
         Standard input
         <Input aria-label="Standard input" defaultValue="Reference surface" />
       </label>
+      <div className="flex flex-col gap-1 text-xs">
+        Loading
+        <div className="code-editor">
+          <CodeEditorPlaceholder label="Loading code editor" />
+        </div>
+      </div>
       <ValueEditorFeedback error={serverInvalid ? serverMessage : undefined}>
         {(errorId) => (
           <CodeEditor

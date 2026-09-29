@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { val } from 'value-enhancer'
 import { createCodeEditor } from '../../../../ui/browser/code-editor.ts'
+import { CodeEditorPlaceholder } from './codeEditorPlaceholder.tsx'
 
 export function PromptEditor({
   ariaDescribedBy,
@@ -138,9 +139,10 @@ export function PromptEditor({
       }}
     >
       <div className="code-editor-host" ref={host} />
-      {state != 'ready' && (
-        <span className="code-editor-state" role={state == 'failed' ? 'alert' : undefined}>
-          {t(state == 'failed' ? 'inspector.task.editorUnavailable' : 'inspector.task.editorLoading')}
+      {state == 'loading' && <CodeEditorPlaceholder label={t('inspector.task.editorLoading')} />}
+      {state == 'failed' && (
+        <span className="code-editor-state" role="alert">
+          {t('inspector.task.editorUnavailable')}
         </span>
       )}
     </div>

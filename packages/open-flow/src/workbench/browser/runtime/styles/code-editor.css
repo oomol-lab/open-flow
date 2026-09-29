@@ -26,7 +26,8 @@
     border-radius: inherit;
   }
 
-  :where(.code-editor-host > .cm-editor) {
+  :where(.code-editor-host > .cm-editor),
+  .code-editor-placeholder {
     overflow: hidden;
     border: 1px solid var(--ui-input);
     background: var(--ui-control-background, var(--ui-background));
@@ -186,6 +187,25 @@
 
   .code-editor-host .cm-lsp-hover-tooltip a:hover {
     text-decoration: underline;
+  }
+
+  .code-editor-placeholder {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+  }
+
+  .code-editor-host .cm-gutters,
+  .code-editor-placeholder-gutter {
+    border-color: var(--ui-code-gutter-border);
+    background: var(--ui-code-gutter-background);
+  }
+
+  .code-editor-placeholder-gutter {
+    width: 30px;
+    height: 100%;
+    border-right: 1px solid var(--ui-code-gutter-border);
   }
 
   .code-editor-state {

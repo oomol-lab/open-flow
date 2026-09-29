@@ -29,6 +29,8 @@
   --open-flow-input: #d2d2d2;
   --open-flow-ring: #777777;
   --open-flow-radius: 10px;
+  --ui-code-gutter-background: light-dark(#fff, #333338);
+  --ui-code-gutter-border: light-dark(#ddd, #333338);
   --ui-background: var(--open-flow-background);
   --ui-foreground: var(--open-flow-foreground);
   --ui-card: var(--open-flow-card);

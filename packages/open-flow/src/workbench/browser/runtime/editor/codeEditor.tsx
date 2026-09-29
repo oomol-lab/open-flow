@@ -5,6 +5,7 @@ import type { WorkbenchTheme } from '../contract.ts'
 import { useEffect, useRef, useState } from 'react'
 import { val } from 'value-enhancer'
 import { createCodeEditor } from '../../../../ui/browser/code-editor.ts'
+import { CodeEditorPlaceholder } from './codeEditorPlaceholder.tsx'
 
 type Editor = Awaited<ReturnType<typeof createCodeEditor>>
 
@@ -215,7 +216,7 @@ export function CodeEditor({
       }}
     >
       <div className="code-editor-host" ref={host} />
-      {loading && <span className="code-editor-state">{loadingLabel}</span>}
+      {loading && <CodeEditorPlaceholder label={loadingLabel} />}
       {failed && <span className="code-editor-state error">{errorLabel}</span>}
     </div>
   )
