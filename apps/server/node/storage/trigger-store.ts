@@ -1,4 +1,4 @@
-import type { ConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
+import type { ConnectorAccessSnapshot, ErrorListener } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { RunAcceptance } from '@oomol-lab/open-flow/run-lifecycle'
 import type { DatabaseSync } from 'node:sqlite'
@@ -498,6 +498,23 @@ export class TriggerStore {
       this.#database.prepare('UPDATE cron_bindings SET next_at = ? WHERE binding_id = ?').run(input.nextScheduledAt, input.bindingId)
       return accepted
     })
+  }
+
+  errorListeners(flowId: string): readonly ErrorListener[] {
+    const rows = this.#database
+      .prepare(`SELECT f.flow_id AS flowId, f.name AS flowName,
+      b.trigger_node_id AS nodeId, json_extract(n.value, '$.name') AS nodeName,
+      (l.enabled = 1 AND b.operator_state = 'active') AS enabled
+      FROM error_subscriptions s
+      JOIN flows f ON f.flow_id = s.handler_flow_id AND f.status = 'active'
+      JOIN error_bindings b ON b.flow_id = f.flow_id
+      JOIN flow_live l ON l.flow_id = f.flow_id AND l.publication_id = b.current_publication_id
+      JOIN publications p ON p.publication_id = l.publication_id
+      JOIN revisions r ON r.revision_id = p.revision_id
+      JOIN json_each(r.content, '$.document.graph.nodes') n ON n.key = b.trigger_node_id
+      WHERE s.source_flow_id = ? ORDER BY f.name, f.flow_id, b.trigger_node_id`)
+      .all(flowId) as unknown as readonly (Omit<ErrorListener, 'enabled'> & { enabled: number })[]
+    return rows.map((row) => ({ flowId: row.flowId, flowName: row.flowName, nodeId: row.nodeId, nodeName: row.nodeName, enabled: row.enabled == 1 }))
   }
 
   failCronTarget(target: StoredCronTarget, now: number, errorCode: string, errorMessage: string): void {

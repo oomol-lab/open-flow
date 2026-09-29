@@ -44,7 +44,7 @@ import { flowCheck } from './checkDecoders.ts'
 import { connection, connectorAccess, connectorAccessSnapshot, connectorAccessCandidatesBatch, connectorAction } from './connectorDecoders.ts'
 import { allConnectorConnectionsQuery, connectorActionQuery, connectorConnectionsQuery, connectorProvidersQuery } from './connectorQueries.ts'
 import { exact, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
-import { flow, flowPage, variable } from './flowDecoders.ts'
+import { errorListener, flow, flowPage, variable } from './flowDecoders.ts'
 import { live, publication, publicationPage, publishOperation } from './publicationDecoders.ts'
 import { draft, draftChange, draftSync, presentation } from './revisionDecoders.ts'
 import { runCancellation, runDetails, runPage, runResult, waitResolution } from './runDecoders.ts'
@@ -59,6 +59,14 @@ import { ApiError } from './errors.ts'
 import { randomId } from './random.ts'
 
 export type ControlRequest = (path: string, init?: RequestInit) => Promise<Response>
+
+export interface ErrorListener {
+  readonly flowId: string
+  readonly flowName: string
+  readonly nodeId: string
+  readonly nodeName: string
+  readonly enabled: boolean
+}
 
 export interface Flow {
   readonly live?: { readonly enabled: boolean; readonly publicationId: string; readonly revisionId: string }
@@ -740,6 +748,12 @@ export class ControlClient {
 
   async getFlow(flowId: string): Promise<Flow> {
     return flow(await this.request(`/v1/flows/${segment(flowId)}`))
+  }
+
+  async getErrorListeners(flowId: string, signal?: AbortSignal): Promise<readonly ErrorListener[]> {
+    const source = record(await this.request(`/v1/flows/${segment(flowId)}/error-listeners`, { signal }))
+    if (source.version != 1 || !Array.isArray(source.listeners)) return invalidResponse()
+    return source.listeners.map(errorListener)
   }
 
   async renameFlow(flowId: string, name: string): Promise<Flow> {

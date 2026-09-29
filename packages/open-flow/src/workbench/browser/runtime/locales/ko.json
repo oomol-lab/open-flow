@@ -758,7 +758,12 @@
     "renameFlow": "{{name}} 이름 바꾸기",
     "search": "검색",
     "searchResources": "{{kind}} 검색",
-    "subflows": "Subflow"
+    "subflows": "Subflow",
+    "listenersLoading": "오류 트리거 확인 중…",
+    "listenersFailed": "오류 트리거를 확인하지 못했습니다. 다시 시도하거나 삭제를 계속할 수 있습니다.",
+    "listenersTitle": "다음 게시된 오류 트리거 설정이 이 워크플로를 감시합니다:",
+    "listenerDisabled": "비활성화됨",
+    "listenersImpact": "삭제하면 이 워크플로의 오류 전달이 중단됩니다. 다른 상위 워크플로에는 영향이 없습니다. 설정에서 사용할 수 없는 참조를 직접 제거해야 합니다."
   },
   "diagnostics": {
     "checking": "현재 초안을 검사하는 중…",
@@ -1361,7 +1366,6 @@
     "trigger": "오류 트리거",
     "description": "다른 워크플로가 실패하면 실행합니다.",
     "empty": "선택할 수 있는 게시된 워크플로가 없습니다.",
-    "unavailable": "사용 불가 · 선택 해제 가능",
     "retry": "다시 시도",
     "more": "더 불러오기",
     "pending": "오류 처리 대기 중",
@@ -1377,6 +1381,13 @@
     "noMatches": "일치하는 워크플로가 없습니다",
     "choose": "상위 워크플로 선택",
     "done": "완료",
-    "clear": "선택 해제"
+    "clear": "선택 해제",
+    "deletedName": "삭제된 워크플로",
+    "deleted": "삭제됨",
+    "retiring": "삭제 중",
+    "unpublished": "게시되지 않음",
+    "self": "현재 워크플로 자체는 감시할 수 없습니다",
+    "removeHint": "사용할 수 없는 상위 워크플로를 제거한 후 다시 게시하세요.",
+    "removeUnavailable": "사용 불가 상위 제거"
   }
 }

@@ -758,7 +758,12 @@
     "renameFlow": "重命名 {{name}}",
     "search": "搜索",
     "searchResources": "搜索{{kind}}",
-    "subflows": "Subflow"
+    "subflows": "Subflow",
+    "listenersLoading": "正在查询错误触发器…",
+    "listenersFailed": "无法确认哪些错误触发器正在监听。可重试，或继续删除。",
+    "listenersTitle": "以下已发布的错误触发器配置正在监听此工作流：",
+    "listenerDisabled": "已停用",
+    "listenersImpact": "删除后将停止接收此工作流的错误，其他上游的监听不受影响。配置中的失效引用需手动移除。"
   },
   "diagnostics": {
     "checking": "正在检查当前草稿…",
@@ -1361,7 +1366,6 @@
     "trigger": "错误触发器",
     "description": "其他工作流失败时运行。",
     "empty": "暂无可选的已发布工作流。",
-    "unavailable": "不可用，可取消选择",
     "retry": "重试",
     "more": "加载更多",
     "pending": "等待错误处理",
@@ -1377,6 +1381,13 @@
     "noMatches": "没有匹配的工作流",
     "choose": "选择上游工作流",
     "done": "完成",
-    "clear": "清空选择"
+    "clear": "清空选择",
+    "deletedName": "已删除的工作流",
+    "deleted": "已删除",
+    "retiring": "删除中",
+    "unpublished": "未发布",
+    "self": "不能监听当前工作流",
+    "removeHint": "请移除失效上游后重新发布。",
+    "removeUnavailable": "移除失效上游"
   }
 }

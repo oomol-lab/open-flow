@@ -1,10 +1,10 @@
 import type { ComponentProps, FormEvent, MouseEvent, ReactElement } from 'react'
-import type { Flow } from '../api.ts'
+import type { ErrorListener, Flow } from '../api.ts'
 import type { WorkbenchLanguage } from '../contract.ts'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 import type { WorkspaceBusy } from '../stores/workspaceModel.ts'
 
-import { lazy, Suspense, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { resourceNameIssue, resourceNameMaxLength } from '../../../../flow/common/change.ts'
@@ -85,6 +85,50 @@ function clickedRowControl(event: MouseEvent<HTMLDivElement>): boolean {
   return event.target instanceof Element && event.target.closest(rowControlSelector) != null
 }
 
+export function FlowDeletionImpact({
+  listeners,
+  failed,
+  onRetry,
+}: {
+  readonly listeners: readonly ErrorListener[] | undefined
+  readonly failed: boolean
+  readonly onRetry: () => void
+}) {
+  const t = useTranslate()
+  if (failed)
+    return (
+      <div className="space-y-2">
+        <p role="alert" className="text-sm text-destructive">
+          {t('sidebar.listenersFailed')}
+        </p>
+        <Button variant="outline" size="sm" onClick={onRetry}>
+          {t('errorWorkflow.retry')}
+        </Button>
+      </div>
+    )
+  if (listeners == null)
+    return (
+      <p role="status" className="text-sm text-muted-foreground">
+        {t('sidebar.listenersLoading')}
+      </p>
+    )
+  if (listeners.length == 0) return null
+  return (
+    <div className="min-w-0 space-y-3 text-sm">
+      <p>{t('sidebar.listenersTitle')}</p>
+      <ul className="m-0 max-h-48 list-none space-y-2 overflow-y-auto p-0">
+        {listeners.map((listener) => (
+          <li key={`${listener.flowId}/${listener.nodeId}`} className="break-words">
+            <span className="font-medium">{listener.flowName}</span> / {listener.nodeName}
+            {!listener.enabled && <span className="ml-2 text-muted-foreground">{t('sidebar.listenerDisabled')}</span>}
+          </li>
+        ))}
+      </ul>
+      <p className="text-muted-foreground">{t('sidebar.listenersImpact')}</p>
+    </div>
+  )
+}
+
 function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): ReactElement {
   const [root, setRoot] = useState<HTMLDivElement | null>(null)
   const renameAnchor = useRef<HTMLSpanElement>(null)
@@ -95,6 +139,25 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
   const t = useTranslate()
   const [mode, setMode] = useState<'delete' | 'idle' | 'rename'>('idle')
   const [name, setName] = useState(flow.name)
+  const [listeners, setListeners] = useState<readonly ErrorListener[]>()
+  const [listenersFailed, setListenersFailed] = useState(false)
+  const [listenersRetry, setListenersRetry] = useState(0)
+  useEffect(() => {
+    if (mode != 'delete') return
+    const controller = new AbortController()
+    setListeners(undefined)
+    setListenersFailed(false)
+    void store.workspace.getErrorListeners(flow.flowId, controller.signal).then(
+      (value) => {
+        if (!controller.signal.aborted) setListeners(value)
+      },
+      () => {
+        if (!controller.signal.aborted) setListenersFailed(true)
+      },
+    )
+    return () => controller.abort()
+  }, [mode, flow.flowId, store, listenersRetry])
+
   const [pending, setPending] = useState<'publish' | 'enabled' | undefined>()
   const changed = flow.live != null && flow.live.revisionId != flow.draftRevisionId
   const publicationStatus =
@@ -318,9 +381,10 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
             <DialogTitle>{t('sidebar.deleteFlowConfirm', { name: flow.name })}</DialogTitle>
             <DialogDescription>{t('resource.deleteDescription')}</DialogDescription>
           </DialogHeader>
+          <FlowDeletionImpact listeners={listeners} failed={listenersFailed} onRetry={() => setListenersRetry((value) => value + 1)} />
           <DialogFooter>
             <DialogClose render={<Button ref={cancelDelete} variant="outline" />}>{t('common.cancel')}</DialogClose>
-            <Button disabled={busy != null} onClick={() => void remove()} variant="destructive">
+            <Button disabled={busy != null || (listeners == null && !listenersFailed)} onClick={() => void remove()} variant="destructive">
               {t(busy == 'flow' ? 'common.deleting' : 'common.delete')}
             </Button>
           </DialogFooter>

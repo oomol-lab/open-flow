@@ -758,7 +758,12 @@
     "renameFlow": "Rename {{name}}",
     "search": "Search",
     "searchResources": "Search {{kind}}",
-    "subflows": "Subflows"
+    "subflows": "Subflows",
+    "listenersLoading": "Checking error listeners…",
+    "listenersFailed": "Could not check error listeners. Retry or continue deleting.",
+    "listenersTitle": "These published Error Trigger configurations listen to this workflow:",
+    "listenerDisabled": "Disabled",
+    "listenersImpact": "Deleting stops errors from this workflow reaching these triggers. Other upstream workflows are unaffected. Unavailable references must be removed from their configurations manually."
   },
   "diagnostics": {
     "checking": "Checking the current Draft…",
@@ -1361,7 +1366,6 @@
     "trigger": "Error Trigger",
     "description": "Runs when another workflow fails.",
     "empty": "No published workflows available.",
-    "unavailable": "Unavailable; you can deselect it",
     "retry": "Retry",
     "more": "Load more",
     "pending": "Waiting for error handling",
@@ -1377,6 +1381,13 @@
     "noMatches": "No matching workflows",
     "choose": "Select upstream workflows",
     "done": "Done",
-    "clear": "Clear selection"
+    "clear": "Clear selection",
+    "deletedName": "Deleted workflow",
+    "deleted": "Deleted",
+    "retiring": "Being deleted",
+    "unpublished": "Not published",
+    "self": "Cannot listen to this workflow itself",
+    "removeHint": "Remove unavailable upstream workflows before publishing again.",
+    "removeUnavailable": "Remove unavailable upstreams"
   }
 }

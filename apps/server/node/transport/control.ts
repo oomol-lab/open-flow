@@ -192,6 +192,10 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.renameFlow)
     return response(200, service.renameFlow(context.req.param('flowId'), body.name))
   })
+  app.get('/flows/:flowId/error-listeners', (context) => {
+    query(context.req.raw, [], controlErrorCode.flowInvalid)
+    return response(200, service.getErrorListeners(context.req.param('flowId')))
+  })
   app.delete('/flows/:flowId', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
     return response(202, service.retireFlow(context.req.param('flowId')))

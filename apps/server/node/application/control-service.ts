@@ -555,6 +555,11 @@ export class ControlService {
     return flow(stored)
   }
 
+  getErrorListeners(flowId: string) {
+    this.getFlow(flowId)
+    return { version: 1 as const, listeners: this.store.triggers.errorListeners(flowId) }
+  }
+
   retireFlow(flowId: string): Flow {
     const stored = this.store.flows.retire(flowId, this.clock())
     if (stored == null) notFound()

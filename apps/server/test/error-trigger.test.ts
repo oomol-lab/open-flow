@@ -382,3 +382,24 @@ it('retries only the pending handler when fan-out exceeds queue capacity', async
   expect(f.store.runViews.errorHandling(sourceRun).errorDispatches?.map((item) => item.status)).toEqual(['dispatched', 'dispatched'])
   expect(f.maintain().errorDispatches).toEqual([])
 })
+
+it('lists published error listeners with their names and disabled state for deletion warnings', async () => {
+  const f = fixture()
+  await f.flow('source')
+  await f.flow('other')
+  await f.flow('active', 'error', ['source'])
+  const disabled = await f.flow('disabled', 'error', ['source'])
+  await f.flow('paused', 'error', ['source'])
+  await f.flow('retiring', 'error', ['source'])
+  await f.flow('unrelated', 'error', ['other'])
+  f.store.flows.rename('active', 'Alerts', 2_000)
+  f.store.flows.setEnabled('disabled', disabled.publicationId, false)
+  f.database.connection.prepare("UPDATE error_bindings SET operator_state = 'paused' WHERE flow_id = 'paused'").run()
+  f.store.flows.retire('retiring', 2_000)
+  expect(f.store.triggers.errorListeners('source')).toEqual([
+    { flowId: 'active', flowName: 'Alerts', nodeId: 'start', nodeName: 'Start', enabled: true },
+    { flowId: 'disabled', flowName: 'disabled', nodeId: 'start', nodeName: 'Start', enabled: false },
+    { flowId: 'paused', flowName: 'paused', nodeId: 'start', nodeName: 'Start', enabled: false },
+  ])
+  expect(f.store.triggers.errorListeners('active')).toEqual([])
+})

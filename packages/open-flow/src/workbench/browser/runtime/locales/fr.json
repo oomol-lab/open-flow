@@ -758,7 +758,12 @@
     "renameFlow": "Renommer {{name}}",
     "search": "Rechercher",
     "searchResources": "Rechercher des {{kind}}",
-    "subflows": "Subflows"
+    "subflows": "Subflows",
+    "listenersLoading": "Recherche des déclencheurs d’erreur…",
+    "listenersFailed": "Impossible de vérifier les déclencheurs. Réessayez ou poursuivez la suppression.",
+    "listenersTitle": "Ces configurations publiées de déclencheurs d’erreur surveillent ce workflow :",
+    "listenerDisabled": "Désactivé",
+    "listenersImpact": "La suppression arrête la transmission des erreurs de ce workflow. Les autres workflows en amont ne sont pas affectés. Retirez manuellement les références indisponibles des configurations."
   },
   "diagnostics": {
     "checking": "Vérification du Brouillon actuel…",
@@ -1361,7 +1366,6 @@
     "trigger": "Déclencheur d’erreur",
     "description": "Exécute ce workflow lorsqu’un autre échoue.",
     "empty": "Aucun workflow publié disponible.",
-    "unavailable": "Indisponible ; vous pouvez le désélectionner",
     "retry": "Réessayer",
     "more": "Charger plus",
     "pending": "En attente de gestion des erreurs",
@@ -1377,6 +1381,13 @@
     "noMatches": "Aucun workflow correspondant",
     "choose": "Sélectionner les workflows en amont",
     "done": "Terminé",
-    "clear": "Effacer la sélection"
+    "clear": "Effacer la sélection",
+    "deletedName": "Workflow supprimé",
+    "deleted": "Supprimé",
+    "retiring": "Suppression en cours",
+    "unpublished": "Non publié",
+    "self": "Impossible de surveiller ce workflow lui-même",
+    "removeHint": "Retirez les workflows en amont indisponibles avant de publier à nouveau.",
+    "removeUnavailable": "Retirer les workflows indisponibles"
   }
 }

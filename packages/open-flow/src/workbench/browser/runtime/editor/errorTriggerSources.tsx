@@ -7,8 +7,10 @@ import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../form/browser/selectionMenuStyles.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
+import { Label } from '../../../../ui/browser/label.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 import { SelectChevron } from '../../../../ui/browser/select.tsx'
 
@@ -38,12 +40,24 @@ export function ErrorTriggerSources({
   const eligible = flows.filter((flow) => flow.flowId != flowId && flow.status == 'active' && flow.live != null)
   const candidates = [...new Set([...eligible.map((flow) => flow.flowId), ...value])].map((sourceId) => {
     const flow = flows.find((item) => item.flowId == sourceId)
-    return { id: sourceId, name: flow?.name ?? sourceId, unavailable: !eligible.some((item) => item.flowId == sourceId) && (complete || flow != null) }
+    const issue =
+      sourceId == flowId
+        ? 'self'
+        : flow?.status == 'retiring'
+          ? 'retiring'
+          : flow == null
+            ? complete
+              ? 'deleted'
+              : undefined
+            : flow.live == null
+              ? 'unpublished'
+              : undefined
+    return { id: sourceId, name: flow?.name ?? (issue == 'deleted' ? t('errorWorkflow.deletedName') : sourceId), issue }
   })
   const visible = candidates.filter((flow) => `${flow.name} ${flow.id}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()))
   const selected = candidates.filter((flow) => value.includes(flow.id))
   const summary = selected.map((flow) => flow.name).join(', ')
-  const unavailable = selected.filter((flow) => flow.unavailable)
+  const unavailable = selected.filter((flow) => flow.issue)
   return (
     <Field className="inspector-field-section">
       <FieldLabel className="inspector-section-title" htmlFor={id}>
@@ -67,7 +81,8 @@ export function ErrorTriggerSources({
                   size="field"
                   disabled={disabled}
                   aria-label={`${t('errorWorkflow.sources')}: ${summary || t('errorWorkflow.choose')}`}
-                  aria-describedby={`${id}-hint`}
+                  aria-describedby={`${id}-hint${unavailable.length > 0 ? ` ${id}-error` : ''}`}
+                  aria-invalid={unavailable.length > 0 || undefined}
                   className="w-full min-w-0 justify-between"
                 />
               }
@@ -95,23 +110,21 @@ export function ErrorTriggerSources({
               </div>
               <div role="group" aria-label={t('errorWorkflow.sources')} className="max-h-[min(40vh,280px)] overflow-y-auto overscroll-contain">
                 {visible.map((flow) => (
-                  <label
+                  <Label
                     key={flow.id}
                     className={`flex cursor-default items-center gap-2 px-2 hover:bg-accent focus-within:bg-accent ${selectionMenuItemClass}`}
                   >
-                    <input
-                      type="checkbox"
-                      className="sr-only"
+                    <Checkbox
                       checked={value.includes(flow.id)}
                       disabled={disabled}
-                      onChange={(event) => onChange(event.target.checked ? [...value, flow.id] : value.filter((item) => item != flow.id))}
+                      onCheckedChange={(checked) => onChange(checked ? [...value, flow.id] : value.filter((item) => item != flow.id))}
                     />
                     <span className="min-w-0 flex-1 break-words">
                       {flow.name}
-                      {flow.unavailable && <span className="block text-destructive">{t('errorWorkflow.unavailable')}</span>}
+                      {flow.issue == 'deleted' && <span className="block break-all text-muted-foreground">{flow.id}</span>}
+                      {flow.issue && <span className="block text-destructive">{t(`errorWorkflow.${flow.issue}`)}</span>}
                     </span>
-                    <i aria-hidden="true" className={`i-lucide-light:check size-4 shrink-0 ${value.includes(flow.id) ? '' : 'invisible'}`} />
-                  </label>
+                  </Label>
                 ))}
                 {visible.length == 0 && (
                   <p className="px-2 py-3 text-xs text-muted-foreground">{t(query ? 'errorWorkflow.noMatches' : 'errorWorkflow.empty')}</p>
@@ -139,9 +152,23 @@ export function ErrorTriggerSources({
         </div>
         <FieldDescription id={`${id}-hint`}>{t('errorWorkflow.setupHint')}</FieldDescription>
         {unavailable.length > 0 && (
-          <FieldError>
-            {unavailable.map((flow) => flow.name).join(', ')} · {t('errorWorkflow.unavailable')}
-          </FieldError>
+          <div className="flex flex-col items-start gap-2">
+            <FieldError id={`${id}-error`}>
+              <ul>
+                {unavailable.map((flow) => (
+                  <li key={flow.id}>
+                    {flow.name} · {t(`errorWorkflow.${flow.issue!}`)}
+                  </li>
+                ))}
+              </ul>
+              <p>{t('errorWorkflow.removeHint')}</p>
+            </FieldError>
+            {!disabled && (
+              <Button variant="outline" size="sm" onClick={() => onChange(value.filter((sourceId) => !unavailable.some((flow) => flow.id == sourceId)))}>
+                {t('errorWorkflow.removeUnavailable')}
+              </Button>
+            )}
+          </div>
         )}
       </div>
     </Field>

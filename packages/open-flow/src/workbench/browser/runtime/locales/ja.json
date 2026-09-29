@@ -758,7 +758,12 @@
     "renameFlow": "{{name}} の名前を変更",
     "search": "検索",
     "searchResources": "{{kind}} を検索",
-    "subflows": "Subflow"
+    "subflows": "Subflow",
+    "listenersLoading": "エラートリガーを確認中…",
+    "listenersFailed": "エラートリガーを確認できませんでした。再試行するか、削除を続行できます。",
+    "listenersTitle": "次の公開済みエラートリガー設定がこのワークフローを監視しています：",
+    "listenerDisabled": "無効",
+    "listenersImpact": "削除すると、このワークフローのエラーは届かなくなります。他の上流の監視には影響しません。無効な参照は設定から手動で削除してください。"
   },
   "diagnostics": {
     "checking": "現在のドラフトを検査中…",
@@ -1361,7 +1366,6 @@
     "trigger": "エラートリガー",
     "description": "別のワークフローが失敗したときに実行します。",
     "empty": "選択できる公開済みワークフローがありません。",
-    "unavailable": "利用不可・選択解除できます",
     "retry": "再試行",
     "more": "さらに読み込む",
     "pending": "エラー処理を待機中",
@@ -1377,6 +1381,13 @@
     "noMatches": "一致するワークフローがありません",
     "choose": "上流ワークフローを選択",
     "done": "完了",
-    "clear": "選択をクリア"
+    "clear": "選択をクリア",
+    "deletedName": "削除済みのワークフロー",
+    "deleted": "削除済み",
+    "retiring": "削除中",
+    "unpublished": "未公開",
+    "self": "このワークフロー自身は監視できません",
+    "removeHint": "利用できない上流ワークフローを削除してから再公開してください。",
+    "removeUnavailable": "利用できない上流を削除"
   }
 }

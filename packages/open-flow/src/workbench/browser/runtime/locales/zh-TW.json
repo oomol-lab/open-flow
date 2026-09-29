@@ -758,7 +758,12 @@
     "renameFlow": "重新命名 {{name}}",
     "search": "搜尋",
     "searchResources": "搜尋 {{kind}}",
-    "subflows": "Subflow"
+    "subflows": "Subflow",
+    "listenersLoading": "正在查詢錯誤觸發器…",
+    "listenersFailed": "無法確認哪些錯誤觸發器正在監聽。可重試，或繼續刪除。",
+    "listenersTitle": "以下已發佈的錯誤觸發器設定正在監聽此工作流程：",
+    "listenerDisabled": "已停用",
+    "listenersImpact": "刪除後將停止接收此工作流程的錯誤，其他上游的監聽不受影響。設定中的失效引用需手動移除。"
   },
   "diagnostics": {
     "checking": "正在檢查目前的草稿…",
@@ -1361,7 +1366,6 @@
     "trigger": "錯誤觸發器",
     "description": "其他工作流程失敗時執行。",
     "empty": "暫無可選的已發布工作流程。",
-    "unavailable": "無法使用，可取消選取",
     "retry": "重試",
     "more": "載入更多",
     "pending": "等待錯誤處理",
@@ -1377,6 +1381,13 @@
     "noMatches": "沒有符合的工作流程",
     "choose": "選擇上游工作流程",
     "done": "完成",
-    "clear": "清空選取"
+    "clear": "清空選取",
+    "deletedName": "已刪除的工作流程",
+    "deleted": "已刪除",
+    "retiring": "刪除中",
+    "unpublished": "未發佈",
+    "self": "不能監聽目前工作流程",
+    "removeHint": "請移除失效上游後重新發佈。",
+    "removeUnavailable": "移除失效上游"
   }
 }

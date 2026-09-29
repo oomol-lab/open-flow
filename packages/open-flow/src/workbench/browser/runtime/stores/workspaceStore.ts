@@ -414,6 +414,10 @@ export class WorkspaceStore {
     }
   }
 
+  public getErrorListeners(flowId: string, signal?: AbortSignal) {
+    return this.#client.getErrorListeners(flowId, signal)
+  }
+
   public async deleteFlow(flowId: string): Promise<boolean> {
     if (!(await this.saveModuleEditor())) return false
     const flow = this.#flows.flow(flowId)

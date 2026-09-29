@@ -1250,3 +1250,18 @@ Flow 服务列表与账号授权分别保存。`ConnectorAccess.providerIds` 保
 `POST /v1/flows` 的创建请求接受 `{ name, teamId?: string, version: 1 }`；teamId 必须是非空字符串，并由部署验证可访问性。省略时保留部署的默认 Team 选择规则。相同 Idempotency-Key 对不同 Team 的创建请求返回冲突。
 
 Server 提供认证后的 `GET /v1/connector/teams`，返回 `{ enabled: boolean, teams: { id: string, name: string, systemCreated: boolean }[], version: 1 }`。不支持 Team 的部署返回 enabled=false 和空 teams。此目录不返回 Flow-Team 绑定列表。公共 ControlClient 通过 listConnectorTeams 读取，并通过 createFlow 的可选第三参数传入 teamId。
+
+### Error Trigger deletion impact
+
+`GET /v1/flows/:flowId/error-listeners` returns `{ version: 1, listeners }` for the
+existing source Flow (404 if it does not exist). Each listener contains `flowId`,
+`flowName`, `nodeId`, `nodeName`, and `enabled`. The response includes all current
+published Error Trigger subscriptions without catalog pagination; unpublished draft
+selections and retiring handlers are excluded. Node names come from the current
+Publication, while Flow names use the current catalog name. `enabled` is false when
+the handler deployment is disabled or its binding is paused.
+
+The deletion dialog queries this endpoint each time it opens. This is an advisory
+snapshot, not a deletion lock: subscriptions can change after the query. Deletion
+still retires the source and eventually removes its subscriptions; handler draft
+references remain available for manual removal.
