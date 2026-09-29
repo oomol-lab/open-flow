@@ -255,9 +255,11 @@ function SettingItem({
 }
 
 export function SettingsPage({
+  onSignOut,
   onConnectorChange,
   onUnauthorized,
 }: {
+  readonly onSignOut: () => void
   readonly onConnectorChange: () => void
   readonly onUnauthorized: () => void
 }): ReactElement {
@@ -415,6 +417,14 @@ export function SettingsPage({
             </section>
           </>
         )}
+        <section className="settings-section" aria-labelledby="settings-session-title">
+          <div className="settings-heading">
+            <h2 id="settings-session-title">{t('settings.session')}</h2>
+            <Button variant="outline" size="sm" type="button" onClick={onSignOut}>
+              {t('session.signOut')}
+            </Button>
+          </div>
+        </section>
       </div>
     </main>
   )

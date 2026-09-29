@@ -22,7 +22,12 @@
     "flows": "Flows",
     "notifications": "Notifications",
     "settings": "Settings",
-    "variables": "Env"
+    "variables": "Env",
+    "language": "Language",
+    "theme": "Theme: {{mode}}",
+    "light": "Light",
+    "dark": "Dark",
+    "auto": "System"
   },
   "settings": {
     "callbackKey": "Callback signing key (kept in Open Flow)",
@@ -64,7 +69,8 @@
     "callbackKeyStored": "Signing key saved in Open Flow. You do not need to provide it manually to a third party.",
     "generateSecret": "Generate random key",
     "integrationDescription": "Set the public address external services use to send events to Open Flow.",
-    "publicOriginHint": "Enter the public root address that Providers can reach, such as https://flows.example.com. Do not add a path or callback endpoint. HTTPS is required in production."
+    "publicOriginHint": "Enter the public root address that Providers can reach, such as https://flows.example.com. Do not add a path or callback endpoint. HTTPS is required in production.",
+    "session": "Session"
   },
   "team": {
     "createFailed": "The Flow could not be created for this Connector Team.",

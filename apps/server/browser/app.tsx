@@ -3,7 +3,7 @@ import type { FormEvent, MouseEvent, ReactElement } from 'react'
 import type { ConnectionConsole } from './connectionNavigation.ts'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
-import { Button, OpenFlowLogo, notificationToasterProps } from '@oomol-lab/open-flow/ui'
+import { HostNavigationActions, OpenFlowLogo, notificationToasterProps } from '@oomol-lab/open-flow/ui'
 import { EventSourcesPage, OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { Toaster } from 'sonner'
@@ -19,11 +19,16 @@ import { parseRoute, routePath } from './route.ts'
 import { SettingsPage } from './settings.tsx'
 import { VariablesPage } from './variables.tsx'
 
+type ThemeMode = WorkbenchTheme | 'auto'
+const themePreference = 'open-flow.workbench.server.theme'
+
 const preferencePrefix = 'open-flow.workbench.server.'
 interface Props {
   readonly language: WorkbenchLanguage
   readonly onLanguageChange: (language: WorkbenchLanguage) => void
   readonly theme: WorkbenchTheme
+  readonly themeMode: ThemeMode
+  readonly onThemeModeChange: (mode: ThemeMode) => void
 }
 
 type Session =
@@ -120,7 +125,7 @@ function connectorTeams(value: unknown):
   return { bindings, enabled: true, teams, version: 1, console }
 }
 
-function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
+function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange }: Props): ReactElement {
   const [routeUrl, setRouteUrl] = useState(() => window.location.pathname + window.location.search)
   const pathname = routeUrl.split('?')[0]
   const route = useMemo(() => parseRoute(routeUrl), [routeUrl])
@@ -409,11 +414,20 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
                 {t('shell.settings')}
               </a>
             </nav>
-            <div className="server-nav-actions">
-              <Button variant="ghost" size="sm" onClick={() => void signOut()} type="button">
-                {t('session.signOut')}
-              </Button>
-            </div>
+            <HostNavigationActions
+              className="server-nav-actions"
+              language={language}
+              onLanguageChange={onLanguageChange}
+              theme={themeMode}
+              onThemeChange={onThemeModeChange}
+              labels={{
+                theme: t('shell.theme', { mode: t(`shell.${themeMode}`) }),
+                language: t('shell.language'),
+                light: t('shell.light'),
+                dark: t('shell.dark'),
+                auto: t('shell.auto'),
+              }}
+            />
           </header>
           <div className="workbench-frame">
             {settingsOpen ? (
@@ -434,7 +448,7 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
                   {eventSourcesOpen ? (
                     <EventSourcesPage client={client} language={language} teams={team.kind == 'ready' ? team.teams : []} />
                   ) : (
-                    <SettingsPage onConnectorChange={() => void loadTeams()} onUnauthorized={sessionExpired} />
+                    <SettingsPage onSignOut={() => void signOut()} onConnectorChange={() => void loadTeams()} onUnauthorized={sessionExpired} />
                   )}
                 </div>
               </div>
@@ -515,7 +529,13 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
 
 export function App(): ReactElement {
   const [language, setLanguage] = useState(initialLanguage)
-  const [theme, setTheme] = useState(initialTheme)
+  const [systemTheme, setSystemTheme] = useState(initialTheme)
+  const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
+    const stored = localStorage.getItem(themePreference)
+    return stored == 'light' || stored == 'dark' ? stored : 'auto'
+  })
+  const theme = themeMode == 'auto' ? systemTheme : themeMode
+  useEffect(() => localStorage.setItem(themePreference, themeMode), [themeMode])
   const [i18n] = useState(() => createI18n(language))
 
   useLayoutEffect(() => {
@@ -529,14 +549,14 @@ export function App(): ReactElement {
   }, [i18n, language])
   useEffect(() => {
     const media = window.matchMedia('(prefers-color-scheme: dark)')
-    const update = (): void => setTheme(media.matches ? 'dark' : 'light')
+    const update = (): void => setSystemTheme(media.matches ? 'dark' : 'light')
     media.addEventListener('change', update)
     return () => media.removeEventListener('change', update)
   }, [])
 
   return (
     <I18nProvider i18n={i18n}>
-      <Shell language={language} onLanguageChange={setLanguage} theme={theme} />
+      <Shell language={language} onLanguageChange={setLanguage} theme={theme} themeMode={themeMode} onThemeModeChange={setThemeMode} />
     </I18nProvider>
   )
 }

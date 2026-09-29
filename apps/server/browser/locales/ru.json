@@ -22,7 +22,12 @@
     "flows": "Flow",
     "notifications": "Уведомления",
     "settings": "Настройки",
-    "variables": "Переменные среды"
+    "variables": "Переменные среды",
+    "language": "Язык",
+    "theme": "Тема: {{mode}}",
+    "light": "Светлая",
+    "dark": "Тёмная",
+    "auto": "Системная"
   },
   "settings": {
     "callbackKey": "Ключ подписи callback (хранится только в Open Flow)",
@@ -64,7 +69,8 @@
     "callbackKeyStored": "Ключ подписи сохранён в Open Flow. Вручную передавать его стороннему сервису не нужно.",
     "generateSecret": "Создать случайный ключ",
     "integrationDescription": "Укажите публичный адрес, на который внешние сервисы будут отправлять события в Open Flow.",
-    "publicOriginHint": "Введите публичный корневой адрес, доступный Provider, например https://flows.example.com. Не добавляйте путь или endpoint callback. В production используйте HTTPS."
+    "publicOriginHint": "Введите публичный корневой адрес, доступный Provider, например https://flows.example.com. Не добавляйте путь или endpoint callback. В production используйте HTTPS.",
+    "session": "Сеанс"
   },
   "team": {
     "createFailed": "Не удалось создать Flow для этой команды Connector.",

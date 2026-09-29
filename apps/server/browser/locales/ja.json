@@ -22,7 +22,12 @@
     "flows": "Flow",
     "notifications": "通知",
     "settings": "設定",
-    "variables": "環境変数"
+    "variables": "環境変数",
+    "language": "言語",
+    "theme": "テーマ：{{mode}}",
+    "light": "ライト",
+    "dark": "ダーク",
+    "auto": "システム"
   },
   "settings": {
     "callbackKey": "Callback 署名キー（Open Flow のみに保存）",
@@ -64,7 +69,8 @@
     "callbackKeyStored": "署名キーは Open Flow に保存されています。外部サービスに手動で渡す必要はありません。",
     "generateSecret": "ランダムキーを生成",
     "integrationDescription": "外部サービスから Open Flow にイベントを送信するための公開アドレスを設定します。",
-    "publicOriginHint": "Provider からアクセスできる公開ルートアドレス（例: https://flows.example.com）を入力してください。パスや callback endpoint は追加しないでください。本番環境では HTTPS を使用します。"
+    "publicOriginHint": "Provider からアクセスできる公開ルートアドレス（例: https://flows.example.com）を入力してください。パスや callback endpoint は追加しないでください。本番環境では HTTPS を使用します。",
+    "session": "セッション"
   },
   "team": {
     "createFailed": "この Connector チームで Flow を作成できませんでした。",

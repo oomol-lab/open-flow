@@ -18,6 +18,10 @@ paths are relative to the repository root. Use production code as the source for
 - Components own interaction semantics. Preserve keyboard operation, accessible names, state
   communication, focus restoration, expected opening and closing behavior, real link semantics,
   and reduced-motion behavior.
+- Icon-only action buttons and links must use the shared Tooltip as well as a localized accessible
+  name. A native `title` is not a substitute. Hosts use `HostTooltip` from `@oomol-lab/open-flow/ui`;
+  product components use the shared UI Tooltip primitives. Verify keyboard focus and hover, preserve
+  the surrounding theme, and keep dynamic hints in sync with the current state.
 - When adding, replacing, or choosing icons, use the
   [iconify-icons skill](../iconify-icons/SKILL.md). Lucide icons use
   `i-lucide-light:<name>`, not `i-lucide:<name>`; existing `lucide-react` components use

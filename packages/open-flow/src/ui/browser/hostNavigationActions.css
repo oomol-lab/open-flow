@@ -1,0 +1,21 @@
+.open-flow-navigation-menu {
+  position: fixed;
+  inset: 48px 16px auto auto;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-popover);
+  color: var(--ui-popover-foreground);
+  box-shadow: 0 4px 12px #0002;
+}
+
+.open-flow-navigation-menu:popover-open {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+}
+
+.open-flow-navigation-menu button[aria-pressed='true'] {
+  background: var(--ui-muted);
+}

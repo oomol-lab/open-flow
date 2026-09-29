@@ -6,7 +6,7 @@
     "notConfigured": "请先在服务端配置 OPEN_FLOW_TOKEN。",
     "retry": "重试",
     "signIn": "登录",
-    "signOut": "退出",
+    "signOut": "退出登录",
     "setupCode": "Setup code",
     "setupCodeDescription": "请输入 Server 启动日志中的一次性 setup code。",
     "setupContinue": "继续",
@@ -22,7 +22,12 @@
     "flows": "工作流",
     "notifications": "通知",
     "settings": "设置",
-    "variables": "环境变量"
+    "variables": "环境变量",
+    "language": "语言",
+    "theme": "主题：{{mode}}",
+    "light": "明亮",
+    "dark": "暗色",
+    "auto": "跟随系统"
   },
   "settings": {
     "callbackKey": "回调签名密钥（仅保存在 Open Flow）",
@@ -64,7 +69,8 @@
     "callbackKeyStored": "签名密钥保存在 Open Flow 中，无需手动提供给第三方。",
     "generateSecret": "生成随机密钥",
     "integrationDescription": "设置外部系统向 Open Flow 发送事件时使用的公网地址。",
-    "publicOriginHint": "填写 Provider 可以访问到的公网根地址，例如 https://flows.example.com。不要添加路径或具体回调地址；生产环境请使用 HTTPS。"
+    "publicOriginHint": "填写 Provider 可以访问到的公网根地址，例如 https://flows.example.com。不要添加路径或具体回调地址；生产环境请使用 HTTPS。",
+    "session": "会话"
   },
   "team": {
     "createFailed": "无法在这个 Connector 团队中创建工作流。",

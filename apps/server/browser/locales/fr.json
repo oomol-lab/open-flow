@@ -22,7 +22,12 @@
     "flows": "Flow",
     "notifications": "Notifications",
     "settings": "Paramètres",
-    "variables": "Variables d’environnement"
+    "variables": "Variables d’environnement",
+    "language": "Langue",
+    "theme": "Thème : {{mode}}",
+    "light": "Clair",
+    "dark": "Sombre",
+    "auto": "Système"
   },
   "settings": {
     "callbackKey": "Clé de signature des callbacks (conservée dans Open Flow)",
@@ -64,7 +69,8 @@
     "callbackKeyStored": "Clé de signature enregistrée dans Open Flow. Vous n’avez pas besoin de la fournir manuellement à un service tiers.",
     "generateSecret": "Générer une clé aléatoire",
     "integrationDescription": "Définissez l’adresse publique utilisée par les services externes pour envoyer des événements à Open Flow.",
-    "publicOriginHint": "Saisissez l’adresse racine publique accessible aux Provider, par exemple https://flows.example.com. N’ajoutez ni chemin ni endpoint de callback. Utilisez HTTPS en production."
+    "publicOriginHint": "Saisissez l’adresse racine publique accessible aux Provider, par exemple https://flows.example.com. N’ajoutez ni chemin ni endpoint de callback. Utilisez HTTPS en production.",
+    "session": "Session"
   },
   "team": {
     "createFailed": "Impossible de créer le Flow pour cette équipe du Connector.",

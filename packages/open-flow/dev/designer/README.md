@@ -78,7 +78,7 @@ Run panels are laid out open in the page, with empty, ready, invalid, starting a
 
 Examples: `?story=trigger-webhook-nodes`, `?story=trigger-webhook-run`, `?story=trigger-webhook-sidebar`, and `?story=trigger-provider-run`. The generic `run-control-states` story remains a control-layout study with placeholder input content; provider-specific visual acceptance belongs in the Provider gallery. A selected provider is shareable through `?story=trigger-provider-run&provider=github-on-repo-event`.
 
-The Lab shell uses a fixed viewport with a shared theme on the document body. The header sits on the background; the sidebar and preview are separate rounded surfaces. Scrolling stays inside the navigation and Story content. Theme and language menus use the shared dropdown components and their default body portal.
+The Lab shell uses a fixed viewport with a shared theme on the document body. The header sits on the background; the sidebar and preview are separate rounded surfaces. Scrolling stays inside the navigation and Story content. The header reuses `HostNavigationActions` from the public UI entry, including GitHub, theme and language icon buttons with tooltips. Theme and language menus use native popovers and remember Lab preferences locally.
 
 `lab.tsx` owns navigation, preferences, and the shell; `lab.css` owns its layout and navigation styles. `storyCatalog.tsx` registers the existing Stories, `storyStage.tsx` provides their canvas preview context, and `styles.css` contains Story presentation styles.
 

@@ -1,15 +1,14 @@
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
+import type { HostThemeMode } from '../../src/ui/browser/public.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
 
-import { Moon, Sun } from 'lucide-react'
 import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createI18n } from '../../src/canvas/browser/i18n/i18n-loader.ts'
-import { defaultUiLanguage, uiLanguageNames, uiLanguages } from '../../src/localization/common/languages.ts'
-import { Button } from '../../src/ui/browser/button.tsx'
-import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '../../src/ui/browser/dropdown-menu.tsx'
+import { defaultUiLanguage, isUiLanguage } from '../../src/localization/common/languages.ts'
 import { IconThemeContext } from '../../src/ui/browser/icons/iconTheme.ts'
 import { Input } from '../../src/ui/browser/input.tsx'
 import { OpenFlowLogo } from '../../src/ui/browser/logo.tsx'
+import { HostNavigationActions } from '../../src/ui/browser/public.ts'
 import { ScrollArea } from '../../src/ui/browser/scroll-area.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../../src/ui/browser/tooltip.tsx'
 import { StoryActions, StoryActionsProvider } from './storyActions.tsx'
@@ -18,16 +17,7 @@ import { normalizeStorySearch } from './storySearch.ts'
 import { StorySidebarLayout } from './storySidebar.tsx'
 import { StoryStage } from './storyStage.tsx'
 
-type ThemeMode = 'system' | 'light' | 'dark'
-const themeOptions = [
-  { value: 'system', label: 'Auto', icon: AutoThemeIcon },
-  { value: 'light', label: 'Light', icon: Sun },
-  { value: 'dark', label: 'Dark', icon: Moon },
-] as const
-
-function AutoThemeIcon() {
-  return <i aria-hidden="true" className="i-lucide:sun-moon shrink-0" style={{ width: 16, height: 16 }} />
-}
+const themeLabels = { auto: 'System', light: 'Light', dark: 'Dark' } as const
 
 // Directory icons belong to navigation metadata, not individual stories.
 const storyGroupIcons: Readonly<Record<string, `i-${string}`>> = {
@@ -159,14 +149,25 @@ export function FrontendLab() {
     .filter((section) => section.groups.length > 0)
   const [storyId, setStoryId] = useState(() => storyFromUrl().id)
   const story = labStories.find((entry) => entry.id === storyId) ?? storyFromUrl()
-  const [theme, setTheme] = useState<ThemeMode>('system')
+  const [theme, setTheme] = useState<HostThemeMode>(() => {
+    const stored = localStorage.getItem('open-flow.lab.theme')
+    return stored == 'light' || stored == 'dark' ? stored : 'auto'
+  })
   const [systemDark, setSystemDark] = useState(() => matchMedia('(prefers-color-scheme: dark)').matches)
-  const [language, setLanguage] = useState<UiLanguage>(defaultUiLanguage)
+  const [language, setLanguage] = useState<UiLanguage>(() => {
+    const stored = localStorage.getItem('open-flow.lab.language')
+    return isUiLanguage(stored) ? stored : defaultUiLanguage
+  })
   const [status, setStatus] = useState('Ready')
-  const dark = theme === 'system' ? systemDark : theme === 'dark'
+  const dark = theme === 'auto' ? systemDark : theme === 'dark'
   const i18n = useMemo(() => createI18n(language), [language])
   const currentSection = storySections.find((section) => section.groups.some((group) => group.name === story.group))!
   const path = [currentSection.name, story.group.replace(/^(?:Node|Trigger) /, ''), story.title]
+
+  useEffect(() => {
+    localStorage.setItem('open-flow.lab.theme', theme)
+    localStorage.setItem('open-flow.lab.language', language)
+  }, [theme, language])
 
   useLayoutEffect(() => {
     // The document owns the Lab theme, including shared menus portaled to body.
@@ -222,7 +223,14 @@ export function FrontendLab() {
             ))}
           </ol>
         </nav>
-        <LabPreferences theme={theme} onThemeChange={setTheme} language={language} onLanguageChange={setLanguage} />
+        <HostNavigationActions
+          className="lab-preferences"
+          theme={theme}
+          onThemeChange={setTheme}
+          language={language}
+          onLanguageChange={setLanguage}
+          labels={{ ...themeLabels, theme: `Theme: ${themeLabels[theme]}`, language: 'Language' }}
+        />
       </header>
       <aside className="lab-sidebar">
         <div className="lab-search">
@@ -283,69 +291,6 @@ export function FrontendLab() {
           </footer>
         </main>
       </StoryActionsProvider>
-    </div>
-  )
-}
-
-function LabPreferences({
-  theme,
-  onThemeChange,
-  language,
-  onLanguageChange,
-}: {
-  theme: ThemeMode
-  onThemeChange: (theme: ThemeMode) => void
-  language: UiLanguage
-  onLanguageChange: (language: UiLanguage) => void
-}) {
-  const currentTheme = themeOptions.find((option) => option.value === theme)!
-  const ThemeIcon = currentTheme.icon
-  return (
-    <div className="lab-preferences">
-      <Button
-        className="mr-2 text-foreground"
-        nativeButton={false}
-        render={<a href="https://github.com/oomol-lab/open-flow" target="_blank" rel="noreferrer" />}
-        variant="ghost"
-        size="icon-sm"
-        aria-label="Open Flow on GitHub"
-        title="Open Flow on GitHub"
-      >
-        <i aria-hidden="true" className="i-simple-icons:github text-base" />
-      </Button>
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger
-          render={<Button variant="ghost" size="icon-sm" />}
-          aria-label={`Theme: ${currentTheme.label}`}
-          title={`Theme: ${currentTheme.label}`}
-        >
-          <ThemeIcon />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="lab-theme-menu min-w-40">
-          <DropdownMenuRadioGroup value={theme} onValueChange={(value) => onThemeChange(value as ThemeMode)}>
-            {themeOptions.map(({ value, label, icon: Icon }) => (
-              <DropdownMenuRadioItem key={value} value={value} closeOnClick>
-                <Icon />
-                {label}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger render={<Button variant="ghost" size="sm" />} aria-label={`Language: ${uiLanguageNames[language]}`}>
-          {uiLanguageNames[language]}
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="min-w-40">
-          <DropdownMenuRadioGroup value={language} onValueChange={(value) => onLanguageChange(value as UiLanguage)}>
-            {uiLanguages.map((value) => (
-              <DropdownMenuRadioItem key={value} value={value} closeOnClick>
-                {uiLanguageNames[value]}
-              </DropdownMenuRadioItem>
-            ))}
-          </DropdownMenuRadioGroup>
-        </DropdownMenuContent>
-      </DropdownMenu>
     </div>
   )
 }

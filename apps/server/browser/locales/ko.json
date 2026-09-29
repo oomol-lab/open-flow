@@ -22,7 +22,12 @@
     "flows": "Flow",
     "notifications": "알림",
     "settings": "설정",
-    "variables": "환경 변수"
+    "variables": "환경 변수",
+    "language": "언어",
+    "theme": "테마: {{mode}}",
+    "light": "라이트",
+    "dark": "다크",
+    "auto": "시스템"
   },
   "settings": {
     "callbackKey": "콜백 서명 키(Open Flow에만 저장)",
@@ -64,7 +69,8 @@
     "callbackKeyStored": "서명 키는 Open Flow에 저장됩니다. 타사 서비스에 직접 제공할 필요가 없습니다.",
     "generateSecret": "무작위 키 생성",
     "integrationDescription": "외부 서비스가 Open Flow로 이벤트를 보낼 때 사용할 공개 주소를 설정합니다.",
-    "publicOriginHint": "Provider가 접근할 수 있는 공개 루트 주소(예: https://flows.example.com)를 입력하세요. 경로나 콜백 endpoint를 추가하지 마세요. 운영 환경에서는 HTTPS를 사용해야 합니다."
+    "publicOriginHint": "Provider가 접근할 수 있는 공개 루트 주소(예: https://flows.example.com)를 입력하세요. 경로나 콜백 endpoint를 추가하지 마세요. 운영 환경에서는 HTTPS를 사용해야 합니다.",
+    "session": "세션"
   },
   "team": {
     "createFailed": "이 Connector 팀에서 Flow를 만들지 못했습니다.",

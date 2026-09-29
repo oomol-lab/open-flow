@@ -22,7 +22,12 @@
     "flows": "Flow",
     "notifications": "通知",
     "settings": "設定",
-    "variables": "環境變數"
+    "variables": "環境變數",
+    "language": "語言",
+    "theme": "主題：{{mode}}",
+    "light": "明亮",
+    "dark": "深色",
+    "auto": "跟隨系統"
   },
   "settings": {
     "callbackKey": "回呼簽章金鑰（僅保存在 Open Flow）",
@@ -64,7 +69,8 @@
     "callbackKeyStored": "簽章金鑰保存在 Open Flow 中，無需手動提供給第三方。",
     "generateSecret": "產生隨機金鑰",
     "integrationDescription": "設定外部服務向 Open Flow 傳送事件時使用的公開位址。",
-    "publicOriginHint": "填寫 Provider 可以存取的公開根位址，例如 https://flows.example.com。不要加入路徑或具體回呼位址；生產環境請使用 HTTPS。"
+    "publicOriginHint": "填寫 Provider 可以存取的公開根位址，例如 https://flows.example.com。不要加入路徑或具體回呼位址；生產環境請使用 HTTPS。",
+    "session": "工作階段"
   },
   "team": {
     "createFailed": "無法在這個 Connector 團隊中建立 Flow。",

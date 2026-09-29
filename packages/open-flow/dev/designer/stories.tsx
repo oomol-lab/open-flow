@@ -32,6 +32,7 @@ import {
 } from '../../src/ui/browser/dropdown-menu.tsx'
 import { Field as UiField, FieldLabel } from '../../src/ui/browser/field.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../src/ui/browser/popover.tsx'
+import { HostTooltip } from '../../src/ui/browser/public.ts'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '../../src/ui/browser/select.tsx'
 import { Textarea } from '../../src/ui/browser/textarea.tsx'
 import { WorkbenchCanvasActions } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
@@ -211,6 +212,14 @@ function PopupStory({ log }: { readonly log: LogAction }) {
       <CanvasTooltip getPopupContainer={() => container} title="Designer tooltip">
         <Button>Tooltip</Button>
       </CanvasTooltip>
+      <HostTooltip label="Host button tooltip" side="bottom">
+        <Button variant="outline">Host button</Button>
+      </HostTooltip>
+      <HostTooltip label="Open the GitHub repository" side="bottom">
+        <a href="https://github.com/oomol-lab/open-flow" target="_blank" rel="noopener noreferrer">
+          Host link
+        </a>
+      </HostTooltip>
     </div>
   )
 }
@@ -597,6 +606,7 @@ export const stories: readonly FrontendStory[] = [
   {
     group: 'Popup',
     id: 'popup',
+    description: 'Hover or focus the controls to inspect canvas and host tooltips, including native host links, in both themes.',
     render: (log) => <PopupStory log={log} />,
     title: 'Dropdown, Popover & Tooltip',
   },
