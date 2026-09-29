@@ -1,6 +1,7 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { TriggerOccurrenceInput } from '../node/storage/trigger-store.ts'
 
+import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { applyFlowChanges, currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { encodeRevision, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { matchesTriggerOutputs } from '@oomol-lab/open-flow/flow-semantics'
@@ -10,6 +11,7 @@ import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
+import { closeService, openService } from './serviceFixture.ts'
 
 const cleanups: (() => void)[] = []
 afterEach(() => {
@@ -27,6 +29,7 @@ function fixture(capacity = 10) {
     rmSync(directory, { recursive: true, force: true })
   })
   return {
+    file,
     get database() {
       return database
     },
@@ -402,4 +405,30 @@ it('lists published error listeners with their names and disabled state for dele
     { flowId: 'paused', flowName: 'paused', nodeId: 'start', nodeName: 'Start', enabled: false },
   ])
   expect(f.store.triggers.errorListeners('active')).toEqual([])
+})
+
+it.each(['unpublished', 'retired'] as const)('repairs a draft while retaining an %s upstream without allowing publication', async (state) => {
+  const f = fixture()
+  await f.flow('source')
+  const handler = await f.flow('handler', 'error', ['source'])
+  const original = f.store.flows.revision('handler', handler.revisionId)
+  if (state == 'unpublished') f.database.connection.prepare("DELETE FROM flow_live WHERE flow_id = 'source'").run()
+  else f.store.flows.retire('source', 2_000)
+  const service = await openService(f.file)
+  try {
+    const repaired = await service.control.repairDraft('operator', 'handler', handler.revisionId, 'repair')
+    expect(repaired.revision.parentRevisionId).toBe(handler.revisionId)
+    expect(service.control.getDraft('handler')).toMatchObject({
+      revisionId: repaired.revision.revisionId,
+      content: { document: { graph: { nodes: { start: { kind: 'error', sourceFlowIds: ['source'] } } } } },
+    })
+    expect(f.database.connection.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(repaired.revision.revisionId)).toBeDefined()
+    expect(f.store.flows.revision('handler', handler.revisionId)).toEqual(original)
+    await expect(service.control.repairDraft('operator', 'handler', handler.revisionId, 'repair')).resolves.toEqual(repaired)
+    await expect(
+      service.control.publishFlow('operator', 'handler', repaired.revision.revisionId, handler.engineContract, handler.publicationId, 'publish-repaired'),
+    ).rejects.toMatchObject({ code: controlErrorCode.flowInvalid })
+  } finally {
+    await closeService(service)
+  }
 })

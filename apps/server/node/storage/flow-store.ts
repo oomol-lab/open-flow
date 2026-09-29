@@ -390,19 +390,19 @@ export class FlowStore {
       if (flow.status != 'active') return { kind: 'busy' }
       if (flow.draftRevisionId != input.expectedRevisionId) return { kind: 'conflict' }
 
-      const next = (JSON.parse(input.content) as Partial<RevisionContent>).document?.graph.nodes ?? {}
-      const previous = input.forceFull
-        ? {}
-        : ((JSON.parse(this.#revisions.read(input.expectedRevisionId)!.content) as Partial<RevisionContent>).document?.graph.nodes ?? {})
-      for (const [nodeId, node] of Object.entries(next)) {
-        if (node.kind != 'error') continue
-        const old = previous[nodeId]
-        const oldSources = old?.kind == 'error' ? (old.sourceFlowIds ?? []) : []
-        requireErrorSources(
-          this.#database,
-          input.flowId,
-          (node.sourceFlowIds ?? []).filter((id) => !oldSources.includes(id)),
-        )
+      if (!input.forceFull) {
+        const next = (JSON.parse(input.content) as Partial<RevisionContent>).document?.graph.nodes ?? {}
+        const previous = (JSON.parse(this.#revisions.read(input.expectedRevisionId)!.content) as Partial<RevisionContent>).document?.graph.nodes ?? {}
+        for (const [nodeId, node] of Object.entries(next)) {
+          if (node.kind != 'error') continue
+          const old = previous[nodeId]
+          const oldSources = old?.kind == 'error' ? (old.sourceFlowIds ?? []) : []
+          requireErrorSources(
+            this.#database,
+            input.flowId,
+            (node.sourceFlowIds ?? []).filter((id) => !oldSources.includes(id)),
+          )
+        }
       }
       updateAccess?.()
       const body = { content: input.content, revisionDigest: input.digest, revisionId: input.revisionId }
