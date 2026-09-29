@@ -1,4 +1,6 @@
 import type { JsonValue, Port, PortDefinition } from '../../types/index.ts'
+
+import { assertOpenApiAuthBindings } from '../../openapi/common/authBindings.ts'
 export { fixedInputValue, inputValue, inputValues } from './inputValue.ts'
 import type { WebhookMethod } from './webhookMethod.ts'
 
@@ -213,6 +215,7 @@ export interface ConditionNode extends GraphNodeBase {
 }
 
 export type ManagedTaskExecutor =
+  | import('../../openapi/common/openapi.ts').OpenApiExecutor
   | { readonly kind: 'connector'; readonly action: string; readonly connectionId?: string }
   | { readonly kind: 'llm'; readonly mode: 'chat' | 'json' }
   | {
@@ -666,6 +669,7 @@ export type ChangeOperation =
   | { readonly kind: 'task.create'; readonly task: FlowDocument['tasks'][string]; readonly taskId: string }
   | { readonly before?: string; readonly kind: 'task.connector.connection.set'; readonly taskId: string; readonly value?: string }
   | { readonly kind: 'task.delete'; readonly taskId: string }
+  | { readonly before: ManagedTaskDefinition; readonly kind: 'task.openapi.set'; readonly taskId: string; readonly value: ManagedTaskDefinition }
   | { readonly before: ManagedTaskDefinition; readonly kind: 'task.agent.set'; readonly taskId: string; readonly value: ManagedTaskDefinition }
   | { readonly before: 'chat' | 'json'; readonly kind: 'task.llm.mode.set'; readonly taskId: string; readonly value: 'chat' | 'json' }
   | { readonly before: string; readonly kind: 'task.name.set'; readonly taskId: string; readonly value: string }
@@ -997,6 +1001,13 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         document.tasks = tasks
         break
       }
+      case 'task.openapi.set': {
+        const task = document.tasks[operation.taskId]
+        if (task?.executor.kind != 'openapi' || operation.value.executor.kind != 'openapi') invalid('The OpenAPI Task does not exist.')
+        if (!dequal(task, operation.before)) invalid('The OpenAPI Task changed before this operation was applied.')
+        document.tasks = { ...document.tasks, [operation.taskId]: operation.value }
+        break
+      }
       case 'task.agent.set': {
         const task = document.tasks[operation.taskId]
         if (task?.executor.kind != 'agent' || operation.value.executor.kind != 'agent') invalid('The Agent Task does not exist.')
@@ -1020,5 +1031,6 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
       }
     }
   }
+  assertOpenApiAuthBindings(document)
   return { document, modelVersion: currentFlowModelVersion, modules }
 }

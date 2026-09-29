@@ -49,7 +49,7 @@ export type SchedulerEvent =
       readonly inputs: Readonly<Record<string, JsonValue>>
       readonly jobId: string
       readonly nodeId: string
-      readonly nodeKind: 'agent' | 'approval' | 'condition' | 'connector' | 'javascript' | 'llm' | 'subflow' | 'value' | 'wait'
+      readonly nodeKind: 'agent' | 'approval' | 'condition' | 'connector' | 'javascript' | 'openapi' | 'llm' | 'subflow' | 'value' | 'wait'
       readonly nodeTitle?: string
       readonly runId: string
       readonly type: 'node.started'
@@ -300,7 +300,7 @@ function nodeTitle(prepared: PreparedFlow, node: ExecutableNode): string | undef
 function nodeKind(
   prepared: PreparedFlow,
   node: ExecutableNode,
-): 'agent' | 'approval' | 'condition' | 'connector' | 'javascript' | 'llm' | 'subflow' | 'value' | 'wait' {
+): 'agent' | 'approval' | 'condition' | 'connector' | 'javascript' | 'openapi' | 'llm' | 'subflow' | 'value' | 'wait' {
   if (node.kind != 'task') return node.kind
   return node.task != null ? 'javascript' : prepared.tasks[node.taskId]!.executor.kind
 }
@@ -732,6 +732,8 @@ function runGraph(
           const title = nodeTitle(context.prepared, node)
           const projectedInputs = Object.fromEntries(
             Object.entries(nodeInputs).filter(([handle]) => {
+              if (node.kind == 'task' && node.taskId != null && context.prepared.tasks[node.taskId]?.executor.kind == 'openapi' && handle.startsWith('auth.'))
+                return false
               const mapping = nodeInputMappings(node)[handle]
               return mapping?.kind != 'sources' || mapping.sources.every((source) => source.kind != 'binding')
             }),
@@ -778,7 +780,18 @@ function runGraph(
                 additionalInputs: Object.fromEntries(Object.entries(nodeInputs).filter(([handle]) => additional.has(handle))),
                 blockId: node.task != null ? node.task.moduleId : node.taskId,
                 flowId: target.flowId,
-                input: Object.fromEntries(Object.entries(nodeInputs).filter(([handle]) => !additional.has(handle))),
+                input: Object.fromEntries(
+                  Object.entries(nodeInputs).filter(([handle]) => {
+                    if (additional.has(handle)) return false
+                    const task = node.taskId == null ? undefined : context.prepared.tasks[node.taskId]
+                    if (task?.executor.kind != 'openapi') return true
+                    const mapping = node.inputs[handle]
+                    return (
+                      mapping?.kind != 'unset' &&
+                      (mapping != null || task.inputs.some((port) => 'handle' in port && port.handle == handle && port.value !== undefined))
+                    )
+                  }),
+                ),
                 invocationId: saved?.invocationId ?? (config == null ? context.createId() : jobId),
                 ...(resolution == null || saved == null ? {} : { agent: { action: resolution, checkpoint: saved.checkpoint } }),
                 jobId,

@@ -1,5 +1,5 @@
 import type { ConnectorAccess, ConnectorActionMetadata } from '../../src/control/common/api.ts'
-import type { ChangeOperation, RevisionContent } from '../../src/flow/common/change.ts'
+import type { ChangeOperation, RevisionContent, JsonValue } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { LogAction } from './stories.tsx'
 
@@ -19,6 +19,7 @@ export function createInspectorTransport(
   log: LogAction,
   initialContent: RevisionContent,
   options: {
+    readonly openApiDocument?: (url: string, signal?: AbortSignal) => Promise<JsonValue>
     readonly published?: boolean
     readonly access?: ConnectorAccess
     readonly accessError?: boolean
@@ -99,6 +100,10 @@ export function createInspectorTransport(
   }
   const client = new WorkbenchClient(async (path, init) => {
     const url = new URL(path instanceof Request ? path.url : path, 'https://lab.invalid')
+    if (url.pathname == '/v1/openapi/document' && options.openApiDocument != null) {
+      const body = JSON.parse(String(init?.body))
+      return Response.json({ version: 1, document: await options.openApiDocument(body.url, init?.signal ?? undefined) })
+    }
     if (url.pathname.endsWith('/connection-usage/remove')) {
       const input = JSON.parse(String(init?.body)) as { connectionId: string; expectedRevisionId: string; expectedAccessRevision: number }
       if (input.expectedRevisionId != revision().revisionId || input.expectedAccessRevision != access.accessRevision)

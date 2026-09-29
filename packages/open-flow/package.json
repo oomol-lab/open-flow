@@ -53,7 +53,8 @@
     "./ui.css": "./src/ui/browser/public.css",
     "./trigger-locales-plugin": "./src/build/node/triggerLocales.ts",
     "./preview": "./src/workbench/browser/runtime/openFlowPreview.tsx",
-    "./preview.css": "./src/workbench/browser/runtime/preview.css"
+    "./preview.css": "./src/workbench/browser/runtime/preview.css",
+    "./openapi": "./src/openapi/common/openapi.ts"
   },
   "scripts": {
     "build": "bun scripts/build.ts",

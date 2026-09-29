@@ -1,3 +1,4 @@
+import { openApiIssues, authHandles } from '../../openapi/common/openapi.ts'
 export { renderPrompt } from './promptTemplate.ts'
 export { connectionUsage, removeConnectionUsage } from './connectionUsage.ts'
 import { matchesTriggerOutputs } from '../../trigger/common/contract.ts'
@@ -257,6 +258,27 @@ export async function validateFlow(revision: RevisionContent, engine: EngineCont
   for (const taskId of [...closure.dependencies.tasks].toSorted()) {
     const task = revision.document.tasks[taskId]
     if (task == null) continue
+    for (const message of openApiIssues(task))
+      checked.diagnostics.push({ code: 'openapi.config-invalid', column: 0, line: 1, message, path: `/document/tasks/${taskId}/executor` })
+    if (task.executor.kind == 'openapi') {
+      const handles = authHandles(task.executor.auth)
+      for (const [graphPath, graph] of graphs) {
+        for (const [nodeId, node] of Object.entries(graph.nodes))
+          if (node.kind == 'task' && node.taskId == taskId) {
+            for (const handle of handles) {
+              const mapping = node.inputs[handle]
+              if (mapping?.kind != 'sources' || mapping.sources.length == 0 || mapping.sources.some((source) => source.kind == 'flow'))
+                checked.diagnostics.push({
+                  code: 'openapi.auth-source',
+                  column: 0,
+                  line: 1,
+                  message: 'Authentication requires a deployment variable or upstream output.',
+                  path: `${graphPath}/nodes/${nodeId}/inputs/${handle}`,
+                })
+            }
+          }
+      }
+    }
     for (const message of agentConfigIssues(task, revision.document.tasks)) {
       checked.diagnostics.push({ code: 'agent.config-invalid', column: 0, line: 1, message, path: `/document/tasks/${taskId}/executor` })
     }

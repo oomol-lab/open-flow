@@ -113,6 +113,7 @@ function nodeIcon(node: ResolvedNode): string | undefined {
       const task = node.definition
       if (task == null) return
       if ('moduleId' in task) return ':carbon:code:'
+      if (task.executor.kind == 'openapi') return ':lucide:braces:'
       return task.executor.kind == 'connector' ? ':carbon:connection-signal:' : ':carbon:machine-learning-model:'
     }
   }
@@ -337,6 +338,7 @@ function executorName(task: TaskDefinition | undefined, providerName: string | u
   if (task == null) return
   if ('moduleId' in task) return t?.('designer.executorJavaScript') ?? 'JavaScript'
   if (task.executor.kind == 'agent') return 'Agent'
+  if (task.executor.kind == 'openapi') return 'OpenAPI'
   if (task.executor.kind == 'llm') return t?.('designer.executorLlm') ?? 'LLM'
   return `${t?.('designer.executorConnector') ?? 'Connector'} · ${providerName ?? task.executor.action.split('.')[0]}`
 }

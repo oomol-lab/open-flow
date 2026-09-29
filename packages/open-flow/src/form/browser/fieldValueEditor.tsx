@@ -38,7 +38,7 @@ export interface FieldValueEditorProps extends ValueControlProps, FieldRowPresen
   /** Inspect values without mutation affordances; disclosure and copying remain available. */
   readonly readOnly?: boolean
   /** Override only this field’s unset presentation and requiredness, never its children. */
-  readonly unset?: { readonly label: string; readonly required: boolean }
+  readonly unset?: { readonly label: string; readonly required: boolean; readonly onActivate?: () => void }
   readonly expansionPolicy?: FieldExpansionPolicy
   readonly compact?: boolean
   readonly onDefinitionChange?: (schema: unknown, value: unknown, deletion?: FieldValueDeletion) => void
@@ -353,9 +353,13 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
           data-field-prompt={invalid || undefined}
           data-field-control
           aria-invalid={invalid || undefined}
-          aria-label={`${label} ${t('valueEditor.setValue')}`}
-          disabled={disabled || !valueEditable}
+          aria-label={`${label} ${customUnset ? props.unset!.label : t('valueEditor.setValue')}`}
+          disabled={disabled || (!valueEditable && props.unset?.onActivate == null)}
           onClick={() => {
+            if (customUnset && props.unset?.onActivate != null) {
+              props.unset.onActivate()
+              return
+            }
             const next = getDefaultValue(typeOfSchema(schema), schema)
             focusCreatedValue.current = true
             onChange(next === undefined ? getDefaultValue(type) : next)
@@ -363,7 +367,7 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
           }}
         >
           <span>{customUnset ? props.unset!.label : t('valueEditor.setValue')}</span>
-          <i aria-hidden="true" className="i-lucide-light:pencil" />
+          {props.unset?.onActivate == null && <i aria-hidden="true" className="i-lucide-light:pencil" />}
         </Button>
       ) : valueEditable && (jsonMode || complex) ? (
         <JsonEditor

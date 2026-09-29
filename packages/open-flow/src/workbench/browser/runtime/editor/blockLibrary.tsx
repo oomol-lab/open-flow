@@ -108,6 +108,7 @@ function fallbackIcon(item: LibraryNodeItem): IconName {
       return 'llm'
     case 'condition':
       return 'condition'
+    case 'openapi':
     case 'connector':
     case 'connector-group':
       return 'connection'

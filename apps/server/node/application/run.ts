@@ -19,6 +19,7 @@ import * as Effect from 'effect/Effect'
 import { executeCode } from '../deployment/agent-code.ts'
 import { executeAgent } from '../deployment/agent.ts'
 import { checkCodeActions, checkCodePermissions, ConnectorTaskError } from '../deployment/connector.ts'
+import { executeOpenApi } from '../deployment/openapi.ts'
 import { errorKind } from '../logger.ts'
 import { isolatedVmEngineDigest, IsolatedVmHost } from '../runtime/isolated-vm.ts'
 
@@ -360,6 +361,8 @@ export class RunExecutor {
     const task = prepared.tasks[invocation.taskId]!
     const executor = task.executor
     switch (executor.kind) {
+      case 'openapi':
+        return executeOpenApi(executor, invocation.input, invocation.signal)
       case 'agent': {
         const model = run.llmConfig
         if (model == null) throw new TaskHostError('llm.unavailable', 'The fixed Agent model configuration is unavailable.')

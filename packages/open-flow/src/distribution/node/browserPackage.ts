@@ -54,6 +54,7 @@ export async function buildBrowserPackage(options: BuildBrowserPackageOptions): 
   const browserOutputPath = path.join(options.packageRoot, 'dist/browser')
   const commonOutputPath = path.join(options.packageRoot, 'dist/common')
   await buildRuntime(options, commonOutputPath, connectorProxyEntryPath, 'connector-proxy', true)
+  await buildRuntime(options, commonOutputPath, 'src/openapi/common/openapi.ts', 'openapi', false)
   await buildRuntime(options, commonOutputPath, connectorActionEntryPath, 'connector-action', false)
   await buildRuntime(options, commonOutputPath, controlRequestsEntryPath, 'control-requests', false)
   await buildRuntime(options, commonOutputPath, mcpEntryPath, 'mcp', false)
@@ -265,6 +266,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       "'./flow-change.js'",
     )
     const flowChangeDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/change.d.ts'), 'utf8'))
+      .replaceAll("'../../openapi/common/openapi.ts'", "'../common/openapi.js'")
       .replaceAll("'../../types/index.ts'", "'../index.js'")
       .replaceAll("'./changeSchema.ts'", "'./flow-change-schema.js'")
       .replaceAll("'./inputValue.ts'", "'./flow-input-value.js'")
@@ -414,6 +416,13 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(path.join(commonOutputPath, 'engine-contract.d.ts'), engineContractDeclaration),
       writeFile(path.join(commonOutputPath, 'runtime-contract.d.ts'), runtimeContractDeclaration),
       writeFile(path.join(commonOutputPath, 'scheduler.d.ts'), schedulerDeclaration),
+      writeFile(
+        path.join(commonOutputPath, 'openapi.d.ts'),
+        (await readFile(path.join(declarationRoot, 'openapi/common/openapi.d.ts'), 'utf8')).replaceAll(
+          "'../../flow/common/change.ts'",
+          "'../browser/flow-change.js'",
+        ),
+      ),
       writeFile(path.join(commonOutputPath, 'connector-action.d.ts'), connectorActionDeclaration),
       writeFile(path.join(commonOutputPath, 'connector-proxy.d.ts'), connectorProxyDeclaration),
       writeFile(

@@ -54,6 +54,7 @@ export type AddNodeOption = AddNodeOptionBase &
         readonly serviceId: string
       }
     | { readonly kind: 'agent' }
+    | { readonly kind: 'openapi' }
     | { readonly kind: 'llm' }
     | { readonly kind: 'new-task' }
     | { readonly kind: 'subflow'; readonly referenceId: string }
@@ -99,6 +100,7 @@ function builtinOptions(t: TFunction): readonly AddNodeOption[] {
       kind: 'agent',
       label: t('addNode.agent'),
     },
+    { description: t('openapi.description'), group, icon: ':lucide:braces:', id: 'openapi', inputs: [], outputs: [], kind: 'openapi', label: 'OpenAPI' },
     {
       description: t('addNode.valueDescription'),
       group,
@@ -231,6 +233,8 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, tar
             outputDescription: t('agent.defaultOutputDescription'),
           }
         : undefined
+    case 'openapi':
+      return { kind: 'openapi', name: 'OpenAPI' }
     case 'llm': {
       const mode = option.id == 'llm:json' ? 'json' : 'chat'
       return {

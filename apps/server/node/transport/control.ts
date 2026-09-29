@@ -11,6 +11,7 @@ import { localizeTrigger } from '@oomol-lab/open-flow/provider-triggers'
 import { runStatuses } from '@oomol-lab/open-flow/run-lifecycle'
 import { Hono } from 'hono'
 import { etag, RETAINED_304_HEADERS } from 'hono/etag'
+import { loadOpenApiDocument } from '../deployment/openapi.ts'
 import { ControlError } from '../error.ts'
 import {
   decodeFlowCursor,
@@ -53,6 +54,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     await next()
   }
   for (const route of [
+    '/openapi/*',
     '/event-sources',
     '/event-sources/*',
     '/connector/*',
@@ -67,6 +69,16 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   ]) {
     app.use(route, authenticate)
   }
+
+  app.post('/openapi/document', async (context) => {
+    try {
+      query(context.req.raw, [], controlErrorCode.flowInvalid)
+      const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.loadOpenApiDocument)
+      return response(200, { version: 1, document: await loadOpenApiDocument(body.url, context.req.raw.signal) })
+    } catch {
+      throw new ControlError(controlErrorCode.flowInvalid, 'Unable to load the OpenAPI JSON document.')
+    }
+  })
 
   app.get('/event-sources', async (context) => {
     query(context.req.raw, ['flowId'], controlErrorCode.eventSourceInvalid)

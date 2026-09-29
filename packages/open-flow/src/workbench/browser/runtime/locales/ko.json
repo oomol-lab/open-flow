@@ -1389,5 +1389,27 @@
     "self": "현재 워크플로 자체는 감시할 수 없습니다",
     "removeHint": "사용할 수 없는 상위 워크플로를 제거한 후 다시 게시하세요.",
     "removeUnavailable": "사용 불가 상위 제거"
+  },
+  "openapi": {
+    "description": "Call a JSON API from a saved OpenAPI definition.",
+    "document": "OpenAPI JSON URL",
+    "loading": "Loading…",
+    "update": "Update",
+    "operation": "Select operation",
+    "search": "Search operations",
+    "server": "Server URL",
+    "servers": "Choose a documented server",
+    "auth": "Authentication",
+    "unsupported": "Unsupported",
+    "none": "None",
+    "keyName": "API key name",
+    "keyLocation": "API key location",
+    "saveFailed": "The definition changed or could not be saved. Try again.",
+    "urlRequired": "Enter an OpenAPI JSON document URL.",
+    "operationRequired": "Load a document and select an operation.",
+    "noOperations": "This document contains no operations.",
+    "noMatches": "No matching operations.",
+    "loadRequired": "Click Update to load the operation definitions.",
+    "untagged": "Untagged"
   }
 }

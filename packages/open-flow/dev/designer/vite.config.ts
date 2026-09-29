@@ -52,5 +52,21 @@ export default defineConfig({
     fullReloadPlugin(),
   ],
   resolve: { alias: { '@lab': path.resolve(import.meta.dirname) } },
-  server: { open: false },
+  server: {
+    open: false,
+    proxy: {
+      '/__lab/openapi-catfacts': {
+        target: 'https://catfact.ninja',
+        changeOrigin: true,
+        rewrite: () => '/docs?api-docs.json',
+        proxyTimeout: 15000,
+        configure(proxy) {
+          proxy.on('proxyReq', (request) => {
+            request.removeHeader('cookie')
+            request.removeHeader('authorization')
+          })
+        },
+      },
+    },
+  },
 })

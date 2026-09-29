@@ -103,3 +103,8 @@ await import.meta.resolve('@oomol-lab/open-flow/theme.css')
 await import.meta.resolve('@oomol-lab/open-flow/ui.css')
 
 await assert.rejects(import('@oomol-lab/open-flow'), { message: /Cannot find package '@oomol-lab\/open-flow'/ })
+
+const openapi = await import('@oomol-lab/open-flow/openapi')
+assert.deepEqual(openapi.listOperations({ openapi: '3.1.0', paths: { '/items': { get: { summary: 'List items', responses: {} } } } }), [
+  { method: 'get', path: '/items', label: 'List items', tag: '' },
+])

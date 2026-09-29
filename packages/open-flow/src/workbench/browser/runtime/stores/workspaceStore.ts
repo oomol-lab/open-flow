@@ -790,6 +790,10 @@ export class WorkspaceStore {
     await this.#canvasChange('edit', 1, [], (value) => setComment(value, target, nodeId, { ...comment, position }))
   }
 
+  public loadOpenApiDocument(url: string, signal?: AbortSignal): Promise<JsonValue> {
+    return this.#client.loadOpenApiDocument(url, signal)
+  }
+
   public async saveTaskSettings(nodeId: string, settings: TaskSettings): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target

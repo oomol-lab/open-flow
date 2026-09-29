@@ -1265,3 +1265,20 @@ The deletion dialog queries this endpoint each time it opens. This is an advisor
 snapshot, not a deletion lock: subscriptions can change after the query. Deletion
 still retires the source and eventually removes its subscriptions; handler draft
 references remain available for manual removal.
+
+## OpenAPI 文档与 Task
+
+`POST /v1/openapi/document` 要求 Operator 认证。请求为 `{ "version": 1, "url": "https://example.com/openapi.json" }`，响应为
+`{ "version": 1, "document": <OpenAPI JSON> }`。地址限制为无内嵌凭证的 HTTP(S)，仅支持公开 OpenAPI 3.0/3.1 JSON；不跟随重定向，读取上限 4 MiB，超时 15 秒。
+无效请求或加载失败返回 `flow.invalid`，不返回上游响应体。该操作不修改 Flow。
+
+Managed Task 新增 `executor.kind: "openapi"`，包含 `sourceUrl`、`method`（小写）、`path`、`serverUrl`、`document`（所选接口与引用依赖快照）、`auth`。
+鉴权项为 `{ id, type: "bearer" | "basic" | "apiKey", name?, in?: "header" | "query" }`。
+`task.openapi.set` 原子提交 `taskId`、完整 `before` 与 `value` Task，支持草稿并发检查和撤销。未选择接口的空 Task 可保存，不能运行。
+参数输入标识为 `path.<name>`、`query.<name>`、`header.<name>`，JSON 请求体为 `body`；鉴权使用 `auth.<id>.token` 或 Basic 的 `username`、`password`。
+鉴权输入禁止固定值和 Flow input Source；可清空，运行时必须具有有效部署变量或上游输出。
+输出为 `body`、`statusCode`、`headers`，`node.started.nodeKind` 新增 `openapi`，启动事件不包含鉴权输入。
+
+首版支持 simple path/header 和 form query 参数编码、文档内部引用和 JSON body；外部引用、二进制、流式响应、其它参数编码与 OAuth 登录不支持。
+请求运行最多等待 30 秒（同时受节点与 Run 的更短期限约束），响应上限 4 MiB，不自动重试或重定向。非 2xx、未声明的状态或媒体类型、Schema 不匹配均使节点失败。
+无响应体为 `null`，响应头不包含 `set-cookie`。文档与 API 请求不转发 Operator 凭证；API 鉴权不用于读取文档。

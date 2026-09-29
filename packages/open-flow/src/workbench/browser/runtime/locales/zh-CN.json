@@ -1389,5 +1389,27 @@
     "self": "不能监听当前工作流",
     "removeHint": "请移除失效上游后重新发布。",
     "removeUnavailable": "移除失效上游"
+  },
+  "openapi": {
+    "description": "通过固定的 OpenAPI 定义调用 JSON API。",
+    "document": "OpenAPI JSON 地址",
+    "loading": "加载中…",
+    "update": "更新",
+    "operation": "选择接口",
+    "search": "搜索接口",
+    "server": "服务地址",
+    "servers": "选择文档中的服务地址",
+    "auth": "鉴权",
+    "unsupported": "暂不支持",
+    "none": "无",
+    "keyName": "API Key 名称",
+    "keyLocation": "API Key 位置",
+    "saveFailed": "定义已变化或保存失败，请重试。",
+    "urlRequired": "填写 OpenAPI JSON 文档地址。",
+    "operationRequired": "加载文档并选择一个接口。",
+    "noOperations": "文档中没有可用接口。",
+    "noMatches": "没有匹配的接口。",
+    "loadRequired": "点击更新以加载接口定义。",
+    "untagged": "未分类"
   }
 }

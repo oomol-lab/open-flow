@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { CodeTaskSection } from './codeTaskSection.tsx'
 import { ConnectorAccount, TriggerConnection } from './connectionSettings.tsx'
 import { NodeInspector } from './nodeInspector.tsx'
+import { OpenApiSection } from './openApiSection.tsx'
 
 vi.mock('use-value-enhancer', () => ({ useVal: (value: { value: unknown }) => value.value }))
 
@@ -701,5 +702,24 @@ describe('Node input ownership', () => {
     props.onVariable('message', undefined)
     expect(setInputValue).toHaveBeenCalledWith('condition', 'message', null, undefined)
     expect(setInputVariable).toHaveBeenCalledWith('condition', 'message', undefined)
+  })
+})
+
+describe('OpenAPI configuration feedback', () => {
+  it.each(['', 'https://api.example.test/spec.json'])('keeps the blocking error visible before loading %s', (sourceUrl) => {
+    const load = vi.fn()
+    const panel = OpenApiSection({
+      task: { name: 'API', inputs: [], outputs: [], executor: { kind: 'openapi', sourceUrl, path: '', method: 'get', serverUrl: '', document: {}, auth: [] } },
+      disabled: false,
+      load,
+      onSave: vi.fn(),
+    })
+    const feedback = find(panel, (item) => typeof item.type == 'function' && item.type.name == 'ValueEditorFeedback')!
+    expect(feedback.props.error).toBe(sourceUrl ? 'openapi.loadRequired' : 'openapi.urlRequired')
+    const input = feedback.props.children('error-id')
+    expect(input.props['aria-invalid']).toBe(true)
+    expect(input.props['aria-describedby']).toBe('error-id')
+    expect(find(panel, (item) => item.props['aria-expanded'] != null)).toBeUndefined()
+    expect(load).not.toHaveBeenCalled()
   })
 })

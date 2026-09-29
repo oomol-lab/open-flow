@@ -205,6 +205,7 @@ function SelectedSourceValue({
 
 export function SourceValueEditor({
   fixed = false,
+  sourceOnly = false,
   editor: customEditor,
   schema,
   label: fieldLabel,
@@ -227,6 +228,7 @@ export function SourceValueEditor({
   onVariable,
   onReset,
 }: {
+  readonly sourceOnly?: boolean
   readonly fixed?: boolean
   readonly editor?: FieldValueEditorProps['editor']
   readonly presentation?: Pick<
@@ -353,6 +355,7 @@ export function SourceValueEditor({
     disabled || fixed ? undefined : (
       <div ref={setSourceContainer} className="flex items-center">
         <DropdownMenu
+          open={sourceOpen}
           onOpenChange={(open) => {
             setSourceOpen(open)
             if (open && variables.enabled) variables.onOpen?.()
@@ -382,18 +385,20 @@ export function SourceValueEditor({
           </Tooltip>
           <DropdownMenuContent align="start" sideOffset={6} className={`w-44 min-w-44 ${selectionMenuContentClass}`} container={sourcePortal}>
             <MenuHeader>{t('inspector.sources.title')}</MenuHeader>
-            <DropdownMenuRadioGroup
-              value={sourceKind === 'literal' ? literalSource : ''}
-              onValueChange={() => {
-                if (bound) onVariable(undefined)
-                else if (connected) onValue(undefined)
-              }}
-            >
-              <DropdownMenuRadioItem className={sourceItemClass} value={literalSource} closeOnClick>
-                <i aria-hidden="true" className="i-lucide-light:pen-line size-3.5 shrink-0 text-muted-foreground" />
-                <span className="min-w-0 flex-1 truncate">{t('nodeInput.literal')}</span>
-              </DropdownMenuRadioItem>
-            </DropdownMenuRadioGroup>
+            {!sourceOnly && (
+              <DropdownMenuRadioGroup
+                value={sourceKind === 'literal' ? literalSource : ''}
+                onValueChange={() => {
+                  if (bound) onVariable(undefined)
+                  else if (connected) onValue(undefined)
+                }}
+              >
+                <DropdownMenuRadioItem className={sourceItemClass} value={literalSource} closeOnClick>
+                  <i aria-hidden="true" className="i-lucide-light:pen-line size-3.5 shrink-0 text-muted-foreground" />
+                  <span className="min-w-0 flex-1 truncate">{t('nodeInput.literal')}</span>
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            )}
             {hasVariables && (
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger className={`${sourceSubTriggerClass} ${sourceKind === 'variable' ? 'bg-accent' : ''}`}>
@@ -552,7 +557,7 @@ export function SourceValueEditor({
         variableName={variableName}
         variables={variables}
       />
-    ) : llm ? (
+    ) : llm && !sourceOnly ? (
       <LlmInputEditor
         readOnly={readOnly}
         addon={sourceControl}
@@ -572,16 +577,30 @@ export function SourceValueEditor({
         {...presentation}
         validationError={validationError}
         onInvalidChange={connected || bound || sourceMissing ? undefined : onInvalidChange}
-        valueAddon={llm && !connected && !bound ? undefined : sourceControl}
+        valueAddon={llm && !sourceOnly && !connected && !bound ? undefined : sourceControl}
         description={presentation?.description ?? fieldDescription}
         schema={schema}
         nullable={nullable}
-        value={value}
+        value={sourceOnly && !connected && !bound && !sourceMissing ? undefined : value}
+        unset={
+          sourceOnly && !connected && !bound && !sourceMissing
+            ? {
+                label: t('inspector.sources.select'),
+                required: true,
+                onActivate: fixed
+                  ? undefined
+                  : () => {
+                      setSourceOpen(true)
+                      if (variables.enabled) variables.onOpen?.()
+                    },
+              }
+            : undefined
+        }
         label={fieldLabel}
         path={`/${fieldLabel.replaceAll('~', '~0').replaceAll('/', '~1')}`}
         disabled={disabled}
         onReset={onReset}
-        valueEditable={!connected && !bound && !sourceMissing}
+        valueEditable={!sourceOnly && !connected && !bound && !sourceMissing}
         editor={customEditor ?? editor}
         onDraftIssue={draftIssue}
         onChange={(next, deletion) => onValue(next as JsonValue | undefined, deletion)}

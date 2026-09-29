@@ -3,6 +3,7 @@ import { mcpTools } from '../src/control/common/mcp.ts'
 import { controlRequests, controlRequestSchema } from '../src/control/common/requests.ts'
 
 const samples = {
+  loadOpenApiDocument: { version: 1, url: 'https://api.example.test/spec.json' },
   createEventSource: {
     version: 1,
     name: 'Feishu',

@@ -125,6 +125,7 @@ export function inverseFlowChanges(content: RevisionContent, operations: readonl
       case 'task.connector.connection.set':
         restore.push({ ...operation, before: operation.value, value: operation.before })
         break
+      case 'task.openapi.set':
       case 'task.agent.set':
         restore.push({ ...operation, before: operation.value, value: operation.before })
         break

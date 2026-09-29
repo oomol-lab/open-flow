@@ -17,6 +17,7 @@ const flowName = id.refine((value) => value == value.trim() && resourceNameIssue
 const inputs = z.record(z.string(), z.record(z.string(), json))
 const trigger = z.strictObject({ nodeId: id, outputs: z.record(z.string(), json) })
 const schemas = {
+  loadOpenApiDocument: z.strictObject({ url: z.string().min(1).max(8192), version }),
   createEventSource: createEventSourceSchema,
   updateEventSource: updateEventSourceSchema,
   eventSourceRevision: eventSourceRevisionSchema,
@@ -54,6 +55,7 @@ function decoder<Value>(schema: z.ZodType<Value>): (value: unknown) => Value {
 }
 
 export const controlRequests = {
+  loadOpenApiDocument: decoder(schemas.loadOpenApiDocument),
   createEventSource: decoder(schemas.createEventSource),
   updateEventSource: decoder(schemas.updateEventSource),
   eventSourceRevision: decoder(schemas.eventSourceRevision),

@@ -571,6 +571,7 @@ export function decodeRunEvent(value: unknown) {
             nodeKind !== 'condition' &&
             nodeKind !== 'connector' &&
             nodeKind !== 'javascript' &&
+            nodeKind !== 'openapi' &&
             nodeKind !== 'llm' &&
             nodeKind !== 'agent' &&
             nodeKind !== 'subflow' &&
@@ -673,6 +674,12 @@ export class ControlClient {
 
   constructor(requestControl: ControlRequest) {
     this.requestControl = requestControl
+  }
+
+  async loadOpenApiDocument(url: string, signal?: AbortSignal): Promise<JsonValue> {
+    const result = record(await this.request('/v1/openapi/document', { method: 'POST', body: JSON.stringify({ url, version: 1 }), signal }))
+    if (result.version != 1) return invalidResponse()
+    return jsonValue(result.document)
   }
 
   async listFlows(options: { readonly cursor?: string; readonly includeTotal?: boolean; readonly limit?: number } = {}): Promise<FlowPage> {

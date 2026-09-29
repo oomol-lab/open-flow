@@ -28,6 +28,9 @@ of the remaining sections. A feature may define the order of multiple sections w
 but must not move them across these category boundaries. Panel chrome, the node header, empty states,
 and multi-selection states are outside this sequence.
 
+OpenAPI nodes place OpenAPI configuration and Authentication after Purpose and before Inputs and
+Outputs. The operation determines the generated ports; unconfigured nodes omit the empty port sections.
+
 Provider triggers place their Options section immediately before Outputs so provider-specific
 configuration precedes the data it produces.
 

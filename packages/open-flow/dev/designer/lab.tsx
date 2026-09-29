@@ -36,6 +36,7 @@ const storyGroupIcons: Readonly<Record<string, `i-${string}`>> = {
   'Node Wait': 'i-carbon:hourglass',
   'Node Approval': 'i-carbon:stamp',
   'Node Subflow': 'i-carbon:subflow',
+  'Node OpenAPI': 'i-lucide-light:braces',
   'Node LLM': 'i-carbon:machine-learning-model',
   'Node Agent': 'i-carbon:machine-learning-model',
   'Node Comment': 'i-codicon:note',

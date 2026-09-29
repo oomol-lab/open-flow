@@ -69,6 +69,8 @@ for (const expected of [
   'package/dist/browser/workbench.css.d.ts',
   'package/dist/browser/workbench.d.ts',
   'package/dist/browser/workbench.js',
+  'package/dist/common/openapi.d.ts',
+  'package/dist/common/openapi.js',
   'package/dist/common/connector-action.d.ts',
   'package/dist/common/connector-action.js',
   'package/dist/common/connector-proxy.d.ts',
@@ -161,6 +163,7 @@ assert.deepEqual(packedManifest.repository, {
 })
 assert.deepEqual(packedManifest.exports, {
   '.': { types: './dist/index.d.ts' },
+  './openapi': { import: './dist/common/openapi.js', types: './dist/common/openapi.d.ts' },
   './connector-action': {
     import: './dist/common/connector-action.js',
     types: './dist/common/connector-action.d.ts',
@@ -328,6 +331,8 @@ async function verifyConsumer(): Promise<void> {
       consumerPath,
       [
         "import type { ConnectorAction, ControlErrorCode } from '@oomol-lab/open-flow/control-api'",
+        "import type { OpenApiExecutor } from '@oomol-lab/open-flow/openapi'",
+        "export const openApiKind: OpenApiExecutor['kind'] = 'openapi'",
         "import { connectorActionPorts } from '@oomol-lab/open-flow/connector-action'",
         "import type { ConnectorProxy } from '@oomol-lab/open-flow/connector-proxy'",
         "import { connectorControlApiConformanceCases, connectorScopeControlApiConformanceCases, controlApiConformanceCases, draftRepairControlApiConformanceCases, eventSourceControlApiConformanceCases, pollControlApiConformanceCases, publicationControlApiConformanceCases, runResultControlApiConformanceCases, triggerControlApiConformanceCases } from '@oomol-lab/open-flow/control-api-conformance'",

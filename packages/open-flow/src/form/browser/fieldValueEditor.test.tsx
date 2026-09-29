@@ -66,3 +66,14 @@ describe('Field unset policy', () => {
     expect(markup).toContain('aria-invalid="true"')
   })
 })
+
+it('keeps delegated required prompts actionable without enabling literal editing', () => {
+  const props = { valueEditable: false, unset: { label: 'Choose source', required: true, onActivate: vi.fn() } }
+  const markup = render(props)
+  expect(markup).toContain('Choose source')
+  expect(markup).toContain('aria-invalid="true"')
+  expect(markup).toContain('role="alert"')
+  expect(markup).not.toContain('disabled=""')
+  expect(render({ ...props, disabled: true })).toContain('disabled=""')
+  expect(render({ ...props, readOnly: true })).toContain('disabled=""')
+})

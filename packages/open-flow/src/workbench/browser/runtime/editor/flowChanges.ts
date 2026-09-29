@@ -67,6 +67,7 @@ interface TaskSettingsBase {
 }
 
 export type TaskSettings =
+  | (TaskSettingsBase & { readonly kind: 'openapi'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'agent'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'code' })
   | (TaskSettingsBase & { readonly kind: 'connector' })
@@ -81,6 +82,7 @@ export interface SubflowSettings {
 }
 
 export type AddNodeIntent =
+  | { readonly kind: 'openapi'; readonly name: string }
   | { readonly kind: 'agent'; readonly name: string; readonly prompt?: string; readonly outputDescription?: string }
   | { readonly kind: 'approval'; readonly name: string }
   | { readonly kind: 'code'; readonly name: string; readonly ports?: TaskPorts }
@@ -162,6 +164,18 @@ export function nameCreatedNodes(revision: RevisionView, target: GraphTarget, ch
 export function addNode(revision: RevisionView, target: GraphTarget, nodeId: string, intent: AddNodeIntent, identity: () => string): FlowChanges | undefined {
   let changes: FlowChanges | undefined
   switch (intent.kind) {
+    case 'openapi':
+      changes = createManagedTask(
+        target,
+        { nodeId, taskId: identity() },
+        {
+          name: intent.name,
+          inputs: [],
+          outputs: [],
+          executor: { kind: 'openapi', sourceUrl: '', method: '', path: '', serverUrl: '', document: {}, auth: [] },
+        },
+      )
+      break
     case 'code':
       changes = createCodeTask(target, { moduleId: nodeId, nodeId }, intent.name, undefined, intent.ports)
       break
@@ -347,6 +361,10 @@ export function updateTask(revision: RevisionView, target: GraphTarget, nodeId: 
   const node = revision.graph(target)?.nodes[nodeId]
   if (node?.kind != 'task') return
   switch (settings.kind) {
+    case 'openapi': {
+      if (node.taskId == null || !dequal(revision.task(node.taskId), settings.before)) return
+      return [{ kind: 'task.openapi.set', taskId: node.taskId, before: settings.before, value: settings.task }]
+    }
     case 'agent': {
       if (node.taskId == null || !dequal(revision.task(node.taskId), settings.before)) return
       return [{ kind: 'task.agent.set', taskId: node.taskId, before: settings.before, value: settings.task }]

@@ -10,6 +10,7 @@ import {
   createValue,
   createWait,
 } from '../../flow/common/nodeChanges.ts'
+import { openApiTask, selectOperation } from '../../openapi/common/openapi.ts'
 
 const target = { kind: 'flow' } as const
 const descriptions = {
@@ -19,6 +20,7 @@ const descriptions = {
   'cron': 'An hourly scheduled start node.',
   'poll': 'Gmail polling by key; replace CONNECTION_ID with an active Gmail connection.',
   'integration': 'Telegram webhook integration by key; replace CONNECTION_ID with an active Telegram connection.',
+  'openapi': 'A fixed JSON API operation. Replace the example document and URL before running.',
   'connector': 'A Connector Task and its node. Replace ACTION_ID, CONNECTION_ID and port definitions using connector_get / connector show.',
   'code': 'A JavaScript module and its node. Use Code for custom computation; use Connector Tasks for existing actions.',
   'condition': 'A condition with true and false execution branches.',
@@ -42,6 +44,18 @@ export function authoringExample(name: string): { version: 1; operations: readon
     case 'error':
       operations = createBuiltinTrigger(target, 'error', { kind: 'error', name: 'Error Trigger' })
       break
+    case 'openapi': {
+      const document = {
+        openapi: '3.1.0',
+        paths: { '/items': { get: { responses: { '200': { content: { 'application/json': { schema: { type: 'array', items: { type: 'string' } } } } } } } } },
+      }
+      operations = createManagedTask(
+        target,
+        { nodeId: 'api', taskId: 'api-task' },
+        openApiTask(selectOperation(document, 'https://api.example.com/openapi.json', '/items', 'get')),
+      )
+      break
+    }
     case 'manual':
       operations = createBuiltinTrigger(target, 'start', { kind: 'manual', name: 'Start' })
       break

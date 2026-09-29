@@ -19,6 +19,7 @@ import { useTranslate } from 'val-i18n-react'
 import { nodeInputMappings } from '../../../../flow/common/condition.ts'
 import { inputValue } from '../../../../flow/common/inputValue.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
+import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { NativeScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { AgentSettingsProvider, AgentPrompt, AgentAdvancedSettings } from './agentSettings.tsx'
 import { presentBuiltInOutputDescription, presentBuiltInSourceCandidates, presentResolutionOutputs } from './builtInOutputPresentation.ts'
@@ -32,6 +33,8 @@ import { LinearTriggerConfig } from './linearTriggerConfig.tsx'
 import { LlmTaskSection } from './llmTaskSection.tsx'
 import { NodeDescription } from './nodeDescription.tsx'
 import { NodeInputs } from './nodeInputs.tsx'
+import { NodeInputValue } from './nodeInputValue.tsx'
+import { OpenApiSection } from './openApiSection.tsx'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 import { presentProviderOutputDescription, presentProviderSourceCandidates, presentProviderTriggerConfig } from './providerTriggerPresentation.ts'
 import { ResolutionDefinition } from './resolutionDefinition.tsx'
@@ -49,6 +52,7 @@ export function inspectorIcon(node: ResolvedSelection | undefined, target: Graph
   if (node?.kind == 'wait') return 'wait'
   if (node?.kind == 'subflow' || (node == null && target.kind == 'subflow')) return 'subflow'
   if (node?.kind == 'task' && node.definition != null && 'executor' in node.definition) {
+    if (node.definition.executor.kind == 'openapi') return 'task'
     return node.definition.executor.kind == 'connector' ? 'connection' : 'llm'
   }
   return 'task'
@@ -206,6 +210,8 @@ export function NodeInspector({
   const content = useRef<HTMLDivElement>(null)
   const task = selection?.kind == 'task' ? selection.definition : undefined
   const isAgent = task != null && 'executor' in task && task.executor.kind == 'agent'
+  const isOpenApi = task != null && 'executor' in task && task.executor.kind == 'openapi'
+  const unconfiguredOpenApi = task != null && 'executor' in task && task.executor.kind == 'openapi' && !task.executor.path
   const isLlm = task != null && 'executor' in task && task.executor.kind == 'llm'
   const connector = task != null && 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
   const taskId = selection?.kind == 'task' && selection.node.task == null ? selection.node.taskId : undefined
@@ -384,7 +390,73 @@ export function NodeInspector({
             }}
           />
         )}
-        {(selection?.kind === 'approval' || selection?.kind === 'wait' || selection?.kind === 'subflow' || selection?.kind === 'task') &&
+        {isOpenApi && task != null && 'executor' in task && (
+          <OpenApiSection
+            key={`openapi:${selection?.id}`}
+            task={task}
+            credentials={(onInvalidChange) =>
+              selection?.kind === 'task' &&
+              task.inputs
+                .filter((port): port is InputPort => 'handle' in port && port.handle.startsWith('auth.'))
+                .map((definition) => {
+                  const mapping = selection.node.inputs[definition.handle]
+                  const source = mapping?.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
+                  const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
+                  return (
+                    <Field key={definition.handle}>
+                      <FieldLabel>
+                        {definition.handle
+                          .slice(5)
+                          .replace(/^manual\./, '')
+                          .replaceAll('.', ' · ')}
+                      </FieldLabel>
+                      <NodeInputValue
+                        embedded
+                        definition={definition}
+                        label={
+                          task.executor.kind == 'openapi' && task.executor.auth.length == 1
+                            ? definition.handle.split('.').at(-1)
+                            : definition.handle.slice(5).replaceAll('.', ' · ')
+                        }
+                        presentation={{ compact: true, hideOptions: true }}
+                        onInvalidChange={onInvalidChange}
+                        sourceOnly
+                        readOnly={readOnly}
+                        disabled={disabled}
+                        value={inputValue(mapping, definition.value)}
+                        connected={mapping?.kind === 'sources' && binding?.kind !== 'variable'}
+                        variableName={binding?.kind === 'variable' ? binding.target : undefined}
+                        upstream={inputUpstreamSources({
+                          revision,
+                          sourceNodeIcons,
+                          target,
+                          selection,
+                          store,
+                          handleName: definition.handle,
+                          t,
+                          triggerDisplays,
+                        })}
+                        variables={variables}
+                        onValue={(value, deletion) => {
+                          void store?.setInputValue(selection.id, definition.handle, value, deletion)
+                        }}
+                        onVariable={(name) => {
+                          void store?.setInputVariable(selection.id, definition.handle, name)
+                        }}
+                      />
+                    </Field>
+                  )
+                })
+            }
+            disabled={disabled}
+            load={(url, signal) => store!.loadOpenApiDocument(url, signal)}
+            onSave={(before, value) =>
+              store?.saveTaskSettings(selection!.id, { kind: 'openapi', name: task.name, before, task: value }) ?? Promise.resolve(false)
+            }
+          />
+        )}
+        {!unconfiguredOpenApi &&
+          (selection?.kind === 'approval' || selection?.kind === 'wait' || selection?.kind === 'subflow' || selection?.kind === 'task') &&
           (() => {
             const definitions: (InputPort | Group)[] =
               selection.kind === 'task'
@@ -397,19 +469,21 @@ export function NodeInspector({
               if (!handles.has(handle) && !(selection.kind === 'task' && selection.node.additionalInputs?.some((port) => port.handle === handle)))
                 definitions.push({ handle, jsonSchema: {}, nullable: true })
             }
-            const entries = definitions.map((definition): Group | NodeInputField => {
-              if ('group' in definition) return definition
-              const mapping = selection.node.inputs[definition.handle]
-              const source = mapping?.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
-              const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
-              return {
-                definition,
-                value: inputValue(mapping, definition.value),
-                onReset: definition.value !== undefined && mapping != null ? () => void store?.resetInputs(selection.id, [definition.handle]) : undefined,
-                connected: mapping?.kind === 'sources' && binding?.kind !== 'variable',
-                variableName: binding?.kind === 'variable' ? binding.target : undefined,
-              }
-            })
+            const entries = definitions
+              .filter((definition) => !isOpenApi || !('handle' in definition) || !definition.handle.startsWith('auth.'))
+              .map((definition): Group | NodeInputField => {
+                if ('group' in definition) return definition
+                const mapping = selection.node.inputs[definition.handle]
+                const source = mapping?.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
+                const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
+                return {
+                  definition,
+                  value: inputValue(mapping, definition.value),
+                  onReset: definition.value !== undefined && mapping != null ? () => void store?.resetInputs(selection.id, [definition.handle]) : undefined,
+                  connected: mapping?.kind === 'sources' && binding?.kind !== 'variable',
+                  variableName: binding?.kind === 'variable' ? binding.target : undefined,
+                }
+              })
             const fields = (
               <NodeInputs
                 readOnly={readOnly}
@@ -534,7 +608,7 @@ export function NodeInspector({
             />
           </div>
         )}
-        {selection?.kind === 'task' && selection.definition != null && (
+        {!unconfiguredOpenApi && selection?.kind === 'task' && selection.definition != null && (
           <section className="inspector-port-section">
             <PortDefinitionEditor
               readOnly={readOnly}

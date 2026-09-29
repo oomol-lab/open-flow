@@ -1,6 +1,7 @@
 import type { ChangeOperation, FlowDocument, JsonValue, RevisionContent } from './change.ts'
 
 import { z } from 'zod'
+import { assertOpenApiAuthBindings } from '../../openapi/common/authBindings.ts'
 import { checkJsonDepth } from './json.ts'
 import { triggerScheduleSchema } from './triggerScheduleSchema.ts'
 import { webhookMethods } from './webhookMethod.ts'
@@ -47,6 +48,15 @@ const managed = z.object({
   name: text,
   executor: z.union([
     z.object({ kind: z.literal('connector'), action: text, connectionId: text.optional() }),
+    z.object({
+      kind: z.literal('openapi'),
+      sourceUrl: text,
+      method: text,
+      path: text,
+      serverUrl: text,
+      document: json,
+      auth: z.array(z.object({ id: text, type: z.enum(['bearer', 'basic', 'apiKey']), name: text.optional(), in: z.enum(['header', 'query']).optional() })),
+    }),
     z.object({ kind: z.literal('llm'), mode: z.enum(['chat', 'json']) }),
     z.object({
       kind: z.literal('agent'),
@@ -386,6 +396,7 @@ export function decodeRevisionContent(value: unknown): RevisionContent {
   checkJsonDepth(value)
   const content = revision.parse(value) as RevisionContent
   checkErrorModelVersion(content)
+  assertOpenApiAuthBindings(content.document)
   return content
 }
 
@@ -395,6 +406,7 @@ export function decodeRevisionEnvelope(value: unknown): RevisionContent {
   const candidate = revisionSource.modelVersion == 2 ? { ...revisionSource, document: upgradeLegacyDocument(revisionSource.document) } : value
   const content = envelope.parse(candidate) as RevisionContent
   checkErrorModelVersion(content)
+  assertOpenApiAuthBindings(content.document)
   return { modelVersion: content.modelVersion, document: content.document, modules: content.modules }
 }
 
@@ -463,6 +475,7 @@ const shapes = {
   'task.create': { taskId: text, task: managed },
   'task.delete': { taskId: text },
   'task.connector.connection.set': { taskId: text, before: text.optional(), value: text.optional() },
+  'task.openapi.set': { taskId: text, before: managed, value: managed },
   'task.agent.set': { taskId: text, before: managed, value: managed },
   'task.llm.mode.set': { taskId: text, before: z.enum(['chat', 'json']), value: z.enum(['chat', 'json']) },
   'task.name.set': { taskId: text, before: text, value: text },
