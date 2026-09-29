@@ -8,12 +8,16 @@ import { Badge } from '../../src/ui/browser/badge.tsx'
 import { Button } from '../../src/ui/browser/button.tsx'
 import { Checkbox } from '../../src/ui/browser/checkbox.tsx'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyTitle } from '../../src/ui/browser/empty.tsx'
+import { IconStack } from '../../src/ui/browser/icon-stack.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../src/ui/browser/input-group.tsx'
 import { Input } from '../../src/ui/browser/input.tsx'
 import { Label } from '../../src/ui/browser/label.tsx'
 import { Progress } from '../../src/ui/browser/progress.tsx'
 import { Switch } from '../../src/ui/browser/switch.tsx'
 import { Textarea } from '../../src/ui/browser/textarea.tsx'
+import { providerIcon } from '../../src/workbench/browser/runtime/providerIcon.ts'
+import trackingIcon from './fixtures/17track.png'
+import { sampleSprite } from './fixtures/providerSprite.ts'
 import { stories } from './stories.tsx'
 
 const canvasTokens = [
@@ -128,12 +132,35 @@ function ControlOverview({ log, dark, language }: { readonly log: LogAction; rea
   )
 }
 
+const stackProviders = [
+  { id: 'tracking', icon: providerIcon({ serviceId: 'tracking', serviceName: 'Tracking', icon: trackingIcon }) },
+  {
+    id: 'sprite',
+    icon: providerIcon({ serviceId: 'sprite', serviceName: 'Sprite', iconSprite: sampleSprite, iconSpritePosition: { x: 54, y: 2 } }),
+  },
+  ...['alpha', 'beta', 'gamma', 'delta'].map((id) => ({ id, icon: providerIcon({ serviceId: id, serviceName: id }) })),
+]
+
 function ProductOverview({ log }: { readonly log: LogAction }) {
   return (
     <div className="product-overview open-flow-workbench">
       <div className="overview-controls">
         <Sample title="Actions">
           <ButtonSamples log={log} />
+        </Sample>
+        <Sample title="Provider icon stacks">
+          <div className="overview-inline" aria-label="One provider, three actions">
+            <span>Single provider · default</span>
+            <IconStack icons={stackProviders.slice(0, 1)} count={3} />
+          </div>
+          <div className="overview-inline" aria-label="Property panel: six providers, twelve actions">
+            <span>Code / Agent properties</span>
+            <IconStack icons={stackProviders} count={12} size="sm" />
+          </div>
+          <div className="overview-inline" aria-label="Canvas: six providers, twelve actions">
+            <span>Canvas · compact</span>
+            <IconStack icons={stackProviders} count={12} limit={5} size="sm" />
+          </div>
         </Sample>
         <Sample title="Compact keyboard focus">
           <div className="overview-buttons">
@@ -282,7 +309,7 @@ export const overviewStories: readonly FrontendStory[] = [
     group: 'Theme Preview',
     id: 'product-controls',
     title: 'Workbench controls',
-    description: 'Inspect control focus states and empty messages without container borders.',
+    description: 'Inspect control focus states, provider icon stacks in both sizes, and empty messages without container borders.',
     standalone: true,
     render: (log) => <ProductOverview log={log} />,
   },

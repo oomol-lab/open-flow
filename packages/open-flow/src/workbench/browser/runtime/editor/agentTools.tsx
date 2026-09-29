@@ -48,7 +48,7 @@ function EditableAgentTools({
               {t('actionPicker.triggerLabel')}
             </>
           ) : (
-            <IconStack icons={summary.providers} count={summary.count} />
+            <IconStack icons={summary.providers} count={summary.count} size="sm" />
           )}
         </Button>
       }
