@@ -5,10 +5,12 @@ import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
 import { NodeDescription } from '../../src/workbench/browser/runtime/editor/nodeDescription.tsx'
 import { NodeHeading } from '../../src/workbench/browser/runtime/editor/nodeHeading.tsx'
+import { PurposeField } from '../../src/workbench/browser/runtime/editor/purposeField.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
 
 function MetadataStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
-  const [value, setValue] = useState<string | undefined>('Explain what this node does.')
+  const [value, setValue] = useState<string | undefined>(undefined)
+  const [compactValue, setCompactValue] = useState('Describe this tool, branch or port.')
   const [title, setTitle] = useState('Example node')
   const [icon, setIcon] = useState(':carbon:code:')
   const i18n = useMemo(() => createI18n(language), [language])
@@ -34,14 +36,17 @@ function MetadataStory({ dark, language, log }: { dark: boolean; language: UiLan
         <output aria-label="Saved icon">{icon}</output>
         <NodeDescription
           value={value}
+          placeholder={i18n.t('addNode.javascriptDescription')}
           disabled={false}
           onSave={(next) => {
             setValue(next)
             log('Save description', next ?? null)
           }}
         />
+        <NodeDescription value={undefined} placeholder={i18n.t('addNode.agentDescription')} />
         <NodeDescription value="Read-only node description." disabled onSave={() => log('Unexpected read-only save')} />
         <NodeDescription value={undefined} disabled onSave={() => log('Unexpected empty read-only save')} />
+        <PurposeField compact value={compactValue} onChange={(event) => setCompactValue(event.target.value)} />
         <output aria-label="Saved description">{JSON.stringify({ description: value })}</output>
       </div>
     </I18nProvider>
@@ -53,6 +58,7 @@ export const metadataStory: FrontendStory = {
   id: 'node-metadata',
   propertyPanel: true,
   title: 'Node Metadata',
+  description: 'Purpose placeholders reuse node descriptions. Compare empty, authored and read-only states; blur the editable field to save.',
   standalone: true,
   render: (log, dark, language) => <MetadataStory dark={dark} language={language} log={log} />,
 }

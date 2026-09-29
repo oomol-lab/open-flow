@@ -19,10 +19,10 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Field, FieldLabel, FieldDescription } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Popover, PopoverPanelContent } from '../../../../ui/browser/popover.tsx'
-import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { fieldPanelAnchor } from './fieldPanelAnchor.ts'
 import { FieldSectionHeader } from './fieldSectionHeader.tsx'
+import { PurposeField } from './purposeField.tsx'
 import { SourceValueEditor } from './sourceValueEditor.tsx'
 
 const emptyExpression = (): ConditionExpression => ({ left: { kind: 'value' }, operator: '==', right: { kind: 'value' } })
@@ -556,16 +556,7 @@ export function ConditionBranchesEditor({
                         <FieldLabel className="text-xs font-normal text-muted-foreground">{t('conditionEditor.handleKeyTitle')}</FieldLabel>
                         <OutputName value={item.output} names={names} disabled={false} onChange={renameOutput} />
                       </Field>
-                      <Field className="gap-1.5">
-                        <FieldLabel className="text-xs font-normal text-muted-foreground">{t('inspector.node.description')}</FieldLabel>
-                        <Textarea
-                          aria-label={t('inspector.node.description')}
-                          rows={2}
-                          className="min-h-16 max-h-40 resize-y text-xs md:text-xs"
-                          value={item.description ?? ''}
-                          onChange={(event) => save({ ...item, description: event.target.value })}
-                        />
-                      </Field>
+                      <PurposeField compact value={item.description ?? ''} onChange={(event) => save({ ...item, description: event.target.value })} />
                     </PopoverPanelContent>
                   </Popover>
                 )}

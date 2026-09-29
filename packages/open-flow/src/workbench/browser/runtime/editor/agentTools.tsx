@@ -11,12 +11,12 @@ import { IconStack } from '../../../../ui/browser/icon-stack.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { PopoverDescription } from '../../../../ui/browser/popover.tsx'
 import { Popover, PopoverTrigger, PopoverContent } from '../../../../ui/browser/popover.tsx'
-import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { actionSummary } from '../actionSummary.ts'
 import { ActionSelectionDialog } from './actionSelectionDialog.tsx'
 import { agentFixedValuesValid } from './agentChanges.ts'
 import { AgentInputSource } from './agentInputSource.tsx'
 import { agentTool } from './flowChanges.ts'
+import { PurposeField } from './purposeField.tsx'
 
 function EditableAgentTools({
   config,
@@ -91,17 +91,7 @@ function AgentToolSettings({
           onChange={(event) => onChange?.({ ...tool, name: event.target.value })}
         />
       </Field>
-      <Field className="gap-1.5">
-        <FieldLabel className="text-xs font-normal text-muted-foreground">{t('inspector.node.description')}</FieldLabel>
-        <Textarea
-          rows={2}
-          className="min-h-16 max-h-40 resize-y text-xs md:text-xs"
-          readOnly={disabled}
-          aria-label={t('inspector.node.description')}
-          value={tool.description}
-          onChange={(event) => onChange?.({ ...tool, description: event.target.value })}
-        />
-      </Field>
+      <PurposeField compact readOnly={disabled} value={tool.description} onChange={(event) => onChange?.({ ...tool, description: event.target.value })} />
       {tool.inputs.length > 0 && <div className="h-px bg-border/50" />}
       {tool.inputs.map((port) => (
         <AgentInputSource

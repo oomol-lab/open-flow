@@ -58,6 +58,57 @@ export function inspectorIcon(node: ResolvedSelection | undefined, target: Graph
   return 'task'
 }
 
+function nodePurposePlaceholder(
+  selection: ResolvedSelection,
+  t: TFunction,
+  action?: ConnectorAction,
+  displays?: Readonly<Record<string, TriggerDisplay>>,
+): string | undefined {
+  switch (selection.kind) {
+    case 'condition':
+      return t('addNode.conditionDescription')
+    case 'value':
+      return t('addNode.valueDescription')
+    case 'approval':
+      return t('addNode.approvalDescription')
+    case 'wait':
+      return t('addNode.waitDescription')
+    case 'subflow':
+      return t('addNode.subflowDescription')
+    case 'trigger': {
+      const node = selection.node
+      switch (node.kind) {
+        case 'manual':
+          return t('addNode.manualDescription')
+        case 'error':
+          return t('errorWorkflow.description')
+        case 'cron':
+          return t('addNode.cronDescription')
+        case 'webhook':
+          return t('addNode.webhookDescription')
+        case 'integration':
+        case 'poll':
+          return displays?.[node.definition.key]?.description ?? node.definition.description
+      }
+    }
+    case 'task': {
+      const definition = selection.definition
+      if (definition == null) return
+      if (!('executor' in definition)) return t('addNode.javascriptDescription')
+      switch (definition.executor.kind) {
+        case 'agent':
+          return t('addNode.agentDescription')
+        case 'openapi':
+          return t('openapi.description')
+        case 'connector':
+          return action?.description
+        case 'llm':
+          return t(definition.executor.mode == 'json' ? 'addNode.llmStructuredDescription' : 'addNode.llmChatDescription')
+      }
+    }
+  }
+}
+
 function inputUpstreamSources({
   revision,
   sourceNodeIcons,
@@ -277,6 +328,7 @@ export function NodeInspector({
           <NodeDescription
             key={`description:${selection.id}`}
             value={selection.node.description}
+            placeholder={nodePurposePlaceholder(selection, t, connectorAction, triggerDisplays)}
             disabled={disabled}
             onSave={(description) => {
               void store?.saveNodeDescription(selection.id, description)

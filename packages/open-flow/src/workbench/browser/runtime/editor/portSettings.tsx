@@ -16,7 +16,7 @@ import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Label } from '../../../../ui/browser/label.tsx'
 import { PopoverPanelContent } from '../../../../ui/browser/popover.tsx'
-import { Textarea } from '../../../../ui/browser/textarea.tsx'
+import { PurposeField } from './purposeField.tsx'
 
 export function PortName({
   value,
@@ -169,19 +169,7 @@ function PortSettingsFields({
         </FieldLabel>
         <PortName id={`${id}-name`} compact value={port.handle} names={names} disabled={disabled} onChange={(handle) => onChange({ ...port, handle })} />
       </Field>
-      <Field className="gap-1.5">
-        <FieldLabel htmlFor={`${id}-description`} className="text-xs font-normal text-muted-foreground">
-          {t('inspector.node.description')}
-        </FieldLabel>
-        <Textarea
-          id={`${id}-description`}
-          rows={2}
-          className="min-h-16 max-h-40 resize-y text-xs md:text-xs"
-          value={port.description ?? ''}
-          readOnly={disabled}
-          onChange={(event) => onChange({ ...port, description: event.target.value })}
-        />
-      </Field>
+      <PurposeField compact value={port.description ?? ''} readOnly={disabled} onChange={(event) => onChange({ ...port, description: event.target.value })} />
       <Field className="gap-1.5">
         <FieldLabel htmlFor={`${id}-type`} className="text-xs font-normal text-muted-foreground">
           {t('inspector.ports.columnType')}
