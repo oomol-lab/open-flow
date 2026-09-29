@@ -113,7 +113,7 @@ function nodeIcon(node: ResolvedNode): string | undefined {
       const task = node.definition
       if (task == null) return
       if ('moduleId' in task) return ':carbon:code:'
-      if (task.executor.kind == 'openapi') return ':lucide:braces:'
+      if (task.executor.kind == 'openapi') return ':logos:openapi-icon:'
       return task.executor.kind == 'connector' ? ':carbon:connection-signal:' : ':carbon:machine-learning-model:'
     }
   }

@@ -100,7 +100,7 @@ function builtinOptions(t: TFunction): readonly AddNodeOption[] {
       kind: 'agent',
       label: t('addNode.agent'),
     },
-    { description: t('openapi.description'), group, icon: ':lucide:braces:', id: 'openapi', inputs: [], outputs: [], kind: 'openapi', label: 'OpenAPI' },
+    { description: t('openapi.description'), group, icon: ':logos:openapi-icon:', id: 'openapi', inputs: [], outputs: [], kind: 'openapi', label: 'OpenAPI' },
     {
       description: t('addNode.valueDescription'),
       group,
