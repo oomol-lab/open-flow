@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { I18nProvider } from 'val-i18n-react'
 import { FieldValueEditor } from '../../src/form/browser/fieldValueEditor.tsx'
+import { ScrollArea } from '../../src/ui/browser/scroll-area.tsx'
 import { EditorContextPanel } from '../../src/workbench/browser/runtime/editor/editorContextPanel.tsx'
 import { NodeInspector } from '../../src/workbench/browser/runtime/editor/nodeInspector.tsx'
 import { PortDefinitionEditor } from '../../src/workbench/browser/runtime/editor/portDefinitionEditor.tsx'
@@ -284,13 +285,13 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
               theme={dark ? 'dark' : 'light'}
               title="Read-only output types"
             >
-              <div className="inspector-scroll overflow-y-auto">
+              <ScrollArea className="inspector-scroll" tabIndex={-1}>
                 <div className="inspector-content">
                   <section className="inspector-port-section">
                     <PortDefinitionEditor groups layout="ports" title="Outputs" output disabled values={readOnlyCompositeOutputs} onChange={() => {}} />
                   </section>
                 </div>
-              </div>
+              </ScrollArea>
             </EditorContextPanel>
           </div>
           <section className="inspector-port-section">

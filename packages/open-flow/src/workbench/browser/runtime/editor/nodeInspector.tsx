@@ -20,7 +20,7 @@ import { nodeInputMappings } from '../../../../flow/common/condition.ts'
 import { inputValue } from '../../../../flow/common/inputValue.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
-import { NativeScrollArea } from '../../../../ui/browser/scroll-area.tsx'
+import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { AgentSettingsProvider, AgentPrompt, AgentAdvancedSettings } from './agentSettings.tsx'
 import { presentBuiltInOutputDescription, presentBuiltInSourceCandidates, presentResolutionOutputs } from './builtInOutputPresentation.ts'
 import { CodeTaskSection } from './codeTaskSection.tsx'
@@ -235,7 +235,7 @@ export function NodeInspector({
   }, [focus, selection?.id, selection?.kind])
 
   const panel = (
-    <NativeScrollArea className="inspector-scroll" tabIndex={-1}>
+    <ScrollArea className="inspector-scroll" tabIndex={-1}>
       <div className="inspector-content" ref={content}>
         {readOnly && connector != null && <SavedConnectionReference action={connector.action} connectionId={connector.connectionId} />}
         {readOnly && selection?.kind === 'trigger' && (selection.trigger.kind === 'poll' || selection.trigger.kind === 'integration') && (
@@ -684,7 +684,7 @@ export function NodeInspector({
           </>
         )}
       </div>
-    </NativeScrollArea>
+    </ScrollArea>
   )
   return selection?.kind == 'task' && task != null && 'executor' in task && task.executor.kind == 'agent' ? (
     <AgentSettingsProvider

@@ -13,6 +13,12 @@
   --os-handle-bg: light-dark(rgb(0 0 0 / 24%), rgb(255 255 255 / 28%));
   --os-handle-bg-hover: light-dark(rgb(0 0 0 / 38%), rgb(255 255 255 / 42%));
   --os-handle-bg-active: light-dark(rgb(0 0 0 / 50%), rgb(255 255 255 / 54%));
+
+  // Keep the transparent rail hoverable so OverlayScrollbars can reveal it on interaction.
+  &:global(.os-scrollbar-auto-hide.os-scrollbar-visible) {
+    visibility: visible;
+    pointer-events: auto;
+  }
 }
 
 .native {
