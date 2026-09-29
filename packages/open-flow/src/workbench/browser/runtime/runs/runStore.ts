@@ -8,6 +8,7 @@ import type { SetNotice } from '../stores/workbenchNotice.ts'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import { arrayShallowEqual, derive, val } from 'value-enhancer'
+import { isRunTerminalEvent } from '../../../../control/common/api.ts'
 import { isRunTerminal } from '../../../../execution/common/runLifecycle.ts'
 import { ApiError } from '../api.ts'
 import { createI18n } from '../i18n.ts'
@@ -99,6 +100,7 @@ const initialState: RunState = {
 const eventPageLimit = 100
 const startingPollDelay = 500
 const runningPollDelay = 1200
+const maxIdlePollDelay = 10_000
 const waitingPollDelay = 60_000
 
 export function canCancelRun(run: Run | undefined): run is Run & { readonly status: 'queued' | 'running' | 'starting' | 'waiting' } {
@@ -478,7 +480,7 @@ export class RunStore {
     this.#observation = Effect.runFork(
       Effect.gen({ self: this }, function* () {
         let previous = run
-        let unchangedStartingPolls = 0
+        let idlePolls = 0
         while (current()) {
           const after = this.#state.value.eventCursor
           const [runResponse, eventsResponse] = yield* Effect.tryPromise({
@@ -488,7 +490,7 @@ export class RunStore {
           })
           if (runResponse.status == 'rejected') return yield* Effect.fail(runResponse.reason)
           if (!current() || this.#state.value.selectedRunId != run.runId) return
-          const nextRun = runResponse.value
+          let nextRun = runResponse.value
           this.#set({ observationFailed: false })
           if (eventsResponse.status == 'rejected') {
             if (!(eventsResponse.reason instanceof ApiError) || eventsResponse.reason.code != 'run.events-expired')
@@ -498,26 +500,32 @@ export class RunStore {
             return
           }
           const page = eventsResponse.value
+          const events = [...this.#state.value.events, ...page.events]
+          const eventsFinished = isRunTerminalEvent(events.at(-1))
           this.#set({
             eventCursor: page.nextAfter,
-            events: [...this.#state.value.events, ...page.events],
+            events,
             eventsExpiresAt: page.eventsExpiresAt,
             historyComplete: page.historyComplete,
             runById: replaceRun(this.#state.value, nextRun),
           })
+          // Preserve the event page even if refreshing a stale parallel Run read fails.
+          if (eventsFinished && !isRunTerminal(nextRun.status)) {
+            nextRun = yield* Effect.tryPromise({ try: (signal) => this.#client.getRun(run.runId, signal), catch: (error) => error })
+            if (!current() || this.#state.value.selectedRunId != run.runId) return
+            this.#set({ runById: replaceRun(this.#state.value, nextRun) })
+          }
           yield* Effect.tryPromise({ try: (signal) => this.#loadResult(nextRun, current, signal), catch: (error) => error })
           yield* Deferred.succeed(ready, undefined)
-          if (isRunTerminal(nextRun.status) && page.done) return
+          if (eventsFinished) return
           const starting = nextRun.status == 'queued' || nextRun.status == 'starting'
-          unchangedStartingPolls = starting && nextRun.status == previous.status ? unchangedStartingPolls + 1 : 0
+          idlePolls = page.events.length == 0 && nextRun.status == previous.status ? Math.min(idlePolls + 1, 6) : 0
           const delay =
-            isRunTerminal(nextRun.status) || page.events.length == eventPageLimit
+            (isRunTerminal(nextRun.status) && page.events.length > 0) || page.events.length == eventPageLimit
               ? 0
               : nextRun.status == 'waiting'
                 ? waitingPollDelay
-                : starting
-                  ? Math.min(runningPollDelay, startingPollDelay * 2 ** Math.max(0, unchangedStartingPolls - 1))
-                  : runningPollDelay
+                : Math.min(maxIdlePollDelay, (starting ? startingPollDelay : runningPollDelay) * 2 ** Math.max(0, idlePolls - 1))
           previous = nextRun
           yield* Effect.sleep(delay)
         }

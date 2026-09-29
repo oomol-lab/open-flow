@@ -444,6 +444,10 @@ export interface RunPage {
 export type RunEvent = Readonly<ReturnType<typeof decodeRunEvent>>
 export type RunEventKind = RunEvent['kind']
 
+export function isRunTerminalEvent(event: RunEvent | undefined): boolean {
+  return event?.kind == 'run.completed' || event?.kind == 'run.failed' || event?.kind == 'run.canceled' || event?.kind == 'run.indeterminate'
+}
+
 export interface RunEvents {
   readonly done: boolean
   readonly events: readonly RunEvent[]

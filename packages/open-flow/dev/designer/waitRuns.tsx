@@ -9,6 +9,7 @@ import { I18nProvider } from 'val-i18n-react'
 import { CanvasBottomRightControls } from '../../src/canvas/browser/graph/ReactFlowContainer/CanvasControls.tsx'
 import { decodeRunEvent } from '../../src/control/common/api.ts'
 import { readResult } from '../../src/control/common/results.ts'
+import { isRunTerminal } from '../../src/execution/common/runLifecycle.ts'
 import { normalizeWaitComment } from '../../src/execution/common/wait.ts'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
@@ -79,7 +80,7 @@ function WaitHistory({ language, log }: { readonly language: UiLanguage; readonl
       }
       if (url.pathname == '/v1/runs/sample') return Response.json(run)
       if (url.pathname == '/v1/runs/sample/events')
-        return Response.json({ runId: run.runId, events: [], done: true, historyComplete: true, nextAfter: 0, version: 1 })
+        return Response.json({ runId: run.runId, events: [], done: false, historyComplete: true, nextAfter: 0, version: 1 })
       if (url.pathname.endsWith('/resolve')) {
         const waitId = url.pathname.split('/').at(-2)!
         const { action, comment } = JSON.parse(String(init?.body))
@@ -350,7 +351,19 @@ function RunHistory({ language, dark, log }: { readonly language: UiLanguage; re
             createdAt: run.finishedAt!,
             payload: { ...payload, error: { code: 'binding.unresolved', message: 'Variable API_TOKEN could not be resolved.' } },
           })
-        return Response.json({ runId: run.runId, events, done: true, historyComplete: true, nextAfter: events.length, version: 1 })
+        if (isRunTerminal(run.status)) {
+          events.push({ kind: `run.${run.status}`, sequence: events.length + 1, createdAt: run.finishedAt!, payload: { result: null } })
+        }
+        const after = Number(url.searchParams.get('after') ?? 0)
+        const page = events.filter((event) => event.sequence > after).slice(0, Number(url.searchParams.get('limit') ?? 100))
+        return Response.json({
+          runId: run.runId,
+          events: page,
+          done: isRunTerminal(run.status),
+          historyComplete: true,
+          nextAfter: page.at(-1)?.sequence ?? after,
+          version: 1,
+        })
       }
       if (url.pathname.endsWith('/result'))
         return Response.json({

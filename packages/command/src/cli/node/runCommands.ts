@@ -2,7 +2,7 @@ import type { JsonValue, RunDetails } from '@oomol-lab/open-flow/control-api'
 import type { ParsedArguments } from './arguments.ts'
 import type { Runtime } from './support.ts'
 
-import { ControlClient } from '@oomol-lab/open-flow/control-api'
+import { ControlClient, isRunTerminalEvent } from '@oomol-lab/open-flow/control-api'
 import {
   CliError,
   argumentText,
@@ -134,7 +134,9 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
           write(runtime, args.json, { ...page, kind: 'run.events', runId, version: 1 }, page.events.map(eventText).join('\n'))
           if (!args.follow) return
           run = await client.getRun(runId, AbortSignal.timeout(Math.max(1, deadline - Date.now())))
-          if (page.done) return runExitCode(run)
+          if (isRunTerminalEvent(page.events.at(-1))) return runExitCode(run)
+          // A resumed cursor may already be at or beyond the terminal event.
+          if (args.after != null && page.events.length == 0 && page.done) return runExitCode(run)
           if (run.waits.length > 0) {
             write(runtime, args.json, { kind: 'run.wait', runId, run, nextAfter: after, timedOut: false, version: 1 }, runText(run))
             return 2

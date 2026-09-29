@@ -417,30 +417,30 @@ describe('agent command contract', () => {
     }
   })
 
-  it('streams event pages before asking for the next page', async () => {
+  it.each(['completed', 'failed', 'canceled', 'indeterminate'] as const)('streams all pages through run.%s despite done on earlier pages', async (status) => {
     const output = runtime()
     let pages = 0
     const request = async (path: string) => {
-      if (!path.includes('/events')) return Response.json(runFixture)
+      if (!path.includes('/events')) return Response.json({ ...runFixture, status })
       pages++
       if (pages == 2) expect(output.stdout()).toContain('run.started')
       return Response.json({
         runId: 'run-1',
         version: 1,
-        done: pages == 2,
+        done: true,
         historyComplete: true,
         nextAfter: pages,
         events: [
           {
             createdAt: flow.createdAt,
-            kind: pages == 1 ? 'run.started' : 'run.completed',
+            kind: pages == 1 ? 'run.started' : `run.${status}`,
             sequence: pages,
             payload: pages == 1 ? { flowId: 'flow', scopeId: 'scope' } : { result: {} },
           },
         ],
       })
     }
-    expect(await runCli(['runs', 'events', 'run-1', '--follow', '--json'], { request }, output.value)).toBe(0)
+    expect(await runCli(['runs', 'events', 'run-1', '--follow', '--json'], { request }, output.value)).toBe(status == 'completed' ? 0 : 1)
     expect(
       output
         .stdout()
@@ -729,6 +729,40 @@ it.each([false, true])('inspects the shared Flow view without invoking check (fu
   expect(await runCli(['inspect', 'flow-1', '--json', ...(full ? ['--full'] : [])], { request }, output.value), output.stderr()).toBe(0)
   expect(JSON.parse(output.stdout())).toEqual({ ...flowInspection(await inspectFlowDraft(flow, () => revisionFixture), live, full), kind: 'flow.inspect' })
   expect(request).toHaveBeenCalledTimes(3)
+})
+
+it('finishes following an empty page when resuming beyond the terminal event', async () => {
+  const output = runtime()
+  const request = vi.fn(async (path: string) =>
+    Response.json(
+      path.includes('/events')
+        ? { runId: 'run-1', version: 1, events: [], done: true, nextAfter: 7, historyComplete: true }
+        : { ...runFixture, status: 'completed' },
+    ),
+  )
+  expect(await runCli(['runs', 'events', 'run-1', '--after=7', '--follow', '--json'], { request }, output.value)).toBe(0)
+  expect(request).toHaveBeenCalledTimes(2)
+})
+
+it('continues a resumed stream when an empty event read precedes Run completion', async () => {
+  const output = runtime()
+  output.value.wait = async () => {}
+  let pages = 0
+  const request = vi.fn(async (path: string) => {
+    if (!path.includes('/events')) return Response.json({ ...runFixture, status: 'completed' })
+    pages++
+    return Response.json({
+      runId: 'run-1',
+      version: 1,
+      done: pages > 1,
+      historyComplete: true,
+      nextAfter: pages == 1 ? 7 : 8,
+      events: pages == 1 ? [] : [{ kind: 'run.completed', createdAt: flow.createdAt, sequence: 8, payload: { result: null } }],
+    })
+  })
+  expect(await runCli(['runs', 'events', 'run-1', '--after=7', '--follow', '--json'], { request }, output.value)).toBe(0)
+  expect(pages).toBe(2)
+  expect(output.stdout()).toContain('run.completed')
 })
 
 it('reports a followed event timeout with a reusable cursor without canceling the run', async () => {
