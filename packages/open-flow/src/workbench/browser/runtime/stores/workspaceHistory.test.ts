@@ -614,7 +614,7 @@ it('syncs saved comment edits to the canvas immediately and retains them after r
   }
 })
 
-it('saves, clears, undoes and redoes Error Trigger sources as ordinary Revision history', async () => {
+it('saves, clears, undoes and redoes Flow Error sources as ordinary Revision history', async () => {
   const { store, saved } = await session()
   try {
     await store.addNode(

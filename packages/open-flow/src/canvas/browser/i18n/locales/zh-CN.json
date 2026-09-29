@@ -596,7 +596,7 @@
       "manual": "手动",
       "cron": "定时",
       "webhook": "Webhook",
-      "error": "错误触发器"
+      "error": "工作流错误"
     },
     "kind": {
       "task": "任务",

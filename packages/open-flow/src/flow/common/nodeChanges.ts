@@ -57,7 +57,7 @@ export function defaultNodeName(content: RevisionContent, node: GraphNode): stri
     case 'task':
       return normalizeNodeName(node.task != null ? node.task.name : (content.document.tasks[node.taskId]?.name ?? '')) || 'Task'
     case 'error':
-      return 'Error Trigger'
+      return 'Flow Error'
     case 'manual':
       return 'Manual Trigger'
     case 'webhook':

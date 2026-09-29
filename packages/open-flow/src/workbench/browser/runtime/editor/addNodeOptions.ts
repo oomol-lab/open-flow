@@ -147,11 +147,11 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
       description: t('errorWorkflow.description'),
       group,
       id: 'trigger:error',
-      icon: ':carbon:warning-alt:',
+      icon: ':lucide-light:siren:',
       inputs: [],
       kind: 'trigger',
       label: t('errorWorkflow.trigger'),
-      outputs: triggerOutputDefinitions({ kind: 'error', name: 'Error Trigger' }),
+      outputs: triggerOutputDefinitions({ kind: 'error', name: 'Flow Error' }),
       trigger: { kind: 'error' },
     },
     {

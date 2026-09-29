@@ -1,12 +1,12 @@
-> 设计修订：配置方向已改为仅在 Error Trigger 节点多选已发布上游，移除源 Flow 的错误处理选择入口。当前实现与契约以 [Error Trigger](../error-trigger.md) 为准；下文保留最初方案背景。
+> 设计修订：配置方向已改为仅在 Flow Error 节点多选已发布上游，移除源 Flow 的错误处理选择入口。当前实现与契约以 [Flow Error](../error-trigger.md) 为准；下文保留最初方案背景。
 
-# Error Trigger 实施计划
+# Flow Error 实施计划
 
-状态：已实施。公共模型、Server 持久化派发、Workbench 与 Lab 已接入；实现合同见 [Error Trigger 使用说明](../error-trigger.md) 和 [Control API](../control/contracts/control-api.md)。
+状态：已实施。公共模型、Server 持久化派发、Workbench 与 Lab 已接入；实现合同见 [Flow Error 使用说明](../error-trigger.md) 和 [Control API](../control/contracts/control-api.md)。
 
 ## 1. 目标与范围
 
-提供内置 Error Trigger：生产自动运行失败后，将失败上下文交给指定 Flow，执行通知、记录或用户编排的处理逻辑。
+提供内置 Flow Error：生产自动运行失败后，将失败上下文交给指定 Flow，执行通知、记录或用户编排的处理逻辑。
 多个源 Flow 可以共用一个错误处理 Flow；错误处理目标必须是另一个 Flow，禁止选择源 Flow 自身。
 
 复用现有 Revision、Publication、Trigger admission、普通 Run 和 Maintenance；不引入通用事件总线、外部队列或第二套执行器。
@@ -18,18 +18,18 @@
 
 ## 2. 产品语义
 
-| 项目     | 实施行为                                                                                    |
-| -------- | ------------------------------------------------------------------------------------------- |
-| 节点     | 根 Flow 可有一个 Error Trigger，作为独立 source node；Subflow 不允许放置                    |
-| 关联     | 源 Flow 显式配置一个错误处理 Flow；不配置则保持原行为                                       |
-| 自身处理 | 禁止选择当前 Flow；加入 Error Trigger 不自动改变错误处理配置                                |
-| 发布     | 错误处理 Flow 必须有包含 Error Trigger 的 Live Publication，并已启用；该 Trigger 必须未暂停 |
-| 触发来源 | 仅生产 Trigger 自动准入的 Run；手动 Draft 和手动 Live 运行不产生错误派发                    |
-| 触发终态 | `failed`、`indeterminate`；`completed`、`canceled` 不触发                                   |
-| 触发粒度 | 每个源 Run 至多创建一个错误处理 Run，按 Run 的最终终态决定                                  |
-| 防递归   | Error Trigger 准入的 Run 失败后不再派发错误处理，包含跨 Flow 的循环关联                     |
-| 测试     | 通过现有手动运行入口，使用符合输出合同的样例错误数据测试分支；不生成真实错误派发            |
-| 原 Run   | 始终保留原失败状态；错误处理成功不把原 Run 改成成功                                         |
+| 项目     | 实施行为                                                                                 |
+| -------- | ---------------------------------------------------------------------------------------- |
+| 节点     | 根 Flow 可有一个 Flow Error，作为独立 source node；Subflow 不允许放置                    |
+| 关联     | 源 Flow 显式配置一个错误处理 Flow；不配置则保持原行为                                    |
+| 自身处理 | 禁止选择当前 Flow；加入 Flow Error 不自动改变错误处理配置                                |
+| 发布     | 错误处理 Flow 必须有包含 Flow Error 的 Live Publication，并已启用；该 Trigger 必须未暂停 |
+| 触发来源 | 仅生产 Trigger 自动准入的 Run；手动 Draft 和手动 Live 运行不产生错误派发                 |
+| 触发终态 | `failed`、`indeterminate`；`completed`、`canceled` 不触发                                |
+| 触发粒度 | 每个源 Run 至多创建一个错误处理 Run，按 Run 的最终终态决定                               |
+| 防递归   | Flow Error 准入的 Run 失败后不再派发错误处理，包含跨 Flow 的循环关联                     |
+| 测试     | 通过现有手动运行入口，使用符合输出合同的样例错误数据测试分支；不生成真实错误派发         |
+| 原 Run   | 始终保留原失败状态；错误处理成功不把原 Run 改成成功                                      |
 
 `indeterminate` 明确表示执行结果无法确认，可能已经产生外部副作用。输出和 UI 保留这一差异，不能将其转换成可安全重试的普通失败。
 节点启动前失败、执行超时、Wait 过期和恢复失败，只要符合来源和终态规则，都由统一终态提交覆盖。
@@ -41,22 +41,22 @@
 
 ### 3.1 Flow 配置
 
-- 在 `FlowDocument` 中增加可选 `errorWorkflow` 引用，保存目标 `flowId`。目标根图最多一个 Error Trigger，不另存可漂移的目标节点选择。
+- 在 `FlowDocument` 中增加可选 `errorWorkflow` 引用，保存目标 `flowId`。目标根图最多一个 Flow Error，不另存可漂移的目标节点选择。
 - 配置属于 Revision，进入 digest，使用正常 Draft change、预期 Revision、幂等 identity 和 inverse operation 保存。
 - 源 Run 读取自己固定 Revision 中的配置；后续草稿修改或重新发布不改变该 Run 的关联目标。
 - 错误处理目标的 `flowId` 必须与源 `flowId` 不同。前端候选列表排除当前 Flow，服务端在关联写入、发布和派发准入边界拒绝自身引用，不能绕过 UI 通过 API 建立。
 - 旧 Revision 缺少该字段时表示未配置；不得改写历史正文或 digest。实施时按既有 modelVersion 规则处理新节点和字段。
-- 新增或切换关联时，服务端只接受同 scope 中已发布并启用、Live 包含未暂停 Error Trigger 的目标；下拉选择遵守相同规则，不能只在前端过滤。
+- 新增或切换关联时，服务端只接受同 scope 中已发布并启用、Live 包含未暂停 Flow Error 的目标；下拉选择遵守相同规则，不能只在前端过滤。
 - 已保存引用后来不可用时，草稿保留引用并显示诊断。发布源 Flow 时重新验证目标资格及非自身约束。
 - 跨 Flow 的资格验证不形成级联发布事务；目标随后停用、删除或重新发布，由派发准入重新检查。
 
-### 3.2 Error Trigger
+### 3.2 Flow Error
 
 - 在公共 `TriggerNode` 联合中增加 `kind: 'error'`，提供固定输出合同、创建操作和内置目录展示。
 - 更新涉及 Trigger kind 的严格 decoder、validation、图编译、Revision 展示转换和 public exports，依赖编译器穷尽检查找齐消费者。
-- Error Trigger 无外部订阅、Connection 或周期配置。发布时在现有激活事务安装内部 binding，保留普通 Trigger 暂停和恢复能力。
+- Flow Error 无外部订阅、Connection 或周期配置。发布时在现有激活事务安装内部 binding，保留普通 Trigger 暂停和恢复能力。
 - 执行继续消费通用 Trigger seed 和端口映射；不要在 Scheduler 中增加跨 Flow 派发逻辑。
-- 源 Flow 同时包含普通入口和 Error Trigger 时，保持现有 source node 可达分支执行语义。
+- 源 Flow 同时包含普通入口和 Flow Error 时，保持现有 source node 可达分支执行语义。
 
 ### 3.3 输出与错误事实
 
@@ -89,7 +89,7 @@ Subflow 错误必须能够定位到调用路径；启动失败、Run 超时和�
 ### 4.2 派发与去重
 
 1. Run owner 提供到期待处理记录和下一工作时间，现有 Maintenance/Supervisor 唤醒链推进。
-2. 读取目标当前 Live，准备其固定 Revision、closure、Error Trigger seed 和执行授权。
+2. 读取目标当前 Live，准备其固定 Revision、closure、Flow Error seed 和执行授权。
 3. 在准入事务重新检查 scope、Flow lifecycle、Live identity、启用状态和 current binding，执行现有运行所需的 Variable/授权检查。
 4. 使用稳定 occurrence identity 调用现有 `acceptTriggerOccurrence`，原子创建普通 Run 并完成派发记录。
 5. 发布处理 Run 的正常创建通知；派发成功或失败提交后，同时向源 Flow 发布源 Run 的变更通知。后续执行、并发限制、取消、等待和恢复全部走普通 Run owner。
@@ -101,7 +101,7 @@ occurrence identity 由源 Run 派生，不包含重试次数。已完成派发�
 ### 4.3 失败、背压与生命周期
 
 - 队列容量不足是暂时背压，持久化下一尝试时间并退避；不能丢失派发，也不能忙循环。
-- 目标已删除、未发布、停用、缺少 Error Trigger、Trigger 暂停或确定性授权/配置失败时，结束本次派发并保存可读原因。
+- 目标已删除、未发布、停用、缺少 Flow Error、Trigger 暂停或确定性授权/配置失败时，结束本次派发并保存可读原因。
 - 目标后来恢复不会自动补发已经结束的派发；首版不增加手动重投入口。
 - 派发失败不改变源 Run terminal，也不能阻止其完成落库；处理 Flow 执行失败不自动重试其副作用。
 - 派发记录独立于普通 RunEvent retention，由源 Run 的生命周期负责清理。源 Flow 删除时取消其尚未准入的派发并清理记录。
@@ -131,9 +131,9 @@ occurrence identity 由源 Run 派生，不包含重试次数。已完成派发�
 ### 5.2 配置流程与状态
 
 - 初始显示“未配置”；选择有效目标后通过 WorkspaceStore 正常保存草稿，并明确“发布后生效”。
-- 目标列表仅提供同 scope 中已发布并启用、Live 包含未暂停 Error Trigger 的 Flow；资格以线上版本为准，草稿中新增节点不算可用。无论当前 Flow 是否已上线或包含 Error Trigger，均不出现在候选列表中。
+- 目标列表仅提供同 scope 中已发布并启用、Live 包含未暂停 Flow Error 的 Flow；资格以线上版本为准，草稿中新增节点不算可用。无论当前 Flow 是否已上线或包含 Flow Error，均不出现在候选列表中。
 - 不把另一 Flow 的全部 Revision 嵌入 Flow catalog，也不为了下拉框无界下载所有草稿。先检查现有查询合同，缺少资格信息时由权威 API 提供最小必要字段。
-- 空列表给出“先发布并启用包含 Error Trigger 的工作流”的简短说明，复用现有新建/导航能力。
+- 空列表给出“先发布并启用包含 Flow Error 的工作流”的简短说明，复用现有新建/导航能力。
 - 加载失败显示重试；已选目标不可用时保留引用和原因，不静默清空、不自动切换目标。
 - 覆盖保存中、保存失败、外部更新、未发布修改、目标停用/删除和历史只读状态。
 - 配置操作进入既有 Draft 保存和 undo/redo 流程，正常保存保留先前历史；不要在组件中维护另一份已保存配置。
@@ -150,7 +150,7 @@ occurrence identity 由源 Run 派生，不包含重试次数。已完成派发�
 ### 5.4 视觉与无障碍约束
 
 - 使用现有 Button、Field、Popover、选择控件、Alert 和导航链接；字号、间距、圆角、边框与状态色沿用标准尺寸及主题 token。
-- 普通 Error Trigger 节点使用同类 Trigger 视觉，不因名称带 Error 而默认整块标红；错误色只表达真实失败状态。
+- 普通 Flow Error 节点使用同类 Trigger 视觉，不因名称带 Error 而默认整块标红；错误色只表达真实失败状态。
 - Workbench chrome 使用产品主题，节点内容使用 canvas surface，不能把画布的紧凑配色泄漏到浮层。
 - 新增图标按 iconify-icons skill 选择；保留国际化文案与可访问名称，覆盖 `uiLanguages`。
 - 弹出内容保留 Workbench theme/mount context；属性面板遵守 ContextPanel 的 stacking 合同，不增加独立 z-index 体系或定位补丁。
@@ -161,7 +161,7 @@ occurrence identity 由源 Run 派生，不包含重试次数。已完成派发�
 
 ### 阶段一：公共模型与结构化失败
 
-- [ ] 增加 Error Trigger、Flow 引用、schema、decoder、Draft change/inverse 和输出合同。
+- [ ] 增加 Flow Error、Flow 引用、schema、decoder、Draft change/inverse 和输出合同。
 - [ ] 校验根图限制、节点数量、禁止自身关联、旧 Revision 读取和新的版本边界。
 - [ ] 在执行错误传播和 terminal result 中保留结构化失败原因，覆盖 Subflow 和无节点错误。
 - [ ] 同步 Control API、公共导出和受影响的 CLI/MCP 定义，避免入口合同分叉。
@@ -170,7 +170,7 @@ occurrence identity 由源 Run 派生，不包含重试次数。已完成派发�
 
 ### 阶段二：发布、可靠派发与恢复
 
-- [ ] 实现 Error Trigger binding 的发布激活、暂停和失效处理。
+- [ ] 实现 Flow Error binding 的发布激活、暂停和失效处理。
 - [ ] 增加数据库迁移、终态原子登记、可信来源关系、去重准入和 Maintenance 调度。
 - [ ] 实现背压、目标变更、不可用原因和生命周期清理。
 - [ ] 暴露源 Run 派发状态、处理 Run 关联及必要的资格查询；接入既有通知。
@@ -198,9 +198,9 @@ occurrence identity 由源 Run 派生，不包含重试次数。已完成派发�
 
 | 边界       | 必须验证的行为                                                                                                                                                            |
 | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 公共模型   | 严格解码、旧 Revision、输出 schema、非法 Subflow/重复 Error Trigger、Draft change 幂等及 inverse                                                                          |
+| 公共模型   | 严格解码、旧 Revision、输出 schema、非法 Subflow/重复 Flow Error、Draft change 幂等及 inverse                                                                             |
 | 执行       | 自动失败、启动失败、超时、Wait 过期、Subflow 路径、恢复 indeterminate；固定原因不会被并发取消覆盖                                                                         |
-| 触发规则   | 手动 Draft/Live 不派发，正常完成和取消不派发，Error Trigger 执行失败不递归                                                                                                |
+| 触发规则   | 手动 Draft/Live 不派发，正常完成和取消不派发，Flow Error 执行失败不递归                                                                                                   |
 | 发布       | 未上线目标不可选择、前端排除自身、API/发布/准入拒绝自身引用、服务端拒绝无效目标、草稿修改隔离、目标 Live 切换、启停及 Trigger 暂停                                        |
 | 持久化     | terminal 与待处理记录原子提交；提交后重启、准入后重启和重复推进均只得到一个处理 Run                                                                                       |
 | 准入       | 队列满后恢复、Live 检查竞争、目标删除、权限/Variable 缺失、scope 隔离                                                                                                     |

@@ -13,10 +13,10 @@ import { sampleErrorOutputs } from '../src/trigger/common/contract.ts'
 const content: RevisionContent = {
   modelVersion: currentFlowModelVersion,
   modules: {},
-  document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: { error: { kind: 'error', name: 'Error Trigger' } } } },
+  document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: { error: { kind: 'error', name: 'Flow Error' } } } },
 }
 
-describe('Error Trigger contract', () => {
+describe('Flow Error contract', () => {
   it('round trips configuration, changes Revision and closure identity, and supports inverse changes', async () => {
     const operations = decodeChangeOperations([{ kind: 'graph.trigger.sources.set', nodeId: 'error', value: ['source', 'other'] }])
     const configured = applyFlowChanges(content, operations)
@@ -37,7 +37,7 @@ describe('Error Trigger contract', () => {
     expect(() => decodeRevisionContent({ ...content, modelVersion: 4 })).toThrow('version 5')
   })
 
-  it('rejects duplicate Error Triggers and Subflow placement', () => {
+  it('rejects duplicate Flow Error nodes and Subflow placement', () => {
     expect(() =>
       applyFlowChanges(content, [{ kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'another', node: { kind: 'error', name: 'Another' } }]),
     ).toThrow('only one')
@@ -74,7 +74,7 @@ describe('Error Trigger contract', () => {
         ...content.document,
         graph: {
           nodes: {
-            error: { kind: 'error', name: 'Error Trigger' },
+            error: { kind: 'error', name: 'Flow Error' },
             manual: { kind: 'manual', name: 'Manual' },
             handled: {
               kind: 'value',

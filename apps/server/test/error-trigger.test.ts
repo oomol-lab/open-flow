@@ -256,7 +256,7 @@ async function configureSources(
 ) {
   const revision = JSON.parse(handler.content) as RevisionContent
   const node = revision.document.graph.nodes.start
-  if (node?.kind != 'error') throw new Error('Expected Error Trigger')
+  if (node?.kind != 'error') throw new Error('Expected Flow Error')
   const updated = applyFlowChanges(revision, [{ kind: 'graph.trigger.sources.set', nodeId: 'start', before: node.sourceFlowIds, value: sourceFlowIds }])
   const bytes = encodeRevision(updated)
   const digest = await digestBytes(bytes)
@@ -345,7 +345,7 @@ it('cancels pending admission when a published handler removes the subscription'
   expect(f.maintain().errorDispatches).toEqual([{ flowId: 'source', runId }])
   expect(f.store.runViews.errorHandling(runId).errorDispatches?.[0]).toMatchObject({
     status: 'failed',
-    message: 'The Error Trigger no longer listens to this upstream Flow.',
+    message: 'The Flow Error node no longer listens to this upstream Flow.',
   })
 })
 

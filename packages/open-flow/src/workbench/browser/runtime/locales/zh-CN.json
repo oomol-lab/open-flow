@@ -759,9 +759,9 @@
     "search": "搜索",
     "searchResources": "搜索{{kind}}",
     "subflows": "Subflow",
-    "listenersLoading": "正在查询错误触发器…",
-    "listenersFailed": "无法确认哪些错误触发器正在监听。可重试，或继续删除。",
-    "listenersTitle": "以下已发布的错误触发器配置正在监听此工作流：",
+    "listenersLoading": "正在查询工作流错误节点…",
+    "listenersFailed": "无法确认哪些工作流错误节点正在监听。可重试，或继续删除。",
+    "listenersTitle": "以下已发布的工作流错误节点配置正在监听此工作流：",
     "listenerDisabled": "已停用",
     "listenersImpact": "删除后将停止接收此工作流的错误，其他上游的监听不受影响。配置中的失效引用需手动移除。"
   },
@@ -1363,8 +1363,8 @@
     "root": "主流程"
   },
   "errorWorkflow": {
-    "trigger": "错误触发器",
-    "description": "其他工作流失败时运行。",
+    "trigger": "工作流错误",
+    "description": "监听所选工作流的自动运行错误，并启动当前工作流。",
     "empty": "暂无可选的已发布工作流。",
     "retry": "重试",
     "more": "加载更多",

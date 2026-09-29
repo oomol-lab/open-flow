@@ -346,7 +346,7 @@ function executorName(task: TaskDefinition | undefined, providerName: string | u
 function triggerIcon(trigger: TriggerNode): string {
   switch (trigger.kind) {
     case 'error':
-      return ':carbon:warning-alt:'
+      return ':lucide-light:siren:'
     case 'manual':
       return ':carbon:play:'
     case 'cron':

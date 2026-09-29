@@ -15,7 +15,7 @@ import { openApiTask, selectOperation } from '../../openapi/common/openapi.ts'
 const target = { kind: 'flow' } as const
 const descriptions = {
   'manual': 'A Manual start node.',
-  'error': 'An Error Trigger. Publish and enable this Flow before selecting it as another Flow’s error workflow.',
+  'error': 'A Flow Error node. Select upstream Flows, then publish and enable this Flow to listen for failures in their automatic runs.',
   'webhook': 'A Webhook start node.',
   'cron': 'An hourly scheduled start node.',
   'poll': 'Gmail polling by key; replace CONNECTION_ID with an active Gmail connection.',
@@ -42,7 +42,7 @@ export function authoringExample(name: string): { version: 1; operations: readon
   let operations: readonly DraftOperation[]
   switch (name) {
     case 'error':
-      operations = createBuiltinTrigger(target, 'error', { kind: 'error', name: 'Error Trigger' })
+      operations = createBuiltinTrigger(target, 'error', { kind: 'error', name: 'Flow Error' })
       break
     case 'openapi': {
       const document = {

@@ -761,7 +761,7 @@
     "subflows": "Subflows",
     "listenersLoading": "Checking error listeners…",
     "listenersFailed": "Could not check error listeners. Retry or continue deleting.",
-    "listenersTitle": "These published Error Trigger configurations listen to this workflow:",
+    "listenersTitle": "These published Flow Error configurations listen to this workflow:",
     "listenerDisabled": "Disabled",
     "listenersImpact": "Deleting stops errors from this workflow reaching these triggers. Other upstream workflows are unaffected. Unavailable references must be removed from their configurations manually."
   },
@@ -1363,8 +1363,8 @@
     "root": "Main flow"
   },
   "errorWorkflow": {
-    "trigger": "Error Trigger",
-    "description": "Runs when another workflow fails.",
+    "trigger": "Flow Error",
+    "description": "Starts this workflow when an automatic run of a selected workflow fails.",
     "empty": "No published workflows available.",
     "retry": "Retry",
     "more": "Load more",

@@ -601,7 +601,7 @@ function validateGraph(
   const errorTriggers = Object.entries(graph.nodes).filter(([, node]) => node.kind == 'error')
   if (errorTriggers.length > 1)
     for (const [nodeId] of errorTriggers)
-      diagnostics.push(graphDiagnostic('graph.error-trigger-duplicate', 'A graph can contain only one Error Trigger.', `${path}/nodes/${nodeId}`))
+      diagnostics.push(graphDiagnostic('graph.error-trigger-duplicate', 'A graph can contain only one Flow Error node.', `${path}/nodes/${nodeId}`))
   const manualTriggers = Object.entries(graph.nodes).filter(([, node]) => node.kind == 'manual')
   if (manualTriggers.length > 1) {
     for (const [nodeId] of manualTriggers) {

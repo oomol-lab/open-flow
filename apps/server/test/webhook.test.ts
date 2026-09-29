@@ -324,7 +324,7 @@ describe('Server Webhook Trigger admission', () => {
   })
 })
 
-it('runs the published Error Trigger after an automatic failure and exposes both Run links', async () => {
+it('runs the published Flow Error after an automatic failure and exposes both Run links', async () => {
   const service = await openService(await databaseFile())
   services.push(service)
   const handler = await storeRevision(
@@ -338,7 +338,7 @@ it('runs the published Error Trigger after an automatic failure and exposes both
         subflows: {},
         graph: {
           nodes: {
-            error: { kind: 'error', name: 'Error Trigger' },
+            error: { kind: 'error', name: 'Flow Error' },
             capture: {
               kind: 'value',
               name: 'Capture',

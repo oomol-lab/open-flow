@@ -83,7 +83,7 @@ function Sample({ dark, language }: { dark: boolean; language: Parameters<Fronte
               <FlowDeletionImpact
                 listeners={[
                   { flowId: 'alerts', flowName: 'Incident notifications', nodeId: 'error', nodeName: 'Order failure alerts', enabled: true },
-                  { flowId: 'ops', flowName: 'Operations', nodeId: 'error', nodeName: 'Error Trigger', enabled: false },
+                  { flowId: 'ops', flowName: 'Operations', nodeId: 'error', nodeName: 'Flow Error', enabled: false },
                 ]}
                 failed={false}
                 onRetry={() => {}}
@@ -112,7 +112,7 @@ function Sample({ dark, language }: { dark: boolean; language: Parameters<Fronte
 }
 
 export const errorWorkflowStory: FrontendStory = {
-  group: 'Trigger Error Trigger',
+  group: 'Trigger Flow Error',
   id: 'error-workflow',
   title: 'Error handling',
   description:

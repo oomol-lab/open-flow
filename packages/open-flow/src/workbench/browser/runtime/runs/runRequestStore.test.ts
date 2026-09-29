@@ -392,14 +392,14 @@ it('remembers explicitly entered empty bodies and keeps cleared data missing', a
   }
 })
 
-it('prefills Error Trigger test data and preserves intentional edits in the session', async () => {
+it('prefills Flow Error test data and preserves intentional edits in the session', async () => {
   const { store, client } = harness()
   const revision = entryDraft()
   const errorDraft: Draft = {
     ...revision,
     content: {
       ...revision.content,
-      document: { ...revision.content.document, graph: { nodes: { error: { kind: 'error', name: 'Error Trigger' } }, edges: [] } },
+      document: { ...revision.content.document, graph: { nodes: { error: { kind: 'error', name: 'Flow Error' } }, edges: [] } },
     },
   }
   try {

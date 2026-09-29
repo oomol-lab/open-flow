@@ -707,8 +707,8 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
       case 'graph.trigger.sources.set': {
         const graph = document.graph
         const node = graph.nodes[operation.nodeId]
-        if (node?.kind != 'error') invalid('The Error Trigger does not exist.')
-        if (!dequal(node.sourceFlowIds, operation.before)) invalid('The Error Trigger sources changed before this operation was applied.')
+        if (node?.kind != 'error') invalid('The Flow Error node does not exist.')
+        if (!dequal(node.sourceFlowIds, operation.before)) invalid('The Flow Error node’s sources changed before this operation was applied.')
         const { sourceFlowIds: _, ...base } = node
         const updated = operation.value == null ? base : { ...base, sourceFlowIds: operation.value }
         document.graph = { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } }
@@ -774,7 +774,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         if (graph.nodes[operation.nodeId] != null) invalid('A Node with this ID already exists in the target graph.')
         if (operation.target.kind == 'subflow' && !('inputs' in operation.node)) invalid('Trigger Nodes cannot be created inside a Subflow.')
         if (operation.node.kind == 'error' && Object.values(graph.nodes).some((node) => node.kind == 'error'))
-          invalid('A graph can contain only one Error Trigger.')
+          invalid('A graph can contain only one Flow Error node.')
         if (operation.node.kind == 'manual' && Object.values(graph.nodes).some((node) => node.kind == 'manual')) {
           invalid('A graph can contain only one manual Trigger.')
         }

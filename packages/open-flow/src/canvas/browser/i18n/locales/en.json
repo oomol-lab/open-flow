@@ -596,7 +596,7 @@
       "manual": "Manual",
       "cron": "Schedule",
       "webhook": "Webhook",
-      "error": "Error Trigger"
+      "error": "Flow Error"
     },
     "kind": {
       "task": "Task",

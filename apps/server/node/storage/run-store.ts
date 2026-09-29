@@ -779,8 +779,8 @@ export class RunStore {
           .prepare('SELECT 1 FROM error_subscriptions WHERE handler_flow_id = ? AND source_flow_id = ?')
           .get(item.targetFlowId, item.sourceFlowId) == null
       )
-        reason = 'The Error Trigger no longer listens to this upstream Flow.'
-      else if (target == null) reason = 'The error workflow is unavailable. It must be published, enabled and have an active Error Trigger.'
+        reason = 'The Flow Error node no longer listens to this upstream Flow.'
+      else if (target == null) reason = 'The error workflow is unavailable. It must be published, enabled and have an active Flow Error node.'
       else {
         const revision = decodeRevision(encoder.encode(target.content))
         const names = Object.values(variableBindings(revision, flowDependencies(revision, target.triggerNodeId).inputBindings))

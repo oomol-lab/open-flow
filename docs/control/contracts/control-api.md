@@ -396,9 +396,9 @@ Publish 和 Live Run 保持完整 Flow 校验。
 
 Manual Trigger 的节点结构为 `{ kind: "manual", name: string, description?: string, icon?: string }`，无输入和调度配置。其执行出口沿普通执行边连接下游，不提供数据输出字段，运行请求中的 `trigger.outputs` 和执行结果均为 `{}`。Cron 直接声明 `scheduledAt` 字符串端口；Poll 和 Integration 通过各自定义声明输出端口。其他 Trigger 可通过显式 outputs 模拟执行，仍保留 Draft/Live Run source，不伪造外部 occurrence。
 
-Error Trigger 使用 Flow model 5，节点为 `{ kind: 'error', name: string, sourceFlowIds?: readonly string[], description?: string, icon?: string }`，仅根图可放置且最多一个。`sourceFlowIds` 为监听的上游 flowId 列表，禁止重复、空 ID、自身以及未发布的 Flow。通过 `{ kind: 'graph.trigger.sources.set', nodeId: string, before?: readonly string[], value?: readonly string[] }` 修改；省略 value 清除，before 是原值前置条件。监听列表由错误处理 Flow 保存并发布，上游不再保存处理目标。旧 model 2/4 Revision 的正文和 digest 保持不变，新的修改升级到 model 5。
+Flow Error 使用 Flow model 5，节点为 `{ kind: 'error', name: string, sourceFlowIds?: readonly string[], description?: string, icon?: string }`，仅根图可放置且最多一个。`sourceFlowIds` 为监听的上游 flowId 列表，禁止重复、空 ID、自身以及未发布的 Flow。通过 `{ kind: 'graph.trigger.sources.set', nodeId: string, before?: readonly string[], value?: readonly string[] }` 修改；省略 value 清除，before 是原值前置条件。监听列表由错误处理 Flow 保存并发布，上游不再保存处理目标。旧 model 2/4 Revision 的正文和 digest 保持不变，新的修改升级到 model 5。
 
-仅自动 occurrence Run 的 failed/indeterminate 终态触发错误处理，手动 Run 可以提供样例 outputs 测试分支。一个上游可以被多个处理 Flow 监听，每个源 Run 对每个处理 Flow 至多派发一次。Error Trigger 的固定必需输出为：
+仅自动 occurrence Run 的 failed/indeterminate 终态触发错误处理，手动 Run 可以提供样例 outputs 测试分支。一个上游可以被多个处理 Flow 监听，每个源 Run 对每个处理 Flow 至多派发一次。Flow Error 的固定必需输出为：
 
 ```ts
 {
@@ -1251,12 +1251,12 @@ Flow 服务列表与账号授权分别保存。`ConnectorAccess.providerIds` 保
 
 Server 提供认证后的 `GET /v1/connector/teams`，返回 `{ enabled: boolean, teams: { id: string, name: string, systemCreated: boolean }[], version: 1 }`。不支持 Team 的部署返回 enabled=false 和空 teams。此目录不返回 Flow-Team 绑定列表。公共 ControlClient 通过 listConnectorTeams 读取，并通过 createFlow 的可选第三参数传入 teamId。
 
-### Error Trigger deletion impact
+### Flow Error deletion impact
 
 `GET /v1/flows/:flowId/error-listeners` returns `{ version: 1, listeners }` for the
 existing source Flow (404 if it does not exist). Each listener contains `flowId`,
 `flowName`, `nodeId`, `nodeName`, and `enabled`. The response includes all current
-published Error Trigger subscriptions without catalog pagination; unpublished draft
+published Flow Error subscriptions without catalog pagination; unpublished draft
 selections and retiring handlers are excluded. Node names come from the current
 Publication, while Flow names use the current catalog name. `enabled` is false when
 the handler deployment is disabled or its binding is paused.

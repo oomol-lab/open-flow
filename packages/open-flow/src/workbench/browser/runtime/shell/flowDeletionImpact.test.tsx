@@ -15,8 +15,8 @@ it('distinguishes an empty result from loading and failed lookups', () => {
       </I18nProvider>,
     )
   expect(render([], false)).toBe('')
-  expect(render(undefined, false)).toContain('正在查询错误触发器')
-  expect(render(undefined, true)).toContain('无法确认哪些错误触发器正在监听')
+  expect(render(undefined, false)).toContain('正在查询工作流错误节点')
+  expect(render(undefined, true)).toContain('无法确认哪些工作流错误节点正在监听')
   expect(render(undefined, true)).toContain('重试')
 })
 

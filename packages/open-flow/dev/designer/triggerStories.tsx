@@ -671,7 +671,7 @@ export const triggerStories: readonly FrontendStory[] = [
         title: 'Properties',
         description:
           fixture.trigger.kind === 'error'
-            ? 'Error Trigger · Verify upstream multi-selection above Outputs in editable and read-only panels, including localized text wrapping.'
+            ? 'Flow Error · Verify upstream multi-selection above Outputs in editable and read-only panels, including localized text wrapping.'
             : fixture.trigger.kind === 'manual'
               ? 'Manual · Read-only and editable properties share a fixed No outputs state. Changes stay in this Lab session.'
               : `${fixture.trigger.name} · Node properties in display and edit states. Changes stay in this Lab session.`,
