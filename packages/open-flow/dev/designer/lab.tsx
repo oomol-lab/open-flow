@@ -9,6 +9,7 @@ import { Button } from '../../src/ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuRadioGroup, DropdownMenuRadioItem } from '../../src/ui/browser/dropdown-menu.tsx'
 import { IconThemeContext } from '../../src/ui/browser/icons/iconTheme.ts'
 import { Input } from '../../src/ui/browser/input.tsx'
+import { OpenFlowLogo } from '../../src/ui/browser/logo.tsx'
 import { ScrollArea } from '../../src/ui/browser/scroll-area.tsx'
 import { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider } from '../../src/ui/browser/tooltip.tsx'
 import { StoryActions, StoryActionsProvider } from './storyActions.tsx'
@@ -209,6 +210,7 @@ export function FrontendLab() {
     <div className="lab-shell">
       <header className="lab-header">
         <h1 className="lab-brand">
+          <OpenFlowLogo theme={dark ? 'dark' : 'light'} alt="" />
           Open Flow <span>Design Lab</span>
         </h1>
         <nav className="lab-path" aria-label="Breadcrumb" title={path.join(' / ')}>

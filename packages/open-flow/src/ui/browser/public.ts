@@ -54,6 +54,7 @@ export const InputGroupAddon: ComponentType<
 > = SharedInputGroupAddon
 export const InputGroupInput: ForwardRefExoticComponent<ComponentPropsWithoutRef<'input'> & RefAttributes<HTMLInputElement>> = SharedInputGroupInput
 export { Label } from './label.tsx'
+export { OpenFlowLogo, type OpenFlowLogoProps } from './logo.tsx'
 export { Textarea } from './textarea.tsx'
 /** Shared Sonner presentation for hosts and the component Lab. */
 export const notificationToasterProps = {

@@ -41,15 +41,15 @@ body {
 }
 .lab-brand {
   display: flex;
-  align-items: baseline;
-  gap: 7px;
-  padding-left: 12px;
+  align-items: center;
+  gap: 4.16px;
   margin: 0;
   font-size: 15px;
   font-weight: 650;
   letter-spacing: -0.3px;
 }
 .lab-brand span {
+  margin-left: 2.84px;
   color: var(--ui-muted-foreground);
   font-size: 12px;
   font-weight: 400;

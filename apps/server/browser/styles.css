@@ -66,6 +66,9 @@ body {
 }
 
 .server-nav-title {
+  display: flex;
+  align-items: center;
+  gap: 4.16px;
   font-size: 13px;
   font-weight: 600;
 }

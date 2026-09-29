@@ -3,7 +3,7 @@ import type { FormEvent, MouseEvent, ReactElement } from 'react'
 import type { ConnectionConsole } from './connectionNavigation.ts'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
-import { Button, notificationToasterProps } from '@oomol-lab/open-flow/ui'
+import { Button, OpenFlowLogo, notificationToasterProps } from '@oomol-lab/open-flow/ui'
 import { EventSourcesPage, OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { Toaster } from 'sonner'
@@ -394,7 +394,10 @@ function Shell({ language, onLanguageChange, theme }: Props): ReactElement {
       ) : session.kind == 'signed-in' ? (
         <>
           <header className="server-nav">
-            <div className="server-nav-title">Open Flow Server</div>
+            <div className="server-nav-title">
+              <OpenFlowLogo theme={theme} alt="" />
+              Open Flow Server
+            </div>
             <nav aria-label="Open Flow Server">
               <a aria-current={variablesOpen || settingsOpen ? undefined : 'page'} href="/" onClick={(event) => followPage(event, '/')}>
                 {t('shell.flows')}
