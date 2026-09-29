@@ -163,10 +163,7 @@ export function AccountSelect({
             ) : selected == null ? (
               selectedLabel
             ) : (
-              <>
-                <AccountName name={displayName(selected)} builtIn={selected.builtInAccount} truncate />
-                {selected.isDefault ? ` (${t('inspector.account.teamDefault')})` : ''}
-              </>
+              <AccountName name={displayName(selected)} builtIn={selected.builtInAccount} truncate />
             )}
           </SelectValue>
         </SelectTrigger>
