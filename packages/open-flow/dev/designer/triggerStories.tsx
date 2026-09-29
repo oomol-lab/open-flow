@@ -282,17 +282,9 @@ function RunSample({ fixture, dark, language, log, state, downstream = false, la
       if (state !== 'closed' && state !== 'direct' && state !== 'disabled') {
         await store.editDraft(flow, draft, 'trigger')
         if (disposed) return
-        for (const group of store.$.inputRequest.value?.groups ?? []) {
-          group.editor.replaceValues(
-            state === 'empty'
-              ? {}
-              : group.nodeId === 'trigger'
-                ? state === 'invalid'
-                  ? Object.fromEntries(Object.keys(fixture.outputs).map((handle) => [handle, null]))
-                  : fixture.outputs
-                : { message: state === 'invalid' ? 123 : 'Test message' },
-          )
-        }
+        store.$.inputRequest.value?.editor?.replaceValues(
+          state === 'empty' ? {} : state === 'invalid' ? Object.fromEntries(Object.keys(fixture.outputs).map((handle) => [handle, null])) : fixture.outputs,
+        )
         if (state === 'invalid' || state === 'starting') void store.confirmInputs()
       }
       if (!disposed) setResource({ store, inputs: { flow, draft } })
@@ -310,7 +302,7 @@ function RunSample({ fixture, dark, language, log, state, downstream = false, la
   return (
     <section className="trigger-case">
       <h3>
-        {downstream ? 'Downstream input · ' : ''}
+        {downstream ? 'Unconfigured downstream node · ' : ''}
         {label ?? state}
       </h3>
       {resource && request && state !== 'closed' && (
@@ -353,12 +345,20 @@ function RunStory(props: StoryProps) {
   return (
     <Gallery {...props}>
       <div className="trigger-case-grid">
-        {direct && <RunSample {...props} state="direct" />}
-        {(['empty', 'ready', 'invalid', 'starting'] as const).map((state) => (
-          <RunSample key={state} {...props} state={state} downstream={direct} />
-        ))}
-        {!direct && <RunSample {...props} state="ready" downstream />}
-        <RunSample {...props} state="closed" downstream={direct} />
+        {direct ? (
+          <>
+            <RunSample {...props} state="direct" />
+            <RunSample {...props} state="direct" downstream />
+          </>
+        ) : (
+          <>
+            {(['empty', 'ready', 'invalid', 'starting'] as const).map((state) => (
+              <RunSample key={state} {...props} state={state} />
+            ))}
+            <RunSample {...props} state="ready" downstream />
+            <RunSample {...props} state="closed" />
+          </>
+        )}
         <RunSample {...props} state="disabled" />
         {props.fixture.trigger.kind === 'webhook' &&
           webhookValueFixtures.map((fixture) => <RunSample {...props} key={fixture.id} fixture={fixture} state="ready" label={fixture.id} />)}
@@ -661,7 +661,7 @@ export const triggerStories: readonly FrontendStory[] = [
         group: `Trigger ${fixture.trigger.name}`,
         id: `trigger-${fixture.id}-run`,
         title: 'Run menu states',
-        description: `${fixture.trigger.name} · Run panels shown side by side. Manual and scheduled triggers run directly; their input samples use a downstream node.`,
+        description: `${fixture.trigger.name} · Run panels shown side by side. Test data contains only the selected trigger’s outputs. Manual and scheduled triggers run directly, including with unconfigured downstream inputs.`,
         standalone: true,
         render: (log, dark, language) => <RunStory fixture={fixture} log={log} dark={dark} language={language} />,
       },

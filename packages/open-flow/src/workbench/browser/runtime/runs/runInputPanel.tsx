@@ -1,6 +1,6 @@
 import type { FormEvent, ReactElement } from 'react'
 import type { WorkbenchTheme } from '../contract.ts'
-import type { RunInputGroup, RunInputRequest, RunRequestStore } from './runRequestStore.ts'
+import type { RunInputRequest, RunRequestStore } from './runRequestStore.ts'
 
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
@@ -9,27 +9,6 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { Spinner } from '../../../../ui/browser/spinner.tsx'
 import { FlowRunInputEditor } from '../../flowRunInputEditor.tsx'
 import { Icon } from '../icons.tsx'
-
-function InputGroup({
-  attempted,
-  group,
-  title,
-  theme,
-}: {
-  readonly attempted: boolean
-  readonly title: string
-  readonly group: RunInputGroup
-  readonly theme: WorkbenchTheme
-}): ReactElement {
-  return (
-    <section className="run-input-group">
-      <header>
-        <strong>{title}</strong>
-      </header>
-      <FlowRunInputEditor store={group.editor} theme={theme} showErrors={attempted} />
-    </section>
-  )
-}
 
 function Form({
   onStarted,
@@ -76,15 +55,14 @@ function Form({
             <AlertDescription>{t('runInput.invalid')}</AlertDescription>
           </Alert>
         )}
-        {request.groups.map((group) => (
-          <InputGroup
-            attempted={request.attempted}
-            group={group}
-            key={group.nodeId}
-            title={group.nodeId == request.triggerId ? t('inspector.ports.outputsTitle') : group.title}
-            theme={theme}
-          />
-        ))}
+        {request.editor && (
+          <section className="run-input-group">
+            <header>
+              <strong>{t('inspector.ports.outputsTitle')}</strong>
+            </header>
+            <FlowRunInputEditor store={request.editor} theme={theme} showErrors={request.attempted} />
+          </section>
+        )}
       </div>
       <footer>
         <Button disabled={starting} onClick={close} type="button" variant="secondary">

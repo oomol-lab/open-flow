@@ -68,7 +68,7 @@ describe('RunRequestStore input preparation', () => {
     )
 
     try {
-      const request = store.requestDraft(flow, draft)
+      const request = store.requestDraft(flow, webhookDraft())
 
       expect(store.$.starting.value).toBe(true)
       expect(store.$.submitting.value).toBeUndefined()
@@ -154,21 +154,20 @@ it.each([false, true])('starts a cron test immediately with an explicit selectio
   }
 })
 
-it('collects downstream inputs for a cron test without asking for trigger outputs', async () => {
+it.each(['manual', 'cron'] as const)('ignores downstream inputs when testing %s', async (kind) => {
   const { client, store } = harness()
-  const revision = cronDraft(draft)
+  const revision = kind === 'cron' ? cronDraft(draft) : draft
   try {
-    expect(await store.requestDraft(flow, revision)).toBe('input')
-    expect(client.createDraftRun).not.toHaveBeenCalled()
-    expect(await store.confirmInputs()).toBe(false)
-    const groups = store.$.inputRequest.value?.groups ?? []
-    expect(groups.map((group) => group.nodeId)).toEqual(['task'])
-    groups[0]?.editor.replaceValues({ value: 'test' })
-    expect(await store.confirmInputs()).toBe(true)
+    expect(store.inputStatus(flow.flowId, revision, 'start')).toBe('none')
+    expect(await store.requestDraft(flow, revision, 'start')).toBe('started')
+    expect(store.$.inputRequest.value).toBeUndefined()
     expect(client.createDraftRun).toHaveBeenCalledExactlyOnceWith(
       'flow',
       'revision',
-      expect.objectContaining({ trigger: { nodeId: 'start', outputs: { scheduledAt: expect.any(String) } }, inputs: { task: { value: 'test' } } }),
+      expect.objectContaining({
+        trigger: { nodeId: 'start', outputs: kind === 'cron' ? { scheduledAt: expect.any(String) } : {} },
+        inputs: {},
+      }),
     )
   } finally {
     store.dispose()
@@ -244,8 +243,8 @@ it('flushes pending code again before confirming inputs and uses the saved revis
     prepare,
   )
   try {
-    expect(await store.requestDraft(flow, draft)).toBe('input')
-    store.$.inputRequest.value?.groups[0]?.editor.replaceValues({ value: 'test' })
+    expect(await store.requestDraft(flow, webhookDraft())).toBe('input')
+    store.$.inputRequest.value?.editor?.replaceValues(webhookOutputs)
     prepare.mockResolvedValueOnce(undefined)
     expect(await store.confirmInputs()).toBe(false)
     expect(createDraftRun).not.toHaveBeenCalled()
@@ -253,7 +252,7 @@ it('flushes pending code again before confirming inputs and uses the saved revis
     expect(createDraftRun).toHaveBeenCalledWith(
       'flow',
       'saved-revision',
-      expect.objectContaining({ inputs: { task: { value: 'test' } }, trigger: { nodeId: 'start', outputs: {} } }),
+      expect.objectContaining({ inputs: {}, trigger: { nodeId: 'start', outputs: webhookOutputs } }),
     )
   } finally {
     store.dispose()
@@ -263,17 +262,17 @@ it('flushes pending code again before confirming inputs and uses the saved revis
 it('remembers valid test data for the selected trigger and reuses it on the next run', async () => {
   const { client, store } = harness()
   try {
-    expect(store.inputStatus(flow.flowId, draft, 'start')).toBe('missing')
-    expect(await store.requestDraft(flow, draft, 'start')).toBe('input')
-    store.$.inputRequest.value?.groups[0]?.editor.replaceValues({ value: 'remembered' })
+    expect(store.inputStatus(flow.flowId, webhookDraft(), 'start')).toBe('missing')
+    expect(await store.requestDraft(flow, webhookDraft(), 'start')).toBe('input')
+    store.$.inputRequest.value?.editor?.replaceValues(webhookOutputs)
     store.dismissInputs()
 
-    expect(store.inputStatus(flow.flowId, draft, 'start')).toBe('ready')
-    expect(await store.requestDraft(flow, draft, 'start')).toBe('started')
+    expect(store.inputStatus(flow.flowId, webhookDraft(), 'start')).toBe('ready')
+    expect(await store.requestDraft(flow, webhookDraft(), 'start')).toBe('started')
     expect(client.createDraftRun).toHaveBeenCalledWith(
       'flow',
       'revision',
-      expect.objectContaining({ inputs: { task: { value: 'remembered' } }, trigger: { nodeId: 'start', outputs: {} } }),
+      expect.objectContaining({ inputs: {}, trigger: { nodeId: 'start', outputs: webhookOutputs } }),
     )
   } finally {
     store.dispose()
@@ -283,28 +282,26 @@ it('remembers valid test data for the selected trigger and reuses it on the next
 it('reopens test data when its input shape changes', async () => {
   const { client, store } = harness()
   try {
-    expect(await store.requestDraft(flow, draft, 'start')).toBe('input')
-    store.$.inputRequest.value?.groups[0]?.editor.replaceValues({ value: 'remembered' })
+    expect(await store.requestDraft(flow, webhookDraft(), 'start')).toBe('input')
+    store.$.inputRequest.value?.editor?.replaceValues(webhookOutputs)
     store.dismissInputs()
+    const revision = webhookDraft()
     const changed = {
-      ...draft,
+      ...revision,
       content: {
-        ...draft.content,
+        ...revision.content,
         document: {
-          ...draft.content.document,
+          ...revision.content.document,
           graph: {
-            ...draft.content.document.graph,
+            ...revision.content.document.graph,
             nodes: {
-              ...draft.content.document.graph.nodes,
-              task: {
-                inputs: {},
-                kind: 'task',
-                task: {
-                  inputs: [{ handle: 'value', jsonSchema: { type: 'number' }, nullable: false }],
-                  moduleId: 'module',
-                  name: 'Code',
-                  outputs: [],
-                },
+              ...revision.content.document.graph.nodes,
+              start: {
+                kind: 'webhook',
+                method: 'POST',
+                name: 'Webhook',
+                options: {},
+                bodyFields: [{ handle: 'count', jsonSchema: { type: 'number' }, nullable: false }],
               },
             },
           },
@@ -320,15 +317,20 @@ it('reopens test data when its input shape changes', async () => {
   }
 })
 
+const webhookOutputs = { headers: {}, query: {}, body: {}, webhookUrl: 'http://example.com/webhook' }
+
 function webhookDraft(): Draft {
-  const revision = entryDraft()
+  const revision = draft
   return {
     ...revision,
     content: {
       ...revision.content,
       document: {
         ...revision.content.document,
-        graph: { edges: [], nodes: { start: { kind: 'webhook', method: 'POST', name: 'Webhook', bodyFields: [], options: {} } } },
+        graph: {
+          ...revision.content.document.graph,
+          nodes: { ...revision.content.document.graph.nodes, start: { kind: 'webhook', method: 'POST', name: 'Webhook', bodyFields: [], options: {} } },
+        },
       },
     },
   }
@@ -356,7 +358,7 @@ it('preserves missing webhook data across untouched open/close cycles', async ()
   try {
     for (let cycle = 0; cycle < 2; cycle++) {
       expect(await store.editDraft(flow, revision, 'start')).toBe('input')
-      expect(store.$.inputRequest.value?.groups[0]?.editor.values()).toEqual({})
+      expect(store.$.inputRequest.value?.editor?.values()).toEqual({})
       expect(store.$.inputRequest.value?.valid.value).toBe(false)
       store.dismissInputs()
       expect(store.inputStatus(flow.flowId, revision, 'start')).toBe('missing')
@@ -375,18 +377,18 @@ it('remembers explicitly entered empty bodies and keeps cleared data missing', a
   try {
     await store.editDraft(flow, revision, 'start')
     const outputs = { headers: {}, query: {}, body: {}, webhookUrl: 'http://example.com/webhook' }
-    store.$.inputRequest.value?.groups[0]?.editor.replaceValues(outputs)
+    store.$.inputRequest.value?.editor?.replaceValues(outputs)
     store.dismissInputs()
     expect(store.inputStatus(flow.flowId, revision, 'start')).toBe('ready')
     expect(await store.requestDraft(flow, revision, 'start')).toBe('started')
     expect(client.createDraftRun).toHaveBeenCalledWith('flow', 'revision', expect.objectContaining({ trigger: { nodeId: 'start', outputs } }))
     await store.editDraft(flow, revision, 'start')
-    expect(store.$.inputRequest.value?.groups[0]?.editor.values()).toEqual(outputs)
-    store.$.inputRequest.value?.groups[0]?.editor.setValue('body', undefined)
+    expect(store.$.inputRequest.value?.editor?.values()).toEqual(outputs)
+    store.$.inputRequest.value?.editor?.setValue('body', undefined)
     store.dismissInputs()
     expect(store.inputStatus(flow.flowId, revision, 'start')).toBe('missing')
     await store.editDraft(flow, revision, 'start')
-    expect(store.$.inputRequest.value?.groups[0]?.editor.values()).toEqual({ headers: {}, query: {}, webhookUrl: outputs.webhookUrl })
+    expect(store.$.inputRequest.value?.editor?.values()).toEqual({ headers: {}, query: {}, webhookUrl: outputs.webhookUrl })
   } finally {
     store.dispose()
   }
@@ -405,14 +407,51 @@ it('prefills Flow Error test data and preserves intentional edits in the session
   try {
     await store.editDraft(flow, errorDraft, 'error')
     const request = store.$.inputRequest.value!
-    expect(request.groups[0]!.editor.values()).toEqual(sampleErrorOutputs)
+    expect(request.editor!.values()).toEqual(sampleErrorOutputs)
     expect(request.valid.value).toBe(true)
-    request.groups[0]!.editor.replaceValues({})
+    request.editor!.replaceValues({})
     store.dismissInputs()
     await store.editDraft(flow, errorDraft, 'error')
-    expect(store.$.inputRequest.value!.groups[0]!.editor.values()).toEqual({})
+    expect(store.$.inputRequest.value!.editor!.values()).toEqual({})
     expect(store.$.inputRequest.value!.valid.value).toBe(false)
     expect(client.createDraftRun).not.toHaveBeenCalled()
+  } finally {
+    store.dispose()
+  }
+})
+
+it('edits only the selected trigger outputs and remembers each trigger separately', async () => {
+  const { client, store } = harness()
+  const revision = webhookDraft()
+  const graph = revision.content.document.graph
+  const multiple: Draft = {
+    ...revision,
+    content: {
+      ...revision.content,
+      document: {
+        ...revision.content.document,
+        graph: { ...graph, nodes: { ...graph.nodes, other: { kind: 'webhook', name: 'Other', method: 'POST', bodyFields: [], options: {} } } },
+      },
+    },
+  }
+  try {
+    await store.editDraft(flow, multiple, 'start')
+    expect(store.$.inputRequest.value?.editor?.definitions.map((definition) => definition.handle)).toEqual(['headers', 'query', 'body', 'webhookUrl'])
+    store.$.inputRequest.value?.editor?.replaceValues(webhookOutputs)
+    await store.selectTrigger('other')
+    expect(store.$.inputRequest.value?.editor?.values()).toEqual({})
+    expect(await store.confirmInputs()).toBe(false)
+    await store.selectTrigger('start')
+    expect(store.$.inputRequest.value?.editor?.values()).toEqual(webhookOutputs)
+    expect(await store.confirmInputs()).toBe(true)
+    expect(client.createDraftRun).toHaveBeenCalledWith(
+      'flow',
+      'revision',
+      expect.objectContaining({
+        inputs: {},
+        trigger: { nodeId: 'start', outputs: webhookOutputs },
+      }),
+    )
   } finally {
     store.dispose()
   }
