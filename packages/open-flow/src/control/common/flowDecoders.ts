@@ -1,4 +1,4 @@
-import type { Flow, FlowPage, Variable } from './api.ts'
+import type { ErrorListener, Flow, FlowPage, Variable } from './api.ts'
 
 import { exact, invalidResponse, record, string } from './decoding.ts'
 
@@ -49,4 +49,16 @@ export function variable(value: unknown): Variable {
     return invalidResponse()
   }
   return { name: string(source.name), updatedAt, value: source.value, version: 1 }
+}
+
+export function errorListener(value: unknown): ErrorListener {
+  const source = record(value)
+  if (typeof source.enabled != 'boolean') return invalidResponse()
+  return {
+    flowId: string(source.flowId),
+    flowName: string(source.flowName),
+    nodeId: string(source.nodeId),
+    nodeName: string(source.nodeName),
+    enabled: source.enabled,
+  }
 }

@@ -25,6 +25,7 @@ export class Maintenance {
   readonly #notifyFlowCatalog: () => void
   readonly #publisher: Pick<Publisher, 'advance'>
   readonly #resolveConnector: () => ConnectorHost | undefined
+  readonly #runCreated: (flowId: string, runId: string) => void
   readonly #runChanged: (flowId: string, runId: string) => void
   readonly #signal: () => void
   readonly #store: Store
@@ -44,7 +45,9 @@ export class Maintenance {
     runChanged: (flowId: string, runId: string) => void,
     signal: () => void,
     maintenanceLock: Semaphore.Semaphore,
+    runCreated: (flowId: string, runId: string) => void = runChanged,
   ) {
+    this.#runCreated = runCreated
     this.#clock = clock
     this.#connectorAccess = connectorAccess
     this.#interrupt = interrupt
@@ -87,6 +90,10 @@ export class Maintenance {
         for (const { flowId, runId } of runs.expiredWaits) {
           this.#interrupt(runId)
           this.#runChanged(flowId, runId)
+        }
+        for (const dispatch of runs.errorDispatches) {
+          this.#runChanged(dispatch.flowId, dispatch.runId)
+          if (dispatch.created != null) this.#runCreated(dispatch.created.flowId, dispatch.created.runId)
         }
         const notification = runs.notification
         if (notification != null) {

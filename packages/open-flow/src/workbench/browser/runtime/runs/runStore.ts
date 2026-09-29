@@ -191,11 +191,11 @@ export class RunStore {
     this.#state.set(initialState)
   }
 
-  public async load(flowId: string, sourceFilter?: Pick<RunFilter, 'source'>): Promise<void> {
+  public async load(flowId: string, sourceFilter?: Pick<RunFilter, 'source' | 'runId'>): Promise<void> {
     const state = this.#state.value
     const warm = state.loaded && state.target?.flowId == flowId
     const filter = { ...(state.target?.flowId == flowId ? state.target.filter : noRunFilter), ...sourceFilter }
-    if (warm && filter.source != state.target?.filter.source) {
+    if (warm && (filter.source != state.target?.filter.source || filter.runId != state.target?.filter.runId)) {
       await this.applyFilter(filter)
       return
     }

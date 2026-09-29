@@ -93,7 +93,13 @@ export class CronDriver {
         !isDeepStrictEqual(trigger, JSON.parse(target.triggerJson)) ||
         !isDeepStrictEqual(trigger.cronTimes, JSON.parse(target.scheduleJson))
       ) {
-        return yield* Effect.fail(new Error('Fixed Cron Trigger target does not match its Publication.'))
+        this.#store.triggers.failCronTarget(
+          target,
+          now,
+          'revision-invalid',
+          'Fixed Cron Trigger target does not match its Publication. Publish the Flow again to resume scheduling.',
+        )
+        return 'admitted'
       }
       const scheduledAt = new Date(target.nextAt).toISOString()
       const outputs = { scheduledAt }

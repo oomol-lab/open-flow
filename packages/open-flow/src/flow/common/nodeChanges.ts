@@ -56,6 +56,8 @@ export function defaultNodeName(content: RevisionContent, node: GraphNode): stri
       return normalizeNodeName(content.document.subflows[node.subflowId]?.name ?? '') || 'Subflow'
     case 'task':
       return normalizeNodeName(node.task != null ? node.task.name : (content.document.tasks[node.taskId]?.name ?? '')) || 'Task'
+    case 'error':
+      return 'Error Trigger'
     case 'manual':
       return 'Manual Trigger'
     case 'webhook':
@@ -94,6 +96,7 @@ interface TriggerSettingsBase {
 
 export type TriggerSettings =
   | (TriggerSettingsBase & { readonly kind: 'manual' })
+  | (TriggerSettingsBase & { readonly kind: 'error' })
   | (TriggerSettingsBase & {
       readonly bodyFields: Extract<TriggerNode, { readonly kind: 'webhook' }>['bodyFields']
       readonly kind: 'webhook'
@@ -299,7 +302,7 @@ export function createApproval(target: Extract<GraphTarget, { readonly kind: 'fl
 export function createBuiltinTrigger(
   target: Extract<GraphTarget, { readonly kind: 'flow' }>,
   nodeId: string,
-  node: Extract<TriggerNode, { readonly kind: 'cron' | 'manual' | 'webhook' }>,
+  node: Extract<TriggerNode, { readonly kind: 'error' | 'cron' | 'manual' | 'webhook' }>,
 ): readonly ChangeOperation[] {
   return [{ kind: 'graph.node.create', node, nodeId, target }]
 }
@@ -503,8 +506,9 @@ export function updateTrigger(
     operations.push({ before: trigger.description, field: 'description', kind: 'graph.node.field.set', nodeId, target, value: settings.description })
   }
   switch (settings.kind) {
+    case 'error':
     case 'manual':
-      if (trigger.kind != 'manual') return
+      if (trigger.kind != settings.kind) return
       break
     case 'webhook': {
       if (trigger.kind != 'webhook') return

@@ -402,6 +402,23 @@ describe('ControlClient Wait API', () => {
     await expect(client.getRun(waiting.runId)).resolves.toEqual(response)
   })
 
+  it('decodes multiple error dispatches and rejects incomplete handler results', async () => {
+    const response = {
+      ...waiting,
+      status: 'failed',
+      waits: [],
+      errorDispatches: [
+        { status: 'pending', flowId: 'first' },
+        { status: 'dispatched', flowId: 'second', runId: 'handler-run' },
+        { status: 'failed', flowId: 'third', message: 'Unavailable' },
+      ],
+    }
+    const client = new ControlClient(async () => Response.json(response))
+    await expect(client.getRun(waiting.runId)).resolves.toEqual(response)
+    response.errorDispatches = [{ status: 'dispatched', flowId: 'second' }]
+    await expect(client.getRun(waiting.runId)).rejects.toMatchObject({ code: 'response.invalid' })
+  })
+
   it('rejects the removed Trigger source', async () => {
     const client = new ControlClient(async () => Response.json({ ...waiting, source: 'trigger' }))
     await expect(client.getRun(waiting.runId)).rejects.toMatchObject({ code: 'response.invalid' })
@@ -690,4 +707,15 @@ it('reads a publication presentation snapshot with cancellation and validates nu
     response = invalid
     await expect(client.getPublicationPresentation('flow', 'bad')).rejects.toMatchObject({ code: 'response.invalid' })
   }
+})
+
+it('reads error listeners for a Flow and rejects malformed responses', async () => {
+  const listener = { flowId: 'handler', flowName: 'Alerts', nodeId: 'error', nodeName: 'Failure', enabled: false }
+  const request = vi.fn(async () => Response.json({ version: 1, listeners: [listener] }))
+  const client = new ControlClient(request)
+  const controller = new AbortController()
+  await expect(client.getErrorListeners('flow/1', controller.signal)).resolves.toEqual([listener])
+  expect(request).toHaveBeenCalledWith('/v1/flows/flow%2F1/error-listeners', expect.objectContaining({ signal: controller.signal }))
+  request.mockImplementation(async () => Response.json({ version: 1, listeners: [{ ...listener, enabled: 'false' }] }))
+  await expect(client.getErrorListeners('flow/1')).rejects.toThrow()
 })

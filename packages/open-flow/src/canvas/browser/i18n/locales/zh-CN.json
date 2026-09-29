@@ -595,7 +595,8 @@
     "triggerSource": {
       "manual": "手动",
       "cron": "定时",
-      "webhook": "Webhook"
+      "webhook": "Webhook",
+      "error": "错误触发器"
     },
     "kind": {
       "task": "任务",

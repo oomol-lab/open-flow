@@ -54,7 +54,7 @@ export function createTriggerSession(
       if (catalog != null) return catalog.request(url, init)
       const definitions = trigger.kind === 'poll' || trigger.kind === 'integration' ? [trigger.definition] : []
       return Response.json({
-        version: 2,
+        version: 3,
         locale: language,
         definitions,
         display: Object.fromEntries(await Promise.all(definitions.map(async (definition) => [definition.key, await localizeTrigger(definition, language)]))),
@@ -109,7 +109,22 @@ export function createTriggerSession(
           },
         ],
       })
-    if (url.pathname === '/v1/flows') return Response.json({ flows: [flow], total: 1, version: 1 })
+    if (url.pathname === '/v1/flows') {
+      const flows =
+        trigger.kind === 'error'
+          ? [
+              flow,
+              ...['orders', 'billing'].map((flowId) =>
+                Object.assign({}, flow, {
+                  flowId,
+                  name: flowId === 'orders' ? 'Orders · Payment events and fulfillment updates' : 'Billing',
+                  live: { publicationId: `${flowId}-publication`, revisionId: `${flowId}-revision`, enabled: true },
+                }),
+              ),
+            ]
+          : [flow]
+      return Response.json({ flows, total: flows.length, version: 1 })
+    }
     if (url.pathname.endsWith('/editor'))
       return Response.json({
         flow,
@@ -162,7 +177,7 @@ export function createTriggerSession(
         modelVersion: currentFlowModelVersion,
         revisionDigest: revision().digest,
         revisionId: revision().revisionId,
-        check: { kind: 'available' },
+        valid: true,
         version: 1,
       })
     if (url.pathname === '/v1/connector/connections')

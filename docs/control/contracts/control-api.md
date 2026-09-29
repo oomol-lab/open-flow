@@ -396,6 +396,22 @@ Publish 和 Live Run 保持完整 Flow 校验。
 
 Manual Trigger 的节点结构为 `{ kind: "manual", name: string, description?: string, icon?: string }`，无输入和调度配置。其执行出口沿普通执行边连接下游，不提供数据输出字段，运行请求中的 `trigger.outputs` 和执行结果均为 `{}`。Cron 直接声明 `scheduledAt` 字符串端口；Poll 和 Integration 通过各自定义声明输出端口。其他 Trigger 可通过显式 outputs 模拟执行，仍保留 Draft/Live Run source，不伪造外部 occurrence。
 
+Error Trigger 使用 Flow model 5，节点为 `{ kind: 'error', name: string, sourceFlowIds?: readonly string[], description?: string, icon?: string }`，仅根图可放置且最多一个。`sourceFlowIds` 为监听的上游 flowId 列表，禁止重复、空 ID、自身以及未发布的 Flow。通过 `{ kind: 'graph.trigger.sources.set', nodeId: string, before?: readonly string[], value?: readonly string[] }` 修改；省略 value 清除，before 是原值前置条件。监听列表由错误处理 Flow 保存并发布，上游不再保存处理目标。旧 model 2/4 Revision 的正文和 digest 保持不变，新的修改升级到 model 5。
+
+仅自动 occurrence Run 的 failed/indeterminate 终态触发错误处理，手动 Run 可以提供样例 outputs 测试分支。一个上游可以被多个处理 Flow 监听，每个源 Run 对每个处理 Flow 至多派发一次。Error Trigger 的固定必需输出为：
+
+```ts
+{
+  workflow: { flowId: string; name: string; revisionId: string; publicationId: string | null }
+  execution: { runId: string; status: 'failed' | 'indeterminate'; startedAt: string | null; finishedAt: string }
+  error: { code: string; message: string; nodeId?: string; jobId?: string; path?: readonly string[] }
+}
+```
+
+时间字段使用 ISO 8601。`path` 是从根图到失败节点所属 Subflow 的调用节点 ID 列表；根图为空列表。系统层失败没有节点上下文。最终失败原因独立于事件日志保存，错误文本复用现有脱敏规则。
+
+Run detail 返回可选 `errorSource: { flowId, runId }`，以及可选 `errorDispatches` 数组，元素为：`{ status: 'pending', flowId }`、`{ status: 'dispatched', flowId, runId }` 或 `{ status: 'failed', flowId, message }`。派发状态变化通知源 Run，创建处理 Run 通知目标 Flow。Run 的失败结果可携带相同的 nodeId/jobId/path；源终态不会因处理成功而改变。Workbench host 的 Runs location 接受可选 runId，以定位两端的运行记录。
+
 Webhook 声明四个必需输出，顺序为 `headers`、`query`、`body`、`webhookUrl`。headers 为小写名称的字符串映射；query 单值为字符串，重复值为有序字符串数组；body 是由 `bodyFields` 定义的严格 JSON 对象；webhookUrl 是服务端 Request URL 去除 query 和 fragment 后的绝对地址。空请求体按 `{}` 校验，不填充字段默认值。请求头完整保存，不在 Trigger 层脱敏。
 
 Webhook HTTP 准入的幂等规则独立于 Control API：没有 `Idempotency-Key` 时每次创建 Run；有 key 时在 endpoint 和运行版本范围内查重。摘要包含固定目标身份、协议版本及规范化后的 method、query、body，排除 headers 和 webhookUrl。相同 key 与摘要重放原 Run，摘要不同返回 409。重试不覆盖首次保存的 outputs；并发准入由数据库事务和唯一约束协调。通过请求头区分业务事件的调用方必须使用不同的 key。
@@ -539,7 +555,7 @@ interface TriggerBinding {
   endpointUrl?: string
   flowId: string
   health: 'failed' | 'healthy' | 'initializing' | 'needs_reauth' | 'suspended'
-  kind: 'cron' | 'integration' | 'poll' | 'webhook'
+  kind: 'cron' | 'error' | 'integration' | 'poll' | 'webhook'
   lastErrorCode?: string
   listener?: { health: 'healthy' | 'failed' | 'needs_reauth'; lastErrorCode?: string }
   operatorState: 'active' | 'paused'
@@ -1234,3 +1250,18 @@ Flow 服务列表与账号授权分别保存。`ConnectorAccess.providerIds` 保
 `POST /v1/flows` 的创建请求接受 `{ name, teamId?: string, version: 1 }`；teamId 必须是非空字符串，并由部署验证可访问性。省略时保留部署的默认 Team 选择规则。相同 Idempotency-Key 对不同 Team 的创建请求返回冲突。
 
 Server 提供认证后的 `GET /v1/connector/teams`，返回 `{ enabled: boolean, teams: { id: string, name: string, systemCreated: boolean }[], version: 1 }`。不支持 Team 的部署返回 enabled=false 和空 teams。此目录不返回 Flow-Team 绑定列表。公共 ControlClient 通过 listConnectorTeams 读取，并通过 createFlow 的可选第三参数传入 teamId。
+
+### Error Trigger deletion impact
+
+`GET /v1/flows/:flowId/error-listeners` returns `{ version: 1, listeners }` for the
+existing source Flow (404 if it does not exist). Each listener contains `flowId`,
+`flowName`, `nodeId`, `nodeName`, and `enabled`. The response includes all current
+published Error Trigger subscriptions without catalog pagination; unpublished draft
+selections and retiring handlers are excluded. Node names come from the current
+Publication, while Flow names use the current catalog name. `enabled` is false when
+the handler deployment is disabled or its binding is paused.
+
+The deletion dialog queries this endpoint each time it opens. This is an advisory
+snapshot, not a deletion lock: subscriptions can change after the query. Deletion
+still retires the source and eventually removes its subscriptions; handler draft
+references remain available for manual removal.

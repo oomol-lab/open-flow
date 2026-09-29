@@ -2,6 +2,7 @@ import type { RevisionContent, TriggerSchedule } from '@oomol-lab/open-flow/flow
 
 import { scheduledTriggerOccurrenceId } from '@oomol-lab/open-flow/cron-trigger'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+import { digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import * as Effect from 'effect/Effect'
 import { TestClock } from 'effect/testing'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -61,77 +62,101 @@ afterEach(async () => {
 })
 
 describe('Server Cron Trigger', () => {
-  it.each([1, 2])('isolates an unreadable model %i publication and recovers after republishing', async (modelVersion) => {
-    const file = await databaseFile()
-    let now = Date.parse('2026-08-21T00:00:30.000Z')
-    let service = await openService(file, { clock: () => now })
-    const content = revision([{ type: 'every', unit: 'minute', value: 1 }])
-    const broken = await service.publisher.publish({
-      expectedLivePublicationId: null,
-      flowId: 'broken',
-      idempotencyKey: 'publish-broken',
-      revision: content,
-      revisionId: 'revision-broken',
-    })
-    if (broken.kind != 'published') throw new Error('Initial Publication unexpectedly conflicted.')
-    await service.publisher.publish({
-      expectedLivePublicationId: null,
-      flowId: 'healthy',
-      idempotencyKey: 'publish-healthy',
-      revision: content,
-      revisionId: 'revision-healthy',
-    })
-    const database = new DatabaseSync(file)
-    const unreadable = JSON.stringify({
-      ...content,
-      modelVersion,
-      document: {
-        ...content.document,
-        graph: { ...content.document.graph, nodes: { ...content.document.graph.nodes, hook: { kind: 'webhook', name: 'Old webhook', inputsDef: [] } } },
-      },
-    })
-    try {
-      database.prepare('UPDATE revisions SET content = ? WHERE revision_id = ?').run(unreadable, 'revision-broken')
-      now = Date.parse('2026-08-21T00:01:00.000Z')
-      await startService(service)
-      await service.waitForIdle()
-      expect(database.prepare('SELECT flow_id AS flowId, status FROM runs').all()).toEqual([{ flowId: 'healthy', status: 'completed' }])
-      expect(
-        database
-          .prepare("SELECT next_at AS nextAt, last_error_code AS errorCode, operator_state AS operatorState FROM cron_bindings WHERE flow_id = 'broken'")
-          .get(),
-      ).toEqual({ nextAt: null, errorCode: 'revision-invalid', operatorState: 'active' })
-      expect(database.prepare('SELECT kind, error_code AS errorCode FROM trigger_activities').all()).toEqual([
-        { kind: 'health.failed', errorCode: 'revision-invalid' },
-      ])
-      expect(database.prepare("SELECT content FROM revisions WHERE revision_id = 'revision-broken'").get()).toEqual({ content: unreadable })
-      const connection = Database.open(file)
-      try {
-        expect(new Store(connection).triggers.listTriggerBindings('broken')).toMatchObject([{ health: 'failed', lastErrorCode: 'revision-invalid' }])
-      } finally {
-        connection.close()
-      }
-      await closeService(service)
-      service = await openService(file, { clock: () => now })
-      await service.tickCron()
-      expect(database.prepare('SELECT COUNT(*) AS count FROM trigger_activities').get()).toEqual({ count: 1 })
-      const recovered = await service.publisher.publish({
-        expectedLivePublicationId: broken.publicationId,
+  it.each([1, 2, 'legacy-error-workflow', 'closure-digest', 'trigger', 'schedule'])(
+    'isolates an invalid publication (%s) and recovers after republishing',
+    async (corruption) => {
+      const file = await databaseFile()
+      let now = Date.parse('2026-08-21T00:00:30.000Z')
+      let service = await openService(file, { clock: () => now })
+      const content = revision([{ type: 'every', unit: 'minute', value: 1 }])
+      const broken = await service.publisher.publish({
+        expectedLivePublicationId: null,
         flowId: 'broken',
-        idempotencyKey: 'publish-recovered',
+        idempotencyKey: 'publish-broken',
         revision: content,
-        revisionId: 'revision-recovered',
+        revisionId: 'revision-broken',
       })
-      expect(recovered.kind).toBe('published')
-      expect(database.prepare("SELECT last_error_code AS errorCode FROM cron_bindings WHERE flow_id = 'broken'").get()).toEqual({ errorCode: null })
-      now = Date.parse('2026-08-21T00:02:00.000Z')
-      await service.tickCron()
-      expect(database.prepare("SELECT COUNT(*) AS count FROM runs WHERE flow_id = 'broken'").get()).toEqual({ count: 1 })
-    } finally {
-      database.close()
-      await closeService(service)
-    }
-  })
+      if (broken.kind != 'published') throw new Error('Initial Publication unexpectedly conflicted.')
+      await service.publisher.publish({
+        expectedLivePublicationId: null,
+        flowId: 'healthy',
+        idempotencyKey: 'publish-healthy',
+        revision: content,
+        revisionId: 'revision-healthy',
+      })
+      const database = new DatabaseSync(file)
+      const unreadable = JSON.stringify({
+        ...content,
+        modelVersion: typeof corruption == 'number' ? corruption : corruption == 'legacy-error-workflow' ? 4 : content.modelVersion,
+        document: {
+          ...content.document,
+          ...(typeof corruption == 'number'
+            ? {
+                graph: { ...content.document.graph, nodes: { ...content.document.graph.nodes, hook: { kind: 'webhook', name: 'Old webhook', inputsDef: [] } } },
+              }
+            : corruption == 'legacy-error-workflow'
+              ? { errorWorkflow: 'old-handler' }
+              : {}),
+        },
+      })
+      try {
+        database.prepare('UPDATE revisions SET content = ? WHERE revision_id = ?').run(unreadable, 'revision-broken')
+        if (corruption == 'legacy-error-workflow') {
+          database
+            .prepare('UPDATE publications SET revision_digest = ? WHERE publication_id = ?')
+            .run(await digestBytes(new TextEncoder().encode(unreadable)), broken.publicationId)
+        } else if (corruption == 'closure-digest') {
+          database.prepare("UPDATE publications SET closure_digest = 'mismatched' WHERE publication_id = ?").run(broken.publicationId)
+        } else if (corruption == 'trigger') {
+          database
+            .prepare("UPDATE cron_bindings SET trigger_json = ? WHERE flow_id = 'broken'")
+            .run(JSON.stringify({ ...content.document.graph.nodes.scheduled, name: 'Changed' }))
+        } else if (corruption == 'schedule') {
+          database
+            .prepare("UPDATE cron_bindings SET schedule_json = ? WHERE flow_id = 'broken'")
+            .run(JSON.stringify([{ type: 'every', unit: 'hour', value: 1 }]))
+        }
+        now = Date.parse('2026-08-21T00:01:00.000Z')
+        await startService(service)
+        await service.waitForIdle()
+        expect(database.prepare('SELECT flow_id AS flowId, status FROM runs').all()).toEqual([{ flowId: 'healthy', status: 'completed' }])
+        expect(
+          database
+            .prepare("SELECT next_at AS nextAt, last_error_code AS errorCode, operator_state AS operatorState FROM cron_bindings WHERE flow_id = 'broken'")
+            .get(),
+        ).toEqual({ nextAt: null, errorCode: 'revision-invalid', operatorState: 'active' })
+        expect(database.prepare('SELECT kind, error_code AS errorCode FROM trigger_activities').all()).toEqual([
+          { kind: 'health.failed', errorCode: 'revision-invalid' },
+        ])
+        expect(database.prepare("SELECT content FROM revisions WHERE revision_id = 'revision-broken'").get()).toEqual({ content: unreadable })
+        const connection = Database.open(file)
+        try {
+          expect(new Store(connection).triggers.listTriggerBindings('broken')).toMatchObject([{ health: 'failed', lastErrorCode: 'revision-invalid' }])
+        } finally {
+          connection.close()
+        }
+        await closeService(service)
+        service = await openService(file, { clock: () => now })
+        await service.tickCron()
+        expect(database.prepare('SELECT COUNT(*) AS count FROM trigger_activities').get()).toEqual({ count: 1 })
+        const recovered = await service.publisher.publish({
+          expectedLivePublicationId: broken.publicationId,
+          flowId: 'broken',
+          idempotencyKey: 'publish-recovered',
+          revision: content,
+          revisionId: 'revision-recovered',
+        })
+        expect(recovered.kind).toBe('published')
+        expect(database.prepare("SELECT last_error_code AS errorCode FROM cron_bindings WHERE flow_id = 'broken'").get()).toEqual({ errorCode: null })
+        now = Date.parse('2026-08-21T00:02:00.000Z')
+        await service.tickCron()
+        expect(database.prepare("SELECT COUNT(*) AS count FROM runs WHERE flow_id = 'broken'").get()).toEqual({ count: 1 })
+      } finally {
+        database.close()
+        await closeService(service)
+      }
+    },
+  )
 
   it('keeps disabled schedules stopped across restart and resumes them when enabled', async () => {
     const file = await databaseFile()

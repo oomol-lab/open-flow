@@ -145,7 +145,7 @@ export type FlowCanvasViewTriggerSchedule =
     }
 
 export interface FlowCanvasViewTriggerPresentation {
-  readonly kind: 'cron' | 'integration' | 'manual' | 'poll' | 'webhook'
+  readonly kind: 'error' | 'cron' | 'integration' | 'manual' | 'poll' | 'webhook'
   readonly schedules: readonly FlowCanvasViewTriggerSchedule[]
   readonly source?: string
 }

@@ -20,6 +20,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/
 import { Icon } from '../icons.tsx'
 import { IdTooltip } from '../shell/idTooltip.tsx'
 import { WorkbenchSelect } from '../shell/workbenchSelect.tsx'
+import { ErrorHandling } from './errorHandling.tsx'
 import {
   ActiveWait,
   useRunLogPresentation,
@@ -523,6 +524,7 @@ export function RunsView({
                   </IdTooltip>
                 </div>
               </header>
+              <ErrorHandling run={run} />
               <ActiveWait
                 onLocate={onLocateWait}
                 onResolve={(waitId, action, comment) => void store.runs.resolve(waitId, action, comment)}

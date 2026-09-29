@@ -262,3 +262,31 @@ it.each(['node.cache-hit', 'node.preview', 'run.output'])('rejects retired runti
   const project = createEventProjector('run')
   await expect(project({ type, runId: 'run' })).rejects.toThrow('is not supported')
 })
+
+it('projects the selected terminal cause with nested node context and redaction', async () => {
+  const project = createEventProjector('root')
+  await project({ type: 'run.started', runId: 'root', flowId: 'flow' })
+  await project({ type: 'node.started', runId: 'root', nodeId: 'call-child', jobId: 'parent-job' })
+  await project({ type: 'run.started', runId: 'child', flowId: 'child-flow', parentRunId: 'root', parentJobId: 'parent-job' })
+  const failure = {
+    type: 'node.failed',
+    runId: 'child',
+    nodeId: 'request',
+    jobId: 'failed-job',
+    code: 'connector.unavailable',
+    message: 'Failed token=private',
+  }
+  await project(failure)
+  expect(await project({ type: 'run.failed', runId: 'child', failure })).toBeUndefined()
+  const terminal = await project({ type: 'run.failed', runId: 'root', failure })
+  expect(terminal).toMatchObject({
+    kind: 'node.failed',
+    payload: {
+      terminal: true,
+      nodeId: 'request',
+      executionId: expect.stringMatching(/^execution_/),
+      path: ['call-child'],
+      error: { code: 'connector.unavailable', message: 'Failed token=[REDACTED]' },
+    },
+  })
+})

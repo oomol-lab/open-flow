@@ -613,3 +613,31 @@ it('syncs saved comment edits to the canvas immediately and retains them after r
     store.dispose()
   }
 })
+
+it('saves, clears, undoes and redoes Error Trigger sources as ordinary Revision history', async () => {
+  const { store, saved } = await session()
+  try {
+    await store.addNode(
+      store.$.addNodeOptions.value.find((option) => option.id == 'trigger:error')!,
+      { x: 0, y: 0 },
+    )
+    const nodeId = Object.entries(saved().draft.content.document.graph.nodes).find(([, node]) => node.kind == 'error')![0]
+    const sources = () => {
+      const node = saved().draft.content.document.graph.nodes[nodeId]!
+      return node.kind == 'error' ? node.sourceFlowIds : undefined
+    }
+    expect(await store.saveErrorSources(nodeId, ['upstream', 'other'])).toBe(true)
+    expect(sources()).toEqual(['upstream', 'other'])
+    expect(await store.saveErrorSources(nodeId, ['upstream', 'other'])).toBe(false)
+    await store.saveErrorSources(nodeId, [])
+    expect(sources()).toBeUndefined()
+    await store.undo()
+    expect(sources()).toEqual(['upstream', 'other'])
+    await store.undo()
+    expect(sources()).toBeUndefined()
+    await store.redo()
+    expect(sources()).toEqual(['upstream', 'other'])
+  } finally {
+    store.dispose()
+  }
+})

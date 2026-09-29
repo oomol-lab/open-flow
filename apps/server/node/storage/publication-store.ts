@@ -14,6 +14,7 @@ import { presentationView } from './flow-store.ts'
 import { insert } from './insert.ts'
 import { IntegrationStore } from './integration-store.ts'
 import { PollStore } from './poll-store.ts'
+import { errorSourcesAvailable } from './trigger-store.ts'
 import { VariableStore } from './variable-store.ts'
 
 export type PublicationAcceptance =
@@ -21,6 +22,7 @@ export type PublicationAcceptance =
   | {
       readonly kind:
         | 'access-conflict'
+        | 'error-sources-unavailable'
         | 'binding-unresolved'
         | 'busy'
         | 'conflict'
@@ -88,6 +90,7 @@ const implicitProviderAccess: ConnectorAccessSnapshot = {
 }
 
 interface PublishInput {
+  readonly errorTriggers?: readonly { readonly nodeId: string; readonly sourceFlowIds: readonly string[] }[]
   readonly closureDigest: string
   readonly content: string
   readonly crons: readonly {
@@ -259,7 +262,18 @@ export class PublicationStore {
     currentProviderAccess?: () => ConnectorAccess,
   ):
     | { readonly kind: 'accepted'; readonly operation: PublishOperation }
-    | { readonly kind: 'access-conflict' | 'binding-unresolved' | 'busy' | 'conflict' | 'live-conflict' | 'not-found' | 'revision-conflict' | 'unsupported' } {
+    | {
+        readonly kind:
+          | 'access-conflict'
+          | 'error-sources-unavailable'
+          | 'binding-unresolved'
+          | 'busy'
+          | 'conflict'
+          | 'live-conflict'
+          | 'not-found'
+          | 'revision-conflict'
+          | 'unsupported'
+      } {
     return this.#transaction(() => {
       const now = this.#clock()
       this.#database
@@ -308,6 +322,14 @@ export class PublicationStore {
       const revision = this.#revision(input.flowId, input.revisionId)
       if (revision == null || revision.digest != input.revisionDigest) return { kind: 'not-found' }
       if (flow.draftRevisionId != input.revisionId) return { kind: 'revision-conflict' }
+      if (
+        !errorSourcesAvailable(
+          this.#database,
+          input.flowId,
+          (input.errorTriggers ?? []).flatMap((trigger) => trigger.sourceFlowIds),
+        )
+      )
+        return { kind: 'error-sources-unavailable' }
       if (!this.#variables.hasAll(input.variableNames)) return { kind: 'binding-unresolved' }
       const live = this.#database.prepare('SELECT publication_id AS publicationId FROM flow_live WHERE flow_id = ?').get(input.flowId) as
         | { readonly publicationId: string }
@@ -601,6 +623,14 @@ export class PublicationStore {
           }
         }
 
+        if (
+          !errorSourcesAvailable(
+            this.#database,
+            input.flowId,
+            (input.errorTriggers ?? []).flatMap((trigger) => trigger.sourceFlowIds),
+          )
+        )
+          return { kind: 'error-sources-unavailable' }
         if (!this.#variables.hasAll(input.variableNames)) return { kind: 'binding-unresolved' }
 
         const live = this.#database.prepare('SELECT publication_id AS publicationId FROM flow_live WHERE flow_id = ?').get(input.flowId) as
@@ -652,6 +682,19 @@ export class PublicationStore {
 
         this.#installWebhooks(input, publicationId)
         this.#installCrons(input, publicationId)
+        const errors = input.errorTriggers ?? []
+        this.#database
+          .prepare('UPDATE error_bindings SET current_publication_id = NULL, runtime_version = runtime_version + 1, updated_at = ? WHERE flow_id = ?')
+          .run(input.publishedAt, input.flowId)
+        this.#database.prepare('DELETE FROM error_subscriptions WHERE handler_flow_id = ?').run(input.flowId)
+        for (const { nodeId, sourceFlowIds } of errors) {
+          this.#database
+            .prepare(`INSERT INTO error_bindings (binding_id, flow_id, trigger_node_id, current_publication_id, updated_at) VALUES (?, ?, ?, ?, ?)
+          ON CONFLICT(flow_id, trigger_node_id) DO UPDATE SET current_publication_id = excluded.current_publication_id, updated_at = excluded.updated_at`)
+            .run(`binding_${randomUUID().replaceAll('-', '')}`, input.flowId, nodeId, publicationId, input.publishedAt)
+          for (const sourceFlowId of sourceFlowIds)
+            this.#database.prepare('INSERT INTO error_subscriptions (handler_flow_id, source_flow_id) VALUES (?, ?)').run(input.flowId, sourceFlowId)
+        }
         if (!this.#polls.install(input, publicationId)) throw publishPending
         if (!this.#integrations.install(input, publicationId)) throw publishPending
         if (input.operationId != null) {

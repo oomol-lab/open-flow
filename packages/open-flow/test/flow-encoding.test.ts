@@ -161,7 +161,7 @@ describe('Flow Revision encoding', () => {
       modules: { helper: { imports: [] }, main: { imports: ['helper'] } },
       version: 1,
     })
-    await expect(digestBytes(first)).resolves.toBe('sha256:2222eb1418444e47481754512050ffa752558efe633249d8cce5b1e6d7d2dae0')
+    await expect(digestBytes(first)).resolves.toBe('sha256:d64665341990696a1d59259bae25fc7dbd0faf816247bd7a10a9f30bc3bd7335')
   })
 
   it('changes the encoded Revision when workflow semantics change', () => {

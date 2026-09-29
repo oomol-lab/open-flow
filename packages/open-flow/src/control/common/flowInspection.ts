@@ -134,6 +134,7 @@ function inspectNode(document: FlowDocument, node: GraphNode): Record<string, un
           })),
         })),
       }
+    case 'error':
     case 'manual':
     case 'cron':
     case 'subflow':

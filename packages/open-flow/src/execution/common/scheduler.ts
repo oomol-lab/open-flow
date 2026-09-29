@@ -1,10 +1,10 @@
-import type * as Cause from 'effect/Cause'
 import type { AgentConfig } from '../../flow/common/agent.ts'
 import type { ConnectorCapability, Graph, GraphNode, InputMapping, InputPortDefinition, JsonValue, TriggerNode, WaitAction } from '../../flow/common/change.ts'
 import type { PreparedFlow } from '../../flow/common/semantics.ts'
 import type { PreviousNode } from '../../types/index.ts'
 import type { AgentCheckpoint, AgentResult } from './runtime.ts'
 
+import * as Cause from 'effect/Cause'
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as FiberSet from 'effect/FiberSet'
@@ -86,6 +86,7 @@ export type SchedulerEvent =
       readonly message: string
       readonly runId: string
       readonly type: 'run.failed'
+      readonly failure?: Extract<SchedulerEvent, { readonly type: 'node.failed' }>
     }
 
 export interface FlowRunResult {
@@ -250,6 +251,7 @@ function nodeFailure(error: unknown, project: FlowRunOptions['projectFailure']):
 }
 
 interface RunContext {
+  readonly failures: WeakMap<Error, Extract<SchedulerEvent, { readonly type: 'node.failed' }>>
   readonly counts: Record<string, Record<string, number>>
   readonly bindingValues: Readonly<Record<string, string>>
   readonly createId: FlowRunOptions['createId']
@@ -888,8 +890,13 @@ function runGraph(
           Effect.catchDefect((error) => Effect.fail(error instanceof Error ? error : new Error(String(error)))),
           Effect.tapError((error) =>
             Effect.gen(function* () {
-              if (firstCause == null) firstFailure ??= error
-              yield* context.emit({ ...nodeFailure(error, context.projectFailure), jobId, nodeId, runId, type: 'node.failed' }).pipe(Effect.ignore)
+              const failure = { ...nodeFailure(error, context.projectFailure), jobId, nodeId, runId, type: 'node.failed' as const }
+              if (!context.failures.has(error)) context.failures.set(error, failure)
+              if (firstCause == null) {
+                firstFailure = error
+                firstCause = Cause.fail(error)
+              }
+              yield* context.emit(failure).pipe(Effect.ignore)
             }),
           ),
           Effect.tapCause((cause) =>
@@ -1003,7 +1010,14 @@ function runGraph(
         if (remainingMs != null && remainingMs <= 0) return yield* Effect.fail(new Error('Run exceeded its execution deadline.'))
         if (firstCause != null) {
           yield* FiberSet.clear(active)
-          yield* context.emit({ message: firstFailure?.message ?? 'Execution failed.', runId, type: 'run.failed' }).pipe(Effect.ignore)
+          yield* context
+            .emit({
+              message: firstFailure?.message ?? 'Execution failed.',
+              runId,
+              type: 'run.failed',
+              ...(firstFailure == null ? {} : { failure: context.failures.get(firstFailure) }),
+            })
+            .pipe(Effect.ignore)
           return yield* Effect.failCause(firstCause)
         }
         if (pendingWaits.size > 0 && context.waits != null)
@@ -1103,6 +1117,7 @@ export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect
     }
     return (yield* runGraph(
       {
+        failures: new WeakMap(),
         counts: Object.fromEntries(Object.entries(checkpoint?.counts ?? {}).map(([scope, counts]) => [scope, { ...counts }])),
         bindingValues: checkpoint?.bindingValues ?? options.bindingValues ?? {},
         createId: options.createId,

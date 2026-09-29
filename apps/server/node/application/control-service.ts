@@ -555,6 +555,11 @@ export class ControlService {
     return flow(stored)
   }
 
+  getErrorListeners(flowId: string) {
+    this.getFlow(flowId)
+    return { version: 1 as const, listeners: this.store.triggers.errorListeners(flowId) }
+  }
+
   retireFlow(flowId: string): Flow {
     const stored = this.store.flows.retire(flowId, this.clock())
     if (stored == null) notFound()
@@ -801,6 +806,7 @@ export class ControlService {
     this.getFlow(flowId)
     const changed = this.store.triggers.setTriggerOperatorState(flowId, triggerNodeId, operatorState, this.clock())
     if (changed == null) triggerNotFound()
+    if (changed.kind == 'error') this.flowCatalogChanged()
     this.triggersChanged()
     return triggerBinding(changed)
   }
@@ -1004,6 +1010,8 @@ export class ControlService {
     switch (accepted.kind) {
       case 'access-conflict':
         throw new ControlError(controlErrorCode.connectorAccessConflict, 'Connector access changed while the Publication was being accepted.')
+      case 'error-sources-unavailable':
+        throw new ControlError(controlErrorCode.flowInvalid, 'Select published upstream Flows other than this Flow.')
       case 'binding-unresolved':
         throw new ControlError(controlErrorCode.bindingUnresolved, 'A required environment variable is unresolved.')
       case 'busy':

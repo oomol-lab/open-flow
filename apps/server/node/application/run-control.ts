@@ -411,6 +411,7 @@ export class RunControl {
     }
     const details = {
       ...run(stored),
+      ...this.store.runViews.errorHandling(stored.runId),
       ...state,
       closureDigest: stored.closureDigest,
       engineContract: stored.engineContract,
@@ -459,11 +460,14 @@ function terminalStatus(status: RunStatus): RunCancellation['status'] {
   throw new Error('Canceled Run did not reach a terminal state.')
 }
 
-function runError(value: unknown): { readonly code: string; readonly message: string } {
-  const candidate = value as { readonly error?: { readonly code?: unknown; readonly message?: unknown } } | undefined
+function runError(value: unknown) {
+  const error = (value as { error?: { code?: string; message?: string; nodeId?: string; jobId?: string; path?: readonly string[] } } | undefined)?.error
   return {
-    code: typeof candidate?.error?.code == 'string' ? candidate.error.code : 'run.failed',
-    message: typeof candidate?.error?.message == 'string' ? candidate.error.message : 'The Flow could not be completed.',
+    code: error?.code ?? 'run.failed',
+    message: error?.message ?? 'The Flow could not be completed.',
+    ...(error?.nodeId == null ? {} : { nodeId: error.nodeId }),
+    ...(error?.jobId == null ? {} : { jobId: error.jobId }),
+    ...(error?.path == null ? {} : { path: error.path }),
   }
 }
 

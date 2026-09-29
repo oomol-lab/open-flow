@@ -120,6 +120,8 @@ function artifact(value: unknown): {
 
 export function createEventProjector(platformRunId: string, nodeFailureCodes: ReadonlySet<string>): (event: unknown) => Promise<ProjectedRunEvent | undefined> {
   const flows = new Map<string, string>()
+  const paths = new Map<string, readonly string[]>()
+  const jobs = new Map<string, string>()
   const nodeProgressBuckets = new Map<string, number>()
   const runProgressBuckets = new Map<string, number>()
   return async (value) => {
@@ -136,6 +138,9 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
       if (parentRunId !== undefined && (typeof parentRunId != 'string' || parentRunId.length == 0)) {
         throw new TypeError('Runtime run.started parentRunId must be a non-empty string when present.')
       }
+      const parentJobId = optionalString(event.parentJobId, 'Runtime run.started parentJobId')
+      const parentNode = parentRunId == null || parentJobId == null ? undefined : jobs.get(JSON.stringify([parentRunId, parentJobId]))
+      paths.set(rawRunId, parentRunId == null ? [] : [...(paths.get(parentRunId as string) ?? []), parentNode ?? flowId])
       return {
         kind: 'run.started',
         payload: {
@@ -167,7 +172,21 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
     }
 
     if (type == 'run.completed' || type == 'run.failed') {
-      runId(event)
+      const rawRunId = runId(event)
+      if (type == 'run.failed' && rawRunId == platformRunId && event.failure != null) {
+        const failure = object(event.failure, 'Runtime terminal failure')
+        const context = nodeContext(failure, flows, platformRunId)
+        return {
+          kind: 'node.failed',
+          payload: {
+            terminal: true,
+            nodeId: context.nodeId,
+            executionId: await context.executionId,
+            path: paths.get(context.rawRunId) ?? [],
+            error: { code: nodeFailureCode(failure.code, nodeFailureCodes), message: message(failure.message) },
+          },
+        }
+      }
       return
     }
 
@@ -195,6 +214,7 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
             value: object(event.outputs, 'Runtime node.completed outputs'),
           }
         case 'node.started': {
+          jobs.set(JSON.stringify([context.rawRunId, event.jobId]), context.nodeId)
           const kind = nodeKind(event.nodeKind)
           const nodeTitle = optionalString(event.nodeTitle, 'Runtime node.started nodeTitle')
           const operation = optionalString(event.operation, 'Runtime node.started operation')
@@ -222,7 +242,14 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
           if (!['debug', 'info', 'warn', 'error'].includes(event.level as string)) throw new TypeError('Runtime node.log level is invalid.')
           return { kind: type, payload: { ...payload, level: event.level, message: message(event.message) } }
         case 'node.failed':
-          return { kind: type, payload: { ...payload, error: { code: nodeFailureCode(event.code, nodeFailureCodes), message: message(event.message) } } }
+          return {
+            kind: type,
+            payload: {
+              ...payload,
+              ...((paths.get(context.rawRunId)?.length ?? 0) == 0 ? {} : { path: paths.get(context.rawRunId)! }),
+              error: { code: nodeFailureCode(event.code, nodeFailureCodes), message: message(event.message) },
+            },
+          }
       }
     }
 

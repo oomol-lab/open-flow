@@ -252,6 +252,14 @@ Flow Revision 只保存连接使用声明，部署拥有共享访问配置，并
 Connector 与 LLM 是独立部署能力，未配置时分别拒绝调用；外部服务不可用不能被误报为尚未配置。
 能力配置的来源和推导规则见 [Server 容器交付](server/container-delivery.md)。
 
+### Error workflow
+
+Error Trigger 节点通过 `sourceFlowIds` 多选监听已发布的上游 Flow，不能包含自身。根图最多一个 Error Trigger，Subflow 不允许放置。监听列表随处理 Flow 的 Revision 保存，发布时在同一事务中替换 `error_subscriptions` 索引，草稿修改不影响线上。上游失败时查询当前可用监听者，每个源 Run 与处理 Flow 至多一条派发记录；派发准入再次验证监听关系并固定处理 Flow 当前 Live 与 Error Trigger。多个处理 Flow 可监听同一个上游。
+
+仅生产 occurrence 准入的 Run 在 `failed` 或 `indeterminate` 终态产生错误处理；手动 Draft/Live、成功与取消不触发。终态和持久化派发意图原子提交，Maintenance 在队列满时保留意图重试，并以源 Run 与处理 Flow 的组合身份去重。目标不可用时记录派发失败，不改变源 Run 终态。Error Trigger 准入的 Run 持久化来源标记，失败后不再派发，避免跨 Flow 递归。
+
+错误上下文来自最终选中的失败原因，独立于可截断、可过期的事件日志。派发状态属于 Run detail 的动态关系，不能写回不可变的终态结果。输出与操作合同见 [Control API 契约](control/contracts/control-api.md)，使用方法见 [Error Trigger](error-trigger.md)。
+
 ### Trigger
 
 Trigger 是 Flow graph 中的 source node。每张图最多有一个 Manual Trigger，由用户显式启动，不建立外部订阅或调度 binding。Webhook、Cron、Poll 和 Integration 的确定性协议、Provider definitions、Registry 与 conformance 属于公共

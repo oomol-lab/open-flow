@@ -343,6 +343,8 @@ function executorName(task: TaskDefinition | undefined, providerName: string | u
 
 function triggerIcon(trigger: TriggerNode): string {
   switch (trigger.kind) {
+    case 'error':
+      return ':carbon:warning-alt:'
     case 'manual':
       return ':carbon:play:'
     case 'cron':
@@ -502,6 +504,7 @@ function triggerDesignerNode(
   const provider = trigger.kind == 'integration' || trigger.kind == 'poll' ? providers[trigger.definition.provider] : undefined
   let presentation: FlowCanvasViewTriggerNode['presentation']
   switch (trigger.kind) {
+    case 'error':
     case 'manual':
       presentation = { kind: trigger.kind, schedules: [] }
       break

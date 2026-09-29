@@ -595,7 +595,8 @@
     "triggerSource": {
       "manual": "手動",
       "cron": "スケジュール実行",
-      "webhook": "Webhook"
+      "webhook": "Webhook",
+      "error": "エラートリガー"
     },
     "kind": {
       "task": "タスク",

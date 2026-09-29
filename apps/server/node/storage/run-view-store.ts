@@ -1,3 +1,4 @@
+import type { ErrorDispatch } from '@oomol-lab/open-flow/control-api'
 import type { RunEventKind } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
@@ -83,6 +84,32 @@ export class RunViewStore {
          FROM runs WHERE idempotency_key = ?`,
       )
       .get(idempotencyKey) as StoredRunRequest | undefined
+  }
+
+  errorHandling(runId: string): { errorDispatches?: readonly ErrorDispatch[]; errorSource?: { flowId: string; runId: string } } {
+    const dispatches = this.#database
+      .prepare(
+        'SELECT status, target_flow_id AS flowId, run_id AS runId, error_message AS message FROM error_dispatches WHERE source_run_id = ? ORDER BY target_flow_id',
+      )
+      .all(runId) as { status: 'pending' | 'dispatched' | 'failed'; flowId: string; runId: string | null; message: string | null }[]
+    const source = this.#database
+      .prepare('SELECT error_source_flow_id AS flowId, error_source_run_id AS runId FROM runs WHERE run_id = ? AND error_source_run_id IS NOT NULL')
+      .get(runId) as { flowId: string; runId: string } | undefined
+    return {
+      ...(source == null ? {} : { errorSource: source }),
+      ...(dispatches.length == 0
+        ? {}
+        : {
+            errorDispatches: dispatches.map(
+              (dispatch): ErrorDispatch =>
+                dispatch.status == 'pending'
+                  ? { status: 'pending', flowId: dispatch.flowId }
+                  : dispatch.status == 'dispatched'
+                    ? { status: 'dispatched', flowId: dispatch.flowId, runId: dispatch.runId! }
+                    : { status: 'failed', flowId: dispatch.flowId, message: dispatch.message! },
+            ),
+          }),
+    }
   }
 
   controlRun(runId: string): StoredControlRun | undefined {

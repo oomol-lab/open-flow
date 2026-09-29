@@ -25,6 +25,7 @@ import { presentBuiltInOutputDescription, presentBuiltInSourceCandidates, presen
 import { CodeTaskSection } from './codeTaskSection.tsx'
 import { ConditionBranchesEditor } from './conditionBranchesEditor.tsx'
 import { ConnectorAccount, TriggerConnection, SavedConnectionReference } from './connectionSettings.tsx'
+import { ErrorTriggerSources, ErrorTriggerSourcesEditor } from './errorTriggerSources.tsx'
 import { FeishuTriggerConfig } from './feishuTriggerConfig.tsx'
 import { GeneralSettings } from './generalSettings.tsx'
 import { LinearTriggerConfig } from './linearTriggerConfig.tsx'
@@ -334,6 +335,22 @@ export function NodeInspector({
               }}
             />
           ))}
+        {selection?.kind === 'trigger' && selection.trigger.kind === 'error' && (
+          <>
+            {store == null ? (
+              <ErrorTriggerSources
+                flows={[]}
+                flowId={revision.revision.flowId}
+                value={selection.trigger.sourceFlowIds ?? []}
+                disabled
+                complete={false}
+                onChange={() => {}}
+              />
+            ) : (
+              <ErrorTriggerSourcesEditor store={store} nodeId={selection.id} value={selection.trigger.sourceFlowIds ?? []} disabled={disabled} />
+            )}
+          </>
+        )}
         {selection?.kind === 'trigger' && selection.trigger.kind !== 'webhook' && (
           <TriggerSummary
             trigger={selection.trigger}

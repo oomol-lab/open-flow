@@ -130,6 +130,8 @@ export class Publisher {
       case 'accepted':
         this.#wakeMaintenance()
         return accepted.operation
+      case 'error-sources-unavailable':
+        throw new ControlError(controlErrorCode.flowInvalid, 'Select published upstream Flows other than this Flow.')
       case 'binding-unresolved':
         throw new ControlError(controlErrorCode.bindingUnresolved, 'A required environment variable is unresolved.')
       case 'busy':
@@ -284,6 +286,9 @@ export class Publisher {
       closureDigest: fixed.prepared.closureDigest,
       content: fixed.content,
       crons,
+      errorTriggers: Object.entries(input.revision.document.graph.nodes).flatMap(([nodeId, node]) =>
+        node.kind == 'error' ? [{ nodeId, sourceFlowIds: node.sourceFlowIds ?? [] }] : [],
+      ),
       engineContract,
       expectedLivePublicationId: input.expectedLivePublicationId,
       flowId: input.flowId,
@@ -345,6 +350,12 @@ export class Publisher {
           break
         case 'access-conflict':
           throw new Error('An accepted Publish operation cannot change its Connector access snapshot.')
+        case 'error-sources-unavailable':
+          this.#store.publications.failPublishOperation(target.operationId, {
+            code: controlErrorCode.flowInvalid,
+            message: 'A selected upstream Flow is no longer published or available.',
+          })
+          break
         case 'binding-unresolved':
           this.#store.publications.failPublishOperation(target.operationId, {
             code: controlErrorCode.bindingUnresolved,

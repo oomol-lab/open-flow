@@ -323,3 +323,68 @@ describe('Server Webhook Trigger admission', () => {
     ).resolves.toBeUndefined()
   })
 })
+
+it('runs the published Error Trigger after an automatic failure and exposes both Run links', async () => {
+  const service = await openService(await databaseFile())
+  services.push(service)
+  const handler = await storeRevision(
+    service,
+    {
+      modelVersion: currentFlowModelVersion,
+      modules: {},
+      document: {
+        bindings: {},
+        tasks: {},
+        subflows: {},
+        graph: {
+          nodes: {
+            error: { kind: 'error', name: 'Error Trigger' },
+            capture: {
+              kind: 'value',
+              name: 'Capture',
+              inputs: {},
+              values: [{ handle: 'handled', value: true, nullable: false, jsonSchema: { type: 'boolean' } }],
+            },
+          },
+          edges: [{ source: 'error', target: 'capture' }],
+        },
+      },
+    },
+    'error-handler',
+  )
+  const revision = webhookFlow()
+  const source = await storeRevision(
+    service,
+    { ...revision, modules: { capture: { imports: [], name: 'Capture', source: 'export default () => { throw new Error("Automatic task failed") }' } } },
+    'failed-source',
+  )
+  await service.control.publishFlow('test', source.flowId, source.revisionId, 'open-flow-engine/v5', null, 'publish-source')
+  await service.tickMaintenance()
+  const configured = await service.control.changeDraft('test', handler.flowId, handler.revisionId, [
+    { kind: 'graph.trigger.sources.set', nodeId: 'error', value: [source.flowId] },
+  ])
+  await service.control.publishFlow('test', handler.flowId, configured.revision.revisionId, 'open-flow-engine/v5', null, 'publish-handler')
+  await service.tickMaintenance()
+  const binding = service.control.getFlowTriggerBinding(source.flowId, 'incoming', 'http://server.local')
+  const target = service.webhookTarget(webhookEndpointId(new URL(binding.endpointUrl!))!)!
+  const accepted = await service.acceptWebhookTarget(target, 'automatic-failure', 'POST', {
+    headers: {},
+    query: {},
+    body: { message: 'fail' },
+    webhookUrl: binding.endpointUrl!,
+  })
+  if (accepted?.kind != 'accepted') throw new Error('Webhook was not accepted')
+  await startService(service)
+  await service.waitForIdle()
+  await service.tickMaintenance()
+  await service.waitForIdle()
+  const failed = service.control.runs.getRun(accepted.runId)
+  expect(failed.status).toBe('failed')
+  expect(failed.errorDispatches?.[0]?.status).toBe('dispatched')
+  if (failed.errorDispatches?.[0]?.status != 'dispatched') throw new Error('Error workflow was not dispatched')
+  const handled = service.control.runs.getRun(failed.errorDispatches[0].runId)
+  expect(handled.status).toBe('completed')
+  expect(handled.errorSource).toEqual({ flowId: source.flowId, runId: accepted.runId })
+  expect(service.run(accepted.runId)?.result).toMatchObject({ error: { nodeId: 'capture', message: 'Automatic task failed' } })
+  expect(service.run(handled.runId)?.result).toMatchObject({ kind: 'node-results', nodes: [{ nodeId: 'capture', outputs: { handled: true } }] })
+})

@@ -44,7 +44,7 @@ import { flowCheck } from './checkDecoders.ts'
 import { connection, connectorAccess, connectorAccessSnapshot, connectorAccessCandidatesBatch, connectorAction } from './connectorDecoders.ts'
 import { allConnectorConnectionsQuery, connectorActionQuery, connectorConnectionsQuery, connectorProvidersQuery } from './connectorQueries.ts'
 import { exact, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
-import { flow, flowPage, variable } from './flowDecoders.ts'
+import { errorListener, flow, flowPage, variable } from './flowDecoders.ts'
 import { live, publication, publicationPage, publishOperation } from './publicationDecoders.ts'
 import { draft, draftChange, draftSync, presentation } from './revisionDecoders.ts'
 import { runCancellation, runDetails, runPage, runResult, waitResolution } from './runDecoders.ts'
@@ -59,6 +59,14 @@ import { ApiError } from './errors.ts'
 import { randomId } from './random.ts'
 
 export type ControlRequest = (path: string, init?: RequestInit) => Promise<Response>
+
+export interface ErrorListener {
+  readonly flowId: string
+  readonly flowName: string
+  readonly nodeId: string
+  readonly nodeName: string
+  readonly enabled: boolean
+}
 
 export interface Flow {
   readonly live?: { readonly enabled: boolean; readonly publicationId: string; readonly revisionId: string }
@@ -114,7 +122,7 @@ export interface TriggerBinding {
   readonly endpointUrl?: string
   readonly flowId: string
   readonly health: 'failed' | 'healthy' | 'initializing' | 'needs_reauth' | 'suspended'
-  readonly kind: 'cron' | 'integration' | 'poll' | 'webhook'
+  readonly kind: 'error' | 'cron' | 'integration' | 'poll' | 'webhook'
   readonly lastErrorCode?: string
   readonly operatorState: 'active' | 'paused'
   readonly runtimeVersion: number
@@ -399,7 +407,14 @@ export interface RunWait {
   readonly waitingSince: string
 }
 
+export type ErrorDispatch =
+  | { readonly status: 'pending'; readonly flowId: string }
+  | { readonly status: 'dispatched'; readonly flowId: string; readonly runId: string }
+  | { readonly status: 'failed'; readonly flowId: string; readonly message: string }
+
 type RunDetailsBase = Run & {
+  readonly errorDispatches?: readonly ErrorDispatch[]
+  readonly errorSource?: { readonly flowId: string; readonly runId: string }
   readonly closureDigest: string
   readonly engineContract: string
   readonly engineDigest: string
@@ -446,10 +461,18 @@ export interface RunCancellation {
   readonly version: 1
 }
 
+export interface RunFailure {
+  readonly code: string
+  readonly message: string
+  readonly nodeId?: string
+  readonly jobId?: string
+  readonly path?: readonly string[]
+}
+
 export type RunResult =
   | { readonly finishedAt: string; readonly result: JsonValue; readonly runId: string; readonly status: 'completed'; readonly version: 1 }
   | {
-      readonly error: { readonly code: string; readonly message: string }
+      readonly error: RunFailure
       readonly finishedAt: string
       readonly runId: string
       readonly status: 'failed' | 'indeterminate'
@@ -725,6 +748,12 @@ export class ControlClient {
 
   async getFlow(flowId: string): Promise<Flow> {
     return flow(await this.request(`/v1/flows/${segment(flowId)}`))
+  }
+
+  async getErrorListeners(flowId: string, signal?: AbortSignal): Promise<readonly ErrorListener[]> {
+    const source = record(await this.request(`/v1/flows/${segment(flowId)}/error-listeners`, { signal }))
+    if (source.version != 1 || !Array.isArray(source.listeners)) return invalidResponse()
+    return source.listeners.map(errorListener)
   }
 
   async renameFlow(flowId: string, name: string): Promise<Flow> {

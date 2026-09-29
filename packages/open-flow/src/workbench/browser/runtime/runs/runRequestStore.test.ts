@@ -2,6 +2,7 @@ import type { Draft, Flow } from '../api.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it, vi } from 'vitest'
+import { sampleErrorOutputs } from '../../../../trigger/common/contract.ts'
 import { RunRequestStore } from './runRequestStore.ts'
 
 const timestamp = '2026-08-30T00:00:00.000Z'
@@ -386,6 +387,32 @@ it('remembers explicitly entered empty bodies and keeps cleared data missing', a
     expect(store.inputStatus(flow.flowId, revision, 'start')).toBe('missing')
     await store.editDraft(flow, revision, 'start')
     expect(store.$.inputRequest.value?.groups[0]?.editor.values()).toEqual({ headers: {}, query: {}, webhookUrl: outputs.webhookUrl })
+  } finally {
+    store.dispose()
+  }
+})
+
+it('prefills Error Trigger test data and preserves intentional edits in the session', async () => {
+  const { store, client } = harness()
+  const revision = entryDraft()
+  const errorDraft: Draft = {
+    ...revision,
+    content: {
+      ...revision.content,
+      document: { ...revision.content.document, graph: { nodes: { error: { kind: 'error', name: 'Error Trigger' } }, edges: [] } },
+    },
+  }
+  try {
+    await store.editDraft(flow, errorDraft, 'error')
+    const request = store.$.inputRequest.value!
+    expect(request.groups[0]!.editor.values()).toEqual(sampleErrorOutputs)
+    expect(request.valid.value).toBe(true)
+    request.groups[0]!.editor.replaceValues({})
+    store.dismissInputs()
+    await store.editDraft(flow, errorDraft, 'error')
+    expect(store.$.inputRequest.value!.groups[0]!.editor.values()).toEqual({})
+    expect(store.$.inputRequest.value!.valid.value).toBe(false)
+    expect(client.createDraftRun).not.toHaveBeenCalled()
   } finally {
     store.dispose()
   }

@@ -148,7 +148,7 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
     store,
     theme: 'light',
   })
-  const main = element.props.children as ReactElement
+  const main = element.props.children.props.children as ReactElement
   const editor = (main.props.children as ReactElement[]).find((child) => child.type == FlowEditor)!
   return { editor, navigation, store }
 }

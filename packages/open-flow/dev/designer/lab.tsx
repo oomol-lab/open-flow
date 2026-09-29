@@ -45,6 +45,7 @@ const storyGroupIcons: Readonly<Record<string, `i-${string}`>> = {
   'Workbench': 'i-carbon:settings-adjust',
   'Controls': 'i-carbon:settings',
   'Popup': 'i-carbon:overflow-menu-horizontal',
+  'Trigger Error Trigger': 'i-lucide-light:shield-alert',
   'Trigger Manual': 'i-carbon:play',
   'Trigger Schedule': 'i-carbon:event-schedule',
   'Trigger Webhook': 'i-carbon:webhook',

@@ -52,11 +52,13 @@ export function copyNodes(revision: RevisionView, target: GraphTarget, nodeIds: 
 
 export function pasteNodes(revision: RevisionView, target: GraphTarget, clipboard: NodeClipboard, identity: () => string): PastedNodes {
   if (revision.graph(target) == null) return { changes: [], nodeIds: [], sourceIds: [] }
+  const hasErrorTrigger = Object.values(revision.graph(target)?.nodes ?? {}).some((node) => node.kind === 'error')
   const hasManualTrigger = Object.values(revision.graph(target)?.nodes ?? {}).some((node) => node.kind === 'manual')
   const entries = Object.entries(clipboard.nodes).filter(
     ([, node]) =>
       (target.kind == 'flow' || 'inputs' in node) &&
       (node.kind !== 'manual' || !hasManualTrigger) &&
+      (node.kind !== 'error' || !hasErrorTrigger) &&
       (node.kind != 'task' || node.task == null || clipboard.modules[node.task.moduleId] != null),
   )
   const sourceIds = entries.map(([sourceId]) => sourceId)

@@ -37,6 +37,7 @@ type AddTrigger =
     }
   | { readonly kind: 'connect'; readonly provider: string }
   | { readonly kind: 'manual' }
+  | { readonly kind: 'error' }
   | { readonly kind: 'cron' }
   | { readonly kind: 'webhook' }
 
@@ -141,6 +142,17 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
   const group = t('addNode.triggers')
   const triggers: readonly AddNodeOption[] = [
     {
+      description: t('errorWorkflow.description'),
+      group,
+      id: 'trigger:error',
+      icon: ':carbon:warning-alt:',
+      inputs: [],
+      kind: 'trigger',
+      label: t('errorWorkflow.trigger'),
+      outputs: triggerOutputDefinitions({ kind: 'error', name: 'Error Trigger' }),
+      trigger: { kind: 'error' },
+    },
+    {
       description: t('addNode.manualDescription'),
       group,
       id: 'trigger:manual',
@@ -198,9 +210,8 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
       outputs: [{ handle: 'continue', jsonSchema: {} }],
     },
   ]
-  return Object.values(revisionView(draft).graph(target)?.nodes ?? {}).some((node) => node.kind == 'manual')
-    ? triggers.filter((option) => option.id != 'trigger:manual')
-    : triggers
+  const nodes = Object.values(revisionView(draft).graph(target)?.nodes ?? {})
+  return triggers.filter((option) => !nodes.some((node) => (node.kind == 'manual' || node.kind == 'error') && option.id == `trigger:${node.kind}`))
 }
 
 export function addNodeIntent(option: AddNodeOption, revision: RevisionView, target: GraphTarget, t: TFunction): AddNodeIntent | undefined {
@@ -236,6 +247,8 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, tar
     case 'trigger': {
       if (!('trigger' in option) || option.trigger.kind == 'connect') return
       switch (option.trigger.kind) {
+        case 'error':
+          return { kind: 'error', name: t('errorWorkflow.trigger') }
         case 'manual':
           return { kind: 'manual', name: t('addNode.manual') }
         case 'webhook':
