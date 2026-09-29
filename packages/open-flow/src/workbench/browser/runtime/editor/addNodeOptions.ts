@@ -144,17 +144,6 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
   const group = t('addNode.triggers')
   const triggers: readonly AddNodeOption[] = [
     {
-      description: t('errorWorkflow.description'),
-      group,
-      id: 'trigger:error',
-      icon: ':lucide-light:siren:',
-      inputs: [],
-      kind: 'trigger',
-      label: t('errorWorkflow.trigger'),
-      outputs: triggerOutputDefinitions({ kind: 'error', name: 'Flow Error' }),
-      trigger: { kind: 'error' },
-    },
-    {
       description: t('addNode.manualDescription'),
       group,
       id: 'trigger:manual',
@@ -186,6 +175,17 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
       label: t('addNode.cron'),
       outputs: triggerOutputDefinitions({ kind: 'cron', name: 'Cron', cronTimes: [] }),
       trigger: { kind: 'cron' },
+    },
+    {
+      description: t('errorWorkflow.description'),
+      group,
+      id: 'trigger:error',
+      icon: ':lucide-light:siren:',
+      inputs: [],
+      kind: 'trigger',
+      label: t('errorWorkflow.trigger'),
+      outputs: triggerOutputDefinitions({ kind: 'error', name: 'Flow Error' }),
+      trigger: { kind: 'error' },
     },
     ...options,
     {
