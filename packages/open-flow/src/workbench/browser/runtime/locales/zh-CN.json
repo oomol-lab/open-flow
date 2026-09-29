@@ -1364,7 +1364,7 @@
   },
   "errorWorkflow": {
     "trigger": "工作流错误",
-    "description": "监听所选工作流的自动运行错误，并启动当前工作流。",
+    "description": "监听其他工作流的错误，并启动当前工作流。",
     "empty": "暂无可选的已发布工作流。",
     "retry": "重试",
     "more": "加载更多",

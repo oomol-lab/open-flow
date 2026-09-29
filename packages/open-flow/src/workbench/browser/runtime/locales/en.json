@@ -1364,7 +1364,7 @@
   },
   "errorWorkflow": {
     "trigger": "Flow Error",
-    "description": "Starts this workflow when an automatic run of a selected workflow fails.",
+    "description": "Listens for errors in other flows and starts this flow.",
     "empty": "No published workflows available.",
     "retry": "Retry",
     "more": "Load more",

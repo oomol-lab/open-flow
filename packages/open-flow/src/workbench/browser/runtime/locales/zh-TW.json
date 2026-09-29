@@ -1364,7 +1364,7 @@
   },
   "errorWorkflow": {
     "trigger": "錯誤觸發器",
-    "description": "其他工作流程失敗時執行。",
+    "description": "監聽其他工作流程的錯誤，並啟動目前的工作流程。",
     "empty": "暫無可選的已發布工作流程。",
     "retry": "重試",
     "more": "載入更多",
