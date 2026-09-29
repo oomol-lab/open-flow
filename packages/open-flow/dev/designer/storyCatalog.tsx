@@ -16,6 +16,7 @@ import { eventSourcesStory, createEventSourceStory, eventSourceSetupStory, feish
 import { fieldLayoutStory } from './fieldLayout.tsx'
 import { fieldSettingsStory, groupSettingsStory } from './fieldSettings.tsx'
 import { fieldTypesStory } from './fieldTypes.tsx'
+import { flowBrowserStory } from './flowBrowser.tsx'
 import { formStory } from './form.tsx'
 import { historyStory, historyControlsStory, historyKeyboardStory } from './history.tsx'
 import { iconPickerStory } from './iconPicker.tsx'
@@ -100,6 +101,7 @@ export const labStories: readonly FrontendStory[] = [
   ...cardStories,
   ...workflowStories,
   workspaceRecoveryStory,
+  flowBrowserStory,
   connectionPathsStory,
   connectorAccessStory,
   ...stories,

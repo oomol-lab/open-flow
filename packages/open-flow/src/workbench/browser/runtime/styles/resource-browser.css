@@ -85,15 +85,33 @@
     gap: 8px;
   }
 
+  .resource-table-scroll {
+    overflow-x: auto;
+  }
+
+  .resource-table {
+    display: grid;
+    grid-template-columns: minmax(190px, 0.9fr) minmax(170px, 0.8fr) minmax(150px, 0.7fr) max-content minmax(240px, max-content);
+    column-gap: 24px;
+    min-width: min-content;
+  }
+
   .resource-list {
-    min-width: 0;
+    display: grid;
+    grid-column: 1 / -1;
+    grid-template-columns: subgrid;
+  }
+
+  .resource-list > :not(.resource-item-row) {
+    grid-column: 1 / -1;
   }
 
   .resource-list-columns-shell {
     display: grid;
     min-width: 0;
     min-height: 40px;
-    grid-template-columns: minmax(0, 1fr) 216px;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
     align-items: center;
     border-top: 1px solid var(--ui-border);
     border-bottom: 1px solid var(--ui-border);
@@ -108,11 +126,11 @@
     height: 100%;
     align-items: center;
     gap: 24px;
-    padding: 0 16px;
+    padding: 0 0 0 16px;
   }
 
   .resource-actions-heading {
-    grid-column: 2;
+    grid-column: 5;
     text-align: center;
   }
 
@@ -123,13 +141,14 @@
     min-height: 64px;
     align-items: center;
     gap: 24px;
-    padding: 8px 16px;
+    padding: 8px 0 8px 16px;
     border-bottom: 1px solid var(--ui-border);
     text-align: left;
   }
 
   .flow-columns {
-    grid-template-columns: minmax(190px, 0.9fr) minmax(170px, 0.8fr) minmax(150px, 0.7fr) 120px;
+    grid-template-columns: subgrid;
+    grid-column: 1 / 5;
   }
 
   .resource-live-controls {
@@ -137,7 +156,7 @@
     align-items: center;
     justify-content: flex-end;
     gap: 12px;
-    grid-column: 2;
+    grid-column: 5;
     grid-row: 1;
     padding-right: 16px;
   }
@@ -273,14 +292,18 @@
   }
 
   .resource-status {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto 1fr;
     align-items: center;
-    gap: 7px;
+    gap: 4px 7px;
     white-space: nowrap;
   }
 
-  .resource-status-separator {
-    color: var(--ui-border);
+  .resource-enabled-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    grid-column: 2;
   }
 
   .resource-change.pending {
@@ -290,7 +313,8 @@
   .resource-item-row {
     position: relative;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 216px;
+    grid-template-columns: subgrid;
+    grid-column: 1 / -1;
     border-bottom: 1px solid var(--ui-border);
   }
 
@@ -299,7 +323,7 @@
   }
 
   .resource-item-row > .resource-list-row {
-    grid-column: 1;
+    grid-column: 1 / 5;
     grid-row: 1;
     border-bottom: 0;
   }

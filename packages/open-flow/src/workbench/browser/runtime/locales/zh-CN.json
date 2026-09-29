@@ -202,7 +202,7 @@
     "publishFirst": "发布后可启用此工作流。",
     "enabledHint": "控制新的线上运行，草稿测试仍可使用。",
     "publish": "发布",
-    "publishUpdate": "发布更新",
+    "publishUpdate": "更新",
     "deleteDescription": "此操作将删除工作流及其运行记录，并停止线上触发，无法撤销。"
   },
   "inspector": {

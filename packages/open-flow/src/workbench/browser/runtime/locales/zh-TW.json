@@ -202,7 +202,7 @@
     "publishFirst": "發佈後可啟用此工作流程。",
     "enabledHint": "控制新的線上執行，草稿測試仍可使用。",
     "publish": "發佈",
-    "publishUpdate": "發佈更新",
+    "publishUpdate": "更新",
     "deleteDescription": "此操作將刪除工作流程及其執行記錄，並停止線上觸發，無法復原。"
   },
   "inspector": {

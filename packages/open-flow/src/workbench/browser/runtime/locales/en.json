@@ -202,7 +202,7 @@
     "publishFirst": "Publish to enable this flow.",
     "enabledHint": "Controls new live runs. Draft tests remain available.",
     "publish": "Publish",
-    "publishUpdate": "Publish update",
+    "publishUpdate": "Update",
     "deleteDescription": "This deletes the flow and its run history and stops live triggers. This cannot be undone."
   },
   "inspector": {

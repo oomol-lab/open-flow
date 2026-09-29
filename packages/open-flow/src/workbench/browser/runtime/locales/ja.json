@@ -202,7 +202,7 @@
     "publishFirst": "公開後に有効にできます。",
     "enabledHint": "新しい本番実行を制御します。下書きのテストは引き続き利用できます。",
     "publish": "公開",
-    "publishUpdate": "更新を公開",
+    "publishUpdate": "更新",
     "deleteDescription": "フローと実行履歴を削除し、本番のトリガーを停止します。この操作は取り消せません。"
   },
   "inspector": {

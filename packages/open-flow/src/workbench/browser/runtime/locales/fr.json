@@ -202,7 +202,7 @@
     "publishFirst": "Publiez pour activer ce flux.",
     "enabledHint": "Contrôle les nouvelles exécutions en production. Les tests du brouillon restent disponibles.",
     "publish": "Publier",
-    "publishUpdate": "Publier la mise à jour",
+    "publishUpdate": "Mettre à jour",
     "deleteDescription": "Le flux et son historique seront supprimés et les déclencheurs arrêtés. Cette action est irréversible."
   },
   "inspector": {

@@ -1,0 +1,66 @@
+import type { Flow } from '../../src/control/common/api.ts'
+import type { UiLanguage } from '../../src/localization/common/languages.ts'
+import type { FrontendStory, LogAction } from './stories.tsx'
+
+import { useEffect, useState } from 'react'
+import { I18nProvider } from 'val-i18n-react'
+import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
+import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
+import { FlowBrowser } from '../../src/workbench/browser/runtime/shell/resourceBrowser.tsx'
+import { WorkbenchStore } from '../../src/workbench/browser/runtime/stores/workbenchStore.ts'
+
+function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
+  const [session, setSession] = useState<{ i18n: ReturnType<typeof createI18n>; store: WorkbenchStore }>()
+  useEffect(() => {
+    const i18n = createI18n(language)
+    const flows: Flow[] = ['Published flow', 'Unpublished changes with a long flow name', 'Disabled flow', 'Draft flow'].map((name, index) => {
+      const flow: Flow = {
+        flowId: `flow-list-sample-${index}`,
+        name,
+        createdAt: '2026-09-24T09:00:00.000Z',
+        updatedAt: '2026-09-24T09:00:00.000Z',
+        draftRevisionId: 'draft',
+        status: 'active',
+        version: 1,
+      }
+      return index == 3
+        ? flow
+        : Object.assign(flow, { live: { enabled: index != 2, publicationId: `publication-${index}`, revisionId: index == 1 ? 'previous' : 'draft' } })
+    })
+    const client = new WorkbenchClient(async (path) => {
+      if (String(path).split('?')[0] == '/v1/flows') return Response.json({ version: 1, flows, total: flows.length })
+      return Response.json({ message: 'Unsupported story action' }, { status: 400 })
+    })
+    const store = new WorkbenchStore(client, { getItem: () => null, setItem: () => {} }, undefined, i18n)
+    setSession({ i18n, store })
+    void store.workspace.reloadFlows()
+    return () => {
+      store.dispose()
+      i18n.dispose()
+    }
+  }, [language])
+  if (session == null) return null
+  return (
+    <I18nProvider i18n={session.i18n}>
+      <div className="open-flow-workbench open-flow-theme h-[520px] w-full" data-theme={dark ? 'dark' : 'light'}>
+        <FlowBrowser
+          language={language}
+          store={session.store}
+          hrefForFlow={(flow) => `#${flow.flowId}`}
+          onCreateFlow={async () => false}
+          onSelectFlow={(flow) => log('flow.open', flow.flowId)}
+        />
+      </div>
+    </I18nProvider>
+  )
+}
+
+export const flowBrowserStory: FrontendStory = {
+  group: 'Workbench',
+  id: 'flow-browser',
+  title: 'Flow list',
+  description:
+    'Published, changed, disabled and draft rows share aligned columns. The enable switch sits beside the running status. Compact widths stack actions; switch language to inspect longer labels.',
+  standalone: true,
+  render: (log, dark, language) => <FlowBrowserStory dark={dark} language={language} log={log} />,
+}

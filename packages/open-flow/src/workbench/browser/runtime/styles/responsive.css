@@ -11,8 +11,18 @@
   }
 
   @container open-flow-workbench (width <= 720px) {
-    .flow-columns {
-      grid-template-columns: minmax(0, 1fr) 104px;
+    .resource-table {
+      grid-template-columns: minmax(190px, 1fr) max-content max-content;
+    }
+
+    .flow-columns,
+    .resource-item-row > .resource-list-row {
+      grid-column: 1 / 3;
+    }
+
+    .resource-actions-heading,
+    .resource-live-controls {
+      grid-column: 3;
     }
 
     .resource-flow-id-heading,
@@ -109,8 +119,26 @@
   }
 
   @container open-flow-workbench (width <= 520px) {
+    .resource-table,
+    .resource-list,
     .resource-item-row {
+      display: block;
+      min-width: 0;
+    }
+
+    .resource-item-row > .resource-list-row {
       grid-template-columns: minmax(0, 1fr);
+      gap: 8px;
+      padding-right: 16px;
+    }
+
+    .resource-live-controls {
+      flex-wrap: wrap;
+    }
+
+    .resource-status {
+      justify-self: start;
+      white-space: normal;
     }
 
     .resource-list-columns-shell {

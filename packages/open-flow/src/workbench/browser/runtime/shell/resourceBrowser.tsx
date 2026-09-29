@@ -313,28 +313,23 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
         </Tooltip>
         <span className="resource-status">
           <span aria-hidden="true" className={cn('status-dot', publicationTone)} />
-          {t(publicationStatus)}
+          <span>{t(publicationStatus)}</span>
           {flow.live != null && (
-            <>
-              <span aria-hidden="true" className="resource-status-separator">
-                ·
-              </span>
+            <span className="resource-enabled-status" aria-busy={pending == 'enabled'}>
               <span>{t(flow.live.enabled ? 'resource.enabled' : 'resource.disabled')}</span>
-            </>
+              <Switch
+                aria-label={t('resource.enableFlow', { name: flow.name })}
+                checked={flow.live.enabled}
+                disabled={flow.status != 'active' || busy != null || pending != null}
+                onCheckedChange={(enabled) => void update(enabled)}
+                size="sm"
+                title={t('resource.enabledHint')}
+              />
+            </span>
           )}
         </span>
       </div>
       <div className="resource-live-controls" aria-busy={pending != null} onClick={openFromRow}>
-        {flow.live != null && (
-          <Switch
-            aria-label={t('resource.enableFlow', { name: flow.name })}
-            checked={flow.live.enabled}
-            disabled={flow.status != 'active' || busy != null || pending != null}
-            onCheckedChange={(enabled) => void update(enabled)}
-            size="sm"
-            title={t('resource.enabledHint')}
-          />
-        )}
         {flow.status == 'active' && (
           <Button onClick={() => onSelect(flow)} size="sm" variant="outline">
             {t('resource.edit')}
@@ -492,64 +487,68 @@ export function FlowBrowser({
               </Button>
             </div>
           </div>
-          <div aria-hidden="true" className="resource-list-columns-shell">
-            <div className="resource-list-columns flow-columns">
-              <span>{t('resource.name')}</span>
-              <span className="resource-flow-id-heading">{t('resource.flowId')}</span>
-              <span className="resource-updated-heading">{t('resource.updated')}</span>
-              <span>{t('resource.status')}</span>
-            </div>
-            <span className="resource-actions-heading">{t('resource.actions')}</span>
-          </div>
-          <div className="resource-list">
-            {loading ? (
-              Array.from({ length: 5 }, (_, index) => <FlowSkeleton key={index} />)
-            ) : loadFailed ? (
-              <Empty className="min-h-64" role="alert">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <Icon name="alert" size={20} />
-                  </EmptyMedia>
-                  <EmptyTitle>{t('resource.flowsLoadFailed')}</EmptyTitle>
-                  <EmptyDescription>{t('resource.flowsLoadFailedDescription')}</EmptyDescription>
-                </EmptyHeader>
-                <EmptyContent>
-                  <Button onClick={() => void store.retryFlows()} variant="outline">
-                    {t('empty.retry')}
-                  </Button>
-                </EmptyContent>
-              </Empty>
-            ) : visible.length == 0 ? (
-              <Empty className="min-h-64">
-                <EmptyHeader>
-                  <EmptyMedia variant="icon">
-                    <Icon name="flow" size={20} />
-                  </EmptyMedia>
-                  <EmptyTitle>{t(normalized.length == 0 ? 'resource.noFlows' : 'resource.noMatchingFlows')}</EmptyTitle>
-                  <EmptyDescription>{t(normalized.length == 0 ? 'resource.noFlowsDescription' : 'resource.noMatchingDescription')}</EmptyDescription>
-                </EmptyHeader>
-                {normalized.length == 0 && (
-                  <EmptyContent>
-                    <Button onClick={() => setCreating(true)} variant="outline">
-                      <Icon data-icon="inline-start" name="plus" />
-                      {t('resource.newFlow')}
-                    </Button>
-                  </EmptyContent>
+          <div className="resource-table-scroll">
+            <div className="resource-table">
+              <div aria-hidden="true" className="resource-list-columns-shell">
+                <div className="resource-list-columns flow-columns">
+                  <span>{t('resource.name')}</span>
+                  <span className="resource-flow-id-heading">{t('resource.flowId')}</span>
+                  <span className="resource-updated-heading">{t('resource.updated')}</span>
+                  <span>{t('resource.status')}</span>
+                </div>
+                <span className="resource-actions-heading">{t('resource.actions')}</span>
+              </div>
+              <div className="resource-list">
+                {loading ? (
+                  Array.from({ length: 5 }, (_, index) => <FlowSkeleton key={index} />)
+                ) : loadFailed ? (
+                  <Empty className="min-h-64" role="alert">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <Icon name="alert" size={20} />
+                      </EmptyMedia>
+                      <EmptyTitle>{t('resource.flowsLoadFailed')}</EmptyTitle>
+                      <EmptyDescription>{t('resource.flowsLoadFailedDescription')}</EmptyDescription>
+                    </EmptyHeader>
+                    <EmptyContent>
+                      <Button onClick={() => void store.retryFlows()} variant="outline">
+                        {t('empty.retry')}
+                      </Button>
+                    </EmptyContent>
+                  </Empty>
+                ) : visible.length == 0 ? (
+                  <Empty className="min-h-64">
+                    <EmptyHeader>
+                      <EmptyMedia variant="icon">
+                        <Icon name="flow" size={20} />
+                      </EmptyMedia>
+                      <EmptyTitle>{t(normalized.length == 0 ? 'resource.noFlows' : 'resource.noMatchingFlows')}</EmptyTitle>
+                      <EmptyDescription>{t(normalized.length == 0 ? 'resource.noFlowsDescription' : 'resource.noMatchingDescription')}</EmptyDescription>
+                    </EmptyHeader>
+                    {normalized.length == 0 && (
+                      <EmptyContent>
+                        <Button onClick={() => setCreating(true)} variant="outline">
+                          <Icon data-icon="inline-start" name="plus" />
+                          {t('resource.newFlow')}
+                        </Button>
+                      </EmptyContent>
+                    )}
+                  </Empty>
+                ) : (
+                  visible.map((flow) => (
+                    <FlowItem
+                      badge={flowBadges?.[flow.flowId]}
+                      busy={busy}
+                      flow={flow}
+                      href={hrefForFlow(flow)}
+                      key={flow.flowId}
+                      onSelect={onSelectFlow}
+                      store={store}
+                    />
+                  ))
                 )}
-              </Empty>
-            ) : (
-              visible.map((flow) => (
-                <FlowItem
-                  badge={flowBadges?.[flow.flowId]}
-                  busy={busy}
-                  flow={flow}
-                  href={hrefForFlow(flow)}
-                  key={flow.flowId}
-                  onSelect={onSelectFlow}
-                  store={store}
-                />
-              ))
-            )}
+              </div>
+            </div>
           </div>
           {nextCursor != null && (
             <div className="resource-list-footer">
