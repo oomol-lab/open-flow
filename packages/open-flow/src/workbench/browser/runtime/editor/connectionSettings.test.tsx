@@ -8,6 +8,42 @@ import { createI18n } from '../i18n.ts'
 import { AccountSelect, ConnectorAccount } from './connectionSettings.tsx'
 
 const i18n = createI18n('zh-CN')
+
+it.each([
+  { state: 'cached while loading', cached: true, loading: true, invalid: false },
+  { state: 'missing while loading', cached: false, loading: true, invalid: false },
+  { state: 'known but no longer selectable', cached: true, loading: false, invalid: true },
+])('preserves account identity independently of available options: $state', ({ cached, loading, invalid }) => {
+  const markup = renderToStaticMarkup(
+    <I18nProvider i18n={i18n}>
+      <AccountSelect
+        loading={loading}
+        invalid={invalid}
+        connections={[]}
+        selectedId="team-account"
+        selectedConnection={
+          cached
+            ? {
+                connectionId: 'team-account',
+                serviceId: 'gmail',
+                displayName: 'Saved account',
+                isDefault: true,
+                status: 'active',
+              }
+            : undefined
+        }
+        disabled={false}
+        onChange={() => {}}
+        onManage={undefined}
+      />
+    </I18nProvider>,
+  )
+  expect(markup.includes('Saved account')).toBe(cached)
+  expect(markup.includes(i18n.t('inspector.account.loading'))).toBe(loading && !cached)
+  expect(markup.includes('aria-busy="true"')).toBe(loading)
+  expect(markup.includes('aria-invalid="true"')).toBe(invalid)
+})
+
 function renderAccount(overrides: Partial<ComponentProps<typeof ConnectorAccount>> = {}) {
   return renderToStaticMarkup(
     <I18nProvider i18n={i18n}>

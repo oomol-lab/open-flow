@@ -4,6 +4,7 @@ import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from '../../../../ui/browser/dialog.tsx'
@@ -147,6 +148,8 @@ function ActionSelectionEditor<T extends SelectedAction>({
 }) {
   const t = useTranslate()
   const [draft, setDraft] = useState(entries)
+  const actions = useVal(connectors.$.actions)
+  const connections = useVal(connectors.$.connections)
   const [initialEntries] = useState(entries)
   // Presentation only: saving always uses draft in its original selection order.
   const [displayOrder, setDisplayOrder] = useState<readonly string[] | null>(entries.length === 0 ? [] : null)
@@ -332,10 +335,14 @@ function ActionSelectionEditor<T extends SelectedAction>({
               <div className="flex flex-col divide-y divide-border/50 px-4">
                 {sortedEntries.map(({ entry, index }) => {
                   const resolved = prepared[entry.action]
-                  const action = resolved?.action ?? discovered.current.get(entry.action) ?? connectors.$.actions.value[entry.action]
+                  const action = resolved?.action ?? discovered.current.get(entry.action) ?? actions[entry.action]
                   const accounts = resolved?.connections ?? []
-                  const selected = accounts.find((account) => account.connectionId == entry.connectionId)
-                  const accountInvalid = action?.authenticated && entry.connectionId != null && selected?.status != 'active'
+                  const selected = connections.find((account) => account.connectionId == entry.connectionId)
+                  const accountInvalid =
+                    resolved != null &&
+                    action?.authenticated &&
+                    entry.connectionId != null &&
+                    !accounts.some((account) => account.connectionId == entry.connectionId && account.status == 'active')
                   return (
                     <section
                       key={entry.id ?? entry.action}
@@ -416,35 +423,36 @@ function ActionSelectionEditor<T extends SelectedAction>({
                         )}
                       </div>
                       <div className="open-flow-property-panel col-start-2 flex min-h-[30px] min-w-0 items-center [&>*]:w-full">
-                        {resolved == null ? (
-                          preparationErrors[entry.action] != null ? (
-                            <AccountControlButton
-                              status="danger"
-                              disabled={disabled}
-                              label={t('inspector.account.retry')}
-                              hint={preparationErrors[entry.action]}
-                              onClick={() => setAttempt((value) => value + 1)}
-                            />
-                          ) : (
-                            <AccountSelect loading connections={[]} disabled={disabled} onChange={() => {}} onManage={undefined} />
-                          )
-                        ) : !resolved.action.authenticated ? (
+                        {resolved == null && preparationErrors[entry.action] != null ? (
+                          <AccountControlButton
+                            status="danger"
+                            disabled={disabled}
+                            label={t('inspector.account.retry')}
+                            hint={preparationErrors[entry.action]}
+                            onClick={() => setAttempt((value) => value + 1)}
+                          />
+                        ) : action?.authenticated === false ? (
                           <div className="text-muted-foreground">{t('actionPicker.noAccount')}</div>
                         ) : (
                           <AccountSelect
+                            loading={resolved == null}
                             connections={accounts.filter((account) => account.status == 'active')}
                             selectedConnection={selected}
                             selectedId={entry.connectionId}
                             invalid={accountInvalid === true}
                             warning={entry.connectionId == null}
                             addWhenEmpty
-                            label={t('actionPicker.accountFor', { action: resolved.action.name })}
+                            label={t('actionPicker.accountFor', { action: action?.name ?? entry.action })}
                             disabled={disabled}
                             onChange={(connectionId) => {
                               const { connectionId: _previous, ...rest } = entry
                               replace(index, (connectionId == null ? rest : { ...rest, connectionId }) as T)
                             }}
-                            onManage={() => void connectors.connect(resolved.action.serviceId).catch((cause: unknown) => setError(String(cause)))}
+                            onManage={
+                              resolved == null
+                                ? undefined
+                                : () => void connectors.connect(resolved.action.serviceId).catch((cause: unknown) => setError(String(cause)))
+                            }
                           />
                         )}
                       </div>

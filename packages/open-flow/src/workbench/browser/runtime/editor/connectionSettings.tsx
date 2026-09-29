@@ -113,6 +113,7 @@ export function AccountSelect({
   const t = useTranslate()
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const selected = selectedConnection ?? connections.find((candidate) => candidate.connectionId == selectedId)
+  const showLoading = loading && selected == null
   const builtInName = t('inspector.account.oomolBuiltIn')
   const displayName = (connection: ConnectorConnection) => accountDisplayName(connection, connection.displayName, builtInName)
   const selectedLabel =
@@ -155,7 +156,7 @@ export function AccountSelect({
           className={`${fieldSelectTriggerClass} account-control`}
         >
           <SelectValue className={!loading && selectedId != null ? 'mr-5' : undefined} placeholder={t('inspector.account.chooseAccount')}>
-            {loading ? (
+            {showLoading ? (
               <span role="status" className="flex min-w-0 items-center gap-2 text-muted-foreground">
                 <Spinner />
                 <span className="truncate">{t('inspector.account.loading')}</span>
