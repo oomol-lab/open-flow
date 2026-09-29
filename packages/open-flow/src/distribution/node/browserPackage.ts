@@ -227,15 +227,15 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         .replaceAll("'../../../control/common/api.ts'", "'../common/control-api.js'")
         .replaceAll("'../../../localization/common/languages.ts'", "'../common/localization.js'"),
     )
-    await Promise.all(
-      ['input', 'label', 'textarea'].map(async (name) => {
-        await copyFile(path.join(declarationRoot, `ui/browser/${name}.d.ts`), path.join(browserOutputPath, `ui-${name}.d.ts`))
-      }),
-    )
-    const uiDeclaration = (await readFile(path.join(declarationRoot, 'ui/browser/public.d.ts'), 'utf8'))
-      .replaceAll("'./input.tsx'", "'./ui-input.js'")
-      .replaceAll("'./label.tsx'", "'./ui-label.js'")
-      .replaceAll("'./textarea.tsx'", "'./ui-textarea.js'")
+    let uiDeclaration = await readFile(path.join(declarationRoot, 'ui/browser/public.d.ts'), 'utf8')
+    for (const name of ['input', 'label', 'logo', 'textarea', 'hostTooltip', 'hostNavigationActions']) {
+      const declaration = (await readFile(path.join(declarationRoot, `ui/browser/${name}.d.ts`), 'utf8')).replaceAll(
+        "'../../localization/common/languages.ts'",
+        "'../common/localization.js'",
+      )
+      await writeFile(path.join(browserOutputPath, `ui-${name}.d.ts`), declaration)
+      uiDeclaration = uiDeclaration.replaceAll(`'./${name}.tsx'`, `'./ui-${name}.js'`)
+    }
     await writeFile(path.join(browserOutputPath, 'ui.d.ts'), uiDeclaration)
     await writeFile(path.join(browserOutputPath, 'ui.css.d.ts'), 'export {}\n')
     const previewDeclaration = (await readFile(path.join(declarationRoot, 'workbench/browser/runtime/openFlowPreview.d.ts'), 'utf8'))

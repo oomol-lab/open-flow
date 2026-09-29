@@ -120,6 +120,12 @@ honestly.
 Run the Open Flow test suite with `bun run test` from `packages/open-flow`. Do not invoke `bun test`
 directly because it bypasses the project's Vitest configuration.
 
+When changes affect the published Open Flow package, including bundled code or assets, public exports,
+type declarations, dependencies, or packaging logic, run
+`bun run --filter @oomol-lab/open-flow test:package` from the repository root before delivery.
+This builds and checks the actual tarball in an isolated consumer; source tests and type checks do not
+replace it. For changes affecting other distributable artifacts, also run their package tests.
+
 Before every Git commit, run `bun run check` from the repository root and require it to pass. Run it
 again after any rebase or merge that changes the result before committing or pushing.
 
