@@ -10,6 +10,7 @@ import { inputValue } from '../../src/flow/common/inputValue.ts'
 import { localizeTrigger } from '../../src/trigger/providers/localization.ts'
 import { WorkbenchClient } from '../../src/workbench/browser/runtime/api.ts'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
+import { ConnectorAccessStore } from '../../src/workbench/browser/runtime/stores/connectorAccessStore.ts'
 import { ConnectorStore } from '../../src/workbench/browser/runtime/stores/connectorStore.ts'
 import { TriggerStore } from '../../src/workbench/browser/runtime/stores/triggerStore.ts'
 import { WorkspaceStore } from '../../src/workbench/browser/runtime/stores/workspaceStore.ts'
@@ -27,6 +28,7 @@ export function createTriggerSession(
     cache: WorkbenchHost['catalogCache']
   },
   eventSources?: readonly EventSource[],
+  triggerAccess?: 'alternative' | 'none',
 ) {
   const i18n = createI18n(language)
   const { flow, draft } = triggerDraft(trigger)
@@ -48,8 +50,39 @@ export function createTriggerSession(
   })
   const serviceId = trigger.kind === 'poll' || trigger.kind === 'integration' ? trigger.definition.provider : 'lab'
   const account = { connectionId: 'lab-account', serviceId, displayName: 'Design team', isDefault: true, status: 'active' as const }
+  const accounts =
+    triggerAccess === 'alternative' ? [account, { ...account, connectionId: 'lab-allowed', displayName: 'Authorized team', isDefault: false }] : [account]
+  let allowedAccounts: readonly (typeof account)[] = accounts
   const client = new WorkbenchClient(async (path, init) => {
     const url = new URL(path instanceof Request ? path.url : path, 'https://lab.invalid')
+    if (url.pathname.endsWith('/connector-access'))
+      return Response.json({ version: 1, mode: triggerAccess == null ? 'implicit' : 'selectable', accessRevision: 1, bindings: [], sharedAccessDigest: 'lab' })
+    if (url.pathname.endsWith('/connector-access/candidates/query'))
+      return Response.json({
+        version: 1,
+        results: [
+          {
+            version: 1,
+            mode: 'selectable',
+            providerId: serviceId,
+            candidates: accounts.map((connection) => ({
+              connectionId: connection.connectionId,
+              accessBindingId: connection.connectionId,
+              connectionDisplayName: connection.displayName,
+              providerId: serviceId,
+              source: { kind: 'policy', ruleId: null },
+              permissions: {
+                actionIds: [],
+                allActions: true,
+                proxy: false,
+                configured: false,
+                allTriggers: connection.connectionId === 'lab-allowed',
+                triggerIds: [],
+              },
+            })),
+          },
+        ],
+      })
     if (url.pathname === '/v1/trigger-keys/catalog') {
       if (catalog != null) return catalog.request(url, init)
       const definitions = trigger.kind === 'poll' || trigger.kind === 'integration' ? [trigger.definition] : []
@@ -183,7 +216,7 @@ export function createTriggerSession(
     if (url.pathname === '/v1/connector/connections')
       return Response.json({
         version: 1,
-        connections: [account],
+        connections: accounts,
       })
     if (url.pathname === '/v1/event-sources/connections') return Response.json({ version: 1, connections: [account] })
     if (url.pathname === `/v1/connector/connections/${serviceId}/page`)
@@ -199,7 +232,22 @@ export function createTriggerSession(
     },
   }
   let identity = 0
-  const workspace = new WorkspaceStore(client, notice, create ? () => (identity++ === 0 ? nodeId : `${nodeId}-${identity}`) : undefined, i18n)
+  const connectorAccess = new ConnectorAccessStore(client, notice, i18n)
+  const workspace = new WorkspaceStore(
+    client,
+    notice,
+    create ? () => (identity++ === 0 ? nodeId : `${nodeId}-${identity}`) : undefined,
+    i18n,
+    undefined,
+    undefined,
+    undefined,
+    undefined,
+    async (flowId, definition, connections) => {
+      const allowed = await connectorAccess.filterTriggerConnections(flowId, definition, connections)
+      allowedAccounts = accounts.filter((item) => allowed.some((connection) => connection.connectionId === item.connectionId))
+      return allowed
+    },
+  )
   const connectors = new ConnectorStore(client, workspace, notice, host, i18n)
   const triggers = new TriggerStore(client, workspace, notice, host, i18n)
   return {
@@ -208,7 +256,11 @@ export function createTriggerSession(
     connectors,
     triggers,
     account,
+    get allowedAccounts() {
+      return allowedAccounts
+    },
     async start() {
+      await connectorAccess.load(flow.flowId)
       await workspace.start(flow.flowId)
       if (create && (trigger.kind == 'poll' || trigger.kind == 'integration')) {
         await workspace.addNode(
@@ -230,6 +282,7 @@ export function createTriggerSession(
     dispose() {
       triggers.dispose()
       connectors.dispose()
+      connectorAccess.dispose()
       workspace.dispose()
       i18n.dispose()
     },

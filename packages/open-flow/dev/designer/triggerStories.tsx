@@ -372,6 +372,8 @@ type SidebarState =
   | 'missing-status'
   | 'options-error'
   | 'created-with-default'
+  | 'created-with-allowed-account'
+  | 'created-without-permission'
   | 'display'
   | 'edit'
   | 'unconfigured'
@@ -409,9 +411,10 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
       language,
       (name, value) => logRef.current(name, value),
       `trigger-${fixture.id}-${state}`,
-      state === 'created-with-default',
+      state.startsWith('created-'),
       undefined,
       state === 'no-event-sources' ? [] : undefined,
+      state === 'created-with-allowed-account' ? 'alternative' : state === 'created-without-permission' ? 'none' : undefined,
     )
     setSession(next)
     void next.start()
@@ -459,9 +462,9 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
               store={session.workspace}
               theme={dark ? 'dark' : 'light'}
               target={{ kind: 'flow' }}
-              triggerActiveConnections={state === 'unconfigured' ? [] : [session.account]}
+              triggerActiveConnections={state === 'unconfigured' ? [] : state.startsWith('created-') ? session.allowedAccounts : [session.account]}
               triggerAuthorizationPending={false}
-              triggerConnection={state === 'unconfigured' ? undefined : state === 'created-with-default' ? createdConnection : session.account}
+              triggerConnection={state === 'unconfigured' ? undefined : state.startsWith('created-') ? createdConnection : session.account}
               triggerConnectionError={state === 'connection-error' ? 'Unable to load accounts. Sample network failure.' : undefined}
               triggerConnectionLoading={false}
               triggerDisplays={triggerCatalog?.data?.display}
@@ -480,6 +483,8 @@ function SidebarStory(props: StoryProps) {
         'display',
         'edit',
         'created-with-default',
+        'created-with-allowed-account',
+        'created-without-permission',
         'unconfigured',
         'connection-error',
         ...(props.fixture.trigger.kind === 'integration' && props.fixture.trigger.definition.key === 'feishu_app_bot.on_event'
@@ -579,6 +584,8 @@ function ProviderStory({ view, ...props }: Omit<StoryProps, 'fixture'> & { reado
                   <FixedDefinitionSample dark={props.dark} language={props.language} log={props.log} />
                   <SidebarSample {...props} fixture={integrationExample} state="created-with-default" />
                   <SidebarSample {...props} fixture={pollExample} state="created-with-default" />
+                  <SidebarSample {...props} fixture={integrationExample} state="created-with-allowed-account" />
+                  <SidebarSample {...props} fixture={pollExample} state="created-without-permission" />
                   <SidebarSample {...props} fixture={integrationExample} state="unconfigured" />
                   <SidebarSample {...props} fixture={pollExample} state="unconfigured" />
                   <SidebarSample {...props} fixture={integrationExample} state="connection-error" />
@@ -687,7 +694,7 @@ export const triggerStories: readonly FrontendStory[] = [
           ? 'Provider trigger states and configuration.'
           : view === 'run'
             ? 'Provider payloads, validation and run states.'
-            : 'Provider properties, account states and optional configuration.',
+            : 'Provider properties, permitted default accounts, missing permissions and optional configuration.',
       id: `trigger-provider-${view}`,
       title: view === 'nodes' ? 'Node states' : view === 'run' ? 'Run menu states' : 'Properties',
       standalone: true,

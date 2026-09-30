@@ -159,6 +159,10 @@ export class WorkbenchStore {
         this.connectorAccess.changed(flowId)
         this.workspace.catalogs.refreshFlow(flowId)
       },
+      async (flowId, definition, connections) => {
+        await this.#accessLoading
+        return this.connectorAccess.filterTriggerConnections(flowId, definition, connections)
+      },
     )
     this.#stopAccessReaction = this.workspace.$.flowId.reaction((flowId) => {
       this.#accessLoading = this.connectorAccess.load(flowId)

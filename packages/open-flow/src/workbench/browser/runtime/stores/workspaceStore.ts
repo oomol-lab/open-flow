@@ -3,7 +3,7 @@ import type { ReadonlyVal } from 'value-enhancer'
 import type { EventSource } from '../../../../control/common/api.ts'
 import type { ConnectorCapability, GraphTarget } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
-import type { WorkbenchClient, Draft, Flow, GraphNode, InputPort, JsonValue, Live, TriggerSchedule } from '../api.ts'
+import type { WorkbenchClient, ConnectorConnection, Draft, Flow, GraphNode, InputPort, JsonValue, Live, TriggerKeySnapshot, TriggerSchedule } from '../api.ts'
 import type { DesignerViewport, Point } from '../canvasPresentation.ts'
 import type { FlowChangeEvent } from '../contract.ts'
 import type { AddNodeOption } from '../editor/addNodeOptions.ts'
@@ -157,6 +157,11 @@ export class WorkspaceStore {
     public readonly catalogs = new CatalogStores(client),
     private readonly flowCreated: (flowId: string) => void = () => {},
     private readonly accessChanged: (flowId: string, accessRevision: number) => void = () => {},
+    private readonly filterTriggerConnections?: (
+      flowId: string,
+      definition: TriggerKeySnapshot,
+      connections: readonly ConnectorConnection[],
+    ) => Promise<readonly ConnectorConnection[]>,
   ) {
     this.#client = client
     this.#setNotice = setNotice
@@ -488,7 +493,8 @@ export class WorkspaceStore {
     if (intent.kind == 'provider-trigger' && intent.connectionId == null) {
       try {
         const connections = await resourceValue(this.catalogs.connections.get(intent.definition.provider, draft.flowId))
-        intent = { ...intent, connectionId: connectionCatalog(connections).preferred?.connectionId }
+        const allowed = this.filterTriggerConnections == null ? connections : await this.filterTriggerConnections(draft.flowId, intent.definition, connections)
+        intent = { ...intent, connectionId: connectionCatalog(allowed).preferred?.connectionId }
       } catch (error) {
         if (!this.#disposed && this.#model.value.draft == draft) this.#setNotice(errorNotice(error, this.#i18n.t))
       }
