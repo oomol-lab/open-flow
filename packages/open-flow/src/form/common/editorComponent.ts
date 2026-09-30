@@ -1,6 +1,4 @@
-import type { JsonDataType } from './value.ts'
-
-import { typeOfSchema } from './schemaWidget.ts'
+import { getDefaultValue, typeOfSchema } from './schemaWidget.ts'
 import { initialValue, objectValue, valueType } from './value.ts'
 
 export const editorGroups = {
@@ -19,6 +17,22 @@ export function editorComponent(schema: unknown): EditorComponent {
     return format === 'time' ? 'time' : format === 'date-time' ? 'dateTime' : 'date'
   }
   return Object.values(editorGroups).some((group) => (group as readonly string[]).includes(type)) ? (type as EditorComponent) : 'json'
+}
+
+/** Choose a starting editor from simple schema hints; unresolved JSON defaults to single-line text. */
+export function defaultValueEditorSchema(schema: unknown): Record<string, unknown> {
+  const hints = { ...objectValue(schema) }
+  if (hints['ui:widget'] === 'any') delete hints['ui:widget']
+  // Presentation does not need to solve compound schemas. Validation still uses the original schema.
+  delete hints.anyOf
+  delete hints.oneOf
+  delete hints.allOf
+  if (Array.isArray(hints.type)) hints.type = hints.type.find((type) => type !== 'null') ?? hints.type[0]
+  if (hints.type == null) {
+    if (hints.properties != null) hints.type = 'object'
+    else if (hints.items != null) hints.type = 'array'
+  }
+  return editorComponent(hints) === 'json' ? schemaForEditor('string', schema) : hints
 }
 
 /** Changing the editor replaces incompatible constraints, retaining descriptive metadata. */
@@ -49,10 +63,10 @@ export function schemaForEditor(component: EditorComponent, previous: unknown): 
   }
 }
 
-/** Preserve compatible data and unset state instead of resetting on visual changes. */
-export function valueForEditor(schema: unknown, value: unknown): unknown {
-  if (value === undefined) return undefined
+/** Preserve compatible data; only explicit value-editor choices create an unset value. */
+export function valueForEditor(schema: unknown, value: unknown, { createIfUnset = false }: { createIfUnset?: boolean } = {}): unknown {
   const source = objectValue(schema) ?? {}
+  if (value === undefined) return createIfUnset && !Array.isArray(source.enum) ? initialEditorValue(schema) : undefined
   if (Array.isArray(source.enum)) return source.enum.some((item) => JSON.stringify(item) === JSON.stringify(value)) ? value : undefined
   const itemEnum = objectValue(source.items)?.enum
   if (Array.isArray(itemEnum))
@@ -69,12 +83,12 @@ export function valueForEditor(schema: unknown, value: unknown): unknown {
     (type === 'null' && value === null)
   )
     return value
-  return initialValue(schema)
+  return initialEditorValue(schema)
 }
 
-/** An explicit data-type choice creates a value when unset and otherwise follows the shared compatibility rules. */
-export function valueForDataType(type: JsonDataType, value: unknown): unknown {
-  const schema = { type }
-  const converted = valueForEditor(schema, value)
-  return converted === undefined ? initialValue(schema, type) : converted
+/** Defaults belong to the schema; otherwise use the editor's creation value or the underlying JSON type. */
+function initialEditorValue(schema: unknown): unknown {
+  return Object.hasOwn(objectValue(schema) ?? {}, 'default') || editorComponent(schema) === 'json'
+    ? initialValue(schema)
+    : getDefaultValue(typeOfSchema(schema), schema)
 }

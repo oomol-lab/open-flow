@@ -330,7 +330,7 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
           onValue={() => {}}
           onVariable={() => {}}
         />
-        <h3>Any data types</h3>
+        <h3>Any value editors</h3>
         <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))' }}>
           <div>
             <h4>Source + value + data type</h4>
@@ -339,6 +339,14 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
           <div>
             <h4>Data type + value</h4>
             <AddonSample fixed schema={{}} initial={42} variables={variables} />
+          </div>
+          <div>
+            <h4>Unset Any · single-line default</h4>
+            <AddonSample schema={{}} initial={undefined} variables={variables} />
+          </div>
+          <div>
+            <h4>Array · per-item editors</h4>
+            <AddonSample fixed schema={{ 'type': 'array', 'ui:widget': 'any' }} initial={['hello', 42, { nested: true }]} variables={variables} />
           </div>
           <div>
             <h4>Editable Schema type + JSON</h4>
@@ -370,7 +378,7 @@ function NodeInputStory({ dark, language, log }: { dark: boolean; language: UiLa
               { label: 'Boolean', schema: { type: 'boolean' }, value: false },
               { label: 'Select', schema: { type: 'string', enum: ['one', 'two'] }, value: 'one' },
               { label: 'Multi-select', schema: { type: 'array', uniqueItems: true, items: { enum: ['one', 'two'] } }, value: ['one'] },
-              { label: 'JSON', schema: {}, value: { answer: 42 } },
+              { label: 'JSON · Object hint', schema: { 'type': 'object', 'ui:widget': 'any' }, value: { answer: 42 } },
               { label: 'Date', schema: { type: 'string', format: 'date' }, value: '2026-09-15' },
               { label: 'Color', schema: { 'type': 'string', 'ui:widget': 'color' }, value: '#ff6600' },
               { label: 'Object', schema: { type: 'object', properties: { name: { type: 'string' } } }, value: { name: 'sample' } },
@@ -408,7 +416,7 @@ export const nodeInputStory: FrontendStory = {
   propertyPanel: true,
   title: 'Node Input',
   description:
-    'Literal, variable and upstream sources, including fixed-schema Any fields with source + value + data type, source-free data type + value, and bound values without a data-type control. Fixed Array shows the read-only item-type suffix beside Reset. Editable definitions omit Reset; editable Any Schema types retain the generic JSON editor. Also covers whole objects, first-level fields, missing references and type mismatches.',
+    'Literal, variable and upstream sources, including fixed-schema Any fields with the complete editor menu (without a duplicate JSON entry), simple Schema hints for default editors with single-line text as the Any/fallback default, session-local editor/choice preferences, source + value + data type, source-free data type + value, and bound values without a data-type control. Fixed Array shows the read-only item-type suffix beside Reset. Editable definitions omit Reset; editable Any Schema types retain the generic JSON editor. Also covers whole objects, first-level fields, missing references and type mismatches.',
   standalone: true,
   render: (log, dark, language) => <NodeInputStory dark={dark} language={language} log={log} />,
 }

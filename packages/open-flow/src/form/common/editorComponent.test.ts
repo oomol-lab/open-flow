@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { editorComponent, schemaForEditor, valueForDataType, valueForEditor } from './editorComponent.ts'
+import { defaultValueEditorSchema, editorComponent, schemaForEditor, valueForEditor } from './editorComponent.ts'
 
 describe('Editor component selection', () => {
   it('keeps text when switching between single line and multiline', () => {
@@ -40,12 +40,58 @@ describe('Editor component selection', () => {
     expect(schemaForEditor('json', { 'title': 'Payload', 'ui:widget': 'any' })).toEqual({ title: 'Payload' })
     expect(editorComponent({ 'ui:widget': 'any' })).toBe('json')
   })
+  it.each(['text', 'color', 'date', 'time', 'dateTime'] as const)('creates a usable %s value without changing the fixed definition', (component) => {
+    const schema = schemaForEditor(component, {})
+    const created = valueForEditor(schema, undefined, { createIfUnset: true })
+    expect(typeof created).toBe('string')
+    if (component !== 'text') expect(valueForEditor(schema, 42)).toBeTruthy()
+    expect(valueForEditor(schema, 42)).not.toBe(42)
+    expect(valueForEditor(schema, 'existing', { createIfUnset: true })).toBe('existing')
+  })
+  it('keeps choice editing available without options', () => {
+    expect(valueForEditor(schemaForEditor('select', {}), undefined, { createIfUnset: true })).toBeUndefined()
+    expect(valueForEditor(schemaForEditor('multiSelect', {}), undefined, { createIfUnset: true })).toEqual([])
+  })
   it('creates and converts values from an explicit data-type choice', () => {
-    expect(valueForDataType('string', undefined)).toBe('')
-    expect(valueForDataType('number', undefined)).toBe(0)
-    expect(valueForDataType('array', undefined)).toEqual([])
-    expect(valueForDataType('object', { answer: 42 })).toEqual({ answer: 42 })
-    expect(valueForDataType('boolean', 'true')).toBe(false)
-    expect(valueForDataType('null', 'value')).toBeNull()
+    expect(valueForEditor({ type: 'string' }, undefined, { createIfUnset: true })).toBe('')
+    expect(valueForEditor({ type: 'number' }, undefined, { createIfUnset: true })).toBe(0)
+    expect(valueForEditor({ type: 'array' }, undefined, { createIfUnset: true })).toEqual([])
+    expect(valueForEditor({ type: 'object' }, { answer: 42 })).toEqual({ answer: 42 })
+    expect(valueForEditor({ type: 'boolean' }, 'true')).toBe(false)
+    expect(valueForEditor({ type: 'null' }, 'value')).toBeNull()
+  })
+  it('preserves unset definitions while explicit creation honors schema defaults', () => {
+    const schema = { type: 'object', default: { answer: 42 } }
+    expect(valueForEditor(schema, undefined)).toBeUndefined()
+    const created = valueForEditor(schema, undefined, { createIfUnset: true })
+    expect(created).toEqual(schema.default)
+    expect(created).not.toBe(schema.default)
+    expect(valueForEditor(schema, 'incompatible')).toEqual(schema.default)
+  })
+  it('uses the underlying JSON type when resetting a typed raw editor', () => {
+    const schema = { 'type': 'number', 'ui:widget': 'any' }
+    expect(valueForEditor(schema, 42)).toBe(42)
+    expect(valueForEditor(schema, 'incompatible')).toBe(0)
+    expect(valueForEditor(schema, undefined)).toBeUndefined()
+  })
+})
+
+describe('Default JSON value editor', () => {
+  it.each([true, {}, { type: [] }, { 'ui:widget': 'any' }, { anyOf: [{ type: 'number' }, { type: 'string' }] }, { $ref: '#/unknown' }])(
+    'falls back to single-line text for %j without resolving the schema',
+    (schema) => {
+      expect(editorComponent(defaultValueEditorSchema(schema))).toBe('string')
+    },
+  )
+  it.each([
+    [{ 'type': ['null', 'number'], 'ui:widget': 'any' }, 'number'],
+    [{ type: ['null'] }, 'null'],
+    [{ 'type': 'string', 'format': 'date', 'ui:widget': 'any' }, 'date'],
+    [{ properties: { name: { type: 'string' } } }, 'object'],
+    [{ items: { type: 'string' } }, 'array'],
+  ])('uses straightforward hints in %j', (schema, component) => {
+    const original = structuredClone(schema)
+    expect(editorComponent(defaultValueEditorSchema(schema))).toBe(component)
+    expect(schema).toEqual(original)
   })
 })

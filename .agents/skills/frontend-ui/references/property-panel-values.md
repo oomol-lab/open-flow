@@ -34,17 +34,22 @@ collections, definitions, and field, node, or group settings. Also read the
 - Opening a panel or inspecting an unset field must not silently create a value. Value creation and
   type changes use the existing shared rules rather than local guesses about defaults.
 - A canonical unconstrained Schema (`true`, an empty object, or an object containing only standard
-  annotations and `ui:*` metadata) remains Any while its editor follows the current runtime value.
+  annotations and `ui:*` metadata) remains Any while its default value editor is single-line text.
   `ui:widget: "any"` explicitly selects this behavior; another recognized widget, an assertion,
   applicator, reference, or `false` does not. Do not normalize logically equivalent forms such as
   `allOf: []` or `not: false` into Any. When the field's Schema type is fixed, the data-type selector
-  offers String, Number, Boolean, Object, Array, and Null. Unset displays Any; selecting Any preserves
-  the value and opens the generic JSON editor. A concrete choice creates an initial value when unset.
-  Compatible values survive a type choice; incompatible values use the shared reset rule. Concrete
-  type changes never mutate Schema, and they close raw JSON mode and collapse collection previews.
+  reuses the full editor-type menu, with Any as the generic JSON mode and no duplicate JSON entry.
+  JSON fields use simple Schema hints (type, format, properties, or items) for their default subtype.
+  Unresolved and unconstrained Schemas fall back to single-line text, including unset values. This
+  presentation never creates or converts a value on mount; non-string data in a text editor displays
+  its JSON text. Explicitly selecting Any preserves the value and opens the generic JSON editor. A concrete
+  choice creates an initial value when unset, except Select without options remains unset. Compatible
+  values survive a type choice; incompatible values use the shared reset rule. Editor preferences and
+  choice options belong to the current field-editor session; they never mutate the fixed Schema or
+  change the saved JSON format. Concrete choices close raw JSON mode and collapse collection previews.
   When the field's Schema type is editable, an unconstrained Schema retains the established generic
   JSON editor and does not add a second data-type selector inside Value.
-- Any Object and Array values use the structured collection editors and retain their JSON-mode
+- JSON fields using Object and Array subtypes use the structured collection editors and retain their JSON-mode
   action. Empty top-level collections follow the normal collapsed-empty rule, including automatic
   expansion for an initial validation error. Explicit recognized widgets retain their own editor.
 - Deleting an upstream node or output preserves saved source references. Show the missing node or

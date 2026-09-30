@@ -424,11 +424,16 @@ $feedback-focus: ':has(#{$feedback-targets})';
   font-variant-numeric: tabular-nums;
 }
 .root[data-header][data-array-child] {
+  --field-value-column: handle / content-end;
+  --field-value-row: 1;
+  > .valueAddon:not([data-side='end']) {
+    margin-left: var(--field-indent);
+  }
   > .summary,
   &:not([data-expansion='branch']) > .body {
     grid-column: handle / content-end;
     grid-row: 1;
-    margin-left: var(--field-indent);
+    margin-left: calc(var(--field-indent) + var(--value-start-addon-width));
   }
 }
 .root[data-header][data-expansion='branch'] > .body {

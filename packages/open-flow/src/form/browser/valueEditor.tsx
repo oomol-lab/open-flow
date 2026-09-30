@@ -20,6 +20,7 @@ export function ValueEditor(props: ValueControlProps) {
   const source = objectValue(schema) ?? {}
   const type = valueType(schema, value)
   const presence = value === undefined ? 'unset' : value === null ? 'null' : 'value'
+  const textValue = typeof value === 'string' ? value : value === undefined ? '' : JSON.stringify(value)
   return type === 'boolean' ? (
     <div className={styles.booleanControl}>
       <Button
@@ -86,7 +87,7 @@ export function ValueEditor(props: ValueControlProps) {
           className={value === '' ? styles.emptyString : undefined}
           placeholder={t(value === '' ? 'valueEditor.emptyStringValue' : 'valueEditor.unset')}
           readOnly={disabled}
-          value={typeof value === 'string' ? value : ''}
+          value={textValue}
           onChange={(event) => onChange(event.target.value)}
         />
       ) : (
@@ -97,7 +98,7 @@ export function ValueEditor(props: ValueControlProps) {
           className={value === '' ? styles.emptyString : undefined}
           placeholder={t(value === '' ? 'valueEditor.emptyStringValue' : 'valueEditor.unset')}
           readOnly={disabled}
-          value={typeof value === 'string' ? value : ''}
+          value={textValue}
           onChange={(event) => onChange(event.target.value)}
         />
       )}

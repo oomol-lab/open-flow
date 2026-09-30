@@ -24,8 +24,8 @@ describe('Independent node inputs', () => {
       </I18nProvider>,
     )
     const sourceControl = markup.indexOf('aria-label="payload Select input source"')
-    const valueControl = markup.match(/<input[^>]*aria-label="payload"/)?.index ?? -1
-    const typeControl = markup.indexOf('aria-label="payload, data type: Number"')
+    const valueControl = markup.match(/<input[^>]*value="42"/)?.index ?? -1
+    const typeControl = markup.indexOf('aria-label="payload, data type: Text"')
     expect(sourceControl).toBeGreaterThan(-1)
     expect(valueControl).toBeGreaterThan(sourceControl)
     expect(typeControl).toBeGreaterThan(valueControl)

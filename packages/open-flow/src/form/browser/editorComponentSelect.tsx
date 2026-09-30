@@ -26,6 +26,7 @@ export function EditorComponentSelect({
   showArrayItemType = false,
   menuTitle,
   addon = false,
+  valueOnly = false,
   disclosure,
   onChange,
 }: {
@@ -41,13 +42,16 @@ export function EditorComponentSelect({
   showArrayItemType?: boolean
   menuTitle?: string
   addon?: boolean
+  /** Select a local value editor while the field's declared schema stays fixed. */
+  valueOnly?: boolean
   disclosure?: FieldDisclosure
   onChange: (schema: Record<string, unknown>) => void
 }) {
   const t = useTranslate()
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   const selectedComponent = editorComponent(schema)
-  const label = t(`valueEditor.components.${selectedComponent}`)
+  const label = t(valueOnly && selectedComponent === 'json' ? 'valueEditor.any' : `valueEditor.components.${selectedComponent}`)
+  const accessibleLabel = valueOnly ? t('valueEditor.valueDataType', { name, type: label }) : `${t('valueEditor.type', { name })}: ${label}`
   if (showArrayItemType && selectedComponent === 'array' && !Array.isArray(objectValue(schema)?.items)) {
     const source = objectValue(schema) ?? {}
     return (
@@ -85,7 +89,7 @@ export function EditorComponentSelect({
       <FieldTypeDisplay
         id={id}
         label={label}
-        accessibleLabel={`${t('valueEditor.type', { name })}: ${label}`}
+        accessibleLabel={accessibleLabel}
         icon={showIcon && <EditorComponentIcon component={selectedComponent} />}
         compact={compact}
         addon={addon}
@@ -96,7 +100,7 @@ export function EditorComponentSelect({
   }
   const items = Object.values(editorGroups)
     .flat()
-    .map((value) => ({ value, label: t(`valueEditor.components.${value}`) }))
+    .map((value) => ({ value, label: t(valueOnly && value === 'json' ? 'valueEditor.any' : `valueEditor.components.${value}`) }))
   return (
     <div ref={setContainer} className="min-w-0">
       <Select
@@ -114,7 +118,7 @@ export function EditorComponentSelect({
                 id={id}
                 size="field"
                 aria-invalid={invalid}
-                aria-label={`${t('valueEditor.type', { name })}: ${label}`}
+                aria-label={accessibleLabel}
                 variant={addon ? 'addon' : 'default'}
                 className={addon ? undefined : fieldSelectTriggerClass}
               />
@@ -135,16 +139,27 @@ export function EditorComponentSelect({
         >
           <SelectGroup className="p-0" aria-label={menuTitle ?? t('valueEditor.typeTitle')}>
             <MenuHeader>{menuTitle ?? t('valueEditor.typeTitle')}</MenuHeader>
+            {valueOnly && (
+              <>
+                <SelectItem value="json" className={selectionMenuItemClass}>
+                  {showIcon && <EditorComponentIcon component="json" />}
+                  {t('valueEditor.any')}
+                </SelectItem>
+                <SelectSeparator className="mx-2 bg-border/50" />
+              </>
+            )}
             {Object.entries(editorGroups).map(([group, components], index) => (
               <Fragment key={group}>
                 {index > 0 && <SelectSeparator className="mx-2 bg-border/50" />}
                 <SelectGroup aria-label={t(`valueEditor.componentGroups.${group}`)} className="p-0">
-                  {components.map((component) => (
-                    <SelectItem key={component} value={component} className={selectionMenuItemClass}>
-                      {showIcon && <EditorComponentIcon component={component} />}
-                      {t(`valueEditor.components.${component}`)}
-                    </SelectItem>
-                  ))}
+                  {components
+                    .filter((component) => !valueOnly || component !== 'json')
+                    .map((component) => (
+                      <SelectItem key={component} value={component} className={selectionMenuItemClass}>
+                        {showIcon && <EditorComponentIcon component={component} />}
+                        {t(`valueEditor.components.${component}`)}
+                      </SelectItem>
+                    ))}
                 </SelectGroup>
               </Fragment>
             ))}

@@ -63,9 +63,9 @@ describe('Field validation presentation', () => {
     expect(onChange).not.toHaveBeenCalled()
   })
   it.each([
-    { value: null, type: 'Null', control: 'aria-label="items.0 null"' },
-    { value: '', type: 'String', control: 'placeholder="Empty string"' },
-  ])('adapts unconstrained array items to the runtime $type editor', ({ value, type, control }) => {
+    { value: null, type: 'Text', control: 'aria-label="items.0 null"' },
+    { value: '', type: 'Text', control: 'placeholder="Empty string"' },
+  ])('defaults unconstrained array items to the $type editor', ({ value, type, control }) => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <ArrayValueFields
@@ -99,7 +99,7 @@ describe('Field validation presentation', () => {
         expect(markup).toContain('role="alert"')
         expect(markup).toContain('aria-invalid="true"')
         if (_label === 'JSON') {
-          expect(markup.match(/<textarea\b[^>]*>/)?.[0]).toContain('aria-invalid="true"')
+          expect(markup).toContain('aria-label="sample, data type: Object"')
         }
         const nullableMarkup = await render(value, true)
         expect(nullableMarkup).not.toContain('role="alert"')
@@ -166,7 +166,7 @@ describe('Empty string presentation', () => {
 })
 
 describe('JSON component with union schemas', () => {
-  it.each(['oneOf', 'anyOf'])('always uses JSON editing while preserving %s validation', async (keyword) => {
+  it.each(['oneOf', 'anyOf'])('defaults fixed %s schemas to text and preserves their validation', async (keyword) => {
     const i18n = createI18n('en')
     const onChange = vi.fn()
     const onDefinitionChange = vi.fn()
@@ -193,8 +193,9 @@ describe('JSON component with union schemas', () => {
       expect(json).not.toContain('aria-invalid="true"')
       expect(await render(false, true)).toContain('aria-invalid="true"')
       const fixedDefinition = await render('hello', false)
-      expect(fixedDefinition).toContain('aria-label="choice JSON"')
-      expect(fixedDefinition).toContain('&quot;hello&quot;')
+      expect(fixedDefinition).toContain('aria-label="choice, data type: Text"')
+      expect(fixedDefinition).toContain('value="hello"')
+      expect(await render(false, false)).toContain('aria-invalid="true"')
       expect(fixedDefinition).not.toContain('choice variant')
       expect(onChange).not.toHaveBeenCalled()
       expect(onDefinitionChange).not.toHaveBeenCalled()
@@ -241,14 +242,14 @@ describe('Nullable field presentation', () => {
           <FieldValueEditor label="note" schema={{}} value={null} nullable onChange={onChange} path="/note" onDraftIssue={vi.fn()} />
         </I18nProvider>,
       )
-      expect(jsonNull).toContain('aria-label="note, data type: Null"')
+      expect(jsonNull).toContain('aria-label="note, data type: Text"')
       expect(jsonNull).toContain('aria-label="note null"')
       expect(jsonNull).not.toContain('Unset')
       expect(jsonNull).not.toContain('aria-invalid="true"')
       const jsonUnset = render(undefined, {})
-      expect(jsonUnset).toContain('aria-label="note, data type: Any"')
-      expect(jsonUnset).toContain('aria-label="note Set value" aria-expanded="false"')
-      expect(jsonUnset).not.toContain('aria-label="note null"')
+      expect(jsonUnset).toContain('aria-label="note, data type: Text"')
+      expect(jsonUnset).toContain('aria-label="note null"')
+      expect(jsonUnset).not.toContain('note Set value')
       expect(onChange).not.toHaveBeenCalled()
     } finally {
       i18n.dispose()
@@ -374,7 +375,7 @@ describe('Collapsed field mounting', () => {
   it.each([
     [{ type: 'object', properties: { child: { type: 'string' } } }, { child: 'hello' }, true],
     [{ type: 'array', items: { type: 'string' } }, ['hello'], true],
-    [{}, { child: 'hello' }, false],
+    [{ 'type': 'object', 'ui:widget': 'any' }, { child: 'hello' }, false],
     [{ 'type': 'string', 'ui:widget': 'text' }, 'hello', true],
   ])('defers compact bodies and mounts standalone editors when their layout is not intrinsically compact', (schema, value, standaloneMounted) => {
     const i18n = createI18n('en')

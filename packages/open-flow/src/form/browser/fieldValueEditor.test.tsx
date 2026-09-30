@@ -77,3 +77,20 @@ it('keeps delegated required prompts actionable without enabling literal editing
   expect(render({ ...props, disabled: true })).toContain('disabled=""')
   expect(render({ ...props, readOnly: true })).toContain('disabled=""')
 })
+
+describe('Default JSON value presentation', () => {
+  it.each([undefined, '', 42, false, { answer: 42 }, ['one']])('uses single-line text for Any containing %j without changing the value', (value) => {
+    const markup = render({ schema: {}, value })
+    expect(markup).toContain('aria-label="parameter, data type: Text"')
+    expect(markup).not.toContain('<textarea')
+    if (value !== undefined) {
+      const text = typeof value === 'string' ? value : JSON.stringify(value)
+      expect(markup).toContain(`value="${text.replaceAll('"', '&quot;')}"`)
+    }
+  })
+  it('takes the default subtype from the JSON schema while leaving validation on that schema', () => {
+    const markup = render({ schema: { 'type': 'number', 'ui:widget': 'any', 'minimum': 0 }, value: 42 })
+    expect(markup).toContain('aria-label="parameter, data type: Number"')
+    expect(markup).toContain('value="42"')
+  })
+})
