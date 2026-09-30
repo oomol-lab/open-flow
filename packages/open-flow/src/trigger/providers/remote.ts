@@ -160,7 +160,7 @@ function createDefinition(item: (typeof catalog)[number]): PollDefinition | Inte
         if (value != null) headers[name] = value
       }
       const query: Record<string, string> = {}
-      for (const name of ['open_flow_callback']) {
+      for (const name of ['open_flow_callback', 'connector_subscription']) {
         const value = context.query(name)
         if (value != null) query[name] = value
       }

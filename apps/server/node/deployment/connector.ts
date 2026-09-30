@@ -569,7 +569,11 @@ export class ConnectorClient implements ConnectorHost {
       throw connectionRequired()
     if (record(response.value) && ['invalid_input', 'trigger_not_found'].includes(String(response.value.errorCode)) && response.status != 409)
       throw new ConnectorTaskError('connector.input-invalid', 'The Trigger operation configuration is invalid.')
-    if (record(response.value) && response.value.errorCode == 'policy_denied') throw accessInvalid()
+    if (
+      record(response.value) &&
+      ['policy_denied', 'trigger_not_allowed', 'trigger_blocked', 'trigger_owner_required'].includes(String(response.value.errorCode))
+    )
+      throw accessInvalid()
     throw unavailable('The Trigger operation could not be completed.')
   }
 

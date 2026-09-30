@@ -2,6 +2,18 @@
 
 ## 权限来源
 
+### 开源 OpenConnector
+
+自托管 OpenConnector 使用独立的 `allowedTriggers` 授权，部署和运行时策略还可设置 `blockedTriggers`。多层 allow 取交集，block 优先；旧 runtime token 未设置 `allowedTriggers` 时不能执行 Trigger。Action 和通用 proxy 授权不授予 Trigger 权限。请求通过 `x-oo-connector-app-id` 选择稳定连接 ID；同时提供 alias 时必须指向同一连接。
+
+`reconcile`、`receive` 和 `resource` 必须使用管理 API 创建的持久化 runtime token，订阅按 token ID、连接、已验证的 provider 账号和 Trigger 隔离。环境 token 和 JWT 不作为远端订阅 owner。请求体不接受 `accessGrant`。首版仅执行本地连接，不支持 SaaS 或 Marketplace 来源；所需第三方权限由各 provider 的权限元数据说明，实际请求沿用该连接的上游权限。
+
+OpenConnector 在 SQLite、PostgreSQL 或 D1 中保存订阅状态，并沿用部署配置的 secret codec 加密，通过租约串行化控制操作。Token 撤销或当前策略不再允许该订阅时，维护任务清理已拥有的远端资源；正常续订仍由 Open Flow 驱动。断开或换账号前必须完成清理，原账号的已验证重新授权可用于恢复清理；管理员可显式 abandon 保留未清理账本。管理接口为 `/api/trigger-subscriptions` 及每条记录的 `/cancel`、`/abandon`。
+
+轮换 OpenConnector token 前，先按旧 token ID 清理订阅，并排空 Open Flow 的 webhook/watch 订阅 ID 和飞书 `source_subscriptions` ready 缓存，再切换 token 并显式重建 binding。保留业务 checkpoint，避免沿用属于旧 token 的远端订阅身份。详细部署步骤见[自托管指南](../server/self-hosted-stack/README.zh-CN.md)。
+
+### 托管 connector
+
 Open Flow 可以由用户自行部署。connector 使用与 Action execute 相同的 Token 身份与授权链路，认证头仍只能来自可信网关：
 
 | 身份                           | 授权方式                                                               |
@@ -34,7 +46,7 @@ Open Flow 可以由用户自行部署。connector 使用与 Action execute 相�
 | `receive`   | `subscriptionId`, `method`, `headers`, `query`, Base64 `rawBody`, `admit`, `current` | 用服务端配置和密钥处理第三方回调     |
 | `resource`  | `config`, `requestKey`, `active`                                                     | 管理飞书共享资源订阅                 |
 
-只有 team-token 可以在上述各操作的请求体中附带可选 `accessGrant`，其格式与 Action execute 相同。用户／服务账号不能提交该字段。所有调用方都不能提交上游 endpoint/method/body、远端 hook/channel ID 或 cleanup 特权。`receive` 的请求信息仅作为回调验证输入。未知字段和不支持的操作被拒绝；没有原始 proxy 回退。底层第三方传输仍复用 connector 的 proxy、凭据解析与执行生命周期。
+只有托管 connector 的 team-token 可以在上述各操作的请求体中附带可选 `accessGrant`，其格式与 Action execute 相同。用户／服务账号不能提交该字段。所有调用方都不能提交上游 endpoint/method/body、远端 hook/channel ID 或 cleanup 特权。`receive` 的请求信息仅作为回调验证输入。未知字段和不支持的操作被拒绝；没有原始 proxy 回退。底层第三方传输仍复用 connector 的 proxy、凭据解析与执行生命周期。
 
 配置字段与游标在服务端校验，上游请求由 provider 实现构造。授权粒度为连接加 Trigger ID，配置中的仓库、标签、时间窗口等是业务筛选条件，不是管理员授予的独立资源 ACL。
 
@@ -52,11 +64,13 @@ connector 加密保存团队、主体、连接、Trigger、不可变配置、cal
 
 ## 实现与更新
 
-第三方实现和快照的源在 connector 的 `src/flow-triggers/providers/`，权限元数据在 `src/providers/<service>/trigger-permissions.ts`。Open Flow 的 `catalog.generated.json` 是生成物。修改 provider 输入、输出或描述后，在 connector 仓库运行：
+开源第三方实现、静态快照和权限元数据由 OpenConnector 的 `src/providers/<service>/trigger-*.ts` 拥有。Open Flow 的 `catalog.generated.json` 是生成物；更新目录时只需要公开仓库和其已安装依赖，在 Open Flow 根目录运行：
 
 ```sh
-bun scripts/flow-triggers/export-catalog.ts /path/to/open-flow/packages/open-flow/src/trigger/providers/catalog.generated.json
+bun run --cwd packages/open-flow generate:provider-triggers /path/to/open-connector
 ```
+
+该命令调用 OpenConnector 的 `scripts/export-flow-trigger-catalog.ts`，导出已注册的 snapshot、options、listener interval 与 eventSource 信息，不需要私有 connector checkout。
 
 随后在 Open Flow 运行格式、类型、本地化及相关测试。飞书事件入口仍由 Open Flow 处理；展示快照同样来自生成物。不要把第三方请求实现重新加入 Open Flow。
 

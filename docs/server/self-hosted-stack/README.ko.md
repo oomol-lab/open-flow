@@ -87,18 +87,16 @@ curl http://localhost:3001/health
 
 ## 2. Open Flow용 runtime token 만들기
 
-Open Flow는 `/v1` 아래의 OpenConnector runtime API를 호출합니다. Provider와 Action 목록, Connection
-목록, Action 실행, Poll 및 Integration Trigger용 `POST /v1/proxy/:service`입니다. admin token 대신 오래 쓰는
-runtime token을 주세요. Web Console의 Access 페이지나 admin API로 만들 수 있습니다.
+Open Flow는 `/v1`에서 Provider, Action, Connection을 조회하고 Action 및 `POST /v1/providers/:service/triggers/:triggerId/execute`를 통한 Provider Trigger를 실행합니다. 상태를 가진 구독에는 영속 runtime token의 소유자 ID가 필요합니다. 관리자 API로 token을 만드세요:
 
 ```bash
 curl -s -X POST http://localhost:3001/api/runtime-tokens \
   -H "authorization: Bearer $OOMOL_CONNECT_ADMIN_TOKEN" \
   -H 'content-type: application/json' \
-  -d '{"name":"open-flow","allowedActions":[],"blockedActions":[],"allowedProxies":["*"]}'
+  -d '{"name":"open-flow","allowedActions":[],"blockedActions":[],"allowedProxies":[],"allowedTriggers":["gmail.on_message_received","github.on_repo_event"]}'
 ```
 
-`*` proxy 권한은 이 로컬 절차용입니다. 운영 환경에서는 실제로 쓰는 Provider만 나열하세요.
+사용하는 Trigger ID를 명시적으로 허용하세요. Trigger, Action, proxy 권한은 독립적이며 이 예제는 일반 proxy 권한을 부여하지 않습니다.
 
 응답의 `token` 필드는 이번에만 반환됩니다. 이 값을 `OPEN_FLOW_CONNECTOR_TOKEN`으로 저장하세요.
 
@@ -108,9 +106,7 @@ export OPEN_FLOW_CONNECTOR_TOKEN="<응답에 포함된 token>"
 
 Open Flow에 해당하는 token 규칙:
 
-- `allowedProxies`는 기본적으로 비어 있습니다. proxy 권한이 없는 장기 token은 `/v1/proxy/:service`를 호출할 수
-  없어 Poll과 Integration Trigger가 실패합니다. `*`을 허용하거나, Provider Trigger를 쓸 Provider를 나열하세요.
-  예: `["gmail","github"]`.
+- `allowedTriggers`의 기본값은 `[]`이며 기존 token에도 Trigger 권한이 추가되지 않습니다. 정확한 ID 또는 `github.*`를 허용하세요. 배포 및 Runtime의 `allowedTriggers` / `blockedTriggers`도 적용됩니다.
 - `allowedActions`와 `blockedActions`는 Open Flow가 실행할 수 있는 Action을 제한합니다. 빈 목록은 배포 정책이
   허용하는 모든 Action을 허용합니다.
 - Open Flow를 특정 Connection으로 제한하려는 경우가 아니면 `allowedConnections`를 설정하지 마세요. 목록 밖
@@ -118,6 +114,8 @@ Open Flow에 해당하는 token 규칙:
 
 장기 token을 하나라도 만들면 OpenConnector는 모든 `/v1`과 `/mcp` 요청에 runtime token을 요구합니다. 같은
 OpenConnector를 쓰는 `oo connector`나 MCP 호스트도 이후에는 각자 token이 필요합니다.
+
+token을 교체하기 전에 이전 token이 유효한 동안 관련 Trigger를 비활성화하고 게시하여 원격 구독과 Feishu 리소스 해제를 기다리세요. `/api/trigger-subscriptions`에서 확인하고 남은 구독은 `POST /api/trigger-subscriptions/:id/cancel`로 취소합니다. 자격 증명을 복구할 수 없으면 관리자가 `POST /api/trigger-subscriptions/:id/abandon`으로 자동 정리를 명시적으로 포기할 수 있습니다. 원격 미정리 기록은 남으며 Provider에서 수동 정리가 필요합니다. 이후 `OPEN_FLOW_CONNECTOR_TOKEN`을 바꾸고 Open Flow를 재시작한 뒤 업무 checkpoint를 보존하며 바인딩을 재구성／활성화하세요. 이전 subscription ID를 새 token에 전달하지 말고 Feishu의 로컬 ready 상태도 먼저 정리하세요. 교체 중 이벤트 공백이 생길 수 있습니다.
 
 ## 3. Open Flow 시작하기
 
@@ -290,7 +288,7 @@ oo connector search "send an email"
 | Workbench 또는 CLI에서 `connector.unavailable`          | Open Flow 컨테이너가 `OPEN_FLOW_CONNECTOR_ORIGIN`에 닿지 않거나 OpenConnector가 `OPEN_FLOW_CONNECTOR_TOKEN`을 거절했습니다. |
 | `/readyz`가 503을 반환하고 `/healthz`는 200             | Connector 헬스 체크가 실패했습니다. `docker logs open-flow`를 확인하고 두 컨테이너가 같은 네트워크에 있는지 확인하세요.     |
 | 실행 시 `connector.connection-required`                 | Connection이 없거나, 비활성이거나, token의 `allowedConnections`에서 제외되었습니다. Console에서 다시 연결하세요.            |
-| 수동 Action은 되는데 Poll 또는 Integration Trigger 실패 | runtime token에 해당 Provider의 `allowedProxies` 권한이 없거나 `OOMOL_CONNECT_BLOCKED_PROXIES`가 막고 있습니다.             |
+| 수동 Action은 되는데 Poll 또는 Integration Trigger 실패 | `allowedTriggers`에 해당 Trigger ID가 없거나 배포／Runtime Trigger 규칙이 차단합니다.                                       |
 | `oo flow`가 OOMOL 로그인을 요구함                       | `OO_OPEN_FLOW_URL` 또는 `OO_OPEN_FLOW_TOKEN`이 없습니다. 둘 다 같은 셸에서 설정해야 합니다.                                 |
 | `oo flow`가 401을 반환함                                | `OO_OPEN_FLOW_TOKEN`이 그 Open Flow의 `OPEN_FLOW_TOKEN`과 다릅니다.                                                         |
 | Workbench의 Console 링크가 잘못된 호스트를 엽니다       | `OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN`이 브라우저가 접근할 수 있는 origin이 아니라 컨테이너 주소를 가리킵니다.                |

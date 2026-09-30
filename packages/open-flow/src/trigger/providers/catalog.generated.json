@@ -1,6 +1,122 @@
 [
   {
     "snapshot": {
+      "configInputs": [
+        {
+          "handle": "baseId",
+          "jsonSchema": {
+            "type": "string",
+            "pattern": "^app[A-Za-z0-9]{14}$"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "fields",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "nullable": false,
+          "value": []
+        },
+        {
+          "handle": "formula",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "value": ""
+        },
+        {
+          "handle": "maxRecordsPerPoll",
+          "jsonSchema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000
+          },
+          "nullable": false,
+          "value": 200
+        },
+        {
+          "handle": "tableIdOrName",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "nullable": false
+        },
+        {
+          "handle": "triggerField",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255,
+            "pattern": "^[^}]*$"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "view",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "value": ""
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Polls an Airtable table and triggers when a record is created or updated, ordered by a time field.",
+      "displayName": "Record Created or Updated",
+      "key": "airtable.on_record_changed",
+      "name": "on_record_changed",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "baseId": {
+                  "type": "string"
+                },
+                "createdTime": {
+                  "type": "string"
+                },
+                "fields": {
+                  "type": "object"
+                },
+                "recordId": {
+                  "type": "string"
+                },
+                "tableIdOrName": {
+                  "type": "string"
+                },
+                "triggerField": {
+                  "type": "string"
+                },
+                "triggerFieldValue": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false,
+              "required": ["baseId", "tableIdOrName", "recordId", "createdTime", "triggerField", "triggerFieldValue", "fields"]
+            }
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "airtable",
+      "type": "poll"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
       "key": "feishu_app_bot.on_event",
       "provider": "feishu_app_bot",
       "name": "on_event",
@@ -31,13 +147,13 @@
           "handle": "eventTypes",
           "jsonSchema": {
             "type": "array",
-            "minItems": 1,
-            "maxItems": 200,
-            "uniqueItems": true,
             "items": {
               "type": "string",
               "pattern": "^[a-z][a-z0-9_.]{0,127}$"
             },
+            "minItems": 1,
+            "maxItems": 200,
+            "uniqueItems": true,
             "title": "Event types"
           },
           "nullable": false
@@ -46,13 +162,13 @@
           "handle": "chatIds",
           "jsonSchema": {
             "type": "array",
-            "maxItems": 100,
-            "uniqueItems": true,
             "items": {
               "type": "string",
               "minLength": 1,
               "maxLength": 256
             },
+            "maxItems": 100,
+            "uniqueItems": true,
             "title": "Chat IDs"
           },
           "nullable": true,
@@ -62,9 +178,6 @@
           "handle": "resource",
           "jsonSchema": {
             "type": "object",
-            "additionalProperties": false,
-            "required": ["kind", "id"],
-            "title": "Resource subscription",
             "properties": {
               "kind": {
                 "type": "string",
@@ -79,7 +192,10 @@
                 "type": "string",
                 "enum": ["doc", "docx", "sheet", "bitable", "file", "folder"]
               }
-            }
+            },
+            "additionalProperties": false,
+            "required": ["kind", "id"],
+            "title": "Resource subscription"
           },
           "nullable": true
         }
@@ -136,250 +252,11 @@
     "snapshot": {
       "configInputs": [
         {
-          "handle": "baseId",
-          "jsonSchema": {
-            "pattern": "^app[A-Za-z0-9]{14}$",
-            "type": "string"
-          },
-          "nullable": false
-        },
-        {
-          "handle": "fields",
-          "jsonSchema": {
-            "items": {
-              "minLength": 1,
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "nullable": false,
-          "value": []
-        },
-        {
-          "handle": "formula",
-          "jsonSchema": {
-            "type": "string"
-          },
-          "nullable": false,
-          "value": ""
-        },
-        {
-          "handle": "maxRecordsPerPoll",
-          "jsonSchema": {
-            "maximum": 1000,
-            "minimum": 1,
-            "type": "integer"
-          },
-          "nullable": false,
-          "value": 200
-        },
-        {
-          "handle": "tableIdOrName",
-          "jsonSchema": {
-            "maxLength": 255,
-            "minLength": 1,
-            "type": "string"
-          },
-          "nullable": false
-        },
-        {
-          "handle": "triggerField",
-          "jsonSchema": {
-            "maxLength": 255,
-            "minLength": 1,
-            "pattern": "^[^}]*$",
-            "type": "string"
-          },
-          "nullable": false
-        },
-        {
-          "handle": "view",
-          "jsonSchema": {
-            "type": "string"
-          },
-          "nullable": false,
-          "value": ""
-        }
-      ],
-      "definitionVersion": 2,
-      "description": "Polls an Airtable table and triggers when a record is created or updated, ordered by a time field.",
-      "displayName": "Record Created or Updated",
-      "key": "airtable.on_record_changed",
-      "name": "on_record_changed",
-      "outputs": [
-        {
           "handle": "events",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "additionalProperties": false,
-              "properties": {
-                "baseId": {
-                  "type": "string"
-                },
-                "createdTime": {
-                  "type": "string"
-                },
-                "fields": {
-                  "type": "object"
-                },
-                "recordId": {
-                  "type": "string"
-                },
-                "tableIdOrName": {
-                  "type": "string"
-                },
-                "triggerField": {
-                  "type": "string"
-                },
-                "triggerFieldValue": {
-                  "type": "string"
-                }
-              },
-              "required": ["baseId", "tableIdOrName", "recordId", "createdTime", "triggerField", "triggerFieldValue", "fields"],
-              "type": "object"
-            },
-            "type": "array"
-          },
-          "nullable": false
-        }
-      ],
-      "provider": "airtable",
-      "type": "poll"
-    },
-    "options": false
-  },
-  {
-    "snapshot": {
-      "configInputs": [
-        {
-          "handle": "includeDrafts",
-          "jsonSchema": {
-            "type": "boolean"
-          },
-          "nullable": false,
-          "value": false,
-          "description": "Also trigger on draft messages."
-        },
-        {
-          "handle": "includeSpamAndTrash",
-          "jsonSchema": {
-            "type": "boolean"
-          },
-          "nullable": false,
-          "value": false,
-          "description": "Also trigger on messages in SPAM and TRASH."
-        },
-        {
-          "handle": "labelNamesOrIds",
-          "jsonSchema": {
-            "items": {
-              "minLength": 1,
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "nullable": false,
-          "description": "Only trigger on messages carrying all of these labels, referenced by name or ID.",
-          "value": []
-        },
-        {
-          "handle": "maxMessagesPerPoll",
-          "jsonSchema": {
-            "maximum": 100,
-            "minimum": 1,
-            "type": "integer"
-          },
-          "nullable": false,
-          "value": 25
-        },
-        {
-          "handle": "readStatus",
-          "jsonSchema": {
-            "enum": ["Read", "Unread", "All"],
-            "type": "string"
-          },
-          "nullable": false,
-          "value": "All"
-        },
-        {
-          "handle": "search",
-          "jsonSchema": {
-            "type": "string"
-          },
-          "nullable": false,
-          "description": "Gmail search-syntax query the message must match.",
-          "value": ""
-        },
-        {
-          "handle": "sender",
-          "jsonSchema": {
-            "type": "string"
-          },
-          "nullable": false,
-          "description": "Only trigger on messages whose sender matches this address or name.",
-          "value": ""
-        }
-      ],
-      "definitionVersion": 2,
-      "description": "Polls the Gmail mailbox and triggers when a new message is received.",
-      "displayName": "New Message Received",
-      "key": "gmail.on_message_received",
-      "name": "on_message_received",
-      "outputs": [
-        {
-          "handle": "events",
-          "jsonSchema": {
-            "items": {
-              "additionalProperties": false,
-              "properties": {
-                "historyId": {
-                  "type": ["string", "null"]
-                },
-                "labelIds": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "messageId": {
-                  "type": "string"
-                },
-                "messageTimestamp": {
-                  "type": "string"
-                },
-                "sender": {
-                  "type": "string"
-                },
-                "subject": {
-                  "type": "string"
-                },
-                "threadId": {
-                  "type": "string"
-                },
-                "to": {
-                  "type": "string"
-                }
-              },
-              "required": ["messageId", "threadId", "historyId", "labelIds", "subject", "sender", "to", "messageTimestamp"],
-              "type": "object"
-            },
-            "type": "array"
-          },
-          "nullable": false
-        }
-      ],
-      "provider": "gmail",
-      "type": "poll"
-    },
-    "options": false
-  },
-  {
-    "snapshot": {
-      "configInputs": [
-        {
-          "handle": "events",
-          "jsonSchema": {
-            "items": {
+              "type": "string",
               "enum": [
                 "*",
                 "branch_protection_configuration",
@@ -435,11 +312,9 @@
                 "watch",
                 "workflow_job",
                 "workflow_run"
-              ],
-              "type": "string"
+              ]
             },
             "minItems": 1,
-            "type": "array",
             "uniqueItems": true
           },
           "nullable": false
@@ -455,16 +330,16 @@
         {
           "handle": "owner",
           "jsonSchema": {
-            "pattern": "^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$",
-            "type": "string"
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$"
           },
           "nullable": false
         },
         {
           "handle": "repo",
           "jsonSchema": {
-            "pattern": "^(?!\\.{1,2}$)[a-zA-Z0-9._-]{1,100}$",
-            "type": "string"
+            "type": "string",
+            "pattern": "^(?!\\.{1,2}$)[a-zA-Z0-9._-]{1,100}$"
           },
           "nullable": false
         }
@@ -517,16 +392,16 @@
         {
           "handle": "owner",
           "jsonSchema": {
-            "pattern": "^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$",
-            "type": "string"
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$"
           },
           "nullable": false
         },
         {
           "handle": "repo",
           "jsonSchema": {
-            "pattern": "^(?!\\.{1,2}$)[a-zA-Z0-9._-]{1,100}$",
-            "type": "string"
+            "type": "string",
+            "pattern": "^(?!\\.{1,2}$)[a-zA-Z0-9._-]{1,100}$"
           },
           "nullable": false
         },
@@ -561,7 +436,6 @@
           "handle": "pullRequest",
           "jsonSchema": {
             "type": "object",
-            "additionalProperties": false,
             "properties": {
               "id": {
                 "type": "integer"
@@ -576,8 +450,8 @@
                 "type": "string"
               },
               "state": {
-                "enum": ["open", "closed"],
-                "type": "string"
+                "type": "string",
+                "enum": ["open", "closed"]
               },
               "draft": {
                 "type": "boolean"
@@ -595,6 +469,7 @@
                 "type": "string"
               }
             },
+            "additionalProperties": false,
             "required": ["id", "number", "title", "url", "state", "draft", "merged", "updatedAt", "headSha", "baseSha"]
           },
           "nullable": false
@@ -617,7 +492,9 @@
         {
           "handle": "events",
           "jsonSchema": {
+            "type": "array",
             "items": {
+              "type": "string",
               "enum": [
                 "push",
                 "tag_push",
@@ -636,11 +513,9 @@
                 "emoji",
                 "resource_access_token",
                 "resource_deploy_token"
-              ],
-              "type": "string"
+              ]
             },
             "minItems": 1,
-            "type": "array",
             "uniqueItems": true
           },
           "nullable": false
@@ -656,18 +531,18 @@
         {
           "handle": "project",
           "jsonSchema": {
-            "maxLength": 255,
+            "type": "string",
             "minLength": 1,
-            "pattern": "^(?:[0-9]+|(?!\\.{1,2}(?:/|$))[A-Za-z0-9_.][A-Za-z0-9_.-]*(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9_.][A-Za-z0-9_.-]*)*)$",
-            "type": "string"
+            "maxLength": 255,
+            "pattern": "^(?:[0-9]+|(?!\\.{1,2}(?:/|$))[A-Za-z0-9_.][A-Za-z0-9_.-]*(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9_.][A-Za-z0-9_.-]*)*)$"
           },
           "nullable": false
         },
         {
           "handle": "pushBranchFilter",
           "jsonSchema": {
-            "maxLength": 255,
-            "type": "string"
+            "type": "string",
+            "maxLength": 255
           },
           "nullable": false,
           "value": ""
@@ -726,23 +601,148 @@
     "snapshot": {
       "configInputs": [
         {
+          "handle": "includeDrafts",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false,
+          "description": "Also trigger on draft messages."
+        },
+        {
+          "handle": "includeSpamAndTrash",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false,
+          "description": "Also trigger on messages in SPAM and TRASH."
+        },
+        {
+          "handle": "labelNamesOrIds",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "nullable": false,
+          "description": "Only trigger on messages carrying all of these labels, referenced by name or ID.",
+          "value": []
+        },
+        {
+          "handle": "maxMessagesPerPoll",
+          "jsonSchema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "nullable": false,
+          "value": 25
+        },
+        {
+          "handle": "readStatus",
+          "jsonSchema": {
+            "type": "string",
+            "enum": ["Read", "Unread", "All"]
+          },
+          "nullable": false,
+          "value": "All"
+        },
+        {
+          "handle": "search",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "description": "Gmail search-syntax query the message must match.",
+          "value": ""
+        },
+        {
+          "handle": "sender",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "description": "Only trigger on messages whose sender matches this address or name.",
+          "value": ""
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Polls the Gmail mailbox and triggers when a new message is received.",
+      "displayName": "New Message Received",
+      "key": "gmail.on_message_received",
+      "name": "on_message_received",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "historyId": {
+                  "type": ["string", "null"]
+                },
+                "labelIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "messageId": {
+                  "type": "string"
+                },
+                "messageTimestamp": {
+                  "type": "string"
+                },
+                "sender": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "threadId": {
+                  "type": "string"
+                },
+                "to": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false,
+              "required": ["messageId", "threadId", "historyId", "labelIds", "subject", "sender", "to", "messageTimestamp"]
+            }
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "gmail",
+      "type": "poll"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
           "handle": "calendarId",
           "jsonSchema": {
-            "maxLength": 1024,
+            "type": "string",
             "minLength": 1,
-            "type": "string"
+            "maxLength": 1024
           },
           "nullable": false
         },
         {
           "handle": "changes",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "enum": ["created", "updated", "cancelled"],
-              "type": "string"
+              "type": "string",
+              "enum": ["created", "updated", "cancelled"]
             },
             "minItems": 1,
-            "type": "array",
             "uniqueItems": true
           },
           "nullable": false,
@@ -759,9 +759,9 @@
         {
           "handle": "maxEventsPerPoll",
           "jsonSchema": {
-            "maximum": 500,
+            "type": "integer",
             "minimum": 1,
-            "type": "integer"
+            "maximum": 500
           },
           "nullable": false,
           "value": 100
@@ -776,21 +776,22 @@
         {
           "handle": "events",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "additionalProperties": false,
+              "type": "object",
               "properties": {
                 "attendeeEmails": {
+                  "type": "array",
                   "items": {
                     "type": "string"
-                  },
-                  "type": "array"
+                  }
                 },
                 "calendarId": {
                   "type": "string"
                 },
                 "changeType": {
-                  "enum": ["created", "updated", "cancelled"],
-                  "type": "string"
+                  "type": "string",
+                  "enum": ["created", "updated", "cancelled"]
                 },
                 "created": {
                   "type": ["string", "null"]
@@ -838,6 +839,7 @@
                   "type": ["string", "null"]
                 }
               },
+              "additionalProperties": false,
               "required": [
                 "changeType",
                 "calendarId",
@@ -857,10 +859,8 @@
                 "eventType",
                 "created",
                 "updated"
-              ],
-              "type": "object"
-            },
-            "type": "array"
+              ]
+            }
           },
           "nullable": false
         }
@@ -876,9 +876,9 @@
         {
           "handle": "driveId",
           "jsonSchema": {
-            "maxLength": 256,
+            "type": "string",
             "minLength": 1,
-            "type": "string"
+            "maxLength": 256
           },
           "nullable": true,
           "description": "Optional shared drive ID. Omit it to monitor the connected account."
@@ -913,9 +913,9 @@
         {
           "handle": "pageSize",
           "jsonSchema": {
-            "maximum": 100,
+            "type": "integer",
             "minimum": 1,
-            "type": "integer"
+            "maximum": 100
           },
           "nullable": false,
           "value": 100,
@@ -949,8 +949,9 @@
         {
           "handle": "events",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "additionalProperties": false,
+              "type": "object",
               "properties": {
                 "changeId": {
                   "type": "string"
@@ -968,13 +969,13 @@
                   "type": ["string", "null"]
                 },
                 "notification": {
-                  "additionalProperties": false,
+                  "type": "object",
                   "properties": {
                     "changedTypes": {
+                      "type": "array",
                       "items": {
                         "type": "string"
-                      },
-                      "type": "array"
+                      }
                     },
                     "messageNumber": {
                       "type": ["string", "null"]
@@ -986,8 +987,8 @@
                       "type": ["string", "null"]
                     }
                   },
-                  "required": ["resourceState", "changedTypes", "messageNumber", "resourceUri"],
-                  "type": "object"
+                  "additionalProperties": false,
+                  "required": ["resourceState", "changedTypes", "messageNumber", "resourceUri"]
                 },
                 "removed": {
                   "type": "boolean"
@@ -996,10 +997,9 @@
                   "type": ["string", "null"]
                 }
               },
-              "required": ["changeId", "changeType", "removed", "time", "fileId", "driveId", "file", "notification"],
-              "type": "object"
-            },
-            "type": "array"
+              "additionalProperties": false,
+              "required": ["changeId", "changeType", "removed", "time", "fileId", "driveId", "file", "notification"]
+            }
           },
           "nullable": false
         }
@@ -1013,11 +1013,163 @@
     "snapshot": {
       "configInputs": [
         {
+          "handle": "changeType",
+          "jsonSchema": {
+            "type": "string",
+            "enum": ["created", "updated"]
+          },
+          "nullable": false
+        },
+        {
           "handle": "driveId",
           "jsonSchema": {
-            "maxLength": 256,
-            "minLength": 1,
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{0,512}$"
+          },
+          "nullable": false,
+          "value": ""
+        },
+        {
+          "handle": "folderId",
+          "jsonSchema": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_-]{2,512}$"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "itemTypes",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["file", "folder"]
+            },
+            "minItems": 1,
+            "uniqueItems": true
+          },
+          "nullable": false,
+          "value": ["file"]
+        },
+        {
+          "handle": "maxFilesPerPoll",
+          "jsonSchema": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          },
+          "nullable": false,
+          "value": 50
+        },
+        {
+          "handle": "mimeTypes",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "nullable": false,
+          "value": []
+        },
+        {
+          "handle": "namePrefix",
+          "jsonSchema": {
             "type": "string"
+          },
+          "nullable": false,
+          "value": ""
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Polls one Google Drive folder and triggers when a file or folder directly inside it is created or updated.",
+      "displayName": "File or Folder Change in a Folder",
+      "key": "googledrive.on_file_change",
+      "name": "on_file_change",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "createdTime": {
+                  "type": ["string", "null"]
+                },
+                "driveId": {
+                  "type": ["string", "null"]
+                },
+                "eventType": {
+                  "type": "string",
+                  "enum": ["file_created", "file_updated", "folder_created", "folder_updated"]
+                },
+                "fileId": {
+                  "type": "string"
+                },
+                "itemType": {
+                  "type": "string",
+                  "enum": ["file", "folder"]
+                },
+                "lastModifyingUser": {
+                  "type": ["object", "null"]
+                },
+                "mimeType": {
+                  "type": "string"
+                },
+                "modifiedTime": {
+                  "type": ["string", "null"]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "parents": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "size": {
+                  "type": "string"
+                },
+                "webViewLink": {
+                  "type": ["string", "null"]
+                }
+              },
+              "additionalProperties": false,
+              "required": [
+                "eventType",
+                "itemType",
+                "fileId",
+                "name",
+                "mimeType",
+                "createdTime",
+                "modifiedTime",
+                "parents",
+                "webViewLink",
+                "driveId",
+                "lastModifyingUser"
+              ]
+            }
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "googledrive",
+      "type": "poll"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "driveId",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
           },
           "nullable": true,
           "description": "Optional shared drive ID. Omit it to monitor the connected account."
@@ -1052,9 +1204,9 @@
         {
           "handle": "pageSize",
           "jsonSchema": {
-            "maximum": 100,
+            "type": "integer",
             "minimum": 1,
-            "type": "integer"
+            "maximum": 100
           },
           "nullable": false,
           "value": 100,
@@ -1106,162 +1258,10 @@
     "snapshot": {
       "configInputs": [
         {
-          "handle": "changeType",
-          "jsonSchema": {
-            "enum": ["created", "updated"],
-            "type": "string"
-          },
-          "nullable": false
-        },
-        {
-          "handle": "driveId",
-          "jsonSchema": {
-            "pattern": "^[A-Za-z0-9_-]{0,512}$",
-            "type": "string"
-          },
-          "nullable": false,
-          "value": ""
-        },
-        {
-          "handle": "folderId",
-          "jsonSchema": {
-            "pattern": "^[A-Za-z0-9_-]{2,512}$",
-            "type": "string"
-          },
-          "nullable": false
-        },
-        {
-          "handle": "itemTypes",
-          "jsonSchema": {
-            "items": {
-              "enum": ["file", "folder"],
-              "type": "string"
-            },
-            "minItems": 1,
-            "type": "array",
-            "uniqueItems": true
-          },
-          "nullable": false,
-          "value": ["file"]
-        },
-        {
-          "handle": "maxFilesPerPoll",
-          "jsonSchema": {
-            "maximum": 200,
-            "minimum": 1,
-            "type": "integer"
-          },
-          "nullable": false,
-          "value": 50
-        },
-        {
-          "handle": "mimeTypes",
-          "jsonSchema": {
-            "items": {
-              "minLength": 1,
-              "type": "string"
-            },
-            "type": "array"
-          },
-          "nullable": false,
-          "value": []
-        },
-        {
-          "handle": "namePrefix",
-          "jsonSchema": {
-            "type": "string"
-          },
-          "nullable": false,
-          "value": ""
-        }
-      ],
-      "definitionVersion": 2,
-      "description": "Polls one Google Drive folder and triggers when a file or folder directly inside it is created or updated.",
-      "displayName": "File or Folder Change in a Folder",
-      "key": "googledrive.on_file_change",
-      "name": "on_file_change",
-      "outputs": [
-        {
-          "handle": "events",
-          "jsonSchema": {
-            "items": {
-              "additionalProperties": false,
-              "properties": {
-                "createdTime": {
-                  "type": ["string", "null"]
-                },
-                "driveId": {
-                  "type": ["string", "null"]
-                },
-                "eventType": {
-                  "enum": ["file_created", "file_updated", "folder_created", "folder_updated"],
-                  "type": "string"
-                },
-                "fileId": {
-                  "type": "string"
-                },
-                "itemType": {
-                  "enum": ["file", "folder"],
-                  "type": "string"
-                },
-                "lastModifyingUser": {
-                  "type": ["object", "null"]
-                },
-                "mimeType": {
-                  "type": "string"
-                },
-                "modifiedTime": {
-                  "type": ["string", "null"]
-                },
-                "name": {
-                  "type": "string"
-                },
-                "parents": {
-                  "items": {
-                    "type": "string"
-                  },
-                  "type": "array"
-                },
-                "size": {
-                  "type": "string"
-                },
-                "webViewLink": {
-                  "type": ["string", "null"]
-                }
-              },
-              "required": [
-                "eventType",
-                "itemType",
-                "fileId",
-                "name",
-                "mimeType",
-                "createdTime",
-                "modifiedTime",
-                "parents",
-                "webViewLink",
-                "driveId",
-                "lastModifyingUser"
-              ],
-              "type": "object"
-            },
-            "type": "array"
-          },
-          "nullable": false
-        }
-      ],
-      "provider": "googledrive",
-      "type": "poll"
-    },
-    "options": false
-  },
-  {
-    "snapshot": {
-      "configInputs": [
-        {
           "handle": "columnRange",
           "jsonSchema": {
-            "pattern": "^[A-Za-z]{1,3}(?::[A-Za-z]{1,3})?$",
-            "type": "string"
+            "type": "string",
+            "pattern": "^[A-Za-z]{1,3}(?::[A-Za-z]{1,3})?$"
           },
           "nullable": false,
           "value": "A:ZZZ"
@@ -1269,8 +1269,8 @@
         {
           "handle": "dateTimeRender",
           "jsonSchema": {
-            "enum": ["FORMATTED_STRING", "SERIAL_NUMBER"],
-            "type": "string"
+            "type": "string",
+            "enum": ["FORMATTED_STRING", "SERIAL_NUMBER"]
           },
           "nullable": false,
           "value": "FORMATTED_STRING"
@@ -1278,8 +1278,8 @@
         {
           "handle": "firstDataRow",
           "jsonSchema": {
-            "minimum": 1,
-            "type": "integer"
+            "type": "integer",
+            "minimum": 1
           },
           "nullable": false,
           "value": 2
@@ -1287,8 +1287,8 @@
         {
           "handle": "headerRow",
           "jsonSchema": {
-            "minimum": 1,
-            "type": "integer"
+            "type": "integer",
+            "minimum": 1
           },
           "nullable": false,
           "value": 1
@@ -1296,9 +1296,9 @@
         {
           "handle": "maxRowsPerPoll",
           "jsonSchema": {
-            "maximum": 500,
+            "type": "integer",
             "minimum": 1,
-            "type": "integer"
+            "maximum": 500
           },
           "nullable": false,
           "value": 100
@@ -1306,24 +1306,24 @@
         {
           "handle": "sheet",
           "jsonSchema": {
-            "minLength": 1,
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "nullable": false
         },
         {
           "handle": "spreadsheetId",
           "jsonSchema": {
-            "minLength": 1,
-            "type": "string"
+            "type": "string",
+            "minLength": 1
           },
           "nullable": false
         },
         {
           "handle": "valueRender",
           "jsonSchema": {
-            "enum": ["UNFORMATTED_VALUE", "FORMATTED_VALUE", "FORMULA"],
-            "type": "string"
+            "type": "string",
+            "enum": ["UNFORMATTED_VALUE", "FORMATTED_VALUE", "FORMULA"]
           },
           "nullable": false,
           "value": "UNFORMATTED_VALUE"
@@ -1338,8 +1338,9 @@
         {
           "handle": "events",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "additionalProperties": false,
+              "type": "object",
               "properties": {
                 "row": {
                   "type": "object"
@@ -1357,14 +1358,13 @@
                   "type": "string"
                 },
                 "values": {
-                  "items": {},
-                  "type": "array"
+                  "type": "array",
+                  "items": {}
                 }
               },
-              "required": ["spreadsheetId", "sheetId", "sheetTitle", "rowNumber", "row", "values"],
-              "type": "object"
-            },
-            "type": "array"
+              "additionalProperties": false,
+              "required": ["spreadsheetId", "sheetId", "sheetTitle", "rowNumber", "row", "values"]
+            }
           },
           "nullable": false
         }
@@ -1380,9 +1380,9 @@
         {
           "handle": "teamId",
           "jsonSchema": {
-            "title": "Team ID",
             "type": "string",
-            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+            "title": "Team ID"
           },
           "nullable": false,
           "description": "Linear Team UUID. Use Copy model UUID in Linear to find it."
@@ -1390,14 +1390,14 @@
         {
           "handle": "stateIds",
           "jsonSchema": {
-            "title": "Issue statuses",
             "type": "array",
             "items": {
               "type": "string",
               "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
             },
+            "maxItems": 50,
             "uniqueItems": true,
-            "maxItems": 50
+            "title": "Issue statuses"
           },
           "nullable": false,
           "value": [],
@@ -1416,7 +1416,6 @@
             "type": "array",
             "items": {
               "type": "object",
-              "additionalProperties": false,
               "properties": {
                 "id": {
                   "type": "string"
@@ -1441,7 +1440,6 @@
                 },
                 "state": {
                   "type": "object",
-                  "additionalProperties": false,
                   "properties": {
                     "id": {
                       "type": "string"
@@ -1453,9 +1451,11 @@
                       "type": "string"
                     }
                   },
+                  "additionalProperties": false,
                   "required": ["id", "name", "type"]
                 }
               },
+              "additionalProperties": false,
               "required": ["id", "identifier", "title", "url", "teamId", "createdAt", "updatedAt", "state"]
             }
           },
@@ -1473,8 +1473,8 @@
         {
           "handle": "dataSourceId",
           "jsonSchema": {
-            "pattern": "^(?:|[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12})$",
-            "type": "string"
+            "type": "string",
+            "pattern": "^(?:|[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12})$"
           },
           "nullable": false,
           "value": ""
@@ -1482,20 +1482,20 @@
         {
           "handle": "databaseId",
           "jsonSchema": {
-            "pattern": "^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$",
-            "type": "string"
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$"
           },
           "nullable": false
         },
         {
           "handle": "events",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "enum": ["page_added", "page_updated"],
-              "type": "string"
+              "type": "string",
+              "enum": ["page_added", "page_updated"]
             },
             "minItems": 1,
-            "type": "array",
             "uniqueItems": true
           },
           "nullable": false,
@@ -1512,9 +1512,9 @@
         {
           "handle": "maxItemsPerPoll",
           "jsonSchema": {
-            "maximum": 100,
+            "type": "integer",
             "minimum": 1,
-            "type": "integer"
+            "maximum": 100
           },
           "nullable": false,
           "value": 25
@@ -1529,8 +1529,9 @@
         {
           "handle": "events",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "additionalProperties": false,
+              "type": "object",
               "properties": {
                 "createdBy": {
                   "type": "object"
@@ -1545,8 +1546,8 @@
                   "type": "string"
                 },
                 "event": {
-                  "enum": ["page_added", "page_updated"],
-                  "type": "string"
+                  "type": "string",
+                  "enum": ["page_added", "page_updated"]
                 },
                 "lastEditedBy": {
                   "type": "object"
@@ -1567,10 +1568,9 @@
                   "type": "string"
                 }
               },
-              "required": ["event", "pageId", "databaseId", "dataSourceId", "url", "title", "createdTime", "lastEditedTime", "createdBy", "lastEditedBy"],
-              "type": "object"
-            },
-            "type": "array"
+              "additionalProperties": false,
+              "required": ["event", "pageId", "databaseId", "dataSourceId", "url", "title", "createdTime", "lastEditedTime", "createdBy", "lastEditedBy"]
+            }
           },
           "nullable": false
         }
@@ -1586,12 +1586,12 @@
         {
           "handle": "events",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "enum": ["created", "updated", "deleted"],
-              "type": "string"
+              "type": "string",
+              "enum": ["created", "updated", "deleted"]
             },
             "minItems": 1,
-            "type": "array",
             "uniqueItems": true
           },
           "nullable": false,
@@ -1608,12 +1608,12 @@
         {
           "handle": "itemTypes",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "enum": ["file", "folder"],
-              "type": "string"
+              "type": "string",
+              "enum": ["file", "folder"]
             },
             "minItems": 1,
-            "type": "array",
             "uniqueItems": true
           },
           "nullable": false,
@@ -1622,9 +1622,9 @@
         {
           "handle": "maxItemsPerPoll",
           "jsonSchema": {
-            "maximum": 200,
+            "type": "integer",
             "minimum": 1,
-            "type": "integer"
+            "maximum": 200
           },
           "nullable": false,
           "value": 50
@@ -1647,12 +1647,13 @@
         {
           "handle": "events",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "additionalProperties": false,
+              "type": "object",
               "properties": {
                 "changeType": {
-                  "enum": ["created", "updated", "deleted"],
-                  "type": "string"
+                  "type": "string",
+                  "enum": ["created", "updated", "deleted"]
                 },
                 "createdDateTime": {
                   "type": ["string", "null"]
@@ -1667,8 +1668,8 @@
                   "type": "string"
                 },
                 "itemType": {
-                  "enum": ["file", "folder"],
-                  "type": "string"
+                  "type": "string",
+                  "enum": ["file", "folder"]
                 },
                 "lastModifiedDateTime": {
                   "type": ["string", "null"]
@@ -1689,6 +1690,7 @@
                   "type": "string"
                 }
               },
+              "additionalProperties": false,
               "required": [
                 "itemId",
                 "name",
@@ -1702,10 +1704,8 @@
                 "createdDateTime",
                 "lastModifiedDateTime",
                 "eTag"
-              ],
-              "type": "object"
-            },
-            "type": "array"
+              ]
+            }
           },
           "nullable": false
         }
@@ -1721,8 +1721,8 @@
         {
           "handle": "folder",
           "jsonSchema": {
-            "pattern": "^[A-Za-z0-9_=-]*$",
-            "type": "string"
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_=-]*$"
           },
           "nullable": false,
           "value": "inbox",
@@ -1739,9 +1739,9 @@
         {
           "handle": "maxMessagesPerPoll",
           "jsonSchema": {
-            "maximum": 100,
+            "type": "integer",
             "minimum": 1,
-            "type": "integer"
+            "maximum": 100
           },
           "nullable": false,
           "value": 25
@@ -1749,8 +1749,8 @@
         {
           "handle": "readStatus",
           "jsonSchema": {
-            "enum": ["All", "Read", "Unread"],
-            "type": "string"
+            "type": "string",
+            "enum": ["All", "Read", "Unread"]
           },
           "nullable": false,
           "value": "All"
@@ -1791,17 +1791,18 @@
         {
           "handle": "events",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "additionalProperties": false,
+              "type": "object",
               "properties": {
                 "bodyPreview": {
                   "type": "string"
                 },
                 "categories": {
+                  "type": "array",
                   "items": {
                     "type": "string"
-                  },
-                  "type": "array"
+                  }
                 },
                 "conversationId": {
                   "type": "string"
@@ -1840,15 +1841,16 @@
                   "type": "string"
                 },
                 "to": {
+                  "type": "array",
                   "items": {
                     "type": "string"
-                  },
-                  "type": "array"
+                  }
                 },
                 "webLink": {
                   "type": "string"
                 }
               },
+              "additionalProperties": false,
               "required": [
                 "messageId",
                 "internetMessageId",
@@ -1866,10 +1868,8 @@
                 "categories",
                 "parentFolderId",
                 "webLink"
-              ],
-              "type": "object"
-            },
-            "type": "array"
+              ]
+            }
           },
           "nullable": false
         }
@@ -1885,7 +1885,9 @@
         {
           "handle": "topics",
           "jsonSchema": {
+            "type": "array",
             "items": {
+              "type": "string",
               "enum": [
                 "app/scopes_update",
                 "app/uninstalled",
@@ -2068,12 +2070,10 @@
                 "themes/update",
                 "variants/in_stock",
                 "variants/out_of_stock"
-              ],
-              "type": "string"
+              ]
             },
-            "maxItems": 20,
             "minItems": 1,
-            "type": "array",
+            "maxItems": 20,
             "uniqueItems": true
           },
           "nullable": false
@@ -2155,8 +2155,8 @@
         {
           "handle": "channelId",
           "jsonSchema": {
-            "pattern": "^[CDG][A-Z0-9]{2,31}$",
-            "type": "string"
+            "type": "string",
+            "pattern": "^[CDG][A-Z0-9]{2,31}$"
           },
           "nullable": false,
           "description": "Slack conversation ID to watch, e.g. C0122KQ70S7E."
@@ -2164,11 +2164,11 @@
         {
           "handle": "fromUserIds",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "pattern": "^[UW][A-Z0-9]{2,31}$",
-              "type": "string"
-            },
-            "type": "array"
+              "type": "string",
+              "pattern": "^[UW][A-Z0-9]{2,31}$"
+            }
           },
           "nullable": false,
           "value": [],
@@ -2177,11 +2177,11 @@
         {
           "handle": "ignoreUserIds",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "pattern": "^[UW][A-Z0-9]{2,31}$",
-              "type": "string"
-            },
-            "type": "array"
+              "type": "string",
+              "pattern": "^[UW][A-Z0-9]{2,31}$"
+            }
           },
           "nullable": false,
           "value": [],
@@ -2208,9 +2208,9 @@
         {
           "handle": "maxMessagesPerPoll",
           "jsonSchema": {
-            "maximum": 100,
+            "type": "integer",
             "minimum": 1,
-            "type": "integer"
+            "maximum": 100
           },
           "nullable": false,
           "value": 15,
@@ -2235,8 +2235,9 @@
         {
           "handle": "events",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "additionalProperties": false,
+              "type": "object",
               "properties": {
                 "botId": {
                   "type": ["string", "null"]
@@ -2245,8 +2246,9 @@
                   "type": "string"
                 },
                 "files": {
+                  "type": "array",
                   "items": {
-                    "additionalProperties": false,
+                    "type": "object",
                     "properties": {
                       "id": {
                         "type": "string"
@@ -2258,10 +2260,9 @@
                         "type": "string"
                       }
                     },
-                    "required": ["id", "name", "mimetype"],
-                    "type": "object"
-                  },
-                  "type": "array"
+                    "additionalProperties": false,
+                    "required": ["id", "name", "mimetype"]
+                  }
                 },
                 "messageTs": {
                   "type": "string"
@@ -2279,10 +2280,9 @@
                   "type": ["string", "null"]
                 }
               },
-              "required": ["channelId", "messageTs", "threadTs", "userId", "botId", "subtype", "text", "files"],
-              "type": "object"
-            },
-            "type": "array"
+              "additionalProperties": false,
+              "required": ["channelId", "messageTs", "threadTs", "userId", "botId", "subtype", "text", "files"]
+            }
           },
           "nullable": false
         }
@@ -2298,8 +2298,8 @@
         {
           "handle": "apiVersion",
           "jsonSchema": {
-            "maxLength": 40,
-            "type": "string"
+            "type": "string",
+            "maxLength": 40
           },
           "nullable": false,
           "value": ""
@@ -2307,13 +2307,13 @@
         {
           "handle": "events",
           "jsonSchema": {
+            "type": "array",
             "items": {
+              "type": "string",
               "maxLength": 120,
-              "pattern": "^(\\*|[a-z0-9_]+(?:\\.[a-z0-9_]+)+)$",
-              "type": "string"
+              "pattern": "^(\\*|[a-z0-9_]+(?:\\.[a-z0-9_]+)+)$"
             },
             "minItems": 1,
-            "type": "array",
             "uniqueItems": true
           },
           "nullable": false
@@ -2382,12 +2382,12 @@
         {
           "handle": "chatIds",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "pattern": "^-?[0-9]{1,20}$",
-              "type": "string"
+              "type": "string",
+              "pattern": "^-?[0-9]{1,20}$"
             },
             "maxItems": 100,
-            "type": "array",
             "uniqueItems": true
           },
           "nullable": false,
@@ -2406,6 +2406,7 @@
         {
           "handle": "updates",
           "jsonSchema": {
+            "type": "array",
             "items": {
               "enum": [
                 "*",
@@ -2438,7 +2439,6 @@
               ]
             },
             "minItems": 1,
-            "type": "array",
             "uniqueItems": true
           },
           "nullable": false,
@@ -2447,12 +2447,12 @@
         {
           "handle": "userIds",
           "jsonSchema": {
+            "type": "array",
             "items": {
-              "pattern": "^[0-9]{1,20}$",
-              "type": "string"
+              "type": "string",
+              "pattern": "^[0-9]{1,20}$"
             },
             "maxItems": 100,
-            "type": "array",
             "uniqueItems": true
           },
           "nullable": false,
@@ -2508,7 +2508,9 @@
         {
           "handle": "events",
           "jsonSchema": {
+            "type": "array",
             "items": {
+              "type": "string",
               "enum": [
                 "coupon.created",
                 "coupon.updated",
@@ -2526,12 +2528,10 @@
                 "product.deleted",
                 "product.restored",
                 "product.published"
-              ],
-              "type": "string"
+              ]
             },
-            "maxItems": 16,
             "minItems": 1,
-            "type": "array",
+            "maxItems": 16,
             "uniqueItems": true
           },
           "nullable": false
@@ -2539,9 +2539,9 @@
         {
           "handle": "webhookName",
           "jsonSchema": {
-            "maxLength": 120,
+            "type": "string",
             "minLength": 1,
-            "type": "string"
+            "maxLength": 120
           },
           "nullable": false,
           "value": "OOMOL Trigger"
@@ -2623,7 +2623,9 @@
         {
           "handle": "events",
           "jsonSchema": {
+            "type": "array",
             "items": {
+              "type": "string",
               "enum": [
                 "zen:event-type:ticket.agent_assignment_changed",
                 "zen:event-type:ticket.attachment_linked_to_comment",
@@ -2695,11 +2697,9 @@
                 "zen:event-type:user.suspended_changed",
                 "zen:event-type:user.tags_changed",
                 "zen:event-type:user.time_zone_changed"
-              ],
-              "type": "string"
+              ]
             },
             "minItems": 1,
-            "type": "array",
             "uniqueItems": true
           },
           "nullable": false

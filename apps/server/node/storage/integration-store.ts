@@ -87,7 +87,11 @@ export class IntegrationStore {
           return false
       }
       const trigger = JSON.parse(integration.triggerJson) as TriggerNode
-      if (trigger.kind != 'integration' || (trigger.definition.key != 'stripe.on_event' && !integration.listener && !integration.eventSource)) return false
+      if (
+        trigger.kind != 'integration' ||
+        (!['stripe.on_event', 'github.on_repo_event'].includes(trigger.definition.key) && !integration.listener && !integration.eventSource)
+      )
+        return false
       candidates.push(integration)
     }
     for (const integration of candidates) {

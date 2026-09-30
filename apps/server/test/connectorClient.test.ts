@@ -1361,6 +1361,9 @@ it('routes a registered Trigger request separately from generic proxy', async ()
 
 it.each([
   ['trigger_connection_error', 409, 'connector.connection-required'],
+  ['trigger_not_allowed', 403, 'connector.access-invalid'],
+  ['trigger_blocked', 403, 'connector.access-invalid'],
+  ['trigger_owner_required', 403, 'connector.access-invalid'],
   ['proxy_upstream_error', 503, 'connector.unavailable'],
   ['provider_error', 500, 'connector.unavailable'],
   ['invalid_input', 400, 'connector.input-invalid'],

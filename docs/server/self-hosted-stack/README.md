@@ -88,19 +88,16 @@ covers PostgreSQL, transit storage, and the remaining variables.
 
 ## 2. Create a runtime token for Open Flow
 
-Open Flow calls the OpenConnector runtime API under `/v1`: the provider and Action catalog,
-the Connection list, Action execution, and `POST /v1/proxy/:service` for Poll and Integration
-Triggers. Give it a long-lived runtime token rather than the admin token. Create one on the Access
-page of the Web Console, or through the admin API:
+Open Flow calls the OpenConnector runtime API under `/v1` for provider and Action metadata, Connections, Actions, and `POST /v1/providers/:service/triggers/:triggerId/execute` for Provider Triggers. Create a persistent runtime token through the admin API; stateful subscriptions require its stable owner ID:
 
 ```bash
 curl -s -X POST http://localhost:3001/api/runtime-tokens \
   -H "authorization: Bearer $OOMOL_CONNECT_ADMIN_TOKEN" \
   -H 'content-type: application/json' \
-  -d '{"name":"open-flow","allowedActions":[],"blockedActions":[],"allowedProxies":["*"]}'
+  -d '{"name":"open-flow","allowedActions":[],"blockedActions":[],"allowedProxies":[],"allowedTriggers":["gmail.on_message_received","github.on_repo_event"]}'
 ```
 
-The `*` proxy grant is for this local walkthrough. In production, list only the providers you use.
+Grant the Trigger IDs you use. Trigger permissions are independent of Action and proxy permissions; this example does not grant public proxy access.
 
 The response contains the token once, as `token`. Store it as `OPEN_FLOW_CONNECTOR_TOKEN`:
 
@@ -110,9 +107,7 @@ export OPEN_FLOW_CONNECTOR_TOKEN="<token from the response>"
 
 Token policy that matters for Open Flow:
 
-- `allowedProxies` is empty by default. A long-lived token without a proxy grant cannot call
-  `/v1/proxy/:service`, so Poll and Integration Triggers fail. Allow `*`, or list the providers
-  whose Provider Triggers you plan to use, for example `["gmail","github"]`.
+- `allowedTriggers` defaults to `[]`, which denies all Provider Triggers, including for existing tokens. Grant exact IDs or provider patterns such as `github.*`. Deployment and Runtime `allowedTriggers` / `blockedTriggers` further restrict access.
 - `allowedActions` and `blockedActions` limit which Actions Open Flow can run. Empty lists allow
   every Action that the deployment policy allows.
 - Leave `allowedConnections` unset unless you want to limit Open Flow to specific Connections. A
@@ -121,6 +116,8 @@ Token policy that matters for Open Flow:
 Once any long-lived token exists, OpenConnector requires a runtime token on every `/v1` and `/mcp`
 request. Other callers of the same OpenConnector, such as `oo connector` or MCP hosts, then need
 their own tokens.
+
+Before rotating the token, disable and publish the affected Triggers while the old token is still valid. Wait for remote subscription cleanup and Feishu resource demands to be released. Inspect `/api/trigger-subscriptions`; use `POST /api/trigger-subscriptions/:id/cancel` for pending cleanup. If credentials cannot be recovered, the administrator can explicitly `POST /api/trigger-subscriptions/:id/abandon`; this records an uncleaned remote resource and requires manual provider cleanup. Then switch `OPEN_FLOW_CONNECTOR_TOKEN`, restart Open Flow, and explicitly rebuild / enable the bindings, preserving business checkpoints. Never forward old subscription IDs to the new token. Feishu resource readiness must be cleared before the switch. Token rotation can introduce an event gap.
 
 ## 3. Start Open Flow
 
@@ -296,7 +293,7 @@ settings. See the
 | `connector.unavailable` in the Workbench or CLI             | `OPEN_FLOW_CONNECTOR_ORIGIN` is unreachable from the Open Flow container, or OpenConnector rejected `OPEN_FLOW_CONNECTOR_TOKEN`. |
 | `/readyz` returns 503 while `/healthz` returns 200          | The Connector health check failed. Check `docker logs open-flow` and that both containers share the network.                     |
 | `connector.connection-required` on run                      | The Connection is missing, inactive, or excluded by the token's `allowedConnections`. Re-authorize in the Console.               |
-| Poll or Integration Trigger fails while manual Actions work | The runtime token has no `allowedProxies` grant for that provider, or `OOMOL_CONNECT_BLOCKED_PROXIES` blocks it.                 |
+| Poll or Integration Trigger fails while manual Actions work | The runtime token lacks the Trigger ID in `allowedTriggers`, or a deployment / Runtime Trigger rule blocks it.                   |
 | `oo flow` asks for an OOMOL login                           | `OO_OPEN_FLOW_URL` or `OO_OPEN_FLOW_TOKEN` is missing. Both must be set in the same shell.                                       |
 | `oo flow` returns 401                                       | `OO_OPEN_FLOW_TOKEN` differs from that Open Flow's `OPEN_FLOW_TOKEN`.                                                            |
 | The Workbench link to the Console opens a wrong host        | `OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN` points at the container address instead of the origin browsers can reach.                   |

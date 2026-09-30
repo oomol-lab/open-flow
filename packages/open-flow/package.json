@@ -71,7 +71,8 @@
     "test:vitest": "vitest run --config vitest.config.ts src test",
     "test:package": "bun scripts/check-npm-package.ts",
     "generate:trigger-locales": "bun scripts/trigger-locales.ts",
-    "check:trigger-locales": "bun scripts/trigger-locales.ts --check"
+    "check:trigger-locales": "bun scripts/trigger-locales.ts --check",
+    "generate:provider-triggers": "bun scripts/update-trigger-catalog.ts"
   },
   "devDependencies": {
     "@babel/parser": "8.0.4",

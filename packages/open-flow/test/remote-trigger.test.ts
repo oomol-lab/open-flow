@@ -52,6 +52,7 @@ it('reuses the owned subscription across publication keys and preserves listener
 it('persists callback subscription scheduling without advancing a listener checkpoint', async () => {
   const saveCheckpoint = vi.fn(async () => {})
   const saveSubscription = vi.fn(async () => {})
+  const trigger = vi.fn(async () => ({ result: { outcome: 'wake' }, checkpoint: { pageToken: 'server' }, subscription: { id: 'owned' }, reconcileAt: 1000 }))
   const result = await listener.receive({
     bindingId: 'binding',
     admit: true,
@@ -63,14 +64,15 @@ it('persists callback subscription scheduling without advancing a listener check
     payload: {},
     rawBody: new Uint8Array(),
     header: () => undefined,
-    query: () => undefined,
+    query: (name) => (name === 'connector_subscription' ? 'owned-nonce' : undefined),
     connector: {
       execute: vi.fn(),
-      trigger: async () => ({ result: { outcome: 'wake' }, checkpoint: { pageToken: 'server' }, subscription: { id: 'owned' }, reconcileAt: 1000 }),
+      trigger,
     },
     state: { checkpoint: null, subscription: { id: 'owned' }, saveCheckpoint, saveSubscription },
   })
   expect(result).toEqual({ outcome: 'wake' })
+  expect(trigger).toHaveBeenCalledWith(expect.objectContaining({ query: { connector_subscription: 'owned-nonce' } }), undefined)
   expect(saveCheckpoint).not.toHaveBeenCalled()
   expect(saveSubscription).toHaveBeenCalledWith({ id: 'owned' }, new Date(1000))
 })

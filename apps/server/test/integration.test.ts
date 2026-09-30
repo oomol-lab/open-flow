@@ -1452,3 +1452,49 @@ it.each(['callback', 'listener'] as const)('preserves declared Integration outpu
     await closeService(service)
   }
 })
+
+it('prepares a GitHub repository webhook before activating Live and rejects an unsafe replacement', async () => {
+  const definition = integrationDefinitions.find((item) => item.snapshot.key == 'github.on_repo_event')!
+  const requests: string[] = []
+  const github = createConnectorHost({
+    listConnections: async () => [{ connectionId: 'github-account', displayName: 'GitHub', isDefault: true, serviceId: 'github', status: 'active' }],
+    trigger: async (_provider, _connection, _trigger, request) => {
+      if (request.operation !== 'reconcile') throw new Error('Unexpected operation')
+      requests.push(request.endpointUrl)
+      return { outcome: 'ready', checkpoint: null, subscription: { id: 'owned-hook' }, reconcileAt: 60_000 }
+    },
+  })
+  const service = await openService(':memory:', {
+    clock: () => 0,
+    capabilities: { connector: () => github, integration: () => ({ callbackKey: 'key', publicOrigin: 'https://flow.example' }) },
+  })
+  const created = await service.control.createFlow('operator', 'GitHub', 'create-github')
+  const flowId = created.flow.flowId
+  const node = {
+    kind: 'integration' as const,
+    name: 'Repository events',
+    connectionId: 'github-account',
+    definition: definition.snapshot,
+    config: inputValues({ owner: 'octocat', repo: 'repository', events: ['issues'] }),
+  }
+  const draft = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
+    { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'github', node },
+  ])
+  const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, 'open-flow-engine/v5', null, 'publish-github')
+  expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('pending')
+  await service.tickIntegration()
+  await service.tickMaintenance()
+  expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('succeeded')
+  expect(service.integrationState(flowId, 'github')?.subscription).toEqual({ id: 'owned-hook' })
+  expect(requests).toHaveLength(1)
+  const changed = await service.control.changeDraft('operator', flowId, draft.revision.revisionId, [
+    { kind: 'graph.trigger.config.set', nodeId: 'github', name: 'repo', before: fixedInputValue('repository'), value: fixedInputValue('another') },
+  ])
+  const live = service.control.getFlow(flowId).live!.publicationId
+  await expect(
+    service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v5', live, 'replace-github'),
+  ).rejects.toMatchObject({
+    code: 'publication.unsupported',
+  })
+  expect(requests).toHaveLength(1)
+})

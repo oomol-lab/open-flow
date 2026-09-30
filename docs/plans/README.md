@@ -24,3 +24,4 @@
 - [草稿 Revision 增量存储实施计划](2026-09-23-draft-revision-delta-storage.md)
 - [前端重构后续清单](frontend-refactor-followups.md)
 - [即时协作编辑重构计划](local-first-collaboration.md)
+- [OpenConnector 第三方 Trigger 接入计划](2026-09-30-openconnector-triggers.md)
