@@ -243,7 +243,13 @@ export class ControlService {
             config: triggerConfigValues(trigger.definition.configInputs, trigger.config),
             signal,
             connector: {
-              execute: (request) => connector.proxy(definition.snapshot.provider, connectionId, `trigger-options:${flowId}`, request, signal, access),
+              execute: () => {
+                throw new PermanentPollError('Raw proxy requests are not available to Triggers.')
+              },
+              trigger: (request) => {
+                if (connector.trigger == null) throw new PermanentPollError('Trigger operation transport is unavailable.')
+                return connector.trigger(definition.snapshot.provider, connectionId, definition.snapshot.key, request, signal, access)
+              },
             },
           })
         } catch (error) {

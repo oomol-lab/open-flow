@@ -498,7 +498,7 @@ describe('Server Integration callback fencing', () => {
     const seen: string[] = []
     const host = createConnectorHost({
       ...connector,
-      proxy: async (_provider, _connection, _binding, _request, _signal, access) => {
+      trigger: async (_provider, _connection, _trigger, _request, _signal, access) => {
         seen.push(access!.providerAccess!.sharedAccessDigest)
         return { status: 200, data: {} }
       },
@@ -508,7 +508,7 @@ describe('Server Integration callback fencing', () => {
       initialState: { checkpoint: null, subscription: {} },
       reconcile: async () => ({ outcome: 'ready' }),
       async receive(context) {
-        await context.connector.execute({ method: 'GET', endpoint: '/event' })
+        await context.connector.trigger!({ operation: 'read', config: {}, checkpoint: null })
         return { outcome: 'ignored', reason: 'unused' }
       },
     }
@@ -1148,25 +1148,33 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
   let notification: { address: string; id: string; token: string } | undefined
   const drive = createConnectorHost({
     listConnections: async () => [{ connectionId: 'connection-main', displayName: 'Drive', isDefault: true, serviceId: 'googledrive', status: 'active' }],
-    proxy: async (_provider, _connection, _binding, request, _signal, access) => {
-      if (request.endpoint == '/changes/startPageToken') return { status: 200, data: { startPageToken: 'baseline' } }
-      if (request.endpoint == '/changes/watch') {
-        if (failPreparation) return { status: 503, data: {} }
-        notification = request.body as typeof notification
-        return { status: 200, data: { resourceId: 'resource', expiration: String(86_400_000) } }
+    trigger: async (_provider, _connection, _trigger, request, _signal, access) => {
+      if (request.operation === 'reconcile') {
+        if (!request.active) {
+          stopped += 1
+          stoppedWithAccess.push(access!.providerAccess!.sharedAccessDigest)
+        } else if (failPreparation) throw new TransientIntegrationError('Remote subscription temporarily unavailable')
+        if (request.active) notification = { address: request.endpointUrl, id: 'channel', token: 'verified-token' }
+        return { outcome: 'ready', checkpoint: { pageToken: 'baseline' }, subscription: { id: request.requestKey }, reconcileAt: now }
       }
-      if (request.endpoint == '/changes') {
+      if (request.operation === 'receive') {
+        if (request.headers['x-goog-channel-token'] !== 'verified-token')
+          return { result: { outcome: 'respond', status: 404, body: '', contentType: 'text/plain' } }
+        return { result: { outcome: 'wake' }, checkpoint: { pageToken: 'baseline' }, subscription: { id: request.subscriptionId }, reconcileAt: now }
+      }
+      if (request.operation === 'read') {
         changesRead += 1
-        return request.query?.pageToken == 'baseline'
-          ? { status: 200, data: { changes: [{ fileId: 'new-file' }], newStartPageToken: 'next' } }
-          : { status: 200, data: { changes: [], newStartPageToken: 'next' } }
+        const fresh = JSON.stringify(request.checkpoint).includes('baseline')
+        return {
+          checkpoint: { pageToken: 'next' },
+          dedupeKey: 'next',
+          hasMore: false,
+          outputs: fresh
+            ? { events: [{ changeId: 'change', fileId: 'new-file', removed: false, changeType: 'file', driveId: null, file: null, time: null }] }
+            : null,
+        }
       }
-      if (request.endpoint == '/channels/stop') {
-        stopped += 1
-        stoppedWithAccess.push(access!.providerAccess!.sharedAccessDigest)
-        return { status: 204, data: null }
-      }
-      throw new Error('Unexpected Drive request')
+      throw new Error('Unexpected Drive operation')
     },
   })
   const settings: ServerServiceOptions = {

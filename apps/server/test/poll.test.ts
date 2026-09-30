@@ -130,18 +130,13 @@ describe('Server Poll Trigger', () => {
     if (!('poll' in linear)) throw new Error('Expected Linear Poll.')
     let calls = 0
     const host = createConnectorHost({
-      proxy: async (provider, connectionId, _rateLimitId, request, signal) => {
+      trigger: async (provider, connectionId, _triggerId, request, signal) => {
         calls++
         expect(provider).toBe('linear')
         expect(connectionId).toBe('connection-main')
         expect(signal.aborted).toBe(false)
-        expect(request.endpoint).toBe('/graphql')
-        return {
-          status: 200,
-          data: {
-            data: { teams: { nodes: [{ id: '72b2a2dc-6f4f-4423-9d34-24b5bd10634a', name: 'Engineering', key: 'ENG' }], pageInfo: { hasNextPage: false } } },
-          },
-        }
+        expect(request.operation).toBe('options')
+        return [{ value: '72b2a2dc-6f4f-4423-9d34-24b5bd10634a', label: 'Engineering (ENG)' }]
       },
     })
     const file = await databaseFile()
@@ -184,11 +179,11 @@ describe('Server Poll Trigger', () => {
     }
     const host = createConnectorHost({
       listConnections: async () => [{ ...activeConnection, serviceId: 'linear' }],
-      proxy: async (provider, connectionId, _rateLimitId, request) => {
+      trigger: async (provider, connectionId, _triggerId, request) => {
         expect(provider).toBe('linear')
         expect(connectionId).toBe('connection-main')
-        expect(request.endpoint).toBe('/graphql')
-        return { status: 200, data: { data: { team: { id: teamId, issues: { nodes: [issue], pageInfo: { hasNextPage: false, endCursor: null } } } } } }
+        if (request.operation !== 'read') throw new Error('Expected read operation')
+        return { checkpoint: { cursor: 'next' }, events: request.checkpoint === null ? [] : [{ dedupeKey: issue.id, payload: { ...issue, teamId } }] }
       },
     })
     const file = await databaseFile()
@@ -221,7 +216,7 @@ describe('Server Poll Trigger', () => {
       service = await openService(file, options)
       await service.tickListeners('2026-08-21T00:03:00.000Z')
       expect(database.prepare('SELECT COUNT(*) AS count FROM poll_admissions').get()).toEqual({ count: 1 })
-      expect(service.pollState('main', 'poll')).toMatchObject({ health: 'healthy', checkpoint: { since: '2026-08-21T00:03:00.000Z' } })
+      expect(service.pollState('main', 'poll')).toMatchObject({ health: 'healthy', checkpoint: { cursor: 'next' } })
     } finally {
       database.close()
       await closeService(service)
@@ -263,7 +258,7 @@ describe('Server Poll Trigger', () => {
     const requestSignal = new AbortController().signal
     const waitingConnector = createConnectorHost({
       listConnections: async () => [activeConnection],
-      async proxy(_provider, _connectionId, _rateLimitId, _request, signal) {
+      async trigger(_provider, _connectionId, _triggerId, _request, signal) {
         entered.resolve()
         return await new Promise((_resolve, reject) => {
           const abort = (): void => {
@@ -280,7 +275,7 @@ describe('Server Poll Trigger', () => {
       snapshot,
       async poll(context): Promise<PollResult> {
         providerSignal = context.signal
-        await context.connector.execute({ endpoint: '/events', method: 'GET' }, requestSignal)
+        await context.connector.trigger!({ operation: 'read', config: context.config, checkpoint: context.checkpoint }, requestSignal)
         return { checkpoint: null, events: [] }
       },
     }

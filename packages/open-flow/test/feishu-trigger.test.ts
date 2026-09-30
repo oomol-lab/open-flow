@@ -1,8 +1,6 @@
 import { createCipheriv, createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { PermanentIntegrationError } from '../src/trigger/common/integration.ts'
 import { receiveFeishuEvent, matchesFeishuEvent } from '../src/trigger/providers/feishu/events.ts'
-import { feishuResponse, feishuSubscriptions } from '../src/trigger/providers/feishu/subscriptions.ts'
 
 const now = Date.parse('2026-09-14T08:00:00.000Z')
 const source = { appId: 'cli_test', verificationToken: 'verification-secret', encryptKey: 'encryption-secret' }
@@ -92,37 +90,5 @@ describe('Feishu event boundary', () => {
     })
     const parsed = await receiveFeishuEvent(raw, headers, source, now)
     expect(parsed).toMatchObject({ event: { id: 'approval_instance:approval-delivery', body: { status: 'APPROVED' } } })
-  })
-})
-
-describe('Feishu resource subscriptions', () => {
-  it('uses the actual event subscription APIs and scopes document subscriptions by type', () => {
-    const [document] = feishuSubscriptions({ eventTypes: ['drive.file.edit_v1'], resource: { kind: 'document', id: 'token', documentType: 'docx' } }, 'feishu')
-    expect(document?.subscribe).toEqual({
-      endpoint: '/drive/v1/files/token/subscribe',
-      method: 'POST',
-      query: { file_type: 'docx', event_type: 'drive.file.edit_v1' },
-    })
-    expect(document?.unsubscribe.endpoint).toBe('/drive/v1/files/token/delete_subscribe')
-    const [calendar] = feishuSubscriptions({ eventTypes: ['calendar.calendar.event.changed_v4'], resource: { kind: 'calendar', id: 'cal' } }, 'feishu')
-    expect(calendar?.subscribe.endpoint).toBe('/calendar/v4/calendars/cal/events/subscription')
-    expect(() => feishuSubscriptions({ eventTypes: ['approval_instance'], resource: { kind: 'approval', id: 'approval' } }, 'feishu')).toThrow(
-      'application Connection',
-    )
-  })
-  it('rejects failed Feishu envelopes even when HTTP succeeds', () => {
-    expect(() => feishuResponse({ status: 200, data: { code: 99991671 } })).toThrow('Connection')
-    expect(() => feishuResponse({ status: 200, data: { code: 1234, msg: 'secret raw error' } })).toThrow('rejected')
-    expect(() => feishuResponse({ status: 429, data: { code: 99991400 } })).toThrow('temporarily')
-  })
-  it('preserves diagnostic codes without exposing raw provider messages', () => {
-    expect(() => feishuResponse({ status: 200, data: { code: 99991672, msg: 'secret raw error' } })).toThrow(
-      new PermanentIntegrationError(
-        "Feishu rejected the request (HTTP 200, Feishu code 99991672). Check the application's API permissions and request parameters.",
-      ),
-    )
-    expect(() => feishuResponse({ status: 400, data: { code: 'secret raw error' } })).toThrow(
-      new PermanentIntegrationError("Feishu rejected the request (HTTP 400). Check the application's API permissions and request parameters."),
-    )
   })
 })

@@ -56,9 +56,10 @@ async function setup() {
         isDefault: true,
       },
     ],
-    proxy: async (_provider, _connection, _rate, request) => {
-      requests.push(request.method + ' ' + request.endpoint)
-      return { status: 200, data: { code: 0, data: {} } }
+    trigger: async (_provider, _connection, _trigger, request) => {
+      if (request.operation !== 'resource') throw new Error('Unexpected operation')
+      requests.push(`${request.active ? 'subscribe' : 'unsubscribe'} ${JSON.stringify(request.config.resource)}`)
+      return { outcome: 'ready' }
     },
   })
   const service = await openService(':memory:', {
@@ -186,7 +187,7 @@ it('shares one approval subscription and prevents deleting an event source still
   const context = await setup()
   await publish(context, 'A', { kind: 'approval', id: 'approval' })
   await publish(context, 'B', { kind: 'approval', id: 'approval' })
-  expect(context.requests.filter((request) => request == 'POST /approval/v4/approvals/approval/subscribe')).toHaveLength(1)
+  expect(context.requests.filter((request) => request.startsWith('subscribe '))).toHaveLength(1)
   expect(
     (
       await context.app.request(`/v1/event-sources/${context.source.sourceId}`, {

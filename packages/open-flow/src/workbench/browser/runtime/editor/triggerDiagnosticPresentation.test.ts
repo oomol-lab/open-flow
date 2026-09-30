@@ -2,9 +2,11 @@ import type { DiagnosticItem } from './diagnostics.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { expect, it } from 'vitest'
-import { airtableRecordChanged } from '../../../../trigger/providers/airtable/on-record-changed.ts'
+import { pollDefinitions } from '../../../../trigger/providers/definitions.ts'
+const airtableRecordChanged = pollDefinitions.find((definition) => definition.snapshot.key === 'airtable.on_record_changed')!
+import { integrationDefinitions } from '../../../../trigger/providers/definitions.ts'
 import { feishuEvents } from '../../../../trigger/providers/feishu/on-event.ts'
-import { githubRepoEvent } from '../../../../trigger/providers/github/on-repo-event.ts'
+const githubRepoEvent = integrationDefinitions.find((definition) => definition.snapshot.key === 'github.on_repo_event')!
 import { localizeTrigger } from '../../../../trigger/providers/localization.ts'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'

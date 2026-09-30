@@ -1,0 +1,2757 @@
+[
+  {
+    "snapshot": {
+      "key": "feishu_app_bot.on_event",
+      "provider": "feishu_app_bot",
+      "name": "on_event",
+      "displayName": "Application Event",
+      "description": "Receives selected Feishu application events through a shared event source.",
+      "definitionVersion": 2,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "sourceId",
+          "jsonSchema": {
+            "type": "string",
+            "pattern": "^source_[0-9a-f]{32}$",
+            "title": "Event source"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "eventTypes",
+          "jsonSchema": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 200,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.]{0,127}$"
+            },
+            "title": "Event types"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "chatIds",
+          "jsonSchema": {
+            "type": "array",
+            "maxItems": 100,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "title": "Chat IDs"
+          },
+          "nullable": true,
+          "description": "Leave empty to receive events from all chats available to the source."
+        },
+        {
+          "handle": "resource",
+          "jsonSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["kind", "id"],
+            "title": "Resource subscription",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["document", "calendar", "approval"]
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "documentType": {
+                "type": "string",
+                "enum": ["doc", "docx", "sheet", "bitable", "file", "folder"]
+              }
+            }
+          },
+          "nullable": true
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "appId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "tenantKey",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "occurredAt",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": true
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "options": false,
+    "eventSource": "feishu"
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "baseId",
+          "jsonSchema": {
+            "pattern": "^app[A-Za-z0-9]{14}$",
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "fields",
+          "jsonSchema": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "nullable": false,
+          "value": []
+        },
+        {
+          "handle": "formula",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "value": ""
+        },
+        {
+          "handle": "maxRecordsPerPoll",
+          "jsonSchema": {
+            "maximum": 1000,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "nullable": false,
+          "value": 200
+        },
+        {
+          "handle": "tableIdOrName",
+          "jsonSchema": {
+            "maxLength": 255,
+            "minLength": 1,
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "triggerField",
+          "jsonSchema": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^[^}]*$",
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "view",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "value": ""
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Polls an Airtable table and triggers when a record is created or updated, ordered by a time field.",
+      "displayName": "Record Created or Updated",
+      "key": "airtable.on_record_changed",
+      "name": "on_record_changed",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "baseId": {
+                  "type": "string"
+                },
+                "createdTime": {
+                  "type": "string"
+                },
+                "fields": {
+                  "type": "object"
+                },
+                "recordId": {
+                  "type": "string"
+                },
+                "tableIdOrName": {
+                  "type": "string"
+                },
+                "triggerField": {
+                  "type": "string"
+                },
+                "triggerFieldValue": {
+                  "type": "string"
+                }
+              },
+              "required": ["baseId", "tableIdOrName", "recordId", "createdTime", "triggerField", "triggerFieldValue", "fields"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "airtable",
+      "type": "poll"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "includeDrafts",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false,
+          "description": "Also trigger on draft messages."
+        },
+        {
+          "handle": "includeSpamAndTrash",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false,
+          "description": "Also trigger on messages in SPAM and TRASH."
+        },
+        {
+          "handle": "labelNamesOrIds",
+          "jsonSchema": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "nullable": false,
+          "description": "Only trigger on messages carrying all of these labels, referenced by name or ID.",
+          "value": []
+        },
+        {
+          "handle": "maxMessagesPerPoll",
+          "jsonSchema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "nullable": false,
+          "value": 25
+        },
+        {
+          "handle": "readStatus",
+          "jsonSchema": {
+            "enum": ["Read", "Unread", "All"],
+            "type": "string"
+          },
+          "nullable": false,
+          "value": "All"
+        },
+        {
+          "handle": "search",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "description": "Gmail search-syntax query the message must match.",
+          "value": ""
+        },
+        {
+          "handle": "sender",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "description": "Only trigger on messages whose sender matches this address or name.",
+          "value": ""
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Polls the Gmail mailbox and triggers when a new message is received.",
+      "displayName": "New Message Received",
+      "key": "gmail.on_message_received",
+      "name": "on_message_received",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "historyId": {
+                  "type": ["string", "null"]
+                },
+                "labelIds": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "messageId": {
+                  "type": "string"
+                },
+                "messageTimestamp": {
+                  "type": "string"
+                },
+                "sender": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "threadId": {
+                  "type": "string"
+                },
+                "to": {
+                  "type": "string"
+                }
+              },
+              "required": ["messageId", "threadId", "historyId", "labelIds", "subject", "sender", "to", "messageTimestamp"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "gmail",
+      "type": "poll"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "enum": [
+                "*",
+                "branch_protection_configuration",
+                "branch_protection_rule",
+                "check_run",
+                "check_suite",
+                "code_scanning_alert",
+                "commit_comment",
+                "create",
+                "custom_property_values",
+                "delete",
+                "dependabot_alert",
+                "deploy_key",
+                "deployment",
+                "deployment_status",
+                "discussion",
+                "discussion_comment",
+                "fork",
+                "gollum",
+                "issue_comment",
+                "issue_dependencies",
+                "issues",
+                "label",
+                "member",
+                "meta",
+                "milestone",
+                "package",
+                "page_build",
+                "project",
+                "project_card",
+                "project_column",
+                "public",
+                "pull_request",
+                "pull_request_review",
+                "pull_request_review_comment",
+                "pull_request_review_thread",
+                "push",
+                "registry_package",
+                "release",
+                "repository",
+                "repository_advisory",
+                "repository_import",
+                "repository_ruleset",
+                "repository_vulnerability_alert",
+                "secret_scanning_alert",
+                "secret_scanning_alert_location",
+                "secret_scanning_scan",
+                "security_and_analysis",
+                "star",
+                "status",
+                "sub_issues",
+                "team_add",
+                "watch",
+                "workflow_job",
+                "workflow_run"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "nullable": false
+        },
+        {
+          "handle": "insecureSsl",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false
+        },
+        {
+          "handle": "owner",
+          "jsonSchema": {
+            "pattern": "^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$",
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "repo",
+          "jsonSchema": {
+            "pattern": "^(?!\\.{1,2}$)[a-zA-Z0-9._-]{1,100}$",
+            "type": "string"
+          },
+          "nullable": false
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Triggers when selected GitHub webhook events occur in a repository.",
+      "displayName": "Repository Event",
+      "endpoint": {
+        "body": {
+          "allowArray": false,
+          "allowEmpty": false,
+          "formats": ["json"]
+        },
+        "methods": ["POST"],
+        "successStatus": 202
+      },
+      "key": "github.on_repo_event",
+      "name": "on_repo_event",
+      "outputs": [
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "github",
+      "type": "integration"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "owner",
+          "jsonSchema": {
+            "pattern": "^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$",
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "repo",
+          "jsonSchema": {
+            "pattern": "^(?!\\.{1,2}$)[a-zA-Z0-9._-]{1,100}$",
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "number",
+          "jsonSchema": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "nullable": false,
+          "description": "Number of the pull request to watch."
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Watches one pull request using notifications and periodic checks. Starts from its current state; reports observed changes, not every intermediate transition or review event.",
+      "displayName": "Watch Pull Request",
+      "endpoint": {
+        "body": {
+          "allowArray": false,
+          "allowEmpty": false,
+          "formats": ["json"]
+        },
+        "methods": ["POST"],
+        "successStatus": 202
+      },
+      "key": "github.watch_pull_request",
+      "name": "watch_pull_request",
+      "provider": "github",
+      "type": "integration",
+      "outputs": [
+        {
+          "handle": "pullRequest",
+          "jsonSchema": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "id": {
+                "type": "integer"
+              },
+              "number": {
+                "type": "integer"
+              },
+              "title": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "state": {
+                "enum": ["open", "closed"],
+                "type": "string"
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "merged": {
+                "type": "boolean"
+              },
+              "updatedAt": {
+                "type": "string"
+              },
+              "headSha": {
+                "type": "string"
+              },
+              "baseSha": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "number", "title", "url", "state", "draft", "merged", "updatedAt", "headSha", "baseSha"]
+          },
+          "nullable": false
+        },
+        {
+          "handle": "version",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "options": false,
+    "intervalMs": 300000
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "enum": [
+                "push",
+                "tag_push",
+                "issues",
+                "confidential_issues",
+                "note",
+                "confidential_note",
+                "merge_requests",
+                "job",
+                "pipeline",
+                "wiki_page",
+                "deployment",
+                "feature_flag",
+                "releases",
+                "milestone",
+                "emoji",
+                "resource_access_token",
+                "resource_deploy_token"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "nullable": false
+        },
+        {
+          "handle": "insecureSsl",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false
+        },
+        {
+          "handle": "project",
+          "jsonSchema": {
+            "maxLength": 255,
+            "minLength": 1,
+            "pattern": "^(?:[0-9]+|(?!\\.{1,2}(?:/|$))[A-Za-z0-9_.][A-Za-z0-9_.-]*(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9_.][A-Za-z0-9_.-]*)*)$",
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "pushBranchFilter",
+          "jsonSchema": {
+            "maxLength": 255,
+            "type": "string"
+          },
+          "nullable": false,
+          "value": ""
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Triggers when selected GitLab webhook events occur in a project.",
+      "displayName": "Project Event",
+      "endpoint": {
+        "body": {
+          "allowArray": false,
+          "allowEmpty": false,
+          "formats": ["json"]
+        },
+        "methods": ["POST"],
+        "successStatus": 202
+      },
+      "key": "gitlab.on_project_event",
+      "name": "on_project_event",
+      "outputs": [
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "gitlabEvent",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "gitlab",
+      "type": "integration"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "calendarId",
+          "jsonSchema": {
+            "maxLength": 1024,
+            "minLength": 1,
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "changes",
+          "jsonSchema": {
+            "items": {
+              "enum": ["created", "updated", "cancelled"],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "nullable": false,
+          "value": ["created", "updated", "cancelled"]
+        },
+        {
+          "handle": "matchTerm",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "value": ""
+        },
+        {
+          "handle": "maxEventsPerPoll",
+          "jsonSchema": {
+            "maximum": 500,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "nullable": false,
+          "value": 100
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Polls a Google Calendar and triggers when an event is created, updated or cancelled.",
+      "displayName": "Event Changed",
+      "key": "googlecalendar.on_event_changed",
+      "name": "on_event_changed",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "attendeeEmails": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "calendarId": {
+                  "type": "string"
+                },
+                "changeType": {
+                  "enum": ["created", "updated", "cancelled"],
+                  "type": "string"
+                },
+                "created": {
+                  "type": ["string", "null"]
+                },
+                "creatorEmail": {
+                  "type": ["string", "null"]
+                },
+                "description": {
+                  "type": ["string", "null"]
+                },
+                "end": {
+                  "type": ["object", "null"]
+                },
+                "eventId": {
+                  "type": "string"
+                },
+                "eventType": {
+                  "type": ["string", "null"]
+                },
+                "htmlLink": {
+                  "type": ["string", "null"]
+                },
+                "isAllDay": {
+                  "type": "boolean"
+                },
+                "location": {
+                  "type": ["string", "null"]
+                },
+                "organizerEmail": {
+                  "type": ["string", "null"]
+                },
+                "recurringEventId": {
+                  "type": ["string", "null"]
+                },
+                "start": {
+                  "type": ["object", "null"]
+                },
+                "status": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": ["string", "null"]
+                },
+                "updated": {
+                  "type": ["string", "null"]
+                }
+              },
+              "required": [
+                "changeType",
+                "calendarId",
+                "eventId",
+                "status",
+                "summary",
+                "description",
+                "location",
+                "htmlLink",
+                "start",
+                "end",
+                "isAllDay",
+                "organizerEmail",
+                "creatorEmail",
+                "attendeeEmails",
+                "recurringEventId",
+                "eventType",
+                "created",
+                "updated"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "googlecalendar",
+      "type": "poll"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "driveId",
+          "jsonSchema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "nullable": true,
+          "description": "Optional shared drive ID. Omit it to monitor the connected account."
+        },
+        {
+          "handle": "includeCorpusRemovals",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false,
+          "description": "Include the accessible file resource when an item leaves the change corpus."
+        },
+        {
+          "handle": "includeItemsFromAllDrives",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": true,
+          "description": "Include items from My Drive and shared drives."
+        },
+        {
+          "handle": "includeRemoved",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": true,
+          "description": "Include changes caused by deletion or loss of access."
+        },
+        {
+          "handle": "pageSize",
+          "jsonSchema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "nullable": false,
+          "value": 100,
+          "description": "Maximum changes included in one Flow Run."
+        },
+        {
+          "handle": "restrictToMyDrive",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false,
+          "description": "Restrict changes to the My Drive hierarchy."
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Uses a Google Drive changes.watch channel and triggers when Drive changes are available.",
+      "displayName": "Changes Detected",
+      "endpoint": {
+        "body": {
+          "allowArray": false,
+          "allowEmpty": true,
+          "formats": ["json"]
+        },
+        "methods": ["POST"],
+        "successStatus": 204
+      },
+      "key": "googledrive.changes_detected",
+      "name": "changes_detected",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "changeId": {
+                  "type": "string"
+                },
+                "changeType": {
+                  "type": ["string", "null"]
+                },
+                "driveId": {
+                  "type": ["string", "null"]
+                },
+                "file": {
+                  "type": ["object", "null"]
+                },
+                "fileId": {
+                  "type": ["string", "null"]
+                },
+                "notification": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "changedTypes": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "messageNumber": {
+                      "type": ["string", "null"]
+                    },
+                    "resourceState": {
+                      "type": "string"
+                    },
+                    "resourceUri": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": ["resourceState", "changedTypes", "messageNumber", "resourceUri"],
+                  "type": "object"
+                },
+                "removed": {
+                  "type": "boolean"
+                },
+                "time": {
+                  "type": ["string", "null"]
+                }
+              },
+              "required": ["changeId", "changeType", "removed", "time", "fileId", "driveId", "file", "notification"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "googledrive",
+      "type": "integration"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "driveId",
+          "jsonSchema": {
+            "maxLength": 256,
+            "minLength": 1,
+            "type": "string"
+          },
+          "nullable": true,
+          "description": "Optional shared drive ID. Omit it to monitor the connected account."
+        },
+        {
+          "handle": "includeCorpusRemovals",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false,
+          "description": "Include the accessible file resource when an item leaves the change corpus."
+        },
+        {
+          "handle": "includeItemsFromAllDrives",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": true,
+          "description": "Include items from My Drive and shared drives."
+        },
+        {
+          "handle": "includeRemoved",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": true,
+          "description": "Include changes caused by deletion or loss of access."
+        },
+        {
+          "handle": "pageSize",
+          "jsonSchema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "nullable": false,
+          "value": 100,
+          "description": "Maximum changes included in one Flow Run."
+        },
+        {
+          "handle": "restrictToMyDrive",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false,
+          "description": "Restrict changes to the My Drive hierarchy."
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Monitors Drive changes using notifications and periodic scans of the same change stream.",
+      "displayName": "Watch Changes",
+      "endpoint": {
+        "body": {
+          "allowArray": false,
+          "allowEmpty": true,
+          "formats": ["json"]
+        },
+        "methods": ["POST"],
+        "successStatus": 204
+      },
+      "key": "googledrive.watch_changes",
+      "name": "watch_changes",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "googledrive",
+      "type": "integration"
+    },
+    "options": false,
+    "intervalMs": 300000
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "changeType",
+          "jsonSchema": {
+            "enum": ["created", "updated"],
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "driveId",
+          "jsonSchema": {
+            "pattern": "^[A-Za-z0-9_-]{0,512}$",
+            "type": "string"
+          },
+          "nullable": false,
+          "value": ""
+        },
+        {
+          "handle": "folderId",
+          "jsonSchema": {
+            "pattern": "^[A-Za-z0-9_-]{2,512}$",
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "itemTypes",
+          "jsonSchema": {
+            "items": {
+              "enum": ["file", "folder"],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "nullable": false,
+          "value": ["file"]
+        },
+        {
+          "handle": "maxFilesPerPoll",
+          "jsonSchema": {
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "nullable": false,
+          "value": 50
+        },
+        {
+          "handle": "mimeTypes",
+          "jsonSchema": {
+            "items": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "nullable": false,
+          "value": []
+        },
+        {
+          "handle": "namePrefix",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "value": ""
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Polls one Google Drive folder and triggers when a file or folder directly inside it is created or updated.",
+      "displayName": "File or Folder Change in a Folder",
+      "key": "googledrive.on_file_change",
+      "name": "on_file_change",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "createdTime": {
+                  "type": ["string", "null"]
+                },
+                "driveId": {
+                  "type": ["string", "null"]
+                },
+                "eventType": {
+                  "enum": ["file_created", "file_updated", "folder_created", "folder_updated"],
+                  "type": "string"
+                },
+                "fileId": {
+                  "type": "string"
+                },
+                "itemType": {
+                  "enum": ["file", "folder"],
+                  "type": "string"
+                },
+                "lastModifyingUser": {
+                  "type": ["object", "null"]
+                },
+                "mimeType": {
+                  "type": "string"
+                },
+                "modifiedTime": {
+                  "type": ["string", "null"]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "parents": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "size": {
+                  "type": "string"
+                },
+                "webViewLink": {
+                  "type": ["string", "null"]
+                }
+              },
+              "required": [
+                "eventType",
+                "itemType",
+                "fileId",
+                "name",
+                "mimeType",
+                "createdTime",
+                "modifiedTime",
+                "parents",
+                "webViewLink",
+                "driveId",
+                "lastModifyingUser"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "googledrive",
+      "type": "poll"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "columnRange",
+          "jsonSchema": {
+            "pattern": "^[A-Za-z]{1,3}(?::[A-Za-z]{1,3})?$",
+            "type": "string"
+          },
+          "nullable": false,
+          "value": "A:ZZZ"
+        },
+        {
+          "handle": "dateTimeRender",
+          "jsonSchema": {
+            "enum": ["FORMATTED_STRING", "SERIAL_NUMBER"],
+            "type": "string"
+          },
+          "nullable": false,
+          "value": "FORMATTED_STRING"
+        },
+        {
+          "handle": "firstDataRow",
+          "jsonSchema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "nullable": false,
+          "value": 2
+        },
+        {
+          "handle": "headerRow",
+          "jsonSchema": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "nullable": false,
+          "value": 1
+        },
+        {
+          "handle": "maxRowsPerPoll",
+          "jsonSchema": {
+            "maximum": 500,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "nullable": false,
+          "value": 100
+        },
+        {
+          "handle": "sheet",
+          "jsonSchema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "spreadsheetId",
+          "jsonSchema": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "valueRender",
+          "jsonSchema": {
+            "enum": ["UNFORMATTED_VALUE", "FORMATTED_VALUE", "FORMULA"],
+            "type": "string"
+          },
+          "nullable": false,
+          "value": "UNFORMATTED_VALUE"
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Polls a sheet and triggers once for every new row appended below the last row already seen.",
+      "displayName": "New Row Added",
+      "key": "googlesheets.on_row_added",
+      "name": "on_row_added",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "row": {
+                  "type": "object"
+                },
+                "rowNumber": {
+                  "type": "integer"
+                },
+                "sheetId": {
+                  "type": "integer"
+                },
+                "sheetTitle": {
+                  "type": "string"
+                },
+                "spreadsheetId": {
+                  "type": "string"
+                },
+                "values": {
+                  "items": {},
+                  "type": "array"
+                }
+              },
+              "required": ["spreadsheetId", "sheetId", "sheetTitle", "rowNumber", "row", "values"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "googlesheets",
+      "type": "poll"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "teamId",
+          "jsonSchema": {
+            "title": "Team ID",
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+          },
+          "nullable": false,
+          "description": "Linear Team UUID. Use Copy model UUID in Linear to find it."
+        },
+        {
+          "handle": "stateIds",
+          "jsonSchema": {
+            "title": "Issue statuses",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            },
+            "uniqueItems": true,
+            "maxItems": 50
+          },
+          "nullable": false,
+          "value": [],
+          "description": "Choose statuses from the selected Team. Empty means all statuses. Matches the current status, not every transition into it."
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Watches new and updated issues in a Linear team with periodic checks. Starts from now without running existing issues. Reports observed current states, not deletions or every intermediate status change.",
+      "displayName": "Issue Created or Updated",
+      "key": "linear.on_issue_changed",
+      "name": "on_issue_changed",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "identifier": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "teamId": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["id", "name", "type"]
+                }
+              },
+              "required": ["id", "identifier", "title", "url", "teamId", "createdAt", "updatedAt", "state"]
+            }
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "linear",
+      "type": "poll"
+    },
+    "options": true
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "dataSourceId",
+          "jsonSchema": {
+            "pattern": "^(?:|[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12})$",
+            "type": "string"
+          },
+          "nullable": false,
+          "value": ""
+        },
+        {
+          "handle": "databaseId",
+          "jsonSchema": {
+            "pattern": "^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$",
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "enum": ["page_added", "page_updated"],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "nullable": false,
+          "value": ["page_added"]
+        },
+        {
+          "handle": "includeProperties",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": true
+        },
+        {
+          "handle": "maxItemsPerPoll",
+          "jsonSchema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "nullable": false,
+          "value": 25
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Polls a Notion database and triggers when a page is added to it or an existing page is edited.",
+      "displayName": "Database Page Added or Updated",
+      "key": "notion.on_database_page_event",
+      "name": "on_database_page_event",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "createdBy": {
+                  "type": "object"
+                },
+                "createdTime": {
+                  "type": "string"
+                },
+                "dataSourceId": {
+                  "type": "string"
+                },
+                "databaseId": {
+                  "type": "string"
+                },
+                "event": {
+                  "enum": ["page_added", "page_updated"],
+                  "type": "string"
+                },
+                "lastEditedBy": {
+                  "type": "object"
+                },
+                "lastEditedTime": {
+                  "type": "string"
+                },
+                "pageId": {
+                  "type": "string"
+                },
+                "properties": {
+                  "type": "object"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
+              },
+              "required": ["event", "pageId", "databaseId", "dataSourceId", "url", "title", "createdTime", "lastEditedTime", "createdBy", "lastEditedBy"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "notion",
+      "type": "poll"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "enum": ["created", "updated", "deleted"],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "nullable": false,
+          "value": ["created", "updated"]
+        },
+        {
+          "handle": "itemId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "value": ""
+        },
+        {
+          "handle": "itemTypes",
+          "jsonSchema": {
+            "items": {
+              "enum": ["file", "folder"],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "nullable": false,
+          "value": ["file"]
+        },
+        {
+          "handle": "maxItemsPerPoll",
+          "jsonSchema": {
+            "maximum": 200,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "nullable": false,
+          "value": 50
+        },
+        {
+          "handle": "parentFolderId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "value": ""
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Polls the OneDrive change feed and triggers when a file or folder is created, updated or deleted.",
+      "displayName": "File or Folder Changed",
+      "key": "one_drive.on_item_changed",
+      "name": "on_item_changed",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "changeType": {
+                  "enum": ["created", "updated", "deleted"],
+                  "type": "string"
+                },
+                "createdDateTime": {
+                  "type": ["string", "null"]
+                },
+                "driveId": {
+                  "type": ["string", "null"]
+                },
+                "eTag": {
+                  "type": ["string", "null"]
+                },
+                "itemId": {
+                  "type": "string"
+                },
+                "itemType": {
+                  "enum": ["file", "folder"],
+                  "type": "string"
+                },
+                "lastModifiedDateTime": {
+                  "type": ["string", "null"]
+                },
+                "mimeType": {
+                  "type": ["string", "null"]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "parentFolderId": {
+                  "type": ["string", "null"]
+                },
+                "size": {
+                  "type": ["number", "null"]
+                },
+                "webUrl": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "itemId",
+                "name",
+                "changeType",
+                "itemType",
+                "size",
+                "mimeType",
+                "webUrl",
+                "parentFolderId",
+                "driveId",
+                "createdDateTime",
+                "lastModifiedDateTime",
+                "eTag"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "one_drive",
+      "type": "poll"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "folder",
+          "jsonSchema": {
+            "pattern": "^[A-Za-z0-9_=-]*$",
+            "type": "string"
+          },
+          "nullable": false,
+          "value": "inbox",
+          "description": "A well-known mail folder name, folder ID, or an empty string for the whole mailbox."
+        },
+        {
+          "handle": "includeDrafts",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false
+        },
+        {
+          "handle": "maxMessagesPerPoll",
+          "jsonSchema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "nullable": false,
+          "value": 25
+        },
+        {
+          "handle": "readStatus",
+          "jsonSchema": {
+            "enum": ["All", "Read", "Unread"],
+            "type": "string"
+          },
+          "nullable": false,
+          "value": "All"
+        },
+        {
+          "handle": "senderAddress",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "value": "",
+          "description": "Exact sender address, or empty for any sender."
+        },
+        {
+          "handle": "subjectContains",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "value": "",
+          "description": "Case-insensitive subject text."
+        },
+        {
+          "handle": "withAttachmentsOnly",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Polls a Microsoft Outlook mail folder and triggers when a new message arrives.",
+      "displayName": "New Message Received",
+      "key": "outlook.on_message_received",
+      "name": "on_message_received",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "bodyPreview": {
+                  "type": "string"
+                },
+                "categories": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "conversationId": {
+                  "type": "string"
+                },
+                "from": {
+                  "type": "string"
+                },
+                "fromName": {
+                  "type": "string"
+                },
+                "hasAttachments": {
+                  "type": "boolean"
+                },
+                "importance": {
+                  "type": "string"
+                },
+                "internetMessageId": {
+                  "type": "string"
+                },
+                "isDraft": {
+                  "type": "boolean"
+                },
+                "isRead": {
+                  "type": "boolean"
+                },
+                "messageId": {
+                  "type": "string"
+                },
+                "parentFolderId": {
+                  "type": "string"
+                },
+                "receivedDateTime": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "to": {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                "webLink": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "messageId",
+                "internetMessageId",
+                "conversationId",
+                "subject",
+                "bodyPreview",
+                "from",
+                "fromName",
+                "to",
+                "receivedDateTime",
+                "hasAttachments",
+                "isRead",
+                "isDraft",
+                "importance",
+                "categories",
+                "parentFolderId",
+                "webLink"
+              ],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "outlook",
+      "type": "poll"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "topics",
+          "jsonSchema": {
+            "items": {
+              "enum": [
+                "app/scopes_update",
+                "app/uninstalled",
+                "app_purchases_one_time/update",
+                "app_subscriptions/approaching_capped_amount",
+                "app_subscriptions/update",
+                "bulk_operations/finish",
+                "carts/create",
+                "carts/update",
+                "channels/delete",
+                "checkout_and_accounts_configurations/update",
+                "checkouts/create",
+                "checkouts/delete",
+                "checkouts/update",
+                "collection_listings/add",
+                "collection_listings/remove",
+                "collection_listings/update",
+                "collection_publications/create",
+                "collection_publications/delete",
+                "collection_publications/update",
+                "collections/create",
+                "collections/delete",
+                "collections/update",
+                "companies/create",
+                "companies/delete",
+                "companies/update",
+                "company_contact_roles/assign",
+                "company_contact_roles/revoke",
+                "company_contacts/create",
+                "company_contacts/delete",
+                "company_contacts/update",
+                "company_locations/create",
+                "company_locations/delete",
+                "company_locations/update",
+                "customer.joined_segment",
+                "customer.left_segment",
+                "customer.tags_added",
+                "customer.tags_removed",
+                "customer_account_settings/update",
+                "customer_groups/create",
+                "customer_groups/delete",
+                "customer_groups/update",
+                "customers/create",
+                "customers/delete",
+                "customers/disable",
+                "customers/enable",
+                "customers/purchasing_summary",
+                "customers/update",
+                "customers_email_marketing_consent/update",
+                "customers_marketing_consent/update",
+                "delivery_promise_settings/update",
+                "disputes/create",
+                "disputes/update",
+                "domains/create",
+                "domains/destroy",
+                "domains/update",
+                "draft_orders/create",
+                "draft_orders/delete",
+                "draft_orders/update",
+                "fulfillment_events/create",
+                "fulfillment_events/delete",
+                "fulfillment_holds/added",
+                "fulfillment_holds/released",
+                "fulfillment_orders/cancellation_request_accepted",
+                "fulfillment_orders/cancellation_request_rejected",
+                "fulfillment_orders/cancellation_request_submitted",
+                "fulfillment_orders/cancelled",
+                "fulfillment_orders/fulfillment_request_accepted",
+                "fulfillment_orders/fulfillment_request_rejected",
+                "fulfillment_orders/fulfillment_request_submitted",
+                "fulfillment_orders/fulfillment_service_failed_to_complete",
+                "fulfillment_orders/hold_released",
+                "fulfillment_orders/line_items_prepared_for_local_delivery",
+                "fulfillment_orders/line_items_prepared_for_pickup",
+                "fulfillment_orders/manually_reported_progress_stopped",
+                "fulfillment_orders/merged",
+                "fulfillment_orders/moved",
+                "fulfillment_orders/order_routing_complete",
+                "fulfillment_orders/placed_on_hold",
+                "fulfillment_orders/progress_reported",
+                "fulfillment_orders/rescheduled",
+                "fulfillment_orders/scheduled_fulfillment_order_ready",
+                "fulfillment_orders/split",
+                "fulfillments/create",
+                "fulfillments/update",
+                "inventory_items/create",
+                "inventory_items/delete",
+                "inventory_items/update",
+                "inventory_levels/connect",
+                "inventory_levels/disconnect",
+                "inventory_levels/update",
+                "locales/create",
+                "locales/destroy",
+                "locales/update",
+                "locations/activate",
+                "locations/create",
+                "locations/deactivate",
+                "locations/delete",
+                "locations/update",
+                "machine_translation_batch/completed",
+                "metafield_definitions/create",
+                "metafield_definitions/delete",
+                "metafield_definitions/update",
+                "order_transactions/create",
+                "orders/cancelled",
+                "orders/create",
+                "orders/delete",
+                "orders/edited",
+                "orders/fulfilled",
+                "orders/link_requested",
+                "orders/paid",
+                "orders/partially_fulfilled",
+                "orders/risk_assessment_changed",
+                "orders/shopify_protect_eligibility_changed",
+                "orders/updated",
+                "payment_schedules/due",
+                "payment_terms/create",
+                "payment_terms/delete",
+                "payment_terms/update",
+                "product_feeds/create",
+                "product_feeds/full_sync",
+                "product_feeds/full_sync_finish",
+                "product_feeds/incremental_sync",
+                "product_feeds/update",
+                "product_listings/add",
+                "product_listings/remove",
+                "product_listings/update",
+                "product_publications/create",
+                "product_publications/delete",
+                "product_publications/update",
+                "products/create",
+                "products/delete",
+                "products/update",
+                "profiles/create",
+                "profiles/delete",
+                "profiles/update",
+                "publications/delete",
+                "refunds/create",
+                "returns/approve",
+                "returns/cancel",
+                "returns/close",
+                "returns/decline",
+                "returns/process",
+                "returns/reopen",
+                "returns/request",
+                "returns/update",
+                "reverse_deliveries/attach_deliverable",
+                "reverse_fulfillment_orders/dispose",
+                "scheduled_product_listings/add",
+                "scheduled_product_listings/remove",
+                "scheduled_product_listings/update",
+                "segments/create",
+                "segments/delete",
+                "segments/update",
+                "selling_plan_groups/create",
+                "selling_plan_groups/delete",
+                "selling_plan_groups/update",
+                "shop/update",
+                "subscription_billing_attempts/challenged",
+                "subscription_billing_attempts/failure",
+                "subscription_billing_attempts/success",
+                "subscription_billing_cycle_edits/create",
+                "subscription_billing_cycle_edits/delete",
+                "subscription_billing_cycle_edits/update",
+                "subscription_billing_cycles/skip",
+                "subscription_billing_cycles/unskip",
+                "subscription_contracts/activate",
+                "subscription_contracts/cancel",
+                "subscription_contracts/create",
+                "subscription_contracts/expire",
+                "subscription_contracts/fail",
+                "subscription_contracts/pause",
+                "subscription_contracts/update",
+                "tax_partners/update",
+                "tax_summaries/create",
+                "tender_transactions/create",
+                "themes/create",
+                "themes/delete",
+                "themes/publish",
+                "themes/update",
+                "variants/in_stock",
+                "variants/out_of_stock"
+              ],
+              "type": "string"
+            },
+            "maxItems": 20,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "nullable": false
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Triggers when selected Shopify webhook topics occur in the connected store.",
+      "displayName": "Store Event",
+      "endpoint": {
+        "body": {
+          "allowArray": false,
+          "allowEmpty": false,
+          "formats": ["json"]
+        },
+        "methods": ["POST"],
+        "successStatus": 202
+      },
+      "key": "shopify.on_shop_event",
+      "name": "on_shop_event",
+      "outputs": [
+        {
+          "handle": "apiVersion",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "eventId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "shopDomain",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "topic",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "triggeredAt",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "webhookId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "shopify",
+      "type": "integration"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "channelId",
+          "jsonSchema": {
+            "pattern": "^[CDG][A-Z0-9]{2,31}$",
+            "type": "string"
+          },
+          "nullable": false,
+          "description": "Slack conversation ID to watch, e.g. C0122KQ70S7E."
+        },
+        {
+          "handle": "fromUserIds",
+          "jsonSchema": {
+            "items": {
+              "pattern": "^[UW][A-Z0-9]{2,31}$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "nullable": false,
+          "value": [],
+          "description": "Only trigger on messages written by these Slack user IDs. Empty means any author."
+        },
+        {
+          "handle": "ignoreUserIds",
+          "jsonSchema": {
+            "items": {
+              "pattern": "^[UW][A-Z0-9]{2,31}$",
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "nullable": false,
+          "value": [],
+          "description": "Never trigger on messages written by these Slack user IDs."
+        },
+        {
+          "handle": "includeBotMessages",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false,
+          "description": "Also trigger on messages posted by bots and apps."
+        },
+        {
+          "handle": "includeSystemMessages",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false,
+          "description": "Also trigger on Slack system notices."
+        },
+        {
+          "handle": "maxMessagesPerPoll",
+          "jsonSchema": {
+            "maximum": 100,
+            "minimum": 1,
+            "type": "integer"
+          },
+          "nullable": false,
+          "value": 15,
+          "description": "Maximum number of messages processed per poll."
+        },
+        {
+          "handle": "textContains",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false,
+          "value": "",
+          "description": "Only trigger when message text contains this string, case-insensitively."
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Polls one Slack conversation and triggers when a new message is posted to it.",
+      "displayName": "New Channel Message",
+      "key": "slack.on_message_posted",
+      "name": "on_message_posted",
+      "outputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "additionalProperties": false,
+              "properties": {
+                "botId": {
+                  "type": ["string", "null"]
+                },
+                "channelId": {
+                  "type": "string"
+                },
+                "files": {
+                  "items": {
+                    "additionalProperties": false,
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "mimetype": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": ["id", "name", "mimetype"],
+                    "type": "object"
+                  },
+                  "type": "array"
+                },
+                "messageTs": {
+                  "type": "string"
+                },
+                "subtype": {
+                  "type": ["string", "null"]
+                },
+                "text": {
+                  "type": "string"
+                },
+                "threadTs": {
+                  "type": ["string", "null"]
+                },
+                "userId": {
+                  "type": ["string", "null"]
+                }
+              },
+              "required": ["channelId", "messageTs", "threadTs", "userId", "botId", "subtype", "text", "files"],
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "slack",
+      "type": "poll"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "apiVersion",
+          "jsonSchema": {
+            "maxLength": 40,
+            "type": "string"
+          },
+          "nullable": false,
+          "value": ""
+        },
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "maxLength": 120,
+              "pattern": "^(\\*|[a-z0-9_]+(?:\\.[a-z0-9_]+)+)$",
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "nullable": false
+        },
+        {
+          "handle": "includeConnectedAccounts",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Triggers when selected Stripe events happen on the connected account.",
+      "displayName": "Account Event",
+      "endpoint": {
+        "body": {
+          "allowArray": false,
+          "allowEmpty": false,
+          "formats": ["json"]
+        },
+        "methods": ["POST"],
+        "successStatus": 202
+      },
+      "key": "stripe.on_event",
+      "name": "on_event",
+      "outputs": [
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "eventId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "livemode",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "stripe",
+      "type": "integration"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "chatIds",
+          "jsonSchema": {
+            "items": {
+              "pattern": "^-?[0-9]{1,20}$",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "nullable": false,
+          "value": [],
+          "description": "Only accept updates from these numeric Telegram chat IDs. Empty means every chat."
+        },
+        {
+          "handle": "dropPendingUpdates",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": true,
+          "description": "Discard updates queued before the webhook is created or resumed."
+        },
+        {
+          "handle": "updates",
+          "jsonSchema": {
+            "items": {
+              "enum": [
+                "*",
+                "message",
+                "edited_message",
+                "channel_post",
+                "edited_channel_post",
+                "business_connection",
+                "business_message",
+                "edited_business_message",
+                "deleted_business_messages",
+                "guest_message",
+                "message_reaction",
+                "message_reaction_count",
+                "inline_query",
+                "chosen_inline_result",
+                "callback_query",
+                "shipping_query",
+                "pre_checkout_query",
+                "purchased_paid_media",
+                "poll",
+                "poll_answer",
+                "my_chat_member",
+                "chat_member",
+                "chat_join_request",
+                "chat_boost",
+                "removed_chat_boost",
+                "managed_bot",
+                "subscription"
+              ]
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "nullable": false,
+          "description": "Telegram update types that trigger a Run. Use * for the Telegram default set."
+        },
+        {
+          "handle": "userIds",
+          "jsonSchema": {
+            "items": {
+              "pattern": "^[0-9]{1,20}$",
+              "type": "string"
+            },
+            "maxItems": 100,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "nullable": false,
+          "value": [],
+          "description": "Only accept updates from these numeric Telegram user IDs. Empty means every user."
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Triggers when the connected Telegram bot receives a selected update.",
+      "displayName": "Bot Update",
+      "endpoint": {
+        "body": {
+          "allowArray": false,
+          "allowEmpty": false,
+          "formats": ["json"]
+        },
+        "methods": ["POST"],
+        "successStatus": 200
+      },
+      "key": "telegram.on_update",
+      "name": "on_update",
+      "outputs": [
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "telegram",
+      "type": "integration"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "enum": [
+                "coupon.created",
+                "coupon.updated",
+                "coupon.deleted",
+                "coupon.restored",
+                "customer.created",
+                "customer.updated",
+                "customer.deleted",
+                "order.created",
+                "order.updated",
+                "order.deleted",
+                "order.restored",
+                "product.created",
+                "product.updated",
+                "product.deleted",
+                "product.restored",
+                "product.published"
+              ],
+              "type": "string"
+            },
+            "maxItems": 16,
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "nullable": false
+        },
+        {
+          "handle": "webhookName",
+          "jsonSchema": {
+            "maxLength": 120,
+            "minLength": 1,
+            "type": "string"
+          },
+          "nullable": false,
+          "value": "OOMOL Trigger"
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Triggers when selected WooCommerce store events occur.",
+      "displayName": "Store Event",
+      "endpoint": {
+        "body": {
+          "allowArray": false,
+          "allowEmpty": false,
+          "formats": ["json"]
+        },
+        "methods": ["POST"],
+        "successStatus": 202
+      },
+      "key": "woocommerce.on_store_event",
+      "name": "on_store_event",
+      "outputs": [
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "resource",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "source",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "topic",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "webhookId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "woocommerce",
+      "type": "integration"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "items": {
+              "enum": [
+                "zen:event-type:ticket.agent_assignment_changed",
+                "zen:event-type:ticket.attachment_linked_to_comment",
+                "zen:event-type:ticket.attachment_redacted_from_comment",
+                "zen:event-type:ticket.brand_changed",
+                "zen:event-type:ticket.comment_added",
+                "zen:event-type:ticket.comment_made_private",
+                "zen:event-type:ticket.comment_redacted",
+                "zen:event-type:ticket.created",
+                "zen:event-type:ticket.csat_received",
+                "zen:event-type:ticket.csat_requested",
+                "zen:event-type:ticket.custom_field_changed",
+                "zen:event-type:ticket.custom_status_changed",
+                "zen:event-type:ticket.description_changed",
+                "zen:event-type:ticket.email_ccs_changed",
+                "zen:event-type:ticket.external_id_changed",
+                "zen:event-type:ticket.followers_changed",
+                "zen:event-type:ticket.form_changed",
+                "zen:event-type:ticket.group_assignment_changed",
+                "zen:event-type:ticket.marked_as_spam",
+                "zen:event-type:ticket.merged",
+                "zen:event-type:ticket.next_sla_breach_changed",
+                "zen:event-type:ticket.ola_policy_changed",
+                "zen:event-type:ticket.organization_changed",
+                "zen:event-type:ticket.permanently_deleted",
+                "zen:event-type:ticket.priority_changed",
+                "zen:event-type:ticket.problem_link_changed",
+                "zen:event-type:ticket.requester_changed",
+                "zen:event-type:ticket.schedule_changed",
+                "zen:event-type:ticket.sla_policy_changed",
+                "zen:event-type:ticket.soft_deleted",
+                "zen:event-type:ticket.status_changed",
+                "zen:event-type:ticket.subject_changed",
+                "zen:event-type:ticket.submitter_changed",
+                "zen:event-type:ticket.tags_changed",
+                "zen:event-type:ticket.task_due_at_changed",
+                "zen:event-type:ticket.type_changed",
+                "zen:event-type:ticket.undeleted",
+                "zen:event-type:organization.created",
+                "zen:event-type:organization.custom_field_changed",
+                "zen:event-type:organization.deleted",
+                "zen:event-type:organization.external_id_changed",
+                "zen:event-type:organization.name_changed",
+                "zen:event-type:organization.tags_changed",
+                "zen:event-type:user.active_changed",
+                "zen:event-type:user.alias_changed",
+                "zen:event-type:user.created",
+                "zen:event-type:user.custom_field_changed",
+                "zen:event-type:user.custom_role_changed",
+                "zen:event-type:user.default_group_changed",
+                "zen:event-type:user.deleted",
+                "zen:event-type:user.details_changed",
+                "zen:event-type:user.external_id_changed",
+                "zen:event-type:user.group_membership_created",
+                "zen:event-type:user.group_membership_deleted",
+                "zen:event-type:user.identity_changed",
+                "zen:event-type:user.identity_created",
+                "zen:event-type:user.identity_deleted",
+                "zen:event-type:user.last_login_changed",
+                "zen:event-type:user.merged",
+                "zen:event-type:user.name_changed",
+                "zen:event-type:user.notes_changed",
+                "zen:event-type:user.only_private_comments_changed",
+                "zen:event-type:user.organization_membership_created",
+                "zen:event-type:user.organization_membership_deleted",
+                "zen:event-type:user.password_changed",
+                "zen:event-type:user.photo_changed",
+                "zen:event-type:user.role_changed",
+                "zen:event-type:user.suspended_changed",
+                "zen:event-type:user.tags_changed",
+                "zen:event-type:user.time_zone_changed"
+              ],
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array",
+            "uniqueItems": true
+          },
+          "nullable": false
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Triggers when one of the selected Zendesk account events occurs.",
+      "displayName": "Event Subscription",
+      "endpoint": {
+        "body": {
+          "allowArray": false,
+          "allowEmpty": false,
+          "formats": ["json"]
+        },
+        "methods": ["POST"],
+        "successStatus": 202
+      },
+      "key": "zendesk.on_event",
+      "name": "on_event",
+      "outputs": [
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "subject",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        }
+      ],
+      "provider": "zendesk",
+      "type": "integration"
+    },
+    "options": false
+  }
+]

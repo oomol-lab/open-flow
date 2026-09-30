@@ -8,7 +8,7 @@ import type { IntegrationOptions } from './integration-runtime.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { IntegrationConnectionError, PermanentIntegrationError, TransientIntegrationError } from '@oomol-lab/open-flow/integration-trigger'
-import { feishuResponse, feishuSubscriptions, receiveFeishuEvent } from '@oomol-lab/open-flow/provider-triggers'
+import { feishuSubscriptions, receiveFeishuEvent } from '@oomol-lab/open-flow/provider-triggers'
 import { ControlError } from '../error.ts'
 
 export class EventSourceRuntime {
@@ -208,17 +208,24 @@ export class EventSourceRuntime {
     const connector = this.#connector()
     if (connector == null) throw new TransientIntegrationError('Connector is unavailable.')
     try {
-      const request = active ? subscription.subscribe : subscription.unsubscribe
-      const result = await connector.proxy(source.provider, source.connectionId, source.sourceId, request, signal ?? AbortSignal.timeout(30_000), {
-        providerAccess: stored.providerAccess,
-        providerId: source.provider,
-        scope: 'proxy',
-        connectionId: source.connectionId,
-        purpose: 'trigger',
-        source: 'publication',
-        ...(source.teamId == null ? {} : { teamId: source.teamId }),
-      })
-      feishuResponse(result)
+      if (connector.trigger == null) throw new TransientIntegrationError('Trigger operation transport is unavailable.')
+      await connector.trigger(
+        source.provider,
+        source.connectionId,
+        'feishu_app_bot.on_event',
+        { operation: 'resource', config: subscription.config, requestKey: `${source.sourceId}:${stored.resourceKey}`, active },
+        signal ?? AbortSignal.timeout(30_000),
+        {
+          providerAccess: stored.providerAccess,
+          providerId: source.provider,
+          scope: 'trigger',
+          triggerId: 'feishu_app_bot.on_event',
+          connectionId: source.connectionId,
+          purpose: 'trigger',
+          source: 'publication',
+          ...(source.teamId == null ? {} : { teamId: source.teamId }),
+        },
+      )
       if (active) this.#store.eventSources.subscriptionState(source.sourceId, stored.resourceKey, 'ready', this.#clock())
       else this.#store.eventSources.deleteSubscription(source.sourceId, stored.resourceKey)
     } catch (error) {

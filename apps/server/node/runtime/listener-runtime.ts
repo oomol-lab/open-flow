@@ -225,6 +225,7 @@ export class ListenerRuntime {
       const result = yield* this.#readPage(
         target,
         definition.snapshot.provider,
+        definition.snapshot.key,
         (input) => definition.poll(input),
         context,
         new TransientPollError('Poll Provider exceeded its execution deadline.'),
@@ -241,6 +242,7 @@ export class ListenerRuntime {
       | Pick<StoredPollTarget, 'bindingId' | 'connectionId' | 'flowId' | 'publicationId'>
       | Pick<PollCandidate, 'bindingId' | 'connectionId' | 'flowId' | 'operationId'>,
     provider: string,
+    triggerId: string,
     read: (context: ListenerReadContext) => Promise<Result>,
     context: Omit<ListenerReadContext, 'connector' | 'signal'>,
     timeoutError: Error,
@@ -258,7 +260,8 @@ export class ListenerRuntime {
         flowId: target.flowId,
         providerAccess,
         providerId: provider,
-        scope: 'proxy',
+        scope: 'trigger',
+        triggerId,
         connectionId: target.connectionId,
         purpose: 'trigger',
         source: 'publication',
@@ -269,15 +272,20 @@ export class ListenerRuntime {
           const result = await read({
             ...context,
             connector: {
-              execute: (request, requestSignal) =>
-                connector.proxy(
+              execute: () => {
+                throw new PermanentPollError('Raw proxy requests are not available to Triggers.')
+              },
+              trigger: (request, requestSignal) => {
+                if (connector.trigger == null) throw new PermanentPollError('Trigger operation transport is unavailable.')
+                return connector.trigger(
                   provider,
                   target.connectionId,
-                  target.bindingId,
+                  triggerId,
                   request,
                   requestSignal == null ? signal : AbortSignal.any([signal, requestSignal]),
                   access,
-                ),
+                )
+              },
             },
             signal,
           })
@@ -307,6 +315,7 @@ export class ListenerRuntime {
       const page = yield* this.#readPage(
         { ...target, publicationId: target.currentPublicationId },
         definition.snapshot.provider,
+        definition.snapshot.key,
         async (context) => {
           const result = await source.read(context)
           validateListenerPage(result)
