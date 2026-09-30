@@ -262,8 +262,13 @@ Flow Error 节点通过 `sourceFlowIds` 多选监听已发布的上游 Flow，�
 
 ### Trigger
 
-Trigger 是 Flow graph 中的 source node。每张图最多有一个 Manual Trigger，由用户显式启动，不建立外部订阅或调度 binding。Webhook、Cron、Poll 和 Integration 的确定性协议、Provider definitions、Registry 与 conformance 属于公共
-package；subscription、checkpoint、调度持久化、endpoint routing 和 admission 事务属于部署实现。
+Trigger 是 Flow graph 中的 source node。每张图最多有一个 Manual Trigger，由用户显式启动，不建立外部订阅或调度 binding。Webhook、Cron、Poll 和 Integration 的确定性协议、展示快照、Registry 与 conformance 属于公共
+package；业务 checkpoint、调度持久化、endpoint routing 和 admission 事务属于部署实现。
+
+用户自部署的 Open Flow 是 connector 的不可信调用方。第三方 Trigger 的请求构造、凭据使用、配置校验与远端订阅状态由 connector 拥有；
+Open Flow 调用已注册操作，connector 沿用 Action execute 的授权语义：用户／服务账号按当前 app-access 校验，部署用 team-token 按 Team 权限执行并检查可选 grant。客户端不能自报远端资源 ID。
+Trigger 权限与 Action、通用 proxy 分离。公共包从 connector 生成展示快照，只持有服务端订阅 ID，并保留流程调度和事件准入。
+飞书共享事件源在部署接收回调，资源订阅和跨主体引用计数由 connector 管理。接口、权限组与升级步骤见 [Trigger 权限与执行](control/trigger-permissions.md)。
 
 Trigger 的有序数据输出由公共 contract 统一定义和校验。接入适配器在准入前构造完整输出；Scheduler 和 checkpoint 只消费通用端口映射，不承担 Webhook 或 Provider 的事件投影。HTTP 请求重试身份由 Webhook 准入层定义，与 Flow 可见输出的数据范围分别管理。
 
