@@ -182,8 +182,8 @@ function createDefinition(item: (typeof catalog)[number]): PollDefinition | Inte
       )
       if (!isJsonObject(result) || !isJsonObject(result.result) || typeof result.result.outcome !== 'string')
         throw new Error('Invalid Trigger callback response.')
-      // Listener 回调不能推进本地 checkpoint。
-      if (result.result.outcome !== 'respond') await saveState(result, context.state, 'intervalMs' in item ? 'never' : 'always')
+      // 业务 checkpoint 由运行时在事件准入后提交。
+      if (result.result.outcome !== 'respond') await saveState(result, context.state, 'never')
       return result.result as unknown as IntegrationReceiveResult
     },
   } satisfies IntegrationDefinition

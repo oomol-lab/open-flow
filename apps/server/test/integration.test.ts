@@ -759,6 +759,89 @@ it('rejects an Integration target captured before its Flow was disabled', async 
   }
 })
 
+it('retains a remote callback checkpoint rejected by Run capacity and admits its retry', async () => {
+  const definition = integrationDefinitions.find((item) => item.snapshot.key == 'googledrive.changes_detected')!
+  const file = await databaseFile()
+  const host = createConnectorHost({
+    listConnections: async () => [{ connectionId: 'connection-main', displayName: 'Drive', isDefault: true, serviceId: 'googledrive', status: 'active' }],
+    trigger: async (_provider, _connection, _trigger, request) => {
+      if (request.operation == 'reconcile')
+        return { outcome: 'ready', checkpoint: { pageToken: 'baseline' }, subscription: { id: 'owned' }, reconcileAt: 60_000 }
+      if (request.operation != 'receive') throw new Error('Unexpected Trigger operation')
+      const deliveryId = request.headers['x-goog-message-number']!
+      const checkpoint = { pageToken: deliveryId }
+      return {
+        result: {
+          outcome: 'event',
+          dedupeKey: deliveryId,
+          checkpoint,
+          outputs: {
+            events: [
+              {
+                changeId: deliveryId,
+                changeType: 'file',
+                driveId: null,
+                file: null,
+                fileId: 'new-file',
+                notification: { changedTypes: [], messageNumber: deliveryId, resourceState: 'change', resourceUri: null },
+                removed: false,
+                time: null,
+              },
+            ],
+          },
+        },
+        checkpoint,
+        subscription: { id: request.subscriptionId },
+        reconcileAt: 60_000,
+      }
+    },
+  })
+  const service = await openService(file, {
+    clock: () => 0,
+    runtime: { maxPendingRuns: 1 },
+    capabilities: {
+      connector: () => host,
+      integration: () => ({ callbackKey: 'callback-key', publicOrigin: 'https://flow.example' }),
+    },
+    triggerDefinitions: [definition],
+  })
+  try {
+    const content = revision('ready', definition.snapshot)
+    Object.assign(content.document.graph.nodes.integration!, { config: inputValues({}) })
+    await service.publisher.publish({
+      expectedLivePublicationId: null,
+      flowId: 'main',
+      idempotencyKey: next('publish'),
+      revision: content,
+      revisionId: next('revision'),
+    })
+    await service.tickIntegration(new Date(0).toISOString())
+    const endpoint = service.integrationEndpoint('main', 'integration')!
+    const app = createServerApp(service)
+    const receive = (deliveryId: string) =>
+      app.request(`/v1/integrations/${endpoint}`, {
+        body: '{}',
+        headers: { 'content-type': 'application/json', 'x-goog-message-number': deliveryId },
+        method: 'POST',
+      })
+    expect((await receive('page-1')).status).toBe(204)
+    expect((await receive('page-2')).status).toBe(429)
+    expect(admissionCount(file)).toBe(1)
+    expect(service.integrationState('main', 'integration')?.checkpoint).toEqual({ pageToken: 'page-1' })
+    const database = new DatabaseSync(file, { readOnly: true })
+    const run = database.prepare("SELECT run_id AS runId FROM runs WHERE status = 'queued'").get() as { runId: string }
+    database.close()
+    expect(service.cancel(run.runId)).toBe(true)
+    expect((await receive('page-2')).status).toBe(204)
+    expect(admissionCount(file)).toBe(2)
+    expect(service.integrationState('main', 'integration')?.checkpoint).toEqual({ pageToken: 'page-2' })
+    expect((await receive('page-2')).status).toBe(204)
+    expect(admissionCount(file)).toBe(2)
+  } finally {
+    await closeService(service)
+  }
+})
+
 describe('Server change listener', () => {
   async function publishListener(service: ServerService, file: string): Promise<string> {
     const publicationId = await publish(service, 'ready', null)
