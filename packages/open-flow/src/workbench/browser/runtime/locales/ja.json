@@ -96,7 +96,7 @@
     "removeAuthorization": "承認を削除",
     "saving": "保存中…",
     "permissionAllTriggers": "すべてのトリガー",
-    "permissionTriggers": "トリガー: {triggers}"
+    "permissionTriggers": "トリガー: {{triggers}}"
   },
   "common": {
     "cancel": "キャンセル",

@@ -96,7 +96,7 @@
     "removeAuthorization": "권한 제거",
     "saving": "저장 중…",
     "permissionAllTriggers": "모든 트리거",
-    "permissionTriggers": "트리거: {triggers}"
+    "permissionTriggers": "트리거: {{triggers}}"
   },
   "common": {
     "cancel": "취소",

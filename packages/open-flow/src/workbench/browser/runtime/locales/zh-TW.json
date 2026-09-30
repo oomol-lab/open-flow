@@ -96,7 +96,7 @@
     "removeAuthorization": "移除授權",
     "saving": "儲存中…",
     "permissionAllTriggers": "全部觸發器",
-    "permissionTriggers": "觸發器：{triggers}"
+    "permissionTriggers": "觸發器：{{triggers}}"
   },
   "common": {
     "cancel": "取消",

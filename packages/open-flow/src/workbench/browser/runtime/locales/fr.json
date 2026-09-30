@@ -96,7 +96,7 @@
     "removeAuthorization": "Retirer l’autorisation",
     "saving": "Enregistrement…",
     "permissionAllTriggers": "Tous les déclencheurs",
-    "permissionTriggers": "Déclencheurs : {triggers}"
+    "permissionTriggers": "Déclencheurs : {{triggers}}"
   },
   "common": {
     "cancel": "Annuler",

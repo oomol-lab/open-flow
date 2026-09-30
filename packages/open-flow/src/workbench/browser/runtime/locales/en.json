@@ -96,7 +96,7 @@
     "removeAuthorization": "Remove authorization",
     "saving": "Saving…",
     "permissionAllTriggers": "All Triggers",
-    "permissionTriggers": "Triggers: {triggers}"
+    "permissionTriggers": "Triggers: {{triggers}}"
   },
   "common": {
     "cancel": "Cancel",

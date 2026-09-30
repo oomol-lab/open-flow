@@ -96,7 +96,7 @@
     "removeAuthorization": "Удалить авторизацию",
     "saving": "Сохранение…",
     "permissionAllTriggers": "Все триггеры",
-    "permissionTriggers": "Триггеры: {triggers}"
+    "permissionTriggers": "Триггеры: {{triggers}}"
   },
   "common": {
     "cancel": "Отмена",

@@ -17,6 +17,18 @@ describe('Workbench i18n', () => {
     i18n.dispose()
   })
 
+  it.each(uiLanguages)('interpolates Trigger permission names in %s', (language) => {
+    const i18n = createI18n(language)
+    const triggers = 'on_message_received, on_message_changed'
+
+    const label = i18n.t('connectorAccess.permissionTriggers', { triggers })
+
+    expect(label).toContain(triggers)
+    expect(label).not.toContain('{triggers}')
+
+    i18n.dispose()
+  })
+
   it('resolves the host language tag', () => {
     const i18n = createI18n('zh-Hant-HK')
 
