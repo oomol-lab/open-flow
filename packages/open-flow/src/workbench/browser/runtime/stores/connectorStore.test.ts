@@ -1,3 +1,5 @@
+import type { Draft, Flow } from '../api.ts'
+
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
@@ -7,7 +9,7 @@ import { resourceValue } from './resource.ts'
 import { WorkspaceStore } from './workspaceStore.ts'
 
 const timestamp = '2026-08-30T00:00:00.000Z'
-const flows = ['flow-a', 'flow-b'].map((flowId, index) => ({
+const flows: readonly Flow[] = ['flow-a', 'flow-b'].map((flowId, index) => ({
   createdAt: timestamp,
   draftRevisionId: `revision-${index + 1}`,
   flowId,
@@ -17,7 +19,7 @@ const flows = ['flow-a', 'flow-b'].map((flowId, index) => ({
   version: 1,
 }))
 
-function draft(flowId: string, revisionId: string) {
+function draft(flowId: string, revisionId: string): Draft {
   return {
     actorId: 'actor-1',
     content: {
@@ -41,6 +43,56 @@ function draft(flowId: string, revisionId: string) {
 }
 
 describe('ConnectorStore', () => {
+  it.each(['providers', 'actions', 'connections', 'missing action'] as const)('retries %s immediately in the selected Flow', async (failure) => {
+    let failing = true
+    const account = { connectionId: 'account', serviceId: 'mail', displayName: 'Mail', status: 'active', isDefault: true }
+    const request = vi.fn(async (path: string) => {
+      const url = new URL(path, 'https://test.invalid')
+      const kind = url.pathname.split('/').at(-1)
+      if (failing && kind == failure) throw new Error('Offline')
+      if (kind == 'connections') return Response.json({ version: 1, connections: [account] })
+      return Response.json({
+        success: true,
+        data:
+          kind == 'providers'
+            ? [{ service: 'mail', displayName: 'Mail', authTypes: ['oauth2'] }]
+            : failing && failure == 'missing action'
+              ? []
+              : [{ id: 'mail.send', service: 'mail', name: 'Send', description: '', inputSchema: { type: 'object' }, outputSchema: { type: 'object' } }],
+      })
+    })
+    const client = new WorkbenchClient(request)
+    vi.spyOn(client, 'listFlows').mockResolvedValue({ version: 1, flows })
+    vi.spyOn(client, 'getEditor').mockResolvedValue({
+      version: 1,
+      flow: flows[0]!,
+      draft: draft('flow-a', 'revision-1'),
+      live: { version: 1, flowId: 'flow-a', hasUnpublishedChanges: false, publication: null, revision: 0, status: 'not-published' },
+      presentation: { version: 1, revision: 1, updatedAt: timestamp, value: {} },
+    })
+    const workspace = new WorkspaceStore(client, vi.fn())
+    const connectors = new ConnectorStore(client, workspace, vi.fn(), { openExternalPage: async () => false })
+    try {
+      await workspace.start('flow-a')
+      await expect(connectors.resolveAction('mail.send')).rejects.toThrow()
+      // Ordinary reads retain backoff. A user retry must bypass it without waiting 30 seconds.
+      failing = false
+      const reads = request.mock.calls.length
+      await expect(connectors.resolveAction('mail.send')).rejects.toThrow()
+      expect(request).toHaveBeenCalledTimes(reads)
+      connectors.retryAction('mail.send')
+      await expect(connectors.resolveAction('mail.send')).resolves.toMatchObject({ action: { actionId: 'mail.send' }, connections: [account] })
+      const retried = request.mock.calls.slice(reads).map(([path]) => path)
+      expect(retried).toContain(`/v1/connector/proxy/actions?flowId=flow-a&service=mail&locale=en`)
+      expect(retried).toContain('/v1/connector/connections?flowId=flow-a')
+      if (failure == 'providers') expect(retried).toContain('/v1/connector/proxy/providers?flowId=flow-a&locale=en')
+      else expect(retried.some((path) => path.includes('/providers'))).toBe(false)
+    } finally {
+      connectors.dispose()
+      workspace.dispose()
+    }
+  })
+
   it('keeps discovery global and resolves selected Actions in the active Flow', async () => {
     const connectorRequests: string[] = []
     const request = vi.fn(async (path: string) => {
@@ -143,6 +195,10 @@ describe('ConnectorStore', () => {
       expect(connectors.$.actions.value).toEqual({})
       const prepared = await connectors.resolveAction('mail.send')
       expect(prepared.action.description).toBe('Send for flow-a.')
+      const accountReads = request.mock.calls.filter(([path]) => path.startsWith('/v1/connector/connections')).length
+      connectors.retryAction('mail.send')
+      await expect(connectors.resolveAction('mail.send')).resolves.toMatchObject({ action: { authenticated: false }, connections: [] })
+      expect(request.mock.calls.filter(([path]) => path.startsWith('/v1/connector/connections'))).toHaveLength(accountReads)
       await resourceValue(connectors.provideAddNodeOptions('send', signal))
       expect(connectors.$.actions.value['mail.send']?.description).toBe('Send for flow-a.')
 

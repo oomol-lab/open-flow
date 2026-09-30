@@ -429,7 +429,10 @@ function ActionSelectionEditor<T extends SelectedAction>({
                             disabled={disabled}
                             label={t('inspector.account.retry')}
                             hint={preparationErrors[entry.action]}
-                            onClick={() => setAttempt((value) => value + 1)}
+                            onClick={() => {
+                              connectors.retryAction(entry.action)
+                              setAttempt((value) => value + 1)
+                            }}
                           />
                         ) : action?.authenticated === false ? (
                           <div className="text-muted-foreground">{t('actionPicker.noAccount')}</div>

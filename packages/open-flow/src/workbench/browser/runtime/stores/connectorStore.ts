@@ -369,12 +369,24 @@ export class ConnectorStore {
     })
   }
 
+  public retryAction(actionId: string): void {
+    const flowId = this.#workspace.$.flowId.value
+    if (flowId == null || this.#disposed) return
+    const actionState = this.data.actions.detail(actionId, flowId, this.#language, true)
+    if (this.data.providers.get(flowId, this.#language).value.error != null) this.data.providers.get(flowId, this.#language, true)
+    if (actionState.value.data?.authenticated !== false) this.data.connections.refreshFlow(flowId)
+  }
+
   public async resolveAction(actionId: string): Promise<{ readonly action: ConnectorActionView; readonly connections: readonly ConnectorConnection[] }> {
     const flowId = this.#workspace.$.flowId.value
     if (flowId == null || this.#disposed) throw new Error('Connector Action cannot be resolved without an active Flow.')
+    const actionState = this.data.actions.detail(actionId, flowId, this.#language)
+    // Resource refresh publishes asynchronously; wait before inspecting cached errors.
     await Promise.resolve()
-    const action = await resourceValue(this.data.actions.detail(actionId, flowId, this.#language), undefined, true)
-    const connections = action.authenticated ? await resourceValue(this.data.connections.get(action.serviceId, flowId), undefined, true) : []
+    const action = await resourceValue(actionState, undefined, true)
+    const connectionState = action.authenticated ? this.data.connections.get(action.serviceId, flowId) : undefined
+    await Promise.resolve()
+    const connections = connectionState == null ? [] : await resourceValue(connectionState, undefined, true)
     this.#remember(this.#actionIds, [actionId])
     if (action.authenticated) this.#remember(this.#services, [action.serviceId])
     return { action: actionWithConnections(action, connections), connections: connectionCatalog(connections).active }

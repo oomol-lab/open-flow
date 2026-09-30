@@ -125,6 +125,7 @@ function createSession(language: UiLanguage, log: LogAction) {
     },
   }
   let failSave = false
+  let failCatalog: 'providers' | 'actions' | 'connections' | undefined
   let sequence = 1
   const revision = () => ({
     actorId: 'lab',
@@ -138,6 +139,13 @@ function createSession(language: UiLanguage, log: LogAction) {
   })
   const client = new WorkbenchClient(async (path, init) => {
     const url = new URL(path instanceof Request ? path.url : path, 'https://lab.invalid')
+    if (url.pathname.startsWith('/v1/connector/') && url.searchParams.has('flowId')) {
+      log('connector.request', url.pathname)
+      if (failCatalog != null && url.pathname.endsWith(`/${failCatalog}`)) {
+        failCatalog = undefined
+        throw new Error('Simulated catalog request failure')
+      }
+    }
     if (url.pathname === '/v1/flows') return Response.json({ flows: [flow], total: 1, version: 1 })
     if (url.pathname.endsWith('/editor'))
       return Response.json({
@@ -236,6 +244,9 @@ function createSession(language: UiLanguage, log: LogAction) {
     failNextSave() {
       failSave = true
     },
+    failNextCatalog(kind: 'providers' | 'actions' | 'connections') {
+      failCatalog = kind
+    },
     i18n,
     workspace,
     connectors,
@@ -297,6 +308,9 @@ function AgentSession({ session, dark, code }: { session: ReturnType<typeof crea
       : []),
     { label: disabled ? 'Enable editing' : 'Read only', onClick: () => setDisabled((value) => !value) },
     { label: slow ? 'Normal preparation' : 'Slow preparation', onClick: () => setSlow((value) => !value) },
+    { label: 'Fail next tool request', onClick: () => session.failNextCatalog('actions') },
+    { label: 'Fail next provider request', onClick: () => session.failNextCatalog('providers') },
+    { label: 'Fail next account request', onClick: () => session.failNextCatalog('connections') },
     {
       label: 'Fail next preparation',
       onClick: () => {
@@ -355,7 +369,7 @@ function AgentSession({ session, dark, code }: { session: ReturnType<typeof crea
 
 export const agentStory: FrontendStory = {
   description:
-    'Edit the Prompt after Purpose, insert {{request}}, and save with blur or Cmd/Ctrl+S. Compare empty and referenced prompts, read-only and save retry. Expand Advanced settings to review model, computation, rounds and node limits. Browse services, check actions without removing them from the list, and choose accounts in the selected rows. Select Hosted tools to check the localized OOMOL Built-in account name and verification icon. Use slow preparation and failure controls to check immediate selection, independent row loading, removal and retry. Save a selected account, enable slow preparation and reopen the dialog: the cached account name stays visible while preparation finishes. Open a tool’s settings gear to edit its name, description and parameters, or remove it. Unset parameters are filled by the Agent. Check text, numbers, booleans, choices and collections; clear values and switch sources. Close and reopen settings with an invalid draft, then compare Save, Cancel and retry.',
+    'Edit the Prompt after Purpose, insert {{request}}, and save with blur or Cmd/Ctrl+S. Compare empty and referenced prompts, read-only and save retry. Expand Advanced settings to review model, computation, rounds and node limits. Browse services, check actions without removing them from the list, and choose accounts in the selected rows. Select Hosted tools to check the localized OOMOL Built-in account name and verification icon. Use slow preparation and failure controls to check immediate selection, independent row loading, removal and retry. Arm a request failure before selecting a tool, then click Retry immediately and check connector.request logs for a fresh read. Save a selected account, enable slow preparation and reopen the dialog: the cached account name stays visible while preparation finishes. Open a tool’s settings gear to edit its name, description and parameters, or remove it. Unset parameters are filled by the Agent. Check text, numbers, booleans, choices and collections; clear values and switch sources. Close and reopen settings with an invalid draft, then compare Save, Cancel and retry.',
   group: 'Node Agent',
   id: 'agent-tools',
   propertyPanel: false,
@@ -368,7 +382,7 @@ export const codeActionsStory: FrontendStory = {
   ...agentStory,
   propertyPanel: true,
   description:
-    'Open Actions from the plus button in the Code heading; saved selections show up to three distinct overlapping provider icons with the total action count as the final circle. Select multiple actions from one service to check icon deduplication and the tooltip counts. Browse services grouped by connected, built-in account, no setup and not connected, then check tools grouped by read, write, high-risk and other. Lab catalog covers all four categories, including filtered and empty results. Scroll provider and action lists to check sticky group headings and transitions between groups. Click a heading or activate it with Enter or Space to scroll smoothly to its group start, or instantly with reduced motion enabled; provider help stays independent. Selected rows use an unlabeled account selector aligned with the action title in the middle column, leaving the delete button in its own column, with the property panel control surface; the header refreshes accounts and trash buttons remove actions. Icon buttons have tooltips. Use slow preparation and failure controls to check immediate selection, concurrent rows, removal and retry. Check opening with 1,000 sample services, the centered empty state, text-only provider header, shared node-picker icons, selected action hierarchy, overlay scrolling, 13px type, saving without accounts, danger on the Code Actions button for account issues, warning account controls, an Add account button for empty accounts, issues sorted first only on initial load, stable order while editing, original selection order preserved on Save, Cancel and account-free actions.',
+    'Open Actions from the plus button in the Code heading; saved selections show up to three distinct overlapping provider icons with the total action count as the final circle. Select multiple actions from one service to check icon deduplication and the tooltip counts. Browse services grouped by connected, built-in account, no setup and not connected, then check tools grouped by read, write, high-risk and other. Lab catalog covers all four categories, including filtered and empty results. Scroll provider and action lists to check sticky group headings and transitions between groups. Click a heading or activate it with Enter or Space to scroll smoothly to its group start, or instantly with reduced motion enabled; provider help stays independent. Selected rows use an unlabeled account selector aligned with the action title in the middle column, leaving the delete button in its own column, with the property panel control surface; the header refreshes accounts and trash buttons remove actions. Icon buttons have tooltips. Use slow preparation and failure controls to check immediate selection, concurrent rows, removal and retry. Arm a request failure before selecting a tool, then click Retry immediately and check connector.request logs for a fresh read. Check opening with 1,000 sample services, the centered empty state, text-only provider header, shared node-picker icons, selected action hierarchy, overlay scrolling, 13px type, saving without accounts, danger on the Code Actions button for account issues, warning account controls, an Add account button for empty accounts, issues sorted first only on initial load, stable order while editing, original selection order preserved on Save, Cancel and account-free actions.',
   group: 'Node Task',
   id: 'code-actions',
   title: 'Select tools',
