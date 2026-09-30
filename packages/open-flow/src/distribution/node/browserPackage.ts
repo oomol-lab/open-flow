@@ -280,7 +280,10 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       "'./flow-change.js'",
     )
     const connectorActionDeclaration = await readFile(path.join(declarationRoot, 'connector/common/actionSchema.d.ts'), 'utf8')
-    const connectorProxyDeclaration = await readFile(path.join(declarationRoot, 'connector/common/proxy.d.ts'), 'utf8')
+    const connectorProxyDeclaration = (await readFile(path.join(declarationRoot, 'connector/common/proxy.d.ts'), 'utf8')).replaceAll(
+      "'../../flow/common/change.ts'",
+      "'../browser/flow-change.js'",
+    )
     await Promise.all(
       ['draftOperations', 'flowInspection', 'authoringExamples', 'providerAccess', 'connectorDecoders', 'providerIconSprite'].map(async (name) => {
         const declaration = (await readFile(path.join(declarationRoot, `control/common/${name}.d.ts`), 'utf8'))

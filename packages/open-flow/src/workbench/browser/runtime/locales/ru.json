@@ -94,7 +94,9 @@
     "dynamicCodeReferences": "Все узлы Code этого Flow, включая подпотоки, используют общий список подключений. Выбор подключения в другом узле не даёт Code доступ к нему.",
     "noAccountSelected": "Аккаунт не выбран",
     "removeAuthorization": "Удалить авторизацию",
-    "saving": "Сохранение…"
+    "saving": "Сохранение…",
+    "permissionAllTriggers": "Все триггеры",
+    "permissionTriggers": "Триггеры: {triggers}"
   },
   "common": {
     "cancel": "Отмена",

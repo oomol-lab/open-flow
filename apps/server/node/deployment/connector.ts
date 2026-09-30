@@ -1,4 +1,4 @@
-import type { ConnectorProxyRequest, ConnectorProxyResult } from '@oomol-lab/open-flow/connector-proxy'
+import type { ConnectorProxyRequest, ConnectorProxyResult, TriggerOperationRequest } from '@oomol-lab/open-flow/connector-proxy'
 import type { ProviderAccessReference, ConnectorAccessCandidates } from '@oomol-lab/open-flow/control-api'
 import type {
   ConnectorAccess,
@@ -17,7 +17,13 @@ import { providerIconAppearance } from '@oomol-lab/open-flow/control-api'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import { errorKind, silentLogger } from '../logger.ts'
-import { providerAccessAllowsAction, providerAccessAllowsProxy, providerAccessBindingCandidates, resolveProviderAccessBinding } from './provider-access.ts'
+import {
+  providerAccessAllowsAction,
+  providerAccessAllowsProxy,
+  providerAccessAllowsTrigger,
+  providerAccessBindingCandidates,
+  resolveProviderAccessBinding,
+} from './provider-access.ts'
 
 const maxResponseBytes = 1024 * 1024
 const maxActionResponseBytes = 32 * 1024 * 1024
@@ -73,6 +79,14 @@ export interface ConnectorHost {
     signal: AbortSignal,
     access?: ConnectorAccessContext,
   ): Promise<ConnectorProxyResult>
+  trigger?(
+    provider: string,
+    connectionId: string,
+    triggerId: string,
+    request: TriggerOperationRequest,
+    signal: AbortSignal,
+    access?: ConnectorAccessContext,
+  ): Promise<unknown>
   ready(): Promise<boolean>
   searchActions(query: string, signal?: AbortSignal, access?: ConnectorAccessContext, locale?: string): Promise<readonly ConnectorActionMetadata[]>
 }
@@ -91,6 +105,13 @@ export type ConnectorAccessContext = ConnectorContext &
     | { readonly scope: 'catalog'; readonly providerAccess: ConnectorAccess }
     | { readonly scope: 'shared' | 'selected'; readonly providerAccess: ConnectorAccessSnapshot }
     | { readonly scope: 'action'; readonly providerAccess: ConnectorAccessSnapshot; readonly action: string; readonly connectionId?: string }
+    | {
+        readonly scope: 'trigger'
+        readonly triggerId: string
+        readonly providerAccess: ConnectorAccessSnapshot
+        readonly providerId: string
+        readonly connectionId: string
+      }
     | { readonly scope: 'proxy'; readonly providerAccess: ConnectorAccessSnapshot; readonly providerId: string; readonly connectionId: string }
   )
 
@@ -102,6 +123,7 @@ function selectedGrants(access: Exclude<ConnectorAccessContext, { readonly scope
       return access.providerAccess.selectedBindings
     case 'action':
     case 'proxy':
+    case 'trigger':
       return access.providerAccess.selectedBindings.filter((binding) => binding.connectionId == access.connectionId)
   }
 }
@@ -507,6 +529,50 @@ export class ConnectorClient implements ConnectorHost {
     )
   }
 
+  async trigger(
+    provider: string,
+    connectionId: string,
+    triggerId: string,
+    request: TriggerOperationRequest,
+    signal: AbortSignal,
+    access?: ConnectorClientAccess,
+  ): Promise<unknown> {
+    if (
+      typeof access == 'object' &&
+      access.scope != 'catalog' &&
+      (access.scope != 'trigger' || access.triggerId != triggerId || access.providerId != provider || access.connectionId != connectionId)
+    )
+      throw accessInvalid()
+    const bindings = await this.#providerAccessBindings(access, provider, signal, true)
+    if (bindings != null && !bindings.some((candidate) => candidate.appId == connectionId && providerAccessAllowsTrigger(candidate, triggerId)))
+      throw accessInvalid()
+    const teamId = connectorTeamId(access)
+    await this.#assertConnection(connectionId, provider, signal, teamId)
+    const response = await this.#request(
+      'trigger.execute',
+      `v1/providers/${encodeURIComponent(provider)}/triggers/${encodeURIComponent(triggerId)}/execute`,
+      {
+        method: 'POST',
+        body: JSON.stringify(request),
+        headers: { 'content-type': 'application/json', 'x-oo-connector-app-id': connectionId },
+      },
+      signal,
+      { fields: { connectionId, provider, triggerId }, teamId },
+    )
+    if (response.ok && record(response.value) && response.value.success === true && 'data' in response.value) return response.value.data
+    if (
+      record(response.value) &&
+      ['scope_missing', 'credential_expired', 'connection_not_allowed', 'connection_not_found', 'trigger_connection_error'].includes(
+        String(response.value.errorCode),
+      )
+    )
+      throw connectionRequired()
+    if (record(response.value) && ['invalid_input', 'trigger_not_found'].includes(String(response.value.errorCode)) && response.status != 409)
+      throw new ConnectorTaskError('connector.input-invalid', 'The Trigger operation configuration is invalid.')
+    if (record(response.value) && response.value.errorCode == 'policy_denied') throw accessInvalid()
+    throw unavailable('The Trigger operation could not be completed.')
+  }
+
   async proxy(
     provider: string,
     connectionId: string,
@@ -520,13 +586,10 @@ export class ConnectorClient implements ConnectorHost {
       access.scope != 'catalog' &&
       (access.scope != 'proxy' || access.providerId != provider || access.connectionId != connectionId)
     )
-      throw accessInvalid('The proxy request is outside this invocation’s access scope.')
+      throw accessInvalid()
     const teamId = connectorTeamId(access)
     const bindings = await this.#providerAccessBindings(access, provider, signal, true)
-    if (bindings != null) {
-      const binding = bindings.find((candidate) => candidate.appId == connectionId && providerAccessAllowsProxy(candidate))
-      if (binding == null) throw accessInvalid()
-    }
+    if (bindings != null && !bindings.some((candidate) => candidate.appId == connectionId && providerAccessAllowsProxy(candidate))) throw accessInvalid()
     await this.#assertConnection(connectionId, provider, signal, teamId)
     const proxyResponse = await this.#request(
       'proxy.execute',

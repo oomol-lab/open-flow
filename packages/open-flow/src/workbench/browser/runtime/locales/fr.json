@@ -94,7 +94,9 @@
     "dynamicCodeReferences": "Tous les nœuds Code de ce Flow, y compris les sous-flux, partagent ces connexions. Les connexions sélectionnées par les autres nœuds ne donnent pas accès au Code.",
     "noAccountSelected": "Aucun compte sélectionné",
     "removeAuthorization": "Retirer l’autorisation",
-    "saving": "Enregistrement…"
+    "saving": "Enregistrement…",
+    "permissionAllTriggers": "Tous les déclencheurs",
+    "permissionTriggers": "Déclencheurs : {triggers}"
   },
   "common": {
     "cancel": "Annuler",

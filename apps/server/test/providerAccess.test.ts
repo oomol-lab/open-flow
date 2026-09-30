@@ -9,6 +9,7 @@ import {
   resolveProviderAccessBinding,
   providerAccessAllowsAction,
   providerAccessAllowsProxy,
+  providerAccessAllowsTrigger,
 } from '../node/deployment/provider-access.ts'
 import { ConnectorTeamStore } from '../node/storage/connector-team-store.ts'
 import { Database } from '../node/storage/database.ts'
@@ -71,7 +72,7 @@ describe('configured Connector access', () => {
         accessBindingId: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
         connectionDisplayName: 'Work account',
         isDefault: true,
-        permissions: { actionIds: ['example.echo'], allActions: false, configured: false, proxy: false },
+        permissions: { actionIds: ['example.echo'], allActions: false, configured: false, proxy: false, triggerIds: [], allTriggers: false },
         permissionGroupName: null,
         providerId: 'example',
       },
@@ -344,7 +345,10 @@ it('uses unrestricted team defaults for unconfigured accounts and applies later 
   const candidates = await providerAccessBindingCandidates(input)
   expect(candidates).toHaveLength(1)
   const candidate = candidates[0]!
-  expect(candidate).toMatchObject({ source: { kind: 'policy', ruleId: null }, permissions: { allActions: true, proxy: true } })
+  expect(candidate).toMatchObject({
+    source: { kind: 'policy', ruleId: null },
+    permissions: { allActions: true, proxy: true, triggerIds: [], allTriggers: true },
+  })
   await expect(resolveProviderAccessBinding({ ...input, ...candidate })).resolves.toMatchObject({ accessGrant: {} })
   await expect(providerAccessBindingCandidates({ ...input, policy: {} })).resolves.toEqual(candidates)
   const policy = {
@@ -417,7 +421,11 @@ it.each(['creator', 'admin'])('offers %s delegation without policy and retains i
   const candidates = result
   expect(candidates.candidates).toHaveLength(1)
   const candidate = candidates.candidates[0]!
-  expect(candidate).toMatchObject({ source: { kind: 'admin-delegation' }, connectionId: 'active', permissions: { allActions: true, proxy: true } })
+  expect(candidate).toMatchObject({
+    source: { kind: 'admin-delegation' },
+    connectionId: 'active',
+    permissions: { allActions: true, proxy: true, triggerIds: [], allTriggers: true },
+  })
   expect(remote.mock.calls.some(([url]) => String(url).endsWith('/app-access') || String(url).endsWith('/v1/users/profile'))).toBe(false)
   const saved = await access.add('operator', 'flow-1', 'example', candidate.accessBindingId, 0)
   expect(saved.kind).toBe('saved')
@@ -497,3 +505,34 @@ it.each([Response.json({ teams: 'invalid' }), new Response(null, { status: 503 }
     expect(fetch).toHaveBeenCalledTimes(1)
   },
 )
+
+it('offers a Trigger-only connection and keeps Action and proxy permissions separate', async () => {
+  const policy = {
+    'role::connector-app:account': {
+      connector: [
+        {
+          method: 'POST',
+          provider: 'gmail',
+          permissionRules: { teamDefault: { actions: [], triggers: ['gmail.on_message_received'] }, rules: [], assignments: {} },
+        },
+      ],
+    },
+  }
+  const connections = [{ connectionId: 'account', displayName: 'Mailbox', isDefault: false, serviceId: 'gmail', status: 'active' as const }]
+  const candidates = await providerAccessBindingCandidates({ actorId: 'user', connections, policy, providerId: 'gmail', teamId: 'team' })
+  expect(candidates).toHaveLength(1)
+  expect(candidates[0]!.permissions).toEqual({
+    allActions: false,
+    actionIds: [],
+    allTriggers: false,
+    triggerIds: ['gmail.on_message_received'],
+    proxy: false,
+    configured: false,
+  })
+  const binding = await resolveProviderAccessBinding({ ...candidates[0]!, connections, policy, teamId: 'team' })
+  expect(binding).toBeDefined()
+  expect(providerAccessAllowsTrigger(binding!, 'gmail.on_message_received')).toBe(true)
+  expect(providerAccessAllowsTrigger(binding!, 'gmail.other')).toBe(false)
+  expect(providerAccessAllowsAction(binding!, { actionId: 'gmail.send', serviceId: 'gmail' })).toBe(false)
+  expect(providerAccessAllowsProxy(binding!)).toBe(false)
+})

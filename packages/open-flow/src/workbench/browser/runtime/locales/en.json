@@ -94,7 +94,9 @@
     "dynamicCodeReferences": "All Code nodes in this Flow, including Subflows, share these connections. Node connection selections do not grant Code access.",
     "noAccountSelected": "No account selected",
     "removeAuthorization": "Remove authorization",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "permissionAllTriggers": "All Triggers",
+    "permissionTriggers": "Triggers: {triggers}"
   },
   "common": {
     "cancel": "Cancel",

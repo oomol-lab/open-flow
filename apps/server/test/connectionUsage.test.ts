@@ -19,7 +19,7 @@ const candidate = {
   accessBindingId: 'binding',
   connectionDisplayName: 'Work',
   source: { kind: 'admin-delegation' as const },
-  permissions: { allActions: true, actionIds: [], proxy: true, configured: false },
+  permissions: { allActions: true, actionIds: [], proxy: true, configured: false, triggerIds: [], allTriggers: true },
 }
 
 afterEach(() => vi.unstubAllGlobals())
@@ -53,7 +53,9 @@ it('captures only selected node connections without adding Code usage and reject
         version: 1,
         providerId: 'mail',
         mode: 'selectable',
-        candidates: [{ ...candidate, permissions: { ...candidate.permissions, allActions: false, actionIds: ['mail.read'] } }],
+        candidates: [
+          { ...candidate, permissions: { ...candidate.permissions, allActions: false, actionIds: ['mail.read'], triggerIds: [], allTriggers: false } },
+        ],
       },
     ],
   })
@@ -234,7 +236,9 @@ it('captures Agent tools, notifications and Trigger proxy usage without Code per
         version: 1,
         mode: 'selectable',
         providerId: 'mail',
-        candidates: [{ ...candidate, permissions: { allActions: false, actionIds: ['mail.send'], proxy: false, configured: false } }],
+        candidates: [
+          { ...candidate, permissions: { allActions: false, actionIds: ['mail.send'], proxy: false, configured: false, triggerIds: [], allTriggers: false } },
+        ],
       },
     ],
   })

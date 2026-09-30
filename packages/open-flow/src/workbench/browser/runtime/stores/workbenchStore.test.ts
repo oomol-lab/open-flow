@@ -773,7 +773,7 @@ it('selects an eligible default connection without adding shared Code usage', as
             accessBindingId: 'mail-read-access',
             connectionDisplayName: connection.displayName,
             isDefault: true,
-            permissions: { actionIds: ['mail.read'], allActions: false, configured: false, proxy: false },
+            permissions: { actionIds: ['mail.read'], allActions: false, configured: false, proxy: false, triggerIds: [], allTriggers: false },
             permissionGroupName: null,
             providerId: 'mail',
           },
@@ -783,7 +783,7 @@ it('selects an eligible default connection without adding shared Code usage', as
             accessBindingId: 'mail-send-access',
             connectionDisplayName: 'Sending account',
             isDefault: false,
-            permissions: { actionIds: ['mail.send'], allActions: false, configured: false, proxy: false },
+            permissions: { actionIds: ['mail.send'], allActions: false, configured: false, proxy: false, triggerIds: [], allTriggers: false },
             permissionGroupName: 'Senders',
             providerId: 'mail',
           },
@@ -985,7 +985,13 @@ it('waits for a candidate query already started by the inspector before selectin
           providerId: 'mail',
           mode: 'selectable',
           version: 1,
-          candidates: [{ ...binding, isDefault: true, permissions: { actionIds: [], allActions: true, configured: false, proxy: true } }],
+          candidates: [
+            {
+              ...binding,
+              isDefault: true,
+              permissions: { actionIds: [], allActions: true, configured: false, proxy: true, triggerIds: [], allTriggers: true },
+            },
+          ],
         },
       ],
     })

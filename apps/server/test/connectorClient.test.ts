@@ -252,7 +252,7 @@ describe('Server Connector client', () => {
         accessBindingId: expect.stringMatching(/^sha256:[0-9a-f]{64}$/),
         connectionDisplayName: 'Work account',
         isDefault: true,
-        permissions: { actionIds: ['example.echo'], allActions: false, configured: false, proxy: false },
+        permissions: { actionIds: ['example.echo'], allActions: false, configured: false, proxy: false, triggerIds: [], allTriggers: false },
         permissionGroupName: 'Editors',
         policyRevision: 'policy-7',
         providerId: 'example',
@@ -1343,4 +1343,34 @@ it('shares candidate inputs across providers and isolates a malformed provider p
   for (const endpoint of ['/v1/me/teams', '/v1/users/profile', '/app-access', '/v1/apps']) {
     expect(calls.filter((url) => url.endsWith(endpoint))).toHaveLength(1)
   }
+})
+
+it('routes a registered Trigger request separately from generic proxy', async () => {
+  const requests: { path: string; body: unknown }[] = []
+  const origin = await startConnector(async (request, response) => {
+    if (request.url == '/v1/apps') return send(response, 200, { data: [app], success: true })
+    requests.push({ path: request.url!, body: await readBody(request) })
+    send(response, 200, { data: { checkpoint: null, events: [] }, success: true })
+  })
+  const client = new ConnectorClient(origin, 'runtime-token')
+  await expect(
+    client.trigger('example', 'connection-work', 'example.on_event', { operation: 'read', config: {}, checkpoint: null }, new AbortController().signal),
+  ).resolves.toEqual({ checkpoint: null, events: [] })
+  expect(requests).toEqual([{ path: '/v1/providers/example/triggers/example.on_event/execute', body: { operation: 'read', config: {}, checkpoint: null } }])
+})
+
+it.each([
+  ['trigger_connection_error', 409, 'connector.connection-required'],
+  ['proxy_upstream_error', 503, 'connector.unavailable'],
+  ['provider_error', 500, 'connector.unavailable'],
+  ['invalid_input', 400, 'connector.input-invalid'],
+])('maps Trigger failure %s to %s', async (errorCode, status, code) => {
+  const origin = await startConnector(async (request, response) => {
+    if (request.url == '/v1/apps') return send(response, 200, { data: [app], success: true })
+    send(response, status, { errorCode, errorMessage: 'Trigger failed' })
+  })
+  const client = new ConnectorClient(origin, 'runtime-token')
+  await expect(
+    client.trigger('example', 'connection-work', 'example.on_event', { operation: 'read', config: {}, checkpoint: null }, new AbortController().signal),
+  ).rejects.toMatchObject({ code })
 })

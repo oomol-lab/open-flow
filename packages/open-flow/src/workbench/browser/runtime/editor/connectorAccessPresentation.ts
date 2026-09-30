@@ -23,7 +23,14 @@ export function connectorAccessPermissionLabel(candidate: PresentedPermissions, 
       ? t('connectorAccess.permissionActionsMore', { actions: shown, count: actions.length - 3 })
       : t('connectorAccess.permissionActions', { actions: shown })
   return [
-    label,
+    permissions.allActions || actions.length > 0 ? label : undefined,
+    permissions.allTriggers
+      ? t('connectorAccess.permissionAllTriggers')
+      : permissions.triggerIds.length > 0
+        ? t('connectorAccess.permissionTriggers', {
+            triggers: permissions.triggerIds.map((id) => (id.startsWith(prefix) ? id.slice(prefix.length) : id)).join(', '),
+          })
+        : undefined,
     permissions.proxy ? t('connectorAccess.permissionProxy') : undefined,
     permissions.configured ? t('connectorAccess.permissionConfigured') : undefined,
   ]

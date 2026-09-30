@@ -94,7 +94,9 @@
     "dynamicCodeReferences": "サブフローを含む、この Flow のすべての Code ノードで接続を共有します。他のノードで選択した接続は、Code に自動で許可されません。",
     "noAccountSelected": "アカウント未選択",
     "removeAuthorization": "承認を削除",
-    "saving": "保存中…"
+    "saving": "保存中…",
+    "permissionAllTriggers": "すべてのトリガー",
+    "permissionTriggers": "トリガー: {triggers}"
   },
   "common": {
     "cancel": "キャンセル",

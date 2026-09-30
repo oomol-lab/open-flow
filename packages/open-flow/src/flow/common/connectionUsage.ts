@@ -4,6 +4,7 @@ export interface ConnectionUsage {
   readonly providerId: string
   readonly connectionId?: string
   readonly actionId?: string
+  readonly triggerId?: string
   readonly nodeId: string
   readonly name: string
   readonly target: GraphTarget
@@ -26,6 +27,7 @@ export function connectionUsage(document: FlowDocument): readonly ConnectionUsag
       if (node.kind == 'poll' || node.kind == 'integration') {
         uses.push({
           kind: 'trigger',
+          triggerId: node.definition.key,
           providerId: node.definition.provider,
           connectionId: node.connectionId,
           nodeId,

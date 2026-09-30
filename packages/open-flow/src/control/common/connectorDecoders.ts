@@ -20,19 +20,29 @@ import { providerIconAppearance } from './providerIconSprite.ts'
 
 function accessPermissions(value: unknown): NonNullable<ProviderAccessBindingCandidate['permissions']> {
   const source = record(value)
-  exact(source, ['actionIds', 'allActions', 'configured', 'proxy'])
-  if (!Array.isArray(source.actionIds) || typeof source.allActions != 'boolean' || typeof source.configured != 'boolean' || typeof source.proxy != 'boolean') {
-    return invalidResponse()
-  }
-  const actionIds = source.actionIds.map(string)
+  exact(source, ['actionIds', 'allActions', 'triggerIds', 'allTriggers', 'configured', 'proxy'])
   if (
-    new Set(actionIds).size != actionIds.length ||
-    source.allActions != (actionIds.length == 0) ||
-    source.proxy != (source.allActions && !source.configured)
+    !Array.isArray(source.triggerIds) ||
+    typeof source.allTriggers != 'boolean' ||
+    !Array.isArray(source.actionIds) ||
+    typeof source.allActions != 'boolean' ||
+    typeof source.configured != 'boolean' ||
+    typeof source.proxy != 'boolean'
   ) {
     return invalidResponse()
   }
-  return { actionIds, allActions: source.allActions, configured: source.configured, proxy: source.proxy }
+  const actionIds = source.actionIds.map(string)
+  const triggerIds = source.triggerIds.map(string)
+  if (
+    new Set(actionIds).size != actionIds.length ||
+    (source.allActions && actionIds.length != 0) ||
+    new Set(triggerIds).size != triggerIds.length ||
+    (source.allTriggers && triggerIds.length != 0) ||
+    (source.proxy && (!source.allActions || !source.allTriggers || source.configured))
+  ) {
+    return invalidResponse()
+  }
+  return { actionIds, triggerIds, allTriggers: source.allTriggers, allActions: source.allActions, configured: source.configured, proxy: source.proxy }
 }
 
 function accessBinding(value: unknown, candidate: true): ProviderAccessBindingCandidate

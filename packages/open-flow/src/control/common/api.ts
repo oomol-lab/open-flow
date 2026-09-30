@@ -227,6 +227,8 @@ export interface ProviderAccessBindingCandidate extends ProviderAccessIdentity {
   readonly permissions?: {
     readonly actionIds: readonly string[]
     readonly allActions: boolean
+    readonly triggerIds: readonly string[]
+    readonly allTriggers: boolean
     readonly configured: boolean
     readonly proxy: boolean
   }

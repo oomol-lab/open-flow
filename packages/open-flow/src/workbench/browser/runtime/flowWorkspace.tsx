@@ -118,6 +118,8 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   const accessState = useVal(store.connectorAccess.$)
   const connectorAccess = accessState.access
   const providerId = connectorAction?.authenticated ? connectorAction.serviceId : undefined
+  const triggerId =
+    selection?.kind == 'trigger' && (selection.trigger.kind == 'poll' || selection.trigger.kind == 'integration') ? selection.trigger.definition.key : undefined
   const triggerProviderId =
     selection?.kind == 'trigger' && (selection.trigger.kind == 'poll' || selection.trigger.kind == 'integration')
       ? selection.trigger.definition.provider
@@ -137,7 +139,10 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   const triggerCandidates =
     triggerProviderId == null
       ? undefined
-      : accessState.candidates[triggerProviderId]?.candidates.filter((candidate) => candidate.permissions == null || candidate.permissions.proxy)
+      : accessState.candidates[triggerProviderId]?.candidates.filter(
+          (candidate) =>
+            candidate.permissions == null || candidate.permissions.allTriggers || (triggerId != null && candidate.permissions.triggerIds.includes(triggerId)),
+        )
   const candidates = providerId == null ? undefined : accessState.candidates[providerId]?.candidates
   const allowedCandidates = candidates?.filter(
     (candidate) => candidate.permissions == null || candidate.permissions.allActions || candidate.permissions.actionIds.includes(connectorAction!.actionId),
