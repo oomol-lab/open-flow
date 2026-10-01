@@ -194,8 +194,8 @@ describe('ConnectorStore', () => {
 
       expect(firstProviders?.[0]?.label).toBe('Mail global')
       expect(firstProviders?.[0]?.icon).toBe(providerIcon({ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail global' }))
-      expect(firstActions?.[0]?.description).toBe('Send for global.')
-      expect(firstActions?.[0]?.icon).toBe(providerIcon({ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail global' }))
+      expect(firstActions?.[0]?.description).toBe('Send for flow-a.')
+      expect(firstActions?.[0]?.icon).toBe(providerIcon({ homepageUrl: 'https://mail.example', serviceId: 'mail', serviceName: 'Mail flow-a' }))
       expect(connectors.$.actions.value).toEqual({})
       const prepared = await connectors.resolveAction('mail.send')
       expect(prepared.action.description).toBe('Send for flow-a.')
@@ -226,19 +226,17 @@ describe('ConnectorStore', () => {
       expect(secondProviders?.[0]?.label).toBe('Mail global')
       expect(connectors.$.actions.value).toEqual({})
       expect(connectorRequests).toContain('/v1/connector/proxy/providers?locale=en')
-      expect(connectorRequests).toContain('/v1/connector/proxy/actions?service=mail&locale=en')
       expect(connectorRequests).toContain('/v1/connector/proxy/actions?flowId=flow-a&service=mail&locale=en')
+      expect(connectorRequests).toContain('/v1/connector/proxy/actions?flowId=flow-b&service=mail&locale=en')
       expect(connectorRequests).toContain('/v1/connector/action-metadata?q=send&locale=en')
-      expect(connectorRequests.some((path) => path.includes('flowId=flow-b'))).toBe(false)
+      expect(connectorRequests.some((path) => path.includes('flowId=flow-b'))).toBe(true)
       connectors.setLanguage('zh-CN')
       const localizedProviders = await resourceValue(connectors.browseAddNodeOptions(signal))
       expect(localizedProviders?.[0]?.label).toBe('邮件 global')
       await resourceValue(connectors.provideAddNodeOptionChoices(localizedProviders![0]!.id, signal))
       await resourceValue(connectors.provideAddNodeOptions('send', signal))
-      expect(connectorRequests.slice(-2)).toEqual([
-        '/v1/connector/proxy/actions?service=mail&locale=zh-CN',
-        '/v1/connector/action-metadata?q=send&locale=zh-CN',
-      ])
+      expect(connectorRequests).toContain('/v1/connector/proxy/actions?flowId=flow-b&service=mail&locale=zh-CN')
+      expect(connectorRequests).toContain('/v1/connector/action-metadata?q=send&locale=zh-CN')
     } finally {
       connectors.dispose()
       workspace.dispose()

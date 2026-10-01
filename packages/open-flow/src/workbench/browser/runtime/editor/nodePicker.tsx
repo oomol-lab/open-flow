@@ -143,7 +143,7 @@ export function NodePickerContent({
     return [...entries.values()].toSorted(comparePickerApps)
   }, [catalog, connections])
   const app = apps.find((item) => item.id == appId)
-  const directoryId = app?.directory?.id
+  const directoryId = app?.directory?.id ?? (app == null ? undefined : `connector-provider:${app.id}`)
   const searching = term != '' && app == null
   const [choicesLoading, setChoicesLoading] = useState(false)
   const [choicesFailed, setChoicesFailed] = useState(false)
@@ -152,12 +152,13 @@ export function NodePickerContent({
     setActions([])
     setChoicesFailed(false)
     setChoicesLoading(directoryId != null)
-    if (directoryId != null)
+    if (directoryId != null) {
       observeResource(provideChoices(directoryId, controller.signal), controller.signal, (state) => {
         setActions(state.data ?? [])
         setChoicesFailed(state.error != null)
         setChoicesLoading(state.data == null && state.error == null)
       })
+    }
     return () => controller.abort()
   }, [directoryId, provideChoices, t])
   useEffect(() => {

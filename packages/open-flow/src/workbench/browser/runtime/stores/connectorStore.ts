@@ -329,8 +329,9 @@ export class ConnectorStore {
 
   public readonly provideAddNodeOptionChoices = (optionId: string, signal: AbortSignal) => {
     const service = optionId.slice('connector-provider:'.length)
-    const source = this.data.actions.get(service, undefined, this.#language)
-    const providers = this.data.providers.get(undefined, this.#language)
+    const flowId = this.#workspace.$.flowId.value
+    const source = this.data.actions.get(service, flowId, this.#language)
+    const providers = this.data.providers.get(flowId, this.#language)
     return scopedValue(signal, (get) => {
       const state = get(source)
       const provider = get(providers).data?.find((item) => item.serviceId == service)

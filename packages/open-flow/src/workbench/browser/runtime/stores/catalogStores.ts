@@ -19,6 +19,11 @@ import { CacheResource } from './resource.ts'
 const catalogMaxAge = { providers: 300_000, actions: 30_000, connections: 30_000 } as const
 const identity = (...parts: (string | undefined)[]) => JSON.stringify(parts)
 
+function proxyCatalogPath(kind: 'providers' | 'actions', flowId: string | undefined, locale: string, service?: string): string {
+  const params = new URLSearchParams({ ...(flowId == null ? {} : { flowId }), ...(service == null ? {} : { service }), locale })
+  return `/v1/connector/proxy/${kind}?${params}`
+}
+
 type CacheScope = Readonly<{
   readonly sessionId: string
   readonly environment?: string
@@ -129,8 +134,7 @@ class ProxyStore {
   }
 
   get(flowId?: string, locale = 'en', service?: string, force = false): ReadonlyVal<ResourceState<ProxyResponse>> {
-    const params = new URLSearchParams({ ...(flowId == null ? {} : { flowId }), ...(service == null ? {} : { service }), locale })
-    const path = `/v1/connector/proxy/${this.kind}?${params}`
+    const path = proxyCatalogPath(this.kind, flowId, locale, service)
     let entry = this.entries.get(path)
     if (entry == null) {
       entry = new CacheResource(() => this.#cache(flowId, locale, service, path), undefined, false, catalogMaxAge[this.kind])
@@ -172,8 +176,11 @@ class ProxyStore {
             maxAge: catalogMaxAge.actions,
             decode: actionCacheValue,
             load: async ({ service: requestedService }, validation) => {
-              if (requestedService != service) throw new Error('Action cache service mismatch.')
-              const result = await this.client.readProxyCatalog({ path, decode: actionCacheValue }, validation.etag, validation.signal)
+              const result = await this.client.readProxyCatalog(
+                { path: proxyCatalogPath('actions', flowId, locale, requestedService), decode: actionCacheValue },
+                validation.etag,
+                validation.signal,
+              )
               return result as LoadResult<ActionsResponse>
             },
           })
