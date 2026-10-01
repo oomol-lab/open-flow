@@ -8,7 +8,6 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { resourceNameIssue, resourceNameMaxLength } from '../../../../flow/common/change.ts'
-import { uiLanguageNames, uiLanguages } from '../../../../localization/common/languages.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../../ui/browser/dialog.tsx'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../../ui/browser/empty.tsx'
@@ -23,11 +22,9 @@ import { cn } from '../../../../ui/browser/utils.ts'
 import { Icon } from '../icons.tsx'
 import { followWorkbenchLink } from '../navigationLink.ts'
 import { IdTooltip } from './idTooltip.tsx'
-import { WorkbenchSelect } from './workbenchSelect.tsx'
 
 const CreateResourceDialog = lazy(() => import('./createResourceDialog.tsx'))
 
-const languageOptions = uiLanguages.map((language) => ({ label: uiLanguageNames[language], value: language }))
 const flowIdTooltipAlignOffset = 44
 const renamePopoverAlignOffset = -12
 const renamePopoverVerticalShift = 8
@@ -36,24 +33,6 @@ const rowControlSelector = 'a, button, input, select, textarea, [data-slot="tool
 interface LanguageSelectProps {
   readonly language: WorkbenchLanguage
   readonly onLanguageChange?: ((language: WorkbenchLanguage) => void) | undefined
-}
-
-export function LanguageSelect({ language, onLanguageChange }: LanguageSelectProps): ReactElement | null {
-  const t = useTranslate()
-  const [portalRoot, setPortalRoot] = useState<HTMLDivElement | null>(null)
-  if (onLanguageChange == null) return null
-  return (
-    <div className="resource-language" ref={setPortalRoot}>
-      <span className="sr-only">{t('language.label')}</span>
-      <WorkbenchSelect
-        ariaLabel={t('language.label')}
-        onValueChange={(value) => onLanguageChange(value as WorkbenchLanguage)}
-        options={languageOptions}
-        portalRoot={portalRoot}
-        value={language}
-      />
-    </div>
-  )
 }
 
 interface FlowItemProps {
@@ -426,9 +405,7 @@ export function FlowBrowser({
   createFlowField,
   flowBadges,
   hrefForFlow,
-  language,
   onCreateFlow,
-  onLanguageChange,
   onSelectFlow,
   store,
 }: FlowBrowserProps): ReactElement {
@@ -467,7 +444,6 @@ export function FlowBrowser({
               {!loading && <span>{t('resource.flowCount', { count: total ?? flows.length })}</span>}
             </div>
             <div className="resource-list-actions">
-              <LanguageSelect language={language} onLanguageChange={onLanguageChange} />
               <InputGroup className="w-full sm:w-56">
                 <InputGroupAddon>
                   <Icon name="search" size={17} />

@@ -37,11 +37,6 @@
     white-space: nowrap;
   }
 
-  .resource-language {
-    display: flex;
-    flex: none;
-  }
-
   .resource-list-section {
     min-width: 0;
     border: 1px solid var(--ui-border);
