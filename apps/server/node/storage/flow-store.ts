@@ -18,6 +18,7 @@ export interface StoredFlow {
   readonly flowId: string
   readonly status: 'active' | 'retiring'
   readonly updatedAt: number
+  readonly connectorTeamId: string | null
 }
 
 export interface StoredFlowRevision {
@@ -55,7 +56,8 @@ export function presentationView(stored: StoredPresentation): Presentation {
 const flowColumns = `(SELECT enabled FROM flow_live WHERE flow_live.flow_id = flows.flow_id) AS liveEnabled,
                      (SELECT publication_id FROM flow_live WHERE flow_live.flow_id = flows.flow_id) AS publicationId,
                      (SELECT publications.revision_id FROM flow_live JOIN publications USING (publication_id) WHERE flow_live.flow_id = flows.flow_id) AS publishedRevisionId, create_request_digest AS createRequestDigest, created_at AS createdAt,
-                     draft_revision_id AS draftRevisionId, name, flow_id AS flowId, status, updated_at AS updatedAt`
+                     draft_revision_id AS draftRevisionId, name, flow_id AS flowId, status, updated_at AS updatedAt,
+                     (SELECT team_id FROM flow_connector_teams WHERE flow_connector_teams.flow_id = flows.flow_id) AS connectorTeamId`
 
 /**
  * Flow identity, its Draft head, and its Presentation.

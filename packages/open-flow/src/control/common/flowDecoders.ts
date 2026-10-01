@@ -14,6 +14,7 @@ export function flow(value: unknown): Flow {
       ? {}
       : { live: { enabled: target.enabled as boolean, publicationId: string(target.publicationId), revisionId: string(target.revisionId) } }),
     createdAt: string(source.createdAt),
+    ...(source.connectorTeamId == null ? {} : { connectorTeamId: string(source.connectorTeamId) }),
     draftRevisionId: string(source.draftRevisionId),
     flowId: string(source.flowId),
     name: string(source.name),

@@ -128,8 +128,9 @@ export class WorkbenchStore {
     preferences: WorkbenchPreferences,
     identity: () => string = randomId,
     i18n: I18n = createI18n(),
-    host: Pick<WorkbenchHost, 'openExternalPage' | 'connectionCache' | 'catalogCache' | 'resolveActor'> = blockedExternalPages,
+    host: Pick<WorkbenchHost, 'openExternalPage' | 'cacheEnvironment' | 'connectorOwnerId' | 'resolveActor'> = blockedExternalPages,
     variables = true,
+    cacheSessionId: string = crypto.randomUUID(),
   ) {
     this.actors = new ActorStore(host.resolveActor)
     this.preferences = preferences
@@ -153,7 +154,7 @@ export class WorkbenchStore {
         if (event.kind == 'run.created') void this.#followExternalRun(client, event)
         else this.runs.changed(event.runId)
       },
-      new CatalogStores(client, host.catalogCache, host.connectionCache),
+      new CatalogStores(client, { sessionId: cacheSessionId, environment: host.cacheEnvironment, connectorOwnerId: host.connectorOwnerId }),
       (flowId) => void this.#openCreatedFlow(flowId),
       (flowId) => {
         this.connectorAccess.changed(flowId)

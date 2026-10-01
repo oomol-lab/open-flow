@@ -5,6 +5,7 @@ import { twemojiCollectionPlugin } from './src/build/node/twemojiCollection.ts'
 export default defineConfig({
   plugins: [providerIconsPlugin({ iconUrls: { github: 'https://static.oomol.com/logo/third-party/github.svg' } }), twemojiCollectionPlugin()],
   test: {
+    setupFiles: ['./test/resource-cache.setup.ts'],
     coverage: {
       include: [
         'src/execution/common/events.ts',

@@ -1,28 +1,27 @@
-import type { ReadonlyVal } from 'value-enhancer'
+import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { TriggerCatalog } from '../../../../control/common/triggerCatalog.ts'
 import type { UiLanguage } from '../../../../localization/common/languages.ts'
 import type { WorkbenchClient } from '../api.ts'
-import type { WorkbenchHost } from '../contract.ts'
 import type { ResourceState } from './resource.ts'
 
+import { createPersistentCache } from '@oomol-lab/resource-cache'
 import { compute, val } from 'value-enhancer'
 import { decodeTriggerCatalog } from '../../../../control/common/triggerCatalog.ts'
-import { catalogPersistence } from './catalogStorage.ts'
-import { Resource } from './resource.ts'
+import { CacheResource } from './resource.ts'
 
 export class TriggerCatalogStore {
-  readonly #language
-  readonly #entries = new Map<UiLanguage, Resource<TriggerCatalog>>()
+  readonly #language: Val<UiLanguage>
+  readonly #entries = new Map<UiLanguage, CacheResource<TriggerCatalog, void>>()
   readonly state: ReadonlyVal<ResourceState<TriggerCatalog>>
   constructor(
     private readonly client: WorkbenchClient,
     language: UiLanguage,
-    private readonly host: Pick<WorkbenchHost, 'catalogCache'>,
+    private readonly environment = 'production',
   ) {
     this.#language = val(language)
     this.state = compute((get) => get(this.#entry(get(this.#language)).state))
   }
-  #entry(locale: UiLanguage): Resource<TriggerCatalog> {
+  #entry(locale: UiLanguage): CacheResource<TriggerCatalog, void> {
     let entry = this.#entries.get(locale)
     if (entry == null) {
       const decode = (value: unknown) => {
@@ -30,12 +29,16 @@ export class TriggerCatalogStore {
         if (data.locale != locale) throw new Error('Unexpected Trigger catalog language.')
         return data
       }
-      const persistence = catalogPersistence(this.host.catalogCache, 'triggers', locale)
-      entry = new Resource(
-        (etag, signal) => this.client.readCatalog({ path: `/v1/trigger-keys/catalog?locale=${encodeURIComponent(locale)}`, decode }, etag, signal),
-        300_000,
-        persistence == null ? undefined : { ...persistence, decode },
-      )
+      const cache = createPersistentCache<TriggerCatalog, void>({
+        namespace: JSON.stringify(['open-flow:trigger-catalog', this.environment]),
+        schemaVersion: 1,
+        maxAge: 300_000,
+        key: () => locale,
+        decode,
+        load: async (_query, validation) =>
+          this.client.readCatalog({ path: `/v1/trigger-keys/catalog?locale=${encodeURIComponent(locale)}`, decode }, validation.etag, validation.signal),
+      })
+      entry = new CacheResource(async () => cache, undefined, true, 300_000)
       this.#entries.set(locale, entry)
     }
     return entry

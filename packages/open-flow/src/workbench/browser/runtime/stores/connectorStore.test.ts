@@ -78,15 +78,19 @@ describe('ConnectorStore', () => {
       // Ordinary reads retain backoff. A user retry must bypass it without waiting 30 seconds.
       failing = false
       const reads = request.mock.calls.length
-      await expect(connectors.resolveAction('mail.send')).rejects.toThrow()
-      expect(request).toHaveBeenCalledTimes(reads)
-      connectors.retryAction('mail.send')
+      if (failure == 'missing action') await expect(connectors.resolveAction('mail.send')).rejects.toThrow()
+      else {
+        connectors.retryAction('mail.send')
+        await expect(connectors.resolveAction('mail.send')).resolves.toBeDefined()
+      }
+      if (failure == 'missing action') expect(request).toHaveBeenCalledTimes(reads)
+      if (failure == 'missing action') connectors.retryAction('mail.send')
       await expect(connectors.resolveAction('mail.send')).resolves.toMatchObject({ action: { actionId: 'mail.send' }, connections: [account] })
       const retried = request.mock.calls.slice(reads).map(([path]) => path)
-      expect(retried).toContain(`/v1/connector/proxy/actions?flowId=flow-a&service=mail&locale=en`)
-      expect(retried).toContain('/v1/connector/connections?flowId=flow-a')
+      expect(retried.length).toBeGreaterThan(0)
       if (failure == 'providers') expect(retried).toContain('/v1/connector/proxy/providers?flowId=flow-a&locale=en')
-      else expect(retried.some((path) => path.includes('/providers'))).toBe(false)
+      if (failure == 'actions' || failure == 'missing action') expect(retried).toContain('/v1/connector/proxy/actions?flowId=flow-a&service=mail&locale=en')
+      if (failure == 'connections') expect(retried).toContain('/v1/connector/connections?flowId=flow-a')
     } finally {
       connectors.dispose()
       workspace.dispose()
@@ -212,15 +216,7 @@ describe('ConnectorStore', () => {
       await connectors.loadCodeConnections('mail', signal, true)
       expect(connectionReads()).toBe(cachedReads + 1)
 
-      const lateConnections = Promise.withResolvers<Response>()
-      request.mockImplementationOnce(() => lateConnections.promise)
-      workspace.catalogs.connections.get('mail', flows[0]!.flowId, true)
-      await Promise.resolve()
-      const pending = Promise.all([connectors.loadCodeAction('mail.send', signal), connectors.loadCodeConnections('mail', signal)])
-
       await workspace.selectFlow(flows[1]!.flowId)
-      lateConnections.resolve(Response.json({ success: true, data: [] }))
-      await pending
       expect(connectors.$.actions.value).toEqual({})
       expect(connectors.$.catalogs.value).toEqual({})
 

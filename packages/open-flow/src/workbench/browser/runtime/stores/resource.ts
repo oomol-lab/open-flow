@@ -1,18 +1,17 @@
+import type { ResourceCache } from '@oomol-lab/resource-cache'
 import type { ReadonlyVal } from 'value-enhancer'
-import type { ConditionalResult } from '../../../../control/common/api.ts'
-import type { CatalogCacheStorage } from '../contract.ts'
 
 import { derive, val } from 'value-enhancer'
-import { optionalStorage } from './resourceStorage.ts'
 
 export interface ResourceState<T> {
   readonly data: T | undefined
   readonly refreshing: boolean
   readonly error: unknown
 }
-// One selector per source: loading/error changes must not invalidate data-only consumers.
+
 const dataSources = new WeakMap<ReadonlyVal<ResourceState<unknown>>, ReadonlyVal<unknown>>()
 
+/** Keep data-only consumers independent from refresh and error notifications. */
 export function resourceData<T>(source: ReadonlyVal<ResourceState<T>>): ReadonlyVal<T | undefined> {
   let data = dataSources.get(source)
   if (data == null) {
@@ -22,52 +21,35 @@ export function resourceData<T>(source: ReadonlyVal<ResourceState<T>>): Readonly
   return data as ReadonlyVal<T | undefined>
 }
 
-interface ResourcePersistence<T> {
-  readonly key: string
-  readonly storage: CatalogCacheStorage
-  readonly decode: (data: unknown) => T
-}
-
-/** Refresh coordination for one Store-owned business value. Has no URL or query registry. */
-export class Resource<T> {
+/**
+ * The browser Store contract is reactive, while resource-cache deliberately
+ * exposes an async cache API. This adapter owns presentation freshness and
+ * refresh coordination; cache identity, persistence, validation and conditional
+ * request coordination stay in the resource-cache instance.
+ */
+export class CacheResource<T, Q> {
   readonly #state = val<ResourceState<T>>({ data: undefined, refreshing: false, error: undefined })
   readonly state: ReadonlyVal<ResourceState<T>> = this.#state
-  #etag: string | null = null
+  #started = false
   #nextCheck = 0
   #pending?: Promise<void>
   #refreshAgain = false
   #disposed = false
-  #restored = false
-  readonly #controller = new AbortController()
-  private readonly persistence?: ResourcePersistence<T>
+  #cache?: ResourceCache<T, Q>
+  #cachePromise?: Promise<ResourceCache<T, Q>>
 
   constructor(
-    private readonly read: (etag: string | null, signal: AbortSignal) => Promise<ConditionalResult<T>>,
-    private readonly interval: number,
-    persistence?: ResourcePersistence<T>,
-  ) {
-    this.persistence = persistence == null ? undefined : { ...persistence, storage: optionalStorage(persistence.storage) }
-  }
+    private readonly resolveCache: () => Promise<ResourceCache<T, Q>>,
+    private readonly query: Q,
+    private readonly closeCache = false,
+    private readonly maxAge = 30_000,
+  ) {}
 
-  async #restore(): Promise<void> {
-    this.#restored = true
-    const persistence = this.persistence
-    if (persistence == null) return
-    try {
-      const entry = await persistence.storage.get(persistence.key)
-      if (!this.#disposed && entry != null && typeof entry === 'object' && 'etag' in entry && 'data' in entry) {
-        if (entry.etag === null || typeof entry.etag == 'string') {
-          const data = persistence.decode(entry.data)
-          this.#etag = entry.etag
-          this.#state.set({ data, refreshing: true, error: undefined })
-        }
-      }
-    } catch {
-      /* Invalid or unavailable storage is a miss. */
-    }
-  }
   get(force = false): ReadonlyVal<ResourceState<T>> {
-    if (!this.#disposed && (force || Date.now() >= this.#nextCheck)) void this.refresh(force)
+    if (!this.#disposed && (force || !this.#started || Date.now() >= this.#nextCheck)) {
+      this.#started = true
+      void this.refresh(force)
+    }
     return this.state
   }
 
@@ -77,36 +59,51 @@ export class Resource<T> {
       if (force) this.#refreshAgain = true
       return this.#pending
     }
-    // Publish asynchronously so accessing a resource inside a computed Val is safe.
+    this.#started = true
     const pending = Promise.resolve()
       .then(async () => {
-        if (this.#disposed) return
-        if (!this.#restored && this.persistence != null) await this.#restore()
-        if (this.#disposed) return
-        this.#state.set({ ...this.#state.value, refreshing: true })
+        let revalidate = force
+        let repeat = false
         do {
-          // A forced read must start after the change that invalidated the current request.
+          const queued = this.#refreshAgain
           this.#refreshAgain = false
+          if (this.#disposed) return
+          this.#state.set({ ...this.#state.value, refreshing: true })
           try {
-            const result = await this.read(this.#etag, this.#controller.signal)
+            const cache = await (this.#cachePromise ??= this.resolveCache().then((resolved) => {
+              this.#cache = resolved
+              if (this.#disposed && this.closeCache) void resolved.dispose()
+              return resolved
+            }))
+            const snapshot = await cache.peek(this.query)
             if (this.#disposed) return
-            if (this.#refreshAgain) continue
-            const data = result.modified ? result.data : this.#state.value.data
-            if (data === undefined) throw new Error('Received 304 without cached data.')
-            const previousEtag = this.#etag
-            this.#etag = result.modified ? result.etag : (result.etag ?? this.#etag)
-            this.#nextCheck = Date.now() + this.interval
-            this.#state.set({ data, refreshing: false, error: undefined })
-            if (this.persistence != null && (result.modified || this.#etag !== previousEtag)) {
-              void this.persistence.storage.set(this.persistence.key, { data, etag: this.#etag })
+            if (snapshot != null) {
+              if (snapshot.fresh && !revalidate) {
+                this.#nextCheck = snapshot.validatedAt + this.maxAge
+                this.#state.set({ data: snapshot.data, refreshing: false, error: undefined })
+                repeat = queued || this.#refreshAgain
+                revalidate = repeat
+                if (!repeat) return
+                continue
+              }
+              this.#state.set({ data: snapshot.data, refreshing: true, error: undefined })
             }
+            const data = await cache.get(this.query, { revalidate })
+            if (!this.#disposed) {
+              this.#nextCheck = Date.now() + this.maxAge
+              this.#state.set({ data, refreshing: false, error: undefined })
+            }
+            repeat = queued || this.#refreshAgain
+            revalidate = repeat
           } catch (error) {
             if (!this.#disposed && !this.#refreshAgain) {
               this.#nextCheck = Date.now() + 30_000
               this.#state.set({ ...this.#state.value, refreshing: false, error })
             }
+            repeat = queued || this.#refreshAgain
+            revalidate = repeat
           }
-        } while (!this.#disposed && this.#refreshAgain)
+        } while (!this.#disposed && repeat)
       })
       .finally(() => {
         if (this.#pending === pending) this.#pending = undefined
@@ -116,14 +113,17 @@ export class Resource<T> {
   }
 
   dispose(): void {
+    if (this.#disposed) return
     this.#disposed = true
-    this.#controller.abort()
-    this.#state.set({ ...this.#state.value, refreshing: false, error: this.#controller.signal.reason })
+    this.#state.set({ ...this.#state.value, refreshing: false })
     this.#state.dispose()
+    if (this.closeCache && this.#cache != null) void this.#cache.dispose()
   }
 }
 
-/** Imperative business operations may wait for their first value; rendering subscribes directly. */
+export type ResourceSource<T> = ReadonlyVal<ResourceState<T>> | Promise<T | undefined>
+
+/** Wait for a value without cancelling the shared cache request. */
 export function resourceValue<T>(state: ReadonlyVal<ResourceState<T>>, signal?: AbortSignal, settled = false): Promise<T> {
   return new Promise((resolve, reject) => {
     let stop: (() => void) | undefined
@@ -133,7 +133,7 @@ export function resourceValue<T>(state: ReadonlyVal<ResourceState<T>>, signal?: 
     }
     const aborted = () => {
       finish()
-      reject(signal?.reason)
+      reject(signal?.reason ?? new DOMException('The operation was aborted.', 'AbortError'))
     }
     const check = () => {
       const value = state.value
@@ -146,7 +146,8 @@ export function resourceValue<T>(state: ReadonlyVal<ResourceState<T>>, signal?: 
         finish()
         reject(value.error)
         return true
-      } else if (value.data !== undefined) {
+      }
+      if (value.data !== undefined) {
         finish()
         resolve(value.data)
         return true
@@ -160,8 +161,6 @@ export function resourceValue<T>(state: ReadonlyVal<ResourceState<T>>, signal?: 
   })
 }
 
-export type ResourceSource<T> = ReadonlyVal<ResourceState<T>> | Promise<T | undefined>
-
 export function observeResource<T>(source: ResourceSource<T>, signal: AbortSignal, update: (state: ResourceState<T>) => void): void {
   if (signal.aborted) return
   if ('then' in source) {
@@ -174,12 +173,12 @@ export function observeResource<T>(source: ResourceSource<T>, signal: AbortSigna
         if (!signal.aborted) update({ data: undefined, refreshing: false, error })
       },
     )
-  } else {
-    const publish = () => {
-      if (!signal.aborted) update(source.value)
-    }
-    const stop = source.subscribe(publish)
-    signal.addEventListener('abort', stop, { once: true })
-    publish()
+    return
   }
+  const publish = () => {
+    if (!signal.aborted) update(source.value)
+  }
+  const stop = source.subscribe(publish)
+  signal.addEventListener('abort', stop, { once: true })
+  publish()
 }

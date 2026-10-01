@@ -186,7 +186,7 @@ function Workbench({
   )
 }
 
-export type { CatalogCacheStorage, WorkbenchActor } from './contract.ts'
+export type { WorkbenchActor } from './contract.ts'
 
 export type {
   FlowCatalogEvent,
@@ -253,7 +253,7 @@ export interface OpenFlowWorkbenchProps {
   readonly variables?: boolean
 }
 
-type SessionProps = Omit<OpenFlowWorkbenchProps, 'sessionKey'>
+type SessionProps = Omit<OpenFlowWorkbenchProps, 'sessionKey'> & { readonly sessionKey: string }
 
 function Session({
   catalogWidth,
@@ -271,6 +271,7 @@ function Session({
   onLanguageChange,
   onNavigate,
   preferences,
+  sessionKey,
   theme,
   variables = true,
 }: SessionProps): ReactElement {
@@ -289,11 +290,12 @@ function Session({
       workbenchI18n,
       {
         openExternalPage: (resolveUrl) => host.openExternalPage(resolveUrl),
-        catalogCache: host.catalogCache,
-        connectionCache: host.connectionCache,
+        cacheEnvironment: host.cacheEnvironment,
+        connectorOwnerId: host.connectorOwnerId,
         resolveActor: actorResolver(host, globalThis.location?.origin),
       },
       variables,
+      sessionKey,
     )
     return {
       i18n: workbenchI18n,
@@ -355,5 +357,5 @@ function Session({
 }
 
 export function OpenFlowWorkbench({ sessionKey, ...props }: OpenFlowWorkbenchProps): ReactElement {
-  return <Session key={sessionKey} {...props} />
+  return <Session key={`${sessionKey}:${props.host.connectorOwnerId ?? ''}`} sessionKey={sessionKey} {...props} />
 }

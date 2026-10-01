@@ -98,10 +98,10 @@ export class TriggerStore {
     client: WorkbenchClient,
     workspace: WorkspaceStore,
     setNotice: SetNotice,
-    host: Pick<WorkbenchHost, 'openExternalPage' | 'catalogCache'>,
+    host: Pick<WorkbenchHost, 'openExternalPage' | 'cacheEnvironment'>,
     i18n: I18n = createI18n(),
   ) {
-    this.catalog = new TriggerCatalogStore(client, resolveUiLanguage([i18n.lang]), host)
+    this.catalog = new TriggerCatalogStore(client, resolveUiLanguage([i18n.lang]), host.cacheEnvironment)
     this.#client = client
     this.#host = host
     this.#i18n = i18n
@@ -116,7 +116,12 @@ export class TriggerStore {
       if (trigger.kind != 'poll' && trigger.kind != 'integration') return { authorizationPending: false }
       const connections = current == null ? undefined : get(workspace.catalogs.connections.get(current.provider, get(workspace.$.flowId))).data
       const catalog = connections == null ? undefined : connectionCatalog(connections)
-      const connectionError = current == null ? undefined : get(workspace.catalogs.connections.get(current.provider, get(workspace.$.flowId))).error
+      const connectionError =
+        current == null
+          ? undefined
+          : state.connectionError?.provider == current.provider
+            ? new Error(state.connectionError.message)
+            : get(workspace.catalogs.connections.get(current.provider, get(workspace.$.flowId))).error
       return {
         activeConnections: catalog?.active,
         authorizationPending: state.authorizationProvider == current?.provider,

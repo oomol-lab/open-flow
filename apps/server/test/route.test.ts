@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { parseRoute, routePath } from '../browser/route.ts'
+import { parseRoute, parseRouteContext, routeOwnerForFlow, routePath } from '../browser/route.ts'
 
 it('maps Server paths without a Team segment', () => {
   expect(parseRoute('/')).toEqual({ view: 'design' })
@@ -12,6 +12,29 @@ it('maps Server paths without a Team segment', () => {
 
   expect(routePath({ view: 'design' })).toBe('/')
   expect(routePath({ flowId: 'main/flow', view: 'publications' })).toBe('/flows/main%2Fflow/publications')
+})
+
+it('keeps the Team owner in the host route context', () => {
+  const location = { flowId: 'main/flow', view: 'design' as const }
+  const path = '/team/acme%2Fengineering/flows/main%2Fflow/design'
+  expect(parseRouteContext(path)).toEqual({ connectorOwnerId: 'acme/engineering', location })
+  expect(routePath(location, 'acme/engineering')).toBe(path)
+  expect(parseRoute(path)).toEqual(location)
+})
+
+it('resolves route owners from the target Flow before falling back to the current route', () => {
+  const current = { flowId: 'flow-a', view: 'design' as const }
+  const bindings = [
+    { flowId: 'flow-a', teamId: 'team-a' },
+    { flowId: 'flow-b', teamId: 'team-b' },
+  ]
+  const teams = [
+    { id: 'team-a', name: 'Team A' },
+    { id: 'team-b', name: 'Team B' },
+  ]
+  expect(routeOwnerForFlow(current, 'Team A', 'flow-b', bindings, teams)).toBe('Team B')
+  expect(routeOwnerForFlow(current, 'Team A', 'flow-a', [], [])).toBe('Team A')
+  expect(routeOwnerForFlow(current, 'Team A', 'flow-c', bindings, teams)).toBeUndefined()
 })
 
 it.each(['draft', 'live'] as const)('round-trips the %s Run source in search params', (runSource) => {

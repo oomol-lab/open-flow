@@ -27,13 +27,10 @@ export interface WorkbenchHost {
   /** Optional deployment-owned identity lookup. Return null for an unknown actor. */
   readonly resolveActor?: (actorId: string, signal: AbortSignal) => Promise<WorkbenchActor | null>
 
-  /** Shared, optional persistent catalog responses, isolated by browser origin. */
-  readonly catalogCache?: {
-    readonly storage?: CatalogCacheStorage
-  }
-  readonly connectionCache?: {
-    readonly storage?: WorkbenchPreferences
-  }
+  /** Cache deployment identity. The session id must be stable and non-secret. */
+  readonly cacheEnvironment?: string
+  /** Host-selected connector owner identity, typically the Team from the host route. */
+  readonly connectorOwnerId?: string
   notify(notification: WorkbenchNotification | undefined): void
   openExternalPage(resolveUrl: () => Promise<string>): Promise<boolean>
   request(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
@@ -62,7 +59,3 @@ export interface WorkbenchPreferences {
 export type ConnectionHref = (flowId: string, providerId: string, connectionId?: string) => string | undefined
 
 /** Object values are complete response/ETag records; implementations must reject failures. */
-export interface CatalogCacheStorage {
-  get(key: string): Promise<unknown>
-  set(key: string, value: unknown): Promise<void>
-}

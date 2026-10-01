@@ -15,7 +15,7 @@ import { idempotencyKey } from './idempotency.ts'
 import { initialLanguage, languagePreference } from './language.ts'
 import { notify } from './notifications.ts'
 import { posthog } from './posthog.ts'
-import { parseRoute, routePath } from './route.ts'
+import { parseRouteContext, routeOwnerForFlow, routePath } from './route.ts'
 import { SettingsPage } from './settings.tsx'
 import { VariablesPage } from './variables.tsx'
 
@@ -128,7 +128,8 @@ function connectorTeams(value: unknown):
 function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange }: Props): ReactElement {
   const [routeUrl, setRouteUrl] = useState(() => window.location.pathname + window.location.search)
   const pathname = routeUrl.split('?')[0]
-  const route = useMemo(() => parseRoute(routeUrl), [routeUrl])
+  const routeContext = useMemo(() => parseRouteContext(routeUrl), [routeUrl])
+  const route = routeContext.location
   const eventSourcesOpen = pathname == '/settings/event-sources'
   const settingsOpen = pathname == '/settings' || eventSourcesOpen
   const variablesOpen = pathname == '/variables'
@@ -146,7 +147,10 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
       }
   >({ kind: 'loading' })
   const t = useTranslate()
-  const host = useMemo(() => createBrowserHost(notify, () => setSession({ configured: true, kind: 'signed-out' })), [])
+  const host = useMemo(
+    () => createBrowserHost(notify, () => setSession({ configured: true, kind: 'signed-out' }), routeContext.connectorOwnerId),
+    [routeContext.connectorOwnerId],
+  )
   const client = useMemo(() => new ControlClient((input, init) => host.request(input, init)), [host])
   const preferences = useMemo(
     () => ({
@@ -229,8 +233,10 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
     window.addEventListener('popstate', restore)
     return () => window.removeEventListener('popstate', restore)
   }, [])
+  const connectorOwnerForFlow = (flowId: string | undefined): string | undefined =>
+    routeOwnerForFlow(route, routeContext.connectorOwnerId, flowId, team.kind == 'ready' ? team.bindings : [], team.kind == 'ready' ? team.teams : [])
   function navigate(next: WorkbenchLocation, options: WorkbenchNavigationOptions): void {
-    const path = routePath(next)
+    const path = routePath(next, connectorOwnerForFlow(next.flowId))
     if (path != window.location.pathname + window.location.search) window.history[options.replace ? 'replaceState' : 'pushState'](null, '', path)
     setRouteUrl(path)
   }
@@ -461,11 +467,9 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
                 createFlowField={createFlowField}
                 flowBadges={flowBadges}
                 connectionHref={(flowId, providerId, connectionId) => {
-                  const binding = team.kind == 'ready' ? team.bindings.find((item) => item.flowId == flowId) : undefined
-                  const teamName = team.kind == 'ready' ? team.teams.find((item) => item.id == binding?.teamId)?.name : undefined
-                  return connectionHref(connectionConsole, teamName, providerId, connectionId)
+                  return connectionHref(connectionConsole, connectorOwnerForFlow(flowId), providerId, connectionId)
                 }}
-                hrefFor={routePath}
+                hrefFor={(location) => routePath(location, connectorOwnerForFlow(location.flowId))}
                 host={host}
                 language={language}
                 location={route}

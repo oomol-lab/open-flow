@@ -829,7 +829,7 @@ it('loads the catalog and editor after their subscriptions settle, without dupli
     const loading = store.start(flow.flowId)
     expect(request).not.toHaveBeenCalled()
     catalogReady.resolve()
-    await vi.waitFor(() => expect(request).toHaveBeenCalledOnce())
+    await vi.waitFor(() => expect(request).toHaveBeenCalledTimes(1))
     expect(request.mock.calls[0]?.[0]).toBe('/v1/flows?limit=50&includeTotal=true')
     flowReady.resolve()
     await loading

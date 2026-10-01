@@ -24,7 +24,6 @@ export function createTriggerSession(
   create = false,
   catalog?: {
     request: (url: URL, init?: RequestInit) => Promise<Response>
-    cache: WorkbenchHost['catalogCache']
   },
   eventSources?: readonly EventSource[],
 ) {
@@ -191,8 +190,8 @@ export function createTriggerSession(
     throw new Error(`Unsupported Trigger Lab request: ${url.pathname}`)
   })
   const notice = (value: unknown) => log('trigger.notice', value)
-  const host = {
-    catalogCache: catalog?.cache,
+  const host: Pick<WorkbenchHost, 'openExternalPage' | 'cacheEnvironment'> = {
+    cacheEnvironment: 'lab',
     openExternalPage: async () => {
       log('trigger.connect')
       return false

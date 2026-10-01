@@ -1,276 +1,109 @@
-import type { ConditionalResult } from '../../../../control/common/api.ts'
+import type { ResourceCache } from '@oomol-lab/resource-cache'
 
-import { compute } from 'value-enhancer'
-import { afterEach, expect, it, vi } from 'vitest'
-import { Resource, resourceData, resourceValue } from './resource.ts'
+import { describe, expect, it, vi } from 'vitest'
+import { CacheResource, resourceValue } from './resource.ts'
 
-afterEach(() => vi.restoreAllMocks())
-
-it.each(['200', '304', 'error'])('waits for a post-invalidation read after an older %s response', async (response) => {
-  const old = Promise.withResolvers<ConditionalResult<string[]>>()
-  const fresh = Promise.withResolvers<ConditionalResult<string[]>>()
-  const read = vi
-    .fn<() => Promise<ConditionalResult<string[]>>>()
-    .mockResolvedValueOnce({ modified: true, data: ['cached'], etag: '"cached"' })
-    .mockReturnValueOnce(old.promise)
-    .mockReturnValueOnce(fresh.promise)
-  const storage = { get: async () => null, set: vi.fn(async (_key: string, _value: unknown) => {}) }
-  const resource = new Resource(read, 30_000, { key: 'test', storage, decode: (data) => data as string[] })
-  await resource.refresh()
-  await vi.waitFor(() => expect(storage.set).toHaveBeenCalled())
-  storage.set.mockClear()
-  const pending = resource.refresh()
-  await Promise.resolve()
-  const state = resource.get(true)
-  resource.get(true)
-  let settled = false
-  const value = resourceValue(state, undefined, true).then((data) => {
-    settled = true
-    return data
-  })
-  if (response == 'error') old.reject(new Error('Old request failed'))
-  else old.resolve(response == '304' ? { modified: false, etag: '"old"' } : { modified: true, data: ['old'], etag: '"old"' })
-  await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(3))
-  expect(settled).toBe(false)
-  expect(state.value).toMatchObject({ data: ['cached'], refreshing: true, error: undefined })
-  expect(storage.set).not.toHaveBeenCalled()
-  expect(read.mock.calls[2]).toEqual(['"cached"', expect.any(AbortSignal)])
-  fresh.resolve({ modified: true, data: ['new-account'], etag: '"new"' })
-  expect(await value).toEqual(['new-account'])
-  await pending
-  expect(read).toHaveBeenCalledTimes(3)
-  await vi.waitFor(() => expect(storage.set).toHaveBeenCalled())
-  expect(storage.set.mock.calls[0]![1]).toEqual({ data: ['new-account'], etag: '"new"' })
-  resource.dispose()
-})
-
-it('publishes a failed replacement request instead of accepting the invalidated result', async () => {
-  const old = Promise.withResolvers<ConditionalResult<string[]>>()
-  const read = vi.fn<() => Promise<ConditionalResult<string[]>>>().mockReturnValueOnce(old.promise).mockRejectedValueOnce(new Error('Replacement failed'))
-  const resource = new Resource(read, 30_000)
-  const pending = resource.refresh()
-  await Promise.resolve()
-  const value = resourceValue(resource.get(true), undefined, true)
-  const failed = expect(value).rejects.toThrow('Replacement failed')
-  old.resolve({ modified: true, data: ['old'], etag: '"old"' })
-  await pending
-  await failed
-  expect(resource.state.value.data).toBeUndefined()
-  resource.dispose()
-})
-
-it('returns a stable Val, merges reads and checks freshness only on access', async () => {
-  let now = 1_000
-  vi.spyOn(Date, 'now').mockImplementation(() => now)
-  const read = vi.fn(async () => ({ modified: true as const, data: ['one'], etag: '"one"' }))
-  const resource = new Resource(read, 30_000)
-  const state = resource.get()
-  expect(resource.get()).toBe(state)
-  expect(state.value.data).toBeUndefined()
-  await resource.refresh()
-  expect(state.value.data).toEqual(['one'])
-  expect(read).toHaveBeenCalledTimes(1)
-  now += 30_000
-  expect(read).toHaveBeenCalledTimes(1)
-  resource.get()
-  await resource.refresh()
-  expect(read).toHaveBeenCalledTimes(2)
-  resource.get()
-  expect(read).toHaveBeenCalledTimes(2)
-  resource.dispose()
-})
-
-it('keeps stale data and errors, backs off failures and permits forced retry', async () => {
-  let now = 1_000
-  vi.spyOn(Date, 'now').mockImplementation(() => now)
-  const read = vi.fn(async () => ({ modified: true as const, data: ['one'], etag: null }))
-  const resource = new Resource(read, 30_000)
-  await resource.refresh()
-  read.mockRejectedValueOnce(new Error('offline'))
-  await resource.refresh()
-  expect(resource.get().value).toMatchObject({ data: ['one'], refreshing: false, error: new Error('offline') })
-  expect(read).toHaveBeenCalledTimes(2)
-  now += 29_999
-  resource.get()
-  expect(read).toHaveBeenCalledTimes(2)
-  await resource.refresh()
-  expect(resource.state.value.error).toBeUndefined()
-  expect(read).toHaveBeenCalledTimes(3)
-  resource.dispose()
-})
-
-it('does not let cancellation of a consumer cancel the shared request', async () => {
-  const pending = Promise.withResolvers<{ modified: true; data: string[]; etag: null }>()
-  const resource = new Resource(() => pending.promise, 30_000)
-  const controller = new AbortController()
-  const first = resourceValue(resource.get(), controller.signal)
-  const failed = expect(first).rejects.toMatchObject({ name: 'AbortError' })
-  const second = resourceValue(resource.get())
-  controller.abort()
-  await failed
-  pending.resolve({ modified: true, data: [], etag: null })
-  expect(await second).toEqual([])
-  resource.dispose()
-})
-
-it('rejects a cold 304 and prevents late writes after disposal', async () => {
-  const resource = new Resource<string[]>(async () => ({ modified: false, etag: '"one"' }), 30_000)
-  await resource.refresh()
-  expect(resource.state.value.error).toBeInstanceOf(Error)
-  resource.dispose()
-  const pending = Promise.withResolvers<{ modified: true; data: string[]; etag: null }>()
-  const storage = { get: async () => null, set: vi.fn(async (_key: string, _value: unknown) => {}) }
-  const late = new Resource(() => pending.promise, 30_000, { key: 'one', storage, decode: (value) => value as string[] })
-  const request = late.refresh()
-  await Promise.resolve()
-  late.get(true)
-  late.dispose()
-  pending.resolve({ modified: true, data: ['late'], etag: null })
-  await request
-  expect(storage.set).not.toHaveBeenCalled()
-})
-
-it('isolates data computations from refresh status, errors and unchanged responses', async () => {
-  const read = vi.fn<() => Promise<ConditionalResult<string[]>>>().mockResolvedValueOnce({ modified: true, data: ['one'], etag: '"one"' })
-  const resource = new Resource(read, 30_000)
-  await resource.refresh()
-  const data = resourceData(resource.state)
-  expect(resourceData(resource.state)).toBe(data)
-  const project = vi.fn((items: string[] | undefined) => items?.join(','))
-  const derived = compute((get) => project(get(data)))
-  const stop = derived.subscribe(() => {})
-  expect(derived.value).toBe('one')
-  project.mockClear()
-  try {
-    const pending = Promise.withResolvers<ConditionalResult<string[]>>()
-    read.mockReturnValueOnce(pending.promise)
-    const refresh = resource.refresh()
-    await Promise.resolve()
-    expect(resource.state.value.refreshing).toBe(true)
-    expect(derived.value).toBe('one')
-    pending.resolve({ modified: false, etag: '"one"' })
-    await refresh
-    expect(derived.value).toBe('one')
-    expect(project).not.toHaveBeenCalled()
-
-    read.mockRejectedValueOnce(new Error('offline'))
-    await resource.refresh()
-    expect(resource.state.value.error).toEqual(new Error('offline'))
-    expect(derived.value).toBe('one')
-    expect(project).not.toHaveBeenCalled()
-
-    read.mockResolvedValueOnce({ modified: true, data: ['two'], etag: '"two"' })
-    await resource.refresh()
-    expect(derived.value).toBe('two')
-    expect(project).toHaveBeenCalledOnce()
-  } finally {
-    stop()
-    derived.dispose()
-    resource.dispose()
+function cacheFixture() {
+  let value: string | undefined
+  let fresh = false
+  let loading: Promise<string> | undefined
+  let loads = 0
+  const cache: ResourceCache<string, void> = {
+    async get(_query, _options) {
+      if (loading == null) {
+        loads++
+        loading = Promise.resolve(`value-${loads}`).then((result) => {
+          value = result
+          fresh = true
+          loading = undefined
+          return result
+        })
+      }
+      return loading
+    },
+    async peek() {
+      return value == null ? undefined : { data: value, etag: null, validatedAt: Date.now(), fresh }
+    },
+    async invalidate() {},
+    async remove() {},
+    async clear() {},
+    async dispose() {},
   }
-})
-
-it('does not subscribe when cached data already satisfies the consumer', async () => {
-  const resource = new Resource(async () => ({ modified: true as const, data: ['one'], etag: null }), 30_000)
-  await resource.refresh()
-  const subscribe = vi.spyOn(resource.state, 'subscribe')
-  try {
-    expect(await resourceValue(resource.state)).toEqual(['one'])
-    expect(await resourceValue(resource.state, undefined, true)).toEqual(['one'])
-    const controller = new AbortController()
-    controller.abort()
-    await expect(resourceValue(resource.state, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
-    expect(subscribe).not.toHaveBeenCalled()
-  } finally {
-    resource.dispose()
+  return {
+    cache,
+    get loads() {
+      return loads
+    },
+    markStale: () => {
+      fresh = false
+    },
   }
-})
+}
 
-it('skips persistence for unchanged 304 responses but saves a replacement ETag', async () => {
-  const storage = { get: async () => null, set: vi.fn(async (_key: string, _value: unknown) => {}) }
-  const read = vi
-    .fn<() => Promise<ConditionalResult<string[]>>>()
-    .mockResolvedValueOnce({ modified: true, data: ['one'], etag: '"one"' })
-    .mockResolvedValueOnce({ modified: false, etag: '"one"' })
-    .mockResolvedValueOnce({ modified: false, etag: '"two"' })
-  const resource = new Resource(read, 30_000, { key: 'test', storage, decode: (data) => data as string[] })
-  try {
-    await resource.refresh()
-    await vi.waitFor(() => expect(storage.set).toHaveBeenCalled())
-    storage.set.mockClear()
-    await resource.refresh()
-    expect(storage.set).not.toHaveBeenCalled()
-    await resource.refresh()
-    await vi.waitFor(() => expect(storage.set).toHaveBeenCalledExactlyOnceWith('test', { data: ['one'], etag: '"two"' }))
-  } finally {
-    resource.dispose()
-  }
-})
+describe('CacheResource', () => {
+  it('maps a cache promise into the reactive resource state and preserves stale data while refreshing', async () => {
+    const fixture = cacheFixture()
+    const resource = new CacheResource(async () => fixture.cache, undefined)
 
-it('bounds cache restoration and ignores its late result while the network remains usable', async () => {
-  vi.useFakeTimers()
-  const restored = Promise.withResolvers<unknown>()
-  const storage = { get: vi.fn(() => restored.promise), set: vi.fn(async () => {}) }
-  const read = vi.fn(async () => ({ modified: true as const, data: ['network'], etag: '"network"' }))
-  const resource = new Resource(read, 30_000, { key: 'key', storage, decode: (value) => value as string[] })
-  try {
-    const pending = resource.refresh()
+    expect(await resourceValue(resource.get())).toBe('value-1')
     resource.get()
-    await vi.advanceTimersByTimeAsync(999)
-    expect(read).not.toHaveBeenCalled()
-    await vi.advanceTimersByTimeAsync(1)
-    await pending
-    expect(read).toHaveBeenCalledExactlyOnceWith(null, expect.any(AbortSignal))
-    expect(resource.state.value).toMatchObject({ data: ['network'], error: undefined })
-    restored.resolve({ data: ['stale'], etag: '"stale"' })
-    await vi.advanceTimersByTimeAsync(0)
-    expect(resource.state.value.data).toEqual(['network'])
-    expect(storage.get).toHaveBeenCalledOnce()
-    expect(storage.set).not.toHaveBeenCalled()
-  } finally {
+    resource.get()
+    await Promise.resolve()
+    expect(fixture.loads).toBe(1)
+    fixture.markStale()
+    const state = resource.refresh().then(() => resource.state)
+    await state
+    expect(await resourceValue(resource.state, undefined, true)).toBe('value-2')
+    expect(fixture.loads).toBe(2)
     resource.dispose()
-    vi.useRealTimers()
-  }
-})
-
-it('publishes network results without waiting for a stuck persistence write', async () => {
-  vi.useFakeTimers()
-  const storage = { get: async () => undefined, set: vi.fn(() => new Promise<void>(() => {})) }
-  const resource = new Resource(async () => ({ modified: true as const, data: ['network'], etag: null }), 30_000, {
-    key: 'key',
-    storage,
-    decode: (value) => value as string[],
   })
-  try {
-    await resource.refresh()
-    expect(resource.state.value).toMatchObject({ data: ['network'], refreshing: false, error: undefined })
-    await vi.advanceTimersByTimeAsync(1_000)
-    await resource.refresh()
-    expect(storage.set).toHaveBeenCalledOnce()
-    expect(resource.state.value.error).toBeUndefined()
-  } finally {
-    resource.dispose()
-    vi.useRealTimers()
-  }
-})
 
-it.each(['refresh', 'dispose'] as const)('handles %s during cache restoration', async (operation) => {
-  const restored = Promise.withResolvers<unknown>()
-  const storage = { get: vi.fn(() => restored.promise), set: vi.fn(async () => {}) }
-  const read = vi.fn(async () => ({ modified: false as const, etag: '"cached"' }))
-  const resource = new Resource(read, 30_000, { key: 'key', storage, decode: (value) => value as string[] })
-  const pending = resource.refresh()
-  await vi.waitFor(() => expect(storage.get).toHaveBeenCalledOnce())
-  if (operation === 'dispose') resource.dispose()
-  else expect(resource.refresh(true)).toBe(pending)
-  restored.resolve({ data: ['cached'], etag: '"cached"' })
-  await pending
-  if (operation === 'dispose') {
-    expect(read).not.toHaveBeenCalled()
-    expect(resource.state.value.data).toBeUndefined()
-  } else {
-    expect(read).toHaveBeenCalledExactlyOnceWith('"cached"', expect.any(AbortSignal))
-    expect(resource.state.value.data).toEqual(['cached'])
+  it('delegates concurrent refreshes to the cache and lets callers cancel their wait', async () => {
+    let resolve!: (value: string) => void
+    const pending = new Promise<string>((done) => {
+      resolve = done
+    })
+    let calls = 0
+    const cache: ResourceCache<string, void> = {
+      get: async () => {
+        calls++
+        return pending
+      },
+      peek: async () => undefined,
+      invalidate: async () => {},
+      remove: async () => {},
+      clear: async () => {},
+      dispose: async () => {},
+    }
+    const resource = new CacheResource(async () => cache, undefined)
+    const first = resource.refresh()
+    const forced = resource.refresh(true)
+    const controller = new AbortController()
+    const cancelled = resourceValue(resource.state, controller.signal)
+    controller.abort(new Error('cancelled'))
+    await expect(cancelled).rejects.toThrow('cancelled')
+    resolve('ready')
+    await first
+    await forced
+    expect(calls).toBe(2)
     resource.dispose()
-  }
+  })
+
+  it('revalidates when a previously loaded value is accessed after its freshness interval', async () => {
+    const fixture = cacheFixture()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(1_000)
+    const resource = new CacheResource(async () => fixture.cache, undefined, false, 100)
+    try {
+      await resourceValue(resource.get())
+      await resource.refresh()
+      fixture.markStale()
+      clock.mockReturnValue(1_100)
+      const state = resource.get()
+      await vi.waitFor(() => expect(fixture.loads).toBe(2))
+      expect(state.value.data).toBe('value-2')
+    } finally {
+      resource.dispose()
+      clock.mockRestore()
+    }
+  })
 })

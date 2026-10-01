@@ -26,6 +26,7 @@ export function flow(stored: StoredFlow): Flow {
           },
         }),
     createdAt: timestamp(stored.createdAt),
+    ...(stored.connectorTeamId == null ? {} : { connectorTeamId: stored.connectorTeamId }),
     draftRevisionId: stored.draftRevisionId,
     name: stored.name,
     flowId: stored.flowId,

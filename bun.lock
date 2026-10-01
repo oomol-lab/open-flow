@@ -70,9 +70,6 @@
     "packages/open-flow": {
       "name": "@oomol-lab/open-flow",
       "version": "0.1.0-beta.51",
-      "dependencies": {
-        "idb-keyval": "^6.3.0",
-      },
       "devDependencies": {
         "@babel/parser": "8.0.4",
         "@babel/traverse": "8.0.4",
@@ -96,6 +93,7 @@
         "@iconify/types": "^2.0.0",
         "@iconify/utils": "^3.1.4",
         "@lezer/highlight": "^1.2.3",
+        "@oomol-lab/resource-cache": "^0.1.4",
         "@rc-component/tooltip": "1.4.0",
         "@tailwindcss/vite": "^4",
         "@types/json-schema": "^7.0.15",
@@ -456,6 +454,8 @@
     "@oomol-lab/open-flow-command": ["@oomol-lab/open-flow-command@workspace:packages/command"],
 
     "@oomol-lab/open-flow-server": ["@oomol-lab/open-flow-server@workspace:apps/server"],
+
+    "@oomol-lab/resource-cache": ["@oomol-lab/resource-cache@0.1.4", "", { "dependencies": { "idb-keyval": "^6.3.0" } }, "sha512-6aWUQSpYa1FNiDR/FSkSz+04RWG80KRxr81Rf4N2f8J6shS5KLEBfHuwT7AUO2HA+IxTTpAYF0VkdwqQMj+rYw=="],
 
     "@oxc-project/types": ["@oxc-project/types@0.146.0", "", {}, "sha512-XC0QsnnhVe7sLIWmYmdPw7x5P0h4W8vUU3Nv1ySgWXtvCz8NizoAEpGXA0sOYoJQV2Rl13LgURAHQ5cI5ILCSA=="],
 

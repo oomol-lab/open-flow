@@ -7,7 +7,6 @@ import { I18nProvider } from 'val-i18n-react'
 import snapshots from 'virtual:lab-trigger-snapshots'
 import { localizeTrigger } from '../../src/trigger/providers/localization.ts'
 import { BlockLibrary } from '../../src/workbench/browser/runtime/editor/blockLibrary.tsx'
-import { catalogPersistence } from '../../src/workbench/browser/runtime/stores/catalogStorage.ts'
 import { useStoryActions } from './storyActions.tsx'
 import { triggerFixtures } from './triggerFixtures.ts'
 import { createTriggerSession } from './triggerSession.ts'
@@ -35,15 +34,7 @@ function Sample({
         display: Object.fromEntries(await Promise.all(definitions.map(async (definition) => [definition.key, await localizeTrigger(definition, language)]))),
       }
     }
-    const values = new Map<string, unknown>()
-    const storage = {
-      get: async (key: string) => values.get(key) ?? null,
-      set: async (key: string, value: unknown) => {
-        values.set(key, value)
-      },
-    }
     const sampleSession = createTriggerSession(triggerFixtures[0]!.trigger, language, log, 'sample', false, {
-      cache: { storage },
       request: async (_url, init) => {
         log('catalog.request', { language, etag: new Headers(init?.headers).get('if-none-match') })
         if (mode == 'failed') return Response.json({ error: { code: 'request.failed', message: 'Sample offline response.' } }, { status: 503 })
@@ -58,12 +49,7 @@ function Sample({
     })
     return {
       ...sampleSession,
-      prepare: async () => {
-        await storage.set(catalogPersistence({ storage }, 'triggers', language)!.key, {
-          data: await data(mode == 'ready' ? 20 : 4),
-          etag: '"cached"',
-        })
-      },
+      prepare: async () => {},
     }
   }, [language, mode, log])
   const lifetime = useMemo(() => ({ users: 0 }), [session])

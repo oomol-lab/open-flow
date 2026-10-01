@@ -6,10 +6,13 @@ import * as Effect from 'effect/Effect'
 const reconnectDelayMs = 1_000
 const initialConnectionTimeoutMs = 5_000
 
-export function createBrowserHost(notify: (notification: WorkbenchNotification | undefined) => void, sessionExpired: () => void): WorkbenchHost {
+export function createBrowserHost(
+  notify: (notification: WorkbenchNotification | undefined) => void,
+  sessionExpired: () => void,
+  connectorOwnerId?: string,
+): WorkbenchHost {
   return {
-    connectionCache: {},
-    catalogCache: {},
+    connectorOwnerId,
     async openExternalPage(resolveUrl) {
       const tab = window.open('about:blank', '_blank')
       if (tab == null) return false

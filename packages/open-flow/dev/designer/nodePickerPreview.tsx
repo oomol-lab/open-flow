@@ -132,7 +132,6 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
   const session = useMemo(
     () =>
       createTriggerSession(triggerFixtures[0]!.trigger, language, log, 'sample', false, {
-        cache: undefined,
         request: async () =>
           Response.json({
             version: 1,
@@ -165,24 +164,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
       await new Promise((resolve) => setTimeout(resolve, 1500))
       return Response.json(url.pathname.endsWith('/actions') ? proxyActions(String(path)) : sampleActionData(String(path)))
     })
-    const entries = new Map<string, unknown>()
-    const data = new CatalogStores(client, {
-      storage: {
-        get: async (key) => {
-          const stored = entries.get(key)
-          if (stored != null) return stored
-          if (key.startsWith('providers:')) return { data: { success: true, data: providers.slice(0, 1) }, etag: '"cached"' }
-          if (key.startsWith('actions:')) {
-            const path = `/v1/connector/proxy/actions?${key.split(':').at(-1)}`
-            return { data: proxyActions(path, true), etag: null }
-          }
-          return null
-        },
-        set: async (key, value) => {
-          entries.set(key, value)
-        },
-      },
-    })
+    const data = new CatalogStores(client, { sessionId: 'lab', environment: 'lab' })
     const store = new ConnectorStore(client, session.workspace, (notice) => log('notice', notice), { openExternalPage: async () => false }, session.i18n, data)
     return { store, data }
   }, [session, log])

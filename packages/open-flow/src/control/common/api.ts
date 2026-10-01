@@ -74,6 +74,8 @@ export interface Flow {
   readonly createdAt: string
   readonly draftRevisionId: string
   readonly flowId: string
+  /** Connector Team scope used by the OOMOL resource cache. */
+  readonly connectorTeamId?: string
   readonly name: string
   readonly status: 'active' | 'retiring'
   readonly updatedAt: string
