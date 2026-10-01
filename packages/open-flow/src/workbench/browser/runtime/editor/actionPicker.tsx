@@ -51,14 +51,18 @@ interface ActionPickerProps {
 export function ActionPicker(props: ActionPickerProps) {
   const [provider, setProvider] = useState<ProviderOption>()
   const [navigation, setNavigation] = useState<'forward' | 'back'>()
+  const scrollPositions = useRef(new Map<string, number>())
   // Navigation replaces the search and resource scope together, including any pending debounce.
   return (
     <ActionPickerPage
       key={provider?.id ?? 'providers'}
       {...props}
       provider={provider}
+      initialScrollTop={scrollPositions.current.get(provider?.id ?? 'providers') ?? 0}
       navigation={navigation}
-      onNavigate={(next) => {
+      onNavigate={(next, scrollTop) => {
+        // The page reports its current viewport before the keyed page is replaced.
+        scrollPositions.current.set(provider?.id ?? 'providers', scrollTop)
         setNavigation(next == null ? 'back' : 'forward')
         setProvider(next)
       }}
@@ -75,10 +79,12 @@ function ActionPickerPage({
   provider,
   onNavigate,
   navigation,
+  initialScrollTop,
 }: ActionPickerProps & {
   readonly navigation: 'forward' | 'back' | undefined
   readonly provider: ProviderOption | undefined
-  readonly onNavigate: (provider: ProviderOption | undefined) => void
+  readonly onNavigate: (provider: ProviderOption | undefined, scrollTop: number) => void
+  readonly initialScrollTop: number
 }) {
   const t = useTranslate()
   const id = useId()
@@ -149,6 +155,11 @@ function ActionPickerPage({
     virtualizer.current?.scrollTo(0)
     setVisibleIndex(0)
   }, [term])
+  useLayoutEffect(() => {
+    if (viewport == null) return
+    virtualizer.current?.scrollTo(initialScrollTop)
+    viewport.scrollTop = initialScrollTop
+  }, [viewport, initialScrollTop, rows.length])
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
       <div className="flex shrink-0 items-center gap-2 px-4">
@@ -172,7 +183,13 @@ function ActionPickerPage({
             <Tooltip>
               <TooltipTrigger
                 render={
-                  <Button type="button" variant="ghost" size="icon-sm" aria-label={t('actionPicker.back')} onClick={() => onNavigate(undefined)}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-label={t('actionPicker.back')}
+                    onClick={() => onNavigate(undefined, viewport?.scrollTop ?? 0)}
+                  >
                     <i aria-hidden="true" className="i-lucide-light:chevron-left size-4" />
                   </Button>
                 }
@@ -237,7 +254,7 @@ function ActionPickerPage({
                         variant="ghost"
                         size="lg"
                         className="group/app h-auto min-w-0 w-full justify-start gap-2.5 rounded-lg px-2.5 py-1.5 text-[13px] font-normal hover:bg-accent focus-visible:bg-accent"
-                        onClick={() => onNavigate(item)}
+                        onClick={() => onNavigate(item, viewport?.scrollTop ?? 0)}
                       >
                         <ProviderAppIcon src={item.icon} />
                         <span className="min-w-0 flex-1 truncate text-left">{item.label}</span>

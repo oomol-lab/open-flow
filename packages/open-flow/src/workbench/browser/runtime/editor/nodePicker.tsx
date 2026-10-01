@@ -3,7 +3,7 @@ import type { DragEvent as ReactDragEvent, ReactElement, MouseEvent as ReactMous
 import type { AddNodeOption } from './addNodeOptions.ts'
 import type { BlockLibraryProps } from './blockLibrary.tsx'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { setAddItemId } from '../../../../canvas/browser/addItemDrag.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
@@ -30,6 +30,10 @@ interface App {
   triggers: AddNodeOption[]
 }
 
+function pickerViewKey(appId: string | undefined, term: string, page: string) {
+  return `${page}:${appId ?? 'catalog'}:${term}`
+}
+
 export function NodePickerContent({
   options,
   connections,
@@ -54,6 +58,7 @@ export function NodePickerContent({
   const [appQuery, setAppQuery] = useState('')
   const searchInput = useRef<HTMLInputElement>(null)
   const searchSession = useRef<AbortController | null>(null)
+  const scrollPositions = useRef(new Map<string, number>())
   useEffect(() => {
     const controller = new AbortController()
     searchSession.current = controller
@@ -66,6 +71,7 @@ export function NodePickerContent({
   const [appId, setAppId] = useState<string>()
   const [navigation, setNavigation] = useState<'forward' | 'back'>()
   const navigateApp = (id?: string) => {
+    if (list.current) scrollPositions.current.set(pickerViewKey(appId, term, page), list.current.scrollTop)
     setNavigation(id ? 'forward' : 'back')
     setAppId(id)
     setAppQuery('')
@@ -161,9 +167,9 @@ export function NodePickerContent({
     }
     return () => controller.abort()
   }, [directoryId, provideChoices, t])
-  useEffect(() => {
-    list.current?.scrollTo(0, 0)
-  }, [appId, term, page])
+  useLayoutEffect(() => {
+    list.current?.scrollTo(0, scrollPositions.current.get(pickerViewKey(appId, term, page)) ?? 0)
+  }, [appId, term, page, catalog.length, results.length, actions.length])
 
   const add = async (item: AddNodeOption) => {
     if (busy.current || disabled || isOptionDisabled?.(item)) return
