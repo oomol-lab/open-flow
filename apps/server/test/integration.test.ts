@@ -498,7 +498,7 @@ describe('Server Integration callback fencing', () => {
     const seen: string[] = []
     const host = createConnectorHost({
       ...connector,
-      proxy: async (_provider, _connection, _binding, _request, _signal, access) => {
+      trigger: async (_provider, _connection, _trigger, _request, _signal, access) => {
         seen.push(access!.providerAccess!.sharedAccessDigest)
         return { status: 200, data: {} }
       },
@@ -508,7 +508,7 @@ describe('Server Integration callback fencing', () => {
       initialState: { checkpoint: null, subscription: {} },
       reconcile: async () => ({ outcome: 'ready' }),
       async receive(context) {
-        await context.connector.execute({ method: 'GET', endpoint: '/event' })
+        await context.connector.trigger!({ operation: 'read', config: {}, checkpoint: null })
         return { outcome: 'ignored', reason: 'unused' }
       },
     }
@@ -755,6 +755,89 @@ it('rejects an Integration target captured before its Flow was disabled', async 
     expect(admissionCount(file)).toBe(0)
   } finally {
     database.close()
+    await closeService(service)
+  }
+})
+
+it('retains a remote callback checkpoint rejected by Run capacity and admits its retry', async () => {
+  const definition = integrationDefinitions.find((item) => item.snapshot.key == 'googledrive.changes_detected')!
+  const file = await databaseFile()
+  const host = createConnectorHost({
+    listConnections: async () => [{ connectionId: 'connection-main', displayName: 'Drive', isDefault: true, serviceId: 'googledrive', status: 'active' }],
+    trigger: async (_provider, _connection, _trigger, request) => {
+      if (request.operation == 'reconcile')
+        return { outcome: 'ready', checkpoint: { pageToken: 'baseline' }, subscription: { id: 'owned' }, reconcileAt: 60_000 }
+      if (request.operation != 'receive') throw new Error('Unexpected Trigger operation')
+      const deliveryId = request.headers['x-goog-message-number']!
+      const checkpoint = { pageToken: deliveryId }
+      return {
+        result: {
+          outcome: 'event',
+          dedupeKey: deliveryId,
+          checkpoint,
+          outputs: {
+            events: [
+              {
+                changeId: deliveryId,
+                changeType: 'file',
+                driveId: null,
+                file: null,
+                fileId: 'new-file',
+                notification: { changedTypes: [], messageNumber: deliveryId, resourceState: 'change', resourceUri: null },
+                removed: false,
+                time: null,
+              },
+            ],
+          },
+        },
+        checkpoint,
+        subscription: { id: request.subscriptionId },
+        reconcileAt: 60_000,
+      }
+    },
+  })
+  const service = await openService(file, {
+    clock: () => 0,
+    runtime: { maxPendingRuns: 1 },
+    capabilities: {
+      connector: () => host,
+      integration: () => ({ callbackKey: 'callback-key', publicOrigin: 'https://flow.example' }),
+    },
+    triggerDefinitions: [definition],
+  })
+  try {
+    const content = revision('ready', definition.snapshot)
+    Object.assign(content.document.graph.nodes.integration!, { config: inputValues({}) })
+    await service.publisher.publish({
+      expectedLivePublicationId: null,
+      flowId: 'main',
+      idempotencyKey: next('publish'),
+      revision: content,
+      revisionId: next('revision'),
+    })
+    await service.tickIntegration(new Date(0).toISOString())
+    const endpoint = service.integrationEndpoint('main', 'integration')!
+    const app = createServerApp(service)
+    const receive = (deliveryId: string) =>
+      app.request(`/v1/integrations/${endpoint}`, {
+        body: '{}',
+        headers: { 'content-type': 'application/json', 'x-goog-message-number': deliveryId },
+        method: 'POST',
+      })
+    expect((await receive('page-1')).status).toBe(204)
+    expect((await receive('page-2')).status).toBe(429)
+    expect(admissionCount(file)).toBe(1)
+    expect(service.integrationState('main', 'integration')?.checkpoint).toEqual({ pageToken: 'page-1' })
+    const database = new DatabaseSync(file, { readOnly: true })
+    const run = database.prepare("SELECT run_id AS runId FROM runs WHERE status = 'queued'").get() as { runId: string }
+    database.close()
+    expect(service.cancel(run.runId)).toBe(true)
+    expect((await receive('page-2')).status).toBe(204)
+    expect(admissionCount(file)).toBe(2)
+    expect(service.integrationState('main', 'integration')?.checkpoint).toEqual({ pageToken: 'page-2' })
+    expect((await receive('page-2')).status).toBe(204)
+    expect(admissionCount(file)).toBe(2)
+  } finally {
     await closeService(service)
   }
 })
@@ -1148,25 +1231,33 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
   let notification: { address: string; id: string; token: string } | undefined
   const drive = createConnectorHost({
     listConnections: async () => [{ connectionId: 'connection-main', displayName: 'Drive', isDefault: true, serviceId: 'googledrive', status: 'active' }],
-    proxy: async (_provider, _connection, _binding, request, _signal, access) => {
-      if (request.endpoint == '/changes/startPageToken') return { status: 200, data: { startPageToken: 'baseline' } }
-      if (request.endpoint == '/changes/watch') {
-        if (failPreparation) return { status: 503, data: {} }
-        notification = request.body as typeof notification
-        return { status: 200, data: { resourceId: 'resource', expiration: String(86_400_000) } }
+    trigger: async (_provider, _connection, _trigger, request, _signal, access) => {
+      if (request.operation === 'reconcile') {
+        if (!request.active) {
+          stopped += 1
+          stoppedWithAccess.push(access!.providerAccess!.sharedAccessDigest)
+        } else if (failPreparation) throw new TransientIntegrationError('Remote subscription temporarily unavailable')
+        if (request.active) notification = { address: request.endpointUrl, id: 'channel', token: 'verified-token' }
+        return { outcome: 'ready', checkpoint: { pageToken: 'baseline' }, subscription: { id: request.requestKey }, reconcileAt: now }
       }
-      if (request.endpoint == '/changes') {
+      if (request.operation === 'receive') {
+        if (request.headers['x-goog-channel-token'] !== 'verified-token')
+          return { result: { outcome: 'respond', status: 404, body: '', contentType: 'text/plain' } }
+        return { result: { outcome: 'wake' }, checkpoint: { pageToken: 'baseline' }, subscription: { id: request.subscriptionId }, reconcileAt: now }
+      }
+      if (request.operation === 'read') {
         changesRead += 1
-        return request.query?.pageToken == 'baseline'
-          ? { status: 200, data: { changes: [{ fileId: 'new-file' }], newStartPageToken: 'next' } }
-          : { status: 200, data: { changes: [], newStartPageToken: 'next' } }
+        const fresh = JSON.stringify(request.checkpoint).includes('baseline')
+        return {
+          checkpoint: { pageToken: 'next' },
+          dedupeKey: 'next',
+          hasMore: false,
+          outputs: fresh
+            ? { events: [{ changeId: 'change', fileId: 'new-file', removed: false, changeType: 'file', driveId: null, file: null, time: null }] }
+            : null,
+        }
       }
-      if (request.endpoint == '/channels/stop') {
-        stopped += 1
-        stoppedWithAccess.push(access!.providerAccess!.sharedAccessDigest)
-        return { status: 204, data: null }
-      }
-      throw new Error('Unexpected Drive request')
+      throw new Error('Unexpected Drive operation')
     },
   })
   const settings: ServerServiceOptions = {
@@ -1360,4 +1451,50 @@ it.each(['callback', 'listener'] as const)('preserves declared Integration outpu
     database.close()
     await closeService(service)
   }
+})
+
+it('prepares a GitHub repository webhook before activating Live and rejects an unsafe replacement', async () => {
+  const definition = integrationDefinitions.find((item) => item.snapshot.key == 'github.on_repo_event')!
+  const requests: string[] = []
+  const github = createConnectorHost({
+    listConnections: async () => [{ connectionId: 'github-account', displayName: 'GitHub', isDefault: true, serviceId: 'github', status: 'active' }],
+    trigger: async (_provider, _connection, _trigger, request) => {
+      if (request.operation !== 'reconcile') throw new Error('Unexpected operation')
+      requests.push(request.endpointUrl)
+      return { outcome: 'ready', checkpoint: null, subscription: { id: 'owned-hook' }, reconcileAt: 60_000 }
+    },
+  })
+  const service = await openService(':memory:', {
+    clock: () => 0,
+    capabilities: { connector: () => github, integration: () => ({ callbackKey: 'key', publicOrigin: 'https://flow.example' }) },
+  })
+  const created = await service.control.createFlow('operator', 'GitHub', 'create-github')
+  const flowId = created.flow.flowId
+  const node = {
+    kind: 'integration' as const,
+    name: 'Repository events',
+    connectionId: 'github-account',
+    definition: definition.snapshot,
+    config: inputValues({ owner: 'octocat', repo: 'repository', events: ['issues'] }),
+  }
+  const draft = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
+    { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'github', node },
+  ])
+  const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, 'open-flow-engine/v5', null, 'publish-github')
+  expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('pending')
+  await service.tickIntegration()
+  await service.tickMaintenance()
+  expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('succeeded')
+  expect(service.integrationState(flowId, 'github')?.subscription).toEqual({ id: 'owned-hook' })
+  expect(requests).toHaveLength(1)
+  const changed = await service.control.changeDraft('operator', flowId, draft.revision.revisionId, [
+    { kind: 'graph.trigger.config.set', nodeId: 'github', name: 'repo', before: fixedInputValue('repository'), value: fixedInputValue('another') },
+  ])
+  const live = service.control.getFlow(flowId).live!.publicationId
+  await expect(
+    service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v5', live, 'replace-github'),
+  ).rejects.toMatchObject({
+    code: 'publication.unsupported',
+  })
+  expect(requests).toHaveLength(1)
 })

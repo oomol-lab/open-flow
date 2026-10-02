@@ -86,19 +86,16 @@ curl http://localhost:3001/health
 
 ## 2. Open Flow 用の runtime token を作成する
 
-Open Flow は `/v1` 配下の OpenConnector runtime API を呼び出します。具体的には、Provider と Action のカタログ、
-Connection の一覧、Action の実行、そして Poll Trigger と Integration Trigger のための `POST /v1/proxy/:service` です。
-admin token ではなく、長く使う runtime token を Open Flow に渡してください。Web Console の Access ページ、または admin API で
-作成します。
+Open Flow は `/v1` で Provider、Action、Connection を取得し、Action と `POST /v1/providers/:service/triggers/:triggerId/execute` による Provider Trigger を実行します。状態を持つ購読には永続 runtime token の所有者 ID が必要です。管理 API から token を作成します：
 
 ```bash
 curl -s -X POST http://localhost:3001/api/runtime-tokens \
   -H "authorization: Bearer $OOMOL_CONNECT_ADMIN_TOKEN" \
   -H 'content-type: application/json' \
-  -d '{"name":"open-flow","allowedActions":[],"blockedActions":[],"allowedProxies":["*"]}'
+  -d '{"name":"open-flow","allowedActions":[],"blockedActions":[],"allowedProxies":[],"allowedTriggers":["gmail.on_message_received","github.on_repo_event"]}'
 ```
 
-`*` の proxy 許可はこのローカル手順用です。本番では実際に使う Provider だけを列挙してください。
+使用する Trigger ID を明示的に許可してください。Trigger、Action、proxy の権限は独立しています。この例は汎用 proxy 権限を付与しません。
 
 レスポンスには token が `token` として 1 回だけ含まれます。これを `OPEN_FLOW_CONNECTOR_TOKEN` として保存します。
 
@@ -108,9 +105,7 @@ export OPEN_FLOW_CONNECTOR_TOKEN="<レスポンスに含まれる token>"
 
 Open Flow に関係する token の規則は次のとおりです。
 
-- `allowedProxies` はデフォルトで空です。proxy の許可がない長期 token は `/v1/proxy/:service` を呼び出せません。
-  その場合、Poll Trigger と Integration Trigger は失敗します。`*` を許可するか、Provider Trigger を使う予定の Provider を
-  列挙してください。たとえば `["gmail","github"]` のようにします。
+- `allowedTriggers` の既定値は `[]` です。既存の token にも Trigger 権限は追加されません。具体的な ID または `github.*` を許可します。デプロイと Runtime の `allowedTriggers` / `blockedTriggers` も適用されます。
 - `allowedActions` と `blockedActions` は、Open Flow が実行できる Action を制限します。空のリストは、デプロイの
   ポリシーが許可するすべての Action を許可します。
 - Open Flow を特定の Connection に限定したい場合を除き、`allowedConnections` は設定しないでください。許可範囲外の
@@ -118,6 +113,8 @@ Open Flow に関係する token の規則は次のとおりです。
 
 長期 token を 1 つでも作ると、OpenConnector はすべての `/v1` と `/mcp` リクエストに runtime token を要求します。
 `oo connector` や MCP ホストなど、同じ OpenConnector を使う他の呼び出し元は、それ以降それぞれ独自の token が必要になります。
+
+token を変更する前に、旧 token が有効な間に対象 Trigger を無効化して公開し、遠隔購読と Feishu リソースの解除を待ちます。`/api/trigger-subscriptions` で確認し、残った購読は `POST /api/trigger-subscriptions/:id/cancel` で解除します。認証情報を回復できない場合、管理者は `POST /api/trigger-subscriptions/:id/abandon` で自動解除を明示的に放棄できます。未解除の記録は残り、Provider 上での手動解除が必要です。その後 `OPEN_FLOW_CONNECTOR_TOKEN` を変更し Open Flow を再起動して、業務 checkpoint を保ちながらバインディングを再作成／有効化します。旧 subscription ID を新 token に送らず、Feishu のローカル ready 状態も先に片付けます。変更中はイベントの欠落があり得ます。
 
 ## 3. Open Flow を起動する
 
@@ -287,7 +284,7 @@ oo connector search "send an email"
 | Workbench または CLI で `connector.unavailable` が出る                          | Open Flow コンテナから `OPEN_FLOW_CONNECTOR_ORIGIN` に到達できないか、OpenConnector が `OPEN_FLOW_CONNECTOR_TOKEN` を拒否しました。        |
 | `/readyz` が 503 を返し、`/healthz` は 200 を返す                               | Connector のヘルスチェックが失敗しました。`docker logs open-flow` を確認し、両方のコンテナが同じネットワークにあることを確認してください。 |
 | 実行時に `connector.connection-required` が出る                                 | Connection が存在しないか、無効か、token の `allowedConnections` によって除外されています。Console で再認可してください。                  |
-| 手動の Action は動作するのに Poll Trigger または Integration Trigger が失敗する | runtime token にその Provider の `allowedProxies` 許可がないか、`OOMOL_CONNECT_BLOCKED_PROXIES` がブロックしています。                     |
+| 手動の Action は動作するのに Poll Trigger または Integration Trigger が失敗する | `allowedTriggers` に対象 Trigger ID の許可がないか、デプロイ／Runtime の Trigger ルールが拒否しています。                                  |
 | `oo flow` が OOMOL へのログインを求める                                         | `OO_OPEN_FLOW_URL` または `OO_OPEN_FLOW_TOKEN` がありません。両方を同じシェルで設定する必要があります。                                    |
 | `oo flow` が 401 を返す                                                         | `OO_OPEN_FLOW_TOKEN` がその Open Flow の `OPEN_FLOW_TOKEN` と異なります。                                                                  |
 | Workbench から Console へのリンクが誤ったホストを開く                           | `OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN` が、ブラウザが到達できる origin ではなくコンテナのアドレスを指しています。                            |

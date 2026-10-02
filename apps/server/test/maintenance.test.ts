@@ -113,6 +113,7 @@ it('runs periodic cleanup on its own schedule despite earlier maintenance wakes'
   const orphans = vi.spyOn(store.flows, 'collectOrphanRevisions')
   const logger = silentLogger.child({})
   const logged = vi.spyOn(logger, 'info')
+  const debugged = vi.spyOn(logger, 'debug')
   const maintenance = new Maintenance(
     store,
     { advance: () => 'idle' },
@@ -132,7 +133,8 @@ it('runs periodic cleanup on its own schedule despite earlier maintenance wakes'
   expect(drafts).toHaveBeenCalledOnce()
   expect(publications).toHaveBeenCalledOnce()
   expect(orphans).toHaveBeenCalledOnce()
-  expect(logged).toHaveBeenCalledExactlyOnceWith(
+  expect(logged).not.toHaveBeenCalled()
+  expect(debugged).toHaveBeenCalledExactlyOnceWith(
     { category: 'maintenance.cleanup.completed', publishOperations: 0, draftRevisions: 0, draftDeltas: 0, orphanRevisions: 0, orphanDeltas: 0 },
     'Maintenance cleanup completed.',
   )
@@ -143,7 +145,8 @@ it('runs periodic cleanup on its own schedule despite earlier maintenance wakes'
   expect(drafts).toHaveBeenCalledOnce()
   expect(publications).toHaveBeenCalledOnce()
   expect(orphans).toHaveBeenCalledOnce()
-  expect(logged).toHaveBeenCalledTimes(1)
+  expect(logged).not.toHaveBeenCalled()
+  expect(debugged).toHaveBeenCalledTimes(1)
   expect(maintenance.nextAt()).toBe(61_000)
 
   setTime(61_000)
@@ -151,7 +154,8 @@ it('runs periodic cleanup on its own schedule despite earlier maintenance wakes'
   expect(drafts).toHaveBeenCalledTimes(2)
   expect(publications).toHaveBeenCalledTimes(2)
   expect(orphans).toHaveBeenCalledTimes(2)
-  expect(logged).toHaveBeenCalledTimes(2)
+  expect(logged).not.toHaveBeenCalled()
+  expect(debugged).toHaveBeenCalledTimes(2)
 })
 
 it('immediately continues cleanup when a batch has more work', async () => {
@@ -159,6 +163,7 @@ it('immediately continues cleanup when a batch has more work', async () => {
   vi.spyOn(store.flows, 'pruneDraftRevisions').mockReturnValueOnce(1).mockReturnValue(0)
   const logger = silentLogger.child({})
   const logged = vi.spyOn(logger, 'info')
+  const debugged = vi.spyOn(logger, 'debug')
   const maintenance = new Maintenance(
     store,
     { advance: () => 'idle' },
@@ -180,9 +185,14 @@ it('immediately continues cleanup when a batch has more work', async () => {
     { category: 'maintenance.cleanup.completed', publishOperations: 0, draftRevisions: 1, draftDeltas: 0, orphanRevisions: 0, orphanDeltas: 0 },
     'Maintenance cleanup completed.',
   )
+  expect(debugged).not.toHaveBeenCalled()
   await Effect.runPromise(maintenance.run(new Date(clock()).toISOString()))
   expect(maintenance.nextAt()).toBe(clock() + 60_000)
-  expect(logged).toHaveBeenCalledTimes(2)
+  expect(logged).toHaveBeenCalledTimes(1)
+  expect(debugged).toHaveBeenCalledExactlyOnceWith(
+    { category: 'maintenance.cleanup.completed', publishOperations: 0, draftRevisions: 0, draftDeltas: 0, orphanRevisions: 0, orphanDeltas: 0 },
+    'Maintenance cleanup completed.',
+  )
 })
 
 it('drains expired Waits in bounded batches before claiming a still-valid notification', () => {

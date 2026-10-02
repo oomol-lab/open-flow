@@ -1,9 +1,11 @@
+import type { ProviderAccessBindingCandidate, TriggerKeySnapshot } from '../api.ts'
 import type { FlowCatalogEvent } from '../contract.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { val } from 'value-enhancer'
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
+import { createI18n } from '../i18n.ts'
 import { NavigationStore } from '../navigation.ts'
 import { canvasInteractiveModePreferenceKey } from './canvasInteractiveMode.ts'
 import { resourceValue } from './resource.ts'
@@ -93,6 +95,187 @@ function access(flowId: string) {
     sharedAccessDigest: flowId,
   }
 }
+
+describe('Trigger creation permissions', () => {
+  const definition: TriggerKeySnapshot = {
+    configInputs: [],
+    definitionVersion: 2,
+    description: '',
+    displayName: 'New event',
+    key: 'mail.event',
+    name: 'event',
+    outputs: [],
+    provider: 'mail',
+    type: 'poll',
+  }
+  const permissions: NonNullable<ProviderAccessBindingCandidate['permissions']> = {
+    actionIds: [],
+    allActions: true,
+    configured: false,
+    proxy: false,
+    triggerIds: [],
+    allTriggers: false,
+  }
+  const candidate = (connectionId: string, granted: Partial<typeof permissions> = {}): ProviderAccessBindingCandidate => ({
+    connectionId,
+    accessBindingId: connectionId,
+    connectionDisplayName: connectionId,
+    isDefault: connectionId == 'default',
+    permissionGroupName: null,
+    providerId: 'mail',
+    source: { kind: 'policy', ruleId: null },
+    permissions: { ...permissions, ...granted },
+  })
+  function setup(candidates: readonly ProviderAccessBindingCandidate[], implicit = false) {
+    const session = catalogSession('first')
+    const { client, store } = session
+    vi.spyOn(client, 'checkFlow').mockImplementation(async (flowId, revisionId) => ({
+      closureDigest: 'closure',
+      diagnostics: [],
+      engineContract: 'open-flow-engine/v5',
+      flowId,
+      modelVersion: currentFlowModelVersion,
+      revisionDigest: 'digest',
+      revisionId,
+      valid: true,
+      version: 1,
+    }))
+    const editor = vi.mocked(client.getEditor)
+    let sequence = 0
+    vi.spyOn(client, 'changeDraft').mockImplementation(async (flowId, request) => ({
+      revision: {
+        ...(await editor(flowId)).draft,
+        revisionId: `revision-${++sequence}`,
+        parentRevisionId: request,
+      },
+      version: 1,
+    }))
+    vi.spyOn(client, 'updatePresentation').mockImplementation(async (_flowId, expectedRevision, value) => ({
+      revision: expectedRevision + 1,
+      updatedAt: timestamp,
+      value,
+      version: 1,
+    }))
+    vi.spyOn(client, 'getConnectorAccess').mockResolvedValue({ ...access('first'), mode: implicit ? 'implicit' : 'selectable' })
+    const lookup = vi.spyOn(client, 'listProviderAccessBindingCandidates').mockResolvedValue({
+      version: 1,
+      results: [{ version: 1, mode: 'selectable', providerId: 'mail', candidates }],
+    })
+    vi.spyOn(client, 'readCatalog').mockResolvedValue({
+      modified: true,
+      etag: null,
+      data: ['default', 'other'].map((connectionId) => ({
+        connectionId,
+        serviceId: 'mail',
+        displayName: connectionId,
+        status: 'active',
+        isDefault: connectionId == 'default',
+      })),
+    })
+    const add = () =>
+      store.addNode(
+        {
+          id: 'trigger:mail.event',
+          kind: 'trigger',
+          label: 'Event',
+          description: '',
+          inputs: [],
+          outputs: [],
+          trigger: { kind: 'catalog', definition },
+        },
+        { x: 0, y: 0 },
+      )
+    const nodes = () => Object.values(store.workspace.$.draft.value!.content.document.graph.nodes)
+    return { ...session, lookup, add, nodes }
+  }
+
+  it.each([
+    ['the specific Trigger', [candidate('default', { triggerIds: ['mail.event'] })], 'default'],
+    ['all Triggers', [candidate('default', { allTriggers: true })], 'default'],
+    ['another eligible account', [candidate('default'), candidate('other', { triggerIds: ['mail.event'] })], 'other'],
+    ['only Action permissions', [candidate('default')], undefined],
+    ['a different Trigger', [candidate('default', { triggerIds: ['mail.other'] })], undefined],
+    ['no eligible accounts', [], undefined],
+  ] as const)('selects an account only when permissions allow %s', async (_name, candidates, expected) => {
+    const { store, navigation, add, nodes } = setup(candidates)
+    try {
+      await navigation.start()
+      await add()
+      expect(nodes()).toEqual([expect.objectContaining({ kind: 'poll' })])
+      const node = nodes()[0]
+      expect('connectionId' in node ? node.connectionId : undefined).toBe(expected)
+      if (expected == null) expect(store.$.notice.value).toMatchObject({ kind: 'error', message: createI18n().t('connectorAccess.noAvailablePermissions') })
+    } finally {
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+
+  it('keeps node creation and its permitted connection in one undo operation', async () => {
+    const { store, navigation, add, nodes, lookup } = setup([candidate('default'), candidate('other', { allTriggers: true })])
+    try {
+      await navigation.start()
+      await add()
+      expect(nodes()).toEqual([expect.objectContaining({ connectionId: 'other' })])
+      await store.workspace.undo()
+      expect(nodes()).toEqual([])
+      await store.workspace.redo()
+      expect(nodes()).toEqual([expect.objectContaining({ connectionId: 'other' })])
+      expect(lookup).toHaveBeenCalledOnce()
+    } finally {
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+
+  it('uses Connector token authority in implicit mode without querying candidates', async () => {
+    const { store, navigation, add, nodes, lookup } = setup([], true)
+    try {
+      await navigation.start()
+      await add()
+      expect(nodes()).toEqual([expect.objectContaining({ connectionId: 'default' })])
+      expect(lookup).not.toHaveBeenCalled()
+    } finally {
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+
+  it('creates an unconnected node when permission lookup fails', async () => {
+    const { store, navigation, add, nodes, lookup } = setup([])
+    lookup.mockRejectedValue(new Error('Permission lookup unavailable'))
+    try {
+      await navigation.start()
+      await add()
+      expect(nodes()).toEqual([expect.objectContaining({ kind: 'poll' })])
+      expect(nodes()[0]).not.toHaveProperty('connectionId')
+      expect(store.$.notice.value).toMatchObject({ kind: 'error', message: 'Permission lookup unavailable' })
+    } finally {
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+
+  it('does not create a node after leaving the Flow during permission lookup', async () => {
+    const { client, store, navigation, add, nodes, lookup } = setup([])
+    const pending = Promise.withResolvers<Awaited<ReturnType<WorkbenchClient['listProviderAccessBindingCandidates']>>>()
+    lookup.mockReturnValue(pending.promise)
+    try {
+      await navigation.start()
+      const added = add()
+      await vi.waitFor(() => expect(lookup).toHaveBeenCalledOnce())
+      await store.selectFlow('second')
+      pending.resolve({ version: 1, results: [] })
+      await added
+      expect(nodes()).toEqual([])
+      expect(client.changeDraft).not.toHaveBeenCalled()
+    } finally {
+      pending.resolve({ version: 1, results: [] })
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+})
 
 describe('Flow creation notifications', () => {
   it('updates node connection state after granting, revoking and restoring Flow access without a server notification', async () => {
@@ -559,7 +742,7 @@ it('selects an eligible default connection without adding shared Code usage', as
             accessBindingId: 'mail-read-access',
             connectionDisplayName: connection.displayName,
             isDefault: true,
-            permissions: { actionIds: ['mail.read'], allActions: false, configured: false, proxy: false },
+            permissions: { actionIds: ['mail.read'], allActions: false, configured: false, proxy: false, triggerIds: [], allTriggers: false },
             permissionGroupName: null,
             providerId: 'mail',
           },
@@ -569,7 +752,7 @@ it('selects an eligible default connection without adding shared Code usage', as
             accessBindingId: 'mail-send-access',
             connectionDisplayName: 'Sending account',
             isDefault: false,
-            permissions: { actionIds: ['mail.send'], allActions: false, configured: false, proxy: false },
+            permissions: { actionIds: ['mail.send'], allActions: false, configured: false, proxy: false, triggerIds: [], allTriggers: false },
             permissionGroupName: 'Senders',
             providerId: 'mail',
           },
@@ -771,7 +954,13 @@ it('waits for a candidate query already started by the inspector before selectin
           providerId: 'mail',
           mode: 'selectable',
           version: 1,
-          candidates: [{ ...binding, isDefault: true, permissions: { actionIds: [], allActions: true, configured: false, proxy: true } }],
+          candidates: [
+            {
+              ...binding,
+              isDefault: true,
+              permissions: { actionIds: [], allActions: true, configured: false, proxy: true, triggerIds: [], allTriggers: true },
+            },
+          ],
         },
       ],
     })

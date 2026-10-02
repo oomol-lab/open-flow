@@ -8,6 +8,7 @@ const userPrefix = 'user::'
 
 export interface ProviderAccessGrant {
   readonly actions?: readonly string[]
+  readonly triggers?: '*' | readonly string[]
   readonly appAccessConfig?: Readonly<Record<string, JsonValue>>
 }
 
@@ -53,7 +54,16 @@ export function providerAccessAllowsAction(
 }
 
 export function providerAccessAllowsProxy(binding: { readonly accessGrant: ProviderAccessGrant }): boolean {
-  return binding.accessGrant.actions == null && binding.accessGrant.appAccessConfig == null
+  return binding.accessGrant.actions == null && binding.accessGrant.triggers == null && binding.accessGrant.appAccessConfig == null
+}
+
+export function providerAccessAllowsTrigger(binding: { readonly accessGrant: ProviderAccessGrant; readonly providerId: string }, triggerId: string): boolean {
+  if (!triggerId.startsWith(`${binding.providerId}.`)) return false
+  const accessGrant = binding.accessGrant
+  return (
+    accessGrant.triggers == '*' ||
+    (accessGrant.triggers != null ? accessGrant.triggers.includes(triggerId) : accessGrant.actions == null && accessGrant.appAccessConfig == null)
+  )
 }
 
 export async function resolveProviderAccessBinding(
@@ -80,6 +90,7 @@ export async function resolveProviderAccessBinding(
     accessBindingId: input.accessBindingId,
     accessGrant: {
       ...(selected.actions == null ? {} : { actions: selected.actions }),
+      ...(selected.triggers == null ? {} : { triggers: selected.triggers }),
       ...(selected.appAccessConfig == null ? {} : { appAccessConfig: selected.appAccessConfig }),
     },
     appId: connection.connectionId,
@@ -111,7 +122,7 @@ export async function providerAccessBindingCandidates(input: {
             connectionDisplayName: connection.displayName,
             isDefault: connection.isDefault,
             permissionGroupName: null,
-            permissions: { actionIds: [], allActions: true, configured: false, proxy: true },
+            permissions: { actionIds: [], allActions: true, triggerIds: [], allTriggers: true, configured: false, proxy: true },
           })
         }),
     )
@@ -123,7 +134,7 @@ export async function providerAccessBindingCandidates(input: {
         const assigned = app.permissionRules.assignments[input.actorId]
         const rule = assigned == null ? undefined : app.permissionRules.rules.find((item) => item.id == assigned)
         const selected = rule ?? app.permissionRules.teamDefault
-        if (selected.actions?.length == 0) return []
+        if (selected.actions?.length == 0 && (selected.triggers == null || selected.triggers.length == 0)) return []
         return [{ app, connection, source: { kind: 'policy' as const, ruleId: rule?.id ?? null }, rule, selected }]
       })
       .map(async ({ app, connection, source, rule, selected }) => {
@@ -136,6 +147,8 @@ export async function providerAccessBindingCandidates(input: {
           permissions: {
             actionIds: selected.actions?.map((action) => `${app.providerId}.${action}`) ?? [],
             allActions: selected.actions == null,
+            triggerIds: Array.isArray(selected.triggers) ? selected.triggers : [],
+            allTriggers: selected.triggers == '*' || (selected.triggers == null && selected.actions == null && selected.appAccessConfig == null),
             configured: selected.appAccessConfig != null,
             proxy: providerAccessAllowsProxy({ accessGrant: selected }),
           },
@@ -183,7 +196,7 @@ function parsePermissionRules(rule: Record<string, unknown>, providerId: string)
   const ids = new Set<string>()
   const rules = value.rules.map((item) => {
     const source = object(item, 'Connector permission rule')
-    onlyKeys(source, ['actions', 'appAccessConfig', 'id', 'name'], 'Connector permission rule')
+    onlyKeys(source, ['actions', 'triggers', 'appAccessConfig', 'id', 'name'], 'Connector permission rule')
     const id = nonEmptyString(source.id, 'Connector permission rule ID')
     const name = nonEmptyString(source.name, 'Connector permission rule name')
     if (ids.has(id)) throw new TypeError('Connector permission rule IDs must be unique.')
@@ -218,7 +231,7 @@ function parseLegacyPermissionRules(policy: Record<string, unknown>, rule: Recor
 
 function grant(value: unknown, description: string, extraKeys: readonly string[] = []): ProviderAccessGrant {
   const source = object(value, description)
-  onlyKeys(source, ['actions', 'appAccessConfig', ...extraKeys], description)
+  onlyKeys(source, ['actions', 'triggers', 'appAccessConfig', ...extraKeys], description)
   let actions: readonly string[] | undefined
   if ('actions' in source) {
     if (!Array.isArray(source.actions)) throw new TypeError(`${description} actions must be an array.`)
@@ -232,6 +245,17 @@ function grant(value: unknown, description: string, extraKeys: readonly string[]
       })
       .toSorted()
   }
+  let triggers: ProviderAccessGrant['triggers']
+  if ('triggers' in source) {
+    if (source.triggers == '*') triggers = '*'
+    else if (
+      Array.isArray(source.triggers) &&
+      source.triggers.every((id) => typeof id == 'string' && id.trim().length > 0 && id != '*') &&
+      new Set(source.triggers).size == source.triggers.length
+    )
+      triggers = source.triggers.toSorted()
+    else throw new TypeError(`${description} Triggers are invalid.`)
+  }
   let appAccessConfig: Readonly<Record<string, JsonValue>> | undefined
   if ('appAccessConfig' in source) {
     if (!isJsonObject(source.appAccessConfig)) throw new TypeError(`${description} App access configuration must be a JSON object.`)
@@ -239,6 +263,7 @@ function grant(value: unknown, description: string, extraKeys: readonly string[]
   }
   return {
     ...(actions == null ? {} : { actions }),
+    ...(triggers == null ? {} : { triggers }),
     ...(appAccessConfig == null ? {} : { appAccessConfig }),
   }
 }

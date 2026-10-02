@@ -1,7 +1,8 @@
 import type { InputSourceCandidate } from '../../../../flow/common/graph.ts'
 
 import { describe, expect, it } from 'vitest'
-import { githubRepoEvent } from '../../../../trigger/providers/github/on-repo-event.ts'
+import { integrationDefinitions } from '../../../../trigger/providers/definitions.ts'
+const githubRepoEvent = integrationDefinitions.find((item) => item.snapshot.key === 'github.on_repo_event')!
 import { localizeTrigger } from '../../../../trigger/providers/localization.ts'
 import {
   presentProviderOutputDescription,

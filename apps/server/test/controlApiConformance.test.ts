@@ -111,10 +111,7 @@ async function createHarness(
           : serviceId == connectorConnection.serviceId
             ? [connectorConnection]
             : [],
-    proxy: async () => ({
-      status: 200,
-      data: { data: { teams: { nodes: [{ id: teamId, name: 'Engineering', key: 'ENG' }], pageInfo: { hasNextPage: false } } } },
-    }),
+    trigger: async () => [{ value: teamId, label: 'Engineering (ENG)' }],
     listProviders: async () => [connectorProvider],
     ready: async () => true,
     searchActions: async () => [connectorAction],

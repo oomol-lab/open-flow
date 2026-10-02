@@ -94,7 +94,9 @@
     "dynamicCodeReferences": "此工作流中的所有 Code 节点（包括子流程）共享这些连接。其他节点选择连接不会自动允许 Code 使用。",
     "noAccountSelected": "未选择账号",
     "removeAuthorization": "移除授权",
-    "saving": "保存中…"
+    "saving": "保存中…",
+    "permissionAllTriggers": "全部触发器",
+    "permissionTriggers": "触发器：{{triggers}}"
   },
   "common": {
     "cancel": "取消",

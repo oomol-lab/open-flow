@@ -70,7 +70,14 @@ await assert.rejects(
     slack.poll({
       checkpoint: null,
       config: { channelId: 'C1' },
-      connector: { execute: async () => ({ data: { error: 'invalid_auth', ok: false }, status: 200 }) },
+      connector: {
+        execute: async () => {
+          throw new Error('Unexpected raw proxy request')
+        },
+        trigger: async () => {
+          throw Object.assign(new Error('Connection requires authorization'), { code: 'connector.connection-required' })
+        },
+      },
       now: new Date(),
     }),
   poll.PollConnectionError,

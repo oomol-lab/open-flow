@@ -163,7 +163,8 @@ export class Maintenance {
     const draftDeltas = this.#store.flows.pruneDraftDeltas(maintenanceBatchSize)
     const orphans = this.#store.flows.collectOrphanRevisions(maintenanceBatchSize)
     const orphanDeltas = this.#store.flows.collectOrphanDeltas(maintenanceBatchSize)
-    this.#logger.info(
+    const cleaned = publications > 0 || drafts > 0 || draftDeltas > 0 || orphans > 0 || orphanDeltas > 0
+    this.#logger[cleaned ? 'info' : 'debug'](
       {
         category: 'maintenance.cleanup.completed',
         publishOperations: publications,
@@ -174,7 +175,7 @@ export class Maintenance {
       },
       'Maintenance cleanup completed.',
     )
-    return publications > 0 || drafts > 0 || draftDeltas > 0 || orphans > 0 || orphanDeltas > 0
+    return cleaned
   }
 
   #retireFlow(now: number): number {

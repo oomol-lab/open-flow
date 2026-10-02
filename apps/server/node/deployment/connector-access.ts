@@ -283,7 +283,9 @@ export async function captureConnectorAccess(
         (item) =>
           item.connectionId == use.connectionId &&
           (item.permissions == null ||
-            (use.kind == 'trigger' ? item.permissions.proxy : item.permissions.allActions || item.permissions.actionIds.includes(use.actionId!))),
+            (use.kind == 'trigger'
+              ? item.permissions.allTriggers || item.permissions.triggerIds.includes(use.triggerId!)
+              : item.permissions.allActions || item.permissions.actionIds.includes(use.actionId!))),
       )
       if (candidate == null) throw new ConnectorTaskError('connector.access-invalid', `The selected connection is unavailable for ${use.name}.`)
       selectedBindings.set(candidate.accessBindingId, captureGrant({ ...candidate, status: 'active' }))

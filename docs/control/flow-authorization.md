@@ -113,7 +113,7 @@ Connector adapter 必须说明上游如何固定执行身份。本地将稳定 I
 | 发布／Run 的显式连接资格检查                    | `selected` | 检查固定的显式选择集合；该 scope 本身不能执行 Action 或运行期 proxy      |
 | 共享 Code                                       | `shared`   | 使用 `sharedBindings` 中账号当前允许的 Actions，不保存节点级 Action 清单 |
 | Connector 节点、Agent 固定工具、通知、独立 Code | `action`   | 固定本次 Action 和 Connection，再从 `selectedBindings` 中解析匹配授权    |
-| Poll／Integration 等运行期 Connector proxy      | `proxy`    | 固定本次 Provider 和 Connection，并检查对应 proxy 权限                   |
+| Poll／Integration 等运行期 Trigger 请求         | `trigger`  | 固定 Trigger ID、Provider 和 Connection，并检查对应 Trigger 权限         |
 
 共享 Code 在其允许账号中调用；省略账号时按共享调用的单账号或默认账号规则解析，不能从 `selectedBindings` 借用账号。
 独立 Code 必须先通过自己的 Action 清单校验，再使用清单中的固定账号。普通节点同样不能因为快照中存在另一个账号就切换过去。
@@ -123,13 +123,13 @@ Connector adapter 必须说明上游如何固定执行身份。本地将稳定 I
 
 1. 宿主确认调用属于当前声明和 invocation，例如 Action 与 Connection 是否匹配。
 2. `selectable` 模式在对应集合中解析固定身份，校验身份、Provider、账号和来源一致。
-3. 检查账号状态及当前 Action 或 proxy 权限，再由 Connector 使用实际部署身份执行请求。
+3. 检查账号状态及当前 Action、Trigger 或 proxy 权限，再由 Connector 使用实际部署身份执行请求。
 
 固定快照只固定“接受哪一个授权身份”，不冻结外部权限。上游撤权、规则删除或账号失效仍可使已发布 Flow 或已接受 Run 的后续调用失败。
 权限解析可能使用部署的缓存和刷新规则，不应将“当前权限检查”理解为每次调用都绕过缓存实时读取所有上游数据。
 
 编辑期读取目录不以 Flow 已选授权过滤。能看到 Action 定义、连接展示信息或候选权限摘要，不等于执行时获得权限。
-Trigger 配置选项查询可在受部署约束的 `catalog` 上下文中使用 proxy；不能将这个编辑期入口交给运行期脚本。
+Trigger 配置选项查询在 `catalog` 上下文中绑定已注册 Trigger ID，运行期调用使用 `trigger` scope，均通过 `/v1/providers/:service/triggers/:triggerId/execute` 提交具体操作。自部署 Open Flow 的本地上下文仅约束自身脚本；connector 与 Action execute 使用相同的 Token 授权：用户／服务账号查询当前 app-access 且不能自报 accessGrant；部署用 team-token 按 Team 权限执行，可选 grant 仅收窄当前调用。第三方请求和远端资源 ID 由 connector 构造和保存，撤权后的资源清理由 connector worker 执行。完整接口与升级合同见 [Trigger 权限与执行](trigger-permissions.md)。
 
 ### 示例：两个账号互不借权
 
@@ -190,17 +190,17 @@ Server 的结构迁移 0030 在启动事务中完成旧摘要列重命名、权�
 
 ## 6. 修改代码时从哪里开始
 
-| 责任                             | 代码入口                                                                                                                                                                                      |
-| -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 配置、候选、grant 与快照公共类型 | [control/common/api.ts](../../packages/open-flow/src/control/common/api.ts)                                                                                                                   |
-| 配置与快照解码                   | [connectorDecoders.ts](../../packages/open-flow/src/control/common/connectorDecoders.ts)                                                                                                      |
-| 从声明收集连接使用               | [connectionUsage.ts](../../packages/open-flow/src/flow/common/connectionUsage.ts)                                                                                                             |
-| 共享配置存取、准入快照捕获       | [connector-access.ts](../../apps/server/node/deployment/connector-access.ts)                                                                                                                  |
-| 调用 scope、Action／proxy 校验   | [connector.ts](../../apps/server/node/deployment/connector.ts)                                                                                                                                |
-| 候选和上游授权身份解析           | [provider-access.ts](../../apps/server/node/deployment/provider-access.ts)                                                                                                                    |
-| 发布、草稿 Run 和执行时上下文    | [publication.ts](../../apps/server/node/application/publication.ts)、[run-control.ts](../../apps/server/node/application/run-control.ts)、[run.ts](../../apps/server/node/application/run.ts) |
-| 旧库结构迁移                     | [migrate-connector-access.ts](../../apps/server/node/storage/migrate-connector-access.ts)                                                                                                     |
-| 旧草稿升级                       | [changeSchema.ts](../../packages/open-flow/src/flow/common/changeSchema.ts)                                                                                                                   |
+| 责任                                    | 代码入口                                                                                                                                                                                      |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 配置、候选、grant 与快照公共类型        | [control/common/api.ts](../../packages/open-flow/src/control/common/api.ts)                                                                                                                   |
+| 配置与快照解码                          | [connectorDecoders.ts](../../packages/open-flow/src/control/common/connectorDecoders.ts)                                                                                                      |
+| 从声明收集连接使用                      | [connectionUsage.ts](../../packages/open-flow/src/flow/common/connectionUsage.ts)                                                                                                             |
+| 共享配置存取、准入快照捕获              | [connector-access.ts](../../apps/server/node/deployment/connector-access.ts)                                                                                                                  |
+| 调用 scope、Action／Trigger／proxy 校验 | [connector.ts](../../apps/server/node/deployment/connector.ts)                                                                                                                                |
+| 候选和上游授权身份解析                  | [provider-access.ts](../../apps/server/node/deployment/provider-access.ts)                                                                                                                    |
+| 发布、草稿 Run 和执行时上下文           | [publication.ts](../../apps/server/node/application/publication.ts)、[run-control.ts](../../apps/server/node/application/run-control.ts)、[run.ts](../../apps/server/node/application/run.ts) |
+| 旧库结构迁移                            | [migrate-connector-access.ts](../../apps/server/node/storage/migrate-connector-access.ts)                                                                                                     |
+| 旧草稿升级                              | [changeSchema.ts](../../packages/open-flow/src/flow/common/changeSchema.ts)                                                                                                                   |
 
 新增连接消费者时，应在自己的声明中保存账号选择，将其纳入连接使用收集与准入检查，并由宿主创建合适的单次调用 scope。
 不要直接把整图 `selectedBindings` 暴露为可执行权限，也不要让客户端或脚本指定可信授权来源。

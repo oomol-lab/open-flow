@@ -444,7 +444,7 @@ export class IntegrationRuntime {
   ): Effect.Effect<IntegrationReconcileResult, unknown> {
     return Effect.tryPromise({
       try: (signal) => {
-        const connectorAccess = this.#connectorContext(definition.snapshot.provider, connectionId, flowId, access)
+        const connectorAccess = this.#connectorContext(definition.snapshot.provider, connectionId, flowId, access, definition.snapshot.key)
         const input = { ...context, connector: this.#connectorProxy(definition, bindingId, connectionId, flowId, signal, access), signal }
         return definition.eventSource == null
           ? definition.reconcile(input)
@@ -752,25 +752,29 @@ export class IntegrationRuntime {
 
   #connectorProxy(
     definition: IntegrationDefinition,
-    bindingId: string,
+    _bindingId: string,
     connectionId: string,
     flowId: string,
     parentSignal: AbortSignal,
     access: ConnectorScope,
   ): ConnectorProxy {
     return {
-      execute: async (request, signal) => {
+      execute: () => {
+        throw new PermanentIntegrationError('Raw proxy requests are not available to Triggers.')
+      },
+      trigger: async (request, signal) => {
         try {
           const connector = this.#resolveConnector()
           if (connector == null) throw new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.')
           const connectorSignal = signal == null ? parentSignal : AbortSignal.any([parentSignal, signal])
-          return await connector.proxy(
+          if (connector.trigger == null) throw new PermanentIntegrationError('Trigger operation transport is unavailable.')
+          return await connector.trigger(
             definition.snapshot.provider,
             connectionId,
-            bindingId,
+            definition.snapshot.key,
             request,
             connectorSignal,
-            this.#connectorContext(definition.snapshot.provider, connectionId, flowId, access),
+            this.#connectorContext(definition.snapshot.provider, connectionId, flowId, access, definition.snapshot.key),
           )
         } catch (cause) {
           if (cause instanceof ConnectorTaskError && cause.code == 'connector.connection-required') {
@@ -782,7 +786,7 @@ export class IntegrationRuntime {
     }
   }
 
-  #connectorContext(providerId: string, connectionId: string, flowId: string, access: ConnectorScope): ConnectorAccessContext {
+  #connectorContext(providerId: string, connectionId: string, flowId: string, access: ConnectorScope, triggerId: string): ConnectorAccessContext {
     const providerAccess = access.providerAccess ?? (access.publicationId == null ? undefined : this.#store.publications.providerAccess(access.publicationId))
     if (providerAccess == null && access.publicationId != null) throw new TransientIntegrationError('Integration Publication access is unavailable.')
     const teamId = this.#store.connectorTeams.get(flowId)
@@ -791,7 +795,7 @@ export class IntegrationRuntime {
       providerId,
       ...(providerAccess == null
         ? { providerAccess: this.#connectorAccess.current(flowId), scope: 'catalog' as const }
-        : { providerAccess, scope: 'proxy' as const, connectionId }),
+        : { providerAccess, scope: 'trigger' as const, connectionId, triggerId }),
       purpose: 'trigger',
       source: access.publicationId == null && access.providerAccess == null ? 'draft' : 'publication',
       ...(teamId == null ? {} : { teamId }),

@@ -80,18 +80,16 @@ curl http://localhost:3001/health
 
 ## 2. 为 Open Flow 创建 runtime token
 
-Open Flow 调用 OpenConnector 位于 `/v1` 的运行时 API：Provider 与 Action 目录、Connection 列表、Action 执行，以及供
-Poll 和 Integration Trigger 使用的 `POST /v1/proxy/:service`。给它一个长期使用的 runtime token，不要用管理 token。可以在 Web
-Console 的 Access 页面创建，也可以通过管理 API 创建：
+Open Flow 通过 `/v1` 读取 Provider、Action 和 Connection，执行 Action，并通过 `POST /v1/providers/:service/triggers/:triggerId/execute` 执行 Provider Trigger。有状态订阅要求持久化 runtime token 的稳定所有者 ID。通过管理员 API 创建 token：
 
 ```bash
 curl -s -X POST http://localhost:3001/api/runtime-tokens \
   -H "authorization: Bearer $OOMOL_CONNECT_ADMIN_TOKEN" \
   -H 'content-type: application/json' \
-  -d '{"name":"open-flow","allowedActions":[],"blockedActions":[],"allowedProxies":["*"]}'
+  -d '{"name":"open-flow","allowedActions":[],"blockedActions":[],"allowedProxies":[],"allowedTriggers":["gmail.on_message_received","github.on_repo_event"]}'
 ```
 
-`*` 只用于这次本机走通。生产环境请只列出你实际要用的 Provider。
+显式授权实际使用的 Trigger ID。Trigger、Action 和 proxy 权限相互独立；这个示例不授予通用 proxy 权限。
 
 响应中的 `token` 字段只会返回这一次。把它保存为 `OPEN_FLOW_CONNECTOR_TOKEN`：
 
@@ -101,14 +99,15 @@ export OPEN_FLOW_CONNECTOR_TOKEN="<响应中的 token>"
 
 与 Open Flow 相关的 token 规则：
 
-- `allowedProxies` 默认为空。没有 proxy 权限的长期 token 无法调用 `/v1/proxy/:service`，Poll 和 Integration Trigger
-  会因此失败。允许 `*`，或列出你打算使用 Provider Trigger 的 Provider，例如 `["gmail","github"]`。
+- `allowedTriggers` 默认为 `[]`，包括旧 token 在内都没有 Provider Trigger 权限。授权具体 ID 或 `github.*` 这样的 Provider 规则；部署和 Runtime 的 `allowedTriggers`／`blockedTriggers` 继续收窄权限。
 - `allowedActions` 和 `blockedActions` 限制 Open Flow 可执行的 Action。空列表表示允许部署策略放行的全部 Action。
 - 除非要把 Open Flow 限定到特定 Connection，否则不要设置 `allowedConnections`。绑定到列表之外 Connection 的 Connector
   Node 会以 `connector.connection-required` 失败。
 
 只要创建过长期 token，OpenConnector 就会要求每个 `/v1` 和 `/mcp` 请求都带 runtime token。同一套 OpenConnector 的其他调用方，例如
 `oo connector` 或 MCP host，从此也需要各自的 token。
+
+轮换 token 前，先在旧 token 仍有效时停用并发布相关 Trigger，等待远端订阅清理和飞书资源需求释放。通过 `/api/trigger-subscriptions` 查看状态；对待清理订阅调用 `POST /api/trigger-subscriptions/:id/cancel`。无法恢复凭据时，管理员可以明确调用 `POST /api/trigger-subscriptions/:id/abandon`：这会保留“远端未清理”记录，仍需在 Provider 上手动处理。随后切换 `OPEN_FLOW_CONNECTOR_TOKEN`、重启 Open Flow，保留业务 checkpoint 并显式重建／启用绑定。不要向新 token 转发旧 subscription ID；飞书本地资源 ready 状态也必须在切换前收尾。轮换期间可能有事件空档。
 
 ## 3. 启动 Open Flow
 
@@ -260,7 +259,7 @@ oo connector search "send an email"
 | Workbench 或 CLI 出现 `connector.unavailable`       | Open Flow 容器访问不到 `OPEN_FLOW_CONNECTOR_ORIGIN`，或 OpenConnector 拒绝了 `OPEN_FLOW_CONNECTOR_TOKEN`。 |
 | `/readyz` 返回 503 而 `/healthz` 返回 200           | Connector 健康检查失败。查看 `docker logs open-flow`，并确认两个容器在同一网络。                           |
 | 运行时出现 `connector.connection-required`          | Connection 缺失、未激活，或被 token 的 `allowedConnections` 排除。到 Console 重新授权。                    |
-| 手动 Action 正常但 Poll 或 Integration Trigger 失败 | runtime token 对该 Provider 没有 `allowedProxies` 权限，或被 `OOMOL_CONNECT_BLOCKED_PROXIES` 阻止。        |
+| 手动 Action 正常但 Poll 或 Integration Trigger 失败 | runtime token 没有在 `allowedTriggers` 中获得该 Trigger ID，或部署／Runtime 的 Trigger 规则阻止了它。      |
 | `oo flow` 要求登录 OOMOL                            | 缺少 `OO_OPEN_FLOW_URL` 或 `OO_OPEN_FLOW_TOKEN`。两者必须在同一个 shell 中设置。                           |
 | `oo flow` 返回 401                                  | `OO_OPEN_FLOW_TOKEN` 与这套 Open Flow 的 `OPEN_FLOW_TOKEN` 不一致。                                        |
 | Workbench 指向 Console 的链接打开了错误的主机       | `OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN` 指向了容器地址，而不是浏览器可访问的 origin。                         |

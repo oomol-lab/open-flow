@@ -1,6 +1,6 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
-import type { ConnectorAccess, ConnectorAccessCandidates, WorkbenchClient } from '../api.ts'
+import type { ConnectorAccess, ConnectorAccessCandidates, ConnectorConnection, TriggerKeySnapshot, WorkbenchClient } from '../api.ts'
 import type { Notice } from './workbenchNotice.ts'
 
 import { val } from 'value-enhancer'
@@ -161,6 +161,32 @@ export class ConnectorAccessStore {
       await this.load(flowId)
     }
     return false
+  }
+
+  allowedTriggerCandidates(providerId: string, triggerId: string) {
+    return this.#state.value.candidates[providerId]?.candidates.filter(
+      (candidate) => candidate.permissions == null || candidate.permissions.allTriggers || candidate.permissions.triggerIds.includes(triggerId),
+    )
+  }
+
+  async filterTriggerConnections(
+    flowId: string,
+    definition: TriggerKeySnapshot,
+    connections: readonly ConnectorConnection[],
+  ): Promise<readonly ConnectorConnection[]> {
+    if (this.#disposed || flowId != this.#flowId) return []
+    const access = this.#state.value.access
+    if (access?.mode == 'implicit') return connections
+    if (access == null) return []
+    await this.loadCandidates([definition.provider])
+    if (this.#disposed || flowId != this.#flowId) return []
+    const candidates = this.allowedTriggerCandidates(definition.provider, definition.key)
+    if (candidates == null) return []
+    const allowed = new Set(candidates.map((candidate) => candidate.connectionId))
+    const filtered = connections.filter((connection) => allowed.has(connection.connectionId))
+    if (!filtered.some((connection) => connection.status == 'active') && connections.some((connection) => connection.status == 'active'))
+      this.setNotice({ kind: 'error', message: this.i18n.t('connectorAccess.noAvailablePermissions') })
+    return filtered
   }
 
   async setService(providerId: string, selected: boolean): Promise<boolean> {

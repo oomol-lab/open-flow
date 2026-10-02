@@ -10,6 +10,7 @@ import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, expect, it } from 'vitest'
 import { ServerService } from '../node/application/service.ts'
+import { ConnectorTaskError } from '../node/deployment/connector.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService } from './serviceFixture.ts'
@@ -73,7 +74,7 @@ async function addMarker(service: ServerService, flowId: string, revisionId: str
   return changed.revision.revisionId
 }
 
-function connector(proxy: ConnectorHost['proxy']) {
+function connector(trigger: NonNullable<ConnectorHost['trigger']>) {
   return createConnectorHost({
     listConnections: async () => [
       {
@@ -84,7 +85,7 @@ function connector(proxy: ConnectorHost['proxy']) {
         status: 'active',
       },
     ],
-    proxy,
+    trigger,
   })
 }
 
@@ -107,18 +108,10 @@ it('recovers Stripe candidate creation with one fixed idempotency key, fences ca
     file,
     options(
       connector(async (_provider, _connectionId, _rateLimitId, request) => {
-        if (request.endpoint == '/v1/webhook_endpoints' && request.method == 'GET') {
-          return { data: { data: [], has_more: false }, status: 200 }
-        }
-        if (request.endpoint == '/v1/webhook_endpoints' && request.method == 'POST') {
-          createCalls += 1
-          createKeys.push(request.headers?.['Idempotency-Key'] ?? '')
-          return { data: { id: 'we_candidate', secret: 'whsec_candidate' }, status: 200 }
-        }
-        if (request.endpoint == '/v1/webhook_endpoints/we_candidate' && request.method == 'POST') {
-          return { data: { id: 'we_candidate' }, status: 200 }
-        }
-        throw new Error('Unexpected Stripe request: ' + request.method + ' ' + request.endpoint)
+        if (request.operation !== 'reconcile') throw new Error('Unexpected Trigger operation')
+        createCalls += 1
+        createKeys.push(request.requestKey)
+        return { outcome: 'ready', checkpoint: null, subscription: { id: 'connector-subscription' }, reconcileAt: Date.parse('2026-09-01T08:00:00.000Z') }
       }),
       () => Date.parse('2026-08-31T08:00:00.000Z'),
     ),
@@ -163,8 +156,7 @@ it('recovers Stripe candidate creation with one fixed idempotency key, fences ca
   if (completed.status != 'succeeded') throw new Error('Stripe Publish operation did not succeed.')
   expect(service.integrationEndpoint(created.flow.flowId, 'stripe')).toBe(candidate.endpointId)
   expect(service.integrationState(created.flow.flowId, 'stripe')?.subscription).toEqual({
-    endpointId: 'we_candidate',
-    signingSecret: 'whsec_candidate',
+    id: 'connector-subscription',
   })
   expect(database.prepare('SELECT COUNT(*) AS count FROM integration_candidates').get()).toEqual({ count: 0 })
 
@@ -201,7 +193,6 @@ it('recovers Stripe candidate creation with one fixed idempotency key, fences ca
 
 it('fails a Stripe candidate before activation, preserves old Live, and recovers remote cleanup', async () => {
   const file = await databaseFile()
-  let createdUrl = ''
   let deletes = 0
   const accessDigests: string[] = []
   const service = await openService(
@@ -209,25 +200,10 @@ it('fails a Stripe candidate before activation, preserves old Live, and recovers
     options(
       connector(async (_provider, _connectionId, _rateLimitId, request, _signal, access) => {
         accessDigests.push(access!.providerAccess!.sharedAccessDigest)
-        if (request.endpoint == '/v1/webhook_endpoints' && request.method == 'GET') {
-          return {
-            data: { data: createdUrl == '' ? [] : [{ id: 'we_failed', url: createdUrl }], has_more: false },
-            status: 200,
-          }
-        }
-        if (request.endpoint == '/v1/webhook_endpoints' && request.method == 'POST') {
-          if (typeof request.body != 'string') throw new Error('Stripe create body is missing.')
-          createdUrl = new URLSearchParams(request.body).get('url') ?? ''
-          return { data: { id: 'we_failed', secret: 'whsec_failed' }, status: 200 }
-        }
-        if (request.endpoint == '/v1/webhook_endpoints/we_failed' && request.method == 'POST') {
-          return { data: { error: { message: 'Rejected.' } }, status: 400 }
-        }
-        if (request.endpoint == '/v1/webhook_endpoints/we_failed' && request.method == 'DELETE') {
-          deletes += 1
-          return { data: { deleted: true, id: 'we_failed' }, status: 200 }
-        }
-        throw new Error('Unexpected Stripe request: ' + request.method + ' ' + request.endpoint)
+        if (request.operation !== 'reconcile') throw new Error('Unexpected Trigger operation')
+        if (request.active) throw new ConnectorTaskError('connector.input-invalid', 'Stripe rejected the configuration.')
+        deletes += 1
+        return { outcome: 'ready', checkpoint: null, subscription: { id: 'connector-subscription' }, reconcileAt: Date.parse('2026-09-01T08:00:00.000Z') }
       }),
       () => Date.parse('2026-08-31T09:00:00.000Z'),
     ),

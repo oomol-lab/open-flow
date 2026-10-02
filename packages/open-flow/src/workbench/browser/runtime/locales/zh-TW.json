@@ -94,7 +94,9 @@
     "dynamicCodeReferences": "此 Flow 中的所有 Code 節點（包括子流程）共用這些連線。其他節點選擇連線不會自動允許 Code 使用。",
     "noAccountSelected": "未選擇帳號",
     "removeAuthorization": "移除授權",
-    "saving": "儲存中…"
+    "saving": "儲存中…",
+    "permissionAllTriggers": "全部觸發器",
+    "permissionTriggers": "觸發器：{{triggers}}"
   },
   "common": {
     "cancel": "取消",

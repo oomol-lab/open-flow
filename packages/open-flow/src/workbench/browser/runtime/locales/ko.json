@@ -94,7 +94,9 @@
     "dynamicCodeReferences": "하위 흐름을 포함한 이 Flow의 모든 Code 노드가 이 연결을 공유합니다. 다른 노드에서 연결을 선택해도 Code 사용이 허용되지는 않습니다.",
     "noAccountSelected": "선택한 계정 없음",
     "removeAuthorization": "권한 제거",
-    "saving": "저장 중…"
+    "saving": "저장 중…",
+    "permissionAllTriggers": "모든 트리거",
+    "permissionTriggers": "트리거: {{triggers}}"
   },
   "common": {
     "cancel": "취소",

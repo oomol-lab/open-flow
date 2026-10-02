@@ -197,14 +197,19 @@ describe('Connector access settings', () => {
   it('summarizes permission group contents without exposing its configuration', () => {
     const t = createI18n('en').t
 
-    expect(connectorAccessPermissionLabel({ permissions: { actionIds: [], allActions: true, configured: false, proxy: true }, providerId: 'mail' }, t)).toBe(
-      'All Actions · API proxy',
-    )
+    expect(
+      connectorAccessPermissionLabel(
+        { permissions: { actionIds: [], allActions: true, configured: false, proxy: true, triggerIds: [], allTriggers: true }, providerId: 'mail' },
+        t,
+      ),
+    ).toBe('All Actions · All Triggers · API proxy')
     expect(
       connectorAccessPermissionLabel(
         {
           permissions: {
             actionIds: ['mail.send', 'mail.read', 'mail.archive', 'mail.delete'],
+            triggerIds: [],
+            allTriggers: false,
             allActions: false,
             configured: true,
             proxy: false,

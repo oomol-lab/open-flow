@@ -90,20 +90,16 @@ PostgreSQL, промежуточное хранилище и остальные 
 
 ## 2. Создание runtime token для Open Flow
 
-Open Flow вызывает runtime API OpenConnector по пути `/v1`: каталог провайдеров и Action,
-список Connection, выполнение Action и `POST /v1/proxy/:service` для Poll и Integration Trigger.
-Дайте ему долгоживущий runtime token, а не admin token. Его можно создать на странице Access в Web
-Console или через admin API:
+Open Flow использует `/v1` для Provider, Action, Connection и выполнения Action, а `POST /v1/providers/:service/triggers/:triggerId/execute` — для Provider Trigger. Подпискам с состоянием нужен постоянный runtime token со стабильным ID владельца. Создайте его через API администратора:
 
 ```bash
 curl -s -X POST http://localhost:3001/api/runtime-tokens \
   -H "authorization: Bearer $OOMOL_CONNECT_ADMIN_TOKEN" \
   -H 'content-type: application/json' \
-  -d '{"name":"open-flow","allowedActions":[],"blockedActions":[],"allowedProxies":["*"]}'
+  -d '{"name":"open-flow","allowedActions":[],"blockedActions":[],"allowedProxies":[],"allowedTriggers":["gmail.on_message_received","github.on_repo_event"]}'
 ```
 
-Разрешение proxy `*` нужно для этого локального прохода. В рабочей среде перечислите только нужные
-провайдеры.
+Явно разрешите нужные ID Trigger. Права Trigger, Action и proxy независимы; этот пример не даёт общего доступа к proxy.
 
 В ответе поле `token` возвращается только один раз. Сохраните его как `OPEN_FLOW_CONNECTOR_TOKEN`:
 
@@ -113,9 +109,7 @@ export OPEN_FLOW_CONNECTOR_TOKEN="<token из ответа>"
 
 Правила token, важные для Open Flow:
 
-- `allowedProxies` по умолчанию пуст. Долгоживущий token без права proxy не может вызывать
-  `/v1/proxy/:service`, поэтому Poll и Integration Trigger завершаются ошибкой. Разрешите `*` или перечислите
-  провайдеров, чьи Provider Trigger вы планируете использовать, например `["gmail","github"]`.
+- `allowedTriggers` по умолчанию равен `[]`, в том числе для старых token. Разрешите конкретные ID или `github.*`. Дополнительно действуют правила `allowedTriggers` / `blockedTriggers` развёртывания и Runtime.
 - `allowedActions` и `blockedActions` ограничивают, какие Action может выполнять Open Flow. Пустые
   списки разрешают все Action, которые допускает политика развёртывания.
 - Не задавайте `allowedConnections`, если не хотите ограничить Open Flow конкретными Connection.
@@ -124,6 +118,8 @@ export OPEN_FLOW_CONNECTOR_TOKEN="<token из ответа>"
 Как только появляется хотя бы один долгоживущий token, OpenConnector требует runtime token на каждый
 запрос `/v1` и `/mcp`. Другим клиентам того же OpenConnector, например `oo connector` или MCP-хостам,
 с этого момента тоже нужны свои token.
+
+До смены token отключите и опубликуйте нужные Trigger, пока старый token ещё действителен, и дождитесь удаления удалённых подписок и освобождения ресурсов Feishu. Проверьте `/api/trigger-subscriptions`; для незавершённой очистки используйте `POST /api/trigger-subscriptions/:id/cancel`. Если восстановить учётные данные невозможно, администратор может явно отказаться от автоматической очистки через `POST /api/trigger-subscriptions/:id/abandon`. Запись о неудалённом ресурсе сохраняется; ресурс нужно удалить у Provider вручную. Затем измените `OPEN_FLOW_CONNECTOR_TOKEN`, перезапустите Open Flow и явно пересоздайте / включите привязки, сохранив бизнес-checkpoint. Не передавайте старые subscription ID новому token и заранее завершите локальное состояние ready ресурсов Feishu. Во время смены возможен пропуск событий.
 
 ## 3. Запуск Open Flow
 
@@ -299,7 +295,7 @@ oo connector search "send an email"
 | `connector.unavailable` в Workbench или CLI                                | Контейнер Open Flow не достучался до `OPEN_FLOW_CONNECTOR_ORIGIN`, или OpenConnector отклонил `OPEN_FLOW_CONNECTOR_TOKEN`. |
 | `/readyz` возвращает 503, а `/healthz` возвращает 200                      | Не прошла проверка состояния Connector. Смотрите `docker logs open-flow` и убедитесь, что оба контейнера в одной сети.     |
 | `connector.connection-required` при запуске                                | Connection отсутствует, неактивен или исключён `allowedConnections` у token. Подключите аккаунт заново в Console.          |
-| Poll или Integration Trigger завершаются ошибкой, а ручные Action работают | У runtime token нет права `allowedProxies` для этого провайдера, или его блокирует `OOMOL_CONNECT_BLOCKED_PROXIES`.        |
+| Poll или Integration Trigger завершаются ошибкой, а ручные Action работают | В `allowedTriggers` нет нужного ID Trigger либо его блокирует правило Trigger развёртывания / Runtime.                     |
 | `oo flow` просит войти в OOMOL                                             | Нет `OO_OPEN_FLOW_URL` или `OO_OPEN_FLOW_TOKEN`. Обе переменные нужно задать в одном shell.                                |
 | `oo flow` возвращает 401                                                   | `OO_OPEN_FLOW_TOKEN` отличается от `OPEN_FLOW_TOKEN` этого Open Flow.                                                      |
 | Ссылка Workbench на Console открывает неверный хост                        | `OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN` указывает на адрес контейнера, а не на origin, доступный браузеру.                    |
