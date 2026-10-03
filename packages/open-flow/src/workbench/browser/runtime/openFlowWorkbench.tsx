@@ -128,6 +128,7 @@ interface WorkbenchProps {
   readonly connectionHref?: ConnectionHref | undefined
   readonly flowBadges?: Readonly<Record<string, string>> | undefined
   readonly hrefFor: (location: WorkbenchLocation) => string
+  readonly initializing: boolean
   readonly language: WorkbenchLanguage
   readonly navigation: NavigationStore
   readonly onConfigureConnector?: (() => void) | undefined
@@ -145,6 +146,7 @@ function Workbench({
   flowBadges,
   connectionHref,
   hrefFor,
+  initializing,
   language,
   navigation,
   onConfigureConnector,
@@ -163,6 +165,7 @@ function Workbench({
           createFlowField={createFlowField}
           flowBadges={flowBadges}
           hrefForFlow={(flow) => hrefFor({ flowId: flow.flowId, view: 'design' })}
+          initializing={initializing}
           language={language}
           onCreateFlow={(name) => navigation.createFlow(name, createFlow)}
           onLanguageChange={onLanguageChange}
@@ -330,7 +333,7 @@ function Session({
       <I18nProvider i18n={i18n}>
         <div className="open-flow-theme open-flow-workbench" data-theme={theme}>
           <NotificationBridge host={host} store={store} />
-          {started ? (
+          {started || location.flowId == null ? (
             <Workbench
               catalogWidth={catalogWidth}
               createFlow={createFlow}
@@ -339,6 +342,7 @@ function Session({
               flowBadges={flowBadges}
               connectionHref={connectionHref}
               hrefFor={hrefFor}
+              initializing={!started}
               language={language}
               navigation={navigation}
               onConfigureConnector={onConfigureConnector}

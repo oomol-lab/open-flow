@@ -765,8 +765,11 @@ type FlowChangeEvent =
   | { flowId: string; kind: 'run.changed'; runId: string; version: 1 }
 ```
 
-`ready` 在首次订阅连接建立后 resolve，客户端在此之后读取初始状态；首次成功连接不再额外调用 `listener(undefined)`。
-首次连接失败或等待超时时，宿主也必须 resolve `ready`，允许客户端继续加载；取消订阅时同样必须 settle `ready`。
+`ready` 在首次订阅连接建立后 resolve；首次成功连接不再额外调用 `listener(undefined)`。
+Flow 列表首次读取与订阅建立并行，列表返回后即可完成列表页初始化和开放操作，不等待实时连接。
+若列表读取开始时 `ready` 尚未 settle，客户端在 `ready` settle 且首次读取结束后后台重新读取列表，补齐连接建立前可能遗漏的变化；
+后台刷新保留已有列表，不推断新建或导航。若读取前订阅已就绪，仅需首次读取。Flow 编辑器仍在对应 Flow 的 `ready` settle 后读取初始状态。
+首次连接失败或等待超时时，宿主也必须 resolve `ready`；取消订阅时同样必须 settle `ready`。
 `stop()` 关闭连接、取消重试，并停止后续回调。
 `undefined` 表示首次等待结束后连接重新建立，包含失败或超时后的第一次成功连接，客户端必须 refetch。
 在初始 snapshot 读取期间收到的 invalidation 不能丢弃；Draft revision 与 snapshot 相同时无需重复同步，否则读取当前 Draft。

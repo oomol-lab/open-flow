@@ -207,6 +207,8 @@ export class WorkspaceStore {
   }
 
   public async start(flowId?: string): Promise<void> {
+    const current = this.#draftSession.capture()
+    let initialLoad: Promise<void> | undefined
     this.#started = false
     if (this.#stopCatalogWatch == null) {
       const subscription = this.#client.watchFlowCatalog((event) => {
@@ -215,11 +217,18 @@ export class WorkspaceStore {
         if (event?.kind == 'flow.created' && this.#started && this.#model.value.flowId == null && this.#model.value.busy == null) this.flowCreated(event.flowId)
       })
       this.#stopCatalogWatch = subscription.stop
-      await subscription.ready
+      void subscription.ready.then(async () => {
+        if (initialLoad == null || this.#disposed) return
+        await initialLoad
+        if (!this.#disposed) await this.reloadFlows()
+      })
+      // An already-ready subscription needs only the initial read.
+      await Promise.resolve()
     }
     if (this.#disposed) return
-    await this.reloadFlows()
-    if (!this.#disposed) await this.selectFlow(flowId)
+    initialLoad = this.reloadFlows()
+    await initialLoad
+    if (!this.#disposed && current()) await this.selectFlow(flowId)
     this.#started = !this.#disposed
   }
 
