@@ -56,11 +56,11 @@ describe('canvas interaction preference', () => {
   })
 })
 
-function catalogSession(initialFlowId?: string) {
+function catalogSession(initialFlowId?: string, catalogReady: Promise<void> = Promise.resolve()) {
   let emit: ((event?: FlowCatalogEvent) => void) | undefined
   const client = new WorkbenchClient(vi.fn(), undefined, (listener) => {
     emit = listener
-    return { ready: Promise.resolve(), stop: vi.fn() }
+    return { ready: catalogReady, stop: vi.fn() }
   })
   const list = vi.spyOn(client, 'listFlows').mockResolvedValue({ flows: [], version: 1 })
   vi.spyOn(client, 'getEditor').mockImplementation(async (flowId) => ({
@@ -403,6 +403,137 @@ describe('Flow creation notifications', () => {
       emit({ kind: 'flow.created', flowId: 'late-flow', version: 1 })
       expect(navigate).not.toHaveBeenCalled()
     } finally {
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+
+  it.each(['before', 'after'])('opens the list without waiting for a subscription that settles %s the first read', async (timing) => {
+    const connection = Promise.withResolvers<void>()
+    const initial = Promise.withResolvers<Awaited<ReturnType<WorkbenchClient['listFlows']>>>()
+    const refreshed = Promise.withResolvers<Awaited<ReturnType<WorkbenchClient['listFlows']>>>()
+    const { store, navigation, navigate, list } = catalogSession(undefined, connection.promise)
+    const flow = {
+      flowId: 'existing',
+      name: 'Initial',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      draftRevisionId: 'revision',
+      status: 'active',
+      version: 1,
+    } as const
+    list.mockReturnValueOnce(initial.promise).mockReturnValueOnce(refreshed.promise)
+    try {
+      const started = navigation.start()
+      await vi.waitFor(() => expect(list).toHaveBeenCalledOnce())
+      if (timing == 'before') {
+        connection.resolve()
+        await connection.promise
+        expect(list).toHaveBeenCalledOnce()
+      }
+      initial.resolve({ flows: [flow], version: 1 })
+      await started
+
+      expect(navigation.$.ready.value).toBe(true)
+      expect(store.workspace.$.flows.value).toEqual([flow])
+      expect(store.workspace.$.flowLoading.value).toBe(false)
+      if (timing == 'after') connection.resolve()
+      await vi.waitFor(() => expect(list).toHaveBeenCalledTimes(2))
+      expect(store.workspace.$.flowRefreshing.value).toBe(true)
+      expect(store.workspace.$.flows.value).toEqual([flow])
+
+      const updated = { ...flow, name: 'Updated before connection' }
+      refreshed.resolve({ flows: [updated], version: 1 })
+      await vi.waitFor(() => expect(store.workspace.$.flows.value).toEqual([updated]))
+      expect(navigate).not.toHaveBeenCalled()
+      expect(store.workspace.$.flowId.value).toBeUndefined()
+    } finally {
+      connection.resolve()
+      initial.resolve({ flows: [], version: 1 })
+      refreshed.resolve({ flows: [], version: 1 })
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+
+  it('preserves the first list after a catch-up failure and refreshes it on reconnect', async () => {
+    const connection = Promise.withResolvers<void>()
+    const { store, navigation, navigate, list, emit } = catalogSession(undefined, connection.promise)
+    const flow = {
+      flowId: 'existing',
+      name: 'Initial',
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      draftRevisionId: 'revision',
+      status: 'active',
+      version: 1,
+    } as const
+    list.mockResolvedValueOnce({ flows: [flow], version: 1 }).mockRejectedValueOnce(new Error('Catch-up failed'))
+    try {
+      await navigation.start()
+      connection.resolve()
+      await vi.waitFor(() => expect(store.$.notice.value?.message).toContain('Catch-up failed'))
+      expect(navigation.$.ready.value).toBe(true)
+      expect(store.workspace.$.flows.value).toEqual([flow])
+      expect(store.workspace.$.flowLoading.value).toBe(false)
+      expect(store.workspace.$.flowRefreshing.value).toBe(false)
+      expect(store.workspace.$.flowLoadFailed.value).toBe(false)
+
+      list.mockResolvedValueOnce({ flows: [], version: 1 })
+      emit()
+      await vi.waitFor(() => expect(store.workspace.$.flows.value).toEqual([]))
+      expect(list).toHaveBeenCalledTimes(3)
+      expect(navigate).not.toHaveBeenCalled()
+    } finally {
+      connection.resolve()
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+
+  it('preserves navigation made while the initial list request is pending', async () => {
+    const connection = Promise.withResolvers<void>()
+    const initial = Promise.withResolvers<Awaited<ReturnType<WorkbenchClient['listFlows']>>>()
+    const { store, navigation, navigate, list } = catalogSession(undefined, connection.promise)
+    list.mockReturnValueOnce(initial.promise)
+    try {
+      const started = navigation.start()
+      await vi.waitFor(() => expect(list).toHaveBeenCalledOnce())
+      await navigation.apply({ flowId: 'chosen-flow', view: 'design' })
+      initial.resolve({ flows: [], version: 1 })
+      await started
+      connection.resolve()
+      await vi.waitFor(() => expect(list).toHaveBeenCalledTimes(2))
+
+      expect(navigation.$.ready.value).toBe(true)
+      expect(store.workspace.$.flowId.value).toBe('chosen-flow')
+      expect(store.workspace.$.draft.value?.flowId).toBe('chosen-flow')
+      expect(navigate).not.toHaveBeenCalled()
+    } finally {
+      connection.resolve()
+      initial.resolve({ flows: [], version: 1 })
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+
+  it('shows an initial list failure without waiting for connection and recovers after it settles', async () => {
+    const connection = Promise.withResolvers<void>()
+    const { store, navigation, navigate, list } = catalogSession(undefined, connection.promise)
+    list.mockRejectedValueOnce(new Error('Initial list failed'))
+    try {
+      await navigation.start()
+      expect(navigation.$.ready.value).toBe(true)
+      expect(store.workspace.$.flowLoadFailed.value).toBe(true)
+      expect(store.workspace.$.flowLoading.value).toBe(false)
+
+      connection.resolve()
+      await vi.waitFor(() => expect(store.workspace.$.flowLoadFailed.value).toBe(false))
+      expect(store.workspace.$.flowLoading.value).toBe(false)
+      expect(list).toHaveBeenCalledTimes(2)
+      expect(navigate).not.toHaveBeenCalled()
+    } finally {
+      connection.resolve()
       navigation.dispose()
       store.dispose()
     }

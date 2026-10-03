@@ -78,7 +78,8 @@ Workbench 使用两个彼此独立的实时通知通道：
 - 当前 Flow 通道发送该 Flow 的 `draft.changed`、`run.created` 和 `run.changed`。
 
 CLI、Workbench 或其他客户端通过 Control API 创建、改名、修改 Draft、发布、回滚、启停或删除 Flow 时，部署必须使 catalog 通道可观察到变化。两个通道必须能独立连接、
-断线和重连。宿主显式报告首次订阅就绪，客户端随后读取初始状态，并保留读取期间收到的 invalidation；首次连接失败不能无限阻塞加载，
+断线和重连。宿主显式报告首次订阅就绪。Flow 列表读取与订阅建立并行，不依赖实时连接完成初始化；订阅就绪后校准连接建立前开始的读取。
+Flow 编辑器等待自身订阅就绪再读取初始状态。客户端保留读取期间收到的 invalidation；首次连接失败不能无限阻塞加载，
 恢复连接或重连后客户端通过普通 Control API 恢复权威状态。通知只是 invalidation，不是 Revision、RunEvent、协作日志或消息队列。
 
 ### 生命周期与 retention
