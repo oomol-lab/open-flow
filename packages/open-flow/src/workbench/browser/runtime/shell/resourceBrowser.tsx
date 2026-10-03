@@ -394,6 +394,7 @@ interface FlowBrowserProps extends LanguageSelectProps {
   readonly createFlowField?: ComponentProps<typeof CreateResourceDialog>['field']
   readonly flowBadges?: Readonly<Record<string, string>> | undefined
   readonly hrefForFlow: (flow: Flow) => string
+  readonly initializing?: boolean
   readonly onCreateFlow: (name: string) => Promise<boolean>
   readonly onSelectFlow: (flow: Flow) => void
   readonly store: WorkbenchStore
@@ -405,6 +406,7 @@ export function FlowBrowser({
   createFlowField,
   flowBadges,
   hrefForFlow,
+  initializing = false,
   onCreateFlow,
   onSelectFlow,
   store,
@@ -413,7 +415,8 @@ export function FlowBrowser({
   const busy = useVal(store.workspace.$.busy)
   const loadFailed = useVal(store.workspace.$.flowLoadFailed)
   const loadMoreFailed = useVal(store.workspace.$.flowLoadMoreFailed)
-  const loading = useVal(store.workspace.$.flowLoading)
+  const flowLoading = useVal(store.workspace.$.flowLoading)
+  const loading = initializing || flowLoading
   const loadingMore = useVal(store.workspace.$.flowLoadingMore)
   const nextCursor = useVal(store.workspace.$.flowNextCursor)
   const refreshing = useVal(store.workspace.$.flowRefreshing)
@@ -437,7 +440,7 @@ export function FlowBrowser({
     <main className="resource-browser" data-tooltip-portal>
       <div className={cn('resource-page', catalogWidth != 'default' && 'resource-page-full')}>
         <h1 className="sr-only">{t('resource.flows')}</h1>
-        <section aria-labelledby="flow-list-title" className="resource-list-section rounded-lg">
+        <section aria-busy={loading || refreshing} aria-labelledby="flow-list-title" className="resource-list-section rounded-lg">
           <div className="resource-list-title">
             <div className="resource-list-heading">
               <h2 id="flow-list-title">{t('resource.flows')}</h2>
@@ -457,7 +460,7 @@ export function FlowBrowser({
                   value={filter}
                 />
               </InputGroup>
-              <Button className="pr-3" disabled={busy != null} onClick={() => setCreating(true)}>
+              <Button className="pr-3" disabled={initializing || busy != null} onClick={() => setCreating(true)}>
                 <Icon data-icon="inline-start" name="plus" />
                 {t('resource.newFlow')}
               </Button>
