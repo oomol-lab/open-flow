@@ -15,8 +15,7 @@ or correcting behavior outside its existing owner or source of truth. Change the
 directly when that remains within scope. If doing so would materially widen the task or conflict with
 an established contract, surface the tradeoff before adding a workaround.
 
-Preserve unrelated work and staging state. Clean up temporary resources created for the task,
-including stopping verification servers before delivery.
+Preserve unrelated work and staging state. Clean up temporary resources created for the task.
 
 ## Proportionality and coherence
 

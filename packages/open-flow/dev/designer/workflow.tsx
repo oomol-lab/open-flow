@@ -409,7 +409,7 @@ export const workflowStories: readonly FrontendStory[] = [
     id: 'workspace-navigation-island',
     title: 'Workspace navigation island',
     description:
-      'Compare the canvas island with the ghost style used while loading or recovering a workflow. Cycle names and the draft status dot beside the title. Open the publish confirmation and menu with the MiniMap expanded to inspect overlapping controls. Cancel or dismiss confirmation without publishing; confirm to log one publication.publish event.',
+      'Compare the canvas island with the ghost style used while loading or recovering a workflow. Cycle names and the draft status dot beside the title. Open the publish confirmation to inspect its content insets and separation between copy and actions in both themes. Open the menu with the MiniMap expanded to inspect overlapping controls. Cancel or dismiss confirmation without publishing; confirm to log one publication.publish event.',
     standalone: true,
     render: (log, dark, language) => <NavigationIslandStory dark={dark} language={language} log={log} />,
   },

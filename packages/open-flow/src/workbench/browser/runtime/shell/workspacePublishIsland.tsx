@@ -5,7 +5,7 @@ import { useTranslate } from 'val-i18n-react'
 import { CanvasTooltip } from '../../../../canvas/browser/components/tooltip.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
-import { Popover, PopoverContent, PopoverDescription, PopoverTitle, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
+import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 
 export type PublishState = 'ready' | 'current' | 'issues' | 'subflow' | 'busy' | 'publishing'
 
@@ -76,10 +76,12 @@ export function WorkspacePublishIsland({
             <span>{publishLabel}</span>
           </PopoverTrigger>
         </CanvasTooltip>
-        <PopoverContent align="end" container={popupContainer} initialFocus={cancelButton} side="bottom" sideOffset={8}>
-          <PopoverTitle className="m-0 text-sm">{t('publication.publishConfirm')}</PopoverTitle>
-          <PopoverDescription className="m-0">{t('publication.publishConfirmDescription')}</PopoverDescription>
-          <div className="flex justify-end gap-2">
+        <PopoverContent align="end" className="gap-4 p-0" container={popupContainer} initialFocus={cancelButton} side="bottom" sideOffset={8}>
+          <PopoverHeader className="gap-2 px-4 pt-4">
+            <PopoverTitle className="m-0 text-sm">{t('publication.publishConfirm')}</PopoverTitle>
+            <PopoverDescription className="m-0">{t('publication.publishConfirmDescription')}</PopoverDescription>
+          </PopoverHeader>
+          <div className="flex justify-end gap-2 px-3 pb-3">
             <Button ref={cancelButton} onClick={() => setConfirming(false)} size="sm" type="button" variant="outline">
               {t('common.cancel')}
             </Button>
