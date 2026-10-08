@@ -96,8 +96,8 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
       return
     }
     case 'create': {
-      requireCount(operands, 1, 'oo flow create <name> [--team <teamId>] [--json]')
-      const flow = await client.createFlow(checkedResourceName(operands[0]!, 'Flow'), args.idempotencyKey, args.team)
+      requireCount(operands, 1, 'oo flow create <name> [--json]')
+      const flow = await client.createFlow(checkedResourceName(operands[0]!, 'Flow'), args.idempotencyKey)
       write(runtime, args.json, { flow, idempotencyKey: args.idempotencyKey, kind: 'flow.create', version: 1 }, flowText(flow))
       return
     }

@@ -492,7 +492,6 @@ describe('agent command contract', () => {
     { command: ['node', 'show', 'flow-1', 'start'], option: '--subflow', next: '--json' },
     { command: ['connector', 'code-access', 'flow-1'], option: '--publication', next: '--json' },
     { command: ['node', 'show', 'flow-1', 'start'], option: '--revision', next: '--subflow=child' },
-    { command: ['create', 'Main'], option: '--team', next: '-x' },
   ])('reports a missing value before consuming a flag: $option $next', async ({ command, option, next }) => {
     const output = runtime()
     const request = vi.fn()
@@ -833,7 +832,15 @@ it('describes Trigger outputs as a JSON object in the CLI schema', async () => {
   expect(JSON.parse(result.stdout())).toMatchObject({ type: 'object' })
 })
 
-it('discovers Provider and Trigger summaries and creates a Flow in the chosen Team', async () => {
+it('rejects a command-owned Team selector without contacting the host', async () => {
+  const output = runtime()
+  const request = vi.fn()
+  expect(await runCli(['create', 'Main', '--team', 'another-team', '--json'], { request }, output.value)).toBe(1)
+  expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'cli.invalid-arguments' } })
+  expect(request).not.toHaveBeenCalled()
+})
+
+it('discovers Provider and Trigger summaries and creates a Flow in the host scope', async () => {
   const trigger = { key: 'mail.received', name: 'received', displayName: 'Mail received', description: 'Incoming email', provider: 'mail', type: 'poll' }
   const teams = { enabled: true, teams: [{ id: 'team', name: 'Engineering', systemCreated: false }], version: 1 }
   const request = async (path: string, init?: RequestInit) => {
@@ -841,7 +848,7 @@ it('discovers Provider and Trigger summaries and creates a Flow in the chosen Te
     if (path == '/v1/trigger-keys') return Response.json({ keys: [trigger], version: 1 })
     if (path == '/v1/connector/teams') return Response.json(teams)
     if (path == '/v1/flows') {
-      expect(JSON.parse(String(init?.body))).toEqual({ name: 'Main', teamId: 'team', version: 1 })
+      expect(JSON.parse(String(init?.body))).toEqual({ name: 'Main', version: 1 })
       return Response.json(flow)
     }
     throw new Error(path)
@@ -852,7 +859,7 @@ it('discovers Provider and Trigger summaries and creates a Flow in the chosen Te
     [['trigger', 'search', 'MAIL'], { keys: [trigger] }],
     [['trigger', 'search', 'absent'], { keys: [] }],
     [['connector', 'teams'], teams],
-    [['create', 'Main', '--team', 'team'], { flow }],
+    [['create', 'Main'], { flow }],
   ] as const) {
     const io = runtime()
     expect(await runCli([...command, '--json'], { request }, io.value), io.stderr()).toBe(0)

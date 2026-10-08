@@ -9,7 +9,6 @@ export interface ParsedArguments {
   readonly expectedPublication?: string
   readonly trigger?: string
   readonly outputs?: string
-  readonly team?: string
   readonly revision?: string
   readonly subflow?: string
   readonly publication?: string
@@ -56,7 +55,6 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
   const options: string[] = []
   let trigger: string | undefined
   let outputs: string | undefined
-  let team: string | undefined
   let revision: string | undefined
   let subflow: string | undefined
   let publication: string | undefined
@@ -119,7 +117,6 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     } else if (
       argument == '--idempotency-key' ||
       argument == '--expected-publication' ||
-      argument == '--team' ||
       argument == '--revision' ||
       argument == '--subflow' ||
       argument == '--publication' ||
@@ -155,7 +152,6 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       if (inlineValue == null) index++
       if (argument == '--idempotency-key') idempotencyKey = value
       else if (argument == '--expected-publication') expectedPublication = value
-      else if (argument == '--team') team = value
       else if (argument == '--revision') revision = value
       else if (argument == '--subflow') subflow = value
       else if (argument == '--publication') publication = value
@@ -223,7 +219,6 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     ...(revision == null ? {} : { revision }),
     ...(subflow == null ? {} : { subflow }),
     ...(publication == null ? {} : { publication }),
-    ...(team == null ? {} : { team }),
     ...(comment == null ? {} : { comment }),
     ...(expectedPublication == null ? {} : { expectedPublication }),
     ...(after == null ? {} : { after }),
