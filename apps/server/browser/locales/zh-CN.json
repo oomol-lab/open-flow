@@ -1,6 +1,6 @@
 {
   "session": {
-    "checking": "正在检查 operator session…",
+    "checking": "正在检查登录状态…",
     "configured": "使用当前 deployment 配置的 operator token 登录。",
     "invalid": "Operator token 不正确。",
     "notConfigured": "请先在服务端配置 OPEN_FLOW_TOKEN。",
@@ -15,7 +15,11 @@
     "setupInvalidToken": "Operator token 经 UTF-8 编码后至少需要 32 bytes。",
     "setupTokenDescription": "设置用于登录和调用 Control API 的 Operator token。",
     "token": "Operator token",
-    "unavailable": "无法连接 Server 服务。"
+    "unavailable": "无法连接 Server 服务。",
+    "userDescription": "使用管理员提供的邮箱和密码登录。",
+    "invalidCredentials": "邮箱或密码不正确。",
+    "userLogin": "使用邮箱登录",
+    "operatorLogin": "管理员 token 登录"
   },
   "shell": {
     "closeNotification": "关闭通知",
@@ -123,5 +127,32 @@
     "value": "值",
     "valueTooLarge": "值经 UTF-8 编码后不能超过 64 KiB。",
     "deleteFailed": "无法删除环境变量。"
+  },
+  "users": {
+    "title": "用户管理",
+    "description": "创建账号和管理访问权限。每个账号拥有独立的工作流。",
+    "email": "邮箱",
+    "password": "密码",
+    "role": "角色",
+    "user": "普通用户",
+    "admin": "管理员",
+    "create": "创建用户",
+    "passwordCreated": "已为 {{email}} 生成密码",
+    "passwordHint": "请保存密码并交给用户，密码只显示一次。重置密码会使已有登录失效。",
+    "dismiss": "已保存密码",
+    "loading": "正在加载用户…",
+    "loadFailed": "无法加载用户。",
+    "saveFailed": "无法保存用户。",
+    "conflict": "邮箱已存在或账号已发生变化，列表已刷新。",
+    "empty": "还没有用户。",
+    "enabled": "正常",
+    "disabled": "已停用",
+    "enable": "启用",
+    "disable": "停用",
+    "resetPassword": "重置密码",
+    "adminRequired": "只有管理员可以访问此页面。",
+    "count": "{{count}} 位用户",
+    "status": "状态",
+    "actions": "操作"
   }
 }

@@ -1,9 +1,11 @@
 import type { OpenFlowWorkbenchProps, WorkbenchLanguage, WorkbenchLocation, WorkbenchNavigationOptions, WorkbenchTheme } from '@oomol-lab/open-flow/workbench'
 import type { FormEvent, MouseEvent, ReactElement } from 'react'
+import type { SessionUser } from '../common/users.ts'
 import type { ConnectionConsole } from './connectionNavigation.ts'
+import type { LoginCredentials } from './login.tsx'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
-import { HostNavigationActions, OpenFlowLogo, notificationToasterProps } from '@oomol-lab/open-flow/ui'
+import { Button, HostNavigationActions, OpenFlowLogo, notificationToasterProps } from '@oomol-lab/open-flow/ui'
 import { EventSourcesPage, OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol-lab/open-flow/workbench'
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { Toaster } from 'sonner'
@@ -13,10 +15,12 @@ import { createBrowserHost } from './host.ts'
 import { createI18n } from './i18n.ts'
 import { idempotencyKey } from './idempotency.ts'
 import { initialLanguage, languagePreference } from './language.ts'
+import { Login } from './login.tsx'
 import { notify } from './notifications.ts'
 import { posthog } from './posthog.ts'
 import { parseRouteContext, routeOwnerForFlow, routePath } from './route.ts'
 import { SettingsPage } from './settings.tsx'
+import { UsersPage } from './users.tsx'
 import { VariablesPage } from './variables.tsx'
 
 type ThemeMode = WorkbenchTheme | 'auto'
@@ -40,9 +44,10 @@ type Session =
       readonly setupAuthorized?: boolean
       readonly setupRequired?: boolean
     }
-  | { readonly kind: 'signed-in' }
+  | { readonly kind: 'signed-in'; readonly user: SessionUser }
 
 interface SessionStatus {
+  readonly user: SessionUser | null
   readonly authenticated: boolean
   readonly configured: boolean
   readonly setupAuthorized: boolean
@@ -68,7 +73,21 @@ function sessionStatus(value: unknown): SessionStatus | undefined {
   ) {
     return
   }
+  let user: SessionUser | null = null
+  if (status.authenticated) {
+    if (status.user == null || typeof status.user != 'object' || Array.isArray(status.user)) return
+    const profile = status.user as Record<string, unknown>
+    if (
+      typeof profile.userId != 'string' ||
+      profile.userId.length == 0 ||
+      (profile.email !== null && typeof profile.email != 'string') ||
+      (profile.role != 'admin' && profile.role != 'user')
+    )
+      return
+    user = { userId: profile.userId, email: profile.email as string | null, role: profile.role as SessionUser['role'] }
+  }
   return {
+    user,
     authenticated: status.authenticated,
     configured: status.configured,
     setupAuthorized: status.setupAuthorized,
@@ -131,9 +150,12 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
   const routeContext = useMemo(() => parseRouteContext(routeUrl), [routeUrl])
   const route = routeContext.location
   const eventSourcesOpen = pathname == '/settings/event-sources'
-  const settingsOpen = pathname == '/settings' || eventSourcesOpen
+  const usersOpen = pathname == '/settings/users'
+  const settingsOpen = pathname == '/settings' || eventSourcesOpen || usersOpen
   const variablesOpen = pathname == '/variables'
   const [session, setSession] = useState<Session>({ kind: 'checking' })
+  const administrator = session.kind == 'signed-in' && session.user.role == 'admin'
+  const userId = session.kind == 'signed-in' ? session.user.userId : undefined
   const [connectionConsole, setConnectionConsole] = useState<ConnectionConsole>()
   const [token, setToken] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -154,10 +176,10 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
   const client = useMemo(() => new ControlClient((input, init) => host.request(input, init)), [host])
   const preferences = useMemo(
     () => ({
-      getItem: (key: string): string | null => localStorage.getItem(`${preferencePrefix}${key}`),
-      setItem: (key: string, value: string): void => localStorage.setItem(`${preferencePrefix}${key}`, value),
+      getItem: (key: string): string | null => localStorage.getItem(`${preferencePrefix}${userId}.${key}`),
+      setItem: (key: string, value: string): void => localStorage.setItem(`${preferencePrefix}${userId}.${key}`, value),
     }),
-    [],
+    [userId],
   )
   const loadTeams = useCallback(async (signal?: AbortSignal): Promise<void> => {
     try {
@@ -203,7 +225,7 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
       if (!response.ok || status == null) throw new Error('Invalid session response.')
       setSession(
         status.authenticated
-          ? { kind: 'signed-in' }
+          ? { kind: 'signed-in', user: status.user! }
           : {
               configured: status.configured,
               kind: 'signed-out',
@@ -241,24 +263,23 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
     setRouteUrl(path)
   }
 
-  function openPage(path: '/' | '/settings' | '/settings/event-sources' | '/variables'): void {
+  function openPage(path: '/' | '/settings' | '/settings/users' | '/settings/event-sources' | '/variables'): void {
     if (path != window.location.pathname + window.location.search) window.history.pushState(null, '', path)
     setRouteUrl(path)
   }
 
-  function followPage(event: MouseEvent<HTMLAnchorElement>, path: '/' | '/settings' | '/settings/event-sources' | '/variables'): void {
+  function followPage(event: MouseEvent<HTMLAnchorElement>, path: '/' | '/settings' | '/settings/users' | '/settings/event-sources' | '/variables'): void {
     if (event.defaultPrevented || event.button != 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     event.preventDefault()
     openPage(path)
   }
 
-  async function signIn(event: FormEvent): Promise<void> {
-    event.preventDefault()
-    if (token.length == 0 || submitting) return
+  async function signIn(credentials: LoginCredentials): Promise<void> {
+    if (submitting) return
     setSubmitting(true)
     try {
-      const response = await fetch('/auth/session', {
-        body: JSON.stringify({ token, version: 1 }),
+      const response = await fetch('token' in credentials ? '/auth/session' : '/auth/user-session', {
+        body: JSON.stringify({ ...credentials, version: 1 }),
         credentials: 'same-origin',
         headers: { 'content-type': 'application/json' },
         method: 'POST',
@@ -267,8 +288,7 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
         setSession({ configured: true, error: response.status == 401 ? 'invalid' : 'unavailable', kind: 'signed-out' })
         return
       }
-      setToken('')
-      setSession({ kind: 'signed-in' })
+      await checkSession()
     } catch {
       setSession({ configured: true, error: 'unavailable', kind: 'signed-out' })
     } finally {
@@ -304,7 +324,11 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
         return
       }
       setToken('')
-      setSession(authorized ? { kind: 'signed-in' } : { configured: false, kind: 'signed-out', setupAuthorized: true, setupRequired: true })
+      setSession(
+        authorized
+          ? { kind: 'signed-in', user: { userId: 'operator', email: null, role: 'admin' } }
+          : { configured: false, kind: 'signed-out', setupAuthorized: true, setupRequired: true },
+      )
     } catch {
       setSession({ configured: false, error: 'unavailable', kind: 'signed-out', setupAuthorized: authorized, setupRequired: true })
     } finally {
@@ -318,6 +342,8 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
       if (!response.ok) throw new Error('Session logout failed.')
       notify(undefined)
       posthog?.reset()
+      window.history.replaceState(null, '', '/')
+      setRouteUrl('/')
       setSession({ configured: true, kind: 'signed-out' })
     } catch {
       notify({ kind: 'error', message: t('session.unavailable') })
@@ -413,34 +439,53 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
               <a aria-current={variablesOpen || settingsOpen ? undefined : 'page'} href="/" onClick={(event) => followPage(event, '/')}>
                 {t('shell.flows')}
               </a>
-              <a aria-current={variablesOpen ? 'page' : undefined} href="/variables" onClick={(event) => followPage(event, '/variables')}>
-                {t('shell.variables')}
-              </a>
-              <a aria-current={settingsOpen ? 'page' : undefined} href="/settings" onClick={(event) => followPage(event, '/settings')}>
-                {t('shell.settings')}
-              </a>
+              {administrator && (
+                <a aria-current={variablesOpen ? 'page' : undefined} href="/variables" onClick={(event) => followPage(event, '/variables')}>
+                  {t('shell.variables')}
+                </a>
+              )}
+              {administrator && (
+                <a aria-current={settingsOpen ? 'page' : undefined} href="/settings" onClick={(event) => followPage(event, '/settings')}>
+                  {t('shell.settings')}
+                </a>
+              )}
             </nav>
-            <HostNavigationActions
-              className="server-nav-actions"
-              language={language}
-              onLanguageChange={onLanguageChange}
-              theme={themeMode}
-              onThemeChange={onThemeModeChange}
-              labels={{
-                theme: t('shell.theme', { mode: t(`shell.${themeMode}`) }),
-                language: t('shell.language'),
-                light: t('shell.light'),
-                dark: t('shell.dark'),
-                auto: t('shell.auto'),
-              }}
-            />
+            <div className="server-nav-actions">
+              <span className="server-account">{session.user.email ?? t('users.admin')}</span>
+              <Button type="button" variant="ghost" size="sm" onClick={() => void signOut()}>
+                {t('session.signOut')}
+              </Button>
+              <HostNavigationActions
+                language={language}
+                onLanguageChange={onLanguageChange}
+                theme={themeMode}
+                onThemeChange={onThemeModeChange}
+                labels={{
+                  theme: t('shell.theme', { mode: t(`shell.${themeMode}`) }),
+                  language: t('shell.language'),
+                  light: t('shell.light'),
+                  dark: t('shell.dark'),
+                  auto: t('shell.auto'),
+                }}
+              />
+            </div>
           </header>
           <div className="workbench-frame">
-            {settingsOpen ? (
+            {(settingsOpen || variablesOpen) && !administrator ? (
+              <main className="settings-page">
+                <div className="settings-content">
+                  <p>{t('users.adminRequired')}</p>
+                  <Button onClick={() => openPage('/')}>{t('shell.flows')}</Button>
+                </div>
+              </main>
+            ) : settingsOpen ? (
               <div className="settings-layout">
                 <nav className="settings-nav" aria-label={t('shell.settings')}>
-                  <a href="/settings" aria-current={eventSourcesOpen ? undefined : 'page'} onClick={(event) => followPage(event, '/settings')}>
+                  <a href="/settings" aria-current={eventSourcesOpen || usersOpen ? undefined : 'page'} onClick={(event) => followPage(event, '/settings')}>
                     {t('shell.settings')}
+                  </a>
+                  <a href="/settings/users" aria-current={usersOpen ? 'page' : undefined} onClick={(event) => followPage(event, '/settings/users')}>
+                    {t('users.title')}
                   </a>
                   <a
                     href="/settings/event-sources"
@@ -451,7 +496,9 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
                   </a>
                 </nav>
                 <div className="settings-body">
-                  {eventSourcesOpen ? (
+                  {usersOpen ? (
+                    <UsersPage currentUserId={session.user.userId} onUnauthorized={sessionExpired} />
+                  ) : eventSourcesOpen ? (
                     <EventSourcesPage client={client} language={language} teams={team.kind == 'ready' ? team.teams : []} />
                   ) : (
                     <SettingsPage onSignOut={() => void signOut()} onConnectorChange={() => void loadTeams()} onUnauthorized={sessionExpired} />
@@ -466,23 +513,28 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
                 createFlowDisabled={team.kind != 'hidden' && (team.kind != 'ready' || team.selectedTeamId == null)}
                 createFlowField={createFlowField}
                 flowBadges={flowBadges}
-                connectionHref={(flowId, providerId, connectionId) => {
-                  return connectionHref(connectionConsole, connectorOwnerForFlow(flowId), providerId, connectionId)
-                }}
+                connectionHref={
+                  administrator
+                    ? (flowId, providerId, connectionId) => connectionHref(connectionConsole, connectorOwnerForFlow(flowId), providerId, connectionId)
+                    : undefined
+                }
                 hrefFor={(location) => routePath(location, connectorOwnerForFlow(location.flowId))}
                 host={host}
                 language={language}
                 location={route}
-                onConfigureConnector={() => openPage('/settings')}
+                onConfigureConnector={administrator ? () => openPage('/settings') : undefined}
                 onLanguageChange={onLanguageChange}
                 onNavigate={navigate}
                 preferences={preferences}
-                sessionKey="server-operator"
+                sessionKey={session.user.userId}
                 theme={theme}
+                variables={administrator}
               />
             )}
           </div>
         </>
+      ) : session.configured === true && session.setupRequired !== true ? (
+        <Login error={session.error == 'invalid' || session.error == 'unavailable' ? session.error : undefined} pending={submitting} onSubmit={signIn} />
       ) : (
         <OpenFlowSessionGate
           action={
@@ -506,7 +558,10 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
                     event.preventDefault()
                     void checkSession()
                   }
-                : (event) => void signIn(event)
+                : (event) => {
+                    event.preventDefault()
+                    void checkSession()
+                  }
           }
           onTokenChange={session.configured === true || session.setupRequired === true ? setToken : undefined}
           pending={submitting}

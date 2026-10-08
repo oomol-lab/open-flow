@@ -1,6 +1,6 @@
 {
   "session": {
-    "checking": "Checking operator session…",
+    "checking": "Checking session…",
     "configured": "Sign in with the operator token configured for this deployment.",
     "invalid": "The operator token is invalid.",
     "notConfigured": "Set OPEN_FLOW_TOKEN on the server before signing in.",
@@ -15,7 +15,11 @@
     "setupInvalidToken": "The Operator token must contain at least 32 UTF-8 bytes.",
     "setupTokenDescription": "Choose the Operator token used to sign in and call the Control API.",
     "token": "Operator token",
-    "unavailable": "The server could not be reached."
+    "unavailable": "The server could not be reached.",
+    "userDescription": "Sign in with the email and password provided by your administrator.",
+    "invalidCredentials": "Email or password is incorrect.",
+    "userLogin": "Sign in with email",
+    "operatorLogin": "Administrator token login"
   },
   "shell": {
     "closeNotification": "Close notification",
@@ -123,5 +127,32 @@
     "value": "Value",
     "valueTooLarge": "Value must be no larger than 64 KiB when encoded as UTF-8.",
     "deleteFailed": "The environment variable could not be deleted."
+  },
+  "users": {
+    "title": "Users",
+    "description": "Create accounts and manage access. Each account has its own workflows.",
+    "email": "Email",
+    "password": "Password",
+    "role": "Role",
+    "user": "User",
+    "admin": "Administrator",
+    "create": "Create user",
+    "passwordCreated": "Password generated for {{email}}",
+    "passwordHint": "Save this password and give it to the user. It is shown only once. Resetting it signs out existing sessions.",
+    "dismiss": "I saved the password",
+    "loading": "Loading users…",
+    "loadFailed": "Unable to load users.",
+    "saveFailed": "Unable to save the user.",
+    "conflict": "This email already exists or the account changed. The list has been refreshed.",
+    "empty": "No users yet.",
+    "enabled": "Active",
+    "disabled": "Disabled",
+    "enable": "Enable",
+    "disable": "Disable",
+    "resetPassword": "Reset password",
+    "adminRequired": "Only administrators can access this page.",
+    "count": "{{count}} users",
+    "status": "Status",
+    "actions": "Actions"
   }
 }

@@ -1,6 +1,6 @@
 {
   "session": {
-    "checking": "正在檢查 operator session…",
+    "checking": "正在檢查登入狀態…",
     "configured": "使用這個部署所設定的 operator token 登入。",
     "invalid": "Operator token 無效。",
     "notConfigured": "請先在伺服器上設定 OPEN_FLOW_TOKEN，然後再登入。",
@@ -15,7 +15,11 @@
     "setupInvalidToken": "Operator token 經 UTF-8 編碼後至少需要 32 bytes。",
     "setupTokenDescription": "設定用於登入和呼叫 Control API 的 Operator token。",
     "token": "Operator token",
-    "unavailable": "無法連線到伺服器。"
+    "unavailable": "無法連線到伺服器。",
+    "userDescription": "使用管理員提供的信箱和密碼登入。",
+    "invalidCredentials": "信箱或密碼不正確。",
+    "userLogin": "使用信箱登入",
+    "operatorLogin": "管理員 token 登入"
   },
   "shell": {
     "closeNotification": "關閉通知",
@@ -123,5 +127,32 @@
     "value": "值",
     "valueTooLarge": "值經 UTF-8 編碼後不能超過 64 KiB。",
     "deleteFailed": "無法刪除環境變數。"
+  },
+  "users": {
+    "title": "使用者管理",
+    "description": "建立帳號並管理存取權限。每個帳號擁有獨立的工作流程。",
+    "email": "信箱",
+    "password": "密碼",
+    "role": "角色",
+    "user": "一般使用者",
+    "admin": "管理員",
+    "create": "建立使用者",
+    "passwordCreated": "已為 {{email}} 產生密碼",
+    "passwordHint": "請儲存密碼並交給使用者，密碼只顯示一次。重設密碼會使現有登入失效。",
+    "dismiss": "已儲存密碼",
+    "loading": "正在載入使用者…",
+    "loadFailed": "無法載入使用者。",
+    "saveFailed": "無法儲存使用者。",
+    "conflict": "信箱已存在或帳號已變更，清單已重新整理。",
+    "empty": "尚無使用者。",
+    "enabled": "正常",
+    "disabled": "已停用",
+    "enable": "啟用",
+    "disable": "停用",
+    "resetPassword": "重設密碼",
+    "adminRequired": "只有管理員可以存取此頁面。",
+    "count": "{{count}} 位使用者",
+    "status": "狀態",
+    "actions": "操作"
   }
 }

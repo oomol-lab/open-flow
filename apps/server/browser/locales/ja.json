@@ -1,6 +1,6 @@
 {
   "session": {
-    "checking": "operator session を確認中…",
+    "checking": "ログイン状態を確認中…",
     "configured": "この deployment に設定されている operator token でログインします。",
     "invalid": "Operator token が正しくありません。",
     "notConfigured": "ログインする前に、サーバーで OPEN_FLOW_TOKEN を設定してください。",
@@ -15,7 +15,11 @@
     "setupInvalidToken": "Operator token は UTF-8 で 32 bytes 以上必要です。",
     "setupTokenDescription": "ログインと Control API の呼び出しに使用する Operator token を設定します。",
     "token": "Operator token",
-    "unavailable": "サーバーに接続できませんでした。"
+    "unavailable": "サーバーに接続できませんでした。",
+    "userDescription": "管理者から提供されたメールアドレスとパスワードでログインします。",
+    "invalidCredentials": "メールアドレスまたはパスワードが正しくありません。",
+    "userLogin": "メールでログイン",
+    "operatorLogin": "管理者トークンでログイン"
   },
   "shell": {
     "closeNotification": "通知を閉じる",
@@ -123,5 +127,32 @@
     "value": "値",
     "valueTooLarge": "UTF-8 でエンコードした値は 64 KiB 以下にしてください。",
     "deleteFailed": "環境変数を削除できませんでした。"
+  },
+  "users": {
+    "title": "ユーザー管理",
+    "description": "アカウントとアクセス権を管理します。各アカウントのワークフローは独立しています。",
+    "email": "メールアドレス",
+    "password": "パスワード",
+    "role": "権限",
+    "user": "一般ユーザー",
+    "admin": "管理者",
+    "create": "ユーザーを作成",
+    "passwordCreated": "{{email}} のパスワードを生成しました",
+    "passwordHint": "パスワードを保存してユーザーに渡してください。一度だけ表示されます。リセットすると既存のセッションは無効になります。",
+    "dismiss": "パスワードを保存しました",
+    "loading": "ユーザーを読み込み中…",
+    "loadFailed": "ユーザーを読み込めません。",
+    "saveFailed": "ユーザーを保存できません。",
+    "conflict": "メールアドレスが既に存在するか、アカウントが変更されました。一覧を更新しました。",
+    "empty": "ユーザーはまだいません。",
+    "enabled": "有効",
+    "disabled": "無効",
+    "enable": "有効にする",
+    "disable": "無効にする",
+    "resetPassword": "パスワードをリセット",
+    "adminRequired": "このページには管理者のみアクセスできます。",
+    "count": "{{count}} 人のユーザー",
+    "status": "状態",
+    "actions": "操作"
   }
 }

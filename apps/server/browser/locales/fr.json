@@ -1,6 +1,6 @@
 {
   "session": {
-    "checking": "Vérification de la session operator…",
+    "checking": "Vérification de la session…",
     "configured": "Connectez-vous avec l'operator token configuré pour ce déploiement.",
     "invalid": "L'operator token n'est pas valide.",
     "notConfigured": "Définissez OPEN_FLOW_TOKEN sur le serveur avant de vous connecter.",
@@ -15,7 +15,11 @@
     "setupInvalidToken": "L’Operator token doit contenir au moins 32 octets UTF-8.",
     "setupTokenDescription": "Choisissez l’Operator token utilisé pour la connexion et les appels à la Control API.",
     "token": "Operator token",
-    "unavailable": "Impossible de contacter le serveur."
+    "unavailable": "Impossible de contacter le serveur.",
+    "userDescription": "Connectez-vous avec l’adresse e-mail et le mot de passe fournis par votre administrateur.",
+    "invalidCredentials": "L’adresse e-mail ou le mot de passe est incorrect.",
+    "userLogin": "Connexion par e-mail",
+    "operatorLogin": "Connexion avec un token administrateur"
   },
   "shell": {
     "closeNotification": "Fermer la notification",
@@ -123,5 +127,32 @@
     "value": "Valeur",
     "valueTooLarge": "La valeur encodée en UTF-8 ne doit pas dépasser 64 KiB.",
     "deleteFailed": "Impossible de supprimer la variable d’environnement."
+  },
+  "users": {
+    "title": "Utilisateurs",
+    "description": "Créez des comptes et gérez les accès. Chaque compte possède ses propres workflows.",
+    "email": "E-mail",
+    "password": "Mot de passe",
+    "role": "Rôle",
+    "user": "Utilisateur",
+    "admin": "Administrateur",
+    "create": "Créer un utilisateur",
+    "passwordCreated": "Mot de passe généré pour {{email}}",
+    "passwordHint": "Enregistrez ce mot de passe et transmettez-le à l’utilisateur. Il n’est affiché qu’une fois. La réinitialisation ferme les sessions existantes.",
+    "dismiss": "Mot de passe enregistré",
+    "loading": "Chargement des utilisateurs…",
+    "loadFailed": "Impossible de charger les utilisateurs.",
+    "saveFailed": "Impossible d’enregistrer l’utilisateur.",
+    "conflict": "Cette adresse existe déjà ou le compte a changé. La liste a été actualisée.",
+    "empty": "Aucun utilisateur pour le moment.",
+    "enabled": "Actif",
+    "disabled": "Désactivé",
+    "enable": "Activer",
+    "disable": "Désactiver",
+    "resetPassword": "Réinitialiser le mot de passe",
+    "adminRequired": "Seuls les administrateurs peuvent accéder à cette page.",
+    "count": "{{count}} utilisateurs",
+    "status": "Statut",
+    "actions": "Actions"
   }
 }

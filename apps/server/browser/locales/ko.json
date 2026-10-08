@@ -1,6 +1,6 @@
 {
   "session": {
-    "checking": "Operator session을 확인하는 중…",
+    "checking": "로그인 상태 확인 중…",
     "configured": "현재 deployment에 설정된 operator token으로 로그인하세요.",
     "invalid": "Operator token이 올바르지 않습니다.",
     "notConfigured": "로그인하기 전에 서버에서 OPEN_FLOW_TOKEN을 설정하세요.",
@@ -15,7 +15,11 @@
     "setupInvalidToken": "Operator token은 UTF-8로 32 bytes 이상이어야 합니다.",
     "setupTokenDescription": "로그인과 Control API 호출에 사용할 Operator token을 설정하세요.",
     "token": "Operator token",
-    "unavailable": "서버에 연결할 수 없습니다."
+    "unavailable": "서버에 연결할 수 없습니다.",
+    "userDescription": "관리자가 제공한 이메일과 비밀번호로 로그인하세요.",
+    "invalidCredentials": "이메일 또는 비밀번호가 올바르지 않습니다.",
+    "userLogin": "이메일로 로그인",
+    "operatorLogin": "관리자 토큰 로그인"
   },
   "shell": {
     "closeNotification": "알림 닫기",
@@ -123,5 +127,32 @@
     "value": "값",
     "valueTooLarge": "UTF-8로 인코딩한 값은 64 KiB 이하여야 합니다.",
     "deleteFailed": "환경 변수를 삭제할 수 없습니다."
+  },
+  "users": {
+    "title": "사용자 관리",
+    "description": "계정과 접근 권한을 관리합니다. 각 계정의 워크플로는 독립적입니다.",
+    "email": "이메일",
+    "password": "비밀번호",
+    "role": "역할",
+    "user": "일반 사용자",
+    "admin": "관리자",
+    "create": "사용자 생성",
+    "passwordCreated": "{{email}}의 비밀번호가 생성되었습니다",
+    "passwordHint": "비밀번호를 저장하여 사용자에게 전달하세요. 한 번만 표시됩니다. 재설정하면 기존 로그인 세션이 만료됩니다.",
+    "dismiss": "비밀번호를 저장했습니다",
+    "loading": "사용자 불러오는 중…",
+    "loadFailed": "사용자를 불러올 수 없습니다.",
+    "saveFailed": "사용자를 저장할 수 없습니다.",
+    "conflict": "이메일이 이미 존재하거나 계정이 변경되었습니다. 목록을 새로 고쳤습니다.",
+    "empty": "아직 사용자가 없습니다.",
+    "enabled": "활성",
+    "disabled": "비활성",
+    "enable": "활성화",
+    "disable": "비활성화",
+    "resetPassword": "비밀번호 재설정",
+    "adminRequired": "관리자만 이 페이지에 접근할 수 있습니다.",
+    "count": "사용자 {{count}}명",
+    "status": "상태",
+    "actions": "작업"
   }
 }
