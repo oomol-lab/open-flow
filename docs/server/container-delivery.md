@@ -130,6 +130,13 @@ SQLite-managed 来源：对应的完整 env 配置存在时锁定该块，不能
 runtime 的 origin/token、Integration 的 public origin/callback key，以及显式 LLM 的 origin/token 都作为完整配置块保存。Connector Console 只有公开 origin，
 与 Connector runtime 独立。
 
+`/settings` 中的 Connector 设置分为「OOMOL 托管」与「自定义配置」。OOMOL 托管支持设备授权或直接填写 API key，runtime 和 Console 地址由托管服务确定，
+无需填写域名；自定义配置保留独立的 runtime origin/token 与 Console origin。选择连接方式本身不修改已保存配置，完成授权或保存 runtime 后才切换。
+使用设备授权时点击「连接 OOMOL」，在打开的 OOMOL 页面确认授权。验证码会自动填入，Server 等待授权完成后保存
+`https://connector.oomol.com` 和 API key，不需要手动复制 key 或再次保存。当前 runtime 为 `connector.oomol.dev` 时使用对应开发环境。
+API key 和设备授权的私有 state 只留在 Server，Browser 仅接收验证码、授权链接和公开配置状态。授权可取消，过期后需要重新开始；授权期间配置 revision
+发生变化时拒绝覆盖。环境变量管理的 runtime 不提供此入口。自部署 OpenConnector 继续通过 runtime 和 Console 配置块设置。
+
 Settings-managed 配置保存后立即用于新的 request、Run、Poll 或 Integration operation，已经开始的 operation 继续使用开始时取得的配置快照，不要求重启。
 读取配置只返回公开 origin、来源和 credential 是否已配置，token 与 callback key 不会返回 Browser。Settings update 使用全局预期 revision，stale update
 返回冲突。LLM 的生效顺序为显式 LLM env、SQLite LLM settings、从当前生效的 OOMOL Connector 推导、未配置；其他配置块的顺序为对应 env、SQLite、未配置。

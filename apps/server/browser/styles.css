@@ -426,6 +426,71 @@ body {
   border-top: 1px solid var(--ui-border);
 }
 
+.settings-oomol {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 16px 16px;
+}
+
+.settings-oomol p,
+.settings-oomol-status {
+  margin: 0;
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.settings-oomol .settings-actions,
+.settings-oomol-status {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-oomol-status a {
+  color: var(--ui-primary);
+}
+
+.settings-oomol [role='alert'] {
+  color: var(--ui-destructive);
+}
+
+.settings-connector-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin: 0;
+  padding: 0 16px 16px;
+  border: 0;
+  font-size: 13px;
+}
+
+.settings-connector-mode legend {
+  margin-bottom: 8px;
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
+}
+
+.settings-connector-mode label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.settings-connector-mode input {
+  margin: 0;
+  accent-color: var(--ui-primary);
+}
+
+.settings-connector-hint {
+  margin: 0 16px 16px;
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
+  line-height: 18px;
+}
+
 .settings-group .settings-heading {
   min-height: 56px;
 }

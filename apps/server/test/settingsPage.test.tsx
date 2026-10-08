@@ -14,6 +14,7 @@ const hooks = vi.hoisted(() => ({
   refs: [] as { current: unknown }[],
   effects: true,
   toast: vi.fn(),
+  success: vi.fn(),
 }))
 
 vi.mock('react', async (importOriginal) => {
@@ -40,7 +41,7 @@ vi.mock('react', async (importOriginal) => {
     },
   }
 })
-vi.mock('sonner', () => ({ toast: { error: hooks.toast } }))
+vi.mock('sonner', () => ({ toast: { error: hooks.toast, success: hooks.success } }))
 vi.mock('val-i18n-react', () => ({ useTranslate: () => (key: string) => key }))
 
 beforeEach(() => {
@@ -52,10 +53,154 @@ beforeEach(() => {
   hooks.refs = []
   hooks.effects = true
   hooks.toast.mockClear()
+  hooks.success.mockClear()
   vi.stubGlobal('addEventListener', (_type: string, callback: () => void) => {
     hooks.focus = callback
   })
   vi.stubGlobal('removeEventListener', vi.fn())
+})
+
+function connectorSettings(current = config(1)) {
+  hooks.states = [current, false, false]
+  hooks.effects = false
+  const changed = vi.fn()
+  const unauthorized = vi.fn()
+  const page = SettingsPage({ onSignOut: vi.fn(), onConnectorChange: changed, onUnauthorized: unauthorized })
+  const item = find(page, (element) => element.props.current != null)
+  if (item == null || typeof item.type != 'function') throw new Error('Connector settings are missing.')
+  hooks.states = [undefined]
+  const render = (): ReactElement => {
+    hooks.stateIndex = 0
+    return (item.type as (props: typeof item.props) => ReactElement)(item.props)
+  }
+  return { changed, render, unauthorized }
+}
+
+function oomolLogin() {
+  const { changed, render: connector, unauthorized } = connectorSettings()
+  const item = find(connector(), (element) => typeof element.props.connected == 'boolean')
+  if (item == null || typeof item.type != 'function') throw new Error('OOMOL connection is missing.')
+  const conflicted = vi.fn().mockResolvedValue(undefined)
+  hooks.states = [false, undefined, undefined]
+  hooks.refs = []
+  hooks.effects = true
+  const render = (): ReactElement => {
+    hooks.stateIndex = 0
+    hooks.refIndex = 0
+    return (item.type as (props: typeof item.props) => ReactElement)({ ...item.props, onConflict: conflicted, onSaved: changed })
+  }
+  return { changed, conflicted, render, unauthorized }
+}
+
+it('connects OOMOL automatically when a popup is blocked', async () => {
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ code: 'ABC123', id: 'login-id', url: 'https://console.oomol.com/login/device?user_code=ABC123', version: 1 }))
+    .mockResolvedValueOnce(Response.json({ configuration: config(2), status: 'saved', version: 1 }))
+  vi.stubGlobal('fetch', fetcher)
+  vi.stubGlobal('window', { open: vi.fn().mockReturnValue(null) })
+  const { render, changed } = oomolLogin()
+  const button = find(render(), (element) => element.props.children == 'settings.oomolConnect')
+  button?.props.onClick()
+  await vi.waitFor(() => expect(changed).toHaveBeenCalledOnce())
+  expect(fetcher.mock.calls.map((call) => call[1].method)).toEqual(['POST', 'PUT'])
+  expect(JSON.parse(fetcher.mock.calls[0]![1].body)).toEqual({ expectedRevision: 1, version: 1 })
+  expect(hooks.states).toEqual([false, undefined, undefined])
+  expect(hooks.success).toHaveBeenCalledWith('settings.oomolConnected')
+})
+
+it.each(['https://connector.oomol.com', 'https://connector.oomol.dev'])(
+  'saves a hosted OOMOL API key for %s without asking for either domain',
+  async (origin) => {
+    const fetcher = vi.fn().mockResolvedValue(Response.json(config(2)))
+    vi.stubGlobal('fetch', fetcher)
+    const current = config(1)
+    if (origin.endsWith('.dev')) Object.assign(current.connector.runtime, { configured: true, origin, source: 'settings', tokenConfigured: true })
+    const { render, changed } = connectorSettings(current)
+    const hosted = render()
+    expect(find(hosted, (element) => element.props.endpoint == '/config/connector-console')).toBeUndefined()
+    const item = find(hosted, (element) => element.props.endpoint == '/config/connector')
+    if (item == null || typeof item.type != 'function') throw new Error('OOMOL API key settings are missing.')
+    hooks.stateIndex = 0
+    hooks.states = [item.props.origin, true, false, false, 'oomol-api-key']
+    const form = find((item.type as (props: typeof item.props) => ReactElement)({ ...item.props, onSaved: changed }), (element) => element.type == 'form')
+    if (form == null) throw new Error('OOMOL API key form is missing.')
+    expect(find(form, (element) => element.type == Input && element.props.type == 'url')).toBeUndefined()
+    form.props.onSubmit({ preventDefault: vi.fn() })
+    await vi.waitFor(() => expect(changed).toHaveBeenCalledOnce())
+    expect(JSON.parse(fetcher.mock.calls[0]![1].body)).toEqual({ expectedRevision: 1, origin, token: 'oomol-api-key', version: 1 })
+  },
+)
+
+it('selects a custom Connector from saved settings and does not save when the connection type changes', () => {
+  const current = config(1)
+  Object.assign(current.connector.runtime, { configured: true, origin: 'https://connector.example.com', source: 'settings', tokenConfigured: true })
+  const fetcher = vi.fn()
+  vi.stubGlobal('fetch', fetcher)
+  const { render } = connectorSettings(current)
+  const custom = render()
+  expect(find(custom, (element) => element.type == 'input' && element.props.value == 'custom')?.props.checked).toBe(true)
+  expect(find(custom, (element) => element.props.endpoint == '/config/connector-console')).toBeDefined()
+  expect(find(custom, (element) => typeof element.props.connected == 'boolean')).toBeUndefined()
+  find(custom, (element) => element.type == 'input' && element.props.value == 'oomol')?.props.onChange()
+  const hosted = render()
+  expect(find(hosted, (element) => element.props.endpoint == '/config/connector-console')).toBeUndefined()
+  expect(fetcher).not.toHaveBeenCalled()
+  expect(current.connector.runtime).toMatchObject({ origin: 'https://connector.example.com', configured: true })
+})
+
+it('offers an authorization link and ignores a completed request after cancellation', async () => {
+  const pending = Promise.withResolvers<Response>()
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ code: 'ABC123', id: 'login-id', url: 'https://console.oomol.com/login/device?user_code=ABC123', version: 1 }))
+    .mockReturnValueOnce(pending.promise)
+    .mockResolvedValue(Response.json({ version: 1 }))
+  vi.stubGlobal('fetch', fetcher)
+  vi.stubGlobal('window', { open: vi.fn().mockReturnValue(null) })
+  const { render, changed } = oomolLogin()
+  find(render(), (element) => element.props.children == 'settings.oomolConnect')?.props.onClick()
+  await vi.waitFor(() => expect(fetcher).toHaveBeenCalledTimes(2))
+  const waiting = render()
+  expect(find(waiting, (element) => element.type == 'a')?.props.href).toBe('https://console.oomol.com/login/device?user_code=ABC123')
+  find(waiting, (element) => element.props.children == 'settings.cancel')?.props.onClick()
+  expect(fetcher.mock.calls[1]![1].signal.aborted).toBe(true)
+  expect(fetcher.mock.calls[2]![1].method).toBe('DELETE')
+  pending.resolve(Response.json({ configuration: config(2), status: 'saved', version: 1 }))
+  await pending.promise
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(changed).not.toHaveBeenCalled()
+  expect(hooks.states).toEqual([false, undefined, undefined])
+})
+
+it('shows an expired authorization and allows another attempt', async () => {
+  const popup = { opener: {}, location: { replace: vi.fn() }, close: vi.fn() }
+  const fetcher = vi
+    .fn()
+    .mockResolvedValueOnce(Response.json({ code: 'ABC123', id: 'login-id', url: 'https://console.oomol.com/login/device?user_code=ABC123', version: 1 }))
+    .mockResolvedValueOnce(new Response(null, { status: 410 }))
+    .mockResolvedValue(Response.json({ version: 1 }))
+  vi.stubGlobal('fetch', fetcher)
+  vi.stubGlobal('window', { open: vi.fn().mockReturnValue(popup) })
+  const { render, changed } = oomolLogin()
+  find(render(), (element) => element.props.children == 'settings.oomolConnect')?.props.onClick()
+  await vi.waitFor(() => expect(hooks.states).toEqual([false, undefined, 'expired']))
+  expect(popup.opener).toBeNull()
+  expect(popup.location.replace).toHaveBeenCalledWith('https://console.oomol.com/login/device?user_code=ABC123')
+  expect(find(render(), (element) => element.props.role == 'alert')?.props.children).toBe('settings.oomolExpired')
+  expect(changed).not.toHaveBeenCalled()
+})
+
+it.each([401, 409])('resets OOMOL authorization after a session or configuration error: %s', async (status) => {
+  vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(null, { status })))
+  const popup = { opener: {}, close: vi.fn() }
+  vi.stubGlobal('window', { open: vi.fn().mockReturnValue(popup) })
+  const { render, conflicted, unauthorized } = oomolLogin()
+  find(render(), (element) => element.props.children == 'settings.oomolConnect')?.props.onClick()
+  await vi.waitFor(() => expect(popup.close).toHaveBeenCalledOnce())
+  expect(hooks.states).toEqual([false, undefined, undefined])
+  expect(unauthorized).toHaveBeenCalledTimes(status == 401 ? 1 : 0)
+  expect(conflicted).toHaveBeenCalledTimes(status == 409 ? 1 : 0)
 })
 afterEach(() => {
   hooks.cleanup?.()

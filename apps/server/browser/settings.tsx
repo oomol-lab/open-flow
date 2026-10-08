@@ -47,6 +47,157 @@ function randomCallbackKey(): string {
   return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
 }
 
+function OomolConnectorLogin({
+  connected,
+  onConflict,
+  onSaved,
+  onUnauthorized,
+  revision,
+}: {
+  readonly connected: boolean
+  readonly onConflict: () => Promise<void>
+  readonly onSaved: (value: NonNullable<ReturnType<typeof config>>) => void
+  readonly onUnauthorized: () => void
+  readonly revision: number
+}): ReactElement {
+  const [starting, setStarting] = useState(false)
+  const [login, setLogin] = useState<{ readonly code: string; readonly url: string }>()
+  const [error, setError] = useState<'expired' | 'failed'>()
+  const active = useRef<{ readonly controller: AbortController; id?: string }>()
+  const t = useTranslate()
+  const endpoint = '/config/connector/oomol-login'
+
+  const stop = useCallback((): void => {
+    const operation = active.current
+    active.current = undefined
+    operation?.controller.abort()
+    if (operation?.id != null) {
+      void fetch(endpoint, {
+        body: JSON.stringify({ id: operation.id, version: 1 }),
+        credentials: 'same-origin',
+        headers: { 'content-type': 'application/json' },
+        keepalive: true,
+        method: 'DELETE',
+      }).catch(() => {})
+    }
+  }, [])
+
+  useEffect(() => stop, [stop])
+
+  async function connect(): Promise<void> {
+    if (active.current != null) return
+    const popup = window.open('about:blank', '_blank')
+    if (popup != null) popup.opener = null
+    const operation = { controller: new AbortController(), id: undefined as string | undefined }
+    active.current = operation
+    setStarting(true)
+    setError(undefined)
+    try {
+      const request = async (method: 'POST' | 'PUT', body: Record<string, unknown>) => {
+        const response = await fetch(endpoint, {
+          body: JSON.stringify({ ...body, version: 1 }),
+          credentials: 'same-origin',
+          headers: { 'content-type': 'application/json' },
+          method,
+          signal: operation.controller.signal,
+        })
+        if (operation.controller.signal.aborted) throw new Error('Canceled.')
+        if (response.status == 401) {
+          operation.controller.abort()
+          onUnauthorized()
+          throw new Error('Unauthorized.')
+        }
+        if (response.status == 409) {
+          operation.controller.abort()
+          toast.error(t('settings.changed'))
+          await onConflict()
+          throw new Error('Configuration changed.')
+        }
+        if (response.status == 410) {
+          setError('expired')
+          throw new Error('Authorization expired.')
+        }
+        if (!response.ok) throw new Error('Authorization failed.')
+        const value: unknown = await response.json()
+        if (value == null || typeof value != 'object' || Array.isArray(value)) throw new Error('Invalid authorization response.')
+        return value as Record<string, unknown>
+      }
+
+      const session = await request('POST', { expectedRevision: revision })
+      if (operation.controller.signal.aborted) return
+      if (session.version !== 1 || typeof session.id != 'string' || typeof session.code != 'string' || typeof session.url != 'string')
+        throw new Error('Invalid authorization response.')
+      operation.id = session.id
+      setLogin({ code: session.code, url: session.url })
+      setStarting(false)
+      if (popup != null) popup.location.replace(session.url)
+      while (!operation.controller.signal.aborted) {
+        const result = await request('PUT', { id: session.id })
+        if (operation.controller.signal.aborted) return
+        if (result.version !== 1) throw new Error('Invalid authorization response.')
+        if (result.status == 'saved') {
+          const value = config(result.configuration)
+          if (value == null) throw new Error('Invalid configuration response.')
+          operation.id = undefined
+          onSaved(value)
+          posthog?.capture('configuration_saved', { configuration_type: 'connector_runtime' })
+          toast.success(t('settings.oomolConnected'))
+          return
+        }
+        if (result.status != 'waiting') throw new Error('Invalid authorization response.')
+        await new Promise((resolve) => setTimeout(resolve, 2_000))
+      }
+    } catch {
+      if (operation.id == null) popup?.close()
+      if (!operation.controller.signal.aborted) {
+        setError((current) => current ?? 'failed')
+      }
+    } finally {
+      if (active.current === operation) {
+        stop()
+        setStarting(false)
+        setLogin(undefined)
+      }
+    }
+  }
+
+  return (
+    <div className="settings-oomol">
+      <p>{t('settings.oomolDescription')}</p>
+      <div className="settings-actions">
+        <Button size="sm" disabled={starting || login != null} onClick={() => void connect()} type="button">
+          {t(starting ? 'settings.oomolStarting' : connected ? 'settings.oomolReconnect' : 'settings.oomolConnect')}
+        </Button>
+        {(starting || login != null) && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              stop()
+              setStarting(false)
+              setLogin(undefined)
+            }}
+            type="button"
+          >
+            {t('settings.cancel')}
+          </Button>
+        )}
+      </div>
+      {login != null && (
+        <div className="settings-oomol-status" role="status">
+          <span>
+            {t('settings.oomolWaiting')} <code>{login.code}</code>
+          </span>
+          <a href={login.url} rel="noopener noreferrer" target="_blank">
+            {t('settings.oomolOpenAuthorization')}
+          </a>
+        </div>
+      )}
+      {error != null && <p role="alert">{t(error == 'expired' ? 'settings.oomolExpired' : 'settings.oomolFailed')}</p>}
+    </div>
+  )
+}
+
 function SettingItem({
   analyticsType,
   body,
@@ -81,9 +232,9 @@ function SettingItem({
   readonly onSaved: (value: NonNullable<ReturnType<typeof config>>) => void
   readonly onUnauthorized: () => void
   readonly origin: string
-  readonly originLabel: string
+  readonly originLabel?: string
   readonly originHint?: string
-  readonly placeholder: string
+  readonly placeholder?: string
   readonly revision: number
   readonly generateSecret?: boolean
   readonly secretLabel?: string
@@ -187,18 +338,22 @@ function SettingItem({
       </div>
       {editing ? (
         <form className="settings-form" onSubmit={save}>
-          <Label htmlFor={`${endpoint}-origin`}>{originLabel}</Label>
-          <Input
-            autoComplete="url"
-            aria-describedby={originHint == null ? undefined : `${endpoint}-origin-hint`}
-            autoFocus
-            id={`${endpoint}-origin`}
-            onChange={(event) => setDraftOrigin(event.target.value)}
-            placeholder={placeholder}
-            spellCheck={false}
-            type="url"
-            value={draftOrigin}
-          />
+          {originLabel != null && (
+            <>
+              <Label htmlFor={`${endpoint}-origin`}>{originLabel}</Label>
+              <Input
+                autoComplete="url"
+                aria-describedby={originHint == null ? undefined : `${endpoint}-origin-hint`}
+                autoFocus
+                id={`${endpoint}-origin`}
+                onChange={(event) => setDraftOrigin(event.target.value)}
+                placeholder={placeholder}
+                spellCheck={false}
+                type="url"
+                value={draftOrigin}
+              />
+            </>
+          )}
           {originHint != null && (
             <span className="settings-hint" id={`${endpoint}-origin-hint`}>
               {originHint}
@@ -217,6 +372,7 @@ function SettingItem({
               <Input
                 aria-describedby={`${endpoint}-secret-hint`}
                 aria-invalid={secretTooShort && secret != ''}
+                autoFocus={originLabel == null}
                 autoComplete="new-password"
                 id={`${endpoint}-secret`}
                 onChange={(event) => setSecret(event.target.value)}
@@ -243,14 +399,115 @@ function SettingItem({
             </Button>
           </div>
         </form>
-      ) : configured ? (
+      ) : configured && (originLabel != null || summaryHint != null || managed) ? (
         <div className="settings-summary">
-          <code>{origin}</code>
+          {originLabel != null && <code>{origin}</code>}
           {summaryHint != null && source == 'settings' && <p>{summaryHint}</p>}
           {managed && <p>{t(source == 'environment' ? 'settings.environmentHint' : 'settings.derivedHint')}</p>}
         </div>
       ) : null}
     </div>
+  )
+}
+
+function ConnectorSettings({
+  current,
+  onConflict,
+  onConnectorChange,
+  onSaved,
+  onUnauthorized,
+}: {
+  readonly current: NonNullable<ReturnType<typeof config>>
+  readonly onConflict: () => Promise<void>
+  readonly onConnectorChange: () => void
+  readonly onSaved: (value: NonNullable<ReturnType<typeof config>>) => void
+  readonly onUnauthorized: () => void
+}): ReactElement {
+  const [selectedMode, setSelectedMode] = useState<'oomol' | 'custom'>()
+  const t = useTranslate()
+  const runtime = current.connector.runtime
+  const hostname = runtime.configured ? new URL(runtime.origin).hostname : undefined
+  const hosted = hostname == 'connector.oomol.com' || hostname == 'connector.oomol.dev'
+  const configuredMode = runtime.configured && !hosted ? 'custom' : 'oomol'
+  const mode = selectedMode ?? configuredMode
+  const managed = runtime.source == 'environment'
+  const saved = (value: NonNullable<ReturnType<typeof config>>): void => {
+    onSaved(value)
+    onConnectorChange()
+  }
+
+  return (
+    <section className="settings-section settings-group">
+      <div className="settings-group-heading">
+        <h2>{t('settings.connector')}</h2>
+        <p>{t('settings.connectorDescription')}</p>
+      </div>
+      <fieldset className="settings-connector-mode" disabled={managed}>
+        <legend>{t('settings.connectorMode')}</legend>
+        <label>
+          <input checked={mode == 'oomol'} name="connector-mode" onChange={() => setSelectedMode('oomol')} type="radio" value="oomol" />
+          {t('settings.oomolHosted')}
+        </label>
+        <label>
+          <input checked={mode == 'custom'} name="connector-mode" onChange={() => setSelectedMode('custom')} type="radio" value="custom" />
+          {t('settings.connectorCustom')}
+        </label>
+      </fieldset>
+      {runtime.configured && mode != configuredMode && (
+        <p className="settings-connector-hint">{t(mode == 'custom' ? 'settings.connectorSwitchCustom' : 'settings.connectorSwitchOomol')}</p>
+      )}
+      {mode == 'oomol' && !managed && (
+        <OomolConnectorLogin
+          connected={hosted && runtime.tokenConfigured}
+          onConflict={onConflict}
+          onSaved={saved}
+          onUnauthorized={onUnauthorized}
+          revision={current.revision}
+        />
+      )}
+      <SettingItem
+        key={mode}
+        analyticsType="connector_runtime"
+        body={(origin, token) => ({ origin, token })}
+        configured={mode == configuredMode && runtime.configured && (mode == 'custom' || runtime.tokenConfigured)}
+        description={t(
+          mode == 'custom' ? 'settings.runtimeDescription' : hosted && runtime.tokenConfigured ? 'settings.oomolConfigured' : 'settings.apiKeyDescription',
+        )}
+        endpoint="/config/connector"
+        heading="h3"
+        name={mode == 'oomol' ? 'API key' : t('settings.runtime')}
+        onConflict={onConflict}
+        onSaved={saved}
+        onUnauthorized={onUnauthorized}
+        origin={
+          mode == 'oomol' ? (hostname == 'connector.oomol.dev' ? 'https://connector.oomol.dev' : 'https://connector.oomol.com') : hosted ? '' : runtime.origin
+        }
+        originLabel={mode == 'custom' ? t('settings.origin') : undefined}
+        placeholder={mode == 'custom' ? 'https://connector.example.com' : undefined}
+        revision={current.revision}
+        secretHint={mode == 'oomol' ? t('settings.apiKeyHint') : undefined}
+        secretLabel={mode == 'oomol' ? 'API key' : t('settings.token')}
+        secretRequired={mode == 'oomol'}
+        source={mode == configuredMode ? runtime.source : 'none'}
+      />
+      {mode == 'custom' && (
+        <SettingItem
+          analyticsType="connector_console"
+          body={(origin) => ({ origin })}
+          {...current.connector.console}
+          description={t('settings.consoleDescription')}
+          endpoint="/config/connector-console"
+          heading="h3"
+          name={t('settings.console')}
+          onConflict={onConflict}
+          onSaved={onSaved}
+          onUnauthorized={onUnauthorized}
+          originLabel={t('settings.console')}
+          placeholder="https://console.example.com"
+          revision={current.revision}
+        />
+      )}
+    </section>
   )
 }
 
@@ -337,47 +594,7 @@ export function SettingsPage({
           </section>
         ) : (
           <>
-            <section className="settings-section settings-group">
-              <div className="settings-group-heading">
-                <h2>{t('settings.connector')}</h2>
-                <p>{t('settings.connectorDescription')}</p>
-              </div>
-              <SettingItem
-                analyticsType="connector_runtime"
-                body={(origin, token) => ({ origin, token })}
-                {...current.connector.runtime}
-                description={t('settings.runtimeDescription')}
-                endpoint="/config/connector"
-                heading="h3"
-                name={t('settings.runtime')}
-                onConflict={load}
-                onSaved={(value) => {
-                  saved(value)
-                  onConnectorChange()
-                }}
-                onUnauthorized={onUnauthorized}
-                originLabel={t('settings.origin')}
-                placeholder="https://connector.example.com"
-                revision={current.revision}
-                secretLabel={t('settings.token')}
-                secretRequired={false}
-              />
-              <SettingItem
-                analyticsType="connector_console"
-                body={(origin) => ({ origin })}
-                {...current.connector.console}
-                description={t('settings.consoleDescription')}
-                endpoint="/config/connector-console"
-                heading="h3"
-                name={t('settings.console')}
-                onConflict={load}
-                onSaved={saved}
-                onUnauthorized={onUnauthorized}
-                originLabel={t('settings.console')}
-                placeholder="https://console.example.com"
-                revision={current.revision}
-              />
-            </section>
+            <ConnectorSettings current={current} onConflict={load} onConnectorChange={onConnectorChange} onSaved={saved} onUnauthorized={onUnauthorized} />
             <section className="settings-section">
               <SettingItem
                 analyticsType="llm"

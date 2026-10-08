@@ -1,18 +1,38 @@
 import { Hono } from 'hono'
 import { serverErrorCode } from '../error.ts'
+import { OomolLogin } from './oomol-login.ts'
 import { Settings } from './settings.ts'
 
 const maxRequestBytes = 4 * 1024
 const encoder = new TextEncoder()
 const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false })
 
-export function createConfigApp(settings: Settings, authenticate: (request: Request) => Promise<string>, changed: () => void = () => {}): Hono {
-  const app = new Hono()
+export function createConfigApp(settings: Settings, authenticate: (request: Request) => Promise<string>, changed: () => void = () => {}) {
+  const app = new Hono<{ Variables: { actorId: string } }>()
+  const login = new OomolLogin(settings)
   app.use('*', async (context, next) => {
-    await authenticate(context.req.raw)
+    context.set('actorId', await authenticate(context.req.raw))
     await next()
   })
   app.get('/', () => json(200, settings.status()))
+  app.post('/connector/oomol-login', async (context) => {
+    const body = await objectRequest(context.req.raw)
+    if (!deleteRequest(body)) return invalid()
+    return json(200, await login.start(context.get('actorId'), body.expectedRevision, context.req.raw.signal))
+  })
+  app.put('/connector/oomol-login', async (context) => {
+    const body = await objectRequest(context.req.raw)
+    if (!loginRequest(body)) return invalid()
+    const result = await login.poll(context.get('actorId'), body.id, context.req.raw.signal)
+    if (result.status == 'saved') changed()
+    return json(200, result)
+  })
+  app.delete('/connector/oomol-login', async (context) => {
+    const body = await objectRequest(context.req.raw)
+    if (!loginRequest(body)) return invalid()
+    login.cancel(context.get('actorId'), body.id)
+    return json(200, { version: 1 })
+  })
   app.put('/connector', async (context) => {
     const body = await objectRequest(context.req.raw)
     if (!runtimeRequest(body)) return invalid()
@@ -115,6 +135,10 @@ function runtimeRequest(
 
 function deleteRequest(body: Record<string, unknown> | undefined): body is Record<'expectedRevision' | 'version', number> {
   return body != null && Object.keys(body).length == 2 && body.version === 1 && Number.isSafeInteger(body.expectedRevision) && Number(body.expectedRevision) > 0
+}
+
+function loginRequest(body: Record<string, unknown> | undefined): body is { readonly id: string; readonly version: 1 } {
+  return body != null && Object.keys(body).length == 2 && body.version === 1 && typeof body.id == 'string' && body.id.length > 0 && body.id.length <= 64
 }
 
 function updated(result: 'conflict' | 'environment' | 'saved', settings: Settings, changed: () => void): Response {
