@@ -1,5 +1,6 @@
 {
   "addNode": {
+    "decision": "AI Decision",
     "agent": "AI Agent",
     "agentDescription": "Describe the task. The AI Agent can use node inputs and the tools you add to complete it.",
     "blocks": "Blocks",

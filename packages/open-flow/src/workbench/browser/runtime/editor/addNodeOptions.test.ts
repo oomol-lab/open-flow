@@ -98,8 +98,8 @@ it('hides legacy LLM nodes from the node library', () => {
 
 it.each([
   ['en', 'JavaScript', 'Run JavaScript code in this node.', 'Describe the task. The AI Agent can use node inputs and the tools you add to complete it.'],
-  ['zh-CN', 'JavaScript 脚本', '在此节点中运行 JavaScript 代码。', '描述要完成的任务。AI Agent 会使用节点输入和你添加的工具来完成。'],
-  ['zh-TW', 'JavaScript 指令碼', '在此節點中執行 JavaScript 程式碼。', '描述要完成的任務。AI Agent 會使用節點輸入和你新增的工具來完成。'],
+  ['zh-CN', 'JavaScript 脚本', '在此节点中运行 JavaScript 代码。', '描述任务，AI 智能体会调用你添加的工具来完成。'],
+  ['zh-TW', 'JavaScript 指令碼', '在此節點中執行 JavaScript 程式碼。', '描述任務，AI 智能體會呼叫你新增的工具來完成。'],
   [
     'ja',
     'JavaScript スクリプト',
@@ -124,12 +124,13 @@ it.each([
     'Exécuter du code JavaScript dans ce nœud.',
     'Décrivez la tâche à accomplir. L’AI Agent utilisera les entrées du nœud et les outils ajoutés pour la réaliser.',
   ],
-] as const)('puts JavaScript and AI Agent first in the %s node library', (language, javascriptLabel, javascriptDescription, agentDescription) => {
+] as const)('puts condition before AI Agent in the %s node library', (language, javascriptLabel, javascriptDescription, agentDescription) => {
   const options = deriveAddNodeOptions(emptyDraft(), { kind: 'flow' }, createI18n(language).t).filter((option) => option.kind != 'trigger')
 
-  expect(options.slice(0, 2)).toMatchObject([
+  expect(options.slice(0, 3)).toMatchObject([
     { id: 'javascript', label: javascriptLabel, description: javascriptDescription },
-    { id: 'agent', label: 'AI Agent', description: agentDescription },
+    { id: 'condition' },
+    { id: 'agent', label: language === 'zh-CN' ? 'AI 智能体' : language === 'zh-TW' ? 'AI 智能體' : 'AI Agent', description: agentDescription },
   ])
 })
 
@@ -150,4 +151,17 @@ it.each(['en', 'zh-CN', 'zh-TW', 'fr', 'ja', 'ko', 'ru'] as const)('creates a us
   expect(output.description).toBe(i18n.t('agent.defaultOutputDescription'))
   expect(output.description?.length).toBeGreaterThan(0)
   i18n.dispose()
+})
+
+it.each([
+  ['en', 'AI Decision'],
+  ['zh-CN', 'AI 决策'],
+  ['zh-TW', 'AI 決策'],
+] as const)('localizes the Decision option and new node name in %s', (language, label) => {
+  const t = createI18n(language).t
+  const draft = emptyDraft()
+  const target = { kind: 'flow' } as const
+  const option = deriveAddNodeOptions(draft, target, t).find((item) => item.kind === 'decision')!
+  expect(option.label).toBe(label)
+  expect(addNodeIntent(option, new RevisionView(draft), target, t)).toMatchObject({ kind: 'decision', name: label })
 })

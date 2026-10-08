@@ -1,5 +1,6 @@
 {
   "addNode": {
+    "decision": "AI Decision",
     "agent": "AI Agent",
     "agentDescription": "Опишите задачу. AI Agent выполнит её, используя входные данные узла и добавленные вами инструменты.",
     "blocks": "Узлы",

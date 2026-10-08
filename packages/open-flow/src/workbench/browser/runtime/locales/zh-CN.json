@@ -1,7 +1,8 @@
 {
   "addNode": {
-    "agent": "AI Agent",
-    "agentDescription": "描述要完成的任务。AI Agent 会使用节点输入和你添加的工具来完成。",
+    "decision": "AI 决策",
+    "agent": "AI 智能体",
+    "agentDescription": "描述任务，AI 智能体会调用你添加的工具来完成。",
     "blocks": "节点",
     "humanInTheLoop": "人类介入",
     "codeTaskName": "代码任务 {{number}}",

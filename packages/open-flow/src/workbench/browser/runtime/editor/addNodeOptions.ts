@@ -93,6 +93,19 @@ function builtinOptions(t: TFunction): readonly AddNodeOption[] {
       outputs: [{ handle: 'result', jsonSchema: {} }],
     },
     {
+      description: t('addNode.conditionDescription'),
+      group,
+      id: 'condition',
+      icon: ':carbon:child-node:',
+      inputs: [{ handle: 'value', jsonSchema: {} }],
+      kind: 'condition',
+      label: t('addNode.condition'),
+      outputs: [
+        { handle: 'false', jsonSchema: {} },
+        { handle: 'true', jsonSchema: {} },
+      ],
+    },
+    {
       description: t('addNode.agentDescription'),
       group,
       id: 'agent',
@@ -106,9 +119,9 @@ function builtinOptions(t: TFunction): readonly AddNodeOption[] {
       description: t('decision.description'),
       group,
       id: 'decision',
-      icon: ':lucide-light:brain-circuit:',
+      icon: ':carbon:ml-model-reference:',
       kind: 'decision',
-      label: 'AI Decision',
+      label: t('addNode.decision'),
       inputs: decisionTask().inputs.filter((port) => 'handle' in port),
       outputs: decisionTask().outputs.filter((port) => 'handle' in port),
     },
@@ -122,19 +135,6 @@ function builtinOptions(t: TFunction): readonly AddNodeOption[] {
       kind: 'value',
       label: t('addNode.value'),
       outputs: [{ handle: 'value', jsonSchema: {} }],
-    },
-    {
-      description: t('addNode.conditionDescription'),
-      group,
-      id: 'condition',
-      icon: ':carbon:child-node:',
-      inputs: [{ handle: 'value', jsonSchema: {} }],
-      kind: 'condition',
-      label: t('addNode.condition'),
-      outputs: [
-        { handle: 'false', jsonSchema: {} },
-        { handle: 'true', jsonSchema: {} },
-      ],
     },
     {
       description: t('addNode.commentDescription'),
@@ -246,7 +246,7 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, tar
           }
         : undefined
     case 'decision':
-      return { kind: 'decision', name: 'AI Decision' }
+      return { kind: 'decision', name: t('addNode.decision') }
     case 'openapi':
       return { kind: 'openapi', name: 'OpenAPI' }
     case 'llm': {
