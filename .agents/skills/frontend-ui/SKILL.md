@@ -30,8 +30,6 @@ paths are relative to the repository root. Use production code as the source for
   Supplement Lab with the product when host layout or a complete flow matters. Consult the
   [Lab documentation](../../../packages/open-flow/dev/designer/README.md) only when changing Lab
   infrastructure or deployment, or when an unfamiliar Story API requires it.
-- Reuse an existing Lab or dev service when available. Stop and confirm termination of any service
-  you start; leave pre-existing services running.
 - For appearance or interaction changes, verify the affected states in Lab or the product. Static
   checks do not establish visual correctness. Report material verification gaps.
 
