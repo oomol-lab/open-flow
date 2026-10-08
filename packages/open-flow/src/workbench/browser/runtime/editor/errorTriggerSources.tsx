@@ -2,17 +2,16 @@ import type { ReactNode } from 'react'
 import type { Flow } from '../api.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 
-import { useEffect, useId, useRef, useState } from 'react'
+import { Combobox } from '@base-ui/react/combobox'
+import { useEffect, useId, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
 import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../form/browser/selectionMenuStyles.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
-import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
 import { Field, FieldDescription, FieldError, FieldLabel } from '../../../../ui/browser/field.tsx'
-import { Input } from '../../../../ui/browser/input.tsx'
-import { Label } from '../../../../ui/browser/label.tsx'
-import { Popover, PopoverContent, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
+import { InputGroup, InputGroupAddon, InputGroupInput } from '../../../../ui/browser/input-group.tsx'
 import { SelectChevron } from '../../../../ui/browser/select.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 
 export function ErrorTriggerSources({
   flows,
@@ -36,7 +35,6 @@ export function ErrorTriggerSources({
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState(false)
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
-  const search = useRef<HTMLInputElement>(null)
   const eligible = flows.filter((flow) => flow.flowId != flowId && flow.status == 'active' && flow.live != null)
   const candidates = [...new Set([...eligible.map((flow) => flow.flowId), ...value])].map((sourceId) => {
     const flow = flows.find((item) => item.flowId == sourceId)
@@ -65,90 +63,84 @@ export function ErrorTriggerSources({
       </FieldLabel>
       <div className="flex flex-col gap-3">
         <div ref={setContainer} className="min-w-0">
-          <Popover
+          <Combobox.Root
+            multiple
+            disabled={disabled}
+            value={[...value]}
+            onValueChange={onChange}
+            items={visible.map((flow) => flow.id)}
+            filter={null}
+            inputValue={open ? query : summary}
+            onInputValueChange={setQuery}
             open={open}
             onOpenChange={(next) => {
               setOpen(next)
               if (!next) setQuery('')
             }}
           >
-            <PopoverTrigger
-              render={
-                <Button
-                  id={id}
-                  type="button"
-                  variant="field"
-                  size="field"
-                  disabled={disabled}
-                  aria-label={`${t('errorWorkflow.sources')}: ${summary || t('errorWorkflow.choose')}`}
-                  aria-describedby={`${id}-hint${unavailable.length > 0 ? ` ${id}-error` : ''}`}
-                  aria-invalid={unavailable.length > 0 || undefined}
-                  className="w-full min-w-0 justify-between"
-                />
-              }
-            >
-              <span className={`min-w-0 flex-1 truncate text-left ${value.length == 0 ? 'text-muted-foreground' : ''}`} title={summary || undefined}>
-                {summary || t('errorWorkflow.choose')}
-              </span>
-              <SelectChevron />
-            </PopoverTrigger>
-            <PopoverContent
-              container={container}
-              align="start"
-              initialFocus={search}
-              aria-label={t('errorWorkflow.sources')}
-              className={`w-(--anchor-width) min-w-56 max-w-[calc(100vw-24px)] gap-1 ${selectionMenuContentClass}`}
-            >
-              <div className="p-1">
-                <Input
-                  ref={search}
-                  aria-label={t('errorWorkflow.search')}
-                  placeholder={t('errorWorkflow.search')}
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-              </div>
-              <div role="group" aria-label={t('errorWorkflow.sources')} className="max-h-[min(40vh,280px)] overflow-y-auto overscroll-contain">
-                {visible.map((flow) => (
-                  <Label
-                    key={flow.id}
-                    className={`flex cursor-default items-center gap-2 px-2 hover:bg-accent focus-within:bg-accent ${selectionMenuItemClass}`}
-                  >
-                    <Checkbox
-                      checked={value.includes(flow.id)}
-                      disabled={disabled}
-                      onCheckedChange={(checked) => onChange(checked ? [...value, flow.id] : value.filter((item) => item != flow.id))}
-                    />
-                    <span className="min-w-0 flex-1 break-words">
-                      {flow.name}
-                      {flow.issue == 'deleted' && <span className="block break-all text-muted-foreground">{flow.id}</span>}
-                      {flow.issue && <span className="block text-destructive">{t(`errorWorkflow.${flow.issue}`)}</span>}
-                    </span>
-                  </Label>
-                ))}
-                {visible.length == 0 && (
-                  <p className="px-2 py-3 text-xs text-muted-foreground">{t(query ? 'errorWorkflow.noMatches' : 'errorWorkflow.empty')}</p>
+            <Combobox.InputGroup render={<InputGroup />}>
+              <Combobox.Input
+                render={<InputGroupInput />}
+                id={id}
+                aria-label={t('errorWorkflow.sources')}
+                aria-describedby={`${id}-hint${unavailable.length > 0 ? ` ${id}-error` : ''}`}
+                aria-invalid={unavailable.length > 0 || undefined}
+                placeholder={open ? t('errorWorkflow.search') : t('errorWorkflow.choose')}
+                title={summary || undefined}
+              />
+              <InputGroupAddon align="inline-end">
+                {value.length > 0 && !disabled && (
+                  <Tooltip>
+                    <TooltipTrigger render={<Combobox.Clear render={<Button variant="ghost" size="icon-xs" />} aria-label={t('errorWorkflow.clear')} />}>
+                      <i aria-hidden="true" className="i-lucide-light:x text-base" />
+                    </TooltipTrigger>
+                    <TooltipContent container={container}>{t('errorWorkflow.clear')}</TooltipContent>
+                  </Tooltip>
                 )}
-              </div>
-              {footer}
-              <div role="separator" className="mx-2 my-1 h-px bg-border/50" />
-              <div className="flex items-center justify-between gap-2 px-1 pb-1">
-                <Button variant="ghost" size="sm" disabled={disabled || value.length == 0} onClick={() => onChange([])}>
-                  {t('errorWorkflow.clear')}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    setOpen(false)
-                    setQuery('')
-                  }}
+                <Tooltip>
+                  <TooltipTrigger render={<Combobox.Trigger render={<Button variant="ghost" size="icon-xs" />} aria-label={t('errorWorkflow.choose')} />}>
+                    <SelectChevron />
+                  </TooltipTrigger>
+                  <TooltipContent container={container}>{t('errorWorkflow.choose')}</TooltipContent>
+                </Tooltip>
+              </InputGroupAddon>
+            </Combobox.InputGroup>
+            <Combobox.Portal container={container} className="contents">
+              <Combobox.Positioner align="start" sideOffset={4} className="isolate z-50">
+                <Combobox.Popup
+                  className={`w-(--anchor-width) min-w-56 max-w-[calc(100vw-24px)] bg-popover text-popover-foreground shadow-md ring-1 ring-foreground/10 outline-none ${selectionMenuContentClass}`}
                 >
-                  {t('errorWorkflow.done')}
-                </Button>
-              </div>
-            </PopoverContent>
-          </Popover>
+                  <Combobox.List aria-label={t('errorWorkflow.sources')} className="max-h-[min(40vh,280px)] overflow-y-auto overscroll-contain">
+                    {visible.map((flow) => (
+                      <Combobox.Item
+                        key={flow.id}
+                        value={flow.id}
+                        className={`group/option flex cursor-default items-center gap-2 px-2 data-highlighted:bg-accent ${selectionMenuItemClass}`}
+                      >
+                        <span
+                          aria-hidden="true"
+                          className="flex size-4 shrink-0 items-center justify-center rounded-[4px] border border-input group-data-selected/option:border-primary group-data-selected/option:bg-primary group-data-selected/option:text-primary-foreground"
+                        >
+                          <Combobox.ItemIndicator>
+                            <i className="i-lucide-light:check block text-sm" />
+                          </Combobox.ItemIndicator>
+                        </span>
+                        <span className="min-w-0 flex-1 break-words">
+                          {flow.name}
+                          {flow.issue == 'deleted' && <span className="block break-all text-muted-foreground">{flow.id}</span>}
+                          {flow.issue && <span className="block text-destructive">{t(`errorWorkflow.${flow.issue}`)}</span>}
+                        </span>
+                      </Combobox.Item>
+                    ))}
+                    {visible.length == 0 && (
+                      <p className="px-2 py-3 text-xs text-muted-foreground">{t(query ? 'errorWorkflow.noMatches' : 'errorWorkflow.empty')}</p>
+                    )}
+                  </Combobox.List>
+                  {footer}
+                </Combobox.Popup>
+              </Combobox.Positioner>
+            </Combobox.Portal>
+          </Combobox.Root>
         </div>
         <FieldDescription id={`${id}-hint`}>{t('errorWorkflow.setupHint')}</FieldDescription>
         {unavailable.length > 0 && (

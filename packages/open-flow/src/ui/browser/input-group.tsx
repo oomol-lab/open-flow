@@ -7,9 +7,10 @@ import * as React from 'react'
 import { Input } from './input.tsx'
 import { cn } from './utils.ts'
 
-function InputGroup({ className, ...props }: React.ComponentProps<'div'>) {
+const InputGroup = React.forwardRef<HTMLDivElement, React.ComponentProps<'div'>>(function InputGroup({ className, ...props }, ref) {
   return (
     <div
+      ref={ref}
       data-slot="input-group"
       role="group"
       className={cn(
@@ -19,7 +20,7 @@ function InputGroup({ className, ...props }: React.ComponentProps<'div'>) {
       {...props}
     />
   )
-}
+})
 
 const inputGroupAddonVariants = cva(
   "flex h-auto cursor-text items-center justify-center gap-2 py-1.5 text-sm font-medium text-muted-foreground select-none group-data-[disabled=true]/input-group:opacity-[var(--ui-disabled-opacity,0.5)] [&>kbd]:rounded-[calc(var(--radius)-5px)] [&>svg:not([class*='size-'])]:size-4",

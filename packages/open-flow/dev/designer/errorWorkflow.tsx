@@ -116,7 +116,7 @@ export const errorWorkflowStory: FrontendStory = {
   id: 'error-workflow',
   title: 'Error handling',
   description:
-    'Upstream picker: verify collapsed summaries, search, repeated selection, clearing, dismissal and focus return. Compare deletion, unpublished and read-only states. Remove unavailable upstreams and verify valid selections remain. Preview deletion warnings, including disabled listeners and query failure.',
+    'Upstream picker: verify collapsed summaries, search in the main input, repeated selection, the inline clear button, keyboard selection, Escape and outside-click dismissal. Compare deletion, unpublished and read-only states. Remove unavailable upstreams and verify valid selections remain. Preview deletion warnings, including disabled listeners and query failure.',
   standalone: true,
   render: (_log, dark, language) => <Sample dark={dark} language={language} />,
 }
