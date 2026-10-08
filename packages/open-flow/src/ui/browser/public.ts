@@ -13,6 +13,7 @@ import {
   DialogTrigger as SharedDialogTrigger,
 } from './dialog.tsx'
 import { InputGroup as SharedInputGroup, InputGroupAddon as SharedInputGroupAddon, InputGroupInput as SharedInputGroupInput } from './input-group.tsx'
+import { NativeSelect as SharedNativeSelect, NativeSelectOption as SharedNativeSelectOption } from './native-select.tsx'
 
 /** Native host button contract; Base UI composition stays internal to the product. */
 export interface ButtonProps extends ComponentPropsWithoutRef<'button'> {
@@ -54,6 +55,8 @@ export const InputGroupAddon: ComponentType<
 > = SharedInputGroupAddon
 export const InputGroupInput: ForwardRefExoticComponent<ComponentPropsWithoutRef<'input'> & RefAttributes<HTMLInputElement>> = SharedInputGroupInput
 export { Label } from './label.tsx'
+export const NativeSelect: ComponentType<Omit<ComponentPropsWithoutRef<'select'>, 'size'> & { readonly size?: 'sm' | 'default' }> = SharedNativeSelect
+export const NativeSelectOption: ComponentType<ComponentPropsWithoutRef<'option'>> = SharedNativeSelectOption
 export { OpenFlowLogo, type OpenFlowLogoProps } from './logo.tsx'
 export { Textarea } from './textarea.tsx'
 /** Shared Sonner presentation for hosts and the component Lab. */
