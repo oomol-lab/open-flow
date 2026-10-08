@@ -4,7 +4,7 @@ const edit = ['expected-revision', 'idempotency-key']
 const page = ['cursor', 'limit']
 const commands = [
   ['list', '[--cursor <cursor>] [--limit <count>]', page],
-  ['create', '<name> [--team <teamId>]', ['idempotency-key', 'team']],
+  ['create', '<name>', ['idempotency-key']],
   ['show', '<flow>', []],
   ['inspect', '<flow> [--full]', ['full']],
   ['apply', '<flow> --file <path|->', [...edit, 'file']],
@@ -70,7 +70,6 @@ const optionDetails: Record<
   string,
   { description: string; type?: string; enum?: readonly string[]; default?: string | number; minimum?: number; maximum?: number }
 > = {
-  'team': { description: 'Team ID from connector teams.', type: 'string' },
   'revision': { description: 'Exact Revision to read or check; defaults to the current Draft.', type: 'string' },
   'subflow': { description: 'Exact subflow ID in the selected Revision; defaults to the root graph.', type: 'string' },
   'publication': { description: 'Exact Publication ID whose fixed Code connections are read; defaults to the Draft.', type: 'string' },

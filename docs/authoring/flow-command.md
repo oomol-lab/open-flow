@@ -1,6 +1,8 @@
 # Flow 命令调用合同
 
 `oo flow` 使用宿主注入的 Control API。命令本身不保存当前 Flow，不从目录推断 Flow，也不保存待提交事务。
+团队选择由 `oo` 宿主统一处理：`--team <name>` 选择本次调用的 OOMOL 托管团队，所有 Flow 请求与 Workbench 链接使用同一认证上下文。
+Flow 创建命令不再单独指定 Team ID。
 
 ## 发现与读取
 
@@ -181,7 +183,7 @@ Connector Provider 发现使用 `oo flow connector providers [--flow FLOW_ID]`�
 
 ```bash
 oo flow connector teams --json
-oo flow create "My Flow" --team TEAM_ID --json
+oo --team TEAM_NAME flow create "My Flow" --json
 oo flow check FLOW_ID --revision REVISION_ID --json
 oo flow disable FLOW_ID --expected-publication PUBLICATION_ID --json
 oo flow enable FLOW_ID --expected-publication PUBLICATION_ID --json
@@ -189,7 +191,7 @@ oo flow runs results RUN_ID --after RESULT_ID --json
 oo flow runs read-result RUN_ID RESULT_ID --pointer /items --offset 20 --limit 20 --max-bytes 15000 --json
 ```
 
-Team 选择使用公共 Control API，并保留创建幂等语义。启停必须指定观察到的 publication ID；发布版本发生变化时返回冲突，不自动修改新版本。指定 `check --revision` 检查该固定版本；省略时检查当前 Draft。
+Team 选择由宿主解析为请求身份，并保留创建幂等语义。启停必须指定观察到的 publication ID；发布版本发生变化时返回冲突，不自动修改新版本。指定 `check --revision` 检查该固定版本；省略时检查当前 Draft。
 
 结果列表游标 `--after` 是结果 ID，事件命令的 `--after` 是数字序号。结果读取的 pointer/offset 已改为命名选项，旧位置参数不再接受；`limit` 默认为 20（1–100），`max-bytes` 默认为 15000（1–1048576），offset 默认为 0，pointer 默认为根。下载完整结果仍使用 `runs download-result`。
 

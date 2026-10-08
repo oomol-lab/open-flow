@@ -29,6 +29,7 @@ function help(runtime: Runtime, args: readonly string[]) {
         3: 'Waiting timed out or publication is pending; the operation continues.',
       },
       notes: [
+        'The oo host selects the team for the whole invocation with --team <name>; Flow commands use that authenticated scope.',
         '--timeout is a wait budget in milliseconds (default 60000), except node set where it changes the node execution timeout.',
         '--follow --json writes NDJSON pages immediately; resume from nextAfter.',
         'Use schema examples to discover complete creation batches, or schema example.connector for a Connector Task.',
