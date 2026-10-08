@@ -1,8 +1,6 @@
 <div align="center">
 
-<h1 align="center">
-  <img src="../assets/logo/open-flow-wordmark-auto.svg" alt="Open Flow" width="280" height="64" />
-</h1>
+<img src="../assets/logo/open-flow-wordmark-auto.svg" alt="Open Flow" width="280" height="64" />
 
 **Создавайте workflow, которые можно увидеть, написать кодом, запустить и полностью контролировать.**
 

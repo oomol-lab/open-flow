@@ -1,8 +1,6 @@
 <div align="center">
 
-<h1 align="center">
-  <img src="assets/logo/open-flow-wordmark-auto.svg" alt="Open Flow" width="280" height="64" />
-</h1>
+<img src="assets/logo/open-flow-wordmark-auto.svg" alt="Open Flow" width="280" height="64" />
 
 [English](README.md) | [简体中文](docs/README.zh-CN.md) | [繁體中文](docs/README.zh-TW.md) | [日本語](docs/README.ja.md) | [한국어](docs/README.ko.md) | [Русский](docs/README.ru.md) | [Français](docs/README.fr.md)
 

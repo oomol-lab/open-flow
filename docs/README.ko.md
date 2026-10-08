@@ -1,8 +1,6 @@
 <div align="center">
 
-<h1 align="center">
-  <img src="../assets/logo/open-flow-wordmark-auto.svg" alt="Open Flow" width="280" height="64" />
-</h1>
+<img src="../assets/logo/open-flow-wordmark-auto.svg" alt="Open Flow" width="280" height="64" />
 
 **보고, 코딩하고, 실행하고, 직접 소유하는 워크플로를 만드세요.**
 
