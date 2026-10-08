@@ -1,14 +1,23 @@
 import type { Context } from 'hono'
 import type { CookieOptions } from 'hono/utils/cookie'
+import type { SessionUser } from '../../common/users.ts'
+import type { UserStore } from '../storage/user-store.ts'
 
 import { Hono } from 'hono'
 import { deleteCookie, setSignedCookie } from 'hono/cookie'
 import { parseSigned } from 'hono/utils/cookie'
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
+import { z } from 'zod'
 import { serverErrorCode } from '../error.ts'
 import { OperatorStore } from '../storage/operator-store.ts'
 
 const actorId = 'operator'
+const userCookieName = 'open_flow_user_session'
+const emailSchema = z.string().trim().max(254).toLowerCase().pipe(z.email())
+const loginSchema = z.strictObject({ version: z.literal(1), email: emailSchema, password: z.string().min(1).max(1024) })
+const createUserSchema = z.strictObject({ version: z.literal(1), email: emailSchema, role: z.enum(['admin', 'user']) })
+const userRevisionSchema = z.strictObject({ version: z.literal(1), expectedRevision: z.number().int().positive() })
+const enabledSchema = userRevisionSchema.extend({ enabled: z.boolean() })
 const cookieName = 'open_flow_operator_session'
 const setupCookieName = 'open_flow_operator_setup'
 const maxRequestBytes = 4 * 1024
@@ -18,6 +27,7 @@ const defaultLoginAttemptsPerMinute = 10
 const encoder = new TextEncoder()
 
 export class OperatorSession {
+  readonly users?: UserStore
   readonly #cookie: CookieOptions
   readonly #envFingerprint?: string
   readonly #envToken?: Uint8Array
@@ -27,7 +37,7 @@ export class OperatorSession {
   readonly #store: OperatorStore
   #setupCode?: Uint8Array
 
-  constructor(store: OperatorStore, token: string | undefined, secure: boolean, setupCode?: string, now: () => number = Date.now) {
+  constructor(store: OperatorStore, token: string | undefined, secure: boolean, setupCode?: string, now: () => number = Date.now, users?: UserStore) {
     if (token != null) {
       const bytes = encoder.encode(token)
       if (bytes.byteLength < 32) throw new Error('OPEN_FLOW_TOKEN must contain at least 32 UTF-8 bytes.')
@@ -42,22 +52,48 @@ export class OperatorSession {
     this.#now = now
     this.#setupCookie = { ...this.#cookie, path: '/auth' }
     this.#store = store
+    this.users = users
   }
 
   async actor(request: Request): Promise<string | undefined> {
     const authorization = request.headers.get('authorization')
     if (authorization?.startsWith('Bearer ') && (await this.matches(authorization.slice(7)))) return actorId
 
-    const fingerprint = this.#fingerprint()
-    if (fingerprint == null) return
     const cookie = request.headers.get('cookie')
     if (cookie == null) return
+    const userValue = (await parseSigned(cookie, this.#store.state().sessionSecret, userCookieName))[userCookieName]
+    if (typeof userValue == 'string') {
+      const [version, expiresAt, userId, revision, nonce, extra] = userValue.split(':')
+      if (version == '1' && extra == null && nonce != null && nonce.length > 0 && Number.isSafeInteger(Number(expiresAt)) && Number(expiresAt) > this.#now()) {
+        const user = this.users?.get(userId ?? '')
+        if (user?.enabled && user.revision == Number(revision)) return user.userId
+      }
+    }
+    const fingerprint = this.#fingerprint()
+    if (fingerprint == null) return
     const value = (await parseSigned(cookie, this.#store.state().sessionSecret, cookieName))[cookieName]
     if (typeof value != 'string') return
     const [version, expiresAt, credential, nonce, extra] = value.split(':')
     if (version != '2' || extra != null || credential != fingerprint || nonce == null || nonce.length == 0) return
     const expiration = Number(expiresAt)
     return Number.isSafeInteger(expiration) && expiration > this.#now() ? actorId : undefined
+  }
+
+  async currentUser(request: Request): Promise<SessionUser | undefined> {
+    const id = await this.actor(request)
+    if (id == actorId) return { userId: actorId, email: null, role: 'admin' }
+    const user = id == null ? undefined : this.users?.get(id)
+    return user == null ? undefined : { userId: user.userId, email: user.email, role: user.role }
+  }
+
+  async setUserCookie(context: Context, userId: string, revision: number): Promise<void> {
+    const expiresAt = this.#now() + sessionLifetimeSeconds * 1_000
+    await setSignedCookie(context, userCookieName, `1:${expiresAt}:${userId}:${revision}:${randomUUID()}`, this.#store.state().sessionSecret, {
+      ...this.#cookie,
+      maxAge: sessionLifetimeSeconds,
+    })
+    deleteCookie(context, cookieName, this.#cookie)
+    deleteCookie(context, setupCookieName, this.#setupCookie)
   }
 
   async matches(token: string): Promise<boolean> {
@@ -112,9 +148,11 @@ export class OperatorSession {
       ...this.#cookie,
       maxAge: sessionLifetimeSeconds,
     })
+    deleteCookie(context, userCookieName, this.#cookie)
   }
 
   clearCookie(context: Context): void {
+    deleteCookie(context, userCookieName, this.#cookie)
     deleteCookie(context, cookieName, this.#cookie)
     deleteCookie(context, setupCookieName, this.#setupCookie)
   }
@@ -133,6 +171,7 @@ export function createOperatorApp(session?: OperatorSession, attemptsPerMinute =
   const app = new Hono()
   let attempts = 0
   let resetAt = 0
+  let loggingIn = false
 
   const admitted = (): boolean => {
     const now = clock()
@@ -153,8 +192,10 @@ export function createOperatorApp(session?: OperatorSession, attemptsPerMinute =
 
   app.get('/session', async (context) => {
     const source = session?.source() ?? 'none'
+    const currentUser = await session?.currentUser(context.req.raw)
     return json(200, {
-      authenticated: session == null ? false : (await session.actor(context.req.raw)) != null,
+      authenticated: currentUser != null,
+      user: currentUser ?? null,
       configured: source != 'none',
       setupAuthorized: session == null ? false : await session.setupAuthorized(context.req.raw),
       setupRequired: session != null && source == 'none',
@@ -178,6 +219,55 @@ export function createOperatorApp(session?: OperatorSession, attemptsPerMinute =
     }
     await session.setCookie(context)
     return json(200, { authenticated: true, configured: true, version: 1 }, context.res.headers)
+  })
+
+  app.post('/user-session', async (context) => {
+    if (session?.users == null || session.source() == 'none') {
+      return json(503, { error: { code: serverErrorCode.operatorNotConfigured, message: 'User authentication is not configured.' }, version: 1 })
+    }
+    if (!admitted()) return limited()
+    const body = loginSchema.safeParse(await objectRequest(context.req.raw))
+    if (!body.success) return json(400, { error: { code: serverErrorCode.requestInvalid, message: 'Login request is invalid.' }, version: 1 })
+    if (loggingIn) return limited()
+    loggingIn = true
+    try {
+      const user = await session.users.verify(body.data.email, body.data.password)
+      if (user == null) return json(401, { error: { code: serverErrorCode.authenticationInvalid, message: 'Email or password is invalid.' }, version: 1 })
+      await session.setUserCookie(context, user.userId, user.revision)
+      return json(200, { authenticated: true, version: 1 }, context.res.headers)
+    } finally {
+      loggingIn = false
+    }
+  })
+
+  app.use('/users*', async (context, next) => {
+    const user = await session?.currentUser(context.req.raw)
+    if (user == null) return json(401, { error: { code: serverErrorCode.authenticationInvalid, message: 'Authentication is required.' }, version: 1 })
+    if (user.role != 'admin')
+      return json(403, { error: { code: serverErrorCode.authorizationDenied, message: 'Administrator permission is required.' }, version: 1 })
+    await next()
+  })
+  app.get('/users', () => json(200, { users: session?.users?.list() ?? [], version: 1 }))
+  app.post('/users', async (context) => {
+    const body = createUserSchema.safeParse(await objectRequest(context.req.raw))
+    if (!body.success || session?.users == null)
+      return json(400, { error: { code: serverErrorCode.requestInvalid, message: 'User request is invalid.' }, version: 1 })
+    return json(201, { ...(await session.users.create(body.data.email, body.data.role)), version: 1 })
+  })
+  app.put('/users/:userId', async (context) => {
+    const body = enabledSchema.safeParse(await objectRequest(context.req.raw))
+    if (!body.success || session?.users == null)
+      return json(400, { error: { code: serverErrorCode.requestInvalid, message: 'User request is invalid.' }, version: 1 })
+    if (context.req.param('userId') == (await session.actor(context.req.raw))) {
+      return json(403, { error: { code: serverErrorCode.authorizationDenied, message: 'You cannot disable your own account.' }, version: 1 })
+    }
+    return json(200, { user: session.users.setEnabled(context.req.param('userId'), body.data.enabled, body.data.expectedRevision), version: 1 })
+  })
+  app.post('/users/:userId/password', async (context) => {
+    const body = userRevisionSchema.safeParse(await objectRequest(context.req.raw))
+    if (!body.success || session?.users == null)
+      return json(400, { error: { code: serverErrorCode.requestInvalid, message: 'User request is invalid.' }, version: 1 })
+    return json(200, { ...(await session.users.resetPassword(context.req.param('userId'), body.data.expectedRevision)), version: 1 })
   })
 
   app.post('/setup/session', async (context) => {
@@ -226,7 +316,7 @@ export function createOperatorApp(session?: OperatorSession, attemptsPerMinute =
   return app
 }
 
-async function tokenRequest(request: Request, key: 'code' | 'token'): Promise<string | undefined> {
+async function objectRequest(request: Request): Promise<Record<string, unknown> | undefined> {
   if (request.body == null) return
   const chunks: Uint8Array[] = []
   let size = 0
@@ -248,8 +338,12 @@ async function tokenRequest(request: Request, key: 'code' | 'token'): Promise<st
     return
   }
   if (value == null || typeof value != 'object' || Array.isArray(value)) return
-  const body = value as Record<string, unknown>
-  if (Object.keys(body).length != 2 || body.version !== 1 || typeof body[key] != 'string' || body[key].length == 0) return
+  return value as Record<string, unknown>
+}
+
+async function tokenRequest(request: Request, key: 'code' | 'token'): Promise<string | undefined> {
+  const body = await objectRequest(request)
+  if (body == null || Object.keys(body).length != 2 || body.version !== 1 || typeof body[key] != 'string' || body[key].length == 0) return
   return body[key]
 }
 

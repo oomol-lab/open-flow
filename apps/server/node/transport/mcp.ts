@@ -71,6 +71,8 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
     server.registerTool(name, definition, async (args, context) => {
       try {
         context.mcpReq.signal.throwIfAborted()
+        control.authorize(actorId, args as { flowId?: string; runId?: string; publicationId?: string })
+        if (name == 'event_source_list') control.requireAdmin(actorId)
         return result(await execute(args, context))
       } catch (error) {
         if (context.mcpReq.signal.aborted) throw error
@@ -95,7 +97,7 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
   }
 
   register('flow_list', mcpTools.flow_list, ({ cursor, limit }) => {
-    const { next, page } = control.listFlows(limit, cursor == null ? undefined : decodeFlowCursor(cursor))
+    const { next, page } = control.listFlows(limit, cursor == null ? undefined : decodeFlowCursor(cursor), false, actorId)
     return { ...page, ...(next == null ? {} : { nextCursor: encodeFlowCursor(next) }) }
   })
   register('flow_get', mcpTools.flow_get, async ({ flowId, full }) => {
@@ -143,8 +145,8 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
   register('flow_run', mcpTools.flow_run, async (args) => {
     return (
       args.source == 'draft'
-        ? await control.runs.createDraftRun(args.flowId, args.revisionId, currentEngineContract, args.inputs, args.idempotencyKey, args.trigger)
-        : await control.runs.createLiveRun(args.publicationId, args.inputs, args.idempotencyKey, args.trigger)
+        ? await control.runs.createDraftRun(args.flowId, args.revisionId, currentEngineContract, args.inputs, args.idempotencyKey, args.trigger, actorId)
+        : await control.runs.createLiveRun(args.publicationId, args.inputs, args.idempotencyKey, args.trigger, actorId)
     ).run
   })
   register('run_list', mcpTools.run_list, ({ flowId, status, cursor, limit, pendingWait }) => {

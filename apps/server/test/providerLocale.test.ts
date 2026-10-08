@@ -52,7 +52,7 @@ it('forwards Provider locale and varies the HTTP representation', async () => {
   const listConnectorProviders = vi.fn(async (_flowId?: string, _signal?: AbortSignal, locale?: string) => [
     { serviceId: 'mail', serviceName: locale == 'zh-CN' ? '邮件' : 'Mail' },
   ])
-  const app = createControlApp({ listConnectorProviders } as unknown as ControlService, () => 'actor')
+  const app = createControlApp({ listConnectorProviders, authorize: vi.fn() } as unknown as ControlService, () => 'actor')
   const english = await app.request('/connector/providers?flowId=flow&locale=en')
   const chinese = await app.request('/connector/providers?flowId=flow&locale=zh-CN', { headers: { 'if-none-match': english.headers.get('etag')! } })
   expect(chinese.status).toBe(200)

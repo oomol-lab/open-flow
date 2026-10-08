@@ -80,11 +80,11 @@ it('accepts databases already rebuilt with the new column names and snapshot for
   const file = await databaseFile()
   const database = Database.open(file)
   database.connection.exec(
-    'DROP TABLE error_subscriptions; DROP TABLE error_bindings; DROP TABLE error_dispatches; ALTER TABLE runs DROP COLUMN failure_detail; ALTER TABLE runs DROP COLUMN error_source_run_id; ALTER TABLE runs DROP COLUMN error_source_flow_id; ALTER TABLE publications DROP COLUMN live_enabled_at_end; ALTER TABLE publications DROP COLUMN live_ended_at; ALTER TABLE poll_candidates DROP COLUMN retry_count; ALTER TABLE publications DROP COLUMN presentation_snapshot; PRAGMA user_version = 29',
+    'DROP TABLE users; DROP INDEX flows_owner_list; ALTER TABLE flows DROP COLUMN owner_id; DROP TABLE error_subscriptions; DROP TABLE error_bindings; DROP TABLE error_dispatches; ALTER TABLE runs DROP COLUMN failure_detail; ALTER TABLE runs DROP COLUMN error_source_run_id; ALTER TABLE runs DROP COLUMN error_source_flow_id; ALTER TABLE publications DROP COLUMN live_enabled_at_end; ALTER TABLE publications DROP COLUMN live_ended_at; ALTER TABLE poll_candidates DROP COLUMN retry_count; ALTER TABLE publications DROP COLUMN presentation_snapshot; PRAGMA user_version = 29',
   )
   database.close()
   const upgraded = Database.open(file)
-  expect(version(upgraded.connection)).toBe(36)
+  expect(version(upgraded.connection)).toBe(37)
   expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
   upgraded.close()
 })
@@ -133,7 +133,7 @@ it('backfills Revision metadata needed after old content is pruned', async () =>
 
   const upgraded = Database.open(file)
   try {
-    expect(version(upgraded.connection)).toBe(36)
+    expect(version(upgraded.connection)).toBe(37)
     expect(upgraded.connection.prepare('SELECT digest, model_version AS modelVersion FROM flow_revisions WHERE revision_id = ?').get('revision')).toEqual({
       digest: 'digest',
       modelVersion: 3,
@@ -189,7 +189,7 @@ it('applies the Flow-first schema without foreign keys', async () => {
   Database.open(file).close()
   const database = new DatabaseSync(file)
   try {
-    expect(version(database)).toBe(36)
+    expect(version(database)).toBe(37)
     const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as {
       readonly name: string
     }[]
@@ -231,7 +231,7 @@ it('upgrades a version 1 Flow database without changing its data', async () => {
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(36)
+    expect(version(reopened)).toBe(37)
     expect(reopened.prepare('SELECT revision_id AS revisionId FROM revisions').all()).toEqual([{ revisionId: 'revision-a' }])
     expect(reopened.prepare('SELECT name FROM variables').all()).toEqual([])
   } finally {
@@ -261,7 +261,7 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(36)
+    expect(version(reopened)).toBe(37)
     expect(reopened.prepare('SELECT flow_id AS flowId, team_id AS teamId FROM flow_connector_teams').all()).toEqual([{ flowId: 'flow-a', teamId: null }])
     expect(reopened.prepare("SELECT name FROM pragma_table_info('runs') WHERE name = 'connector_team_id'").get()).toEqual({ name: 'connector_team_id' })
   } finally {
@@ -309,13 +309,13 @@ it('rejects a newer Flow schema version without modifying it', async () => {
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
-  database.exec('PRAGMA user_version = 37')
+  database.exec('PRAGMA user_version = 38')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('SQLite schema version 37 is newer than the supported version 36.')
+  expect(() => Database.open(file)).toThrow('SQLite schema version 38 is newer than the supported version 37.')
 
   const reopened = new DatabaseSync(file)
-  expect(version(reopened)).toBe(37)
+  expect(version(reopened)).toBe(38)
   reopened.close()
 })
 
@@ -353,7 +353,7 @@ it('preserves old checkpoint bytes for explicit recovery validation', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(36)
+    expect(version(reopened)).toBe(37)
     expect(reopened.prepare('SELECT * FROM run_checkpoints').get()).toEqual({
       run_id: 'run-a',
       checkpoint_json: '{"value":42}',
@@ -386,7 +386,7 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   Database.open(file).close()
   const upgraded = new DatabaseSync(file)
   try {
-    expect(version(upgraded)).toBe(36)
+    expect(version(upgraded)).toBe(37)
     const after = tables.map((table) => upgraded.prepare('SELECT * FROM ' + table).all())
     expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
     expect(after[2]).toEqual(
@@ -512,6 +512,7 @@ it('classifies existing automatic runs as Live while preserving their execution 
     expect(upgraded.connection.prepare('SELECT * FROM runs ORDER BY run_id').all()).toEqual(
       original.map((run) =>
         Object.assign({}, run, {
+          idempotency_key: JSON.stringify(['operator', run.idempotency_key]),
           source: run.source == 'trigger' ? 'live' : run.source,
           failure_detail: null,
           error_source_run_id: null,
@@ -540,4 +541,24 @@ it('leaves migrated Publication end states unknown without deriving them from cu
   } finally {
     upgraded.close()
   }
+})
+
+it('assigns existing workflows to Operator and scopes even keys that resemble namespaced keys exactly once', async () => {
+  const file = await databaseFile()
+  const old = legacyDatabase(file, 36)
+  const keys = ['request', JSON.stringify(['operator', 'request'])]
+  for (const [index, key] of keys.entries()) {
+    old
+      .prepare(`INSERT INTO flows (flow_id, name, status, draft_revision_id, create_idempotency_key,
+      create_request_digest, created_at, updated_at) VALUES (?, 'Old flow', 'active', 'revision', ?, 'request', 1, 1)`)
+      .run(`flow-${index}`, key)
+  }
+  old.close()
+  const upgraded = Database.open(file)
+  const expected = keys.map((key, index) => ({ flow_id: `flow-${index}`, owner_id: 'operator', create_idempotency_key: JSON.stringify(['operator', key]) }))
+  expect(upgraded.connection.prepare('SELECT flow_id, owner_id, create_idempotency_key FROM flows ORDER BY flow_id').all()).toEqual(expected)
+  upgraded.close()
+  const reopened = Database.open(file)
+  expect(reopened.connection.prepare('SELECT flow_id, owner_id, create_idempotency_key FROM flows ORDER BY flow_id').all()).toEqual(expected)
+  reopened.close()
 })

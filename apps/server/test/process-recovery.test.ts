@@ -239,6 +239,7 @@ it('serves the compiled Workbench, MCP and Control API in the real process', asy
 
   await expect(json(await fetch(`${app.origin}/auth/session`))).resolves.toEqual({
     authenticated: false,
+    user: null,
     configured: true,
     setupAuthorized: false,
     setupRequired: false,

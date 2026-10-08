@@ -77,7 +77,7 @@ export class ServerService {
   readonly #clockService: Clock.Clock
   readonly #cron: CronDriver
   readonly #executor: RunExecutor
-  readonly #flowCatalogSubscribers = new Set<(event: FlowCatalogEvent) => void>()
+  readonly #flowCatalogSubscribers = new Map<(event: FlowCatalogEvent) => void, string | undefined>()
   readonly #flowSubscribers = new Map<string, Set<(event: FlowChangeEvent) => void>>()
   readonly #integration: IntegrationRuntime
   readonly #connectorAccess: ConnectorAccessHost
@@ -179,7 +179,7 @@ export class ServerService {
       validatedFlow,
       () => this.#supervisor.signal(),
       () => this.#maintenance.wake(),
-      () => this.#notifyFlowCatalog(),
+      (ownerId) => this.#notifyFlowCatalog(undefined, ownerId),
       () => this.#resolveLlm()?.config != null,
     )
     this.#maintenance = new Maintenance(
@@ -191,7 +191,7 @@ export class ServerService {
       this.#connectorAccess,
       (runId) => this.#supervisor.interrupt(runId),
       (flowId) => this.#supervisor.isFlowRunning(flowId),
-      () => this.#notifyFlowCatalog(),
+      (ownerId) => this.#notifyFlowCatalog(undefined, ownerId),
       (flowId, runId) => this.#runChanged(flowId, runId),
       () => this.#supervisor.signal(),
       maintenanceLock,
@@ -240,7 +240,7 @@ export class ServerService {
       () => this.#maintenance.wake(),
       snapshots,
       (flowId, triggerNodeId) => this.#listeners.test(flowId, triggerNodeId),
-      (event) => this.#notifyFlowCatalog(event),
+      (event, ownerId) => this.#notifyFlowCatalog(event, ownerId),
       (event) => this.#notifyFlow(event),
       (kind) => (kind == 'agent' ? this.#resolveLlm()?.config != null : kind == 'decision' ? this.#resolveLlm()?.decision != null : this.#resolveLlm() != null),
       this.#resolveConnector,
@@ -371,8 +371,8 @@ export class ServerService {
     }
   }
 
-  subscribeFlowCatalog(listener: (event: FlowCatalogEvent) => void): () => void {
-    this.#flowCatalogSubscribers.add(listener)
+  subscribeFlowCatalog(listener: (event: FlowCatalogEvent) => void, ownerId?: string): () => void {
+    this.#flowCatalogSubscribers.set(listener, ownerId)
     return () => this.#flowCatalogSubscribers.delete(listener)
   }
 
@@ -485,8 +485,11 @@ export class ServerService {
     for (const listener of this.#flowSubscribers.get(event.flowId) ?? []) listener(event)
   }
 
-  #notifyFlowCatalog(event: FlowCatalogEvent = { kind: 'flows.changed', version: 1 }): void {
-    for (const listener of this.#flowCatalogSubscribers) listener(event)
+  #notifyFlowCatalog(event: FlowCatalogEvent = { kind: 'flows.changed', version: 1 }, ownerId?: string): void {
+    const owner = ownerId ?? (event.kind == 'flow.created' ? this.#store.flows.get(event.flowId)?.ownerId : undefined)
+    for (const [listener, subscriberOwner] of this.#flowCatalogSubscribers) {
+      if (owner == null || subscriberOwner == null || subscriberOwner == owner) listener(event)
+    }
   }
 
   #runCreated(flowId: string, runId: string): void {

@@ -131,7 +131,7 @@ function main(): Effect.Effect<void> {
       yield* service.start()
       const operatorStore = new OperatorStore(database)
       const setupCode = operatorToken == null && !operatorStore.state().claimed ? randomBytes(32).toString('base64url') : undefined
-      const operator = new OperatorSession(operatorStore, operatorToken, secureCookie == 'true', setupCode)
+      const operator = new OperatorSession(operatorStore, operatorToken, secureCookie == 'true', setupCode, Date.now, service.control.users)
       if (setupCode != null) {
         logger.warn({ category: 'operator.setup.required', setupCode }, 'Open Flow Server requires operator setup. Use the setup code from this log entry.')
       }

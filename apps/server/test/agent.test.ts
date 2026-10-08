@@ -625,7 +625,7 @@ it('resumes a streamed gateway batch after restart and retains earlier receipts 
     expect(service.events(accepted.runId).filter((event) => event.kind == 'node.started')).toHaveLength(1)
     expect(service.events(accepted.runId).filter((event) => event.kind == 'node.completed')).toHaveLength(1)
     const app = createServerApp(service, {
-      resolveControlActor: (request) => (request.headers.get('authorization') == 'Bearer operator' ? 'server-operator' : undefined),
+      resolveControlActor: (request) => (request.headers.get('authorization') == 'Bearer operator' ? 'test' : undefined),
     })
     const client = new ControlClient(async (route, init) =>
       app.request(new Request(`http://server.local${route}`, { ...init, headers: { authorization: 'Bearer operator' } })),
@@ -825,7 +825,7 @@ it('runs a code-only Agent through the service without a Connector deployment', 
     await service.waitForIdle()
     expect(service.control.runs.getRun(accepted.runId).status).toBe('completed')
     expect(requests).toBe(2)
-    const app = createServerApp(service, { resolveControlActor: () => 'server-operator' })
+    const app = createServerApp(service, { resolveControlActor: () => 'test' })
     const client = new ControlClient(async (route, init) => app.request(new Request(`http://local${route}`, init)))
     const results = await client.listRunResults(accepted.runId)
     expect(results.results[0]?.source).toEqual({ kind: 'code' })

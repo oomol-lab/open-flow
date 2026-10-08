@@ -51,6 +51,8 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const actorId = await resolveActor?.(context.req.raw)
     if (actorId == null || actorId.length == 0) throw new ControlError(controlErrorCode.authenticationRequired, 'Authentication is required.')
     context.set('actorId', actorId)
+    const flowId = context.req.query('flowId')
+    if (flowId != null) service.authorize(actorId, { flowId })
     await next()
   }
   for (const route of [
@@ -69,6 +71,25 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   ]) {
     app.use(route, authenticate)
   }
+
+  for (const route of ['/flows/:flowId', '/flows/:flowId/*', '/runs/:runId', '/runs/:runId/*']) {
+    app.use(route, async (context, next) => {
+      service.authorize(context.get('actorId'), { flowId: context.req.param('flowId'), runId: context.req.param('runId') })
+      await next()
+    })
+  }
+
+  const administrator = async (context: Context<Environment>, next: Next): Promise<void> => {
+    service.requireAdmin(context.get('actorId'))
+    await next()
+  }
+  app.use('/variables', administrator)
+  app.use('/variables/*', administrator)
+  app.use('/event-sources', async (context, next) => {
+    if (context.req.method != 'GET' || context.req.query('flowId') == null) service.requireAdmin(context.get('actorId'))
+    await next()
+  })
+  app.use('/event-sources/*', administrator)
 
   app.post('/openapi/document', async (context) => {
     try {
@@ -180,7 +201,12 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const limit = pageSize(parameters)
     const cursor = parameters.get('cursor')
     const after = cursor == null ? undefined : decodeFlowCursor(cursor)
-    const { next, page } = service.listFlows(limit, after, optionalBoolean(parameters.get('includeTotal'), controlErrorCode.flowInvalid))
+    const { next, page } = service.listFlows(
+      limit,
+      after,
+      optionalBoolean(parameters.get('includeTotal'), controlErrorCode.flowInvalid),
+      context.get('actorId'),
+    )
     return response(200, { ...page, ...(next == null ? {} : { nextCursor: encodeFlowCursor(next) }) })
   })
   app.post('/flows', async (context) => {
@@ -399,6 +425,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     })
   })
   app.post('/connector/connections/:serviceId/page', async (context) => {
+    service.requireAdmin(context.get('actorId'))
     const parameters = query(context.req.raw, ['flowId', 'teamId'], controlErrorCode.flowInvalid)
     const flowId = parameters.get('flowId')
     const teamId = parameters.get('teamId')
@@ -523,17 +550,20 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       body.inputs,
       idempotencyKey(context.req.raw, controlErrorCode.runInvalid),
       body.trigger,
+      context.get('actorId'),
     )
     return response(accepted.created ? 202 : 200, accepted.run)
   })
 
   app.post('/runs', async (context) => {
     const body = await decodeRequest(context.req.raw, controlErrorCode.runInvalid, controlRequests.createLiveRun)
+    service.authorize(context.get('actorId'), { publicationId: body.publicationId })
     const accepted = await service.runs.createLiveRun(
       text(body.publicationId, controlErrorCode.runInvalid),
       body.inputs,
       idempotencyKey(context.req.raw, controlErrorCode.runInvalid),
       body.trigger,
+      context.get('actorId'),
     )
     return response(accepted.created ? 202 : 200, accepted.run)
   })

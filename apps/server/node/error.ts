@@ -3,6 +3,9 @@ import type { ControlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { controlErrorMetadata } from '@oomol-lab/open-flow/control-api'
 
 export const serverErrorCode = {
+  authorizationDenied: 'authorization.denied',
+  userConflict: 'user.conflict',
+  userNotFound: 'user.not-found',
   authenticationInvalid: 'authentication.invalid',
   configurationConflict: 'configuration.conflict',
   configurationEnvironmentManaged: 'configuration.environment-managed',
@@ -24,6 +27,9 @@ type ErrorCode = ControlErrorCode | ServerErrorCode
 
 const errorMetadata = {
   ...controlErrorMetadata,
+  [serverErrorCode.authorizationDenied]: { status: 403 },
+  [serverErrorCode.userConflict]: { status: 409 },
+  [serverErrorCode.userNotFound]: { status: 404 },
   [serverErrorCode.authenticationInvalid]: { status: 401 },
   [serverErrorCode.configurationConflict]: { status: 409 },
   [serverErrorCode.configurationEnvironmentManaged]: { status: 409 },

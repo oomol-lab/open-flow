@@ -57,7 +57,7 @@ export class Publisher {
   }>
   readonly #signal: () => void
   readonly #wakeMaintenance: () => void
-  readonly #notifyFlowCatalog: () => void
+  readonly #notifyFlowCatalog: (ownerId?: string) => void
 
   constructor(
     store: Store,
@@ -76,7 +76,7 @@ export class Publisher {
     }>,
     signal: () => void,
     wakeMaintenance: () => void,
-    notifyFlowCatalog: () => void,
+    notifyFlowCatalog: (ownerId?: string) => void,
     agentAvailable: () => boolean,
   ) {
     this.#agentAvailable = agentAvailable
@@ -342,7 +342,7 @@ export class Publisher {
       const accepted = this.#store.publications.publish({ ...input, operationId: target.operationId, publishedAt: now })
       switch (accepted.kind) {
         case 'published':
-          this.#notifyFlowCatalog()
+          this.#notifyFlowCatalog(this.#store.flows.get(input.flowId)?.ownerId)
           this.#logger.info(
             { category: 'publication.succeeded', operationId: target.operationId, publicationId: accepted.publicationId },
             'Publish operation succeeded.',
