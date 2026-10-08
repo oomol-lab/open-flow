@@ -17,9 +17,10 @@ import { FieldTable } from '../../../../form/browser/fieldTable.tsx'
 import { FieldValuePreview } from '../../../../form/browser/fieldValuePreview.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
+import { HelpButton } from '../../../../ui/browser/helpButton.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
-import { createTooltipHandle, Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { InspectorSection } from './inspectorSection.tsx'
 import { TaskExecutorChanges } from './taskExecutorChanges.ts'
 
@@ -527,23 +528,10 @@ function DecisionChoice({
 
 function DecisionLevelsHelp() {
   const t = useTranslate()
-  const id = useId()
-  const [tooltip] = useState(() => createTooltipHandle())
   return (
-    <Tooltip handle={tooltip}>
-      <TooltipTrigger
-        id={id}
-        handle={tooltip}
-        closeOnClick={false}
-        onClick={() => tooltip.open(id)}
-        render={<Button type="button" variant="ghost" size="icon-xs" aria-label={t('decision.levels')} />}
-      >
-        <i aria-hidden="true" className="i-lucide-light:circle-help text-muted-foreground" />
-      </TooltipTrigger>
-      <TooltipContent>
-        {t('decision.levelsCount')} {t('decision.levelsHint')}
-      </TooltipContent>
-    </Tooltip>
+    <HelpButton label={t('decision.levels')}>
+      {t('decision.levelsCount')} {t('decision.levelsHint')}
+    </HelpButton>
   )
 }
 

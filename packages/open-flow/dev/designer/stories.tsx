@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from '../../src/ui/browser/dropdown-menu.tsx'
 import { Field as UiField, FieldLabel } from '../../src/ui/browser/field.tsx'
+import { HelpButton } from '../../src/ui/browser/helpButton.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../src/ui/browser/popover.tsx'
 import { HostTooltip } from '../../src/ui/browser/public.ts'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '../../src/ui/browser/select.tsx'
@@ -577,6 +578,31 @@ function Field({ children, label }: { readonly children: ReactNode; readonly lab
 }
 
 export const stories: readonly FrontendStory[] = [
+  {
+    group: 'Controls',
+    id: 'help-button',
+    title: 'Help button',
+    standalone: true,
+    propertyPanel: true,
+    description:
+      'Compare the default 24px button with larger sizes. Icons scale at 5:8. Hover, focus, or click each button to open its explanation in both themes.',
+    render: () => (
+      <div className="flex flex-wrap items-center gap-6 p-4">
+        <div className="flex items-center gap-2">
+          <span>Default · 24px</span>
+          <HelpButton label="Default help">Default button size with a proportional info icon.</HelpButton>
+        </div>
+        {[32, 40].map((size) => (
+          <div key={size} className="flex items-center gap-2">
+            <span>{size}px</span>
+            <HelpButton size={size} label={`${size}px help`}>
+              The icon scales with the button size.
+            </HelpButton>
+          </div>
+        ))}
+      </div>
+    ),
+  },
   {
     group: 'Canvas',
     id: 'interaction-mode',
