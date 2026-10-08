@@ -414,6 +414,25 @@ export class RunExecutor {
           invocation.signal,
           { ...access, scope: 'action', action: executor.action, connectionId: executor.connectionId },
         )
+      case 'decision': {
+        const decision = this.#resolveLlm()?.decision
+        if (decision == null) throw new TaskHostError('llm.unavailable', 'AI Decision is not configured for this deployment.')
+        let result
+        try {
+          result = await decision({
+            questions: executor.questions,
+            state: invocation.input.target!,
+            invocationId: invocation.invocationId,
+            signal: invocation.signal,
+            version: 1,
+          })
+        } catch {
+          if (invocation.signal.aborted) throw invocation.signal.reason
+          throw new TaskHostError('llm.unavailable', 'The AI Decision request could not be completed.')
+        }
+        if (result.kind == 'failed') throw new TaskHostError(result.code, result.message)
+        return result.value
+      }
       case 'llm':
         const llm = this.#resolveLlm()
         if (llm == null) throw new TaskHostError('llm.unavailable', 'The LLM request could not be completed.')

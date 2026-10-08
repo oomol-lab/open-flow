@@ -49,7 +49,7 @@ export type SchedulerEvent =
       readonly inputs: Readonly<Record<string, JsonValue>>
       readonly jobId: string
       readonly nodeId: string
-      readonly nodeKind: 'agent' | 'approval' | 'condition' | 'connector' | 'javascript' | 'openapi' | 'llm' | 'subflow' | 'value' | 'wait'
+      readonly nodeKind: 'agent' | 'approval' | 'condition' | 'connector' | 'decision' | 'javascript' | 'openapi' | 'llm' | 'subflow' | 'value' | 'wait'
       readonly nodeTitle?: string
       readonly runId: string
       readonly type: 'node.started'
@@ -300,7 +300,7 @@ function nodeTitle(prepared: PreparedFlow, node: ExecutableNode): string | undef
 function nodeKind(
   prepared: PreparedFlow,
   node: ExecutableNode,
-): 'agent' | 'approval' | 'condition' | 'connector' | 'javascript' | 'openapi' | 'llm' | 'subflow' | 'value' | 'wait' {
+): 'agent' | 'approval' | 'condition' | 'connector' | 'decision' | 'javascript' | 'openapi' | 'llm' | 'subflow' | 'value' | 'wait' {
   if (node.kind != 'task') return node.kind
   return node.task != null ? 'javascript' : prepared.tasks[node.taskId]!.executor.kind
 }

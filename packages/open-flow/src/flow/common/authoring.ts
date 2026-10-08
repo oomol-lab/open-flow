@@ -10,6 +10,7 @@ export {
   createBuiltinTrigger,
   createCodeTask,
   createCondition,
+  createDecisionTask,
   createAgentTask,
   createLlmTask,
   createManagedTask,

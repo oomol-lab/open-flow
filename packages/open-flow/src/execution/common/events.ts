@@ -10,7 +10,7 @@ export type ProjectedRunEvent =
     }
 
 const encoder = new TextEncoder()
-const nodeKinds = new Set(['agent', 'approval', 'condition', 'connector', 'javascript', 'openapi', 'llm', 'subflow', 'value', 'wait'])
+const nodeKinds = new Set(['agent', 'approval', 'condition', 'connector', 'decision', 'javascript', 'openapi', 'llm', 'subflow', 'value', 'wait'])
 
 function object(value: unknown, description: string): Record<string, unknown> {
   if (value == null || typeof value != 'object' || Array.isArray(value)) throw new TypeError(`${description} must be an object.`)
@@ -28,12 +28,12 @@ function optionalString(value: unknown, description: string): string | undefined
 
 function nodeKind(
   value: unknown,
-): 'agent' | 'approval' | 'condition' | 'connector' | 'javascript' | 'openapi' | 'llm' | 'subflow' | 'value' | 'wait' | undefined {
+): 'agent' | 'approval' | 'condition' | 'connector' | 'decision' | 'javascript' | 'openapi' | 'llm' | 'subflow' | 'value' | 'wait' | undefined {
   if (value === undefined) return
   if (!nodeKinds.has(value as string)) {
     throw new TypeError('Runtime node.started nodeKind is invalid.')
   }
-  return value as 'agent' | 'approval' | 'condition' | 'connector' | 'javascript' | 'openapi' | 'llm' | 'subflow' | 'value' | 'wait'
+  return value as 'agent' | 'approval' | 'condition' | 'connector' | 'decision' | 'javascript' | 'openapi' | 'llm' | 'subflow' | 'value' | 'wait'
 }
 
 function runId(event: Record<string, unknown>): string {

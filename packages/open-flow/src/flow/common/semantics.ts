@@ -1,3 +1,4 @@
+import { decisionTaskIssues, limitDecisionTask } from '../../decision/common/decision.ts'
 import { openApiIssues, authHandles } from '../../openapi/common/openapi.ts'
 export { renderPrompt } from './promptTemplate.ts'
 export { connectionUsage, removeConnectionUsage } from './connectionUsage.ts'
@@ -258,6 +259,8 @@ export async function validateFlow(revision: RevisionContent, engine: EngineCont
   for (const taskId of [...closure.dependencies.tasks].toSorted()) {
     const task = revision.document.tasks[taskId]
     if (task == null) continue
+    for (const issue of decisionTaskIssues(task))
+      checked.diagnostics.push({ code: 'decision.config-invalid', column: 0, line: 1, message: issue.message, path: `/document/tasks/${taskId}/executor` })
     for (const message of openApiIssues(task))
       checked.diagnostics.push({ code: 'openapi.config-invalid', column: 0, line: 1, message, path: `/document/tasks/${taskId}/executor` })
     if (task.executor.kind == 'openapi') {
@@ -405,7 +408,7 @@ export async function prepareFlow(revision: RevisionContent, engineContract: str
       graph: revision.document.graph,
       modules: Object.fromEntries([...closure.dependencies.modules].toSorted().map((id) => [id, revision.modules[id]!])),
       subflows: Object.fromEntries([...closure.dependencies.subflows].toSorted().map((id) => [id, revision.document.subflows[id]!])),
-      tasks: Object.fromEntries([...closure.dependencies.tasks].toSorted().map((id) => [id, revision.document.tasks[id]!])),
+      tasks: Object.fromEntries([...closure.dependencies.tasks].toSorted().map((id) => [id, limitDecisionTask(revision.document.tasks[id]!)])),
     },
     kind: 'prepared',
     validation,

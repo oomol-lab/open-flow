@@ -63,4 +63,6 @@ function TooltipContent({
   )
 }
 
-export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider }
+const createTooltipHandle = TooltipPrimitive.createHandle
+
+export { Tooltip, TooltipTrigger, TooltipContent, TooltipProvider, createTooltipHandle }

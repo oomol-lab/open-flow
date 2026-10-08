@@ -13,6 +13,12 @@
   color: var(--ui-foreground);
 }
 
+.list[data-action-slots='2'] {
+  --field-actions-width: 58px;
+  --field-table-actions-gap: 4px;
+  --field-action-pair-gap: 2px;
+}
+
 .columns {
   @include fieldLayout.columns;
   @container value-fields (max-width: #{fieldLayout.$wrap-width}) {

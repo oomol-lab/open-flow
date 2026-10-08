@@ -809,12 +809,12 @@ export class WorkspaceStore {
     return this.#client.loadOpenApiDocument(url, signal)
   }
 
-  public async saveTaskSettings(nodeId: string, settings: TaskSettings): Promise<boolean> {
+  public async saveTaskSettings(nodeId: string, settings: TaskSettings, deletion?: PropertyDeletion): Promise<boolean> {
     const revision = this.$.revision.value
     const target = this.#model.value.target
     if (revision == null || target == null) return false
     const changes = updateTask(revision, target, nodeId, settings)
-    return changes != null && (await this.#editDraft(changes)) != null
+    return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
   public async saveTaskPorts(

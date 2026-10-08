@@ -115,3 +115,9 @@ const openapi = await import('@oomol-lab/open-flow/openapi')
 assert.deepEqual(openapi.listOperations({ openapi: '3.1.0', paths: { '/items': { get: { summary: 'List items', responses: {} } } } }), [
   { method: 'get', path: '/items', label: 'List items', tag: '' },
 ])
+
+const decision = await import('@oomol-lab/open-flow/decision')
+assert.deepEqual(
+  decision.decisionAnswers([{ name: 'result', type: 'noul', instructions: 'Is it true?' }], { answers: { result: { type: 'noul', noul: 0.8 } } }),
+  { result: { type: 'noul', noul: 0.8 } },
+)

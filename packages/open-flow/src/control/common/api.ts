@@ -579,6 +579,7 @@ export function decodeRunEvent(value: unknown) {
             nodeKind !== 'condition' &&
             nodeKind !== 'connector' &&
             nodeKind !== 'javascript' &&
+            nodeKind !== 'decision' &&
             nodeKind !== 'openapi' &&
             nodeKind !== 'llm' &&
             nodeKind !== 'agent' &&

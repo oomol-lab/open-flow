@@ -31,7 +31,7 @@ export class RunControl {
   private readonly abortRun: (runId: string) => void
   private readonly wake: () => void
   private readonly flowChanged: (event: FlowChangeEvent) => void
-  private readonly llmAvailable: (kind?: 'agent') => boolean
+  private readonly llmAvailable: (kind?: 'agent' | 'decision') => boolean
   private readonly resolveConnector: () => ConnectorHost | undefined
   private readonly connectorAccess: ConnectorAccessHost
   private readonly resolveWaitPublicOrigin: () => URL | undefined
@@ -42,7 +42,7 @@ export class RunControl {
     abortRun: (runId: string) => void,
     wake: () => void,
     flowChanged: (event: FlowChangeEvent) => void,
-    llmAvailable: (kind?: 'agent') => boolean,
+    llmAvailable: (kind?: 'agent' | 'decision') => boolean,
     resolveConnector: () => ConnectorHost | undefined,
     connectorAccess: ConnectorAccessHost,
     resolveWaitPublicOrigin: () => URL | undefined,
@@ -348,6 +348,8 @@ export class RunControl {
   ): Promise<void> {
     if (Object.values(prepared.tasks).some((task) => task.executor.kind == 'agent') && !this.llmAvailable('agent'))
       throw new ControlError(controlErrorCode.flowInvalid, 'Agent requires a configured model host.')
+    if (Object.values(prepared.tasks).some((task) => task.executor.kind == 'decision') && !this.llmAvailable('decision'))
+      throw new ControlError(controlErrorCode.flowInvalid, 'AI Decision requires a configured decision host.')
     const teamId = this.store.connectorTeams.get(flowId)
     await checkCodeActions(agentActions(prepared), this.resolveConnector(), {
       flowId,

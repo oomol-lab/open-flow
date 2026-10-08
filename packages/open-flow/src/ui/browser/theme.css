@@ -87,6 +87,7 @@
 
 .open-flow-property-panel {
   --ui-control-radius: 6px;
+  --ui-textarea-font-size: 12px;
   --ui-disabled-opacity: 1;
   --ui-disabled-cursor: default;
   --ui-disabled-background: var(--ui-control-background);

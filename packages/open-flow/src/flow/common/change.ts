@@ -215,6 +215,7 @@ export interface ConditionNode extends GraphNodeBase {
 }
 
 export type ManagedTaskExecutor =
+  | import('../../decision/common/decision.ts').DecisionExecutor
   | import('../../openapi/common/openapi.ts').OpenApiExecutor
   | { readonly kind: 'connector'; readonly action: string; readonly connectionId?: string }
   | { readonly kind: 'llm'; readonly mode: 'chat' | 'json' }
@@ -671,6 +672,7 @@ export type ChangeOperation =
   | { readonly kind: 'task.delete'; readonly taskId: string }
   | { readonly before: ManagedTaskDefinition; readonly kind: 'task.openapi.set'; readonly taskId: string; readonly value: ManagedTaskDefinition }
   | { readonly before: ManagedTaskDefinition; readonly kind: 'task.agent.set'; readonly taskId: string; readonly value: ManagedTaskDefinition }
+  | { readonly before: ManagedTaskDefinition; readonly kind: 'task.decision.set'; readonly taskId: string; readonly value: ManagedTaskDefinition }
   | { readonly before: 'chat' | 'json'; readonly kind: 'task.llm.mode.set'; readonly taskId: string; readonly value: 'chat' | 'json' }
   | { readonly before: string; readonly kind: 'task.name.set'; readonly taskId: string; readonly value: string }
 
@@ -999,6 +1001,13 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         const tasks = { ...document.tasks }
         delete tasks[operation.taskId]
         document.tasks = tasks
+        break
+      }
+      case 'task.decision.set': {
+        const task = document.tasks[operation.taskId]
+        if (task?.executor.kind != 'decision' || operation.value.executor.kind != 'decision') invalid('The AI Decision Task does not exist.')
+        if (!dequal(task, operation.before)) invalid('The AI Decision Task changed before this operation was applied.')
+        document.tasks = { ...document.tasks, [operation.taskId]: operation.value }
         break
       }
       case 'task.openapi.set': {

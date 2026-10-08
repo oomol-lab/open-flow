@@ -7,7 +7,7 @@ $wrap-width: 340px;
   --field-type-track: minmax(64px, 0.48fr);
   --field-value-track: minmax(0, 1.5fr);
   --field-name-gap: 4px;
-  --field-actions-gap: 4px;
+  --field-actions-gap: var(--field-table-actions-gap, 4px);
   --field-name-type-gap: 4px;
   --field-type-value-gap: 4px;
   --field-value-prefix-gap: 8px;
@@ -53,7 +53,7 @@ $wrap-width: 340px;
     --field-value-track: minmax(0, 1fr);
     --field-type-track: var(--field-type-width, 56px);
     --field-name-gap: var(--field-value-name-gap, 2px);
-    --field-actions-gap: 2px;
+    --field-actions-gap: var(--field-table-actions-gap, 2px);
   }
   &[data-output] {
     grid-template-columns:

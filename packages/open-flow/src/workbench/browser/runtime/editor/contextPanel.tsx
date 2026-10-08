@@ -99,6 +99,8 @@ export function ContextPanel({
     const current = panel.current
     if (current == null || !(event.target instanceof Node) || !current.contains(event.target)) return
     if (event.key == 'Escape') {
+      // The child popup handles Escape after this native panel listener bubbles.
+      if (event.target instanceof Element && event.target.closest('[data-popup-open]') != null) return
       event.preventDefault()
       event.stopPropagation()
       onClose()

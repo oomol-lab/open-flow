@@ -19,6 +19,8 @@ the [property panel entry](property-panel.md) for shared scope.
   story. Compare typography, control height, column edges, indentation, connector endpoints, and
   surrounding spacing. Check both themes when changing shared colors. Use the actual product when
   the relevant integration cannot be represented by the story.
+- Escape on an open popup trigger closes the popup before the property panel. Once the popup is
+  closed, Escape retains the panel's normal close behavior.
 - Do not claim visual or interaction verification from source inspection or static checks alone.
 
 ## Geometry and surfaces
@@ -50,6 +52,8 @@ the [property panel entry](property-panel.md) for shared scope.
   control-size and `--ui-control-radius` conventions instead of independently sizing each control.
   Collection add actions match adjacent field typography and height; copying an Options button's
   appearance is insufficient if the surrounding row uses different geometry.
+- Property-panel textareas default to 12px through `--ui-textarea-font-size`; shared textareas outside
+  the panel retain the product font-size default.
 - Property panels use the node outer-surface token; input controls use the node content-surface
   token. Theme values belong to `src/ui/browser/theme.css`. Keep control borders quiet and avoid
   introducing local shades to compensate for a mismatch in the shared state styling.

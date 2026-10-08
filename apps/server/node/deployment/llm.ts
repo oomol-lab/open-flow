@@ -1,6 +1,7 @@
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
-import type { InvokeLlmTask, LlmTaskResult } from '@oomol-lab/open-flow/runtime-contract'
+import type { InvokeDecisionTask, InvokeLlmTask, LlmTaskResult } from '@oomol-lab/open-flow/runtime-contract'
 
+import { decisionAnswers, decisionRequest } from '@oomol-lab/open-flow/decision'
 import { renderPrompt } from '@oomol-lab/open-flow/flow-semantics'
 
 export interface LlmConfig {
@@ -8,7 +9,7 @@ export interface LlmConfig {
   readonly token: string
 }
 
-export type LlmHost = InvokeLlmTask & { readonly config?: LlmConfig }
+export type LlmHost = InvokeLlmTask & { readonly config?: LlmConfig; readonly decision?: InvokeDecisionTask }
 
 const defaultModel = 'oomol-chat'
 
@@ -26,7 +27,10 @@ export function createLlm(origin: string, token: string): LlmHost {
     throw new Error('OPEN_FLOW_LLM_ORIGIN must be an HTTPS origin without credentials, a path, query, or fragment, except on loopback.')
   }
   if (token.length == 0) throw new Error('OPEN_FLOW_LLM_TOKEN must not be empty.')
-  return Object.assign(invokeLlm(new URL('v1/', url), token), { config: { origin: url.origin, token } })
+  return Object.assign(invokeLlm(new URL('v1/', url), token), {
+    config: { origin: url.origin, token },
+    decision: invokeDecision(new URL('v1/systemone', url), token),
+  })
 }
 
 export function oomolLlm(connectorOrigin: string | undefined, token: string | undefined): LlmHost | undefined {
@@ -120,4 +124,35 @@ function chatMessages(value: unknown, transform: (content: string) => string): r
 
 function unavailable(): LlmTaskResult {
   return { code: 'llm.unavailable', kind: 'failed', message: 'The LLM request could not be completed.', version: 1 }
+}
+
+function invokeDecision(url: URL, token: string): InvokeDecisionTask {
+  return async ({ questions, state, signal }) => {
+    let body: JsonValue
+    try {
+      body = decisionRequest(questions, state)
+    } catch (error) {
+      if (error instanceof TypeError) return { code: 'llm.unavailable', kind: 'failed', message: error.message, version: 1 }
+      throw error
+    }
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: { 'authorization': `Bearer ${token}`, 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+        redirect: 'error',
+        signal,
+      })
+      if (!response.ok) return unavailable()
+      try {
+        return { kind: 'completed', value: decisionAnswers(questions, await response.json()), version: 1 }
+      } catch {
+        if (signal.aborted) throw signal.reason
+        return { code: 'llm.output-invalid', kind: 'failed', message: 'The model returned invalid decision answers.', version: 1 }
+      }
+    } catch {
+      if (signal.aborted) throw signal.reason
+      return unavailable()
+    }
+  }
 }

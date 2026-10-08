@@ -54,6 +54,7 @@
     "./trigger-locales-plugin": "./src/build/node/triggerLocales.ts",
     "./preview": "./src/workbench/browser/runtime/openFlowPreview.tsx",
     "./preview.css": "./src/workbench/browser/runtime/preview.css",
+    "./decision": "./src/decision/common/decision.ts",
     "./openapi": "./src/openapi/common/openapi.ts"
   },
   "scripts": {

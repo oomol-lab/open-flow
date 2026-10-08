@@ -27,6 +27,7 @@ import { FieldRow, FieldBody } from './fieldLayout.tsx'
 import { FieldSelect } from './fieldSelect.tsx'
 import { FieldSorting } from './fieldSorting.ts'
 import { FieldTypeAddon } from './fieldTypeAddon.tsx'
+import { FieldValuePreview } from './fieldValuePreview.tsx'
 import { JsonEditor } from './jsonEditor.tsx'
 import { useFieldExpansion } from './useFieldExpansion.ts'
 import { useValueIssues } from './useValueIssues.ts'
@@ -523,21 +524,21 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
         </div>
       )}
       {compactValue && expandable && (
-        <Button
-          type="button"
-          variant="disclosure"
-          size="field"
-          className={styles.summary}
-          data-value-preview
+        <FieldValuePreview
+          empty={value === ''}
           hidden={inlineExpansion && hasExpandedContent && expanded}
           data-field-prompt={summaryInvalid || undefined}
           data-readonly={disabled || undefined}
-          data-field-control
           disabled={sorting || (!hasExpandedContent && !createValue) || (needsCreation && !createValue)}
           aria-label={`${label} ${t('valueEditor.setValue')}`}
           aria-expanded={needsCreation || !hasExpandedContent ? undefined : expanded}
           aria-invalid={summaryInvalid}
           aria-controls={`${id}-body`}
+          trailing={
+            !inlineExpansion && props.header == null && hasExpandedContent && !needsCreation ? (
+              <SelectChevron className={expanded ? 'rotate-180' : undefined} />
+            ) : undefined
+          }
           onClick={
             needsCreation
               ? () => {
@@ -547,23 +548,18 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
               : toggleExpanded
           }
         >
-          <span className={styles.summaryText} data-empty-string={value === '' || undefined}>
-            {state.display === 'null'
-              ? 'null'
-              : presence === 'unset'
-                ? t('valueEditor.unset')
-                : structured
-                  ? JSON.stringify(value)
-                  : typeof value === 'string'
-                    ? value === ''
-                      ? t('valueEditor.emptyStringValue')
-                      : value
-                    : JSON.stringify(value)}
-          </span>
-          {!inlineExpansion && props.header == null && hasExpandedContent && !needsCreation && (
-            <SelectChevron className={expanded ? 'rotate-180' : undefined} />
-          )}
-        </Button>
+          {state.display === 'null'
+            ? 'null'
+            : presence === 'unset'
+              ? t('valueEditor.unset')
+              : structured
+                ? JSON.stringify(value)
+                : typeof value === 'string'
+                  ? value === ''
+                    ? t('valueEditor.emptyStringValue')
+                    : value
+                  : JSON.stringify(value)}
+        </FieldValuePreview>
       )}
       {(!expandable || inlineExpansion) && body}
       <ValueTools

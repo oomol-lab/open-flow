@@ -26,6 +26,7 @@ import {
   createCodeTask,
   createBuiltinTrigger,
   createCondition,
+  createDecisionTask,
   createLlmTask,
   createManagedTask,
   createProviderTrigger,
@@ -67,6 +68,7 @@ interface TaskSettingsBase {
 }
 
 export type TaskSettings =
+  | (TaskSettingsBase & { readonly kind: 'decision'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'openapi'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'agent'; readonly before: ManagedTaskDefinition; readonly task: ManagedTaskDefinition })
   | (TaskSettingsBase & { readonly kind: 'code' })
@@ -82,6 +84,7 @@ export interface SubflowSettings {
 }
 
 export type AddNodeIntent =
+  | { readonly kind: 'decision'; readonly name: string }
   | { readonly kind: 'openapi'; readonly name: string }
   | { readonly kind: 'agent'; readonly name: string; readonly prompt?: string; readonly outputDescription?: string }
   | { readonly kind: 'approval'; readonly name: string }
@@ -164,6 +167,9 @@ export function nameCreatedNodes(revision: RevisionView, target: GraphTarget, ch
 export function addNode(revision: RevisionView, target: GraphTarget, nodeId: string, intent: AddNodeIntent, identity: () => string): FlowChanges | undefined {
   let changes: FlowChanges | undefined
   switch (intent.kind) {
+    case 'decision':
+      changes = createDecisionTask(target, { nodeId, taskId: identity() }, intent.name)
+      break
     case 'openapi':
       changes = createManagedTask(
         target,
@@ -361,6 +367,22 @@ export function updateTask(revision: RevisionView, target: GraphTarget, nodeId: 
   const node = revision.graph(target)?.nodes[nodeId]
   if (node?.kind != 'task') return
   switch (settings.kind) {
+    case 'decision': {
+      if (node.taskId == null || !dequal(revision.task(node.taskId), settings.before)) return
+      const changes: ChangeOperation[] = []
+      const document = revision.revision.content.document
+      const targets: GraphTarget[] = [{ kind: 'flow' }, ...Object.keys(document.subflows).map((subflowId) => ({ kind: 'subflow' as const, id: subflowId }))]
+      for (const graphTarget of targets) {
+        const instance = Object.entries(revision.graph(graphTarget)!.nodes).find(
+          ([, candidate]) => candidate.kind === 'task' && candidate.taskId === node.taskId,
+        )
+        if (instance == null) continue
+        changes.push(...(replaceTaskPorts(revision, graphTarget, instance[0], settings.task) ?? []).filter((change) => change.kind !== 'task.decision.set'))
+      }
+      if (!dequal(settings.before, settings.task))
+        changes.push({ kind: 'task.decision.set', taskId: node.taskId, before: settings.before, value: settings.task })
+      return changes
+    }
     case 'openapi': {
       if (node.taskId == null || !dequal(revision.task(node.taskId), settings.before)) return
       return [{ kind: 'task.openapi.set', taskId: node.taskId, before: settings.before, value: settings.task }]
@@ -572,13 +594,18 @@ function replaceTaskPorts(
   if (graph == null || current?.kind != 'task') return
   const previous = current.task ?? revision.task(current.taskId)
   if (previous == null) return
+  const instances = new Set(
+    current.task == null && 'executor' in task && task.executor.kind === 'decision'
+      ? Object.entries(graph.nodes).flatMap(([id, node]) => (node.kind === 'task' && node.taskId === current.taskId ? [id] : []))
+      : [nodeId],
+  )
   const inputRename = renamedPort(previous.inputs, task.inputs)
   const outputRename = renamedPort(previous.outputs, task.outputs)
   const inputNames = new Set(task.inputs.flatMap((port) => ('handle' in port ? [port.handle] : [])))
   const outputNames = new Set(task.outputs.flatMap((port) => ('handle' in port ? [port.handle] : [])))
   const changes: ChangeOperation[] = []
   for (const edge of graph.edges) {
-    if (edge.source != nodeId || edge.sourceHandle == null) continue
+    if (!instances.has(edge.source) || edge.sourceHandle == null) continue
     const renamed = outputRename != null && edge.sourceHandle == outputRename[0] ? outputRename[1] : edge.sourceHandle
     if (renamed == edge.sourceHandle && outputNames.has(renamed)) continue
     changes.push({ kind: 'graph.edge.disconnect', edge, target })
@@ -593,7 +620,7 @@ function replaceTaskPorts(
     for (const [name, mapping] of Object.entries(inputs)) {
       if (mapping.kind != 'sources') continue
       const sources = mapping.sources.map((source) => {
-        if (source.kind != 'node' || source.nodeId != nodeId) return source
+        if (source.kind != 'node' || !instances.has(source.nodeId)) return source
         if (outputRename != null && source.output == outputRename[0]) return { ...source, output: outputRename[1] }
         return source
       })
@@ -611,6 +638,18 @@ function replaceTaskPorts(
     }
     changes.push(...changedInputs(nodeInputMappings(node), inputs, target, currentNodeId))
   }
+  if (target.kind === 'subflow' && outputRename != null) {
+    const { graph: _graph, ...before } = revision.revision.content.document.subflows[target.id]!
+    const outputs = before.outputs.map((output) => ({
+      ...output,
+      sources: output.sources.map((source) =>
+        source.kind === 'node' && instances.has(source.nodeId) && source.output === outputRename[0] ? { ...source, output: outputRename[1] } : source,
+      ),
+    }))
+    if (!dequal(outputs, before.outputs)) changes.push({ kind: 'subflow.definition.set', subflowId: target.id, before, definition: { ...before, outputs } })
+  }
+  if (current.task == null && 'executor' in task && task.executor.kind == 'decision' && 'executor' in previous && !dequal(previous, task))
+    changes.unshift({ kind: 'task.decision.set', taskId: current.taskId, before: previous, value: task })
   if (current.task == null && 'executor' in task && task.executor.kind == 'agent' && 'executor' in previous) {
     const config = task.executor
     const source = <Value extends AgentInput>(

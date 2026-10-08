@@ -1,7 +1,8 @@
 import type { ManagedTaskExecutor } from '../../../../flow/common/change.ts'
 
 import { describe, expect, it, vi } from 'vitest'
-import { AgentChanges, agentFixedValuesValid } from './agentChanges.ts'
+import { agentFixedValuesValid } from './agentChanges.ts'
+import { TaskExecutorChanges } from './taskExecutorChanges.ts'
 
 const initial: ManagedTaskExecutor = { kind: 'agent', model: 'test', prompt: '', maxRounds: 10, tools: [] }
 
@@ -17,7 +18,7 @@ describe('Agent automatic saving', () => {
           }),
       )
       .mockResolvedValue(true)
-    const changes = new AgentChanges(initial, write)
+    const changes = new TaskExecutorChanges(initial, write)
     const first = { ...initial, model: 'first' }
     const second = { ...initial, model: 'second' }
     const unfinished = { ...initial, model: 'typing' }
@@ -33,12 +34,12 @@ describe('Agent automatic saving', () => {
     finish(true)
     expect(await saved).toBe(true)
     expect(write.mock.calls).toEqual([
-      [initial, first],
-      [first, second],
+      [initial, first, undefined],
+      [first, second, undefined],
     ])
     expect(changes.value).toEqual(unfinished)
     await changes.save()
-    expect(write).toHaveBeenLastCalledWith(second, unfinished)
+    expect(write).toHaveBeenLastCalledWith(second, unfinished, undefined)
   })
 
   it.each(['conflict', 'network'])('keeps edits after a %s failure and retries only when requested', async (failure) => {
@@ -46,7 +47,7 @@ describe('Agent automatic saving', () => {
     if (failure == 'network') write.mockRejectedValueOnce(new Error('offline'))
     else write.mockResolvedValueOnce(false)
     write.mockResolvedValue(true)
-    const changes = new AgentChanges(initial, write)
+    const changes = new TaskExecutorChanges(initial, write)
     const edited = { ...initial, prompt: 'Keep this text' }
     changes.value = edited
     if (failure == 'network') await expect(changes.save()).rejects.toThrow('offline')
@@ -55,7 +56,7 @@ describe('Agent automatic saving', () => {
     expect(changes.value).toEqual(edited)
     expect(write).toHaveBeenCalledTimes(1)
     expect(await changes.save()).toBe(true)
-    expect(write).toHaveBeenLastCalledWith(initial, edited)
+    expect(write).toHaveBeenLastCalledWith(initial, edited, undefined)
   })
 
   it('preserves prompt, tools and advanced settings across queued saves', async () => {
@@ -69,7 +70,7 @@ describe('Agent automatic saving', () => {
           }),
       )
       .mockResolvedValue(true)
-    const changes = new AgentChanges(initial, write)
+    const changes = new TaskExecutorChanges(initial, write)
     changes.value = { ...initial, prompt: 'Summarize {{request}}' }
     const first = changes.save()
     if (changes.value.kind != 'agent') throw new Error('Expected Agent')
@@ -82,22 +83,22 @@ describe('Agent automatic saving', () => {
     void changes.save()
     finish(true)
     expect(await first).toBe(true)
-    expect(write).toHaveBeenLastCalledWith({ ...initial, prompt: 'Summarize {{request}}' }, changes.value)
+    expect(write).toHaveBeenLastCalledWith({ ...initial, prompt: 'Summarize {{request}}' }, changes.value, undefined)
     expect(changes.value).toMatchObject({ prompt: 'Summarize {{request}}', code: true, maxRounds: 5, tools: [{ id: 'lookup' }] })
   })
 
   it('does not drop an edit immediately after an unchanged blur', async () => {
     const write = vi.fn().mockResolvedValue(true)
-    const changes = new AgentChanges(initial, write)
+    const changes = new TaskExecutorChanges(initial, write)
     void changes.save()
     changes.value = { ...initial, model: 'changed' }
     await changes.save()
-    expect(write).toHaveBeenCalledWith(initial, changes.value)
+    expect(write).toHaveBeenCalledWith(initial, changes.value, undefined)
   })
 
   it('does not write unchanged values and accepts external changes when clean', async () => {
     const write = vi.fn().mockResolvedValue(true)
-    const changes = new AgentChanges(initial, write)
+    const changes = new TaskExecutorChanges(initial, write)
     await changes.save()
     changes.sync({ ...initial, model: 'remote' })
     await changes.save()

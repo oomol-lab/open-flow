@@ -34,6 +34,7 @@ function createManifest(version: string): object {
       '.': {
         types: './dist/index.d.ts',
       },
+      './decision': { types: './dist/common/decision.d.ts', import: './dist/common/decision.js' },
       './openapi': { types: './dist/common/openapi.d.ts', import: './dist/common/openapi.js' },
       './connector-action': {
         types: './dist/common/connector-action.d.ts',

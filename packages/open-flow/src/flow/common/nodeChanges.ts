@@ -1,3 +1,4 @@
+import type { DecisionQuestion } from '../../decision/common/decision.ts'
 import type {
   ChangeOperation,
   CodeModule,
@@ -18,6 +19,7 @@ import type {
 } from './change.ts'
 
 import { dequal } from 'dequal/lite'
+import { decisionTask } from '../../decision/common/decision.ts'
 import { applyFlowChanges, nextNodeName, normalizeNodeName } from './change.ts'
 import { codeSharedPermissionsEnabled } from './codePermissions.ts'
 import { nodeInputMappings } from './condition.ts'
@@ -624,4 +626,13 @@ export function setCodeActions(
   const node = selected?.nodes[nodeId]
   if (node?.kind != 'task' || node.task == null || dequal(node.task.capabilities ?? [], capabilities)) return
   return [{ kind: 'graph.node.task.capabilities.set', target, nodeId, before: node.task.capabilities, value: capabilities }]
+}
+
+export function createDecisionTask(
+  target: GraphTarget,
+  identity: { readonly nodeId: string; readonly taskId: string },
+  name = 'AI Decision',
+  questions?: readonly DecisionQuestion[],
+): readonly ChangeOperation[] {
+  return createManagedTask(target, identity, decisionTask(questions, name))
 }

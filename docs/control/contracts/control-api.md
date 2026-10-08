@@ -464,7 +464,7 @@ Run list 按 `createdAt`、`runId` 逆序稳定分页。查询可按单个 `stat
 
 Node context 固定为 `{ flowId, scopeId, nodeId, executionId }`，各 identity 为非空字符串。
 `progress` 为 0–100 的有限数值；Artifact `size` 为非负安全整数，`digest` 为 `sha256:` 加 64 位小写十六进制。
-`nodeKind` 为 `agent / condition / connector / javascript / llm / subflow / value / wait`。
+`nodeKind` 为 `agent / approval / condition / connector / decision / javascript / openapi / llm / subflow / value / wait`。
 Runtime projector 不接受旧的 `node.cache-hit`、`node.preview` 或 `run.output` 事件。
 
 等待登记、整图冻结和决议分别追加事件：
@@ -1283,3 +1283,26 @@ Managed Task 新增 `executor.kind: "openapi"`，包含 `sourceUrl`、`method`�
 首版支持 simple path/header 和 form query 参数编码、文档内部引用和 JSON body；外部引用、二进制、流式响应、其它参数编码与 OAuth 登录不支持。
 请求运行最多等待 30 秒（同时受节点与 Run 的更短期限约束），响应上限 4 MiB，不自动重试或重定向。非 2xx、未声明的状态或媒体类型、Schema 不匹配均使节点失败。
 无响应体为 `null`，响应头不包含 `set-cookie`。文档与 API 请求不转发 Operator 凭证；API 鉴权不用于读取文档。
+
+### AI Decision
+
+Managed Task 的 `executor.kind: "decision"` 保存有序 `questions` 数组。每个问题含 `name`（唯一输出名称）、
+`instructions`（纯文本）和 `type`；`noul` 可选 `criteria: { true?: string, false?: string }`，
+`choice` 使用 `criteria: { name: string, description: string }[]`，`score` 使用有序 `criteria: string[]`。
+至少一个问题，问题总数不设上限；Choice 使用前 255 个类别，Score 使用前 10 个等级，均按配置顺序截取。
+加载、Schema 派生、校验和运行共用这一规则，超出部分忽略；UI 达到对应上限时禁用添加按钮，删除后恢复。
+有效范围内仍要求 Choice 至少一个且名称唯一，Score 至少两个非空等级。未完成配置可保存草稿，不能运行或发布。
+
+固定输入 `target` 接受非 null 的文本、对象或数组，支持普通输入来源绑定。输入与输出定义由公共 `decisionTask` 派生，
+不能独立更改。每个问题的同名端口保留完整答案：Noul 的 `type/noul`，Choice 的
+`type/choice/probabilities/confidence`，Score 的 `type/score/legend/probabilities/confidence`。
+不增加 `answers` 包装，不自动转换布尔值或选择执行分支。Condition 可通过既有一级字段 Source 引用判断结果。
+
+`task.decision.set` 使用完整 `before/value` Task 进行并发校验与原子替换，支持撤销重做。
+`@oomol-lab/open-flow/decision` 导出问题类型、Task/Schema 派生、配置校验及请求响应转换；
+`flow-authoring` 导出 `createDecisionTask`，authoring example 名称为 `decision`。
+`node.started.nodeKind` 增加 `decision`。
+
+部署通过 LLM host 的可选 `decision` 方法调用 `/v1/systemone`，复用部署 origin/token，固定模型 `typesafe/jev`。
+节点的 `target` 映射为网关请求的 `state`。所有问题使用相同待判断内容，在单次请求中独立判断。不支持提示词插值、问题间依赖或输入数组逐项遍历。
+答案缺失、类型或范围错误导致整个节点失败，不产生部分输出。调用遵守节点取消与超时，未配置能力时拒绝准入。

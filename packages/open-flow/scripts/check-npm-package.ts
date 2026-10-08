@@ -69,6 +69,8 @@ for (const expected of [
   'package/dist/browser/workbench.css.d.ts',
   'package/dist/browser/workbench.d.ts',
   'package/dist/browser/workbench.js',
+  'package/dist/common/decision.d.ts',
+  'package/dist/common/decision.js',
   'package/dist/common/openapi.d.ts',
   'package/dist/common/openapi.js',
   'package/dist/common/connector-action.d.ts',
@@ -163,6 +165,7 @@ assert.deepEqual(packedManifest.repository, {
 })
 assert.deepEqual(packedManifest.exports, {
   '.': { types: './dist/index.d.ts' },
+  './decision': { import: './dist/common/decision.js', types: './dist/common/decision.d.ts' },
   './openapi': { import: './dist/common/openapi.js', types: './dist/common/openapi.d.ts' },
   './connector-action': {
     import: './dist/common/connector-action.js',
@@ -331,6 +334,8 @@ async function verifyConsumer(): Promise<void> {
       consumerPath,
       [
         "import type { ConnectorAction, ControlErrorCode } from '@oomol-lab/open-flow/control-api'",
+        "import type { DecisionExecutor } from '@oomol-lab/open-flow/decision'",
+        "export const decisionKind: DecisionExecutor['kind'] = 'decision'",
         "import type { OpenApiExecutor } from '@oomol-lab/open-flow/openapi'",
         "export const openApiKind: OpenApiExecutor['kind'] = 'openapi'",
         "import { connectorActionPorts } from '@oomol-lab/open-flow/connector-action'",

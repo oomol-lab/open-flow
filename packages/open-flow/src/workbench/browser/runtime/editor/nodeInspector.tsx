@@ -16,16 +16,24 @@ import type { InputVariables, NodeInputUpstreamSources } from './sourceValueEdit
 
 import { useEffect, useRef } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { decisionModel } from '../../../../decision/common/decision.ts'
 import { nodeInputMappings } from '../../../../flow/common/condition.ts'
 import { inputValue } from '../../../../flow/common/inputValue.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
+import { Input } from '../../../../ui/browser/input.tsx'
 import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
 import { AgentSettingsProvider, AgentPrompt, AgentAdvancedSettings } from './agentSettings.tsx'
-import { presentBuiltInOutputDescription, presentBuiltInSourceCandidates, presentResolutionOutputs } from './builtInOutputPresentation.ts'
+import {
+  presentBuiltInOutputDescription,
+  presentBuiltInSourceCandidates,
+  presentDecisionOutputs,
+  presentResolutionOutputs,
+} from './builtInOutputPresentation.ts'
 import { CodeTaskSection } from './codeTaskSection.tsx'
 import { ConditionBranchesEditor } from './conditionBranchesEditor.tsx'
 import { ConnectorAccount, TriggerConnection, SavedConnectionReference } from './connectionSettings.tsx'
+import { DecisionSection } from './decisionSection.tsx'
 import { ErrorTriggerSources, ErrorTriggerSourcesEditor } from './errorTriggerSources.tsx'
 import { FeishuTriggerConfig } from './feishuTriggerConfig.tsx'
 import { GeneralSettings } from './generalSettings.tsx'
@@ -52,6 +60,7 @@ export function inspectorIcon(node: ResolvedSelection | undefined, target: Graph
   if (node?.kind == 'wait') return 'wait'
   if (node?.kind == 'subflow' || (node == null && target.kind == 'subflow')) return 'subflow'
   if (node?.kind == 'task' && node.definition != null && 'executor' in node.definition) {
+    if (node.definition.executor.kind == 'decision') return 'decision'
     if (node.definition.executor.kind == 'openapi') return 'task'
     return node.definition.executor.kind == 'connector' ? 'connection' : 'llm'
   }
@@ -98,6 +107,8 @@ function nodePurposePlaceholder(
       switch (definition.executor.kind) {
         case 'agent':
           return t('addNode.agentDescription')
+        case 'decision':
+          return t('decision.description')
         case 'openapi':
           return t('openapi.description')
         case 'connector':
@@ -261,6 +272,7 @@ export function NodeInspector({
   const content = useRef<HTMLDivElement>(null)
   const task = selection?.kind == 'task' ? selection.definition : undefined
   const isAgent = task != null && 'executor' in task && task.executor.kind == 'agent'
+  const isDecision = task != null && 'executor' in task && task.executor.kind == 'decision'
   const isOpenApi = task != null && 'executor' in task && task.executor.kind == 'openapi'
   const unconfiguredOpenApi = task != null && 'executor' in task && task.executor.kind == 'openapi' && !task.executor.path
   const isLlm = task != null && 'executor' in task && task.executor.kind == 'llm'
@@ -442,6 +454,16 @@ export function NodeInspector({
             }}
           />
         )}
+        {selection?.kind === 'task' && task != null && 'executor' in task && task.executor.kind === 'decision' && (
+          <DecisionSection
+            key={`decision:${selection.id}`}
+            task={task}
+            disabled={disabled}
+            onSave={(before, value, deletion) =>
+              store?.saveTaskSettings(selection.id, { kind: 'decision', name: task.name, before, task: value }, deletion) ?? Promise.resolve(false)
+            }
+          />
+        )}
         {isOpenApi && task != null && 'executor' in task && (
           <OpenApiSection
             key={`openapi:${selection?.id}`}
@@ -525,6 +547,15 @@ export function NodeInspector({
               .filter((definition) => !isOpenApi || !('handle' in definition) || !definition.handle.startsWith('auth.'))
               .map((definition): Group | NodeInputField => {
                 if ('group' in definition) return definition
+                if (
+                  selection.kind === 'task' &&
+                  selection.definition != null &&
+                  'executor' in selection.definition &&
+                  selection.definition.executor.kind === 'decision' &&
+                  definition.handle === 'target'
+                ) {
+                  definition = { ...definition, description: t('decision.targetDescription') }
+                }
                 const mapping = selection.node.inputs[definition.handle]
                 const source = mapping?.kind === 'sources' ? mapping.sources.find((item) => item.kind === 'binding') : undefined
                 const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
@@ -668,7 +699,7 @@ export function NodeInspector({
               layout="ports"
               title={t('inspector.ports.outputsTitle')}
               output
-              values={selection.definition.outputs}
+              values={presentDecisionOutputs(selection.definition, t)}
               disabled={disabled || !(selection.node.task != null || isAgent)}
               onChange={(outputs, deletion) => {
                 void store?.saveTaskPorts(selection.id, { inputs: selection.definition!.inputs, outputs }, deletion)
@@ -706,13 +737,19 @@ export function NodeInspector({
                   {isLlm && <LlmTaskSection selection={selection} disabled={disabled} store={store} />}
                   <GeneralSettings
                     readOnly={readOnly}
-                    title={isAgent ? t('agent.more') : undefined}
+                    title={isAgent || isDecision ? t('agent.more') : undefined}
                     disabled={disabled}
                     node={selection.node}
                     nodeId={selection.id}
                     store={store}
                   >
                     {isAgent && <AgentAdvancedSettings />}
+                    {isDecision && (
+                      <Field>
+                        <FieldLabel htmlFor={`${selection.id}-model`}>{t('agent.model')}</FieldLabel>
+                        <Input id={`${selection.id}-model`} readOnly value={decisionModel} />
+                      </Field>
+                    )}
                   </GeneralSettings>
                 </>
               )

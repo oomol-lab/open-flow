@@ -36,6 +36,8 @@ export const FieldRow = forwardRef<
       label: string
       sorting?: boolean
       disclosureInvalid?: boolean
+      /** Groups of independent controls stay in the panel stacking context. */
+      stacking?: 'editor' | 'fields'
     }
 >(
   (
@@ -54,6 +56,7 @@ export const FieldRow = forwardRef<
       label,
       sorting,
       disclosureInvalid,
+      stacking = 'editor',
       children,
       style,
       className,
@@ -68,6 +71,7 @@ export const FieldRow = forwardRef<
         {...props}
         ref={ref}
         className={[styles.root, className].filter(Boolean).join(' ')}
+        data-stacking={stacking}
         data-layout={layout ?? geometry.layout}
         data-header={header != null || undefined}
         data-nested-field={level > 0 || undefined}

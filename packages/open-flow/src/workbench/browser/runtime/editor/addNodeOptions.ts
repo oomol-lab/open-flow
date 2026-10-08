@@ -5,6 +5,7 @@ import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { RevisionView } from '../revisionView.ts'
 import type { AddNodeIntent } from './flowChanges.ts'
 
+import { decisionTask } from '../../../../decision/common/decision.ts'
 import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
 import { revisionView } from '../revisionView.ts'
 
@@ -53,6 +54,7 @@ export type AddNodeOption = AddNodeOptionBase &
         readonly noSetup?: boolean
         readonly serviceId: string
       }
+    | { readonly kind: 'decision' }
     | { readonly kind: 'agent' }
     | { readonly kind: 'openapi' }
     | { readonly kind: 'llm' }
@@ -99,6 +101,16 @@ function builtinOptions(t: TFunction): readonly AddNodeOption[] {
       outputs: [{ handle: 'output', jsonSchema: { type: 'string' } }],
       kind: 'agent',
       label: t('addNode.agent'),
+    },
+    {
+      description: t('decision.description'),
+      group,
+      id: 'decision',
+      icon: ':lucide-light:brain-circuit:',
+      kind: 'decision',
+      label: 'AI Decision',
+      inputs: decisionTask().inputs.filter((port) => 'handle' in port),
+      outputs: decisionTask().outputs.filter((port) => 'handle' in port),
     },
     { description: t('openapi.description'), group, icon: ':logos:openapi-icon:', id: 'openapi', inputs: [], outputs: [], kind: 'openapi', label: 'OpenAPI' },
     {
@@ -233,6 +245,8 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, tar
             outputDescription: t('agent.defaultOutputDescription'),
           }
         : undefined
+    case 'decision':
+      return { kind: 'decision', name: 'AI Decision' }
     case 'openapi':
       return { kind: 'openapi', name: 'OpenAPI' }
     case 'llm': {

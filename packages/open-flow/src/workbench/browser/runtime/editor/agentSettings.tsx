@@ -17,9 +17,10 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel, FieldDescription } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Switch } from '../../../../ui/browser/switch.tsx'
-import { AgentChanges, agentFixedValuesValid } from './agentChanges.ts'
+import { agentFixedValuesValid } from './agentChanges.ts'
 import { AgentTools } from './agentTools.tsx'
 import { PromptEditor } from './promptEditor.tsx'
+import { TaskExecutorChanges } from './taskExecutorChanges.ts'
 
 const AgentSettingsContext = createContext<{ prompt: ReactNode; advanced: ReactNode } | null>(null)
 
@@ -57,7 +58,7 @@ function EditableAgentSettingsProvider({
   const [flowId] = useState(store.$.flowId.value)
   const [changes] = useState(
     () =>
-      new AgentChanges(task.executor, async (before, value) => {
+      new TaskExecutorChanges(task.executor, async (before, value) => {
         if (store.$.flowId.value != flowId) return false
         const current = store.$.revision.value?.node({ kind: 'flow' }, nodeId)
         const definition = current?.kind == 'task' ? current.definition : undefined

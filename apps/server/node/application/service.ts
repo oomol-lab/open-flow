@@ -242,7 +242,7 @@ export class ServerService {
       (flowId, triggerNodeId) => this.#listeners.test(flowId, triggerNodeId),
       (event) => this.#notifyFlowCatalog(event),
       (event) => this.#notifyFlow(event),
-      (kind) => (kind == 'agent' ? this.#resolveLlm()?.config != null : this.#resolveLlm() != null),
+      (kind) => (kind == 'agent' ? this.#resolveLlm()?.config != null : kind == 'decision' ? this.#resolveLlm()?.decision != null : this.#resolveLlm() != null),
       this.#resolveConnector,
       this.#connectorAccess,
       this.#resolveConnectorConsoleOrigin,

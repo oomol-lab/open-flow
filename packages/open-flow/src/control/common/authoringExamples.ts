@@ -5,6 +5,7 @@ import {
   createBuiltinTrigger,
   createCodeTask,
   createCondition,
+  createDecisionTask,
   createLlmTask,
   createManagedTask,
   createValue,
@@ -20,6 +21,7 @@ const descriptions = {
   'cron': 'An hourly scheduled start node.',
   'poll': 'Gmail polling by key; replace CONNECTION_ID with an active Gmail connection.',
   'integration': 'Telegram webhook integration by key; replace CONNECTION_ID with an active Telegram connection.',
+  'decision': 'AI Decision evaluates named questions against target and returns a complete answer object per output. Configure target before running.',
   'openapi': 'A fixed JSON API operation. Replace the example document and URL before running.',
   'connector': 'A Connector Task and its node. Replace ACTION_ID, CONNECTION_ID and port definitions using connector_get / connector show.',
   'code': 'A JavaScript module and its node. Use Code for custom computation; use Connector Tasks for existing actions.',
@@ -43,6 +45,11 @@ export function authoringExample(name: string): { version: 1; operations: readon
   switch (name) {
     case 'error':
       operations = createBuiltinTrigger(target, 'error', { kind: 'error', name: 'Flow Error' })
+      break
+    case 'decision':
+      operations = createDecisionTask(target, { nodeId: 'decision', taskId: 'decision-task' }, 'AI Decision', [
+        { name: 'needs_support', type: 'noul', instructions: 'Does the customer need support?' },
+      ])
       break
     case 'openapi': {
       const document = {

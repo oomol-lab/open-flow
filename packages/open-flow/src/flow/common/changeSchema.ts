@@ -1,6 +1,7 @@
 import type { ChangeOperation, FlowDocument, JsonValue, RevisionContent } from './change.ts'
 
 import { z } from 'zod'
+import { limitDecisionTask } from '../../decision/common/decision.ts'
 import { assertOpenApiAuthBindings } from '../../openapi/common/authBindings.ts'
 import { checkJsonDepth } from './json.ts'
 import { triggerScheduleSchema } from './triggerScheduleSchema.ts'
@@ -43,42 +44,55 @@ const capability = z.union([
 const inline = z.object({ ...ports, name: text, moduleId: text, capabilities: z.array(capability).optional() })
 const agentValue = z.union([z.object({ kind: z.literal('value'), value: json }), z.object({ kind: z.literal('input'), input: text })])
 const agentInput = z.union([agentValue, z.object({ kind: z.literal('model') })])
-const managed = z.object({
-  ...ports,
-  name: text,
-  executor: z.union([
-    z.object({ kind: z.literal('connector'), action: text, connectionId: text.optional() }),
-    z.object({
-      kind: z.literal('openapi'),
-      sourceUrl: text,
-      method: text,
-      path: text,
-      serverUrl: text,
-      document: json,
-      auth: z.array(z.object({ id: text, type: z.enum(['bearer', 'basic', 'apiKey']), name: text.optional(), in: z.enum(['header', 'query']).optional() })),
-    }),
-    z.object({ kind: z.literal('llm'), mode: z.enum(['chat', 'json']) }),
-    z.object({
-      kind: z.literal('agent'),
-      code: z.boolean().optional(),
-      model: text,
-      prompt: text,
-      maxRounds: z.number(),
-      tools: z.array(
-        z.object({
-          id: text,
-          name: text,
-          description: text,
-          action: text,
-          connectionId: text.optional(),
-          approval: z.boolean(),
-          inputs: z.array(input.extend({ source: agentInput })),
-        }),
-      ),
-      notification: z.object({ taskId: text, messageHandle: text, inputs: z.record(text, agentValue) }).optional(),
-    }),
-  ]),
-})
+const decisionQuestion = z.discriminatedUnion('type', [
+  z.strictObject({
+    name: text,
+    instructions: text,
+    type: z.literal('noul'),
+    criteria: z.strictObject({ true: text.optional(), false: text.optional() }).optional(),
+  }),
+  z.strictObject({ name: text, instructions: text, type: z.literal('choice'), criteria: z.array(z.strictObject({ name: text, description: text })) }),
+  z.strictObject({ name: text, instructions: text, type: z.literal('score'), criteria: strings }),
+])
+const managed = z
+  .object({
+    ...ports,
+    name: text,
+    executor: z.union([
+      z.object({ kind: z.literal('connector'), action: text, connectionId: text.optional() }),
+      z.object({
+        kind: z.literal('openapi'),
+        sourceUrl: text,
+        method: text,
+        path: text,
+        serverUrl: text,
+        document: json,
+        auth: z.array(z.object({ id: text, type: z.enum(['bearer', 'basic', 'apiKey']), name: text.optional(), in: z.enum(['header', 'query']).optional() })),
+      }),
+      z.strictObject({ kind: z.literal('decision'), questions: z.array(decisionQuestion) }),
+      z.object({ kind: z.literal('llm'), mode: z.enum(['chat', 'json']) }),
+      z.object({
+        kind: z.literal('agent'),
+        code: z.boolean().optional(),
+        model: text,
+        prompt: text,
+        maxRounds: z.number(),
+        tools: z.array(
+          z.object({
+            id: text,
+            name: text,
+            description: text,
+            action: text,
+            connectionId: text.optional(),
+            approval: z.boolean(),
+            inputs: z.array(input.extend({ source: agentInput })),
+          }),
+        ),
+        notification: z.object({ taskId: text, messageHandle: text, inputs: z.record(text, agentValue) }).optional(),
+      }),
+    ]),
+  })
+  .transform(limitDecisionTask)
 const operand = z.union([
   z.object({ kind: z.literal('value'), value: json.optional(), jsonSchema: json.optional() }),
   z.object({ kind: z.literal('source'), source }),
@@ -475,6 +489,7 @@ const shapes = {
   'task.create': { taskId: text, task: managed },
   'task.delete': { taskId: text },
   'task.connector.connection.set': { taskId: text, before: text.optional(), value: text.optional() },
+  'task.decision.set': { taskId: text, before: managed, value: managed },
   'task.openapi.set': { taskId: text, before: managed, value: managed },
   'task.agent.set': { taskId: text, before: managed, value: managed },
   'task.llm.mode.set': { taskId: text, before: z.enum(['chat', 'json']), value: z.enum(['chat', 'json']) },

@@ -2,7 +2,9 @@ import type { GraphNode, ResolutionNode, TriggerNode } from '../../../../flow/co
 import type { InputSourceCandidate } from '../../../../flow/common/graph.ts'
 
 import { describe, expect, it } from 'vitest'
+import { decisionTask } from '../../../../decision/common/decision.ts'
 import { resolutionOutputPorts } from '../../../../flow/common/graph.ts'
+import { objectValue } from '../../../../form/common/value.ts'
 import { uiLanguages } from '../../../../localization/common/languages.ts'
 import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
 import { createI18n } from '../i18n.ts'
@@ -10,6 +12,7 @@ import {
   presentBuiltInOutputDescription,
   presentBuiltInSourceCandidates,
   presentBuiltInTriggerOutputs,
+  presentDecisionOutputs,
   presentResolutionOutputs,
 } from './builtInOutputPresentation.ts'
 
@@ -20,7 +23,47 @@ const resolution = (kind: ResolutionNode['kind']): ResolutionNode => ({
   prompt: 'Review this run.',
 })
 
+const withoutHelp = (value: unknown): unknown => {
+  const field = objectValue(value)!
+  expect(field.description).toEqual(expect.any(String))
+  expect(field.description).not.toMatch(/decision\.|\{\{/)
+  expect(String(field.description).length).toBeGreaterThan(5)
+  const { description: _description, properties, ...schema } = field
+  return properties == null
+    ? schema
+    : {
+        ...schema,
+        properties: Object.fromEntries(Object.entries(objectValue(properties)!).map(([name, child]) => [name, withoutHelp(child)])),
+      }
+}
+
 describe('built-in output presentation', () => {
+  it.each(uiLanguages)('localizes every Decision answer field for %s without changing runtime schemas', (language) => {
+    const task = decisionTask([
+      { name: 'yes', type: 'noul', instructions: 'Does this need support?' },
+      { name: 'team', type: 'choice', instructions: 'Choose a team.', criteria: [{ name: 'billing', description: 'Payments' }] },
+      { name: 'urgency', type: 'score', instructions: 'Rate urgency.', criteria: ['Low', 'High'] },
+    ])
+    const before = structuredClone(task)
+    const localized = presentDecisionOutputs(task, createI18n(language).t)
+    for (const [index, port] of localized.entries()) {
+      expect('handle' in port).toBe(true)
+      if (!('handle' in port)) continue
+      const { description, jsonSchema, ...rest } = port
+      const schema = objectValue(jsonSchema)!
+      expect(description).toBeTruthy()
+      expect(description).not.toContain('decision.')
+      expect({ ...rest, jsonSchema: withoutHelp({ ...schema, description }) }).toEqual(task.outputs[index])
+      if (language !== 'en') expect(port).not.toEqual(presentDecisionOutputs(task, createI18n('en').t)[index])
+    }
+    expect(task).toEqual(before)
+  })
+
+  it('preserves non-Decision task outputs', () => {
+    const task = { name: 'Code', moduleId: 'code', inputs: [], outputs: [{ handle: 'result', jsonSchema: { type: 'string' }, nullable: false }] }
+    expect(presentDecisionOutputs(task, createI18n('zh-CN').t)).toBe(task.outputs)
+  })
+
   it.each(uiLanguages)('localizes scheduledAt for %s without adding copy to its runtime definition', (language) => {
     const trigger: TriggerNode = { kind: 'cron', name: 'Schedule', cronTimes: [] }
     const runtime = triggerOutputDefinitions(trigger)

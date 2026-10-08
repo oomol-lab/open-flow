@@ -17,8 +17,9 @@ export const FieldTable = forwardRef<
     output?: boolean
     nullable?: boolean
     empty?: boolean
+    actionSlots?: 1 | 2
   }
->(({ layout = 'definition', fixedTypes, typeColumn = true, output, nullable, empty, className, children, ...props }, ref) => {
+>(({ layout = 'definition', fixedTypes, typeColumn = true, output, nullable, empty, actionSlots = 1, className, children, ...props }, ref) => {
   const t = useTranslate()
   return (
     <div
@@ -32,6 +33,7 @@ export const FieldTable = forwardRef<
       data-fixed-types={fixedTypes || undefined}
       data-nullable={nullable || undefined}
       data-empty={empty || undefined}
+      data-action-slots={actionSlots}
     >
       {!empty && (
         <div className={styles.columns} data-layout={layout} data-output={output || undefined}>

@@ -1,10 +1,78 @@
 import type { TFunction } from 'val-i18n'
-import type { GraphNode, Port, ResolutionNode, TriggerNode } from '../../../../flow/common/change.ts'
+import type { GraphNode, Group, Port, ResolutionNode, TaskDefinition, TriggerNode } from '../../../../flow/common/change.ts'
 import type { InputSourceCandidate } from '../../../../flow/common/graph.ts'
 
 import { waitBranchDescription } from '../../../../canvas/browser/i18n/waitBranchLocales.ts'
 import { resolutionOutputPorts } from '../../../../flow/common/graph.ts'
+import { schemaObject } from '../../../../flow/common/schema.ts'
 import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
+
+/** Localized answer help is presentation-only; persisted Decision schemas stay language-neutral. */
+export function presentDecisionOutputs(task: TaskDefinition, t: TFunction): readonly (Port | Group)[] {
+  if (!('executor' in task) || task.executor.kind !== 'decision') return task.outputs
+  const questions = new Map(task.executor.questions.map((question) => [question.name, question]))
+  return task.outputs.map((port) => {
+    if (!('handle' in port)) return port
+    const question = questions.get(port.handle)
+    const schema = schemaObject(port.jsonSchema)
+    if (question == null || schema == null) return port
+    const properties = Object.fromEntries(
+      Object.entries(schemaObject(schema.properties ?? null) ?? {}).map(([name, value]) => {
+        const field = schemaObject(value)
+        if (field == null) return [name, value]
+        let description: string
+        switch (name) {
+          case 'type':
+            description = t('decision.outputs.type', { type: question.type })
+            break
+          case 'noul':
+          case 'choice':
+          case 'score':
+          case 'confidence':
+          case 'legend':
+            description = t(`decision.outputs.${name}`)
+            break
+          case 'probabilities':
+            description = t(`decision.outputs.${question.type}Probabilities`)
+            break
+          default:
+            return [name, value]
+        }
+        const children = schemaObject(field.properties ?? null)
+        return [
+          name,
+          {
+            ...field,
+            description,
+            ...(children == null
+              ? {}
+              : {
+                  properties: Object.fromEntries(
+                    Object.entries(children).map(([key, child]) => [
+                      key,
+                      {
+                        ...schemaObject(child),
+                        description:
+                          name === 'legend'
+                            ? t('decision.outputs.level', { level: key })
+                            : question.type === 'choice'
+                              ? t('decision.outputs.choiceProbability', { name: key })
+                              : t('decision.outputs.scoreProbability', { level: key }),
+                      },
+                    ]),
+                  ),
+                }),
+          },
+        ]
+      }),
+    )
+    return {
+      ...port,
+      description: t('decision.outputs.answer', { type: t(`decision.${question.type}`) }),
+      jsonSchema: { ...schema, properties },
+    }
+  })
+}
 
 function withDescriptions(ports: readonly Port[], descriptionFor: (handle: string) => string | undefined): readonly Port[] {
   return ports.map((port) => {

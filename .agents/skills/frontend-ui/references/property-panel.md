@@ -21,12 +21,16 @@ Within a selected node's property-panel body, render applicable sections in this
 3. Code or Agent prompt editor, immediately after Purpose
 4. Port configuration
 5. Node-specific settings
-6. Node settings (Advanced settings for Agent, with model, code computation, and execution rounds before the common fields)
+6. Node settings (Advanced settings for Agent and AI Decision; Agent places model, code computation,
+   and execution rounds before the common fields; AI Decision places its fixed, read-only model first)
 
 Omit sections that do not apply without leaving placeholders, while preserving the relative order
 of the remaining sections. A feature may define the order of multiple sections within one category,
 but must not move them across these category boundaries. Panel chrome, the node header, empty states,
 and multi-selection states are outside this sequence.
+
+AI Decision nodes place Decision items after Purpose and before Inputs and Outputs. Questions own
+the generated, read-only output definitions.
 
 OpenAPI nodes place OpenAPI configuration and Authentication after Purpose and before Inputs and
 Outputs. The operation determines the generated ports; unconfigured nodes omit the empty port sections.

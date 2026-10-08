@@ -93,7 +93,7 @@ export class ControlService {
   private readonly clock: () => number
   private readonly flowCatalogChanged: (event?: FlowCatalogEvent) => void
   private readonly flowChanged: (event: FlowChangeEvent) => void
-  private readonly llmAvailable: (kind?: 'agent') => boolean
+  private readonly llmAvailable: (kind?: 'agent' | 'decision') => boolean
   private readonly publish: (input: PublishInput) => Promise<PublicationAcceptance>
   private readonly resolveConnector: () => ConnectorHost | undefined
   private readonly connectorAccess: ConnectorAccessHost
@@ -119,7 +119,7 @@ export class ControlService {
     testPollTrigger: (flowId: string, triggerNodeId: string) => Promise<PollTriggerTestResult>,
     flowCatalogChanged: (event?: FlowCatalogEvent) => void,
     flowChanged: (event: FlowChangeEvent) => void,
-    llmAvailable: (kind?: 'agent') => boolean,
+    llmAvailable: (kind?: 'agent' | 'decision') => boolean,
     resolveConnector: () => ConnectorHost | undefined,
     connectorAccess: ConnectorAccessHost,
     resolveConnectorConsoleOrigin: () => URL | undefined,
@@ -981,7 +981,7 @@ export class ControlService {
     })
     const llmDiagnostics = [...checked.closure.dependencies.tasks].toSorted().flatMap((taskId) => {
       const kind = content.document.tasks[taskId]?.executor.kind
-      if ((kind != 'llm' && kind != 'agent') || this.llmAvailable(kind == 'agent' ? 'agent' : undefined)) return []
+      if ((kind != 'llm' && kind != 'agent' && kind != 'decision') || this.llmAvailable(kind == 'llm' ? undefined : kind)) return []
       return [
         {
           code: 'llm.unconfigured',

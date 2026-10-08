@@ -54,6 +54,7 @@ export async function buildBrowserPackage(options: BuildBrowserPackageOptions): 
   const browserOutputPath = path.join(options.packageRoot, 'dist/browser')
   const commonOutputPath = path.join(options.packageRoot, 'dist/common')
   await buildRuntime(options, commonOutputPath, connectorProxyEntryPath, 'connector-proxy', true)
+  await buildRuntime(options, commonOutputPath, 'src/decision/common/decision.ts', 'decision', false)
   await buildRuntime(options, commonOutputPath, 'src/openapi/common/openapi.ts', 'openapi', false)
   await buildRuntime(options, commonOutputPath, connectorActionEntryPath, 'connector-action', false)
   await buildRuntime(options, commonOutputPath, controlRequestsEntryPath, 'control-requests', false)
@@ -261,11 +262,11 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       "'./change.ts'",
       "'./flow-change.js'",
     )
-    const flowAuthoringNodeDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/nodeChanges.d.ts'), 'utf8')).replaceAll(
-      "'./change.ts'",
-      "'./flow-change.js'",
-    )
+    const flowAuthoringNodeDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/nodeChanges.d.ts'), 'utf8'))
+      .replaceAll("'../../decision/common/decision.ts'", "'../common/decision.js'")
+      .replaceAll("'./change.ts'", "'./flow-change.js'")
     const flowChangeDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/change.d.ts'), 'utf8'))
+      .replaceAll("'../../decision/common/decision.ts'", "'../common/decision.js'")
       .replaceAll("'../../openapi/common/openapi.ts'", "'../common/openapi.js'")
       .replaceAll("'../../types/index.ts'", "'../index.js'")
       .replaceAll("'./changeSchema.ts'", "'./flow-change-schema.js'")
@@ -350,6 +351,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
     const runEventsDeclaration = await readFile(path.join(declarationRoot, 'execution/common/events.d.ts'), 'utf8')
     const engineContractDeclaration = await readFile(path.join(declarationRoot, 'execution/common/engineContract.d.ts'), 'utf8')
     const runtimeContractDeclaration = (await readFile(path.join(declarationRoot, 'execution/common/runtime.d.ts'), 'utf8'))
+      .replaceAll("'../../decision/common/decision.ts'", "'./decision.js'")
       .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
       .replaceAll("'./engineContract.ts'", "'./engine-contract.js'")
     const schedulerDeclaration = (await readFile(path.join(declarationRoot, 'execution/common/scheduler.d.ts'), 'utf8'))
@@ -419,6 +421,13 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(path.join(commonOutputPath, 'engine-contract.d.ts'), engineContractDeclaration),
       writeFile(path.join(commonOutputPath, 'runtime-contract.d.ts'), runtimeContractDeclaration),
       writeFile(path.join(commonOutputPath, 'scheduler.d.ts'), schedulerDeclaration),
+      writeFile(
+        path.join(commonOutputPath, 'decision.d.ts'),
+        (await readFile(path.join(declarationRoot, 'decision/common/decision.d.ts'), 'utf8')).replaceAll(
+          "'../../flow/common/change.ts'",
+          "'../browser/flow-change.js'",
+        ),
+      ),
       writeFile(
         path.join(commonOutputPath, 'openapi.d.ts'),
         (await readFile(path.join(declarationRoot, 'openapi/common/openapi.d.ts'), 'utf8')).replaceAll(

@@ -532,3 +532,12 @@ export function resolveAction(
   if (permissions?.mode == 'shared' && Object.hasOwn(source, 'options') && connectionId == null) throw denied
   return { action: source.action, input: source.input as Readonly<Record<string, JsonValue>>, ...(connectionId == null ? {} : { connectionId }) }
 }
+
+export interface DecisionTaskInvocation {
+  readonly questions: readonly import('../../decision/common/decision.ts').DecisionQuestion[]
+  readonly state: JsonValue
+  readonly invocationId: string
+  readonly signal: AbortSignal
+  readonly version: 1
+}
+export type InvokeDecisionTask = (invocation: DecisionTaskInvocation) => Promise<LlmTaskResult>

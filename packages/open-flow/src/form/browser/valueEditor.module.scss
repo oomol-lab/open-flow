@@ -8,9 +8,15 @@
   --ui-danger-border-width: 1px;
   --ui-danger-focus-width: 2px;
   --value-body-inset: 0px;
-  isolation: isolate;
   position: relative;
   min-width: 0;
+}
+/* A structural field group has independent editors; hovering a descendant must
+   not lift the entire group above sticky section titles. */
+.root:not([data-stacking='fields']),
+.errorAnchor,
+.root:not([data-stacking='fields']) > .body {
+  isolation: isolate;
 }
 .root {
   --ui-danger-control-background: var(--ui-danger-control-background-default);
@@ -34,7 +40,6 @@
   --ui-danger-control-background: var(--ui-danger-control-background-hover);
 }
 .body {
-  isolation: isolate;
   position: relative;
   display: flex;
   min-width: 0;
@@ -151,6 +156,8 @@ $summary-focus: '> .summary:focus-visible, > :is(.valueTools) :focus-visible';
 $feedback-targets: '#{$summary-focus}, > .body:not([hidden]) :focus-visible';
 $feedback-focus: ':has(#{$feedback-targets})';
 :global([data-value-editor-scope]):has(#{selector.nest('.root', $feedback-targets)}),
+// Custom controls also own feedback when placed in a row header, outside .body.
+:global([data-value-editor-scope]):has(.errorAnchor :focus-visible),
 .root#{$feedback-focus} {
   --error-hover-opacity: 0;
   --error-hover-visibility: hidden;
@@ -168,11 +175,11 @@ $feedback-focus: ':has(#{$feedback-targets})';
   opacity: 1;
   visibility: visible;
 }
-.root:not(#{$feedback-focus}):has(> :is(.body, .summary, .valueTools, .summaryError):hover) {
+.root:not([data-stacking='fields']):not(#{$feedback-focus}):has(> :is(.body, .summary, .valueTools, .summaryError):hover) {
   z-index: var(--value-editor-hover-layer, 1);
 }
-.root#{$feedback-focus},
-.root:has([data-popup-open]) {
+.root:not([data-stacking='fields'])#{$feedback-focus},
+.root:not([data-stacking='fields']):has([data-popup-open]) {
   z-index: var(--value-editor-active-layer, 2);
 }
 
@@ -323,11 +330,14 @@ $feedback-focus: ':has(#{$feedback-targets})';
 /* Expanded content is the base layer. Summary feedback covers that content,
    while the parent control stays in front of its attached feedback. An open
    descendant overlay raises the content plane above both. */
-.body:has([data-popup-open]) {
+.root:not([data-stacking='fields']) > .body:has([data-popup-open]) {
   z-index: var(--value-editor-overlay-layer);
 }
 .summary {
   z-index: var(--value-editor-control-layer);
+}
+.root[data-stacking='fields'] > .summary {
+  z-index: auto;
 }
 .summary {
   --preview-background: var(--ui-control-background, var(--ui-muted));
@@ -574,12 +584,18 @@ $feedback-focus: ':has(#{$feedback-targets})';
 .collectionActions {
   @include fieldLayout.columns(280px);
   --field-grip-width: 0px;
-  --field-actions-width: 28px;
   &:empty {
     display: none;
   }
   > * {
     grid-column: handle / content-end;
+  }
+  > .errorAnchor {
+    margin-left: calc(var(--field-indent, 0px) + 16px);
+    > .emptyObjectContent {
+      margin-left: 0;
+      width: 100%;
+    }
   }
 }
 
@@ -678,7 +694,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
   grid-column: nullable / end;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0;
+  gap: var(--field-action-pair-gap, 0px);
   > * {
     justify-self: center;
   }
