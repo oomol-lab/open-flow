@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="64" viewBox="0 0 280 64" role="img" aria-label="Open Flow">
+  <style>
+    @media (prefers-color-scheme: dark) {
+      .of-auto-primary { fill: #e0e2e6; }
+      .of-auto-secondary { fill: #8c919a; }
+    }
+  </style>
+  <g transform="scale(0.64)">
+    <path class="of-auto-primary" fill="#44474c" d="M32 16H68Q84 16 84 32V36H68C46 36 54 56 32 56H16V32Q16 16 32 16Z"/>
+    <path class="of-auto-secondary" fill="#93979f" d="M16 68H32C54 68 46 48 68 48H84V68Q84 84 68 84H32Q16 84 16 68Z"/>
+  </g>
+  <text class="of-auto-primary" fill="#44474c" x="72" y="45" font-family="Arial, Helvetica, sans-serif" font-size="40" font-weight="700">Open Flow</text>
+</svg>

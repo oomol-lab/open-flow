@@ -1,6 +1,8 @@
 <div align="center">
 
-# Open Flow
+<h1 align="center">
+  <img src="../assets/logo/open-flow-wordmark-auto.svg" alt="Open Flow" width="280" height="64" />
+</h1>
 
 **在画布上搭工作流，需要时直接写代码，最后部署到自己的环境。**
 

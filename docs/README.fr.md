@@ -1,6 +1,8 @@
 <div align="center">
 
-# Open Flow
+<h1 align="center">
+  <img src="../assets/logo/open-flow-wordmark-auto.svg" alt="Open Flow" width="280" height="64" />
+</h1>
 
 **Construisez des workflows que vous pouvez voir, coder, exécuter et posséder.**
 
