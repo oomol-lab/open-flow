@@ -538,7 +538,7 @@ function DecisionLevelsHelp() {
         onClick={() => tooltip.open(id)}
         render={<Button type="button" variant="ghost" size="icon-xs" aria-label={t('decision.levels')} />}
       >
-        <i aria-hidden="true" className="i-lucide-light:info text-muted-foreground" />
+        <i aria-hidden="true" className="i-lucide-light:circle-help text-muted-foreground" />
       </TooltipTrigger>
       <TooltipContent>
         {t('decision.levelsCount')} {t('decision.levelsHint')}

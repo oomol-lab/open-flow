@@ -8,6 +8,12 @@ describe('Editor component selection', () => {
     expect(valueForEditor(schema, 'hello')).toBe('hello')
     expect(valueForEditor(schema, undefined)).toBeUndefined()
   })
+  it('defaults new arrays to single-line text items and preserves existing item definitions', () => {
+    expect(schemaForEditor('array', {})).toEqual({ type: 'array', items: { type: 'string' } })
+    for (const schema of [{ type: 'array', items: { type: 'number' } }, { type: 'array' }]) {
+      expect(schemaForEditor('array', schema)).toEqual(schema)
+    }
+  })
   it('carries choices between single and multiple select and filters invalid values', () => {
     const schema = schemaForEditor('multiSelect', { enum: ['a', 'b'] })
     expect(schema).toEqual({ type: 'array', uniqueItems: true, items: { enum: ['a', 'b'] } })

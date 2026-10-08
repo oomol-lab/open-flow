@@ -115,6 +115,7 @@ Agent tool parameters may opt into a shared unset policy: show “由 Agent 填�
   after the current item; minus removes that item. A nonempty collection has no redundant bottom
   add button. An empty collection has one full-row add action on the child indentation baseline.
 - Arrays keep the parent value control, preceded by the localized `valueEditor.arrayOf` label, with a compact item-type suffix.
+  Newly selected Array definitions default their items to single-line text; existing item definitions are preserved.
   This suffix shares the Case type-addon component but edits `items`, not the whole value Schema.
   It remains present for unset, null and source-bound arrays; changing item type preserves source
   bindings and never creates an unset value. Value errors belong to the value control, not the type.

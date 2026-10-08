@@ -5,6 +5,7 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 
 import { useMemo, useState } from 'react'
 import { I18nProvider } from 'val-i18n-react'
+import { schemaForEditor } from '../../src/form/common/editorComponent.ts'
 import { NodeInputs } from '../../src/workbench/browser/runtime/editor/nodeInputs.tsx'
 import { PortDefinitionEditor } from '../../src/workbench/browser/runtime/editor/portDefinitionEditor.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
@@ -34,7 +35,8 @@ function ValueStory({ dark, language, log, reservedNames }: { dark: boolean; lan
     { handle: 'dateTime', jsonSchema: { type: 'string', format: 'date-time' }, nullable: false, value: '2026-09-15T10:30:00+08:00' },
     { handle: 'color', jsonSchema: { 'type': 'string', 'ui:widget': 'color' }, nullable: false, value: '#7d7fe9' },
     { handle: 'array', jsonSchema: { type: 'array', items: { type: 'string' } }, nullable: false, value: ['first', 'second', 'third'] },
-    { handle: 'emptyArray', jsonSchema: { type: 'array', items: {} }, nullable: false, value: [] },
+    { handle: 'emptyArray', jsonSchema: schemaForEditor('array', {}), nullable: false, value: [] },
+    { handle: 'jsonArray', jsonSchema: { type: 'array', items: {} }, nullable: false, value: [] },
     {
       handle: 'objectArray',
       jsonSchema: { type: 'array', items: { type: 'object', properties: { name: { type: 'string' }, tags: { type: 'array', items: { type: 'string' } } } } },
