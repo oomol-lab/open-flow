@@ -78,6 +78,24 @@ function renderAccount(overrides: Partial<ComponentProps<typeof ConnectorAccount
   )
 }
 
+it.each(['reauth_required', 'error', 'disconnected'] as const)('shows a known %s account with its identity and recovery message', (status) => {
+  const markup = renderAccount({
+    accessError: undefined,
+    connectionId: 'saved-account',
+    connection: { connectionId: 'saved-account', serviceId: 'gmail', displayName: 'Saved Gmail account', isDefault: false, status },
+  })
+  expect(markup).toContain('Saved Gmail account')
+  expect(markup).toContain(i18n.t(`inspector.account.status.${status}`))
+  expect(markup).not.toContain(i18n.t('inspector.account.missing'))
+  expect(markup).not.toContain(`saved-account (${i18n.t('inspector.account.unavailable')})`)
+})
+
+it('describes an unavailable account without claiming that it was deleted', () => {
+  const markup = renderAccount({ accessError: undefined, connectionId: 'unavailable-account' })
+  expect(markup).toContain(i18n.t('inspector.account.missing'))
+  expect(markup).not.toContain('已不存在')
+})
+
 it.each(['metadata', 'connections'] as const)('shows loading while waiting for %s without a refresh call', (pending) => {
   const markup = renderAccount({
     ...(pending == 'metadata' ? { action: undefined } : {}),

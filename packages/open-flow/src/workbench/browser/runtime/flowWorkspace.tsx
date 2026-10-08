@@ -141,12 +141,17 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   const allowedCandidates = candidates?.filter(
     (candidate) => candidate.permissions == null || candidate.permissions.allActions || candidate.permissions.actionIds.includes(connectorAction!.actionId),
   )
-  const accessError =
-    providerId != null && connectorAccess?.mode == 'selectable' && allowedCandidates?.length == 0 ? t('connectorAccess.noAvailablePermissions') : undefined
   const connectorActionError = useVal(store.connectors.$.selectedActionError)
   const connectorActionLoading = useVal(store.connectors.$.actionLoading)
   const connectorAuthorizationPending = useVal(store.connectors.$.selectedAuthorizationPending)
   const connectorConnection = useVal(store.connectors.$.selectedConnection)
+  const accessError =
+    providerId != null &&
+    connectorAccess?.mode == 'selectable' &&
+    allowedCandidates?.length == 0 &&
+    (connectorConnection == null || connectorConnection.status == 'active')
+      ? t('connectorAccess.noAvailablePermissions')
+      : undefined
   const connectorConnectionError = useVal(store.connectors.$.selectedConnectionError)
   const connectorConnectionLoading = useVal(store.connectors.$.connectionLoading)
   const activeConnectorConnections = useVal(store.connectors.$.selectedActiveConnections)
@@ -179,6 +184,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
       connectorActionError={connectorActionError}
       connectorAuthorizationPending={connectorAuthorizationPending}
       connectorConnection={
+        connectorConnection?.status == 'active' &&
         connectorAccess?.mode == 'selectable' &&
         allowedCandidates != null &&
         !allowedCandidates.some((candidate) => candidate.connectionId == connectorConnection?.connectionId)

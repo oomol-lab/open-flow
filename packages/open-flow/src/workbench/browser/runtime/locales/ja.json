@@ -230,7 +230,7 @@
       "connection": "Connection",
       "loading": "Connection を読み込み中…",
       "oomolBuiltIn": "OOMOL 組み込みアカウント",
-      "missing": "固定されていた Connection は存在しません。別のアカウントを選択するか、Connection を追加してください。",
+      "missing": "このノードで選択されたアカウントは現在利用できません。別のアカウントを選択するか、アカウントを管理してください。",
       "refreshFailed": "Connection を更新できませんでした。",
       "retry": "再試行",
       "status": {

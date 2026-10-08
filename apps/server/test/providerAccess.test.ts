@@ -37,6 +37,51 @@ function success(data: unknown): unknown {
 }
 
 describe('configured Connector access', () => {
+  it.each(['creator', 'member'])('retains authorized account health in the %s catalog without making inactive accounts assignable', async (role) => {
+    const connections = [
+      { id: 'ready', displayName: 'Ready', service: 'example', isDefault: true, status: 'active' },
+      { id: 'expired', displayName: 'Expired', service: 'example', isDefault: false, status: 'reauth_required' },
+      { id: 'error', displayName: 'Error', service: 'example', isDefault: false, status: 'error' },
+      { id: 'disconnected', displayName: 'Disconnected', service: 'example', isDefault: false, status: 'disconnected' },
+      { id: 'denied', displayName: 'Denied', service: 'example', isDefault: false, status: 'reauth_required' },
+    ]
+    const remote = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input)
+      if (url.endsWith('/v1/me/teams')) return Response.json({ teams: [{ id: 'team-1', role, status: 'normal', deleted: false }] })
+      if (url.endsWith('/v1/users/profile')) return Response.json({ uid: 'member' })
+      if (url.endsWith('/app-access'))
+        return Response.json({
+          'role::connector-app:denied': {
+            connector: [{ method: 'POST', provider: 'example', permissionRules: { assignments: {}, rules: [], teamDefault: { actions: [] } } }],
+          },
+        })
+      if (url.endsWith('/v1/apps') || url.endsWith('/v1/apps/services/example')) return Response.json(success(connections))
+      throw new Error(`Unexpected request: ${url}`)
+    })
+    vi.stubGlobal('fetch', remote)
+    const connector = new ConnectorClient('https://connector.oomol.dev', 'token')
+    const access = {
+      scope: 'catalog' as const,
+      purpose: 'catalog' as const,
+      source: 'draft' as const,
+      teamId: 'team-1',
+      providerAccess: { accessRevision: 0, bindings: [], mode: 'selectable' as const, sharedAccessDigest: 'empty', version: 1 as const },
+    }
+    const expected = connections
+      .filter((connection) => role == 'creator' || connection.id != 'denied')
+      .map(({ id, service, displayName, isDefault, status }) => ({ connectionId: id, serviceId: service, displayName, isDefault, status }))
+
+    await expect(connector.listConnections('example', undefined, access)).resolves.toEqual(expected)
+    await expect(connector.listAllConnections(undefined, access)).resolves.toEqual(expected)
+    const candidates = (await connector.listProviderAccessBindingCandidates('team-1', ['example'])).results[0]!
+    if ('error' in candidates) throw new Error(candidates.error.message)
+    expect(candidates.candidates.map((candidate) => candidate.connectionId)).toEqual(['ready'])
+    await expect(connector.execute('example.echo', 'expired', {}, 'invocation', new AbortController().signal, 'team-1')).rejects.toMatchObject({
+      code: 'connector.connection-required',
+    })
+    expect(remote.mock.calls.some(([url]) => String(url).includes('/v1/actions/'))).toBe(false)
+  })
+
   it('projects the team default separately from the connection name', async () => {
     await expect(
       providerAccessBindingCandidates({

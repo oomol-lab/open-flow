@@ -1,10 +1,16 @@
-import type { ReactElement } from 'react'
+import type { ReactElement, ReactNode } from 'react'
 import type { NavigationStore } from './navigation.ts'
 import type { WorkbenchStore } from './stores/workbenchStore.ts'
 
-import { useEffect } from 'react'
+import { Children, isValidElement, useEffect } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { I18nProvider } from 'val-i18n-react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { ConnectorAccount } from './editor/connectionSettings.tsx'
+import { NodeInspector } from './editor/nodeInspector.tsx'
 import FlowWorkspace, { FlowEditor } from './flowWorkspace.tsx'
+import { createI18n } from './i18n.ts'
+import { RevisionView } from './revisionView.ts'
 import { runDrawerPreferenceKey } from './runs/runDrawerPreference.ts'
 
 const mocks = vi.hoisted(() => ({
@@ -34,12 +40,22 @@ vi.mock('use-value-enhancer', async (importOriginal) => ({
 
 vi.mock('val-i18n-react', async (importOriginal) => ({
   ...(await importOriginal<typeof import('val-i18n-react')>()),
+  useLang: () => 'en',
   useTranslate: () => (key: string) => key,
 }))
 
 vi.mock('./editor/workbenchCanvas.tsx', () => ({ WorkbenchCanvas: () => null }))
 
 const value = <T,>(current: T): { readonly value: T } => ({ value: current })
+
+function find(element: ReactElement, predicate: (item: ReactElement) => boolean): ReactElement | undefined {
+  if (predicate(element)) return element
+  for (const child of Children.toArray((element.props as { children?: ReactNode }).children)) {
+    if (!isValidElement(child)) continue
+    const match = find(child, predicate)
+    if (match != null) return match
+  }
+}
 
 function renderWorkspace(busy?: string, withTrigger = true, invalid = false, selectedNodeIds: readonly string[] = [], hasUnpublishedChanges = true) {
   const navigation = {
@@ -160,6 +176,46 @@ describe('FlowWorkspace run drawer', () => {
     mocks.setRunDrawerOpen.mockReset()
     mocks.stateCall = 0
     mocks.stateValues.clear()
+  })
+
+  it('keeps the expired account name and recovery message after assignable accounts finish loading', () => {
+    mocks.stateValues.set(3, true)
+    mocks.stateValues.set(4, 'properties')
+    const { editor, store } = renderWorkspace(undefined, true, false, ['mail'])
+    const node = { inputs: {}, kind: 'task', taskId: 'mail' } as const
+    const definition = {
+      executor: { action: 'gmail.fetch_emails', connectionId: 'expired', kind: 'connector' },
+      inputs: [],
+      outputs: [],
+      name: 'Read mail',
+    } as const
+    const revision = new RevisionView({
+      content: { document: { bindings: {}, graph: { nodes: { mail: node }, edges: [] }, subflows: {}, tasks: { mail: definition } }, modules: {} },
+    } as never)
+    Object.assign(store.$, { connectorSetupPending: value(false), sourceNodeIcons: value({}) })
+    Object.assign(store.workspace.$.revision, { value: revision })
+    Object.assign(store.workspace.$.selection, { value: { id: 'mail', kind: 'task', node, definition } })
+    Object.assign(store.connectors.$.selectedAction, {
+      value: { actionId: 'gmail.fetch_emails', authenticated: true, serviceId: 'gmail', serviceName: 'Gmail' },
+    })
+    Object.assign(store.connectors.$.selectedConnection, {
+      value: { connectionId: 'expired', displayName: 'Saved Gmail account', serviceId: 'gmail', isDefault: false, status: 'reauth_required' },
+    })
+    const view = (editor.type as (props: typeof editor.props) => ReactElement)(editor.props)
+    const container = find(view, (item) => item.props.selection?.id == 'mail')!
+    const renderInspector = (container.type as unknown as { type: (props: unknown) => ReactElement }).type
+    for (const candidates of [undefined, [], [{ connectionId: 'other', permissions: { allActions: true } }]]) {
+      Object.assign(store.connectorAccess.$, {
+        value: { access: { mode: 'selectable', bindings: [] }, candidates: { gmail: candidates == null ? undefined : { candidates } } },
+      })
+      const inspector = renderInspector(container.props)
+      const account = find(NodeInspector(inspector.props), (item) => item.type == ConnectorAccount)!
+      const markup = renderToStaticMarkup(<I18nProvider i18n={createI18n()}>{account}</I18nProvider>)
+      expect(markup).toContain('Saved Gmail account')
+      expect(markup).toContain('inspector.account.status.reauth_required')
+      expect(markup).not.toContain('inspector.account.missing')
+      expect(markup).not.toContain('connectorAccess.noAvailablePermissions')
+    }
   })
 
   it.each([false, true])('runs from the canvas and opens logs despite unrelated diagnostics (invalid: %s)', async (invalid) => {

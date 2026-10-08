@@ -230,7 +230,7 @@
       "connection": "Connection",
       "loading": "Загрузка Connection…",
       "oomolBuiltIn": "Встроенный аккаунт OOMOL",
-      "missing": "Закреплённый Connection больше не существует. Выберите другой аккаунт или добавьте Connection.",
+      "missing": "Выбранный для этого узла аккаунт недоступен. Выберите другой аккаунт или откройте управление подключениями.",
       "refreshFailed": "Не удалось обновить Connection.",
       "retry": "Повторить",
       "status": {

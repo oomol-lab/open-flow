@@ -230,7 +230,7 @@
       "connection": "连接",
       "loading": "正在加载连接…",
       "oomolBuiltIn": "OOMOL 内置账号",
-      "missing": "此节点固定的 Connection 已不存在，请选择其他账号或添加连接。",
+      "missing": "此节点选择的账号当前不可用，请选择其他账号或管理账号。",
       "refreshFailed": "无法刷新 Connection。",
       "retry": "重试",
       "status": {

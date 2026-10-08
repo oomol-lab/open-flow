@@ -230,7 +230,7 @@
       "connection": "Connection",
       "loading": "Connection 불러오는 중…",
       "oomolBuiltIn": "OOMOL 기본 제공 계정",
-      "missing": "이 블록에 고정된 Connection이 더 이상 존재하지 않습니다. 다른 계정을 선택하거나 Connection을 추가하세요.",
+      "missing": "이 노드에서 선택한 계정을 현재 사용할 수 없습니다. 다른 계정을 선택하거나 계정을 관리하세요.",
       "refreshFailed": "Connection을 새로 고치지 못했습니다.",
       "retry": "다시 시도",
       "status": {

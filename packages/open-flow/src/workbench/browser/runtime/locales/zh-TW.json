@@ -230,7 +230,7 @@
       "connection": "Connection",
       "loading": "正在載入 Connection…",
       "oomolBuiltIn": "OOMOL 內建帳號",
-      "missing": "這個固定的 Connection 已不存在。請選擇其他帳號或新增 Connection。",
+      "missing": "此節點選擇的帳號目前無法使用，請選擇其他帳號或管理帳號。",
       "refreshFailed": "無法重新整理 Connection。",
       "retry": "重試",
       "status": {

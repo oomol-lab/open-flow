@@ -1,4 +1,4 @@
-import type { ConnectorAccess } from '../../src/control/common/api.ts'
+import type { ConnectorAccess, ConnectorConnection } from '../../src/control/common/api.ts'
 import type { RevisionContent } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { FrontendStory, LogAction } from './stories.tsx'
@@ -129,7 +129,7 @@ function Sample({
   readonly label: string
   readonly loadFailed?: boolean
   readonly log: LogAction
-  readonly connectionStatus?: 'active' | 'reauth_required'
+  readonly connectionStatus?: ConnectorConnection['status']
   readonly noAuth?: boolean
   readonly noCandidates?: boolean
   readonly configure?: boolean
@@ -236,18 +236,24 @@ function Sample({
                   }
                   actionError={undefined}
                   actionId="mail.send"
-                  accessError={noCandidates ? i18n.t('notice.error.connectorAccessRequired') : undefined}
+                  accessError={
+                    noCandidates && (connectionStatus == null || connectionStatus == 'active') ? i18n.t('notice.error.connectorAccessRequired') : undefined
+                  }
                   activeConnections={
                     accountPending == 'setup'
                       ? []
                       : accountPending != null
                         ? undefined
-                        : connectionStatus == null
+                        : connectionStatus != 'active'
                           ? []
                           : [{ connectionId: 'mail-account', displayName: 'Work account', isDefault: true, serviceId: 'mail', status: connectionStatus }]
                   }
                   authorizationPending={false}
-                  connection={undefined}
+                  connection={
+                    connectionStatus == null
+                      ? undefined
+                      : { connectionId: 'mail-account', displayName: 'Work account', isDefault: true, serviceId: 'mail', status: connectionStatus }
+                  }
                   connectionError={undefined}
                   connectionId={connectionStatus == null ? undefined : 'mail-account'}
                   connectors={store.connectors}
@@ -272,7 +278,7 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
     readonly emptyFlow?: boolean
     readonly label: string
     readonly loadFailed?: boolean
-    readonly connectionStatus?: 'active' | 'reauth_required'
+    readonly connectionStatus?: ConnectorConnection['status']
     readonly noAuth?: boolean
     readonly noCandidates?: boolean
     readonly configure?: boolean
@@ -421,6 +427,20 @@ function Gallery({ dark, language, log }: { readonly dark: boolean; readonly lan
       label: 'Account needs reconnection',
       noCandidates: true,
       connectionStatus: 'reauth_required',
+      configure: true,
+    },
+    {
+      access: { accessRevision: 0, bindings: [], mode: 'selectable', sharedAccessDigest: 'selectable:0', version: 1 },
+      label: 'Account connection error',
+      noCandidates: true,
+      connectionStatus: 'error',
+      configure: true,
+    },
+    {
+      access: { accessRevision: 0, bindings: [], mode: 'selectable', sharedAccessDigest: 'selectable:0', version: 1 },
+      label: 'Disconnected account',
+      noCandidates: true,
+      connectionStatus: 'disconnected',
       configure: true,
     },
     {

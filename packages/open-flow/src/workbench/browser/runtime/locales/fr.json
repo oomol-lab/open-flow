@@ -230,7 +230,7 @@
       "connection": "Connection",
       "loading": "Chargement des Connections…",
       "oomolBuiltIn": "Compte intégré OOMOL",
-      "missing": "Cette Connection épinglée n'existe plus. Choisissez un autre compte ou ajoutez une Connection.",
+      "missing": "Le compte sélectionné pour ce nœud est indisponible. Choisissez un autre compte ou gérez les connexions.",
       "refreshFailed": "Impossible d'actualiser les Connections.",
       "retry": "Réessayer",
       "status": {

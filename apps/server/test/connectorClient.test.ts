@@ -167,6 +167,57 @@ async function readBody(request: IncomingMessage): Promise<unknown> {
 const app = { alias: 'work', id: 'connection-work', service: 'example', status: 'active' }
 
 describe('Server Connector client', () => {
+  it.each(['upstream-status', 'transport', 'timeout', 'invalid-json', 'invalid-data'] as const)(
+    'logs the actual Connection request destination for %s failures',
+    async (failure) => {
+      vi.stubGlobal('fetch', async (_input: unknown, init: RequestInit) => {
+        if (failure == 'transport') throw new TypeError('fetch failed', { cause: Object.assign(new Error('Connection refused'), { code: 'ECONNREFUSED' }) })
+        if (failure == 'timeout') {
+          return await new Promise<Response>((_resolve, reject) => {
+            init.signal!.addEventListener('abort', () => reject(init.signal!.reason), { once: true })
+          })
+        }
+        if (failure == 'upstream-status') return Response.json({ success: false, errorCode: 'forbidden' }, { status: 403 })
+        if (failure == 'invalid-json') return new Response('credential=provider-secret-private', { status: 502 })
+        return Response.json(success([{ id: 'invalid' }]))
+      })
+      const captured = captureLogger()
+      const connector = new ConnectorClient('https://connector.test:8443/runtime', 'runtime-token-private', 25, captured.logger)
+
+      await expect(connector.listAllConnections()).rejects.toMatchObject({ code: 'connector.unavailable' })
+
+      const log = JSON.parse(captured.output().trim())
+      expect(log).toMatchObject({
+        category: 'connector.request.failed',
+        failure: failure == 'invalid-json' || failure == 'invalid-data' ? 'response-invalid' : failure,
+        operation: 'connections.list',
+        upstreamOrigin: 'https://connector.test:8443',
+        upstreamPath: '/runtime/v1/apps',
+      })
+      if (failure == 'upstream-status') expect(log).toMatchObject({ status: 403, upstreamErrorCode: 'forbidden' })
+      if (failure == 'transport') expect(log.causeErrorCode).toBe('ECONNREFUSED')
+      expect(captured.output()).not.toContain('runtime-token-private')
+      expect(captured.output()).not.toContain('provider-secret-private')
+    },
+  )
+
+  it.each(['upstream-status', 'invalid-data'] as const)('logs the Team service destination for %s failures', async (failure) => {
+    vi.stubGlobal('fetch', async () => Response.json({}, { status: failure == 'upstream-status' ? 503 : 200 }))
+    const captured = captureLogger()
+    const connector = new ConnectorClient('https://connector.oomol.dev', 'runtime-token-private', 30_000, captured.logger)
+
+    await expect(connector.listTeams()).rejects.toMatchObject({ code: 'connector.unavailable' })
+
+    expect(JSON.parse(captured.output().trim())).toMatchObject({
+      category: 'connector.request.failed',
+      failure: failure == 'invalid-data' ? 'response-invalid' : failure,
+      operation: 'teams.list',
+      upstreamOrigin: 'https://relation-control.oomol.dev',
+      upstreamPath: '/v1/me/teams',
+    })
+    expect(captured.output()).not.toContain('runtime-token-private')
+  })
+
   it('lists OOMOL Teams and scopes Connector requests to the selected Team', async () => {
     const requests: { readonly authorization: string | null; readonly teamId: string | null; readonly url: string }[] = []
     vi.stubGlobal(
@@ -353,6 +404,8 @@ describe('Server Connector client', () => {
         success([
           { id: 'mail-1', service: 'mail', displayName: 'Mail', isDefault: false, status: 'active', marketplace: { id: 'oomol', pricing: 'metered' } },
           { id: 'drive-1', service: 'drive', displayName: 'Drive', isDefault: true, status: 'disconnected' },
+          { id: 'mail-expired', service: 'mail', displayName: 'Expired Mail', isDefault: false, status: 'reauth_required' },
+          { id: 'mail-error', service: 'mail', displayName: 'Mail Error', isDefault: false, status: 'error' },
         ]),
       )
     })
@@ -361,6 +414,8 @@ describe('Server Connector client', () => {
     expect(await connector.listAllConnections(undefined, 'team-1')).toEqual([
       { connectionId: 'mail-1', serviceId: 'mail', displayName: 'Mail', isDefault: false, status: 'active', builtInAccount: true },
       { connectionId: 'drive-1', serviceId: 'drive', displayName: 'Drive', isDefault: true, status: 'disconnected' },
+      { connectionId: 'mail-expired', serviceId: 'mail', displayName: 'Expired Mail', isDefault: false, status: 'reauth_required' },
+      { connectionId: 'mail-error', serviceId: 'mail', displayName: 'Mail Error', isDefault: false, status: 'error' },
     ])
     expect(request).toHaveBeenCalledTimes(1)
   })
@@ -1141,20 +1196,23 @@ describe('Server Connector client', () => {
     })
   })
 
-  it('does not persist the runtime token or an upstream credential error', async () => {
+  it.each([
+    ['connection_not_allowed', 403],
+    ['credential_expired', 409],
+  ])('reports %s (HTTP %s) as a Connection failure without persisting credentials', async (errorCode, status) => {
     const token = 'runtime-token-private'
     const upstreamSecret = 'provider-secret-private'
     const captured = captureLogger()
     const origin = await startConnector((request, response) => {
       if (request.url == '/v1/apps') return send(response, 200, { data: [app], success: true })
-      send(response, 403, { data: {}, errorCode: 'connection_not_allowed', message: `credential=${upstreamSecret}`, success: false })
+      send(response, status, { data: {}, errorCode, message: `credential=${upstreamSecret}`, success: false })
     })
     const { file, service } = await startService(origin, token, 30_000, captured.logger)
     const runId = await run(service)
 
     expect(service.run(runId)?.status).toBe('failed')
     expect(service.events(runId).find((event) => event.kind == 'node.failed')).toMatchObject({
-      payload: { error: { code: 'connector.connection-required' } },
+      payload: { error: { code: 'connector.connection-required', message: 'The selected Connector Connection must be reconnected or replaced.' } },
     })
     const database = new DatabaseSync(file, { readOnly: true })
     const stored = JSON.stringify({
@@ -1167,9 +1225,21 @@ describe('Server Connector client', () => {
     expect(stored).not.toContain(upstreamSecret)
     expect(captured.output()).toContain('"category":"connector.request.failed"')
     expect(captured.output()).toContain('"operation":"action.execute"')
-    expect(captured.output()).toContain('"status":403')
+    expect(captured.output()).toContain(`"status":${status}`)
     expect(captured.output()).not.toContain(token)
     expect(captured.output()).not.toContain(upstreamSecret)
+  })
+
+  it('reports expired proxy credentials as a Connection failure', async () => {
+    const origin = await startConnector((request, response) => {
+      if (request.url == '/v1/apps') return send(response, 200, { data: [app], success: true })
+      send(response, 409, { errorCode: 'credential_expired', success: false })
+    })
+    const connector = new ConnectorClient(origin, 'runtime-token')
+
+    await expect(
+      connector.proxy('example', 'connection-work', 'binding-main', { endpoint: '/items', method: 'GET' }, new AbortController().signal),
+    ).rejects.toMatchObject({ code: 'connector.connection-required', message: 'The selected Connector Connection must be reconnected or replaced.' })
   })
 
   it('propagates the node timeout into an in-flight Connector request', async () => {
@@ -1187,6 +1257,7 @@ describe('Server Connector client', () => {
 
   it.each([
     [400, false, 'Connector reported an action failure (HTTP 400).'],
+    [409, false, 'Connector reported an action failure (HTTP 409).'],
     [502, false, 'Connector reported an action failure (HTTP 502).'],
     [200, true, 'Connector returned an unexpected action response (HTTP 200).'],
   ])('preserves the HTTP %s failure reason without exposing the upstream body', async (status, succeeded, message) => {

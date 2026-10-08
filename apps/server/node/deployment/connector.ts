@@ -22,6 +22,7 @@ import {
   providerAccessAllowsProxy,
   providerAccessAllowsTrigger,
   providerAccessBindingCandidates,
+  providerAccessConnections,
   resolveProviderAccessBinding,
 } from './provider-access.ts'
 
@@ -216,7 +217,7 @@ export class ConnectorClient implements ConnectorHost {
     if (this.#teamOrigin == null || this.#token.length == 0) throw unavailable()
     const response = await this.#request('teams.list', 'v1/me/teams', { method: 'GET' }, signal, { origin: this.#teamOrigin })
     if (!response.ok) throw unavailable()
-    return this.#decode('teams.list', {}, () => {
+    return this.#decode('teams.list', { upstreamOrigin: this.#teamOrigin.origin, upstreamPath: '/v1/me/teams' }, () => {
       if (!record(response.value) || !Array.isArray(response.value.teams)) throw unavailable()
       return response.value.teams.map(runtimeTeam)
     })
@@ -230,23 +231,12 @@ export class ConnectorClient implements ConnectorHost {
     readonly results: readonly (ConnectorAccessCandidates | { readonly providerId: string; readonly error: Pick<ConnectorTaskError, 'code' | 'message'> })[]
     readonly version: 1
   }> {
-    if (this.#teamOrigin == null || this.#token.length == 0) throw unavailable()
-    const response = await this.#request('teams.membership', 'v1/me/teams', { method: 'GET' }, signal, { origin: this.#teamOrigin })
-    if (!response.ok || !record(response.value) || !Array.isArray(response.value.teams)) throw unavailable('The OOMOL Team membership could not be loaded.')
-    const team = response.value.teams.find((entry: unknown) => record(entry) && entry.id == teamId)
-    if (!record(team) || team.deleted !== false || team.status != 'normal') throw accessInvalid()
-    if (team.role != 'creator' && team.role != 'admin' && team.role != 'member') throw accessInvalid()
-    const teamAdmin = team.role == 'creator' || team.role == 'admin'
-    const [actorId, connections, access] = await Promise.all([
-      teamAdmin ? Promise.resolve('') : this.#oomolUserId(signal),
-      this.#connections(providerIds.length == 1 ? providerIds[0] : undefined, signal, teamId),
-      teamAdmin ? Promise.resolve({ policy: {} }) : this.#readTeamAppAccess(teamId, signal),
-    ])
+    const context = await this.#providerAccessContext(teamId, providerIds, signal)
     const results = await Promise.all(
       providerIds.map(async (providerId) => {
         signal?.throwIfAborted()
         try {
-          const candidates = await providerAccessBindingCandidates({ actorId, connections, ...access, providerId, teamId, teamAdmin })
+          const candidates = await providerAccessBindingCandidates({ ...context, providerId, teamId })
           return { providerId, candidates, mode: 'selectable' as const, version: 1 as const }
         } catch (error) {
           signal?.throwIfAborted()
@@ -257,6 +247,22 @@ export class ConnectorClient implements ConnectorHost {
       }),
     )
     return { results, version: 1 }
+  }
+
+  async #providerAccessContext(teamId: string, providerIds: readonly string[], signal?: AbortSignal, catalog?: readonly ConnectorConnection[]) {
+    if (this.#teamOrigin == null || this.#token.length == 0) throw unavailable()
+    const response = await this.#request('teams.membership', 'v1/me/teams', { method: 'GET' }, signal, { origin: this.#teamOrigin })
+    if (!response.ok || !record(response.value) || !Array.isArray(response.value.teams)) throw unavailable('The OOMOL Team membership could not be loaded.')
+    const team = response.value.teams.find((entry: unknown) => record(entry) && entry.id == teamId)
+    if (!record(team) || team.deleted !== false || team.status != 'normal') throw accessInvalid()
+    if (team.role != 'creator' && team.role != 'admin' && team.role != 'member') throw accessInvalid()
+    const teamAdmin = team.role == 'creator' || team.role == 'admin'
+    const [actorId, connections, access] = await Promise.all([
+      teamAdmin ? Promise.resolve('') : this.#oomolUserId(signal),
+      catalog ?? this.#connections(providerIds.length == 1 ? providerIds[0] : undefined, signal, teamId),
+      teamAdmin ? Promise.resolve({ policy: {} }) : this.#readTeamAppAccess(teamId, signal),
+    ])
+    return { actorId, connections, ...access, teamAdmin }
   }
 
   async #oomolUserId(signal?: AbortSignal): Promise<string> {
@@ -360,6 +366,7 @@ export class ConnectorClient implements ConnectorHost {
                 limitBytes: maxActionCatalogBytes,
                 operation: 'actions.list',
                 responseBytes,
+                upstreamOrigin: this.#origin.origin,
               },
               'Connector Action catalog was too large.',
             )
@@ -436,6 +443,7 @@ export class ConnectorClient implements ConnectorHost {
 
   async listAllConnections(signal?: AbortSignal, access?: ConnectorClientAccess): Promise<readonly ConnectorConnection[]> {
     const connections = await this.#connections(undefined, signal, connectorTeamId(access))
+    if (selectableAccess(access) && access.scope == 'catalog') return this.#visibleConnections(access, connections, signal)
     const bindings = await this.#accessBindings(access, signal, connections)
     if (bindings == null) return connections
     const allowed = new Set(bindings.map((binding) => binding.appId))
@@ -443,6 +451,8 @@ export class ConnectorClient implements ConnectorHost {
   }
 
   async listConnections(serviceId: string, signal?: AbortSignal, access?: ConnectorClientAccess): Promise<readonly ConnectorConnection[]> {
+    if (selectableAccess(access) && access.scope == 'catalog')
+      return this.#visibleConnections(access, await this.#connections(serviceId, signal, access.teamId), signal)
     const bindings = await this.#providerAccessBindings(access, serviceId, signal)
     return bindings == null ? await this.#connections(serviceId, signal, connectorTeamId(access)) : bindings.map((binding) => binding.connection)
   }
@@ -520,7 +530,8 @@ export class ConnectorClient implements ConnectorHost {
         `Connector returned an invalid action response (HTTP ${actionResponse.status}). The action outcome is unknown.`,
       )
     if (actionResponse.ok && response.success === true && Object.hasOwn(response, 'data')) return response.data as JsonValue
-    if (response.errorCode === 'connection_not_allowed' || response.errorCode === 'connection_not_found') throw connectionRequired()
+    if (response.errorCode === 'credential_expired' || response.errorCode === 'connection_not_allowed' || response.errorCode === 'connection_not_found')
+      throw connectionRequired()
     const failure = actionFailure(response)
     if (failure.code == 'connector.input-invalid') throw failure
     throw new ConnectorTaskError(
@@ -618,7 +629,8 @@ export class ConnectorClient implements ConnectorHost {
         return { data: response.data.data, status: Number(status) }
       }
     }
-    if (response.errorCode === 'connection_not_allowed' || response.errorCode === 'connection_not_found') throw connectionRequired()
+    if (response.errorCode === 'credential_expired' || response.errorCode === 'connection_not_allowed' || response.errorCode === 'connection_not_found')
+      throw connectionRequired()
     const details = connectorFailureDetails(response, this.#token)
     throw unavailable(
       `Connector proxy request failed (HTTP ${proxyResponse.status})${details.upstreamErrorCode ? ` [${details.upstreamErrorCode}]` : ''}${details.upstreamErrorMessage ? `: ${details.upstreamErrorMessage}` : '.'}`,
@@ -638,6 +650,27 @@ export class ConnectorClient implements ConnectorHost {
     const bindings = selectedGrants(access)
     if (access.teamId == null) throw accessInvalid()
     return this.#resolveAccessBindings(access.teamId, bindings, signal, connections)
+  }
+
+  async #visibleConnections(
+    access: Extract<ConnectorAccessContext, { readonly scope: 'catalog' }>,
+    connections: readonly ConnectorConnection[],
+    signal?: AbortSignal,
+  ): Promise<readonly ConnectorConnection[]> {
+    const { teamId } = access
+    if (teamId == null) throw accessInvalid()
+    const providerIds = [...new Set(connections.map((connection) => connection.serviceId))]
+    if (providerIds.length == 0) return []
+    const context = await this.#providerAccessContext(teamId, providerIds, signal, connections)
+    try {
+      const visible = await Promise.all(providerIds.map((providerId) => providerAccessConnections({ ...context, providerId, teamId })))
+      const allowed = new Set(visible.flat().map((connection) => connection.connectionId))
+      return connections.filter((connection) => allowed.has(connection.connectionId))
+    } catch (error) {
+      signal?.throwIfAborted()
+      if (error instanceof TypeError) throw unavailable('Connector Connection access could not be loaded.')
+      throw error
+    }
   }
 
   async #providerAccessBindings(
@@ -745,7 +778,7 @@ export class ConnectorClient implements ConnectorHost {
     const response = await this.#request(operation, path, { method: 'GET' }, signal, options)
     if (!response.ok) throw options.failure?.(response.value) ?? unavailable()
     signal?.throwIfAborted()
-    return this.#decode(operation, options.fields ?? {}, () => decode(response.value))
+    return this.#decode(operation, { ...options.fields, upstreamPath: new URL(path, this.#origin).pathname }, () => decode(response.value))
   }
 
   #decode<Value>(operation: string, fields: Readonly<Record<string, string>>, decode: () => Value): Value {
@@ -758,6 +791,7 @@ export class ConnectorClient implements ConnectorHost {
           errorMessage: error instanceof Error ? error.message : String(error),
           failure: 'response-invalid',
           operation,
+          upstreamOrigin: this.#origin.origin,
           ...fields,
           ...errorKind(error),
         },
@@ -811,9 +845,10 @@ export class ConnectorClient implements ConnectorHost {
   ): Promise<{ readonly headers: Headers; readonly ok: boolean; readonly status: number; readonly value: unknown }> {
     const startedAt = performance.now()
     const timeout = AbortSignal.timeout(this.#timeoutMs)
+    const target = new URL(path, origin)
     let status: number | undefined
     try {
-      const response = await fetch(new URL(path, origin), {
+      const response = await fetch(target, {
         ...init,
         headers: {
           ...(this.#token == '' ? {} : { authorization: `Bearer ${this.#token}` }),
@@ -836,6 +871,8 @@ export class ConnectorClient implements ConnectorHost {
             method: init.method ?? 'GET',
             operation,
             status,
+            upstreamOrigin: target.origin,
+            upstreamPath: target.pathname,
             ...fields,
           },
           'Connector request failed.',
@@ -856,6 +893,8 @@ export class ConnectorClient implements ConnectorHost {
           method: init.method ?? 'GET',
           operation,
           ...(status == null ? {} : { status }),
+          upstreamOrigin: target.origin,
+          upstreamPath: target.pathname,
           ...fields,
           ...errorKind(error),
         },
@@ -1029,12 +1068,13 @@ function runtimeTeam(value: unknown): { readonly id: string; readonly name: stri
   }
 }
 
-function connectionStatus(value: unknown): 'active' | 'disconnected' {
+function connectionStatus(value: unknown): ConnectorConnection['status'] {
   switch (value) {
     case 'active':
-      return 'active'
     case 'disconnected':
-      return 'disconnected'
+    case 'error':
+    case 'reauth_required':
+      return value
     default:
       throw unavailable('Connector Connection status was invalid.')
   }

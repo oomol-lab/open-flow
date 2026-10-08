@@ -29,6 +29,16 @@ interface AppAccess {
   readonly providerId: string
 }
 
+interface ProviderAccessInput {
+  readonly teamAdmin?: boolean
+  readonly actorId: string
+  readonly connections: readonly ConnectorConnection[]
+  readonly policy: unknown
+  readonly policyRevision?: string
+  readonly providerId: string
+  readonly teamId: string
+}
+
 export interface TeamAppAccess {
   readonly policy: unknown
   readonly policyRevision?: string
@@ -100,37 +110,36 @@ export async function resolveProviderAccessBinding(
   }
 }
 
-export async function providerAccessBindingCandidates(input: {
-  readonly teamAdmin?: boolean
-  readonly actorId: string
-  readonly connections: readonly ConnectorConnection[]
-  readonly policy: unknown
-  readonly policyRevision?: string
-  readonly providerId: string
-  readonly teamId: string
-}): Promise<readonly ProviderAccessBindingCandidate[]> {
+export async function providerAccessBindingCandidates(input: ProviderAccessInput): Promise<readonly ProviderAccessBindingCandidate[]> {
+  return providerAccessBindings({ ...input, connections: input.connections.filter((connection) => connection.status == 'active') })
+}
+
+export async function providerAccessConnections(input: ProviderAccessInput): Promise<readonly ConnectorConnection[]> {
+  const allowed = new Set((await providerAccessBindings(input)).map((binding) => binding.connectionId))
+  return input.connections.filter((connection) => allowed.has(connection.connectionId))
+}
+
+async function providerAccessBindings(input: ProviderAccessInput): Promise<readonly ProviderAccessBindingCandidate[]> {
   if (!isObject(input.policy)) throw new TypeError('Connector access must be an object.')
   const connections = input.connections.filter((connection) => connection.serviceId == input.providerId)
   if (input.teamAdmin)
     return await Promise.all(
-      connections
-        .filter((connection) => connection.status == 'active')
-        .map(async (connection) => {
-          const identity = { connectionId: connection.connectionId, providerId: input.providerId, source: { kind: 'admin-delegation' as const } }
-          return Object.assign(identity, {
-            accessBindingId: await providerAccessBindingId(input.teamId, identity),
-            connectionDisplayName: connection.displayName,
-            isDefault: connection.isDefault,
-            permissionGroupName: null,
-            permissions: { actionIds: [], allActions: true, triggerIds: [], allTriggers: true, configured: false, proxy: true },
-          })
-        }),
+      connections.map(async (connection) => {
+        const identity = { connectionId: connection.connectionId, providerId: input.providerId, source: { kind: 'admin-delegation' as const } }
+        return Object.assign(identity, {
+          accessBindingId: await providerAccessBindingId(input.teamId, identity),
+          connectionDisplayName: connection.displayName,
+          isDefault: connection.isDefault,
+          permissionGroupName: null,
+          permissions: { actionIds: [], allActions: true, triggerIds: [], allTriggers: true, configured: false, proxy: true },
+        })
+      }),
     )
   const candidates = await Promise.all(
     parseAppAccess(input.policy, connections)
       .flatMap((app) => {
         const connection = connections.find((item) => item.connectionId == app.appId)
-        if (connection == null || connection.status != 'active') return []
+        if (connection == null) return []
         const assigned = app.permissionRules.assignments[input.actorId]
         const rule = assigned == null ? undefined : app.permissionRules.rules.find((item) => item.id == assigned)
         const selected = rule ?? app.permissionRules.teamDefault
