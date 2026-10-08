@@ -229,7 +229,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         .replaceAll("'../../../localization/common/languages.ts'", "'../common/localization.js'"),
     )
     let uiDeclaration = await readFile(path.join(declarationRoot, 'ui/browser/public.d.ts'), 'utf8')
-    for (const name of ['input', 'label', 'logo', 'textarea', 'hostTooltip', 'hostNavigationActions']) {
+    for (const name of ['input', 'label', 'logo', 'textarea', 'hostTooltip', 'hostNavigationActions', 'idTooltip']) {
       const declaration = (await readFile(path.join(declarationRoot, `ui/browser/${name}.d.ts`), 'utf8')).replaceAll(
         "'../../localization/common/languages.ts'",
         "'../common/localization.js'",

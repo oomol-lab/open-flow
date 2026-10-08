@@ -26,6 +26,15 @@ Server on `http://127.0.0.1:3001`. The first run writes an operator token to
 `apps/server/.open-flow-dev/operator-token`; later runs reuse it. Set `OPEN_FLOW_TOKEN` to use an
 explicit token instead.
 
+## CLI Lab
+
+Run `bun run lab start fix-notification` for an isolated CLI session with a read-only workflow preview, mock accounts and
+external services. In another terminal, use `bun run lab open` and `bun run lab flow ...` to
+inspect or edit the same workflow. `bun run lab verify` checks the task; `bun run lab report`
+shows operation counts and input/output bytes. `bun run lab test` runs the four reference
+scenarios without model calls. See the [CLI Lab guide](docs/authoring/cli-lab.md) for sessions,
+reset, comparisons, and adding scenarios.
+
 ## Repository Layout
 
 - [`packages/open-flow`](packages/open-flow): the public `@oomol-lab/open-flow` npm package.

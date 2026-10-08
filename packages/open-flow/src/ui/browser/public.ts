@@ -84,3 +84,5 @@ export function NotificationUndoLabel({ children }: { children: ReactNode }): Re
 export { HostTooltip, type HostTooltipProps } from './hostTooltip.tsx'
 
 export { HostNavigationActions, type HostNavigationActionsProps, type HostThemeMode } from './hostNavigationActions.tsx'
+
+export { IdTooltip } from './idTooltip.tsx'

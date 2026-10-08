@@ -40,12 +40,13 @@ interface ErrorDetails {
 }
 
 export class CliError extends Error {
-  constructor(
-    readonly code: string,
-    message: string,
-    readonly details?: ErrorDetails,
-  ) {
+  readonly code: string
+  readonly details?: ErrorDetails
+
+  constructor(code: string, message: string, details?: ErrorDetails) {
     super(message)
+    this.code = code
+    this.details = details
     this.name = 'CliError'
   }
 }

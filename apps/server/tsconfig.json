@@ -18,6 +18,15 @@
     "target": "ES2024",
     "types": ["node", "vite/client"]
   },
-  "include": ["browser/**/*.ts", "browser/**/*.tsx", "node/**/*.ts", "scripts/**/*.ts", "test/**/*.ts", "vite.config.ts", "vitest.config.ts"],
+  "include": [
+    "browser/**/*.ts",
+    "browser/**/*.tsx",
+    "node/**/*.ts",
+    "scripts/**/*.ts",
+    "scripts/**/*.tsx",
+    "test/**/*.ts",
+    "vite.config.ts",
+    "vitest.config.ts"
+  ],
   "exclude": ["dist", "node_modules"]
 }

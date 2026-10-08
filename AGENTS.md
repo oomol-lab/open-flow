@@ -116,6 +116,11 @@ the product when integration matters. Browser acceptance is warranted when rende
 interaction is material and cheaper evidence is insufficient. Report material verification gaps
 honestly.
 
+When changing CLI authoring behavior, use CLI Lab to reproduce the task and run affected reference
+scenarios. Use its read-only preview when visual inspection helps. See
+[CLI Lab](docs/authoring/cli-lab.md) for commands, scenario authoring, and cost accounting. Changes to
+the preview do not replace verification of the editable Workbench.
+
 Run the Open Flow test suite with `bun run test` from `packages/open-flow`. Do not invoke `bun test`
 directly because it bypasses the project's Vitest configuration.
 

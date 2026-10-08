@@ -16,3 +16,6 @@ assets/star-history/star-history.png
 
 .env
 .env.local
+
+# CLI Lab sessions and reports.
+.open-flow-lab/

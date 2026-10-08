@@ -14,33 +14,45 @@ import { developmentBackendAgent, developmentBackendPlugin } from './scripts/dev
 
 const serverPathPattern = `^(?:${serverPaths.join('|')})(?:/|$)`
 
-export default defineConfig(({ command }) => ({
-  publicDir: path.resolve(import.meta.dirname, '../../assets/logo'),
-  build: { outDir: 'dist/public' },
-  css: { modules: { generateScopedName } },
-  plugins: [
-    triggerLocalesPlugin(),
-    command == 'serve' ? developmentBackendPlugin() : undefined,
-    providerIconsPlugin(),
-    twemojiCollectionPlugin(),
-    tailwindcss(),
-    UnoCSS({
-      ...designerUnoConfig,
-      postprocess: [
-        (utility) => {
-          utility.selector = scopeDesignerSelector(utility.selector, [...designerUnoScopes, '.server-host'])
-        },
-      ],
-    }),
-    react(),
-    fullReloadPlugin(),
-  ],
-  server: {
-    proxy: {
-      [serverPathPattern]: { target: process.env.OPEN_FLOW_DEV_API_ORIGIN ?? 'http://127.0.0.1:3001', agent: developmentBackendAgent() },
+export function frontendConfig() {
+  return {
+    publicDir: path.resolve(import.meta.dirname, '../../assets/logo'),
+    build: { outDir: 'dist/public' },
+    css: { modules: { generateScopedName } },
+    plugins: [
+      triggerLocalesPlugin(),
+      providerIconsPlugin(),
+      twemojiCollectionPlugin(),
+      tailwindcss(),
+      UnoCSS({
+        ...designerUnoConfig,
+        postprocess: [
+          (utility) => {
+            utility.selector = scopeDesignerSelector(utility.selector, [...designerUnoScopes, '.server-host'])
+          },
+        ],
+      }),
+      react(),
+      fullReloadPlugin(),
+    ],
+    optimizeDeps: {
+      entries: ['index.html', '../../packages/open-flow/src/workbench/browser/typeScriptWorker.ts'],
     },
-  },
-  optimizeDeps: {
-    entries: ['index.html', '../../packages/open-flow/src/workbench/browser/typeScriptWorker.ts'],
-  },
-}))
+  }
+}
+
+export default defineConfig(({ command }) => {
+  const frontend = frontendConfig()
+  return {
+    ...frontend,
+    plugins: [...frontend.plugins, command == 'serve' ? developmentBackendPlugin() : undefined],
+    server: {
+      proxy: {
+        [serverPathPattern]: {
+          target: process.env.OPEN_FLOW_DEV_API_ORIGIN ?? 'http://127.0.0.1:3001',
+          agent: developmentBackendAgent(),
+        },
+      },
+    },
+  }
+})
