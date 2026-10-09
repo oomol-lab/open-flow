@@ -16,6 +16,23 @@ it('uses the development API and token while opening the frontend origin', async
   expect(await host.getWorkbenchUrl!('flow name')).toBe('http://localhost:5174/flows/flow%20name/design')
 })
 
+it('retries failed connection resolution and caches a successful retry', async () => {
+  const readToken = vi.fn(async () => token).mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }))
+  const fetcher = vi.fn(async () => new Response('{}'))
+  const host = createDevelopmentCommandHost({}, { readToken, fetch: fetcher })
+  await Promise.all([
+    expect(host.cloudRequest!('/v1/flows')).rejects.toThrow('Development operator token is missing'),
+    expect(host.getWorkbenchUrl!()).rejects.toThrow('Development operator token is missing'),
+  ])
+  expect(readToken).toHaveBeenCalledTimes(1)
+  expect(fetcher).not.toHaveBeenCalled()
+
+  expect((await host.cloudRequest!('/v1/flows')).status).toBe(200)
+  expect(await host.getWorkbenchUrl!()).toBe('http://localhost:5174/flows')
+  expect(readToken).toHaveBeenCalledTimes(2)
+  expect(fetcher).toHaveBeenCalledTimes(1)
+})
+
 it('uses environment credentials and the configured development port', async () => {
   const readToken = vi.fn()
   const fetcher = vi.fn(async (_url: URL, _init: RequestInit) => new Response('{}'))

@@ -56,6 +56,8 @@ describe('CLI', () => {
       ['--help', '--json'],
       ['edit', '--help', '--json'],
       ['runs', 'show', '--json'],
+      ['open', 'flow', 'extra', '--json'],
+      ['workbench', 'flow', 'extra', '--json'],
       ['unknown', '--json'],
     ]) {
       const output = runtime()

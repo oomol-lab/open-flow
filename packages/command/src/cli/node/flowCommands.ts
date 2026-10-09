@@ -74,7 +74,7 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
     }
     case 'open':
     case 'workbench': {
-      if (operands.length > 1) throw new CliError('cli.invalid-arguments', `Usage: oo flow ${operation} [flow] [--json]`)
+      if (operands.length > 1) throw new CliError('cli.invalid-arguments', `Usage: ${runtime.commandPrefix ?? 'oo flow'} ${operation} [flow] [--json]`)
       if (host.getWorkbenchUrl == null) throw new CliError('workbench.unavailable', 'This CLI host cannot provide a Workbench URL.')
       const flow = operands[0] == null ? undefined : await referencedFlow(client, operands[0])
       const url = await host.getWorkbenchUrl(flow?.flowId)

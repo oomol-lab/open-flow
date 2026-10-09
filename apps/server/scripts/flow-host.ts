@@ -9,7 +9,11 @@ export function createDevelopmentCommandHost(
   dependencies: { readToken?: () => Promise<string>; fetch?: (url: URL, init: RequestInit) => Promise<Response> } = {},
 ): OpenFlowCommandHost {
   let connection: Promise<{ origin: string; token: string; workbenchOrigin: string }> | undefined
-  const resolveConnection = () => (connection ??= resolve())
+  const resolveConnection = () =>
+    (connection ??= resolve().catch((error) => {
+      connection = undefined
+      throw error
+    }))
   return {
     async cloudRequest(path, init = {}) {
       const { origin, token } = await resolveConnection()
