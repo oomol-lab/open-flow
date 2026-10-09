@@ -70,7 +70,7 @@ function renderAccount(overrides: Partial<ComponentProps<typeof ConnectorAccount
         disabled={false}
         fieldIdPrefix="mail"
         loading={false}
-        taskId="mail"
+        nodeId="mail"
         onConfigureAccess={vi.fn()}
         {...overrides}
       />

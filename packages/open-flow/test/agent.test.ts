@@ -1,4 +1,5 @@
 import type { FlowRunOutcome, FlowRunOptions, TaskInvocation } from '../src/execution/common/scheduler.ts'
+import type { TaskNode } from '../src/flow/common/change.ts'
 import type { AgentTool, JsonValue, ManagedTaskDefinition, RevisionContent } from '../src/flow/common/change.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
@@ -43,12 +44,12 @@ function revision(agent = task()): RevisionContent {
     modules: {},
     document: {
       bindings: {},
-      tasks: { agent },
+
       graph: {
         edges: [{ source: 'trigger', target: 'agent' }],
         nodes: {
           trigger: { kind: 'manual', name: 'Start' },
-          agent: { kind: 'task', maxExecutions: 1, name: 'Agent', taskId: 'agent', inputs: { email: { kind: 'value', value: 'customer@example.com' } } },
+          agent: { kind: 'task', maxExecutions: 1, name: 'Agent', task: agent, inputs: { email: { kind: 'value', value: 'customer@example.com' } } },
         },
       },
     },
@@ -59,9 +60,9 @@ describe('Agent tool contracts', () => {
   it('edits an Agent atomically and rejects a stale definition', () => {
     const before = task()
     const value = { ...before, executor: { ...before.executor, maxRounds: 5 } } as ManagedTaskDefinition
-    const operations = decodeChangeOperations([{ kind: 'task.agent.set', taskId: 'agent', before, value }])
+    const operations = decodeChangeOperations([{ kind: 'graph.node.task.set', target: { kind: 'flow' as const }, nodeId: 'agent', before, value }])
     const edited = applyFlowChanges(revision(before), operations)
-    expect(edited.document.tasks.agent).toEqual(value)
+    expect((edited.document.graph.nodes['agent'] as TaskNode).task as ManagedTaskDefinition).toEqual(value)
     expect(() => applyFlowChanges(edited, operations)).toThrow(/changed/)
   })
 
@@ -92,14 +93,14 @@ describe('Agent tool contracts', () => {
   })
 
   it('rejects duplicate tools, invalid mappings and unsupported schema constraints', () => {
-    expect(agentConfigIssues(task([tool, tool]), {})).toEqual(
+    expect(agentConfigIssues(task([tool, tool]))).toEqual(
       expect.arrayContaining(['Agent tool identities must be non-empty and unique.', 'Agent tool names must be unique provider-compatible names.']),
     )
     const invalid = {
       ...tool,
       inputs: [{ ...tool.inputs[0]!, source: { kind: 'input' as const, input: 'missing' }, jsonSchema: { type: 'string', customConstraint: true } }],
     }
-    expect(agentConfigIssues(task([invalid]), {})).toEqual(
+    expect(agentConfigIssues(task([invalid]))).toEqual(
       expect.arrayContaining([
         'Tool send_mail input to has an invalid schema (unsupported keywords: customConstraint).',
         'Tool send_mail input to has an incompatible source.',
@@ -121,7 +122,7 @@ describe('Agent tool contracts', () => {
       ],
     }
     const original = structuredClone(gmail)
-    expect(agentConfigIssues(task([gmail]), {})).toEqual([])
+    expect(agentConfigIssues(task([gmail]))).toEqual([])
     expect(agentToolSchema(gmail)).toMatchObject({
       properties: {
         detail: { type: 'string', enum: ['ids', 'summary', 'full'], description: 'How much message detail to return.' },
@@ -165,7 +166,7 @@ describe('Agent tool contracts', () => {
         { handle: 'fixed', nullable: false, source: { kind: 'value', value: 'actual' }, jsonSchema: { type: 'string', default: 'metadata', writeOnly: true } },
       ],
     }
-    expect(agentConfigIssues(task([annotated]), {})).toEqual([])
+    expect(agentConfigIssues(task([annotated]))).toEqual([])
     expect(agentToolSchema(annotated)).toEqual({
       type: 'object',
       required: ['data'],
@@ -185,7 +186,7 @@ describe('Agent tool contracts', () => {
       ...annotated,
       inputs: [{ ...annotated.inputs[0]!, jsonSchema: { type: 'object', properties: { ref: { $ref: '#/missing' } } } }],
     }
-    expect(agentConfigIssues(task([unsupported]), {})).toContain('Tool send_mail input data has an invalid schema (Unresolved schema reference: #/missing).')
+    expect(agentConfigIssues(task([unsupported]))).toContain('Tool send_mail input data has an invalid schema (Unresolved schema reference: #/missing).')
   })
 
   it('roundtrips the full declaration and includes authority changes in the digest', async () => {
@@ -195,34 +196,32 @@ describe('Agent tool contracts', () => {
     expect(await digestBytes(encodeRevision(value))).not.toEqual(await digestBytes(encodeRevision(revision(task([{ ...tool, approval: false }])))))
   })
 
-  it('includes notification Tasks in the closure and validates their independent inputs', () => {
+  it('keeps notification configuration on its Agent and validates its independent inputs', () => {
     const value = revision()
-    const original = value.document.tasks.agent!
+    const original = ((value.document.graph.nodes['agent'] as TaskNode).task as ManagedTaskDefinition)!
     if (original.executor.kind != 'agent') throw new Error('Expected Agent fixture.')
     const agent: ManagedTaskDefinition = {
       ...original,
       executor: {
         ...original.executor,
         notification: {
-          taskId: 'notice',
+          action: 'mail.send',
+          connectionId: 'reviewer',
+          inputDefinitions: [
+            { handle: 'text', jsonSchema: { type: 'string' }, nullable: false },
+            { handle: 'recipient', jsonSchema: { type: 'string' }, nullable: false },
+          ],
           messageHandle: 'text',
           inputs: { recipient: { kind: 'input', input: 'email' } },
         },
       },
     }
-    const notice: ManagedTaskDefinition = {
-      name: 'Notify',
-      executor: { kind: 'connector', action: 'mail.send', connectionId: 'reviewer' },
-      outputs: [],
-      inputs: [
-        { handle: 'text', jsonSchema: { type: 'string' }, nullable: false },
-        { handle: 'recipient', jsonSchema: { type: 'string' }, nullable: false },
-      ],
-    }
-    const document = { ...value.document, tasks: { agent, notice } }
-    expect([...flowDependencies({ ...value, document }).tasks].toSorted()).toEqual(['agent', 'notice'])
-    expect(agentConfigIssues(agent, document.tasks)).toEqual([])
-    expect(agentConfigIssues(agent, { agent })).toContain('Agent notification must reference a Connector Task.')
+    const content = revision(agent)
+    expect([...flowDependencies(content).nodes].toSorted()).toEqual(['agent', 'trigger'])
+    expect(agentConfigIssues(agent)).toEqual([])
+    if (agent.executor.kind != 'agent') throw new Error('Expected Agent')
+    const invalid = { ...agent, executor: { ...agent.executor, notification: { ...agent.executor.notification!, action: '' } } } as ManagedTaskDefinition
+    expect(agentConfigIssues(invalid)).toContain('Agent notification requires an action.')
   })
 
   it('accepts root Agents', async () => {
@@ -472,7 +471,7 @@ describe('Agent JSON Schema compatibility', () => {
     [{ type: 'object', allOf: [{ properties: { allowed: { type: 'boolean' } } }], unevaluatedProperties: false }, { allowed: true }, { extra: true }],
   ] as readonly (readonly [JsonValue, JsonValue, JsonValue])[])('enforces %j rather than merely accepting its keywords', (jsonSchema, valid, invalid) => {
     const declaration: AgentTool = { ...tool, inputs: [{ handle: 'value', jsonSchema, nullable: false, source: { kind: 'model' } }] }
-    expect(agentConfigIssues(task([declaration]), {})).toEqual([])
+    expect(agentConfigIssues(task([declaration]))).toEqual([])
     expect(agentToolInput(declaration, {}, { value: valid })).toEqual({ value: valid })
     expect(() => agentToolInput(declaration, {}, { value: invalid })).toThrow()
     expect(matchesSchema({ value: valid }, agentToolSchema(declaration))).toBe(true)
@@ -490,7 +489,7 @@ describe('Agent JSON Schema compatibility', () => {
     }
     const declaration: AgentTool = { ...tool, inputs: [{ handle: 'request', jsonSchema, nullable: false, source: { kind: 'model' } }] }
     const before = structuredClone(declaration)
-    expect(agentConfigIssues(task([declaration]), {})).toEqual([])
+    expect(agentConfigIssues(task([declaration]))).toEqual([])
     expect(JSON.stringify(agentToolSchema(declaration))).not.toContain('$ref')
     expect(agentToolInput(declaration, {}, { request: { count: 10 } })).toEqual({ request: { count: 10 } })
     expect(() => agentToolInput(declaration, {}, { request: { count: 21 } })).toThrow()
@@ -511,22 +510,22 @@ describe('Agent JSON Schema compatibility', () => {
   it('allows recursive fixed data but explains references that cannot be sent to a model', () => {
     const jsonSchema = { type: 'object', properties: { next: { $ref: '#' } }, additionalProperties: false }
     const fixed: AgentTool = { ...tool, inputs: [{ handle: 'chain', jsonSchema, nullable: false, source: { kind: 'value', value: { next: {} } } }] }
-    expect(agentConfigIssues(task([fixed]), {})).toEqual([])
+    expect(agentConfigIssues(task([fixed]))).toEqual([])
     expect(agentToolInput(fixed, {}, {})).toEqual({ chain: { next: {} } })
     const generated: AgentTool = { ...fixed, inputs: [{ ...fixed.inputs[0]!, source: { kind: 'model' } }] }
-    expect(agentConfigIssues(task([generated]), {}).join(' ')).toContain('Recursive reference')
+    expect(agentConfigIssues(task([generated])).join(' ')).toContain('Recursive reference')
     const external: AgentTool = { ...generated, inputs: [{ ...generated.inputs[0]!, jsonSchema: { $ref: 'https://example.com/schema' } }] }
-    expect(agentConfigIssues(task([external]), {}).join(' ')).toContain('External or anchor reference')
+    expect(agentConfigIssues(task([external])).join(' ')).toContain('External or anchor reference')
   })
 })
 
 it('reserves the saved result reader name for the host', () => {
-  expect(agentConfigIssues(task([{ ...tool, name: 'read_result' }]), {}).join(' ')).toContain('reserved')
+  expect(agentConfigIssues(task([{ ...tool, name: 'read_result' }])).join(' ')).toContain('reserved')
 })
 
 it('accepts an Agent without tools or code computation', async () => {
   const agent = task([])
-  expect(agentConfigIssues(agent, {})).toEqual([])
+  expect(agentConfigIssues(agent)).toEqual([])
   const value = revision(agent)
   expect((await validateFlow(value, findEngineContract(currentEngineContract)!)).diagnostics).toEqual([])
   expect(decodeRevision(encodeRevision(value))).toEqual(value)
@@ -534,16 +533,16 @@ it('accepts an Agent without tools or code computation', async () => {
 
 it('accepts 64 tools and rejects 65 tools', () => {
   const tools = Array.from({ length: 65 }, (_, index) => ({ ...tool, id: `tool-${index}`, name: `tool_${index}` }))
-  expect(agentConfigIssues(task(tools.slice(0, 64)), {})).toEqual([])
-  expect(agentConfigIssues(task(tools), {})).toEqual(['Declare at most 64 Agent tools.'])
+  expect(agentConfigIssues(task(tools.slice(0, 64)))).toEqual([])
+  expect(agentConfigIssues(task(tools))).toEqual(['Declare at most 64 Agent tools.'])
 })
 
 it('round trips code capability and permits an Agent without Connector tools', () => {
   const agent = task([])
   if (agent.executor.kind != 'agent') throw new Error('Expected Agent.')
   const enabled = { ...agent, executor: { ...agent.executor, code: true } }
-  expect(agentConfigIssues(enabled, {})).toEqual([])
+  expect(agentConfigIssues(enabled)).toEqual([])
   const value = revision(enabled)
   expect(decodeRevision(encodeRevision(value))).toEqual(value)
-  expect(agentConfigIssues(task([{ ...tool, name: 'run_code' }]), {}).join(' ')).toContain('reserved')
+  expect(agentConfigIssues(task([{ ...tool, name: 'run_code' }])).join(' ')).toContain('reserved')
 })

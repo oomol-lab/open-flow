@@ -796,9 +796,6 @@
           "node": "Upstream node \"{{nodeId}}\" does not exist.",
           "output": "Upstream node \"{{nodeId}}\" does not expose output \"{{output}}\"."
         },
-        "target-missing": {
-          "task": "Task \"{{taskId}}\" does not exist."
-        },
         "trigger-not-allowed": "Trigger nodes are only allowed in Flows.",
         "variable-incompatible": "Environment variable binding \"{{bindingId}}\" is not compatible with this input.",
         "variable-source-mixed": "An environment variable must be the only source for an input."
@@ -826,8 +823,8 @@
       "task": {
         "capability-incomplete": "Inline Task \"{{nodeId}}\" has an incomplete Connector Capability.",
         "action-connection-required": "Action \"{{action}}\" requires an account before running.",
-        "connector-connection-required": "Connector Task \"{{taskId}}\" requires an active Connection.",
-        "connector-incomplete": "Connector Task \"{{taskId}}\" requires an action.",
+        "connector-connection-required": "Connector Task \"{{nodeId}}\" requires an active Connection.",
+        "connector-incomplete": "Connector Task \"{{nodeId}}\" requires an action.",
         "missing-entry": "CodeModule \"{{moduleId}}\" used by an Inline Task must export a default function.",
         "module-missing": "Inline Task \"{{nodeId}}\" references missing CodeModule \"{{moduleId}}\"."
       },

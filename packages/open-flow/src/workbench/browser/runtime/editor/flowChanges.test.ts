@@ -1,3 +1,5 @@
+import type { TaskNode } from '../../../../flow/common/change.ts'
+import type { ManagedTaskDefinition } from '../../../../flow/common/change.ts'
 import type { InputPort } from '../../../../flow/common/change.ts'
 import type { Draft } from '../api.ts'
 
@@ -48,7 +50,6 @@ function draft(source: string): Draft {
             },
           },
         },
-        tasks: {},
       },
       modelVersion: currentFlowModelVersion,
       modules: { module: { imports: [], name: 'Code', source } },
@@ -82,16 +83,13 @@ function managedDraft(): Draft {
                 start: { kind: 'value', value: 'manual' },
               },
               kind: 'task',
-              taskId: 'connector',
+              task: {
+                executor: { action: 'send', kind: 'connector' },
+                inputs: [{ handle: 'message', jsonSchema: {}, nullable: false }],
+                name: 'Send',
+                outputs: [],
+              },
             },
-          },
-        },
-        tasks: {
-          connector: {
-            executor: { action: 'send', kind: 'connector' },
-            inputs: [{ handle: 'message', jsonSchema: {}, nullable: false }],
-            name: 'Send',
-            outputs: [],
           },
         },
       },
@@ -103,14 +101,14 @@ describe('Code task port changes', () => {
   it('does not emit a Draft change when the ports stay the same', () => {
     const current = draft('export default (input) => ({ result: input.value })\n')
     const task = current.content.document.graph.nodes.task
-    if (task?.kind != 'task' || task.task == null) throw new Error('Expected code Task fixture.')
+    if (task?.kind != 'task' || !('moduleId' in task.task)) throw new Error('Expected code Task fixture.')
 
     expect(updateTaskPorts(revisionView(current), { kind: 'flow' }, 'task', task.task)).toEqual([])
   })
 
   it('uses the node ID for a new code module', () => {
     const current = draft('export default () => {}\n')
-    const changes = addNode(revisionView(current), { kind: 'flow' }, 'new-code', { kind: 'code', name: 'New code' }, () => 'unused')
+    const changes = addNode(revisionView(current), { kind: 'flow' }, 'new-code', { kind: 'code', name: 'New code' })
 
     if (changes == null) throw new Error('Expected code task changes.')
     const changed = applyFlowChanges(current, changes)
@@ -120,7 +118,7 @@ describe('Code task port changes', () => {
 
   it('adds a numeric suffix when a new Node name is already used', () => {
     const current = draft('export default () => {}\n')
-    const changes = addNode(revisionView(current), { kind: 'flow' }, 'new-code', { kind: 'code', name: 'Code' }, () => 'unused')
+    const changes = addNode(revisionView(current), { kind: 'flow' }, 'new-code', { kind: 'code', name: 'Code' })
 
     if (changes == null) throw new Error('Expected code task changes.')
     expect(applyFlowChanges(current, changes).content.document.graph.nodes['new-code']?.name).toBe('Code (2)')
@@ -128,20 +126,14 @@ describe('Code task port changes', () => {
 
   it('creates a code task with connection-derived ports', () => {
     const current = draft('export default () => {}\n')
-    const changes = addNode(
-      revisionView(current),
-      { kind: 'flow' },
-      'new-code',
-      {
-        kind: 'code',
-        name: 'New code',
-        ports: {
-          inputs: [{ description: 'Count', handle: 'value', jsonSchema: { type: 'number' }, nullable: false, value: null }],
-          outputs: [{ handle: 'result', jsonSchema: {}, nullable: true }],
-        },
+    const changes = addNode(revisionView(current), { kind: 'flow' }, 'new-code', {
+      kind: 'code',
+      name: 'New code',
+      ports: {
+        inputs: [{ description: 'Count', handle: 'value', jsonSchema: { type: 'number' }, nullable: false, value: null }],
+        outputs: [{ handle: 'result', jsonSchema: {}, nullable: true }],
       },
-      () => 'unused',
-    )
+    })
 
     if (changes == null) throw new Error('Expected code task changes.')
     expect(applyFlowChanges(current, changes).content.document.graph.nodes['new-code']).toMatchObject({
@@ -219,7 +211,7 @@ describe('Code task port changes', () => {
       { edge: { source: 'task', sourceHandle: 'result', target: 'sink' }, kind: 'graph.edge.connect', target },
     ])
     const task = current.content.document.graph.nodes.task
-    if (task?.kind != 'task' || task.task == null) throw new Error('Expected code Task fixture.')
+    if (task?.kind != 'task' || !('moduleId' in task.task)) throw new Error('Expected code Task fixture.')
 
     const changes = updateTaskPorts(revisionView(current), target, 'task', { inputs: task.task.inputs, outputs: [] })!
     const changed = applyFlowChanges(current, changes)
@@ -291,7 +283,12 @@ describe('Managed task additional input changes', () => {
     expect(applyFlowChanges(changed, removed).content.document.graph.nodes.task).toEqual({
       inputs: { message: { kind: 'value', value: 'Hello' } },
       kind: 'task',
-      taskId: 'connector',
+      task: {
+        executor: { action: 'send', kind: 'connector' },
+        inputs: [{ handle: 'message', jsonSchema: {}, nullable: false }],
+        name: 'Send',
+        outputs: [],
+      },
     })
   })
 })
@@ -410,10 +407,10 @@ describe('Condition changes', () => {
 describe('Resolution node changes', () => {
   it('creates separate Wait and Approval nodes, updates prompts', () => {
     const current = draft('export default (input) => ({ result: input.value })\n')
-    const wait = addNode(revisionView(current), { kind: 'flow' }, 'wait', { kind: 'wait', name: 'Wait' }, () => 'unused')
+    const wait = addNode(revisionView(current), { kind: 'flow' }, 'wait', { kind: 'wait', name: 'Wait' })
     if (wait == null) throw new Error('Expected Wait changes.')
     let changed = applyFlowChanges(current, wait)
-    const approval = addNode(revisionView(changed), { kind: 'flow' }, 'approval', { kind: 'approval', name: 'Approval' }, () => 'unused')
+    const approval = addNode(revisionView(changed), { kind: 'flow' }, 'approval', { kind: 'approval', name: 'Approval' })
     if (approval == null) throw new Error('Expected Approval changes.')
     changed = applyFlowChanges(changed, approval)
     const updated = updateResolution(revisionView(changed), { kind: 'flow' }, 'approval', {
@@ -481,8 +478,8 @@ describe('Variable input changes', () => {
     const changes = setInputVariable(revisionView(current), { kind: 'flow' }, 'task', 'value', 'TOKEN', 'binding-a')
     if (changes == null) throw new Error('Expected Variable input changes.')
     const bound = applyFlowChanges(current, changes)
-    const clipboard = copyNodes(revisionView(bound), { kind: 'flow' }, ['task'])
     const ids = ['task-copy', 'binding-copy']
+    const clipboard = copyNodes(revisionView(bound), { kind: 'flow' }, ['task'])
     const pasted = pasteNodes(revisionView(bound), { kind: 'flow' }, clipboard, () => {
       const id = ids.shift()
       if (id == null) throw new Error('Paste requested an unexpected identity.')
@@ -504,36 +501,25 @@ describe('Variable input changes', () => {
 describe('Provider Trigger changes', () => {
   it('creates an unconnected Trigger and stores its selected Connection directly', () => {
     const current = draft('export default () => {}\n')
-    const ids = ['binding']
-    const changes = addNode(
-      revisionView(current),
-      { kind: 'flow' },
-      'trigger',
-      {
-        definition: {
-          configInputs: [],
-          definitionVersion: 2,
-          description: 'Runs when a repository changes.',
-          displayName: 'Repository event',
-          endpoint: {
-            body: { allowArray: false, allowEmpty: false, formats: ['json'] },
-            methods: ['POST'],
-            successStatus: 200,
-          },
-          key: 'github.on_repo_event',
-          name: 'on_repo_event',
-          outputs: [{ handle: 'payload', jsonSchema: { additionalProperties: true, type: 'object' }, nullable: false }],
-          provider: 'github',
-          type: 'integration',
+    const changes = addNode(revisionView(current), { kind: 'flow' }, 'trigger', {
+      definition: {
+        configInputs: [],
+        definitionVersion: 2,
+        description: 'Runs when a repository changes.',
+        displayName: 'Repository event',
+        endpoint: {
+          body: { allowArray: false, allowEmpty: false, formats: ['json'] },
+          methods: ['POST'],
+          successStatus: 200,
         },
-        kind: 'provider-trigger',
+        key: 'github.on_repo_event',
+        name: 'on_repo_event',
+        outputs: [{ handle: 'payload', jsonSchema: { additionalProperties: true, type: 'object' }, nullable: false }],
+        provider: 'github',
+        type: 'integration',
       },
-      () => {
-        const id = ids.shift()
-        if (id == null) throw new Error('Expected a Trigger identity.')
-        return id
-      },
-    )
+      kind: 'provider-trigger',
+    })
 
     if (changes == null) throw new Error('Expected provider Trigger changes.')
     const added = applyFlowChanges(current, changes)
@@ -557,28 +543,42 @@ describe('Agent input editing', () => {
         ...base.content,
         document: {
           ...base.content.document,
-          graph: { edges: [], nodes: { agent: { kind: 'task', taskId: 'agent', inputs: { request: { kind: 'value', value: 'Hello' } } } } },
-          tasks: {
-            agent: {
-              name: 'Agent',
-              inputs: [port],
-              outputs: [output],
-              executor: {
-                kind: 'agent',
-                model: 'test',
-                maxRounds: 10,
-                prompt: '{{request}}',
-                tools: [
-                  {
-                    id: 'tool',
-                    name: 'send',
-                    action: 'mail.send',
-                    description: '',
-                    approval: true,
-                    inputs: [{ ...port, source: { kind: 'input', input: 'request' } }],
+          graph: {
+            edges: [],
+            nodes: {
+              agent: {
+                kind: 'task',
+                task: {
+                  name: 'Agent',
+                  inputs: [port],
+                  outputs: [output],
+                  executor: {
+                    kind: 'agent',
+                    model: 'test',
+                    maxRounds: 10,
+                    prompt: '{{request}}',
+                    tools: [
+                      {
+                        id: 'tool',
+                        name: 'send',
+                        action: 'mail.send',
+                        description: '',
+                        approval: true,
+                        inputs: [{ ...port, source: { kind: 'input', input: 'request' } }],
+                      },
+                    ],
+                    notification: {
+                      action: 'mail.send',
+                      inputDefinitions: [
+                        { handle: 'text', jsonSchema: { type: 'string' }, nullable: false },
+                        { handle: 'subject', jsonSchema: { type: 'string' }, nullable: false },
+                      ],
+                      messageHandle: 'text',
+                      inputs: { subject: { kind: 'input', input: 'request' } },
+                    },
                   },
-                ],
-                notification: { taskId: 'notice', messageHandle: 'text', inputs: { subject: { kind: 'input', input: 'request' } } },
+                },
+                inputs: { request: { kind: 'value', value: 'Hello' } },
               },
             },
           },
@@ -589,7 +589,7 @@ describe('Agent input editing', () => {
     if (changes == null) throw new Error('Expected Agent input changes.')
     const changed = applyFlowChanges(current, changes)
     expect(changed.content.document.graph.nodes.agent).toMatchObject({ inputs: { question: { kind: 'value', value: 'Hello' } } })
-    expect(changed.content.document.tasks.agent).toMatchObject({
+    expect((changed.content.document.graph.nodes['agent'] as TaskNode).task as ManagedTaskDefinition).toMatchObject({
       executor: {
         prompt: '{{question}}',
         tools: [{ inputs: [{ source: { kind: 'input', input: 'question' } }] }],
@@ -600,7 +600,9 @@ describe('Agent input editing', () => {
     if (removed == null) throw new Error('Expected input removal.')
     const result = applyFlowChanges(changed, removed)
     expect(result.content.document.graph.nodes.agent).toMatchObject({ inputs: {} })
-    expect(result.content.document.tasks.agent).toMatchObject({ executor: { tools: [{ inputs: [{ source: { kind: 'value', value: null } }] }] } })
+    expect((result.content.document.graph.nodes['agent'] as TaskNode).task as ManagedTaskDefinition).toMatchObject({
+      executor: { tools: [{ inputs: [{ source: { kind: 'value', value: null } }] }] },
+    })
   })
 })
 
@@ -793,13 +795,13 @@ describe('Webhook product editing', () => {
     expect(get.content.document.graph.nodes.task).toMatchObject({
       inputs: { value: { sources: [{ nodeId: 'hook', output: 'body' }] } },
     })
-    expect(checkInputSource(get.content.document, get.content.document.graph, 'task', 'value', { nodeId: 'hook', output: 'body' })).toEqual({
+    expect(checkInputSource(get.content.document.graph, 'task', 'value', { nodeId: 'hook', output: 'body' })).toEqual({
       kind: 'output-missing',
     })
 
     const restored = applyFlowChanges(get, inverseFlowChanges(current.content, changes))
     expect(restored.content.document.graph).toEqual(current.content.document.graph)
-    expect(checkInputSource(restored.content.document, restored.content.document.graph, 'task', 'value', { nodeId: 'hook', output: 'body' })).toEqual({
+    expect(checkInputSource(restored.content.document.graph, 'task', 'value', { nodeId: 'hook', output: 'body' })).toEqual({
       kind: 'available',
     })
   })
@@ -903,7 +905,7 @@ describe('Input type conversion', () => {
   ] as const)('converts literals while preserving compatible, unset and connected inputs (%j)', (mapping, schema, nullable, expected) => {
     const current = draft('export default () => ({})')
     const node = current.content.document.graph.nodes.task
-    if (node?.kind !== 'task' || node.task == null) throw new Error('Expected code task')
+    if (node?.kind !== 'task' || !('moduleId' in node.task)) throw new Error('Expected code task')
     const assigned =
       mapping == null
         ? current
@@ -921,10 +923,7 @@ describe('Input type conversion', () => {
 it.each(['wait', 'approval'] as const)('edits %s input definitions, preserves renamed bindings, and supports undo', (kind) => {
   const target = { kind: 'flow' } as const
   let current = draft('export default (input) => ({ result: input.value })')
-  current = applyFlowChanges(
-    current,
-    addNode(revisionView(current), target, 'resolution', { kind, name: 'Review' }, () => 'unused')!,
-  )
+  current = applyFlowChanges(current, addNode(revisionView(current), target, 'resolution', { kind, name: 'Review' })!)
   const save = (inputDefinitions: readonly InputPort[]) =>
     updateResolution(revisionView(current), target, 'resolution', { name: 'Review', prompt: 'Review', inputDefinitions })!
   expect(current.content.document.graph.nodes.resolution).toMatchObject({ inputDefinitions: [], inputs: {} })
@@ -943,10 +942,7 @@ it.each(['wait', 'approval'] as const)('edits %s input definitions, preserves re
 it.each(['wait', 'approval'] as const)('preserves %s bindings when only the prompt changes', (kind) => {
   const target = { kind: 'flow' } as const
   let current = draft('export default () => ({})')
-  current = applyFlowChanges(
-    current,
-    addNode(revisionView(current), target, 'resolution', { kind, name: 'Review' }, () => 'unused')!,
-  )
+  current = applyFlowChanges(current, addNode(revisionView(current), target, 'resolution', { kind, name: 'Review' })!)
   current = applyFlowChanges(current, setInputValue(revisionView(current), target, 'resolution', 'unavailable', 'keep for repair')!)
   const changes = updateResolution(revisionView(current), target, 'resolution', {
     name: 'Review',

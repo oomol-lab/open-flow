@@ -26,7 +26,6 @@ function draft(flowId: string, revisionId: string): Draft {
       document: {
         bindings: {},
         graph: { edges: [], nodes: {} },
-        tasks: {},
       },
       modelVersion: currentFlowModelVersion,
       modules: {},

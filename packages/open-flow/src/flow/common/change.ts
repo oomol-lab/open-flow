@@ -213,7 +213,9 @@ export type ManagedTaskExecutor =
       readonly maxRounds: number
       readonly tools: readonly AgentTool[]
       readonly notification?: {
-        readonly taskId: string
+        readonly action: string
+        readonly connectionId?: string
+        readonly inputDefinitions: readonly InputPort[]
         readonly messageHandle: string
         readonly inputs: Readonly<Record<string, Exclude<AgentInput, { readonly kind: 'model' }>>>
       }
@@ -394,10 +396,11 @@ export interface ManagedTaskDefinition extends TaskDefinitionBase {
 
 export type TaskDefinition = InlineTaskDefinition | ManagedTaskDefinition
 
-export type TaskNode = GraphNodeBase & { readonly kind: 'task' } & (
-    | { readonly additionalInputs?: readonly InputPort[]; readonly task: InlineTaskDefinition; readonly taskId?: never }
-    | { readonly additionalInputs?: readonly InputPort[]; readonly task?: never; readonly taskId: string }
-  )
+export interface TaskNode extends GraphNodeBase {
+  readonly kind: 'task'
+  readonly additionalInputs?: readonly InputPort[]
+  readonly task: TaskDefinition
+}
 
 export interface Graph {
   readonly edges: readonly GraphEdge[]
@@ -481,7 +484,6 @@ export type GraphNode = ApprovalNode | ConditionNode | TaskNode | TriggerNode | 
 export interface FlowDocument {
   readonly bindings: Readonly<Record<string, { readonly kind: 'variable'; readonly target: string }>>
   readonly graph: Graph
-  readonly tasks: Readonly<Record<string, ManagedTaskDefinition>>
 }
 
 export interface CodeModule {
@@ -634,14 +636,13 @@ export type ChangeOperation =
       readonly moduleId: string
       readonly source: string
     }
-  | { readonly kind: 'task.create'; readonly task: FlowDocument['tasks'][string]; readonly taskId: string }
-  | { readonly before?: string; readonly kind: 'task.connector.connection.set'; readonly taskId: string; readonly value?: string }
-  | { readonly kind: 'task.delete'; readonly taskId: string }
-  | { readonly before: ManagedTaskDefinition; readonly kind: 'task.openapi.set'; readonly taskId: string; readonly value: ManagedTaskDefinition }
-  | { readonly before: ManagedTaskDefinition; readonly kind: 'task.agent.set'; readonly taskId: string; readonly value: ManagedTaskDefinition }
-  | { readonly before: ManagedTaskDefinition; readonly kind: 'task.decision.set'; readonly taskId: string; readonly value: ManagedTaskDefinition }
-  | { readonly before: 'chat' | 'json'; readonly kind: 'task.llm.mode.set'; readonly taskId: string; readonly value: 'chat' | 'json' }
-  | { readonly before: string; readonly kind: 'task.name.set'; readonly taskId: string; readonly value: string }
+  | {
+      readonly kind: 'graph.node.task.set'
+      readonly nodeId: string
+      readonly target: GraphTarget
+      readonly before: TaskDefinition
+      readonly value: TaskDefinition
+    }
 
 export class FlowChangeError extends Error {
   constructor(message: string) {
@@ -732,7 +733,8 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         if (operation.node.kind == 'manual' && Object.values(graph.nodes).some((node) => node.kind == 'manual')) {
           invalid('A graph can contain only one manual Trigger.')
         }
-        if (operation.node.kind == 'task' && operation.node.task?.capabilities !== undefined) decodeConnectorCapabilities(operation.node.task.capabilities)
+        if (operation.node.kind == 'task' && 'moduleId' in operation.node.task && operation.node.task.capabilities !== undefined)
+          decodeConnectorCapabilities(operation.node.task.capabilities)
         if (operation.node.name == null) invalid('A Node name cannot be empty.')
         const name = normalizeNodeName(operation.node.name)
         const issue = nodeNameIssue(graph, operation.nodeId, name)
@@ -797,7 +799,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
       case 'graph.node.task.capabilities.set': {
         const graph = document.graph
         const node = graph.nodes[operation.nodeId]
-        if (node?.kind != 'task' || node.task == null) invalid('The inline Task Node does not exist.')
+        if (node?.kind != 'task' || !('moduleId' in node.task)) invalid('The inline Task Node does not exist.')
         if (!dequal(node.task.capabilities, operation.before)) invalid('The inline Task capabilities changed before this operation was applied.')
         const task = { ...node.task }
         if (operation.value === undefined) delete task.capabilities
@@ -808,7 +810,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
       case 'graph.node.task.name.set': {
         const graph = document.graph
         const node = graph.nodes[operation.nodeId]
-        if (node?.kind != 'task' || node.task == null) invalid('The inline Task Node does not exist.')
+        if (node?.kind != 'task' || !('moduleId' in node.task)) invalid('The inline Task Node does not exist.')
         if (node.task.name != operation.before) invalid('The inline Task name changed before this operation was applied.')
         const updated = { ...node, task: { ...node.task, name: operation.value } }
         Object.assign(document, { graph: { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } } })
@@ -817,7 +819,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
       case 'graph.node.task.ports.set': {
         const graph = document.graph
         const node = graph.nodes[operation.nodeId]
-        if (node?.kind != 'task' || node.task == null) invalid('The inline Task Node does not exist.')
+        if (node?.kind != 'task' || !('moduleId' in node.task)) invalid('The inline Task Node does not exist.')
         if (!dequal({ inputs: node.task.inputs, outputs: node.task.outputs }, operation.before)) {
           invalid('The inline Task ports changed before this operation was applied.')
         }
@@ -907,59 +909,12 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         modules[operation.moduleId] = { ...module, imports: operation.imports, source: operation.source }
         break
       }
-      case 'task.create':
-        if (document.tasks[operation.taskId] != null) invalid('A Task with this ID already exists.')
-        document.tasks = { ...document.tasks, [operation.taskId]: operation.task }
-        break
-      case 'task.connector.connection.set': {
-        const task = document.tasks[operation.taskId]
-        if (task == null || !('executor' in task) || task.executor.kind != 'connector') invalid('The Connector Task does not exist.')
-        if (task.executor.connectionId != operation.before) invalid('The Connector Task connection changed before this operation was applied.')
-        const { connectionId: _, ...executor } = task.executor
-        const next = operation.value == null ? executor : { ...executor, connectionId: operation.value }
-        document.tasks = { ...document.tasks, [operation.taskId]: { ...task, executor: next } }
-        break
-      }
-      case 'task.delete': {
-        if (document.tasks[operation.taskId] == null) invalid('The Task does not exist.')
-        const tasks = { ...document.tasks }
-        delete tasks[operation.taskId]
-        document.tasks = tasks
-        break
-      }
-      case 'task.decision.set': {
-        const task = document.tasks[operation.taskId]
-        if (task?.executor.kind != 'decision' || operation.value.executor.kind != 'decision') invalid('The AI Decision Task does not exist.')
-        if (!dequal(task, operation.before)) invalid('The AI Decision Task changed before this operation was applied.')
-        document.tasks = { ...document.tasks, [operation.taskId]: operation.value }
-        break
-      }
-      case 'task.openapi.set': {
-        const task = document.tasks[operation.taskId]
-        if (task?.executor.kind != 'openapi' || operation.value.executor.kind != 'openapi') invalid('The OpenAPI Task does not exist.')
-        if (!dequal(task, operation.before)) invalid('The OpenAPI Task changed before this operation was applied.')
-        document.tasks = { ...document.tasks, [operation.taskId]: operation.value }
-        break
-      }
-      case 'task.agent.set': {
-        const task = document.tasks[operation.taskId]
-        if (task?.executor.kind != 'agent' || operation.value.executor.kind != 'agent') invalid('The Agent Task does not exist.')
-        if (!dequal(task, operation.before)) invalid('The Agent Task changed before this operation was applied.')
-        document.tasks = { ...document.tasks, [operation.taskId]: operation.value }
-        break
-      }
-      case 'task.llm.mode.set': {
-        const task = document.tasks[operation.taskId]
-        if (task == null || !('executor' in task) || task.executor.kind != 'llm') invalid('The LLM Task does not exist.')
-        if (task.executor.mode != operation.before) invalid('The LLM Task mode changed before this operation was applied.')
-        document.tasks = { ...document.tasks, [operation.taskId]: { ...task, executor: { ...task.executor, mode: operation.value } } }
-        break
-      }
-      case 'task.name.set': {
-        const task = document.tasks[operation.taskId]
-        if (task == null) invalid('The Task does not exist.')
-        if (task.name != operation.before) invalid('The Task name changed before this operation was applied.')
-        document.tasks = { ...document.tasks, [operation.taskId]: { ...task, name: operation.value } }
+      case 'graph.node.task.set': {
+        const graph = document.graph
+        const node = graph.nodes[operation.nodeId]
+        if (node?.kind != 'task') invalid('The Task Node does not exist.')
+        if (!dequal(node.task, operation.before)) invalid('The Task configuration changed before this operation was applied.')
+        document.graph = { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: { ...node, task: operation.value } } }
         break
       }
     }

@@ -487,7 +487,7 @@ export class WorkspaceStore {
       if (this.#disposed || this.#model.value.draft != draft || this.#model.value.target != target) return
     }
     const edge = connection?.(nodeId)
-    const nodeChanges = addFlowNode(revision, target, nodeId, intent, this.#identity)
+    const nodeChanges = addFlowNode(revision, target, nodeId, intent)
     if (nodeChanges == null) return
     const changes =
       edge == null
@@ -820,10 +820,10 @@ export class WorkspaceStore {
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
-  public async setConnectorConnection(taskId: string, connectionId: string | undefined): Promise<boolean> {
+  public async setConnectorConnection(nodeId: string, connectionId: string | undefined): Promise<boolean> {
     const revision = this.$.revision.value
     if (revision == null) return false
-    const changes = changeConnectorConnection(revision.revision.content, taskId, connectionId)
+    const changes = changeConnectorConnection(revision.revision.content, nodeId, connectionId)
     return changes != null && (await this.#editDraft(changes)) != null
   }
 

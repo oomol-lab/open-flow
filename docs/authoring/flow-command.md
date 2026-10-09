@@ -60,7 +60,7 @@ oo flow schema example.poll-notification --json > changes.json
 MCP 对应 `flow_schema {"example":"connector"}` 和 `flow_schema {"example":"poll-notification"}`。返回的 `{version,operations}` 可直接作为 CLI apply 文件；MCP flow_apply 使用其中的 operations，并另传 flowId、expectedRevisionId 和 idempotencyKey。
 示例中的 `ACTION_ID`、`CONNECTION_ID` 必须替换为目标 Flow 作用域内的真实 identity，Connector 输入输出端口必须按 `connector show` / `connector_get` 的定义调整。示例通过结构和图语义检查，不证明外部账号可用。
 
-已有 Connector Action 使用 `task.create`（executor.kind 为 connector）与引用 taskId 的节点。JavaScript 计算使用 `module.create` 与引用 moduleId 的 Code Task；仅做已有 Action 调用时无需写 JS。`poll-notification` 示例展示 events 数组转换为文本、执行连线及独立输入映射。
+已有 Connector Action 使用 `graph.node.create`，执行配置直接放在 `node.task`（executor.kind 为 connector）。JavaScript 计算使用 `module.create` 与引用 moduleId 的 Code Task；仅做已有 Action 调用时无需写 JS。`poll-notification` 示例展示 events 数组转换为文本、执行连线及独立输入映射。
 
 `graph.trigger.create` 是 Draft 请求操作，用 key 创建 Provider Trigger：
 
@@ -116,7 +116,7 @@ Run 即使仍为 `running`，也可能包含需要决议的 `waits`。决议时�
 
 ## Agent 节点
 
-`oo flow node add <flow> agent <name>` 创建可继续配置的 Agent 草稿。完整配置通过 `task.agent.set` 原子更新，`before` 是读取到的完整 Task；模型、任务说明、工具与参数来源属于同一个配置。使用 `oo flow schema task.agent.set --json` 查看操作结构。
+`oo flow node add <flow> agent <name>` 创建可继续配置的 Agent 草稿。完整配置通过 `graph.node.task.set` 原子更新，`before` 是读取到的完整 Task；模型、任务说明、工具与参数来源属于同一个配置。使用 `oo flow schema graph.node.task.set --json` 查看操作结构。
 
 快速建图形式也接受 `nodes.<id> = { "kind": "agent", "task": <完整 ManagedTaskDefinition> }`，其中 `task.executor.kind` 必须为 `agent`。它保留显式工具定义与账号，不重新解释当前 Connector 目录。精确字段、参数约束与审批语义见 [Agent Task 合同](../control/contracts/control-api.md#11-agent-task)。
 

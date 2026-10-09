@@ -182,15 +182,15 @@ describe('FlowWorkspace run drawer', () => {
     mocks.stateValues.set(3, true)
     mocks.stateValues.set(4, 'properties')
     const { editor, store } = renderWorkspace(undefined, true, false, ['mail'])
-    const node = { inputs: {}, kind: 'task', taskId: 'mail' } as const
     const definition = {
       executor: { action: 'gmail.fetch_emails', connectionId: 'expired', kind: 'connector' },
       inputs: [],
       outputs: [],
       name: 'Read mail',
     } as const
+    const node = { inputs: {}, kind: 'task', task: definition } as const
     const revision = new RevisionView({
-      content: { document: { bindings: {}, graph: { nodes: { mail: node }, edges: [] }, tasks: { mail: definition } }, modules: {} },
+      content: { document: { bindings: {}, graph: { nodes: { mail: node }, edges: [] } }, modules: {} },
     } as never)
     Object.assign(store.$, { connectorSetupPending: value(false), sourceNodeIcons: value({}) })
     Object.assign(store.workspace.$.revision, { value: revision })

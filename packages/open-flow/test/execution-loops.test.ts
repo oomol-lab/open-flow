@@ -21,7 +21,7 @@ function revision(graph: Graph): RevisionContent {
   return {
     modelVersion: currentFlowModelVersion,
     modules: { counter: { name: 'Counter', imports: [], source: 'export default () => ({ count: 1 })' } },
-    document: { bindings: {}, tasks: {}, graph },
+    document: { bindings: {}, graph },
   }
 }
 async function prepare(source: RevisionContent) {

@@ -56,7 +56,7 @@ describe('CLI', () => {
       modules: {},
       document: {
         bindings: {},
-        tasks: {},
+
         graph: {
           edges: [],
           nodes: {
@@ -295,7 +295,7 @@ it.each([
           modules: {},
           document: {
             bindings: {},
-            tasks: {},
+
             graph: {
               edges: [],
               nodes: {
@@ -364,7 +364,7 @@ const revisionFixture = {
   content: {
     modelVersion: currentFlowModelVersion,
     modules: {},
-    document: { bindings: {}, tasks: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
+    document: { bindings: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
   },
 } as const
 

@@ -9,6 +9,7 @@ import type {
   InputMapping,
   InputPort,
   JsonValue,
+  ManagedTaskDefinition,
   Port,
   RevisionContent,
   TriggerKeySnapshot,
@@ -124,9 +125,9 @@ function canonicalNode(value: GraphNode): JsonValue {
       }
     case 'task': {
       const node: Record<string, JsonValue> =
-        value.task != null
+        'moduleId' in value.task
           ? Object.assign({}, common, { kind: value.kind, task: canonicalInlineTask(value.task) })
-          : Object.assign({}, common, { kind: value.kind, taskId: value.taskId })
+          : Object.assign({}, common, { kind: value.kind, task: canonicalTask(value.task) })
       if (value.additionalInputs != null) node.additionalInputs = canonicalPorts(value.additionalInputs)
       return node
     }
@@ -217,7 +218,7 @@ export function canonicalRevisionGraph(content: RevisionContent, graph: Graph): 
   return content.modelVersion == 2 ? canonicalLegacyGraph(graph) : canonicalGraph(graph)
 }
 
-export function canonicalTask(task: FlowDocument['tasks'][string]): JsonValue {
+export function canonicalTask(task: ManagedTaskDefinition): JsonValue {
   return {
     executor: task.executor as unknown as JsonValue,
     inputs: canonicalPorts(task.inputs),
@@ -333,19 +334,18 @@ export function canonicalDocument(document: FlowDocument): JsonValue {
   return {
     bindings: Object.fromEntries(entries(document.bindings)),
     graph: canonicalGraph(document.graph),
-    tasks: Object.fromEntries(entries(document.tasks).map(([id, task]) => [id, canonicalTask(task)])),
   }
 }
 
 function canonicalRevisionDocument(content: RevisionContent): JsonValue {
   if (content.modelVersion >= 6) return canonicalDocument(content.document)
-  if (content.modelVersion != 2) return { ...(canonicalDocument(content.document) as Record<string, JsonValue>), subflows: {} }
+  if (content.modelVersion != 2) return { ...(canonicalDocument(content.document) as Record<string, JsonValue>), subflows: {}, tasks: {} }
   const { document } = content
   return {
     bindings: Object.fromEntries(entries(document.bindings)),
     graph: canonicalLegacyGraph(document.graph),
     subflows: {},
-    tasks: Object.fromEntries(entries(document.tasks).map(([id, task]) => [id, canonicalTask(task)])),
+    tasks: {},
   }
 }
 

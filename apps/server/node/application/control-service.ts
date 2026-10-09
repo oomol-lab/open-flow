@@ -1006,8 +1006,9 @@ export class ControlService {
       const teamId = await this.resolveConnectorScope(flowId)
       return connector.getAction(actionId, undefined, this.#connectorContext(flowId, teamId))
     })
-    const llmDiagnostics = [...checked.closure.dependencies.tasks].toSorted().flatMap((taskId) => {
-      const kind = content.document.tasks[taskId]?.executor.kind
+    const llmDiagnostics = [...checked.closure.dependencies.nodes].toSorted().flatMap((nodeId) => {
+      const node = content.document.graph.nodes[nodeId]
+      const kind = node?.kind == 'task' && 'executor' in node.task ? node.task.executor.kind : undefined
       if ((kind != 'llm' && kind != 'agent' && kind != 'decision') || this.llmAvailable(kind == 'llm' ? undefined : kind)) return []
       return [
         {
@@ -1015,7 +1016,7 @@ export class ControlService {
           column: 0,
           line: 0,
           message: 'LLM is not configured for this deployment. Configure OPEN_FLOW_LLM_ORIGIN and OPEN_FLOW_LLM_TOKEN.',
-          path: `/document/tasks/${taskId}/executor`,
+          path: `/document/graph/nodes/${nodeId}/task/executor`,
           values: {},
         },
       ]
@@ -1113,7 +1114,7 @@ export class ControlService {
 
 function emptyRevision(): RevisionContent {
   return {
-    document: { bindings: {}, graph: { edges: [], nodes: {} }, tasks: {} },
+    document: { bindings: {}, graph: { edges: [], nodes: {} } },
     modelVersion: currentFlowModelVersion,
     modules: {},
   }

@@ -20,7 +20,7 @@ const independent = { kind: 'connector', mode: 'independent', actions: [{ action
 
 function revision(): RevisionContent {
   return applyFlowChanges(
-    { document: { bindings: {}, graph: { edges: [], nodes: {} }, tasks: {} }, modules: {}, modelVersion: currentFlowModelVersion },
+    { document: { bindings: {}, graph: { edges: [], nodes: {} } }, modules: {}, modelVersion: currentFlowModelVersion },
     createCodeTask(target, { nodeId: 'code', moduleId: 'code' }, 'Code'),
   )
 }

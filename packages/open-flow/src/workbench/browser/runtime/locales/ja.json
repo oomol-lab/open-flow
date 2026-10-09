@@ -796,9 +796,6 @@
           "node": "上流ノード「{{nodeId}}」は存在しません。",
           "output": "上流ノード「{{nodeId}}」に出力「{{output}}」はありません。"
         },
-        "target-missing": {
-          "task": "Task「{{taskId}}」は存在しません。"
-        },
         "trigger-not-allowed": "Trigger ノードは Flow 内でのみ使用できます。",
         "variable-incompatible": "環境変数バインディング「{{bindingId}}」はこの入力と互換性がありません。",
         "variable-source-mixed": "環境変数は入力の唯一のソースである必要があります。"
@@ -826,8 +823,8 @@
       "task": {
         "capability-incomplete": "Inline Task「{{nodeId}}」の Connector Capability が未設定です。",
         "action-connection-required": "ツール「{{action}}」を実行するにはアカウントを選択してください。",
-        "connector-connection-required": "Connector Task「{{taskId}}」には有効な Connection が必要です。",
-        "connector-incomplete": "Connector Task「{{taskId}}」には action が必要です。",
+        "connector-connection-required": "Connector Task「{{nodeId}}」には有効な Connection が必要です。",
+        "connector-incomplete": "Connector Task「{{nodeId}}」には action が必要です。",
         "missing-entry": "Inline Task で使用する CodeModule「{{moduleId}}」は default function を export する必要があります。",
         "module-missing": "Inline Task「{{nodeId}}」が存在しない CodeModule「{{moduleId}}」を参照しています。"
       },

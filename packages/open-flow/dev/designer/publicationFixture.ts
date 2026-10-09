@@ -24,7 +24,7 @@ export function publicationFixture(flowId: string, revisionId: string): { draft:
       },
       document: {
         bindings: { region: { kind: 'variable', target: 'REGION' } },
-        tasks: {},
+
         graph: {
           nodes: {
             start: { kind: 'manual', name: 'Start onboarding' },

@@ -20,7 +20,7 @@ function revision(graph: Graph): RevisionContent {
   return {
     modelVersion: currentFlowModelVersion,
     modules: { main: { name: 'Main', imports: [], source: 'export default () => ({})' } },
-    document: { bindings: {}, tasks: {}, graph },
+    document: { bindings: {}, graph },
   }
 }
 

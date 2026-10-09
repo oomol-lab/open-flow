@@ -1,4 +1,4 @@
-import type { JsonValue, RevisionContent } from '../src/flow/common/change.ts'
+import type { JsonValue, RevisionContent, TaskNode } from '../src/flow/common/change.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
@@ -38,7 +38,6 @@ it('upgrades legacy trigger connection bindings without losing accounts or varia
     document: {
       bindings: { account: { kind: 'connection', target: 'connection' }, variable: { kind: 'variable', target: 'TOKEN' } },
       graph: { nodes: { poll, missing: { ...poll, bindingId: 'missing' }, direct: { ...poll, connectionId: 'explicit' } }, edges: [] },
-      tasks: {},
     },
   }
   const bytes = new TextEncoder().encode(JSON.stringify(source))
@@ -93,14 +92,6 @@ function revision(reverse = false): RevisionContent {
     document: {
       bindings: { variable: { kind: 'variable', target: 'TOKEN' } },
       graph: { edges: [], nodes: reverse ? { value: nodes.value, condition: nodes.condition } : nodes },
-      tasks: {
-        managed: {
-          executor: { kind: 'llm', mode: 'json' },
-          inputs: [{ handle: 'prompt', jsonSchema: { type: 'string' }, nullable: false }],
-          name: 'LLM',
-          outputs: [],
-        },
-      },
     },
     modelVersion: currentFlowModelVersion,
     modules: reverse ? { main: modules.main, helper: modules.helper } : modules,
@@ -143,14 +134,13 @@ describe('Flow Revision encoding', () => {
       document: {
         bindings: { variable: { kind: 'variable', target: 'TOKEN' } },
         graph: { edges: [], nodes: { condition: { cases: [{ description: 'Qualified order' }] }, value: {} } },
-        tasks: { managed: { executor: { kind: 'llm', mode: 'json' }, name: 'LLM' } },
       },
       kind: 'open-flow-flow-revision',
       modelVersion: currentFlowModelVersion,
       modules: { helper: { imports: [] }, main: { imports: ['helper'] } },
       version: 1,
     })
-    await expect(digestBytes(first)).resolves.toBe('sha256:3bcdfc4f3eb6ef4bb1f0802a3828f664194da03ceef59682a2e36ec968ce9a2c')
+    await expect(digestBytes(first)).resolves.toBe('sha256:7e801fc1ce3108a6d1359f9cd66e0f6c9a601bbbcb7c8b315032ded4e7d6d7e0')
   })
 
   it('changes the encoded Revision when workflow semantics change', () => {
@@ -180,31 +170,31 @@ describe('Flow Revision encoding', () => {
     })
   })
 
-  it('preserves Task port order', () => {
+  it('preserves node-owned Task port order', () => {
     const source = revision()
-    const managed = source.document.tasks.managed!
+    const task = {
+      name: 'Task',
+      executor: { kind: 'llm' as const, mode: 'chat' as const },
+      inputs: [
+        { ...port, handle: 'value' },
+        { ...port, handle: 'input' },
+      ],
+      outputs: [
+        { ...port, handle: 'result' },
+        { ...port, handle: 'detail' },
+      ],
+    }
     const changed: RevisionContent = {
       ...source,
       document: {
         ...source.document,
-        tasks: {
-          managed: {
-            ...managed,
-            inputs: [
-              { ...port, handle: 'value' },
-              { ...port, handle: 'input' },
-            ],
-            outputs: [
-              { ...port, handle: 'result' },
-              { ...port, handle: 'detail' },
-            ],
-          },
-        },
+        graph: { ...source.document.graph, nodes: { ...source.document.graph.nodes, managed: { kind: 'task', inputs: {}, task } } },
       },
     }
-
     expect(JSON.parse(decoder.decode(encodeRevision(changed)))).toMatchObject({
-      document: { tasks: { managed: { inputs: [{ handle: 'value' }, { handle: 'input' }], outputs: [{ handle: 'result' }, { handle: 'detail' }] } } },
+      document: {
+        graph: { nodes: { managed: { task: { inputs: [{ handle: 'value' }, { handle: 'input' }], outputs: [{ handle: 'result' }, { handle: 'detail' }] } } } },
+      },
     })
   })
 
@@ -272,7 +262,7 @@ describe('Revision decoding', () => {
     expect(decodeFlowDocument(revision().document)).toEqual(revision().document)
   })
 
-  it('reads canonical model v2 Resolution nodes without changing their immutable bytes or closure identity', async () => {
+  it('upgrades model v2 Resolution nodes and Task references without rewriting the source', async () => {
     const sink = { kind: 'task', taskId: 'sink', inputs: { notice: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'pause', output: 'notification' }] } } }
     const legacy = {
       kind: 'open-flow-flow-revision',
@@ -307,10 +297,11 @@ describe('Revision decoding', () => {
     }
     const bytes = canonicalJsonBytes(legacy as JsonValue)
 
-    expect(revisionRepairKind(bytes)).toBeUndefined()
-    const decoded = decodeRevision(bytes)
+    expect(revisionRepairKind(bytes)).toBe('upgrade')
+    expect(() => decodeRevision(bytes)).toThrow(/Task/)
+    const decoded = repairRevision(bytes)
     expect(decoded).toMatchObject({
-      modelVersion: 2,
+      modelVersion: currentFlowModelVersion,
       document: {
         graph: {
           nodes: {
@@ -321,8 +312,9 @@ describe('Revision decoding', () => {
         },
       },
     })
-    expect(encodeRevision(decoded)).toEqual(bytes)
-    await expect(flowClosure(decoded)).resolves.toMatchObject({ digest: 'sha256:456e14b04b9cd379eb5f4f0dc9be4a7c78226ab701a7a546b8ff9d926536f38f' })
+    expect(decoded.document).not.toHaveProperty('tasks')
+    expect(decodeRevision(encodeRevision(decoded))).toEqual(decoded)
+    expect(canonicalJsonBytes(legacy as JsonValue)).toEqual(bytes)
   })
 
   it('refuses malformed model v2 Resolution nodes instead of repairing by deletion', () => {
@@ -353,7 +345,12 @@ describe('Revision decoding', () => {
     }
     legacy.document.graph.nodes.consumer = {
       kind: 'task',
-      taskId: 'managed',
+      task: {
+        executor: { kind: 'llm', mode: 'json' },
+        inputs: [{ handle: 'prompt', jsonSchema: { type: 'string' }, nullable: false }],
+        name: 'LLM',
+        outputs: [],
+      },
       inputs: {
         value: {
           kind: 'sources',
@@ -391,7 +388,7 @@ describe('Revision decoding', () => {
     expect(revisionRepairKind(bytes)).toBe('repair')
     expect(repairRevision(bytes)).toEqual({
       modelVersion: currentFlowModelVersion,
-      document: { bindings: {}, graph: { nodes: { valid: { kind: 'manual', name: 'Start' } }, edges: [] }, tasks: {} },
+      document: { bindings: {}, graph: { nodes: { valid: { kind: 'manual', name: 'Start' } }, edges: [] } },
       modules: {},
     })
     for (const value of [{ ...damaged, modelVersion: currentFlowModelVersion + 1 }, { ...damaged, kind: 'other' }, 'not json']) {
@@ -451,7 +448,7 @@ describe('Revision decoding', () => {
     const content = {
       modelVersion: currentFlowModelVersion,
       modules: {},
-      document: { bindings: {}, tasks: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
+      document: { bindings: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
     } as const
     const extended = {
       ...content,
@@ -500,7 +497,16 @@ it('round trips explicit unset input mappings through canonical persistence', ()
         ...content.document.graph,
         nodes: {
           ...content.document.graph.nodes,
-          cleared: { kind: 'task', taskId: 'managed', inputs: { model: { kind: 'unset' } } },
+          cleared: {
+            kind: 'task',
+            task: {
+              executor: { kind: 'llm', mode: 'json' },
+              inputs: [{ handle: 'prompt', jsonSchema: { type: 'string' }, nullable: false }],
+              name: 'LLM',
+              outputs: [],
+            },
+            inputs: { model: { kind: 'unset' } },
+          },
         },
       },
     },
@@ -527,7 +533,12 @@ it.each([2, 4, 5] as const)('preserves immutable bytes and identity for root-onl
     kind: 'open-flow-flow-revision',
     version: 1,
     modelVersion,
-    document: { bindings: {}, tasks: {}, subflows: {}, graph: { nodes: { start: { kind: 'manual', name: 'Start' } }, edges: [] } },
+    document: {
+      bindings: {},
+      tasks: {},
+      subflows: {},
+      graph: { nodes: { start: { kind: 'manual', name: 'Start' } }, edges: [] },
+    },
     modules: {},
   }
   const bytes = canonicalJsonBytes(legacy as JsonValue)
@@ -548,4 +559,76 @@ it.each([2, 4, 5] as const)('preserves immutable bytes and identity for root-onl
       }),
     ),
   })
+})
+
+it('upgrades v5 shared Task references into independent node configurations and embeds Agent notifications', async () => {
+  const mail = {
+    name: 'Send',
+    inputs: [{ handle: 'text', jsonSchema: { type: 'string' }, nullable: false }],
+    outputs: [],
+    executor: { kind: 'connector', action: 'mail.send', connectionId: 'work' },
+  }
+  const legacy = {
+    kind: 'open-flow-flow-revision',
+    version: 1,
+    modelVersion: 5,
+    modules: {},
+    document: {
+      bindings: {},
+      subflows: {},
+      tasks: {
+        mail,
+        agent: {
+          name: 'Agent',
+          inputs: [],
+          outputs: [],
+          executor: {
+            kind: 'agent',
+            model: 'test',
+            prompt: 'Review',
+            maxRounds: 3,
+            tools: [],
+            notification: { taskId: 'mail', messageHandle: 'text', inputs: {} },
+          },
+        },
+      },
+      graph: {
+        edges: [],
+        nodes: {
+          first: { kind: 'task', name: 'First', taskId: 'mail', inputs: {} },
+          second: { kind: 'task', name: 'Second', taskId: 'mail', inputs: {} },
+          agent: { kind: 'task', name: 'Agent', taskId: 'agent', inputs: {} },
+        },
+      },
+    },
+  }
+  const bytes = canonicalJsonBytes(legacy as JsonValue)
+  expect(() => decodeRevision(bytes)).toThrow(/Task/)
+  expect(revisionRepairKind(bytes)).toBe('upgrade')
+  const upgraded = repairRevision(bytes)
+  expect(upgraded.modelVersion).toBe(6)
+  expect(upgraded.document).not.toHaveProperty('tasks')
+  expect(upgraded.document).not.toHaveProperty('subflows')
+  const first = upgraded.document.graph.nodes.first as TaskNode
+  const second = upgraded.document.graph.nodes.second as TaskNode
+  expect(first.task).toEqual(mail)
+  expect(second.task).toEqual(mail)
+  expect(first.task).not.toBe(second.task)
+  expect(first).not.toHaveProperty('taskId')
+  expect(upgraded.document.graph.nodes.agent).toHaveProperty('task.executor.notification', {
+    action: 'mail.send',
+    connectionId: 'work',
+    inputDefinitions: mail.inputs,
+    messageHandle: 'text',
+    inputs: {},
+  })
+  expect(decodeRevision(encodeRevision(upgraded))).toEqual(upgraded)
+  expect(canonicalJsonBytes(legacy as JsonValue)).toEqual(bytes)
+  const changed = structuredClone(upgraded)
+  const agent = changed.document.graph.nodes.agent as TaskNode
+  if (!('executor' in agent.task) || agent.task.executor.kind != 'agent') throw new Error('Expected Agent')
+  Object.assign(agent.task.executor.notification!, { connectionId: 'personal' })
+  expect((await flowClosure(changed)).digest).not.toBe((await flowClosure(upgraded)).digest)
+  legacy.document.graph.nodes.first.taskId = 'missing'
+  expect(() => repairRevision(canonicalJsonBytes(legacy as JsonValue))).toThrow()
 })

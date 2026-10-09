@@ -326,7 +326,7 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
       const name = extra[0]!.trim()
       if (name.length == 0) throw new CliError('cli.invalid-arguments', 'Node name cannot be empty.')
       const nodeId = authoringId(args, 'node')
-      let identity: { readonly moduleId?: string; readonly taskId?: string } = {}
+      let identity: { readonly moduleId?: string } = {}
       let operations
       switch (nodeReference) {
         case 'code': {
@@ -347,22 +347,15 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
           break
         case 'agent': {
           if (args.code != null) throw new CliError('cli.invalid-arguments', '--code is only valid when adding a Code Node.')
-          const taskId = authoringId(args, 'task')
-          identity = { taskId }
-          operations = createAgentTask(selected.target, { nodeId, taskId }, name)
+
+          operations = createAgentTask(selected.target, { nodeId }, name)
           break
         }
         case 'llm-chat':
         case 'llm-json':
           if (args.code != null) throw new CliError('cli.invalid-arguments', '--code is only valid when adding a Code Node.')
-          identity = { taskId: authoringId(args, 'task') }
-          operations = createLlmTask(
-            selected.target,
-            { nodeId, taskId: identity.taskId! },
-            name,
-            nodeReference == 'llm-chat' ? 'chat' : 'json',
-            'Generated response.',
-          )
+
+          operations = createLlmTask(selected.target, { nodeId }, name, nodeReference == 'llm-chat' ? 'chat' : 'json', 'Generated response.')
           break
         case 'value':
           if (args.code != null) throw new CliError('cli.invalid-arguments', '--code is only valid when adding a Code Node.')
@@ -570,7 +563,7 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
         case 'connector': {
           const action = await actionRequests.get(node.action)!
           const connection = await preferredConnection(client, action.serviceId, node.connection, action.defaultConnection, false, flow?.flowId)
-          const identity = { nodeId, taskId: authoringId(args, `task:${reference}`) }
+          const identity = { nodeId }
           const name = node.name ?? action.name
           return {
             identity: {
@@ -581,7 +574,6 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
               name,
               nodeId,
               reference,
-              taskId: identity.taskId,
             },
             operations: createManagedTask(selected.target, identity, {
               executor: {
@@ -602,18 +594,17 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
           }
         case 'agent': {
           if (selected.target.kind != 'flow') throw new CliError('flow.apply-invalid', 'Agent nodes are only supported in the root Flow.')
-          const taskId = authoringId(args, `task:${reference}`)
+
           return {
-            identity: { kind: node.kind, name: node.task.name, nodeId, reference, taskId },
-            operations: createManagedTask(selected.target, { nodeId, taskId }, node.task),
+            identity: { kind: node.kind, name: node.task.name, nodeId, reference },
+            operations: createManagedTask(selected.target, { nodeId }, node.task),
           }
         }
         case 'llm-chat':
         case 'llm-json': {
-          const taskId = authoringId(args, `task:${reference}`)
           return {
-            identity: { kind: node.kind, name: node.name, nodeId, reference, taskId },
-            operations: createLlmTask(selected.target, { nodeId, taskId }, node.name, node.kind == 'llm-chat' ? 'chat' : 'json', 'Generated response.', {
+            identity: { kind: node.kind, name: node.name, nodeId, reference },
+            operations: createLlmTask(selected.target, { nodeId }, node.name, node.kind == 'llm-chat' ? 'chat' : 'json', 'Generated response.', {
               inputs: node.inputs,
               output: node.output,
             }),

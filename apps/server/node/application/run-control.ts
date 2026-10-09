@@ -336,7 +336,9 @@ export class RunControl {
         break
     }
     if (
-      Object.values(fixed.flow.tasks).some((task) => task.executor.kind == 'agent' && task.executor.notification != null) &&
+      Object.values(fixed.flow.graph.nodes)
+        .flatMap((node) => (node.kind == 'task' && 'executor' in node.task ? [node.task] : []))
+        .some((task) => task.executor.kind == 'agent' && task.executor.notification != null) &&
       this.resolveWaitPublicOrigin() == null
     ) {
       throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
@@ -350,9 +352,19 @@ export class RunControl {
     providerAccess: ConnectorAccessSnapshot,
     source: 'draft' | 'publication' = 'draft',
   ): Promise<void> {
-    if (Object.values(prepared.tasks).some((task) => task.executor.kind == 'agent') && !this.llmAvailable('agent'))
+    if (
+      Object.values(prepared.graph.nodes)
+        .flatMap((node) => (node.kind == 'task' && 'executor' in node.task ? [node.task] : []))
+        .some((task) => task.executor.kind == 'agent') &&
+      !this.llmAvailable('agent')
+    )
       throw new ControlError(controlErrorCode.flowInvalid, 'Agent requires a configured model host.')
-    if (Object.values(prepared.tasks).some((task) => task.executor.kind == 'decision') && !this.llmAvailable('decision'))
+    if (
+      Object.values(prepared.graph.nodes)
+        .flatMap((node) => (node.kind == 'task' && 'executor' in node.task ? [node.task] : []))
+        .some((task) => task.executor.kind == 'decision') &&
+      !this.llmAvailable('decision')
+    )
       throw new ControlError(controlErrorCode.flowInvalid, 'AI Decision requires a configured decision host.')
     const teamId = this.store.connectorTeams.get(flowId)
     await checkCodeActions(agentActions(prepared), this.resolveConnector(), {

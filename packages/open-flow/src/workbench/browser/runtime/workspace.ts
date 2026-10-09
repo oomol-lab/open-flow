@@ -91,7 +91,7 @@ function nodeTitle(node: ResolvedNode, t?: TFunction): string {
     case 'wait':
       return t?.('addNode.wait') ?? 'Wait'
     case 'task':
-      return node.definition?.name ?? (node.node.task != null ? node.node.task.moduleId : node.node.taskId)
+      return node.definition?.name ?? node.id
   }
 }
 
@@ -229,8 +229,7 @@ function nodeDiagnosticCount(node: ResolvedNode, diagnostics: readonly Diagnosti
   const graphPath = `/document/graph/nodes/${node.id}`
   const paths = [graphPath]
   if (node.kind == 'task') {
-    if (node.node.task != null) paths.push(`${graphPath}/task`)
-    else paths.push(`/document/tasks/${node.node.taskId}`)
+    if ('moduleId' in node.node.task) paths.push(`${graphPath}/task`)
     const moduleId = node.definition != null && 'moduleId' in node.definition ? node.definition.moduleId : undefined
     if (moduleId != null) paths.push(`/modules/${moduleId}`)
   }
@@ -599,7 +598,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
           ? { actionSummary: actionSummary(task.executor.tools, context.connectorActions, Object.values(context.providers)) }
           : {}),
         connectionRequired,
-        reference: node.task != null ? node.task.moduleId : node.taskId,
+        reference: 'moduleId' in node.task ? node.task.moduleId : nodeId,
       }
     case 'value':
       return { ...common, kind: node.kind, values: node.values.map((port) => Object.assign({}, port)) }

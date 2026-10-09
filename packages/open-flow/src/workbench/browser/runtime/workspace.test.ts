@@ -1,3 +1,6 @@
+import type { TaskNode } from '../../../flow/common/change.ts'
+import type { ManagedTaskDefinition } from '../../../flow/common/change.ts'
+
 import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
@@ -38,7 +41,7 @@ describe('Designer port projection', () => {
       content: {
         modelVersion: currentFlowModelVersion,
         modules: { module: { name: 'Code', source: 'export default () => ({})', imports: [] } },
-        document: { bindings: {}, tasks: {}, graph: { edges: [], nodes: { code, other: code } } },
+        document: { bindings: {}, graph: { edges: [], nodes: { code, other: code } } },
       },
     }
     const issue = {
@@ -82,7 +85,6 @@ describe('Designer port projection', () => {
               second: { inputs: {}, kind: 'value', name: 'Second', values: [] },
             },
           },
-          tasks: {},
         },
         modelVersion: currentFlowModelVersion,
         modules: {},
@@ -136,7 +138,6 @@ describe('Designer port projection', () => {
               },
             },
           },
-          tasks: {},
         },
         modelVersion: currentFlowModelVersion,
         modules: { module: { imports: [], name: 'Task', source: 'export default () => ({})' } },
@@ -204,7 +205,6 @@ describe('Designer port projection', () => {
               },
             },
           },
-          tasks: {},
         },
         modelVersion: currentFlowModelVersion,
         modules: {},
@@ -239,16 +239,13 @@ describe('Designer port projection', () => {
 
                 inputs: {},
                 kind: 'task',
-                taskId: 'news',
+                task: {
+                  executor: { action: 'hacker-news.get-ask-stories', kind: 'connector' },
+                  inputs: [],
+                  name: 'Get Ask Stories',
+                  outputs: [],
+                },
               },
-            },
-          },
-          tasks: {
-            news: {
-              executor: { action: 'hacker-news.get-ask-stories', kind: 'connector' },
-              inputs: [],
-              name: 'Get Ask Stories',
-              outputs: [],
             },
           },
         },
@@ -287,8 +284,8 @@ describe('Designer port projection', () => {
           column: 0,
           line: 1,
           message: 'Connector Task "news" requires an active Connection.',
-          path: '/document/tasks/news/executor/connectionId',
-          values: { taskId: 'news' },
+          path: '/document/graph/nodes/news/task/executor/connectionId',
+          values: { nodeId: 'news' },
         },
       ],
       { [action.actionId]: { ...action, authenticated: true } },
@@ -321,14 +318,6 @@ describe('Designer port projection', () => {
                 kind,
                 prompt: 'Review this request.',
               },
-            },
-          },
-          tasks: {
-            notify: {
-              executor: { action: 'feishu.send-text-message', kind: 'connector' },
-              inputs: [{ handle: 'text', jsonSchema: { type: 'string' }, nullable: false }],
-              name: 'send_text_message',
-              outputs: [],
             },
           },
         },
@@ -409,7 +398,6 @@ describe('Designer port projection', () => {
               },
             },
           },
-          tasks: {},
         },
         modelVersion: currentFlowModelVersion,
         modules: {},
@@ -510,7 +498,6 @@ describe('Designer presentation', () => {
               'z-old': { inputs: {}, kind: 'value', name: 'Old', values: [] },
             },
           },
-          tasks: {},
         },
         modelVersion: currentFlowModelVersion,
         modules: {},
@@ -545,7 +532,7 @@ describe('Canvas run records', () => {
       modules: { module: { imports: [], name: 'Task', source: 'export default () => ({ result: 42 })' } },
       document: {
         bindings: {},
-        tasks: {},
+
         graph: {
           edges: [],
           nodes: {
@@ -661,24 +648,31 @@ it('projects Agent tools through the shared action summary', () => {
       modules: {},
       document: {
         bindings: {},
-        tasks: {
-          agent: {
-            name: 'Agent',
-            inputs: [],
-            outputs: [{ handle: 'output', jsonSchema: { type: 'string' }, nullable: false }],
-            executor: {
-              kind: 'agent',
-              model: 'test',
-              prompt: 'Read mail',
-              maxRounds: 10,
-              tools: [
-                { id: 'fetch', name: 'fetch', description: 'Fetch mail', action: 'gmail.fetch_emails', approval: false, inputs: [] },
-                { id: 'send', name: 'send', description: 'Send mail', action: 'gmail.send_email', approval: true, inputs: [] },
-              ],
+
+        graph: {
+          edges: [],
+          nodes: {
+            agent: {
+              kind: 'task',
+              task: {
+                name: 'Agent',
+                inputs: [],
+                outputs: [{ handle: 'output', jsonSchema: { type: 'string' }, nullable: false }],
+                executor: {
+                  kind: 'agent',
+                  model: 'test',
+                  prompt: 'Read mail',
+                  maxRounds: 10,
+                  tools: [
+                    { id: 'fetch', name: 'fetch', description: 'Fetch mail', action: 'gmail.fetch_emails', approval: false, inputs: [] },
+                    { id: 'send', name: 'send', description: 'Send mail', action: 'gmail.send_email', approval: true, inputs: [] },
+                  ],
+                },
+              },
+              inputs: {},
             },
           },
         },
-        graph: { edges: [], nodes: { agent: { kind: 'task', taskId: 'agent', inputs: {} } } },
       },
     },
   }
@@ -686,13 +680,22 @@ it('projects Agent tools through the shared action summary', () => {
   expect(first).toMatchObject({
     actionSummary: { count: 2, providers: [{ id: 'gmail', icon: expect.any(String), label: 'gmail' }] },
   })
-  const agent = draft.content.document.tasks.agent!
+  const agent = ((draft.content.document.graph.nodes['agent'] as TaskNode).task as ManagedTaskDefinition)!
   if (agent.executor.kind != 'agent') throw new Error('Expected Agent.')
   const removed = {
     ...draft,
     content: {
       ...draft.content,
-      document: { ...draft.content.document, tasks: { agent: { ...agent, executor: { ...agent.executor, code: true, tools: [] } } } },
+      document: {
+        ...draft.content.document,
+        graph: {
+          ...draft.content.document.graph,
+          nodes: {
+            ...draft.content.document.graph.nodes,
+            ['agent']: { ...draft.content.document.graph.nodes['agent'], task: { ...agent, executor: { ...agent.executor, code: true, tools: [] } } },
+          },
+        },
+      },
     },
   }
   expect(designerGraph(removed, { kind: 'flow' }).nodes[0]).toMatchObject({ actionSummary: { count: 0, providers: [] } })

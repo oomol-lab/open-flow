@@ -36,7 +36,7 @@ it('resolves authentication sources privately, keeps defaults and omits explicit
     modules: {},
     document: {
       bindings: { key: { kind: 'variable', target: 'API_KEY' } },
-      tasks: { api: task },
+
       graph: {
         edges: [
           { source: 'start', target: 'upstream' },
@@ -53,7 +53,7 @@ it('resolves authentication sources privately, keeps defaults and omits explicit
           api: {
             kind: 'task',
             name: 'API',
-            taskId: 'api',
+            task: task,
             inputs: {
               'query.limit': { kind: 'unset' },
               'auth.bearer.token': { kind: 'sources', sources: [{ kind: 'node', nodeId: 'upstream', output: 'token' }] },

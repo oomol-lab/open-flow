@@ -796,9 +796,6 @@
           "node": "Le nœud en amont « {{nodeId}} » n’existe pas.",
           "output": "Le nœud en amont « {{nodeId}} » n’expose pas la sortie « {{output}} »."
         },
-        "target-missing": {
-          "task": "La Task « {{taskId}} » n’existe pas."
-        },
         "trigger-not-allowed": "Les nœuds Trigger sont uniquement autorisés dans les Flows.",
         "variable-incompatible": "La liaison de variable d’environnement « {{bindingId}} » n’est pas compatible avec cette entrée.",
         "variable-source-mixed": "Une variable d’environnement doit être l’unique source d’une entrée."
@@ -826,8 +823,8 @@
       "task": {
         "capability-incomplete": "L’Inline Task « {{nodeId}} » possède une Connector Capability incomplète.",
         "action-connection-required": "L’action « {{action}} » nécessite un compte pour être exécutée.",
-        "connector-connection-required": "La Connector Task « {{taskId}} » nécessite une Connection active.",
-        "connector-incomplete": "La Connector Task « {{taskId}} » nécessite une action.",
+        "connector-connection-required": "La Connector Task « {{nodeId}} » nécessite une Connection active.",
+        "connector-incomplete": "La Connector Task « {{nodeId}} » nécessite une action.",
         "missing-entry": "Le CodeModule « {{moduleId}} » utilisé par une Inline Task doit exporter une fonction par défaut.",
         "module-missing": "L’Inline Task « {{nodeId}} » référence le CodeModule manquant « {{moduleId}} »."
       },

@@ -87,7 +87,7 @@ describe('Provider account section', () => {
       disabled: false,
       fieldIdPrefix: 'slack',
       loading: false,
-      taskId: 'task',
+      nodeId: 'task',
       onConfigureAccess: configure,
     })
     const button = find(rendered, (item) => typeof item.props.onClick == 'function')
@@ -118,13 +118,13 @@ describe('Provider account section', () => {
     const connect = vi.fn()
     const configureAccess = vi.fn()
     const setConnection = vi.fn()
-    const node = { inputs: {}, kind: 'task', name: 'Send message', taskId: 'provider-task' }
     const definition = {
       executor: { action: 'slack.send-message', connectionId: 'connection', kind: 'connector' },
       inputs: [],
       name: 'Send message',
       outputs: [],
     }
+    const node = { inputs: {}, kind: 'task', name: 'Send message', task: definition }
     const element = NodeInspector({
       variables: { enabled: true, names: [], loaded: true, loading: false, onOpen: vi.fn() },
       activeConnectorConnections: [{ connectionId: 'connection', displayName: 'Work', isDefault: true, serviceId: 'slack', status: 'active' }],
@@ -166,7 +166,7 @@ describe('Provider account section', () => {
     expect(connect).toHaveBeenCalledTimes(2)
     expect(setConnection).not.toHaveBeenCalled()
     ;(select!.props.onValueChange as (value: string) => void)('connection')
-    expect(setConnection).toHaveBeenCalledWith('provider-task', 'connection')
+    expect(setConnection).toHaveBeenCalledWith('provider', 'connection')
   })
 })
 
@@ -306,7 +306,14 @@ describe('Resolution Inspector', () => {
 describe('Node execution settings', () => {
   it('saves execution limits and timeout, preserves sibling settings, and rejects invalid values', () => {
     const saveNodeSettings = vi.fn()
-    const node = { inputs: {}, kind: 'task', name: 'Review', taskId: 'review', timeoutMs: 100, maxExecutions: 25 }
+    const node = {
+      inputs: {},
+      kind: 'task',
+      name: 'Review',
+      task: { name: 'Review', inputs: [], outputs: [], executor: { kind: 'llm', mode: 'chat' } },
+      timeoutMs: 100,
+      maxExecutions: 25,
+    }
     const revision = {
       graph: () => ({ nodes: { current: node, other: { inputs: {}, kind: 'value', name: 'Review', values: [] } } }),
     }
@@ -527,7 +534,7 @@ describe('Code task sections', () => {
       name: 'Summarize',
       outputs: [{ handle: 'content', jsonSchema: { type: 'string' }, nullable: false }],
     }
-    const node = { inputs: {}, kind: 'task', name: 'Summarize', taskId: 'llm' }
+    const node = { inputs: {}, kind: 'task', name: 'Summarize', task: definition }
     const element = NodeInspector({
       variables: { enabled: true, names: [], loaded: true, loading: false, onOpen: vi.fn() },
       activeConnectorConnections: [],
@@ -663,7 +670,12 @@ describe('Node input ownership', () => {
         graph: () => ({ nodes: { upstream: { name: 'Source' } } }),
         inputSource: () => ({ check: vi.fn(), candidates: vi.fn() }),
       } as never,
-      selection: { id: 'condition', kind, node: { ...node, kind }, definition: { inputs: [node.input] } } as never,
+      selection: {
+        id: 'condition',
+        kind,
+        node: { ...node, kind, task: { name: 'Task', inputs: [node.input], outputs: [], executor: { kind: 'llm', mode: 'chat' } } },
+        definition: { inputs: [node.input] },
+      } as never,
       store: {
         $: { flowId: { value: 'flow' } },
         setInputSource,

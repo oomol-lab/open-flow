@@ -130,25 +130,21 @@ const fixtures: readonly Fixture[] = [
     node: {
       kind: 'task',
       name: 'Review assistant',
-      taskId: 'agent',
-      inputs: { request: { kind: 'value', value: 'Review the release notes for missing details.' } },
-    },
-    content: {
-      tasks: {
-        agent: {
-          name: 'Review assistant',
-          inputs: [field('request')],
-          outputs: [field('result')],
-          executor: {
-            kind: 'agent',
-            model: 'example-model',
-            prompt: 'Check facts and keep the response concise.\n\n{{request}}',
-            maxRounds: 8,
-            tools: [],
-          },
+      task: {
+        name: 'Review assistant',
+        inputs: [field('request')],
+        outputs: [field('result')],
+        executor: {
+          kind: 'agent',
+          model: 'example-model',
+          prompt: 'Check facts and keep the response concise.\n\n{{request}}',
+          maxRounds: 8,
+          tools: [],
         },
       },
+      inputs: { request: { kind: 'value', value: 'Review the release notes for missing details.' } },
     },
+    content: {},
   },
   {
     id: 'llm',
@@ -156,25 +152,21 @@ const fixtures: readonly Fixture[] = [
     node: {
       kind: 'task',
       name: 'Summarize report',
-      taskId: 'llm',
+      task: {
+        name: 'Summarize report',
+        executor: { kind: 'llm', mode: 'chat' },
+        inputs: [
+          { ...field('messages', 'array'), jsonSchema: { 'type': 'array', 'ui:widget': 'llm/messages', 'minItems': 1 } },
+          { ...field('model', 'object'), jsonSchema: { 'type': 'object', 'ui:widget': 'llm/model' } },
+        ],
+        outputs: [field('content')],
+      },
       inputs: {
         messages: { kind: 'value', value: [{ role: 'user', content: 'Summarize the release notes.' }] },
         model: { kind: 'value', value: { model: 'example-model', temperature: 0.7 } },
       },
     },
-    content: {
-      tasks: {
-        llm: {
-          name: 'Summarize report',
-          executor: { kind: 'llm', mode: 'chat' },
-          inputs: [
-            { ...field('messages', 'array'), jsonSchema: { 'type': 'array', 'ui:widget': 'llm/messages', 'minItems': 1 } },
-            { ...field('model', 'object'), jsonSchema: { 'type': 'object', 'ui:widget': 'llm/model' } },
-          ],
-          outputs: [field('content')],
-        },
-      },
-    },
+    content: {},
   },
 ]
 
@@ -182,7 +174,7 @@ function contentFor(fixture: Fixture): RevisionContent {
   return {
     modelVersion: currentFlowModelVersion,
     modules: { module: { name: 'Prepare report', imports: [], source: 'export default (inputs) => ({ report: inputs.message, count: inputs.count })' } },
-    document: { bindings: {}, tasks: {}, ...fixture.content, graph: { nodes: { sample: fixture.node }, edges: [] } },
+    document: { bindings: {}, ...fixture.content, graph: { nodes: { sample: fixture.node }, edges: [] } },
   }
 }
 

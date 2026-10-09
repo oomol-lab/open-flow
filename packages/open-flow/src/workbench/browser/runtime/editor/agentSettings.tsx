@@ -66,9 +66,10 @@ function EditableAgentSettingsProvider({
         const decoded = decodeRevisionContent({
           modelVersion: currentFlowModelVersion,
           modules: {},
-          document: { bindings: {}, graph: { nodes: {}, edges: [] }, tasks: { agent: { ...definition, executor: value } } },
-        }).document.tasks.agent!
-        return store.saveTaskSettings(nodeId, { kind: 'agent', name: definition.name, before: definition, task: decoded })
+          document: { bindings: {}, graph: { nodes: { agent: { kind: 'task', inputs: {}, task: { ...definition, executor: value } } }, edges: [] } },
+        }).document.graph.nodes.agent!
+        if (decoded.kind != 'task' || !('executor' in decoded.task)) return false
+        return store.saveTaskSettings(nodeId, { kind: 'agent', name: definition.name, before: definition, task: decoded.task })
       }),
   )
   useEffect(() => {
@@ -77,8 +78,8 @@ function EditableAgentSettingsProvider({
   }, [changes, task.executor])
   const save = async (): Promise<boolean> => {
     const value = changes.value
-    const notification = value.kind === 'agent' && value.notification != null ? store.$.revision.value?.task(value.notification.taskId) : undefined
-    const notificationInputs = notification?.inputs.filter((port): port is InputPort => 'handle' in port) ?? []
+    const notification = value.kind === 'agent' ? value.notification : undefined
+    const notificationInputs = notification?.inputDefinitions ?? []
     if (value.kind == 'agent' && (!value.model.trim() || !Number.isSafeInteger(value.maxRounds) || value.maxRounds < 1 || value.maxRounds > 100)) return false
     if (!agentFixedValuesValid(value, notificationInputs)) {
       setSaveError(t('agent.invalidValues'))

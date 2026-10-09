@@ -452,11 +452,11 @@ export class WorkbenchStore {
       const prepared = await this.prepareConnectorAction(action)
       if (prepared == null || this.#disposed || flowId != this.workspace.$.flowId.value) return
       const node = this.workspace.$.revision.value?.node(target, nodeId)
-      if (node?.kind != 'task' || node.node.task != null) return
-      const executor = this.workspace.$.revision.value?.task(node.node.taskId)?.executor
+      if (node?.kind != 'task' || 'moduleId' in node.node.task) return
+      const executor = 'executor' in node.node.task ? node.node.task.executor : undefined
       if (executor?.kind != 'connector' || executor.action != action.actionId || executor.connectionId != null) return
       const connection = prepared.action.defaultConnection
-      if (connection != null) await this.workspace.setConnectorConnection(node.node.taskId, connection.connectionId)
+      if (connection != null) await this.workspace.setConnectorConnection(node.id, connection.connectionId)
       if (!this.#disposed && flowId == this.workspace.$.flowId.value) await this.connectors.refresh()
     } catch (error) {
       if (!this.#disposed && flowId == this.workspace.$.flowId.value) this.#notice.set(errorNotice(error, this.#i18n.t))

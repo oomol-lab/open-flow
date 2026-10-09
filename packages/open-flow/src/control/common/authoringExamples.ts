@@ -47,7 +47,7 @@ export function authoringExample(name: string): { version: 1; operations: readon
       operations = createBuiltinTrigger(target, 'error', { kind: 'error', name: 'Flow Error' })
       break
     case 'decision':
-      operations = createDecisionTask(target, { nodeId: 'decision', taskId: 'decision-task' }, 'AI Decision', [
+      operations = createDecisionTask(target, { nodeId: 'decision' }, 'AI Decision', [
         { name: 'needs_support', type: 'noul', instructions: 'Does the customer need support?' },
       ])
       break
@@ -56,11 +56,7 @@ export function authoringExample(name: string): { version: 1; operations: readon
         openapi: '3.1.0',
         paths: { '/items': { get: { responses: { '200': { content: { 'application/json': { schema: { type: 'array', items: { type: 'string' } } } } } } } } },
       }
-      operations = createManagedTask(
-        target,
-        { nodeId: 'api', taskId: 'api-task' },
-        openApiTask(selectOperation(document, 'https://api.example.com/openapi.json', '/items', 'get')),
-      )
+      operations = createManagedTask(target, { nodeId: 'api' }, openApiTask(selectOperation(document, 'https://api.example.com/openapi.json', '/items', 'get')))
       break
     }
     case 'manual':
@@ -100,7 +96,7 @@ export function authoringExample(name: string): { version: 1; operations: readon
     case 'agent':
       operations = createManagedTask(
         target,
-        { nodeId: 'agent', taskId: 'agent-task' },
+        { nodeId: 'agent' },
         {
           name: 'Agent',
           inputs: [{ handle: 'input', jsonSchema: { type: 'string' }, nullable: false, value: 'Summarize the current input.' }],
@@ -112,7 +108,7 @@ export function authoringExample(name: string): { version: 1; operations: readon
     case 'connector':
       operations = createManagedTask(
         target,
-        { nodeId: 'notify', taskId: 'notify-task' },
+        { nodeId: 'notify' },
         {
           name: 'Notify',
           executor: { kind: 'connector', action: 'ACTION_ID', connectionId: 'CONNECTION_ID' },
@@ -161,7 +157,7 @@ export function authoringExample(name: string): { version: 1; operations: readon
       break
     case 'llm-chat':
     case 'llm-json':
-      operations = createLlmTask(target, { nodeId: 'llm', taskId: 'llm-task' }, 'LLM', name == 'llm-chat' ? 'chat' : 'json', 'Generated response.')
+      operations = createLlmTask(target, { nodeId: 'llm' }, 'LLM', name == 'llm-chat' ? 'chat' : 'json', 'Generated response.')
       break
     case 'poll-notification':
       operations = [

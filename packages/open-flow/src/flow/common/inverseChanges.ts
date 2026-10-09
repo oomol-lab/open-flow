@@ -56,12 +56,6 @@ export function inverseFlowChanges(content: RevisionContent, operations: readonl
       case 'binding.delete':
         restore.push({ kind: 'binding.create', bindingId: operation.bindingId, binding: current.document.bindings[operation.bindingId]! })
         break
-      case 'task.create':
-        restore.push({ kind: 'task.delete', taskId: operation.taskId })
-        break
-      case 'task.delete':
-        restore.push({ kind: 'task.create', taskId: operation.taskId, task: current.document.tasks[operation.taskId]! })
-        break
       case 'graph.node.input.set': {
         const beforeGraph = current.document.graph
         const afterGraph = after.document.graph
@@ -117,18 +111,7 @@ export function inverseFlowChanges(content: RevisionContent, operations: readonl
       case 'graph.trigger.schedule.set':
         restore.push({ ...operation, before: operation.value, value: operation.before })
         break
-      case 'task.connector.connection.set':
-        restore.push({ ...operation, before: operation.value, value: operation.before })
-        break
-      case 'task.decision.set':
-      case 'task.openapi.set':
-      case 'task.agent.set':
-        restore.push({ ...operation, before: operation.value, value: operation.before })
-        break
-      case 'task.llm.mode.set':
-        restore.push({ ...operation, before: operation.value, value: operation.before })
-        break
-      case 'task.name.set':
+      case 'graph.node.task.set':
         restore.push({ ...operation, before: operation.value, value: operation.before })
         break
       default:

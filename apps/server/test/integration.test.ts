@@ -117,7 +117,6 @@ function revision(mode: 'connection' | 'permanent' | 'ready' | 'transient', defi
           },
         },
       },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: { 'module-main': { imports: [], name: 'Main', source: 'export default function run() { return {} }' } },
@@ -911,7 +910,7 @@ describe('Server change listener', () => {
           modules: {},
           document: {
             bindings: {},
-            tasks: {},
+
             graph: {
               edges: [],
               nodes: {

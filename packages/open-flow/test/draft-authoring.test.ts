@@ -16,7 +16,7 @@ it.each(authoringExamples)('validates and applies the complete $name example', a
   const decoded = decodeDraftOperations(example.operations)
   const operations = resolveDraftOperations(decoded, definitions)
   const content = applyFlowChanges(
-    { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, tasks: {}, graph: { nodes: {}, edges: [] } } },
+    { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] } } },
     operations,
   )
   const checked = await validateFlow(content, findEngineContract(currentEngineContract)!)

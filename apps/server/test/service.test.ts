@@ -1,6 +1,8 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { InvokeLlmTask } from '@oomol-lab/open-flow/runtime-contract'
+import type { TaskNode } from '../../../packages/open-flow/src/flow/common/change.ts'
+import type { ManagedTaskDefinition } from '../../../packages/open-flow/src/flow/common/change.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
@@ -67,7 +69,6 @@ function fullFlow(value = 2): RevisionContent {
           },
         },
       },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {
@@ -101,7 +102,6 @@ function hangingFlow(): RevisionContent {
           },
         },
       },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {
@@ -129,7 +129,6 @@ function oversizedOutputsFlow(): RevisionContent {
           },
         },
       },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {
@@ -157,7 +156,6 @@ function variableFlow(): RevisionContent {
           },
         },
       },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: { main: { imports: [], name: 'Main', source: 'export default ({ token }) => ({ token })' } },
@@ -180,7 +178,6 @@ function waitFlow(): RevisionContent {
           },
         },
       },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {},
@@ -250,16 +247,13 @@ function llmFlow(): RevisionContent {
 
             inputs: { prompt: { kind: 'value', value: 'Hello' }, topic: { kind: 'value', value: 'Open Flow' } },
             kind: 'task',
-            taskId: 'llm',
+            task: {
+              executor: { kind: 'llm', mode: 'json' },
+              inputs: [{ ...port, handle: 'prompt' }],
+              name: 'Generate',
+              outputs: [{ ...port, handle: 'answer' }],
+            },
           },
-        },
-      },
-      tasks: {
-        llm: {
-          executor: { kind: 'llm', mode: 'json' },
-          inputs: [{ ...port, handle: 'prompt' }],
-          name: 'Generate',
-          outputs: [{ ...port, handle: 'answer' }],
         },
       },
     },
@@ -280,16 +274,13 @@ function connectorFlow(): RevisionContent {
 
             inputs: { message: { kind: 'value', value: 'Hello' }, start: { kind: 'value', value: 'manual' } },
             kind: 'task',
-            taskId: 'connector',
+            task: {
+              executor: { action: 'send', kind: 'connector' },
+              inputs: [{ ...port, handle: 'message' }],
+              name: 'Send',
+              outputs: [{ ...port, handle: 'sent' }],
+            },
           },
-        },
-      },
-      tasks: {
-        connector: {
-          executor: { action: 'send', kind: 'connector' },
-          inputs: [{ ...port, handle: 'message' }],
-          name: 'Send',
-          outputs: [{ ...port, handle: 'sent' }],
         },
       },
     },
@@ -1295,7 +1286,7 @@ describe('Server application service', () => {
     const service = await openService(await databaseFile(), { capabilities: { connector: () => createConnectorHost({ getAction }) } })
     const source = fullFlow()
     const increment = source.document.graph.nodes.increment!
-    if (increment.kind !== 'task' || increment.task == null) throw new Error('Missing fixture task')
+    if (increment.kind !== 'task' || !('moduleId' in increment.task)) throw new Error('Missing fixture task')
     const entry = { action: 'mail.send', ...(connectionId == null ? {} : { connectionId }) }
     const revision: RevisionContent =
       kind === 'code'
@@ -1316,22 +1307,29 @@ describe('Server application service', () => {
             ...source,
             document: {
               ...source.document,
-              tasks: {
-                ...source.document.tasks,
-                agent: {
-                  name: 'Agent',
-                  inputs: [],
-                  outputs: [{ handle: 'output', nullable: false, jsonSchema: { type: 'string' } }],
-                  executor: {
-                    kind: 'agent',
-                    model: 'fixture',
-                    prompt: 'Go',
-                    maxRounds: 3,
-                    tools: [{ ...entry, id: 'send', name: 'send', description: '', approval: false, inputs: [] }],
+
+              graph: {
+                ...source.document.graph,
+                nodes: {
+                  ...source.document.graph.nodes,
+                  agent: {
+                    kind: 'task',
+                    task: {
+                      name: 'Agent',
+                      inputs: [],
+                      outputs: [{ handle: 'output', nullable: false, jsonSchema: { type: 'string' } }],
+                      executor: {
+                        kind: 'agent',
+                        model: 'fixture',
+                        prompt: 'Go',
+                        maxRounds: 3,
+                        tools: [{ ...entry, id: 'send', name: 'send', description: '', approval: false, inputs: [] }],
+                      },
+                    },
+                    inputs: {},
                   },
                 },
               },
-              graph: { ...source.document.graph, nodes: { ...source.document.graph.nodes, agent: { kind: 'task', taskId: 'agent', inputs: {} } } },
             },
           }
     const stored = await storeRevision(service, revision, `account-check-${kind}-${authenticated}-${connectionId}`)
@@ -1344,7 +1342,7 @@ describe('Server application service', () => {
         path:
           kind === 'code'
             ? '/document/graph/nodes/increment/task/capabilities/0/actions/0/connectionId'
-            : '/document/tasks/agent/executor/tools/0/connectionId',
+            : '/document/graph/nodes/agent/task/executor/tools/0/connectionId',
         values: { action: 'mail.send' },
       })
     }
@@ -1360,7 +1358,7 @@ describe('Server application service', () => {
         {
           code: 'llm.unconfigured',
           message: 'LLM is not configured for this deployment. Configure OPEN_FLOW_LLM_ORIGIN and OPEN_FLOW_LLM_TOKEN.',
-          path: '/document/tasks/llm/executor',
+          path: '/document/graph/nodes/llm/task/executor',
         },
       ],
       valid: false,
@@ -1485,7 +1483,7 @@ describe('Server application service', () => {
           revisionId: repaired.revision.revisionId,
           content: {
             modelVersion: currentFlowModelVersion,
-            document: { bindings: {}, graph: { edges: [], nodes: {} }, tasks: {} },
+            document: { bindings: {}, graph: { edges: [], nodes: {} } },
             modules: {},
           },
         },
@@ -1508,7 +1506,7 @@ describe('Server application service', () => {
       modules: {},
       document: {
         bindings: {},
-        tasks: {},
+
         graph: {
           nodes: {
             start: { kind: 'manual', name: 'Start' },
@@ -1586,7 +1584,7 @@ describe('Server application service', () => {
   it('ignores unreferenced LLM Tasks when the deployment has no LLM host', async () => {
     const unavailable = await openService(await databaseFile())
     const content = variableFlow()
-    const unused = llmFlow().document.tasks.llm
+    const unused = (llmFlow().document.graph.nodes['llm'] as TaskNode).task as ManagedTaskDefinition
     if (unused == null) throw new Error('LLM Task fixture is missing.')
     const stored = await storeRevision(
       unavailable,
@@ -1594,7 +1592,7 @@ describe('Server application service', () => {
         ...content,
         document: {
           ...content.document,
-          tasks: { unused },
+          graph: { ...content.document.graph, nodes: { ...content.document.graph.nodes } },
         },
       },
       'llm-check-unreferenced',

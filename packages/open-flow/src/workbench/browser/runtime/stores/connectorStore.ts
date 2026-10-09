@@ -11,7 +11,6 @@ import type { SetNotice } from './workbenchNotice.ts'
 import type { WorkspaceStore } from './workspaceStore.ts'
 
 import { compute, derive, val } from 'value-enhancer'
-import { flowDependencies } from '../../../../flow/common/semantics.ts'
 import { ApiError } from '../api.ts'
 import { connectionCatalog, actionWithConnections } from '../connectionCatalog.ts'
 import { createI18n } from '../i18n.ts'
@@ -47,7 +46,6 @@ interface ConnectorTarget {
   readonly actionId: string
   readonly connectionId?: string
   readonly nodeId: string
-  readonly taskId: string
 }
 
 export interface Connector$ {
@@ -135,17 +133,14 @@ function providerOption(provider: ConnectorProvider, t: TFunction): AddNodeOptio
   }
 }
 
-function connectorTarget(selection: ResolvedSelection | undefined, revision: RevisionView | undefined): ConnectorTarget | undefined {
+function connectorTarget(selection: ResolvedSelection | undefined): ConnectorTarget | undefined {
   if (selection == null) return
-  const taskId = selection.kind == 'task' && selection.node.task == null ? selection.node.taskId : undefined
-  if (taskId == null) return
-  const task = selection.kind == 'task' ? selection.definition : revision?.task(taskId)
+  const task = selection.kind == 'task' ? selection.definition : undefined
   if (task == null || !('executor' in task) || task.executor.kind != 'connector') return
   return {
     actionId: task.executor.action,
     connectionId: task.executor.connectionId,
     nodeId: selection.id,
-    taskId,
   }
 }
 
@@ -156,20 +151,18 @@ function connectionDiagnostics(
 ): readonly Diagnostic[] {
   if (revision == null) return []
   const diagnostics: Diagnostic[] = []
-  for (const taskId of [...flowDependencies(revision.revision.content).tasks].toSorted()) {
-    const task = revision.task(taskId)
-    if (task?.executor.kind != 'connector') continue
-    const action = actions[task.executor.action]
+  for (const { nodeId, actionId, connectionId } of revision.connectorNodes()) {
+    const action = actions[actionId]
     if (action?.authenticated != true) continue
-    const connection = task.executor.connectionId == null ? undefined : catalogs[action.serviceId]?.byId.get(task.executor.connectionId)
-    if (task.executor.connectionId != null && (catalogs[action.serviceId] == null || connection?.status == 'active')) continue
+    const connection = connectionId == null ? undefined : catalogs[action.serviceId]?.byId.get(connectionId)
+    if (connectionId != null && (catalogs[action.serviceId] == null || connection?.status == 'active')) continue
     diagnostics.push({
       code: 'task.connector-connection-required',
       column: 0,
       line: 1,
-      message: `Connector Task "${taskId}" requires an active Connection.`,
-      path: `/document/tasks/${taskId}/executor/connectionId`,
-      values: { taskId },
+      message: `Connector Task "${nodeId}" requires an active Connection.`,
+      path: `/document/graph/nodes/${nodeId}/task/executor/connectionId`,
+      values: { nodeId },
     })
   }
   return diagnostics
@@ -230,7 +223,7 @@ export class ConnectorStore {
       )
     })
     this.#selected = compute<Selection>((get) => {
-      const target = connectorTarget(get(workspace.$.selection), get(workspace.$.revision))
+      const target = connectorTarget(get(workspace.$.selection))
       const state = get(this.#state)
       if (target == null) return { authorizationPending: false }
       const action = get(actions)[target.actionId]
@@ -403,7 +396,7 @@ export class ConnectorStore {
     if (this.#disposed) return
     const current = this.#refresh.begin()
     const flowId = this.#workspace.$.flowId.value
-    const target = connectorTarget(this.#workspace.$.selection.value, this.#workspace.$.revision.value)
+    const target = connectorTarget(this.#workspace.$.selection.value)
     if (flowId == null || target == null) {
       if (this.#state.value.actionLoading != null || this.#state.value.connectionLoading != null) {
         this.#set({ actionLoading: undefined, connectionLoading: undefined })
@@ -470,8 +463,8 @@ export class ConnectorStore {
     }
   }
 
-  public async setConnection(taskId: string, connectionId: string | undefined): Promise<boolean> {
-    return await this.#workspace.setConnectorConnection(taskId, connectionId)
+  public async setConnection(nodeId: string, connectionId: string | undefined): Promise<boolean> {
+    return await this.#workspace.setConnectorConnection(nodeId, connectionId)
   }
 
   public async refreshAfterAuthorization(): Promise<void> {
@@ -514,7 +507,8 @@ export class ConnectorStore {
     const authorization = this.#authorization?.serviceId == serviceId ? this.#authorization : undefined
     const created = authorization == null ? [] : catalog.active.filter((connection) => !authorization.connectionIds.has(connection.connectionId))
     const connection = created.length == 1 ? created[0] : catalog.preferred
-    const task = this.#workspace.$.revision.value?.task(target.taskId)
+    const selected = this.#workspace.$.revision.value?.node({ kind: 'flow' }, target.nodeId)
+    const task = selected?.kind == 'task' ? selected.definition : undefined
     if (
       connection != null &&
       this.#workspace.$.selectedNodeIds.value.includes(target.nodeId) &&
@@ -523,7 +517,7 @@ export class ConnectorStore {
       task.executor.kind == 'connector' &&
       task.executor.connectionId == null
     ) {
-      await this.#workspace.setConnectorConnection(target.taskId, connection.connectionId)
+      await this.#workspace.setConnectorConnection(target.nodeId, connection.connectionId)
     }
   }
 
@@ -567,10 +561,8 @@ export class ConnectorStore {
     }
     if (!this.#isCurrent(current, flowId)) return
     const services = new Set<string>()
-    for (const taskId of flowDependencies(revision.revision.content).tasks) {
-      const task = revision.task(taskId)
-      if (task?.executor.kind != 'connector') continue
-      const action = this.$.actions.value[task.executor.action]
+    for (const { actionId } of revision.connectorNodes()) {
+      const action = this.$.actions.value[actionId]
       if (action?.authenticated == true) services.add(action.serviceId)
     }
     await Promise.all([...services].map((serviceId) => this.#loadCatalog(flowId, serviceId, false, current)))

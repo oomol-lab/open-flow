@@ -126,13 +126,19 @@ export class RevisionStore {
   agentSnapshot(revisionId: string, triggerId?: string): AgentSnapshot | undefined {
     const row = this.#database
       .prepare(`SELECT content FROM revisions WHERE revision_id = ? AND EXISTS (
-      SELECT 1 FROM json_each(revisions.content, '$.document.tasks') WHERE json_extract(value, '$.executor.kind') = 'agent'
+      SELECT 1 FROM json_each(revisions.content, '$.document.graph.nodes') WHERE json_extract(value, '$.task.executor.kind') = 'agent'
     )`)
       .get(revisionId) as { readonly content: string } | undefined
     if (row == null) return
     const revision = decodeRevision(encoder.encode(row.content))
     const dependencies = flowDependencies(revision, triggerId)
-    if (![...dependencies.tasks].some((id) => revision.document.tasks[id]?.executor.kind == 'agent')) return
+    if (
+      ![...dependencies.nodes].some((id) => {
+        const node = revision.document.graph.nodes[id]
+        return node?.kind == 'task' && 'executor' in node.task && node.task.executor.kind == 'agent'
+      })
+    )
+      return
     const model = this.#llmConfig()
     const bindings = this.#variables.resolve(variableBindings(revision, dependencies.inputBindings))
     if (model == null || bindings == null) throw new AcceptanceError('flow-invalid', 'Agent model or environment variable configuration is unavailable.')

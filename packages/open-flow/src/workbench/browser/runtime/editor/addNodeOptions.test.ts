@@ -24,7 +24,7 @@ function emptyDraft(): Draft {
       modules: {},
       document: {
         bindings: {},
-        tasks: {},
+
         graph: { edges: [], nodes: {} },
       },
     },
@@ -44,7 +44,7 @@ it('offers a manual trigger again after the existing one is removed', () => {
     content: {
       modelVersion: currentFlowModelVersion,
       modules: {},
-      document: { bindings: {}, tasks: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
+      document: { bindings: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
     },
   }
   expect(designerGraph(draft, { kind: 'flow' }).nodes).toEqual([expect.objectContaining({ id: 'start', outputs: [] })])
@@ -140,12 +140,13 @@ it.each(['en', 'zh-CN', 'zh-TW', 'fr', 'ja', 'ko', 'ru'] as const)('creates a us
   const target = { kind: 'flow' } as const
   const option = deriveAddNodeOptions(draft, target, i18n.t).find((item) => item.kind == 'agent')!
   const intent = addNodeIntent(option, view, target, i18n.t)!
-  const changes = addNode(view, target, 'agent', intent, () => 'agent-task')!
-  const created = changes.find((operation) => operation.kind == 'task.create')
-  if (created?.kind != 'task.create' || !('executor' in created.task) || created.task.executor.kind != 'agent') throw new Error('Expected Agent creation.')
-  expect(created.task.executor.prompt).toContain('{{input}}')
-  expect(created.task.executor.prompt).toBe(i18n.t('agent.defaultPrompt', { input: '{{input}}' }))
-  const output = created.task.outputs[0]
+  const changes = addNode(view, target, 'agent', intent)!
+  const created = changes.find((operation) => operation.kind == 'graph.node.create')
+  if (created?.kind != 'graph.node.create' || created.node.kind != 'task' || !('executor' in created.node.task) || created.node.task.executor.kind != 'agent')
+    throw new Error('Expected Agent creation.')
+  expect(created.node.task.executor.prompt).toContain('{{input}}')
+  expect(created.node.task.executor.prompt).toBe(i18n.t('agent.defaultPrompt', { input: '{{input}}' }))
+  const output = created.node.task.outputs[0]
   if (output == null || !('handle' in output)) throw new Error('Expected output port.')
   expect(output.description).toBe(i18n.t('agent.defaultOutputDescription'))
   expect(output.description?.length).toBeGreaterThan(0)

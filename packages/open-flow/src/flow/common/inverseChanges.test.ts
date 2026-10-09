@@ -10,7 +10,7 @@ const target = { kind: 'flow' } as const
 const empty: RevisionContent = {
   modelVersion: currentFlowModelVersion,
   modules: {},
-  document: { bindings: {}, graph: { nodes: {}, edges: [] }, tasks: {} },
+  document: { bindings: {}, graph: { nodes: {}, edges: [] } },
 }
 function roundTrip(before: RevisionContent, operations: readonly ChangeOperation[]) {
   const after = applyFlowChanges(before, operations)
@@ -61,53 +61,65 @@ describe('inverse canvas changes', () => {
       applyFlowChanges(content, [{ kind: 'graph.node.field.set', target, nodeId: 'trigger', field: 'connectionId', before: 'stale', value: 'personal' }]),
     ).toThrow()
   })
-  it('removes only tasks losing their last reference and restores them on undo', () => {
+  it('deletes node-owned task configurations independently and restores them on undo', () => {
     const task = { name: 'Mail', inputs: [], outputs: [], executor: { kind: 'connector' as const, action: 'netease_mail.list_folders' } }
     const content: RevisionContent = {
       ...empty,
       document: {
         ...empty.document,
-        tasks: { mail: task, orphan: task },
-        graph: { edges: [], nodes: { a: { kind: 'task', name: 'A', taskId: 'mail', inputs: {} }, b: { kind: 'task', name: 'B', taskId: 'mail', inputs: {} } } },
+
+        graph: { edges: [], nodes: { a: { kind: 'task', name: 'A', task: task, inputs: {} }, b: { kind: 'task', name: 'B', task: task, inputs: {} } } },
       },
     }
-    expect(applyFlowChanges(content, deleteNodes(content, target, ['a'])).document.tasks.mail).toEqual(task)
+    const remaining = applyFlowChanges(content, deleteNodes(content, target, ['a']))
+    expect(remaining.document.graph.nodes.a).toBeUndefined()
+    expect(remaining.document.graph.nodes.b).toEqual(content.document.graph.nodes.b)
     const operations = deleteNodes(content, target, ['a', 'b'])
-    expect(applyFlowChanges(content, operations).document.tasks).toEqual({ orphan: task })
+    expect(applyFlowChanges(content, operations).document.graph.nodes).toEqual({})
     roundTrip(content, operations)
   })
 
-  it('preserves Agent notification tasks until the Agent is removed', () => {
+  it('keeps Agent notification configuration independent of other nodes', () => {
     const content: RevisionContent = {
       ...empty,
       document: {
         ...empty.document,
-        tasks: {
-          mail: { name: 'Mail', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send' } },
-          agent: {
-            name: 'Agent',
-            inputs: [],
-            outputs: [],
-            executor: {
-              kind: 'agent',
-              model: 'test',
-              prompt: '',
-              maxRounds: 10,
-              tools: [],
-              notification: { taskId: 'mail', messageHandle: 'message', inputs: {} },
-            },
-          },
-        },
+
         graph: {
           edges: [],
-          nodes: { mail: { kind: 'task', name: 'Mail', taskId: 'mail', inputs: {} }, agent: { kind: 'task', name: 'Agent', taskId: 'agent', inputs: {} } },
+          nodes: {
+            mail: {
+              kind: 'task',
+              name: 'Mail',
+              task: { name: 'Mail', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send' } },
+              inputs: {},
+            },
+            agent: {
+              kind: 'task',
+              name: 'Agent',
+              task: {
+                name: 'Agent',
+                inputs: [],
+                outputs: [],
+                executor: {
+                  kind: 'agent',
+                  model: 'test',
+                  prompt: '',
+                  maxRounds: 10,
+                  tools: [],
+                  notification: { action: 'mail.send', inputDefinitions: [], messageHandle: 'message', inputs: {} },
+                },
+              },
+              inputs: {},
+            },
+          },
         },
       },
     }
     const remaining = applyFlowChanges(content, deleteNodes(content, target, ['mail']))
-    expect(remaining.document.tasks.mail).toBeDefined()
+    expect(remaining.document.graph.nodes.agent).toEqual(content.document.graph.nodes.agent)
     const operations = deleteNodes(remaining, target, ['agent'])
-    expect(applyFlowChanges(remaining, operations).document.tasks).toEqual({})
+    expect(applyFlowChanges(remaining, operations).document.graph.nodes).toEqual({})
     roundTrip(remaining, operations)
   })
 
@@ -152,7 +164,7 @@ describe('inverse canvas changes', () => {
   it('restores optional fields, input values and code port definitions across a batch', () => {
     const content = applyFlowChanges(empty, createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Code'))
     const node = content.document.graph.nodes.code!
-    if (node.kind != 'task' || node.task == null) throw new Error('Expected inline task')
+    if (node.kind != 'task' || !('moduleId' in node.task)) throw new Error('Expected inline task')
     roundTrip(content, [
       { kind: 'graph.node.field.set', target, nodeId: 'code', field: 'description', value: 'Description' },
       { kind: 'graph.node.field.set', target, nodeId: 'code', field: 'description', before: 'Description' },

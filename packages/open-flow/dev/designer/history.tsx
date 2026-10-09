@@ -32,7 +32,7 @@ function createSession(language: UiLanguage, log: LogAction, notify: SetNotice) 
   let sequence = 1
   let layoutRevision = 1
   let content: RevisionContent = applyFlowChanges(
-    { modelVersion: currentFlowModelVersion, document: { graph: { nodes: {}, edges: [] }, tasks: {}, bindings: {} }, modules: {} },
+    { modelVersion: currentFlowModelVersion, document: { graph: { nodes: {}, edges: [] }, bindings: {} }, modules: {} },
     [
       ...createBuiltinTrigger(target, 'trigger', { kind: 'cron', name: 'Schedule', cronTimes: [] }),
       ...createValue(target, 'value', 'Input'),

@@ -26,7 +26,6 @@ function draft(revisionId: string, name?: string, description?: string): Draft {
             },
           },
         },
-        tasks: {},
       },
       modelVersion: currentFlowModelVersion,
       modules: { module: { imports: [], name: 'Task', source: 'export default () => ({})' } },

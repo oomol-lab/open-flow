@@ -1,13 +1,20 @@
 # 公共契约与版本演进
 
-## 移除旧 Subflow 模型
+## Flow model v6：移除共享 Task 和旧 Subflow
 
-Flow model v6 删除 `document.subflows`、Subflow 节点、子图输入来源，以及 `subflow.*` 编辑操作。
+Flow model v6 删除 `document.tasks` 和节点的 `taskId`。所有执行节点通过 `node.task` 保存自己的配置；
+Managed Task 修改使用 `{ kind: 'graph.node.task.set', target, nodeId, before, value }`，旧 `task.*` 操作不再接受。
+复制节点后配置独立，修改端口只更新该节点及其下游引用。Agent notification 直接保存 Action、Connection、输入定义与参数映射。
+
+旧引用式 Task 数据需要通过现有草稿升级操作生成 v6 Revision；每个引用展开为独立配置，通知引用同步展开。
+缺失或无效的引用会拒绝升级。读取不会静默改写原始 Revision。没有独立 Task 定义的 v2/v4/v5 数据仍保留原始编码与摘要。
+
+同一次版本升级删除 `document.subflows`、Subflow 节点、子图输入来源，以及 `subflow.*` 编辑操作。
 Graph target 仅接受 `{ kind: 'flow' }`。Workbench、CLI 和 MCP 不再提供旧子图入口；CLI 的
-`--subflow` 和 MCP `flow_node_get.subflowId` 已移除。本次不增加 Flow 调用能力，也不改变 Task 共享模型。
+`--subflow` 和 MCP `flow_node_get.subflowId` 已移除。该版本不增加 Flow 调用能力。
 
 包含旧子图或 Subflow 节点的 Revision 明确拒绝读取和修复，不会静默删除后当作完整 Flow 使用。
-旧版纯根图 Revision 仍可读取，model v2/v4/v5 的不可变编码和 closure digest 保持不变；新编辑生成 model v6。
+旧版纯根图 Revision 仍可读取，model v2/v4/v5 的不可变编码和 closure digest 保持不变；该版本的新编辑生成 model v6。
 以下条目记录历史版本变化，不代表已移除接口仍受支持。
 
 公共入口、序列化格式、Control API 和运行语义分别拥有版本，不能互相替代。

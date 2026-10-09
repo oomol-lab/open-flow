@@ -34,7 +34,6 @@ function hangingFlow(): RevisionContent {
           },
         },
       },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: { main: { imports: [], name: 'Main', source: 'export default async () => await new Promise(() => {})' } },

@@ -59,7 +59,6 @@ function failingFlow(): RevisionContent {
           },
         },
       },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: { main: { imports: [], name: 'Main', source: "export default () => { throw new Error('user-secret-must-not-leak') }" } },

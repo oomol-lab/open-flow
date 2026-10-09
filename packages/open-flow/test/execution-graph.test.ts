@@ -15,7 +15,7 @@ const value = { inputs: {}, kind: 'value' as const, values: [{ ...port, handle: 
 const task = { inputs: {}, kind: 'task' as const, task: { inputs: [{ ...port, handle: 'input', value: null }], moduleId: 'main', name: 'Task', outputs: [] } }
 function revision(graph: Graph): RevisionContent {
   return {
-    document: { bindings: {}, graph, tasks: {} },
+    document: { bindings: {}, graph },
     modelVersion: currentFlowModelVersion,
     modules: { main: { imports: [], name: 'Main', source: 'export default () => ({})' } },
   }
@@ -41,7 +41,7 @@ describe('Execution graph contract', () => {
     }
     const source = revision(graph)
     expect((await prepareFlow(source, currentEngineContract)).kind).toBe('prepared')
-    expect(availableOutputs(source.document, graph, 'c')).toEqual({ a: ['value'] })
+    expect(availableOutputs(graph, 'c')).toEqual({ a: ['value'] })
     const broken = revision({ ...graph, edges: [] })
     const result = await prepareFlow(broken, currentEngineContract)
     expect(result.kind).toBe('flow-invalid')
@@ -69,9 +69,7 @@ describe('Execution graph contract', () => {
       edges: [{ source: 'source', target: 'target' }],
       nodes: { source, target, unrelated: source },
     }
-    const content = revision(graph)
-
-    expect(inputSourceCandidates(content.document, graph, 'target', 'input')).toEqual({
+    expect(inputSourceCandidates(graph, 'target', 'input')).toEqual({
       source: [
         { output: 'text', check: { kind: 'available' } },
         {
@@ -81,7 +79,7 @@ describe('Execution graph contract', () => {
         { output: 'unknown', check: { kind: 'schema-error' } },
       ],
     })
-    expect(availableOutputs(content.document, graph, 'target', 'input')).toEqual({ source: ['text'] })
+    expect(availableOutputs(graph, 'target', 'input')).toEqual({ source: ['text'] })
   })
 
   it('offers ancestor outputs even when their branch may be skipped', () => {
@@ -104,8 +102,8 @@ describe('Execution graph contract', () => {
         d: task,
       },
     }
-    expect(availableOutputs(revision(graph).document, graph, 'd')).toEqual({ b: ['value'], c: ['value'] })
-    expect(availableOutputs(revision(graph).document, graph, 'b')).toEqual({})
+    expect(availableOutputs(graph, 'd')).toEqual({ b: ['value'], c: ['value'] })
+    expect(availableOutputs(graph, 'b')).toEqual({})
     const parallel = {
       ...graph,
       edges: [
@@ -113,7 +111,7 @@ describe('Execution graph contract', () => {
         { source: 'c', target: 'd' },
       ],
     }
-    expect(availableOutputs(revision(parallel).document, parallel, 'd')).toEqual({ b: ['value'], c: ['value'] })
+    expect(availableOutputs(parallel, 'd')).toEqual({ b: ['value'], c: ['value'] })
   })
 })
 
@@ -307,7 +305,7 @@ it('does not treat eventual action values as available on the notification path'
   const content = revision(graph)
   const result = await prepareFlow(content, currentEngineContract)
   expect(result.kind).toBe('flow-invalid')
-  expect(availableOutputs(content.document, graph, 'notify')).toEqual({ wait: ['pending'] })
+  expect(availableOutputs(graph, 'notify')).toEqual({ wait: ['pending'] })
 })
 
 it('only offers resolution outputs on their reachable paths', () => {
@@ -332,13 +330,12 @@ it('only offers resolution outputs on their reachable paths', () => {
       { source: 'approval', sourceHandle: 'reject', target: 'reject' },
     ],
   }
-  const content = revision(graph)
-  expect(availableOutputs(content.document, graph, 'waitNotify', 'input')).toEqual({ wait: ['pending'] })
-  expect(availableOutputs(content.document, graph, 'continue', 'input')).toEqual({ wait: ['continue'] })
-  expect(availableOutputs(content.document, graph, 'approvalNotify', 'input')).toEqual({ approval: ['pending'] })
-  expect(availableOutputs(content.document, graph, 'approve', 'input')).toEqual({ approval: ['approve'] })
-  expect(availableOutputs(content.document, graph, 'reject', 'input')).toEqual({ approval: ['reject'] })
-  expect(inputSourceCandidates(content.document, graph, 'waitNotify', 'input')).toEqual({
+  expect(availableOutputs(graph, 'waitNotify', 'input')).toEqual({ wait: ['pending'] })
+  expect(availableOutputs(graph, 'continue', 'input')).toEqual({ wait: ['continue'] })
+  expect(availableOutputs(graph, 'approvalNotify', 'input')).toEqual({ approval: ['pending'] })
+  expect(availableOutputs(graph, 'approve', 'input')).toEqual({ approval: ['approve'] })
+  expect(availableOutputs(graph, 'reject', 'input')).toEqual({ approval: ['reject'] })
+  expect(inputSourceCandidates(graph, 'waitNotify', 'input')).toEqual({
     wait: [expect.objectContaining({ output: 'pending', check: { kind: 'available' } })],
   })
 })

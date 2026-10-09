@@ -41,7 +41,7 @@ export function copyNodes(revision: RevisionView, target: GraphTarget, nodeIds: 
     ),
     modules: Object.fromEntries(
       Object.values(copied).flatMap((node) => {
-        if (node.kind != 'task' || node.task == null) return []
+        if (node.kind != 'task' || !('moduleId' in node.task)) return []
         const module = revision.revision.content.modules[node.task.moduleId]
         return module == null ? [] : [[node.task.moduleId, module]]
       }),
@@ -59,7 +59,7 @@ export function pasteNodes(revision: RevisionView, target: GraphTarget, clipboar
       (target.kind == 'flow' || 'inputs' in node) &&
       (node.kind !== 'manual' || !hasManualTrigger) &&
       (node.kind !== 'error' || !hasErrorTrigger) &&
-      (node.kind != 'task' || node.task == null || clipboard.modules[node.task.moduleId] != null),
+      (node.kind != 'task' || !('moduleId' in node.task) || clipboard.modules[node.task.moduleId] != null),
   )
   const sourceIds = entries.map(([sourceId]) => sourceId)
   const ids = new Map(sourceIds.map((sourceId) => [sourceId, identity()]))
@@ -124,7 +124,7 @@ export function pasteNodes(revision: RevisionView, target: GraphTarget, clipboar
             ? { ...source, bindingId: bindingIds.get(source.bindingId) ?? source.bindingId }
             : source,
       )
-    if (node.kind == 'task' && node.task != null) {
+    if (node.kind == 'task' && 'moduleId' in node.task) {
       const moduleId = nodeId
       const module = clipboard.modules[node.task.moduleId]
       operations.push({ kind: 'module.create', module: { ...module, name: `${module.name} copy` }, moduleId })

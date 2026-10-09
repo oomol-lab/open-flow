@@ -34,7 +34,7 @@ it.each([
   const operation = { kind: 'graph.node.create', target, nodeId: 'code', node }
   expect(() => decodeChangeOperations([operation])).toThrow()
   expect(new Validator(changeOperationsSchema() as object).validate([operation]).valid).toBe(false)
-  expect(() => decodeFlowDocument({ bindings: {}, tasks: {}, graph: { nodes: { code: node }, edges: [] } })).toThrow()
+  expect(() => decodeFlowDocument({ bindings: {}, graph: { nodes: { code: node }, edges: [] } })).toThrow()
 })
 
 it.each([
@@ -57,7 +57,7 @@ describe('ChangeOperation wire contract', () => {
     const content: RevisionContent = {
       modelVersion: currentFlowModelVersion,
       modules: {},
-      document: { bindings: {}, tasks: {}, graph: { edges: [], nodes: {} } },
+      document: { bindings: {}, graph: { edges: [], nodes: {} } },
     }
     expect(applyFlowChanges(content, decodeChangeOperations(operations)).document.graph.nodes.pause).toMatchObject({
       kind: 'wait',
@@ -145,4 +145,19 @@ it.each([
 ])('rejects retired Subflow operations at the public boundary: %j', (operation) => {
   expect(() => decodeChangeOperations([operation])).toThrow()
   expect(new Validator(changeOperationsSchema() as object).validate([operation]).valid).toBe(false)
+})
+
+it('rejects retired shared Task operations instead of creating independent definitions', () => {
+  for (const kind of [
+    'task.create',
+    'task.delete',
+    'task.agent.set',
+    'task.decision.set',
+    'task.openapi.set',
+    'task.name.set',
+    'task.llm.mode.set',
+    'task.connector.connection.set',
+  ]) {
+    expect(() => decodeChangeOperations([{ kind, taskId: 'shared' }])).toThrow(/Unknown operation/)
+  }
 })

@@ -135,16 +135,16 @@ export function nameCreatedNodes(revision: RevisionView, target: GraphTarget, ch
   })
 }
 
-export function addNode(revision: RevisionView, target: GraphTarget, nodeId: string, intent: AddNodeIntent, identity: () => string): FlowChanges | undefined {
+export function addNode(revision: RevisionView, target: GraphTarget, nodeId: string, intent: AddNodeIntent): FlowChanges | undefined {
   let changes: FlowChanges | undefined
   switch (intent.kind) {
     case 'decision':
-      changes = createDecisionTask(target, { nodeId, taskId: identity() }, intent.name)
+      changes = createDecisionTask(target, { nodeId }, intent.name)
       break
     case 'openapi':
       changes = createManagedTask(
         target,
-        { nodeId, taskId: identity() },
+        { nodeId },
         {
           name: intent.name,
           inputs: [],
@@ -157,13 +157,13 @@ export function addNode(revision: RevisionView, target: GraphTarget, nodeId: str
       changes = createCodeTask(target, { moduleId: nodeId, nodeId }, intent.name, undefined, intent.ports)
       break
     case 'agent':
-      changes = createAgentTask(target, { nodeId, taskId: identity() }, intent.name, intent)
+      changes = createAgentTask(target, { nodeId }, intent.name, intent)
       break
     case 'llm':
-      changes = createLlmTask(target, { nodeId, taskId: identity() }, intent.name, intent.mode, intent.outputDescription)
+      changes = createLlmTask(target, { nodeId }, intent.name, intent.mode, intent.outputDescription)
       break
     case 'connector':
-      changes = createManagedTask(target, { nodeId, taskId: identity() }, connectorTask(intent.action))
+      changes = createManagedTask(target, { nodeId }, connectorTask(intent.action))
       break
     case 'condition':
       changes = createCondition(target, nodeId, intent.name)
@@ -329,43 +329,26 @@ export function updateTask(revision: RevisionView, target: GraphTarget, nodeId: 
   const node = revision.graph(target)?.nodes[nodeId]
   if (node?.kind != 'task') return
   switch (settings.kind) {
-    case 'decision': {
-      if (node.taskId == null || !dequal(revision.task(node.taskId), settings.before)) return
-      const changes: ChangeOperation[] = (replaceTaskPorts(revision, target, nodeId, settings.task) ?? []).filter(
-        (change) => change.kind !== 'task.decision.set',
-      )
-      if (!dequal(settings.before, settings.task))
-        changes.push({ kind: 'task.decision.set', taskId: node.taskId, before: settings.before, value: settings.task })
-      return changes
-    }
-    case 'openapi': {
-      if (node.taskId == null || !dequal(revision.task(node.taskId), settings.before)) return
-      return [{ kind: 'task.openapi.set', taskId: node.taskId, before: settings.before, value: settings.task }]
-    }
+    case 'decision':
+    case 'openapi':
     case 'agent': {
-      if (node.taskId == null || !dequal(revision.task(node.taskId), settings.before)) return
-      return [{ kind: 'task.agent.set', taskId: node.taskId, before: settings.before, value: settings.task }]
+      if (!dequal(node.task, settings.before)) return
+      return replaceTaskPorts(revision, target, nodeId, settings.task)
     }
     case 'code': {
-      if (node.task == null) return
+      if (!('moduleId' in node.task)) return
       return replaceTaskPorts(revision, target, nodeId, { ...node.task, name: settings.name })
     }
     case 'llm': {
-      if (node.task != null) return
-      const task = revision.task(node.taskId)
-      if (task?.executor.kind != 'llm') return
-      const changes: ChangeOperation[] = []
-      if (task.name != settings.name) changes.push({ before: task.name, kind: 'task.name.set', taskId: node.taskId, value: settings.name })
-      if (task.executor.mode != settings.mode) {
-        changes.push({ before: task.executor.mode, kind: 'task.llm.mode.set', taskId: node.taskId, value: settings.mode })
-      }
-      return changes
+      const task = node.task
+      if (!('executor' in task) || task.executor.kind != 'llm') return
+      const value = { ...task, name: settings.name, executor: { ...task.executor, mode: settings.mode } }
+      return dequal(task, value) ? [] : [{ before: task, kind: 'graph.node.task.set', nodeId, target, value }]
     }
     case 'connector': {
-      if (node.task != null) return
-      const task = revision.task(node.taskId)
-      if (task?.executor.kind != 'connector') return
-      return task.name == settings.name ? [] : [{ before: task.name, kind: 'task.name.set', taskId: node.taskId, value: settings.name }]
+      const task = node.task
+      if (!('executor' in task) || task.executor.kind != 'connector') return
+      return task.name == settings.name ? [] : [{ before: task, kind: 'graph.node.task.set', nodeId, target, value: { ...task, name: settings.name } }]
     }
   }
 }
@@ -378,17 +361,11 @@ export function updateTaskPorts(
   values?: Readonly<Record<string, JsonValue | undefined>>,
 ): FlowChanges | undefined {
   const selection = revision.node(target, nodeId)
-  if (
-    selection?.kind == 'task' &&
-    selection.node.taskId != null &&
-    selection.definition != null &&
-    'executor' in selection.definition &&
-    selection.definition.executor.kind == 'agent'
-  ) {
+  if (selection?.kind == 'task' && selection.definition != null && 'executor' in selection.definition && selection.definition.executor.kind == 'agent') {
     const changes = replaceTaskPorts(revision, target, nodeId, { ...selection.definition, ...ports }, values)
     return changes == null ? undefined : cleanVariableBindings(revision.revision.content, changes)
   }
-  if (selection?.kind != 'task' || selection.node.task == null || selection.module == null) return
+  if (selection?.kind != 'task' || !('moduleId' in selection.node.task) || selection.module == null) return
   if (values == null && dequal(selection.node.task.inputs, ports.inputs) && dequal(selection.node.task.outputs, ports.outputs)) return []
   const changes = replaceTaskPorts(revision, target, nodeId, { ...selection.node.task, ...ports }, values)
   if (changes == null) return
@@ -403,7 +380,7 @@ export function updateTaskAdditionalInputs(
   values?: Readonly<Record<string, JsonValue | undefined>>,
 ): FlowChanges | undefined {
   const selection = revision.node(target, nodeId)
-  if (selection?.kind != 'task' || selection.node.task != null || selection.definition == null) return
+  if (selection?.kind != 'task' || 'moduleId' in selection.node.task || selection.definition == null) return
   const current = selection.node
   if (values == null && dequal(current.additionalInputs ?? [], additionalInputs)) return []
   const rename = renamedPort(current.additionalInputs ?? [], additionalInputs)
@@ -520,13 +497,9 @@ function replaceTaskPorts(
   const graph = revision.graph(target)
   const current = graph?.nodes[nodeId]
   if (graph == null || current?.kind != 'task') return
-  const previous = current.task ?? revision.task(current.taskId)
+  const previous = current.task
   if (previous == null) return
-  const instances = new Set(
-    current.task == null && 'executor' in task && task.executor.kind === 'decision'
-      ? Object.entries(graph.nodes).flatMap(([id, node]) => (node.kind === 'task' && node.taskId === current.taskId ? [id] : []))
-      : [nodeId],
-  )
+  const instances = new Set([nodeId])
   const inputRename = renamedPort(previous.inputs, task.inputs)
   const outputRename = renamedPort(previous.outputs, task.outputs)
   const inputNames = new Set(task.inputs.flatMap((port) => ('handle' in port ? [port.handle] : [])))
@@ -556,7 +529,7 @@ function replaceTaskPorts(
       inputs[name] = { kind: 'sources', sources }
     }
 
-    if (currentNodeId == nodeId && current.task != null) {
+    if (currentNodeId == nodeId && 'moduleId' in current.task) {
       if (current.task.name != task.name) {
         changes.push({ before: current.task.name, kind: 'graph.node.task.name.set', nodeId, target, value: task.name })
       }
@@ -567,9 +540,7 @@ function replaceTaskPorts(
     changes.push(...changedInputs(nodeInputMappings(node), inputs, target, currentNodeId))
   }
 
-  if (current.task == null && 'executor' in task && task.executor.kind == 'decision' && 'executor' in previous && !dequal(previous, task))
-    changes.unshift({ kind: 'task.decision.set', taskId: current.taskId, before: previous, value: task })
-  if (current.task == null && 'executor' in task && task.executor.kind == 'agent' && 'executor' in previous) {
+  if (!('moduleId' in current.task) && 'executor' in task && task.executor.kind == 'agent' && 'executor' in previous) {
     const config = task.executor
     const source = <Value extends AgentInput>(
       value: Value,
@@ -595,8 +566,8 @@ function replaceTaskPorts(
             }),
       },
     }
-    if (!dequal(previous, value)) changes.unshift({ kind: 'task.agent.set', taskId: current.taskId, before: previous, value })
-  }
+    if (!dequal(previous, value)) changes.unshift({ kind: 'graph.node.task.set', nodeId, target, before: previous, value })
+  } else if ('executor' in task && !dequal(previous, task)) changes.unshift({ kind: 'graph.node.task.set', nodeId, target, before: previous, value: task })
   return changes
 }
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'

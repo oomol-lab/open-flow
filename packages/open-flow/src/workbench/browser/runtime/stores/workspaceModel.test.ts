@@ -1,3 +1,5 @@
+import type { TaskNode } from '../../../../flow/common/change.ts'
+import type { ManagedTaskDefinition } from '../../../../flow/common/change.ts'
 import type { Draft } from '../api.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
@@ -20,14 +22,7 @@ function draft(): Draft {
       modules: {},
       document: {
         bindings: {},
-        tasks: {
-          task: {
-            name: 'Task',
-            executor: { kind: 'connector', action: 'test' },
-            inputs: Array.from({ length: 16 }, (_, index) => ({ handle: `input${index}`, jsonSchema: { type: 'string' }, nullable: true })),
-            outputs: [],
-          },
-        },
+
         graph: {
           edges: [{ source: 'source', target: 'task' }],
           nodes: {
@@ -36,8 +31,26 @@ function draft(): Draft {
               inputs: {},
               values: [{ description: 'Plain text', handle: 'text', jsonSchema: { type: 'string' }, nullable: false, value: 'hello' }],
             },
-            task: { kind: 'task', taskId: 'task', inputs: {} },
-            other: { kind: 'task', taskId: 'task', inputs: {} },
+            task: {
+              kind: 'task',
+              task: {
+                name: 'Task',
+                executor: { kind: 'connector', action: 'test' },
+                inputs: Array.from({ length: 16 }, (_, index) => ({ handle: `input${index}`, jsonSchema: { type: 'string' }, nullable: true })),
+                outputs: [],
+              },
+              inputs: {},
+            },
+            other: {
+              kind: 'task',
+              task: {
+                name: 'Task',
+                executor: { kind: 'connector', action: 'test' },
+                inputs: Array.from({ length: 16 }, (_, index) => ({ handle: `input${index}`, jsonSchema: { type: 'string' }, nullable: true })),
+                outputs: [],
+              },
+              inputs: {},
+            },
           },
         },
       },
@@ -46,50 +59,6 @@ function draft(): Draft {
 }
 
 describe('Connector providers', () => {
-  it('ignores orphan connector and Agent definitions when reporting service usage', () => {
-    const base = draft()
-    const source: Draft = {
-      ...base,
-      content: {
-        ...base.content,
-        document: {
-          ...base.content.document,
-          tasks: {
-            ...base.content.document.tasks,
-            orphan: { name: 'Mail', inputs: [], outputs: [], executor: { kind: 'connector', action: 'netease_mail.list_folders' } },
-            agent: {
-              name: 'Agent',
-              inputs: [],
-              outputs: [],
-              executor: {
-                kind: 'agent',
-                model: 'test',
-                prompt: '',
-                maxRounds: 10,
-                tools: [{ id: 'user', name: 'User', description: '', approval: false, inputs: [], action: 'github.get_current_user' }],
-              },
-            },
-          },
-        },
-      },
-    }
-    expect([...revisionView(source).connectorProviderIds]).toEqual([])
-    const referenced: Draft = {
-      ...source,
-      content: {
-        ...source.content,
-        document: {
-          ...source.content.document,
-          graph: {
-            ...source.content.document.graph,
-            nodes: { ...source.content.document.graph.nodes, agent: { kind: 'task', name: 'Agent', taskId: 'agent', inputs: {} } },
-          },
-        },
-      },
-    }
-    expect([...revisionView(referenced).connectorProviderIds]).toEqual(['github'])
-  })
-
   it('derives Providers used by Actions and Triggers in the revision view', () => {
     const base = draft()
     const source: Draft = {
@@ -102,6 +71,7 @@ describe('Connector providers', () => {
             ...base.content.document.graph,
             nodes: {
               ...base.content.document.graph.nodes,
+              mail: { kind: 'task', inputs: {}, task: { name: 'Mail', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send' } } },
               watch: {
                 config: {},
                 definition: {
@@ -120,10 +90,6 @@ describe('Connector providers', () => {
                 pollTimes: [],
               },
             },
-          },
-          tasks: {
-            ...base.content.document.tasks,
-            task: { ...base.content.document.tasks.task!, executor: { action: 'mail.send', kind: 'connector' } },
           },
         },
       },
@@ -177,7 +143,12 @@ describe('Per-field input sources', () => {
               ...base.content.document.graph.nodes,
               task: {
                 kind: 'task',
-                taskId: 'task',
+                task: {
+                  name: 'Task',
+                  executor: { kind: 'connector', action: 'test' },
+                  inputs: Array.from({ length: 16 }, (_, index) => ({ handle: `input${index}`, jsonSchema: { type: 'string' }, nullable: true })),
+                  outputs: [],
+                },
                 inputs: {
                   input0: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'text' }] },
                   input1: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'missing' }] },
@@ -204,9 +175,20 @@ describe('Per-field input sources', () => {
           ...source.content,
           document: {
             ...source.content.document,
-            tasks: {
-              ...source.content.document.tasks,
-              task: { ...source.content.document.tasks.task!, inputs: [{ handle: 'input0', jsonSchema: { type: 'number' }, nullable: true }] },
+            graph: {
+              ...source.content.document.graph,
+              nodes: {
+                ...source.content.document.graph.nodes,
+                ['task']: {
+                  ...source.content.document.graph.nodes['task'],
+                  kind: 'task',
+                  inputs: (source.content.document.graph.nodes.task as TaskNode).inputs,
+                  task: {
+                    ...((source.content.document.graph.nodes['task'] as TaskNode).task as ManagedTaskDefinition)!,
+                    inputs: [{ handle: 'input0', jsonSchema: { type: 'number' }, nullable: true }],
+                  },
+                },
+              },
             },
           },
         },
@@ -270,7 +252,12 @@ describe('Per-field input sources', () => {
               ...base.content.document.graph.nodes,
               task: {
                 kind: 'task',
-                taskId: 'task',
+                task: {
+                  name: 'Task',
+                  executor: { kind: 'connector', action: 'test' },
+                  inputs: Array.from({ length: 16 }, (_, index) => ({ handle: `input${index}`, jsonSchema: { type: 'string' }, nullable: true })),
+                  outputs: [],
+                },
                 inputs: { input0: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'text' }] } },
               },
             },
@@ -300,7 +287,12 @@ describe('Per-field input sources', () => {
               second: { kind: 'value', inputs: {}, values: [{ handle: 'text', jsonSchema: { type: 'string' }, nullable: false, value: 'world' }] },
               task: {
                 kind: 'task',
-                taskId: 'task',
+                task: {
+                  name: 'Task',
+                  executor: { kind: 'connector', action: 'test' },
+                  inputs: Array.from({ length: 16 }, (_, index) => ({ handle: `input${index}`, jsonSchema: { type: 'string' }, nullable: true })),
+                  outputs: [],
+                },
                 inputs: {
                   input0: {
                     kind: 'sources',

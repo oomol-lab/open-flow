@@ -28,20 +28,43 @@ const draft = {
     modules: { script: { name: 'Script', imports: [], source: 'export default () => ({ limit: 20 });' } },
     document: {
       bindings: { token: { kind: 'variable', target: 'TOKEN' } },
-      tasks: {
-        mail: {
-          name: 'Mail',
-          inputs: [port],
-          outputs: [{ ...port, handle: 'messages' }],
-          executor: { kind: 'connector', action: 'mail.list', connectionId: 'connection' },
-        },
-      },
+
       graph: {
         nodes: {
           start: { kind: 'cron', name: 'Schedule', cronTimes: [{ type: 'every', unit: 'hour', value: 1 }] },
-          mail: { kind: 'task', name: 'Read', taskId: 'mail', inputs: { limit: { kind: 'value', value: 50 } } },
-          defaults: { kind: 'task', name: 'Default', taskId: 'mail', inputs: {} },
-          unset: { kind: 'task', name: 'Unset', taskId: 'mail', inputs: { limit: { kind: 'unset' } } },
+          mail: {
+            kind: 'task',
+            name: 'Read',
+            task: {
+              name: 'Mail',
+              inputs: [port],
+              outputs: [{ ...port, handle: 'messages' }],
+              executor: { kind: 'connector', action: 'mail.list', connectionId: 'connection' },
+            },
+            inputs: { limit: { kind: 'value', value: 50 } },
+          },
+          defaults: {
+            kind: 'task',
+            name: 'Default',
+            task: {
+              name: 'Mail',
+              inputs: [port],
+              outputs: [{ ...port, handle: 'messages' }],
+              executor: { kind: 'connector', action: 'mail.list', connectionId: 'connection' },
+            },
+            inputs: {},
+          },
+          unset: {
+            kind: 'task',
+            name: 'Unset',
+            task: {
+              name: 'Mail',
+              inputs: [port],
+              outputs: [{ ...port, handle: 'messages' }],
+              executor: { kind: 'connector', action: 'mail.list', connectionId: 'connection' },
+            },
+            inputs: { limit: { kind: 'unset' } },
+          },
           code: {
             kind: 'task',
             name: 'Code',
@@ -87,7 +110,6 @@ it('preserves editable graph relationships and defaults without catalog schemas 
         nodes: {
           start: { cronTimes: [{ type: 'every', unit: 'hour', value: 1 }] },
           mail: {
-            taskId: 'mail',
             inputs: { limit: { kind: 'value', value: 50 } },
             executor: { action: 'mail.list', connectionId: 'connection' },
             inputHandles: ['limit'],

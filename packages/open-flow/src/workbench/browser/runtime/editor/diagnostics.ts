@@ -62,7 +62,7 @@ export function diagnosticMessage(
   const title = nodeId == null ? undefined : nodeTitle?.(nodeId)
   let values = title == null ? diagnostic.values : { ...diagnostic.values, nodeId: title }
   if (diagnostic.code == 'task.connector-connection-required' && affectedNodeTitle != null) {
-    values = { ...values, taskId: affectedNodeTitle }
+    values = { ...values, nodeId: affectedNodeTitle }
   }
   const translated = t(key, values)
   return translated == key ? diagnostic.message : translated
@@ -89,13 +89,15 @@ function scope(path: string): DiagnosticScope {
   if (path.startsWith('/modules/')) return 'code'
   if (/\/graph\/nodes\/[^/]+\/task(?:\/|$)/.test(path)) return 'task'
   if (path.includes('/graph/nodes/')) return 'node'
-  if (path.startsWith('/document/tasks/')) return 'task'
   return 'flow'
 }
 
 function nodeSection(node: GraphNode, suffix: string): InspectorSection {
   if (suffix.startsWith('/inputs/')) return node.kind === 'condition' ? 'condition' : 'inputs'
-  if (node.kind == 'task' && suffix.startsWith('/task')) return 'task'
+  if (node.kind == 'task' && suffix.startsWith('/task')) {
+    if ('executor' in node.task && node.task.executor.kind == 'connector' && suffix.startsWith('/task/executor')) return 'account'
+    return 'task'
+  }
   if ((node.kind == 'poll' || node.kind == 'integration') && suffix.startsWith('/connectionId')) return 'account'
   if (node.kind == 'condition' && (suffix.startsWith('/cases/') || suffix.startsWith('/input') || suffix.startsWith('/matchMode'))) {
     return 'condition'
@@ -119,17 +121,6 @@ function location(revision: RevisionView | undefined, target: GraphTarget | unde
     return
   }
 
-  const taskMatch = /^\/document\/tasks\/([^/]+)(.*)$/.exec(diagnostic.path)
-  if (taskMatch != null) {
-    const nodeId = revision.findTaskNode(target, new Set([taskMatch[1]!]))
-    if (nodeId == null) return
-    const suffix = taskMatch[2]!
-    return {
-      nodeId,
-      section: revision.task(taskMatch[1]!)?.executor.kind == 'agent' ? 'task' : suffix.startsWith('/executor') ? 'account' : 'task',
-    }
-  }
-
   const moduleMatch = /^\/modules\/([^/]+)\/source$/.exec(diagnostic.path)
   if (moduleMatch != null) {
     const nodeId = revision.findModuleNode(target, moduleMatch[1]!)
@@ -151,8 +142,7 @@ function diagnosticsForNode(node: ResolvedSelection, diagnostics: readonly Diagn
   const nodePath = `/document/graph/nodes/${node.id}`
   const paths = [nodePath]
   if (node.kind == 'task') {
-    if (node.node.task != null) paths.push(`${nodePath}/task`)
-    else paths.push(`/document/tasks/${node.node.taskId}`)
+    if ('moduleId' in node.node.task) paths.push(`${nodePath}/task`)
     const moduleId = node.definition != null && 'moduleId' in node.definition ? node.definition.moduleId : undefined
     if (moduleId != null) paths.push(`/modules/${moduleId}`)
   }

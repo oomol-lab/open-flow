@@ -62,14 +62,14 @@ it('uses a fixed definition to call a local server without requesting the docume
         modules: {},
         document: {
           bindings: { token: { kind: 'variable', target: 'API_TOKEN' } },
-          tasks: { api: task },
+
           graph: {
             nodes: {
               start: { kind: 'manual', name: 'Start' },
               api: {
                 kind: 'task',
                 name: 'API',
-                taskId: 'api',
+                task: task,
                 inputs: { 'auth.token.token': { kind: 'sources', sources: [{ kind: 'binding', bindingId: 'token' }] } },
               },
             },

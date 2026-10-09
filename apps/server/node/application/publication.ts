@@ -155,7 +155,12 @@ export class Publisher {
       access.version == 2
         ? access
         : await captureConnectorAccess(this.#connectorAccess, input.flowId, { ...input.revision.document, ...fixed.prepared }, access)
-    if (Object.values(fixed.prepared.tasks).some((task) => task.executor.kind == 'agent') && !this.#agentAvailable())
+    if (
+      Object.values(fixed.prepared.graph.nodes)
+        .flatMap((node) => (node.kind == 'task' && 'executor' in node.task ? [node.task] : []))
+        .some((task) => task.executor.kind == 'agent') &&
+      !this.#agentAvailable()
+    )
       throw new ControlError(controlErrorCode.flowInvalid, 'Agent requires a configured model host.')
     const connectorAccess: ConnectorAccessContext = {
       flowId: input.flowId,
@@ -172,7 +177,9 @@ export class Publisher {
       throw new AcceptanceError('revision-conflict', 'The fixed Revision digest does not match its content.')
     }
     if (
-      Object.values(fixed.prepared.tasks).some((task) => task.executor.kind == 'agent' && task.executor.notification != null) &&
+      Object.values(fixed.prepared.graph.nodes)
+        .flatMap((node) => (node.kind == 'task' && 'executor' in node.task ? [node.task] : []))
+        .some((task) => task.executor.kind == 'agent' && task.executor.notification != null) &&
       this.#resolveWaitPublicOrigin() == null
     ) {
       throw new ControlError(controlErrorCode.flowInvalid, 'Wait notification requires OPEN_FLOW_PUBLIC_ORIGIN.')
@@ -180,9 +187,9 @@ export class Publisher {
     const requestDigest = await this.#publicationRequestDigest(input, fixed.revisionDigest, providerAccess.sharedAccessDigest)
     const publishedAt = this.#clock()
     const integrations = this.#integration.bindings(fixed.prepared, publishedAt)
-    const connectorTasks = Object.values(fixed.prepared.tasks).flatMap((task) =>
-      'executor' in task && task.executor.kind == 'connector' ? [task.executor] : [],
-    )
+    const connectorTasks = Object.values(fixed.prepared.graph.nodes)
+      .flatMap((node) => (node.kind == 'task' && 'executor' in node.task ? [node.task] : []))
+      .flatMap((task) => ('executor' in task && task.executor.kind == 'connector' ? [task.executor] : []))
     const providerTriggers = Object.values(fixed.prepared.graph.nodes).filter(
       (trigger): trigger is Extract<TriggerNode, { readonly kind: 'integration' | 'poll' }> => trigger.kind == 'integration' || trigger.kind == 'poll',
     )

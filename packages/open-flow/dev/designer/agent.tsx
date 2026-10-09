@@ -1,3 +1,4 @@
+import type { TaskNode } from '../../src/flow/common/change.ts'
 import type { ChangeOperation, RevisionContent } from '../../src/flow/common/change.ts'
 import type { UiLanguage } from '../../src/localization/common/languages.ts'
 import type { ConnectorAction } from '../../src/workbench/browser/runtime/api.ts'
@@ -98,16 +99,16 @@ function createSession(language: UiLanguage, log: LogAction) {
     version: 1,
   }
   let content: RevisionContent = applyFlowChanges(
-    { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] }, tasks: {} } },
+    { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] } } },
     [
-      ...createAgentTask({ kind: 'flow' }, { nodeId: 'agent', taskId: 'agent-task' }, 'Research agent', {
+      ...createAgentTask({ kind: 'flow' }, { nodeId: 'agent' }, 'Research agent', {
         prompt: i18n.t('agent.defaultPrompt', { input: '{{request}}' }),
         outputDescription: i18n.t('agent.defaultOutputDescription'),
       }),
       ...createCodeTask({ kind: 'flow' }, { nodeId: 'code', moduleId: 'code-module' }, 'Code'),
     ],
   )
-  const agentTask = content.document.tasks['agent-task']!
+  const agentTask = (content.document.graph.nodes.agent as TaskNode).task
   const agentNode = content.document.graph.nodes.agent!
   if (agentNode.kind != 'task') throw new Error('Expected Agent node.')
   content = {
@@ -118,10 +119,13 @@ function createSession(language: UiLanguage, log: LogAction) {
         ...content.document.graph,
         nodes: {
           ...content.document.graph.nodes,
-          agent: { ...agentNode, inputs: { request: { kind: 'value', value: 'Find recent records.' } } },
+          agent: {
+            ...agentNode,
+            task: { ...agentTask, inputs: [{ handle: 'request', jsonSchema: { type: 'string' }, nullable: false }] },
+            inputs: { request: { kind: 'value', value: 'Find recent records.' } },
+          },
         },
       },
-      tasks: { ...content.document.tasks, 'agent-task': { ...agentTask, inputs: [{ handle: 'request', nullable: false, jsonSchema: { type: 'string' } }] } },
     },
   }
   let failSave = false
@@ -163,7 +167,7 @@ function createSession(language: UiLanguage, log: LogAction) {
       const body = JSON.parse(String(init?.body)) as { operations: ChangeOperation[] }
       content = applyFlowChanges(content, body.operations)
       sequence++
-      log('node.saved', { agent: content.document.tasks['agent-task'], code: content.document.graph.nodes.code })
+      log('node.saved', { agent: content.document.graph.nodes.agent, code: content.document.graph.nodes.code })
       return Response.json({ revision: revision(), version: 1 })
     }
     if (url.pathname.endsWith('/check'))
@@ -286,7 +290,8 @@ function AgentSession({ session, dark, code }: { session: ReturnType<typeof crea
     if (fail) throw new Error('Simulated account loading failure')
     return session.connectors.resolveAction(selectedAction.actionId)
   }
-  const task = draft?.content.document.tasks['agent-task']
+  const agent = draft?.content.document.graph.nodes.agent
+  const task = agent?.kind == 'task' ? agent.task : undefined
   const revision = useVal(session.workspace.$.revision)
   const selection = revision?.node({ kind: 'flow' }, code ? 'code' : 'agent')
   const setPrompt = (prompt: string) => {

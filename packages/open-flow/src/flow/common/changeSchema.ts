@@ -87,7 +87,9 @@ const managed = z
             inputs: z.array(input.extend({ source: agentInput })),
           }),
         ),
-        notification: z.object({ taskId: text, messageHandle: text, inputs: z.record(text, agentValue) }).optional(),
+        notification: z
+          .object({ action: text, connectionId: text.optional(), inputDefinitions: z.array(input), messageHandle: text, inputs: z.record(text, agentValue) })
+          .optional(),
       }),
     ]),
   })
@@ -192,8 +194,7 @@ const node = z.union([
     kind: z.literal('value'),
     values: z.array(input),
   }),
-  z.object({ ...base, kind: z.literal('task'), task: inline, additionalInputs: z.array(input).optional() }),
-  z.object({ ...base, kind: z.literal('task'), taskId: text, additionalInputs: z.array(input).optional() }),
+  z.object({ ...base, kind: z.literal('task'), task: z.union([inline, managed]), additionalInputs: z.array(input).optional() }),
   z.strictObject({ ...base, kind: z.literal('approval'), ...wait }).omit({ timeoutMs: true }),
   z.strictObject({ ...base, kind: z.literal('wait'), ...wait }).omit({ timeoutMs: true }),
   z.object({ ...trigger, kind: z.literal('manual') }),
@@ -223,11 +224,10 @@ const graph = z.object({ nodes: z.record(text, node), edges: z.array(edge).defau
 const binding = z.object({ kind: z.literal('variable'), target: text })
 const module = z.object({ name: text, imports: strings, source: text })
 const document = z.preprocess(
-  rejectSubflows,
+  rejectRetiredDefinitions,
   z.object({
     bindings: z.record(text, binding),
     graph,
-    tasks: z.record(text, managed),
   }),
 )
 const revision = z.object({
@@ -237,8 +237,15 @@ const revision = z.object({
 })
 const envelope = revision.extend({ kind: z.literal('open-flow-flow-revision'), version: z.literal(1) })
 
-function rejectSubflows(value: unknown): unknown {
+function rejectRetiredDefinitions(value: unknown): unknown {
   const candidate = record(value)
+  if (
+    candidate.tasks !== undefined &&
+    (candidate.tasks === null || typeof candidate.tasks !== 'object' || Array.isArray(candidate.tasks) || Object.keys(candidate.tasks).length > 0)
+  )
+    throw new TypeError('Independent Task definitions are no longer supported.')
+  if (Object.values(record(record(candidate.graph).nodes)).some((candidateNode) => Object.hasOwn(record(candidateNode), 'taskId')))
+    throw new TypeError('Task references are no longer supported.')
   const subflows = candidate.subflows
   if (subflows !== undefined && (subflows === null || typeof subflows !== 'object' || Array.isArray(subflows) || Object.keys(subflows).length > 0))
     throw new TypeError('Subflows are no longer supported.')
@@ -366,6 +373,46 @@ function repairGraph(value: unknown, bindings: Record<string, unknown>): z.infer
   }
 }
 
+function upgradeTaskNodes(candidateDocument: Record<string, unknown>): Record<string, unknown> {
+  const definitions = record(candidateDocument.tasks)
+  const sourceGraph = record(candidateDocument.graph)
+  const nodes = Object.fromEntries(
+    Object.entries(record(sourceGraph.nodes)).map(([id, value]) => {
+      const candidateNode = record(value)
+      if (candidateNode.kind != 'task' || !Object.hasOwn(candidateNode, 'taskId')) return [id, value]
+      if (typeof candidateNode.taskId != 'string' || candidateNode.task !== undefined) throw new TypeError('Invalid legacy Task reference.')
+      const task = record(definitions[candidateNode.taskId])
+      const executor = record(task.executor)
+      let upgraded = task
+      if (executor.kind == 'agent' && executor.notification != null) {
+        const notice = record(executor.notification)
+        const connector = record(definitions[String(notice.taskId)])
+        const config = record(connector.executor)
+        if (config.kind != 'connector') throw new TypeError('Invalid legacy Agent notification reference.')
+        const { taskId: _, ...rest } = notice
+        upgraded = {
+          ...task,
+          executor: {
+            ...executor,
+            notification: {
+              ...rest,
+              action: config.action,
+              connectionId: config.connectionId,
+              inputDefinitions: Array.isArray(connector.inputs)
+                ? connector.inputs.filter((candidatePort) => Object.hasOwn(record(candidatePort), 'handle'))
+                : connector.inputs,
+            },
+          },
+        }
+      }
+      const { taskId: _, ...rest } = candidateNode
+      return [id, { ...rest, task: managed.parse(upgraded) }]
+    }),
+  )
+  const { tasks: _, ...rest } = candidateDocument
+  return { ...rest, graph: { ...sourceGraph, nodes } }
+}
+
 /** Best-effort recovery for a parseable Revision envelope. Invalid collection entries are discarded. */
 export function repairRevisionEnvelope(value: unknown): RevisionContent {
   checkJsonDepth(value)
@@ -373,10 +420,11 @@ export function repairRevisionEnvelope(value: unknown): RevisionContent {
   if (envelopeSource.kind != 'open-flow-flow-revision' || envelopeSource.version != 1) throw new TypeError('The value is not an Open Flow Revision envelope.')
   if (typeof envelopeSource.modelVersion == 'number' && envelopeSource.modelVersion > currentFlowModelVersion)
     throw new TypeError('The Flow model is newer than this package.')
-  const sourceDocument = record(
+  let sourceDocument = record(
     envelopeSource.modelVersion == 1 || envelopeSource.modelVersion == 2 ? upgradeLegacyDocument(envelopeSource.document) : envelopeSource.document,
   )
-  rejectSubflows(sourceDocument)
+  if (typeof envelopeSource.modelVersion == 'number' && envelopeSource.modelVersion < 6) sourceDocument = upgradeTaskNodes(sourceDocument)
+  rejectRetiredDefinitions(sourceDocument)
   const bindings = record(sourceDocument.bindings)
   const sourceGraph = repairGraph(sourceDocument.graph, bindings)
   return decodeRevisionContent({
@@ -384,7 +432,6 @@ export function repairRevisionEnvelope(value: unknown): RevisionContent {
     document: {
       bindings: repairedEntries(sourceDocument.bindings, binding),
       graph: sourceGraph,
-      tasks: repairedEntries(sourceDocument.tasks, managed),
     },
     modules: repairedEntries(envelopeSource.modules, module),
   })
@@ -398,7 +445,7 @@ export function decodeFlowDocument(value: unknown): FlowDocument {
 export function decodeRevisionContent(value: unknown): RevisionContent {
   checkJsonDepth(value)
   const content = revision.parse(value) as RevisionContent
-  checkErrorModelVersion(content)
+  checkModelVersion(content)
   assertOpenApiAuthBindings(content.document)
   return content
 }
@@ -408,7 +455,7 @@ export function decodeRevisionEnvelope(value: unknown): RevisionContent {
   const revisionSource = record(value)
   const candidate = revisionSource.modelVersion == 2 ? { ...revisionSource, document: upgradeLegacyDocument(revisionSource.document) } : value
   const content = envelope.parse(candidate) as RevisionContent
-  checkErrorModelVersion(content)
+  checkModelVersion(content)
   assertOpenApiAuthBindings(content.document)
   return { modelVersion: content.modelVersion, document: content.document, modules: content.modules }
 }
@@ -472,14 +519,7 @@ const shapes = {
   'module.delete': { moduleId: text },
   'module.rename': { moduleId: text, before: text, name: text },
   'module.source.replace': { moduleId: text, beforeImports: strings, beforeSource: text, imports: strings, source: text },
-  'task.create': { taskId: text, task: managed },
-  'task.delete': { taskId: text },
-  'task.connector.connection.set': { taskId: text, before: text.optional(), value: text.optional() },
-  'task.decision.set': { taskId: text, before: managed, value: managed },
-  'task.openapi.set': { taskId: text, before: managed, value: managed },
-  'task.agent.set': { taskId: text, before: managed, value: managed },
-  'task.llm.mode.set': { taskId: text, before: z.enum(['chat', 'json']), value: z.enum(['chat', 'json']) },
-  'task.name.set': { taskId: text, before: text, value: text },
+  'graph.node.task.set': { ...at, before: z.union([inline, managed]), value: z.union([inline, managed]) },
 } satisfies Record<ChangeOperation['kind'], z.ZodRawShape | z.ZodType>
 const variants = new Map(
   Object.entries(shapes).map(([kind, shape]) => [kind, shape instanceof z.ZodType ? shape : z.object({ kind: z.literal(kind), ...shape })]),
@@ -513,7 +553,12 @@ export function changeOperationsSchema(kind?: string): JsonValue {
   return z.toJSONSchema(schema, { io: 'input' }) as JsonValue
 }
 
-function checkErrorModelVersion(content: RevisionContent): void {
+function checkModelVersion(content: RevisionContent): void {
+  if (
+    content.modelVersion < 6 &&
+    Object.values(content.document.graph.nodes).some((candidateNode) => candidateNode.kind == 'task' && 'executor' in candidateNode.task)
+  )
+    throw new TypeError('Node-owned managed Tasks require Flow model version 6.')
   if (content.modelVersion < 5 && Object.values(content.document.graph.nodes).some((itemNode) => itemNode.kind == 'error'))
     throw new TypeError('Error workflows require Flow model version 5.')
 }

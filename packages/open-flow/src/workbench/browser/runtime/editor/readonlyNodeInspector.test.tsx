@@ -30,7 +30,16 @@ it('inspects saved values and definitions without exposing writable controls or 
     {
       id: 'agent',
       kind: 'task',
-      node: { kind: 'task', inputs: {}, taskId: 'agent' },
+      node: {
+        kind: 'task',
+        inputs: {},
+        task: {
+          name: 'Agent',
+          inputs: [],
+          outputs: [],
+          executor: { kind: 'agent', prompt: 'Review the request', model: 'model', maxRounds: 3, tools: [] },
+        },
+      },
       definition: {
         name: 'Agent',
         inputs: [],
@@ -41,13 +50,17 @@ it('inspects saved values and definitions without exposing writable controls or 
     {
       id: 'connector',
       kind: 'task',
-      node: { kind: 'task', inputs: {}, taskId: 'connector' },
+      node: {
+        kind: 'task',
+        inputs: {},
+        task: { name: 'Connector', inputs: [], outputs: [], executor: { kind: 'connector', action: 'saved.action', connectionId: 'saved-connection' } },
+      },
       definition: { name: 'Connector', inputs: [], outputs: [], executor: { kind: 'connector', action: 'saved.action', connectionId: 'saved-connection' } },
     },
     {
       id: 'llm',
       kind: 'task',
-      node: { kind: 'task', inputs: {}, taskId: 'llm' },
+      node: { kind: 'task', inputs: {}, task: { name: 'LLM', inputs: [], outputs: [], executor: { kind: 'llm', mode: 'chat' } } },
       definition: { name: 'LLM', inputs: [], outputs: [], executor: { kind: 'llm', mode: 'chat' } },
     },
   ]
@@ -109,7 +122,7 @@ it('preserves saved input groups, defaults and references through the shared ins
   const i18n = createI18n('en')
   const { draft } = publicationFixture('flow', 'fixed')
   const node = draft.content.document.graph.nodes.prepare!
-  if (node.kind !== 'task' || node.task == null) throw new Error('Expected inline task')
+  if (node.kind !== 'task' || !('moduleId' in node.task)) throw new Error('Expected inline task')
   const snapshot = {
     ...draft,
     content: {

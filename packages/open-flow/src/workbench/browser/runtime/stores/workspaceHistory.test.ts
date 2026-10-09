@@ -15,7 +15,7 @@ async function session() {
   const flow = { flowId: 'flow', name: 'Flow', status: 'active', createdAt: timestamp, updatedAt: timestamp, draftRevisionId: 'r1', version: 1 } as const
   let draft: Draft = {
     actorId: 'test',
-    content: applyFlowChanges({ modelVersion: currentFlowModelVersion, document: { graph: { nodes: {}, edges: [] }, tasks: {}, bindings: {} }, modules: {} }, [
+    content: applyFlowChanges({ modelVersion: currentFlowModelVersion, document: { graph: { nodes: {}, edges: [] }, bindings: {} }, modules: {} }, [
       ...createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Code'),
       ...createValue(target, 'value', 'Value'),
       { kind: 'graph.edge.connect', target, edge: { source: 'value', target: 'code' } },
@@ -85,7 +85,7 @@ describe('Workspace canvas history', () => {
       await store.setInputValue('code', 'input', 'old value')
       const before = saved().draft.content
       const node = before.document.graph.nodes.code
-      if (node?.kind !== 'task' || node.task == null) throw new Error('Expected code task')
+      if (node?.kind !== 'task' || !('moduleId' in node.task)) throw new Error('Expected code task')
       await store.saveTaskPorts('code', {
         inputs: [{ handle: 'input', jsonSchema: { type: 'null' }, nullable: true }],
         outputs: node.task.outputs,
@@ -260,7 +260,7 @@ describe('Workspace canvas history', () => {
       const nodeId = await store.addNode(option, { x: 600, y: 0 })
       if (nodeId == null) throw new Error('Expected added code node')
       const node = saved().draft.content.document.graph.nodes[nodeId]
-      if (node?.kind != 'task' || node.task == null || !('moduleId' in node.task)) throw new Error('Expected code task')
+      if (node?.kind != 'task' || !('moduleId' in node.task) || !('moduleId' in node.task)) throw new Error('Expected code task')
       const moduleId = node.task.moduleId
       const source = "import dependency from './dependency.mjs'\nexport default () => ({result: dependency})"
       store.updateModuleSource(source)

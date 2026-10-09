@@ -24,7 +24,6 @@ import { applyFlowChanges, nextNodeName, normalizeNodeName } from './change.ts'
 import { codeSharedPermissionsEnabled } from './codePermissions.ts'
 import { nodeInputMappings } from './condition.ts'
 import { fixedInputValue, inputValues } from './inputValue.ts'
-import { referencedTaskIds } from './semantics.ts'
 
 const codeTaskTemplate = `export default async function (inputs, context) {
   return { result: inputs.value }
@@ -44,7 +43,7 @@ export interface LlmTaskOptions {
 
 export type LlmInputHandle = 'input' | 'messages' | 'model' | 'template'
 
-export function defaultNodeName(content: RevisionContent, node: GraphNode): string {
+export function defaultNodeName(_content: RevisionContent, node: GraphNode): string {
   switch (node.kind) {
     case 'condition':
       return 'Condition'
@@ -55,7 +54,7 @@ export function defaultNodeName(content: RevisionContent, node: GraphNode): stri
     case 'wait':
       return 'Wait'
     case 'task':
-      return normalizeNodeName(node.task != null ? node.task.name : (content.document.tasks[node.taskId]?.name ?? '')) || 'Task'
+      return normalizeNodeName(node.task.name) || 'Task'
     case 'error':
       return 'Flow Error'
     case 'manual':
@@ -152,18 +151,17 @@ export function createCodeTask(
 
 export function createManagedTask(
   target: GraphTarget,
-  identity: { readonly nodeId: string; readonly taskId: string },
+  identity: { readonly nodeId: string },
   task: Extract<TaskDefinition, { readonly executor: unknown }>,
 ): readonly ChangeOperation[] {
   return [
-    { kind: 'task.create', task, taskId: identity.taskId },
     {
       kind: 'graph.node.create',
       node: {
         inputs: defaultInputs(task.inputs),
         kind: 'task',
         name: task.name,
-        taskId: identity.taskId,
+        task,
       },
       nodeId: identity.nodeId,
       target,
@@ -173,7 +171,7 @@ export function createManagedTask(
 
 export function createAgentTask(
   target: GraphTarget,
-  identity: { readonly nodeId: string; readonly taskId: string },
+  identity: { readonly nodeId: string },
   name: string,
   defaults: { readonly prompt?: string; readonly outputDescription?: string } = {},
 ): readonly ChangeOperation[] {
@@ -201,7 +199,7 @@ export function createAgentTask(
 
 export function createLlmTask(
   target: GraphTarget,
-  identity: { readonly nodeId: string; readonly taskId: string },
+  identity: { readonly nodeId: string },
   name: string,
   mode: 'chat' | 'json',
   outputDescription: string,
@@ -344,13 +342,9 @@ export function deleteNodes(content: RevisionContent, target: GraphTarget, nodeI
     if (node == null) return []
     return [
       { kind: 'graph.node.delete' as const, nodeId, target },
-      ...(node.kind == 'task' && node.task != null ? [{ kind: 'module.delete' as const, moduleId: node.task.moduleId }] : []),
+      ...(node.kind == 'task' && 'moduleId' in node.task ? [{ kind: 'module.delete' as const, moduleId: node.task.moduleId }] : []),
     ]
   })
-  const remaining = referencedTaskIds(applyFlowChanges(content, operations).document)
-  for (const taskId of referencedTaskIds(content.document)) {
-    if (!remaining.has(taskId) && content.document.tasks[taskId] != null) operations.push({ kind: 'task.delete', taskId })
-  }
   return cleanVariableBindings(content, operations)
 }
 
@@ -478,11 +472,22 @@ function bindingReferences(document: RevisionContent['document']): Map<string, n
   return references
 }
 
-export function setConnectorConnection(content: RevisionContent, taskId: string, connectionId: string | undefined): readonly ChangeOperation[] | undefined {
-  const task = content.document.tasks[taskId]
-  if (task == null || !('executor' in task) || task.executor.kind != 'connector') return
+export function setConnectorConnection(content: RevisionContent, nodeId: string, connectionId: string | undefined): readonly ChangeOperation[] | undefined {
+  const node = content.document.graph.nodes[nodeId]
+  if (node?.kind != 'task' || !('executor' in node.task) || node.task.executor.kind != 'connector') return
+  const task = node.task
+  if (task.executor.kind != 'connector') return
   if (task.executor.connectionId == connectionId) return []
-  return [{ before: task.executor.connectionId, kind: 'task.connector.connection.set', taskId, value: connectionId }]
+  const { connectionId: _, ...executor } = task.executor
+  return [
+    {
+      before: task,
+      kind: 'graph.node.task.set',
+      nodeId,
+      target: { kind: 'flow' },
+      value: { ...task, executor: { ...executor, ...(connectionId == null ? {} : { connectionId }) } },
+    },
+  ]
 }
 
 export function updateTrigger(
@@ -613,13 +618,13 @@ export function setCodeActions(
 ): readonly ChangeOperation[] | undefined {
   const selected = content.document.graph
   const node = selected?.nodes[nodeId]
-  if (node?.kind != 'task' || node.task == null || dequal(node.task.capabilities ?? [], capabilities)) return
+  if (node?.kind != 'task' || !('moduleId' in node.task) || dequal(node.task.capabilities ?? [], capabilities)) return
   return [{ kind: 'graph.node.task.capabilities.set', target, nodeId, before: node.task.capabilities, value: capabilities }]
 }
 
 export function createDecisionTask(
   target: GraphTarget,
-  identity: { readonly nodeId: string; readonly taskId: string },
+  identity: { readonly nodeId: string },
   name = 'AI Decision',
   questions?: readonly DecisionQuestion[],
 ): readonly ChangeOperation[] {

@@ -67,7 +67,6 @@ function revision(config: Readonly<Record<string, JsonValue>>, connectionId: str
             }
           : {},
       },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: { 'module-main': { imports: [], name: 'Main', source: 'export default function run() { return {} }' } },

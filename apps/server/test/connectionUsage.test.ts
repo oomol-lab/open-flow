@@ -8,8 +8,17 @@ import { checkCodePermissions, ConnectorClient } from '../node/deployment/connec
 
 const document: FlowDocument = {
   bindings: {},
-  graph: { edges: [], nodes: { send: { kind: 'task', taskId: 'send', name: 'Send', inputs: {} } } },
-  tasks: { send: { name: 'Send', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send', connectionId: 'account' } } },
+  graph: {
+    edges: [],
+    nodes: {
+      send: {
+        kind: 'task',
+        task: { name: 'Send', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send', connectionId: 'account' } },
+        name: 'Send',
+        inputs: {},
+      },
+    },
+  },
 }
 const access: ConnectorAccess = { version: 1, mode: 'selectable', accessRevision: 0, bindings: [], sharedAccessDigest: 'empty' }
 const candidate = {
@@ -159,7 +168,23 @@ it('captures Agent tools, notifications and Trigger proxy usage without Code per
     graph: {
       edges: [],
       nodes: {
-        agent: { kind: 'task', taskId: 'agent', inputs: {} },
+        agent: {
+          kind: 'task',
+          task: {
+            name: 'Agent',
+            inputs: [],
+            outputs: [],
+            executor: {
+              kind: 'agent',
+              model: 'model',
+              prompt: '',
+              maxRounds: 1,
+              tools: [{ id: 'send', action: 'mail.send', name: 'Send', connectionId: 'account', inputs: [], approval: false, description: '' }],
+              notification: { action: 'mail.send', connectionId: 'account', inputDefinitions: [], messageHandle: 'message', inputs: {} },
+            },
+          },
+          inputs: {},
+        },
         poll: {
           name: 'Received',
           kind: 'poll',
@@ -177,22 +202,6 @@ it('captures Agent tools, notifications and Trigger proxy usage without Code per
             configInputs: [],
             outputs: [],
           },
-        },
-      },
-    },
-    tasks: {
-      ...document.tasks,
-      agent: {
-        name: 'Agent',
-        inputs: [],
-        outputs: [],
-        executor: {
-          kind: 'agent',
-          model: 'model',
-          prompt: '',
-          maxRounds: 1,
-          tools: [{ id: 'send', action: 'mail.send', name: 'Send', connectionId: 'account', inputs: [], approval: false, description: '' }],
-          notification: { taskId: 'send', messageHandle: 'message', inputs: {} },
         },
       },
     },

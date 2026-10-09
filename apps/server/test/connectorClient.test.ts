@@ -46,21 +46,18 @@ function connectorFlow(options: { readonly action?: string; readonly connectionI
           connector: {
             inputs: { message: { kind: 'value', value: 'hello' } },
             kind: 'task',
-            taskId: 'connector',
+            task: {
+              executor: {
+                action: options.action ?? 'example.echo',
+                connectionId: options.connectionId ?? 'connection-work',
+                kind: 'connector',
+              },
+              inputs: [{ ...port, handle: 'message' }],
+              name: 'Echo',
+              outputs: [{ ...port, handle: 'message' }],
+            },
             ...(options.timeoutMs == null ? {} : { timeoutMs: options.timeoutMs }),
           },
-        },
-      },
-      tasks: {
-        connector: {
-          executor: {
-            action: options.action ?? 'example.echo',
-            connectionId: options.connectionId ?? 'connection-work',
-            kind: 'connector',
-          },
-          inputs: [{ ...port, handle: 'message' }],
-          name: 'Echo',
-          outputs: [{ ...port, handle: 'message' }],
         },
       },
     },
@@ -100,7 +97,6 @@ function capabilityFlow(declared = true): RevisionContent {
           },
         },
       },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {

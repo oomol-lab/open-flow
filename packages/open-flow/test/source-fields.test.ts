@@ -30,7 +30,7 @@ function fixture(value: JsonValue = { name: 'Ada', count: 2 }, schema: JsonValue
     modules: { main: { name: 'Main', imports: [], source: 'export default (inputs) => inputs' } },
     document: {
       bindings: {},
-      tasks: {},
+
       graph: {
         edges: [
           { source: 'start', target: 'data' },
@@ -127,14 +127,14 @@ describe('Source object fields', () => {
   it('checks the field independently of the whole object and preserves missing-field diagnostics', async () => {
     const content = fixture()
     const { document } = content
-    const candidates = inputSourceCandidates(document, document.graph, 'sink', 'value').data!
+    const candidates = inputSourceCandidates(document.graph, 'sink', 'value').data!
     expect(candidates[0]?.check.kind).toBe('schema')
     expect(candidates[0]?.description).toBe('Structured customer payload.')
     expect(candidates[0]?.fields).toMatchObject([
       { field: 'name', description: 'Customer display name.', check: { kind: 'available' } },
       { field: 'count', check: { kind: 'schema' } },
     ])
-    expect(checkInputSource(document, document.graph, 'sink', 'value', reference('removed'))).toEqual({ kind: 'field-missing' })
+    expect(checkInputSource(document.graph, 'sink', 'value', reference('removed'))).toEqual({ kind: 'field-missing' })
     expect(view(content).sourceType(target, reference('name'))).toBe('string')
     expect((await validateFlow(fixture({ name: 'Ada' }, outputSchema, 'removed'), engine)).diagnostics).toContainEqual(
       expect.objectContaining({ code: 'graph.source-missing', values: expect.objectContaining({ variant: 'field', field: 'removed' }) }),
@@ -191,7 +191,7 @@ describe('Source object fields', () => {
   it('does not read inherited properties', async () => {
     const content = fixture({}, { type: 'object', properties: { constructor: true } }, 'constructor')
     const sink = content.document.graph.nodes.sink
-    if (sink?.kind !== 'task' || sink.task == null) throw new Error('Missing task')
+    if (sink?.kind !== 'task' || !('moduleId' in sink.task)) throw new Error('Missing task')
     const revision = {
       ...content,
       document: {

@@ -132,7 +132,6 @@ export interface WaitRequest {
   readonly notification?: {
     readonly input: Readonly<Record<string, JsonValue>>
     readonly messageHandle: string
-    readonly taskId: string
   }
 }
 
@@ -191,7 +190,7 @@ interface TaskInvocationBase {
 export type TaskInvocation = TaskInvocationBase &
   (
     | { readonly capabilities: readonly ConnectorCapability[]; readonly moduleId: string; readonly getPrevious: () => PreviousNode | null }
-    | { readonly taskId: string }
+    | { readonly kind: 'managed' }
   )
 
 export interface TriggerSeed {
@@ -252,21 +251,21 @@ interface RunContext {
   readonly remainingMs: number | undefined
 }
 
-function nodePorts(prepared: PreparedFlow, node: ExecutableNode): Readonly<Record<string, InputPortDefinition>> {
+function nodePorts(node: ExecutableNode): Readonly<Record<string, InputPortDefinition>> {
   switch (node.kind) {
     case 'condition':
       return conditionInputPorts(node)
     case 'value':
       return {}
     case 'task':
-      return portsByHandle([...(node.task != null ? node.task.inputs : prepared.tasks[node.taskId]!.inputs), ...(node.additionalInputs ?? [])])
+      return portsByHandle([...node.task.inputs, ...(node.additionalInputs ?? [])])
     case 'approval':
     case 'wait':
       return portsByHandle(node.inputDefinitions)
   }
 }
 
-function nodeTitle(prepared: PreparedFlow, node: ExecutableNode): string | undefined {
+function nodeTitle(node: ExecutableNode): string | undefined {
   if (node.name != null) return node.name
   switch (node.kind) {
     case 'condition':
@@ -274,7 +273,7 @@ function nodeTitle(prepared: PreparedFlow, node: ExecutableNode): string | undef
     case 'value':
       return 'Fixed Values'
     case 'task':
-      return node.task != null ? node.task.name : prepared.tasks[node.taskId]!.name
+      return node.task.name
     case 'approval':
       return 'Approval'
     case 'wait':
@@ -282,12 +281,9 @@ function nodeTitle(prepared: PreparedFlow, node: ExecutableNode): string | undef
   }
 }
 
-function nodeKind(
-  prepared: PreparedFlow,
-  node: ExecutableNode,
-): 'agent' | 'approval' | 'condition' | 'connector' | 'decision' | 'javascript' | 'openapi' | 'llm' | 'value' | 'wait' {
+function nodeKind(node: ExecutableNode): 'agent' | 'approval' | 'condition' | 'connector' | 'decision' | 'javascript' | 'openapi' | 'llm' | 'value' | 'wait' {
   if (node.kind != 'task') return node.kind
-  return node.task != null ? 'javascript' : prepared.tasks[node.taskId]!.executor.kind
+  return 'moduleId' in node.task ? 'javascript' : node.task.executor.kind
 }
 
 function checkpointRecord(value: unknown, description: string): Readonly<Record<string, unknown>> {
@@ -423,20 +419,18 @@ function outputRecord(value: unknown, nodeId: string): Readonly<Record<string, J
   return value as Readonly<Record<string, JsonValue>>
 }
 
-function agentConfig(prepared: PreparedFlow, node: ExecutableNode): AgentConfig | undefined {
-  const task = node.kind == 'task' && node.taskId != null ? prepared.tasks[node.taskId] : undefined
+function agentConfig(node: ExecutableNode): AgentConfig | undefined {
+  const task = node.kind == 'task' && 'executor' in node.task ? node.task : undefined
   return task?.executor.kind == 'agent' ? task.executor : undefined
 }
 
-function agentNotice(prepared: PreparedFlow, node: ExecutableNode, values: Readonly<Record<string, JsonValue>>) {
-  const notification = agentConfig(prepared, node)?.notification
+function agentNotice(node: ExecutableNode, values: Readonly<Record<string, JsonValue>>) {
+  const notification = agentConfig(node)?.notification
   if (notification == null) return undefined
-  const task = prepared.tasks[notification.taskId]!
   return {
-    taskId: notification.taskId,
     messageHandle: notification.messageHandle,
     input: Object.fromEntries(
-      task.inputs.flatMap((port) => {
+      notification.inputDefinitions.flatMap((port) => {
         if (!('handle' in port) || port.handle == notification.messageHandle) return []
         const source = notification.inputs[port.handle]
         return [[port.handle, source == null ? (port.value ?? null) : agentInput(source, values)]]
@@ -464,13 +458,13 @@ function agentApproval(config: AgentConfig, checkpoint: AgentCheckpoint, inputs:
   }
 }
 
-function validateOutputs(prepared: PreparedFlow, nodeId: string, node: ExecutableNode, value: unknown): Readonly<Record<string, JsonValue>> {
+function validateOutputs(nodeId: string, node: ExecutableNode, value: unknown): Readonly<Record<string, JsonValue>> {
   const raw = outputRecord(value, nodeId)
-  const discardUndeclared = node.kind == 'task' && node.taskId != null && prepared.tasks[node.taskId]!.executor.kind == 'connector'
+  const discardUndeclared = node.kind == 'task' && 'executor' in node.task && node.task.executor.kind == 'connector'
   const ports = isResolutionNode(node)
     ? resolutionOutputPorts(node)
     : node.kind == 'task'
-      ? portsByHandle(node.task != null ? node.task.outputs : prepared.tasks[node.taskId]!.outputs)
+      ? portsByHandle(node.task.outputs)
       : node.kind == 'value'
         ? portsByHandle(node.values)
         : {}
@@ -498,7 +492,6 @@ function validateOutputs(prepared: PreparedFlow, nodeId: string, node: Executabl
 }
 
 function validateCheckpoint(
-  prepared: PreparedFlow,
   target: GraphTarget,
   checkpoint: FlowRunCheckpoint,
   resolveInputs: (nodeId: string, node: ExecutableNode, jobId: string) => Readonly<Record<string, JsonValue>>,
@@ -523,7 +516,7 @@ function validateCheckpoint(
         if (!matchesTriggerOutputs(node, outputs)) throw new Error('Checkpoint Trigger output is invalid.')
       } else {
         if (checkpoint.counts['']?.[id] == null) throw new Error('Checkpoint execution count is missing.')
-        if (!jsonEqual(validateOutputs(prepared, id, node, outputs), outputs)) throw new Error('Checkpoint node outputs are incomplete.')
+        if (!jsonEqual(validateOutputs(id, node, outputs), outputs)) throw new Error('Checkpoint node outputs are incomplete.')
         const count = Object.keys(outputs).length
         if (
           (node.kind == 'condition' && count != 0) ||
@@ -552,14 +545,14 @@ function validateCheckpoint(
   }
   for (const [id, values] of Object.entries(launch)) {
     const node = target.graph.nodes[id]!
-    if (!('inputs' in node) || Object.keys(values).some((handle) => nodePorts(prepared, node)[handle] == null))
+    if (!('inputs' in node) || Object.keys(values).some((handle) => nodePorts(node)[handle] == null))
       throw new Error('Checkpoint launch inputs do not match the prepared graph.')
   }
 
   for (const waiting of checkpoint.waits) {
     const node = target.graph.nodes[waiting.nodeId]
     if (node == null || !('inputs' in node)) throw new Error('Checkpoint waiting node is missing.')
-    const config = agentConfig(prepared, node)
+    const config = agentConfig(node)
     const saved = agents[waiting.jobId]
     if (!isResolutionNode(node) && config == null) throw new Error('Checkpoint waiting node cannot suspend.')
     if (config != null) {
@@ -576,7 +569,7 @@ function validateCheckpoint(
         throw new Error('Checkpoint resolution input changed.')
       const notify = usesPending(target.graph, waiting.nodeId)
       if (notify != (waiting.pending != null)) throw new Error('Checkpoint Wait pending output is missing or unexpected.')
-      if (waiting.pending != null) validateOutputs(prepared, waiting.nodeId, node, { pending: waiting.pending })
+      if (waiting.pending != null) validateOutputs(waiting.nodeId, node, { pending: waiting.pending })
     }
     if (checkpoint.counts['']?.[waiting.nodeId] == null) throw new Error('Checkpoint waiting execution count is missing.')
   }
@@ -667,7 +660,7 @@ function runGraph(
       const resolveInputs = (nodeId: string, node: ExecutableNode, jobId: string): Readonly<Record<string, JsonValue>> => {
         const mappings = nodeInputMappings(node)
         return Object.fromEntries(
-          Object.entries(nodePorts(context.prepared, node)).map(([handle, port]) => [
+          Object.entries(nodePorts(node)).map(([handle, port]) => [
             handle,
             resolveInput(mappings[handle], port, launch[nodeId]?.[handle], `Node "${nodeId}" input "${handle}"`, frames[jobId]!, node.kind == 'condition'),
           ]),
@@ -700,17 +693,16 @@ function runGraph(
         resolution?: 'approve' | 'reject',
         previousId?: string,
       ): Effect.Effect<NodeResult, Error> => {
-        const config = agentConfig(context.prepared, node)
+        const config = agentConfig(node)
         const saved = agents[jobId]
         const nodeRemainingMs = saved?.remainingMs ?? node.timeoutMs
         const startedAt = performance.now()
         const execution = Effect.gen(function* () {
-          const kind = nodeKind(context.prepared, node)
-          const title = nodeTitle(context.prepared, node)
+          const kind = nodeKind(node)
+          const title = nodeTitle(node)
           const projectedInputs = Object.fromEntries(
             Object.entries(nodeInputs).filter(([handle]) => {
-              if (node.kind == 'task' && node.taskId != null && context.prepared.tasks[node.taskId]?.executor.kind == 'openapi' && handle.startsWith('auth.'))
-                return false
+              if (node.kind == 'task' && 'executor' in node.task && node.task?.executor.kind == 'openapi' && handle.startsWith('auth.')) return false
               const mapping = nodeInputMappings(node)[handle]
               return mapping?.kind != 'sources' || mapping.sources.every((source) => source.kind != 'binding')
             }),
@@ -739,12 +731,12 @@ function runGraph(
               const additional = new Set((node.additionalInputs ?? []).map((port) => port.handle))
               const result = yield* context.invokeTask({
                 additionalInputs: Object.fromEntries(Object.entries(nodeInputs).filter(([handle]) => additional.has(handle))),
-                blockId: node.task != null ? node.task.moduleId : node.taskId,
+                blockId: 'moduleId' in node.task ? node.task.moduleId : nodeId,
                 flowId: target.flowId,
                 input: Object.fromEntries(
                   Object.entries(nodeInputs).filter(([handle]) => {
                     if (additional.has(handle)) return false
-                    const task = node.taskId == null ? undefined : context.prepared.tasks[node.taskId]
+                    const task = 'executor' in node.task ? node.task : undefined
                     if (task?.executor.kind != 'openapi') return true
                     const mapping = node.inputs[handle]
                     return (
@@ -758,7 +750,7 @@ function runGraph(
                 jobId,
                 nodeId,
                 runId,
-                ...(node.task != null
+                ...('moduleId' in node.task
                   ? {
                       capabilities: node.task.capabilities ?? [],
                       moduleId: node.task.moduleId,
@@ -767,9 +759,9 @@ function runGraph(
                         const previous = target.graph.nodes[previousId]!
                         return {
                           id: previousId,
-                          name: previous.name ?? ('inputs' in previous ? nodeTitle(context.prepared, previous) : undefined) ?? previousId,
+                          name: previous.name ?? ('inputs' in previous ? nodeTitle(previous) : undefined) ?? previousId,
                           outputs: frame[previousId]!,
-                          outputDefs: Object.entries(nodeOutputPorts(context.prepared, previous)).map(([handle, definition]) =>
+                          outputDefs: Object.entries(nodeOutputPorts(previous)).map(([handle, definition]) =>
                             Object.assign(
                               {
                                 handle,
@@ -782,7 +774,7 @@ function runGraph(
                         }
                       },
                     }
-                  : { taskId: node.taskId }),
+                  : { kind: 'managed' as const }),
               })
               if (config != null) {
                 const response: AgentResult = agentResultSchema.parse(result)
@@ -811,7 +803,7 @@ function runGraph(
               return yield* Effect.fail(new Error('Resolution jobs are handled by the Scheduler suspension boundary.'))
           }
           return yield* Effect.try({
-            try: () => ({ kind: 'completed' as const, outputs: validateOutputs(context.prepared, nodeId, node, outputs) }),
+            try: () => ({ kind: 'completed' as const, outputs: validateOutputs(nodeId, node, outputs) }),
             catch: (error) => (error instanceof Error ? error : new Error(String(error))),
           })
         })
@@ -839,10 +831,10 @@ function runGraph(
             notify,
             actions: isResolutionNode(node) ? resolutionActions(node) : ['approve', 'reject'],
             prompt: isResolutionNode(node) ? node.prompt : JSON.stringify(value, null, 2),
-            ...(isResolutionNode(node) ? {} : { notification: agentNotice(context.prepared, node, agents[jobId]!.input) }),
+            ...(isResolutionNode(node) ? {} : { notification: agentNotice(node, agents[jobId]!.input) }),
           })
           if (notify) {
-            validateOutputs(context.prepared, nodeId, node, { pending: pending! })
+            validateOutputs(nodeId, node, { pending: pending! })
             const frame = { ...frames[jobId], [nodeId]: { pending: pending! } }
             dispatch(nodeId, ['pending'], frame)
           }
@@ -930,7 +922,7 @@ function runGraph(
       }
       if (resume != null) {
         yield* Effect.try({
-          try: () => validateCheckpoint(context.prepared, target, resume.checkpoint, resolveInputs),
+          try: () => validateCheckpoint(target, resume.checkpoint, resolveInputs),
           catch: (error) => (error instanceof Error ? error : new Error(String(error))),
         })
       }
@@ -960,7 +952,7 @@ function runGraph(
                   yield* commit(
                     saved.nodeId,
                     saved.jobId,
-                    validateOutputs(context.prepared, saved.nodeId, node, {
+                    validateOutputs(saved.nodeId, node, {
                       ...(saved.pending == null ? {} : { pending: saved.pending }),
                       [action]: { inputs: saved.value, action, resolvedAt, comment },
                     }),

@@ -27,13 +27,14 @@ Presentation、Publication、Live、Run 和 Trigger binding。
 每个 Flow graph 内的 Node title 是非空且唯一的用户标识；`nodeId` 是稳定的内部 identity，继续用于连线、binding、运行事件和机器协议，
 不能随 title 修改。Workbench 读取不满足约束的 Draft 后，必须通过正常的 Draft change 创建修正 Revision，不能在读取时改写既有 Revision。
 
-Flow 有一个可变 Draft head 和不可变的 Revision 历史。Revision 是该 Flow 的 graph、Task、binding 和 CodeModule source 的完整事实来源；
+Flow 有一个可变 Draft head 和不可变的 Revision 历史。Revision 是该 Flow 的 graph（包含节点执行配置）、binding 和 CodeModule source 的完整事实来源；
 语义修改必须以预期 Revision 为前提并使用稳定 change identity 原子提交，不能静默覆盖 stale head；幂等重放必须先于 Draft head 比较返回已经接受的
 Revision。Draft 同步只返回当前完整 Revision snapshot，不提供持久化 authoring operation history。内部索引、缓存、增量记录和存储布局不能成为第二个事实来源。
 不可变约束适用于仍保留的 Revision 内容；Server 可以将草稿正文存为基于父版本的有界增量，读取时还原并校验 digest，对外仍返回完整快照。Run 和 Publish operation 准入时将固定版本物化为完整正文。旧内容可按 Server 的保留策略清理，但 Run 结果与 Draft change 幂等记录不依赖被清理的内容。
 
 Presentation 独立保存布局、viewport 和 Comment 等展示状态；每个 Flow 图只有一个画布和 viewport，节点配置由侧栏承载。Presentation
 不进入 Revision digest，也不影响 validation、Run 或 Live 的执行语义。Publication 在首次接受发布操作时固定已保存的 Presentation，随异步操作持久化，成功后作为不可变展示快照提供独立读取；回滚继承来源 Publication 的快照而不修改草稿布局。旧 Publication 缺少快照时，历史查看使用自动布局。历史查看的节点移动和视口只属于查看会话，不进入保存与撤销历史。
+执行节点直接拥有 `node.task` 配置，不存在独立 Task ID 或可共享的 Task 定义表。复制节点复制配置；编辑、删除、撤销只作用于指定节点。Code 节点仍通过 `moduleId` 引用 CodeModule。
 Task 的端口分组随有序端口定义保存在 Revision 并参与 digest；分组不创建语义端口，也不参与连接、validation 或 Run。
 Revision 不保存 credential、Run、Engine IR、Provider 状态或部署缓存。
 
@@ -192,8 +193,9 @@ Wait 与 Approval 使用同一个等待执行机制，分别提供固定的 `con
 界面。一次 Wait 的所有 resolve 入口共享同一个 first-writer-wins 决议事实。
 各等待保留独立决议事实，后续等待和 Run terminal 不覆盖旧决议；这些事实不受 RunEvent retention 影响，随 Flow 物理删除清理。
 
-Agent 是根 Flow 中的 Managed Task，拥有显式输入、固定模型、Connector 工具与可选代码计算能力声明。提示词为支持 `{{输入名称}}` 的字符串模板，与 LLM 共用单次替换语义；渲染结果作为用户消息，宿主控制执行约束与输出格式。模型不能改变工具 Action、Connection、固定参数或审批策略。
+Agent 是根 Flow 中持有 Managed Task 配置的节点，拥有显式输入、固定模型、Connector 工具与可选代码计算能力声明。提示词为支持 `{{输入名称}}` 的字符串模板，与 LLM 共用单次替换语义；渲染结果作为用户消息，宿主控制执行约束与输出格式。模型不能改变工具 Action、Connection、固定参数或审批策略。
 Connector 工具和代码计算均可不配置；Agent 可以仅根据模型和提示词生成结果，仍须满足声明的输出 schema。Connector 工具最多 64 个。最终输出的 schema（包括文本约束）和用途说明作为生成要求传给模型；JSON 解析或 schema 校验失败时，将具体错误反馈给模型修正。修正沿用已有对话与结果，禁用工具调用，累计占用同一个最大执行轮数；耗尽后失败。
+Agent 的可选通知由该节点直接保存 Action、Connection、输入定义和参数映射，不引用其他节点或 Task 定义。
 Agent 的工具批次串行处理，批准或拒绝只处理该次固定调用。框架 continuation 属于部署私有数据；Run owner 持久化审批等待与通知 work，在安全冻结时保存完整 continuation 和 Scheduler 状态。并行 Agent 的等待独立可决议，框架不拥有另一套 Run 状态机。
 Agent 节点超时累计各次实际执行段，审批与排队不消耗节点预算；Run 总预算独立保留。执行结果不明时终止为不确定失败，不能让模型自动重试。
 

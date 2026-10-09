@@ -120,10 +120,10 @@ export async function connectorCommand(
       const name = args.name?.trim() ?? action.name
       if (name.length == 0) throw new CliError('cli.invalid-arguments', 'Connector Node name cannot be empty.')
       const nodeId = authoringId(args, 'node')
-      const taskId = authoringId(args, 'task')
+
       const operations = createManagedTask(
         selected.target,
-        { nodeId, taskId },
+        { nodeId },
         {
           executor: { action: action.actionId, ...(connection == null ? {} : { connectionId: connection.connectionId }), kind: 'connector' },
           inputs: withInputValues(action, values),
@@ -131,7 +131,7 @@ export async function connectorCommand(
           outputs: Object.entries(action.outputs).map(([handle, port]) => Object.assign({ handle }, port)),
         },
       )
-      const target = { actionId: action.actionId, flowId: selected.flow.flowId, kind: 'connector', nodeId, taskId }
+      const target = { actionId: action.actionId, flowId: selected.flow.flowId, kind: 'connector', nodeId }
       const changed = await changeDraft(client, args, requiredFlowId(flow), selected.draft.revisionId, target, operations)
       write(
         runtime,
@@ -161,10 +161,10 @@ export async function connectorCommand(
       }
       const selected = await selectedDraftFlow(client, flow!, args)
       const resolved = exactNode(selected.graph.nodes, second)
-      if (resolved.node.kind != 'task' || resolved.node.task != null) {
+      if (resolved.node.kind != 'task' || 'moduleId' in resolved.node.task) {
         throw new CliError('connector.node-invalid', `Node ${JSON.stringify(second)} is not a Connector Node.`)
       }
-      const task = selected.draft.content.document.tasks[resolved.node.taskId]
+      const task = resolved.node.task
       if (task == null || !('executor' in task) || task.executor.kind != 'connector') {
         throw new CliError('connector.node-invalid', `Node ${JSON.stringify(second)} is not a Connector Node.`)
       }
@@ -202,10 +202,10 @@ export async function connectorCommand(
         return
       }
       const operations = [
-        ...(connectionChanged ? setConnectorConnection(selected.draft.content, resolved.node.taskId, connectionId!)! : []),
+        ...(connectionChanged ? setConnectorConnection(selected.draft.content, resolved.nodeId, connectionId!)! : []),
         ...(inputChanged ? setInputValues(selected.draft.content, selected.target, resolved.nodeId, values)! : []),
       ]
-      const target = { flowId: selected.flow.flowId, kind: 'connector', nodeId: resolved.nodeId, taskId: resolved.node.taskId }
+      const target = { flowId: selected.flow.flowId, kind: 'connector', nodeId: resolved.nodeId }
       const changed = await changeDraft(client, args, requiredFlowId(flow), selected.draft.revisionId, target, operations)
       write(
         runtime,

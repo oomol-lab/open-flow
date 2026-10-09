@@ -34,7 +34,6 @@ function revision(rules?: readonly TriggerSchedule[]): RevisionContent {
                 },
               },
       },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {},

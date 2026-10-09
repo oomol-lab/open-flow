@@ -146,7 +146,7 @@ function content(live: boolean): RevisionContent {
     modules: {},
     document: {
       bindings: { token: { kind: 'variable', target: 'API_TOKEN' } },
-      tasks: { api: task },
+
       graph: {
         nodes: {
           upstream: {
@@ -158,7 +158,7 @@ function content(live: boolean): RevisionContent {
           api: {
             kind: 'task',
             name: 'API',
-            taskId: 'api',
+            task: task,
             inputs: live
               ? {}
               : { 'path.id': { kind: 'value', value: 'sample' }, 'auth.token.token': { kind: 'sources', sources: [{ kind: 'binding', bindingId: 'token' }] } },

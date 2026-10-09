@@ -86,7 +86,7 @@ const portsContent: RevisionContent = {
   modules: { module: { name: 'Summarize', imports: [], source: 'export default (inputs) => ({ summary: inputs.message, issues: [], count: 0 })' } },
   document: {
     bindings: {},
-    tasks: {},
+
     graph: {
       nodes: {
         source: {

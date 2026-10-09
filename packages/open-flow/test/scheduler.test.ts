@@ -101,7 +101,7 @@ describe('revision graph scheduler', () => {
     const source = revision(
       {
         bindings: {},
-        tasks: {},
+
         graph: {
           nodes: {
             left: { name: 'Left', kind: 'task', inputs: {}, task: task('left', [], ['value']) },
@@ -154,7 +154,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        tasks: {},
       },
       ['capture'],
     )
@@ -198,7 +197,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        tasks: {},
       },
       ['capture'],
     )
@@ -242,7 +240,6 @@ describe('revision graph scheduler', () => {
             scheduled: { cronTimes: [{ type: 'every', unit: 'minute', value: 1 }], kind: 'cron', name: 'Scheduled' },
           },
         },
-        tasks: {},
       },
       ['capture'],
     )
@@ -294,7 +291,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        tasks: {},
       },
       [],
     )
@@ -344,7 +340,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        tasks: {},
       },
       ['after'],
     )
@@ -425,7 +420,6 @@ describe('revision graph scheduler', () => {
               },
             },
           },
-          tasks: {},
         },
         ['a'],
       ),
@@ -489,7 +483,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        tasks: {},
       },
       ['approved', 'rejected'],
     )
@@ -543,7 +536,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        tasks: {},
       },
       [],
     )
@@ -645,7 +637,6 @@ describe('revision graph scheduler', () => {
               },
             },
           },
-          tasks: {},
         },
         ['fallback', 'matched'],
       )
@@ -718,7 +709,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        tasks: {},
       },
       ['all', 'any', 'later'],
     )
@@ -761,7 +751,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        tasks: {},
       },
       ['a', 'b', 'collect'],
     )
@@ -799,7 +788,6 @@ describe('revision graph scheduler', () => {
               after: { inputs: {}, kind: 'task', task: task('after', [], []) },
             },
           },
-          tasks: {},
         },
         ['source', 'after'],
       ),
@@ -841,7 +829,6 @@ describe('revision graph scheduler', () => {
             collect: { inputs: {}, kind: 'task', task: task('collect', [], []) },
           },
         },
-        tasks: {},
       },
       ['source', 'collect'],
     )
@@ -870,13 +857,19 @@ describe('revision graph scheduler', () => {
     const source = revision(
       {
         bindings: {},
-        graph: { edges: [], nodes: { news: { inputs: {}, kind: 'task', taskId: 'news' } } },
-        tasks: {
-          news: {
-            executor: { action: 'hacker-news.get-latest-posts', kind: 'connector' },
-            inputs: [],
-            name: 'Get Latest Posts',
-            outputs: [{ handle: 'posts', jsonSchema: { type: 'array' }, nullable: false }],
+        graph: {
+          edges: [],
+          nodes: {
+            news: {
+              inputs: {},
+              kind: 'task',
+              task: {
+                executor: { action: 'hacker-news.get-latest-posts', kind: 'connector' },
+                inputs: [],
+                name: 'Get Latest Posts',
+                outputs: [{ handle: 'posts', jsonSchema: { type: 'array' }, nullable: false }],
+              },
+            },
           },
         },
       },
@@ -902,7 +895,6 @@ describe('revision graph scheduler', () => {
       {
         bindings: {},
         graph: { edges: [], nodes: { slow: { inputs: {}, kind: 'task', task: task('slow', [], []), timeoutMs: 10 } } },
-        tasks: {},
       },
       ['slow'],
     )
@@ -955,7 +947,6 @@ describe('revision graph scheduler', () => {
             slow: { inputs: {}, kind: 'task', task: task('slow', [], []) },
           },
         },
-        tasks: {},
       },
       ['fail', 'slow'],
     )
@@ -989,7 +980,6 @@ describe('revision graph scheduler', () => {
       {
         bindings: {},
         graph: { edges: [], nodes: { task: { inputs: {}, kind: 'task', task: task('task', [], []) } } },
-        tasks: {},
       },
       ['task'],
     )
@@ -1013,13 +1003,19 @@ describe('revision graph scheduler', () => {
     const source = revision(
       {
         bindings: {},
-        graph: { edges: [], nodes: { task: { inputs: {}, kind: 'task', taskId: 'task-main' } } },
-        tasks: {
-          'task-main': {
-            executor: { kind: 'llm', mode: 'chat' },
-            inputs: [],
-            name: 'Managed',
-            outputs: [],
+        graph: {
+          edges: [],
+          nodes: {
+            task: {
+              inputs: {},
+              kind: 'task',
+              task: {
+                executor: { kind: 'llm', mode: 'chat' },
+                inputs: [],
+                name: 'Managed',
+                outputs: [],
+              },
+            },
           },
         },
       },
@@ -1046,7 +1042,7 @@ describe('port null normalization', () => {
         revision(
           {
             bindings: {},
-            tasks: {},
+
             graph: {
               edges: [{ source: 'source', target: 'consumer' }],
               nodes: {
@@ -1100,7 +1096,7 @@ describe('port null normalization', () => {
       revision(
         {
           bindings: {},
-          tasks: {},
+
           graph: {
             edges: [],
             nodes: {
@@ -1121,7 +1117,7 @@ describe('port null normalization', () => {
       revision(
         {
           bindings: {},
-          tasks: {},
+
           graph: {
             edges: [
               { source: 'choice', sourceHandle: 'yes', target: 'consumer' },
@@ -1175,7 +1171,7 @@ it('validates formed Webhook outputs at launch and checkpoint recovery without p
   const source = revision(
     {
       bindings: {},
-      tasks: {},
+
       graph: {
         nodes: {
           start: { kind: 'webhook', method: 'POST', name: 'Webhook', bodyFields: [] },
@@ -1221,7 +1217,7 @@ it.each([true, false])('does not execute with a cleared collection default (null
   const source = revision(
     {
       bindings: {},
-      tasks: {},
+
       graph: {
         edges: [],
         nodes: {

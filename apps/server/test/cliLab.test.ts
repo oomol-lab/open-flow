@@ -154,7 +154,7 @@ describe('CLI Lab', () => {
         head.revisionId,
         [
           { kind: 'graph.node.field.set', target: { kind: 'flow' }, nodeId: 'notify', field: 'name', before: 'Send notification', value: 'Partial' },
-          { kind: 'task.delete', taskId: 'missing' },
+          { kind: 'graph.node.delete', nodeId: 'missing', target: { kind: 'flow' } },
         ],
         'bad',
       ),

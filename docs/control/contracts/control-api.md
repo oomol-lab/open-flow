@@ -1066,7 +1066,7 @@ Run 取消、deadline、兄弟节点失败和节点退出沿既有执行生命�
 
 ## 11. Agent Task
 
-Agent 使用 Managed Task：`executor.kind: "agent"`，由 Flow 的 Task node 引用。确定性配置错误产生 `agent.config-invalid`。
+Agent 使用 Managed Task：`executor.kind: "agent"`，直接保存在 Flow 节点的 `node.task` 中。确定性配置错误产生 `agent.config-invalid`。
 
 ```json
 {
@@ -1132,13 +1132,13 @@ Action 与 Connection 固定在 Revision；无需认证的 Action 可以省略 `
 最终输出恰为一个非 nullable 的 `output`。`type: "string"` 使用最终文本；其他 schema 要求最终文本可解码为 JSON，
 并验证整体输出后才提交节点完成。Agent 工具结果独立保存，模型只取得有界预览；框架与 Scheduler 的完整 checkpoint 上限为 16 MiB。
 
-可选 `executor.notification` 为 `{ taskId, messageHandle, inputs }`。`taskId` 引用 Connector Task；通知输入的 source
-只能是固定值或此次节点输入，消息字段由宿主填写。通知 Task 属于 closure，独立进行 Action、Connection 和公共通知 origin 检查。
+可选 `executor.notification` 为 `{ action, connectionId?, inputDefinitions, messageHandle, inputs }`。通知配置由 Agent 节点独立持有；通知输入的 source
+只能是固定值或此次节点输入，消息字段由宿主填写。通知配置随 Agent 节点进入 closure，独立进行 Action、Connection 和公共通知 origin 检查。
 待审批的完整调用以 JSON 展示在 `RunDetails.waits[].prompt`，包含 `callId`、`toolId`、Action、可选 Connection 和完整 `input`。
 通知消息追加原等待的到期时间和决议链接。
 
-修改 Agent 使用 change operation `{ kind: "task.agent.set", taskId, before, value }`。
-`before` 与 `value` 是完整 Managed Task；前者必须与当前定义相等，后者必须仍为 Agent。
+修改 Agent 使用 change operation `{ kind: "graph.node.task.set", target, nodeId, before, value }`。
+`before` 与 `value` 是完整 Managed Task；前者必须与当前定义相等，后者提交该节点的新执行配置。
 语义无效配置可保存在 Draft，但 Run 与 Publish 必须通过 validation。
 
 ### 执行与恢复
@@ -1274,7 +1274,7 @@ references remain available for manual removal.
 
 Managed Task 新增 `executor.kind: "openapi"`，包含 `sourceUrl`、`method`（小写）、`path`、`serverUrl`、`document`（所选接口与引用依赖快照）、`auth`。
 鉴权项为 `{ id, type: "bearer" | "basic" | "apiKey", name?, in?: "header" | "query" }`。
-`task.openapi.set` 原子提交 `taskId`、完整 `before` 与 `value` Task，支持草稿并发检查和撤销。未选择接口的空 Task 可保存，不能运行。
+`graph.node.task.set` 原子提交 `target`、`nodeId`、完整 `before` 与 `value` Task，支持草稿并发检查和撤销。未选择接口的空 Task 可保存，不能运行。
 参数输入标识为 `path.<name>`、`query.<name>`、`header.<name>`，JSON 请求体为 `body`；鉴权使用 `auth.<id>.token` 或 Basic 的 `username`、`password`。
 鉴权输入禁止固定值和 Flow input Source；可清空，运行时必须具有有效部署变量或上游输出。
 输出为 `body`、`statusCode`、`headers`，`node.started.nodeKind` 新增 `openapi`，启动事件不包含鉴权输入。
@@ -1297,7 +1297,7 @@ Managed Task 的 `executor.kind: "decision"` 保存有序 `questions` 数组。�
 `type/choice/probabilities/confidence`，Score 的 `type/score/legend/probabilities/confidence`。
 不增加 `answers` 包装，不自动转换布尔值或选择执行分支。Condition 可通过既有一级字段 Source 引用判断结果。
 
-`task.decision.set` 使用完整 `before/value` Task 进行并发校验与原子替换，支持撤销重做。
+`graph.node.task.set` 使用完整 `before/value` Task 进行并发校验与原子替换，支持撤销重做。
 `@oomol-lab/open-flow/decision` 导出问题类型、Task/Schema 派生、配置校验及请求响应转换；
 `flow-authoring` 导出 `createDecisionTask`，authoring example 名称为 `decision`。
 `node.started.nodeKind` 增加 `decision`。

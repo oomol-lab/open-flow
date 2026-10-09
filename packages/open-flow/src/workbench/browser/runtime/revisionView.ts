@@ -18,7 +18,7 @@ import type {
 import { nodeInputMappings } from '../../../flow/common/condition.ts'
 import { connectionUsage } from '../../../flow/common/connectionUsage.ts'
 import { checkInputSources, inputSourceCandidates, nodeOutputDescription, nodeOutputPorts } from '../../../flow/common/graph.ts'
-import { agentActions, codeActions, referencedTaskIds } from '../../../flow/common/semantics.ts'
+import { agentActions, codeActions } from '../../../flow/common/semantics.ts'
 import { sourcePort } from '../../../flow/common/sourceField.ts'
 
 export interface InputSourceQuery {
@@ -48,11 +48,6 @@ export interface ResolvedTrigger {
 
 export type ResolvedSelection = ResolvedNode | ResolvedTrigger
 
-interface TaskNodeReference {
-  readonly nodeId: string
-  readonly taskId: string
-}
-
 const views = new WeakMap<Draft, RevisionView>()
 
 export class RevisionView {
@@ -63,18 +58,16 @@ export class RevisionView {
   readonly #modules: Draft['content']['modules']
   readonly #resolvedNodes = new WeakMap<GraphNode, Map<string, ResolvedSelection>>()
   readonly #inputSourcesByGraph = new WeakMap<Graph, Map<string, InputSourceQuery>>()
-  readonly #taskNodesByGraph = new WeakMap<Graph, readonly TaskNodeReference[]>()
 
   public constructor(public readonly revision: Draft) {
     this.#document = revision.content.document
     this.#modules = revision.content.modules
     this.connectorReferences = connectorAccessReferences(this.#document)
     const connectorActionIds = new Set<string>()
-    const tasks = Object.fromEntries(
-      [...referencedTaskIds(this.#document)].flatMap((id) => (this.#document.tasks[id] == null ? [] : [[id, this.#document.tasks[id]]])),
-    )
-    for (const task of Object.values(tasks)) if (task.executor.kind == 'connector') connectorActionIds.add(task.executor.action)
-    for (const declaration of [...codeActions(this.#document), ...agentActions({ tasks })]) {
+    for (const node of Object.values(this.#document.graph.nodes)) {
+      if (node.kind == 'task' && 'executor' in node.task && node.task.executor.kind == 'connector') connectorActionIds.add(node.task.executor.action)
+    }
+    for (const declaration of [...codeActions(this.#document), ...agentActions(this.#document)]) {
       if ('action' in declaration) connectorActionIds.add(declaration.action)
       else if ('mode' in declaration) {
         if (declaration.mode == 'independent') for (const action of declaration.actions) connectorActionIds.add(action.action)
@@ -114,8 +107,8 @@ export class RevisionView {
     let checks: InputSourcesCheck | undefined = sources.length == 0 ? { conflict: false, sources: [] } : undefined
     let candidates: ReturnType<typeof inputSourceCandidates> | undefined
     const query: InputSourceQuery = {
-      check: () => (checks ??= checkInputSources(this.#document, graph, nodeId, handle, sources)),
-      candidates: () => (candidates ??= inputSourceCandidates(this.#document, graph, nodeId, handle)),
+      check: () => (checks ??= checkInputSources(graph, nodeId, handle, sources)),
+      candidates: () => (candidates ??= inputSourceCandidates(graph, nodeId, handle)),
     }
     if (queries == null) this.#inputSourcesByGraph.set(graph, (queries = new Map()))
     queries.set(key, query)
@@ -125,7 +118,7 @@ export class RevisionView {
   public sourceType(target: GraphTarget, source: import('../../../flow/common/change.ts').Source): string | undefined {
     const graph = this.graph(target)
     const node = source.kind === 'node' ? graph?.nodes[source.nodeId] : undefined
-    const output = source.kind === 'node' && node != null ? nodeOutputPorts(this.#document, node)[source.output] : undefined
+    const output = source.kind === 'node' && node != null ? nodeOutputPorts(node)[source.output] : undefined
     const schema = output == null || source.kind !== 'node' ? undefined : sourcePort(output, source.field)?.jsonSchema
     if (source.kind === 'binding') return 'string'
     if (schema != null && typeof schema === 'object' && !Array.isArray(schema) && 'type' in schema && typeof schema.type === 'string') return schema.type
@@ -134,7 +127,7 @@ export class RevisionView {
 
   public outputDescription(target: GraphTarget, nodeId: string, output: string): string | undefined {
     const graph = this.graph(target)
-    return graph == null ? undefined : nodeOutputDescription(this.#document, graph, nodeId, output)
+    return graph == null ? undefined : nodeOutputDescription(graph, nodeId, output)
   }
 
   public designerInputs(): readonly unknown[] {
@@ -166,7 +159,7 @@ export class RevisionView {
         resolved = { id: nodeId, kind: node.kind, node }
         break
       case 'task': {
-        const definition = node.task != null ? node.task : this.#document.tasks[node.taskId]
+        const definition = node.task
         const module = definition != null && 'moduleId' in definition ? this.#modules[definition.moduleId] : undefined
         resolved = { definition, id: nodeId, kind: node.kind, module, node }
         break
@@ -194,22 +187,17 @@ export class RevisionView {
     return resolved
   }
 
-  public findTaskNode(target: GraphTarget, taskIds: ReadonlySet<string>): string | undefined {
-    const graph = this.graph(target)
-    if (graph == null) return
-    return this.#taskNodes(graph).find(({ taskId }) => taskIds.has(taskId))?.nodeId
-  }
-
   public findModuleNode(target: GraphTarget, moduleId: string): string | undefined {
-    return Object.entries(this.graph(target)?.nodes ?? {}).find(([, node]) => node.kind == 'task' && node.task?.moduleId == moduleId)?.[0]
+    return Object.entries(this.graph(target)?.nodes ?? {}).find(
+      ([, node]) => node.kind == 'task' && 'moduleId' in node.task && node.task.moduleId == moduleId,
+    )?.[0]
   }
 
-  public task(taskId: string): FlowDocument['tasks'][string] | undefined {
-    return this.#document.tasks[taskId]
-  }
-
-  public tasks(): [string, TaskDefinition][] {
-    return Object.entries(this.#document.tasks)
+  public connectorNodes(): readonly { readonly nodeId: string; readonly actionId: string; readonly connectionId?: string }[] {
+    return Object.entries(this.#document.graph.nodes).flatMap(([nodeId, node]) => {
+      if (node.kind != 'task' || !('executor' in node.task) || node.task.executor.kind != 'connector') return []
+      return [{ nodeId, actionId: node.task.executor.action, connectionId: node.task.executor.connectionId }]
+    })
   }
 
   public binding(bindingId: string): FlowDocument['bindings'][string] | undefined {
@@ -219,14 +207,6 @@ export class RevisionView {
   public trigger(triggerId: string): TriggerNode | undefined {
     const node = this.#document.graph.nodes[triggerId]
     return node != null && !('inputs' in node) ? node : undefined
-  }
-
-  #taskNodes(graph: Graph): readonly TaskNodeReference[] {
-    let taskNodes = this.#taskNodesByGraph.get(graph)
-    if (taskNodes != null) return taskNodes
-    taskNodes = Object.entries(graph.nodes).flatMap(([nodeId, node]) => (node.kind == 'task' && node.task == null ? [{ nodeId, taskId: node.taskId }] : []))
-    this.#taskNodesByGraph.set(graph, taskNodes)
-    return taskNodes
   }
 }
 
@@ -252,6 +232,6 @@ function connectorAccessReferences(document: FlowDocument): { readonly accounts:
   const accounts = [
     ...new Map(connectionUsage(document).map((use) => [JSON.stringify([use.target, use.nodeId, use.kind, use.providerId, use.connectionId]), use])).values(),
   ]
-  const hasCode = Object.values(document.graph.nodes).some((node) => node.kind == 'task' && node.task != null)
+  const hasCode = Object.values(document.graph.nodes).some((node) => node.kind == 'task' && 'moduleId' in node.task)
   return { accounts, hasCode }
 }

@@ -796,9 +796,6 @@
           "node": "上游节点“{{nodeId}}”不存在。",
           "output": "上游节点“{{nodeId}}”没有输出“{{output}}”。"
         },
-        "target-missing": {
-          "task": "Task“{{taskId}}”不存在。"
-        },
         "trigger-not-allowed": "Trigger 节点只能用于工作流。",
         "variable-incompatible": "环境变量绑定“{{bindingId}}”与此输入不兼容。",
         "variable-source-mixed": "环境变量必须是一个输入的唯一来源。"
@@ -826,8 +823,8 @@
       "task": {
         "capability-incomplete": "Inline Task“{{nodeId}}”的 Connector Capability 配置不完整。",
         "action-connection-required": "工具“{{action}}”需要选择账号后才能运行。",
-        "connector-connection-required": "请为连接器节点“{{taskId}}”选择连接账号。",
-        "connector-incomplete": "请为连接器任务“{{taskId}}”选择操作。",
+        "connector-connection-required": "请为连接器节点“{{nodeId}}”选择连接账号。",
+        "connector-incomplete": "请为连接器任务“{{nodeId}}”选择操作。",
         "missing-entry": "Inline Task 使用的 CodeModule“{{moduleId}}”必须导出 default function。",
         "module-missing": "Inline Task“{{nodeId}}”引用的 CodeModule“{{moduleId}}”不存在。"
       },

@@ -15,7 +15,7 @@ it('requires an entry and skips unrelated roots and other trigger branches', asy
     modules: {},
     document: {
       bindings: {},
-      tasks: {},
+
       graph: {
         edges: [
           { source: 'manual', target: 'selected' },
@@ -62,7 +62,7 @@ it('rejects adding a second manual trigger and allows replacing the existing one
   const content: RevisionContent = {
     modelVersion: currentFlowModelVersion,
     modules: {},
-    document: { bindings: {}, tasks: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
+    document: { bindings: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
   }
   const create = { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'other', node: { kind: 'manual', name: 'Other' } } as const
   expect(() => applyFlowChanges(content, [create])).toThrow('only one manual Trigger')
@@ -77,7 +77,7 @@ it('rejects imported graphs with multiple manual triggers during preparation', a
     modules: {},
     document: {
       bindings: {},
-      tasks: {},
+
       graph: {
         edges: [],
         nodes: {

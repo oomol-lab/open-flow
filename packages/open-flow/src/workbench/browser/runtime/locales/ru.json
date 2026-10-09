@@ -796,9 +796,6 @@
           "node": "Вышестоящий узел «{{nodeId}}» не существует.",
           "output": "Вышестоящий узел «{{nodeId}}» не предоставляет выход «{{output}}»."
         },
-        "target-missing": {
-          "task": "Task «{{taskId}}» не существует."
-        },
         "trigger-not-allowed": "Узлы Trigger разрешены только во Flow.",
         "variable-incompatible": "Привязка переменной среды «{{bindingId}}» несовместима с этим входом.",
         "variable-source-mixed": "Переменная среды должна быть единственным источником входа."
@@ -826,8 +823,8 @@
       "task": {
         "capability-incomplete": "Inline Task «{{nodeId}}» содержит незавершенную Connector Capability.",
         "action-connection-required": "Для запуска действия «{{action}}» выберите аккаунт.",
-        "connector-connection-required": "Для Connector Task «{{taskId}}» требуется активная Connection.",
-        "connector-incomplete": "Для Connector Task «{{taskId}}» требуется action.",
+        "connector-connection-required": "Для Connector Task «{{nodeId}}» требуется активная Connection.",
+        "connector-incomplete": "Для Connector Task «{{nodeId}}» требуется action.",
         "missing-entry": "CodeModule «{{moduleId}}», используемый Inline Task, должен экспортировать default function.",
         "module-missing": "Inline Task «{{nodeId}}» ссылается на отсутствующий CodeModule «{{moduleId}}»."
       },

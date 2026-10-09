@@ -13,7 +13,7 @@ import { sampleErrorOutputs } from '../src/trigger/common/contract.ts'
 const content: RevisionContent = {
   modelVersion: currentFlowModelVersion,
   modules: {},
-  document: { bindings: {}, tasks: {}, graph: { edges: [], nodes: { error: { kind: 'error', name: 'Flow Error' } } } },
+  document: { bindings: {}, graph: { edges: [], nodes: { error: { kind: 'error', name: 'Flow Error' } } } },
 }
 
 describe('Flow Error contract', () => {

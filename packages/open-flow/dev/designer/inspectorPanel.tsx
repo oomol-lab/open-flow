@@ -43,17 +43,19 @@ const content: RevisionContent = {
   },
   document: {
     bindings: {},
-    tasks: {
-      github: {
-        name: 'Read GitHub profile',
-        executor: { kind: 'connector', action: 'github.get_current_user', connectionId: 'github-work' },
-        inputs: [],
-        outputs: [],
-      },
-    },
+
     graph: {
       nodes: {
-        profile: { kind: 'task', inputs: {}, taskId: 'github' },
+        profile: {
+          kind: 'task',
+          inputs: {},
+          task: {
+            name: 'Read GitHub profile',
+            executor: { kind: 'connector', action: 'github.get_current_user', connectionId: 'github-work' },
+            inputs: [],
+            outputs: [],
+          },
+        },
         data: {
           kind: 'value',
           name: 'Issue text',

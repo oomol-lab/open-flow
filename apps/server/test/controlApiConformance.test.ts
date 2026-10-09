@@ -1,6 +1,8 @@
 import type { ConnectorAccess, ConnectorAction, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
 import type { ControlApiConformanceHarness } from '@oomol-lab/open-flow/control-api-conformance'
 import type { PollDefinition } from '@oomol-lab/open-flow/poll-trigger'
+import type { TaskNode } from '../../../packages/open-flow/src/flow/common/change.ts'
+import type { ManagedTaskDefinition } from '../../../packages/open-flow/src/flow/common/change.ts'
 import type { ConnectorAccessHost } from '../node/deployment/connector-access.ts'
 import type { ConnectorHost } from '../node/deployment/connector.ts'
 
@@ -584,11 +586,16 @@ it('removes Draft node and Code usage together, detects conflicts and preserves 
     const flow = await api.createFlow('Connection usage', 'usage-create')
     const changed = await api.changeDraft(flow.flowId, flow.draftRevisionId, [
       {
-        kind: 'task.create',
-        taskId: 'send',
-        task: { name: 'Send', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send', connectionId: 'fixture-account' } },
+        kind: 'graph.node.create',
+        target: { kind: 'flow' },
+        nodeId: 'send',
+        node: {
+          kind: 'task',
+          task: { name: 'Send', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send', connectionId: 'fixture-account' } },
+          name: 'Send',
+          inputs: {},
+        },
       },
-      { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'send', node: { kind: 'task', taskId: 'send', name: 'Send', inputs: {} } },
     ])
     const added = await api.addProviderAccessBinding(flow.flowId, 'mail', 'editors', 0)
     await expect(api.removeConnectionUsage(flow.flowId, 'fixture-account', changed.revision.revisionId, 0, 'stale-access')).rejects.toMatchObject({
@@ -597,12 +604,15 @@ it('removes Draft node and Code usage together, detects conflicts and preserves 
     expect((await api.getFlow(flow.flowId)).draftRevisionId).toBe(changed.revision.revisionId)
     expect((await api.getConnectorAccess(flow.flowId)).bindings).toHaveLength(1)
     const removed = await api.removeConnectionUsage(flow.flowId, 'fixture-account', changed.revision.revisionId, added.accessRevision, 'remove-account')
-    expect((await api.getDraft(flow.flowId)).content.document.tasks.send?.executor).toEqual({ kind: 'connector', action: 'mail.send' })
+    expect((((await api.getDraft(flow.flowId)).content.document.graph.nodes['send'] as TaskNode).task as ManagedTaskDefinition)?.executor).toEqual({
+      kind: 'connector',
+      action: 'mail.send',
+    })
     expect((await api.getConnectorAccess(flow.flowId)).bindings).toEqual([])
-    expect((await api.getRevision(flow.flowId, changed.revision.revisionId)).content.document.tasks.send?.executor).toHaveProperty(
-      'connectionId',
-      'fixture-account',
-    )
+    expect(
+      (((await api.getRevision(flow.flowId, changed.revision.revisionId)).content.document.graph.nodes['send'] as TaskNode).task as ManagedTaskDefinition)
+        ?.executor,
+    ).toHaveProperty('connectionId', 'fixture-account')
     expect(await api.removeConnectionUsage(flow.flowId, 'fixture-account', changed.revision.revisionId, added.accessRevision, 'remove-account')).toEqual(
       removed,
     )

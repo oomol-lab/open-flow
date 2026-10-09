@@ -36,7 +36,7 @@ const pickerDraft: Draft = {
   parentRevisionId: null,
   revisionId: 'lab',
   version: 1,
-  content: { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, tasks: {}, graph: { edges: [], nodes: {} } } },
+  content: { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, graph: { edges: [], nodes: {} } } },
 }
 
 const workflowViewport = { x: 35, y: 40, zoom: 0.9 }

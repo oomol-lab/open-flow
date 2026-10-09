@@ -21,7 +21,6 @@ function revision(source: string, imports: readonly string[] = [], modules: Revi
           task: { inputs: {}, kind: 'task', task: { inputs: [], moduleId: 'module-main', name: 'Main', outputs: [] } },
         },
       },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {
@@ -50,7 +49,6 @@ it('rejects request body fields on a GET Webhook', async () => {
           },
         },
       },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {},
@@ -64,7 +62,7 @@ it('rejects request body fields on a GET Webhook', async () => {
 function variableRevision(jsonSchema: JsonValue): RevisionFixture {
   const source = revision('export default ({ token }) => ({ token })')
   const task = source.document.graph.nodes.task
-  if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
+  if (task?.kind != 'task' || !('moduleId' in task.task)) throw new Error('Fixture inline Task is missing.')
   return {
     ...source,
     document: {
@@ -87,7 +85,7 @@ function variableRevision(jsonSchema: JsonValue): RevisionFixture {
 function triggerRevision(config: Readonly<Record<string, JsonValue>>, jsonSchema: Readonly<Record<string, JsonValue>>): RevisionFixture {
   const source = revision('export default ({ input }) => ({ input })')
   const task = source.document.graph.nodes.task
-  if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
+  if (task?.kind != 'task' || !('moduleId' in task.task)) throw new Error('Fixture inline Task is missing.')
   return {
     ...source,
     document: {
@@ -324,13 +322,19 @@ export default () => value`,
     const source: RevisionFixture = {
       document: {
         bindings: {},
-        graph: { edges: [], nodes: { news: { inputs: {}, kind: 'task', taskId: 'news' } } },
-        tasks: {
-          news: {
-            executor: { action: 'hacker-news.get-ask-stories', kind: 'connector' },
-            inputs: [],
-            name: 'Get Ask Stories',
-            outputs: [],
+        graph: {
+          edges: [],
+          nodes: {
+            news: {
+              inputs: {},
+              kind: 'task',
+              task: {
+                executor: { action: 'hacker-news.get-ask-stories', kind: 'connector' },
+                inputs: [],
+                name: 'Get Ask Stories',
+                outputs: [],
+              },
+            },
           },
         },
       },
@@ -371,7 +375,6 @@ export default () => value`,
             },
           },
         },
-        tasks: {},
       },
       modelVersion: currentFlowModelVersion,
       modules: {},
@@ -434,7 +437,6 @@ export default () => value`,
             },
           },
         },
-        tasks: {},
       },
       modelVersion: currentFlowModelVersion,
       modules: {},
@@ -465,7 +467,7 @@ export default () => value`,
   it('rejects retired Runtime Ref schemas before execution', async () => {
     const source = revision('export default ({ value }) => ({ value })')
     const task = source.document.graph.nodes.task
-    if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
+    if (task?.kind != 'task' || !('moduleId' in task.task)) throw new Error('Fixture inline Task is missing.')
     const invalid: RevisionFixture = {
       ...source,
       document: {
@@ -501,7 +503,7 @@ export default () => value`,
   it('allows ordinary data that resembles a retired Runtime Ref schema', async () => {
     const source = revision('export default ({ value }) => ({ value })')
     const task = source.document.graph.nodes.task
-    if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
+    if (task?.kind != 'task' || !('moduleId' in task.task)) throw new Error('Fixture inline Task is missing.')
     const value = { contentMediaType: 'oomol/ref' }
     const valid: RevisionFixture = {
       ...source,
@@ -528,7 +530,7 @@ export default () => value`,
   it('accepts an annotated string output for an unconstrained string input', async () => {
     const source = revision('export default ({ input }) => ({ input })')
     const task = source.document.graph.nodes.task
-    if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
+    if (task?.kind != 'task' || !('moduleId' in task.task)) throw new Error('Fixture inline Task is missing.')
     const valid: RevisionFixture = {
       ...source,
       document: {
@@ -579,7 +581,7 @@ export default () => value`,
   ])('$name', async ({ codes, sourceSchema, targetSchema }) => {
     const source = revision('export default ({ input }) => ({ input })')
     const task = source.document.graph.nodes.task
-    if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
+    if (task?.kind != 'task' || !('moduleId' in task.task)) throw new Error('Fixture inline Task is missing.')
     const invalid: RevisionFixture = {
       ...source,
       document: {
@@ -611,7 +613,7 @@ export default () => value`,
   it('accepts a schema-nullable output for a nullable input', async () => {
     const source = revision('export default ({ input }) => ({ input })')
     const task = source.document.graph.nodes.task
-    if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
+    if (task?.kind != 'task' || !('moduleId' in task.task)) throw new Error('Fixture inline Task is missing.')
     const valid: RevisionFixture = {
       ...source,
       document: {
@@ -638,7 +640,7 @@ export default () => value`,
     await expect(validateFlow(valid, engine)).resolves.toMatchObject({ diagnostics: [], valid: true })
 
     const target = valid.document.graph.nodes.task
-    if (target?.kind != 'task' || target.task == null) throw new Error('Fixture inline Task is missing.')
+    if (target?.kind != 'task' || !('moduleId' in target.task)) throw new Error('Fixture inline Task is missing.')
     const invalid: RevisionFixture = {
       ...valid,
       document: {
@@ -661,7 +663,7 @@ export default () => value`,
   it('rejects incomplete Connector Capability declarations on inline Tasks', async () => {
     const source = revision('export default () => ({})')
     const task = source.document.graph.nodes.task
-    if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
+    if (task?.kind != 'task' || !('moduleId' in task.task)) throw new Error('Fixture inline Task is missing.')
     const invalid: RevisionFixture = {
       ...source,
       document: {
@@ -752,7 +754,15 @@ export default () => value`,
           nodes: {
             notify: {
               kind: 'task',
-              taskId: 'notify',
+              task: {
+                executor: { action: 'mail.send', connectionId: 'connection-1', kind: 'connector' },
+                inputs: [
+                  { handle: 'recipient', jsonSchema: { type: 'string' }, nullable: false },
+                  { handle: 'message', jsonSchema: { type: 'string' }, nullable: false },
+                ],
+                name: 'Notify',
+                outputs: [],
+              },
               inputs: {
                 recipient: { kind: 'sources', sources: [{ bindingId: 'recipient', kind: 'binding' }] },
                 message: { kind: 'value', value: 'Review requested' },
@@ -766,17 +776,6 @@ export default () => value`,
             },
           },
         },
-        tasks: {
-          notify: {
-            executor: { action: 'mail.send', connectionId: 'connection-1', kind: 'connector' },
-            inputs: [
-              { handle: 'recipient', jsonSchema: { type: 'string' }, nullable: false },
-              { handle: 'message', jsonSchema: { type: 'string' }, nullable: false },
-            ],
-            name: 'Notify',
-            outputs: [],
-          },
-        },
       },
       modelVersion: currentFlowModelVersion,
       modules: {},
@@ -784,7 +783,7 @@ export default () => value`,
 
     await expect(validateFlow(source, engine)).resolves.toMatchObject({ diagnostics: [], valid: true })
     const dependencies = flowDependencies(source)
-    expect([...dependencies.tasks]).toEqual(['notify'])
+    expect([...dependencies.nodes]).toEqual(['notify', 'wait'])
     expect([...dependencies.bindings]).toEqual(['recipient'])
     expect([...dependencies.inputBindings]).toEqual(['recipient'])
   })
@@ -792,7 +791,7 @@ export default () => value`,
   it('exposes a structured Approval decision instead of forwarding its input type', async () => {
     const source = revision('export default ({ input }) => ({ input })')
     const task = source.document.graph.nodes.task
-    if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
+    if (task?.kind != 'task' || !('moduleId' in task.task)) throw new Error('Fixture inline Task is missing.')
     const valid: RevisionFixture = {
       ...source,
       document: {
@@ -848,7 +847,6 @@ export default () => value`,
             } as RevisionFixture['document']['graph']['nodes'][string],
           },
         },
-        tasks: {},
       },
       modelVersion: currentFlowModelVersion,
       modules: {},

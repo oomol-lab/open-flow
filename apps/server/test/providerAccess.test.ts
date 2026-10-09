@@ -478,7 +478,7 @@ it.each(['creator', 'admin'])('offers %s delegation without policy and retains i
   currentRole = 'member'
   await expect(access.add('operator', 'flow-1', 'example', candidate.accessBindingId, 1)).resolves.toEqual({ kind: 'invalid' })
   remote.mockClear()
-  const providerAccess = await captureConnectorAccess(access, 'flow-1', { bindings: {}, graph: { nodes: {}, edges: [] }, tasks: {} }, saved.access)
+  const providerAccess = await captureConnectorAccess(access, 'flow-1', { bindings: {}, graph: { nodes: {}, edges: [] } }, saved.access)
   const context = { flowId: 'flow-1', teamId: 'team-1', providerAccess, scope: 'shared' as const, purpose: 'execute' as const, source: 'run' as const }
   await expect(connector.listConnections('example', undefined, context)).resolves.toHaveLength(1)
   expect(remote.mock.calls.every(([url]) => String(url).endsWith('/v1/apps/services/example'))).toBe(true)

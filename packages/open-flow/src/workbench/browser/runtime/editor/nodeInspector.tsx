@@ -270,7 +270,7 @@ export function NodeInspector({
   const unconfiguredOpenApi = task != null && 'executor' in task && task.executor.kind == 'openapi' && !task.executor.path
   const isLlm = task != null && 'executor' in task && task.executor.kind == 'llm'
   const connector = task != null && 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
-  const taskId = selection?.kind == 'task' && selection.node.task == null ? selection.node.taskId : undefined
+  const nodeId = selection?.kind == 'task' ? selection.id : undefined
   const locatedRequest = useRef<number>()
   useEffect(() => {
     if (focus == null) return
@@ -310,7 +310,7 @@ export function NodeInspector({
             onConfigureAccess={(providerId) => void triggers.connect(providerId)}
           />
         )}
-        {!readOnly && connectors != null && connector != null && taskId != null && connectorAction?.authenticated !== false && (
+        {!readOnly && connectors != null && connector != null && nodeId != null && connectorAction?.authenticated !== false && (
           <ConnectorAccount
             action={connectorAction}
             actionError={connectorActionError}
@@ -326,7 +326,7 @@ export function NodeInspector({
             disabled={disabled}
             fieldIdPrefix={`task-${selection?.id}`}
             loading={connectorLoading}
-            taskId={taskId}
+            nodeId={nodeId}
           />
         )}
         {selection != null && (
@@ -570,7 +570,7 @@ export function NodeInspector({
                   )
                 }}
                 onDefinitions={
-                  selection.kind === 'task' && selection.definition != null && (selection.node.task != null || isAgent)
+                  selection.kind === 'task' && selection.definition != null && ('moduleId' in selection.node.task || isAgent)
                     ? (inputs, deletion, values) => {
                         void store?.saveTaskPorts(selection.id, { inputs, outputs: selection.definition!.outputs }, deletion, values)
                       }
@@ -603,7 +603,7 @@ export function NodeInspector({
             return (
               <section className="inspector-port-section" data-inspector-section="inputs">
                 {fields}
-                {selection.kind === 'task' && selection.definition != null && selection.node.task == null && isLlm && (
+                {selection.kind === 'task' && selection.definition != null && !('moduleId' in selection.node.task) && isLlm && (
                   <section className="inspector-nested-port-section">
                     <NodeInputs
                       readOnly={readOnly}
@@ -689,7 +689,7 @@ export function NodeInspector({
               title={t('inspector.ports.outputsTitle')}
               output
               values={presentDecisionOutputs(selection.definition, t)}
-              disabled={disabled || !(selection.node.task != null || isAgent)}
+              disabled={disabled || !('moduleId' in selection.node.task || isAgent)}
               onChange={(outputs, deletion) => {
                 void store?.saveTaskPorts(selection.id, { inputs: selection.definition!.inputs, outputs }, deletion)
               }}

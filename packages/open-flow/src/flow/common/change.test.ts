@@ -1,3 +1,5 @@
+import type { TaskNode } from './change.ts'
+import type { ManagedTaskDefinition } from './change.ts'
 import type { ChangeOperation, GraphNode, RevisionContent } from './change.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
@@ -22,7 +24,6 @@ function revision(): RevisionContent {
     document: {
       bindings: {},
       graph: { edges: [], nodes: {} },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {},
@@ -76,7 +77,6 @@ describe('Flow changes', () => {
             d: { inputs: {}, kind: 'value', name: 'Review (2)', values: [] },
           },
         },
-        tasks: { shared: { executor: { kind: 'llm', mode: 'chat' }, inputs: [], name: 'Summarize', outputs: [] } },
       },
     }
 
@@ -136,21 +136,29 @@ describe('Flow changes', () => {
         source: 'export default () => 2',
       },
       { before: 'Module', kind: 'module.rename', moduleId: 'module', name: 'Renamed module' },
-      { kind: 'task.create', task, taskId: 'managed' },
-      { before: 'Managed', kind: 'task.name.set', taskId: 'managed', value: 'Replaced' },
-      { before: 'chat', kind: 'task.llm.mode.set', taskId: 'managed', value: 'json' },
+      { kind: 'graph.node.create', nodeId: 'managed', target: { kind: 'flow' }, node: { kind: 'task', name: 'Managed', task, inputs: {} } },
+      {
+        before: task,
+        kind: 'graph.node.task.set',
+        nodeId: 'managed',
+        target: { kind: 'flow' },
+        value: { ...task, name: 'Replaced', executor: { kind: 'llm', mode: 'json' } },
+      },
     ]
 
     const changed = applyFlowChanges(revision(), operations)
 
     expect(changed.document.bindings.binding).toEqual({ kind: 'variable', target: 'connection-b' })
     expect(changed.modules.module).toEqual({ imports: ['helper'], name: 'Renamed module', source: 'export default () => 2' })
-    expect(changed.document.tasks.managed).toMatchObject({ executor: { kind: 'llm', mode: 'json' }, name: 'Replaced' })
+    expect((changed.document.graph.nodes['managed'] as TaskNode).task as ManagedTaskDefinition).toMatchObject({
+      executor: { kind: 'llm', mode: 'json' },
+      name: 'Replaced',
+    })
 
     const removed = applyFlowChanges(changed, [
       { bindingId: 'binding', kind: 'binding.delete' },
       { kind: 'module.delete', moduleId: 'module' },
-      { kind: 'task.delete', taskId: 'managed' },
+      { kind: 'graph.node.delete', nodeId: 'managed', target: { kind: 'flow' } },
     ])
     expect(removed).toEqual(revision())
   })
@@ -241,7 +249,7 @@ describe('Flow changes', () => {
   it.each([
     { before: 'OLD', bindingId: 'missing', kind: 'binding.target.set', value: 'TOKEN' },
     { kind: 'module.delete', moduleId: 'missing' },
-    { kind: 'task.delete', taskId: 'missing' },
+    { kind: 'graph.node.delete', nodeId: 'missing', target: { kind: 'flow' } },
   ] satisfies readonly ChangeOperation[])('rejects invalid operation %#', (operation) => {
     expect(() => applyFlowChanges(revision(), [operation])).toThrow(FlowChangeError)
   })

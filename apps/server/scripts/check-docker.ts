@@ -282,7 +282,6 @@ function codeFlow(): RevisionContent {
           },
         },
       },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: { code: { imports: [], name: 'Code', source: 'export default () => ({ result: 42 })' } },
