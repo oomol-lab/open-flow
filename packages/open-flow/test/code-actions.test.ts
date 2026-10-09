@@ -8,7 +8,6 @@ import { digestBytes, encodeRevision } from '../src/flow/common/encoding.ts'
 import { createCodeTask, setCodeActions } from '../src/flow/common/nodeChanges.ts'
 import { flowClosure } from '../src/flow/common/semantics.ts'
 
-const target = { kind: 'flow' } as const
 const capability: ConnectorCapability = { kind: 'connector' }
 const legacyAction: ConnectorActionCapability = {
   kind: 'connector',
@@ -21,7 +20,7 @@ const independent = { kind: 'connector', mode: 'independent', actions: [{ action
 function revision(): RevisionContent {
   return applyFlowChanges(
     { document: { bindings: {}, graph: { edges: [], nodes: {} } }, modules: {}, modelVersion: currentFlowModelVersion },
-    createCodeTask(target, { nodeId: 'code', moduleId: 'code' }, 'Code'),
+    createCodeTask({ nodeId: 'code', moduleId: 'code' }, 'Code'),
   )
 }
 
@@ -75,12 +74,12 @@ describe('Code Connector capability', () => {
 
   it('saves the capability without losing source and rejects stale edits', () => {
     const source = revision()
-    const operations = setCodeActions(source, target, 'code', [capability])
+    const operations = setCodeActions(source, 'code', [capability])
     if (operations == null) throw new Error('Expected capability edit.')
     const saved = applyFlowChanges(source, operations)
     expect(saved.modules).toEqual(source.modules)
     expect(saved.document.graph.nodes.code).toMatchObject({ task: { capabilities: [capability] } })
-    expect(setCodeActions(saved, target, 'code', [capability])).toBeUndefined()
+    expect(setCodeActions(saved, 'code', [capability])).toBeUndefined()
     expect(() => applyFlowChanges(saved, operations)).toThrow(/changed/)
   })
 
@@ -97,7 +96,7 @@ describe('Code Connector capability', () => {
       { kind: 'connector', connectionHints: [{ action: 'github.user', connectionId: 'work', alias: 'office' }] },
     ]
     const contents = variants.map((value) => {
-      const changes = setCodeActions(source, target, 'code', [value])
+      const changes = setCodeActions(source, 'code', [value])
       if (changes == null) throw new Error('Expected capability edit.')
       return applyFlowChanges(source, changes)
     })

@@ -498,8 +498,6 @@ export interface RevisionContent {
   readonly modules: Readonly<Record<string, CodeModule>>
 }
 
-export type GraphTarget = { readonly kind: 'flow' }
-
 export interface GraphEdge {
   readonly source: string
   readonly sourceHandle?: string
@@ -536,37 +534,37 @@ export type ChangeOperation =
       readonly before?: readonly ConnectorCapability[]
       readonly kind: 'graph.node.task.capabilities.set'
       readonly nodeId: string
-      readonly target: GraphTarget
+
       readonly value?: readonly ConnectorCapability[]
     }
   | { readonly kind: 'graph.trigger.sources.set'; readonly nodeId: string; readonly before?: readonly string[]; readonly value?: readonly string[] }
   | { readonly binding: FlowDocument['bindings'][string]; readonly bindingId: string; readonly kind: 'binding.create' }
   | { readonly bindingId: string; readonly kind: 'binding.delete' }
   | { readonly before: string; readonly bindingId: string; readonly kind: 'binding.target.set'; readonly value: string }
-  | { readonly kind: 'graph.edge.connect'; readonly edge: GraphEdge; readonly target: GraphTarget }
-  | { readonly kind: 'graph.edge.disconnect'; readonly edge: GraphEdge; readonly target: GraphTarget }
+  | { readonly kind: 'graph.edge.connect'; readonly edge: GraphEdge }
+  | { readonly kind: 'graph.edge.disconnect'; readonly edge: GraphEdge }
   | {
       readonly before?: readonly InputPort[]
       readonly kind: 'graph.node.additional-inputs.set'
       readonly nodeId: string
-      readonly target: GraphTarget
+
       readonly value?: readonly InputPort[]
     }
   | {
       readonly before: Pick<ConditionNode, 'cases' | 'matchMode'>
       readonly kind: 'graph.node.condition.set'
       readonly nodeId: string
-      readonly target: GraphTarget
+
       readonly value: Pick<ConditionNode, 'cases' | 'matchMode'>
     }
-  | { readonly kind: 'graph.node.create'; readonly node: GraphNode; readonly nodeId: string; readonly target: GraphTarget }
-  | { readonly kind: 'graph.node.delete'; readonly nodeId: string; readonly target: GraphTarget }
+  | { readonly kind: 'graph.node.create'; readonly node: GraphNode; readonly nodeId: string }
+  | { readonly kind: 'graph.node.delete'; readonly nodeId: string }
   | {
       readonly before?: number | string
       readonly field: 'connectionId' | 'description' | 'icon' | 'maxExecutions' | 'name' | 'timeoutMs'
       readonly kind: 'graph.node.field.set'
       readonly nodeId: string
-      readonly target: GraphTarget
+
       readonly value?: number | string
     }
   | {
@@ -574,42 +572,42 @@ export type ChangeOperation =
       readonly handle: string
       readonly kind: 'graph.node.input.set'
       readonly nodeId: string
-      readonly target: GraphTarget
+
       readonly value?: InputMapping
     }
   | {
       readonly before: Pick<InlineTaskDefinition, 'inputs' | 'outputs'>
       readonly kind: 'graph.node.task.ports.set'
       readonly nodeId: string
-      readonly target: GraphTarget
+
       readonly value: Pick<InlineTaskDefinition, 'inputs' | 'outputs'>
     }
   | {
       readonly before: string
       readonly kind: 'graph.node.task.name.set'
       readonly nodeId: string
-      readonly target: GraphTarget
+
       readonly value: string
     }
   | {
       readonly before: readonly InputPort[]
       readonly kind: 'graph.node.values.set'
       readonly nodeId: string
-      readonly target: GraphTarget
+
       readonly value: readonly InputPort[]
     }
   | {
       readonly before: Pick<ResolutionNode, 'inputDefinitions' | 'prompt'>
       readonly kind: 'graph.node.resolution.set'
       readonly nodeId: string
-      readonly target: Extract<GraphTarget, { readonly kind: 'flow' }>
+
       readonly value: Pick<ResolutionNode, 'inputDefinitions' | 'prompt'>
     }
   | {
       readonly before: Pick<Extract<TriggerNode, { readonly kind: 'webhook' }>, 'bodyFields' | 'method' | 'options'>
       readonly kind: 'graph.node.webhook.set'
       readonly nodeId: string
-      readonly target: Extract<GraphTarget, { readonly kind: 'flow' }>
+
       readonly value: Pick<Extract<TriggerNode, { readonly kind: 'webhook' }>, 'bodyFields' | 'method' | 'options'>
     }
   | {
@@ -639,7 +637,7 @@ export type ChangeOperation =
   | {
       readonly kind: 'graph.node.task.set'
       readonly nodeId: string
-      readonly target: GraphTarget
+
       readonly before: TaskDefinition
       readonly value: TaskDefinition
     }

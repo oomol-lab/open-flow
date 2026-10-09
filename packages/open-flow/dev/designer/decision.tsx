@@ -127,7 +127,7 @@ function DecisionStory({ dark, language, log }: { dark: boolean; language: UiLan
 }
 function DecisionPanel({ session, dark, disabled }: { session: ReturnType<typeof createInspectorSession>; dark: boolean; disabled: boolean }) {
   const revision = useVal(session.store.$.revision)
-  const selection = revision?.node({ kind: 'flow' }, 'decision')
+  const selection = revision?.node('decision')
   return (
     <I18nProvider i18n={session.i18n}>
       <div
@@ -149,7 +149,7 @@ function DecisionPanel({ session, dark, disabled }: { session: ReturnType<typeof
               disabled={disabled}
               revision={revision}
               selection={selection}
-              target={{ kind: 'flow' }}
+
               theme={dark ? 'dark' : 'light'}
             />
           </InspectorSamplePanel>

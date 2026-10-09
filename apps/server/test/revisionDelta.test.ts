@@ -230,7 +230,7 @@ it('repairs an unreadable delta as a new full Revision without changing the old 
     await rm(directory, { recursive: true, force: true })
   })
   const created = await service.control.createFlow('operator', 'Flow', 'create')
-  const operations = [{ kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'start', node: { kind: 'manual', name: 'Start' } }] as const
+  const operations = [{ kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } }] as const
   const changed = await service.control.changeDraft('operator', created.flow.flowId, created.flow.draftRevisionId, operations, 'change')
   const database = new DatabaseSync(file)
   try {

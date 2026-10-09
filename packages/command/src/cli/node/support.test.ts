@@ -13,7 +13,7 @@ describe('Flow apply Code Actions', () => {
     if (node?.kind != 'code') throw new Error('Expected Code node.')
     const content = applyFlowChanges(
       { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, graph: { edges: [], nodes: {} } } },
-      createCodeTask({ kind: 'flow' }, { moduleId: 'main', nodeId: 'code' }, node.name, undefined, {
+      createCodeTask({ moduleId: 'main', nodeId: 'code' }, node.name, undefined, {
         inputs: [],
         outputs: [],
         capabilities: node.capabilities,

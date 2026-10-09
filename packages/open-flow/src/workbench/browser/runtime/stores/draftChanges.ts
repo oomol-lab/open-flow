@@ -38,14 +38,14 @@ function mergeChanges(before: FlowChanges, after: FlowChanges): FlowChanges | un
   const first = before[0]
   const last = after[0]
   if (first?.kind == 'graph.node.field.set' && last?.kind == 'graph.node.field.set') {
-    if (first.nodeId != last.nodeId || first.field != last.field || first.target.kind != last.target.kind) return
+    if (first.nodeId != last.nodeId || first.field != last.field) return
 
-    return [{ before: first.before, field: last.field, kind: last.kind, nodeId: last.nodeId, target: last.target, value: last.value }]
+    return [{ before: first.before, field: last.field, kind: last.kind, nodeId: last.nodeId, value: last.value }]
   }
   if (first?.kind == 'graph.node.input.set' && last?.kind == 'graph.node.input.set') {
-    if (first.nodeId != last.nodeId || first.handle != last.handle || first.target.kind != last.target.kind) return
+    if (first.nodeId != last.nodeId || first.handle != last.handle) return
 
-    return [{ before: first.before, handle: last.handle, kind: last.kind, nodeId: last.nodeId, target: last.target, value: last.value }]
+    return [{ before: first.before, handle: last.handle, kind: last.kind, nodeId: last.nodeId, value: last.value }]
   }
 }
 

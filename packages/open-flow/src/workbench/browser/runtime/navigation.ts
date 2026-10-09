@@ -85,7 +85,7 @@ export class NavigationStore {
   }
 
   public openMainFlow(): void {
-    if (this.#store.workspace.selectTarget({ kind: 'flow' })) this.#write('design', false)
+    this.#write('design', false)
   }
 
   public async openFlows(): Promise<void> {

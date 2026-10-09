@@ -28,7 +28,7 @@ function renderState({ failedLoad = false, published = false, loading = false, i
     workspace: {
       $: {
         flowId: val('flow'),
-        targetFlow: val({ flowId: 'flow', name: 'Customer onboarding', status: 'active' }),
+        flow: val({ flowId: 'flow', name: 'Customer onboarding', status: 'active' }),
         draft: val({ revisionId: 'revision-draft' }),
         presentation: val({ revision: 1, value: {}, version: 1 }),
         revision: val(undefined),

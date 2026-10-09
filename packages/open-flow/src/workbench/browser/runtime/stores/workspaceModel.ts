@@ -1,6 +1,5 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
-import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { Diagnostic, Draft, Flow, FlowCheck, Live, Presentation } from '../api.ts'
 import type { AddNodeOption } from '../editor/addNodeOptions.ts'
 import type { DiagnosticFocus, DiagnosticItem } from '../editor/diagnostics.ts'
@@ -46,16 +45,11 @@ export interface WorkspaceState {
   readonly nodeFocus?: NodeFocus
   readonly presentation?: Presentation
   readonly selectedNodeIds: readonly string[]
-  readonly target?: GraphTarget
+
   readonly workspaceLoadFailed: boolean
   readonly workspaceLoadProblem?: { readonly kind: 'failed' | 'repair' | 'upgrade'; readonly message?: string }
   readonly workspaceLoading: boolean
   readonly workspaceRepairing: boolean
-}
-
-interface RevisionContext {
-  readonly revision?: RevisionView
-  readonly target?: GraphTarget
 }
 
 export interface Workspace$ {
@@ -85,9 +79,7 @@ export interface Workspace$ {
   readonly selection: ReadonlyVal<ResolvedSelection | undefined>
   readonly selectedNodeIds: ReadonlyVal<readonly string[]>
   readonly status: ReadonlyVal<WorkspaceStatus>
-  readonly target: ReadonlyVal<GraphTarget | undefined>
-  readonly targetFlow: ReadonlyVal<Flow | undefined>
-  readonly targetName: ReadonlyVal<string | undefined>
+
   readonly workspaceLoadFailed: ReadonlyVal<boolean>
   readonly workspaceLoadProblem: ReadonlyVal<WorkspaceState['workspaceLoadProblem']>
   readonly workspaceLoading: ReadonlyVal<boolean>
@@ -117,13 +109,9 @@ export function moduleEditorStatus(draft: Draft | undefined, editor: ModuleEdito
   return editor.source == module.source ? 'saved' : 'dirty'
 }
 
-export function selectedModuleEditor(
-  revision: RevisionView | undefined,
-  target: GraphTarget | undefined,
-  nodeIds: readonly string[],
-): ModuleEditorDraft | undefined {
-  if (revision == null || target == null || nodeIds.length != 1) return
-  const node = revision.node(target, nodeIds[0]!)
+export function selectedModuleEditor(revision: RevisionView | undefined, nodeIds: readonly string[]): ModuleEditorDraft | undefined {
+  if (revision == null || nodeIds.length != 1) return
+  const node = revision.node(nodeIds[0]!)
   if (node?.kind != 'task' || node.definition == null || !('moduleId' in node.definition) || node.module == null) return
   return {
     moduleId: node.definition.moduleId,
@@ -132,7 +120,6 @@ export function selectedModuleEditor(
 }
 
 export class WorkspaceModel {
-  readonly #revisionContext: ReadonlyVal<RevisionContext>
   readonly #state: Val<WorkspaceState> = val(initialState)
   readonly #catalogValues: ReadonlySet<ReadonlyVal<unknown>>
   public readonly $: Workspace$
@@ -157,36 +144,23 @@ export class WorkspaceModel {
     const live = derive(this.#state, (state) => state.live)
     const revision = derive(this.#state, (state) => (state.draft == null ? undefined : revisionView(state.draft)))
     const selectedNodeIds = derive(this.#state, (state) => state.selectedNodeIds)
-    const target = derive(this.#state, (state) => state.target)
     const workspaceLoadFailed = derive(this.#state, (state) => state.workspaceLoadFailed)
     const workspaceLoadProblem = derive(this.#state, (state) => state.workspaceLoadProblem)
     const workspaceLoading = derive(this.#state, (state) => state.workspaceLoading)
     const workspaceRepairing = derive(this.#state, (state) => state.workspaceRepairing)
-    this.#revisionContext = derive(
-      this.#state,
-      (state) => ({
-        revision: state.draft == null ? undefined : revisionView(state.draft),
-        target: state.target,
-      }),
-      {
-        equal: (next, previous) => next.revision === previous.revision && next.target === previous.target,
-      },
-    )
     const selection = derive(this.#state, (state) => {
-      if (state.draft == null || state.target == null || state.selectedNodeIds.length != 1) return
-      return revisionView(state.draft).selection(state.target, state.selectedNodeIds[0]!)
+      if (state.draft == null || state.selectedNodeIds.length != 1) return
+      return revisionView(state.draft).selection(state.selectedNodeIds[0]!)
     })
     this.$ = {
       addNodeOptions: compute((get) => {
-        const { revision: currentRevision, target: currentTarget } = get(this.#revisionContext)
-        return deriveAddNodeOptions(currentRevision?.revision, currentTarget, get(i18n.t$))
+        const currentRevision = get(revision)
+        return deriveAddNodeOptions(currentRevision?.revision, get(i18n.t$))
       }),
       busy,
       checkLoading,
       diagnosticFocus,
-      diagnosticItems: derive(this.#state, (state) =>
-        diagnosticItems(state.draft == null ? undefined : revisionView(state.draft), state.target, state.diagnostics),
-      ),
+      diagnosticItems: derive(this.#state, (state) => diagnosticItems(state.draft == null ? undefined : revisionView(state.draft), state.diagnostics)),
       diagnostics,
       draft,
       flow: compute((get) => {
@@ -203,7 +177,7 @@ export class WorkspaceModel {
       flowTotal: flows.$.total,
       flows: flows.$.flows,
       inspectorDiagnostics: derive(this.#state, (state) =>
-        deriveInspectorDiagnostics(state.draft == null ? undefined : revisionView(state.draft), state.target, state.diagnostics, selection.value),
+        deriveInspectorDiagnostics(state.draft == null ? undefined : revisionView(state.draft), state.diagnostics, selection.value),
       ),
       live,
       moduleEditor,
@@ -213,12 +187,6 @@ export class WorkspaceModel {
       selection,
       selectedNodeIds,
       status: derive(this.#state, status),
-      target,
-      targetFlow: compute((get) => (get(target)?.kind == 'flow' ? get(flows.$.flows).find((flow) => flow.flowId == get(flowId)) : undefined)),
-      targetName: derive(this.#state, (state) => {
-        if (state.target == null) return
-        return flows.flow(state.flowId ?? '')?.name
-      }),
       workspaceLoadFailed,
       workspaceLoadProblem,
       workspaceLoading,
@@ -239,7 +207,6 @@ export class WorkspaceModel {
     for (const value of Object.values(this.$)) {
       if (!this.#catalogValues.has(value)) value.dispose()
     }
-    this.#revisionContext.dispose()
     this.#state.dispose()
   }
 }

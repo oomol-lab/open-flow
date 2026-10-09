@@ -1,6 +1,5 @@
 import type { KeyboardEvent, PointerEvent, ReactElement, ReactNode } from 'react'
 import type { FlowCanvasViewProps } from '../../../../canvas/browser/graph/FlowCanvas/model.ts'
-import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { DesignerViewport, Point } from '../canvasPresentation.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { ResourceSource } from '../stores/resource.ts'
@@ -63,7 +62,6 @@ interface Props {
   readonly onSelectNodes: (nodeIds: readonly string[]) => void
   readonly onToggleInspector: (opener?: HTMLButtonElement) => void
   readonly selectedNodeIds: readonly string[]
-  readonly target: GraphTarget | undefined
 }
 
 export interface WorkbenchCanvasHandle {
@@ -117,7 +115,6 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     topLeftTools,
     bottomRightTools,
     selectedNodeIds,
-    target,
     theme,
   }: Props,
   ref,
@@ -192,17 +189,6 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     }
   }, [model.nodes])
 
-  useEffect(() => {
-    setPickerRequest(undefined)
-    setPickerCentered(false)
-    setAddNodeRequest(undefined)
-    setAddItemRequest(undefined)
-    pendingAdd.current?.(undefined)
-    pendingAdd.current = undefined
-    dynamicOptions.current.clear()
-    draggedNode.current.clear()
-  }, [target?.kind])
-
   const canvasCenter = (): Point => ({
     x: (canvas.current?.clientWidth ?? 184) / 2,
     y: (canvas.current?.clientHeight ?? 184) / 2,
@@ -263,7 +249,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     })
   }
   const manualTrigger = staticOptions.get('trigger:manual')
-  const needsTrigger = target?.kind == 'flow' && !model.nodes.some((node) => node.kind == 'trigger')
+  const needsTrigger = !model.nodes.some((node) => node.kind == 'trigger')
   const addRecommended = async (option: AddNodeOption): Promise<void> => {
     if (addingRecommended.current) return
     addingRecommended.current = true
@@ -275,7 +261,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
   }
 
   const keyDown = (event: KeyboardEvent<HTMLElement>) => {
-    if (disabled || target == null) return
+    if (disabled) return
     if (!(event.target instanceof Node) || !event.currentTarget.contains(event.target)) return
     if (event.target instanceof Element && event.target.closest('[contenteditable="true"], [role="dialog"], .nokey')) return
     if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.target instanceof HTMLSelectElement) return
@@ -317,7 +303,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
         dark={theme == 'dark'}
         editable={!disabled}
         focusNodeRequest={readyFocusNodeRequest}
-        identity={target == null ? 'empty' : 'flow'}
+        identity="flow"
         interactiveMode$={interactiveMode$}
         isValidConnection={isValidConnection}
         language={language}
@@ -325,7 +311,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
         cornerTools={
           <>
             {connectionControl}
-            <WorkbenchInspectorToggle label={t('designer.toggleInspector')} open={inspectorOpen} disabled={target == null} onToggle={onToggleInspector} />
+            <WorkbenchInspectorToggle label={t('designer.toggleInspector')} open={inspectorOpen} disabled={disabled} onToggle={onToggleInspector} />
           </>
         }
         cornerLeading={cornerLeading}
@@ -350,7 +336,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
             }
             addNodeControl={addNodeControl}
             pickerOpen={pickerRequest != null}
-            disabled={disabled || target == null}
+            disabled={disabled}
             onOpenNodePicker={openAddNode}
             runControl={runControl}
             onAddTrigger={needsTrigger && model.nodes.length > 0 && manualTrigger != null ? () => void addRecommended(manualTrigger) : undefined}
@@ -426,7 +412,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
           }}
         />
       )}
-      {target != null && model.nodes.length == 0 && (
+      {model.nodes.length == 0 && (
         <div className="canvas-empty">
           <Button className="canvas-empty-add" disabled={disabled} onClick={openAddNode} type="button" variant="outline">
             <span className="canvas-empty-add-icon">

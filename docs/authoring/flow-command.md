@@ -30,7 +30,6 @@ Flow 创建命令不再单独指定 Team ID。
   "operations": [
     {
       "kind": "graph.node.create",
-      "target": { "kind": "flow" },
       "nodeId": "start",
       "node": { "kind": "manual", "name": "Start" }
     }

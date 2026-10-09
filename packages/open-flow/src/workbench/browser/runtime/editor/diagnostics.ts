@@ -1,5 +1,4 @@
 import type { TFunction } from 'val-i18n'
-import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { Diagnostic, FlowCheck, GraphNode } from '../api.ts'
 import type { ResolvedSelection, RevisionView } from '../revisionView.ts'
 
@@ -74,11 +73,10 @@ function within(path: string, candidate: string): boolean {
 
 export function deriveInspectorDiagnostics(
   revision: RevisionView | undefined,
-  target: GraphTarget | undefined,
   diagnostics: FlowCheck | undefined,
   selection: ResolvedSelection | undefined,
 ): readonly Diagnostic[] {
-  if (revision == null || target == null || diagnostics == null || diagnostics.revisionId != revision.revision.revisionId) return []
+  if (revision == null || diagnostics == null || diagnostics.revisionId != revision.revision.revisionId) return []
   if (selection != null) return diagnosticsForNode(selection, diagnostics.diagnostics)
   const targetPath = '/document/graph'
   const nodePath = '/document/graph/nodes/'
@@ -105,14 +103,14 @@ function nodeSection(node: GraphNode, suffix: string): InspectorSection {
   return 'node'
 }
 
-function location(revision: RevisionView | undefined, target: GraphTarget | undefined, diagnostic: Diagnostic): DiagnosticLocation | undefined {
-  if (revision == null || target == null) return
+function location(revision: RevisionView | undefined, diagnostic: Diagnostic): DiagnosticLocation | undefined {
+  if (revision == null) return
   const graphPrefix = '/document/graph/nodes/'
   if (diagnostic.path.startsWith(graphPrefix)) {
     const path = diagnostic.path.slice(graphPrefix.length)
     const slash = path.indexOf('/')
     const nodeId = slash < 0 ? path : path.slice(0, slash)
-    const node = revision.node(target, nodeId)
+    const node = revision.node(nodeId)
     if (node != null)
       return {
         nodeId,
@@ -123,16 +121,16 @@ function location(revision: RevisionView | undefined, target: GraphTarget | unde
 
   const moduleMatch = /^\/modules\/([^/]+)\/source$/.exec(diagnostic.path)
   if (moduleMatch != null) {
-    const nodeId = revision.findModuleNode(target, moduleMatch[1]!)
+    const nodeId = revision.findModuleNode(moduleMatch[1]!)
     if (nodeId != null) return { nodeId, section: 'module' }
   }
 }
 
-export function diagnosticItems(revision: RevisionView | undefined, target: GraphTarget | undefined, check: FlowCheck | undefined): readonly DiagnosticItem[] {
+export function diagnosticItems(revision: RevisionView | undefined, check: FlowCheck | undefined): readonly DiagnosticItem[] {
   return (
     check?.diagnostics.map((diagnostic) => ({
       diagnostic,
-      location: location(revision, target, diagnostic),
+      location: location(revision, diagnostic),
       scope: scope(diagnostic.path),
     })) ?? []
   )

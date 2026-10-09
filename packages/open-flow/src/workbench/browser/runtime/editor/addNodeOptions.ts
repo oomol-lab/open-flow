@@ -1,5 +1,4 @@
 import type { TFunction } from 'val-i18n'
-import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { Draft, JsonValue, TriggerKeySnapshot } from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { RevisionView } from '../revisionView.ts'
@@ -148,10 +147,9 @@ function builtinOptions(t: TFunction): readonly AddNodeOption[] {
   ]
 }
 
-export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarget | undefined, t: TFunction): readonly AddNodeOption[] {
-  if (draft == null || target == null) return []
+export function deriveAddNodeOptions(draft: Draft | undefined, t: TFunction): readonly AddNodeOption[] {
+  if (draft == null) return []
   const options = builtinOptions(t)
-  if (target.kind != 'flow') return options.filter((option) => option.kind != 'agent')
   const group = t('addNode.triggers')
   const triggers: readonly AddNodeOption[] = [
     {
@@ -223,15 +221,15 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
       outputs: [{ handle: 'continue', jsonSchema: {} }],
     },
   ]
-  const nodes = Object.values(revisionView(draft).graph(target)?.nodes ?? {})
+  const nodes = Object.values(revisionView(draft).graph()?.nodes ?? {})
   return triggers.filter((option) => !nodes.some((node) => (node.kind == 'manual' || node.kind == 'error') && option.id == `trigger:${node.kind}`))
 }
 
-export function addNodeIntent(option: AddNodeOption, revision: RevisionView, target: GraphTarget, t: TFunction): AddNodeIntent | undefined {
+export function addNodeIntent(option: AddNodeOption, revision: RevisionView, t: TFunction): AddNodeIntent | undefined {
   switch (option.kind) {
     case 'new-task': {
       const name = t('addNode.codeTaskName', {
-        number: Object.keys(revision.graph(target)!.nodes).length + 1,
+        number: Object.keys(revision.graph()!.nodes).length + 1,
       })
       return { kind: 'code', name }
     }

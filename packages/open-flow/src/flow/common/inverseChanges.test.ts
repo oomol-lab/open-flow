@@ -6,7 +6,6 @@ import { applyFlowChanges } from './change.ts'
 import { inverseFlowChanges } from './inverseChanges.ts'
 import { createCodeTask, createValue, deleteNodes, setTriggerConnection } from './nodeChanges.ts'
 
-const target = { kind: 'flow' } as const
 const empty: RevisionContent = {
   modelVersion: currentFlowModelVersion,
   modules: {},
@@ -51,14 +50,14 @@ describe('inverse canvas changes', () => {
       },
     }
     for (const connection of ['personal', undefined]) {
-      const changes = setTriggerConnection(content, target, 'trigger', connection)!
+      const changes = setTriggerConnection(content, 'trigger', connection)!
       expect(applyFlowChanges(content, changes).document.graph.nodes.trigger).toMatchObject({ kind: 'poll' })
       expect(Reflect.get(applyFlowChanges(content, changes).document.graph.nodes.trigger!, 'connectionId')).toBe(connection)
       roundTrip(content, changes)
     }
-    roundTrip(content, deleteNodes(content, target, ['trigger']))
+    roundTrip(content, deleteNodes(content, ['trigger']))
     expect(() =>
-      applyFlowChanges(content, [{ kind: 'graph.node.field.set', target, nodeId: 'trigger', field: 'connectionId', before: 'stale', value: 'personal' }]),
+      applyFlowChanges(content, [{ kind: 'graph.node.field.set', nodeId: 'trigger', field: 'connectionId', before: 'stale', value: 'personal' }]),
     ).toThrow()
   })
   it('deletes node-owned task configurations independently and restores them on undo', () => {
@@ -71,10 +70,10 @@ describe('inverse canvas changes', () => {
         graph: { edges: [], nodes: { a: { kind: 'task', name: 'A', task: task, inputs: {} }, b: { kind: 'task', name: 'B', task: task, inputs: {} } } },
       },
     }
-    const remaining = applyFlowChanges(content, deleteNodes(content, target, ['a']))
+    const remaining = applyFlowChanges(content, deleteNodes(content, ['a']))
     expect(remaining.document.graph.nodes.a).toBeUndefined()
     expect(remaining.document.graph.nodes.b).toEqual(content.document.graph.nodes.b)
-    const operations = deleteNodes(content, target, ['a', 'b'])
+    const operations = deleteNodes(content, ['a', 'b'])
     expect(applyFlowChanges(content, operations).document.graph.nodes).toEqual({})
     roundTrip(content, operations)
   })
@@ -116,23 +115,22 @@ describe('inverse canvas changes', () => {
         },
       },
     }
-    const remaining = applyFlowChanges(content, deleteNodes(content, target, ['mail']))
+    const remaining = applyFlowChanges(content, deleteNodes(content, ['mail']))
     expect(remaining.document.graph.nodes.agent).toEqual(content.document.graph.nodes.agent)
-    const operations = deleteNodes(remaining, target, ['agent'])
+    const operations = deleteNodes(remaining, ['agent'])
     expect(applyFlowChanges(remaining, operations).document.graph.nodes).toEqual({})
     roundTrip(remaining, operations)
   })
 
   it('restores batch deletion, code, bindings, input references and edge order', () => {
     const content = applyFlowChanges(empty, [
-      ...createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Code'),
-      ...createValue(target, 'a', 'A'),
-      ...createValue(target, 'b', 'B'),
-      ...createValue(target, 'c', 'C'),
+      ...createCodeTask({ nodeId: 'code', moduleId: 'module' }, 'Code'),
+      ...createValue('a', 'A'),
+      ...createValue('b', 'B'),
+      ...createValue('c', 'C'),
       { kind: 'binding.create', bindingId: 'variable', binding: { kind: 'variable', target: 'TOKEN' } },
       {
         kind: 'graph.node.input.set',
-        target,
         nodeId: 'code',
         handle: 'value',
         before: { kind: 'value', value: 'foo' },
@@ -140,7 +138,6 @@ describe('inverse canvas changes', () => {
       },
       {
         kind: 'graph.node.input.set',
-        target,
         nodeId: 'b',
         handle: 'value',
         value: {
@@ -155,32 +152,31 @@ describe('inverse canvas changes', () => {
         { source: 'a', target: 'b' },
         { source: 'b', target: 'c' },
         { source: 'code', target: 'b' },
-      ].map((edge): ChangeOperation => ({ kind: 'graph.edge.connect', target, edge })),
+      ].map((edge): ChangeOperation => ({ kind: 'graph.edge.connect', edge })),
     ])
-    roundTrip(content, deleteNodes(content, target, ['code', 'a']))
-    roundTrip(content, [{ kind: 'graph.edge.disconnect', target, edge: { source: 'a', target: 'b' } }])
+    roundTrip(content, deleteNodes(content, ['code', 'a']))
+    roundTrip(content, [{ kind: 'graph.edge.disconnect', edge: { source: 'a', target: 'b' } }])
   })
 
   it('restores optional fields, input values and code port definitions across a batch', () => {
-    const content = applyFlowChanges(empty, createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Code'))
+    const content = applyFlowChanges(empty, createCodeTask({ nodeId: 'code', moduleId: 'module' }, 'Code'))
     const node = content.document.graph.nodes.code!
     if (node.kind != 'task' || !('moduleId' in node.task)) throw new Error('Expected inline task')
     roundTrip(content, [
-      { kind: 'graph.node.field.set', target, nodeId: 'code', field: 'description', value: 'Description' },
-      { kind: 'graph.node.field.set', target, nodeId: 'code', field: 'description', before: 'Description' },
-      { kind: 'graph.node.field.set', target, nodeId: 'code', field: 'timeoutMs', value: 2000 },
-      { kind: 'graph.node.field.set', target, nodeId: 'code', field: 'maxExecutions', value: 25 },
-      { kind: 'graph.node.task.name.set', target, nodeId: 'code', before: 'Code', value: 'Renamed' },
-      { kind: 'graph.node.task.capabilities.set', target, nodeId: 'code', before: node.task.capabilities, value: [] },
-      { kind: 'graph.node.additional-inputs.set', target, nodeId: 'code', value: [{ handle: 'extra', jsonSchema: {}, nullable: false }] },
+      { kind: 'graph.node.field.set', nodeId: 'code', field: 'description', value: 'Description' },
+      { kind: 'graph.node.field.set', nodeId: 'code', field: 'description', before: 'Description' },
+      { kind: 'graph.node.field.set', nodeId: 'code', field: 'timeoutMs', value: 2000 },
+      { kind: 'graph.node.field.set', nodeId: 'code', field: 'maxExecutions', value: 25 },
+      { kind: 'graph.node.task.name.set', nodeId: 'code', before: 'Code', value: 'Renamed' },
+      { kind: 'graph.node.task.capabilities.set', nodeId: 'code', before: node.task.capabilities, value: [] },
+      { kind: 'graph.node.additional-inputs.set', nodeId: 'code', value: [{ handle: 'extra', jsonSchema: {}, nullable: false }] },
       {
         kind: 'graph.node.task.ports.set',
-        target,
         nodeId: 'code',
         before: { inputs: node.task.inputs, outputs: node.task.outputs },
         value: { inputs: [], outputs: [] },
       },
-      { kind: 'graph.node.input.set', target, nodeId: 'code', handle: 'value', before: node.inputs.value, value: { kind: 'value', value: '' } },
+      { kind: 'graph.node.input.set', nodeId: 'code', handle: 'value', before: node.inputs.value, value: { kind: 'value', value: '' } },
     ])
   })
 
@@ -191,9 +187,9 @@ describe('inverse canvas changes', () => {
 
   it('replays creation using the same node and module identities', () => {
     roundTrip(empty, [
-      ...createValue(target, 'a', 'A'),
-      ...createCodeTask(target, { nodeId: 'b', moduleId: 'module' }, 'B'),
-      { kind: 'graph.edge.connect', target, edge: { source: 'a', target: 'b' } },
+      ...createValue('a', 'A'),
+      ...createCodeTask({ nodeId: 'b', moduleId: 'module' }, 'B'),
+      { kind: 'graph.edge.connect', edge: { source: 'a', target: 'b' } },
     ])
   })
 })

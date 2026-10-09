@@ -4,7 +4,6 @@ import type { ChangeOperation, RevisionContent, ManagedTaskDefinition } from '@o
 import { applyFlowChanges, currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { isDeepStrictEqual } from 'node:util'
 
-export const target = { kind: 'flow' } as const
 const port = { jsonSchema: { type: 'string' }, nullable: false } as const
 export const oldSource = 'export default async function () { return { text: "Original content", revised: "Original content" } }'
 export const newSource = 'export default async function () { return { text: "Original content", revised: "Weekly summary: 3 updates" } }'
@@ -54,20 +53,18 @@ export function initialOperations(id: string): ChangeOperation[] {
     executor: { kind: 'agent', code: true, model: 'lab-model', prompt: 'Summarize updates.', maxRounds: 3, tools: [] },
   }
   return [
-    { kind: 'graph.node.create', target, nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
+    { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
 
-    { kind: 'graph.node.create', target, nodeId: 'summary', node: { kind: 'task', name: 'Weekly summary', task: agent, inputs: {} } },
+    { kind: 'graph.node.create', nodeId: 'summary', node: { kind: 'task', name: 'Weekly summary', task: agent, inputs: {} } },
 
     {
       kind: 'graph.node.create',
-      target,
       nodeId: 'archive',
       node: { kind: 'task', name: 'Archive summary', task: { ...agent, name: 'Archive summary' }, inputs: {} },
     },
     { kind: 'module.create', moduleId: 'format-module', module: { name: 'Format message', source: oldSource, imports: [] } },
     {
       kind: 'graph.node.create',
-      target,
       nodeId: 'format',
       node: {
         kind: 'task',
@@ -86,16 +83,15 @@ export function initialOperations(id: string): ChangeOperation[] {
       },
     },
     ...notificationOperations(),
-    { kind: 'graph.edge.connect', target, edge: { source: 'start', target: 'format' } },
-    { kind: 'graph.edge.connect', target, edge: { source: 'format', target: 'notify' } },
-    { kind: 'graph.edge.connect', target, edge: { source: 'start', target: 'summary' } },
+    { kind: 'graph.edge.connect', edge: { source: 'start', target: 'format' } },
+    { kind: 'graph.edge.connect', edge: { source: 'format', target: 'notify' } },
+    { kind: 'graph.edge.connect', edge: { source: 'start', target: 'summary' } },
   ]
 }
 export function notificationOperations(): ChangeOperation[] {
   return [
     {
       kind: 'graph.node.create',
-      target,
       nodeId: 'notify',
       node: {
         kind: 'task',
@@ -115,22 +111,21 @@ export function referenceChanges(id: string, content: RevisionContent): ChangeOp
   if (id == 'edit-prompt') {
     const before = (content.document.graph.nodes.summary as TaskNode).task
     if (!('executor' in before) || before.executor.kind != 'agent') throw new Error('Expected Agent')
-    return [{ kind: 'graph.node.task.set', nodeId: 'summary', target, before, value: { ...before, executor: { ...before.executor, prompt: taskPrompt } } }]
+    return [{ kind: 'graph.node.task.set', nodeId: 'summary', before, value: { ...before, executor: { ...before.executor, prompt: taskPrompt } } }]
   }
   const notify = content.document.graph.nodes.notify
   if (id == 'create-flow')
     return [
-      { kind: 'graph.node.create', target, nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
+      { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
       ...notificationOperations(),
       {
         kind: 'graph.node.input.set',
-        target,
         nodeId: 'notify',
         handle: 'text',
         before: { kind: 'value', value: 'Wrong source' },
         value: { kind: 'value', value: 'Hello Lab' },
       },
-      { kind: 'graph.edge.connect', target, edge: { source: 'start', target: 'notify' } },
+      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'notify' } },
     ]
   if (notify?.kind != 'task') throw new Error('Missing notify node')
   return [
@@ -148,7 +143,6 @@ export function referenceChanges(id: string, content: RevisionContent): ChangeOp
       : []),
     {
       kind: 'graph.node.input.set',
-      target,
       nodeId: 'notify',
       handle: 'text',
       before: notify.inputs.text,

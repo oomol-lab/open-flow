@@ -9,7 +9,7 @@ import type {
   FlowCanvasViewOutput,
   FlowCanvasViewTriggerNode,
 } from '../../../canvas/browser/graph/FlowCanvas/model.ts'
-import type { ConditionOperand, GraphTarget } from '../../../flow/common/change.ts'
+import type { ConditionOperand } from '../../../flow/common/change.ts'
 import type { ConnectorProvider, Diagnostic, Draft, GraphNode, Group, JsonValue, Run, RunDetails, RunEvent, TaskDefinition, TriggerNode } from './api.ts'
 import type { Point, DesignerViewport } from './canvasPresentation.ts'
 import type { ConnectionCatalog, ConnectorActionView } from './connectionCatalog.ts'
@@ -64,7 +64,6 @@ interface NodeProjectionContext {
   readonly revision: RevisionView
   readonly runNodes: ReadonlyMap<string, FlowCanvasViewNodeRun>
   readonly t: TFunction | undefined
-  readonly target: GraphTarget
 }
 
 export function semanticNodeIcon(node: ResolvedNode, connectorActions: Readonly<Record<string, ConnectorActionView>>): string | undefined {
@@ -238,11 +237,10 @@ function nodeDiagnosticCount(node: ResolvedNode, diagnostics: readonly Diagnosti
 
 function runProjection(
   revision: RevisionView,
-  target: GraphTarget,
   run: Run | RunDetails | undefined,
   events: readonly RunEvent[],
 ): { readonly nodes: ReadonlyMap<string, FlowCanvasViewNodeRun>; readonly status?: 'idle' | 'running' } {
-  if (target.kind != 'flow' || run?.flowId != revision.revision.flowId || run.revisionId != revision.revision.revisionId) return { nodes: new Map() }
+  if (run?.flowId != revision.revision.flowId || run.revisionId != revision.revision.revisionId) return { nodes: new Map() }
   const active = run.status == 'queued' || run.status == 'starting' || run.status == 'running' || run.status == 'waiting'
   const nodes = new Map<string, FlowCanvasViewNodeRun>()
   if ('waits' in run) for (const wait of run.waits) nodes.set(wait.nodeId, { runId: run.runId, status: 'waiting' })
@@ -610,7 +608,6 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
 
 export function designerGraph(
   draft: Draft | undefined,
-  target: GraphTarget | undefined,
   presentation: Readonly<Record<string, JsonValue>> = {},
   diagnostics: readonly Diagnostic[] = [],
   connectorActions: Readonly<Record<string, ConnectorActionView>> = {},
@@ -621,9 +618,9 @@ export function designerGraph(
   providers: Readonly<Record<string, ConnectorProvider>> = {},
 ): DesignerGraph {
   const revision = draft == null ? undefined : revisionView(draft)
-  const graph = revision == null || target == null ? undefined : revision.graph(target)
-  if (revision == null || target == null || graph == null) return { edges: [], nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }
-  const projectedRun = runProjection(revision, target, run, runEvents)
+  const graph = revision == null ? undefined : revision.graph()
+  if (revision == null || graph == null) return { edges: [], nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }
+  const projectedRun = runProjection(revision, run, runEvents)
 
   const entries = Object.entries(graph.nodes)
   const definitions = new Map(entries.map(([nodeId, node]) => [nodeId, revision.resolveNode(nodeId, node)]))
@@ -631,8 +628,8 @@ export function designerGraph(
   const ports = new Map([...definitions].map(([nodeId, node]) => [nodeId, nodePorts(node)]))
   const edgeProjection = projectEdges(graph, nodeIds)
   const layout = layoutNodes(nodeIds, edgeProjection.dependencies, edgeProjection.dependents)
-  const positions = savedPositions(presentation, target)
-  const hiddenNodeContent = savedHiddenNodeContent(presentation, target)
+  const positions = savedPositions(presentation)
+  const hiddenNodeContent = savedHiddenNodeContent(presentation)
   const context: NodeProjectionContext = {
     connectionCatalogs,
     connectorActions,
@@ -642,7 +639,6 @@ export function designerGraph(
     revision,
     runNodes: projectedRun.nodes,
     t,
-    target,
   }
   const rows = new Map<number, number>()
   const nodes: DesignerNode[] = []
@@ -662,7 +658,7 @@ export function designerGraph(
     const node = semanticDesignerNode(nodeId, resolved, ports.get(nodeId)!, position, context)
     nodes.push({ ...node, contentHidden: hiddenNodeContent?.[nodeId] === true })
   }
-  for (const [nodeId, comment] of Object.entries(savedComments(presentation, target, positions)).toSorted(([left], [right]) => left.localeCompare(right))) {
+  for (const [nodeId, comment] of Object.entries(savedComments(presentation, positions)).toSorted(([left], [right]) => left.localeCompare(right))) {
     nodes.push({
       ...comment,
       id: nodeId,
@@ -670,12 +666,12 @@ export function designerGraph(
       contentHidden: hiddenNodeContent?.[nodeId] === true,
     })
   }
-  const order = new Map(savedOrder(presentation, target).map((nodeId, index) => [nodeId, index]))
+  const order = new Map(savedOrder(presentation).map((nodeId, index) => [nodeId, index]))
   nodes.sort((left, right) => (order.get(left.id) ?? -1) - (order.get(right.id) ?? -1))
   return {
     edges: edgeProjection.edges,
     nodes,
     ...(projectedRun.status == null ? {} : { runStatus: projectedRun.status }),
-    viewport: savedViewport(presentation, target),
+    viewport: savedViewport(presentation),
   }
 }

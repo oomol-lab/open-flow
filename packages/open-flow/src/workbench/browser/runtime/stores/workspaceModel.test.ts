@@ -102,8 +102,8 @@ describe('Connector providers', () => {
 describe('Per-field input sources', () => {
   it('describes node outputs through the revision view', () => {
     const view = revisionView(draft())
-    expect(view.outputDescription({ kind: 'flow' }, 'source', 'text')).toBe('Plain text')
-    expect(view.outputDescription({ kind: 'flow' }, 'source', 'missing')).toBeUndefined()
+    expect(view.outputDescription('source', 'text')).toBe('Plain text')
+    expect(view.outputDescription('source', 'missing')).toBeUndefined()
   })
 
   it('does no compatibility work until requested and caches each field independently', () => {
@@ -111,17 +111,17 @@ describe('Per-field input sources', () => {
     const check = vi.spyOn(graph, 'checkInputSources')
     try {
       const view = revisionView(draft())
-      const query = view.inputSource({ kind: 'flow' }, 'task', 'input0')
+      const query = view.inputSource('task', 'input0')
       expect(calculate).not.toHaveBeenCalled()
       expect(check).not.toHaveBeenCalled()
       expect(query.check()).toEqual({ conflict: false, sources: [] })
       expect(check).not.toHaveBeenCalled()
       expect(query.candidates()).toEqual({ source: [{ description: 'Plain text', output: 'text', check: { kind: 'available' } }] })
       expect(calculate).toHaveBeenCalledTimes(1)
-      expect(view.inputSource({ kind: 'flow' }, 'task', 'input0')).toBe(query)
+      expect(view.inputSource('task', 'input0')).toBe(query)
       expect(query.candidates()).toBe(query.candidates())
       expect(calculate).toHaveBeenCalledTimes(1)
-      view.inputSource({ kind: 'flow' }, 'task', 'input1').candidates()
+      view.inputSource('task', 'input1').candidates()
       expect(calculate).toHaveBeenCalledTimes(2)
     } finally {
       calculate.mockRestore()
@@ -164,10 +164,10 @@ describe('Per-field input sources', () => {
     const check = vi.spyOn(graph, 'checkInputSources')
     try {
       const view = revisionView(source)
-      expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual({ conflict: false, sources: [{ kind: 'available' }] })
-      expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual({ conflict: false, sources: [{ kind: 'available' }] })
+      expect(view.inputSource('task', 'input0').check()).toEqual({ conflict: false, sources: [{ kind: 'available' }] })
+      expect(view.inputSource('task', 'input0').check()).toEqual({ conflict: false, sources: [{ kind: 'available' }] })
       expect(check).toHaveBeenCalledTimes(1)
-      expect(view.inputSource({ kind: 'flow' }, 'task', 'input1').check()).toEqual({ conflict: false, sources: [{ kind: 'output-missing' }] })
+      expect(view.inputSource('task', 'input1').check()).toEqual({ conflict: false, sources: [{ kind: 'output-missing' }] })
       expect(calculate).not.toHaveBeenCalled()
       const changed: Draft = {
         ...source,
@@ -194,11 +194,11 @@ describe('Per-field input sources', () => {
         },
       }
 
-      expect(revisionView(changed).inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual({
+      expect(revisionView(changed).inputSource('task', 'input0').check()).toEqual({
         conflict: false,
         sources: [{ kind: 'schema', mismatch: { kind: 'keyword', keyword: 'type', path: [], source: 'string', target: 'number' } }],
       })
-      expect(revisionView(changed).inputSource({ kind: 'flow' }, 'task', 'input0').candidates()).toEqual({
+      expect(revisionView(changed).inputSource('task', 'input0').candidates()).toEqual({
         source: [
           {
             description: 'Plain text',
@@ -226,15 +226,15 @@ describe('Per-field input sources', () => {
     }
 
     const view = revisionView(source)
-    expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').candidates()).toEqual({
+    expect(view.inputSource('task', 'input0').candidates()).toEqual({
       source: [{ description: 'Plain text', output: 'text', check: { kind: 'available' } }],
     })
-    expect(view.inputSource({ kind: 'flow' }, 'other', 'input0').candidates()).toEqual({})
+    expect(view.inputSource('other', 'input0').candidates()).toEqual({})
     const changed: Draft = {
       ...source,
       content: { ...source.content, document: { ...source.content.document, graph: { ...source.content.document.graph, edges: [] } } },
     }
-    expect(revisionView(changed).inputSource({ kind: 'flow' }, 'task', 'input0').candidates()).toEqual({})
+    expect(revisionView(changed).inputSource('task', 'input0').candidates()).toEqual({})
   })
 
   it('distinguishes a source that is not upstream from a schema mismatch', () => {
@@ -266,7 +266,7 @@ describe('Per-field input sources', () => {
       },
     }
 
-    expect(revisionView(source).inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual({ conflict: false, sources: [{ kind: 'not-ready' }] })
+    expect(revisionView(source).inputSource('task', 'input0').check()).toEqual({ conflict: false, sources: [{ kind: 'not-ready' }] })
   })
 
   it('allows sources supplied on separate incoming execution paths', () => {
@@ -309,7 +309,7 @@ describe('Per-field input sources', () => {
       },
     }
 
-    expect(revisionView(source).inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual({
+    expect(revisionView(source).inputSource('task', 'input0').check()).toEqual({
       conflict: false,
       sources: [{ kind: 'available' }, { kind: 'available' }],
     })

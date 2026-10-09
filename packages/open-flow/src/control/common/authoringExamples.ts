@@ -13,7 +13,6 @@ import {
 } from '../../flow/common/nodeChanges.ts'
 import { openApiTask, selectOperation } from '../../openapi/common/openapi.ts'
 
-const target = { kind: 'flow' } as const
 const descriptions = {
   'manual': 'A Manual start node.',
   'error': 'A Flow Error node. Select upstream Flows, then publish and enable this Flow to listen for failures in their automatic runs.',
@@ -44,10 +43,10 @@ export function authoringExample(name: string): { version: 1; operations: readon
   let operations: readonly DraftOperation[]
   switch (name) {
     case 'error':
-      operations = createBuiltinTrigger(target, 'error', { kind: 'error', name: 'Flow Error' })
+      operations = createBuiltinTrigger('error', { kind: 'error', name: 'Flow Error' })
       break
     case 'decision':
-      operations = createDecisionTask(target, { nodeId: 'decision' }, 'AI Decision', [
+      operations = createDecisionTask({ nodeId: 'decision' }, 'AI Decision', [
         { name: 'needs_support', type: 'noul', instructions: 'Does the customer need support?' },
       ])
       break
@@ -56,17 +55,17 @@ export function authoringExample(name: string): { version: 1; operations: readon
         openapi: '3.1.0',
         paths: { '/items': { get: { responses: { '200': { content: { 'application/json': { schema: { type: 'array', items: { type: 'string' } } } } } } } } },
       }
-      operations = createManagedTask(target, { nodeId: 'api' }, openApiTask(selectOperation(document, 'https://api.example.com/openapi.json', '/items', 'get')))
+      operations = createManagedTask({ nodeId: 'api' }, openApiTask(selectOperation(document, 'https://api.example.com/openapi.json', '/items', 'get')))
       break
     }
     case 'manual':
-      operations = createBuiltinTrigger(target, 'start', { kind: 'manual', name: 'Start' })
+      operations = createBuiltinTrigger('start', { kind: 'manual', name: 'Start' })
       break
     case 'webhook':
-      operations = createBuiltinTrigger(target, 'start', { kind: 'webhook', method: 'POST', name: 'Webhook', bodyFields: [] })
+      operations = createBuiltinTrigger('start', { kind: 'webhook', method: 'POST', name: 'Webhook', bodyFields: [] })
       break
     case 'cron':
-      operations = createBuiltinTrigger(target, 'start', { kind: 'cron', name: 'Schedule', cronTimes: [{ type: 'every', unit: 'hour', value: 1 }] })
+      operations = createBuiltinTrigger('start', { kind: 'cron', name: 'Schedule', cronTimes: [{ type: 'every', unit: 'hour', value: 1 }] })
       break
     case 'poll':
       operations = [
@@ -95,7 +94,6 @@ export function authoringExample(name: string): { version: 1; operations: readon
       break
     case 'agent':
       operations = createManagedTask(
-        target,
         { nodeId: 'agent' },
         {
           name: 'Agent',
@@ -107,7 +105,6 @@ export function authoringExample(name: string): { version: 1; operations: readon
       break
     case 'connector':
       operations = createManagedTask(
-        target,
         { nodeId: 'notify' },
         {
           name: 'Notify',
@@ -119,7 +116,6 @@ export function authoringExample(name: string): { version: 1; operations: readon
       break
     case 'code':
       operations = createCodeTask(
-        target,
         { nodeId: 'format', moduleId: 'format-module' },
         'Format',
         {
@@ -141,34 +137,33 @@ export function authoringExample(name: string): { version: 1; operations: readon
       break
     case 'condition':
       operations = [
-        ...createCondition(target, 'condition', 'Condition'),
-        { kind: 'graph.node.input.set', target, nodeId: 'condition', handle: '0/0/0/left', value: { kind: 'value', value: 100 } },
-        { kind: 'graph.node.input.set', target, nodeId: 'condition', handle: '0/0/0/right', value: { kind: 'value', value: 100 } },
+        ...createCondition('condition', 'Condition'),
+        { kind: 'graph.node.input.set', nodeId: 'condition', handle: '0/0/0/left', value: { kind: 'value', value: 100 } },
+        { kind: 'graph.node.input.set', nodeId: 'condition', handle: '0/0/0/right', value: { kind: 'value', value: 100 } },
       ]
       break
     case 'value':
-      operations = createValue(target, 'value', 'Value')
+      operations = createValue('value', 'Value')
       break
     case 'approval':
-      operations = createApproval(target, 'approval', 'Approve?')
+      operations = createApproval('approval', 'Approve?')
       break
     case 'wait':
-      operations = createWait(target, 'wait', 'Continue?')
+      operations = createWait('wait', 'Continue?')
       break
     case 'llm-chat':
     case 'llm-json':
-      operations = createLlmTask(target, { nodeId: 'llm' }, 'LLM', name == 'llm-chat' ? 'chat' : 'json', 'Generated response.')
+      operations = createLlmTask({ nodeId: 'llm' }, 'LLM', name == 'llm-chat' ? 'chat' : 'json', 'Generated response.')
       break
     case 'poll-notification':
       operations = [
         ...authoringExample('poll').operations,
         ...authoringExample('code').operations,
         ...authoringExample('connector').operations,
-        { kind: 'graph.edge.connect', target, edge: { source: 'mail', target: 'format' } },
-        { kind: 'graph.edge.connect', target, edge: { source: 'format', target: 'notify' } },
+        { kind: 'graph.edge.connect', edge: { source: 'mail', target: 'format' } },
+        { kind: 'graph.edge.connect', edge: { source: 'format', target: 'notify' } },
         {
           kind: 'graph.node.input.set',
-          target,
           nodeId: 'format',
           handle: 'events',
           before: { kind: 'value', value: [] },
@@ -176,7 +171,6 @@ export function authoringExample(name: string): { version: 1; operations: readon
         },
         {
           kind: 'graph.node.input.set',
-          target,
           nodeId: 'notify',
           handle: 'text',
           before: { kind: 'value', value: 'Hello' },

@@ -112,7 +112,7 @@ export async function selectedDraftFlow(client: ControlClient, flow: Flow, args:
     })
   }
   const draft = await client.getRevision(flow.flowId, args.expectedRevision ?? flow.draftRevisionId)
-  return { draft, flow, graph: draft.content.document.graph, target: { kind: 'flow' } as const }
+  return { draft, flow, graph: draft.content.document.graph }
 }
 
 export type SemanticNode = Exclude<GraphNode, TriggerNode>

@@ -157,10 +157,10 @@ describe('Workbench Diagnostic messages', () => {
       valid: false,
       version: 1 as const,
     }
-    expect(deriveInspectorDiagnostics(revision, { kind: 'flow' }, { ...check, revisionId: 'previous' }, undefined)).toEqual([])
+    expect(deriveInspectorDiagnostics(revision, { ...check, revisionId: 'previous' }, undefined)).toEqual([])
 
-    expect(diagnosticItems(revision, { kind: 'flow' }, check)).toMatchObject([{ location: { nodeId: 'trigger', section: 'account' } }, { location: undefined }])
-    expect(deriveInspectorDiagnostics(revision, { kind: 'flow' }, check, undefined)).toEqual([flowDiagnostic])
-    expect(deriveInspectorDiagnostics(revision, { kind: 'flow' }, check, revision.selection({ kind: 'flow' }, 'trigger'))).toEqual([diagnostic])
+    expect(diagnosticItems(revision, check)).toMatchObject([{ location: { nodeId: 'trigger', section: 'account' } }, { location: undefined }])
+    expect(deriveInspectorDiagnostics(revision, check, undefined)).toEqual([flowDiagnostic])
+    expect(deriveInspectorDiagnostics(revision, check, revision.selection('trigger'))).toEqual([diagnostic])
   })
 })

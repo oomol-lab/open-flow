@@ -57,7 +57,6 @@ export type {
   Graph,
   GraphEdge,
   GraphNode,
-  GraphTarget,
   Group,
   InputMapping,
   InputPort,

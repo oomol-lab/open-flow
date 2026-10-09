@@ -641,12 +641,11 @@ it('applies a complete operation batch atomically and reports validation separat
   const operations = [
     {
       kind: 'graph.node.create',
-      target: { kind: 'flow' },
       nodeId: 'value',
       node: { kind: 'value', name: 'Value', inputs: {}, values: [{ handle: 'value', jsonSchema: {}, nullable: false, value: 42 }] },
     },
-    { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'start', target: 'value' } },
-    { kind: 'graph.node.field.set', target: { kind: 'flow' }, nodeId: 'value', field: 'name', before: 'Value', value: 'Answer' },
+    { kind: 'graph.edge.connect', edge: { source: 'start', target: 'value' } },
+    { kind: 'graph.node.field.set', nodeId: 'value', field: 'name', before: 'Value', value: 'Answer' },
   ]
   output.value.readFile = async () => JSON.stringify({ version: 1, operations })
   let changes = 0

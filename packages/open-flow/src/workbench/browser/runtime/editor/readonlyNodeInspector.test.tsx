@@ -88,7 +88,7 @@ it('inspects saved values and definitions without exposing writable controls or 
   ]
   extra.push(...triggers.map((trigger, index): ResolvedSelection => ({ kind: 'trigger', id: `trigger-${index}`, node: trigger, trigger })))
   try {
-    for (const selection of [...Object.keys(draft.content.document.graph.nodes).map((id) => revision.node({ kind: 'flow' }, id)!), ...extra]) {
+    for (const selection of [...Object.keys(draft.content.document.graph.nodes).map((id) => revision.node(id)!), ...extra]) {
       const html = renderToStaticMarkup(
         <I18nProvider i18n={i18n}>
           <NodeInspector
@@ -104,7 +104,7 @@ it('inspects saved values and definitions without exposing writable controls or 
               },
             })}
             selection={selection}
-            target={{ kind: 'flow' }}
+
             theme="light"
           />
         </I18nProvider>,
@@ -152,11 +152,11 @@ it('preserves saved input groups, defaults and references through the shared ins
     },
   }
   const revision = revisionView(snapshot)
-  const selection = revision.node({ kind: 'flow' }, 'prepare')!
+  const selection = revision.node('prepare')!
   try {
     const html = renderToStaticMarkup(
       <I18nProvider i18n={i18n}>
-        <NodeInspector readOnly revision={revision} selection={selection} target={{ kind: 'flow' }} theme="light" />
+        <NodeInspector readOnly revision={revision} selection={selection} theme="light" />
       </I18nProvider>,
     )
     expect(html).toContain('Saved group')

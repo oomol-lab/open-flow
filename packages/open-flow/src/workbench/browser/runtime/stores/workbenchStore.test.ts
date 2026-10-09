@@ -1027,7 +1027,7 @@ it.each(['connected', 'unconfigured', 'failed'] as const)('keeps new Connector a
     const revision = store.workspace.$.revision.value!
     const definition = { name: 'Send', inputs: [], outputs: [], executor: { kind: 'connector' as const, action: 'mail.send' } }
     const node = { id: 'new', kind: 'task' as const, node: { kind: 'task' as const, task: definition, inputs: {} }, definition }
-    vi.spyOn(revision, 'selection').mockImplementation((_target, id) => ({ ...node, id }))
+    vi.spyOn(revision, 'selection').mockImplementation((id) => ({ ...node, id }))
     vi.spyOn(revision, 'node').mockReturnValue(node)
     vi.spyOn(store.workspace, 'addNode').mockImplementation(async () => {
       store.workspace.selectNodes(['new'])

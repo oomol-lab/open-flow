@@ -154,10 +154,10 @@ it('recovers a process crash after the start barrier as one indeterminate termin
       body: JSON.stringify({
         expectedRevisionId: flow.draftRevisionId,
         operations: [
-          { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start', target: { kind: 'flow' } },
+          { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start' },
           { kind: 'module.create', module: revision.modules.main, moduleId: 'main' },
-          { kind: 'graph.node.create', node: revision.document.graph.nodes.task, nodeId: 'task', target: { kind: 'flow' } },
-          { kind: 'graph.edge.connect', edge: { source: 'start', target: 'task' }, target: { kind: 'flow' } },
+          { kind: 'graph.node.create', node: revision.document.graph.nodes.task, nodeId: 'task' },
+          { kind: 'graph.edge.connect', edge: { source: 'start', target: 'task' } },
         ],
         version: 1,
       }),

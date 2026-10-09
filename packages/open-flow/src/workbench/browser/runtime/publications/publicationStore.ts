@@ -241,7 +241,7 @@ export class PublicationStore {
         ...(warm ? {} : { operation, publishing: operation?.status == 'pending' }),
       })
       if (!warm && operation?.status == 'pending') {
-        const flow = this.#workspace.$.targetFlow.value
+        const flow = this.#workspace.$.flow.value
         void this.#observe(target, operation, this.#operation.begin(), flow?.flowId == target.flowId ? flow.name : target.flowId)
       }
     } catch (error) {
@@ -276,7 +276,7 @@ export class PublicationStore {
   public async publish(): Promise<boolean> {
     const flowId = this.#workspace.$.flowId.value
     if (!(await this.#workspace.saveModuleEditor()) || flowId != this.#workspace.$.flowId.value) return false
-    const flow = this.#workspace.$.targetFlow.value
+    const flow = this.#workspace.$.flow.value
     const draft = this.#workspace.$.draft.value
     if (
       flow == null ||

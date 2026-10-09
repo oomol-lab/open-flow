@@ -1,4 +1,4 @@
-import type { FlowDocument, GraphTarget, RevisionContent } from './change.ts'
+import type { FlowDocument, RevisionContent } from './change.ts'
 
 export interface ConnectionUsage {
   readonly providerId: string
@@ -7,19 +7,18 @@ export interface ConnectionUsage {
   readonly triggerId?: string
   readonly nodeId: string
   readonly name: string
-  readonly target: GraphTarget
+
   readonly kind: 'connector' | 'agent' | 'trigger' | 'notification' | 'code'
 }
 
 export function connectionUsage(document: FlowDocument): readonly ConnectionUsage[] {
   const uses: ConnectionUsage[] = []
-  const target: GraphTarget = { kind: 'flow' }
 
   for (const [nodeId, node] of Object.entries(document.graph.nodes)) {
     const task = node.kind == 'task' && 'executor' in node.task ? node.task : undefined
     const name = node.name ?? task?.name ?? nodeId
     const add = (kind: ConnectionUsage['kind'], actionId: string, connectionId?: string) => {
-      uses.push({ kind, providerId: actionId.split('.')[0]!, actionId, connectionId, nodeId, name, target })
+      uses.push({ kind, providerId: actionId.split('.')[0]!, actionId, connectionId, nodeId, name })
     }
     if (node.kind == 'poll' || node.kind == 'integration') {
       uses.push({
@@ -29,7 +28,6 @@ export function connectionUsage(document: FlowDocument): readonly ConnectionUsag
         connectionId: node.connectionId,
         nodeId,
         name,
-        target,
       })
     }
     if (task?.executor.kind == 'connector') add('connector', task.executor.action, task.executor.connectionId)

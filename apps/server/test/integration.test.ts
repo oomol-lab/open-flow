@@ -1274,7 +1274,6 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
       {
         kind: 'graph.node.create',
         nodeId: 'listen',
-        target: { kind: 'flow' },
         node: {
           kind: 'integration',
           connectionId: 'connection-main',
@@ -1474,9 +1473,7 @@ it('prepares a GitHub repository webhook before activating Live and rejects an u
     definition: definition.snapshot,
     config: inputValues({ owner: 'octocat', repo: 'repository', events: ['issues'] }),
   }
-  const draft = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
-    { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'github', node },
-  ])
+  const draft = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [{ kind: 'graph.node.create', nodeId: 'github', node }])
   const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, 'open-flow-engine/v5', null, 'publish-github')
   expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('pending')
   await service.tickIntegration()

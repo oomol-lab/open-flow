@@ -17,7 +17,7 @@ import { revisionView } from '../src/workbench/browser/runtime/revisionView.ts'
 import { advanceWaiting, waitHost } from './waitHost.ts'
 
 const engine = findEngineContract(currentEngineContract)!
-const target = { kind: 'flow' } as const
+
 const reference = (field?: string): NodeSource => ({ kind: 'node', nodeId: 'data', output: 'payload', ...(field === undefined ? {} : { field }) })
 const outputSchema = {
   type: 'object',
@@ -135,7 +135,7 @@ describe('Source object fields', () => {
       { field: 'count', check: { kind: 'schema' } },
     ])
     expect(checkInputSource(document.graph, 'sink', 'value', reference('removed'))).toEqual({ kind: 'field-missing' })
-    expect(view(content).sourceType(target, reference('name'))).toBe('string')
+    expect(view(content).sourceType(reference('name'))).toBe('string')
     expect((await validateFlow(fixture({ name: 'Ada' }, outputSchema, 'removed'), engine)).diagnostics).toContainEqual(
       expect.objectContaining({ code: 'graph.source-missing', values: expect.objectContaining({ variant: 'field', field: 'removed' }) }),
     )
@@ -146,7 +146,6 @@ describe('Source object fields', () => {
     const operations = decodeChangeOperations([
       {
         kind: 'graph.node.input.set',
-        target,
         nodeId: 'sink',
         handle: 'value',
         before: { kind: 'sources', sources: [reference('name')] },
@@ -162,9 +161,9 @@ describe('Source object fields', () => {
     expect(encodeRevision(decodeRevision(encodeRevision(changed)))).toEqual(encodeRevision(changed))
     expect(await digestBytes(encodeRevision(changed))).not.toEqual(await digestBytes(encodeRevision(original)))
     expect(applyFlowChanges(changed, inverseFlowChanges(original, operations))).toEqual(original)
-    const clipboard = copyNodes(view(changed), target, ['data', 'sink'])
+    const clipboard = copyNodes(view(changed), ['data', 'sink'])
     let id = 0
-    const pasted = pasteNodes(view(changed), target, clipboard, () => `copy${++id}`)
+    const pasted = pasteNodes(view(changed), clipboard, () => `copy${++id}`)
     const copied = applyFlowChanges(changed, pasted.changes)
     const sink = copied.document.graph.nodes[pasted.nodeIds[pasted.sourceIds.indexOf('sink')]!]!
     expect('inputs' in sink && sink.inputs.value).toEqual({

@@ -185,7 +185,6 @@ it('logs the cause of an invalid Draft structure without copying the request bod
           kind: 'graph.node.create',
           node: { bodyFields: 'request-body-secret', kind: 'webhook', name: 'Webhook' },
           nodeId: 'webhook',
-          target: { kind: 'flow' },
         },
       ],
       version: 1,

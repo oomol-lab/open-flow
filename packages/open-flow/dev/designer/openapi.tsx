@@ -255,7 +255,7 @@ function OpenApiPanel({
   disabled: boolean
 }) {
   const revision = useVal(session.store.$.revision)
-  const selection = revision?.node({ kind: 'flow' }, 'api')
+  const selection = revision?.node('api')
   return (
     <I18nProvider i18n={session.i18n}>
       <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ height: '100%', width: '100%' }}>
@@ -269,7 +269,7 @@ function OpenApiPanel({
               revision={revision}
               selection={selection}
               store={session.store}
-              target={{ kind: 'flow' }}
+
               theme={dark ? 'dark' : 'light'}
             />
           </InspectorSamplePanel>

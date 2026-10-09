@@ -217,9 +217,8 @@ const node = z.union([
     definition: z.object({ ...definition, type: z.literal('integration'), endpoint }),
   }),
 ])
-const target = z.object({ kind: z.literal('flow') })
 const edge = z.object({ source: text, target: text, sourceHandle: text.optional() })
-const at = { nodeId: text, target }
+const at = { nodeId: text, target: z.never().optional() }
 const graph = z.object({ nodes: z.record(text, node), edges: z.array(edge).default([]) })
 const binding = z.object({ kind: z.literal('variable'), target: text })
 const module = z.object({ name: text, imports: strings, source: text })
@@ -465,8 +464,8 @@ const shapes = {
   'binding.create': { bindingId: text, binding },
   'binding.delete': { bindingId: text },
   'binding.target.set': { bindingId: text, before: text, value: text },
-  'graph.edge.connect': { target, edge },
-  'graph.edge.disconnect': { target, edge },
+  'graph.edge.connect': { edge, target: z.never().optional() },
+  'graph.edge.disconnect': { edge, target: z.never().optional() },
   'graph.node.create': { ...at, node },
   'graph.node.delete': at,
   'graph.node.field.set': z.union([
@@ -503,10 +502,10 @@ const shapes = {
   'graph.node.additional-inputs.set': { ...at, before: z.array(input).optional(), value: z.array(input).optional() },
   'graph.node.condition.set': { ...at, before: z.object(condition), value: z.object(condition) },
   'graph.node.values.set': { ...at, before: z.array(input), value: z.array(input) },
-  'graph.node.resolution.set': { ...at, target: z.object({ kind: z.literal('flow') }), before: z.object(wait), value: z.object(wait) },
+  'graph.node.resolution.set': { ...at, before: z.object(wait), value: z.object(wait) },
   'graph.node.webhook.set': {
     ...at,
-    target: z.object({ kind: z.literal('flow') }),
+
     before: z.object(webhook),
     value: z.object(webhook),
   },

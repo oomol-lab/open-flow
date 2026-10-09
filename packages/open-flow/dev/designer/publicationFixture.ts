@@ -69,12 +69,8 @@ export function publicationFixture(flowId: string, revisionId: string): { draft:
       },
     },
   }
-  const positions = setNodePositions(
-    {},
-    { kind: 'flow' },
-    { start: { x: 30, y: 20 }, customer: { x: 30, y: 210 }, prepare: { x: 470, y: 40 }, review: { x: 470, y: 370 } },
-  )
-  const value = setComment(positions, { kind: 'flow' }, 'note', {
+  const positions = setNodePositions({}, { start: { x: 30, y: 20 }, customer: { x: 30, y: 210 }, prepare: { x: 470, y: 40 }, review: { x: 470, y: 370 } })
+  const value = setComment(positions, 'note', {
     title: 'Release notes',
     content: 'Published onboarding flow.\n\nInspect configuration or drag nodes temporarily.',
     position: { x: 30, y: 510 },

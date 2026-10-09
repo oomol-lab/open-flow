@@ -101,11 +101,11 @@ function createSession(language: UiLanguage, log: LogAction) {
   let content: RevisionContent = applyFlowChanges(
     { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] } } },
     [
-      ...createAgentTask({ kind: 'flow' }, { nodeId: 'agent' }, 'Research agent', {
+      ...createAgentTask({ nodeId: 'agent' }, 'Research agent', {
         prompt: i18n.t('agent.defaultPrompt', { input: '{{request}}' }),
         outputDescription: i18n.t('agent.defaultOutputDescription'),
       }),
-      ...createCodeTask({ kind: 'flow' }, { nodeId: 'code', moduleId: 'code-module' }, 'Code'),
+      ...createCodeTask({ nodeId: 'code', moduleId: 'code-module' }, 'Code'),
     ],
   )
   const agentTask = (content.document.graph.nodes.agent as TaskNode).task
@@ -293,7 +293,7 @@ function AgentSession({ session, dark, code }: { session: ReturnType<typeof crea
   const agent = draft?.content.document.graph.nodes.agent
   const task = agent?.kind == 'task' ? agent.task : undefined
   const revision = useVal(session.workspace.$.revision)
-  const selection = revision?.node({ kind: 'flow' }, code ? 'code' : 'agent')
+  const selection = revision?.node(code ? 'code' : 'agent')
   const setPrompt = (prompt: string) => {
     if (task == null || !('executor' in task) || task.executor.kind != 'agent') return
     void session.workspace.saveTaskSettings('agent', {
@@ -360,7 +360,7 @@ function AgentSession({ session, dark, code }: { session: ReturnType<typeof crea
               selection={selection}
               store={session.workspace}
               theme={dark ? 'dark' : 'light'}
-              target={{ kind: 'flow' }}
+
               triggerAuthorizationPending={false}
               triggerConnectionLoading={false}
               triggers={session.triggers}

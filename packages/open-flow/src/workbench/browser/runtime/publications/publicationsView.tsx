@@ -53,7 +53,7 @@ export function PublicationsView({
   const language = useLang()
   const t = useTranslate()
   const busy = useVal(store.$.busy)
-  const flow = useVal(store.workspace.$.targetFlow)
+  const flow = useVal(store.workspace.$.flow)
   const live = useVal(store.publications.$.live)
   const loadFailed = useVal(store.publications.$.loadFailed)
   const loadingPublications = useVal(store.publications.$.loading)

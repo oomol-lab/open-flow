@@ -113,14 +113,12 @@ describe('OpenAPI fixed operations', () => {
       modules: {},
     }
     const next = openApiTask({ ...config(), serverUrl: 'https://other.example' })
-    const operation = { kind: 'graph.node.task.set' as const, target: { kind: 'flow' as const }, nodeId: 'node', before: task, value: next }
+    const operation = { kind: 'graph.node.task.set' as const, nodeId: 'node', before: task, value: next }
     const updated = applyFlowChanges(content, [operation])
     expect((decodeRevisionContent(updated).document.graph.nodes['node'] as TaskNode).task as ManagedTaskDefinition).toEqual(next)
     expect(() => applyFlowChanges(updated, [operation])).toThrow('changed')
     expect(() =>
-      applyFlowChanges(content, [
-        { kind: 'graph.node.input.set', target: { kind: 'flow' }, nodeId: 'node', handle: 'auth.manual.token', value: { kind: 'value', value: 'secret' } },
-      ]),
+      applyFlowChanges(content, [{ kind: 'graph.node.input.set', nodeId: 'node', handle: 'auth.manual.token', value: { kind: 'value', value: 'secret' } }]),
     ).toThrow()
   })
 })

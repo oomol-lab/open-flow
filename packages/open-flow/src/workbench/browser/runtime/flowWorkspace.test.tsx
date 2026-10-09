@@ -145,7 +145,6 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
         selectedNodeIds: value(selectedNodeIds),
         selection: value(undefined),
         status: value('saved'),
-        target: value({ kind: 'flow' }),
         targetName: value('Flow'),
         workspaceLoadFailed: value(false),
         workspaceLoadProblem: value(undefined),

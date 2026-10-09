@@ -24,7 +24,7 @@ it('keeps queued deletions distinct from additions and associates undo feedback 
       if (!feedback.length) await firstWrite
       if (before.kind !== 'decision' || value.kind !== 'decision') throw new Error('Expected Decision')
       const task = decisionTask(value.questions)
-      const operations = updateTask(revisionView(current), { kind: 'flow' }, 'decision', {
+      const operations = updateTask(revisionView(current), 'decision', {
         kind: 'decision',
         name: task.name,
         before: decisionTask(before.questions),
@@ -139,7 +139,7 @@ function draft(): Draft {
 it('renames answer references in Condition and restores the entire edit with undo', () => {
   const before = draft()
   const task = decisionTask([{ name: 'needs_support', type: 'noul', instructions: 'Needs support?' }])
-  const operations = updateTask(revisionView(before), { kind: 'flow' }, 'decision', {
+  const operations = updateTask(revisionView(before), 'decision', {
     kind: 'decision',
     name: task.name,
     before: ((before.content.document.graph.nodes['decision'] as TaskNode).task as ManagedTaskDefinition)!,
@@ -156,7 +156,7 @@ it('preserves missing references after deletion and copies node-owned configurat
   const task = decisionTask([])
   const removed = applyFlowChanges(
     before,
-    updateTask(revisionView(before), { kind: 'flow' }, 'decision', {
+    updateTask(revisionView(before), 'decision', {
       kind: 'decision',
       name: task.name,
       before: ((before.content.document.graph.nodes['decision'] as TaskNode).task as ManagedTaskDefinition)!,
@@ -166,7 +166,7 @@ it('preserves missing references after deletion and copies node-owned configurat
   expect(removed.content.document.graph.nodes.route).toMatchObject({ cases: [{ groups: [{ expressions: [{ left: { source: { output: 'result' } } }] }] }] })
   const view = revisionView(before)
   let sequence = 0
-  const pasted = pasteNodes(view, { kind: 'flow' }, copyNodes(view, { kind: 'flow' }, ['decision', 'route']), () => `copy-${++sequence}`)
+  const pasted = pasteNodes(view, copyNodes(view, ['decision', 'route']), () => `copy-${++sequence}`)
   const after = applyFlowChanges(before, pasted.changes)
   expect(
     Object.values(after.content.document.graph.nodes).filter(
@@ -184,7 +184,7 @@ it('renames only the edited node and preserves copied configurations and referen
   const initial = draft()
   const view = revisionView(initial)
   let sequence = 0
-  const pasted = pasteNodes(view, { kind: 'flow' }, copyNodes(view, { kind: 'flow' }, ['decision', 'route']), () => `copy-${++sequence}`)
+  const pasted = pasteNodes(view, copyNodes(view, ['decision', 'route']), () => `copy-${++sequence}`)
   const copied = applyFlowChanges(initial, pasted.changes)
   const before: Draft = {
     ...copied,
@@ -196,7 +196,7 @@ it('renames only the edited node and preserves copied configurations and referen
     },
   }
   const task = decisionTask([{ name: 'support', type: 'noul', instructions: 'Needs support?' }])
-  const operations = updateTask(revisionView(before), { kind: 'flow' }, 'decision', {
+  const operations = updateTask(revisionView(before), 'decision', {
     kind: 'decision',
     name: task.name,
     before: ((before.content.document.graph.nodes['decision'] as TaskNode).task as ManagedTaskDefinition)!,

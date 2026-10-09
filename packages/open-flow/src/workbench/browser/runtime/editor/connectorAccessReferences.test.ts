@@ -64,7 +64,6 @@ it('matches explicit account IDs across nodes and triggers without inferring dyn
   expect(result.hasCode).toBe(true)
   expect(result.accounts.filter((item) => item.connectionId == 'work').map((item) => item.name)).toEqual(['Send receipt', 'Send mail', 'New mail'])
   expect(result.accounts.filter((item) => item.connectionId == null).map((item) => item.nodeId)).toEqual(['pending'])
-  expect(result.accounts.at(-1)?.target).toEqual({ kind: 'flow' })
   expect(result.accounts.some((item) => item.nodeId == 'code' || item.connectionId == 'other')).toBe(false)
 })
 

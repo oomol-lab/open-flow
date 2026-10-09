@@ -100,12 +100,11 @@ describe('AI Decision contracts', () => {
     expect(decisionTaskIssues({ ...task, outputs: [] })).toContainEqual({ field: 'ports', message: 'AI Decision ports must match its questions.' })
   })
   it('round-trips revisions and supports undo/redo of question edits', () => {
-    const created = applyFlowChanges(empty, createDecisionTask({ kind: 'flow' }, { nodeId: 'decision' }, 'AI Decision', questions))
+    const created = applyFlowChanges(empty, createDecisionTask({ nodeId: 'decision' }, 'AI Decision', questions))
     expect(decodeRevision(encodeRevision(created))).toEqual(created)
     const operations = [
       {
         kind: 'graph.node.task.set' as const,
-        target: { kind: 'flow' as const },
         nodeId: 'decision',
         before: ((created.document.graph.nodes['decision'] as TaskNode).task as ManagedTaskDefinition)!,
         value: decisionTask(questions.slice(0, 1)),
@@ -213,7 +212,6 @@ describe('AI Decision collection limits', () => {
     const operations = [
       {
         kind: 'graph.node.task.set' as const,
-        target: { kind: 'flow' as const },
         nodeId: 'decision',
         before: ((decoded.document.graph.nodes['decision'] as TaskNode).task as ManagedTaskDefinition)!,
         value: decisionTask([questions[0]!]),

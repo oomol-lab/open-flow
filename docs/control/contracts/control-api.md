@@ -135,8 +135,7 @@ interface DraftSync {
 }
 ```
 
-`RevisionContent`、顶层 `FlowDocument` 和 `ChangeOperation` 由 `@oomol-lab/open-flow/flow-change` 定义。顶层 graph target 固定为
-`{ kind: 'flow' }`。不存在嵌套 Flow map 或 Flow create/delete operation。
+`RevisionContent`、顶层 `FlowDocument` 和 `ChangeOperation` 由 `@oomol-lab/open-flow/flow-change` 定义。图操作直接作用于当前 Flow 的 graph，不接受 graph target。不存在嵌套 Flow map 或 Flow create/delete operation。
 
 Revision 在 API 上是完整 immutable snapshot；Server 可以增量存储草稿正文，读取时还原为完整内容并校验 digest。Draft Run 和 Publish operation 准入时固定完整正文。Draft change 使用 `expectedRevisionId` 做 CAS；stale head 返回 `flow.revision-conflict`。每个 change batch
 要求 `Idempotency-Key`；相同 key 与相同 batch 返回第一次提交的 Revision，相同 key 与不同 batch 返回 `flow.conflict`。幂等重放先于 Draft head CAS。
@@ -995,7 +994,6 @@ Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 只保�
 ```ts
 {
   kind: 'graph.node.task.capabilities.set',
-  target: { kind: 'flow' },
   nodeId: 'code-node',
   before: previousCapabilities, // 原声明不存在时省略。
   value: nextCapabilities, // 省略时删除整个 capabilities 属性。
@@ -1003,7 +1001,7 @@ Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 只保�
 ```
 
 operation 检查目标是 inline Code Task，并精确比较 `before`，沿既有 expected Revision 和 change identity 提交。
-公开 `setCodeActions(content, target, nodeId, capabilities)` 生成该 operation；`createCodeTask` 的端口配置参数也接受 `capabilities`。
+公开 `setCodeActions(content, nodeId, capabilities)` 生成该 operation；`createCodeTask` 的端口配置参数也接受 `capabilities`。
 CLI 的 `flow apply` JSON 中，`kind: "code"` 节点直接接受同一 `capabilities` 数组，无需独立命令或另一套配置格式。
 普通源码、端口修改和复制保留声明。
 
@@ -1139,7 +1137,7 @@ Action 与 Connection 固定在 Revision；无需认证的 Action 可以省略 `
 待审批的完整调用以 JSON 展示在 `RunDetails.waits[].prompt`，包含 `callId`、`toolId`、Action、可选 Connection 和完整 `input`。
 通知消息追加原等待的到期时间和决议链接。
 
-修改 Agent 使用 change operation `{ kind: "graph.node.task.set", target, nodeId, before, value }`。
+修改 Agent 使用 change operation `{ kind: "graph.node.task.set", nodeId, before, value }`。
 `before` 与 `value` 是完整 Managed Task；前者必须与当前定义相等，后者提交该节点的新执行配置。
 语义无效配置可保存在 Draft，但 Run 与 Publish 必须通过 validation。
 
@@ -1276,7 +1274,7 @@ references remain available for manual removal.
 
 Managed Task 新增 `executor.kind: "openapi"`，包含 `sourceUrl`、`method`（小写）、`path`、`serverUrl`、`document`（所选接口与引用依赖快照）、`auth`。
 鉴权项为 `{ id, type: "bearer" | "basic" | "apiKey", name?, in?: "header" | "query" }`。
-`graph.node.task.set` 原子提交 `target`、`nodeId`、完整 `before` 与 `value` Task，支持草稿并发检查和撤销。未选择接口的空 Task 可保存，不能运行。
+`graph.node.task.set` 原子提交 `nodeId`、完整 `before` 与 `value` Task，支持草稿并发检查和撤销。未选择接口的空 Task 可保存，不能运行。
 参数输入标识为 `path.<name>`、`query.<name>`、`header.<name>`，JSON 请求体为 `body`；鉴权使用 `auth.<id>.token` 或 Basic 的 `username`、`password`。
 鉴权输入禁止固定值和 Flow input Source；可清空，运行时必须具有有效部署变量或上游输出。
 输出为 `body`、`statusCode`、`headers`，`node.started.nodeKind` 新增 `openapi`，启动事件不包含鉴权输入。

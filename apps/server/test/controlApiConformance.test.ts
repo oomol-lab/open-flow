@@ -403,7 +403,7 @@ it('Server stored tool result Control API conformance', async () => {
     const api = new ControlClient((route, init) => harness.request(new Request(new URL(route, harness.origin), init)))
     const flow = await api.createFlow('Stored results', 'stored-results')
     const changed = await api.changeDraft(flow.flowId, flow.draftRevisionId, [
-      { kind: 'graph.node.create', nodeId: 'start', target: { kind: 'flow' }, node: { kind: 'manual', name: 'Start' } },
+      { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
     ])
     const run = await api.createDraftRun(flow.flowId, changed.revision.revisionId, { trigger: { nodeId: 'start', outputs: {} }, idempotencyKey: 'results-run' })
     const other = await api.createDraftRun(flow.flowId, changed.revision.revisionId, {
@@ -460,7 +460,7 @@ it('Server unreadable Draft repair conformance', async () => {
     const api = new ControlClient((route, init) => harness.request(new Request(new URL(route, harness.origin), init)))
     const flow = await api.createFlow('Unreadable Draft', 'unreadable-draft')
     const changed = await api.changeDraft(flow.flowId, flow.draftRevisionId, [
-      { kind: 'graph.node.create', nodeId: 'start', target: { kind: 'flow' }, node: { kind: 'manual', name: 'Start' } },
+      { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
     ])
     const draft = await api.getDraft(flow.flowId)
     const stored = {
@@ -587,7 +587,6 @@ it('removes Draft node and Code usage together, detects conflicts and preserves 
     const changed = await api.changeDraft(flow.flowId, flow.draftRevisionId, [
       {
         kind: 'graph.node.create',
-        target: { kind: 'flow' },
         nodeId: 'send',
         node: {
           kind: 'task',

@@ -60,7 +60,7 @@ function EditableAgentSettingsProvider({
     () =>
       new TaskExecutorChanges(task.executor, async (before, value) => {
         if (store.$.flowId.value != flowId) return false
-        const current = store.$.revision.value?.node({ kind: 'flow' }, nodeId)
+        const current = store.$.revision.value?.node(nodeId)
         const definition = current?.kind == 'task' ? current.definition : undefined
         if (definition == null || !('executor' in definition) || !dequal(definition.executor, before)) return false
         const decoded = decodeRevisionContent({

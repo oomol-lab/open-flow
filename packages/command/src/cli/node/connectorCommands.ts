@@ -122,7 +122,6 @@ export async function connectorCommand(
       const nodeId = authoringId(args, 'node')
 
       const operations = createManagedTask(
-        selected.target,
         { nodeId },
         {
           executor: { action: action.actionId, ...(connection == null ? {} : { connectionId: connection.connectionId }), kind: 'connector' },
@@ -203,7 +202,7 @@ export async function connectorCommand(
       }
       const operations = [
         ...(connectionChanged ? setConnectorConnection(selected.draft.content, resolved.nodeId, connectionId!)! : []),
-        ...(inputChanged ? setInputValues(selected.draft.content, selected.target, resolved.nodeId, values)! : []),
+        ...(inputChanged ? setInputValues(selected.draft.content, resolved.nodeId, values)! : []),
       ]
       const target = { flowId: selected.flow.flowId, kind: 'connector', nodeId: resolved.nodeId }
       const changed = await changeDraft(client, args, requiredFlowId(flow), selected.draft.revisionId, target, operations)
@@ -293,21 +292,21 @@ export async function triggerCommand(
           throw new CliError('trigger.config-invalid', 'Manual trigger creation only accepts --name.')
         name = args.name?.trim() ?? 'Manual trigger'
         kind = 'manual'
-        operations = createBuiltinTrigger(selected.target, triggerId, { kind, name })
+        operations = createBuiltinTrigger(triggerId, { kind, name })
       } else if (second == 'webhook') {
         if (args.connection != null || configuredSchedule != null || Object.keys(values).length > 0) {
           throw new CliError('trigger.config-invalid', 'Webhook creation only accepts --name; configure request and response fields in Workbench.')
         }
         name = args.name?.trim() ?? 'Webhook'
         kind = 'webhook'
-        operations = createBuiltinTrigger(selected.target, triggerId, { bodyFields: [], kind, method: 'POST', name })
+        operations = createBuiltinTrigger(triggerId, { bodyFields: [], kind, method: 'POST', name })
       } else if (second == 'cron') {
         if (args.connection != null || Object.keys(values).length > 0) {
           throw new CliError('trigger.config-invalid', 'Cron creation does not accept --connection or --set.')
         }
         name = args.name?.trim() ?? 'Scheduled Trigger'
         kind = 'cron'
-        operations = createBuiltinTrigger(selected.target, triggerId, {
+        operations = createBuiltinTrigger(triggerId, {
           cronTimes: configuredSchedule ?? [{ type: 'every', unit: 'hour', value: 1 }],
           kind,
           name,
@@ -381,14 +380,14 @@ export async function triggerCommand(
         let changedTrigger
         switch (resolved.trigger.kind) {
           case 'manual':
-            changedTrigger = updateTrigger(selected.draft.content, selected.target, resolved.triggerId, {
+            changedTrigger = updateTrigger(selected.draft.content, resolved.triggerId, {
               ...(description == null ? {} : { description }),
               kind: 'manual',
               name,
             })
             break
           case 'webhook':
-            changedTrigger = updateTrigger(selected.draft.content, selected.target, resolved.triggerId, {
+            changedTrigger = updateTrigger(selected.draft.content, resolved.triggerId, {
               ...(description == null ? {} : { description }),
               bodyFields: resolved.trigger.bodyFields,
               kind: 'webhook',
@@ -398,7 +397,7 @@ export async function triggerCommand(
             })
             break
           case 'cron':
-            changedTrigger = updateTrigger(selected.draft.content, selected.target, resolved.triggerId, {
+            changedTrigger = updateTrigger(selected.draft.content, resolved.triggerId, {
               ...(description == null ? {} : { description }),
               kind: 'cron',
               name,
@@ -410,7 +409,7 @@ export async function triggerCommand(
             for (const [field, value] of Object.entries(values)) {
               config[field] = fixedInputValue(value)
             }
-            changedTrigger = updateTrigger(selected.draft.content, selected.target, resolved.triggerId, {
+            changedTrigger = updateTrigger(selected.draft.content, resolved.triggerId, {
               ...(description == null ? {} : { description }),
               config,
               kind: 'poll',
@@ -424,7 +423,7 @@ export async function triggerCommand(
             for (const [field, value] of Object.entries(values)) {
               config[field] = fixedInputValue(value)
             }
-            changedTrigger = updateTrigger(selected.draft.content, selected.target, resolved.triggerId, {
+            changedTrigger = updateTrigger(selected.draft.content, resolved.triggerId, {
               ...(description == null ? {} : { description }),
               config,
               kind: 'integration',
@@ -438,7 +437,7 @@ export async function triggerCommand(
       if (args.connection != null && (resolved.trigger.kind == 'poll' || resolved.trigger.kind == 'integration')) {
         const connection = await preferredConnection(client, resolved.trigger.definition.provider, args.connection, undefined, true, flow?.flowId)
         if (resolved.trigger.connectionId != connection!.connectionId)
-          operations.push(...setTriggerConnection(selected.draft.content, selected.target, resolved.triggerId, connection!.connectionId)!)
+          operations.push(...setTriggerConnection(selected.draft.content, resolved.triggerId, connection!.connectionId)!)
       }
       if (operations.length == 0) {
         write(
@@ -490,7 +489,7 @@ export async function triggerCommand(
         requiredFlowId(flow),
         selected.draft.revisionId,
         target,
-        deleteNodes(selected.draft.content, selected.target, [resolved.triggerId]),
+        deleteNodes(selected.draft.content, [resolved.triggerId]),
       )
       write(
         runtime,

@@ -1,4 +1,4 @@
-import type { CodeModule, GraphTarget } from '../../../../flow/common/change.ts'
+import type { CodeModule } from '../../../../flow/common/change.ts'
 import type { CanvasPresentationChange } from '../canvasPresentation.ts'
 import type { FlowChanges } from '../editor/flowChanges.ts'
 
@@ -8,7 +8,7 @@ export type CanvasAction = 'add' | 'delete' | 'paste' | 'connect' | 'disconnect'
 export interface CanvasHistoryEntry {
   readonly action: CanvasAction
   readonly count: number
-  readonly target: GraphTarget
+
   readonly forward: FlowChanges
   readonly inverse: FlowChanges
   readonly presentation: CanvasPresentationChange

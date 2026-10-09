@@ -56,6 +56,6 @@ export function resolveDraftOperations(operations: readonly DraftOperation[], de
     if (operation.kind != 'graph.trigger.create') return [operation]
     const snapshot = definition(operation.key)
     if (snapshot.type != 'poll' && operation.schedule != null) throw new Error('Only Poll triggers accept a schedule.')
-    return createProviderTrigger({ kind: 'flow' }, operation.nodeId, snapshot, operation)
+    return createProviderTrigger(operation.nodeId, snapshot, operation)
   })
 }

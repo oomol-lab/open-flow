@@ -202,7 +202,7 @@ it('rejects another owner’s run, publication and error subscription through RE
   const headers = await f.login(account.user.email, account.password)
   const flow = await f.flow(headers)
   const changed = await f.service.control.changeDraft(account.user.userId, flow.flowId, flow.draftRevisionId, [
-    { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
+    { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
   ])
   const revisionId = changed.revision.revisionId
   const operation = await f.service.control.publishFlow(account.user.userId, flow.flowId, revisionId, currentEngineContract, null, 'publish')
@@ -236,7 +236,7 @@ it('rejects another owner’s run, publication and error subscription through RE
   const target = await f.flow(administrator)
   await expect(
     f.service.control.changeDraft('operator', target.flowId, target.draftRevisionId, [
-      { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'error', node: { kind: 'error', name: 'Errors', sourceFlowIds: [flow.flowId] } },
+      { kind: 'graph.node.create', nodeId: 'error', node: { kind: 'error', name: 'Errors', sourceFlowIds: [flow.flowId] } },
     ]),
   ).rejects.toMatchObject({ code: 'flow.invalid' })
   const mcp = await f.mcp('run_get', { runId }, administrator)
@@ -290,7 +290,7 @@ it('lets ordinary users execute workflows with the administrator’s configured 
     const changed = await f.service.control.changeDraft(account.user.userId, flow.flowId, flow.draftRevisionId, [
       ...authoringExample('manual').operations,
       ...authoringExample('llm-chat').operations,
-      { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'start', target: 'llm' } },
+      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'llm' } },
     ])
     await startService(f.service)
     const accepted = await f.request(

@@ -20,7 +20,7 @@ const samples = {
   renameFlow: { name: 'Flow', version: 1 },
   changeDraft: {
     expectedRevisionId: 'r1',
-    operations: [{ kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'start', node: { kind: 'manual', name: 'Start' } }],
+    operations: [{ kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } }],
     version: 1,
   },
   repairDraft: { expectedRevisionId: 'r1', version: 1 },

@@ -507,7 +507,7 @@ export class ConnectorStore {
     const authorization = this.#authorization?.serviceId == serviceId ? this.#authorization : undefined
     const created = authorization == null ? [] : catalog.active.filter((connection) => !authorization.connectionIds.has(connection.connectionId))
     const connection = created.length == 1 ? created[0] : catalog.preferred
-    const selected = this.#workspace.$.revision.value?.node({ kind: 'flow' }, target.nodeId)
+    const selected = this.#workspace.$.revision.value?.node(target.nodeId)
     const task = selected?.kind == 'task' ? selected.definition : undefined
     if (
       connection != null &&
@@ -540,7 +540,7 @@ export class ConnectorStore {
     const flowId = this.#workspace.$.flowId.value
     const revision = this.#workspace.$.revision.value
     if (flowId == null || revision == null) return
-    if (Object.values(revision.graph({ kind: 'flow' })?.nodes ?? {}).some((node) => node.kind == 'integration' || node.kind == 'poll')) {
+    if (Object.values(revision.graph()?.nodes ?? {}).some((node) => node.kind == 'integration' || node.kind == 'poll')) {
       this.data.providers.get(flowId, this.#language)
     }
     const missing = [...revision.connectorActionIds].filter((actionId) => this.$.actions.value[actionId] == null && !this.#loadingActions.has(actionId))

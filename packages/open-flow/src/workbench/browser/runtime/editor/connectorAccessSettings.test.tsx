@@ -120,7 +120,7 @@ describe('Connector access settings', () => {
           revision: val({
             node: () => undefined,
             connectorReferences: {
-              accounts: [{ connectionId: 'account', providerId: 'mail', nodeId: 'send', name: 'Send mail', target: { kind: 'flow' } }],
+              accounts: [{ connectionId: 'account', providerId: 'mail', nodeId: 'send', name: 'Send mail' }],
               hasCode: true,
             },
           }),
@@ -163,7 +163,7 @@ describe('Connector access settings', () => {
           live: val(undefined),
           revision: val({
             node: () => undefined,
-            connectorReferences: { accounts: [{ providerId: 'mail', nodeId: 'send', name: 'Send mail', kind: 'connector', target: { kind: 'flow' } }] },
+            connectorReferences: { accounts: [{ providerId: 'mail', nodeId: 'send', name: 'Send mail', kind: 'connector' }] },
           }),
         },
         catalogs: {

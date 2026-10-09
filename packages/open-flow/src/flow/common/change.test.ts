@@ -11,10 +11,9 @@ import { imports as moduleImports, replaceSource } from './moduleChanges.ts'
 import { createCodeTask, repairNodeNames } from './nodeChanges.ts'
 
 const port = { jsonSchema: {}, nullable: false } as const
-const target = { kind: 'flow' } as const
 
 it('distinguishes clearing a Trigger account from an empty account ID at the change boundary', () => {
-  const operation = { kind: 'graph.node.field.set', target, nodeId: 'trigger', field: 'connectionId', before: 'work' }
+  const operation = { kind: 'graph.node.field.set', nodeId: 'trigger', field: 'connectionId', before: 'work' }
   expect(decodeChangeOperations([operation])).toEqual([operation])
   expect(() => decodeChangeOperations([{ ...operation, value: '' }])).toThrow()
 })
@@ -45,7 +44,7 @@ function taskNode(): GraphNode {
 
 describe('Flow changes', () => {
   it('preserves incomplete code in a Draft without requiring valid syntax', async () => {
-    const content = applyFlowChanges(revision(), createCodeTask(target, { moduleId: 'module', nodeId: 'task' }, 'Task'))
+    const content = applyFlowChanges(revision(), createCodeTask({ moduleId: 'module', nodeId: 'task' }, 'Task'))
     const module = content.modules.module
     assert(module != null)
     const source = 'export default async function ('
@@ -91,17 +90,17 @@ describe('Flow changes', () => {
 
   it('rejects a duplicate or empty Node name edit', () => {
     const source = applyFlowChanges(revision(), [
-      { kind: 'graph.node.create', node: { inputs: {}, kind: 'value', name: 'First', values: [] }, nodeId: 'first', target },
-      { kind: 'graph.node.create', node: { inputs: {}, kind: 'value', name: 'Second', values: [] }, nodeId: 'second', target },
+      { kind: 'graph.node.create', node: { inputs: {}, kind: 'value', name: 'First', values: [] }, nodeId: 'first' },
+      { kind: 'graph.node.create', node: { inputs: {}, kind: 'value', name: 'Second', values: [] }, nodeId: 'second' },
     ])
 
-    expect(() =>
-      applyFlowChanges(source, [{ before: 'Second', field: 'name', kind: 'graph.node.field.set', nodeId: 'second', target, value: ' First ' }]),
-    ).toThrow(/name already exists/)
-    expect(() => applyFlowChanges(source, [{ before: 'Second', field: 'name', kind: 'graph.node.field.set', nodeId: 'second', target, value: '  ' }])).toThrow(
+    expect(() => applyFlowChanges(source, [{ before: 'Second', field: 'name', kind: 'graph.node.field.set', nodeId: 'second', value: ' First ' }])).toThrow(
+      /name already exists/,
+    )
+    expect(() => applyFlowChanges(source, [{ before: 'Second', field: 'name', kind: 'graph.node.field.set', nodeId: 'second', value: '  ' }])).toThrow(
       /cannot be empty/,
     )
-    expect(() => applyFlowChanges(source, [{ kind: 'graph.node.create', node: { inputs: {}, kind: 'value', values: [] }, nodeId: 'missing', target }])).toThrow(
+    expect(() => applyFlowChanges(source, [{ kind: 'graph.node.create', node: { inputs: {}, kind: 'value', values: [] }, nodeId: 'missing' }])).toThrow(
       /cannot be empty/,
     )
   })
@@ -111,7 +110,7 @@ describe('Flow changes', () => {
   })
 
   it('creates code tasks with clean JavaScript source', () => {
-    const changed = applyFlowChanges(revision(), createCodeTask(target, { moduleId: 'module', nodeId: 'task' }, 'Code'))
+    const changed = applyFlowChanges(revision(), createCodeTask({ moduleId: 'module', nodeId: 'task' }, 'Code'))
     const source = changed.modules.module?.source
 
     expect(source).toBe('export default async function (inputs, context) {\n  return { result: inputs.value }\n}\n')
@@ -136,12 +135,11 @@ describe('Flow changes', () => {
         source: 'export default () => 2',
       },
       { before: 'Module', kind: 'module.rename', moduleId: 'module', name: 'Renamed module' },
-      { kind: 'graph.node.create', nodeId: 'managed', target: { kind: 'flow' }, node: { kind: 'task', name: 'Managed', task, inputs: {} } },
+      { kind: 'graph.node.create', nodeId: 'managed', node: { kind: 'task', name: 'Managed', task, inputs: {} } },
       {
         before: task,
         kind: 'graph.node.task.set',
         nodeId: 'managed',
-        target: { kind: 'flow' },
         value: { ...task, name: 'Replaced', executor: { kind: 'llm', mode: 'json' } },
       },
     ]
@@ -158,25 +156,23 @@ describe('Flow changes', () => {
     const removed = applyFlowChanges(changed, [
       { bindingId: 'binding', kind: 'binding.delete' },
       { kind: 'module.delete', moduleId: 'module' },
-      { kind: 'graph.node.delete', nodeId: 'managed', target: { kind: 'flow' } },
+      { kind: 'graph.node.delete', nodeId: 'managed' },
     ])
     expect(removed).toEqual(revision())
   })
 
   it('connects, replaces, disconnects, and deletes graph nodes while preserving their sources', () => {
     const created = applyFlowChanges(revision(), [
-      { kind: 'graph.node.create', node: valueNode(1), nodeId: 'source', target },
-      { kind: 'graph.node.create', node: taskNode(), nodeId: 'target', target },
+      { kind: 'graph.node.create', node: valueNode(1), nodeId: 'source' },
+      { kind: 'graph.node.create', node: taskNode(), nodeId: 'target' },
       {
         edge: { source: 'source', target: 'target' },
         kind: 'graph.edge.connect',
-        target,
       },
       {
         before: [{ ...port, handle: 'value', value: 1 }],
         kind: 'graph.node.values.set',
         nodeId: 'source',
-        target,
         value: [{ ...port, handle: 'value', value: 2 }],
       },
     ])
@@ -188,7 +184,6 @@ describe('Flow changes', () => {
       {
         edge: { source: 'source', target: 'target' },
         kind: 'graph.edge.disconnect',
-        target,
       },
     ])
     expect(disconnected.document.graph.nodes.target).toMatchObject({ inputs: {} })
@@ -197,16 +192,14 @@ describe('Flow changes', () => {
       {
         edge: { source: 'source', target: 'target' },
         kind: 'graph.edge.connect',
-        target,
       },
       {
         handle: 'input',
         kind: 'graph.node.input.set',
         nodeId: 'target',
-        target,
         value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] },
       },
-      { kind: 'graph.node.delete', nodeId: 'source', target },
+      { kind: 'graph.node.delete', nodeId: 'source' },
     ])
     expect(connected.document.graph.edges).toEqual([])
     expect(connected.document.graph.nodes).toEqual({
@@ -238,7 +231,7 @@ describe('Flow changes', () => {
       },
     }
 
-    const changed = applyFlowChanges(content, connect(content, target, { source: 'source', target: 'target' }))
+    const changed = applyFlowChanges(content, connect(content, { source: 'source', target: 'target' }))
 
     expect(changed.document.bindings).toEqual(content.document.bindings)
     expect(changed.document.graph.nodes.target).toMatchObject({
@@ -249,7 +242,7 @@ describe('Flow changes', () => {
   it.each([
     { before: 'OLD', bindingId: 'missing', kind: 'binding.target.set', value: 'TOKEN' },
     { kind: 'module.delete', moduleId: 'missing' },
-    { kind: 'graph.node.delete', nodeId: 'missing', target: { kind: 'flow' } },
+    { kind: 'graph.node.delete', nodeId: 'missing' },
   ] satisfies readonly ChangeOperation[])('rejects invalid operation %#', (operation) => {
     expect(() => applyFlowChanges(revision(), [operation])).toThrow(FlowChangeError)
   })
@@ -266,23 +259,22 @@ describe('Flow changes', () => {
   })
 
   it('describes why a Node cannot be created', () => {
-    const source = applyFlowChanges(revision(), [{ kind: 'graph.node.create', node: valueNode(1), nodeId: 'duplicate', target }])
+    const source = applyFlowChanges(revision(), [{ kind: 'graph.node.create', node: valueNode(1), nodeId: 'duplicate' }])
 
-    expect(() => applyFlowChanges(source, [{ kind: 'graph.node.create', node: valueNode(2), nodeId: 'duplicate', target }])).toThrow(
+    expect(() => applyFlowChanges(source, [{ kind: 'graph.node.create', node: valueNode(2), nodeId: 'duplicate' }])).toThrow(
       'A Node with this ID already exists in the target graph.',
     )
   })
 
   it('applies independent node fields without replacing the node', () => {
-    const source = applyFlowChanges(revision(), [{ kind: 'graph.node.create', node: taskNode(), nodeId: 'task', target }])
+    const source = applyFlowChanges(revision(), [{ kind: 'graph.node.create', node: taskNode(), nodeId: 'task' }])
     const changed = applyFlowChanges(source, [
-      { before: 'Task', field: 'name', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'Renamed' },
+      { before: 'Task', field: 'name', kind: 'graph.node.field.set', nodeId: 'task', value: 'Renamed' },
       {
         before: undefined,
         handle: 'input',
         kind: 'graph.node.input.set',
         nodeId: 'task',
-        target,
         value: { kind: 'value', value: 'hello' },
       },
     ])
@@ -294,24 +286,23 @@ describe('Flow changes', () => {
   })
 
   it('rejects a stale field change atomically', () => {
-    const source = applyFlowChanges(revision(), [{ kind: 'graph.node.create', node: taskNode(), nodeId: 'task', target }])
+    const source = applyFlowChanges(revision(), [{ kind: 'graph.node.create', node: taskNode(), nodeId: 'task' }])
     expect(() =>
       applyFlowChanges(source, [
-        { before: undefined, field: 'description', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'Description' },
-        { before: 'Old', field: 'name', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'Renamed' },
+        { before: undefined, field: 'description', kind: 'graph.node.field.set', nodeId: 'task', value: 'Description' },
+        { before: 'Old', field: 'name', kind: 'graph.node.field.set', nodeId: 'task', value: 'Renamed' },
       ]),
     ).toThrow(FlowChangeError)
     expect(source.document.graph.nodes.task).toEqual(taskNode())
   })
 
   it('sets additional inputs without replacing input mappings', () => {
-    const source = applyFlowChanges(revision(), [{ kind: 'graph.node.create', node: taskNode(), nodeId: 'task', target }])
+    const source = applyFlowChanges(revision(), [{ kind: 'graph.node.create', node: taskNode(), nodeId: 'task' }])
     const changed = applyFlowChanges(source, [
       {
         before: undefined,
         kind: 'graph.node.additional-inputs.set',
         nodeId: 'task',
-        target,
         value: [{ handle: 'payload', jsonSchema: {}, nullable: true }],
       },
       {
@@ -319,7 +310,6 @@ describe('Flow changes', () => {
         handle: 'payload',
         kind: 'graph.node.input.set',
         nodeId: 'task',
-        target,
         value: { kind: 'value', value: null },
       },
     ])
@@ -342,7 +332,6 @@ describe('Flow changes', () => {
           prompt: 'Continue?',
         },
         nodeId: 'wait',
-        target,
       },
     ])
     const changed = applyFlowChanges(source, [
@@ -350,7 +339,6 @@ describe('Flow changes', () => {
         before: { inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }], prompt: 'Continue?' },
         kind: 'graph.node.resolution.set',
         nodeId: 'wait',
-        target,
         value: { inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }], prompt: 'Continue now?' },
       },
     ])
@@ -363,7 +351,6 @@ describe('Flow changes', () => {
           before: { inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }], prompt: 'Continue?' },
           kind: 'graph.node.resolution.set',
           nodeId: 'wait',
-          target,
           value: { inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }], prompt: 'Continue again?' },
         },
       ]),

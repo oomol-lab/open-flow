@@ -189,7 +189,7 @@ export function commandSchema(name = 'apply') {
     properties: { version: { const: 1 }, operations },
     description:
       'An atomic ordered ChangeOperation transaction. IDs are explicit; before values refer to the specified base revision. Reapplying with a new key is a new transaction.',
-    examples: [{ version: 1, operations: [{ kind: 'graph.node.create', nodeId: 'start', target: { kind: 'flow' }, node: { kind: 'manual', name: 'Start' } }] }],
+    examples: [{ version: 1, operations: [{ kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } }] }],
   }
 }
 

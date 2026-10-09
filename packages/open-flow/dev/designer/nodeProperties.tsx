@@ -210,7 +210,7 @@ function PropertySample({
     if (reload > 0) void session?.start().then(() => session.store.selectNodes(['sample']))
   }, [reload, session])
   const revision = useVal(session?.store.$.revision)
-  const selection = revision?.selection({ kind: 'flow' }, 'sample')
+  const selection = revision?.selection('sample')
   if (!session || !revision) return null
   return (
     <I18nProvider i18n={session.i18n}>
@@ -242,7 +242,7 @@ function PropertySample({
             selection={selection}
             store={session.store}
             theme={dark ? 'dark' : 'light'}
-            target={{ kind: 'flow' }}
+
             triggerAuthorizationPending={false}
             triggerConnectionLoading={false}
             triggers={session.triggers}

@@ -4,7 +4,7 @@ import type { ManagedTaskDefinition } from '../../../flow/common/change.ts'
 import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
-import { setNodeContentHidden, targetPresentation } from './canvasPresentation.ts'
+import { setNodeContentHidden, flowPresentation } from './canvasPresentation.ts'
 import { setComment, setFlowViewport, setNodePositions } from './canvasPresentation.ts'
 import { createI18n } from './i18n.ts'
 import { providerIcon } from './providerIcon.ts'
@@ -51,7 +51,7 @@ describe('Designer port projection', () => {
       line: 0,
       column: 0,
     }
-    const nodes = designerGraph(draft, { kind: 'flow' }, {}, [issue]).nodes
+    const nodes = designerGraph(draft, {}, [issue]).nodes
     expect(nodes.find((node) => node.id === 'code')).toMatchObject({
       connectionRequired: true,
       diagnostics: 1,
@@ -65,11 +65,11 @@ describe('Designer port projection', () => {
       },
     })
     expect(nodes.find((node) => node.id === 'other')).toMatchObject({ connectionRequired: false, diagnostics: 0 })
-    expect(designerGraph(draft, { kind: 'flow' }, {}, [{ ...issue, code: 'module.syntax', path: '/modules/module/source' }]).nodes[0]).toMatchObject({
+    expect(designerGraph(draft, {}, [{ ...issue, code: 'module.syntax', path: '/modules/module/source' }]).nodes[0]).toMatchObject({
       connectionRequired: false,
       diagnostics: 1,
     })
-    expect(designerGraph(draft, { kind: 'flow' }, {}, []).nodes[0]).toMatchObject({ connectionRequired: false, diagnostics: 0 })
+    expect(designerGraph(draft, {}, []).nodes[0]).toMatchObject({ connectionRequired: false, diagnostics: 0 })
   })
 
   it('ignores malformed remote edges instead of throwing', () => {
@@ -98,7 +98,7 @@ describe('Designer port projection', () => {
       version: 1,
     }
 
-    expect(designerGraph(draft, { kind: 'flow' })).toMatchObject({
+    expect(designerGraph(draft)).toMatchObject({
       edges: [expect.objectContaining({ source: 'first', target: 'second' })],
       nodes: [expect.objectContaining({ id: 'first' }), expect.objectContaining({ id: 'second' })],
     })
@@ -110,7 +110,7 @@ describe('Designer port projection', () => {
         document: { ...draft.content.document, graph: { ...draft.content.document.graph, edges: undefined as never } },
       },
     }
-    expect(designerGraph(missing, { kind: 'flow' })).toMatchObject({ edges: [], nodes: expect.any(Array) })
+    expect(designerGraph(missing)).toMatchObject({ edges: [], nodes: expect.any(Array) })
   })
 
   it('preserves revision port order', () => {
@@ -151,7 +151,7 @@ describe('Designer port projection', () => {
       version: 1,
     }
 
-    const node = designerGraph(draft, { kind: 'flow' }).nodes[0]
+    const node = designerGraph(draft).nodes[0]
     if (node == null || node.kind == 'comment') throw new Error('Expected a Task node.')
 
     expect(node.inputs).toEqual([{ group: 'Request' }, expect.objectContaining({ handle: 'second' }), expect.objectContaining({ handle: 'first' })])
@@ -218,7 +218,7 @@ describe('Designer port projection', () => {
       version: 1,
     }
 
-    const node = designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, createI18n('zh-CN').t).nodes.find((item) => item.id == 'condition')
+    const node = designerGraph(draft, {}, [], {}, {}, createI18n('zh-CN').t).nodes.find((item) => item.id == 'condition')
     if (node?.kind != 'condition') throw new Error('Expected a Condition node.')
 
     expect(node.cases[0]?.groups[0]?.expressions[0]?.left).toEqual({ kind: 'environment', label: '环境变量' })
@@ -271,12 +271,11 @@ describe('Designer port projection', () => {
       serviceName: 'Hacker News',
     }
 
-    expect(designerGraph(draft, { kind: 'flow' }, {}, []).nodes[0]).toMatchObject({ executorName: 'Connector · hacker-news' })
+    expect(designerGraph(draft, {}, []).nodes[0]).toMatchObject({ executorName: 'Connector · hacker-news' })
 
-    const publicNode = designerGraph(draft, { kind: 'flow' }, {}, [], { [action.actionId]: action }).nodes[0]
+    const publicNode = designerGraph(draft, {}, [], { [action.actionId]: action }).nodes[0]
     const authenticatedNode = designerGraph(
       draft,
-      { kind: 'flow' },
       {},
       [
         {
@@ -332,7 +331,7 @@ describe('Designer port projection', () => {
       revisionId: 'revision',
       version: 1,
     }
-    const projected = designerGraph(draft, { kind: 'flow' }).nodes[0]!
+    const projected = designerGraph(draft).nodes[0]!
     if (projected.kind != kind) throw new Error(`Expected ${kind}`)
     expect(projected.outputs.flatMap((port) => ('handle' in port ? [port.handle] : []))).toEqual(['pending', ...actions])
     const waiting = {
@@ -360,7 +359,7 @@ describe('Designer port projection', () => {
         },
       ],
     } as const
-    expect(designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, undefined, waiting).nodes[0]).toMatchObject({ run: { status: 'waiting' } })
+    expect(designerGraph(draft, {}, [], {}, {}, undefined, waiting).nodes[0]).toMatchObject({ run: { status: 'waiting' } })
   })
 
   it('keeps trigger configuration editing outside the canvas projection', () => {
@@ -410,7 +409,7 @@ describe('Designer port projection', () => {
       revisionId: 'revision',
       version: 1,
     }
-    const node = designerGraph(draft, { kind: 'flow' }, {}, [
+    const node = designerGraph(draft, {}, [
       {
         code: 'trigger.config-incomplete',
         column: 0,
@@ -422,7 +421,7 @@ describe('Designer port projection', () => {
     ]).nodes[0]
 
     expect(node).toMatchObject({ diagnostics: 1, connectionRequired: false })
-    expect(designerGraph(draft, { kind: 'flow' }, {}, []).nodes[0]).toMatchObject({ diagnostics: 0, connectionRequired: false })
+    expect(designerGraph(draft, {}, []).nodes[0]).toMatchObject({ diagnostics: 0, connectionRequired: false })
 
     expect(node).toMatchObject({
       icon: providerIcon({ serviceId: 'github', serviceName: 'github' }),
@@ -430,17 +429,17 @@ describe('Designer port projection', () => {
       presentation: { kind: 'integration', source: 'github' },
     })
     expect(
-      designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, undefined, undefined, [], {
+      designerGraph(draft, {}, [], {}, {}, undefined, undefined, [], {
         github: { serviceId: 'github', serviceName: 'GitHub' },
       }).nodes[0],
     ).toMatchObject({ presentation: { source: 'GitHub' }, title: 'Repository event' })
     for (const code of ['trigger.connection-missing', 'trigger.connection-invalid', 'trigger.config-invalid']) {
       const diagnostic = { code, column: 0, line: 1, message: 'Sample diagnostic', path: '/document/graph/nodes/trigger/bindingId' }
-      expect(designerGraph(draft, { kind: 'flow' }, {}, [diagnostic]).nodes[0]).toMatchObject({
+      expect(designerGraph(draft, {}, [diagnostic]).nodes[0]).toMatchObject({
         diagnostics: 1,
         connectionRequired: code !== 'trigger.config-invalid',
       })
-      expect(designerGraph(draft, { kind: 'flow' }, {}, [{ ...diagnostic, path: '/document/graph/nodes/trigger-other/bindingId' }]).nodes[0]).toMatchObject({
+      expect(designerGraph(draft, {}, [{ ...diagnostic, path: '/document/graph/nodes/trigger-other/bindingId' }]).nodes[0]).toMatchObject({
         diagnostics: 0,
         connectionRequired: false,
       })
@@ -460,17 +459,16 @@ describe('Designer port projection', () => {
         },
       },
     }
-    expect(designerGraph(filled, { kind: 'flow' }, {}, []).nodes[0]).toEqual({ ...node, diagnostics: 0 })
+    expect(designerGraph(filled, {}, []).nodes[0]).toEqual({ ...node, diagnostics: 0 })
     expect(node).not.toHaveProperty('presentation.config')
   })
 })
 
 describe('Designer presentation', () => {
   it('preserves positions and comments while replacing the single viewport', () => {
-    const target = { kind: 'flow' } as const
-    const noted = setComment({}, target, 'note', { title: 'Note', content: 'Body', position: { x: 15, y: 25 } })
-    const positioned = setNodePositions(noted, target, { task: { x: 30, y: 40 } })
-    const moved = setFlowViewport(positioned, target, { x: 10, y: 20, zoom: 0.8 })
+    const noted = setComment({}, 'note', { title: 'Note', content: 'Body', position: { x: 15, y: 25 } })
+    const positioned = setNodePositions(noted, { task: { x: 30, y: 40 } })
+    const moved = setFlowViewport(positioned, { x: 10, y: 20, zoom: 0.8 })
     expect(moved).toMatchObject({
       designer: {
         flow: {
@@ -481,11 +479,10 @@ describe('Designer presentation', () => {
         },
       },
     })
-    expect(setFlowViewport(moved, target, { x: 10, y: 20, zoom: 0.8 })).toBe(moved)
+    expect(setFlowViewport(moved, { x: 10, y: 20, zoom: 0.8 })).toBe(moved)
   })
 
   it('keeps later nodes above earlier nodes regardless of their IDs', () => {
-    const target = { kind: 'flow' } as const
     const draft: NonNullable<Parameters<typeof designerGraph>[0]> = {
       actorId: 'actor',
       content: {
@@ -510,10 +507,10 @@ describe('Designer presentation', () => {
       revisionId: 'revision',
       version: 1,
     }
-    const old = setNodePositions({}, target, { 'z-old': { x: 0, y: 0 } })
-    const current = setNodePositions(old, target, { 'a-new': { x: 24, y: 24 } })
+    const old = setNodePositions({}, { 'z-old': { x: 0, y: 0 } })
+    const current = setNodePositions(old, { 'a-new': { x: 24, y: 24 } })
 
-    expect(designerGraph(draft, target, current).nodes.map((node) => node.id)).toEqual(['z-old', 'a-new'])
+    expect(designerGraph(draft, current).nodes.map((node) => node.id)).toEqual(['z-old', 'a-new'])
   })
 })
 
@@ -555,7 +552,7 @@ describe('Canvas run records', () => {
     status: 'completed',
     version: 1,
   } as const
-  const events: NonNullable<Parameters<typeof designerGraph>[8]> = [
+  const events: NonNullable<Parameters<typeof designerGraph>[7]> = [
     { sequence: 1, kind: 'run.started', createdAt: draft.createdAt, payload: { flowId: 'flow', scopeId: 'root' } },
     {
       sequence: 2,
@@ -583,7 +580,7 @@ describe('Canvas run records', () => {
     },
   ]
   it('keeps output, logs and timing together for the selected root execution', () => {
-    expect(designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, undefined, run, events).nodes[0]).toMatchObject({
+    expect(designerGraph(draft, {}, [], {}, {}, undefined, run, events).nodes[0]).toMatchObject({
       run: {
         runId: 'run',
         status: 'success',
@@ -607,7 +604,7 @@ describe('Canvas run records', () => {
       events[3]!,
     ]
     const active = { ...run, status: 'running' as const }
-    expect(designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, undefined, active, repeated).nodes[0]).toMatchObject({
+    expect(designerGraph(draft, {}, [], {}, {}, undefined, active, repeated).nodes[0]).toMatchObject({
       run: { status: 'running', successCount: 1 },
     })
     const waiting = {
@@ -623,12 +620,12 @@ describe('Canvas run records', () => {
         },
       ],
     }
-    expect(designerGraph(draft, { kind: 'flow' }, {}, [], {}, {}, undefined, waiting, repeated).nodes[0]).toMatchObject({
+    expect(designerGraph(draft, {}, [], {}, {}, undefined, waiting, repeated).nodes[0]).toMatchObject({
       run: { status: 'waiting', successCount: 1 },
     })
   })
   it('does not attach historical results to a changed draft', () => {
-    const node = designerGraph({ ...draft, revisionId: 'changed' }, { kind: 'flow' }, {}, [], {}, {}, undefined, run, events).nodes[0]
+    const node = designerGraph({ ...draft, revisionId: 'changed' }, {}, [], {}, {}, undefined, run, events).nodes[0]
     expect(node).not.toHaveProperty('run')
   })
 })
@@ -676,7 +673,7 @@ it('projects Agent tools through the shared action summary', () => {
       },
     },
   }
-  const first = designerGraph(draft, { kind: 'flow' }).nodes[0]
+  const first = designerGraph(draft).nodes[0]
   expect(first).toMatchObject({
     actionSummary: { count: 2, providers: [{ id: 'gmail', icon: expect.any(String), label: 'gmail' }] },
   })
@@ -698,16 +695,15 @@ it('projects Agent tools through the shared action summary', () => {
       },
     },
   }
-  expect(designerGraph(removed, { kind: 'flow' }).nodes[0]).toMatchObject({ actionSummary: { count: 0, providers: [] } })
+  expect(designerGraph(removed).nodes[0]).toMatchObject({ actionSummary: { count: 0, providers: [] } })
 })
 
 it('keeps node content visibility independent and preserves unrelated presentation settings', () => {
-  const target = { kind: 'flow' } as const
   const initial = { custom: 'preserved' }
-  const hidden = setNodeContentHidden(initial, target, 'value', true)
-  const bothHidden = setNodeContentHidden(hidden, target, 'other', true)
-  const shown = setNodeContentHidden(bothHidden, target, 'value', false)
-  expect(targetPresentation(shown, target)?.hiddenNodeContent).toEqual({ other: true })
+  const hidden = setNodeContentHidden(initial, 'value', true)
+  const bothHidden = setNodeContentHidden(hidden, 'other', true)
+  const shown = setNodeContentHidden(bothHidden, 'value', false)
+  expect(flowPresentation(shown)?.hiddenNodeContent).toEqual({ other: true })
   expect(shown.custom).toBe('preserved')
-  expect(setNodeContentHidden(initial, target, 'value', false)).toBe(initial)
+  expect(setNodeContentHidden(initial, 'value', false)).toBe(initial)
 })

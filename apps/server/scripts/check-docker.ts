@@ -60,9 +60,9 @@ try {
         expectedRevisionId: flow.draftRevisionId,
         operations: [
           { kind: 'module.create', module: revision.modules.code, moduleId: 'code' },
-          { kind: 'graph.node.create', node: revision.document.graph.nodes.start, nodeId: 'start', target: { kind: 'flow' } },
-          { kind: 'graph.node.create', node: revision.document.graph.nodes.code, nodeId: 'code', target: { kind: 'flow' } },
-          { kind: 'graph.edge.connect', edge: revision.document.graph.edges[0], target: { kind: 'flow' } },
+          { kind: 'graph.node.create', node: revision.document.graph.nodes.start, nodeId: 'start' },
+          { kind: 'graph.node.create', node: revision.document.graph.nodes.code, nodeId: 'code' },
+          { kind: 'graph.edge.connect', edge: revision.document.graph.edges[0] },
         ],
         version: 1,
       }),

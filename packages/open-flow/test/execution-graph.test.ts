@@ -25,10 +25,10 @@ describe('Execution graph contract', () => {
   it('stores execution edges independently and preserves bindings on disconnect', () => {
     const edge = { source: 'a', target: 'b' }
     const source = revision({ edges: [], nodes: { a: value, b: task } })
-    const connected = applyFlowChanges(source, [{ kind: 'graph.edge.connect', edge, target: { kind: 'flow' } }])
+    const connected = applyFlowChanges(source, [{ kind: 'graph.edge.connect', edge }])
     expect(connected.document.graph.edges).toEqual([edge])
     expect(connected.document.graph.nodes.b).toEqual(task)
-    expect(applyFlowChanges(connected, [{ kind: 'graph.edge.disconnect', edge, target: { kind: 'flow' } }])).toEqual(source)
+    expect(applyFlowChanges(connected, [{ kind: 'graph.edge.disconnect', edge }])).toEqual(source)
   })
 
   it('offers transitive ancestors without adding edges from data bindings', async () => {

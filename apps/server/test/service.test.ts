@@ -305,7 +305,6 @@ describe('Server application service', () => {
     const changed = await service.control.changeDraft('test', stored.flowId, stored.revisionId, [
       {
         kind: 'graph.node.create',
-        target: { kind: 'flow' },
         nodeId: 'other',
         node: {
           kind: 'poll',
@@ -329,7 +328,6 @@ describe('Server application service', () => {
       { kind: 'binding.create', bindingId: 'unused', binding: { kind: 'variable', target: 'MISSING' } },
       {
         kind: 'graph.node.create',
-        target: { kind: 'flow' },
         nodeId: 'unused',
         node: {
           kind: 'task',
@@ -346,7 +344,6 @@ describe('Server application service', () => {
       },
       {
         kind: 'graph.node.create',
-        target: { kind: 'flow' },
         nodeId: 'unused-wait',
         node: {
           kind: 'wait',

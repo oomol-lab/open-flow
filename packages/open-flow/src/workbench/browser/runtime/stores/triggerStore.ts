@@ -165,7 +165,7 @@ export class TriggerStore {
     return scopedValue(signal, (get) => {
       const state = get(source)
       get(this.#i18n.t$)
-      const enabled = get(this.#workspace.$.flowId) != null && get(this.#workspace.$.target)?.kind == 'flow'
+      const enabled = get(this.#workspace.$.flowId) != null && get(this.#workspace.$.draft) != null
       const catalog = state.data
       const definitions = catalog?.definitions.filter(
         (item) =>

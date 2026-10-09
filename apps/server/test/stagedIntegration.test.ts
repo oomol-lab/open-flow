@@ -44,9 +44,7 @@ function stripeNode(events: readonly string[]): Extract<TriggerNode, { readonly 
 }
 
 async function addStripe(service: ServerService, flowId: string, revisionId: string, events: readonly string[]): Promise<string> {
-  const changed = await service.control.changeDraft('operator', flowId, revisionId, [
-    { kind: 'graph.node.create', node: stripeNode(events), nodeId: 'stripe', target: { kind: 'flow' } },
-  ])
+  const changed = await service.control.changeDraft('operator', flowId, revisionId, [{ kind: 'graph.node.create', node: stripeNode(events), nodeId: 'stripe' }])
   return changed.revision.revisionId
 }
 
@@ -68,7 +66,6 @@ async function addMarker(service: ServerService, flowId: string, revisionId: str
         values: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
       },
       nodeId: 'marker',
-      target: { kind: 'flow' },
     },
   ])
   return changed.revision.revisionId

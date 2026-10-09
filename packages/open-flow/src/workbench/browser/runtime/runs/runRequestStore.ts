@@ -50,7 +50,7 @@ const initialState: RequestState = {
 }
 
 function inputSpec(draft: Draft, triggerId: string) {
-  const trigger = revisionView(draft).graph({ kind: 'flow' })?.nodes[triggerId]
+  const trigger = revisionView(draft).graph()?.nodes[triggerId]
   if (trigger == null || 'inputs' in trigger || trigger.kind == 'manual' || trigger.kind == 'cron') return undefined
   const definitions = triggerOutputDefinitions(trigger)
   return definitions.length === 0 ? undefined : { definitions, samples: trigger.kind == 'error' ? sampleErrorOutputs : undefined }
@@ -74,7 +74,7 @@ async function inputEditor(
 }
 
 function testOutputs(revision: Draft, triggerId: string): Readonly<Record<string, JsonValue>> {
-  const node = revisionView(revision).graph({ kind: 'flow' })?.nodes[triggerId]
+  const node = revisionView(revision).graph()?.nodes[triggerId]
   if (node?.kind == 'error') return sampleErrorOutputs
   return node?.kind === 'cron' ? { scheduledAt: new Date().toISOString() } : {}
 }
@@ -248,7 +248,7 @@ export class RunRequestStore {
     this.#rememberInputs(previous)
     this.#set({ inputRequest: undefined, starting: !edit, submitting: undefined })
     this.#disposeInputRequest(previous)
-    const graph = revisionView(revision).graph({ kind: 'flow' })
+    const graph = revisionView(revision).graph()
     const triggers = Object.entries(graph?.nodes ?? {}).flatMap(([nodeId, node]) => ('inputs' in node ? [] : [{ nodeId, title: node.name }]))
     if (triggers.length == 0) {
       this.#set({ starting: false })

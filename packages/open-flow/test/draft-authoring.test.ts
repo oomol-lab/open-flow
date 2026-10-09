@@ -48,13 +48,13 @@ it('rejects schedules on Integration triggers and allows an unselected account',
 })
 
 it.each([
-  { name: 'ordinary operation fields', candidate: { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'a' } }, path: 'edge.target:' },
+  { name: 'ordinary operation fields', candidate: { kind: 'graph.edge.connect', edge: { source: 'a' } }, path: 'edge.target:' },
   { name: 'trigger fields', candidate: { ...authoringExample('poll').operations[0]!, key: '' }, path: 'key:' },
   { name: 'unknown kind', candidate: { kind: 'unknown' }, path: 'Unknown operation "unknown".' },
   { name: 'missing kind', candidate: {}, path: 'kind:' },
   { name: 'invalid kind', candidate: { kind: 42 }, path: 'kind:' },
 ])('preserves batch indices for $name', ({ candidate, path }) => {
-  const valid = { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'a', target: 'b' } }
+  const valid = { kind: 'graph.edge.connect', edge: { source: 'a', target: 'b' } }
   for (const index of [0, 1, 2]) {
     const batch = [...Array.from({ length: index }, () => valid), candidate]
     const draftBatch = batch.map((operation, position) => (index > 0 && position == 0 ? authoringExample('poll').operations[0]! : operation))

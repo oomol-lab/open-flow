@@ -228,10 +228,9 @@ export type RunLaunch =
       readonly trigger?: never
     }
 
-interface GraphTarget {
+interface RunGraph {
   readonly flowId: string
   readonly graph: Graph
-  readonly kind: 'flow'
 }
 
 function nodeFailure(error: unknown, project: FlowRunOptions['projectFailure']): SchedulerFailure {
@@ -492,7 +491,7 @@ function validateOutputs(nodeId: string, node: ExecutableNode, value: unknown): 
 }
 
 function validateCheckpoint(
-  target: GraphTarget,
+  target: RunGraph,
   checkpoint: FlowRunCheckpoint,
   resolveInputs: (nodeId: string, node: ExecutableNode, jobId: string) => Readonly<Record<string, JsonValue>>,
 ): void {
@@ -581,7 +580,7 @@ type NodeResult =
 
 function runGraph(
   context: RunContext,
-  target: GraphTarget,
+  target: RunGraph,
   runId: string,
   launchInputs: Readonly<Record<string, Readonly<Record<string, JsonValue>>>> = {},
   trigger?: TriggerSeed,
@@ -1071,7 +1070,7 @@ export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect
         waits: options.waits,
         remainingMs: options.remainingMs,
       },
-      { flowId: options.flowId, graph: prepared.graph, kind: 'flow' },
+      { flowId: options.flowId, graph: prepared.graph },
       options.runId,
       options.inputs,
       options.trigger,

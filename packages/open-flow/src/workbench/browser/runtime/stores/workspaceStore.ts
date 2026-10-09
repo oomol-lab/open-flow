@@ -1,7 +1,7 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal } from 'value-enhancer'
 import type { EventSource } from '../../../../control/common/api.ts'
-import type { ConnectorCapability, GraphTarget } from '../../../../flow/common/change.ts'
+import type { ConnectorCapability } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
 import type { WorkbenchClient, ConnectorConnection, Draft, Flow, GraphNode, InputPort, JsonValue, Live, TriggerKeySnapshot, TriggerSchedule } from '../api.ts'
 import type { DesignerViewport, Point } from '../canvasPresentation.ts'
@@ -110,7 +110,6 @@ interface Clipboard {
 interface ReconciledRevision {
   readonly revision: RevisionView
   readonly selectedNodeIds: readonly string[]
-  readonly target?: GraphTarget
 }
 
 export class WorkspaceStore {
@@ -171,7 +170,7 @@ export class WorkspaceStore {
           this.#set({ busy: 'designer' })
         }
       },
-      check: () => void this.#checkTarget(),
+      check: () => void this.#checkDraft(),
       current: (context) => this.#isDraftChangeCurrent(context),
       finishChanges: () => {
         if (!this.#disposed && this.#model.value.busy == 'designer') this.#set({ busy: undefined })
@@ -267,7 +266,6 @@ export class WorkspaceStore {
       presentation: undefined,
       flowId,
       selectedNodeIds: [],
-      target: flowId == null ? undefined : { kind: 'flow' },
       workspaceLoadFailed: false,
       workspaceLoadProblem: undefined,
       workspaceLoading: flowId != null,
@@ -310,7 +308,6 @@ export class WorkspaceStore {
         draft,
         live,
         presentation,
-        target: { kind: 'flow' },
         workspaceLoadFailed: false,
         workspaceLoadProblem: undefined,
         workspaceLoading: false,
@@ -373,33 +370,13 @@ export class WorkspaceStore {
     }
   }
 
-  public selectTarget(target: GraphTarget | undefined): boolean {
-    if (this.#history.applying) return false
-    if (!dequal(target, this.#model.value.target)) this.#history.clear()
-    void this.#modules.flush()
-    this.#set({
-      diagnosticFocus: undefined,
-      diagnostics: undefined,
-      moduleEditor: undefined,
-      nodeFocus: undefined,
-      selectedNodeIds: [],
-      target,
-    })
-    void this.#checkTarget()
-    return true
-  }
-
   public selectNodes(nodeIds: readonly string[]): boolean {
     if (nodeIds.length == this.#model.value.selectedNodeIds.length && nodeIds.every((nodeId, index) => nodeId == this.#model.value.selectedNodeIds[index]))
       return true
     void this.#modules.flush()
     this.#set({
       diagnosticFocus: undefined,
-      moduleEditor: selectedModuleEditor(
-        this.#model.value.draft == null ? undefined : revisionView(this.#model.value.draft),
-        this.#model.value.target,
-        nodeIds,
-      ),
+      moduleEditor: selectedModuleEditor(this.#model.value.draft == null ? undefined : revisionView(this.#model.value.draft), nodeIds),
       nodeFocus: undefined,
       selectedNodeIds: nodeIds,
     })
@@ -469,12 +446,11 @@ export class WorkspaceStore {
   public async addNode(option: AddNodeOption, position: Point, connection?: (nodeId: string) => Omit<DesignerEdge, 'id'>): Promise<string | undefined> {
     if (!(await this.saveModuleEditor())) return
     const draft = this.#model.value.draft
-    const target = this.#model.value.target
-    if (draft == null || target == null) return
+    if (draft == null) return
     const nodeId = this.#identity()
-    if (option.kind == 'comment') return await this.#addComment(target, nodeId, position)
+    if (option.kind == 'comment') return await this.#addComment(nodeId, position)
     const revision = revisionView(draft)
-    let intent = addNodeIntent(option, revision, target, this.#i18n.t)
+    let intent = addNodeIntent(option, revision, this.#i18n.t)
     if (intent == null) return
     if (intent.kind == 'provider-trigger' && intent.connectionId == null) {
       try {
@@ -484,23 +460,23 @@ export class WorkspaceStore {
       } catch (error) {
         if (!this.#disposed && this.#model.value.draft == draft) this.#setNotice(errorNotice(error, this.#i18n.t))
       }
-      if (this.#disposed || this.#model.value.draft != draft || this.#model.value.target != target) return
+      if (this.#disposed || this.#model.value.draft != draft) return
     }
     const edge = connection?.(nodeId)
-    const nodeChanges = addFlowNode(revision, target, nodeId, intent)
+    const nodeChanges = addFlowNode(revision, nodeId, intent)
     if (nodeChanges == null) return
     const changes =
       edge == null
         ? nodeChanges
         : [
             ...nodeChanges,
-            ...connectFlowNodes(applyFlowChanges(draft, nodeChanges).content, target, {
+            ...connectFlowNodes(applyFlowChanges(draft, nodeChanges).content, {
               source: edge.source,
               target: edge.target,
               ...(edge.sourceHandle.startsWith('$branch:') ? { sourceHandle: edge.sourceHandle.slice(8) } : {}),
             }),
           ]
-    if (!(await this.#canvasChange('add', 1, changes, (value) => setNodePositions(value, target, { [nodeId]: position }), [nodeId]))) return
+    if (!(await this.#canvasChange('add', 1, changes, (value) => setNodePositions(value, { [nodeId]: position }), [nodeId]))) return
     if (this.#disposed) return
     this.#set({ nodeFocus: { nodeId, requestId: ++this.#nodeFocusId } })
     return nodeId
@@ -508,9 +484,8 @@ export class WorkspaceStore {
 
   public async connect(edge: Omit<DesignerEdge, 'id'>): Promise<void> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return
-    const changes = connectFlowNodes(revision.revision.content, target, {
+    if (revision == null) return
+    const changes = connectFlowNodes(revision.revision.content, {
       source: edge.source,
       target: edge.target,
       ...(edge.sourceHandle.startsWith('$branch:') ? { sourceHandle: edge.sourceHandle.slice(8) } : {}),
@@ -520,9 +495,8 @@ export class WorkspaceStore {
 
   public async disconnect(edge: DesignerEdge): Promise<void> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return
-    const changes = disconnectFlowNodes(revision.revision.content, target, {
+    if (revision == null) return
+    const changes = disconnectFlowNodes(revision.revision.content, {
       source: edge.source,
       target: edge.target,
       ...(edge.sourceHandle.startsWith('$branch:') ? { sourceHandle: edge.sourceHandle.slice(8) } : {}),
@@ -533,19 +507,18 @@ export class WorkspaceStore {
   public async deleteSelectedNodes(): Promise<void> {
     if (!(await this.saveModuleEditor())) return
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null || this.#model.value.selectedNodeIds.length == 0) return
+    if (revision == null || this.#model.value.selectedNodeIds.length == 0) return
     const selectedNodeIds = [...this.#model.value.selectedNodeIds]
-    const comments = commentIds(this.#model.value.presentation?.value ?? {}, target)
+    const comments = commentIds(this.#model.value.presentation?.value ?? {})
     const commentNodes = new Set(this.#model.value.selectedNodeIds.filter((nodeId) => comments.has(nodeId)))
-    const changes = deleteSelection(revision, target, this.#model.value.selectedNodeIds)
+    const changes = deleteSelection(revision, this.#model.value.selectedNodeIds)
     await this.#canvasChange(
       'delete',
       this.#model.value.selectedNodeIds.length,
       changes,
       (value) => {
-        let next = commentNodes.size == 0 ? value : removeComments(value, target, commentNodes)
-        for (const nodeId of selectedNodeIds) next = setNodeContentHidden(next, target, nodeId, false)
+        let next = commentNodes.size == 0 ? value : removeComments(value, commentNodes)
+        for (const nodeId of selectedNodeIds) next = setNodeContentHidden(next, nodeId, false)
         return next
       },
       [],
@@ -554,8 +527,7 @@ export class WorkspaceStore {
 
   public copySelectedNodes(): void {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null || this.#model.value.selectedNodeIds.length == 0) return
+    if (revision == null || this.#model.value.selectedNodeIds.length == 0) return
     const selected = new Set(this.#model.value.selectedNodeIds)
     this.#clipboard = {
       hiddenNodeIds: this.#designer().nodes.flatMap((node) => (node.contentHidden && selected.has(node.id) ? [node.id] : [])),
@@ -571,17 +543,16 @@ export class WorkspaceStore {
             ]
           : [],
       ),
-      nodes: copyNodes(revision, target, this.#model.value.selectedNodeIds),
+      nodes: copyNodes(revision, this.#model.value.selectedNodeIds),
     }
   }
 
   public async pasteNodes(sourcePositions?: Readonly<Record<string, Point>>, offset: Point = PASTE_OFFSET): Promise<void> {
     if (!(await this.saveModuleEditor())) return
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null || this.#clipboard == null) return
+    if (revision == null || this.#clipboard == null) return
     const hiddenNodeIds = new Set(this.#clipboard.hiddenNodeIds)
-    const pasted = pasteNodes(revision, target, this.#clipboard.nodes, this.#identity)
+    const pasted = pasteNodes(revision, this.#clipboard.nodes, this.#identity)
     const comments = this.#clipboard.comments.map((comment) => ({
       ...comment,
       nodeId: this.#identity(),
@@ -615,13 +586,13 @@ export class WorkspaceStore {
       added.size,
       pasted.changes,
       (value) => {
-        let next = setNodePositions(value, target, positions)
+        let next = setNodePositions(value, positions)
         for (const [index, sourceId] of pasted.sourceIds.entries()) {
-          if (hiddenNodeIds.has(sourceId)) next = setNodeContentHidden(next, target, pasted.nodeIds[index]!, true)
+          if (hiddenNodeIds.has(sourceId)) next = setNodeContentHidden(next, pasted.nodeIds[index]!, true)
         }
         for (const comment of comments) {
-          if (hiddenNodeIds.has(comment.sourceId)) next = setNodeContentHidden(next, target, comment.nodeId, true)
-          next = setComment(next, target, comment.nodeId, {
+          if (hiddenNodeIds.has(comment.sourceId)) next = setNodeContentHidden(next, comment.nodeId, true)
+          next = setComment(next, comment.nodeId, {
             content: comment.content,
             position: { x: comment.position.x + offset.x * step, y: comment.position.y + offset.y * step },
             title: this.#i18n.t('addNode.commentCopy', { title: comment.title }),
@@ -639,7 +610,7 @@ export class WorkspaceStore {
   }
 
   public async saveErrorSources(nodeId: string, value: readonly string[]): Promise<boolean> {
-    const node = this.$.revision.value?.graph({ kind: 'flow' })?.nodes[nodeId]
+    const node = this.$.revision.value?.graph()?.nodes[nodeId]
     if (node?.kind != 'error' || dequal(node.sourceFlowIds ?? [], value)) return false
     return (
       (await this.#editDraft([{ kind: 'graph.trigger.sources.set', nodeId, before: node.sourceFlowIds, value: value.length == 0 ? undefined : value }])) != null
@@ -648,56 +619,49 @@ export class WorkspaceStore {
 
   public async saveNodeSettings(nodeId: string, settings: NodeSettings): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    const changes = updateNodeSettings(revision, target, nodeId, settings)
+    if (revision == null) return false
+    const changes = updateNodeSettings(revision, nodeId, settings)
     return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async saveNodeDescription(nodeId: string, description: string | undefined): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    const changes = updateNodeDescription(revision, target, nodeId, description)
+    if (revision == null) return false
+    const changes = updateNodeDescription(revision, nodeId, description)
     return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async saveNodeIcon(nodeId: string, icon: string | undefined): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    const changes = updateNodeIcon(revision, target, nodeId, icon)
+    if (revision == null) return false
+    const changes = updateNodeIcon(revision, nodeId, icon)
     return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async saveNodeTitle(nodeId: string, title: string | undefined): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    const changes = updateNodeName(revision, target, nodeId, title)
+    if (revision == null) return false
+    const changes = updateNodeName(revision, nodeId, title)
     return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async setInputValue(nodeId: string, handle: string, value: JsonValue | undefined, deletion?: PropertyDeletion): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    const changes = changeInputValue(revision, target, nodeId, handle, value)
+    if (revision == null) return false
+    const changes = changeInputValue(revision, nodeId, handle, value)
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
   public async resetInputs(nodeId: string, handles: readonly string[]): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    return (await this.#editDraft(resetInputValues(revision.revision.content, target, nodeId, handles))) != null
+    if (revision == null) return false
+    return (await this.#editDraft(resetInputValues(revision.revision.content, nodeId, handles))) != null
   }
 
   public async resetTriggerConfig(triggerId: string, names?: readonly string[]): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target?.kind !== 'flow') return false
-    const trigger = revision.graph(target)?.nodes[triggerId]
+    if (revision == null) return false
+    const trigger = revision.graph()?.nodes[triggerId]
     if (trigger?.kind !== 'poll' && trigger?.kind !== 'integration') return false
     const selected =
       names == null
@@ -719,35 +683,28 @@ export class WorkspaceStore {
     source: { readonly nodeId: string; readonly output: string; readonly field?: string },
   ): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    return (await this.#editDraft(setInputSources(revision.revision.content, target, nodeId, handle, [{ kind: 'node', ...source }]))) != null
+    if (revision == null) return false
+    return (await this.#editDraft(setInputSources(revision.revision.content, nodeId, handle, [{ kind: 'node', ...source }]))) != null
   }
 
   public async setInputVariable(nodeId: string, handle: string, name: string | undefined): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    const changes =
-      name == null
-        ? changeInputValue(revision, target, nodeId, handle, undefined)
-        : changeInputVariable(revision, target, nodeId, handle, name, this.#identity())
+    if (revision == null) return false
+    const changes = name == null ? changeInputValue(revision, nodeId, handle, undefined) : changeInputVariable(revision, nodeId, handle, name, this.#identity())
     return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async saveCondition(nodeId: string, settings: ConditionSettings, deletion?: PropertyDeletion): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    const changes = updateCondition(revision, target, nodeId, settings)
+    if (revision == null) return false
+    const changes = updateCondition(revision, nodeId, settings)
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
   public async saveValue(nodeId: string, values: readonly ValueSettings[], deletion?: PropertyDeletion): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    const changes = updateValue(revision, target, nodeId, values)
+    if (revision == null) return false
+    const changes = updateValue(revision, nodeId, values)
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
@@ -761,25 +718,22 @@ export class WorkspaceStore {
     values?: Readonly<Record<string, JsonValue | undefined>>,
   ): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target?.kind != 'flow') return false
-    const changes = updateResolution(revision, target, nodeId, settings, values)
+    if (revision == null) return false
+    const changes = updateResolution(revision, nodeId, settings, values)
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
   public async saveNodeContentHidden(nodeId: string, hidden: boolean): Promise<void> {
-    const target = this.#model.value.target
     const node = this.#designer().nodes.find((candidate) => candidate.id == nodeId)
-    if (target == null || node == null || node.kind == 'condition') return
-    await this.#canvasChange('edit', 1, [], (value) => setNodeContentHidden(value, target, nodeId, hidden))
+    if (node == null || node.kind == 'condition') return
+    await this.#canvasChange('edit', 1, [], (value) => setNodeContentHidden(value, nodeId, hidden))
   }
 
   public async saveComment(nodeId: string, comment: { readonly content: string; readonly title: string }): Promise<void> {
-    const target = this.#model.value.target
-    if (target == null) return
+    if (this.#model.value.draft == null) return
     const position = this.#designer().nodes.find((node) => node.id == nodeId)?.position
     if (position == null) return
-    await this.#canvasChange('edit', 1, [], (value) => setComment(value, target, nodeId, { ...comment, position }))
+    await this.#canvasChange('edit', 1, [], (value) => setComment(value, nodeId, { ...comment, position }))
   }
 
   public loadOpenApiDocument(url: string, signal?: AbortSignal): Promise<JsonValue> {
@@ -788,9 +742,8 @@ export class WorkspaceStore {
 
   public async saveTaskSettings(nodeId: string, settings: TaskSettings, deletion?: PropertyDeletion): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    const changes = updateTask(revision, target, nodeId, settings)
+    if (revision == null) return false
+    const changes = updateTask(revision, nodeId, settings)
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
@@ -801,9 +754,8 @@ export class WorkspaceStore {
     values?: Readonly<Record<string, JsonValue | undefined>>,
   ): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    const changes = updateTaskPorts(revision, target, nodeId, ports, values)
+    if (revision == null) return false
+    const changes = updateTaskPorts(revision, nodeId, ports, values)
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
@@ -814,9 +766,8 @@ export class WorkspaceStore {
     values?: Readonly<Record<string, JsonValue | undefined>>,
   ): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    const changes = updateTaskAdditionalInputs(revision, target, nodeId, inputs, values)
+    if (revision == null) return false
+    const changes = updateTaskAdditionalInputs(revision, nodeId, inputs, values)
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
@@ -829,9 +780,8 @@ export class WorkspaceStore {
 
   public async setCodeActions(nodeId: string, capabilities: readonly ConnectorCapability[]): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    const changes = changeCodeActions(revision.revision.content, target, nodeId, capabilities)
+    if (revision == null) return false
+    const changes = changeCodeActions(revision.revision.content, nodeId, capabilities)
     return changes == null || (await this.#editDraft(changes)) != null
   }
 
@@ -847,20 +797,19 @@ export class WorkspaceStore {
 
   public async setTriggerEventSource(triggerId: string, source: EventSource): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target?.kind != 'flow') return false
-    const trigger = revision.graph(target)?.nodes[triggerId]
+    if (revision == null) return false
+    const trigger = revision.graph()?.nodes[triggerId]
     if (trigger?.kind != 'integration' || trigger.definition.key != 'feishu_app_bot.on_event' || source.provider != trigger.definition.provider) return false
-    const connectionChanges = changeTriggerConnection(revision.revision.content, target, triggerId, source.connectionId)
+    const connectionChanges = changeTriggerConnection(revision.revision.content, triggerId, source.connectionId)
     if (connectionChanges == null) return false
     const changed = inputValue(trigger.config.sourceId, undefined) != source.sourceId
     return (
       (await this.#editDraft([
         ...connectionChanges,
-        ...(updateTriggerConfig(revision.revision.content, target, triggerId, 'sourceId', source.sourceId) ?? []),
-        ...(changed ? (updateTriggerConfig(revision.revision.content, target, triggerId, 'eventTypes', undefined) ?? []) : []),
-        ...(changed ? (updateTriggerConfig(revision.revision.content, target, triggerId, 'resource', undefined) ?? []) : []),
-        ...(changed ? (updateTriggerConfig(revision.revision.content, target, triggerId, 'chatIds', undefined) ?? []) : []),
+        ...(updateTriggerConfig(revision.revision.content, triggerId, 'sourceId', source.sourceId) ?? []),
+        ...(changed ? (updateTriggerConfig(revision.revision.content, triggerId, 'eventTypes', undefined) ?? []) : []),
+        ...(changed ? (updateTriggerConfig(revision.revision.content, triggerId, 'resource', undefined) ?? []) : []),
+        ...(changed ? (updateTriggerConfig(revision.revision.content, triggerId, 'chatIds', undefined) ?? []) : []),
       ])) != null
     )
   }
@@ -876,54 +825,49 @@ export class WorkspaceStore {
 
   public async saveTriggerConfig(triggerId: string, name: string, value: JsonValue | undefined): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target?.kind != 'flow') return false
-    let changes = updateTriggerConfig(revision.revision.content, target, triggerId, name, value)
+    if (revision == null) return false
+    let changes = updateTriggerConfig(revision.revision.content, triggerId, name, value)
     if (changes == null) return false
-    const trigger = revision.graph(target)?.nodes[triggerId]
+    const trigger = revision.graph()?.nodes[triggerId]
     if (changes.length > 0 && trigger?.kind == 'integration' && trigger.definition.key == 'feishu_app_bot.on_event' && name == 'eventTypes') {
       const events = Array.isArray(value) ? value.filter((item): item is string => typeof item == 'string') : []
-      if (!supportsFeishuChatFilter(events))
-        changes = [...changes, ...(updateTriggerConfig(revision.revision.content, target, triggerId, 'chatIds', undefined) ?? [])]
+      if (!supportsFeishuChatFilter(events)) changes = [...changes, ...(updateTriggerConfig(revision.revision.content, triggerId, 'chatIds', undefined) ?? [])]
       const resource = inputValue(trigger.config.resource, undefined)
       if (isJsonObject(resource) && resource.kind != feishuResourceKind(events)) {
-        changes = [...changes, ...(updateTriggerConfig(revision.revision.content, target, triggerId, 'resource', undefined) ?? [])]
+        changes = [...changes, ...(updateTriggerConfig(revision.revision.content, triggerId, 'resource', undefined) ?? [])]
       }
     }
     if (changes.length > 0 && trigger?.kind == 'poll' && trigger.definition.key == 'linear.on_issue_changed' && name == 'teamId') {
-      return (await this.#editDraft([...changes, ...(updateTriggerConfig(revision.revision.content, target, triggerId, 'stateIds', undefined) ?? [])])) != null
+      return (await this.#editDraft([...changes, ...(updateTriggerConfig(revision.revision.content, triggerId, 'stateIds', undefined) ?? [])])) != null
     }
     return (await this.#editDraft(changes)) != null
   }
 
   public async saveTriggerSchedule(triggerId: string, schedule: readonly TriggerSchedule[]): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target?.kind != 'flow') return false
-    const changes = updateTriggerSchedule(revision.revision.content, target, triggerId, schedule)
+    if (revision == null) return false
+    const changes = updateTriggerSchedule(revision.revision.content, triggerId, schedule)
     return changes != null && (await this.#editDraft(changes)) != null
   }
 
   public async saveWebhook(triggerId: string, settings: WebhookSettings, deletion?: PropertyDeletion): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target?.kind != 'flow') return false
-    const changes = updateWebhook(revision, target, triggerId, settings)
+    if (revision == null) return false
+    const changes = updateWebhook(revision, triggerId, settings)
     return changes != null && (await this.#editDraft(changes, deletion)) != null
   }
 
   public async setTriggerConnection(triggerId: string, connectionId: string | undefined): Promise<boolean> {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target?.kind != 'flow') return false
-    const changes = changeTriggerConnection(revision.revision.content, target, triggerId, connectionId)
+    if (revision == null) return false
+    const changes = changeTriggerConnection(revision.revision.content, triggerId, connectionId)
     if (changes == null) return false
-    const trigger = revision.graph(target)?.nodes[triggerId]
+    const trigger = revision.graph()?.nodes[triggerId]
     if (changes.length > 0 && trigger?.kind == 'poll' && trigger.definition.key == 'linear.on_issue_changed') {
       return (
         (await this.#editDraft([
           ...changes,
-          ...['teamId', 'stateIds'].flatMap((field) => updateTriggerConfig(revision.revision.content, target, triggerId, field, undefined) ?? []),
+          ...['teamId', 'stateIds'].flatMap((field) => updateTriggerConfig(revision.revision.content, triggerId, field, undefined) ?? []),
         ])) != null
       )
     }
@@ -957,19 +901,17 @@ export class WorkspaceStore {
   }
 
   public async moveNodes(positions: Readonly<Record<string, Point>>): Promise<void> {
-    const target = this.#model.value.target
-    if (target == null) return
-    await this.#canvasChange('move', Object.keys(positions).length, [], (value) => setNodePositions(value, target, positions))
+    if (this.#model.value.draft == null) return
+    await this.#canvasChange('move', Object.keys(positions).length, [], (value) => setNodePositions(value, positions))
   }
 
   public async moveViewport(viewport: DesignerViewport): Promise<void> {
-    const target = this.#model.value.target
-    if (target == null) return
-    await this.#changePresentation((value) => setFlowViewport(value, target, viewport), true)
+    if (this.#model.value.draft == null) return
+    await this.#changePresentation((value) => setFlowViewport(value, viewport), true)
   }
 
   public async check(): Promise<void> {
-    await this.#checkTarget()
+    await this.#checkDraft()
   }
 
   public async refreshFlows(): Promise<void> {
@@ -982,9 +924,8 @@ export class WorkspaceStore {
 
   public locateNode(nodeId: string, { preserveSelection = false }: { readonly preserveSelection?: boolean } = {}): boolean {
     const revision = this.$.revision.value
-    const target = this.#model.value.target
-    if (revision == null || target == null) return false
-    if (revision.node(target, nodeId) == null && !commentIds(this.#model.value.presentation?.value ?? {}, target).has(nodeId)) return false
+    if (revision == null) return false
+    if (revision.node(nodeId) == null && !commentIds(this.#model.value.presentation?.value ?? {}).has(nodeId)) return false
     if (!preserveSelection && !this.selectNodes([nodeId])) return false
     this.#set({ nodeFocus: { nodeId, requestId: ++this.#nodeFocusId } })
     return true
@@ -1002,7 +943,7 @@ export class WorkspaceStore {
     return true
   }
 
-  async #addComment(target: GraphTarget, nodeId: string, position: Point): Promise<string | undefined> {
+  async #addComment(nodeId: string, position: Point): Promise<string | undefined> {
     const number = Math.max(
       0,
       ...this.#designer().nodes.flatMap((node) => {
@@ -1016,7 +957,7 @@ export class WorkspaceStore {
       1,
       [],
       (value) =>
-        setComment(value, target, nodeId, {
+        setComment(value, nodeId, {
           content: '',
           position,
           title: this.#i18n.t('addNode.commentName', { number: number + 1 }),
@@ -1086,30 +1027,29 @@ export class WorkspaceStore {
       if (draft == null) return
       const repairs = repairNodeNames(draft.content)
       if (repairs.length == 0) {
-        void this.#checkTarget()
+        void this.#checkDraft()
         return
       }
       const changed = await this.#changeDraft(repairs, false)
       if (changed != null || !current()) return
       if (this.#model.value.draft?.revisionId == draft.revisionId) break
     }
-    if (current()) void this.#checkTarget()
+    if (current()) void this.#checkDraft()
   }
 
   #applyDraft(draft: Draft, origin: 'local' | 'external'): boolean {
     const previousDraft = this.#model.value.draft
-    const { revision, selectedNodeIds, target } = this.#reconcileRevision(draft)
+    const { revision, selectedNodeIds } = this.#reconcileRevision(draft)
     const editor = this.#model.value.moduleEditor
     const keepEditor = editor != null && (origin == 'external' || previousDraft != null) && moduleEditorStatus(previousDraft, editor) != 'saved'
     let moduleEditor: ModuleEditorDraft | undefined
     if (keepEditor) moduleEditor = origin == 'external' ? { ...editor, phase: 'failed' } : editor
-    else moduleEditor = selectedModuleEditor(revision, target, selectedNodeIds)
+    else moduleEditor = selectedModuleEditor(revision, selectedNodeIds)
     this.#set({
       // Keep the last check until its replacement arrives; pending is not error-free.
       draft,
       moduleEditor,
       selectedNodeIds,
-      target,
     })
     return keepEditor
   }
@@ -1147,10 +1087,10 @@ export class WorkspaceStore {
     deletion?: PropertyDeletion,
   ): Promise<boolean> {
     if (this.#disposed || this.#history.applying || this.#history.failed) return false
-    const { draft, target, presentation, selectedNodeIds } = this.#model.value
-    if (draft == null || target == null || presentation == null) return false
+    const { draft, presentation, selectedNodeIds } = this.#model.value
+    if (draft == null || presentation == null) return false
     const next = update?.(presentation.value) ?? presentation.value
-    const presentationChange = canvasPresentationChange(presentation.value, next, target)
+    const presentationChange = canvasPresentationChange(presentation.value, next)
     if (dequal(applyFlowChanges(draft, changes).content, draft.content) && presentationChange.nodeIds.length == 0) return true
     const generation = this.#history.generation
     const inverse = inverseFlowChanges(draft.content, changes)
@@ -1158,7 +1098,6 @@ export class WorkspaceStore {
     const entry: CanvasHistoryEntry = {
       action,
       count,
-      target,
       forward: changes,
       inverse,
       presentation: presentationChange,
@@ -1204,7 +1143,7 @@ export class WorkspaceStore {
     try {
       const [draft, presentation] = await Promise.all([
         this.#changeDraft(redo ? entry.forward : entry.inverse, true, 'canvas'),
-        this.#changePresentation((value) => restoreCanvasPresentation(value, entry.target, entry.presentation, redo), true),
+        this.#changePresentation((value) => restoreCanvasPresentation(value, entry.presentation, redo), true),
       ])
       if (draft != null && presentation && generation == this.#history.generation) {
         this.selectNodes(redo ? entry.afterSelection : entry.beforeSelection)
@@ -1239,7 +1178,7 @@ export class WorkspaceStore {
         this.#flows.advanceHead(flowId, draft.revisionId)
         this.#history.failed = false
         this.#setNotice({ kind: 'error', message: this.#i18n.t('history.resynced') })
-        void this.#checkTarget()
+        void this.#checkDraft()
       } catch {
         if (current() && !this.#disposed) this.#setNotice({ kind: 'error', message: this.#i18n.t('history.syncFailed') })
       }
@@ -1251,13 +1190,12 @@ export class WorkspaceStore {
     return this.#historyRecovery
   }
 
-  async #checkTarget(): Promise<void> {
+  async #checkDraft(): Promise<void> {
     if (this.#disposed) return
     const flowId = this.#model.value.flowId
     const draft = this.#model.value.draft
-    const target = this.#model.value.target
-    if (flowId == null || draft == null || target == null) {
-      if (target == null) this.#set({ checkLoading: false, diagnostics: undefined })
+    if (flowId == null || draft == null) {
+      if (this.#model.value.draft == null) this.#set({ checkLoading: false, diagnostics: undefined })
       return
     }
     this.#set({ checkLoading: true, diagnosticFocus: undefined })
@@ -1328,7 +1266,7 @@ export class WorkspaceStore {
           message: this.#i18n.t(preserveModuleEditor ? 'notice.moduleUpdated' : 'notice.draftUpdated'),
         })
       }
-      void this.#checkTarget()
+      void this.#checkDraft()
       return true
     } catch (error) {
       if (reportError && this.#isDraftChangeCurrent(context)) this.#setNotice(errorNotice(error, this.#i18n.t))
@@ -1338,14 +1276,13 @@ export class WorkspaceStore {
 
   #designer(): DesignerGraph {
     const state = this.#model.value
-    return designerGraph(state.draft, state.target, state.presentation?.value, state.diagnostics?.diagnostics, {}, {}, this.#i18n.t)
+    return designerGraph(state.draft, state.presentation?.value, state.diagnostics?.diagnostics, {}, {}, this.#i18n.t)
   }
 
   #reconcileRevision(draft: Draft): ReconciledRevision {
     const revision = revisionView(draft)
-    const target = this.#model.value.target
-    const selectedNodeIds = this.#model.value.selectedNodeIds.filter((nodeId) => target != null && revision.selection(target, nodeId) != null)
-    return { revision, selectedNodeIds, target }
+    const selectedNodeIds = this.#model.value.selectedNodeIds.filter((nodeId) => revision.selection(nodeId) != null)
+    return { revision, selectedNodeIds }
   }
 
   #isDraftChangeCurrent(context: DraftChangeContext): boolean {

@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
 import type { TriggerDisplay } from '../../../../control/common/triggerCatalog.ts'
-import type { GraphNode, GraphTarget } from '../../../../flow/common/change.ts'
+import type { GraphNode } from '../../../../flow/common/change.ts'
 import type { ConnectorAccess, ConnectorAccessCandidates, ConnectorAction, ConnectorConnection, Diagnostic, Group, InputPort } from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { WorkbenchTheme } from '../contract.ts'
@@ -118,18 +118,17 @@ function nodePurposePlaceholder(
 function inputUpstreamSources({
   revision,
   sourceNodeIcons,
-  target,
   selection,
   store,
   handleName,
   t,
   triggerDisplays,
-}: Pick<Props, 'revision' | 'sourceNodeIcons' | 'target' | 'store' | 'triggerDisplays'> & {
+}: Pick<Props, 'revision' | 'sourceNodeIcons' | 'store' | 'triggerDisplays'> & {
   readonly selection: ResolvedNode
   readonly handleName: string
   readonly t: TFunction
 }): NodeInputUpstreamSources | undefined {
-  const graph = revision.graph(target)!
+  const graph = revision.graph()!
   const mapping = nodeInputMappings(selection.node)[handleName]
   const sources = mapping?.kind == 'sources' ? mapping.sources.filter((source) => source.kind == 'node') : []
   const providerDisplay = (node: GraphNode | undefined) =>
@@ -140,11 +139,11 @@ function inputUpstreamSources({
       return {
         description:
           node == null
-            ? revision.outputDescription(target, source.nodeId, source.output)
+            ? revision.outputDescription(source.nodeId, source.output)
             : presentProviderOutputDescription(
                 node,
                 source.output,
-                presentBuiltInOutputDescription(node, source.output, revision.outputDescription(target, source.nodeId, source.output), t),
+                presentBuiltInOutputDescription(node, source.output, revision.outputDescription(source.nodeId, source.output), t),
                 providerDisplay(node),
               ),
         icon: sourceNodeIcons?.[source.nodeId],
@@ -155,7 +154,7 @@ function inputUpstreamSources({
         check: undefined,
       }
     }),
-    query: revision.inputSource(target, selection.id, handleName),
+    query: revision.inputSource(selection.id, handleName),
     groups: [],
     describeGroups: (candidates) =>
       Object.entries(candidates).map(([nodeId, outputs]) => {
@@ -202,7 +201,7 @@ interface Props {
   readonly sourceNodeIcons?: Readonly<Record<string, string | undefined>>
   readonly store?: WorkspaceStore
   readonly theme: WorkbenchTheme
-  readonly target: GraphTarget
+
   readonly triggerActiveConnections?: readonly ConnectorConnection[]
   readonly triggerAuthorizationPending?: boolean
   readonly triggerConnection?: ConnectorConnection
@@ -248,7 +247,6 @@ export function NodeInspector({
   sourceNodeIcons,
   store: writableStore,
   theme,
-  target,
   triggerActiveConnections,
   triggerAuthorizationPending = false,
   triggerConnection,
@@ -496,7 +494,6 @@ export function NodeInspector({
                         upstream={inputUpstreamSources({
                           revision,
                           sourceNodeIcons,
-                          target,
                           selection,
                           store,
                           handleName: definition.handle,
@@ -589,7 +586,7 @@ export function NodeInspector({
                         }
                       : undefined
                 }
-                renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t, triggerDisplays })}
+                renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, selection, store, handleName: handle, t, triggerDisplays })}
                 variables={variables}
                 disabled={disabled}
                 onValue={(handle, value, deletion) => {
@@ -640,9 +637,7 @@ export function NodeInspector({
                       onVariable={(handle, name) => {
                         void store?.setInputVariable(selection.id, handle, name)
                       }}
-                      renderSource={(handle) =>
-                        inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t, triggerDisplays })
-                      }
+                      renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, selection, store, handleName: handle, t, triggerDisplays })}
                     />
                   </section>
                 )}
@@ -656,9 +651,9 @@ export function NodeInspector({
             value={selection.node}
             disabled={disabled}
             variables={variables}
-            renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t, triggerDisplays })}
+            renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, selection, store, handleName: handle, t, triggerDisplays })}
             variableName={(source) => (source.kind === 'binding' ? revision.binding(source.bindingId)?.target : undefined)}
-            sourceType={(source) => revision.sourceType(target, source)}
+            sourceType={(source) => revision.sourceType(source)}
             onVariable={(handle, name) => {
               void store?.setInputVariable(selection.id, handle, name)
             }}

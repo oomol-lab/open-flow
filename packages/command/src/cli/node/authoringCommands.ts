@@ -199,8 +199,7 @@ export async function edgeCommand(
   const source = exactEdgeSource(selected.graph.nodes, operands[1]!)
   const targetNode = exactNode(selected.graph.nodes, operands[2]!)
   const edge = { source: source.id, target: targetNode.nodeId, ...(operands[3] == null ? {} : { sourceHandle: operands[3] }) }
-  const operations =
-    operation == 'connect' ? connectEdge(selected.draft.content, selected.target, edge) : disconnectEdge(selected.draft.content, selected.target, edge)
+  const operations = operation == 'connect' ? connectEdge(selected.draft.content, edge) : disconnectEdge(selected.draft.content, edge)
   const kind = `edge.${operation}` as const
   if (operations.length == 0) {
     write(
@@ -291,7 +290,7 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
         const source = exactEdgeSource(selected.graph.nodes, extra[index]!)
         sources.push({ kind: 'node' as const, nodeId: source.id, output: extra[index + 1]! })
       }
-      const operations = setInputSources(selected.draft.content, selected.target, resolved.nodeId, extra[0]!, sources)
+      const operations = setInputSources(selected.draft.content, resolved.nodeId, extra[0]!, sources)
       const changed = await changeDraft(
         client,
         args,
@@ -332,34 +331,29 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
         case 'code': {
           const moduleId = authoringId(args, 'module')
           const source = args.code == null ? undefined : await argumentText(args.code, '--code', 'code.source-unreadable', runtime)
-          operations = createCodeTask(
-            selected.target,
-            { moduleId, nodeId },
-            name,
-            source == null ? undefined : { imports: await moduleImports(source), source },
-          )
+          operations = createCodeTask({ moduleId, nodeId }, name, source == null ? undefined : { imports: await moduleImports(source), source })
           identity = { moduleId }
           break
         }
         case 'condition':
           if (args.code != null) throw new CliError('cli.invalid-arguments', '--code is only valid when adding a Code Node.')
-          operations = createCondition(selected.target, nodeId, name)
+          operations = createCondition(nodeId, name)
           break
         case 'agent': {
           if (args.code != null) throw new CliError('cli.invalid-arguments', '--code is only valid when adding a Code Node.')
 
-          operations = createAgentTask(selected.target, { nodeId }, name)
+          operations = createAgentTask({ nodeId }, name)
           break
         }
         case 'llm-chat':
         case 'llm-json':
           if (args.code != null) throw new CliError('cli.invalid-arguments', '--code is only valid when adding a Code Node.')
 
-          operations = createLlmTask(selected.target, { nodeId }, name, nodeReference == 'llm-chat' ? 'chat' : 'json', 'Generated response.')
+          operations = createLlmTask({ nodeId }, name, nodeReference == 'llm-chat' ? 'chat' : 'json', 'Generated response.')
           break
         case 'value':
           if (args.code != null) throw new CliError('cli.invalid-arguments', '--code is only valid when adding a Code Node.')
-          operations = createValue(selected.target, nodeId, name)
+          operations = createValue(nodeId, name)
           break
         default:
           throw new CliError('node.kind-invalid', `Unknown Node kind ${JSON.stringify(nodeReference)}.`)
@@ -416,7 +410,7 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
         )
         return
       }
-      const operations = updateSettings(selected.draft.content, selected.target, resolved.nodeId, settings)!
+      const operations = updateSettings(selected.draft.content, resolved.nodeId, settings)!
       const target = { flowId: selected.flow.flowId, kind: 'node', nodeId: resolved.nodeId }
       const changed = await changeDraft(client, args, flow.flowId, selected.draft.revisionId, target, operations)
       write(
@@ -441,14 +435,7 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
       if (!args.yes) throw new CliError('node.confirmation-required', 'Node removal requires --yes.')
       const resolved = exactNode(selected.graph.nodes, nodeReference)
       const target = { flowId: selected.flow.flowId, kind: 'node', nodeId: resolved.nodeId }
-      const changed = await changeDraft(
-        client,
-        args,
-        flow.flowId,
-        selected.draft.revisionId,
-        target,
-        deleteNodes(selected.draft.content, selected.target, [resolved.nodeId]),
-      )
+      const changed = await changeDraft(client, args, flow.flowId, selected.draft.revisionId, target, deleteNodes(selected.draft.content, [resolved.nodeId]))
       write(
         runtime,
         args.json,
@@ -544,7 +531,6 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
           return {
             identity: { kind: node.kind, moduleId: identity.moduleId, name: node.name, nodeId, reference },
             operations: createCodeTask(
-              selected.target,
               identity,
               node.name,
               { imports: await moduleImports(code), source: code },
@@ -575,7 +561,7 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
               nodeId,
               reference,
             },
-            operations: createManagedTask(selected.target, identity, {
+            operations: createManagedTask(identity, {
               executor: {
                 action: action.actionId,
                 ...(connection == null ? {} : { connectionId: connection.connectionId }),
@@ -590,21 +576,19 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
         case 'condition':
           return {
             identity: { kind: node.kind, name: node.name, nodeId, reference },
-            operations: createCondition(selected.target, nodeId, node.name),
+            operations: createCondition(nodeId, node.name),
           }
         case 'agent': {
-          if (selected.target.kind != 'flow') throw new CliError('flow.apply-invalid', 'Agent nodes are only supported in the root Flow.')
-
           return {
             identity: { kind: node.kind, name: node.task.name, nodeId, reference },
-            operations: createManagedTask(selected.target, { nodeId }, node.task),
+            operations: createManagedTask({ nodeId }, node.task),
           }
         }
         case 'llm-chat':
         case 'llm-json': {
           return {
             identity: { kind: node.kind, name: node.name, nodeId, reference },
-            operations: createLlmTask(selected.target, { nodeId }, node.name, node.kind == 'llm-chat' ? 'chat' : 'json', 'Generated response.', {
+            operations: createLlmTask({ nodeId }, node.name, node.kind == 'llm-chat' ? 'chat' : 'json', 'Generated response.', {
               inputs: node.inputs,
               output: node.output,
             }),
@@ -613,7 +597,7 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
         case 'value':
           return {
             identity: { kind: node.kind, name: node.name, nodeId, reference },
-            operations: createValue(selected.target, nodeId, node.name),
+            operations: createValue(nodeId, node.name),
           }
       }
     }),
@@ -626,21 +610,21 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
           const name = trigger.name ?? 'Manual trigger'
           return {
             identity: { kind: trigger.kind, name, reference, triggerId },
-            operations: createBuiltinTrigger(selected.target, triggerId, { kind: 'manual', name }),
+            operations: createBuiltinTrigger(triggerId, { kind: 'manual', name }),
           }
         }
         case 'webhook': {
           const name = trigger.name ?? 'Webhook'
           return {
             identity: { kind: trigger.kind, name, reference, triggerId },
-            operations: createBuiltinTrigger(selected.target, triggerId, { bodyFields: [], kind: trigger.kind, method: 'POST', name }),
+            operations: createBuiltinTrigger(triggerId, { bodyFields: [], kind: trigger.kind, method: 'POST', name }),
           }
         }
         case 'cron': {
           const name = trigger.name ?? 'Scheduled Trigger'
           return {
             identity: { kind: trigger.kind, name, reference, triggerId },
-            operations: createBuiltinTrigger(selected.target, triggerId, {
+            operations: createBuiltinTrigger(triggerId, {
               cronTimes: trigger.schedule ?? [{ type: 'every', unit: 'hour', value: 1 }],
               kind: trigger.kind,
               name,
@@ -662,7 +646,7 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
               triggerId,
               triggerKind: definition.type,
             },
-            operations: createProviderTrigger(selected.target, triggerId, definition, {
+            operations: createProviderTrigger(triggerId, definition, {
               config: trigger.config,
               connectionId: connection!.connectionId,
               name,
@@ -695,7 +679,7 @@ export async function applyFlowCommand(client: ControlClient, flow: Flow, operan
       ...(requested.sourceHandle == null ? {} : { sourceHandle: requested.sourceHandle }),
       target: targetNodeId,
     }
-    const edgeOperations = connectEdge(content, selected.target, edge)
+    const edgeOperations = connectEdge(content, edge)
     operations.push(...edgeOperations)
     if (edgeOperations.length > 0) content = applyFlowChanges(content, edgeOperations)
     edges.push({ ...edge, sourceReference: requested.source, targetReference: requested.target })

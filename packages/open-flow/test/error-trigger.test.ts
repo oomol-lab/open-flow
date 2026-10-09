@@ -38,9 +38,7 @@ describe('Flow Error contract', () => {
   })
 
   it('rejects duplicate Flow Error nodes', () => {
-    expect(() =>
-      applyFlowChanges(content, [{ kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'another', node: { kind: 'error', name: 'Another' } }]),
-    ).toThrow('only one')
+    expect(() => applyFlowChanges(content, [{ kind: 'graph.node.create', nodeId: 'another', node: { kind: 'error', name: 'Another' } }])).toThrow('only one')
   })
 
   it('rejects duplicate or empty upstream IDs at the input boundary', () => {

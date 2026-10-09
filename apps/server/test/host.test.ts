@@ -515,7 +515,6 @@ it('streams independent Flow catalog and current Flow invalidations', async () =
         kind: 'graph.node.create',
         node: { kind: 'manual', name: 'Start' },
         nodeId: 'marker',
-        target: { kind: 'flow' },
       },
     ])
     const notification = await reader.read()

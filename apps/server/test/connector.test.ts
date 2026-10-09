@@ -492,14 +492,13 @@ describe('Server Connector host', () => {
     await service.control.addProviderAccessBinding('test', created.flow.flowId, 'example', candidates.candidates[0]!.accessBindingId, 0)
     const revision = connectorFlow()
     const changed = await service.control.changeDraft('test', created.flow.flowId, created.flow.draftRevisionId, [
-      { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start', target: { kind: 'flow' } },
+      { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start' },
       {
         kind: 'graph.node.create',
         node: { ...revision.document.graph.nodes.connector!, name: 'Connector' },
         nodeId: 'connector',
-        target: { kind: 'flow' },
       },
-      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'connector' }, target: { kind: 'flow' } },
+      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'connector' } },
     ])
     const accepted = await service.control.runs.createDraftRun(created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v5', {}, 'team-run', {
       nodeId: 'start',

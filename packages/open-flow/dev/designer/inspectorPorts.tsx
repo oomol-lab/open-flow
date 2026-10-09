@@ -18,7 +18,6 @@ import { InspectorSamplePanel } from './inspectorSamplePanel.tsx'
 import { createInspectorSession } from './inspectorSession.ts'
 import { useStoryActions } from './storyActions.tsx'
 
-const target = { kind: 'flow' } as const
 const port = (handle: string, type = 'string') => ({ handle, jsonSchema: { type } as const, nullable: false })
 const reportSchema = {
   type: 'object',
@@ -164,14 +163,14 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
   ])
   if (session == null || revision == null) return null
   const selection = session.store.$.selection.value
-  const model = designerGraph(revision.revision, target, presentation?.value, [], {}, {}, session.i18n.t)
+  const model = designerGraph(revision.revision, presentation?.value, [], {}, {}, session.i18n.t)
   return (
     <I18nProvider i18n={session.i18n}>
       <div className="open-flow-workbench open-flow-theme h-full p-5" style={{ overflow: 'auto' }} data-theme={dark ? 'dark' : 'light'}>
         <div className={`editor-grid h-[650px] overflow-hidden rounded-lg border border-border ${open ? '' : 'context-panel-closed'}`}>
           <WorkbenchCanvas
             model={model}
-            target={target}
+
             theme={dark ? 'dark' : 'light'}
             disabled={disabled}
             inspectorOpen={open}
@@ -222,7 +221,7 @@ function Gallery({ dark, language, log }: { dark: boolean; language: UiLanguage;
                 selection={selection}
                 store={session.store}
                 theme={dark ? 'dark' : 'light'}
-                target={target}
+
                 triggerAuthorizationPending={false}
                 triggerConnectionLoading={false}
                 triggers={session.triggers}

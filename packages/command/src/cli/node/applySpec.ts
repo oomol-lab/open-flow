@@ -211,9 +211,7 @@ export function applySpec(source: string): ApplySpec {
           applyKeys(node, ['kind', 'task'], `nodes.${reference}`)
           let operation
           try {
-            ;[operation] = decodeChangeOperations([
-              { kind: 'graph.node.create', nodeId: reference, target: { kind: 'flow' }, node: { kind: 'task', inputs: {}, task: node.task } },
-            ])
+            ;[operation] = decodeChangeOperations([{ kind: 'graph.node.create', nodeId: reference, node: { kind: 'task', inputs: {}, task: node.task } }])
           } catch (error) {
             throw new CliError('flow.apply-invalid', `nodes.${reference}.task: ${error instanceof Error ? error.message : String(error)}`)
           }

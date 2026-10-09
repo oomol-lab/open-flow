@@ -60,7 +60,7 @@ describe('Agent tool contracts', () => {
   it('edits an Agent atomically and rejects a stale definition', () => {
     const before = task()
     const value = { ...before, executor: { ...before.executor, maxRounds: 5 } } as ManagedTaskDefinition
-    const operations = decodeChangeOperations([{ kind: 'graph.node.task.set', target: { kind: 'flow' as const }, nodeId: 'agent', before, value }])
+    const operations = decodeChangeOperations([{ kind: 'graph.node.task.set', nodeId: 'agent', before, value }])
     const edited = applyFlowChanges(revision(before), operations)
     expect((edited.document.graph.nodes['agent'] as TaskNode).task as ManagedTaskDefinition).toEqual(value)
     expect(() => applyFlowChanges(edited, operations)).toThrow(/changed/)

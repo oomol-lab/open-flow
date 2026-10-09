@@ -6,19 +6,18 @@ import { describe, expect, it } from 'vitest'
 import { applyFlowChanges, changeOperationsSchema, decodeChangeOperations } from '../src/flow/common/change.ts'
 import { decodeFlowDocument } from '../src/flow/common/changeSchema.ts'
 
-const target = { kind: 'flow' }
 const operations = [
-  { kind: 'graph.node.create', target, nodeId: 'start', node: { kind: 'webhook', method: 'POST', name: 'Start', bodyFields: [] } },
+  { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'webhook', method: 'POST', name: 'Start', bodyFields: [] } },
   {
     kind: 'graph.node.create',
-    target,
+
     nodeId: 'pause',
     node: { kind: 'wait', name: 'Pause', inputs: {}, inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true }], prompt: 'Continue?' },
   },
-  { kind: 'graph.edge.connect', target, edge: { source: 'start', target: 'pause' } },
+  { kind: 'graph.edge.connect', edge: { source: 'start', target: 'pause' } },
   {
     kind: 'graph.node.input.set',
-    target,
+
     nodeId: 'pause',
     handle: 'value',
     value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'start', output: 'payload' }] },
@@ -31,7 +30,7 @@ it.each([
   { kind: 'connector', connectionHints: [{ action: 'example.echo', connectionId: 'connection', extra: true }] },
 ])('rejects malformed Connector capabilities instead of stripping them: %j', (capability) => {
   const node = { kind: 'task', inputs: {}, task: { name: 'Code', moduleId: 'main', inputs: [], outputs: [], capabilities: [capability] } }
-  const operation = { kind: 'graph.node.create', target, nodeId: 'code', node }
+  const operation = { kind: 'graph.node.create', nodeId: 'code', node }
   expect(() => decodeChangeOperations([operation])).toThrow()
   expect(new Validator(changeOperationsSchema() as object).validate([operation]).valid).toBe(false)
   expect(() => decodeFlowDocument({ bindings: {}, graph: { nodes: { code: node }, edges: [] } })).toThrow()
@@ -44,7 +43,7 @@ it.each([
 ])('preserves valid Connector capability declarations: %j', (capability) => {
   const operation = {
     kind: 'graph.node.create',
-    target,
+
     nodeId: 'code',
     node: { kind: 'task', inputs: {}, task: { name: 'Code', moduleId: 'main', inputs: [], outputs: [], capabilities: [capability] } },
   }
@@ -99,7 +98,7 @@ describe('ChangeOperation wire contract', () => {
     { bodyFields: [], kind: 'webhook', method: 'POST', name: 'Webhook', options: { noResponseBody: true } },
     { bodyFields: [], kind: 'webhook', name: 'Webhook', options: { allowedMethods: ['POST'] } },
   ])('rejects an unsupported or legacy Webhook contract: %j', (node) => {
-    const operation = [{ kind: 'graph.node.create', node, nodeId: 'webhook', target }]
+    const operation = [{ kind: 'graph.node.create', node, nodeId: 'webhook' }]
     expect(() => decodeChangeOperations(operation)).toThrow()
     expect(new Validator(changeOperationsSchema() as object).validate(operation).valid).toBe(false)
   })
@@ -107,7 +106,7 @@ describe('ChangeOperation wire contract', () => {
   it('accepts Approval as a separate node and rejects legacy actions on both resolution nodes', () => {
     const approval = {
       kind: 'graph.node.create',
-      target,
+
       nodeId: 'approval',
       node: { kind: 'approval', inputs: {}, inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true }], prompt: 'Approve?' },
     }
@@ -130,7 +129,7 @@ it('exposes a small standalone schema for a single operation', () => {
 })
 
 it('rejects a field value with the wrong primitive type', () => {
-  const invalid = [{ kind: 'graph.node.field.set', target, nodeId: 'start', field: 'name', before: 'Start', value: 42 }]
+  const invalid = [{ kind: 'graph.node.field.set', nodeId: 'start', field: 'name', before: 'Start', value: 42 }]
   expect(() => decodeChangeOperations(invalid)).toThrow()
   expect(new Validator(changeOperationsSchema() as object).validate(invalid).valid).toBe(false)
 })
@@ -139,9 +138,9 @@ it.each([
   { kind: 'subflow.create', subflowId: 'child', subflow: { name: 'Child', inputs: [], outputs: [], graph: { nodes: {}, edges: [] } } },
   { kind: 'subflow.delete', subflowId: 'child' },
   { kind: 'subflow.definition.set', subflowId: 'child', before: {}, definition: {} },
-  { kind: 'graph.node.create', target, nodeId: 'child', node: { kind: 'subflow', subflowId: 'child', inputs: {} } },
+  { kind: 'graph.node.create', nodeId: 'child', node: { kind: 'subflow', subflowId: 'child', inputs: {} } },
   { kind: 'graph.node.delete', target: { kind: 'subflow', id: 'child' }, nodeId: 'node' },
-  { kind: 'graph.node.input.set', target, nodeId: 'node', handle: 'value', value: { kind: 'sources', sources: [{ kind: 'flow', input: 'value' }] } },
+  { kind: 'graph.node.input.set', nodeId: 'node', handle: 'value', value: { kind: 'sources', sources: [{ kind: 'flow', input: 'value' }] } },
 ])('rejects retired Subflow operations at the public boundary: %j', (operation) => {
   expect(() => decodeChangeOperations([operation])).toThrow()
   expect(new Validator(changeOperationsSchema() as object).validate([operation]).valid).toBe(false)

@@ -262,7 +262,7 @@ function Preview({ dark, language, log }: { dark: boolean; language: UiLanguage;
                 }}
                 provideAddNodeOptions={data.searchOptions}
                 selectedNodeIds={[]}
-                target={{ kind: 'flow' }}
+
                 theme={dark ? 'dark' : 'light'}
                 onAddNode={async (option) => {
                   log('Add node from empty canvas', option.id)

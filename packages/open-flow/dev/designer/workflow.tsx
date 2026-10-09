@@ -277,10 +277,10 @@ function WorkflowStory({
             <CanvasNodePicker
               key={`${pickerRequest.screenPosition.x}:${pickerRequest.screenPosition.y}`}
               request={pickerRequest}
-              options={deriveAddNodeOptions(pickerDraft, { kind: 'flow' }, i18n.t)}
+              options={deriveAddNodeOptions(pickerDraft, i18n.t)}
               browseOptions={async () => []}
               searchOptions={async (query) =>
-                deriveAddNodeOptions(pickerDraft, { kind: 'flow' }, i18n.t).filter((option) => option.label.toLowerCase().includes(query.toLowerCase()))
+                deriveAddNodeOptions(pickerDraft, i18n.t).filter((option) => option.label.toLowerCase().includes(query.toLowerCase()))
               }
               provideChoices={async () => []}
               disabled={!editable}
