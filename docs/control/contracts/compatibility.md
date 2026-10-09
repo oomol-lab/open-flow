@@ -108,5 +108,5 @@ Wait 的提前输出端口及等待记录中的输出字段直接由 `notificati
 
 本次预发布包含两处 CLI JSON 断点：`trigger search` 的 `definitions` 改为 `keys`；`node show` 的
 `nodeId`、`node`、`task?`、`module?` 从原来的 `node` 包装中展开到结果顶层。旧字段和嵌套不保留别名，
-消费方需按 [CLI 结果合同](../../authoring/flow-command.md#cli-与-mcp-的结果合同) 更新读取路径。
+消费方需按 [CLI 结果合同](../../authoring/flow-command.md#输出与错误) 更新读取路径。
 MCP 工具合同、Flow model 和 Engine Contract 不变。

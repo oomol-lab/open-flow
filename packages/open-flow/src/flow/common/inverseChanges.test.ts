@@ -19,6 +19,12 @@ function roundTrip(before: RevisionContent, operations: readonly ChangeOperation
 }
 
 describe('inverse canvas changes', () => {
+  it('restores a replacement whose name was normalized when applied', () => {
+    const content = applyFlowChanges(empty, createValue('value', 'Original'))
+    const before = content.document.graph.nodes.value!
+    roundTrip(content, [{ kind: 'graph.node.replace', nodeId: 'value', before, node: { ...before, name: '  Cafe\u0301  ' } }])
+  })
+
   it('restores direct Trigger selections after changing, clearing and deleting a node', () => {
     const content: RevisionContent = {
       ...empty,

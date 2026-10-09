@@ -727,9 +727,14 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
       case 'graph.node.replace': {
         const graph = document.graph
         if (!dequal(graph.nodes[operation.nodeId], operation.before)) invalid('The Node changed before this operation was applied.')
-        const issue = nodeNameIssue(graph, operation.nodeId, operation.node.name ?? '')
+        if (operation.node.kind != operation.before.kind) invalid('Replacing a Node cannot change its kind.')
+        if (operation.node.kind == 'task' && 'moduleId' in operation.node.task && operation.node.task.capabilities !== undefined)
+          decodeConnectorCapabilities(operation.node.task.capabilities)
+        const name = normalizeNodeName(operation.node.name ?? '')
+        const issue = nodeNameIssue(graph, operation.nodeId, name)
         if (issue != null) invalid(`Node name is ${issue}.`)
-        Object.assign(document, { graph: { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: operation.node } } })
+        const node = name == operation.node.name ? operation.node : { ...operation.node, name }
+        Object.assign(document, { graph: { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: node } } })
         break
       }
       case 'graph.node.create': {

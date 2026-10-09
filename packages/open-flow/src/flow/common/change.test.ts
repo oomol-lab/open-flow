@@ -43,6 +43,47 @@ function taskNode(): GraphNode {
 }
 
 describe('Flow changes', () => {
+  it.each(['manual', 'error'] as const)('rejects replacing a Value with a %s Trigger', (kind) => {
+    const before = valueNode(1)
+    const source = applyFlowChanges(revision(), [
+      { kind: 'graph.node.create', nodeId: 'value', node: before },
+      { kind: 'graph.node.create', nodeId: 'trigger', node: { kind, name: 'Trigger' } },
+    ])
+    expect(() => applyFlowChanges(source, [{ kind: 'graph.node.replace', nodeId: 'value', before, node: { kind, name: 'Replacement' } }])).toThrow(
+      /cannot change its kind/,
+    )
+    expect(source.document.graph.nodes.value).toEqual(before)
+  })
+
+  it('validates inline Code capabilities when replacing a node without decoding first', () => {
+    const before = taskNode()
+    assert(before.kind == 'task' && 'moduleId' in before.task)
+    const source = applyFlowChanges(revision(), [{ kind: 'graph.node.create', nodeId: 'code', node: before }])
+    const invalidNode = { ...before, task: { ...before.task, capabilities: [{ kind: 'connector', action: 42, connections: [] }] } } as unknown as GraphNode
+    expect(() => applyFlowChanges(source, [{ kind: 'graph.node.replace', nodeId: 'code', before, node: invalidNode }])).toThrow()
+    const capabilities = [{ kind: 'connector', action: 'example.echo', connections: [] }] as const
+    const node = { ...before, task: { ...before.task, capabilities } }
+    expect(applyFlowChanges(source, [{ kind: 'graph.node.replace', nodeId: 'code', before, node }]).document.graph.nodes.code).toEqual(node)
+    expect(source.document.graph.nodes.code).toEqual(before)
+  })
+
+  it('normalizes replacement names while preserving configuration, edges and before-state checks', () => {
+    const before = valueNode(1)
+    const source = applyFlowChanges(revision(), [
+      { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
+      { kind: 'graph.node.create', nodeId: 'value', node: before },
+      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'value' } },
+    ])
+    const node = { ...valueNode(2), name: '  Cafe\u0301  ' }
+    const operation = { kind: 'graph.node.replace', nodeId: 'value', before, node } as const
+    const changed = applyFlowChanges(source, [operation])
+    expect(changed.document.graph.nodes.value).toEqual({ ...node, name: 'Café' })
+    expect(changed.document.graph.edges).toEqual(source.document.graph.edges)
+    expect(source.document.graph.nodes.value).toEqual(before)
+    expect(() => applyFlowChanges(changed, [operation])).toThrow(/changed before/)
+    for (const name of ['  ', ' Start ']) expect(() => applyFlowChanges(source, [{ ...operation, node: { ...node, name } }])).toThrow(/Node name is/)
+  })
+
   it('preserves incomplete code in a Draft without requiring valid syntax', async () => {
     const content = applyFlowChanges(revision(), createCodeTask({ moduleId: 'module', nodeId: 'task' }, 'Task'))
     const module = content.modules.module
