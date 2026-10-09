@@ -1,6 +1,45 @@
-import type { ErrorListener, Flow, FlowPage, Variable } from './api.ts'
+import type { ErrorListener, Flow, FlowPage, FlowResources, Variable } from './api.ts'
 
-import { exact, invalidResponse, record, string } from './decoding.ts'
+import { exact, integer, invalidResponse, record, string } from './decoding.ts'
+
+function strings(value: unknown): readonly string[] {
+  return Array.isArray(value) ? value.map(string) : invalidResponse()
+}
+
+function resourceReferences(input: unknown): FlowResources {
+  const source = record(input)
+  const draft = source.draft === null ? null : record(source.draft)
+  const shared = record(source.sharedAccess)
+  if (draft != null && !Array.isArray(draft.connections)) return invalidResponse()
+  if (!Array.isArray(shared.bindings)) return invalidResponse()
+  const accessRevision = integer(shared.accessRevision)
+  if (accessRevision < 0) return invalidResponse()
+  return {
+    draft:
+      draft == null
+        ? null
+        : {
+            variableNames: strings(draft.variableNames),
+            errorSourceFlowIds: strings(draft.errorSourceFlowIds),
+            connections: (draft.connections as unknown[]).map((value) => {
+              const connection = record(value)
+              return { providerId: string(connection.providerId), connectionId: string(connection.connectionId) }
+            }),
+          },
+    sharedAccess: {
+      accessRevision,
+      providerIds: strings(shared.providerIds),
+      bindings: shared.bindings.map((value) => {
+        const binding = record(value)
+        return {
+          providerId: string(binding.providerId),
+          connectionId: binding.connectionId === null ? null : string(binding.connectionId),
+          accessBindingId: string(binding.accessBindingId),
+        }
+      }),
+    },
+  }
+}
 
 export function flow(value: unknown): Flow {
   const source = record(value)
@@ -16,6 +55,7 @@ export function flow(value: unknown): Flow {
     createdAt: string(source.createdAt),
     ...(source.connectorTeamId == null ? {} : { connectorTeamId: string(source.connectorTeamId) }),
     draftRevisionId: string(source.draftRevisionId),
+    resourceReferences: resourceReferences(source.resourceReferences),
     flowId: string(source.flowId),
     name: string(source.name),
     status: status as Flow['status'],

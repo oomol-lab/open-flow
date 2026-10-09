@@ -114,6 +114,10 @@ export function triggerDraft(trigger: TriggerNode, downstream = false): { flow: 
     createdAt: timestamp,
     updatedAt: timestamp,
     draftRevisionId: 'revision-1',
+    resourceReferences: {
+      draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+      sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+    },
     flowId: 'trigger-lab',
     name: trigger.name,
     status: 'active',

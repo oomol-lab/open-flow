@@ -36,6 +36,10 @@ function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: Ui
         createdAt: '2026-09-24T09:00:00.000Z',
         updatedAt: '2026-09-24T09:00:00.000Z',
         draftRevisionId: 'draft',
+        resourceReferences: {
+          draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+          sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+        },
         status: 'active',
         version: 1,
       }

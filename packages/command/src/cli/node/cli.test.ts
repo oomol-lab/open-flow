@@ -17,6 +17,10 @@ function helpMessage(language: UiLanguage, key: 'options' | 'title'): string {
 const flow = {
   createdAt: '2026-08-14T00:00:00.000Z',
   draftRevisionId: 'revision-1',
+  resourceReferences: {
+    draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+    sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+  },
   flowId: 'flow-1',
   name: 'Main',
   status: 'active',

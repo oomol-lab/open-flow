@@ -9,6 +9,10 @@ const timestamp = '2026-08-26T00:00:00.000Z'
 const flow = {
   createdAt: timestamp,
   draftRevisionId: 'revision-1',
+  resourceReferences: {
+    draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+    sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+  },
   flowId: 'flow-1',
   name: 'Main',
   status: 'active',

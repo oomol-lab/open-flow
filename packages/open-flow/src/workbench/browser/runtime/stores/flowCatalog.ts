@@ -1,10 +1,12 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
+import type { RevisionContent } from '../../../../flow/common/change.ts'
 import type { WorkbenchClient, Flow } from '../api.ts'
 import type { SetNotice } from './workbenchNotice.ts'
 
 import * as Effect from 'effect/Effect'
 import { derive, val } from 'value-enhancer'
+import { flowResourceReferences } from '../../../../flow/common/semantics.ts'
 import { Latest } from './latest.ts'
 import { errorNotice } from './workbenchNotice.ts'
 
@@ -220,9 +222,17 @@ export class FlowCatalog {
     })
   }
 
-  public advanceHead(flowId: string, revisionId: string): void {
+  public advanceHead(flowId: string, revisionId: string, content: RevisionContent): void {
     this.#set({
-      flows: this.#state.value.flows.map((flow) => (flow.flowId == flowId ? { ...flow, draftRevisionId: revisionId } : flow)),
+      flows: this.#state.value.flows.map((flow) =>
+        flow.flowId == flowId
+          ? {
+              ...flow,
+              draftRevisionId: revisionId,
+              resourceReferences: { ...flow.resourceReferences, draft: flowResourceReferences(content) },
+            }
+          : flow,
+      ),
     })
   }
 

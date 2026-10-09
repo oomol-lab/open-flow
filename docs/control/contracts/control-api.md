@@ -84,6 +84,18 @@ interface Flow {
   live?: { enabled: boolean; publicationId: string; revisionId: string }
   createdAt: string
   draftRevisionId: string
+  resourceReferences: {
+    draft: {
+      variableNames: readonly string[]
+      connections: readonly { providerId: string; connectionId: string }[]
+      errorSourceFlowIds: readonly string[]
+    } | null
+    sharedAccess: {
+      accessRevision: number
+      providerIds: readonly string[]
+      bindings: readonly { providerId: string; connectionId: string | null; accessBindingId: string }[]
+    }
+  }
   flowId: string
   name: string
   status: 'active' | 'retiring'
@@ -101,6 +113,14 @@ interface FlowPage {
 
 `flowId` 由部署生成。删除请求把 Flow 推进到 `retiring`，此后 Draft mutation、Run、Publish、Rollback 和 Trigger admission fail closed。
 `total` 只在 `includeTotal=true` 时要求返回。
+
+`resourceReferences.draft` 对应 `draftRevisionId`，包含草稿实际引用的 Variable 名称、明确选择的连接账号和 Error Trigger 来源 Flow ID，
+去重并按稳定顺序返回。它描述整个草稿的静态引用，不表示某次 Run 实际使用了所有资源。
+草稿无法解码、需要修复或升级时返回 `null`，可读取但没有资源引用时返回三个空数组。
+`sharedAccess` 来自 Flow 当前独立维护的共享账号授权配置，按 `accessRevision` 标识版本；未配置时为 revision 0 和空数组。
+共享授权表示可用范围，不等于节点已使用该账号；无法识别账号的授权引用保留 `accessBindingId`，`connectionId` 为 `null`。
+账号作用域沿用 Flow 的 `connectorTeamId`。这些字段不包含 Variable 值、凭证、账号实时状态或发布版本资源快照。
+列表与详情返回相同资源引用投影。
 
 Flow 的 `live` 在未发布时省略，存在时表示当前发布版本与总开关。列表与单个 Flow 返回相同投影；`revisionId` 与 `draftRevisionId` 可用于区分草稿版本是否更新。
 `PUT /v1/flows/:flowId/enabled` 接受 `{ enabled: boolean, expectedPublicationId: string, version: 1 }`，不接受其他字段或 query，成功返回 `200 Flow`。

@@ -9,6 +9,10 @@ afterEach(() => {
 const flow = {
   createdAt: '2026-08-14T00:00:00.000Z',
   draftRevisionId: 'revision-1',
+  resourceReferences: {
+    draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+    sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+  },
   flowId: 'flow/1',
   name: 'Main',
   status: 'active',
@@ -17,6 +21,30 @@ const flow = {
 } as const
 
 describe('ControlClient Flow API', () => {
+  it.each([
+    {
+      draft: { variableNames: ['TOKEN'], connections: [], errorSourceFlowIds: [] },
+      sharedAccess: { accessRevision: 1, providerIds: ['mail'], bindings: [{ providerId: 'mail', connectionId: 'account', accessBindingId: 'grant' }] },
+    },
+    { draft: null, sharedAccess: { accessRevision: 2, providerIds: [], bindings: [{ providerId: 'mail', connectionId: null, accessBindingId: 'missing' }] } },
+  ])('decodes resource references in Flow detail and list responses', async (resourceReferences) => {
+    const expected = { ...flow, resourceReferences }
+    const client = new ControlClient(async (url) => Response.json(String(url).endsWith('/v1/flows') ? { flows: [expected], version: 1 } : expected))
+    await expect(client.getFlow(flow.flowId)).resolves.toEqual(expected)
+    await expect(client.listFlows()).resolves.toEqual({ flows: [expected], version: 1 })
+  })
+
+  it.each([
+    undefined,
+    { ...flow.resourceReferences, draft: {} },
+    { ...flow.resourceReferences, draft: { variableNames: [1], connections: [], errorSourceFlowIds: [] } },
+    { ...flow.resourceReferences, draft: { variableNames: [], connections: [{ providerId: 'mail', connectionId: null }], errorSourceFlowIds: [] } },
+    { ...flow.resourceReferences, sharedAccess: { accessRevision: -1, providerIds: [], bindings: [] } },
+    { ...flow.resourceReferences, sharedAccess: { accessRevision: 1, providerIds: [], bindings: [{ providerId: 'mail', accessBindingId: 'grant' }] } },
+  ])('rejects malformed Flow resource references', async (resourceReferences) => {
+    const client = new ControlClient(async () => Response.json({ ...flow, resourceReferences }))
+    await expect(client.getFlow(flow.flowId)).rejects.toMatchObject({ code: 'response.invalid' })
+  })
   it('creates and lists top-level Flows', async () => {
     const request = vi.fn(async (path: string, init?: RequestInit) => {
       if (path == '/v1/flows' && init?.method == 'POST') return Response.json(flow, { status: 201 })

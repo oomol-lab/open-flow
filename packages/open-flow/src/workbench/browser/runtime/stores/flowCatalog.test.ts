@@ -7,6 +7,10 @@ const flow = {
   createdAt: '2026-09-08T00:00:00.000Z',
   updatedAt: '2026-09-08T00:00:00.000Z',
   draftRevisionId: 'draft',
+  resourceReferences: {
+    draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+    sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+  },
   flowId: 'flow',
   name: 'Main',
   status: 'active',
@@ -24,6 +28,33 @@ const operation = {
 } as const
 
 afterEach(() => vi.useRealTimers())
+
+it('advances the draft and its resource references together while preserving shared access', () => {
+  const catalog = new FlowCatalog(new WorkbenchClient(vi.fn()), vi.fn(), createI18n())
+  const sharedAccess = { accessRevision: 2, providerIds: ['mail'], bindings: [{ providerId: 'mail', connectionId: 'shared', accessBindingId: 'grant' }] }
+  catalog.include({ ...flow, resourceReferences: { ...flow.resourceReferences, sharedAccess } })
+  try {
+    catalog.advanceHead('flow', 'next', {
+      modelVersion: 6,
+      modules: {},
+      document: {
+        bindings: {},
+        graph: {
+          edges: [],
+          nodes: {
+            error: { kind: 'error', name: 'Error', sourceFlowIds: ['upstream'] },
+          },
+        },
+      },
+    })
+    expect(catalog.flow('flow')).toMatchObject({
+      draftRevisionId: 'next',
+      resourceReferences: { draft: { variableNames: [], connections: [], errorSourceFlowIds: ['upstream'] }, sharedAccess },
+    })
+  } finally {
+    catalog.dispose()
+  }
+})
 
 it('refreshes stale enable controls without overwriting the current publication', async () => {
   const client = new WorkbenchClient(vi.fn())

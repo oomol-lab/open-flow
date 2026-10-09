@@ -17,6 +17,10 @@ const published: Flow = {
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
   draftRevisionId: 'draft',
+  resourceReferences: {
+    draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+    sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+  },
   live: { enabled: false, publicationId: 'publication', revisionId: 'revision' },
 }
 function render(props: Partial<ComponentProps<typeof ErrorTriggerSources>> = {}) {

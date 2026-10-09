@@ -51,7 +51,19 @@ export function createInspectorTransport(
     {},
     Object.fromEntries(Object.keys(initialContent.document.graph.nodes).map((id, index) => [id, { x: 30 + index * 360, y: 40 + index * 40 }])),
   )
-  const flow = { flowId: 'inspector-lab', name: 'Properties', draftRevisionId: 'r1', createdAt: timestamp, updatedAt: timestamp, version: 1, status: 'active' }
+  const flow = {
+    flowId: 'inspector-lab',
+    name: 'Properties',
+    draftRevisionId: 'r1',
+    resourceReferences: {
+      draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+      sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+    },
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    version: 1,
+    status: 'active',
+  }
   const revision = () => ({
     actorId: 'lab',
     createdAt: timestamp,

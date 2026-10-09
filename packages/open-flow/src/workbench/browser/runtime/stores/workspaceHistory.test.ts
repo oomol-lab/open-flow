@@ -11,7 +11,19 @@ import { WorkspaceStore } from './workspaceStore.ts'
 
 const timestamp = '2026-09-10T00:00:00.000Z'
 async function session() {
-  const flow = { flowId: 'flow', name: 'Flow', status: 'active', createdAt: timestamp, updatedAt: timestamp, draftRevisionId: 'r1', version: 1 } as const
+  const flow = {
+    flowId: 'flow',
+    name: 'Flow',
+    status: 'active',
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    draftRevisionId: 'r1',
+    resourceReferences: {
+      draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+      sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+    },
+    version: 1,
+  } as const
   let draft: Draft = {
     actorId: 'test',
     content: applyFlowChanges({ modelVersion: currentFlowModelVersion, document: { graph: { nodes: {}, edges: [] }, bindings: {} }, modules: {} }, [

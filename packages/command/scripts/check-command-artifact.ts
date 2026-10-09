@@ -114,7 +114,7 @@ const host = {
       const body = JSON.parse(String(init.body))
       flow = {
         createdAt: '2026-08-14T00:00:00.000Z',
-        draftRevisionId: 'revision-1',
+        draftRevisionId: 'revision-1', resourceReferences: { draft: { variableNames: [], connections: [], errorSourceFlowIds: [] }, sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] } },
         flowId: 'flow-1',
         name: body.name,
         status: 'active',
@@ -162,6 +162,10 @@ function flow() {
   return {
     createdAt: '2026-08-14T00:00:00.000Z',
     draftRevisionId: 'revision-1',
+    resourceReferences: {
+      draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+      sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+    },
     flowId: 'flow-1',
     name: 'Main',
     status: 'active',

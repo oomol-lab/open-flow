@@ -42,6 +42,7 @@ export {
 } from './results.ts'
 import type { RunStatus } from '../../execution/common/runLifecycle.ts'
 import type { InputPortDefinition, JsonValue, PortDefinition, RevisionContent, TriggerKeySnapshot, WaitAction } from '../../flow/common/change.ts'
+import type { FlowResourceReferences } from '../../flow/common/semantics.ts'
 
 import { flowCheck } from './checkDecoders.ts'
 import { connection, connectorAccess, connectorAccessSnapshot, connectorAccessCandidatesBatch, connectorAction } from './connectorDecoders.ts'
@@ -71,11 +72,21 @@ export interface ErrorListener {
   readonly enabled: boolean
 }
 
+export interface FlowResources {
+  readonly draft: FlowResourceReferences | null
+  readonly sharedAccess: {
+    readonly accessRevision: number
+    readonly providerIds: readonly string[]
+    readonly bindings: readonly { readonly providerId: string; readonly connectionId: string | null; readonly accessBindingId: string }[]
+  }
+}
+
 export interface Flow {
   readonly live?: { readonly enabled: boolean; readonly publicationId: string; readonly revisionId: string }
 
   readonly createdAt: string
   readonly draftRevisionId: string
+  readonly resourceReferences: FlowResources
   readonly flowId: string
   /** Connector Team scope used by the OOMOL resource cache. */
   readonly connectorTeamId?: string

@@ -310,6 +310,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       }),
     )
     const controlApiDeclaration = (await readFile(path.join(declarationRoot, 'control/common/api.d.ts'), 'utf8'))
+      .replaceAll("'../../flow/common/semantics.ts'", "'./flow-semantics.js'")
       .replaceAll("'./providerIconSprite.ts'", "'./providerIconSprite.js'")
       .replaceAll("'./draftOperations.ts'", "'./draftOperations.js'")
       .replaceAll("'./authoring.ts'", "'./authoring.js'")
