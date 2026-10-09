@@ -231,15 +231,16 @@ Node bound to the GitHub Connection, check it, run it, and publish it:
 ```bash
 oo flow create "GitHub digest"
 oo flow connector search "current user"
-oo flow connector add "GitHub digest" github.get_current_user --name me
+oo flow read "GitHub digest" --json
+oo flow schema connector --json
+oo flow edit "GitHub digest" --file edits.json --json
 oo flow check "GitHub digest"
 oo flow run "GitHub digest" --wait
 oo flow publish "GitHub digest"
 oo flow open "GitHub digest"
 ```
 
-- `connector add` binds the Action's default Connection when `--connection` is omitted. Pass
-  `--connection <alias>` to select a named Connection.
+- Prepare `edits.json` with `baseRevision`, `requestId` and node/input/edge edits, including a Manual trigger. Select an explicit Connection ID in the Connector configuration. See the [authoring contract](../../authoring/flow-command.md).
 - `check` validates the Revision. Whether credentials work, and whether the provider actually
   runs the Action, is only tested by `run`.
 - `run --wait` executes the Draft through OpenConnector and prints the result.
@@ -247,9 +248,7 @@ oo flow open "GitHub digest"
 - `open` prints the Workbench URL for the Flow and opens it in the browser. The operator token is
   not placed in the URL. The browser signs in with its own session.
 
-Add `--json` to any command for versioned machine output. `oo flow node add`, `oo flow connect`,
-`oo flow trigger add`, and `oo flow apply --file` cover Code Tasks, Edges, Triggers, and writing a
-Flow from a file. See `oo flow --help`.
+`oo flow read`, `oo flow search`, `oo flow schema`, `oo flow edit --file edits.json`, `oo flow check`: `oo flow --help --json`.
 
 ## 7. Optional: Use the same OpenConnector from oo connector
 

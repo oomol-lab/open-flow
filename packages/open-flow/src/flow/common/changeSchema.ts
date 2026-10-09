@@ -53,47 +53,47 @@ const decisionQuestion = z.discriminatedUnion('type', [
   z.strictObject({ name: text, instructions: text, type: z.literal('choice'), criteria: z.array(z.strictObject({ name: text, description: text })) }),
   z.strictObject({ name: text, instructions: text, type: z.literal('score'), criteria: strings }),
 ])
-const managed = z
-  .object({
-    ...ports,
-    name: text,
-    executor: z.union([
-      z.object({ kind: z.literal('connector'), action: text, connectionId: text.optional() }),
-      z.object({
-        kind: z.literal('openapi'),
-        sourceUrl: text,
-        method: text,
-        path: text,
-        serverUrl: text,
-        document: json,
-        auth: z.array(z.object({ id: text, type: z.enum(['bearer', 'basic', 'apiKey']), name: text.optional(), in: z.enum(['header', 'query']).optional() })),
-      }),
-      z.strictObject({ kind: z.literal('decision'), questions: z.array(decisionQuestion) }),
-      z.object({ kind: z.literal('llm'), mode: z.enum(['chat', 'json']) }),
-      z.object({
-        kind: z.literal('agent'),
-        code: z.boolean().optional(),
-        model: text,
-        prompt: text,
-        maxRounds: z.number(),
-        tools: z.array(
-          z.object({
-            id: text,
-            name: text,
-            description: text,
-            action: text,
-            connectionId: text.optional(),
-            approval: z.boolean(),
-            inputs: z.array(input.extend({ source: agentInput })),
-          }),
-        ),
-        notification: z
-          .object({ action: text, connectionId: text.optional(), inputDefinitions: z.array(input), messageHandle: text, inputs: z.record(text, agentValue) })
-          .optional(),
-      }),
-    ]),
-  })
-  .transform(limitDecisionTask)
+const managedFields = z.object({
+  ...ports,
+  name: text,
+  executor: z.union([
+    z.object({ kind: z.literal('connector'), action: text, connectionId: text.optional() }),
+    z.object({
+      kind: z.literal('openapi'),
+      sourceUrl: text,
+      method: text,
+      path: text,
+      serverUrl: text,
+      document: json,
+      auth: z.array(z.object({ id: text, type: z.enum(['bearer', 'basic', 'apiKey']), name: text.optional(), in: z.enum(['header', 'query']).optional() })),
+    }),
+    z.strictObject({ kind: z.literal('decision'), questions: z.array(decisionQuestion) }),
+    z.object({ kind: z.literal('llm'), mode: z.enum(['chat', 'json']) }),
+    z.object({
+      kind: z.literal('agent'),
+      code: z.boolean().optional(),
+      model: text,
+      prompt: text,
+      maxRounds: z.number(),
+      tools: z.array(
+        z.object({
+          id: text,
+          name: text,
+          description: text,
+          action: text,
+          connectionId: text.optional(),
+          approval: z.boolean(),
+          inputs: z.array(input.extend({ source: agentInput })),
+        }),
+      ),
+      notification: z
+        .object({ action: text, connectionId: text.optional(), inputDefinitions: z.array(input), messageHandle: text, inputs: z.record(text, agentValue) })
+        .optional(),
+    }),
+  ]),
+})
+
+const managed = managedFields.transform(limitDecisionTask)
 const operand = z.union([
   z.object({ kind: z.literal('value'), value: json.optional(), jsonSchema: json.optional() }),
   z.object({ kind: z.literal('source'), source }),
@@ -217,6 +217,22 @@ const node = z.union([
     definition: z.object({ ...definition, type: z.literal('integration'), endpoint }),
   }),
 ])
+/** Configuration schemas shared by the node authoring boundary. */
+export const authoringDefinitionSchemas = {
+  input,
+  port,
+  ports,
+  condition: z.strictObject(condition),
+  wait: z.strictObject(wait),
+  webhook: z.strictObject(webhook),
+  schedule: triggerScheduleSchema,
+  capabilities: z.array(capability),
+  connector: managedFields.shape.executor.options[0].omit({ kind: true }).strict(),
+  openapi: managedFields.shape.executor.options[1].omit({ kind: true }).strict(),
+  decision: managedFields.shape.executor.options[2].omit({ kind: true }).strict(),
+  llm: managedFields.shape.executor.options[3].omit({ kind: true }).strict(),
+  agent: managedFields.shape.executor.options[4].omit({ kind: true, notification: true }).strict(),
+}
 const edge = z.object({ source: text, target: text, sourceHandle: text.optional() })
 const at = { nodeId: text, target: z.never().optional() }
 const graph = z.object({ nodes: z.record(text, node), edges: z.array(edge).default([]) })
@@ -467,6 +483,7 @@ const shapes = {
   'graph.edge.connect': { edge, target: z.never().optional() },
   'graph.edge.disconnect': { edge, target: z.never().optional() },
   'graph.node.create': { ...at, node },
+  'graph.node.replace': { ...at, before: node, node },
   'graph.node.delete': at,
   'graph.node.field.set': z.union([
     z.object({

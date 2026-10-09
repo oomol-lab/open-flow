@@ -292,7 +292,10 @@ export function createServerApp(service: ServerService, options: ServerAppOption
           'HTTP request was rejected after an internal validation error.',
         )
       }
-      return json(error.status, { error: { code: error.code, message: error.message }, version: 1 })
+      return json(error.status, {
+        error: { code: error.code, message: error.message, ...(error.details == null ? {} : { details: error.details }) },
+        version: 1,
+      })
     }
     if (error instanceof AcceptanceError) {
       context.set('errorCode', error.code)

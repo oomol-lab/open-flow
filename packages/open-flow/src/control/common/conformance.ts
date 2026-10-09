@@ -206,6 +206,58 @@ function liveRunRequest(harness: ControlApiConformanceHarness, publicationId: st
 
 export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = [
   {
+    name: 'authors nodes atomically with public views, fixed reads and replay before CAS',
+    async verify(harness) {
+      const api = client(harness),
+        flow = await api.createFlow('Node authoring')
+      const input = {
+        baseRevision: flow.draftRevisionId,
+        requestId: 'semantic-create',
+        edits: [{ op: 'node.add' as const, type: 'code' as const, as: 'code', name: 'Format', code: 'export default () => ({value:1})' }],
+      }
+      const first = await api.editAuthoring(flow.flowId, input),
+        ref = first.nodes.code!
+      const detail = await api.readAuthoring(flow.flowId, { nodes: [ref], revision: first.revision })
+      if (/"(?:taskId|moduleId|bindingId)"/.test(JSON.stringify(detail))) fail('Public node view leaked storage identities')
+      equal((await api.searchAuthoring(flow.flowId, { query: 'Format' })).data.matches[0]?.node, ref, 'Search reference')
+      const changed = await api.editAuthoring(flow.flowId, {
+        baseRevision: first.revision,
+        requestId: 'semantic-text',
+        edits: [{ op: 'text.edit', node: ref, field: 'code', oldText: 'value:1', newText: 'value:2' }],
+      })
+      equal(
+        (await api.readAuthoring(flow.flowId, { revision: first.revision, text: { node: ref, field: 'code' } })).data.text?.content,
+        'export default () => ({value:1})',
+        'Immutable text',
+      )
+      const replay = await api.editAuthoring(flow.flowId, input)
+      equal(replay.revision, first.revision, 'Replay receipt after head advances')
+      equal(replay.nodes, first.nodes, 'Stable alias identities')
+      const post = (value: unknown) => request(harness, `/v1/flows/${flow.flowId}/authoring/edit`, { method: 'POST', body: JSON.stringify(value) })
+      await error(await post({ ...input, requestId: 'stale' }), 412, 'flow.revision-conflict', 'Stale semantic edit')
+      await error(await post({ ...input, edits: [{ op: 'node.remove', node: ref }] }), 409, 'flow.conflict', 'Request identity conflict')
+      await error(
+        await post({
+          baseRevision: changed.revision,
+          requestId: 'partial',
+          edits: [
+            { op: 'node.update', node: ref, set: { name: 'Changed' } },
+            { op: 'text.edit', node: ref, field: 'code', oldText: 'absent', newText: 'new' },
+          ],
+        }),
+        400,
+        'flow.invalid',
+        'Atomic text failure',
+      )
+      equal((await api.getFlow(flow.flowId)).draftRevisionId, changed.revision, 'Rejected batch preserves head')
+      // Workbench consumes the same committed Revision through its normal decoder.
+      const draft = await api.getDraft(flow.flowId)
+      equal(draft.content.document.graph.nodes[ref]?.name, 'Format', 'Workbench node identity')
+      const check = await api.checkAuthoring(flow.flowId, changed.revision)
+      equal(check.revisionId, changed.revision, 'Fixed check identity')
+    },
+  },
+  {
     name: 'admits simultaneous retries as one Run and preserves its Trigger identity',
     async verify(harness) {
       const flow = await createFlow(harness, 'Concurrent Run', 'concurrent-run-flow')

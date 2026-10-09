@@ -102,9 +102,12 @@ export class ApiError extends Error {
   readonly code: string
   readonly status: number
 
-  constructor(status: number, code: string, message: string) {
+  readonly details?: Readonly<Record<string, unknown>>
+
+  constructor(status: number, code: string, message: string, details?: Readonly<Record<string, unknown>>) {
     super(message)
     this.code = code
+    this.details = details
     this.name = 'ApiError'
     this.status = status
   }

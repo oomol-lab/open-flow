@@ -157,7 +157,29 @@ Draft 请求的 operations 使用 `@oomol-lab/open-flow/control-requests` 的 `D
 `connectionId` 直接保存于 Trigger 节点；省略表示尚未选择账号。服务端在提交时解析 Provider 定义，转换为完整 ChangeOperation 并保存定义快照。
 Flow model 4 的 Poll/Integration 使用可选的 `connectionId`，`document.bindings` 只接受 `kind: 'variable'`。账号编辑通过 `graph.node.field.set` 的 `connectionId` 字段完成，省略 value 清除选择；不再接受 Connection binding 或 Trigger bindingId。
 幂等请求摘要按原始 DraftOperation 计算，已提交请求在解析目录之前重放，目录变更不改变重试结果。未知 key 或批次后续操作失败时，不提交部分变更。
-CLI `schema`、MCP `flow_schema` 与 REST Draft decoder 使用同一个输入合同；底层离线 `applyFlowChanges` 仍只接受已解析的 ChangeOperation。
+低层 REST Draft decoder 与 Workbench 继续使用此合同；Agent CLI/MCP 使用下述节点 authoring 合同。底层离线 `applyFlowChanges` 仍只接受已解析的 ChangeOperation。
+
+### 节点 authoring
+
+以下 POST 接口由 `@oomol-lab/open-flow/control-requests` 定义公共视图、输入 schema、编译和诊断映射：
+
+| 路径                                 | 请求                                                                        |
+| ------------------------------------ | --------------------------------------------------------------------------- |
+| `/v1/flows/:flowId/authoring/read`   | `{revision?, nodes?, text?:{node,field,start?,lines?}}`，nodes 与 text 互斥 |
+| `/v1/flows/:flowId/authoring/search` | `{revision?,query,type?,offset?,limit?}`                                    |
+| `/v1/flows/:flowId/authoring/schema` | `{type?}`、`{action?}` 或空对象                                             |
+| `/v1/flows/:flowId/authoring/edit`   | `{baseRevision,requestId,edits}`                                            |
+| `/v1/flows/:flowId/authoring/check`  | `{revisionId}`                                                              |
+
+CLI `read/search/schema/edit/check` 和 MCP `flow_read/search/schema/edit/check` 使用同一服务。公共节点视图聚合配置并隐藏节点执行配置、Module、binding 和 imports 的装配；源码与 prompt 按需读取。只支持当前模型的 Flow 图，包含已退役 Subflow 的 Revision 按模型兼容合同拒绝读取和修复。
+
+编辑编译为既有 ChangeOperation，使用原提交 owner 的整图 CAS、原子保存和幂等记录。`graph.node.replace` 在内部按完整 before 检查节点替换，保持节点 ID 与边。各节点独立拥有执行配置，编辑默认仅影响目标节点；共享 CodeModule 的局部源码编辑由工具按需复制模块，保留其他节点的行为。
+
+同一 requestId 重试先读取原幂等结果，不重新解析目录；不同请求复用 requestId 返回 flow.conflict。响应丢失可重放。冲突不自动合并。编辑响应的 saved 与 validation 独立，校验不可用不否认已保存事实。Check 返回固定 revisionId、valid 和节点/字段/代码位置诊断。
+
+操作参数、文本精确匹配、局部合并、显式清除和输入来源语义见 [Flow 命令合同](../../authoring/flow-command.md)。
+
+Authoring 配置使用业务字段映射，而非 Task 端口数组。Code/Agent/LLM/Wait/Approval 的 `config.inputs` 按字段名描述 `schema`、`nullable`、`description` 和输入 `default`，Code 的结果字段使用 `config.outputs`；Agent/LLM 的结果使用 `resultSchema`，固定运行时输出由服务端生成。`node.add.inputs` 直接绑定数据，这些节点的新命名输入可自动声明。输出来源在目标仅有一个输出时允许省略 `port`，多个输出返回候选项要求明确选择。这些转换由公共包拥有，低层 Draft/Workbench 存储合同不变。
 
 Presentation 独立于 Draft head：
 
@@ -206,15 +228,7 @@ Value Node 没有数据输入端口。解码时将其 `inputs` 统一归一化�
 
 `graph.edge.connect` 与 `graph.edge.disconnect` 只修改执行边，`graph.node.input.set` 独立修改数据映射。节点不保存 `concurrency`。
 
-CLI 分开设置执行顺序与输入来源：
-
-```sh
-oo flow connect <flow> <source> <target-node> [branch]
-oo flow disconnect <flow> <source> <target-node> [branch]
-oo flow node input <flow> <node> <input> <source> <output> [<source> <output>...]
-```
-
-`oo flow apply` 的 `edges` 同样使用 `source`、`target` 和可选 `sourceHandle`。
+Agent 的 `edge.connect/disconnect` 与 `input.set` 独立修改执行关系与数据来源，参见 [Flow 命令合同](../../authoring/flow-command.md)。
 不提供旧数据流边、节点 concurrency 或旧 checkpoint 的兼容转换。
 
 ## 4. Validation、Publication 与 Live
@@ -657,7 +671,7 @@ interface ConnectorAccess {
 | `PUT`    | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
 | `DELETE` | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
 
-`bindings` 是整个 Flow的 Code 共享允许列表。`sharedAccessDigest` 只计算排序后的 `[providerId, accessBindingId]` 共享选择，
+`bindings` 是整个 Flow 的 Code 共享允许列表。`sharedAccessDigest` 只计算排序后的 `[providerId, accessBindingId]` 共享选择，
 用于配置变更检测、发布状态与请求身份；不包含节点选择、展示名称、上游即时权限或 Provider 展示列表，不是完整执行快照摘要。
 `GET /v1/flows/:flowId/connector-access?publicationId=...` 读取归属此 Flow 的已发布 `ConnectorAccessSnapshot`，只读；不带参数读取 Draft `ConnectorAccess` 配置。
 客户端分别使用 `getPublishedConnectorAccess` 与 `getConnectorAccess`。
@@ -1002,7 +1016,7 @@ Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 只保�
 
 operation 检查目标是 inline Code Task，并精确比较 `before`，沿既有 expected Revision 和 change identity 提交。
 公开 `setCodeActions(content, nodeId, capabilities)` 生成该 operation；`createCodeTask` 的端口配置参数也接受 `capabilities`。
-CLI 的 `flow apply` JSON 中，`kind: "code"` 节点直接接受同一 `capabilities` 数组，无需独立命令或另一套配置格式。
+Agent 的 `node.add/update` 在 Code 节点的 `config.capabilities` 中接受同一声明。
 普通源码、端口修改和复制保留声明。
 
 ### 脚本 API
@@ -1276,7 +1290,7 @@ Managed Task 新增 `executor.kind: "openapi"`，包含 `sourceUrl`、`method`�
 鉴权项为 `{ id, type: "bearer" | "basic" | "apiKey", name?, in?: "header" | "query" }`。
 `graph.node.task.set` 原子提交 `nodeId`、完整 `before` 与 `value` Task，支持草稿并发检查和撤销。未选择接口的空 Task 可保存，不能运行。
 参数输入标识为 `path.<name>`、`query.<name>`、`header.<name>`，JSON 请求体为 `body`；鉴权使用 `auth.<id>.token` 或 Basic 的 `username`、`password`。
-鉴权输入禁止固定值和 Flow input Source；可清空，运行时必须具有有效部署变量或上游输出。
+鉴权输入禁止固定值；可清空，运行时必须具有有效部署变量或上游输出。
 输出为 `body`、`statusCode`、`headers`，`node.started.nodeKind` 新增 `openapi`，启动事件不包含鉴权输入。
 
 首版支持 simple path/header 和 form query 参数编码、文档内部引用和 JSON body；外部引用、二进制、流式响应、其它参数编码与 OAuth 登录不支持。

@@ -286,10 +286,23 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       "'../browser/flow-change.js'",
     )
     await Promise.all(
-      ['draftOperations', 'flowInspection', 'authoringExamples', 'providerAccess', 'connectorDecoders', 'providerIconSprite'].map(async (name) => {
+      [
+        'authoring',
+        'authoringSchema',
+        'draftOperations',
+        'flowInspection',
+        'authoringExamples',
+        'providerAccess',
+        'connectorDecoders',
+        'providerIconSprite',
+      ].map(async (name) => {
         const declaration = (await readFile(path.join(declarationRoot, `control/common/${name}.d.ts`), 'utf8'))
           .replaceAll(/(['"])\.\/api\.ts\1/g, "'./control-api.js'")
+          .replaceAll(/(['"])\.\.\/\.\.\/types\/index\.ts\1/g, "'../index.js'")
           .replaceAll("'./draftOperations.ts'", "'./draftOperations.js'")
+          .replaceAll("'./authoring.ts'", "'./authoring.js'")
+          .replaceAll("'./authoringSchema.ts'", "'./authoringSchema.js'")
+          .replaceAll("'../../flow/common/changeSchema.ts'", "'../browser/flow-change-schema.js'")
           .replaceAll("'./providerAccess.ts'", "'./providerAccess.js'")
           .replaceAll("'./connectorDecoders.ts'", "'./connectorDecoders.js'")
           .replaceAll(/(['"])\.\.\/\.\.\/flow\/common\/change\.ts\1/g, "'../browser/flow-change.js'")
@@ -299,6 +312,9 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
     const controlApiDeclaration = (await readFile(path.join(declarationRoot, 'control/common/api.d.ts'), 'utf8'))
       .replaceAll("'./providerIconSprite.ts'", "'./providerIconSprite.js'")
       .replaceAll("'./draftOperations.ts'", "'./draftOperations.js'")
+      .replaceAll("'./authoring.ts'", "'./authoring.js'")
+      .replaceAll("'./authoringSchema.ts'", "'./authoringSchema.js'")
+      .replaceAll("'../../flow/common/changeSchema.ts'", "'../browser/flow-change-schema.js'")
       .replaceAll("'./providerAccess.ts'", "'./providerAccess.js'")
       .replaceAll("'./connectorDecoders.ts'", "'./connectorDecoders.js'")
       .replaceAll("'./flowInspection.ts'", "'./flowInspection.js'")
@@ -441,6 +457,9 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         path.join(commonOutputPath, 'control-requests.d.ts'),
         (await readFile(path.join(declarationRoot, 'control/common/requests.d.ts'), 'utf8'))
           .replaceAll("'./draftOperations.ts'", "'./draftOperations.js'")
+          .replaceAll("'./authoring.ts'", "'./authoring.js'")
+          .replaceAll("'./authoringSchema.ts'", "'./authoringSchema.js'")
+          .replaceAll("'../../flow/common/changeSchema.ts'", "'../browser/flow-change-schema.js'")
           .replaceAll("'./providerAccess.ts'", "'./providerAccess.js'")
           .replaceAll("'./connectorDecoders.ts'", "'./connectorDecoders.js'")
           .replaceAll("'./authoringExamples.ts'", "'./authoringExamples.js'")

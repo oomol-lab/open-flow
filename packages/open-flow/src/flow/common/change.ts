@@ -530,6 +530,7 @@ export function nodeNameIssue(graph: Graph, nodeId: string, value: string): 'dup
 }
 
 export type ChangeOperation =
+  | { readonly kind: 'graph.node.replace'; readonly nodeId: string; readonly before: GraphNode; readonly node: GraphNode }
   | {
       readonly before?: readonly ConnectorCapability[]
       readonly kind: 'graph.node.task.capabilities.set'
@@ -721,6 +722,19 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         }
         const updated: ConditionNode = { ...node, ...operation.value }
         Object.assign(document, { graph: { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } } })
+        break
+      }
+      case 'graph.node.replace': {
+        const graph = document.graph
+        if (!dequal(graph.nodes[operation.nodeId], operation.before)) invalid('The Node changed before this operation was applied.')
+        if (operation.node.kind != operation.before.kind) invalid('Replacing a Node cannot change its kind.')
+        if (operation.node.kind == 'task' && 'moduleId' in operation.node.task && operation.node.task.capabilities !== undefined)
+          decodeConnectorCapabilities(operation.node.task.capabilities)
+        const name = normalizeNodeName(operation.node.name ?? '')
+        const issue = nodeNameIssue(graph, operation.nodeId, name)
+        if (issue != null) invalid(`Node name is ${issue}.`)
+        const node = name == operation.node.name ? operation.node : { ...operation.node, name }
+        Object.assign(document, { graph: { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: node } } })
         break
       }
       case 'graph.node.create': {

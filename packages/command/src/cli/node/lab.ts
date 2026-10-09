@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto'
 import { readFile, realpath } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { runCli } from './cli.ts'
+export { isOfflineCommand as isLabCliOffline } from './cli.ts'
 
 export interface RequestCost {
   method: string
@@ -10,6 +11,8 @@ export interface RequestCost {
   status?: number
   inputBytes: number
   outputBytes: number
+  durationMs?: number
+  excludedMs?: number
   retryIdentity?: string
 }
 export interface CommandRecord {
@@ -41,7 +44,7 @@ export async function runLabCli(args: string[], options: LabCliOptions): Promise
         ? 'check'
         : args[0] == 'run' || (args[0] == 'runs' && ['cancel', 'resolve'].includes(args[1] ?? ''))
           ? 'execute'
-          : ['list', 'show', 'inspect', 'schema', 'runs'].includes(args[0] ?? '') ||
+          : ['read', 'search', 'list', 'show', 'inspect', 'schema', 'runs'].includes(args[0] ?? '') ||
               args.includes('--help') ||
               ['show', 'search', 'providers', 'connections', 'teams', 'list'].includes(args[1] ?? '')
             ? 'read'
@@ -70,6 +73,7 @@ export async function runLabCli(args: string[], options: LabCliOptions): Promise
     args,
     {
       request: async (path, init) => {
+        const requestStart = performance.now()
         const headers = new Headers(init?.headers)
         headers.set('authorization', `Bearer ${options.token}`)
         headers.set('x-lab-command', options.id)
@@ -90,14 +94,28 @@ export async function runLabCli(args: string[], options: LabCliOptions): Promise
               }),
         }
         record.requests.push(cost)
-        const response = await fetch(new URL(path, options.origin), { ...init, headers })
+        let response: Response
+        try {
+          response = await fetch(new URL(path, options.origin), { ...init, headers })
+        } finally {
+          cost.durationMs = performance.now() - requestStart
+        }
         cost.status = response.status
+        const excludedMs = Number(response.headers.get('x-lab-excluded-ms') ?? 0)
+        if (excludedMs > 0) {
+          cost.excludedMs = excludedMs
+          cost.durationMs = Math.max(0, (cost.durationMs ?? 0) - excludedMs)
+        }
         if (response.body == null) return response
         const bodyStream = response.body.pipeThrough(
           new TransformStream<Uint8Array, Uint8Array>({
             transform(chunk, controller) {
               cost.outputBytes += chunk.byteLength
+              cost.durationMs = Math.max(0, performance.now() - requestStart - excludedMs)
               controller.enqueue(chunk)
+            },
+            flush() {
+              cost.durationMs = Math.max(0, performance.now() - requestStart - excludedMs)
             },
           }),
         )
@@ -117,7 +135,7 @@ export async function runLabCli(args: string[], options: LabCliOptions): Promise
       wait: (milliseconds) => new Promise((done) => setTimeout(done, milliseconds)),
     },
   )
-  record.durationMs = performance.now() - started
+  record.durationMs = Math.max(0, performance.now() - started - record.requests.reduce((sum, r) => sum + (r.excludedMs ?? 0), 0))
   return record
 }
 async function readStdin() {

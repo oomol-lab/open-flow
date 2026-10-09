@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { runStatuses } from '../../execution/common/runLifecycle.ts'
 import { waitCommentSchema } from '../../execution/common/wait.ts'
 import { resourceNameIssue } from '../../flow/common/change.ts'
+import { authoringReadSchema, authoringSearchSchema, authoringRequestSchema, authoringSchemaQuery } from './authoringSchema.ts'
 import { resultQuerySchema } from './resultQuery.ts'
 
 export const mcpProtocolVersion = '2026-07-28'
@@ -14,13 +15,13 @@ const pageLimit = z.int().min(1).max(100).default(50)
 const flow = id.describe('Exact Flow ID returned by flow_list or flow_create.')
 const run = id.describe('Exact Run ID returned by flow_run or run_list.')
 export const mcpInstructions =
-  'Use flow_list and flow_get to inspect a Flow. Use flow_node_get with the observed revisionId for individual node schemas or code. Use flow_schema to learn atomic edit operations, then flow_apply with the observed expectedRevisionId and a stable idempotencyKey. ' +
+  'Use flow_list, flow_read and flow_search to inspect root workflows. Read node type schemas with flow_schema. Use flow_edit with the observed baseRevision and a stable requestId. Node edits affect only the selected node. Text edits require exactly one match. Execution edges and input sources are independent. Legacy Subflow content is unsupported. Edits can save incomplete drafts; inspect returned diagnostics and use flow_check before running. ' +
   'Use flow_check before flow_run. Select an explicit Trigger node ID and fixed revision or publication. A new Flow has no Trigger until you add one. ' +
   'Before adding a Feishu Trigger, use event_source_list and compare its Connection IDs with connector_connections in the Flow scope. If no source is available, create and verify one in Workbench. ' +
   'Use flow_publish to publish a fixed Revision, then poll flow_publish_status until succeeded or failed. Use flow_set_enabled to enable or disable the observed Live publication. ' +
   'flow_run returns an accepted Run, not its final result. Find Runs with run_list, poll run_get and use run_result after terminal. Resolve a waiting Run only with an explicit run_resolve_wait action allowed by run_get. ' +
   'Use run_results and run_result_read to inspect stored Agent tool results; these are separate from the terminal Run result. ' +
-  'Retry flow_create, flow_apply, flow_publish and flow_run only with identical arguments and the same idempotencyKey; a new key can execute the Flow again. Other mutations use the same resource identity and arguments when retrying. Cancel a Run explicitly with run_cancel. ' +
+  'Retry flow_edit with identical arguments and the same requestId. Retry flow_create, flow_publish and flow_run only with identical arguments and the same idempotencyKey; a new key can execute the Flow again. Other mutations use the same resource identity and arguments when retrying. Cancel a Run explicitly with run_cancel. ' +
   'Use nextCursor and nextAfter to read subsequent pages. Connector-backed deployments may require a Team; inspect connector_teams before creating a Flow.'
 
 function tool<Args>(description: string, schema: z.ZodType<Args>, readOnly: boolean) {
@@ -52,21 +53,19 @@ export const mcpTools = {
     z.strictObject({ cursor: id.optional(), limit: pageLimit }),
     true,
   ),
-  flow_get: tool(
-    'Read a compact Draft graph with input bindings, port handles and Live status. Use full=true for complete Revision content, schemas, source code and exact before values required by complex edits. Unreadable Drafts return draft=null and draftIssue; flow.live still identifies the published version. Use draft.revisionId as the base of an edit.',
-    z.strictObject({ flowId: flow, full: z.boolean().optional() }),
+  flow_read: tool(
+    'Read an outline, selected node details, or a bounded code/prompt excerpt. Carry the returned revision into subsequent reads and edits.',
+    authoringReadSchema.safeExtend({ flowId: flow }).meta({ ...authoringReadSchema.meta() }),
     true,
   ),
-  flow_node_get: tool(
-    'Read one node and its Task definition or code module from a fixed Revision. Use revisionId from flow_get; the returned node contains exact before values for edits.',
-    z.strictObject({ flowId: flow, revisionId: id, nodeId: id }),
+  flow_search: tool(
+    'Find nodes by name, configuration or source text in a fixed Revision. Follow nextOffset for more matches.',
+    authoringSearchSchema.extend({ flowId: flow }),
     true,
   ),
   flow_schema: tool(
-    'Get an operation schema by kind, or a complete apply batch by example (connector, poll, poll-notification, code, wait). Use example=index to list examples. graph.trigger.create resolves a provider key into a fixed definition at commit.',
-    z
-      .strictObject({ kind: id.optional(), example: id.optional() })
-      .refine((value) => value.kind == null || value.example == null, 'Choose kind or example, not both.'),
+    'Read node configuration schemas and the edit grammar, or an Action contract. Action lookup requires a flowId.',
+    authoringSchemaQuery.safeExtend({ flowId: flow.optional() }),
     true,
   ),
   flow_create: tool(
@@ -78,18 +77,13 @@ export const mcpTools = {
     }),
     false,
   ),
-  flow_apply: tool(
-    'Apply ordered atomic changes. Read flow_schema first. A stale expectedRevisionId is a conflict; reread the Draft before deciding on a new edit.',
-    z.strictObject({
-      flowId: flow,
-      expectedRevisionId: id,
-      idempotencyKey: mutationKey,
-      operations: z.array(json).min(1).describe('Change operations defined by flow_schema. Explicit IDs and before values refer to the base Revision.'),
-    }),
+  flow_edit: tool(
+    'Atomically edit root nodes, input sources, execution edges and text. Use $alias for preceding creations. Preserve baseRevision and requestId when retrying. A saved draft may have validation diagnostics.',
+    authoringRequestSchema.extend({ flowId: flow }),
     false,
   ),
   flow_check: tool(
-    'Validate a fixed Revision and return diagnostics. Get its revisionId from flow_get or flow_apply.',
+    'Validate a fixed Revision and return diagnostics. Use the revision returned by flow_read or flow_edit as revisionId.',
     z.strictObject({ flowId: flow, revisionId: id }),
     true,
   ),
@@ -104,7 +98,7 @@ export const mcpTools = {
     true,
   ),
   flow_set_enabled: tool(
-    'Enable or disable a published Flow. Supply expectedPublicationId from flow_get; a changed Live publication is a conflict. This does not cancel accepted Runs; use run_cancel for those.',
+    'Enable or disable a published Flow. Supply expectedPublicationId from flow_list; a changed Live publication is a conflict. This does not cancel accepted Runs; use run_cancel for those.',
     z.strictObject({ flowId: flow, expectedPublicationId: id, enabled: z.boolean() }),
     false,
   ),
@@ -214,7 +208,7 @@ export const mcpTools = {
     true,
   ),
   trigger_search: tool(
-    'Search provider Trigger summaries; omit query to list all. Flow trigger instances are in flow_get. Manual, Webhook and Cron are built-in node kinds described by flow_schema.',
+    'Search provider Trigger summaries; omit query to list all. Flow trigger instances are in flow_read. Manual, Webhook and Cron are built-in node kinds described by flow_schema.',
     z.strictObject({ query: z.string().trim().min(1).max(256).optional() }),
     true,
   ),

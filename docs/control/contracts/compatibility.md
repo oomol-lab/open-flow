@@ -3,14 +3,14 @@
 ## Flow model v6：移除共享 Task 和旧 Subflow
 
 Flow model v6 删除 `document.tasks` 和节点的 `taskId`。所有执行节点通过 `node.task` 保存自己的配置；
-Managed Task 修改使用 `{ kind: 'graph.node.task.set', target, nodeId, before, value }`，旧 `task.*` 操作不再接受。
+Managed Task 修改使用 `{ kind: 'graph.node.task.set', nodeId, before, value }`，旧 `task.*` 操作不再接受。
 复制节点后配置独立，修改端口只更新该节点及其下游引用。Agent notification 直接保存 Action、Connection、输入定义与参数映射。
 
 旧引用式 Task 数据需要通过现有草稿升级操作生成 v6 Revision；每个引用展开为独立配置，通知引用同步展开。
 缺失或无效的引用会拒绝升级。读取不会静默改写原始 Revision。没有独立 Task 定义的 v2/v4/v5 数据仍保留原始编码与摘要。
 
 同一次版本升级删除 `document.subflows`、Subflow 节点、子图输入来源，以及 `subflow.*` 编辑操作。
-Graph target 仅接受 `{ kind: 'flow' }`。Workbench、CLI 和 MCP 不再提供旧子图入口；CLI 的
+图操作直接作用于当前 Flow，不再接受 graph target。Workbench、CLI 和 MCP 不再提供旧子图入口；CLI 的
 `--subflow` 和 MCP `flow_node_get.subflowId` 已移除。该版本不增加 Flow 调用能力。
 
 包含旧子图或 Subflow 节点的 Revision 明确拒绝读取和修复，不会静默删除后当作完整 Flow 使用。
@@ -93,7 +93,7 @@ Wait 的提前输出端口及等待记录中的输出字段直接由 `notificati
 
 公共包与 Command 升至 `0.1.0-beta.39`，Server 升至 `0.1.0-beta.16`。本次 beta 包含显式不兼容的工具与命令调整，客户端脚本和部署需一起升级：
 
-- MCP `flow_get` 和 CLI `inspect --json` 默认返回精简视图；完整数据使用 MCP `full: true` 或 CLI `--full`，修订内容统一位于 `draft.content`。原 CLI `--summary` 已移除。
+- Agent 接口使用 `flow_read/search/schema/edit/check`，CLI 对应 `read/search/schema/edit/check`；旧 flow_get/flow_node_get/flow_apply 和低层 CLI authoring 命令退出公共入口。Workbench 低层 Revision/ChangeOperation 合同保留。
 - MCP `connector_list` 改为 `connector_providers`，`trigger_list` 改为支持可选 query 的 `trigger_search`；CLI `connector list` 改为 `connector providers`。旧名称不保留别名。
 - Connector 搜索仅返回 Action 摘要，完整 Schema 使用 `connector_get` / `connector show`；Team 目录不再返回 Flow-Team 绑定清单。
 - CLI `connector set --name` 不再接受，改用 `node set --name`。结果列表和结果读取的旧位置参数改为 `--after`、`--pointer`、`--offset` 等命名选项。
@@ -108,5 +108,5 @@ Wait 的提前输出端口及等待记录中的输出字段直接由 `notificati
 
 本次预发布包含两处 CLI JSON 断点：`trigger search` 的 `definitions` 改为 `keys`；`node show` 的
 `nodeId`、`node`、`task?`、`module?` 从原来的 `node` 包装中展开到结果顶层。旧字段和嵌套不保留别名，
-消费方需按 [CLI 结果合同](../../authoring/flow-command.md#cli-与-mcp-的结果合同) 更新读取路径。
+消费方需按 [CLI 结果合同](../../authoring/flow-command.md#输出与错误) 更新读取路径。
 MCP 工具合同、Flow model 和 Engine Contract 不变。

@@ -1,7 +1,7 @@
 import { serve } from '@hono/node-server'
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
-import { ControlClient, flowInspection, inspectFlowDraft } from '@oomol-lab/open-flow/control-api'
-import { authoringExample } from '@oomol-lab/open-flow/control-requests'
+import { ControlClient } from '@oomol-lab/open-flow/control-api'
+import { authoringExample, decodeDraftOperations } from '@oomol-lab/open-flow/control-requests'
 import { mcpConformanceCases } from '@oomol-lab/open-flow/mcp'
 import { once } from 'node:events'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -55,45 +55,35 @@ it('discovers independent Feishu event sources without exposing secrets', async 
   expect(JSON.stringify(listed)).not.toContain('encrypt-secret')
 })
 
-it('shares compact trigger transactions and example discovery between MCP and REST', async () => {
+it('shares semantic authoring between MCP and REST and replays before catalog lookup', async () => {
   const { call, control, service, client } = await fixture()
-  expect(await call('flow_schema', { example: 'poll' })).toEqual(authoringExample('poll'))
-  const created = await control.createFlow('Compact trigger')
-  const operations = authoringExample('poll').operations
-  const args = { flowId: created.flowId, expectedRevisionId: created.draftRevisionId, operations, idempotencyKey: 'compact-trigger' }
-  const changed = await call('flow_apply', args)
-  const current = await control.getDraft(created.flowId)
-  expect(current.content.document.graph.nodes.mail).toMatchObject({
+  expect(await call('flow_schema', { type: 'poll' })).toHaveProperty('configuration')
+  const flow = await control.createFlow('Semantic trigger')
+  const args = {
+    flowId: flow.flowId,
+    baseRevision: flow.draftRevisionId,
+    requestId: 'semantic-trigger',
+    edits: [{ op: 'node.add', as: 'mail', type: 'poll', name: 'Mail', config: { key: 'gmail.on_message_received', connectionId: 'CONNECTION_ID' } }],
+  }
+  const changed = await call('flow_edit', args)
+  const nodeId = (changed.nodes as Record<string, string>).mail!
+  expect((await control.getDraft(flow.flowId)).content.document.graph.nodes[nodeId]).toMatchObject({
     kind: 'poll',
-    definition: { key: 'gmail.on_message_received', outputs: [{ handle: 'events', jsonSchema: { type: 'array' } }] },
+    definition: { key: 'gmail.on_message_received' },
+    connectionId: 'CONNECTION_ID',
   })
-  expect(current.content.document.graph.nodes.mail).toMatchObject({ connectionId: 'CONNECTION_ID' })
-  const metadata = await control.getFlow(created.flowId)
-  const live = await control.getLive(created.flowId)
-  const inspected = await inspectFlowDraft(metadata, () => current)
-  expect(await call('flow_get', { flowId: created.flowId })).toEqual(flowInspection(inspected, live))
-  expect(await call('flow_get', { flowId: created.flowId, full: true })).toEqual(flowInspection(inspected, live, true))
+  expect(await call('flow_read', { flowId: flow.flowId, nodes: [nodeId] })).toEqual(await control.readAuthoring(flow.flowId, { nodes: [nodeId] }))
   const lookup = vi.spyOn(service.control, 'getTriggerKey').mockImplementation(() => {
     throw new Error('Catalog changed')
   })
-  expect(await control.changeDraft(created.flowId, created.draftRevisionId, operations, 'compact-trigger')).toEqual(changed)
-  expect(await call('flow_apply', args)).toEqual(changed)
+  expect(await call('flow_edit', args)).toEqual(changed)
+  const { flowId: _, ...request } = args
+  expect(await control.editAuthoring(flow.flowId, request as Parameters<ControlClient['editAuthoring']>[1])).toEqual(changed)
   expect(lookup).not.toHaveBeenCalled()
-  const conflicting = await client.callTool({ name: 'flow_apply', arguments: { ...args, operations: [{ ...operations[0], config: { search: 'new' } }] } })
-  expect(conflicting.structuredContent).toMatchObject({ error: { code: 'flow.conflict' } })
-})
-
-it.each(['flow.invalid', 'flow.revision-upgrade-required'])('keeps Flow identity readable when its Draft reports %s', async (code) => {
-  const { call, control, service } = await fixture()
-  const created = await control.createFlow('Old Draft')
-  vi.spyOn(service.control, 'getRevision').mockImplementation(() => {
-    throw Object.assign(new Error('Draft needs attention'), { code })
-  })
-  expect(await call('flow_get', { flowId: created.flowId })).toMatchObject({
-    flow: { flowId: created.flowId, name: 'Old Draft' },
-    draft: null,
-    draftIssue: { code, revisionId: created.draftRevisionId },
-  })
+  expect(
+    (await client.callTool({ name: 'flow_edit', arguments: { ...args, edits: [{ op: 'node.add', as: 'other', type: 'manual', name: 'Other' }] } }))
+      .structuredContent,
+  ).toMatchObject({ error: { code: 'flow.conflict' } })
 })
 
 it('does not commit partial compact trigger batches or accept unknown keys', async () => {
@@ -213,38 +203,35 @@ it('serves discovery and an atomic authoring, validation and execution workflow 
   const discovered = await client.discover()
   expect(JSON.stringify(discovered)).toContain(version)
   const tools = await client.listTools()
-  expect(tools.tools.map((tool) => tool.name)).toContain('flow_apply')
-  expect(tools.tools.map((tool) => tool.name)).not.toContain('flow_delete')
-  expect(await call('flow_schema', { kind: 'graph.node.create' })).toHaveProperty('operations')
-
+  expect(tools.tools.map((tool) => tool.name)).toContain('flow_edit')
+  expect(tools.tools.map((tool) => tool.name)).not.toContain('flow_apply')
+  expect(await call('flow_schema', { type: 'value' })).toHaveProperty('configuration')
   const flow = await call('flow_create', { name: 'MCP workflow', idempotencyKey: 'create' })
   const flowId = z.string().parse(flow.flowId)
   expect(await call('flow_create', { name: 'MCP workflow', idempotencyKey: 'create' })).toEqual(flow)
   const edit = {
     flowId,
-    expectedRevisionId: flow.draftRevisionId,
-    idempotencyKey: 'edit',
-    operations: [
-      start,
+    baseRevision: flow.draftRevisionId,
+    requestId: 'edit',
+    edits: [
+      { op: 'node.add', as: 'start', type: 'manual', name: 'Start' },
       {
-        kind: 'graph.node.create',
-        nodeId: 'answer',
-        node: {
-          kind: 'value',
-          name: 'Answer',
-          inputs: {},
-          values: [{ handle: 'answer', jsonSchema: { type: 'number' }, nullable: false, value: 42 }],
-        },
+        op: 'node.add',
+        as: 'answer',
+        type: 'value',
+        name: 'Answer',
+        config: { values: { answer: 42 }, outputs: { answer: { schema: { type: 'number' }, nullable: false } } },
       },
-      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'answer' } },
+      { op: 'edge.connect', source: '$start', target: '$answer' },
     ],
   }
-  const changed = await call('flow_apply', edit)
-  expect(await call('flow_apply', edit)).toEqual(changed)
-  const revisionId = z.object({ revisionId: z.string() }).parse(changed.revision).revisionId
+  const changed = await call('flow_edit', edit)
+  expect(await call('flow_edit', edit)).toEqual(changed)
+  const revisionId = z.string().parse(changed.revision)
+  const startId = (changed.nodes as Record<string, string>).start!
   expect((await control.getDraft(flowId)).revisionId).toBe(revisionId)
   expect(await call('flow_check', { flowId, revisionId })).toMatchObject({ valid: true, revisionId })
-  const runArgs = { source: 'draft', flowId, revisionId, trigger: { nodeId: 'start', outputs: {} }, idempotencyKey: 'run' }
+  const runArgs = { source: 'draft', flowId, revisionId, trigger: { nodeId: startId, outputs: {} }, idempotencyKey: 'run' }
   const run = await call('flow_run', runArgs)
   const runId = z.string().parse(run.runId)
   expect(await call('flow_run', runArgs)).toEqual(run)
@@ -255,24 +242,125 @@ it('serves discovery and an atomic authoring, validation and execution workflow 
   expect(page.events).toHaveLength(1)
   const rest = await call('run_events', { runId, after: page.nextAfter })
   expect(JSON.stringify(rest.events)).toContain('42')
-  expect(await call('flow_get', { flowId })).toMatchObject({ draft: { revisionId } })
+  expect(await call('flow_read', { flowId })).toMatchObject({ revision: revisionId })
+})
+
+it('shares business node configuration across MCP and REST and executes only the selected LLM branch', async () => {
+  const modelInputs: unknown[] = []
+  const { call, control, service } = await fixture({
+    capabilities: {
+      llm:
+        () =>
+        async ({ input }) => {
+          modelInputs.push(input)
+          return { kind: 'completed', value: { output: 'Order A-1 needs review.' }, version: 1 }
+        },
+    },
+  })
+  const flow = await control.createFlow('Order review')
+  const created = await call('flow_edit', {
+    flowId: flow.flowId,
+    baseRevision: flow.draftRevisionId,
+    requestId: 'business-create',
+    edits: [
+      { op: 'node.add', as: 'start', type: 'manual', name: 'Start' },
+      {
+        op: 'node.add',
+        as: 'order',
+        type: 'value',
+        name: 'Order',
+        config: {
+          values: { order: { id: 'A-1', total: 42 } },
+          outputs: { order: { schema: { type: 'object', properties: { id: { type: 'string' }, total: { type: 'number' } } } } },
+        },
+      },
+      {
+        op: 'node.add',
+        as: 'threshold',
+        type: 'condition',
+        name: 'Review threshold',
+        config: {
+          branches: [
+            {
+              name: 'review',
+              when: {
+                left: { kind: 'output', node: '$order', field: 'total' },
+                operator: '>',
+                right: { kind: 'value', value: 100 },
+              },
+            },
+          ],
+        },
+      },
+      {
+        op: 'node.add',
+        as: 'summary',
+        type: 'llm',
+        name: 'Summary',
+        config: { model: { model: 'test-model', temperature: 0.25 }, template: [{ role: 'user', content: 'Summarize {{order}}.' }] },
+        inputs: { order: { kind: 'output', node: '$order' } },
+      },
+      { op: 'edge.connect', source: '$start', target: '$order' },
+      { op: 'edge.connect', source: '$order', target: '$threshold' },
+      { op: 'edge.connect', source: '$threshold', target: '$summary', branch: 'review' },
+    ],
+  })
+  expect(created, JSON.stringify(created.validation)).toMatchObject({ saved: true, validation: { status: 'valid' } })
+  const refs = z.record(z.string(), z.string()).parse(created.nodes)
+  const revision = z.string().parse(created.revision)
+  const nodes = [refs.order!, refs.threshold!, refs.summary!]
+  expect(await call('flow_read', { flowId: flow.flowId, nodes })).toEqual(await control.readAuthoring(flow.flowId, { nodes }))
+  const draft = await control.getDraft(flow.flowId)
+  expect(draft.content.document.graph.nodes[refs.order!]).toMatchObject({ kind: 'value', values: [{ handle: 'order', value: { id: 'A-1', total: 42 } }] })
+  expect(await call('flow_check', { flowId: flow.flowId, revisionId: revision })).toMatchObject({ valid: true })
+
+  await startService(service)
+  const run = async (revisionId: string, idempotencyKey: string) => {
+    const accepted = await call('flow_run', { source: 'draft', flowId: flow.flowId, revisionId, trigger: { nodeId: refs.start!, outputs: {} }, idempotencyKey })
+    const runId = z.string().parse(accepted.runId)
+    await expect.poll(async () => (await control.getRun(runId)).status, { timeout: 15_000 }).toBe('completed')
+    return runId
+  }
+  await run(revision, 'below-threshold')
+  expect(modelInputs).toEqual([])
+
+  const updated = await control.editAuthoring(flow.flowId, {
+    baseRevision: revision,
+    requestId: 'raise-order',
+    edits: [{ op: 'node.update', node: refs.order!, set: { config: { values: { order: { total: 142 } } } } }],
+  })
+  expect(updated).toMatchObject({ saved: true, validation: { status: 'valid' } })
+  expect(await call('flow_read', { flowId: flow.flowId, nodes })).toEqual(await control.readAuthoring(flow.flowId, { nodes }))
+  const runId = await run(updated.revision, 'above-threshold')
+  expect(modelInputs).toEqual([
+    {
+      messages: null,
+      model: { model: 'test-model', temperature: 0.25 },
+      template: [{ role: 'user', content: 'Summarize {{order}}.' }],
+      order: { id: 'A-1', total: 142 },
+    },
+  ])
+  expect(await call('run_result', { runId })).toMatchObject({ status: 'completed' })
+  const events = await call('run_events', { runId })
+  expect(JSON.stringify(events.events)).toContain('Order A-1 needs review.')
+  expect((await control.listRuns(flow.flowId)).runs).toHaveLength(2)
 })
 
 it('rejects stale concurrent edits and mismatched idempotent requests without losing accepted changes', async () => {
   const { call, client, connect, control } = await fixture()
   const flow = await call('flow_create', { name: 'Conflict', idempotencyKey: 'conflict-create' })
-  const args = { flowId: flow.flowId, expectedRevisionId: flow.draftRevisionId, operations: [start] }
+  const args = { flowId: flow.flowId, baseRevision: flow.draftRevisionId, edits: [{ op: 'node.add', as: 'start', type: 'manual', name: 'Start' }] }
   const other = await connect()
   const replies = await Promise.all([
-    client.callTool({ name: 'flow_apply', arguments: { ...args, idempotencyKey: 'first' } }),
-    other.callTool({ name: 'flow_apply', arguments: { ...args, idempotencyKey: 'second' } }),
+    client.callTool({ name: 'flow_edit', arguments: { ...args, requestId: 'first' } }),
+    other.callTool({ name: 'flow_edit', arguments: { ...args, requestId: 'second' } }),
   ])
   expect(replies.filter((reply) => reply.isError)).toHaveLength(1)
   expect(replies.find((reply) => reply.isError)?.structuredContent).toMatchObject({ error: { code: 'flow.revision-conflict' } })
   const conflict = await client.callTool({ name: 'flow_create', arguments: { name: 'Different', idempotencyKey: 'conflict-create' } })
   expect(conflict.structuredContent).toMatchObject({ error: { code: 'flow.conflict' } })
   const draft = await control.getDraft(z.string().parse(flow.flowId))
-  expect(draft.content.document.graph.nodes.start).toMatchObject({ kind: 'manual' })
+  expect(Object.values(draft.content.document.graph.nodes)).toEqual([expect.objectContaining({ kind: 'manual' })])
 })
 
 it('shares pagination cursors with the Control API and preserves invalid input and business errors', async () => {
@@ -296,9 +384,9 @@ it('shares pagination cursors with the Control API and preserves invalid input a
 })
 
 it('keeps admitted Runs across client disconnects and exposes Wait and cancellation state', async () => {
-  const { call, client, connect, service } = await fixture()
+  const { call, client, connect, service, control } = await fixture()
   const flow = await call('flow_create', { name: 'Approval', idempotencyKey: 'wait-create' })
-  const changed = await call('flow_apply', {
+  const changed = await seedDraft(control, {
     flowId: flow.flowId,
     expectedRevisionId: flow.draftRevisionId,
     idempotencyKey: 'wait-edit',
@@ -347,7 +435,7 @@ it('keeps admitted Runs across client disconnects and exposes Wait and cancellat
 it.each(['approve', 'reject', 'continue'] as const)('resolves a persisted Wait with %s and preserves its first decision', async (action) => {
   const { call, client, control, service } = await fixture()
   const flow = await control.createFlow(`Wait ${action}`)
-  const changed = await call('flow_apply', {
+  const changed = await seedDraft(control, {
     flowId: flow.flowId,
     expectedRevisionId: flow.draftRevisionId,
     idempotencyKey: 'resolve-edit',
@@ -404,7 +492,7 @@ it.each(['approve', 'reject', 'continue'] as const)('resolves a persisted Wait w
 it('pages stored tool results through MCP and REST and isolates results by Run', async () => {
   const { call, client, control, file } = await fixture()
   const flow = await control.createFlow('Stored results')
-  const changed = await call('flow_apply', {
+  const changed = await seedDraft(control, {
     flowId: flow.flowId,
     expectedRevisionId: flow.draftRevisionId,
     idempotencyKey: 'results-edit',
@@ -520,7 +608,7 @@ it('executes fixed Live code revisions and keeps old Run retries stable after re
   const flow = await call('flow_create', { name: 'Live code', idempotencyKey: 'live-create' })
   const flowId = z.string().parse(flow.flowId)
   const source = 'export default () => ({ answer: 42 })'
-  const edit = await call('flow_apply', {
+  const edit = await seedDraft(control, {
     flowId,
     expectedRevisionId: flow.draftRevisionId,
     idempotencyKey: 'live-edit',
@@ -562,7 +650,7 @@ it('executes fixed Live code revisions and keeps old Run retries stable after re
   await service.waitForIdle()
   expect((await call('run_get', { runId: run.runId })).status).toBe('completed')
   expect(JSON.stringify(await call('run_result', { runId: run.runId }))).toContain('42')
-  const changed = await call('flow_apply', {
+  const changed = await seedDraft(control, {
     flowId,
     expectedRevisionId: revisionId,
     idempotencyKey: 'failing-edit',
@@ -695,6 +783,19 @@ for (const conformance of mcpConformanceCases) {
   })
 }
 
+it('reads code from fixed revisions and rejects obsolete Subflow parameters', async () => {
+  const { call, control, client } = await fixture()
+  const flow = await control.createFlow('Read details')
+  const changed = await control.changeDraft(flow.flowId, flow.draftRevisionId, authoringExample('code').operations, 'details')
+  const revision = changed.revision.revisionId,
+    args = { flowId: flow.flowId, revision, text: { node: 'format', field: 'code' } }
+  const detail = await call('flow_read', args)
+  expect(detail).toMatchObject({ revision, data: { text: { content: expect.stringContaining('export default') } } })
+  await control.changeDraft(flow.flowId, revision, [{ kind: 'graph.node.delete', nodeId: 'format' }], 'delete')
+  expect(await call('flow_read', args)).toEqual(detail)
+  expect((await client.callTool({ name: 'flow_read', arguments: { ...args, subflowId: 'child' } })).isError).toBe(true)
+})
+
 it('discovers Trigger definitions separately from Flow instances and rejects contradictory Run identities', async () => {
   const { call, client, service } = await fixture()
   expect(await call('connector_teams')).toEqual({ enabled: false, teams: [], version: 1 })
@@ -742,3 +843,12 @@ it('shares Draft account usage removal with REST and preserves its idempotent re
   expect(await control.removeConnectionUsage(flow.flowId, 'account', flow.draftRevisionId, 0, 'remove-usage')).toEqual(removed)
   expect((await control.getDraft(flow.flowId)).revisionId).not.toBe(flow.draftRevisionId)
 })
+
+async function seedDraft(control: ControlClient, args: { flowId: unknown; expectedRevisionId: unknown; operations: unknown; idempotencyKey: string }) {
+  return control.changeDraft(
+    z.string().parse(args.flowId),
+    z.string().parse(args.expectedRevisionId),
+    decodeDraftOperations(args.operations),
+    args.idempotencyKey,
+  )
+}

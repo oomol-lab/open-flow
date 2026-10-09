@@ -1,203 +1,370 @@
-import type { TaskNode } from '@oomol-lab/open-flow/flow-change'
-import type { ChangeOperation, RevisionContent, ManagedTaskDefinition } from '@oomol-lab/open-flow/flow-change'
+import type { ChangeOperation, JsonValue, ManagedTaskDefinition, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
 import { applyFlowChanges, currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { isDeepStrictEqual } from 'node:util'
+import { fulfillmentSamples, fulfillmentStages } from './fulfillment.ts'
 
-const port = { jsonSchema: { type: 'string' }, nullable: false } as const
-export const oldSource = 'export default async function () { return { text: "Original content", revised: "Original content" } }'
-export const newSource = 'export default async function () { return { text: "Original content", revised: "Weekly summary: 3 updates" } }'
-export const taskPrompt = "Summarize this week's updates in English, preserving all numbers."
 export const scenarios = [
   {
-    id: 'edit-prompt',
-    name: 'Edit an Agent prompt',
-    version: 2,
-    task: `Find the Weekly summary Agent and change its prompt to "${taskPrompt}". Leave all other settings unchanged.`,
-    expectedText: null,
+    id: 'fulfillment-ops',
+    entry: { kind: 'manual' },
+    name: 'Evolve a fulfillment operations workflow',
+    version: 1,
+    task: fulfillmentStages[0]!.task,
   },
   {
-    id: 'fix-notification',
-    name: 'Fix the notification source',
-    version: 2,
-    task: 'Send notification should use the text output of Format message. Fix the input source without changing the execution order or other settings.',
-    expectedText: 'Original content',
+    id: 'order-alert',
+    entry: { kind: 'manual' },
+    name: 'Build an order alert',
+    version: 1,
+    task: 'Build a workflow with a Manual trigger. Find the action that lists orders and use Orders test account. Sum their amounts. If the total is greater than 100, send its decimal total as a notification using Notifications test account. Empty orders produce zero and no notification.',
   },
   {
-    id: 'edit-code',
-    name: 'Update code and downstream input',
-    version: 2,
-    task: 'Make Format message return "Weekly summary: 3 updates" in its revised output, preserve its text output, and use revised as the notification input. Leave all other settings unchanged.',
-    expectedText: 'Weekly summary: 3 updates',
+    id: 'customer-redaction',
+    entry: { node: 'start' },
+    name: 'Add customer data redaction',
+    version: 1,
+    task: 'Customer notification must contain JSON with only orderId and total. Insert a processing step on its execution path. Internal archive must continue receiving the complete original order. Keep the existing accounts, other settings and behavior.',
   },
   {
-    id: 'create-flow',
-    name: 'Create a flow',
+    id: 'specialize-summary',
+    entry: { node: 'start' },
+    name: 'Specialize one independent summary',
     version: 2,
-    task: 'In the empty flow, add a Manual trigger and the Send notification action from Lab Notifications. Select Lab account and send "Hello Lab". Connect the execution path and verify the run.',
-    expectedText: 'Hello Lab',
+    task: 'Find Customer summary and replace only the prompt rule "Include internal cost breakdown." with "Exclude internal cost breakdown." Keep all other prompt content and configuration. Internal summary and the other nodes must remain unchanged.',
+  },
+  {
+    id: 'specialize-summary-large',
+    entry: { node: 'start' },
+    name: 'Specialize one independent summary in a larger flow',
+    version: 2,
+    task: 'Find Customer summary and replace only the prompt rule "Include internal cost breakdown." with "Exclude internal cost breakdown." Keep all other prompt content and configuration. Internal summary and the other nodes must remain unchanged.',
+  },
+  {
+    id: 'repair-amount',
+    entry: { node: 'start' },
+    name: 'Repair a failed amount formatter',
+    version: 1,
+    task: 'Inspect the existing failed Run and fix the amount formatter. Null amounts must format as zero, while zero and ordinary amounts keep two decimal places. A missing order list must still fail. Preserve schemas, unrelated code and workflow behavior.',
+  },
+  {
+    id: 'concurrent-edit',
+    entry: { node: 'start' },
+    name: 'Recover from a concurrent edit',
+    version: 1,
+    task: 'Change Customer notification to send "Order received". Another operator may edit the workflow while you work; preserve their changes and all other settings. Do not create duplicate nodes or run the workflow unnecessarily.',
   },
 ] as const
-export type Scenario = (typeof scenarios)[number]
-export function scenario(id: string): Scenario {
-  const value = scenarios.find((item) => item.id == id)
-  if (value == null) throw new Error(`Unknown scenario: ${id}`)
-  return value
+export type Scenario = Omit<(typeof scenarios)[number], 'name' | 'task'> & { name: string; task: string }
+export function scenario(id: string, stage = 0): Scenario {
+  const found = scenarios.find((s) => s.id == id)
+  if (found == null) throw new Error(`Unknown scenario ${id}`)
+  if (id != 'fulfillment-ops') return found
+  const current = fulfillmentStages[stage]
+  if (current == null) throw new Error('Unknown fulfillment stage')
+  return { ...found, name: `${found.name} (${stage + 1}/${fulfillmentStages.length}: ${current.name})`, task: current.task }
+}
+export function stageCount(id: string) {
+  return id == 'fulfillment-ops' ? fulfillmentStages.length : 1
+}
+const string = { jsonSchema: { type: 'string' }, nullable: false } as const
+const any = { jsonSchema: {}, nullable: true } as const
+const order = { orderId: 'O-17', total: 125, email: 'buyer@example.test', phone: '555-0100', internalCost: 47 }
+const summaryPrompt =
+  'Summarize the order for the selected audience.\nAudience: {{input}}\nInclude internal cost breakdown.\nPreserve order identifiers and currency.\nReport missing information explicitly.\nDo not invent shipment dates.\nSeparate confirmed facts from estimates.\n\nAudience handling\nAddress the selected audience directly. Use a professional tone and explain any abbreviation on first use. Keep customer-facing information actionable and do not promise dates not present in the order.\n\nOrder facts\nStart with the order identifier and total. Distinguish the order status from its payment status. If fulfillment details are available, describe shipped, pending and canceled items separately. Preserve the original currency and do not infer exchange rates.\n\nExceptions\nReport discrepancies between line items and the total without changing the supplied figures. Mention missing contact or shipping details when they prevent the next action. Refunds and negative adjustments must keep their original sign.\n\nOutput\nWrite a concise summary followed by outstanding actions. Each action should identify its owner when the data supplies one. If no action is required, say that explicitly. Never invent an owner, account, approval or shipment tracking number.'
+export const amountSource = `function formatAmount(amount) { return amount.toFixed(2) }
+export default function ({orders}) {
+  if (!Array.isArray(orders)) throw new Error('Order list is required')
+  return {text: orders.map(order => formatAmount(order.amount)).join(', ')}
+}`
+function node(nodeId: string, value: Extract<ChangeOperation, { kind: 'graph.node.create' }>['node']): ChangeOperation {
+  return { kind: 'graph.node.create', nodeId, node: value }
+}
+function edge(sourceNode: string, targetNode: string): ChangeOperation {
+  return { kind: 'graph.edge.connect', edge: { source: sourceNode, target: targetNode } }
+}
+function connector(
+  nodeId: string,
+  name: string,
+  action: string,
+  connectionId: string,
+  inputs: ManagedTaskDefinition['inputs'],
+  outputs: ManagedTaskDefinition['outputs'],
+  values: Record<string, JsonValue> = {},
+): ChangeOperation[] {
+  return [
+    node(nodeId, {
+      kind: 'task',
+      name,
+      task: { name, inputs, outputs, executor: { kind: 'connector', action, connectionId } },
+      inputs: Object.fromEntries(Object.entries(values).map(([key, value]) => [key, { kind: 'value', value }])),
+    }),
+  ]
+}
+function source(nodeId: string, handle: string, from: string, output: string): ChangeOperation {
+  return { kind: 'graph.node.input.set', nodeId, handle, value: { kind: 'sources', sources: [{ kind: 'node', nodeId: from, output }] } }
 }
 export function initialOperations(id: string): ChangeOperation[] {
-  if (id == 'create-flow') return []
-  const agent: ManagedTaskDefinition = {
-    name: 'Weekly summary',
-    inputs: [],
-    outputs: [{ handle: 'output', ...port }],
-    executor: { kind: 'agent', code: true, model: 'lab-model', prompt: 'Summarize updates.', maxRounds: 3, tools: [] },
-  }
-  return [
-    { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
-
-    { kind: 'graph.node.create', nodeId: 'summary', node: { kind: 'task', name: 'Weekly summary', task: agent, inputs: {} } },
-
-    {
-      kind: 'graph.node.create',
-      nodeId: 'archive',
-      node: { kind: 'task', name: 'Archive summary', task: { ...agent, name: 'Archive summary' }, inputs: {} },
-    },
-    { kind: 'module.create', moduleId: 'format-module', module: { name: 'Format message', source: oldSource, imports: [] } },
-    {
-      kind: 'graph.node.create',
-      nodeId: 'format',
-      node: {
+  if (id == 'order-alert' || id == 'fulfillment-ops') return []
+  const start = node('start', { kind: 'manual', name: 'Manual trigger' })
+  if (id.startsWith('specialize-summary')) {
+    const task: ManagedTaskDefinition = {
+      name: 'Order summary',
+      inputs: [{ handle: 'input', ...string }],
+      outputs: [{ handle: 'output', ...string }],
+      executor: {
+        kind: 'agent',
+        model: 'lab-model',
+        prompt: summaryPrompt,
+        maxRounds: 3,
+        tools: [
+          {
+            id: 'lookup',
+            name: 'lookup_orders',
+            description: 'Read current order details when the summary needs additional facts.',
+            action: 'lab-orders.list',
+            connectionId: 'orders-test',
+            approval: false,
+            inputs: [],
+          },
+        ],
+        code: false,
+      },
+    }
+    const operations: ChangeOperation[] = [
+      start,
+      node('customer', {
         kind: 'task',
-        name: 'Format message',
+        name: 'Customer summary',
+        task: structuredClone(task),
+        inputs: { input: { kind: 'value', value: 'Customer audience: order O-17' } },
+      }),
+      node('internal', {
+        kind: 'task',
+        name: 'Internal summary',
+        task: structuredClone(task),
+        inputs: { input: { kind: 'value', value: 'Internal audience: order O-17' } },
+      }),
+      edge('start', 'customer'),
+      edge('start', 'internal'),
+    ]
+    const departments = [
+      'Shipping',
+      'Inventory',
+      'Returns',
+      'Billing',
+      'Tax',
+      'Support',
+      'Fulfillment',
+      'Fraud',
+      'Wholesale',
+      'Retail',
+      'Export',
+      'Warranty',
+      'Procurement',
+      'Finance',
+      'Packaging',
+      'Routing',
+      'Reconciliation',
+      'Settlement',
+      'Customer care',
+      'Logistics',
+      'Compliance',
+      'Quality',
+      'Forecasting',
+      'Analytics',
+    ]
+    for (const [index, name] of departments.slice(0, id.endsWith('large') ? 24 : 4).entries()) {
+      operations.push(
+        node(`metric-${index}`, {
+          kind: 'value',
+          name: `${name} summary settings`,
+          inputs: {},
+          values: [
+            {
+              handle: 'settings',
+              ...any,
+              value: {
+                department: name,
+                period: 'weekly',
+                report: `Summarize ${name.toLowerCase()} order activity, exceptions and outstanding work.`,
+                threshold: index + 1,
+              },
+            },
+          ],
+        }),
+        edge('start', `metric-${index}`),
+      )
+    }
+    return operations
+  }
+  if (id == 'concurrent-edit')
+    return [
+      start,
+      ...connector('notify', 'Customer notification', 'lab-notifications.send', 'notifications-test', [{ handle: 'text', ...string }], [], { text: 'Pending' }),
+      node('notes', { kind: 'value', name: 'Operator notes', description: 'Initial note', inputs: {}, values: [] }),
+      edge('start', 'notify'),
+    ]
+  const operations: ChangeOperation[] = [
+    start,
+    ...connector(
+      'orders',
+      'Read orders',
+      'lab-orders.list',
+      'orders-test',
+      [],
+      [
+        { handle: 'orders', ...any },
+        { handle: 'order', ...any },
+      ],
+    ),
+    edge('start', 'orders'),
+  ]
+  if (id == 'repair-amount')
+    return [
+      ...operations,
+      { kind: 'module.create', moduleId: 'amount-code', module: { name: 'Format amounts', imports: [], source: amountSource } },
+      node('format', {
+        kind: 'task',
+        name: 'Format amounts',
         inputs: {},
         task: {
-          name: 'Format message',
-          moduleId: 'format-module',
-          inputs: [],
-          outputs: [
-            { handle: 'text', ...port },
-            { handle: 'revised', ...port },
-          ],
+          name: 'Format amounts',
+          moduleId: 'amount-code',
+          inputs: [{ handle: 'orders', ...any }],
+          outputs: [{ handle: 'text', ...string }],
           capabilities: [],
         },
-      },
-    },
-    ...notificationOperations(),
-    { kind: 'graph.edge.connect', edge: { source: 'start', target: 'format' } },
-    { kind: 'graph.edge.connect', edge: { source: 'format', target: 'notify' } },
-    { kind: 'graph.edge.connect', edge: { source: 'start', target: 'summary' } },
-  ]
-}
-export function notificationOperations(): ChangeOperation[] {
-  return [
-    {
-      kind: 'graph.node.create',
-      nodeId: 'notify',
-      node: {
-        kind: 'task',
-        name: 'Send notification',
-        task: {
-          name: 'Send notification',
-          inputs: [{ handle: 'text', ...port }],
-          outputs: [{ handle: 'receipt', ...port }],
-          executor: { kind: 'connector', action: 'lab-notifications.send', connectionId: 'lab-account' },
-        },
-        inputs: { text: { kind: 'value', value: 'Wrong source' } },
-      },
-    },
-  ]
-}
-export function referenceChanges(id: string, content: RevisionContent): ChangeOperation[] {
-  if (id == 'edit-prompt') {
-    const before = (content.document.graph.nodes.summary as TaskNode).task
-    if (!('executor' in before) || before.executor.kind != 'agent') throw new Error('Expected Agent')
-    return [{ kind: 'graph.node.task.set', nodeId: 'summary', before, value: { ...before, executor: { ...before.executor, prompt: taskPrompt } } }]
-  }
-  const notify = content.document.graph.nodes.notify
-  if (id == 'create-flow')
-    return [
-      { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
-      ...notificationOperations(),
-      {
-        kind: 'graph.node.input.set',
-        nodeId: 'notify',
-        handle: 'text',
-        before: { kind: 'value', value: 'Wrong source' },
-        value: { kind: 'value', value: 'Hello Lab' },
-      },
-      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'notify' } },
+      }),
+      source('format', 'orders', 'orders', 'orders'),
+      edge('orders', 'format'),
     ]
-  if (notify?.kind != 'task') throw new Error('Missing notify node')
   return [
-    ...(id == 'edit-code'
-      ? [
-          {
-            kind: 'module.source.replace' as const,
-            moduleId: 'format-module',
-            beforeSource: content.modules['format-module']!.source,
-            beforeImports: content.modules['format-module']!.imports,
-            source: newSource,
-            imports: [],
-          },
-        ]
-      : []),
-    {
-      kind: 'graph.node.input.set',
-      nodeId: 'notify',
-      handle: 'text',
-      before: notify.inputs.text,
-      value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'format', output: id == 'edit-code' ? 'revised' : 'text' }] },
-    },
+    ...operations,
+    ...connector('notify', 'Customer notification', 'lab-notifications.send-json', 'notifications-test', [{ handle: 'payload', ...any }], []),
+    ...connector('archive', 'Internal archive', 'lab-archive.save', 'archive-test', [{ handle: 'payload', ...any }], []),
+    source('notify', 'payload', 'orders', 'order'),
+    source('archive', 'payload', 'orders', 'order'),
+    edge('orders', 'notify'),
+    edge('orders', 'archive'),
   ]
 }
 export const emptyContent: RevisionContent = {
   modelVersion: currentFlowModelVersion,
   modules: {},
-  document: { bindings: {}, graph: { nodes: {}, edges: [] } },
-}
-/** Checks intent and preservation independently from the reference command sequence. */
-export function assertions(id: string, base: RevisionContent, current: RevisionContent): string[] {
-  const errors: string[] = []
-  const preserved = structuredClone(current)
-  if (id == 'edit-prompt') {
-    const node = current.document.graph.nodes.summary
-    const task = node?.kind == 'task' && 'executor' in node.task ? node.task : undefined
-    if (task?.executor.kind != 'agent' || task.executor.prompt != taskPrompt) errors.push('Weekly summary prompt does not match the requested text.')
-    if (node?.kind == 'task' && task?.executor.kind == 'agent')
-      Object.assign(preserved.document.graph.nodes, { summary: { ...node, task: { ...task, executor: { ...task.executor, prompt: 'Summarize updates.' } } } })
-  } else if (id == 'create-flow') {
-    const nodes = Object.values(current.document.graph.nodes)
-    if (!nodes.some((node) => node.kind == 'manual')) errors.push('A Manual trigger is required.')
-    if (
-      !nodes.some(
-        (node) =>
-          node.kind == 'task' &&
-          'executor' in node.task &&
-          node.task.executor.kind == 'connector' &&
-          node.task.executor.action == 'lab-notifications.send' &&
-          node.task.executor.connectionId == 'lab-account',
-      )
-    )
-      errors.push('Select lab-notifications.send with Lab account.')
-    return errors
-  } else {
-    const node = current.document.graph.nodes.notify
-    const expected = { kind: 'sources', sources: [{ kind: 'node', nodeId: 'format', output: id == 'edit-code' ? 'revised' : 'text' }] }
-    if (node?.kind != 'task' || !isDeepStrictEqual(node.inputs.text, expected))
-      errors.push('Notification input must reference the requested Format message output.')
-    if (node?.kind == 'task') {
-      const before = base.document.graph.nodes.notify
-      if (before?.kind == 'task') Object.assign(preserved.document.graph.nodes, { notify: { ...node, inputs: { ...node.inputs, text: before.inputs.text } } })
-    }
-    if (id == 'edit-code') {
-      const module = current.modules['format-module']
-      if (module == null || module.source == base.modules['format-module']!.source) errors.push('Format message code was not changed.')
-      if (module != null) Object.assign(preserved.modules, { 'format-module': { ...module, source: base.modules['format-module']!.source } })
-    }
-  }
-  if (!isDeepStrictEqual(base, preserved)) errors.push('Content outside the requested edit changed.')
-  return errors
+  document: { graph: { nodes: {}, edges: [] }, bindings: {} },
 }
 export function initialContent(id: string) {
   return applyFlowChanges(emptyContent, initialOperations(id))
+}
+export interface Sample {
+  name: string
+  orders: JsonValue
+  order: JsonValue
+  failure?: boolean
+  notification?: JsonValue
+  formatted?: string
+  outputs?: Record<string, JsonValue>
+  parameters?: Record<string, JsonValue>
+}
+export function samples(id: string, stage = 0): Sample[] {
+  if (id == 'fulfillment-ops') return fulfillmentSamples(stage)
+  if (id == 'order-alert')
+    return [[], [{ amount: 99 }], [{ amount: 60 }, { amount: 40 }], [{ amount: 60 }, { amount: 65 }]].map((orders, index) => ({
+      name: ['empty', 'below', 'equal', 'above'][index]!,
+      orders,
+      order,
+      notification: index == 3 ? '125' : undefined,
+    }))
+  if (id == 'repair-amount')
+    return [
+      { name: 'null', orders: [{ amount: null }], order, formatted: '0.00' },
+      { name: 'zero', orders: [{ amount: 0 }], order, formatted: '0.00' },
+      { name: 'ordinary', orders: [{ amount: 12.5 }, { amount: -2 }], order, formatted: '12.50, -2.00' },
+      { name: 'missing', orders: null, order, failure: true },
+    ]
+  return [{ name: 'default', orders: [], order }]
+}
+function effectiveNode(content: RevisionContent, id: string): unknown {
+  const n = content.document.graph.nodes[id]
+  if (n?.kind != 'task') return n
+  const { task, ...instance } = n
+  if ('moduleId' in task) {
+    const { moduleId: _moduleId, ...definition } = task
+    return { ...instance, task: definition, code: content.modules[task.moduleId] }
+  }
+  const { name: _taskName, ...configuration } = task
+  if (configuration.executor.kind == 'agent') {
+    const { notification, tools, ...executor } = configuration.executor
+    return {
+      ...instance,
+      task: {
+        ...configuration,
+        executor: {
+          ...executor,
+          tools: tools.map((tool) => {
+            const { id: _toolId, ...settings } = tool
+            return settings
+          }),
+          ...(notification == null ? {} : { notification }),
+        },
+      },
+    }
+  }
+  return { ...instance, task: configuration }
+}
+/** Independent assertions: compare behavior and preserved effective configurations, not generated IDs. */
+export function assertions(id: string, base: RevisionContent, current: RevisionContent): string[] {
+  if (id == 'fulfillment-ops') return []
+  const errors: string[] = []
+  const allowed = new Set(
+    id.startsWith('specialize-summary') ? ['customer'] : id == 'customer-redaction' ? ['notify'] : id == 'repair-amount' ? ['format'] : ['notify', 'notes'],
+  )
+  for (const nodeId of Object.keys(base.document.graph.nodes)) {
+    if (!allowed.has(nodeId) && !isDeepStrictEqual(effectiveNode(base, nodeId), effectiveNode(current, nodeId)))
+      errors.push(`Unrelated node ${nodeId} changed.`)
+  }
+  if (id.startsWith('specialize-summary')) {
+    if (!isDeepStrictEqual(Object.keys(base.document.graph.nodes).toSorted(), Object.keys(current.document.graph.nodes).toSorted()))
+      errors.push('Unexpected node set changes.')
+    const before = effectiveNode(base, 'customer') as { task: ManagedTaskDefinition },
+      after = effectiveNode(current, 'customer') as { task?: ManagedTaskDefinition }
+    const expected = {
+      ...before,
+      task: {
+        ...before.task,
+        executor: { ...before.task.executor, prompt: summaryPrompt.replace('Include internal cost breakdown.', 'Exclude internal cost breakdown.') },
+      },
+    }
+    if (!isDeepStrictEqual(expected, after)) errors.push('Only the requested customer prompt rule may change.')
+  }
+  if (id == 'repair-amount') {
+    const before = effectiveNode(base, 'format') as Record<string, unknown>,
+      after = effectiveNode(current, 'format') as Record<string, unknown>
+    if (after == null || !isDeepStrictEqual({ ...before, code: undefined }, { ...after, code: undefined }))
+      errors.push('Formatter configuration and schemas must remain unchanged.')
+  }
+  if (id == 'concurrent-edit') {
+    if (current.document.graph.nodes.notes?.description != 'Operator reviewed') errors.push('Concurrent operator note was lost.')
+    const n = current.document.graph.nodes.notify
+    if (n?.kind != 'task' || !isDeepStrictEqual(n.inputs.text, { kind: 'value', value: 'Order received' })) errors.push('Notification text is incorrect.')
+    const before = effectiveNode(base, 'notify') as Record<string, unknown>
+    const after = effectiveNode(current, 'notify') as Record<string, unknown>
+    if (!isDeepStrictEqual({ ...after, inputs: before.inputs }, before)) errors.push('Other notification settings changed.')
+    if (
+      !isDeepStrictEqual({ ...current.document.graph.nodes.notes, description: base.document.graph.nodes.notes?.description }, base.document.graph.nodes.notes)
+    )
+      errors.push('Other operator note settings changed.')
+    if (Object.keys(current.document.graph.nodes).length != Object.keys(base.document.graph.nodes).length) errors.push('Unexpected nodes were created.')
+  }
+  if (id == 'customer-redaction') {
+    const notify = effectiveNode(current, 'notify') as Record<string, unknown>,
+      before = effectiveNode(base, 'notify') as Record<string, unknown>
+    if (!isDeepStrictEqual({ ...notify, inputs: before.inputs }, before)) errors.push('Notification settings changed.')
+    const incoming = current.document.graph.edges.filter((e) => e.target == 'notify')
+    if (incoming.length != 1 || incoming[0]!.source == 'orders') errors.push('Insert a processing step before Customer notification.')
+    if (!current.document.graph.edges.some((e) => e.source == 'orders' && e.target == incoming[0]?.source))
+      errors.push('Processing step is not on the order execution path.')
+  } else if (id != 'order-alert' && !isDeepStrictEqual(base.document.graph.edges, current.document.graph.edges)) errors.push('Execution relationships changed.')
+  return errors
 }

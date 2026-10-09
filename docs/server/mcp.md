@@ -76,11 +76,11 @@ try {
 | 工具                           | 输入要点                                                                                   | 结果                                             |
 | ------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------ |
 | `flow_list`                    | `cursor?`、`limit?`                                                                        | Flow 列表和 `nextCursor?`                        |
-| `flow_get`                     | `flowId`、可选 `full`                                                                      | 默认精简 Draft 和 Live；`full=true` 返回完整内容 |
-| `flow_node_get`                | `flowId`、`revisionId`、`nodeId`                                                           | 固定版本节点、Task 定义或代码模块                |
-| `flow_schema`                  | `kind?` 或 `example?`                                                                      | Draft operations schema 或完整创建批次           |
+| `flow_read`                    | `flowId`、`revision?`、`nodes?` 或 `text?`                                                 | 固定版本概要、节点详情或文本片段                 |
+| `flow_search`                  | `flowId`、`query`、`type?`、`revision?`、`offset?`、`limit?`                               | 引用与有限上下文                                 |
+| `flow_schema`                  | `type?` 或 `action?`；Action 需要 `flowId`                                                 | 编辑语法、配置、端口及示例                       |
 | `flow_create`                  | `name`、`idempotencyKey`、`teamId?`                                                        | Flow，包含初始 `draftRevisionId`                 |
-| `flow_apply`                   | `flowId`、`expectedRevisionId`、`idempotencyKey`、`operations`                             | 新 Revision identity                             |
+| `flow_edit`                    | `flowId`、`baseRevision`、`requestId`、`edits`                                             | 保存结果、新版本、别名引用和独立校验结果         |
 | `flow_check`                   | `flowId`、`revisionId`                                                                     | 固定 Revision 的 diagnostics                     |
 | `flow_publish`                 | `flowId`、`revisionId`、`expectedLivePublicationId`、`idempotencyKey`                      | 发布操作，包含 `operationId` 和状态              |
 | `flow_publish_status`          | `flowId`、`operationId`                                                                    | 发布操作的状态、成功的 Publication ID 或失败原因 |
@@ -118,10 +118,10 @@ Flow、Run 分页游标与 Control API 相同；Run cursor 绑定 Flow。`run_li
 
 典型步骤：
 
-1. 通过 `flow_list`、`flow_get` 定位 Flow；创建时调用 `flow_create`。OOMOL Connector 部署可先通过 `connector_teams` 选择具体 Team。
-2. 优先调用 `flow_schema {"example":"index"}` 查看简短示例索引，或按 kind 查询单个操作。`example: "connector"`、`"poll"`、`"poll-notification"` 返回完整创建批次；替换真实账号、Action 和端口后提交 flow_apply。节点 title 非空且在图内唯一；ID 显式指定。
+1. 通过 `flow_list`、`flow_read` 定位 Flow；创建时调用 `flow_create`。OOMOL Connector 部署可先通过 `connector_teams` 选择具体 Team。
+2. 用 `flow_search` 定位目标，`flow_read` 按需读取固定版本的详情或文本。`flow_schema {"type":"code"}` 返回节点配置和示例，Action 端口用 `{flowId,action}` 查询。`flow_edit` 按序原子执行语义操作，创建使用批次内别名，无需分配内部定义 ID。
 3. 新 Flow 没有 Trigger，需显式添加 Manual 或其他 Trigger。编辑返回新 Revision，用该 identity 调用 `flow_check`。
-4. 上线时调用 `flow_publish`，固定 `flowId`、`revisionId`，并传入从 `flow_get` 观察到的 `expectedLivePublicationId`；首次发布传 `null`。
+4. 上线时调用 `flow_publish`，固定 `flowId`、`revisionId`，并传入从 `flow_list` 观察到的 `expectedLivePublicationId`；首次发布传 `null`。
    轮询 `flow_publish_status`，`pending` 表示仍在进行，`succeeded` 才确认发布成功，`failed` 返回 `issue`。
    用 `flow_set_enabled` 控制已发布 Flow 的启停；`expectedPublicationId` 防止误操作已被替换的 Live。
 5. Draft Run 使用 `source: "draft"`、`flowId`、`revisionId`；Live Run 使用 `source: "live"`、`publicationId`。
@@ -138,17 +138,17 @@ Flow、Run 分页游标与 Control API 相同；Run cursor 绑定 Flow。`run_li
 工具业务失败返回 `isError: true`，结构化结果包含 `error.code`、`message` 和适用的 HTTP `status`。
 协议错误由 MCP SDK 返回 JSON-RPC error。未知内部错误不向客户端暴露异常堆栈。
 
-`flow_create`、`flow_apply`、`flow_publish`、`flow_run` 和 `flow_connection_usage_remove` 必须显式提供非空且最多 256 字符的 `idempotencyKey`。
-同一 mutation 重试必须保持 key 和参数一致；更换 key 表示一次新操作，可能执行第二次 Run。
+`flow_create`、`flow_publish`、`flow_run` 和 `flow_connection_usage_remove` 必须显式提供非空且最多 256 字符的 `idempotencyKey`。
+`flow_edit` 使用同样有长度限制的 `requestId`，并固定 `baseRevision`。同一 mutation 重试必须保持身份和参数一致；更换 key 表示一次新操作，可能执行第二次 Run。
 MCP JSON-RPC request ID 与业务幂等 key 是不同身份。
 
 Draft head 冲突返回 `flow.revision-conflict`，调用方重新读取后决定修改。
 mutation 内部发生无法确定结果的异常时返回 `flow.mutation-outcome-unknown` 与原 key；连接断开没有响应时也应以原参数和原 key 重试。
 不要因为客户端超时自动换 key 或换到新的 Draft/Live。
 
-`graph.trigger.create` 允许按 Provider key 创建节点，服务端将解析后的定义固定进 Revision，重试不会重新解析目录。CLI 的 `schema example.NAME` / `apply` 使用相同示例与输入合同，详见 [Flow 命令调用合同](../authoring/flow-command.md#创建示例与-provider-trigger)。
+Provider Trigger 通过 `node.add` 的 `config.key` 创建，服务端解析并固定定义快照。重试先读取原请求的幂等记录，再检查版本和解析目录。`flow_edit` 的 `saved:true` 与 `validation.status` 独立；草稿可带语义诊断保存。文本零匹配、多匹配和批次失败返回带 `details.reason`、`editIndex` 的可修正错误，不产生部分写入。
 
-`flow_get` 在 Draft 返回 `flow.invalid` 或 `flow.revision-upgrade-required` 时保留 Flow 元信息，并返回 `draft: null` 与 `draftIssue`（code、message、revisionId）；此时省略依赖 Draft 的 live 详情，已发布版本身份仍在 flow.live。CLI inspect 使用相同降级规则。该结果不表示 Draft 可编辑或可运行；权限和其他错误不降级。
+`flow_read` 仅读取指定版本，不回退新版本。Draft 无法读取时返回错误；可用 `flow_list` 查看 Flow 元信息。包含已退役 Subflow 的 Revision 拒绝读取和修复，不提供只读调用节点入口。
 
 请求取消会传播给该请求中的 Connector 查询；Server 关闭会中止正在进行的 MCP 请求。
 已接受的 Run 独立于 MCP 连接继续执行。显式取消使用 `run_cancel`，完成与取消竞争时以部署返回的权威状态为准。
@@ -163,19 +163,21 @@ mutation 内部发生无法确定结果的异常时返回 `flow.mutation-outcome
 
 工具参数、描述和 annotations 由 `@oomol-lab/open-flow/mcp` 的 `mcpTools` 统一提供。Server 直接注册这些 Standard Schema 定义，并运行同一入口导出的 `mcpConformanceCases`。部署边界及版本规则见[公共契约与版本演进](../control/contracts/compatibility.md)。
 
-`flow_get` 默认与 CLI `oo flow inspect <flow> --json` 使用同一精简视图：`draft.graph.nodes` 按节点 ID 索引，保留原始 kind、输入绑定、inputHandles、outputHandles、未被覆盖的 inputDefaults，以及 Task 的 executor 或代码 moduleId。子流程保留各自图、接口与输出来源；bindings 和模块名称、imports 仍可读取。完整 Schema、源码、actorId、digest、parentRevisionId 和 modelVersion 不在默认视图中。Live 只保留 status、hasUnpublishedChanges 和 publication 的 publicationId/revisionId。
+`flow_read`、`flow_search`、`flow_edit` 的业务响应与 CLI、HTTP 一致。默认概要不包含完整 schema 和长文本，详情不返回 Module/binding ID。各节点独立拥有执行配置，不存在独立 Task ID。`text` 读取返回行数和 `nextStart`；搜索结果带 `nextOffset`。固定 `revision` 继续读取，避免混合版本。
 
-需要完整 Schema、源码或复杂修改的精确 before 值时，使用 `flow_get({ flowId, full: true })`，CLI 使用 `oo flow inspect <flow> --full --json`。完整模式保留原始 `draft.content` 和修订元数据。精简视图不是可直接写回的 Revision，也不会截断或打码用户输入。读取仍使用现有固定 Revision 与 Control API，未改变持久化格式。
+`node.update` 局部合并配置，未提供字段保留，数组整体替换；`clear` 路径与 JSON null 分开。`text.edit` 采用精确唯一匹配。节点修改只影响目标节点；共享代码模块的局部编辑由工具按需复制模块。输入来源与执行连线独立。完整参数见 [Flow 命令合同](../authoring/flow-command.md)。
+
+`node.add.inputs` 可直接按业务字段名提供数据来源，Code/Agent/LLM/Wait/Approval 的新命名输入会自动声明；已有字段继续遵守原有约束。自定义输入约束使用 `config.inputs` 字段映射，Code 结果字段使用 `config.outputs`；Agent/LLM 的结构化结果使用 `config.resultSchema`，无需声明固定输出端口。单输出来源可写作 `{kind:"output",node:"$summary"}`，多输出需要显式选择 `port`。CLI、HTTP 和 MCP 使用同一配置转换和错误合同。
+
+Agent 的工具参数也只接收按名称索引的 `model`、`value` 或 `input` 来源，端口约束由所选 Action 装配。既有工具保留原定义和未覆盖来源；只有新增工具或更换 Action 才重新读取目录。
 
 ### 目录发现和固定版本节点详情
 
 `connector_providers` 列出 Provider，替代原 `connector_list`。`connector_search` 返回 Action 摘要（身份、描述、authenticated 和默认连接摘要），不返回 inputs/outputs/inputSchema/outputSchema；通过 `connector_get` 按需读取完整定义。
 
-`trigger_search({ query? })` 替代原 `trigger_list`，省略 query 列出全部可用定义摘要，提供 query 时进行不区分大小写的匹配。Flow 中已创建的触发器实例由 `flow_get` 读取。Connector 和 Trigger 搜索 query 长度为 1–256 个字符。
+`trigger_search({ query? })` 替代原 `trigger_list`，省略 query 列出全部可用定义摘要，提供 query 时进行不区分大小写的匹配。Flow 中已创建的触发器实例由 `flow_read` 读取。Connector 和 Trigger 搜索 query 长度为 1–256 个字符。
 
 事件源是独立于 Flow 的部署资源。`event_source_list({})` 列出当前身份可见的事件源；实际使用关系见各项的 `consumers`。配置飞书 Trigger 时，调用 `connector_connections({ serviceId: "feishu_app_bot", flowId })` 对照 Connection。空列表附带引导信息：在 Workbench 创建并验证事件源后再查询；工具不会接收或返回事件源密钥。返回的 `sourceId`、`teamId`、`connectionId`、`eventTypes`、`enabled` 和 `verifiedAt` 用于选择和确认来源。
-
-`flow_node_get({ flowId, revisionId, nodeId })` 返回固定 Revision 的单个节点及其使用的 Task 定义或代码 module。代码 Task 定义保留在 node.task，不重复返回顶层 task。Draft 后续变化不影响历史版本详情。找不到目标时返回错误，不自动读取最新版本。
 
 `flow_run` 的输入 Schema 按 source 区分互斥分支：draft 要求 flowId/revisionId，live 要求 publicationId，另一分支字段不允许出现。该约束同时用于工具发现的 JSON Schema 与调用验证。
 
@@ -183,9 +185,7 @@ mutation 内部发生无法确定结果的异常时返回 `flow.mutation-outcome
 
 ### CLI 对应入口与返回包装
 
-固定版本节点读取对应 `oo flow node show FLOW_ID NODE_ID --revision REVISION_ID --json`。
-两端都把 `nodeId`、`node`、`task?`、`module?` 放在结果顶层，CLI 另有 `kind: "node.show"`。
-CLI 省略 revision 时读取当前 Draft，并额外支持无歧义的节点名称（含 Trigger）。
+节点读取对应 `oo flow read FLOW_ID --input '{"revision":"REVISION","nodes":["NODE"]}' --json`；搜索和编辑分别对应 `search`、`edit`。CLI 支持 JSON、文件或 stdin 输入，不装配底层操作。
 
 `flow_code_connections` 对应 `connector code-access FLOW_ID [--publication PUBLICATION_ID]`；
 `flow_connection_candidates` 对应 `connector candidates FLOW_ID PROVIDER_ID [PROVIDER_ID ...]`。

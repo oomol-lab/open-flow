@@ -11,6 +11,9 @@ export function inverseFlowChanges(content: RevisionContent, operations: readonl
     const after = applyFlowChanges(current, [operation])
     const restore: ChangeOperation[] = []
     switch (operation.kind) {
+      case 'graph.node.replace':
+        restore.push({ ...operation, before: after.document.graph.nodes[operation.nodeId]!, node: operation.before })
+        break
       case 'graph.node.create':
         restore.push({ kind: 'graph.node.delete', nodeId: operation.nodeId })
         break

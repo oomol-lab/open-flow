@@ -384,9 +384,30 @@ it('issues private, persistent personal tokens and enforces owner isolation thro
   expect(mcp.isError).not.toBe(true)
   expect(JSON.stringify(mcp.structuredContent)).toContain(own.flowId)
   expect(JSON.stringify(mcp.structuredContent)).not.toContain(other.flowId)
-  const denied = await f.mcp('flow_get', { flowId: other.flowId }, headers)
+  const ownRead = await f.mcp('flow_read', { flowId: own.flowId }, headers)
+  expect(ownRead.isError).not.toBe(true)
+  expect(ownRead.structuredContent).toMatchObject({ flowId: own.flowId, revision: own.draftRevisionId })
+  const denied = await f.mcp('flow_read', { flowId: other.flowId }, headers)
   expect(denied.isError).toBe(true)
   expect(JSON.stringify(denied)).toContain('flow.not-found')
+  const before = f.service.control.getDraft(other.flowId)
+  const edit = {
+    baseRevision: before.revisionId,
+    requestId: 'foreign-edit',
+    edits: [{ op: 'node.add', as: 'stolen', type: 'manual', name: 'Unauthorized trigger' }],
+  }
+  const deniedEdit = await f.mcp('flow_edit', { flowId: other.flowId, ...edit }, headers)
+  expect(deniedEdit.isError).toBe(true)
+  expect(JSON.stringify(deniedEdit)).toContain('flow.not-found')
+  for (const [operation, body] of [
+    ['read', {}],
+    ['edit', edit],
+  ] as const) {
+    const deniedResponse = await f.request(`/v1/flows/${other.flowId}/authoring/${operation}`, headers, 'POST', body)
+    expect(deniedResponse.status).toBe(404)
+    expect(await deniedResponse.text()).toContain('flow.not-found')
+  }
+  expect(f.service.control.getDraft(other.flowId)).toEqual(before)
   const reopened = Database.open(f.file)
   expect(new UserStore(reopened.connection).tokenActor(created.token)).toBe(alice.user.userId)
   reopened.close()

@@ -313,6 +313,41 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       ),
     )
   })
+  app.post('/flows/:flowId/authoring/check', async (context) => {
+    const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.authoringCheck)
+    return response(200, await service.checkAuthoring(context.req.param('flowId'), text(body.revisionId, controlErrorCode.flowInvalid)))
+  })
+  app.post('/flows/:flowId/authoring/read', async (context) =>
+    response(
+      200,
+      service.readAuthoring(context.req.param('flowId'), await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.authoringRead)),
+    ),
+  )
+  app.post('/flows/:flowId/authoring/search', async (context) =>
+    response(
+      200,
+      service.searchAuthoring(context.req.param('flowId'), await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.authoringSearch)),
+    ),
+  )
+  app.post('/flows/:flowId/authoring/schema', async (context) =>
+    response(
+      200,
+      await service.authoringSchema(
+        context.req.param('flowId'),
+        await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.authoringSchema),
+      ),
+    ),
+  )
+  app.post('/flows/:flowId/authoring/edit', async (context) =>
+    response(
+      200,
+      await service.editAuthoring(
+        context.get('actorId'),
+        context.req.param('flowId'),
+        await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.authoringEdit),
+      ),
+    ),
+  )
   app.get('/flows/:flowId/draft', (context) => response(200, service.getDraft(context.req.param('flowId'))))
   app.get('/flows/:flowId/draft/sync', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)

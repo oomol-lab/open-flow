@@ -3,8 +3,8 @@ import type { Logger } from 'pino'
 import type { ServerService } from '../application/service.ts'
 
 import { createMcpHandler, McpServer } from '@modelcontextprotocol/server'
-import { controlErrorCode, inspectFlowDraft, flowInspection, actionSummary, nodeDetails, searchTriggerKeys } from '@oomol-lab/open-flow/control-api'
-import { authoringExample, authoringExamples, draftOperationsSchema, decodeDraftOperations } from '@oomol-lab/open-flow/control-requests'
+import { controlErrorCode, actionSummary, searchTriggerKeys } from '@oomol-lab/open-flow/control-api'
+import { authoringSchema } from '@oomol-lab/open-flow/control-requests'
 import { mcpTools, mcpProtocolVersion, mcpInstructions } from '@oomol-lab/open-flow/mcp'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { Hono } from 'hono'
@@ -76,18 +76,26 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
         return result(await execute(args, context))
       } catch (error) {
         if (context.mcpReq.signal.aborted) throw error
-        if (error instanceof ControlError) return result({ error: { code: error.code, message: error.message, status: error.status } }, true)
+        if (error instanceof ControlError)
+          return result(
+            { error: { code: error.code, message: error.message, status: error.status, ...(error.details == null ? {} : { details: error.details }) } },
+            true,
+          )
         logger.error({ err: error, tool: name }, 'MCP tool failed.')
         const input = args as Record<string, unknown>
         return result(
           {
             error: {
-              code: input.idempotencyKey == null ? 'internal' : 'flow.mutation-outcome-unknown',
+              code: (input.idempotencyKey ?? input.requestId) == null ? 'internal' : 'flow.mutation-outcome-unknown',
               message:
-                input.idempotencyKey == null
+                (input.idempotencyKey ?? input.requestId) == null
                   ? 'The request could not be completed.'
-                  : 'The mutation outcome is unknown. Retry the same tool with identical arguments and the same idempotencyKey.',
-              ...(input.idempotencyKey == null ? {} : { idempotencyKey: input.idempotencyKey }),
+                  : 'The mutation outcome is unknown. Retry the same tool with identical arguments and the same request identity.',
+              ...((input.idempotencyKey ?? input.requestId) == null
+                ? {}
+                : input.requestId == null
+                  ? { idempotencyKey: input.idempotencyKey }
+                  : { requestId: input.requestId }),
             },
           },
           true,
@@ -100,41 +108,20 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
     const { next, page } = control.listFlows(limit, cursor == null ? undefined : decodeFlowCursor(cursor), false, actorId)
     return { ...page, ...(next == null ? {} : { nextCursor: encodeFlowCursor(next) }) }
   })
-  register('flow_get', mcpTools.flow_get, async ({ flowId, full }) => {
-    const metadata = control.getFlow(flowId)
-    const inspected = await inspectFlowDraft(metadata, () => control.getRevision(flowId, metadata.draftRevisionId))
-    return flowInspection(inspected, inspected.draft == null ? undefined : await control.getLive(flowId), full)
-  })
-  register('flow_node_get', mcpTools.flow_node_get, ({ flowId, revisionId, nodeId }) => {
-    const draft = control.getRevision(flowId, revisionId)
-    const graph = draft.content.document.graph
-    const node = graph?.nodes[nodeId]
-    if (node == null) throw new ControlError(controlErrorCode.flowInvalid, 'Node was not found in the selected Revision and graph.')
-    return { flowId, revisionId, ...nodeDetails(draft.content, nodeId, node), version: 1 }
-  })
-  register('flow_schema', mcpTools.flow_schema, ({ kind, example }) => {
-    try {
-      if (example != null) return example == 'index' ? { examples: authoringExamples } : authoringExample(example)
-      return { operations: draftOperationsSchema(kind), examples: authoringExamples }
-    } catch {
-      throw new ControlError(controlErrorCode.flowInvalid, 'Unknown change operation kind or example.')
-    }
+  register('flow_read', mcpTools.flow_read, ({ flowId, ...query }) => control.readAuthoring(flowId, query))
+  register('flow_search', mcpTools.flow_search, ({ flowId, ...query }) => control.searchAuthoring(flowId, query))
+  register('flow_schema', mcpTools.flow_schema, ({ flowId, ...query }) => {
+    if (flowId != null) return control.authoringSchema(flowId, query)
+    if (query.action != null) throw new ControlError(controlErrorCode.flowInvalid, 'Action lookup requires flowId.')
+    return authoringSchema(query.type)
   })
   register(
     'flow_create',
     mcpTools.flow_create,
     async ({ name, idempotencyKey, teamId }) => (await control.createFlow(actorId, name, idempotencyKey, teamId)).flow,
   )
-  register('flow_apply', mcpTools.flow_apply, async ({ flowId, expectedRevisionId, operations, idempotencyKey }) => {
-    let changes
-    try {
-      changes = decodeDraftOperations(operations)
-    } catch (error) {
-      throw new ControlError(controlErrorCode.flowInvalid, error instanceof Error ? error.message : 'Invalid change operations.')
-    }
-    return await control.changeDraft(actorId, flowId, expectedRevisionId, changes, idempotencyKey)
-  })
-  register('flow_check', mcpTools.flow_check, ({ flowId, revisionId }) => control.checkFlow(flowId, revisionId, currentEngineContract))
+  register('flow_edit', mcpTools.flow_edit, ({ flowId, ...request }) => control.editAuthoring(actorId, flowId, request))
+  register('flow_check', mcpTools.flow_check, ({ flowId, revisionId }) => control.checkAuthoring(flowId, revisionId))
   register('flow_publish', mcpTools.flow_publish, ({ flowId, revisionId, expectedLivePublicationId, idempotencyKey }) =>
     control.publishFlow(actorId, flowId, revisionId, currentEngineContract, expectedLivePublicationId, idempotencyKey),
   )

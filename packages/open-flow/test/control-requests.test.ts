@@ -1,8 +1,14 @@
+import { Validator } from '@cfworker/json-schema'
 import { describe, expect, it } from 'vitest'
 import { mcpTools } from '../src/control/common/mcp.ts'
 import { controlRequests, controlRequestSchema } from '../src/control/common/requests.ts'
 
 const samples = {
+  authoringCheck: { revisionId: 'revision' },
+  authoringRead: {},
+  authoringSearch: { query: 'test', offset: 0, limit: 20 },
+  authoringSchema: { type: 'code' },
+  authoringEdit: { baseRevision: 'r', requestId: 'change', edits: [{ op: 'node.add', as: 'start', type: 'manual', name: 'Start' }] },
   loadOpenApiDocument: { version: 1, url: 'https://api.example.test/spec.json' },
   createEventSource: {
     version: 1,
@@ -42,6 +48,25 @@ const samples = {
 } satisfies Record<keyof typeof controlRequests, unknown>
 
 describe('Control request boundaries', () => {
+  it('publishes the read modes and defaults consistently in HTTP and MCP schemas', () => {
+    const validators = [
+      new Validator(controlRequestSchema('authoringRead') as object),
+      new Validator(mcpTools.flow_read.inputSchema['~standard'].jsonSchema.input()),
+    ]
+    for (const [input, valid] of [
+      [{}, true],
+      [{ nodes: ['node'] }, true],
+      [{ text: { node: 'node', field: 'prompt' } }, true],
+      [{ nodes: ['node'], text: { node: 'node', field: 'prompt' } }, false],
+      [{ text: { node: 'node', field: 'prompt', start: 0 } }, false],
+      [{ text: { node: 'node', field: 'prompt', lines: 201 } }, false],
+    ] as const) {
+      expect(validators[0]!.validate(input).valid).toBe(valid)
+      expect(validators[1]!.validate({ ...input, flowId: 'flow' }).valid).toBe(valid)
+      if (valid) expect(() => controlRequests.authoringRead(input)).not.toThrow()
+      else expect(() => controlRequests.authoringRead(input)).toThrow()
+    }
+  })
   for (const name of Object.keys(samples) as (keyof typeof samples)[]) {
     it(`decodes ${name} and rejects unknown fields and unsupported versions`, () => {
       expect(controlRequests[name](samples[name])).toEqual(samples[name])
@@ -65,7 +90,7 @@ describe('Control request boundaries', () => {
 it('validates MCP defaults without accepting extra arguments', () => {
   expect(mcpTools.flow_list.inputSchema['~standard'].validate({})).toEqual({ value: { limit: 50 } })
   expect(mcpTools.run_events.inputSchema['~standard'].validate({ runId: 'r1' })).toEqual({ value: { runId: 'r1', after: 0, limit: 50 } })
-  expect(mcpTools.flow_get.inputSchema['~standard'].validate({ flowId: 'f1', tenant: 'other' })).toHaveProperty('issues')
+  expect(mcpTools.flow_read.inputSchema['~standard'].validate({ flowId: 'f1', tenant: 'other' })).toHaveProperty('issues')
   expect(mcpTools.flow_create.inputSchema['~standard'].validate({ name: 'Flow', idempotencyKey: '' })).toHaveProperty('issues')
 })
 

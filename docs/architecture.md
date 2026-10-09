@@ -15,9 +15,11 @@ Workbench ─┐
 CLI ───────┘
 ```
 
-公共 package 拥有完整 Revision 解码、Control API 写请求和 MCP 工具定义；部署适配器复用这些契约，并运行对应的一致性测试。
+公共 package 拥有完整 Revision 解码、节点 authoring 视图/配置/编辑编译/诊断映射、Control API 写请求和 MCP 工具定义；部署适配器复用这些契约，并运行对应的一致性测试。
 Server 同时提供 MCP Streamable HTTP 入口。MCP adapter 与 Control API adapter 共享 Server application service；认证主体、
 Flow 修改、幂等准入、持久化和执行语义由同一个部署负责，不能形成第二套 authoring 或 Run 状态机。
+
+节点 authoring 区分业务配置、输入来源与内部定义。调用方提供业务选择和数据契约，公共包负责装配固定端口、能力派生定义及内部身份；读取、编辑、schema、搜索和诊断使用同一公开视图。输入来源限制遵循节点的实际执行能力，不能为统一接口而允许触发器依赖尚未执行的节点。新增节点的实现与验证要求见[节点 authoring 开发指引](authoring/node-authoring.md)。
 
 ### Flow 与 Revision
 

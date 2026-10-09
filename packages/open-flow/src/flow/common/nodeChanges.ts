@@ -7,6 +7,7 @@ import type {
   GraphNode,
   InputMapping,
   InputValues,
+  InputPort,
   JsonValue,
   PortDefinition,
   RevisionContent,
@@ -28,6 +29,10 @@ const codeTaskTemplate = `export default async function (inputs, context) {
   return { result: inputs.value }
 }
 `
+export const defaultCodeTaskPorts: Pick<Extract<TaskDefinition, { readonly moduleId: string }>, 'inputs' | 'outputs' | 'capabilities'> = {
+  inputs: [{ handle: 'value', jsonSchema: { type: 'string' }, nullable: true, value: 'foo' }],
+  outputs: [{ handle: 'result', jsonSchema: {}, nullable: true }],
+}
 
 export interface Settings {
   readonly name?: string
@@ -110,10 +115,7 @@ export function createCodeTask(
   identity: { readonly moduleId: string; readonly nodeId: string },
   name: string,
   module: Pick<CodeModule, 'imports' | 'source'> | undefined = undefined,
-  ports: Pick<Extract<TaskDefinition, { readonly moduleId: string }>, 'inputs' | 'outputs' | 'capabilities'> = {
-    inputs: [{ handle: 'value', jsonSchema: { type: 'string' }, nullable: true, value: 'foo' }],
-    outputs: [{ handle: 'result', jsonSchema: {}, nullable: true }],
-  },
+  ports: Pick<Extract<TaskDefinition, { readonly moduleId: string }>, 'inputs' | 'outputs' | 'capabilities'> = defaultCodeTaskPorts,
 ): readonly ChangeOperation[] {
   const codeModule = module ?? {
     imports: [],
@@ -167,11 +169,11 @@ export function createManagedTask(
 export function createAgentTask(
   identity: { readonly nodeId: string },
   name: string,
-  defaults: { readonly prompt?: string; readonly outputDescription?: string } = {},
+  defaults: { readonly prompt?: string; readonly outputDescription?: string; readonly inputs?: TaskDefinition['inputs'] } = {},
 ): readonly ChangeOperation[] {
   return createManagedTask(identity, {
     name,
-    inputs: [{ handle: 'input', jsonSchema: { type: 'string' }, nullable: false, value: '' }],
+    inputs: defaults.inputs ?? [{ handle: 'input', jsonSchema: { type: 'string' }, nullable: false, value: '' }],
     outputs: [
       {
         handle: 'output',
@@ -240,11 +242,15 @@ export function createCondition(nodeId: string, name: string): readonly ChangeOp
   ]
 }
 
-export function createValue(nodeId: string, name: string): readonly ChangeOperation[] {
+export function createValue(
+  nodeId: string,
+  name: string,
+  values: readonly InputPort[] = [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
+): readonly ChangeOperation[] {
   return [
     {
       kind: 'graph.node.create',
-      node: { inputs: {}, kind: 'value', name, values: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }] },
+      node: { inputs: {}, kind: 'value', name, values },
       nodeId,
     },
   ]

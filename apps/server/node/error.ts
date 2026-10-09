@@ -49,10 +49,12 @@ const errorMetadata = {
 export class ControlError extends Error {
   readonly code: ErrorCode
   readonly status: number
+  readonly details?: Record<string, unknown>
 
-  constructor(code: ErrorCode, message: string, options?: ErrorOptions) {
+  constructor(code: ErrorCode, message: string, options?: ErrorOptions & { details?: Record<string, unknown> }) {
     super(message, options)
     this.code = code
+    this.details = options?.details
     this.name = 'ControlError'
     this.status = errorMetadata[code].status
   }

@@ -209,20 +209,21 @@ Flow 可以用 ID 或精确名称引用。下面的命令创建一个 Draft，�
 ```bash
 oo flow create "GitHub digest"
 oo flow connector search "current user"
-oo flow connector add "GitHub digest" github.get_current_user --name me
+oo flow read "GitHub digest" --json
+oo flow schema connector --json
+oo flow edit "GitHub digest" --file edits.json --json
 oo flow check "GitHub digest"
 oo flow run "GitHub digest" --wait
 oo flow publish "GitHub digest"
 oo flow open "GitHub digest"
 ```
 
-- 省略 `--connection` 时，`connector add` 绑定该 Action 的默认 Connection。传 `--connection <alias>` 可选择命名 Connection。
+- 在 `edits.json` 中填写 `baseRevision`、`requestId` 和节点、输入、连线操作，包含手动触发器，并在 Connector 配置中选择明确的 Connection ID。见[编辑合同](../../authoring/flow-command.md)。
 - `check` 检查 Revision 是否合法。账号是否可用、会不会在 Provider 上真正执行，只有 `run` 才会碰到。
 - `run --wait` 通过 OpenConnector 执行 Draft 并打印结果。`oo flow runs events <run>` 显示完整事件历史。
 - `open` 打印该 Flow 的 Workbench URL 并在浏览器中打开。operator token 不会放进 URL，浏览器用自己的 session 登录。
 
-给任意命令加上 `--json` 可得到带版本的机器可读输出。`oo flow node add`、`oo flow connect`、`oo flow trigger add` 和
-`oo flow apply --file` 分别用于 Code Task、Edge、Trigger，以及从文件写入 Flow，见 `oo flow --help`。
+`oo flow read`, `oo flow search`, `oo flow schema`, `oo flow edit --file edits.json`, `oo flow check`: `oo flow --help --json`.
 
 ## 7. 可选：在 oo connector 中复用同一套 OpenConnector
 

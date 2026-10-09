@@ -227,24 +227,23 @@ Node を追加し、確認し、実行し、公開します。
 ```bash
 oo flow create "GitHub digest"
 oo flow connector search "current user"
-oo flow connector add "GitHub digest" github.get_current_user --name me
+oo flow read "GitHub digest" --json
+oo flow schema connector --json
+oo flow edit "GitHub digest" --file edits.json --json
 oo flow check "GitHub digest"
 oo flow run "GitHub digest" --wait
 oo flow publish "GitHub digest"
 oo flow open "GitHub digest"
 ```
 
-- `connector add` は、`--connection` を省略すると Action のデフォルトの Connection をバインドします。名前付きの Connection を
-  選ぶには `--connection <alias>` を渡します。
+- `edits.json` に `baseRevision`、`requestId`、ノード・入力・接続の編集を記述し、Manual Trigger を含めます。Connector の設定で Connection ID を明示します。[編集仕様](../../authoring/flow-command.md)を参照してください。
 - `check` は Revision が正しいかを確認します。認証情報が使えるか、Provider 側で実際に実行されるかは、`run` でのみ分かります。
 - `run --wait` は OpenConnector に対して Draft を実行し、結果を出力します。`oo flow runs events <run>` で完全なイベント履歴を
   確認できます。
 - `open` は Flow の Workbench URL を出力し、ブラウザで開きます。operator token は URL に含まれず、ブラウザは自身のセッションで
   サインインします。
 
-任意のコマンドに `--json` を追加すると、バージョン付きの機械可読出力が得られます。`oo flow node add`、`oo flow connect`、
-`oo flow trigger add`、`oo flow apply --file` は Code Task、Edge、Trigger、およびファイルからの Flow 作成に使います。
-`oo flow --help` を参照してください。
+`oo flow read`, `oo flow search`, `oo flow schema`, `oo flow edit --file edits.json`, `oo flow check`: `oo flow --help --json`.
 
 ## 7. 任意: oo connector から同じ OpenConnector を使う
 

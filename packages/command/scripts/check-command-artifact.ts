@@ -44,9 +44,14 @@ try {
   const help = await execFileAsync(process.execPath, [entryPath, 'runs', 'wait', '--help', '--json'])
   assert.equal(help.stderr, '')
   assert.equal(JSON.parse(help.stdout).commands[0].command, 'runs wait')
-  const schema = await execFileAsync(process.execPath, [entryPath, 'schema', 'graph.node.input.set', '--json'])
+  const schema = await execFileAsync(process.execPath, [entryPath, 'schema', 'code', '--json'])
   assert.equal(schema.stderr, '')
-  assert.equal(JSON.parse(schema.stdout).properties.kind.const, 'graph.node.input.set')
+  assert.equal(JSON.parse(schema.stdout).example.type, 'code')
+  const readSchema = await execFileAsync(process.execPath, [entryPath, 'schema', 'read', '--json'])
+  const readHelp = await execFileAsync(process.execPath, [entryPath, 'read', '--help', '--json'])
+  assert.equal(readSchema.stderr, '')
+  assert.deepEqual(JSON.parse(readHelp.stdout).request, JSON.parse(readSchema.stdout).request)
+  assert.deepEqual(JSON.parse(readSchema.stdout).request.not, { required: ['nodes', 'text'] })
   await assert.rejects(execFileAsync(process.execPath, [entryPath, 'list', '--json']), (error: unknown) => {
     assert.ok(error != null && typeof error == 'object' && 'stderr' in error)
     assert.equal(JSON.parse(String(error.stderr)).error.code, 'host.unavailable')
@@ -118,7 +123,7 @@ const host = {
       }
       return Response.json(flow, { status: 201 })
     }
-    if (path === '/v1/flows/flow-1/revisions/revision-1/check') {
+    if (path === '/v1/flows/flow-1/authoring/check') {
       return Response.json({
         closureDigest: 'closure-1',
         diagnostics: [],
