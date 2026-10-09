@@ -5,7 +5,19 @@ import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/
 import { expect, it, vi } from 'vitest'
 import { runCli } from './cli.ts'
 import { isLabCliOffline } from './lab.ts'
-const flow = { flowId: 'flow', name: 'Flow', draftRevisionId: 'r1', createdAt: '2026-01-01', updatedAt: '2026-01-01', status: 'active', version: 1 }
+const flow = {
+  flowId: 'flow',
+  name: 'Flow',
+  draftRevisionId: 'r1',
+  resourceReferences: {
+    draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+    sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+  },
+  createdAt: '2026-01-01',
+  updatedAt: '2026-01-01',
+  status: 'active',
+  version: 1,
+}
 const edit = { baseRevision: 'r1', requestId: 'one', edits: [{ op: 'node.add', as: 'code', type: 'code', name: 'Code', code: 'export default () => ({})' }] }
 const receipt = {
   flowId: 'flow',
