@@ -1,4 +1,4 @@
-import { copyFile, mkdir, writeFile } from 'node:fs/promises'
+import { copyFile, cp, mkdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 
 interface StageNpmPackageOptions {
@@ -11,6 +11,7 @@ export async function stageNpmPackage(options: StageNpmPackageOptions): Promise<
   const { packageRoot, sourceRoot, version } = options
   await mkdir(path.join(packageRoot, 'dist'), { recursive: true })
   await Promise.all([
+    cp(path.join(sourceRoot, 'skills'), path.join(packageRoot, 'skills'), { recursive: true }),
     copyFile(path.join(sourceRoot, 'LICENSE'), path.join(packageRoot, 'LICENSE')),
     copyFile(path.join(sourceRoot, 'NOTICE'), path.join(packageRoot, 'NOTICE')),
     writeFile(path.join(packageRoot, 'README.md'), renderReadme()),
@@ -31,6 +32,11 @@ function createManifest(version: string): object {
     },
     types: './dist/index.d.ts',
     exports: {
+      './package.json': './package.json',
+      './skills/open-flow/SKILL.md': './skills/open-flow/SKILL.md',
+      './skills/open-flow/references/flow-authoring.md': './skills/open-flow/references/flow-authoring.md',
+      './skills/open-flow/references/flow-n8n-conversion.md': './skills/open-flow/references/flow-n8n-conversion.md',
+
       '.': {
         types: './dist/index.d.ts',
       },
@@ -128,7 +134,7 @@ function createManifest(version: string): object {
         default: './dist/browser/theme.css',
       },
     },
-    files: ['dist', 'README.md', 'NOTICE', 'LICENSE'],
+    files: ['dist', 'skills', 'README.md', 'NOTICE', 'LICENSE'],
     peerDependencies: {
       'effect': '4.0.0-rc.112',
       'zod': '^4.6.5',

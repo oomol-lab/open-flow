@@ -24,6 +24,8 @@ export interface CommandHost {
 }
 
 export interface Runtime {
+  readonly commandPrefix?: string
+  readonly scopeGuidance?: readonly string[]
   readonly env: Readonly<Record<string, string | undefined>>
   readonly language: UiLanguage
   openUrl(url: string): Promise<void>

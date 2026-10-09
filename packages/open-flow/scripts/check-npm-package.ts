@@ -39,6 +39,10 @@ await execFileAsync(process.execPath, [path.join(rootPath, 'scripts/build.ts'), 
 const entries = await unpackTar(gunzipSync(await readFile(tarballPath)), { strict: true })
 const entryNames = entries.map((entry) => entry.header.name).toSorted()
 for (const expected of [
+  'package/skills/open-flow/SKILL.md',
+  'package/skills/open-flow/references/flow-authoring.md',
+  'package/skills/open-flow/references/flow-n8n-conversion.md',
+
   'package/LICENSE',
   'package/NOTICE',
   'package/README.md',
@@ -125,7 +129,7 @@ for (const expected of [
   assert.ok(entryNames.includes(expected), `Missing npm package entry ${expected}.`)
 }
 assert.equal(
-  entryNames.some((name) => name.includes('/command/') || name.includes('/skills/') || name.includes('/src/')),
+  entryNames.some((name) => name.includes('/command/') || name.includes('/src/')),
   false,
 )
 assert.equal(
@@ -165,6 +169,11 @@ assert.deepEqual(packedManifest.repository, {
   url: 'git+https://github.com/oomol-lab/open-flow.git',
 })
 assert.deepEqual(packedManifest.exports, {
+  './package.json': './package.json',
+  './skills/open-flow/SKILL.md': './skills/open-flow/SKILL.md',
+  './skills/open-flow/references/flow-authoring.md': './skills/open-flow/references/flow-authoring.md',
+  './skills/open-flow/references/flow-n8n-conversion.md': './skills/open-flow/references/flow-n8n-conversion.md',
+
   '.': { types: './dist/index.d.ts' },
   './decision': { import: './dist/common/decision.js', types: './dist/common/decision.d.ts' },
   './openapi': { import: './dist/common/openapi.js', types: './dist/common/openapi.d.ts' },

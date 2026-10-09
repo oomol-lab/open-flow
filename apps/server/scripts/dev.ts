@@ -3,17 +3,19 @@ import type { Plugin, ViteDevServer } from 'vite'
 
 import { spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { Agent } from 'node:http'
 import { connect, createServer } from 'node:net'
 import path from 'node:path'
-import { loadEnvFile } from 'node:process'
-
-const appRoot = path.resolve(import.meta.dirname, '..')
-const workspaceEnvPath = path.resolve(appRoot, '../..', '.env')
-const developmentStateDirectory = path.join(appRoot, '.open-flow-dev')
-const operatorTokenPath = path.join(developmentStateDirectory, 'operator-token')
+import {
+  appRoot,
+  developmentStateDirectory,
+  operatorTokenPath,
+  loadDevelopmentEnvironment,
+  developmentApiOrigin,
+  developmentWorkbenchOrigin,
+  readBackendPort,
+} from './development-config.ts'
 const backendReadyTimeoutMs = 10_000
 
 export function developmentBackendAgent(): Agent {
@@ -41,9 +43,9 @@ export function developmentBackendAgent(): Agent {
 }
 
 export function developmentBackendPlugin(): Plugin {
-  if (existsSync(workspaceEnvPath)) loadEnvFile(workspaceEnvPath)
+  loadDevelopmentEnvironment()
   const backendPort = readBackendPort()
-  process.env.OPEN_FLOW_DEV_API_ORIGIN = `http://127.0.0.1:${backendPort}`
+  process.env.OPEN_FLOW_DEV_API_ORIGIN = developmentApiOrigin(process.env)
   let backend: ChildProcess | undefined
   let backendResult: Promise<void> | undefined
   let stopping = false
@@ -52,7 +54,7 @@ export function developmentBackendPlugin(): Plugin {
     name: 'open-flow-development-backend',
     apply: 'serve',
     async configureServer(server) {
-      const waitPublicOrigin = process.env.OPEN_FLOW_PUBLIC_ORIGIN ?? `http://127.0.0.1:${backendPort}`
+      const waitPublicOrigin = process.env.OPEN_FLOW_PUBLIC_ORIGIN ?? developmentApiOrigin(process.env)
       const configuredOperatorToken = process.env.OPEN_FLOW_TOKEN
       if (configuredOperatorToken != null && Buffer.byteLength(configuredOperatorToken) < 32) {
         throw new Error('OPEN_FLOW_TOKEN must contain at least 32 UTF-8 bytes. Remove it to use a generated development token.')
@@ -77,7 +79,7 @@ export function developmentBackendPlugin(): Plugin {
       backendResult = completed(backend)
 
       process.stdout.write(
-        `Development endpoints:\n  Workbench: http://localhost:5174\n  Server API: http://127.0.0.1:${backendPort}\n  Wait actions: ${waitPublicOrigin}\n`,
+        `Development endpoints:\n  Workbench: ${developmentWorkbenchOrigin}\n  Server API: http://127.0.0.1:${backendPort}\n  Wait actions: ${waitPublicOrigin}\n`,
       )
       if (configuredOperatorToken == null) {
         const action = developmentToken.created ? 'created' : 'reused'
@@ -126,14 +128,6 @@ function completed(child: ChildProcess): Promise<void> {
       else reject(new Error(`Server backend exited with ${signal ?? `code ${code ?? 'unknown'}`}.`))
     })
   })
-}
-
-function readBackendPort(): number {
-  const port = Number(process.env.OPEN_FLOW_PORT ?? '3001')
-  if (!Number.isInteger(port) || port < 1 || port > 65_535) {
-    throw new Error('OPEN_FLOW_PORT must be an integer between 1 and 65535 in development.')
-  }
-  return port
 }
 
 async function portAvailable(port: number): Promise<boolean> {

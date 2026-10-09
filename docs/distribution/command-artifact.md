@@ -83,9 +83,29 @@ The sections below define argument adaptation, output, exit codes, and waiting. 
 
 The artifact runs in the same trusted Bun process as the host. This is not a JavaScript sandbox. The host injects the current identity and rejects cross-origin requests, non-Control API paths, and authorization headers forged by the artifact. The artifact cannot directly call a Connector, Provider, or arbitrary URL returned by Cloud.
 
+## Skill resources and development entry
+
+The public npm package ships the source templates separately from the Command Artifact:
+
+- `@oomol-lab/open-flow/skills/open-flow/SKILL.md`
+- `@oomol-lab/open-flow/skills/open-flow/references/flow-authoring.md`
+- `@oomol-lab/open-flow/skills/open-flow/references/flow-n8n-conversion.md`
+
+Render these with `agentic-markdown` and a `flowCommand` variable. The local skill uses
+`bun run flow --`; the oo host uses `oo flow`. The standalone entrypoint accepts the
+`localDevelopment` presence variable for repository connection guidance. Hosts own their
+login, deployment selection and installation instructions. `./package.json` exposes the
+npm version so hosts can require it to match their pinned Command Artifact version.
+
+Within this workspace, `@oomol-lab/open-flow-command/development` exports `runCommand`
+and `OpenFlowCommandHost`. The Server development tools provide the connection and pass
+version, command prefix and scope guidance. This reuses production argument parsing,
+Control API calls and process I/O; it does not add files or fields to Artifact v2.
+See [Contributing](../../CONTRIBUTING.md#local-flow-cli-and-skill) for local usage.
+
 ## CLI invocation contract
 
-[The oo-cli Flow skill reference](https://github.com/oomol-lab/oo-cli/blob/main/contrib/skills/shared/oo/references/flow-authoring.md) owns CLI workflows and Agent instructions. This document defines the artifact behavior observable by hosts and scripts. Use the matching artifact’s `--help` and public schema for command arguments, node fields, and examples.
+[The shared Flow skill reference](../../packages/open-flow/skills/open-flow/references/flow-authoring.md) owns CLI workflows and Agent instructions. This document defines the artifact behavior observable by hosts and scripts. Use the matching artifact’s `--help` and public schema for command arguments, node fields, and examples.
 
 The CLI stores no current Flow or local transaction. The host selects the team and deployment. Flow references accept an ID or a unique full name.
 

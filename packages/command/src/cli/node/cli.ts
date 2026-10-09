@@ -10,15 +10,15 @@ import { CliError, cloudError, argumentText, referencedFlow } from './support.ts
 
 function help(runtime: Runtime, args: readonly string[]) {
   const path = args.filter((argument) => !argument.startsWith('-'))
-  let entries = commandHelp(path)
+  let entries = commandHelp(path, runtime.commandPrefix)
   while (entries.length == 0 && path.length > 0) {
     path.pop()
-    entries = commandHelp(path)
+    entries = commandHelp(path, runtime.commandPrefix)
   }
   const i18n = createI18n(runtime.language)
   try {
     const contract = entries.length == 1 ? commandContract(entries[0]!.command) : undefined
-    const examples = examplesForCommand(entries.length == 1 ? entries[0]!.command : '')
+    const examples = examplesForCommand(entries.length == 1 ? entries[0]!.command : '', runtime.commandPrefix)
     const result = {
       kind: 'cli.help',
       version: 1,
@@ -34,7 +34,9 @@ function help(runtime: Runtime, args: readonly string[]) {
       notes:
         contract == null
           ? [
-              'The oo host selects the team for the whole invocation with --team <name>; Flow commands use that authenticated scope.',
+              ...(runtime.scopeGuidance ?? [
+                'The oo host selects the team for the whole invocation with --team <name>; Flow commands use that authenticated scope.',
+              ]),
               '--timeout is a wait budget in milliseconds (default 60000).',
               '--follow --json writes NDJSON pages immediately; resume from nextAfter.',
               'Use read/search to locate nodes, schema read|search|edit|check for requests, and schema <type> for configuration and ports.',
@@ -96,7 +98,7 @@ export async function runCli(args: readonly string[], host: CommandHost, runtime
     }
     parsed = parseArguments(args)
     const allowed = commandOptions(parsed.positionals)
-    if (allowed == null) throw new CliError('cli.invalid-arguments', 'Unknown command. Use oo flow --help.')
+    if (allowed == null) throw new CliError('cli.invalid-arguments', `Unknown command. Use ${runtime.commandPrefix ?? 'oo flow'} --help.`)
     for (const flag of parsed.options) {
       if (flag != 'json' && !allowed.includes(flag)) throw new CliError('cli.invalid-arguments', `Option --${flag} is not supported by this command.`)
     }
@@ -118,7 +120,10 @@ export async function runCli(args: readonly string[], host: CommandHost, runtime
       throw new CliError('cli.invalid-arguments', 'Use --expected-revision for draft runs and --expected-publication for live runs.')
     if (isLocalSchema(parsed)) {
       if (parsed.positionals.length > 2)
-        throw new CliError('cli.invalid-arguments', 'Usage: oo flow schema [read|search|edit|check|edits|node-type|input|outputs]')
+        throw new CliError(
+          'cli.invalid-arguments',
+          `Usage: ${runtime.commandPrefix ?? 'oo flow'} schema [read|search|edit|check|edits|node-type|input|outputs]`,
+        )
       const schema = commandSchema(parsed.positionals[1])
       if (schema == null) throw new CliError('cli.invalid-arguments', 'Unknown schema. Use read, search, edit, check, or a node type such as agent or code.')
       runtime.stdout.write(`${JSON.stringify(schema)}\n`)
