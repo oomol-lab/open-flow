@@ -754,17 +754,19 @@ export class ControlService {
       return { revision: revisionMetadata(previous), version: 1 }
     }
     if (currentFlow.draftRevisionId != expectedRevisionId) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
-    let content: RevisionContent
-    try {
-      const base = this.store.flows.revision(flowId, expectedRevisionId)
-      if (base == null) throw new TypeError('The stored Draft is missing.')
+    const base = this.store.flows.revision(flowId, expectedRevisionId)
+    let content = emptyRevision()
+    if (base != null) {
       const source = new TextEncoder().encode(base.content)
-      if ((await digestBytes(source)) != base.digest) throw new TypeError('The stored Draft digest does not match its content.')
-      content = repairRevision(source)
-    } catch {
-      // The source Revision remains immutable. When none of it is readable, create a blank
-      // child Draft so the user can still enter the workspace and rebuild the Flow.
-      content = emptyRevision()
+      if ((await digestBytes(source)) == base.digest) {
+        try {
+          content = repairRevision(source)
+        } catch (error) {
+          // Only unreadable JSON can fall back to a blank child Draft.
+          if (!(error instanceof SyntaxError))
+            throw new ControlError(controlErrorCode.flowInvalid, 'The stored Draft cannot be repaired or upgraded.', { cause: error })
+        }
+      }
     }
     const bytes = encodeRevision(content)
     const digest = await digestBytes(bytes)

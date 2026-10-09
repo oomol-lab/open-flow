@@ -1393,7 +1393,7 @@ describe('Server application service', () => {
     }
   })
 
-  it.each([1, 3])('repairs a model %s Draft into a new Revision without changing its source', async (modelVersion) => {
+  it.each([1, 3, 5])('repairs a model %s Draft into a new Revision without changing its source', async (modelVersion) => {
     const file = await databaseFile()
     const service = await openService(file)
     const created = await service.control.createFlow('test', 'Repairable', 'repairable')
@@ -1406,11 +1406,13 @@ describe('Server application service', () => {
       document: {
         ...source.content.document,
         bindings: { account: { kind: 'connection', target: 'connection' } },
+        tasks: modelVersion == 5 ? { task: { name: 'LLM', inputs: [], outputs: [], executor: { kind: 'llm', mode: 'json' } } } : {},
         graph: {
           edges: [],
           nodes: {
             start: { kind: 'manual', name: 'Start' },
             other: { kind: 'manual', name: 'Other' },
+            ...(modelVersion == 5 ? { llm: { kind: 'task', taskId: 'task', inputs: {} } } : {}),
             broken: { kind: 'unknown' },
             poll: {
               kind: 'poll',
@@ -1452,6 +1454,12 @@ describe('Server application service', () => {
           },
         },
       })
+      if (modelVersion == 5)
+        expect((await service.control.getEditor(source.flowId)).draft.content.document.graph.nodes.llm).toEqual({
+          kind: 'task',
+          inputs: {},
+          task: { name: 'LLM', inputs: [], outputs: [], executor: { kind: 'llm', mode: 'json' } },
+        })
       expect(database.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(source.revisionId)).toEqual({ content: legacy })
       await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'repair-request')).resolves.toEqual(repaired)
       await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'another-repair')).rejects.toMatchObject({
@@ -1461,6 +1469,70 @@ describe('Server application service', () => {
       database.close()
     }
   })
+
+  it.each(['missing Task', 'invalid notification', 'retired Subflow', 'future model'])(
+    'rejects a Draft repair with %s without changing the head or source',
+    async (failure) => {
+      const file = await databaseFile()
+      const service = await openService(file)
+      const created = await service.control.createFlow('test', 'Rejected upgrade', 'rejected-upgrade')
+      const source = service.control.getRevision(created.flow.flowId, created.flow.draftRevisionId)
+      const legacy = JSON.stringify({
+        kind: 'open-flow-flow-revision',
+        version: 1,
+        modelVersion: failure == 'future model' ? currentFlowModelVersion + 1 : 5,
+        modules: {},
+        document: {
+          bindings: { token: { kind: 'variable', target: 'TOKEN' } },
+          subflows: failure == 'retired Subflow' ? { nested: { graph: { nodes: {}, edges: [] }, inputs: [], outputs: [] } } : {},
+          tasks: {
+            agent: {
+              name: 'Agent',
+              inputs: [],
+              outputs: [],
+              executor: {
+                kind: 'agent',
+                model: 'test',
+                prompt: 'Review',
+                maxRounds: 3,
+                tools: [],
+                notification: { taskId: 'missing', messageHandle: 'text', inputs: {} },
+              },
+            },
+          },
+          graph: {
+            edges: [],
+            nodes: {
+              start: { kind: 'manual', name: 'Start' },
+              value: { kind: 'value', inputs: {}, values: [{ ...port, handle: 'value', value: 42 }] },
+              ...(failure == 'missing Task' || failure == 'invalid notification'
+                ? { task: { kind: 'task', taskId: failure == 'missing Task' ? 'missing' : 'agent', inputs: {} } }
+                : {}),
+            },
+          },
+        },
+      })
+      const database = new DatabaseSync(file)
+      try {
+        database
+          .prepare('UPDATE revisions SET content = ?, digest = ? WHERE revision_id = ?')
+          .run(legacy, await digestBytes(new TextEncoder().encode(legacy)), source.revisionId)
+
+        await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'rejected-repair')).rejects.toMatchObject({
+          code: controlErrorCode.flowInvalid,
+          status: 400,
+        })
+
+        expect(service.control.getFlow(source.flowId).draftRevisionId).toBe(source.revisionId)
+        await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'rejected-repair')).rejects.toMatchObject({
+          code: controlErrorCode.flowInvalid,
+        })
+        expect(database.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(source.revisionId)).toEqual({ content: legacy })
+      } finally {
+        database.close()
+      }
+    },
+  )
 
   it('replaces an unreadable Draft with an empty child Revision so the editor can open', async () => {
     const file = await databaseFile()

@@ -149,7 +149,9 @@ Run 记录、终态结果与 Draft change 的幂等元数据仍保留。同一 R
 无法按当前模型读取但可以宽容恢复的 Draft 分别返回 `flow.upgrade-required` 或 `flow.repair-required`。客户端可以调用
 `POST /v1/flows/{flowId}/draft/repair`，body 为 `{ expectedRevisionId, version: 1 }` 并提供 `Idempotency-Key`。修复逐项保留
 当前模型可读取的资源，丢弃无法读取的 collection entry，并以旧 Draft 为 parent 创建新 Revision；原 Revision、Live、Publication、Run 和
-Presentation 不变。无法恢复任何内容时，显式 repair 创建空白子 Revision；普通读取仍按原错误返回，不会隐式修复。
+Presentation 不变。原始 Draft 缺失、digest 不匹配或 JSON 无法解析时，显式 repair 创建空白子 Revision；
+可解析内容因无效 Task 引用、旧 Subflow 或不支持的模型而拒绝修复或升级时，返回 `flow.invalid`，保持 Draft head 不变。
+普通读取仍按原错误返回，不会隐式修复。
 
 Draft 请求的 operations 使用 `@oomol-lab/open-flow/control-requests` 的 `DraftOperation`：包含完整 ChangeOperation，以及 `graph.trigger.create`。
 后者接受 `nodeId`、Provider `key`、`config` 和可选的 `connectionId`、`name`、`schedule`。仅在根 Flow 创建 Poll/Integration；schedule 仅供 Poll 使用，默认每五分钟。
