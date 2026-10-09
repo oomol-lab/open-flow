@@ -76,6 +76,7 @@ describe('Connector conditional HTTP responses', () => {
       return [{ revision }]
     }
     const service = {
+      authorize: vi.fn(),
       listConnectorProviders: read,
       listConnectorActions: read,
       listConnectorActionMetadata: read,

@@ -8,8 +8,8 @@ it('authenticates listener lookups and returns the complete service response', a
   const listeners = [{ flowId: 'handler', flowName: 'Alerts', nodeId: 'error', nodeName: 'Failure', enabled: false }]
   const getErrorListeners = vi.fn(() => ({ version: 1, listeners }))
   let authorized = false
-  const app = createControlApp({ getErrorListeners } as unknown as ControlService, () => (authorized ? 'actor' : undefined)).onError((error) =>
-    Response.json({ error: { message: error.message } }, { status: error instanceof ControlError ? error.status : 500 }),
+  const app = createControlApp({ getErrorListeners, authorize: vi.fn() } as unknown as ControlService, () => (authorized ? 'actor' : undefined)).onError(
+    (error) => Response.json({ error: { message: error.message } }, { status: error instanceof ControlError ? error.status : 500 }),
   )
   expect((await app.request('/flows/source/error-listeners')).status).toBe(401)
   expect(getErrorListeners).not.toHaveBeenCalled()

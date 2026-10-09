@@ -65,7 +65,9 @@ export class RunControl {
     inputs: RunInputs,
     idempotencyKey: string,
     trigger: TriggerSeed,
+    actorId?: string,
   ): Promise<{ readonly created: boolean; readonly run: RunDetails }> {
+    if (actorId != null) idempotencyKey = JSON.stringify([actorId, idempotencyKey])
     const sharedAccess = this.connectorAccess.current(flowId)
     const requestDigest = await digestBytes(
       canonicalJsonBytes({
@@ -113,7 +115,9 @@ export class RunControl {
     inputs: RunInputs,
     idempotencyKey: string,
     trigger: TriggerSeed,
+    actorId?: string,
   ): Promise<{ readonly created: boolean; readonly run: RunDetails }> {
+    if (actorId != null) idempotencyKey = JSON.stringify([actorId, idempotencyKey])
     const requestDigest = await digestBytes(canonicalJsonBytes({ inputs, trigger: { ...trigger }, kind: 'live', publicationId }))
     const existing = this.replayRun(idempotencyKey, requestDigest, 'live')
     if (existing != null) return existing

@@ -9,6 +9,7 @@ WORKDIR /workspace
 COPY package.json bun.lock ./
 COPY apps/server/package.json apps/server/package.json
 COPY packages/open-flow/package.json packages/open-flow/package.json
+COPY packages/command/package.json packages/command/package.json
 RUN bun install --frozen-lockfile
 
 COPY . .

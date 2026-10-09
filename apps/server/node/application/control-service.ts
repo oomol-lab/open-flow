@@ -91,7 +91,7 @@ export interface PublicationPosition {
 export class ControlService {
   private readonly acceptPublish: (input: PublishInput) => Promise<PublishOperation>
   private readonly clock: () => number
-  private readonly flowCatalogChanged: (event?: FlowCatalogEvent) => void
+  private readonly flowCatalogChanged: (event?: FlowCatalogEvent, ownerId?: string) => void
   private readonly flowChanged: (event: FlowChangeEvent) => void
   private readonly llmAvailable: (kind?: 'agent' | 'decision') => boolean
   private readonly publish: (input: PublishInput) => Promise<PublicationAcceptance>
@@ -104,6 +104,7 @@ export class ControlService {
   private readonly triggerDefinitions: readonly TriggerKeySnapshot[]
   private readonly triggersChanged: () => void
 
+  readonly users: Store['users']
   readonly runs: RunControl
   readonly eventSources?: EventSourceRuntime
 
@@ -117,7 +118,7 @@ export class ControlService {
     triggersChanged: () => void,
     triggerDefinitions: readonly TriggerKeySnapshot[],
     testPollTrigger: (flowId: string, triggerNodeId: string) => Promise<PollTriggerTestResult>,
-    flowCatalogChanged: (event?: FlowCatalogEvent) => void,
+    flowCatalogChanged: (event?: FlowCatalogEvent, ownerId?: string) => void,
     flowChanged: (event: FlowChangeEvent) => void,
     llmAvailable: (kind?: 'agent' | 'decision') => boolean,
     resolveConnector: () => ConnectorHost | undefined,
@@ -127,6 +128,7 @@ export class ControlService {
     resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>,
     eventSources?: EventSourceRuntime,
   ) {
+    this.users = store.users
     this.runs = new RunControl(store, clock, abortRun, wake, flowChanged, llmAvailable, resolveConnector, connectorAccess, resolveWaitPublicOrigin)
     this.eventSources = eventSources
     this.store = store
@@ -143,6 +145,30 @@ export class ControlService {
     this.connectorAccess = connectorAccess
     this.resolveConnectorConsoleOrigin = resolveConnectorConsoleOrigin
     this.resolveConnectorTeam = resolveConnectorTeam
+  }
+
+  requireAdmin(actorId: string): void {
+    const user = this.users.get(actorId)
+    if (actorId != 'operator' && !(user?.enabled && user.role == 'admin')) {
+      throw new ControlError(serverErrorCode.authorizationDenied, 'Administrator permission is required.')
+    }
+  }
+
+  ownsFlow(actorId: string, flowId: string): boolean {
+    return this.store.flows.get(flowId)?.ownerId == actorId
+  }
+
+  authorize(actorId: string, resources: { readonly flowId?: string; readonly runId?: string; readonly publicationId?: string }): void {
+    if (resources.flowId != null && !this.ownsFlow(actorId, resources.flowId)) notFound()
+    if (resources.runId != null) {
+      const run = this.store.runViews.controlRun(resources.runId)
+      if (run == null || !this.ownsFlow(actorId, run.flowId)) throw new ControlError(controlErrorCode.runNotFound, 'The Run was not found.')
+    }
+    if (resources.publicationId != null) {
+      const storedPublication = this.store.publications.publicationById(resources.publicationId)
+      if (storedPublication == null || !this.ownsFlow(actorId, storedPublication.flowId))
+        throw new ControlError(controlErrorCode.publicationNotFound, 'The Publication was not found.')
+    }
   }
 
   async listEventSources(flowId?: string) {
@@ -334,7 +360,7 @@ export class ControlService {
     switch (mutation.kind) {
       case 'saved':
         this.flowChanged({ accessRevision: mutation.access.accessRevision, flowId, kind: 'access.changed', version: 1 })
-        this.flowCatalogChanged()
+        this.flowCatalogChanged(undefined, this.store.flows.get(flowId)?.ownerId)
         return mutation.access
       case 'conflict':
         throw new ControlError(controlErrorCode.connectorAccessConflict, 'Connector access changed concurrently.')
@@ -522,11 +548,12 @@ export class ControlService {
     limit: number,
     after?: FlowPosition,
     includeTotal = false,
+    ownerId?: string,
   ): {
     readonly next?: FlowPosition
     readonly page: { readonly flows: readonly Flow[]; readonly total?: number; readonly version: 1 }
   } {
-    const stored = this.store.flows.list(limit + 1, after, includeTotal)
+    const stored = this.store.flows.list(limit + 1, after, includeTotal, ownerId)
     const rows = stored.flows.slice(0, limit)
     const last = rows.at(-1)
     return {
@@ -550,14 +577,14 @@ export class ControlService {
     const stored = this.store.flows.setEnabled(flowId, publicationId, enabled)
     if (stored == null) throw new ControlError(controlErrorCode.flowConflict, 'The published Flow changed or is retiring.')
     this.triggersChanged()
-    this.flowCatalogChanged()
+    this.flowCatalogChanged(undefined, stored.ownerId)
     return flow(stored)
   }
 
   renameFlow(flowId: string, name: string): Flow {
     const stored = this.store.flows.rename(flowId, name, this.clock())
     if (stored == null) notFound()
-    this.flowCatalogChanged()
+    this.flowCatalogChanged(undefined, stored.ownerId)
     return flow(stored)
   }
 
@@ -570,7 +597,7 @@ export class ControlService {
     const stored = this.store.flows.retire(flowId, this.clock())
     if (stored == null) notFound()
     this.triggersChanged()
-    this.flowCatalogChanged()
+    this.flowCatalogChanged(undefined, stored.ownerId)
     return flow(stored)
   }
 
@@ -646,7 +673,7 @@ export class ControlService {
         return notFound()
       case 'committed':
         this.triggersChanged()
-        this.flowCatalogChanged()
+        this.flowCatalogChanged(undefined, this.store.flows.get(flowId)?.ownerId)
         this.flowChanged({ kind: 'draft.changed', flowId, revisionId: stored.revision.revisionId, version: 1 })
         this.flowChanged({ kind: 'access.changed', flowId, accessRevision: this.connectorAccess.current(flowId).accessRevision, version: 1 })
         return { revision: revisionMetadata(stored.revision), version: 1 }
@@ -711,7 +738,7 @@ export class ControlService {
         return notFound()
       case 'committed':
         this.triggersChanged()
-        this.flowCatalogChanged()
+        this.flowCatalogChanged(undefined, this.store.flows.get(flowId)?.ownerId)
         this.flowChanged({ kind: 'draft.changed', flowId, revisionId: stored.revision.revisionId, version: 1 })
         return { revision: revisionMetadata(stored.revision), version: 1 }
     }
@@ -765,7 +792,7 @@ export class ControlService {
         return notFound()
       case 'committed':
         this.triggersChanged()
-        this.flowCatalogChanged()
+        this.flowCatalogChanged(undefined, this.store.flows.get(flowId)?.ownerId)
         this.flowChanged({ kind: 'draft.changed', flowId, revisionId: stored.revision.revisionId, version: 1 })
         return { revision: revisionMetadata(stored.revision), version: 1 }
     }
@@ -812,7 +839,7 @@ export class ControlService {
     this.getFlow(flowId)
     const changed = this.store.triggers.setTriggerOperatorState(flowId, triggerNodeId, operatorState, this.clock())
     if (changed == null) triggerNotFound()
-    if (changed.kind == 'error') this.flowCatalogChanged()
+    if (changed.kind == 'error') this.flowCatalogChanged(undefined, this.store.flows.get(flowId)?.ownerId)
     this.triggersChanged()
     return triggerBinding(changed)
   }
@@ -929,7 +956,7 @@ export class ControlService {
       revisionDigest: revision.digest,
       revisionId: source.revisionId,
     })
-    if (result.created) this.flowCatalogChanged()
+    if (result.created) this.flowCatalogChanged(undefined, this.store.flows.get(flowId)?.ownerId)
     return result
   }
 

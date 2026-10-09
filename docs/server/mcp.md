@@ -13,7 +13,15 @@ Server 在 `/v1/mcp` 提供 MCP Streamable HTTP，与 Workbench、Control API �
 
 ## 2. 认证与连接
 
-每次请求使用部署的 Operator credential：
+邮箱用户在“设置 → MCP 接入”创建个人访问 Token，将 `/v1/mcp` 地址和以下请求头配置到客户端：
+
+```http
+Authorization: Bearer <personal-token>
+```
+
+Token 的创建、撤销及失效规则见[个人访问 Token](users.md#个人访问-token-与-mcp)。
+
+Operator 使用部署的 Operator credential：
 
 ```http
 Authorization: Bearer <operator-token>
@@ -21,7 +29,7 @@ Authorization: Bearer <operator-token>
 
 凭据的环境锁定、持久化和失效规则与 Control API 相同。同源 Browser session 也由现有认证入口验证。
 未认证请求返回 HTTP 401；当前没有 OAuth 授权发现和交互式授权流程，客户端需要支持配置 Authorization header。
-工具具有该部署 Operator 的能力，不提供单独的 MCP 权限角色。
+MCP 沿用 Server 本地账号的 Flow 归属与管理权限：Operator token 只能访问 Operator 自己的 Flow；使用邮箱账号的个人访问 Token 或登录会话时，只能访问该账号自己的 Flow。管理员角色不扩大 Flow 读取范围，普通用户不能管理部署资源。详见 [用户系统](users.md)。
 
 如果请求包含 `Origin`，它必须与 Server 收到的请求 URL origin 一致，否则返回 403。
 跨域浏览器直接调用不在当前接入范围。无 Origin 的服务端客户端可以正常连接。

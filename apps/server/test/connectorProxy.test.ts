@@ -50,7 +50,7 @@ it.each<ConnectorProxyResource>(['providers', 'actions', 'apps'])('forwards %s w
     expect(result.headers.get('vary')).toBe('Accept-Language')
   }
   expect(fetcher).toHaveBeenCalledTimes(2)
-  expect(test.scope).toHaveBeenCalledWith('flow')
+  expect(test.scope).toHaveBeenCalledWith('flow', 'actor')
   const [url, init] = fetcher.mock.calls[0] as unknown as [URL, RequestInit]
   expect(url.pathname).toBe(`/base/v1/${resource}`)
   expect([...url.searchParams]).toEqual([

@@ -135,13 +135,24 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     return actor
   }
   app.get('/v1/flows/notifications', async (context) => {
-    await authenticate(context.req.raw)
-    return notificationResponse(notifications((listener) => service.subscribeFlowCatalog(listener), [context.req.raw.signal, options.shutdownSignal]))
+    const actorId = await authenticate(context.req.raw)
+    return notificationResponse(
+      notifications(
+        (listener) => service.subscribeFlowCatalog(listener, actorId),
+        [context.req.raw.signal, options.shutdownSignal],
+        async () => (await resolveActor?.(context.req.raw)) == actorId,
+      ),
+    )
   })
   app.get('/v1/flows/:flowId/notifications', async (context) => {
-    await authenticate(context.req.raw)
+    const actorId = await authenticate(context.req.raw)
+    service.control.authorize(actorId, { flowId: context.req.param('flowId') })
     return notificationResponse(
-      notifications((listener) => service.subscribeFlow(context.req.param('flowId'), listener), [context.req.raw.signal, options.shutdownSignal]),
+      notifications(
+        (listener) => service.subscribeFlow(context.req.param('flowId'), listener),
+        [context.req.raw.signal, options.shutdownSignal],
+        async () => (await resolveActor?.(context.req.raw)) == actorId,
+      ),
     )
   })
   app.all('/v1/wait-actions/:capability/:action', async (context) => {
@@ -192,7 +203,10 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     createConnectorProxyApp({
       authenticate,
       configuration: () => options.settings?.connectorConfiguration(),
-      resolveScope: (flowId) => service.control.resolveConnectorScope(flowId),
+      resolveScope: (flowId, actorId) => {
+        service.control.authorize(actorId, { flowId })
+        return service.control.resolveConnectorScope(flowId)
+      },
       forward: (configuration, resource, request, teamId) => forwardConnector(configuration, resource, request, teamId, { logger }),
     }),
   )
@@ -205,11 +219,25 @@ export function createServerApp(service: ServerService, options: ServerAppOption
   if (options.settings != null)
     app.route(
       '/config',
-      createConfigApp(options.settings, authenticate, () => service.configurationChanged()),
+      createConfigApp(
+        options.settings,
+        async (request) => {
+          const actorId = await authenticate(request)
+          service.control.requireAdmin(actorId)
+          return actorId
+        },
+        () => service.configurationChanged(),
+      ),
     )
   app.get('/connector/teams', async (context) => {
-    await authenticate(context.req.raw)
-    return json(200, { ...(await service.connectorTeams(context.req.raw.signal)), console: service.connectionConsole() })
+    const actorId = await authenticate(context.req.raw)
+    const teams = await service.connectorTeams(context.req.raw.signal)
+    const user = service.control.users.get(actorId)
+    return json(200, {
+      ...teams,
+      bindings: teams.bindings.filter((binding) => service.control.ownsFlow(actorId, binding.flowId)),
+      console: actorId == 'operator' || user?.role == 'admin' ? service.connectionConsole() : null,
+    })
   })
   app.post('/connector/flows', async (context) => {
     const actorId = await authenticate(context.req.raw)
@@ -296,6 +324,7 @@ function notificationResponse(body: ReadableStream<Uint8Array>): Response {
 function notifications<Event>(
   subscribe: (listener: (event: Event) => void) => () => void,
   signals: readonly (AbortSignal | undefined)[],
+  authorized?: () => Promise<boolean>,
 ): ReadableStream<Uint8Array> {
   let controller: ReadableStreamDefaultController<Uint8Array> | undefined
   let closed = false
@@ -318,7 +347,19 @@ function notifications<Event>(
     start(streamController) {
       controller = streamController
       unsubscribe = subscribe((event) => {
-        if (!closed) streamController.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
+        const deliver = async (): Promise<void> => {
+          if (closed) return
+          if (authorized != null && !(await authorized())) {
+            abort()
+            return
+          }
+          if (!closed) streamController.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
+        }
+        void deliver().catch((error) => {
+          if (closed) return
+          cleanup()
+          streamController.error(error)
+        })
       })
       if (signals.some((signal) => signal?.aborted)) return abort()
       for (const signal of signals) signal?.addEventListener('abort', abort, { once: true })

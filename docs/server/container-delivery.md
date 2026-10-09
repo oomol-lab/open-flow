@@ -41,7 +41,7 @@ bun run --filter @oomol-lab/open-flow-server test:docker
 
 Server 可以在启动环境中读取 operator token，也可以在第一次启动后由部署者通过 Workbench 认领。Operator token 至少包含 32 UTF-8 bytes，既用于浏览器
 建立 operator session，也可由 machine client 作为 Control API Bearer token 使用。Browser session 使用 Server 独立生成并保存在数据卷中的签名 secret，
-不会直接使用 operator token 签名。
+不会直接使用 operator token 签名。管理员登录后可在“设置 → 用户管理”中创建邮箱账号并生成密码。所有账号的工作流相互隔离，普通用户只能使用管理员配置的能力，不能修改部署设置；详见 [用户系统](users.md)。
 
 需要由外部 Secret 管理固定 credential 时，通过只供部署者读取的 env file 注入，不要把 token 写入 Dockerfile、镜像层或仓库文件。例如
 `.env.server` 可以包含：

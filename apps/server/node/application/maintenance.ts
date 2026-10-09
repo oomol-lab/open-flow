@@ -22,7 +22,7 @@ export class Maintenance {
   readonly #isFlowRunning: (flowId: string) => boolean
   readonly #logger: Logger
   readonly #maintenanceLock: Semaphore.Semaphore
-  readonly #notifyFlowCatalog: () => void
+  readonly #notifyFlowCatalog: (ownerId?: string) => void
   readonly #publisher: Pick<Publisher, 'advance'>
   readonly #resolveConnector: () => ConnectorHost | undefined
   readonly #runCreated: (flowId: string, runId: string) => void
@@ -41,7 +41,7 @@ export class Maintenance {
     connectorAccess: ConnectorAccessHost,
     interrupt: (runId: string) => void,
     isFlowRunning: (flowId: string) => boolean,
-    notifyFlowCatalog: () => void,
+    notifyFlowCatalog: (ownerId?: string) => void,
     runChanged: (flowId: string, runId: string) => void,
     signal: () => void,
     maintenanceLock: Semaphore.Semaphore,
@@ -189,10 +189,11 @@ export class Maintenance {
     if (this.#store.flows.hasIntegrationState(flowId)) return maintenanceIntervalMs
     if (this.#store.runs.deleteByFlow(flowId, maintenanceBatchSize) > 0) return 0
     if (!this.#connectorAccess.delete(flowId)) return maintenanceRetryMs
+    const ownerId = this.#store.flows.get(flowId)!.ownerId
     if (!this.#store.flows.delete(flowId)) return maintenanceIntervalMs
 
     this.#logger.info({ category: 'flow.deleted', flowId }, 'Retired Flow was physically deleted.')
-    this.#notifyFlowCatalog()
+    this.#notifyFlowCatalog(ownerId)
     this.#cleanupAt = Math.min(this.#cleanupAt, now)
     return maintenanceIntervalMs
   }

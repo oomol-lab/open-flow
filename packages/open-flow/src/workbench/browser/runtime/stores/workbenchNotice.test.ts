@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { ControlClient } from '../../../../control/common/api.ts'
 import { controlErrorCode } from '../../../../control/common/errors.ts'
 import { ApiError } from '../api.ts'
 import { createI18n } from '../i18n.ts'
@@ -58,6 +59,14 @@ describe('Workbench notices', () => {
       kind: 'error',
       message: 'Custom deployment detail. (deployment.custom)',
     })
+  })
+
+  it('shows response incompatibility details from the client without exposing response values', async () => {
+    const client = new ControlClient(async () => Response.json({ results: [], version: 1, incompatible: 'private response value' }))
+    const error = await client.listProviderAccessBindingCandidates('flow', ['gmail']).catch((failure: unknown) => failure)
+
+    expect(error).toMatchObject({ code: 'response.invalid', status: 502 })
+    expect(errorNotice(error, createI18n('zh-CN').t).message).toBe('服务返回了无法识别的数据，请稍后重试。 (Unexpected fields: incompatible.)')
   })
 })
 

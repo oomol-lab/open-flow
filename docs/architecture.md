@@ -72,6 +72,14 @@ credential 混合验证。全新 Server 在两种来源都不存在时进入未�
 credential。认领必须原子且最多成功一次，不能把第一个访问管理面的匿名请求直接提升为 Operator。Operator credential verification、Browser session
 signing 和 callback endpoint identity 使用彼此独立的秘密与生命周期。
 
+开源 Server 的账号与角色属于部署宿主。Operator token 对应固定管理员身份；管理员创建的邮箱账号通过密码登录，并有独立、稳定的账号 ID。
+每个 Flow 固定一个不可变的账号归属；管理员也只能访问自己的 Flow。Revision、Publication、Run、结果、错误订阅和实时通知沿所属 Flow 继承该边界，
+Control API 与 MCP 使用同一个服务端授权判断，客户端不能通过资源 ID、Team 或请求参数改变归属。升级前的 Flow 归属 Operator。
+
+管理员管理本地用户和部署能力，包括 Connector、LLM、Integration、Variable 和 Event Source。普通用户可在自己的 Flow 中使用已配置能力与账号，
+但不能修改部署配置或建立外部连接。Open Flow 本地角色不替代 Connector 的上游身份和执行权限。账号停用、密码重置与会话到期使登录失效，
+实时通道在发送下一条数据前重新检查登录状态。具体认证和管理接口见 [Server 用户系统](server/users.md)。
+
 Workbench 使用两个彼此独立的实时通知通道：
 
 - Flow catalog 通道只发送 `flows.changed`，用于重新读取顶层 Flow 列表；
@@ -109,7 +117,7 @@ Server 的 Run owner 统一处理 Wait 到期、事件清理、通知 work 领�
 可编辑副本。Workbench runtime、类型声明和样式只通过 `@oomol-lab/open-flow/workbench`、`workbench.css` 与 `theme.css` 同版本发布。
 `theme.css` 是部署宿主与 Workbench 共用的产品语义主题合同；Canvas Content 的 Designer token 仍由 Designer 独立拥有，只有 Canvas Chrome
 显式桥接产品主题。宿主操作通过公开 Workbench props 进入 Workbench 持有的共享 UI composition，部署宿主不能通过绝对定位或内部 selector
-覆盖 Workbench Header。部署宿主的 pre-auth session 页面同样通过公开 Workbench composition 使用共享 shadcn primitive，宿主只持有认证请求和状态。
+覆盖 Workbench Header。部署宿主的 pre-auth 页面复用公开的共享 UI primitive 与适用的 Workbench composition；宿主持有认证请求、状态和账号表单，公共 Workbench 不拥有宿主用户与角色。
 
 产品中立 Workbench 拥有 Flow authoring 所需的 Variable name selector，只接收 name projection。deployment Variable 的 value 管理面属于正式
 Workbench 宿主：开源 Server 在自己的 Browser host 中提供，其他部署可以使用自己的既有管理面，不能为此复制或分叉公共 Workbench runtime。

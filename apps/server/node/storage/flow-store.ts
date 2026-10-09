@@ -15,6 +15,7 @@ export interface StoredFlow {
   readonly createdAt: number
   readonly draftRevisionId: string
   readonly name: string
+  readonly ownerId: string
   readonly flowId: string
   readonly status: 'active' | 'retiring'
   readonly updatedAt: number
@@ -57,7 +58,7 @@ const flowColumns = `(SELECT enabled FROM flow_live WHERE flow_live.flow_id = fl
                      (SELECT publication_id FROM flow_live WHERE flow_live.flow_id = flows.flow_id) AS publicationId,
                      (SELECT publications.revision_id FROM flow_live JOIN publications USING (publication_id) WHERE flow_live.flow_id = flows.flow_id) AS publishedRevisionId, create_request_digest AS createRequestDigest, created_at AS createdAt,
                      draft_revision_id AS draftRevisionId, name, flow_id AS flowId, status, updated_at AS updatedAt,
-                     (SELECT team_id FROM flow_connector_teams WHERE flow_connector_teams.flow_id = flows.flow_id) AS connectorTeamId`
+                     (SELECT team_id FROM flow_connector_teams WHERE flow_connector_teams.flow_id = flows.flow_id) AS connectorTeamId, owner_id AS ownerId`
 
 /**
  * Flow identity, its Draft head, and its Presentation.
@@ -90,9 +91,10 @@ export class FlowStore {
     readonly revisionId: string
   }): { readonly created: boolean; readonly flow: StoredFlow } | { readonly kind: 'conflict' } {
     return this.#transaction(() => {
+      const idempotencyKey = JSON.stringify([input.actorId, input.idempotencyKey])
       const existing = this.#database
         .prepare('SELECT flow_id AS flowId, create_request_digest AS requestDigest FROM flows WHERE create_idempotency_key = ?')
-        .get(input.idempotencyKey) as { readonly flowId: string; readonly requestDigest: string } | undefined
+        .get(idempotencyKey) as { readonly flowId: string; readonly requestDigest: string } | undefined
       if (existing != null) {
         if (existing.requestDigest != input.requestDigest) return { kind: 'conflict' }
         return { created: false, flow: this.get(existing.flowId)! }
@@ -108,10 +110,10 @@ export class FlowStore {
         .prepare(
           `INSERT INTO flows (
              flow_id, name, status, draft_revision_id, create_idempotency_key,
-             create_request_digest, created_at, updated_at
-           ) VALUES (?, ?, 'active', ?, ?, ?, ?, ?)`,
+             create_request_digest, created_at, updated_at, owner_id
+           ) VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?)`,
         )
-        .run(input.flowId, input.name, input.revisionId, input.idempotencyKey, input.requestDigest, input.createdAt, input.createdAt)
+        .run(input.flowId, input.name, input.revisionId, idempotencyKey, input.requestDigest, input.createdAt, input.createdAt, input.actorId)
       this.#database.prepare("INSERT INTO flow_presentations (flow_id, revision, value, updated_at) VALUES (?, 1, '{}', ?)").run(input.flowId, input.createdAt)
       this.#database.prepare('INSERT INTO flow_connector_teams (flow_id, team_id) VALUES (?, ?)').run(input.flowId, input.connectorTeamId ?? null)
       return { created: true, flow: this.get(input.flowId)! }
@@ -126,20 +128,29 @@ export class FlowStore {
     limit: number,
     after?: { readonly createdAt: number; readonly flowId: string },
     includeTotal = false,
+    ownerId?: string,
   ): { readonly flows: readonly StoredFlow[]; readonly total?: number } {
-    const flows =
-      after == null
-        ? (this.#database.prepare(`SELECT ${flowColumns} FROM flows ORDER BY created_at, flow_id LIMIT ?`).all(limit) as unknown as StoredFlow[])
-        : (this.#database
-            .prepare(
-              `SELECT ${flowColumns} FROM flows
-               WHERE created_at > ? OR (created_at = ? AND flow_id > ?)
-               ORDER BY created_at, flow_id LIMIT ?`,
-            )
-            .all(after.createdAt, after.createdAt, after.flowId, limit) as unknown as StoredFlow[])
+    const conditions: string[] = []
+    const values: (string | number)[] = []
+    if (ownerId != null) {
+      conditions.push('owner_id = ?')
+      values.push(ownerId)
+    }
+    if (after != null) {
+      conditions.push('(created_at > ? OR (created_at = ? AND flow_id > ?))')
+      values.push(after.createdAt, after.createdAt, after.flowId)
+    }
+    const where = conditions.length == 0 ? '' : `WHERE ${conditions.join(' AND ')}`
+    const flows = this.#database
+      .prepare(`SELECT ${flowColumns} FROM flows ${where} ORDER BY created_at, flow_id LIMIT ?`)
+      .all(...values, limit) as unknown as StoredFlow[]
     if (!includeTotal) return { flows }
-    const total = (this.#database.prepare('SELECT COUNT(*) AS total FROM flows').get() as { readonly total: number }).total
-    return { flows, total }
+    const total = (
+      ownerId == null
+        ? this.#database.prepare('SELECT COUNT(*) AS total FROM flows').get()
+        : this.#database.prepare('SELECT COUNT(*) AS total FROM flows WHERE owner_id = ?').get(ownerId)
+    ) as { readonly total: number }
+    return { flows, total: total.total }
   }
 
   rename(flowId: string, name: string, updatedAt: number): StoredFlow | undefined {

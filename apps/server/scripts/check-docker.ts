@@ -107,6 +107,31 @@ try {
   const output = events.events.find((event) => event.kind == 'node.completed' && event.payload.nodeId == 'code')
   assert.deepEqual(output?.payload.outputs, { result: 42 })
 
+  const account = await requestJson<{ readonly user: { readonly email: string }; readonly password: string }>(
+    firstOrigin,
+    '/auth/users',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'cookie': firstCookie },
+      body: JSON.stringify({ version: 1, email: `docker-user-${suffix}@example.test`, role: 'user' }),
+    },
+    201,
+  )
+  const userCookie = await loginUser(firstOrigin, account.user.email, account.password)
+  const userFlow = await requestJson<{ readonly flowId: string }>(
+    firstOrigin,
+    '/v1/flows',
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'cookie': userCookie, 'idempotency-key': `flow-${suffix}` },
+      body: JSON.stringify({ version: 1, name: 'Private user workflow' }),
+    },
+    201,
+  )
+  assert.equal((await fetch(`${firstOrigin}/v1/flows/${userFlow.flowId}`, { headers: { cookie: firstCookie } })).status, 404)
+  assert.equal((await fetch(`${firstOrigin}/v1/flows/${flow.flowId}`, { headers: { cookie: userCookie } })).status, 404)
+  assert.equal((await fetch(`${firstOrigin}/config`, { headers: { cookie: userCookie } })).status, 403)
+
   await stopContainer(firstContainer)
   await docker(['rm', firstContainer])
 
@@ -130,6 +155,19 @@ try {
   )
   assert.equal(restoredRun.runId, accepted.runId)
   assert.equal(restoredRun.status, 'completed')
+  const restoredUserCookie = await loginUser(secondOrigin, account.user.email, account.password)
+  const userFlows = await requestJson<{ readonly flows: readonly { readonly flowId: string }[] }>(
+    secondOrigin,
+    '/v1/flows',
+    { headers: { cookie: restoredUserCookie } },
+    200,
+  )
+  assert.deepEqual(
+    userFlows.flows.map((candidate) => candidate.flowId),
+    [userFlow.flowId],
+  )
+  assert.equal((await fetch(`${secondOrigin}/v1/flows/${userFlow.flowId}`, { headers: { cookie: userCookie } })).status, 200)
+  assert.ok(!flows.flows.some((candidate) => candidate.flowId == userFlow.flowId))
   await stopContainer(secondContainer)
 
   process.stdout.write('Claiming the same deployment without an operator environment variable.\n')
@@ -212,7 +250,9 @@ try {
   })
   await stopContainer(restoredContainer)
 
-  process.stdout.write('Verified the Server image, operator setup, Workbench, Isolated VM, graceful shutdown, and SQLite volume persistence.\n')
+  process.stdout.write(
+    'Verified the Server image, operator setup, user login and isolation, Workbench, Isolated VM, graceful shutdown, and SQLite volume persistence.\n',
+  )
 } catch (error) {
   for (const container of containers) {
     const logs = await docker(['logs', container]).catch(() => '')
@@ -327,6 +367,18 @@ async function login(baseUrl: string): Promise<string> {
   const cookie = response.headers.get('set-cookie')
   assert.ok(cookie != null)
   return cookie.split(';', 1)[0]!
+}
+
+async function loginUser(baseUrl: string, email: string, password: string): Promise<string> {
+  const response = await fetch(`${baseUrl}/auth/user-session`, {
+    body: JSON.stringify({ version: 1, email, password }),
+    headers: { 'content-type': 'application/json' },
+    method: 'POST',
+  })
+  assert.equal(response.status, 200)
+  const cookie = response.headers.get('set-cookie')?.match(/open_flow_user_session=[^;]+/)?.[0]
+  assert.ok(cookie != null)
+  return cookie
 }
 
 async function requestJson<Body>(baseUrl: string, pathname: string, init: RequestInit, status: number): Promise<Body> {

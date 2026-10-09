@@ -656,7 +656,11 @@ export function errorSourcesAvailable(database: DatabaseSync, flowId: string, so
   return sources.every(
     (source) =>
       source != flowId &&
-      database.prepare(`SELECT 1 FROM flows f JOIN flow_live l ON l.flow_id = f.flow_id WHERE f.flow_id = ? AND f.status = 'active'`).get(source) != null,
+      database
+        .prepare(
+          `SELECT 1 FROM flows f JOIN flow_live l ON l.flow_id = f.flow_id WHERE f.flow_id = ? AND f.status = 'active' AND f.owner_id = (SELECT owner_id FROM flows WHERE flow_id = ?)`,
+        )
+        .get(source, flowId) != null,
   )
 }
 

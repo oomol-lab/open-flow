@@ -12,6 +12,7 @@ import { RevisionStore } from './revision-store.ts'
 import { RunStore } from './run-store.ts'
 import { RunViewStore } from './run-view-store.ts'
 import { TriggerStore } from './trigger-store.ts'
+import { UserStore } from './user-store.ts'
 import { VariableStore } from './variable-store.ts'
 
 const defaultRunEventRetentionMs = 30 * 24 * 60 * 60 * 1000
@@ -37,6 +38,7 @@ export class Store {
   readonly runs: RunStore
   readonly runViews: RunViewStore
   readonly triggers: TriggerStore
+  readonly users: UserStore
   readonly variables: VariableStore
 
   constructor(
@@ -49,6 +51,7 @@ export class Store {
     const connection = database.connection
     const transaction = <Value>(operation: () => Value): Value => database.transaction(operation)
 
+    this.users = new UserStore(connection)
     this.eventSources = new EventSourceStore(connection, transaction, clock)
     this.variables = new VariableStore(connection, transaction, clock)
     this.connectorTeams = new ConnectorTeamStore(connection)

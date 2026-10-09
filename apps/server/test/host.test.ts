@@ -47,6 +47,7 @@ it('uses a signed operator session, expires it on time or token rotation, and cl
     expect(anonymous.headers.get('x-frame-options')).toBe('DENY')
     expect(await anonymous.json()).toEqual({
       authenticated: false,
+      user: null,
       configured: true,
       setupAuthorized: false,
       setupRequired: false,
@@ -79,6 +80,7 @@ it('uses a signed operator session, expires it on time or token rotation, and cl
     const authenticated = await app.request('/auth/session', { headers: { cookie } })
     expect(await authenticated.json()).toEqual({
       authenticated: true,
+      user: { userId: 'operator', email: null, role: 'admin' },
       configured: true,
       setupAuthorized: false,
       setupRequired: false,
@@ -104,6 +106,7 @@ it('uses a signed operator session, expires it on time or token rotation, and cl
     })
     expect(await (await rotated.request('/auth/session', { headers: { cookie } })).json()).toEqual({
       authenticated: false,
+      user: null,
       configured: true,
       setupAuthorized: false,
       setupRequired: false,
@@ -192,6 +195,7 @@ it('reports missing operator configuration without disabling callbacks or health
   try {
     expect(await (await app.request('/auth/session')).json()).toEqual({
       authenticated: false,
+      user: null,
       configured: false,
       setupAuthorized: false,
       setupRequired: true,
@@ -235,6 +239,7 @@ it('claims an unconfigured deployment with a one-time setup session and restores
     expect(setupCookie).toContain('open_flow_operator_setup=')
     expect(await (await app.request('/auth/session', { headers: { cookie: setupCookie } })).json()).toEqual({
       authenticated: false,
+      user: null,
       configured: false,
       setupAuthorized: true,
       setupRequired: true,
@@ -259,6 +264,7 @@ it('claims an unconfigured deployment with a one-time setup session and restores
     expect(cookie).toBeDefined()
     expect(await (await app.request('/auth/session', { headers: { cookie: cookie! } })).json()).toEqual({
       authenticated: true,
+      user: { userId: 'operator', email: null, role: 'admin' },
       configured: true,
       setupAuthorized: false,
       setupRequired: false,

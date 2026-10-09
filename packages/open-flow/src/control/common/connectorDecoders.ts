@@ -21,26 +21,20 @@ import { providerIconAppearance } from './providerIconSprite.ts'
 function accessPermissions(value: unknown): NonNullable<ProviderAccessBindingCandidate['permissions']> {
   const source = record(value)
   exact(source, ['actionIds', 'allActions', 'triggerIds', 'allTriggers', 'configured', 'proxy'])
-  if (
-    !Array.isArray(source.triggerIds) ||
-    typeof source.allTriggers != 'boolean' ||
-    !Array.isArray(source.actionIds) ||
-    typeof source.allActions != 'boolean' ||
-    typeof source.configured != 'boolean' ||
-    typeof source.proxy != 'boolean'
-  ) {
-    return invalidResponse()
-  }
+  if (!Array.isArray(source.actionIds)) return invalidResponse('permissions.actionIds: expected an array.')
+  if (!Array.isArray(source.triggerIds)) return invalidResponse('permissions.triggerIds: expected an array.')
+  if (typeof source.allActions != 'boolean') return invalidResponse('permissions.allActions: expected a boolean.')
+  if (typeof source.allTriggers != 'boolean') return invalidResponse('permissions.allTriggers: expected a boolean.')
+  if (typeof source.configured != 'boolean') return invalidResponse('permissions.configured: expected a boolean.')
+  if (typeof source.proxy != 'boolean') return invalidResponse('permissions.proxy: expected a boolean.')
   const actionIds = source.actionIds.map(string)
   const triggerIds = source.triggerIds.map(string)
-  if (
-    new Set(actionIds).size != actionIds.length ||
-    (source.allActions && actionIds.length != 0) ||
-    new Set(triggerIds).size != triggerIds.length ||
-    (source.allTriggers && triggerIds.length != 0) ||
-    (source.proxy && (!source.allActions || !source.allTriggers || source.configured))
-  ) {
-    return invalidResponse()
+  if (new Set(actionIds).size != actionIds.length) return invalidResponse('permissions.actionIds: duplicate IDs.')
+  if (source.allActions && actionIds.length != 0) return invalidResponse('permissions.actionIds: must be empty when allActions is true.')
+  if (new Set(triggerIds).size != triggerIds.length) return invalidResponse('permissions.triggerIds: duplicate IDs.')
+  if (source.allTriggers && triggerIds.length != 0) return invalidResponse('permissions.triggerIds: must be empty when allTriggers is true.')
+  if (source.proxy && (!source.allActions || !source.allTriggers || source.configured)) {
+    return invalidResponse('permissions.proxy: requires allActions=true, allTriggers=true and configured=false.')
   }
   return { actionIds, triggerIds, allTriggers: source.allTriggers, allActions: source.allActions, configured: source.configured, proxy: source.proxy }
 }
@@ -67,15 +61,16 @@ function accessBinding(value: unknown, candidate: boolean): ProviderAccessBindin
     'providerId',
     ...(candidate ? [] : ['status']),
   ])
-  if (policyRevision != null && typeof policyRevision != 'string') return invalidResponse()
-  if (candidate && isDefault !== undefined && typeof isDefault != 'boolean') return invalidResponse()
-  if (permissionGroupName !== undefined && permissionGroupName !== null && typeof permissionGroupName != 'string') return invalidResponse()
+  if (policyRevision != null && typeof policyRevision != 'string') return invalidResponse('policyRevision: expected a string.')
+  if (candidate && isDefault !== undefined && typeof isDefault != 'boolean') return invalidResponse('isDefault: expected a boolean.')
+  if (permissionGroupName !== undefined && permissionGroupName !== null && typeof permissionGroupName != 'string')
+    return invalidResponse('permissionGroupName: expected a string or null.')
   if (!candidate && status != 'active' && status != 'forbidden' && status != 'invalid' && status != 'missing') return invalidResponse()
   let bindingSource
   try {
     bindingSource = parseProviderAccessSource(source.source)
   } catch {
-    return invalidResponse()
+    return invalidResponse("source: expected { kind: 'admin-delegation' } or { kind: 'policy', ruleId: string | null }.")
   }
   return {
     accessBindingId: string(source.accessBindingId),
@@ -92,7 +87,7 @@ function accessBinding(value: unknown, candidate: boolean): ProviderAccessBindin
 }
 
 function accessMode(value: unknown): ConnectorAccess['mode'] {
-  if (value != 'implicit' && value != 'selectable') return invalidResponse()
+  if (value != 'implicit' && value != 'selectable') return invalidResponse('mode: expected implicit or selectable.')
   return value as ConnectorAccess['mode']
 }
 
@@ -204,29 +199,34 @@ export function connectorAccessSnapshot(value: unknown): ConnectorAccessSnapshot
 export function connectorAccessCandidates(value: unknown, providerId: string): ConnectorAccessCandidates {
   const source = record(value)
   exact(source, ['candidates', 'mode', 'providerId', 'version'])
-  if (source.version != 1 || string(source.providerId) != providerId || !Array.isArray(source.candidates)) return invalidResponse()
+  if (source.version != 1) return invalidResponse('version: expected 1.')
+  if (string(source.providerId) != providerId) return invalidResponse('providerId: does not match the requested provider.')
+  if (!Array.isArray(source.candidates)) return invalidResponse('candidates: expected an array.')
   const candidates = source.candidates.map((candidate) => accessBinding(candidate, true))
-  if (candidates.some((candidate) => candidate.providerId != providerId)) return invalidResponse()
-  if (new Set(candidates.map((candidate) => candidate.accessBindingId)).size != candidates.length) return invalidResponse()
+  if (candidates.some((candidate) => candidate.providerId != providerId))
+    return invalidResponse('candidates[].providerId: does not match the requested provider.')
+  if (new Set(candidates.map((candidate) => candidate.accessBindingId)).size != candidates.length)
+    return invalidResponse('candidates[].accessBindingId: duplicate IDs.')
   return { candidates, mode: accessMode(source.mode), providerId, version: 1 }
 }
 
 export function connectorAccessCandidatesBatch(value: unknown, providerIds: readonly string[]): ConnectorAccessCandidatesBatch {
   const source = record(value)
   exact(source, ['results', 'version'])
-  if (source.version != 1 || !Array.isArray(source.results)) return invalidResponse()
+  if (source.version != 1) return invalidResponse('version: expected 1.')
+  if (!Array.isArray(source.results)) return invalidResponse('results: expected an array.')
   const remaining = new Set(providerIds)
   const results = source.results.map((entry) => {
     const item = record(entry)
     const providerId = string(item.providerId)
-    if (!remaining.delete(providerId)) return invalidResponse()
+    if (!remaining.delete(providerId)) return invalidResponse('results[].providerId: duplicate or unrequested provider.')
     if (!Object.hasOwn(item, 'error')) return connectorAccessCandidates(item, providerId)
     exact(item, ['providerId', 'error'])
     const error = record(item.error)
     exact(error, ['code', 'message'])
     return { providerId, error: { code: string(error.code), message: string(error.message) } }
   })
-  if (remaining.size != 0) return invalidResponse()
+  if (remaining.size != 0) return invalidResponse('results: missing requested providers.')
   return { results, version: 1 }
 }
 

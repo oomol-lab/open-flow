@@ -135,7 +135,7 @@ async function createHarness(
     return service
   }
   const options = {
-    resolveControlActor: (request: Request) => (request.headers.get('authorization') == 'Bearer control-api-conformance' ? 'server-operator' : undefined),
+    resolveControlActor: (request: Request) => (request.headers.get('authorization') == 'Bearer control-api-conformance' ? 'operator' : undefined),
   }
   let service = await open()
   let app = createServerApp(service, options)

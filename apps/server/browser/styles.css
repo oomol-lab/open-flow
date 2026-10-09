@@ -532,6 +532,50 @@ body {
   flex-wrap: wrap;
 }
 
+.settings-mcp-address {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-mcp-address input {
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-mcp-address button {
+  flex-shrink: 0;
+}
+
+.settings-mcp-details {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.settings-mcp-details > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.settings-mcp-details dt {
+  width: 96px;
+  color: var(--ui-muted-foreground);
+}
+
+.settings-mcp-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-form > p.settings-hint {
+  margin: 0;
+  line-height: 18px;
+}
+
 .settings-form-actions {
   justify-content: flex-end;
 }
@@ -666,4 +710,98 @@ body {
   50% {
     opacity: 0.55;
   }
+}
+
+.server-login {
+  display: grid;
+  min-height: 0;
+  flex: 1;
+  place-items: center;
+  padding: 24px;
+  overflow: auto;
+}
+
+.server-login-form {
+  display: grid;
+  width: min(100%, 360px);
+  gap: 24px;
+}
+
+.server-login-form h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.server-login-form p {
+  margin: 8px 0 0;
+  line-height: 1.6;
+  color: var(--ui-muted-foreground);
+}
+
+.server-login-form fieldset {
+  display: grid;
+  min-width: 0;
+  gap: 16px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.server-login-field {
+  display: grid;
+  gap: 8px;
+}
+
+.server-login-form .server-login-error {
+  color: var(--ui-destructive);
+}
+
+.server-account {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ui-muted-foreground);
+  font-size: 12px;
+}
+
+.server-user-list {
+  overflow-x: auto;
+  border-top: 1px solid var(--ui-border);
+}
+
+.server-user-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  text-align: left;
+}
+
+.server-user-table th,
+.server-user-table td {
+  padding: 12px 16px;
+  vertical-align: middle;
+}
+
+.server-user-table thead {
+  background: var(--ui-muted);
+  color: var(--ui-muted-foreground);
+}
+
+.server-user-table th {
+  font-weight: 600;
+}
+
+.server-user-table tbody tr {
+  border-top: 1px solid var(--ui-border);
+}
+
+.server-user-table tbody th {
+  overflow-wrap: anywhere;
+}
+
+.server-user-table td,
+.server-user-table thead th {
+  white-space: nowrap;
 }
