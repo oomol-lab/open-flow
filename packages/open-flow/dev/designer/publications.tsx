@@ -58,6 +58,10 @@ function createSession(language: UiLanguage, scenario: Scenario, log: LogAction)
     createdAt: timestamp,
     updatedAt: timestamp,
     draftRevisionId: 'revision-draft',
+    resourceReferences: {
+      draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+      sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+    },
     status: 'active',
     version: 1,
     ...(current == null ? {} : { live: { enabled, publicationId: current.publicationId, revisionId: current.revisionId } }),

@@ -12,6 +12,10 @@ const timestamp = '2026-08-30T00:00:00.000Z'
 const flows: readonly Flow[] = ['flow-a', 'flow-b'].map((flowId, index) => ({
   createdAt: timestamp,
   draftRevisionId: `revision-${index + 1}`,
+  resourceReferences: {
+    draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+    sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+  },
   flowId,
   name: `Flow ${index + 1}`,
   status: 'active',

@@ -365,6 +365,15 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       const draftRevisionId = requiredString(created.draftRevisionId, 'Created Flow draftRevisionId')
       equal(created.name, 'Control flow', 'Created Flow name')
       equal(created.status, 'active', 'Created Flow status')
+      equal(
+        record(created.resourceReferences, 'Flow resource references').draft,
+        {
+          variableNames: [],
+          connections: [],
+          errorSourceFlowIds: [],
+        },
+        'Empty draft resources',
+      )
       equal(await json(await createFlowRequest(harness, 'Control flow', 'flow-lifecycle'), 200, 'Replay Flow'), created, 'Replayed Flow')
       await error(await createFlowRequest(harness, 'Different flow', 'flow-lifecycle'), 409, 'flow.conflict', 'Conflicting Flow')
       equal(await json(await request(harness, `/v1/flows/${flowId}`), 200, 'Read Flow'), created, 'Read Flow')

@@ -17,6 +17,10 @@ const flows: readonly Flow[] = ['source', 'handler', 'upstream-2', 'offline', 'r
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
   draftRevisionId: 'draft',
+  resourceReferences: {
+    draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+    sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+  },
   status: flowId == 'retiring' ? 'retiring' : 'active',
   version: 1,
   live: flowId == 'offline' ? undefined : { enabled: true, publicationId: 'publication', revisionId: 'revision' },

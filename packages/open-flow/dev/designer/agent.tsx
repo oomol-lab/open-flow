@@ -93,6 +93,10 @@ function createSession(language: UiLanguage, log: LogAction) {
     createdAt: timestamp,
     updatedAt: timestamp,
     draftRevisionId: 'revision-1',
+    resourceReferences: {
+      draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+      sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+    },
     flowId: 'agent-lab',
     name: 'Agent Lab',
     status: 'active',

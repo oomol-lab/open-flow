@@ -29,7 +29,7 @@ type Hooks = {
   readonly check: () => void
   readonly current: (context: DraftChangeContext) => boolean
   readonly finishChanges: () => void
-  readonly headChanged: (flowId: string, revisionId: string) => void
+  readonly headChanged: (flowId: string, revisionId: string, content: Draft['content']) => void
   readonly recover: (context: DraftChangeContext) => Promise<boolean>
 }
 
@@ -198,7 +198,7 @@ export class DraftChanges {
     this.#pending = this.#pending.filter((candidate) => candidate !== pending)
     this.#committed = committed
     this.#hooks.apply(this.project(committed))
-    this.#hooks.headChanged(pending.flowId, committed.revisionId)
+    this.#hooks.headChanged(pending.flowId, committed.revisionId, committed.content)
     return committed
   }
 

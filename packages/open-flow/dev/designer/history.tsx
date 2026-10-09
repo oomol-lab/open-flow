@@ -54,6 +54,10 @@ function createSession(language: UiLanguage, log: LogAction, notify: SetNotice) 
     flowId: 'history-lab',
     name: 'Canvas history',
     draftRevisionId: 'r1',
+    resourceReferences: {
+      draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+      sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+    },
     createdAt: timestamp,
     updatedAt: timestamp,
     version: 1,

@@ -34,6 +34,9 @@ Flow 有一个可变 Draft head 和不可变的 Revision 历史。Revision 是�
 Revision。Draft 同步只返回当前完整 Revision snapshot，不提供持久化 authoring operation history。内部索引、缓存、增量记录和存储布局不能成为第二个事实来源。
 不可变约束适用于仍保留的 Revision 内容；Server 可以将草稿正文存为基于父版本的有界增量，读取时还原并校验 digest，对外仍返回完整快照。Run 和 Publish operation 准入时将固定版本物化为完整正文。旧内容可按 Server 的保留策略清理，但 Run 结果与 Draft change 幂等记录不依赖被清理的内容。
 
+Flow 可维护当前 Draft 的资源引用投影，用于列表与详情读取；投影从完整 Revision 派生，与 Draft head 原子更新，不能参与执行或替代 Revision 事实来源。
+共享账号授权保留独立的存储与版本，在查询层组合，不复制进 Draft 投影。资源投影只包含引用，不拥有 Variable 值、账号实时状态或凭证。
+
 Presentation 独立保存布局、viewport 和 Comment 等展示状态；每个 Flow 图只有一个画布和 viewport，节点配置由侧栏承载。Presentation
 不进入 Revision digest，也不影响 validation、Run 或 Live 的执行语义。Publication 在首次接受发布操作时固定已保存的 Presentation，随异步操作持久化，成功后作为不可变展示快照提供独立读取；回滚继承来源 Publication 的快照而不修改草稿布局。旧 Publication 缺少快照时，历史查看使用自动布局。历史查看的节点移动和视口只属于查看会话，不进入保存与撤销历史。
 执行节点直接拥有 `node.task` 配置，不存在独立 Task ID 或可共享的 Task 定义表。复制节点复制配置；编辑、删除、撤销只作用于指定节点。Code 节点仍通过 `moduleId` 引用 CodeModule。

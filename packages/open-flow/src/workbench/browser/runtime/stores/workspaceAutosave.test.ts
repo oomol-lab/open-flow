@@ -11,7 +11,19 @@ import { WorkbenchStore } from './workbenchStore.ts'
 const timestamp = '2026-09-07T00:00:00.000Z'
 
 async function setup() {
-  const flow = { createdAt: timestamp, updatedAt: timestamp, draftRevisionId: 'r0', flowId: 'flow', name: 'Flow', status: 'active', version: 1 } as const
+  const flow = {
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    draftRevisionId: 'r0',
+    resourceReferences: {
+      draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+      sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+    },
+    flowId: 'flow',
+    name: 'Flow',
+    status: 'active',
+    version: 1,
+  } as const
 
   const content = applyFlowChanges({ modelVersion: currentFlowModelVersion, document: { bindings: {}, graph: { nodes: {}, edges: [] } }, modules: {} }, [
     ...createCodeTask({ moduleId: 'a', nodeId: 'a' }, 'A'),

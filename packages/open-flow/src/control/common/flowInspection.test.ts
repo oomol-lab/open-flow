@@ -10,6 +10,10 @@ const flow: Flow = {
   name: 'Mail',
   status: 'active',
   draftRevisionId: 'r1',
+  resourceReferences: {
+    draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+    sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+  },
   createdAt: '2026-09-22T00:00:00Z',
   updatedAt: '2026-09-22T00:00:00Z',
   version: 1,

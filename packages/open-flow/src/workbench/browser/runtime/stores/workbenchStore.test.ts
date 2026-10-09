@@ -64,7 +64,19 @@ function catalogSession(initialFlowId?: string, catalogReady: Promise<void> = Pr
   })
   const list = vi.spyOn(client, 'listFlows').mockResolvedValue({ flows: [], version: 1 })
   vi.spyOn(client, 'getEditor').mockImplementation(async (flowId) => ({
-    flow: { flowId, name: flowId, createdAt: timestamp, updatedAt: timestamp, draftRevisionId: 'revision', status: 'active', version: 1 },
+    flow: {
+      flowId,
+      name: flowId,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      draftRevisionId: 'revision',
+      resourceReferences: {
+        draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+        sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+      },
+      status: 'active',
+      version: 1,
+    },
     draft: {
       flowId,
       revisionId: 'revision',
@@ -428,6 +440,10 @@ describe('Flow creation notifications', () => {
       createdAt: timestamp,
       updatedAt: timestamp,
       draftRevisionId: 'revision',
+      resourceReferences: {
+        draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+        sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+      },
       status: 'active',
       version: 1,
     } as const
@@ -474,6 +490,10 @@ describe('Flow creation notifications', () => {
       createdAt: timestamp,
       updatedAt: timestamp,
       draftRevisionId: 'revision',
+      resourceReferences: {
+        draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+        sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+      },
       status: 'active',
       version: 1,
     } as const

@@ -28,6 +28,16 @@ export function flow(stored: StoredFlow): Flow {
     createdAt: timestamp(stored.createdAt),
     ...(stored.connectorTeamId == null ? {} : { connectorTeamId: stored.connectorTeamId }),
     draftRevisionId: stored.draftRevisionId,
+    resourceReferences: {
+      draft: stored.draftResourceReferences == null ? null : JSON.parse(stored.draftResourceReferences),
+      sharedAccess: {
+        accessRevision: stored.sharedAccessRevision,
+        providerIds: JSON.parse(stored.sharedProviderIds),
+        bindings: (JSON.parse(stored.sharedBindings) as readonly { providerId: string; connectionId: string | null; accessBindingId: string }[]).map(
+          ({ providerId, connectionId, accessBindingId }) => ({ providerId, connectionId, accessBindingId }),
+        ),
+      },
+    },
     name: stored.name,
     flowId: stored.flowId,
     status: stored.status,

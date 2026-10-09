@@ -4,6 +4,7 @@ import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { DatabaseSync } from 'node:sqlite'
 import type { RevisionStore } from './revision-store.ts'
 
+import { draftResourceReferences } from './flow-resources.ts'
 import { requireErrorSources } from './trigger-store.ts'
 
 export interface StoredFlow {
@@ -14,6 +15,10 @@ export interface StoredFlow {
   readonly createRequestDigest: string
   readonly createdAt: number
   readonly draftRevisionId: string
+  readonly draftResourceReferences: string | null
+  readonly sharedAccessRevision: number
+  readonly sharedProviderIds: string
+  readonly sharedBindings: string
   readonly name: string
   readonly ownerId: string
   readonly flowId: string
@@ -56,9 +61,15 @@ export function presentationView(stored: StoredPresentation): Presentation {
 
 const flowColumns = `(SELECT enabled FROM flow_live WHERE flow_live.flow_id = flows.flow_id) AS liveEnabled,
                      (SELECT publication_id FROM flow_live WHERE flow_live.flow_id = flows.flow_id) AS publicationId,
-                     (SELECT publications.revision_id FROM flow_live JOIN publications USING (publication_id) WHERE flow_live.flow_id = flows.flow_id) AS publishedRevisionId, create_request_digest AS createRequestDigest, created_at AS createdAt,
-                     draft_revision_id AS draftRevisionId, name, flow_id AS flowId, status, updated_at AS updatedAt,
-                     (SELECT team_id FROM flow_connector_teams WHERE flow_connector_teams.flow_id = flows.flow_id) AS connectorTeamId, owner_id AS ownerId`
+                     (SELECT publications.revision_id FROM flow_live JOIN publications USING (publication_id) WHERE flow_live.flow_id = flows.flow_id) AS publishedRevisionId,
+                     flows.create_request_digest AS createRequestDigest, flows.created_at AS createdAt,
+                     flows.draft_revision_id AS draftRevisionId, flows.name, flows.flow_id AS flowId, flows.status, flows.updated_at AS updatedAt,
+                     flows.draft_resource_references AS draftResourceReferences,
+                     COALESCE(access.access_revision, 0) AS sharedAccessRevision,
+                     COALESCE(access.provider_ids_json, '[]') AS sharedProviderIds,
+                     COALESCE(access.bindings_json, '[]') AS sharedBindings,
+                     (SELECT team_id FROM flow_connector_teams WHERE flow_connector_teams.flow_id = flows.flow_id) AS connectorTeamId, flows.owner_id AS ownerId`
+const flowTables = 'flows LEFT JOIN flow_provider_access AS access ON access.flow_id = flows.flow_id'
 
 /**
  * Flow identity, its Draft head, and its Presentation.
@@ -110,10 +121,20 @@ export class FlowStore {
         .prepare(
           `INSERT INTO flows (
              flow_id, name, status, draft_revision_id, create_idempotency_key,
-             create_request_digest, created_at, updated_at, owner_id
-           ) VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?)`,
+             create_request_digest, created_at, updated_at, owner_id, draft_resource_references
+           ) VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?, ?)`,
         )
-        .run(input.flowId, input.name, input.revisionId, idempotencyKey, input.requestDigest, input.createdAt, input.createdAt, input.actorId)
+        .run(
+          input.flowId,
+          input.name,
+          input.revisionId,
+          idempotencyKey,
+          input.requestDigest,
+          input.createdAt,
+          input.createdAt,
+          input.actorId,
+          draftResourceReferences(input.content),
+        )
       this.#database.prepare("INSERT INTO flow_presentations (flow_id, revision, value, updated_at) VALUES (?, 1, '{}', ?)").run(input.flowId, input.createdAt)
       this.#database.prepare('INSERT INTO flow_connector_teams (flow_id, team_id) VALUES (?, ?)').run(input.flowId, input.connectorTeamId ?? null)
       return { created: true, flow: this.get(input.flowId)! }
@@ -121,7 +142,7 @@ export class FlowStore {
   }
 
   get(flowId: string): StoredFlow | undefined {
-    return this.#database.prepare(`SELECT ${flowColumns} FROM flows WHERE flow_id = ?`).get(flowId) as StoredFlow | undefined
+    return this.#database.prepare(`SELECT ${flowColumns} FROM ${flowTables} WHERE flows.flow_id = ?`).get(flowId) as StoredFlow | undefined
   }
 
   list(
@@ -137,12 +158,12 @@ export class FlowStore {
       values.push(ownerId)
     }
     if (after != null) {
-      conditions.push('(created_at > ? OR (created_at = ? AND flow_id > ?))')
+      conditions.push('(created_at > ? OR (created_at = ? AND flows.flow_id > ?))')
       values.push(after.createdAt, after.createdAt, after.flowId)
     }
     const where = conditions.length == 0 ? '' : `WHERE ${conditions.join(' AND ')}`
     const flows = this.#database
-      .prepare(`SELECT ${flowColumns} FROM flows ${where} ORDER BY created_at, flow_id LIMIT ?`)
+      .prepare(`SELECT ${flowColumns} FROM ${flowTables} ${where} ORDER BY created_at, flows.flow_id LIMIT ?`)
       .all(...values, limit) as unknown as StoredFlow[]
     if (!includeTotal) return { flows }
     const total = (
@@ -438,7 +459,9 @@ export class FlowStore {
           input.digest,
           input.modelVersion,
         )
-      this.#database.prepare('UPDATE flows SET draft_revision_id = ?, updated_at = ? WHERE flow_id = ?').run(input.revisionId, input.createdAt, input.flowId)
+      this.#database
+        .prepare('UPDATE flows SET draft_revision_id = ?, draft_resource_references = ?, updated_at = ? WHERE flow_id = ?')
+        .run(input.revisionId, draftResourceReferences(input.content), input.createdAt, input.flowId)
       return { kind: 'committed', revision: this.change(input.flowId, input.changeId)! }
     })
   }

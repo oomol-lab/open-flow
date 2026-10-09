@@ -175,7 +175,7 @@ export class WorkspaceStore {
       finishChanges: () => {
         if (!this.#disposed && this.#model.value.busy == 'designer') this.#set({ busy: undefined })
       },
-      headChanged: (flowId, revisionId) => this.#flows.advanceHead(flowId, revisionId),
+      headChanged: (flowId, revisionId, content) => this.#flows.advanceHead(flowId, revisionId, content),
       recover: (context) => {
         void this.retryHistorySync()
         return this.#syncDraftHead(context, true)
@@ -1175,7 +1175,7 @@ export class WorkspaceStore {
         this.#presentationChanges.reset(presentation)
         this.#applyDraft(draft, 'external')
         this.#set({ presentation })
-        this.#flows.advanceHead(flowId, draft.revisionId)
+        this.#flows.advanceHead(flowId, draft.revisionId, draft.content)
         this.#history.failed = false
         this.#setNotice({ kind: 'error', message: this.#i18n.t('history.resynced') })
         void this.#checkDraft()
@@ -1259,7 +1259,7 @@ export class WorkspaceStore {
       if (this.#history.clear()) this.#setNotice({ kind: 'success', message: this.#i18n.t('history.external') })
       const draft = this.#draftChanges.replaceCommitted(committed)
       const preserveModuleEditor = this.#applyDraft(draft, 'external')
-      this.#flows.advanceHead(context.flowId, committed.revisionId)
+      this.#flows.advanceHead(context.flowId, committed.revisionId, committed.content)
       if (notifyUpdate) {
         this.#setNotice({
           kind: preserveModuleEditor ? 'error' : 'success',

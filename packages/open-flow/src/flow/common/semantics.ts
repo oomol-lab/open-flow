@@ -4,6 +4,7 @@ export { renderPrompt } from './promptTemplate.ts'
 export { connectionUsage, removeConnectionUsage } from './connectionUsage.ts'
 import { matchesTriggerOutputs } from '../../trigger/common/contract.ts'
 import { nodeInputMappings } from './condition.ts'
+import { connectionUsage } from './connectionUsage.ts'
 export { matchesTriggerOutputs, triggerOutputDefinitions, triggerOutputPorts } from '../../trigger/common/contract.ts'
 import type { EngineContract } from '../../execution/common/engineContract.ts'
 import type { RuntimeProgram } from '../../execution/common/runtime.ts'
@@ -113,6 +114,27 @@ export function variableBindings(revision: RevisionContent, bindingIds: Iterable
       return binding?.kind == 'variable' ? [[bindingId, binding.target]] : []
     }),
   )
+}
+
+export interface FlowResourceReferences {
+  readonly variableNames: readonly string[]
+  readonly connections: readonly { readonly providerId: string; readonly connectionId: string }[]
+  readonly errorSourceFlowIds: readonly string[]
+}
+
+export function flowResourceReferences(content: RevisionContent): FlowResourceReferences {
+  const connections = new Map<string, { readonly providerId: string; readonly connectionId: string }>()
+  for (const use of connectionUsage(content.document)) {
+    if (use.connectionId == null) continue
+    connections.set(JSON.stringify([use.providerId, use.connectionId]), { providerId: use.providerId, connectionId: use.connectionId })
+  }
+  return {
+    variableNames: [...new Set(Object.values(variableBindings(content, flowDependencies(content).bindings)))].toSorted(),
+    connections: [...connections].toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0)).map(([, value]) => value),
+    errorSourceFlowIds: [
+      ...new Set(Object.values(content.document.graph.nodes).flatMap((node) => (node.kind == 'error' ? (node.sourceFlowIds ?? []) : []))),
+    ].toSorted(),
+  }
 }
 
 export interface Diagnostic {
