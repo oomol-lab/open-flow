@@ -1,4 +1,3 @@
-import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { Attempt } from './report.ts'
 import type { Manifest } from './session.ts'
 
@@ -12,18 +11,20 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { createServer } from 'vite'
 import { frontendConfig } from '../../vite.config.ts'
+import { driver } from './driver.ts'
 import { labFetch, labOrigins } from './network.ts'
 import { servePreview } from './preview.ts'
+import { reference } from './reference.ts'
 import { compare, summary, reportText } from './report.ts'
-import { scenarios, scenario, referenceChanges } from './scenarios.ts'
+import { scenarios, scenario, stageCount } from './scenarios.ts'
 import { LabSession, jsonFile, saveJson } from './session.ts'
-import { startupMessage } from './terminal.ts'
+import { agentPrompt, startupMessage } from './terminal.ts'
 
 const root = path.resolve(import.meta.dirname, '../../../..')
 const stateRoot = path.join(root, '.open-flow-lab')
 async function command(manifest: Manifest, args: string[], stdin?: string, capture = false) {
   const id = randomUUID()
-  const begin = await control<{ attemptId: string }>(manifest, 'begin', { id })
+  const begin = await control<{ attemptId: string }>(manifest, 'begin', { id, args })
   let stdout = ''
   const record = await runLabCli(args, {
     id,
@@ -99,7 +100,7 @@ async function start(id: string) {
     lab.manifest.preview = `http://127.0.0.1:${address.port}/`
     await lab.saveManifest()
     await writeFile(path.join(stateRoot, 'current'), lab.manifest.id)
-    console.log(startupMessage(lab.manifest, scenario(id), process.stdout.columns))
+    console.log(startupMessage(lab.manifest, scenario(id), root, process.stdout.columns))
     await new Promise<void>((resolve) => {
       process.once('SIGINT', resolve)
       process.once('SIGTERM', resolve)
@@ -111,43 +112,30 @@ async function start(id: string) {
     await new Promise<void>((resolve) => http.close(() => resolve()))
   }
 }
-async function reference(lab: LabSession) {
-  const run = async (args: string[], stdin?: string) => {
-    const output = await command(lab.manifest, args, stdin, true)
-    if (output.record.exitCode != 0) throw new Error(`Reference command failed: ${args.join(' ')}`)
-    return JSON.parse(output.stdout)
-  }
-  const flowId = lab.manifest.flowId
-  const inspected = (await run(['inspect', flowId, '--full', '--json'])) as { draft: { revisionId: string; content: RevisionContent } }
-  if (lab.scenarioId == 'create-flow') {
-    await run(['connector', 'search', 'notification', '--flow', flowId, '--json'])
-    await run(['connector', 'show', 'lab-notifications.send', '--flow', flowId, '--json'])
-    await run(['connector', 'connections', 'lab-notifications', '--flow', flowId, '--json'])
-  }
-  const operations = referenceChanges(lab.scenarioId, inspected.draft.content)
-  for (const kind of new Set(operations.map((operation) => operation.kind))) await run(['schema', kind, '--json'])
-  await run(
-    ['apply', flowId, '--file', '-', '--expected-revision', inspected.draft.revisionId, '--idempotency-key', `reference-${lab.attempt.id}`, '--json'],
-    JSON.stringify({ version: 1, operations }),
-  )
-  await run(['check', flowId, '--json'])
-  const result = await lab.verify()
-  if (!result.passed) throw new Error(JSON.stringify(result))
-}
-async function test(id?: string, keepFailed = false) {
+async function test(id?: string, keepFailed = false, transport: 'cli' | 'mcp' = 'cli') {
   const source = await readFile(import.meta.filename)
   let failures = 0
   for (const item of id == null ? scenarios : [scenario(id)]) {
     const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-lab-'))
     const lab = new LabSession(directory, item.id)
+    const attempts: Attempt[] = []
     let passed = false
     try {
       await lab.open()
-      lab.attempt.script = `reference-v1:${createHash('sha256')
+      const script = `reference-v1:${createHash('sha256')
         .update(source)
         .update(await readFile(path.join(import.meta.dirname, 'scenarios.ts')))
+        .update(await readFile(path.join(import.meta.dirname, 'reference.ts')))
+        .update(await readFile(path.join(import.meta.dirname, 'fulfillmentReference.ts')))
         .digest('hex')}`
-      await reference(lab)
+      for (let stage = 0; stage < stageCount(item.id); stage++) {
+        lab.attempt.script = script
+        attempts.push(lab.attempt)
+        await reference(driver(lab, transport), item.id, lab.manifest.flowId, stage)
+        const verified = await lab.verify()
+        if (!verified.passed) throw new Error(JSON.stringify(verified))
+        if (stage + 1 < stageCount(item.id)) await lab.next()
+      }
       passed = true
     } catch (error) {
       failures++
@@ -159,12 +147,18 @@ async function test(id?: string, keepFailed = false) {
     } finally {
       if (lab.attempt != null) {
         await mkdir(path.join(stateRoot, 'reports'), { recursive: true })
-        await saveJson(path.join(stateRoot, 'reports', `${lab.attempt.id}.json`), lab.attempt)
-        const artifacts = path.join(stateRoot, 'reports', lab.attempt.id)
-        await mkdir(artifacts, { recursive: true })
-        for (const file of await readdir(directory))
-          if (file.endsWith('.stdout') || file.endsWith('.stderr')) await copyFile(path.join(directory, file), path.join(artifacts, file))
-        console.log(JSON.stringify({ scenario: item.id, passed, attemptId: lab.attempt.id, totals: summary(lab.attempt) }, null, 2))
+        if (!attempts.includes(lab.attempt)) attempts.push(lab.attempt)
+        for (const attempt of attempts) {
+          await saveJson(path.join(stateRoot, 'reports', `${attempt.id}.json`), attempt)
+          const artifacts = path.join(stateRoot, 'reports', attempt.id)
+          await mkdir(artifacts, { recursive: true })
+          for (const file of await readdir(directory))
+            if (file.startsWith(`${attempt.id}.`) && (file.endsWith('.stdout') || file.endsWith('.stderr')))
+              await copyFile(path.join(directory, file), path.join(artifacts, file))
+          console.log(
+            JSON.stringify({ scenario: item.id, stage: attempt.stage, passed: attempt.passed, attemptId: attempt.id, totals: summary(attempt) }, null, 2),
+          )
+        }
       }
       await lab.close()
       if (passed || !keepFailed) await rm(directory, { recursive: true, force: true })
@@ -200,17 +194,18 @@ async function main() {
     return 0
   }
   if (action == 'start') {
-    await start(args[0] ?? 'fix-notification')
+    await start(args[0] ?? 'customer-redaction')
     return 0
   }
   if (action == 'test')
     return await test(
       args.find((arg) => !arg.startsWith('--')),
       args.includes('--keep-failed'),
+      args.includes('--mcp') ? 'mcp' : 'cli',
     )
   if (action == null || action == '--help') {
     console.log(
-      'bun run lab [--session ID] list|start SCENARIO|open|flow ...|diff|verify|report [--attempt ID] [--compare ID]|reset|test [SCENARIO] [--keep-failed]|clean SESSION_ID\nreport supports --json; other Lab results are JSON. flow preserves production CLI output and exit codes.',
+      'bun run lab [--session ID] list|start SCENARIO|task|next|open|flow ...|diff|verify|report [--attempt ID] [--compare ID]|reset|test [SCENARIO] [--mcp] [--keep-failed]|clean SESSION_ID\nreport supports --json; task and next print Agent prompts. flow preserves production CLI output and exit codes.',
     )
     return 0
   }
@@ -237,6 +232,11 @@ async function main() {
   labOrigins.add(manifest.origin)
   if (manifest.stopped) throw new Error('Session is stopped. Use report --attempt ID or start a new session.')
   if (action == 'flow') return (await command(manifest, args)).record.exitCode
+  if (action == 'next' || action == 'task') {
+    const current = await control<Manifest>(manifest, action == 'task' ? 'state' : 'next', action == 'task' ? undefined : {})
+    console.log(agentPrompt(current, scenario(current.scenario, current.stage ?? 0), root))
+    return 0
+  }
   if (action == 'open') {
     await openBrowser(manifest.preview!)
     return 0

@@ -1,10 +1,6 @@
-import type { ChangeOperation, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { UiLanguage } from '@oomol-lab/open-flow/localization'
 
-import { flowInspection, inspectFlowDraft, nodeDetails } from '@oomol-lab/open-flow/control-api'
-import { authoringExample } from '@oomol-lab/open-flow/control-requests'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
-import { applyFlowChanges, decodeChangeOperations } from '@oomol-lab/open-flow/flow-change'
 import { uiLanguages } from '@oomol-lab/open-flow/localization'
 import { describe, expect, it, vi } from 'vitest'
 import { parseArguments } from './arguments.ts'
@@ -50,65 +46,6 @@ function runtime(language: UiLanguage = 'en') {
 }
 
 describe('CLI', () => {
-  it('edits execution order and input sources independently through revision changes', async () => {
-    let content: RevisionContent = {
-      modelVersion: currentFlowModelVersion,
-      modules: {},
-      document: {
-        bindings: {},
-
-        graph: {
-          edges: [],
-          nodes: {
-            a: { kind: 'value', inputs: {}, values: [{ handle: 'value', jsonSchema: {}, nullable: false, value: 42 }] },
-            b: { kind: 'wait', inputs: {}, inputDefinitions: [{ handle: 'input', jsonSchema: {}, nullable: false }], prompt: '' },
-          },
-        },
-      },
-    }
-    let sequence = 1
-    const operations: ChangeOperation[][] = []
-    const metadata = () => ({
-      actorId: 'operator',
-      createdAt: flow.createdAt,
-      digest: 'digest',
-      flowId: flow.flowId,
-      modelVersion: currentFlowModelVersion,
-      parentRevisionId: null,
-      revisionId: `revision-${sequence}`,
-      version: 1,
-    })
-    const request = async (path: string, init?: RequestInit) => {
-      if (path == '/v1/flows/flow-1') return Response.json({ ...flow, draftRevisionId: `revision-${sequence}` })
-      if (path == `/v1/flows/flow-1/revisions/revision-${sequence}`) return Response.json({ ...metadata(), content })
-      if (path == '/v1/flows/flow-1/draft/changes') {
-        const body = JSON.parse(String(init?.body)) as { expectedRevisionId: string; operations: ChangeOperation[] }
-        expect(body.expectedRevisionId).toBe(`revision-${sequence}`)
-        expect(new Headers(init?.headers).get('idempotency-key')).toBeTruthy()
-        operations.push(body.operations)
-        content = applyFlowChanges(content, body.operations)
-        sequence++
-        return Response.json({ revision: metadata(), version: 1 })
-      }
-      throw new Error(`Unexpected request ${path}`)
-    }
-    for (const args of [
-      ['connect', 'flow-1', 'a', 'b'],
-      ['node', 'input', 'flow-1', 'b', 'input', 'a', 'value'],
-      ['disconnect', 'flow-1', 'a', 'b'],
-    ]) {
-      const output = runtime()
-      expect(await runCli([...args, '--json'], { request }, output.value), output.stderr()).toBe(0)
-    }
-    expect(operations.map((batch) => batch.map((operation) => operation.kind))).toEqual([
-      ['graph.edge.connect'],
-      ['graph.node.input.set'],
-      ['graph.edge.disconnect'],
-    ])
-    expect(content.document.graph.edges).toEqual([])
-    expect(content.document.graph.nodes.b).toMatchObject({ inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'a', output: 'value' }] } } })
-  })
-
   it('prints help without making a Control API request', async () => {
     const output = runtime()
     const request = vi.fn()
@@ -132,13 +69,13 @@ describe('CLI', () => {
     }
   })
 
-  it('prints the localized usage line for a code subcommand', async () => {
+  it('prints the localized usage line for an editing command', async () => {
     const output = runtime('fr')
 
-    await expect(runCli(['code', 'list', '--help'], { request: vi.fn() }, output.value)).resolves.toBe(0)
+    await expect(runCli(['edit', '--help'], { request: vi.fn() }, output.value)).resolves.toBe(0)
 
-    expect(output.stdout()).toContain('oo flow code list <flow> [--json]')
-    expect(output.stdout()).not.toContain('oo flow code edit <flow>')
+    expect(output.stdout()).toContain('oo flow edit <flow>')
+    expect(output.stdout()).not.toContain('oo flow code edit')
   })
 
   it('creates a top-level Flow through POST /v1/flows', async () => {
@@ -214,7 +151,7 @@ describe('CLI', () => {
     const request = vi.fn(async (path: string) => {
       if (path == '/v1/flows/Main') return Response.json({ error: { code: 'flow.not-found', message: 'Missing.' }, version: 1 }, { status: 404 })
       if (path == '/v1/flows?limit=100') return Response.json({ flows: [flow], version: 1 })
-      if (path == '/v1/flows/flow-1/revisions/revision-1/check') {
+      if (path == '/v1/flows/flow-1/authoring/check') {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
@@ -505,9 +442,9 @@ describe('agent command contract', () => {
   it('provides command-specific machine help without a host', async () => {
     const output = runtime()
     const request = vi.fn()
-    expect(await runCli(['node', 'add', '--help', '--json'], { request }, output.value)).toBe(0)
+    expect(await runCli(['edit', '--help', '--json'], { request }, output.value)).toBe(0)
     expect(JSON.parse(output.stdout())).toMatchObject({
-      commands: [{ command: 'node add', options: expect.arrayContaining([expect.objectContaining({ name: '--code', repeatable: false, value: true })]) }],
+      commands: [{ command: 'edit', options: expect.arrayContaining([expect.objectContaining({ name: '--input', repeatable: false, value: true })]) }],
       exitCodes: { 2: expect.any(String) },
     })
     expect(request).not.toHaveBeenCalled()
@@ -541,34 +478,6 @@ describe('agent command contract', () => {
     expect(await runCli(['list', '--cursor=before', '--limit', '2', '--json'], { request }, output.value)).toBe(0)
     expect(JSON.parse(output.stdout())).toMatchObject({ nextCursor: 'after' })
     expect(request).toHaveBeenCalledOnce()
-  })
-
-  it('keeps a repeatable edit identical after the head advances and its first response is lost', async () => {
-    const bodies: unknown[] = []
-    const keys: string[] = []
-    const request = async (path: string, init?: RequestInit) => {
-      if (path == '/v1/flows/flow-1') return Response.json({ ...flow, draftRevisionId: bodies.length == 0 ? 'revision-1' : 'revision-2' })
-      if (path.endsWith('/revisions/revision-1')) return Response.json(revisionFixture)
-      if (path.endsWith('/draft/changes')) {
-        bodies.push(JSON.parse(String(init?.body)))
-        keys.push(new Headers(init?.headers).get('idempotency-key') ?? '')
-        if (bodies.length == 1) throw new Error('Lost response')
-        return Response.json({ version: 1, revision: { ...revisionFixture, content: undefined, revisionId: 'revision-2', parentRevisionId: 'revision-1' } })
-      }
-      throw new Error(path)
-    }
-    const args = ['node', 'add', 'flow-1', 'code', 'Code', '--expected-revision=revision-1', '--idempotency-key=edit-1', '--json']
-    const first = runtime()
-    expect(await runCli(args, { request }, first.value)).toBe(1)
-    expect(JSON.parse(first.stderr())).toMatchObject({
-      error: { code: 'flow.mutation-outcome-unknown', details: { baseRevisionId: 'revision-1', idempotencyKey: 'edit-1' } },
-    })
-    const second = runtime()
-    expect(await runCli(args, { request }, second.value), second.stderr()).toBe(0)
-    expect(bodies).toHaveLength(2)
-    expect(bodies[1]).toEqual(bodies[0])
-    expect(keys).toEqual(['edit-1', 'edit-1'])
-    expect(JSON.parse(second.stdout())).toMatchObject({ revisionId: 'revision-2', baseRevisionId: 'revision-1', changed: true })
   })
 
   it('passes Flow scope to connector discovery', async () => {
@@ -634,96 +543,6 @@ describe('agent command contract', () => {
       clock.mockRestore()
     }
   })
-})
-
-it('applies a complete operation batch atomically and reports validation separately from acceptance', async () => {
-  const output = runtime()
-  const operations = [
-    {
-      kind: 'graph.node.create',
-      nodeId: 'value',
-      node: { kind: 'value', name: 'Value', inputs: {}, values: [{ handle: 'value', jsonSchema: {}, nullable: false, value: 42 }] },
-    },
-    { kind: 'graph.edge.connect', edge: { source: 'start', target: 'value' } },
-    { kind: 'graph.node.field.set', nodeId: 'value', field: 'name', before: 'Value', value: 'Answer' },
-  ]
-  output.value.readFile = async () => JSON.stringify({ version: 1, operations })
-  let changes = 0
-  const request = async (path: string, init?: RequestInit) => {
-    if (path == '/v1/flows/flow-1') return Response.json(flow)
-    if (path.endsWith('/revisions/revision-1')) return Response.json(revisionFixture)
-    if (path.endsWith('/draft/changes')) {
-      changes++
-      expect(JSON.parse(String(init?.body))).toEqual({ version: 1, expectedRevisionId: 'revision-1', operations })
-      return Response.json({ version: 1, revision: { ...revisionFixture, content: undefined, revisionId: 'revision-2', parentRevisionId: 'revision-1' } })
-    }
-    if (path.endsWith('/check'))
-      return Response.json({
-        waits: [],
-        closureDigest: 'closure',
-        diagnostics: [],
-        engineContract: 'open-flow-engine/v5',
-        flowId: flow.flowId,
-        modelVersion: currentFlowModelVersion,
-        revisionDigest: 'digest',
-        revisionId: 'revision-2',
-        valid: false,
-        version: 1,
-      })
-    throw new Error(path)
-  }
-  expect(await runCli(['apply', 'flow-1', '--file=changes.json', '--json'], { request }, output.value), output.stderr()).toBe(0)
-  expect(changes).toBe(1)
-  expect(JSON.parse(output.stdout())).toMatchObject({ changed: true, valid: false, revisionId: 'revision-2' })
-})
-
-it('discovers and submits the shared compact trigger example without inlining a definition', async () => {
-  const help = runtime()
-  expect(await runCli(['schema', 'example.poll', '--json'], { request: vi.fn() }, help.value)).toBe(0)
-  expect(JSON.parse(help.stdout())).toEqual(authoringExample('poll'))
-  const output = runtime()
-  output.value.readFile = async () => help.stdout()
-  const request = async (path: string, init?: RequestInit) => {
-    if (path == '/v1/flows/flow-1') return Response.json(flow)
-    if (path.endsWith('/revisions/revision-1')) return Response.json(revisionFixture)
-    if (path.endsWith('/draft/changes')) {
-      expect(JSON.parse(String(init?.body)).operations).toEqual(authoringExample('poll').operations)
-      return Response.json({ version: 1, revision: { ...revisionFixture, content: undefined, revisionId: 'revision-2', parentRevisionId: 'revision-1' } })
-    }
-    throw new Error('Check unavailable')
-  }
-  expect(await runCli(['apply', 'flow-1', '--file', 'changes.json', '--json'], { request }, output.value), output.stderr()).toBe(0)
-  expect(JSON.parse(output.stdout())).toMatchObject({ changed: true, revisionId: 'revision-2', valid: null })
-})
-
-it.each(['flow.invalid', 'flow.revision-upgrade-required'])('keeps inspect metadata when the Draft reports %s', async (code) => {
-  const output = runtime()
-  const request = async (path: string) =>
-    path == '/v1/flows/flow-1' ? Response.json(flow) : Response.json({ error: { code, message: 'Draft needs attention' } }, { status: 409 })
-  expect(await runCli(['inspect', 'flow-1', '--json'], { request }, output.value)).toBe(0)
-  expect(JSON.parse(output.stdout())).toMatchObject({ flow, draft: null, draftIssue: { code, revisionId: 'revision-1' } })
-})
-
-it('does not hide authorization failures as an unreadable Draft', async () => {
-  const output = runtime()
-  const request = async (path: string) =>
-    path == '/v1/flows/flow-1' ? Response.json(flow) : Response.json({ error: { code: 'authorization.denied', message: 'Denied' } }, { status: 403 })
-  expect(await runCli(['inspect', 'flow-1', '--json'], { request }, output.value)).toBe(1)
-  expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'authorization.denied' } })
-})
-
-it.each([false, true])('inspects the shared Flow view without invoking check (full=%s)', async (full) => {
-  const output = runtime()
-  const live = { flowId: flow.flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 } as const
-  const request = vi.fn(async (path: string) => {
-    if (path == '/v1/flows/flow-1') return Response.json(flow)
-    if (path.endsWith('/revisions/revision-1')) return Response.json(revisionFixture)
-    if (path.endsWith('/live')) return Response.json(live)
-    throw new Error(`Unexpected inspection request: ${path}`)
-  })
-  expect(await runCli(['inspect', 'flow-1', '--json', ...(full ? ['--full'] : [])], { request }, output.value), output.stderr()).toBe(0)
-  expect(JSON.parse(output.stdout())).toEqual({ ...flowInspection(await inspectFlowDraft(flow, () => revisionFixture), live, full), kind: 'flow.inspect' })
-  expect(request).toHaveBeenCalledTimes(3)
 })
 
 it('finishes following an empty page when resuming beyond the terminal event', async () => {
@@ -863,79 +682,6 @@ it('discovers Provider and Trigger summaries and creates a Flow in the host scop
   }
 })
 
-it.each([
-  { reference: 'format', nodeId: 'format', revision: 'historical' },
-  { reference: 'Start', nodeId: 'start', revision: 'historical' },
-  { reference: 'start', nodeId: 'start' },
-])('reads the same node detail shape as MCP from the selected graph: %j', async ({ reference, nodeId, revision }) => {
-  const content = applyFlowChanges(revisionFixture.content, [...decodeChangeOperations(authoringExample('code').operations)])
-  const request = vi.fn(async (path: string) => {
-    if (path == '/v1/flows/flow-1') return Response.json({ ...flow, draftRevisionId: 'new-head' })
-    if (path == `/v1/flows/flow-1/revisions/${revision ?? 'new-head'}`)
-      return Response.json({ ...revisionFixture, revisionId: revision ?? 'new-head', content })
-    throw new Error(`Unexpected request: ${path}`)
-  })
-  const output = runtime()
-  expect(
-    await runCli(['node', 'show', 'flow-1', reference, ...(revision == null ? [] : ['--revision', revision]), '--json'], { request }, output.value),
-    output.stderr(),
-  ).toBe(0)
-  const graph = content.document.graph
-  expect(JSON.parse(output.stdout())).toEqual({
-    ...nodeDetails(content, nodeId, graph.nodes[nodeId]!),
-    flowId: flow.flowId,
-    revisionId: revision ?? 'new-head',
-    kind: 'node.show',
-    version: 1,
-  })
-  expect(request).toHaveBeenCalledTimes(2)
-})
-
-it.each([{ node: 'missing' }, { node: '__proto__' }, { node: 'constructor' }, { node: 'toString' }])(
-  'does not fall back to another node: %j',
-  async ({ node }) => {
-    const content = applyFlowChanges(revisionFixture.content, [])
-    const request = async (path: string) => {
-      if (path == '/v1/flows/flow-1') return Response.json(flow)
-      if (path == '/v1/flows/flow-1/revisions/revision-1') return Response.json({ ...revisionFixture, content })
-      throw new Error(path)
-    }
-    const output = runtime()
-    expect(await runCli(['node', 'show', 'flow-1', node, '--json'], { request }, output.value)).toBe(1)
-    expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'node.not-found' } })
-  },
-)
-
-it.each([true, false])('resolves prototype-like node names and gives own IDs precedence (own ID=%s)', async (ownId) => {
-  const reference = ownId ? 'constructor' : '__proto__'
-  const nodes = {
-    named: { kind: 'manual', name: reference },
-    ...(ownId ? { [reference]: { kind: 'manual', name: 'Own node' } } : {}),
-  }
-  const content = { ...revisionFixture.content, document: { ...revisionFixture.content.document, graph: { edges: [], nodes } } }
-  const request = async (path: string) => {
-    if (path == '/v1/flows/flow-1') return Response.json(flow)
-    if (path == '/v1/flows/flow-1/revisions/revision-1') return Response.json({ ...revisionFixture, content })
-    throw new Error(path)
-  }
-  const output = runtime()
-  expect(await runCli(['node', 'show', 'flow-1', reference, '--json'], { request }, output.value), output.stderr()).toBe(0)
-  expect(JSON.parse(output.stdout())).toMatchObject({ nodeId: ownId ? reference : 'named', node: { name: ownId ? 'Own node' : reference } })
-})
-
-it('preserves fixed Revision failures without reading the current Draft', async () => {
-  const request = vi.fn(async (path: string) => {
-    if (path == '/v1/flows/flow-1') return Response.json(flow)
-    if (path == '/v1/flows/flow-1/revisions/missing')
-      return Response.json({ error: { code: 'flow.not-found', message: 'Revision not found.' } }, { status: 404 })
-    throw new Error(path)
-  })
-  const output = runtime()
-  expect(await runCli(['node', 'show', 'flow-1', 'start', '--revision', 'missing', '--json'], { request }, output.value)).toBe(1)
-  expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'flow.not-found' } })
-  expect(request).toHaveBeenCalledTimes(2)
-})
-
 it.each([false, true])('reads Code connections without requiring a readable Draft (published=%s)', async (published) => {
   const access = published
     ? { mode: 'implicit', sharedAccessDigest: 'implicit:1', sharedBindings: [], selectedBindings: [], version: 2 }
@@ -977,7 +723,7 @@ it('queries multiple connection Providers in one request and preserves individua
 it('checks a fixed Revision and changes only the observed Live publication enablement', async () => {
   const request = async (path: string, init?: RequestInit) => {
     if (path == '/v1/flows/flow-1') return Response.json(flow)
-    if (path == '/v1/flows/flow-1/revisions/historical/check')
+    if (path == '/v1/flows/flow-1/authoring/check')
       return Response.json({
         waits: [],
         closureDigest: 'closure',

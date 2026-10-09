@@ -11,13 +11,12 @@ import type {
   TriggerKeySnapshot,
   TriggerKeySummary,
 } from '@oomol-lab/open-flow/control-api'
-import type { CodeModule, GraphNode, InputPort, RevisionContent, TriggerNode, TriggerSchedule } from '@oomol-lab/open-flow/flow-change'
+import type { RevisionContent, TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { UiLanguage } from '@oomol-lab/open-flow/localization'
 import type { ParsedArguments } from './arguments.ts'
 
 import { ApiError, ControlClient } from '@oomol-lab/open-flow/control-api'
 import { resourceNameIssue, resourceNameMaxLength } from '@oomol-lab/open-flow/flow-change'
-import { createHash } from 'node:crypto'
 
 export interface CommandHost {
   readonly request: (path: string, init?: RequestInit) => Promise<Response>
@@ -115,35 +114,6 @@ export async function selectedDraftFlow(client: ControlClient, flow: Flow, args:
   return { draft, flow, graph: draft.content.document.graph }
 }
 
-export type SemanticNode = Exclude<GraphNode, TriggerNode>
-
-export function exactNode(nodes: Readonly<Record<string, GraphNode>>, reference: string): { readonly node: SemanticNode; readonly nodeId: string } {
-  const byId = nodes[reference]
-  if (byId != null && !('inputs' in byId)) throw new CliError('node.not-found', `Node ${JSON.stringify(reference)} was not found.`)
-  if (byId != null) return { node: byId, nodeId: reference }
-  const byName = Object.entries(nodes).filter((entry): entry is [string, SemanticNode] => 'inputs' in entry[1] && entry[1].name == reference)
-  if (byName.length == 1) return { node: byName[0]![1], nodeId: byName[0]![0] }
-  if (byName.length > 1) {
-    throw new CliError('node.ambiguous', `Node name ${JSON.stringify(reference)} is ambiguous.`, {
-      candidates: byName.map(([nodeId, node]) => ({ name: node.name, nodeId })),
-    })
-  }
-  throw new CliError('node.not-found', `Node ${JSON.stringify(reference)} was not found.`)
-}
-
-export function exactModule(modules: Readonly<Record<string, CodeModule>>, reference: string): { readonly module: CodeModule; readonly moduleId: string } {
-  const byId = modules[reference]
-  if (byId != null) return { module: byId, moduleId: reference }
-  const byName = Object.entries(modules).filter(([, module]) => module.name == reference)
-  if (byName.length == 1) return { module: byName[0]![1], moduleId: byName[0]![0] }
-  if (byName.length > 1) {
-    throw new CliError('code.ambiguous', `CodeModule name ${JSON.stringify(reference)} is ambiguous.`, {
-      candidates: byName.map(([moduleId, module]) => ({ moduleId, name: module.name })),
-    })
-  }
-  throw new CliError('code.not-found', `CodeModule ${JSON.stringify(reference)} was not found.`)
-}
-
 function exactAction(actions: readonly ConnectorAction[], reference: string): ConnectorAction {
   const byId = actions.find((action) => action.actionId == reference)
   if (byId != null) return byId
@@ -166,38 +136,6 @@ export async function referencedAction(client: ControlClient, reference: string,
   return exactAction(await client.searchConnectorActions(reference, undefined, flowId), reference)
 }
 
-function exactConnection(connections: readonly ConnectorConnection[], reference: string): ConnectorConnection {
-  const active = connections.filter((connection) => connection.status == 'active')
-  const byId = active.find((connection) => connection.connectionId == reference)
-  if (byId != null) return byId
-  const byName = active.filter((connection) => connection.displayName == reference)
-  if (byName.length == 1) return byName[0]!
-  if (byName.length > 1) {
-    throw new CliError('connector.connection-ambiguous', `Connection name ${JSON.stringify(reference)} is ambiguous.`, {
-      candidates: byName.map(({ connectionId, displayName, serviceId }) => ({ connectionId, displayName, serviceId })),
-    })
-  }
-  throw new CliError('connector.connection-not-found', `Active Connection ${JSON.stringify(reference)} was not found.`)
-}
-
-export async function preferredConnection(
-  client: ControlClient,
-  serviceId: string,
-  reference: string | undefined,
-  fallback: ConnectorConnection | undefined,
-  required: boolean,
-  flowId?: string,
-): Promise<ConnectorConnection | undefined> {
-  const selected = reference == 'default' ? undefined : reference
-  if (selected == null && fallback?.status == 'active') return fallback
-  const connections = await client.listConnectorConnections(serviceId, undefined, flowId)
-  if (selected != null) return exactConnection(connections, selected)
-  const active = connections.filter((connection) => connection.status == 'active')
-  const preferred = active.find((connection) => connection.isDefault) ?? (active.length == 1 ? active[0] : undefined)
-  if (preferred != null || !required) return preferred
-  throw new CliError('connector.connection-required', `Select an active ${JSON.stringify(serviceId)} Connection with --connection.`)
-}
-
 export function exactTrigger(content: RevisionContent, reference: string): { readonly trigger: TriggerNode; readonly triggerId: string } {
   const entries = Object.entries(content.document.graph.nodes).filter((entry): entry is [string, TriggerNode] => !('inputs' in entry[1]))
   const byId = entries?.find(([triggerId]) => triggerId == reference)
@@ -210,19 +148,6 @@ export function exactTrigger(content: RevisionContent, reference: string): { rea
     })
   }
   throw new CliError('trigger.not-found', `Trigger ${JSON.stringify(reference)} was not found.`)
-}
-
-export function exactEdgeSource(nodes: Readonly<Record<string, GraphNode>>, reference: string): { readonly id: string; readonly kind: 'node' | 'trigger' } {
-  const byId = nodes[reference]
-  if (byId != null) return { id: reference, kind: 'inputs' in byId ? 'node' : 'trigger' }
-  const candidates = Object.entries(nodes).flatMap(([id, node]) =>
-    node.name == reference ? [{ id, kind: ('inputs' in node ? 'node' : 'trigger') as 'node' | 'trigger' }] : [],
-  )
-  if (candidates.length == 1) return candidates[0]!
-  if (candidates.length > 1) {
-    throw new CliError('edge.source-ambiguous', `Edge source name ${JSON.stringify(reference)} is ambiguous.`, { candidates })
-  }
-  throw new CliError('edge.source-not-found', `Edge source ${JSON.stringify(reference)} was not found.`)
 }
 
 export function triggerKeyText(definition: TriggerKeySummary): string {
@@ -246,44 +171,12 @@ export async function referencedTriggerKey(client: ControlClient, reference: str
   throw new CliError('trigger-key.not-found', `Trigger Key ${JSON.stringify(reference)} was not found.`)
 }
 
-export function triggerText(triggerId: string, trigger: TriggerNode): string {
-  const provider = trigger.kind == 'poll' || trigger.kind == 'integration' ? trigger.definition.provider : 'open-flow'
-  const connection = trigger.kind == 'poll' || trigger.kind == 'integration' ? (trigger.connectionId ?? '') : ''
-  return `${trigger.name}\t${triggerId}\t${trigger.kind}\t${provider}\t${connection}`
-}
-
 export function connectionText(connection: ConnectorConnection): string {
   return `${connection.displayName}\t${connection.connectionId}\t${connection.serviceId}\t${connection.status}${connection.isDefault ? '\tdefault' : ''}`
 }
 
 export function actionText(action: ConnectorAction): string {
   return `${action.name}\t${action.actionId}\t${action.serviceName}\t${action.serviceId}`
-}
-
-export function inspectedNodeSummary(_content: RevisionContent, nodeId: string, node: GraphNode) {
-  if (node.kind != 'task') return { kind: node.kind, ...(node.name == null ? {} : { name: node.name }), nodeId }
-  if ('moduleId' in node.task) {
-    return { kind: 'code', moduleId: node.task.moduleId, ...(node.name == null ? {} : { name: node.name }), nodeId }
-  }
-  const task = node.task
-  return {
-    ...(task.executor.kind == 'connector'
-      ? { actionId: task.executor.action, ...(task.executor.connectionId == null ? {} : { connectionId: task.executor.connectionId }) }
-      : {}),
-    kind: task.executor.kind,
-    ...(node.name == null ? {} : { name: node.name }),
-    nodeId,
-  }
-}
-
-export function inspectedTriggerSummary(triggerId: string, trigger: TriggerNode) {
-  return {
-    ...((trigger.kind == 'poll' || trigger.kind == 'integration') && trigger.connectionId != null ? { connectionId: trigger.connectionId } : {}),
-    kind: trigger.kind,
-    name: trigger.name,
-    ...(trigger.kind == 'poll' || trigger.kind == 'integration' ? { provider: trigger.definition.provider } : {}),
-    triggerId,
-  }
 }
 
 export function requireCount(positionals: readonly string[], count: number, usage: string): void {
@@ -296,18 +189,6 @@ export function write(runtime: Runtime, json: boolean, value: unknown, text: str
 
 export function flowText(flow: Flow): string {
   return `${flow.name}\t${flow.flowId}\t${flow.status}`
-}
-
-export function nodeText(nodeId: string, node: GraphNode): string {
-  return `${node.name ?? '<unnamed>'}\t${nodeId}\t${node.kind}`
-}
-
-export function nodeSummary(nodeId: string, node: GraphNode) {
-  return { kind: node.kind, ...(node.name == null ? {} : { name: node.name }), nodeId }
-}
-
-export function moduleText(moduleId: string, module: CodeModule): string {
-  return `${module.name}\t${moduleId}\t${module.imports.join(',')}`
 }
 
 export function publicationText(publication: Publication): string {
@@ -338,85 +219,6 @@ export async function argumentText(value: string, option: string, errorCode: str
     if (error instanceof CliError) throw error
     throw new CliError(errorCode, error instanceof Error ? error.message : String(error))
   }
-}
-
-function parsedJson(value: string, code: string, message: string): JsonValue {
-  try {
-    return JSON.parse(value) as JsonValue
-  } catch {
-    throw new CliError(code, message)
-  }
-}
-
-type SettingPorts = Readonly<Record<string, { readonly jsonSchema: JsonValue }>>
-
-function inlineSettingValue(source: string, schema: JsonValue | undefined, name: string): JsonValue {
-  const schemaObject = schema != null && typeof schema == 'object' && !Array.isArray(schema) ? (schema as Readonly<Record<string, JsonValue>>) : undefined
-  const type = typeof schemaObject?.type == 'string' ? schemaObject.type : undefined
-  const choices = Array.isArray(schemaObject?.enum) ? (schemaObject.enum as readonly JsonValue[]) : undefined
-  if (type == 'string' || (choices?.length != null && choices.length > 0 && choices.every((value) => typeof value == 'string'))) return source
-  try {
-    return JSON.parse(source) as JsonValue
-  } catch {
-    if (type == null) return source
-    throw new CliError('config.invalid', `--set ${name}= must contain a valid ${type} value.`)
-  }
-}
-
-export async function settingValues(args: ParsedArguments, runtime: Runtime, ports?: SettingPorts): Promise<Readonly<Record<string, JsonValue | undefined>>> {
-  const values: Record<string, JsonValue | undefined> = {}
-  for (const setting of args.sets) {
-    const separator = setting.indexOf('=')
-    if (separator < 0) {
-      const source = await argumentText(setting, '--set', 'config.unreadable', runtime)
-      const object = parsedJson(source, 'config.invalid', '--set @file or --set - must contain a JSON object.')
-      if (object == null || typeof object != 'object' || Array.isArray(object)) {
-        throw new CliError('config.invalid', '--set @file or --set - must contain a JSON object.')
-      }
-      Object.assign(values, object)
-      continue
-    }
-    const name = setting.slice(0, separator).trim()
-    const source = setting.slice(separator + 1)
-    if (name.length == 0) throw new CliError('config.invalid', '--set requires a field name before =.')
-    if (source.startsWith('@') || source == '-') {
-      values[name] = parsedJson(await argumentText(source, '--set', 'config.unreadable', runtime), 'config.invalid', `--set ${name}= must contain valid JSON.`)
-      continue
-    }
-    values[name] = inlineSettingValue(source, ports?.[name]?.jsonSchema, name)
-  }
-  for (const name of args.unsets) {
-    if (name.length == 0) throw new CliError('config.invalid', '--unset requires a field name.')
-    values[name] = undefined
-  }
-  return values
-}
-
-export function triggerSchedule(every: string | undefined, cron: string | undefined, timezone: string | undefined): readonly TriggerSchedule[] | undefined {
-  if (every != null && cron != null) throw new CliError('trigger.schedule-invalid', 'Use either every or cron, not both.')
-  if (every != null) {
-    if (timezone != null) throw new CliError('trigger.schedule-invalid', 'Timezone is only valid with cron.')
-    const match = /^(\d+)(mo|m|h|d|w)$/.exec(every)
-    const value = Number(match?.[1])
-    if (match == null || !Number.isSafeInteger(value) || value < 1) {
-      throw new CliError('trigger.schedule-invalid', 'Every must use a positive interval such as 5m, 1h, 1d, 1w, or 1mo.')
-    }
-    const units = { d: 'day', h: 'hour', m: 'minute', mo: 'month', w: 'week' } as const
-    return [{ type: 'every', unit: units[match[2] as keyof typeof units], value }]
-  }
-  if (cron != null) return [{ expression: cron, timezone: timezone ?? 'UTC', type: 'cron' }]
-  if (timezone != null) throw new CliError('trigger.schedule-invalid', 'Timezone requires cron.')
-}
-
-export function withInputValues(action: ConnectorAction, values: Readonly<Record<string, JsonValue | undefined>>): readonly InputPort[] {
-  const inputs = { ...action.inputs }
-  for (const [handle, value] of Object.entries(values)) {
-    const input = inputs[handle]
-    if (input == null) throw new CliError('connector.input-not-found', `Connector input ${JSON.stringify(handle)} was not found.`)
-    const { value: _value, ...rest } = input
-    inputs[handle] = value === undefined ? rest : { ...rest, value }
-  }
-  return Object.entries(inputs).map(([handle, input]) => Object.assign({ handle }, input))
 }
 
 export async function runInputs(args: ParsedArguments, runtime: Runtime): Promise<Readonly<Record<string, Readonly<Record<string, JsonValue>>>>> {
@@ -478,39 +280,7 @@ export function runExitCode(run: RunDetails, timedOut = false): number {
 }
 
 export function cloudError(error: ApiError): CliError {
-  return new CliError(error.code, error.message, { status: error.status })
-}
-
-export async function changeDraft(
-  client: ControlClient,
-  args: ParsedArguments,
-  flowId: string,
-  baseRevisionId: string,
-  target: ErrorDetails,
-  operations: Parameters<ControlClient['changeDraft']>[2],
-) {
-  try {
-    return { ...(await client.changeDraft(flowId, baseRevisionId, operations, args.idempotencyKey)), baseRevisionId }
-  } catch (error) {
-    if (error instanceof ApiError && error.code != 'response.invalid') throw cloudError(error)
-    throw new CliError(
-      'flow.mutation-outcome-unknown',
-      'The deployment did not confirm whether the Draft change was accepted. Retry with the same --idempotency-key, --expected-revision and arguments.',
-      {
-        baseRevisionId,
-        idempotencyKey: args.idempotencyKey,
-        flowId,
-        target,
-      },
-    )
-  }
-}
-
-export function authoringId(args: ParsedArguments, label: string): string {
-  return createHash('sha256')
-    .update(JSON.stringify([args.idempotencyKey, label]))
-    .digest('hex')
-    .slice(0, 24)
+  return new CliError(error.code, error.message, { status: error.status, ...error.details })
 }
 
 export async function waitForPublication(client: ControlClient, flowId: string, created: PublishOperation, runtime: Runtime, timeoutMs = 60_000) {

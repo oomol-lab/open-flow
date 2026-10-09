@@ -1,133 +1,192 @@
 # Flow 命令调用合同
 
-`oo flow` 使用宿主注入的 Control API。命令本身不保存当前 Flow，不从目录推断 Flow，也不保存待提交事务。
-团队选择由 `oo` 宿主统一处理：`--team <name>` 选择本次调用的 OOMOL 托管团队，所有 Flow 请求与 Workbench 链接使用同一认证上下文。
-Flow 创建命令不再单独指定 Team ID。
+`oo flow` 通过宿主注入的 Control API 操作部署。CLI 不保存当前 Flow 或本地事务。`oo --team <name>` 由宿主选择本次调用的团队。Flow 引用接受 ID 或唯一完整名称；后续调用使用返回的 ID 可避免名称查找。
 
-## 发现与读取
+## Agent authoring
 
-- `oo flow --help --json` 返回命令索引；`oo flow node add --help --json` 等子命令返回参数、选项、退出码和示例。Help、schema、version 不需要已配置的宿主。
-- `oo flow schema apply --json` 返回完整事务输入的 JSON Schema；`schema operations` 返回 ChangeOperation 数组的 schema；`schema graph.node.input.set` 等返回单个操作的独立 schema。
-- `schema input` 描述 Run 输入覆盖（node ID → handle → JSON value）；`schema outputs` 描述 Trigger 输出对象。节点实际端口与 Trigger 合同仍由 Revision 决定。
-- `inspect <flow> --json` 默认返回与 MCP `flow_get` 相同的精简视图（CLI 另有 `kind: "flow.inspect"`）：`flow`、`draft.revisionId`、`draft.graph`、`draft.bindings`、模块摘要与 Live 状态。节点保留输入绑定、端口 handle、未被覆盖的输入默认值和执行配置；省略完整 Schema、代码源码和审计元数据。`--full` 返回完整 `draft.content`、修订元数据和 Live 详情，供需要精确 before 值的编辑使用。原 `--summary` 已由默认行为取代。Inspect 不执行 check。
-- `check <flow> --json` 单独校验当前 Draft，返回 `valid`、`revisionId` 和 `check`。无效时退出码为 1，诊断只随 stdout 的这一份结果返回。
-- `event-source list --json` 列出当前身份可见、独立于 Flow 的事件源及其 Team、Connection、事件类型和验证状态。实际使用关系见 `consumers`；给 Flow 配置 Trigger 时可对照 `connector connections <service> --flow <flow>` 的 Connection。空列表提示到 Workbench 创建并验证事件源。
-- Flow 引用接受 ID 或唯一的完整名称。名称歧义返回候选 identity；保存后续调用所需的 ID 可以避免名称查找。
-- `inspect` 遇到不可读的 Draft 时返回 `flow`、`draft: null` 和 `draftIssue`（code、message、revisionId）。`flow.live` 仍保留已发布版本身份；不能从缺失内容推断流程用途。权限、网络和其他调用错误仍然报错。只需元信息时使用 `show`。
-- `list`、`runs list`、`publications list` 一次只返回一页，支持 `--cursor` 和 `--limit`（1–100）。继续时传入 `nextCursor`，并保持同样的过滤条件。
+CLI 与 MCP 使用相同的节点接口。配置解析、节点执行配置装配、CodeModule 管理、变量绑定、源码 imports 和变更生成由公共 Open Flow 包拥有，服务端通过现有 Draft 提交 owner 保存。
 
-有值的选项统一支持 `--option value` 和 `--option=value`。不支持的选项及重复的单值选项会报错；`--set`、`--unset` 可以重复。
-有值选项后紧跟另一个 flag 时，报告缺少值且不发送请求。以 `-` 开头的值使用 `--option=value` 显式传入；单独的 `-` 仍可作为 stdin 参数。
-指定 `--json` 后，参数解析错误和宿主缺失错误也使用 JSON。普通结果写 stdout，调用错误写 stderr；事件跟随输出 NDJSON。
+| CLI                                                | MCP                           | 用途                                   |
+| -------------------------------------------------- | ----------------------------- | -------------------------------------- |
+| `read FLOW --input JSON`                           | `flow_read`                   | 概要、批量节点详情、代码或 prompt 片段 |
+| `search FLOW --input JSON`                         | `flow_search`                 | 名称、类型、配置和源码搜索             |
+| `schema [edits\|TYPE]`                             | `flow_schema`                 | 编辑语法、类型配置、端口与创建示例     |
+| `schema read\|search\|edit\|check`                 | 各工具的 inputSchema          | 请求结构、约束与示例                   |
+| `schema --flow FLOW --input '{"action":"ACTION"}'` | `flow_schema {flowId,action}` | 当前 Flow 作用域的 Action 端口         |
+| `edit FLOW --file edits.json`                      | `flow_edit`                   | 原子批量编辑                           |
+| `check FLOW --revision REVISION`                   | `flow_check`                  | 固定版本诊断                           |
 
-## 编辑与重试
+`read/search/edit` 支持 `--input` 的 JSON、`@file`、`-`，或 `--file path|-`，两者不能同时提供。MCP 直接传入相同请求并增加 `flowId`。`schema TYPE` 和请求 schema 可离线查询，Action 查询需要部署。`read/search/edit/check --help --json` 直接包含该命令的请求 schema、约束和示例；普通文本帮助包含相同的使用说明和示例。`schema check` 描述公共请求的 `revisionId`，CLI 使用 `--revision` 传递。
 
-完整批量编辑复用公开的 `ChangeOperation`，包含节点、执行边、输入映射、模块、Task、Wait 和 Binding 操作：
+```bash
+oo flow read FLOW_ID --json
+oo flow read --help --json
+oo flow schema read --json
+oo flow search FLOW_ID --input '{"query":"Customer summary","type":"agent"}' --json
+oo flow read FLOW_ID --input '{"revision":"REVISION","nodes":["NODE"]}' --json
+oo flow read FLOW_ID --input '{"revision":"REVISION","text":{"node":"NODE","field":"prompt","start":1,"lines":40}}' --json
+oo flow schema agent --json
+```
+
+读取返回 `{flowId,revision,data,version:1}`。省略 `nodes` 和 `text` 返回概要，两者互斥。概要包含节点引用、名称、类型、端口 handle、压缩输入摘要与执行边，不展开 schema 或长文本。详情聚合实际配置、端口、输入来源和相邻边，不返回内部定义 ID。代码和 prompt 以文本元信息表示，正文通过 `text` 按行读取。默认 80 行，上限 200 行和 24000 字符；读取完整文本时，根据 `nextStart` 继续，直到 `truncated: false`。搜索返回匹配引用、字段、行号、有限上下文和 `nextOffset`。分页读取使用同一 `revision`。
+
+## 编辑合同
 
 ```json
 {
-  "version": 1,
-  "operations": [
+  "baseRevision": "REVISION",
+  "requestId": "stable-request-id",
+  "edits": [
+    { "op": "node.add", "as": "start", "type": "manual", "name": "Start" },
     {
-      "kind": "graph.node.create",
-      "nodeId": "start",
-      "node": { "kind": "manual", "name": "Start" }
-    }
+      "op": "node.add",
+      "as": "format",
+      "type": "code",
+      "name": "Format",
+      "config": { "outputs": { "value": { "schema": { "type": "string" } } } },
+      "inputs": { "value": { "kind": "value", "value": 42 } },
+      "code": "export default ({value}) => ({value: String(value)})"
+    },
+    { "op": "edge.connect", "source": "$start", "target": "$format" }
   ]
 }
 ```
 
-```bash
-oo flow inspect FLOW_ID --json
-oo flow schema graph.node.input.set --json
-oo flow apply FLOW_ID --file changes.json \
-  --expected-revision REVISION_ID --idempotency-key EDIT_KEY --json
-```
+支持 `node.add/update/remove`、`input.set`、`edge.connect/disconnect`、`text.edit/set`。`$alias` 只能引用批次前面创建的节点；响应 `nodes` 将别名映射为稳定引用。批次顺序执行，任何应用错误均不写入部分结果。
 
-`operations` 按顺序原子提交，`before` 必须匹配指定 Revision 在前序操作执行后的值。执行边和数据映射是独立操作；节点 ID 显式指定。
-Server 使用公共 decoder 校验请求结构；操作的图语义和并发条件由底层变更合同验证。
+`node.update.set` 包含名称、说明、图标、执行限制和 `config`。配置递归合并，未提供字段保留，数组整体替换。OpenAPI 的 `config.authentication` 是完整的鉴权选择，提供时整体替换，避免混合上一次选择的方案与参数。`clear` 是字段路径数组，例如 `[["description"],["config","connectionId"]]`。显式清除与 JSON `null` 不同；必填配置不能清除。配置具体字段通过 `schema TYPE` 获取。
 
-### 创建示例与 Provider Trigger
+`node.add.inputs` 按业务字段名提供数据来源，等同于创建后逐项执行 `input.set`。Code、Agent、LLM、Wait 和 Approval 的命名输入可随绑定自动声明，默认接受任意 JSON（包含 null）；需要约束时可提供 `config.inputs`。已有输入约束不会因重新绑定而放宽；Connector、OpenAPI 和 Provider Trigger 的字段由能力定义确定，LLM 的 `model/template/messages` 使用运行时已有约束。
 
-CLI 与 MCP 共用创建示例。先用 `oo flow schema examples --json` 或 MCP `flow_schema {"example":"index"}` 查看索引，按需获取一个完整批次：
+通过此接口创建 Code、Agent 和 LLM 时不注入示例业务数据；输入来自调用方提供的绑定或业务约束。既有节点的输入和默认值保持原样。
 
-```bash
-oo flow schema example.connector --json
-oo flow schema example.poll-notification --json > changes.json
-```
+Code 的 `config.inputs/config.outputs`、Agent/LLM/Wait/Approval 的 `config.inputs`、Webhook 的 `config.body` 和 Value 的 `config.outputs` 使用字段映射，例如 `{"orders":{"schema":{"type":"array"},"nullable":false}}`。每个字段可指定 `schema`（默认 `{}`）、`nullable`（默认 `true`）和 `description`；输入还可指定 `default`。这些是业务数据约束，无需提供 `handle` 或 `jsonSchema` 等内部包装。字段映射遵循局部合并规则，移除字段使用 `clear`，例如 `[["config","inputs","obsolete"]]`。
 
-MCP 对应 `flow_schema {"example":"connector"}` 和 `flow_schema {"example":"poll-notification"}`。返回的 `{version,operations}` 可直接作为 CLI apply 文件；MCP flow_apply 使用其中的 operations，并另传 flowId、expectedRevisionId 和 idempotencyKey。
-示例中的 `ACTION_ID`、`CONNECTION_ID` 必须替换为目标 Flow 作用域内的真实 identity，Connector 输入输出端口必须按 `connector show` / `connector_get` 的定义调整。示例通过结构和图语义检查，不证明外部账号可用。
-
-已有 Connector Action 使用 `graph.node.create`，执行配置直接放在 `node.task`（executor.kind 为 connector）。JavaScript 计算使用 `module.create` 与引用 moduleId 的 Code Task；仅做已有 Action 调用时无需写 JS。`poll-notification` 示例展示 events 数组转换为文本、执行连线及独立输入映射。
-
-`graph.trigger.create` 是 Draft 请求操作，用 key 创建 Provider Trigger：
+Agent 和 LLM 的结果默认是文本，结构化结果使用 `config.resultSchema` 指定 JSON Schema。工具生成运行时输出定义；调用方不声明 `config.outputs`。创建一个读取订单对象的 Agent 只需：
 
 ```json
 {
-  "kind": "graph.trigger.create",
-  "nodeId": "mail",
-  "key": "gmail.on_message_received",
-  "connectionId": "CONNECTION_ID",
-  "config": {},
-  "schedule": [{ "type": "every", "unit": "minute", "value": 5 }]
+  "op": "node.add",
+  "as": "summary",
+  "type": "agent",
+  "name": "Summarize orders",
+  "config": { "model": "MODEL" },
+  "inputs": { "orders": { "kind": "output", "node": "ORDERS_NODE", "port": "orders" } },
+  "prompt": "Summarize {{orders}}."
 }
 ```
 
-它固定作用于根 Flow。connectionId 直接保存在 Trigger 节点，省略时表示尚未选择账号。schedule 仅供 Poll 使用，省略时每五分钟轮询。Integration 不接受 schedule。
-服务端在提交时解析 key，并将完整 definition 固定进 Revision；check 不动态替换定义。同 key、同请求重试先返回原提交结果，不再读取当前目录。一个批次仍只产生一个 Revision。需要显式固定定义时仍可使用原有 graph.node.create。
-CLI `trigger add` 也使用此操作；快速建图形式仍支持原有 Provider 配置。
+输入来源支持：
 
-原有 `{version,nodes,triggers,edges}` 快速建图输入继续用于创建节点和连接；它不能与 `operations` 混用。
-`schema apply` 描述的是完整的 operations 形式。两种形式都是一次事务，重新用新 key 调用会发起新事务，不表示声明式同步。
+- `{kind:"value",value:null}`：显式 null，仍受端口校验。
+- `{kind:"unset"}`：显式未设置，不继承端口默认值。
+- `{kind:"default"}`：删除覆盖，恢复端口默认值继承。
+- `{kind:"output",node:"NODE",port:"value",field:"name"}`：节点输出或其一级属性。
+- `{kind:"variable",name:"TOKEN"}`：按名称绑定部署变量。
+- `{kind:"sources",sources:[...]}`：多个输出或变量来源，执行时使用既有来源解析规则。
 
-创建 Flow、编辑 Draft、创建 Run、Publish 和 Rollback 支持 `--idempotency-key`。未指定时生成 key，并在成功结果或无法确认结果的错误中返回。
-显式 key 的 Draft 编辑、Draft Run 和 Publish 必须同时固定 `--expected-revision`；Publish、Rollback、Live Run 必须固定 `--expected-publication`。
-首次发布没有 Live 时使用 `--expected-publication none`。Live Run 使用该 Publication 的固定 Revision 解析 Trigger。
+节点只有一个输出时可省略 `port`，例如 `{kind:"output",node:"$summary"}`。多个输出时必须选定业务字段；省略会返回候选项供修正。`field` 在选定输出内部读取一级属性，不用于选择节点输出。
 
-重试时保持相同的 key、Flow ID、Revision/Publication、参数和文件内容。便捷创建命令的生成 ID 由 key 固定；重试读取原 Revision，不能改用新的 Draft head。
-需要完全固定 Connector 定义和 Connection 时，使用显式 operations，避免重新解析当前目录中的名称和默认账号。
-服务端仍会拒绝同 key 不同请求、过期 Live 和不满足并发条件的新操作；CLI 不会自动换 key 或自动重放外部副作用。
+### 各节点的业务配置
 
-Draft 编辑结果统一包含 `changed`、`revisionId`；真正提交的变更还包含 `baseRevisionId` 和 `idempotencyKey`。
-Apply 的提交成功与校验结果分开：`changed: true` 表示变更已接受，`valid: false` 表示仍有诊断，`valid: null` 表示后续 check 不可用。
-已接受的 Apply 返回 0，Agent 应在运行前处理 `valid` 或显式调用 `check`。不要因为 check 失败而用新 key 重复创建节点。
+提供数据使用 `inputs` 或 `input.set`；配置字段只描述业务选择和必要的数据约束。读取详情返回同一套业务配置，内部端口定义和能力快照由工具维护。
 
-## Wait 节点
+| 节点               | 配置与数据                                                                                                                  |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------- |
+| Value              | `config.values` 直接提供命名 JSON 值；`config.outputs` 可选，约束对应值。                                                   |
+| Webhook            | `config.body` 描述请求体字段，`config.method/options` 保留请求处理选项。                                                    |
+| Wait / Approval    | `prompt` 设置提示词，`inputs` 绑定待展示或确认的数据；`config.inputs` 可选，补充业务约束。                                  |
+| LLM                | `config.model/template/messages` 设置默认模型、消息模板和历史消息；`inputs` 为这些字段或模板中的命名字段绑定数据来源。      |
+| Condition          | `config.branches` 定义分支，每项包含 `name` 和 `when`；`config.match` 选择首个匹配或全部匹配。                              |
+| Poll / Integration | `config.key/connectionId` 选择 Trigger 和账号，Poll 另外提供 `config.schedule`；参数统一通过 `inputs` 或 `input.set` 设置。 |
+| OpenAPI            | `config.sourceUrl/path/method` 选择操作；可覆盖 `serverUrl` 和 `authentication`。请求字段及凭据输入由规范生成。             |
 
-Wait 节点通过 `apply` 的 `operations` 创建和配置，目前没有 `node add wait` 便捷命令。
-创建使用 `graph.node.create`（`node.kind` 为 `wait`），修改提示和操作使用 `graph.node.wait.set`。
-先读取对应 schema，再按当前 Revision 提交事务：
+例如创建常量和 Webhook 时，只需描述值和请求体字段：
 
-```bash
-oo flow schema graph.node.create --json
-oo flow schema graph.node.wait.set --json
-oo flow apply FLOW_ID --file changes.json --expected-revision REVISION_ID --json
+```json
+[
+  { "op": "node.add", "as": "settings", "type": "value", "name": "Thresholds", "config": { "values": { "minimumTotal": 100, "currency": "USD" } } },
+  {
+    "op": "node.add",
+    "as": "webhook",
+    "type": "webhook",
+    "name": "Order received",
+    "config": { "method": "POST", "body": { "orderId": { "schema": { "type": "string" }, "nullable": false } } }
+  }
+]
 ```
 
-Wait 在等待建立时触发固定的 `pending` 出口，可用 `connect FLOW_ID WAIT_NODE NOTIFY_NODE pending` 连接后续通知节点。
-操作出口为 `continue` 或 `approve/reject`，同样通过 `connect` 的最后一个参数选择。
-执行连线与输入映射独立；传递通知数据时，还需使用 `node input` 或 `graph.node.input.set` 配置输入来源。
-`pending` 不是可决议的操作，不能传给 `runs resolve`。
+Value 的 `values` 与 `outputs` 分别保存取值和约束。只提供约束而不提供值表示该输出尚未设置；移除一个输出时，清除 `config.values.FIELD` 和 `config.outputs.FIELD`，避免把“清除取值”误当成“删除字段”。JSON 对象可以整体传递；通过来源的 `field` 引用其属性时，需要在 `config.outputs.FIELD.schema.properties` 声明该属性的业务结构，工具不会根据一次取值推断永久类型。
 
-查询待处理等待使用 `runs list --flow FLOW_ID --pending-wait --json`；`--pending-wait` 是无参数开关。
-Run 即使仍为 `running`，也可能包含需要决议的 `waits`。决议时必须指定其中的 `waitId`。
+LLM 的 `template` 保留运行时消息模板语义，模板内容可使用 `{{orders}}` 等命名输入。`messages` 是不进行模板插值的历史消息，排在模板消息之前。配置中的值是默认值，节点输入绑定优先；使用 `input.set` 的 `default` 恢复默认值继承，`unset` 则显式不取默认值。修改默认模型或模板不会清除既有绑定。
 
-## Agent 节点
+```json
+{
+  "op": "node.add",
+  "as": "summary",
+  "type": "llm",
+  "name": "Order summary",
+  "config": {
+    "model": { "model": "MODEL" },
+    "template": [{ "role": "user", "content": "Summarize {{orders}}." }]
+  },
+  "inputs": { "orders": { "kind": "output", "node": "ORDERS_NODE", "port": "orders" } }
+}
+```
 
-`oo flow node add <flow> agent <name>` 创建可继续配置的 Agent 草稿。完整配置通过 `graph.node.task.set` 原子更新，`before` 是读取到的完整 Task；模型、任务说明、工具与参数来源属于同一个配置。使用 `oo flow schema graph.node.task.set --json` 查看操作结构。
+Condition 的比较两侧直接使用值、节点输出或变量来源，无需 `kind:"source"` 包装。分支名称用于 `edge.connect.branch`，执行连线仍单独编辑。`when` 可以是单个比较、`{all:[比较,...]}`，或 `{any:[比较,{all:[比较,...]},...]}`。没有分支匹配时使用固定的 `otherwise` 分支：
 
-快速建图形式也接受 `nodes.<id> = { "kind": "agent", "task": <完整 ManagedTaskDefinition> }`，其中 `task.executor.kind` 必须为 `agent`。它保留显式工具定义与账号，不重新解释当前 Connector 目录。精确字段、参数约束与审批语义见 [Agent Task 合同](../control/contracts/control-api.md#11-agent-task)。
+```json
+{
+  "op": "node.add",
+  "as": "threshold",
+  "type": "condition",
+  "name": "Above threshold",
+  "config": {
+    "match": "first",
+    "branches": [
+      {
+        "name": "above",
+        "when": { "left": { "kind": "output", "node": "TOTAL_NODE", "port": "total" }, "operator": ">", "right": { "kind": "value", "value": 100 } }
+      }
+    ]
+  }
+}
+```
 
-`task.executor.code: true` 启用 JavaScript 代码计算，允许 `tools: []`；这类 Agent 无需 Connector 部署。
-代码只处理当前输入和已取得的结果，不修改 Flow 或获得业务工具权限。结果列表的 `source.kind` 区分 `code` 与 `connector`，后者提供 `source.action`。
+Poll 和 Integration 的参数来自目录定义，仅支持固定 `value`、显式 `unset` 或恢复 `default`，不能依赖其他节点的执行输出或变量来源。不再使用单独的 `config.values` 包装；输入名称和默认值可通过 Trigger 目录及节点详情查看。
 
-Agent 审批沿用 Run 的等待查询与决议命令。每次以当前 `waitId` 提交 `approve` 或 `reject`；历史等待的重复决议返回原事实，不会批准下一次工具调用。
+OpenAPI 节点详情提供操作支持的鉴权选项。`authentication:{schemes:["bearer","apiKey"]}` 选择一个完整选项，其中多个方案必须同时满足；不能随意组合不同选项或只选择其中一部分。`{schemes:[]}` 仅在规范允许匿名访问时有效。也可手动选择 `{type:"bearer"}`、`{type:"basic"}` 或 `{type:"apiKey",name:"X-Token",in:"header"}`；手动 bearer 可用于规范声明 OAuth、但调用方已持有访问令牌的情况。凭据通过节点详情列出的输入绑定部署变量，配置中不填写密钥。
 
-## Connector 作用域
+创建时省略鉴权和服务地址，使用操作默认选择。修改同一操作的名称、地址或鉴权时复用已保存的规范快照；切换 `sourceUrl/path/method` 时重新读取规范，并使用新操作的默认鉴权与地址，除非本次同时显式指定。清除 `config.authentication` 或 `config.serverUrl` 会恢复已保存操作的默认选择。手动或规范鉴权的选择整体替换，既有输入绑定仍按输入名称保留。
 
-`connector providers/search/show/connections --flow FLOW_ID` 按该 Flow 的 Team 查询。Connector 添加、修改及 Apply 中的 Action 与 Connection 查询自动使用目标 Flow。
-Provider Trigger 的 Connection 选择也使用目标 Flow。Trigger Key 是部署提供的静态定义目录，不按 Team 改写。
+执行边独立于输入来源。连接使用 `source`、`target` 和可选 `branch`，不会隐式绑定输入；输入修改不会隐式增加执行边。
+
+```json
+{ "op": "text.edit", "node": "NODE", "field": "prompt", "oldText": "Include internal costs.", "newText": "Exclude internal costs." }
+```
+
+精确替换必须恰好匹配一次。零匹配或多匹配返回 `flow.invalid`，其 `details` 包含 `reason:"text.match-count"`、`matches`、`node`、`field` 和 `editIndex`。读取更多上下文后修正请求。`text.set` 替换全部正文。执行配置由各节点独立拥有；修改共享代码模块时，工具按需复制模块，保持节点 ID、连线和其他节点的实际配置不变。
+
+仅支持当前模型的单个 Flow 图。Subflow 已退役，包含旧子图或 Subflow 节点的 Revision 拒绝读取和修复；接口不会忽略这些内容后继续编辑。旧版根图的读取与升级规则见[公共契约与版本演进](../control/contracts/compatibility.md)。
+
+## 保存、校验和重试
+
+编辑返回 `{saved:true,revision,nodes,changes,validation,version:1}`。`validation.status` 为 `valid`、`invalid` 或 `unavailable`。保存成功可包含语义诊断，CLI 返回 0；运行前处理诊断并用固定版本 `check` 复验。诊断提供节点引用、字段路径和可用的代码行列，隐藏存储路径和定义 ID。
+
+`requestId` 是稳定幂等身份。响应丢失时重复相同 Flow、baseRevision、requestId 和完整 edits。服务端先查原请求记录，再检查 Draft 版本与解析目录。同身份不同请求返回 `flow.conflict`；新请求的旧版本返回 `flow.revision-conflict`，不自动合并。冲突后重读相关节点，保留用户修改，使用新的请求身份提交新版本。
+
+Flow 创建、运行、发布和回滚保留原职责及 `--idempotency-key`。Draft Run 与 Publish 固定 `--expected-revision`；Publish、Rollback、Live Run 固定 `--expected-publication`，首次发布使用 `none`。
+
+旧 `apply`、`inspect`、`node`、`code`、`connect/disconnect` 和节点创建/修改便捷命令已由新接口替代；不再通过 CLI/MCP 暴露底层 ChangeOperation。Workbench 所需的低层 Control API 保留。
+
+## 能力发现与账号
+
+`connector providers/search/show/connections --flow FLOW_ID` 按 Flow 的 Team 查询；Action 配置使用发现的 Action ID 和 Connection ID。`trigger search/show` 发现 Provider Trigger；创建时设置 `config.key`，服务端固定定义快照。Agent 配置的工具使用业务名称、Action、账号和参数，内部工具 ID 由服务端装配。
+
+Agent 工具的 `inputs` 按 Action 参数名指定来源：`{kind:"model"}` 交给模型填写，`{kind:"value",value:...}` 固定取值，`{kind:"input",input:"orders"}` 引用 Agent 的命名输入。无需提供参数 schema；新工具或更换 Action 时由目录装配，未指定参数默认由模型填写。同一 Action 的既有工具保留原参数约束和未覆盖来源，修改说明或审批设置不会刷新目录定义；未知参数名返回可选参数列表。
+
+`event-source list` 列出独立事件源及其账号和验证状态。`connector code-access FLOW [--publication ID]`、`connector candidates FLOW PROVIDER...` 保留 Code 连接管理职责。列表支持原有游标分页，详情读取不代表验证通过。
 
 ## 执行、暂停与发布
 
@@ -151,14 +210,14 @@ Run 固定一个 Trigger。图中仅有一个 Manual Trigger 时自动选择，�
 `publish` 等待发布操作完成或超时。超时结果保留 `flowId` 和 `operation.operationId`；用
 `publications operation FLOW_ID OPERATION_ID` 查询，或 `publications wait FLOW_ID OPERATION_ID --timeout 60000` 继续等待。
 
-| 退出码 | 含义                                                                      |
-| ------ | ------------------------------------------------------------------------- |
-| 0      | 操作成功、异步创建已接受，或等待到成功终态。Apply 的有效性另看 valid。    |
-| 1      | 调用错误、校验失败，或等待/结果查询得到 failed、canceled、indeterminate。 |
-| 2      | Run 正在 Wait，需处理返回的 actions。                                     |
-| 3      | 等待超时，或查询的发布操作仍 pending。底层操作继续进行。                  |
+| 退出码 | 含义                                                                       |
+| ------ | -------------------------------------------------------------------------- |
+| 0      | 操作成功、异步创建已接受，或等待到成功终态。Edit 的有效性另看 validation。 |
+| 1      | 调用错误、校验失败，或等待/结果查询得到 failed、canceled、indeterminate。  |
+| 2      | Run 正在 Wait，需处理返回的 actions。                                      |
+| 3      | 等待超时，或查询的发布操作仍 pending。底层操作继续进行。                   |
 
-`node set --timeout` 仍设置节点的执行时限，与上述 CLI 等待预算属于不同命令语境。
+节点执行时限通过 `node.update.set.timeoutMs` 设置。
 
 ### 查看 Agent 工具结果
 
@@ -174,50 +233,8 @@ oo flow runs download-result RUN_ID RESULT_ID > result.json
 页面存在 `nextOffset` 时，用该值替换 `read-result` 的 offset。对于长字符串，offset 按 Unicode code point 计数。
 这些命令读取已有结果，不会重新调用外部工具。
 
-## 精确读取与命令入口
+## 输出与错误
 
-Connector Provider 发现使用 `oo flow connector providers [--flow FLOW_ID]`，原 `connector list` 已移除。Action 搜索使用 `connector search QUERY`，返回不含完整 Schema 的摘要；`connector show ACTION_ID` 返回完整定义。两端搜索摘要包含 authenticated 与当前默认连接摘要。
+普通结果写 stdout，调用错误写 stderr，`--json` 使两者可解析。`check` 失败只在 stdout 返回一次结构化诊断并退出 1；事件跟随使用 NDJSON。`read/search/edit` 直接返回与 MCP、HTTP 一致的业务对象。其他既有命令保留自身包装，例如 `check.check`、`runs show.run`。
 
-`trigger search [QUERY]` 搜索可用 Trigger 定义；省略 query 列出全部摘要。`trigger list FLOW_ID` 列出 Flow 内的触发器实例。`connector set` 只修改连接和输入；节点重命名统一使用 `node set FLOW_ID NODE_ID --name NAME`，不再接受被忽略的 `connector set --name`。
-
-```bash
-oo flow connector teams --json
-oo --team TEAM_NAME flow create "My Flow" --json
-oo flow check FLOW_ID --revision REVISION_ID --json
-oo flow disable FLOW_ID --expected-publication PUBLICATION_ID --json
-oo flow enable FLOW_ID --expected-publication PUBLICATION_ID --json
-oo flow runs results RUN_ID --after RESULT_ID --json
-oo flow runs read-result RUN_ID RESULT_ID --pointer /items --offset 20 --limit 20 --max-bytes 15000 --json
-```
-
-Team 选择由宿主解析为请求身份，并保留创建幂等语义。启停必须指定观察到的 publication ID；发布版本发生变化时返回冲突，不自动修改新版本。指定 `check --revision` 检查该固定版本；省略时检查当前 Draft。
-
-结果列表游标 `--after` 是结果 ID，事件命令的 `--after` 是数字序号。结果读取的 pointer/offset 已改为命名选项，旧位置参数不再接受；`limit` 默认为 20（1–100），`max-bytes` 默认为 15000（1–1048576），offset 默认为 0，pointer 默认为根。下载完整结果仍使用 `runs download-result`。
-
-### 固定版本节点与连接读取
-
-```bash
-oo flow node show FLOW_ID NODE_ID --revision REVISION_ID --json
-oo flow node show FLOW_ID NODE_ID --revision REVISION_ID --json
-oo flow connector code-access FLOW_ID --publication PUBLICATION_ID --json
-oo flow connector candidates FLOW_ID PROVIDER_ID OTHER_PROVIDER_ID --json
-```
-
-`node show` 对应 MCP `flow_node_get`，支持普通节点和 Trigger，引用可以是 ID 或无歧义的完整名称。
-省略 `--revision` 使用当前 Draft。节点或 Revision 不存在时返回错误，不回退到其他节点或当前 Draft。结果顶层为 `flowId`、`revisionId`、`nodeId`、`node`、`task?`、`module?`，
-与 MCP 相同，CLI 另有 `kind: "node.show"`。代码 Task 保留在 `node.task`，不重复返回顶层 task。
-
-`connector code-access` 省略 `--publication` 时读取 Draft 共享 Code 连接；指定时读取不可编辑的发布快照。
-该读取和 `connector candidates` 都不要求 Draft 内容可读。Candidates 接受一个或多个 Provider ID，一次请求返回各 Provider
-的候选项或独立错误，与 MCP `flow_connection_candidates.providerIds` 对应。
-
-### CLI 与 MCP 的结果合同
-
-`trigger search --json` 与 MCP `trigger_search` 都返回 `keys`；原 CLI `definitions` 字段已移除。
-`node show --json` 的详情字段展开到顶层，原 `node.node`、`node.nodeId`、`node.task`（Task 定义）、`node.module` 路径应分别迁移到
-`node`、`nodeId`、`task`、`module`。内联代码 Task 的 `node.task` 仍是节点自身的数据。
-
-CLI 保留 `kind/version` 和命令输出包装，例如 `runs show` 的 `run`、`connector show` 的 `action`、`check` 的 `check`；
-对应 MCP 工具直接返回业务对象。CLI 的等待结果、退出码、stdout/stderr 与 MCP 的 `isError` 也各遵循自身传输合同。
-Flow/Run/事件分页默认 CLI 为 100、MCP 为 50。CLI 的名称解析、自动幂等 key、当前版本默认值及发布等待仍保留；
-自动化重试应显式固定 key 和版本。
+`--help --json` 不访问部署。选项支持 `--option value` 或 `--option=value`；以 `-` 开头的值使用后者，单独的 `-` 表示 stdin。不支持的选项、重复单值选项和缺少值均在请求前拒绝。

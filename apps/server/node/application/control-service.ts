@@ -23,6 +23,7 @@ import type {
   TriggerKeySummary,
   Variable,
 } from '@oomol-lab/open-flow/control-api'
+import type { AuthoringRead, AuthoringSearch, AuthoringRequest, AuthoringType } from '@oomol-lab/open-flow/control-requests'
 import type { DraftOperation } from '@oomol-lab/open-flow/control-requests'
 import type { JsonValue, RevisionContent, TriggerKeySnapshot } from '@oomol-lab/open-flow/flow-change'
 import type { ConnectorAccessHost, ConnectorAccessMutation } from '../deployment/connector-access.ts'
@@ -33,6 +34,7 @@ import type { PublicationAcceptance } from '../storage/publication-store.ts'
 import type { StoredTriggerBinding } from '../storage/trigger-store.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
+import { readAuthoring, searchAuthoring, compileAuthoring, authoringSchema, authoringDiagnostics, AuthoringError } from '@oomol-lab/open-flow/control-requests'
 import { resolveDraftOperations } from '@oomol-lab/open-flow/control-requests'
 import { applyFlowChanges, currentFlowModelVersion, FlowChangeError } from '@oomol-lab/open-flow/flow-change'
 import { canonicalJsonBytes, digestBytes, encodeRevision, repairRevision } from '@oomol-lab/open-flow/flow-encoding'
@@ -41,8 +43,10 @@ import { triggerConfigValues } from '@oomol-lab/open-flow/integration-trigger'
 import { PermanentPollError, PollConnectionError } from '@oomol-lab/open-flow/poll-trigger'
 import { triggerDefinitions as providerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
+import { createHash } from 'node:crypto'
 import { randomUUID } from 'node:crypto'
 import { ConnectorTaskError, ConnectorClient } from '../deployment/connector.ts'
+import { loadOpenApiDocument } from '../deployment/openapi.ts'
 import { AcceptanceError, ControlError, serverErrorCode } from '../error.ts'
 import { RevisionIntegrityError } from '../storage/revision-store.ts'
 import { Store } from '../storage/store.ts'
@@ -688,21 +692,123 @@ export class ControlService {
     operations: readonly DraftOperation[],
     changeId: string = randomUUID(),
   ): Promise<DraftChange> {
+    return this.commitDraft(
+      actorId,
+      flowId,
+      expectedRevisionId,
+      changeId,
+      { expectedRevisionId, operations: operations as unknown as JsonValue },
+      async (base) =>
+        applyFlowChanges(
+          base,
+          resolveDraftOperations(operations, (key) => this.getTriggerKey(key)),
+        ),
+    )
+  }
+
+  readAuthoring(flowId: string, query: AuthoringRead = {}) {
+    const revision = this.getRevision(flowId, query.revision ?? this.getFlow(flowId).draftRevisionId)
+    try {
+      return { flowId, revision: revision.revisionId, data: readAuthoring(revision.content, query), version: 1 as const }
+    } catch (error) {
+      return this.authoringError(error)
+    }
+  }
+
+  searchAuthoring(flowId: string, query: AuthoringSearch) {
+    const revision = this.getRevision(flowId, query.revision ?? this.getFlow(flowId).draftRevisionId)
+    try {
+      return { flowId, revision: revision.revisionId, data: searchAuthoring(revision.content, query), version: 1 as const }
+    } catch (error) {
+      return this.authoringError(error)
+    }
+  }
+
+  async authoringSchema(flowId: string, query: { type?: AuthoringType; action?: string }) {
+    this.getFlow(flowId)
+    if (query.action != null) {
+      const action = await this.getConnectorAction(query.action, flowId)
+      return { action: action.actionId, name: action.name, inputs: action.inputs, outputs: action.outputs, version: 1 as const }
+    }
+    return { ...authoringSchema(query.type), version: 1 as const }
+  }
+
+  async checkAuthoring(flowId: string, revisionId: string) {
+    const check = await this.checkFlow(flowId, revisionId, currentEngineContract)
+    const revision = this.getRevision(flowId, revisionId)
+    return { flowId, revisionId, valid: check.valid, diagnostics: authoringDiagnostics(revision.content, check.diagnostics), version: 1 as const }
+  }
+
+  private authoringError(error: unknown): never {
+    if (error instanceof AuthoringError)
+      throw new ControlError(controlErrorCode.flowInvalid, error.message, { cause: error, details: { ...error.details, reason: error.code } })
+    throw error
+  }
+
+  async editAuthoring(actorId: string, flowId: string, request: AuthoringRequest) {
+    const id = (label: string) =>
+      createHash('sha256')
+        .update(JSON.stringify([flowId, request.requestId, label]))
+        .digest('hex')
+        .slice(0, 24)
+    const result = await this.commitDraft(actorId, flowId, request.baseRevision, request.requestId, request as unknown as JsonValue, async (base) => {
+      try {
+        return (
+          await compileAuthoring(base, request, {
+            id,
+            action: (action) => this.getConnectorAction(action, flowId, undefined, undefined, actorId),
+            trigger: (key) => this.getTriggerKey(key),
+            openapi: (url) => loadOpenApiDocument(url),
+          })
+        ).content
+      } catch (error) {
+        return this.authoringError(error)
+      }
+    })
+    // Diagnostics are separate from the commit receipt, including after retention or a check failure.
+    let validation: { status: string; diagnostics?: ReturnType<typeof authoringDiagnostics> }
+    try {
+      const revision = this.getRevision(flowId, result.revision.revisionId)
+      const checked = await this.checkAuthoring(flowId, revision.revisionId)
+      validation = { status: checked.valid ? 'valid' : 'invalid', diagnostics: checked.diagnostics }
+    } catch {
+      validation = { status: 'unavailable' }
+    }
+    return {
+      flowId,
+      saved: true,
+      revision: result.revision.revisionId,
+      nodes: Object.fromEntries(request.edits.flatMap((edit) => (edit.op == 'node.add' ? [[edit.as, id(`node:${edit.as}`)]] : []))),
+      changes: request.edits.map((edit, index) => ({ index, op: edit.op, ...('node' in edit ? { node: edit.node } : {}) })),
+      validation,
+      version: 1 as const,
+    }
+  }
+
+  private async commitDraft(
+    actorId: string,
+    flowId: string,
+    expectedRevisionId: string,
+    changeId: string,
+    request: JsonValue,
+    resolve: (base: RevisionContent) => Promise<RevisionContent>,
+  ): Promise<DraftChange> {
     this.requireDraft(flowId)
-    const requestDigest = await digestBytes(canonicalJsonBytes({ expectedRevisionId, operations: operations as unknown as JsonValue }))
+    const requestDigest = await digestBytes(canonicalJsonBytes(request))
     const previous = this.store.flows.change(flowId, changeId)
     if (previous != null) {
       if (previous.requestDigest != requestDigest) throw new ControlError(controlErrorCode.flowConflict, 'The change identity refers to another Draft change.')
       return { revision: revisionMetadata(previous), version: 1 }
     }
+    if (this.getFlow(flowId).draftRevisionId != expectedRevisionId)
+      throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed. Read the affected nodes before editing again.', {
+        details: { revision: this.getFlow(flowId).draftRevisionId },
+      })
     const base = readRevisionOrRepair(() => this.store.flows.revision(flowId, expectedRevisionId))
     if (base == null) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
     let content: RevisionContent
     try {
-      content = applyFlowChanges(
-        revisionContent(base),
-        resolveDraftOperations(operations, (key) => this.getTriggerKey(key)),
-      )
+      content = await resolve(revisionContent(base))
     } catch (error) {
       if (error instanceof FlowChangeError) invalidFlow(`The Draft change could not be applied. ${error.message}`)
       if (error instanceof ControlError) throw error

@@ -1,7 +1,7 @@
 # CLI Lab
 
-CLI Lab provides an isolated local deployment for experimenting with the existing `oo flow`
-commands. Edit flows in the terminal and inspect the same data in a live, read-only page.
+CLI Lab provides an isolated local deployment for experimenting with node-oriented `oo flow`
+commands and MCP tools. Edit flows in the terminal and inspect the same data in a live, read-only page.
 Validation, revision commits, execution, code isolation, and change notifications use the
 production implementation. Connectors and models use deterministic mocks, so no real accounts
 or paid model calls are needed.
@@ -13,15 +13,15 @@ Install dependencies and start a session from the repository root:
 ```bash
 bun install
 bun run lab list
-bun run lab start fix-notification
+bun run lab start customer-redaction
 ```
 
 Keep that terminal running. In another terminal, run:
 
 ```bash
 bun run lab open
-bun run lab flow inspect FLOW_ID --json
-bun run lab flow node input FLOW_ID notify text format text --json
+bun run lab flow read FLOW_ID --json
+bun run lab flow edit FLOW_ID --file edits.json --json
 bun run lab diff
 bun run lab verify
 bun run lab report
@@ -55,12 +55,15 @@ Commands select the most recently started manual session by default. When using 
 sessions, specify the session before the Lab command:
 
 ```bash
-bun run lab --session SESSION_ID flow inspect FLOW_ID --json
+bun run lab --session SESSION_ID flow read FLOW_ID --json
 bun run lab --session SESSION_ID report --json
 ```
 
-Run CLI commands sequentially within each session. Initialization, reset, and acceptance
-verification do not interleave with CLI edits. Ctrl+C stops the backend and the read-only page's
+Offline help and local schema commands may run concurrently within a session, including alongside
+one deployment command. Each call retains its own input/output and cost record. Commands that
+access the deployment remain sequential. Reset and acceptance verification require every active
+command to finish, including offline commands, and block new registrations while running.
+Ctrl+C stops the backend and the read-only page's
 development server while preserving the experiment database and reports.
 
 ```bash
@@ -74,7 +77,7 @@ Lab does not read the regular development server's data or configuration. Restar
 after changing backend source. CLI source changes take effect on the next invocation; frontend
 changes update through Vite.
 
-Reports default to readable text; `--json` returns the full structure. Each command record includes
+Comparisons require the same scenario version and fixture/verifier identity. Reports default to readable text; `--json` returns the full structure. Each command record includes
 arguments, input sources, request paths, statuses, and byte counts. Raw stdout/stderr are saved
 separately in files named with the attempt and command IDs. Git HEAD, working-tree status, and a
 diff digest help identify the source version, but the digest cannot reconstruct uncommitted or
@@ -82,24 +85,126 @@ untracked files. Pin source and script versions when strict comparisons are requ
 
 The first successful verification freezes the task result. Later commands are recorded under
 `after` and do not change the completed cost totals. Run `reset` to start another comparison.
+For a continuing scenario, `next` starts the next task on the accepted Flow instead of resetting it.
 A failed manual verification allows further repairs; a script failure ends the attempt.
 
 The read-only page does not modify Revision or Presentation data and does not mark attempts as
 `mixed`. Semantic changes made directly through other clients still mark an attempt as `mixed`,
 excluding it from pure CLI cost comparisons. Presentation differences are reported separately.
 
+## Testing with an Agent
+
+Start a session and copy the complete Agent prompt printed at startup into a fresh Agent
+conversation with terminal access to this repository. The prompt contains the actual task,
+working directory, Session and Flow, so no placeholders need to be filled in. It restricts
+workflow access to the public `lab --session ID flow ...` interface, allows JSON request files,
+and keeps fixtures, reference solutions, the verifier and session storage outside the Agent's
+task. It does not prescribe the solution or tool-call order.
+
+Use a fresh conversation for each trial so previous solutions do not influence discovery.
+Keep the session terminal running. After the Agent finishes, review and independently verify:
+
+```bash
+bun run lab --session SESSION_ID diff
+bun run lab --session SESSION_ID verify
+bun run lab --session SESSION_ID report
+```
+
+Reset before testing another Agent or retrying from the initial state. Record qualitative
+feedback as well as acceptance and costs: failed discovery calls, unclear parameters, and
+unnecessary reads can explain differences between solutions. Coding Agent model usage is billed
+by its provider and is not measured by Lab's byte or HTTP counters.
+
+The manual CLI wrapper records real Agent calls. `lab test --mcp` exercises a reference script
+through MCP; it does not launch an Agent. External MCP clients need compatible protocol support
+and a Lab recording adapter for comparable per-call costs. Direct external edits mark the
+attempt as mixed.
+
+## A continuing fulfillment workflow
+
+`fulfillment-ops` tests how an Agent maintains one useful workflow as requirements evolve. Start
+an empty Flow, give the printed task to an Agent, and keep the same Agent conversation and Lab
+session through all four tasks:
+
+```bash
+bun run lab start fulfillment-ops
+```
+
+| Task                           | Workflow evolution                                                                                              | Independent acceptance                                                                                                                                                                             |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Daily report                   | Discover the batch-query Action and test account; build a manually triggered query and internal report archive. | Batch is supplied at run time; empty and ordinary batches produce the correct order count and paid total.                                                                                          |
+| Overdue notification           | Add a run-time SLA input and notify operations about paid, pending orders at or beyond the SLA.                 | Preserve the complete archive, select the correct orders at two SLA values, and skip notifications when none qualify.                                                                              |
+| Manager and supplier follow-up | Replace JSON notifications with a model-generated manager summary; add a supplier fulfillment request.          | The actual model request contains only the redacted summary and required instruction. The notification forwards the actual model response. Supplier data contains only order ID, SKU and quantity. |
+| Upstream change                | Accept decimal strings and null amounts; change the SLA boundary to strictly greater than.                      | Preserve previous behavior, handle boundary and migrated batches, and reject malformed data before any write or model call.                                                                        |
+
+After each task, independently verify the result and advance:
+
+```bash
+bun run lab --session SESSION_ID verify
+bun run lab --session SESSION_ID report
+bun run lab --session SESSION_ID next
+```
+
+`next` requires successful verification of the current stage and an unchanged Draft head since
+that verification. It prints the next task, preserves the Flow and starts a linked attempt with
+separate costs. Send that task to the same Agent conversation so it must retain context, inspect
+the current workflow and preserve the earlier requirements. Do not reset between stages. After
+the fourth successful verification, the journey is complete; there is no fifth task.
+
+Reports retain the chain of stages and their acceptance results. Each stage is measured against
+its own task and starting Revision; do not compare its isolated cost with a trial that starts
+from an empty Flow. `reset` restores the empty baseline and returns to the first task while
+preserving previous reports. Use a fresh Agent conversation when restarting the whole journey.
+
+This example accepts run parameters on unbound node inputs without default values. A Manual
+trigger has no output parameters. Supply the query's `batch` input and calculation's `slaHours`
+input through the public run command on every run; the Agent can inspect that command's help
+when testing its work. Model outputs remain deterministic mocks, so this exercise verifies data
+routing and transmitted instructions rather than the quality of generated prose.
+
+The reference journey binds the redacted summary object directly to the Agent's named `orders`
+input and uses `{{orders}}` in its prompt. It does not add a code output solely to stringify that
+object or declare the Agent's internal output port. The notification reads the Agent's unique
+result without naming a port. Code data contracts use named field maps, while node creation can
+provide data sources directly through `inputs`. This exercises the same business-level authoring
+contract through both CLI and MCP.
+
+Both reference drivers run the same four stages without resetting the Flow:
+
+```bash
+bun run lab test fulfillment-ops
+bun run lab test fulfillment-ops --mcp
+```
+
+Reference regression results and trials performed by real Agents must be reported separately.
+One successful reference program does not demonstrate that an Agent can discover, build and
+maintain the workflow without that program.
+
 ## Script regression tests without model costs
 
 ```bash
 bun run lab test
-bun run lab test edit-code
-bun run lab test fix-notification --keep-failed
+bun run lab test --mcp
+bun run lab test repair-amount
+bun run lab test customer-redaction --keep-failed
 ```
 
-The four scenarios cover prompt changes, notification input repairs, coordinated code and
-downstream input changes, and creation from an empty flow. Each reference script starts in a
-clean environment, reads state, queries schemas, submits edits, checks the flow, and invokes
-the shared acceptance verifier.
+The default suite includes focused tasks, two sizes of the summary customization task, and a continuing
+fulfillment workflow:
+
+| Scenario                   | Task and independent acceptance                                                                                                                                                                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `order-alert`              | Build from an empty flow. Discover order and notification Actions and test accounts among decoys. Run empty, below, equal and above-threshold orders; verify branch choice, call counts, content and accounts.                                            |
+| `customer-redaction`       | Insert a processing step into the customer notification execution path and bind its data. Verify only order ID and total leave the customer path; the internal archive retains the complete original record and account.                                  |
+| `specialize-summary`       | Two Agent nodes start with identical, independently owned configurations. Change one exact rule only in the customer prompt; verify the internal prompt, other configuration and actual customer/internal model requests.                                 |
+| `specialize-summary-large` | The same task with more real departmental configuration nodes and execution branches. Compare selected reads with the small fixture; unrelated content should not inflate the caller's input.                                                             |
+| `repair-amount`            | Inspect a seeded failed Run, locate source and fix nullable amounts. Check null, zero, ordinary amounts and missing orders. Schemas remain fixed; missing orders must still fail.                                                                         |
+| `concurrent-edit`          | After the first read containing the notification target, a deterministic gate commits an operator note edit. Require a stale write rejection with an unchanged Draft, a successful retry preserving the note, and no duplicate nodes or unnecessary Runs. |
+| `fulfillment-ops`          | Maintain one Flow across four accepted tasks: batch reporting, overdue alerts, manager/supplier follow-up and an upstream data migration. Each stage retains the previous Flow and checks cumulative behavior.                                            |
+
+Both drivers use the same task, fixture and verifier. Reference scripts call only public Agent tools through `driver.ts`; they cannot read fixture data, the database or the service to obtain answers. CLI calls use production argument/file handling; MCP calls use the real HTTP transport. Each scenario declares its entry: existing fixtures name their initial trigger; the blank-flow task requires one newly created Manual trigger. The verifier uses those entries and sample sets, supports independent Runs and expected failures, and inspects actual mock calls. Model outputs are deterministic; model request records establish correct prompt/configuration transmission, not generation quality.
+
+The old four scenario IDs have left the default set. Historical reports retain their original IDs and versions. Compare interfaces on the same new task and verifier; an old interface unable to complete a task has a capability gap. Script regression scores do not measure real Agent success rates.
 
 Tests do not use the current manual session, start a browser, or call real models. Trials with
 real Agents require an explicit user request; Lab does not automatically drive external Agents.
@@ -119,11 +224,11 @@ that an Agent can discover it independently.
 
 Three layers are reported separately and are not added into one total:
 
-| Layer               | Measurements                                                                                |
-| ------------------- | ------------------------------------------------------------------------------------------- |
-| CLI operations      | Count, read/write/execute/validate classification, exit codes, duration, exact replay count |
-| Caller-visible data | Argument text, consumed file/stdin content, stdout, stderr                                  |
-| HTTP                | Request count, method/path, status, request and response bodies                             |
+| Layer               | Measurements                                                                                                          |
+| ------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Tool calls          | CLI/MCP calls, read/write/check categories, failures, repair attempts, revision conflicts, duration and exact replays |
+| Caller-visible data | Argument text, consumed file/stdin content, stdout, stderr                                                            |
+| HTTP                | Round trips, method/path, status, request and response bytes, and transport duration                                  |
 
 All sizes are measured in UTF-8 bytes. Argument text is calculated by joining argv elements with
 a single space. It excludes shell quoting, the Lab invocation prefix, and the shell's own output.
@@ -136,10 +241,9 @@ shown to the caller counts only at the HTTP layer. HTTP sizes measure bodies con
 transport adapter, excluding headers, TLS overhead, and compression overhead. Responses and
 terminal output are counted incrementally as they stream.
 
-Initialization, reset, and Lab acceptance verification are excluded from task costs. Explicit
+Initialization, seeded failure Runs, mock operator edits and Lab acceptance verification are separately recorded under `excluded` and excluded from task costs. The seed failure is a substep of initialization. The concurrency gate reports its own time separately from the caller command and HTTP duration. Explicit
 `check`, `run`, and status polling calls made by task scripts are included. Requests are marked
-as replays only when their method, path, idempotency key, and body match exactly. Lab does not
-infer whether a modified request after an error is a retry. Nonzero exit codes are reported
+as replays only when their method, path, idempotency key, and body match exactly. Repair attempts count edits submitted after a rejected edit; they do not imply the same request identity. Nonzero exit codes are reported
 separately; they include production CLI waiting/timeout states and do not always indicate a
 failed edit.
 
@@ -153,7 +257,10 @@ are neither token estimates nor model billing estimates.
 The development host lives in `apps/server/scripts/lab/`:
 
 - `scenarios.ts` defines stable scenario IDs, versions, tasks, initialization operations,
-  acceptance assertions, and reference edits.
+  sample sets and semantic preservation assertions.
+- `reference.ts` contains caller-visible reference programs. `driver.ts` adapts the same programs to CLI and MCP.
+- `fulfillment.ts` defines the continuing task and batch data; `fulfillmentAcceptance.ts` checks it independently of `fulfillmentReference.ts`, which uses only public tools.
+- `acceptance.ts` independently checks execution results and calls.
 - `mocks.ts` provides mock catalogs, accounts, model protocols, and call records. The CLI uses
   this catalog for capability discovery.
 - `session.ts` manages the real deployment lifecycle, baseline snapshots, verification, and reset.

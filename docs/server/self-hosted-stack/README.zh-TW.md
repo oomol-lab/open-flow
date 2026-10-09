@@ -209,20 +209,21 @@ Flow 可以用 ID 或精確名稱引用。下面的命令會建立一個 Draft�
 ```bash
 oo flow create "GitHub digest"
 oo flow connector search "current user"
-oo flow connector add "GitHub digest" github.get_current_user --name me
+oo flow read "GitHub digest" --json
+oo flow schema connector --json
+oo flow edit "GitHub digest" --file edits.json --json
 oo flow check "GitHub digest"
 oo flow run "GitHub digest" --wait
 oo flow publish "GitHub digest"
 oo flow open "GitHub digest"
 ```
 
-- 省略 `--connection` 時，`connector add` 會綁定該 Action 的預設 Connection。傳入 `--connection <alias>` 可選擇具名 Connection。
+- 在 `edits.json` 中填入 `baseRevision`、`requestId` 與節點、輸入、連線操作，包含手動觸發器，並在 Connector 設定中選擇明確的 Connection ID。請參閱[編輯合同](../../authoring/flow-command.md)。
 - `check` 檢查 Revision 是否合法。帳號是否可用、會不會在 Provider 上真正執行，只有 `run` 才會碰到。
 - `run --wait` 透過 OpenConnector 執行 Draft 並印出結果。`oo flow runs events <run>` 會顯示完整的事件記錄。
 - `open` 會印出該 Flow 的 Workbench URL 並在瀏覽器中開啟。operator token 不會放進 URL，瀏覽器以自己的 session 登入。
 
-為任意命令加上 `--json` 可取得有版本的機器可讀輸出。`oo flow node add`、`oo flow connect`、`oo flow trigger add` 和
-`oo flow apply --file` 分別用於 Code Task、Edge、Trigger，以及從檔案寫入 Flow，請參閱 `oo flow --help`。
+`oo flow read`, `oo flow search`, `oo flow schema`, `oo flow edit --file edits.json`, `oo flow check`: `oo flow --help --json`.
 
 ## 7. 選用：在 oo connector 中重複使用同一套 OpenConnector
 

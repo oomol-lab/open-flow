@@ -1,4 +1,7 @@
+import type { AuthoringRead, AuthoringSearch, AuthoringRequest, AuthoringType } from './authoringSchema.ts'
 import type { ProviderIconAppearance } from './providerIconSprite.ts'
+
+import { authoringReadResponse, authoringSearchResponse, authoringEditResponse, authoringCheckResponse } from './authoringSchema.ts'
 export { providerIconAppearance } from './providerIconSprite.ts'
 export type { ProviderIconAppearance, ProviderIconSprite, ProviderIconSpriteCatalog } from './providerIconSprite.ts'
 export { connectorAccess as decodeConnectorAccess, connectorAccessSnapshot as decodeConnectorAccessSnapshot } from './connectorDecoders.ts'
@@ -1059,6 +1062,34 @@ export class ControlClient {
     }
   }
 
+  async readAuthoring(flowId: string, query: AuthoringRead = {}) {
+    return authoringReadResponse.parse(await this.request(`/v1/flows/${segment(flowId)}/authoring/read`, { method: 'POST', body: JSON.stringify(query) }))
+  }
+
+  async searchAuthoring(flowId: string, query: AuthoringSearch) {
+    return authoringSearchResponse.parse(await this.request(`/v1/flows/${segment(flowId)}/authoring/search`, { method: 'POST', body: JSON.stringify(query) }))
+  }
+
+  async authoringSchema(flowId: string, query: { type?: AuthoringType; action?: string }) {
+    return record(await this.request(`/v1/flows/${segment(flowId)}/authoring/schema`, { method: 'POST', body: JSON.stringify(query) }))
+  }
+
+  async editAuthoring(flowId: string, request: AuthoringRequest) {
+    return authoringEditResponse.parse(
+      await this.request(`/v1/flows/${segment(flowId)}/authoring/edit`, {
+        method: 'POST',
+        headers: { 'idempotency-key': request.requestId },
+        body: JSON.stringify(request),
+      }),
+    )
+  }
+
+  async checkAuthoring(flowId: string, revisionId: string) {
+    return authoringCheckResponse.parse(
+      await this.request(`/v1/flows/${segment(flowId)}/authoring/check`, { method: 'POST', body: JSON.stringify({ revisionId }) }),
+    )
+  }
+
   async changeDraft(
     flowId: string,
     expectedRevisionId: string,
@@ -1292,6 +1323,7 @@ export class ControlClient {
         response.status,
         typeof source?.code == 'string' ? source.code : 'request.failed',
         typeof source?.message == 'string' ? source.message : `Request failed with status ${response.status}.`,
+        source?.details == null ? undefined : record(source.details),
       )
     }
     return response

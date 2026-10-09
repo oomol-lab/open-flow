@@ -3,10 +3,10 @@ import type { CommandHost, Runtime } from './support.ts'
 
 import { ApiError, ControlClient } from '@oomol-lab/open-flow/control-api'
 import { parseArguments } from './arguments.ts'
-import { commandExamples, commandHelp, commandOptions, commandSchema } from './commands.ts'
+import { commandContract, commandHelp, commandOptions, commandSchema, examplesForCommand } from './commands.ts'
 import { flowCommand } from './flowCommands.ts'
 import { createI18n } from './i18n.ts'
-import { CliError, cloudError } from './support.ts'
+import { CliError, cloudError, argumentText, referencedFlow } from './support.ts'
 
 function help(runtime: Runtime, args: readonly string[]) {
   const path = args.filter((argument) => !argument.startsWith('-'))
@@ -17,25 +17,34 @@ function help(runtime: Runtime, args: readonly string[]) {
   }
   const i18n = createI18n(runtime.language)
   try {
+    const contract = entries.length == 1 ? commandContract(entries[0]!.command) : undefined
+    const examples = examplesForCommand(entries.length == 1 ? entries[0]!.command : '')
     const result = {
       kind: 'cli.help',
       version: 1,
       commands: entries.length == 1 ? entries : entries.map(({ command, usage }) => ({ command, usage })),
-      examples: commandExamples,
+      ...(contract == null ? {} : { request: contract.request }),
+      examples,
       exitCodes: {
         0: 'Success or accepted asynchronous operation.',
         1: 'Error or unsuccessful terminal Run.',
         2: 'Run is waiting for an explicit action; inspect run.waits.',
         3: 'Waiting timed out or publication is pending; the operation continues.',
       },
-      notes: [
-        'The oo host selects the team for the whole invocation with --team <name>; Flow commands use that authenticated scope.',
-        '--timeout is a wait budget in milliseconds (default 60000), except node set where it changes the node execution timeout.',
-        '--follow --json writes NDJSON pages immediately; resume from nextAfter.',
-        'Use schema examples to discover complete creation batches, or schema example.connector for a Connector Task.',
-        'Use schema apply for atomic edits. graph.trigger.create resolves a provider key into a fixed definition at commit.',
-        'Retry mutations with the same idempotency key, fixed revision/publication and identical arguments.',
-      ],
+      notes:
+        contract == null
+          ? [
+              'The oo host selects the team for the whole invocation with --team <name>; Flow commands use that authenticated scope.',
+              '--timeout is a wait budget in milliseconds (default 60000).',
+              '--follow --json writes NDJSON pages immediately; resume from nextAfter.',
+              'Use read/search to locate nodes, schema read|search|edit|check for requests, and schema <type> for configuration and ports.',
+              'Use edit with baseRevision, requestId and an ordered edits array. Read selected text before an exact text.edit.',
+              'Retry mutations with the same idempotency key, fixed revision/publication and identical arguments.',
+            ]
+          : [
+              contract.guidance,
+              ...(entries[0]!.command == 'check' ? [] : ['Use either --input (literal JSON, @file, or - for stdin) or --file (path or -), never both.']),
+            ],
     }
     return args.includes('--json')
       ? JSON.stringify(result)
@@ -52,10 +61,28 @@ function help(runtime: Runtime, args: readonly string[]) {
           '',
           ...result.notes,
           '',
-          ...commandExamples,
+          ...examples,
         ].join('\n')
   } finally {
     i18n.dispose()
+  }
+}
+
+function isHelp(args: readonly string[]) {
+  return args.length == 0 || args.includes('--help') || args.includes('-h')
+}
+
+function isLocalSchema(parsed: ParsedArguments) {
+  return parsed.positionals[0] == 'schema' && parsed.flow == null
+}
+
+/** Whether this invocation can finish without ever contacting the deployment. */
+export function isOfflineCommand(args: readonly string[]): boolean {
+  if (isHelp(args)) return true
+  try {
+    return isLocalSchema(parseArguments(args))
+  } catch {
+    return false
   }
 }
 
@@ -63,7 +90,7 @@ export async function runCli(args: readonly string[], host: CommandHost, runtime
   let parsed: ParsedArguments | undefined
   let mutation: { path: string; idempotencyKey: string; request?: unknown } | undefined
   try {
-    if (args.length == 0 || args.includes('--help') || args.includes('-h')) {
+    if (isHelp(args)) {
       runtime.stdout.write(`${help(runtime, args)}\n`)
       return 0
     }
@@ -89,10 +116,11 @@ export async function runCli(args: readonly string[], host: CommandHost, runtime
       ((parsed.source == 'live' && parsed.expectedRevision != null) || (parsed.source == 'draft' && parsed.expectedPublication != null))
     )
       throw new CliError('cli.invalid-arguments', 'Use --expected-revision for draft runs and --expected-publication for live runs.')
-    if (parsed.positionals[0] == 'schema') {
-      if (parsed.positionals.length > 2) throw new CliError('cli.invalid-arguments', 'Usage: oo flow schema [apply|operations|input|payload]')
+    if (isLocalSchema(parsed)) {
+      if (parsed.positionals.length > 2)
+        throw new CliError('cli.invalid-arguments', 'Usage: oo flow schema [read|search|edit|check|edits|node-type|input|outputs]')
       const schema = commandSchema(parsed.positionals[1])
-      if (schema == null) throw new CliError('cli.invalid-arguments', 'Unknown schema.')
+      if (schema == null) throw new CliError('cli.invalid-arguments', 'Unknown schema. Use read, search, edit, check, or a node type such as agent or code.')
       runtime.stdout.write(`${JSON.stringify(schema)}\n`)
       return 0
     }
@@ -102,6 +130,13 @@ export async function runCli(args: readonly string[], host: CommandHost, runtime
         key == null ? undefined : { path, idempotencyKey: key, ...(typeof init?.body == 'string' ? { request: JSON.parse(init.body) as unknown } : {}) }
       return await host.request(path, init)
     })
+    if (parsed.positionals[0] == 'schema' && parsed.flow != null) {
+      const query =
+        parsed.input == null ? { type: parsed.positionals[1] } : JSON.parse(await argumentText(parsed.input, 'input', 'flow.authoring-unreadable', runtime))
+      const flow = await referencedFlow(client, parsed.flow)
+      runtime.stdout.write(`${JSON.stringify(await client.authoringSchema(flow.flowId, query))}\n`)
+      return 0
+    }
     return (await flowCommand(client, host, parsed, runtime)) ?? 0
   } catch (error) {
     let value: CliError

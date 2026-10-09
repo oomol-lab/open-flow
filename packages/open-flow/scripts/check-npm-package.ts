@@ -155,6 +155,7 @@ assert.deepEqual(Object.keys(packedManifest).toSorted(), [
 ])
 assert.deepEqual(packedManifest.peerDependencies, {
   'effect': '4.0.0-rc.112',
+  'zod': '^4.6.5',
   'react': '^18.3.1 || ^19.0.0',
   'react-dom': '^18.3.1 || ^19.0.0',
 })
@@ -433,7 +434,7 @@ async function verifyConsumer(): Promise<void> {
         'void decodeRevision',
         'void decodeRevisionContent',
         'void verifyWorkbenchHost',
-        "const argumentsResult = mcpTools.flow_get.inputSchema['~standard'].validate({flowId: 'test'})",
+        "const argumentsResult = mcpTools.flow_read.inputSchema['~standard'].validate({flowId: 'test'})",
         "if ('value' in argumentsResult) { const flowId: string = argumentsResult.value.flowId; void flowId }",
         "const create = controlRequests.createFlow({ name: 'Test', version: 1 }); const name: string = create.name; void name",
         'void prepareFlow',

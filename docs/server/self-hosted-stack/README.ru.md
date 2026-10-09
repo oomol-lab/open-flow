@@ -234,15 +234,16 @@ Flow можно указывать по ID или точному имени. К�
 ```bash
 oo flow create "GitHub digest"
 oo flow connector search "current user"
-oo flow connector add "GitHub digest" github.get_current_user --name me
+oo flow read "GitHub digest" --json
+oo flow schema connector --json
+oo flow edit "GitHub digest" --file edits.json --json
 oo flow check "GitHub digest"
 oo flow run "GitHub digest" --wait
 oo flow publish "GitHub digest"
 oo flow open "GitHub digest"
 ```
 
-- Если `--connection` не указан, `connector add` привязывает Connection по умолчанию для этого
-  Action. Передайте `--connection <alias>`, чтобы выбрать именованный Connection.
+- Подготовьте `edits.json` с `baseRevision`, `requestId` и изменениями узлов, входов и связей, включая Manual Trigger. Укажите Connection ID в настройках Connector. См. [контракт редактирования](../../authoring/flow-command.md).
 - `check` проверяет, корректен ли Revision. Работают ли учётные данные и выполняется ли Action у
   провайдера, проверяет только `run`.
 - `run --wait` выполняет Draft через OpenConnector и печатает результат.
@@ -250,9 +251,7 @@ oo flow open "GitHub digest"
 - `open` печатает URL Workbench для этого Flow и открывает его в браузере. Operator token в URL не
   попадает. Браузер входит со своей сессией.
 
-Добавьте `--json` к любой команде, чтобы получить машиночитаемый вывод с версией. `oo flow node add`,
-`oo flow connect`, `oo flow trigger add` и `oo flow apply --file` нужны для Code Task, Edge, Trigger
-и записи Flow из файла. См. `oo flow --help`.
+`oo flow read`, `oo flow search`, `oo flow schema`, `oo flow edit --file edits.json`, `oo flow check`: `oo flow --help --json`.
 
 ## 7. Необязательно: тот же OpenConnector из oo connector
 

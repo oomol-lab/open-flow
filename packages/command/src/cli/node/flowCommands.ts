@@ -2,27 +2,34 @@ import type { ParsedArguments } from './arguments.ts'
 import type { CommandHost, Runtime } from './support.ts'
 
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
-import { applyFlowCommand, codeCommand, edgeCommand, inspectFlowCommand, nodeCommand } from './authoringCommands.ts'
+import { controlRequests } from '@oomol-lab/open-flow/control-requests'
 import { connectorCommand, triggerCommand } from './connectorCommands.ts'
 import { createRunCommand, publicationsCommand, publishCommand, rollbackCommand, runsCommand } from './runCommands.ts'
-import { checkedResourceName, CliError, flowText, referencedFlow, requireCount, write } from './support.ts'
+import { argumentText, checkedResourceName, CliError, flowText, referencedFlow, requireCount, write } from './support.ts'
 
 export async function flowCommand(client: ControlClient, host: CommandHost, args: ParsedArguments, runtime: Runtime): Promise<number | void> {
   const [operation, ...operands] = args.positionals
 
   switch (operation) {
-    case 'apply': {
-      const flow = await operandFlow(client, operands)
-      return await applyFlowCommand(client, flow, operands, args, runtime)
-    }
-    case 'code': {
-      const flowReference = operands[1]
-      if (flowReference == null) throw new CliError('cli.invalid-arguments', 'Usage: oo flow code <operation> <flow> [module]')
-      const flow = await referencedFlow(client, flowReference)
-      return await codeCommand(client, flow, [operands[0]!, ...operands.slice(2)], args, runtime)
+    case 'read':
+    case 'search':
+    case 'edit': {
+      requireCount(operands, 1, `oo flow ${operation} <flow> [--input JSON|@file|-] [--file path|-] --json`)
+      const flow = await referencedFlow(client, operands[0]!)
+      if (args.file != null && args.input != null) throw new CliError('cli.invalid-arguments', 'Choose --input or --file.')
+      const source = args.file == null ? args.input : args.file == '-' ? '-' : `@${args.file}`
+      const payload: unknown = source == null ? {} : JSON.parse(await argumentText(source, 'input', 'flow.authoring-unreadable', runtime))
+      const result =
+        operation == 'read'
+          ? await client.readAuthoring(flow.flowId, controlRequests.authoringRead(payload))
+          : operation == 'search'
+            ? await client.searchAuthoring(flow.flowId, controlRequests.authoringSearch(payload))
+            : await client.editAuthoring(flow.flowId, controlRequests.authoringEdit(payload))
+      runtime.stdout.write(`${JSON.stringify(result)}\n`)
+      return
     }
     case 'connector': {
-      const mutation = ['add', 'set', 'remove', 'code-access', 'candidates', 'code-allow', 'code-remove', 'remove-usage'].includes(operands[0] ?? '')
+      const mutation = ['code-access', 'candidates', 'code-allow', 'code-remove', 'remove-usage'].includes(operands[0] ?? '')
       const flow = mutation ? await operandFlow(client, operands.slice(1)) : args.flow == null ? undefined : await referencedFlow(client, args.flow)
       return await connectorCommand(client, flow, operands, args, runtime)
     }
@@ -51,19 +58,6 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
       )
       return
     }
-    case 'connect':
-    case 'disconnect': {
-      const flow = await operandFlow(client, operands)
-      return await edgeCommand(client, flow, operation, operands, args, runtime)
-    }
-    case 'node': {
-      const flow = await operandFlow(client, operands.slice(1))
-      return await nodeCommand(client, flow, operands, args, runtime)
-    }
-    case 'inspect': {
-      const flow = await operandFlow(client, operands)
-      return await inspectFlowCommand(client, flow, operands, args, runtime)
-    }
     case 'run':
       return await createRunCommand(client, operands, args, runtime)
     case 'runs':
@@ -75,9 +69,7 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
     case 'rollback':
       return await rollbackCommand(client, operands, args, runtime)
     case 'trigger': {
-      const operationUsesFlow = operands[0] == 'list' || operands[0] == 'add' || operands[0] == 'set' || operands[0] == 'remove'
-      const flow = operationUsesFlow ? await operandFlow(client, operands.slice(1)) : undefined
-      return await triggerCommand(client, flow, operands, args, runtime)
+      return await triggerCommand(client, operands, args, runtime)
     }
     case 'open':
     case 'workbench': {
@@ -136,7 +128,7 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
       requireCount(operands, 1, 'oo flow check <flow> [--revision <revisionId>] [--json]')
       const flow = await referencedFlow(client, operands[0]!)
       const revisionId = args.revision ?? flow.draftRevisionId
-      const check = await client.checkFlow(flow.flowId, revisionId)
+      const check = await client.checkAuthoring(flow.flowId, revisionId)
       write(
         runtime,
         args.json,
@@ -148,7 +140,7 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
     default:
       throw new CliError(
         'cli.invalid-arguments',
-        'Usage: oo flow <list|create|show|inspect|apply|rename|delete|check|enable|disable|node|connect|disconnect|code|connector|event-source|trigger|run|runs|publish|publications|rollback|workbench>',
+        'Usage: oo flow <list|create|show|read|search|edit|schema|rename|delete|check|enable|disable|connector|event-source|trigger|run|runs|publish|publications|rollback|workbench>',
       )
   }
 }

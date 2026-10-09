@@ -153,9 +153,10 @@ describe('Source object fields', () => {
       },
     ])
     expect(controlRequests.changeDraft({ version: 1, expectedRevisionId: 'draft', operations }).operations).toEqual(operations)
-    expect(
-      mcpTools.flow_apply.inputSchema['~standard'].validate({ flowId: 'flow', expectedRevisionId: 'draft', idempotencyKey: 'change', operations }),
-    ).toMatchObject({ value: { operations } })
+    const edits = [{ op: 'input.set', node: 'sink', input: 'value', source: { kind: 'output', node: 'data', port: 'result', field: 'name' } }]
+    expect(mcpTools.flow_edit.inputSchema['~standard'].validate({ flowId: 'flow', baseRevision: 'revision', requestId: 'edit', edits })).toMatchObject({
+      value: { edits },
+    })
     const changed = applyFlowChanges(original, operations)
     expect(decodeRevision(encodeRevision(changed)).document.graph.nodes).toEqual(changed.document.graph.nodes)
     expect(encodeRevision(decodeRevision(encodeRevision(changed)))).toEqual(encodeRevision(changed))

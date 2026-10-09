@@ -1,30 +1,21 @@
-import { authoringExample, authoringExamples, draftOperationsSchema } from '@oomol-lab/open-flow/control-requests'
+import type { AuthoringType } from '@oomol-lab/open-flow/control-requests'
+
+import { authoringRequestContract, authoringSchema, authoringTypes } from '@oomol-lab/open-flow/control-requests'
 
 const edit = ['expected-revision', 'idempotency-key']
 const page = ['cursor', 'limit']
 const commands = [
+  ['read', '<flow> [--input JSON|@file|- | --file path|-]', ['input', 'file']],
+  ['search', '<flow> (--input JSON|@file|- | --file path|-)', ['input', 'file']],
+  ['edit', '<flow> (--input JSON|@file|- | --file path|-)', ['input', 'file']],
   ['list', '[--cursor <cursor>] [--limit <count>]', page],
   ['create', '<name>', ['idempotency-key']],
   ['show', '<flow>', []],
-  ['inspect', '<flow> [--full]', ['full']],
-  ['apply', '<flow> --file <path|->', [...edit, 'file']],
   ['rename', '<flow> <new-name>', []],
   ['delete', '<flow> --yes', ['yes']],
   ['check', '<flow> [--revision <revisionId>]', ['revision']],
   ['enable', '<flow> --expected-publication <publicationId>', ['expected-publication']],
   ['disable', '<flow> --expected-publication <publicationId>', ['expected-publication']],
-  ['node list', '<flow>', []],
-  ['node show', '<flow> <node> [--revision <revisionId>]', ['revision']],
-  ['node add', '<flow> <agent|code|condition|value|llm-chat|llm-json> <name>', [...edit, 'code']],
-  ['node set', '<flow> <node>', [...edit, 'name', 'timeout']],
-  ['node input', '<flow> <node> <input> <source> <output> [<source> <output> ...]', edit],
-  ['node remove', '<flow> <node> --yes', [...edit, 'yes']],
-  ['connect', '<flow> <source> <target-node> [branch]', edit],
-  ['disconnect', '<flow> <source> <target-node> [branch]', edit],
-  ['code list', '<flow>', []],
-  ['code show', '<flow> <module>', []],
-  ['code edit', '<flow> <module> --code <javascript|@file|->', [...edit, 'code']],
-  ['code set', '<flow> <module> --name <name>', [...edit, 'name']],
   ['connector code-access', '<flow> [--publication <publicationId>]', ['publication']],
   ['connector candidates', '<flow> <provider> [provider ...]', []],
   ['connector code-allow', '<flow> <provider> <binding> <access-revision>', []],
@@ -36,14 +27,8 @@ const commands = [
   ['connector show', '<action> [--flow <flow>]', ['flow']],
   ['connector connections', '<service> [--flow <flow>]', ['flow']],
   ['event-source list', '', []],
-  ['connector add', '<flow> <action>', [...edit, 'name', 'connection', 'set']],
-  ['connector set', '<flow> <node>', [...edit, 'connection', 'set', 'unset']],
   ['trigger search', '[query]', []],
   ['trigger show', '<key>', []],
-  ['trigger list', '<flow>', []],
-  ['trigger add', '<flow> <manual|webhook|cron|provider-key>', [...edit, 'name', 'connection', 'cron', 'every', 'timezone', 'set']],
-  ['trigger set', '<flow> <trigger>', [...edit, 'name', 'description', 'connection', 'cron', 'every', 'timezone', 'set', 'unset']],
-  ['trigger remove', '<flow> <trigger> --yes', [...edit, 'yes']],
   ['run', '<flow>', [...edit, 'expected-publication', 'source', 'trigger', 'outputs', 'input', 'wait', 'timeout']],
   ['runs list', '--flow <flow>', ['flow', 'status', 'pending-wait', ...page]],
   ['runs show', '<run>', []],
@@ -63,7 +48,7 @@ const commands = [
   ['rollback', '<flow> <publication>', ['expected-publication', 'idempotency-key']],
   ['open', '[flow]', []],
   ['workbench', '[flow]', []],
-  ['schema', '[operations|apply|input|outputs|examples|example.name|operation-kind]', []],
+  ['schema', '[read|search|edit|check|node-type]', ['flow', 'input']],
 ] as const
 
 const optionDetails: Record<
@@ -76,7 +61,7 @@ const optionDetails: Record<
   'offset': { description: 'Page offset at the selected pointer.', type: 'integer', minimum: 0, default: 0 },
   'max-bytes': { description: 'Maximum result page bytes.', type: 'integer', minimum: 1, maximum: 1048576, default: 15000 },
   'expected-revision': {
-    description: 'Base Revision ID from inspect. Required with an explicit idempotency key for draft edits and draft runs.',
+    description: 'Base Revision ID from read. Required with an explicit idempotency key for draft edits and draft runs.',
     type: 'string',
   },
   'expected-publication': { description: 'Fixed Publication ID. Use none when publishing without a Live Publication.', type: 'string' },
@@ -99,9 +84,9 @@ const optionDetails: Record<
     type: 'string',
     enum: ['queued', 'starting', 'running', 'waiting', 'completed', 'failed', 'canceled', 'indeterminate'],
   },
-  'file': { description: 'Apply JSON file path, @path, or - for stdin. See schema apply for complete atomic edits.', type: 'string' },
+  'file': { description: 'Authoring request JSON file path or - for stdin.', type: 'string' },
   'code': { description: 'JavaScript source, @file, or - for stdin.', type: 'string' },
-  'input': { description: 'JSON object keyed by node ID then input handle; literal JSON, @file, or -.', type: 'string' },
+  'input': { description: 'Authoring request JSON; literal JSON, @file, or -. For run, node ID to input values.', type: 'string' },
   'outputs': { description: 'Trigger outputs: literal JSON, @file, or -. Defaults to {}.', type: 'string' },
   'set': { description: 'handle=value; repeat for multiple fields. Values use port schemas, JSON, @file, or -.', type: 'string' },
   'unset': { description: 'Input/config handle to remove; repeat for multiple fields.', type: 'string' },
@@ -135,7 +120,6 @@ export function commandHelp(path: readonly string[]) {
             repeatable: flag == 'set' || flag == 'unset',
           },
           optionDetails[flag],
-          key == 'node set' && flag == 'timeout' ? { default: undefined } : {},
           key == 'runs results' && flag == 'after'
             ? { type: 'string', minimum: undefined, default: undefined, description: 'Result ID from nextAfter on the preceding page.' }
             : {},
@@ -149,16 +133,11 @@ export function commandOptions(positionals: readonly string[]): readonly string[
   return commands.find(([key]) => key == positionals.slice(0, key.split(' ').length).join(' '))?.[2]
 }
 
-export function commandSchema(name = 'apply') {
-  if (name == 'examples') return { examples: authoringExamples }
-  if (name.startsWith('example.')) {
-    try {
-      return authoringExample(name.slice('example.'.length))
-    } catch {
-      return undefined
-    }
-  }
-  if (name == 'operations') return draftOperationsSchema()
+export function commandSchema(name = 'edits') {
+  const contract = authoringRequestContract(name)
+  if (contract != null) return contract
+  if (name == 'edits') return authoringSchema()
+  if (authoringTypes.includes(name as AuthoringType)) return authoringSchema(name as AuthoringType)
   if (name == 'outputs')
     return {
       $schema: 'https://json-schema.org/draft/2020-12/schema',
@@ -172,32 +151,27 @@ export function commandSchema(name = 'apply') {
       additionalProperties: { type: 'object', additionalProperties: true },
       description: 'Node ID -> input handle -> JSON value.',
     }
-  if (name != 'apply') {
-    try {
-      return draftOperationsSchema(name)
-    } catch {
-      return undefined
-    }
-  }
-  const { $defs, $schema: _, ...operations } = draftOperationsSchema() as Record<string, unknown>
-  return {
-    $defs,
-    $schema: 'https://json-schema.org/draft/2020-12/schema',
-    type: 'object',
-    additionalProperties: false,
-    required: ['version', 'operations'],
-    properties: { version: { const: 1 }, operations },
-    description:
-      'An atomic ordered ChangeOperation transaction. IDs are explicit; before values refer to the specified base revision. Reapplying with a new key is a new transaction.',
-    examples: [{ version: 1, operations: [{ kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } }] }],
-  }
+  return undefined
+}
+
+export function commandContract(name: string) {
+  return authoringRequestContract(name)
+}
+
+export function examplesForCommand(name: string) {
+  if (name == 'schema')
+    return ['oo flow schema read --json', 'oo flow schema agent --json', `oo flow schema --flow FLOW_ID --input '{"action":"ACTION_ID"}' --json`]
+  const contract = commandContract(name)
+  if (contract == null) return commandExamples
+  if (name == 'check') return ['oo flow check FLOW_ID --revision REVISION --json']
+  return contract.examples.map((example) => `oo flow ${name} FLOW_ID${Object.keys(example).length == 0 ? '' : ` --input '${JSON.stringify(example)}'`} --json`)
 }
 
 export const commandExamples = [
   'oo flow list --limit 20 --json',
-  'oo flow inspect FLOW_ID --json',
-  'oo flow schema apply --json',
-  'oo flow apply FLOW_ID --file changes.json --expected-revision REVISION_ID --idempotency-key EDIT_KEY --json',
+  'oo flow read FLOW_ID --json',
+  'oo flow schema code --json',
+  'oo flow edit FLOW_ID --file edits.json --json',
   'oo flow connector search email --flow FLOW_ID --json',
   'oo flow run FLOW_ID --expected-revision REVISION_ID --idempotency-key RUN_KEY --wait --timeout 60000 --json',
   'oo flow runs wait RUN_ID --timeout 60000 --json',

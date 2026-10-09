@@ -1,3 +1,5 @@
+import { authoringRequestSchema, authoringReadSchema, authoringSearchSchema, authoringSchemaQuery, authoringCheckSchema } from './authoringSchema.ts'
+export * from './authoring.ts'
 import type { JsonValue } from '../../flow/common/change.ts'
 import type { DraftOperation } from './draftOperations.ts'
 
@@ -17,6 +19,11 @@ const flowName = id.refine((value) => value == value.trim() && resourceNameIssue
 const inputs = z.record(z.string(), z.record(z.string(), json))
 const trigger = z.strictObject({ nodeId: id, outputs: z.record(z.string(), json) })
 const schemas = {
+  authoringCheck: authoringCheckSchema,
+  authoringEdit: authoringRequestSchema,
+  authoringRead: authoringReadSchema,
+  authoringSearch: authoringSearchSchema,
+  authoringSchema: authoringSchemaQuery,
   loadOpenApiDocument: z.strictObject({ url: z.string().min(1).max(8192), version }),
   createEventSource: createEventSourceSchema,
   updateEventSource: updateEventSourceSchema,
@@ -55,6 +62,11 @@ function decoder<Value>(schema: z.ZodType<Value>): (value: unknown) => Value {
 }
 
 export const controlRequests = {
+  authoringCheck: decoder(schemas.authoringCheck),
+  authoringEdit: decoder(schemas.authoringEdit),
+  authoringRead: decoder(schemas.authoringRead),
+  authoringSearch: decoder(schemas.authoringSearch),
+  authoringSchema: decoder(schemas.authoringSchema),
   loadOpenApiDocument: decoder(schemas.loadOpenApiDocument),
   createEventSource: decoder(schemas.createEventSource),
   updateEventSource: decoder(schemas.updateEventSource),
@@ -84,7 +96,7 @@ export const controlRequests = {
 }
 
 export function controlRequestSchema(name: keyof typeof controlRequests): JsonValue {
-  const schema = z.toJSONSchema(schemas[name])
+  const schema = z.toJSONSchema(schemas[name], { io: 'input' })
   if (name == 'changeDraft') return { ...schema, properties: { ...schema.properties, operations: draftOperationsSchema() } } as unknown as JsonValue
   return schema as JsonValue
 }

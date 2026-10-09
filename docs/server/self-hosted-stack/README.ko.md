@@ -228,15 +228,16 @@ Node를 추가한 뒤 검사, 실행, 게시합니다.
 ```bash
 oo flow create "GitHub digest"
 oo flow connector search "current user"
-oo flow connector add "GitHub digest" github.get_current_user --name me
+oo flow read "GitHub digest" --json
+oo flow schema connector --json
+oo flow edit "GitHub digest" --file edits.json --json
 oo flow check "GitHub digest"
 oo flow run "GitHub digest" --wait
 oo flow publish "GitHub digest"
 oo flow open "GitHub digest"
 ```
 
-- `--connection`을 생략하면 `connector add`는 해당 Action의 기본 Connection을 묶습니다. 이름이 있는 Connection을
-  고르려면 `--connection <alias>`를 넘기세요.
+- `edits.json`에 `baseRevision`, `requestId`, 노드·입력·연결 편집과 Manual Trigger를 작성하세요. Connector 설정에 Connection ID를 명시하세요. [편집 계약](../../authoring/flow-command.md)을 참고하세요.
 - `check`는 Revision이 올바른지 검사합니다. 자격 증명이 동작하는지, Provider에서 실제로 실행되는지는 `run`만
   확인합니다.
 - `run --wait`는 OpenConnector를 통해 Draft를 실행하고 결과를 출력합니다. `oo flow runs events <run>`은 전체
@@ -244,9 +245,7 @@ oo flow open "GitHub digest"
 - `open`은 해당 Flow의 Workbench URL을 출력하고 브라우저에서 엽니다. operator token은 URL에 넣지 않으며, 브라우저는
   자신의 session으로 로그인합니다.
 
-어떤 명령이든 `--json`을 붙이면 버전이 있는 기계 판독 출력을 얻습니다. `oo flow node add`, `oo flow connect`,
-`oo flow trigger add`, `oo flow apply --file`은 Code Task, Edge, Trigger, 파일에서 Flow 쓰기에 사용합니다.
-`oo flow --help`를 참고하세요.
+`oo flow read`, `oo flow search`, `oo flow schema`, `oo flow edit --file edits.json`, `oo flow check`: `oo flow --help --json`.
 
 ## 7. 선택: oo connector에서 같은 OpenConnector 사용하기
 

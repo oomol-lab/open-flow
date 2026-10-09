@@ -56,10 +56,31 @@ caching simpler than the repeated work it removes.
 
 ## Project invariants
 
-Before implementing or reviewing frontend appearance, layout, components, or interactions, read and
-use the [frontend-ui skill](.agents/skills/frontend-ui/SKILL.md).
+### Node authoring
+
+When adding or changing a node type, read [Node authoring](docs/authoring/node-authoring.md) and include
+its public authoring contract in the change. Separate business configuration, input data sources, and
+internal definitions. Callers supply business intent and data; Open Flow assembles fixed ports,
+node-owned execution configuration, Module identities, bindings, imports, and capability-derived definitions. Custom business data
+contracts remain explicit where they cannot be derived reliably.
+
+Own the conversion in `packages/open-flow`. Keep read views, edit compilation, schema/examples,
+search, and diagnostics consistent, with CLI and MCP using the same deployment service. Do not fix
+an incomplete node contract through client-specific defaults or instructions that require callers to
+reconstruct internal definitions. Source choices must reflect runtime capabilities; a trigger cannot
+depend on outputs that do not exist before its Run starts.
+
+Verify a new node through public creation, read, local update, validation, and execution where
+supported. Preserve unrelated node configuration, shared CodeModules, and default/null/unset semantics.
+Follow the current model's explicit rejection of retired Subflow data; do not restore a read-only
+Subflow editing path. Examples must compile through the public interface. Use the affected
+CLI/MCP Lab scenarios to verify task completion; deterministic model responses can verify request
+configuration and forwarding, but cannot establish generation quality.
 
 ### Frontend style boundaries
+
+Before implementing or reviewing frontend appearance, layout, components, or interactions, read and
+use the [frontend-ui skill](.agents/skills/frontend-ui/SKILL.md).
 
 - **Host shell and chrome:** Keep host selectors inside host-owned UI. Customize Open Flow through
   public `--open-flow-*` tokens. Do not target packaged product roots or force them to inherit host
