@@ -79,9 +79,9 @@ export class LabSession {
     this.modelOrigin = origin(this.modelServer)
     labOrigins.add(this.modelOrigin)
     await this.openService()
-    const flow = (await this.service.control.createFlow('lab', `Lab ${this.scenarioId}`, 'lab-initial')).flow
+    const flow = (await this.service.control.createFlow('operator', `Lab ${this.scenarioId}`, 'lab-initial')).flow
     const operations = initialOperations(this.scenarioId)
-    if (operations.length > 0) await this.service.control.changeDraft('lab', flow.flowId, flow.draftRevisionId, operations, 'lab-seed')
+    if (operations.length > 0) await this.service.control.changeDraft('operator', flow.flowId, flow.draftRevisionId, operations, 'lab-seed')
     const content = this.current(flow.flowId).content
     const positions = {
       start: { x: 40, y: 160 },

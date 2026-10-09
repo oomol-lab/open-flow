@@ -143,13 +143,13 @@ describe('CLI Lab', () => {
     const lab = await fixture()
     const base = lab.current()
     const changes = referenceChanges(lab.scenarioId, base.content)
-    const first = await lab.service.control.changeDraft('lab', lab.manifest.flowId, base.revisionId, changes, 'same')
-    expect(await lab.service.control.changeDraft('lab', lab.manifest.flowId, base.revisionId, changes, 'same')).toEqual(first)
-    await expect(lab.service.control.changeDraft('lab', lab.manifest.flowId, base.revisionId, changes, 'new')).rejects.toThrow()
+    const first = await lab.service.control.changeDraft('operator', lab.manifest.flowId, base.revisionId, changes, 'same')
+    expect(await lab.service.control.changeDraft('operator', lab.manifest.flowId, base.revisionId, changes, 'same')).toEqual(first)
+    await expect(lab.service.control.changeDraft('operator', lab.manifest.flowId, base.revisionId, changes, 'new')).rejects.toThrow()
     const head = lab.current()
     await expect(
       lab.service.control.changeDraft(
-        'lab',
+        'operator',
         lab.manifest.flowId,
         head.revisionId,
         [
@@ -167,7 +167,7 @@ describe('CLI Lab', () => {
     const before = lab.current(),
       flowId = lab.manifest.flowId,
       attempt = lab.attempt.id
-    await lab.service.control.changeDraft('lab', flowId, before.revisionId, referenceChanges(lab.scenarioId, before.content), 'edit')
+    await lab.service.control.changeDraft('operator', flowId, before.revisionId, referenceChanges(lab.scenarioId, before.content), 'edit')
     const run = await lab.service.control.runs.createDraftRun(flowId, lab.current().revisionId, currentEngineContract, {}, 'test-run', {
       nodeId: 'start',
       outputs: {},
@@ -186,7 +186,7 @@ describe('CLI Lab', () => {
     expect((await lab.verify()).passed).toBe(false)
     const base = lab.current()
     await lab.service.control.changeDraft(
-      'lab',
+      'operator',
       lab.manifest.flowId,
       base.revisionId,
       [
@@ -271,7 +271,7 @@ it('rejects verification while an existing Run is waiting, and reset removes tha
   const lab = await fixture('create-flow')
   const base = lab.current()
   const changed = await lab.service.control.changeDraft(
-    'lab',
+    'operator',
     lab.manifest.flowId,
     base.revisionId,
     [
