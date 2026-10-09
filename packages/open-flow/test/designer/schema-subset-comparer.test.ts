@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { createSchemaComparer } from '../../src/flow/common/schemaComparer.ts'
 import { SubsetCompareResult } from '../../src/json-schema-subset/index.ts'
-import { createSchemaComparer } from '../../src/manifest/common/schemaComparer.ts'
 
 interface CompareSchemaInfo {
   schema: object

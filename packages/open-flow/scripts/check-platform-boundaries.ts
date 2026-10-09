@@ -16,19 +16,7 @@ interface BoundaryViolation {
 }
 
 const platformOwners: Set<string> = new Set(['common', 'browser', 'node', 'worker'])
-const platformDomains: Set<string> = new Set([
-  'base',
-  'build',
-  'compiler',
-  'canvas',
-  'execution',
-  'file-picker',
-  'localization',
-  'manifest',
-  'project',
-  'runtime',
-  'workbench',
-])
+const platformDomains: Set<string> = new Set(['base', 'build', 'compiler', 'canvas', 'execution', 'file-picker', 'localization', 'runtime', 'workbench'])
 const nodeModules: Set<string> = new Set(builtinModules.map((name) => name.replace(/^node:/, '')))
 const browserPackagePrefixes: readonly string[] = ['antd', 'react', 'react-dom']
 const nonPortablePackagePrefixes: readonly string[] = ['@cloudflare/', '@oomol/', 'cloudflare:']

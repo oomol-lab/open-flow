@@ -2,7 +2,7 @@ import type { ConnectorAccessCapability, ConnectorCapability } from '../../../..
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { TaskPorts } from './flowChanges.ts'
 
-import { generateTyping, typescriptOf } from '../../../../manifest/common/meta/block/generateTyping.ts'
+import { generateTyping, typescriptOf } from './generateTyping.ts'
 
 export function codeTyping(
   ports: TaskPorts,

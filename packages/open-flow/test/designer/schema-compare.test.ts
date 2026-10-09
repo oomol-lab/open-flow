@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { comparePorts } from '../../src/flow/common/schema.ts'
-import { compareJSONSchema, normalizeNullableSchemaPath } from '../../src/manifest/common/schemaCompare.ts'
+import { compareJSONSchema, normalizeNullableSchemaPath } from '../../src/flow/common/schemaCompare.ts'
 
 const port = (jsonSchema: Parameters<typeof comparePorts>[0]['jsonSchema'], nullable = false) => ({ handle: 'value', jsonSchema, nullable })
 
