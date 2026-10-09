@@ -105,7 +105,7 @@ export class RunControl {
       requestDigest,
       revisionDigest: stored.digest,
       revisionId,
-      variableNames: Object.values(variableBindings(content, fixed.validation.closure.dependencies.inputBindings)),
+      variableNames: Object.values(variableBindings(content, fixed.validation.closure.dependencies.bindings)),
     })
     return this.acceptedRun(flowId, accepted)
   }
@@ -161,7 +161,7 @@ export class RunControl {
       requestDigest,
       revisionDigest: livePublication.revisionDigest,
       revisionId: livePublication.revisionId,
-      variableNames: Object.values(variableBindings(content, fixed.validation.closure.dependencies.inputBindings)),
+      variableNames: Object.values(variableBindings(content, fixed.validation.closure.dependencies.bindings)),
     })
     return this.acceptedRun(flowId, accepted)
   }

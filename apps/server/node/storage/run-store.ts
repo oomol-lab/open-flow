@@ -781,7 +781,7 @@ export class RunStore {
       else if (target == null) reason = 'The error workflow is unavailable. It must be published, enabled and have an active Flow Error node.'
       else {
         const revision = decodeRevision(encoder.encode(target.content))
-        const names = Object.values(variableBindings(revision, flowDependencies(revision, target.triggerNodeId).inputBindings))
+        const names = Object.values(variableBindings(revision, flowDependencies(revision, target.triggerNodeId).bindings))
         if (!this.#deps.variables.hasAll(names)) reason = 'The error workflow requires an unavailable Variable.'
       }
       if (reason == null && target != null) {

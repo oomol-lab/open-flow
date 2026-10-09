@@ -152,8 +152,7 @@ export class RunExecutor {
         run.bindingValues == null
       )
         return yield* Effect.fail(new Error('The fixed Agent environment variable snapshot is unavailable.'))
-      const bindingValues =
-        run.bindingValues ?? this.#store.variables.resolve(variableBindings(revision, prepared.validation.closure.dependencies.inputBindings))
+      const bindingValues = run.bindingValues ?? this.#store.variables.resolve(variableBindings(revision, prepared.validation.closure.dependencies.bindings))
       if (bindingValues == null) return { kind: 'binding-unresolved' as const }
       return { bindingValues, flow: prepared.flow, kind: 'prepared' as const, projectEvent, started }
     })

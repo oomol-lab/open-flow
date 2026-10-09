@@ -145,7 +145,7 @@ describe('Condition groups and routing', () => {
       },
     ])
     const revision = content(condition)
-    expect([...flowDependencies(revision).inputBindings]).toEqual(['secret'])
+    expect([...flowDependencies(revision).bindings]).toEqual(['secret'])
   })
   it('fails when a later-case Source is absent at runtime instead of selecting the first case', async () => {
     const condition = node([

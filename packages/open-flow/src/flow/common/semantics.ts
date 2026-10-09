@@ -24,7 +24,6 @@ export { agentInput, agentToolInput, agentToolSchema } from './agent.ts'
 export interface SemanticClosure {
   readonly dependencies: {
     readonly bindings: ReadonlySet<string>
-    readonly inputBindings: ReadonlySet<string>
     readonly nodes: ReadonlySet<string>
     readonly modules: ReadonlySet<string>
   }
@@ -40,12 +39,7 @@ function entries<T>(value: Readonly<Record<string, T>>): readonly (readonly [str
 export function flowDependencies(content: RevisionContent, triggerId?: string): SemanticClosure['dependencies'] {
   if (triggerId != null) return flowDependencies(runRevision(content, triggerId))
   const bindings = new Set<string>()
-  const inputBindings = new Set<string>()
   const modules = new Set<string>()
-
-  function visitBinding(id: string): void {
-    bindings.add(id)
-  }
 
   function visitModule(id: string): void {
     if (modules.has(id)) return
@@ -60,8 +54,7 @@ export function flowDependencies(content: RevisionContent, triggerId?: string): 
       if (mapping.kind != 'sources') continue
       for (const source of mapping.sources) {
         if (source.kind != 'binding') continue
-        inputBindings.add(source.bindingId)
-        visitBinding(source.bindingId)
+        bindings.add(source.bindingId)
       }
     }
   }
@@ -93,7 +86,7 @@ export function flowDependencies(content: RevisionContent, triggerId?: string): 
 
   visitGraph(content.document.graph)
 
-  return { bindings, inputBindings, modules, nodes: new Set(Object.keys(content.document.graph.nodes)) }
+  return { bindings, modules, nodes: new Set(Object.keys(content.document.graph.nodes)) }
 }
 
 export async function flowClosure(content: RevisionContent): Promise<SemanticClosure> {

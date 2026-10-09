@@ -785,7 +785,6 @@ export default () => value`,
     const dependencies = flowDependencies(source)
     expect([...dependencies.nodes]).toEqual(['notify', 'wait'])
     expect([...dependencies.bindings]).toEqual(['recipient'])
-    expect([...dependencies.inputBindings]).toEqual(['recipient'])
   })
 
   it('exposes a structured Approval decision instead of forwarding its input type', async () => {
