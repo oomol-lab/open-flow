@@ -39,7 +39,7 @@ is not exported by this package.
 
 `@oomol-lab/open-flow/preview` exports the same read-only viewer used in Publications,
 without its striped canvas background. It includes temporary node movement, layout restoration,
-properties, and subflow navigation. It does not fetch a publication, save changes, or execute a flow.
+properties. It does not fetch a publication, save changes, or execute a flow.
 
 ```tsx
 import { OpenFlowPreview, type Draft, type Presentation } from '@oomol-lab/open-flow/preview'
@@ -59,12 +59,11 @@ using the existing control API contracts. They can be constructed locally; no se
 `WorkbenchHost` is required. Pass `null` for an absent presentation to use the Publications viewer's
 existing missing-layout behavior. These are workflow definitions, not React Flow nodes.
 
-The preview has no title bar. Its optional `label` names the accessible region; subflow navigation
-and layout restoration appear as canvas controls when needed.
+The preview has no title bar. Its optional `label` names the accessible region; layout restoration appears as canvas controls when needed.
 
 The host owns container dimensions, language and light/dark theme. Theme and language can change
 without resetting temporary node positions. Movement never writes back to the supplied objects.
-Use a new React `key` when switching examples to reset selection, subflow navigation and layout.
+Use a new React `key` when switching examples to reset selection and layout.
 
 For Shadow DOM, the host creates the shadow root and mounts the React component inside it.
 Load **preview.css inside that root**, for example with a `<link rel="stylesheet">` pointing to
@@ -76,7 +75,7 @@ outer document alone does not style a shadow tree. No Shadow DOM container or sa
 shipped in the public component; Lab has normal and shadow-hosted verification examples.
 
 The Lab [publication fixture](dev/designer/publicationFixture.ts) is a complete locally constructed
-example with a trigger, values, a code task, approval, comments, and a nested subflow.
+example with a trigger, values, a code task, approval and comments.
 
 The full inspector retains its existing lazy code/language and icon resources. Load the homepage
 island on demand when integrating it into a static site, and measure the host's final production

@@ -1,12 +1,22 @@
 # 公共契约与版本演进
 
+## 移除旧 Subflow 模型
+
+Flow model v6 删除 `document.subflows`、Subflow 节点、子图输入来源，以及 `subflow.*` 编辑操作。
+Graph target 仅接受 `{ kind: 'flow' }`。Workbench、CLI 和 MCP 不再提供旧子图入口；CLI 的
+`--subflow` 和 MCP `flow_node_get.subflowId` 已移除。本次不增加 Flow 调用能力，也不改变 Task 共享模型。
+
+包含旧子图或 Subflow 节点的 Revision 明确拒绝读取和修复，不会静默删除后当作完整 Flow 使用。
+旧版纯根图 Revision 仍可读取，model v2/v4/v5 的不可变编码和 closure digest 保持不变；新编辑生成 model v6。
+以下条目记录历史版本变化，不代表已移除接口仍受支持。
+
 公共入口、序列化格式、Control API 和运行语义分别拥有版本，不能互相替代。
 
 | 版本              | 当前值                                              | 约束                                                             |
 | ----------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
 | npm package       | package manifest 的精确版本                         | 固定实现、类型、Workbench 资产和一致性测试集。部署锁定同一版本。 |
 | Revision envelope | `kind: open-flow-flow-revision`、`version: 1`       | 固定 UTF-8 JSON 信封字段和 canonical bytes 规则。                |
-| Flow model        | `modelVersion: 4`                                   | 固定 document、modules、节点和端口的序列化结构。                 |
+| Flow model        | `modelVersion: 6`                                   | 固定 document、modules、节点和端口的序列化结构。                 |
 | Control API       | `/v1`、Run 创建请求 `version: 2`，其他 `version: 1` | 固定请求字段、响应、错误码、CAS 和幂等行为。                     |
 | Engine Contract   | `open-flow-engine/v5`                               | 固定执行、Trigger、Task 返回、Wait 和取消语义。                  |
 | MCP               | `2026-07-28`                                        | 固定 Streamable HTTP 协商；工具的产品语义复用 Control API。      |

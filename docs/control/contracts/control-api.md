@@ -136,7 +136,7 @@ interface DraftSync {
 ```
 
 `RevisionContent`、顶层 `FlowDocument` 和 `ChangeOperation` 由 `@oomol-lab/open-flow/flow-change` 定义。顶层 graph target 固定为
-`{ kind: 'flow' }`；Subflow target 为 `{ kind: 'subflow', id }`。不存在嵌套 Flow map 或 Flow create/delete operation。
+`{ kind: 'flow' }`。不存在嵌套 Flow map 或 Flow create/delete operation。
 
 Revision 在 API 上是完整 immutable snapshot；Server 可以增量存储草稿正文，读取时还原为完整内容并校验 digest。Draft Run 和 Publish operation 准入时固定完整正文。Draft change 使用 `expectedRevisionId` 做 CAS；stale head 返回 `flow.revision-conflict`。每个 change batch
 要求 `Idempotency-Key`；相同 key 与相同 batch 返回第一次提交的 Revision，相同 key 与不同 batch 返回 `flow.conflict`。幂等重放先于 Draft head CAS。
@@ -191,18 +191,18 @@ interface Presentation {
 
 ### 执行图与输入来源
 
-Revision 的根图和每个 Subflow graph 必须包含 `nodes` 和 `edges`；没有执行边时显式保存 `edges: []`。
+Revision 的 graph 必须包含 `nodes` 和 `edges`；没有执行边时显式保存 `edges: []`。
 为兼容旧 Draft，解码时将缺失的 `edges` 补为 `[]`；显式提供的 `edges` 仍须通过数组及边结构校验。
-Value Node 没有数据输入端口。解码时将其 `inputs` 统一归一化为 `{}`，忽略缺失或任意旧输入数据；执行入边保持不变，仍决定节点何时执行。根图和 Subflow graph 均适用。
+Value Node 没有数据输入端口。解码时将其 `inputs` 统一归一化为 `{}`，忽略缺失或任意旧输入数据；执行入边保持不变，仍决定节点何时执行。
 执行边使用 `{ source: nodeId, target: nodeId, sourceHandle?: branch }`。普通节点不得设置 `sourceHandle`；Condition 和 Wait 必须指定已声明的分支或 action。
 边不含目标 input handle。重复边、缺失端点和指向 Trigger 的边不能通过 validation；允许自连接和回边。边集合按规范顺序参与 Revision digest。
 
 `inputs[handle]` 使用 `{ kind: 'value', value }` 或 `{ kind: 'sources', sources }`。Node source 使用
-`{ kind: 'node', nodeId, output, field?: string }`；省略 `field` 选择整个输出，提供时选择输出对象 schema 声明的一级属性，字段名按原始 key 处理（包括空字符串、点号和斜杠），不支持多级路径或数组下标。字段选择统一用于 Inputs、Condition 操作数和 Subflow 输出映射。候选字段来自对象 schema 的直接 `properties`，不解析 `$ref`，不展开 `allOf`、`anyOf`、`oneOf` 分支；无法直接列出字段时仍可选择整个输出。父对象为 null 或自身属性缺失视为无可用来源，显式字段 null 仍是可用来源。Flow input 与 Variable binding 的 source 形式保持不变。Node source 必须指向经执行边可达的祖先，
+`{ kind: 'node', nodeId, output, field?: string }`；省略 `field` 选择整个输出，提供时选择输出对象 schema 声明的一级属性，字段名按原始 key 处理（包括空字符串、点号和斜杠），不支持多级路径或数组下标。字段选择统一用于 Inputs 和 Condition 操作数。候选字段来自对象 schema 的直接 `properties`，不解析 `$ref`，不展开 `allOf`、`anyOf`、`oneOf` 分支；无法直接列出字段时仍可选择整个输出。父对象为 null 或自身属性缺失视为无可用来源，显式字段 null 仍是可用来源。Variable binding 的 source 形式保持不变。Node source 必须指向经执行边可达的祖先，
 不要求覆盖目标的每一条执行路径。每条被选中的执行入边分别启动一次 invocation，不等待其他前驱。输入只读取这次到达路径上的结果快照，多个 source 不能在该快照同时提供值；并行前驱的结果分别传给各自触发的 invocation。
-所有可执行节点支持可选正整数 `maxExecutions`，默认 1000；按一次 Flow Run 累计，同一 Subflow 节点跨调用共享计数。下一次到达会超过上限时，Run 报错终止。Wait/Agent 决议恢复不增加次数。
+所有可执行节点支持可选正整数 `maxExecutions`，默认 1000；按一次 Flow Run 中的节点累计。下一次到达会超过上限时，Run 报错终止。Wait/Agent 决议恢复不增加次数。
 调度仅依据执行连线及分支状态；输入来源缺失不导致跳过。零个可用来源补 `null`，一个来源取其值，多个来源报错；实际输出 `null` 仍算一个已提供的值。收集后按端口声明校验，失败则报错。
-Subflow 的最终输出采用相同规则，来源可以不覆盖所有返回路径。
+
 `graph.edge.connect` 与 `graph.edge.disconnect` 只修改执行边，`graph.node.input.set` 独立修改数据映射。节点不保存 `concurrency`。
 
 CLI 分开设置执行顺序与输入来源：
@@ -390,7 +390,7 @@ Draft Run body 是 `{ engineContract, inputs, trigger, version: 2 }`。Live Run 
 `trigger` 必填，形如 `{ nodeId: string, outputs: Record<string, JsonValue> }`，固定本次运行的起始 Trigger 和完整输出。缺少入口、入口不是固定 Revision 中的 Trigger，或 outputs 缺失、包含额外端口或不符合各端口 schema 时返回 `run.invalid`。nullable 允许端口值为 null，不允许缺失端口。入口及完整 outputs 参与 Control API 幂等 request digest，并随 Run 持久化；不会自动选择入口或退回整图运行。
 
 Draft Run 只对选中 Trigger 沿执行边可达的节点及其依赖进行语义校验、能力检查和 Variable 准入检查。其他分支的未配置 Trigger、无效代码和缺失资源仍出现在全图 check 中，但不阻断此次测试。
-共享下游输入的多来源映射忽略本次不可达的已有节点来源；剩余来源缺失时补 `null` 并校验，不影响执行边调度；不能同时提供多个值。缺失节点引用、选中分支内的环、无效代码及实际使用的 Subflow 错误仍返回 `flow.invalid`。
+共享下游输入的多来源映射忽略本次不可达的已有节点来源；剩余来源缺失时补 `null` 并校验，不影响执行边调度；不能同时提供多个值。缺失节点引用、选中分支内的环、无效代码仍返回 `flow.invalid`。
 Draft Run 的 `revisionDigest` 标识完整 Revision，`closureDigest` 标识本次入口的执行 closure，可以与全图 check 的 `closureDigest` 不同。读取和恢复 Run 不修改原 Revision。
 Publish 和 Live Run 保持完整 Flow 校验。
 
@@ -408,7 +408,7 @@ Flow Error 使用 Flow model 5，节点为 `{ kind: 'error', name: string, sourc
 }
 ```
 
-时间字段使用 ISO 8601。`path` 是从根图到失败节点所属 Subflow 的调用节点 ID 列表；根图为空列表。系统层失败没有节点上下文。最终失败原因独立于事件日志保存，错误文本复用现有脱敏规则。
+时间字段使用 ISO 8601。`path` 为空列表。系统层失败没有节点上下文。最终失败原因独立于事件日志保存，错误文本复用现有脱敏规则。
 
 Run detail 返回可选 `errorSource: { flowId, runId }`，以及可选 `errorDispatches` 数组，元素为：`{ status: 'pending', flowId }`、`{ status: 'dispatched', flowId, runId }` 或 `{ status: 'failed', flowId, message }`。派发状态变化通知源 Run，创建处理 Run 通知目标 Flow。Run 的失败结果可携带相同的 nodeId/jobId/path；源终态不会因处理成功而改变。Workbench host 的 Runs location 接受可选 runId，以定位两端的运行记录。
 
@@ -464,7 +464,7 @@ Run list 按 `createdAt`、`runId` 逆序稳定分页。查询可按单个 `stat
 
 Node context 固定为 `{ flowId, scopeId, nodeId, executionId }`，各 identity 为非空字符串。
 `progress` 为 0–100 的有限数值；Artifact `size` 为非负安全整数，`digest` 为 `sha256:` 加 64 位小写十六进制。
-`nodeKind` 为 `agent / approval / condition / connector / decision / javascript / openapi / llm / subflow / value / wait`。
+`nodeKind` 为 `agent / approval / condition / connector / decision / javascript / openapi / llm / value / wait`。
 Runtime projector 不接受旧的 `node.cache-hit`、`node.preview` 或 `run.output` 事件。
 
 等待登记、整图冻结和决议分别追加事件：
@@ -656,7 +656,7 @@ interface ConnectorAccess {
 | `PUT`    | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
 | `DELETE` | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
 
-`bindings` 是整个 Flow（含 Subflow）的 Code 共享允许列表。`sharedAccessDigest` 只计算排序后的 `[providerId, accessBindingId]` 共享选择，
+`bindings` 是整个 Flow的 Code 共享允许列表。`sharedAccessDigest` 只计算排序后的 `[providerId, accessBindingId]` 共享选择，
 用于配置变更检测、发布状态与请求身份；不包含节点选择、展示名称、上游即时权限或 Provider 展示列表，不是完整执行快照摘要。
 `GET /v1/flows/:flowId/connector-access?publicationId=...` 读取归属此 Flow 的已发布 `ConnectorAccessSnapshot`，只读；不带参数读取 Draft `ConnectorAccess` 配置。
 客户端分别使用 `getPublishedConnectorAccess` 与 `getConnectorAccess`。
@@ -947,7 +947,7 @@ Scheduler checkpoint 的精确对象为：
 ```
 
 `inputs` 保存按 node ID 和 input handle 索引的启动输入，`bindingValues` 保存本次 Run 的 Variable binding 快照。
-`results` 保存各节点最后一次完成的 output。`counts` 按 graph scope 和 node ID 保存累计执行次数，根 Flow 的 scope 为 `""`，Subflow 的 scope 为 subflow ID。
+`results` 保存各节点最后一次完成的 output。`counts` 按 node ID 保存累计执行次数，外层 scope 固定为 `""`。
 `frames` 按等待 job ID 保存其到达时的节点结果快照。`waits` 保存所有待应用决议的等待，允许同一 node ID 的多个不同 job；已释放 pending 时每项还保存完整 `pending` 输出。`agents` 按 job ID 保存
 `{ invocationId, input, remainingMs?, checkpoint }`，其中 checkpoint 是 Agent continuation 合同。配置了节点 timeoutMs 时，
 remainingMs 必须为正且不得超过原上限。总 JSON 大小不得超过 16 MiB。
@@ -993,7 +993,7 @@ Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 只保�
 ```ts
 {
   kind: 'graph.node.task.capabilities.set',
-  target: { kind: 'flow' }, // Subflow 使用 { kind: 'subflow', id }。
+  target: { kind: 'flow' },
   nodeId: 'code-node',
   before: previousCapabilities, // 原声明不存在时省略。
   value: nextCapabilities, // 省略时删除整个 capabilities 属性。
@@ -1066,8 +1066,7 @@ Run 取消、deadline、兄弟节点失败和节点退出沿既有执行生命�
 
 ## 11. Agent Task
 
-Agent 使用 Managed Task：`executor.kind: "agent"`，只能由根 Flow 的 Task node 引用。Subflow 引用产生
-`agent.subflow-unsupported`；其他确定性配置错误产生 `agent.config-invalid`。
+Agent 使用 Managed Task：`executor.kind: "agent"`，由 Flow 的 Task node 引用。确定性配置错误产生 `agent.config-invalid`。
 
 ```json
 {

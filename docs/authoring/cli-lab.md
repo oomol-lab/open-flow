@@ -29,7 +29,7 @@ bun run lab report
 
 Replace `FLOW_ID` with the ID printed at startup. `lab open` opens the current session's read-only
 workflow page without a login. The page uses the public `OpenFlowPreview` component to support
-zooming, node selection, property inspection, and subflow navigation. Dragging nodes temporarily
+zooming, node selection, property inspection. Dragging nodes temporarily
 does not save their positions. Use the terminal to edit, validate, and run flows.
 
 Arguments after `lab flow` pass unchanged to the production CLI in the current source tree.
