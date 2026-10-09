@@ -78,7 +78,7 @@ fly secrets set \
   --app my-open-flow
 ```
 
-`fly secrets set` 会重新部署 machine。完整环境变量和各 origin 的约束见[容器交付参考](../container-delivery.md#4-配置)。
+`fly secrets set` 会重新部署 machine。完整环境变量和各 origin 的约束见[容器交付参考](../container-delivery.md#4-configuration)。
 
 ## 5. 部署
 

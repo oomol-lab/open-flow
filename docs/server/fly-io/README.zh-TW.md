@@ -81,7 +81,7 @@ fly secrets set \
 ```
 
 `fly secrets set` 會重新部署 machine。完整的環境變數清單和各 origin 的限制請參閱
-[容器交付參考](../container-delivery.md#4-配置)。
+[容器交付參考](../container-delivery.md#4-configuration)。
 
 ## 部署
 

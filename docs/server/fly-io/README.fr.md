@@ -92,7 +92,7 @@ fly secrets set \
 ```
 
 `fly secrets set` redéploie la machine. Consultez la
-[référence de livraison en conteneur](../container-delivery.md#4-配置) pour la liste complète des
+[référence de livraison en conteneur](../container-delivery.md#4-configuration) pour la liste complète des
 variables d'environnement et les contraintes applicables à chaque origine.
 
 ## Déployer

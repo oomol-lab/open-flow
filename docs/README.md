@@ -1,28 +1,50 @@
-# Open Flow 文档
+# Open Flow documentation
 
-Open Flow 提供公共产品合同、Workbench runtime、CLI runtime 与完整 Server 实现。产品边界、所有权与运行时不变量只以
-[产品与架构边界](architecture.md)为准；Workbench 和 CLI 在一个 session 中只连接一个 Control API deployment，不能把本地
-旧 Project、YAML、DeploymentPackage、provider carrier 或另一部署实现当作 fallback。
+This directory contains current product boundaries, technical contracts, usage guides, and deployment references.
+For the product overview and quick start, see the [project README](../README.md) ([Simplified Chinese](README.zh-CN.md)).
 
-## 当前产品与合同
+## Product and technical contracts
 
-- [产品与架构边界](architecture.md)
-- [Control API 技术参考](control/contracts/control-api.md)
-- [公共契约与版本演进](control/contracts/compatibility.md)
+- [Product and architecture boundaries](architecture.md)
+- [Control API reference](control/contracts/control-api.md)
+- [Public contracts and version evolution](control/contracts/compatibility.md)
 - [Node compatibility runtime contract](control/contracts/nodejs-runtime.md)
-- [Command Artifact v2 分发合同](distribution/command-artifact.md)
-- [Flow 命令调用合同](authoring/flow-command.md)
-- [Workbench 与 Designer 前端注意事项](../.agents/skills/frontend-ui/SKILL.md)
+- [Command Artifact v2 distribution contract](distribution/command-artifact.md)
 
-## Server 实施参考
+## Flow authoring and node development
 
-- [Server 容器交付参考](server/container-delivery.md)
-- [MCP 入口](server/mcp.md)
-- [用户、登录与权限](server/users.md)
-- [Docker 镜像 (GHCR)](server/docker-ghcr/README.zh-CN.md) ([English](server/docker-ghcr/README.md))
-- [Fly.io 部署](server/fly-io/README.zh-CN.md) ([English](server/fly-io/README.md))
-- [用 OpenConnector 和 oo CLI 运行 Open Flow](server/self-hosted-stack/README.zh-CN.md) ([English](server/self-hosted-stack/README.md))
+- [Public node read and edit contract](control/contracts/control-api.md#node-authoring)
+- [Node authoring development guide](authoring/node-authoring.md)
+- [CLI Lab verification guide](authoring/cli-lab.md)
 
-## 历史记录
+## Connections and permissions
 
-- [阶段计划索引](plans/README.md)
+- [Flow authorization model](control/flow-authorization.md)
+- [Trigger permissions and execution](control/trigger-permissions.md)
+
+## Trigger guides
+
+- [Flow Error](triggers/error-trigger.md)
+- [Linear Issue Trigger](triggers/linear-trigger.md)
+
+## Server and deployment
+
+- [Server container delivery](server/container-delivery.md)
+- [MCP integration](server/mcp.md)
+- [Users, login, and permissions](server/users.md)
+- [Docker images (GHCR)](server/docker-ghcr/README.md) ([Simplified Chinese](server/docker-ghcr/README.zh-CN.md))
+- [Fly.io deployment](server/fly-io/README.md) ([Simplified Chinese](server/fly-io/README.zh-CN.md))
+- [Run Open Flow with OpenConnector and the oo CLI](server/self-hosted-stack/README.md) ([Simplified Chinese](server/self-hosted-stack/README.zh-CN.md))
+
+## Development and documentation maintenance
+
+- [Contributing](../CONTRIBUTING.md)
+- [Development principles and verification requirements](../AGENTS.md)
+- [Workbench and Designer frontend guidance](../.agents/skills/frontend-ui/SKILL.md)
+- [Lab Story development](../packages/open-flow/dev/designer/README.md)
+
+The architecture document owns product boundaries and runtime invariants. Technical references own exact fields and protocols.
+Usage and deployment guides belong in their respective topic directories.
+`README.<locale>.md` files translate the project README. `assets/` stores its images.
+Use Git history to trace implementation plans, migrations, and verification records.
+Historical tasks do not establish current capabilities or completed verification.

@@ -13,7 +13,7 @@ Open Flow может работать сам по себе. Для двух фу
 
 Это руководство запускает все три компонента на одной машине через Docker, соединяет их и создаёт
 первый Flow из терминала. Переменные окружения совпадают со
-[справочником по доставке контейнера](../container-delivery.md#4-配置). Здесь добавлены только порядок
+[справочником по доставке контейнера](../container-delivery.md#4-configuration). Здесь добавлены только порядок
 шагов и значения, которые должны совпадать между проектами.
 
 ```mermaid
@@ -243,7 +243,7 @@ oo flow publish "GitHub digest"
 oo flow open "GitHub digest"
 ```
 
-- Подготовьте `edits.json` с `baseRevision`, `requestId` и изменениями узлов, входов и связей, включая Manual Trigger. Укажите Connection ID в настройках Connector. См. [контракт редактирования](../../authoring/flow-command.md).
+- Подготовьте `edits.json` с `baseRevision`, `requestId` и изменениями узлов, входов и связей, включая Manual Trigger. Укажите Connection ID в настройках Connector. См. [контракт редактирования](../../control/contracts/control-api.md#node-authoring).
 - `check` проверяет, корректен ли Revision. Работают ли учётные данные и выполняется ли Action у
   провайдера, проверяет только `run`.
 - `run --wait` выполняет Draft через OpenConnector и печатает результат.
@@ -281,7 +281,7 @@ oo connector search "send an email"
   `OPEN_FLOW_CONNECTOR_TOKEN`.
 - У каждого сервиса свои данные: `/data/open-flow` у Open Flow и `/app/data` у OpenConnector.
   Резервные копии делайте отдельно. См.
-  [справочник по доставке контейнера](../container-delivery.md#6-持久化与恢复).
+  [справочник по доставке контейнера](../container-delivery.md#6-persistence-and-recovery).
 - На Fly.io запускайте OpenConnector и Open Flow как два app в одной organization и используйте
   частную сеть Fly для runtime origin, например `http://my-open-connector.internal:3000`. См.
   [руководство по развёртыванию на Fly.io](../fly-io/README.ru.md) и

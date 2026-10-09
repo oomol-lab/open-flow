@@ -11,7 +11,7 @@ Open Flow는 단독으로 실행할 수 있습니다. 다음 두 기능에는 �
   [oo CLI](https://github.com/oomol-lab/oo-cli)가 제공하며 하나의 Open Flow의 Control API에 연결합니다.
 
 이 가이드는 Docker로 한 대의 컴퓨터에서 세 가지를 모두 시작하고, 서로 연결한 뒤, 터미널에서 첫 Flow를 만듭니다.
-환경 변수는 [컨테이너 배포 참조](../container-delivery.md#4-配置)와 동일합니다. 이 가이드는 작업 순서와
+환경 변수는 [컨테이너 배포 참조](../container-delivery.md#4-configuration)와 동일합니다. 이 가이드는 작업 순서와
 프로젝트 간에 일치해야 하는 값만 추가로 설명합니다.
 
 ```mermaid
@@ -237,7 +237,7 @@ oo flow publish "GitHub digest"
 oo flow open "GitHub digest"
 ```
 
-- `edits.json`에 `baseRevision`, `requestId`, 노드·입력·연결 편집과 Manual Trigger를 작성하세요. Connector 설정에 Connection ID를 명시하세요. [편집 계약](../../authoring/flow-command.md)을 참고하세요.
+- `edits.json`에 `baseRevision`, `requestId`, 노드·입력·연결 편집과 Manual Trigger를 작성하세요. Connector 설정에 Connection ID를 명시하세요. [편집 계약](../../control/contracts/control-api.md#node-authoring)을 참고하세요.
 - `check`는 Revision이 올바른지 검사합니다. 자격 증명이 동작하는지, Provider에서 실제로 실행되는지는 `run`만
   확인합니다.
 - `run --wait`는 OpenConnector를 통해 Draft를 실행하고 결과를 출력합니다. `oo flow runs events <run>`은 전체
@@ -273,7 +273,7 @@ oo connector search "send an email"
 - 모든 token은 secret 또는 배포자만 읽을 수 있는 env 파일로 넣으세요. Access 페이지에서 OpenConnector runtime
   token을 바꿀 때 `OPEN_FLOW_CONNECTOR_TOKEN`도 함께 갱신하세요.
 - 각 서비스는 자신의 데이터를 가집니다. Open Flow는 `/data/open-flow`, OpenConnector는 `/app/data`입니다. 따로
-  백업하세요. [컨테이너 배포 참조](../container-delivery.md#6-持久化与恢复)를 참고하세요.
+  백업하세요. [컨테이너 배포 참조](../container-delivery.md#6-persistence-and-recovery)를 참고하세요.
 - Fly.io에서는 OpenConnector와 Open Flow를 한 organization 안의 두 app으로 실행하고, runtime origin에는 Fly 사설
   네트워크를 사용하세요. 예: `http://my-open-connector.internal:3000`.
   [Fly.io 배포 가이드](../fly-io/README.ko.md)와

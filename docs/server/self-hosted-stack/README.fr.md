@@ -15,7 +15,7 @@ Open Flow peut fonctionner seul. Deux fonctions ont besoin d'autres projets OOMO
 
 Ce guide démarre les trois sur une seule machine avec Docker, les relie et construit un premier
 Flow depuis le terminal. Les variables d'environnement sont les mêmes que dans la
-[référence de livraison en conteneur](../container-delivery.md#4-配置). Ce guide n'ajoute que
+[référence de livraison en conteneur](../container-delivery.md#4-configuration). Ce guide n'ajoute que
 l'ordre des étapes et les valeurs qui doivent correspondre entre les projets.
 
 ```mermaid
@@ -251,7 +251,7 @@ oo flow publish "GitHub digest"
 oo flow open "GitHub digest"
 ```
 
-- Préparez `edits.json` avec `baseRevision`, `requestId` et les modifications de nœuds, entrées et liens, dont un Manual Trigger. Indiquez le Connection ID dans la configuration Connector. Voir le [contrat de modification](../../authoring/flow-command.md).
+- Préparez `edits.json` avec `baseRevision`, `requestId` et les modifications de nœuds, entrées et liens, dont un Manual Trigger. Indiquez le Connection ID dans la configuration Connector. Voir le [contrat de modification](../../control/contracts/control-api.md#node-authoring).
 - `check` valide la Revision. Que les identifiants fonctionnent, et que le Provider exécute
   vraiment l'Action, n'est testé que par `run`.
 - `run --wait` exécute le Draft via OpenConnector et affiche le résultat.
@@ -291,7 +291,7 @@ oo connector search "send an email"
   `OPEN_FLOW_CONNECTOR_TOKEN` en même temps.
 - Chaque service possède ses propres données : `/data/open-flow` pour Open Flow et `/app/data`
   pour OpenConnector. Sauvegardez-les séparément. Voir la
-  [référence de livraison en conteneur](../container-delivery.md#6-持久化与恢复).
+  [référence de livraison en conteneur](../container-delivery.md#6-persistence-and-recovery).
 - Sur Fly.io, exécutez OpenConnector et Open Flow comme deux apps dans une organisation et
   utilisez le réseau privé Fly pour l'origine runtime, par exemple
   `http://my-open-connector.internal:3000`. Voir le

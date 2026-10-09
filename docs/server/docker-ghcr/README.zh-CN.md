@@ -58,9 +58,9 @@ docker run -d \
 ```
 
 打开 [http://127.0.0.1:3000](http://127.0.0.1:3000)，用该 token 登录。如果省略 `OPEN_FLOW_TOKEN`，首次启动会在日志中输出一次性 setup code，
-Workbench 会先要求输入该 code 再设置 token；认领流程见[启动](../container-delivery.md#3-启动)。
+Workbench 会先要求输入该 code 再设置 token；认领流程见[启动](../container-delivery.md#3-startup)。
 
-要接入 Connector 或 LLM 服务，按[配置表](../container-delivery.md#4-配置)添加对应变量。
+要接入 Connector 或 LLM 服务，按[配置表](../container-delivery.md#4-configuration)添加对应变量。
 [自托管组合指南](../self-hosted-stack/README.zh-CN.md)演示了如何用 OpenConnector 和 oo CLI 运行 Open Flow。
 
 ### Docker Compose
@@ -93,4 +93,4 @@ docker compose up -d
 ```
 
 同一时间只能有一个 Server 容器写入数据卷。不要在旧容器仍在使用同一 volume 时启动新容器；升级生产环境前先做
-[quiesced backup](../container-delivery.md#6-持久化与恢复)。
+[quiesced backup](../container-delivery.md#6-persistence-and-recovery)。

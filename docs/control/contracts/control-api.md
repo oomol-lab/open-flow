@@ -1,36 +1,32 @@
-# Control API 技术参考
+# Control API technical reference
 
-本文记录 Open Flow Control API 跨部署成立的 HTTP 合同。数据库、认证 provider、事务实现、调度器和部署资源不属于本文。
-公共 black-box cases 由 `@oomol-lab/open-flow/control-api-conformance` 导出。
+This document defines the Open Flow Control API HTTP contract shared across deployments. It excludes databases, authentication providers, transaction implementations, schedulers, and deployment resources. `@oomol-lab/open-flow/control-api-conformance` exports public black-box cases.
 
-部署应运行适用的完整 profile，而不仅导入公共类型或测试自身客户端 mock。cases 使用真实 HTTP transport，
-并复用公共 `ControlClient` 的响应 decoder；fixtures 只准备确定性数据和外部能力，不替代被测路由。
+Deployments should run each applicable profile in full. Importing public types or testing client mocks is insufficient. Cases use real HTTP transport and the public `ControlClient` response decoder. Fixtures prepare deterministic data and external capabilities; they do not replace the routes under test.
 
-| Profile                                                                                                    | 部署 fixture 要求                                                                                                                                              |
-| ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `controlApiConformanceCases`、`publicationControlApiConformanceCases`、`triggerControlApiConformanceCases` | 每个 case 使用隔离的数据；支持 Flow、发布、Trigger 目录与 Webhook，标记 `runtime` 的 case 启动执行器                                                           |
-| `connectorControlApiConformanceCases`                                                                      | 无 scope 和新建 Flow 中均提供至少一个 Provider、Action；支持按名称搜索、授权页和条件读取；implicit access                                                      |
-| `selectableConnectorAccessControlApiConformanceCases(fixture)`                                             | selectable access；提供可添加的 Provider 和有效账号授权候选，初始 Flow 无服务选择或授权                                                                        |
-| `connectorScopeControlApiConformanceCases(fixture)`                                                        | 两个已存在 Flow，账号列表不同；提供每个 Flow 的精确 Connection 列表，至少一份非空                                                                              |
-| `eventSourceControlApiConformanceCases(fixture)`                                                           | 可创建事件源的 active `feishu_app_bot` Connection，含可信 `providerAccountId`，以及所属 `teamId` 和预期授权页 `connectionPageUrl`；该应用尚无事件源            |
-| `pollControlApiConformanceCases(fixture)`                                                                  | 已注册的 Poll definition、Connection、有效配置、动态选项及确定性 preview；发布后 baseline 就绪，preview 不推进 checkpoint；测试期间不自动调度                  |
-| `runResultControlApiConformanceCases(fixture)`                                                             | 一个 Run 保存恰好 51 项结果；另一 Run 无结果。指定一项正文为 `{ rows: number[] }` 的结果，至少两行，完整 JSON 不超过默认 15,000 bytes；提供各结果真实 metadata |
-| `draftRepairControlApiConformanceCases(fixture)`                                                           | 已存在的不可读或需升级 Draft，提供其 Flow、Revision identity 和修复后预期 content；保留可恢复条目                                                              |
+| Profile                                                                                                    | Deployment fixture requirements                                                                                                                                                                                                           |
+| ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `controlApiConformanceCases`, `publicationControlApiConformanceCases`, `triggerControlApiConformanceCases` | Isolated data per case; Flow, publication, Trigger catalog, and Webhook support. Start an executor for cases marked `runtime`.                                                                                                            |
+| `connectorControlApiConformanceCases`                                                                      | At least one Provider and Action both without scope and in a new Flow; name search, authorization pages, conditional reads, and implicit access.                                                                                          |
+| `selectableConnectorAccessControlApiConformanceCases(fixture)`                                             | Selectable access, an addable Provider, and valid account authorization candidates. The initial Flow has no service selection or authorization.                                                                                           |
+| `connectorScopeControlApiConformanceCases(fixture)`                                                        | Two existing Flows with different account lists. Supply each Flow’s exact Connection list, with at least one nonempty list.                                                                                                               |
+| `eventSourceControlApiConformanceCases(fixture)`                                                           | An active `feishu_app_bot` Connection that can create an event source, with trusted `providerAccountId`, owning `teamId`, and expected `connectionPageUrl`. The app has no event source yet.                                              |
+| `pollControlApiConformanceCases(fixture)`                                                                  | A registered Poll definition, Connection, valid configuration, dynamic options, and deterministic preview. The baseline is ready after publication. Preview does not advance the checkpoint; automatic scheduling stays off during tests. |
+| `runResultControlApiConformanceCases(fixture)`                                                             | One Run with exactly 51 results and another with none. Identify a result with body `{ rows: number[] }`, at least two rows, and complete JSON within the default 15,000 bytes. Supply real metadata for every result.                     |
+| `draftRepairControlApiConformanceCases(fixture)`                                                           | An existing unreadable or outdated Draft, its Flow and Revision identity, and expected repaired content. Preserve recoverable entries.                                                                                                    |
 
-每个 factory 返回的 cases 都必须执行；不要因为部署缺少接口而跳过对应验证。Connector scope、事件源、Poll 和结果 profile
-分别由支持这些能力的部署准备数据。已有基础 profile 不会自动执行需要 fixture 的 factory。
-部署可以通过存储层准备历史损坏 Revision 或已保存的工具结果，但验证过程只走公共 HTTP；不要调用外部生产服务生成测试数据。
+Run every case returned by a factory. Do not skip verification because a deployment lacks an interface. Deployments with Connector scopes, event sources, Poll, or results prepare the corresponding fixtures. Base profiles do not automatically run fixture-dependent factories. Storage setup may prepare historical corrupt Revisions or saved tool results, but verification uses only public HTTP. Do not call production services to generate test data.
 
 ## 1. Transport
 
-- 路径以 `/v1` 开头；resource identity 放入 path segment 时使用 UTF-8 percent encoding。
-- 带 JSON body 的请求使用 `Content-Type: application/json`。
-- JSON response 顶层或资源对象包含 `version: 1`。
-- 创建 Flow、提交 Draft change、创建 Publication 和 Run 的请求要求非空、受限长度的 `Idempotency-Key`。
-- 相同 key 与相同 logical operation 返回原资源；相同 key 与不同 operation 返回对应 conflict。
-- 认证与 deployment scope 由 adapter 提供，公共合同不指定 Team header、Cookie 或 token 格式。
+- Paths start with `/v1`. Percent-encode resource identities as UTF-8 when placing them in path segments.
+- Requests with JSON bodies use `Content-Type: application/json`.
+- JSON responses contain `version: 1` at the root or in the resource object.
+- Flow creation, Draft changes, Publication creation, and Run creation require a nonempty, length-limited `Idempotency-Key`.
+- The same key and logical operation return the original resource. The same key with a different operation returns the corresponding conflict.
+- Adapters provide authentication and deployment scope. The public contract specifies no Team header, Cookie, or token format.
 
-错误 response：
+Error response:
 
 ```json
 {
@@ -42,14 +38,11 @@
 }
 ```
 
-客户端只按稳定 `code` 分支。当前错误域包括 `authentication.*`、`authorization.*`、`flow.*`、`live.*`、`publication.*`、`run.*`、
-`trigger.*`、`trigger-key.*`、`connector.*`、`event-source.*`、`variable.*`、`binding.*`、`engine.*`、`page.*` 和 `route.*`；精确 code 集合由
-`@oomol-lab/open-flow/control-api` 的 `controlErrorCode` 导出。`message` 用于展示和排查，应在已知时说明请求被拒绝的直接原因，但不是稳定的机器合同，
-也不能包含 credential、请求 payload 或其他敏感值。
+Clients branch only on stable `code` values. Error domains include `authentication.*`, `authorization.*`, `flow.*`, `live.*`, `publication.*`, `run.*`, `trigger.*`, `trigger-key.*`, `connector.*`, `event-source.*`, `variable.*`, `binding.*`, `engine.*`, `page.*`, and `route.*`. `controlErrorCode` from `@oomol-lab/open-flow/control-api` exports the exact set. `message` supports display and diagnosis. When known, it should state the immediate reason for rejection. It is not a stable machine contract and must not contain credentials, request payloads, or other sensitive values.
 
 ## 2. Variable
 
-Variable 是 deployment scope 配置，不属于 Flow：
+Variables are deployment-scoped configuration and do not belong to a Flow:
 
 ```ts
 interface Variable {
@@ -62,22 +55,18 @@ interface Variable {
 
 | Method   | Path                  | Request             | Success                                     | Missing                  |
 | -------- | --------------------- | ------------------- | ------------------------------------------- | ------------------------ |
-| `GET`    | `/v1/variables`       | 无 body/query       | `200 { variables: Variable[], version: 1 }` | 不适用                   |
-| `GET`    | `/v1/variables/:name` | 无 body/query       | `200 Variable`                              | `404 variable.not-found` |
-| `PUT`    | `/v1/variables/:name` | `{ value: string }` | `200 Variable`                              | 不适用                   |
-| `DELETE` | `/v1/variables/:name` | 无 body/query       | `200 { version: 1 }`                        | `404 variable.not-found` |
+| `GET`    | `/v1/variables`       | No body/query       | `200 { variables: Variable[], version: 1 }` | Not applicable           |
+| `GET`    | `/v1/variables/:name` | No body/query       | `200 Variable`                              | `404 variable.not-found` |
+| `PUT`    | `/v1/variables/:name` | `{ value: string }` | `200 Variable`                              | Not applicable           |
+| `DELETE` | `/v1/variables/:name` | No body/query       | `200 { version: 1 }`                        | `404 variable.not-found` |
 
-name 大小写敏感，只允许 1–256 个 ASCII 字符并匹配 `^[A-Za-z_][A-Za-z0-9_]*$`；不区分大小写的 `OO_` 前缀保留。
-列表按 name 的 ASCII/BINARY 升序返回。value 允许空字符串、NUL、换行和 Unicode，经 UTF-8 编码后最多 64 KiB；每个 deployment
-最多有 200 个不同 name，达到上限后仍可更新已有记录。相同 value 的 PUT 不改变 `updatedAt`。非法请求返回 `variable.invalid`，
-第 201 个 name 返回 `variable.limit-reached`。
+Names are case-sensitive, contain 1–256 ASCII characters, and match `^[A-Za-z_][A-Za-z0-9_]*$`. The `OO_` prefix is reserved case-insensitively. Lists use ascending ASCII/BINARY name order. Values may contain empty strings, NUL, newlines, and Unicode, up to 64 KiB in UTF-8. Each deployment permits 200 distinct names. Existing records remain editable at the limit. PUT with the same value preserves `updatedAt`. Invalid requests return `variable.invalid`; a 201st name returns `variable.limit-reached`.
 
-Control API Operator 可以枚举并读取所有 value。Variable 是可导出的 deployment configuration，不提供 Secret Manager 的不可导出值、
-per-variable ACL、KMS、轮换或独立审计语义。
+Control API Operators can enumerate and read all values. Variables are exportable deployment configuration. They provide no Secret Manager guarantees for nonexportable values, per-variable ACLs, KMS, rotation, or separate auditing.
 
-## 3. Flow、Revision 与 Presentation
+## 3. Flow, Revision, and Presentation
 
-Flow 是顶层资源：
+Flow is a top-level resource:
 
 ```ts
 interface Flow {
@@ -111,21 +100,13 @@ interface FlowPage {
 }
 ```
 
-`flowId` 由部署生成。删除请求把 Flow 推进到 `retiring`，此后 Draft mutation、Run、Publish、Rollback 和 Trigger admission fail closed。
-`total` 只在 `includeTotal=true` 时要求返回。
+Deployments generate `flowId`. Deletion moves a Flow to `retiring`. Draft mutation, Run, Publish, Rollback, and Trigger admission then fail closed. `total` is required only with `includeTotal=true`.
 
-`resourceReferences.draft` 对应 `draftRevisionId`，包含草稿实际引用的 Variable 名称、明确选择的连接账号和 Error Trigger 来源 Flow ID，
-去重并按稳定顺序返回。它描述整个草稿的静态引用，不表示某次 Run 实际使用了所有资源。
-草稿无法解码、需要修复或升级时返回 `null`，可读取但没有资源引用时返回三个空数组。
-`sharedAccess` 来自 Flow 当前独立维护的共享账号授权配置，按 `accessRevision` 标识版本；未配置时为 revision 0 和空数组。
-共享授权表示可用范围，不等于节点已使用该账号；无法识别账号的授权引用保留 `accessBindingId`，`connectionId` 为 `null`。
-账号作用域沿用 Flow 的 `connectorTeamId`。这些字段不包含 Variable 值、凭证、账号实时状态或发布版本资源快照。
-列表与详情返回相同资源引用投影。
+`resourceReferences.draft` corresponds to `draftRevisionId`. It contains deduplicated, stably ordered Variable names, explicitly selected connection accounts, and Error Trigger source Flow IDs actually referenced by the Draft. These are static references across the whole Draft, not proof that a Run used every resource. An undecodable Draft or one requiring repair/upgrade returns `null`; a readable Draft without references returns three empty arrays. `sharedAccess` comes from independently maintained Flow shared account authorization, versioned by `accessRevision`.
 
-Flow 的 `live` 在未发布时省略，存在时表示当前发布版本与总开关。列表与单个 Flow 返回相同投影；`revisionId` 与 `draftRevisionId` 可用于区分草稿版本是否更新。
-`PUT /v1/flows/:flowId/enabled` 接受 `{ enabled: boolean, expectedPublicationId: string, version: 1 }`，不接受其他字段或 query，成功返回 `200 Flow`。
-Flow 不存在返回 `404 flow.not-found`；未发布、Publication 已变化或 Flow 已进入 retiring 返回 `409 flow.conflict`。
-首次发布默认 enabled=true；发布与回滚保留 enabled。enabled=false 时 Live status 为 suspended，新的 Live Run 返回 `412 live.conflict`；草稿测试不受影响。
+Unconfigured access uses revision 0 and empty arrays. Shared access describes availability, not node usage. Unresolvable account references retain `accessBindingId` with `connectionId: null`. Account scope follows the Flow’s `connectorTeamId`. These fields contain no Variable values, credentials, live account status, or published resource snapshots. Lists and details return the same reference projection.
+
+Unpublished Flows omit `live`. When present, it identifies the current publication and master enabled state. Lists and individual reads use the same projection. Compare `revisionId` with `draftRevisionId` to detect Draft changes. `PUT /v1/flows/:flowId/enabled` accepts `{ enabled: boolean, expectedPublicationId: string, version: 1 }`, no other fields or query, and returns `200 Flow`. A missing Flow returns `404 flow.not-found`. An unpublished Flow, changed Publication, or retiring Flow returns `409 flow.conflict`. First publication defaults to enabled=true. Publication and rollback retain enabled state. With enabled=false, Live status is suspended and new Live Runs return `412 live.conflict`; Draft tests are unaffected.
 
 ```ts
 interface RevisionMetadata {
@@ -155,53 +136,131 @@ interface DraftSync {
 }
 ```
 
-`RevisionContent`、顶层 `FlowDocument` 和 `ChangeOperation` 由 `@oomol-lab/open-flow/flow-change` 定义。图操作直接作用于当前 Flow 的 graph，不接受 graph target。不存在嵌套 Flow map 或 Flow create/delete operation。
+`@oomol-lab/open-flow/flow-change` defines `RevisionContent`, top-level `FlowDocument`, and `ChangeOperation`. Graph operations act directly on the current Flow graph and accept no graph target. There is no nested Flow map or Flow create/delete operation.
 
-Revision 在 API 上是完整 immutable snapshot；Server 可以增量存储草稿正文，读取时还原为完整内容并校验 digest。Draft Run 和 Publish operation 准入时固定完整正文。Draft change 使用 `expectedRevisionId` 做 CAS；stale head 返回 `flow.revision-conflict`。每个 change batch
-要求 `Idempotency-Key`；相同 key 与相同 batch 返回第一次提交的 Revision，相同 key 与不同 batch 返回 `flow.conflict`。幂等重放先于 Draft head CAS。
-Draft sync 始终返回当前完整 snapshot，不接受 revision cursor，也不返回 authoring operation history。
+The API exposes Revisions as complete immutable snapshots. Server may store Draft content incrementally, reconstructing it and verifying its digest on read. Draft Run and Publish admission pin complete content. Draft changes use `expectedRevisionId` for CAS; stale heads return `flow.revision-conflict`. Each batch requires `Idempotency-Key`. The same key and batch return the first committed Revision; the same key with a different batch returns `flow.conflict`. Idempotent replay precedes Draft head CAS. Draft sync always returns the current complete snapshot. It accepts no revision cursor and returns no authoring operation history.
 
-Server 保留当前 Draft、Publication、待处理 Publish operation、未结束 Run 和每个 Flow 最近 50 条 Draft Run 引用的完整 Revision。
-其他旧 Revision 内容可由维护任务清理；`GET /v1/flows/:flowId/revisions/:revisionId` 对已清理的内容返回 404。
-Run 记录、终态结果与 Draft change 的幂等元数据仍保留。同一 Revision 被多次运行时，按 Run 条数计算最近 50 条。
+Server retains complete Revisions referenced by current Drafts, Publications, pending Publish operations, nonterminal Runs, and the latest 50 Draft Runs per Flow. Maintenance may remove other old Revision content. `GET /v1/flows/:flowId/revisions/:revisionId` returns 404 for removed content. Run records, terminal results, and Draft change idempotency metadata remain. Repeated Runs of the same Revision each count toward the latest 50.
 
-无法按当前模型读取但可以宽容恢复的 Draft 分别返回 `flow.upgrade-required` 或 `flow.repair-required`。客户端可以调用
-`POST /v1/flows/{flowId}/draft/repair`，body 为 `{ expectedRevisionId, version: 1 }` 并提供 `Idempotency-Key`。修复逐项保留
-当前模型可读取的资源，丢弃无法读取的 collection entry，并以旧 Draft 为 parent 创建新 Revision；原 Revision、Live、Publication、Run 和
-Presentation 不变。原始 Draft 缺失、增量数据损坏、digest 不匹配或 JSON 无法解析时，显式 repair 创建空白子 Revision；
-可解析内容因无效 Task 引用、旧 Subflow 或不支持的模型而拒绝修复或升级时，返回 `flow.invalid`，保持 Draft head 不变。
-普通读取仍按原错误返回，不会隐式修复。
+Drafts unreadable under the current model but recoverable through tolerant decoding return `flow.upgrade-required` or `flow.repair-required`. Clients may call `POST /v1/flows/{flowId}/draft/repair` with `{ expectedRevisionId, version: 1 }` and `Idempotency-Key`. Repair retains individually readable resources, drops unreadable collection entries, and creates a new Revision with the old Draft as parent. The original Revision, Live, Publication, Run, and Presentation remain unchanged. If the original Draft is missing, incremental data is corrupt, the digest mismatches, or JSON cannot parse, explicit repair creates a blank child Revision.
 
-Draft 请求的 operations 使用 `@oomol-lab/open-flow/control-requests` 的 `DraftOperation`：包含完整 ChangeOperation，以及 `graph.trigger.create`。
-后者接受 `nodeId`、Provider `key`、`config` 和可选的 `connectionId`、`name`、`schedule`。仅在根 Flow 创建 Poll/Integration；schedule 仅供 Poll 使用，默认每五分钟。
-`connectionId` 直接保存于 Trigger 节点；省略表示尚未选择账号。服务端在提交时解析 Provider 定义，转换为完整 ChangeOperation 并保存定义快照。
-Flow model 4 的 Poll/Integration 使用可选的 `connectionId`，`document.bindings` 只接受 `kind: 'variable'`。账号编辑通过 `graph.node.field.set` 的 `connectionId` 字段完成，省略 value 清除选择；不再接受 Connection binding 或 Trigger bindingId。
-幂等请求摘要按原始 DraftOperation 计算，已提交请求在解析目录之前重放，目录变更不改变重试结果。未知 key 或批次后续操作失败时，不提交部分变更。
-低层 REST Draft decoder 与 Workbench 继续使用此合同；Agent CLI/MCP 使用下述节点 authoring 合同。底层离线 `applyFlowChanges` 仍只接受已解析的 ChangeOperation。
+Parseable content with invalid Task references, legacy Subflows, or unsupported models returns `flow.invalid` when repair/upgrade is rejected, leaving Draft head unchanged. Ordinary reads retain their original errors and never repair implicitly.
 
-### 节点 authoring
+Draft requests use `DraftOperation` from `@oomol-lab/open-flow/control-requests`: complete ChangeOperation plus `graph.trigger.create`. The latter accepts `nodeId`, Provider `key`, `config`, and optional `connectionId`, `name`, and `schedule`. It creates Poll/Integration only in the root Flow. Schedule applies only to Poll and defaults to every five minutes. The Trigger node stores `connectionId` directly; omission means no selected account. On commit, the server resolves the Provider definition, converts it into a complete ChangeOperation, and stores its snapshot.
 
-以下 POST 接口由 `@oomol-lab/open-flow/control-requests` 定义公共视图、输入 schema、编译和诊断映射：
+Flow model 4 Poll/Integration uses optional `connectionId`; `document.bindings` accepts only `kind: 'variable'`. Edit accounts through the `connectionId` field of `graph.node.field.set`; omit value to clear selection. Connection bindings and Trigger bindingId are no longer accepted. Idempotency digests use the original DraftOperation. Committed requests replay before catalog resolution, so catalog changes do not change retry results. Unknown keys or later batch failures produce no partial commit. Low-level REST Draft decoding and Workbench retain this contract.
 
-| 路径                                 | 请求                                                                        |
-| ------------------------------------ | --------------------------------------------------------------------------- |
-| `/v1/flows/:flowId/authoring/read`   | `{revision?, nodes?, text?:{node,field,start?,lines?}}`，nodes 与 text 互斥 |
-| `/v1/flows/:flowId/authoring/search` | `{revision?,query,type?,offset?,limit?}`                                    |
-| `/v1/flows/:flowId/authoring/schema` | `{type?}`、`{action?}` 或空对象                                             |
-| `/v1/flows/:flowId/authoring/edit`   | `{baseRevision,requestId,edits}`                                            |
-| `/v1/flows/:flowId/authoring/check`  | `{revisionId}`                                                              |
+Agent CLI/MCP use the node authoring contract below. Offline `applyFlowChanges` still accepts only resolved ChangeOperation.
 
-CLI `read/search/schema/edit/check` 和 MCP `flow_read/search/schema/edit/check` 使用同一服务。公共节点视图聚合配置并隐藏节点执行配置、Module、binding 和 imports 的装配；源码与 prompt 按需读取。只支持当前模型的 Flow 图，包含已退役 Subflow 的 Revision 按模型兼容合同拒绝读取和修复。
+### Node authoring
 
-编辑编译为既有 ChangeOperation，使用原提交 owner 的整图 CAS、原子保存和幂等记录。`graph.node.replace` 在内部按完整 before 检查节点替换，保持节点 ID 与边。各节点独立拥有执行配置，编辑默认仅影响目标节点；共享 CodeModule 的局部源码编辑由工具按需复制模块，保留其他节点的行为。
+For these POST endpoints, `@oomol-lab/open-flow/control-requests` defines public views, input schemas, compilation, and diagnostic mapping:
 
-同一 requestId 重试先读取原幂等结果，不重新解析目录；不同请求复用 requestId 返回 flow.conflict。响应丢失可重放。冲突不自动合并。编辑响应的 saved 与 validation 独立，校验不可用不否认已保存事实。Check 返回固定 revisionId、valid 和节点/字段/代码位置诊断。
+| Path                                 | Request                                                                                        |
+| ------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `/v1/flows/:flowId/authoring/read`   | `{revision?, nodes?, text?:{node,field,start?,lines?}}`; nodes and text are mutually exclusive |
+| `/v1/flows/:flowId/authoring/search` | `{revision?,query,type?,offset?,limit?}`                                                       |
+| `/v1/flows/:flowId/authoring/schema` | `{type?}`, `{action?}`, or an empty object                                                     |
+| `/v1/flows/:flowId/authoring/edit`   | `{baseRevision,requestId,edits}`                                                               |
+| `/v1/flows/:flowId/authoring/check`  | `{revisionId}`                                                                                 |
 
-操作参数、文本精确匹配、局部合并、显式清除和输入来源语义见 [Flow 命令合同](../../authoring/flow-command.md)。
+CLI `read/search/schema/edit/check` and MCP `flow_read/search/schema/edit/check` use the same service. Public node views combine configuration and hide assembly of execution configuration, Modules, bindings, and imports. Source code and prompts are read on demand. Only current-model Flow graphs are supported. Revisions with retired Subflows reject reads and repair under the model compatibility contract.
 
-Authoring 配置使用业务字段映射，而非 Task 端口数组。Code/Agent/LLM/Wait/Approval 的 `config.inputs` 按字段名描述 `schema`、`nullable`、`description` 和输入 `default`，Code 的结果字段使用 `config.outputs`；Agent/LLM 的结果使用 `resultSchema`，固定运行时输出由服务端生成。`node.add.inputs` 直接绑定数据，这些节点的新命名输入可自动声明。输出来源在目标仅有一个输出时允许省略 `port`，多个输出返回候选项要求明确选择。这些转换由公共包拥有，低层 Draft/Workbench 存储合同不变。
+Edits compile to existing ChangeOperation and use the original commit owner’s whole-graph CAS, atomic save, and idempotency records. Internal `graph.node.replace` checks the complete before value and preserves node IDs and edges. Nodes own independent execution configuration; edits affect only the target by default. Tools copy shared CodeModules as needed for local source edits, preserving other nodes’ behavior.
 
-Presentation 独立于 Draft head：
+#### Reads and schemas
+
+Reads return `{flowId,revision,data,version:1}`. `nodes` and `text` are mutually exclusive. Omitting both returns a summary.
+
+- Summaries include node references, names, types, port handles, compact input summaries, and execution edges. They omit expanded schemas and long text.
+- Details combine actual configuration, ports, input sources, and adjacent edges without internal definition IDs.
+- Code and prompts appear as text metadata. Use `text` to read their bodies by line.
+
+Text reads default to 80 lines, with limits of 200 lines and 24000 characters. Continue with `nextStart` until `truncated: false`. Search returns matching references, fields, line numbers, bounded context, and `nextOffset`. Pin the same `revision` for all pages.
+
+Public schemas from `@oomol-lab/open-flow/control-requests` define request structure, node configuration, constraints, and creation examples. CLI `schema`, `--help --json`, and MCP tools share this source. Action schemas resolve within the specified Flow’s deployment scope.
+
+#### Edits and input sources
+
+Supported operations are `node.add/update/remove`, `input.set`, `edge.connect/disconnect`, and `text.edit/set`. `$alias` may reference only a node created earlier in the batch. Response `nodes` maps aliases to stable references. Batches execute in order; any application error prevents partial writes.
+
+`node.update.set` contains name, description, icon, execution limits, and `config`. Configuration merges recursively: omitted fields remain, and arrays replace whole arrays. OpenAPI `config.authentication` is a complete authentication selection. When supplied, it replaces the whole selection to avoid mixing schemes and parameters.
+
+`clear` is an array of field paths, such as `[["description"],["config","connectionId"]]`. Explicit clearing differs from JSON `null`. Required configuration cannot be cleared. Use `schema TYPE` for specific fields.
+
+`node.add.inputs` supplies data sources by business field name, equivalent to `input.set` after creation. Code, Agent, LLM, Wait, and Approval named inputs can be declared automatically by binding. They accept any JSON, including null, by default. Supply `config.inputs` for constraints. Rebinding does not weaken existing constraints.
+
+Capability definitions determine Connector, OpenAPI, and Provider Trigger fields. LLM `model/template/messages` use existing runtime constraints.
+
+Creating Code, Agent, or LLM through this interface injects no sample business data. Inputs come from caller bindings or business constraints. Existing node inputs and defaults remain unchanged.
+
+These configurations use field maps: Code `config.inputs/config.outputs`; Agent/LLM/Wait/Approval `config.inputs`; Webhook `config.body`; Value `config.outputs`. Example: `{"orders":{"schema":{"type":"array"},"nullable":false}}`.
+
+Each field may specify `schema` (default `{}`), `nullable` (default `true`), and `description`. Inputs may also specify `default`. These describe business data constraints; callers need no internal wrappers such as `handle` or `jsonSchema`. Field maps follow local merge rules. Remove fields with `clear`, such as `[["config","inputs","obsolete"]]`.
+
+Agent and LLM results default to text. Use `config.resultSchema` for structured results. The server generates fixed runtime outputs; callers do not declare `config.outputs`.
+
+Supported input sources:
+
+- `{kind:"value",value:null}`: explicit null, still subject to port validation.
+- `{kind:"unset"}`: explicitly unset; do not inherit the port default.
+- `{kind:"default"}`: remove the override and restore default inheritance.
+- `{kind:"output",node:"NODE",port:"value",field:"name"}`: node output or its direct property.
+- `{kind:"variable",name:"TOKEN"}`: bind a deployment variable by name.
+- `{kind:"sources",sources:[...]}`: multiple output or variable sources, resolved by existing execution rules.
+
+Omit `port` only for a node with one output, as in `{kind:"output",node:"$summary"}`. Multiple outputs require an explicit business field; omission returns candidates for correction. `field` selects a direct property within the chosen output, not the node output itself.
+
+Execution edges are independent of input sources. Connections use `source`, `target`, and optional `branch` without implicitly binding inputs. Input edits do not implicitly create execution edges.
+
+For `text.edit`, `oldText` must match exactly once, then is replaced by `newText`. Zero or multiple matches return `flow.invalid` with `details` containing `reason:"text.match-count"`, `matches`, `node`, `field`, and `editIndex`. `text.set` replaces the entire body.
+
+#### Node configuration semantics
+
+Public schemas define node fields and complete examples. These rules govern updates and preservation of capability definitions.
+
+Value `values` stores values; `outputs` stores constraints. A constraint without a value leaves that output unset. To remove an output, clear both `config.values.FIELD` and `config.outputs.FIELD`. Clearing only its value does not remove the field.
+
+JSON objects can pass as whole values. To select an object property through source `field`, declare its business structure in `config.outputs.FIELD.schema.properties`. Tools do not infer permanent types from one value.
+
+LLM `template` retains runtime message-template semantics and can use named inputs such as `{{orders}}`. `messages` contains history without template interpolation and precedes template messages. Configuration values are defaults; node bindings take precedence. `input.set` with `default` restores inheritance; `unset` explicitly suppresses defaults. Changing a default model or template preserves existing bindings.
+
+Condition comparison operands directly use values, node outputs, or variable sources without a `kind:"source"` wrapper. Branch names serve `edge.connect.branch`; execution edges are edited separately. `when` accepts one comparison, `{all:[comparison,...]}`, or `{any:[comparison,{all:[comparison,...]},...]}`. If no branch matches, execution uses the fixed `otherwise` branch.
+
+`first` selects the first matching branch in saved order; `all` selects all matches. Branch ports provide no data outputs, so Condition cannot be a data source. All operand sources resolve before matching. Missing values, incomplete configuration, or incompatible types produce errors rather than `otherwise`.
+
+Poll and Integration parameters come from catalog definitions. They accept only fixed `value`, explicit `unset`, or restored `default`, not other nodes’ outputs or variables. There is no separate `config.values` wrapper. Trigger catalogs and node details show input names and defaults.
+
+OpenAPI node details list supported authentication options. `authentication:{schemes:["bearer","apiKey"]}` selects one complete option requiring all its schemes. Do not combine different options or select only part of one. `{schemes:[]}` is valid only when the specification permits anonymous access. Manual choices include `{type:"bearer"}`, `{type:"basic"}`, and `{type:"apiKey",name:"X-Token",in:"header"}`. Manual bearer supports specifications declaring OAuth when the caller already has an access token. Bind credentials to deployment variables through inputs listed in node details; do not put secrets in configuration.
+
+At creation, omitted authentication and server URLs use the operation’s defaults. Changes to the same operation’s name, URL, or authentication reuse its saved specification snapshot.
+
+Changing `sourceUrl/path/method` rereads the specification and uses the new operation’s default authentication and URL, unless the request explicitly supplies them. Clearing `config.authentication` or `config.serverUrl` restores the saved operation’s defaults. Manual and specification-based authentication selections replace as a whole. Existing input bindings remain by input name.
+
+Agent tool `inputs` selects sources by Action parameter name:
+
+- `{kind:"model"}`: the model supplies the value.
+- `{kind:"value",value:...}`: use a fixed value.
+- `{kind:"input",input:"orders"}`: reference an Agent named input.
+
+Callers need not supply parameter schemas. Adding a tool or changing its Action assembles constraints from the catalog. Unspecified parameters default to model input. Existing tools with unchanged Actions retain constraints and sources not overwritten. Description or approval changes do not refresh catalog definitions. Unknown parameter names return the available names.
+
+#### Saving, validation, and retries
+
+Edits return `{saved:true,revision,nodes,changes,validation,version:1}`. `validation.status` is `valid`, `invalid`, or `unavailable`. A successful save may contain semantic diagnostics. Resolve them and recheck the pinned revision with `check` before execution. Diagnostics include node references, field paths, and available code line/column locations, hiding storage paths and definition IDs.
+
+`requestId` is a stable idempotency identity. After a lost response, retry with the same Flow, baseRevision, requestId, and complete edits. The server checks the original request record before Draft versions and catalog resolution.
+
+- Reusing an identity for a different request returns `flow.conflict`.
+- A new request against an old revision returns `flow.revision-conflict` without automatic merging.
+
+After a revision conflict, reread affected nodes, preserve user changes, and submit against the new revision with a new request identity.
+
+Check returns pinned `revisionId`, `valid`, and diagnostics with node, field, and code locations.
+
+### Presentation and editor reads
+
+Presentation is independent of Draft head:
 
 ```ts
 interface Presentation {
@@ -212,9 +271,9 @@ interface Presentation {
 }
 ```
 
-更新 body 为 `{ expectedRevision, value, version: 1 }`，stale CAS 返回 `flow.presentation-conflict`。
+Update bodies use `{ expectedRevision, value, version: 1 }`. Stale CAS returns `flow.presentation-conflict`.
 
-`GET /v1/flows/{flowId}/editor` 聚合编辑器首次加载所需的数据：
+`GET /v1/flows/{flowId}/editor` combines data for initial editor loading:
 
 ```ts
 {
@@ -226,32 +285,31 @@ interface Presentation {
 }
 ```
 
-各字段复用对应资源读取的合同。`flow.flowId`、`draft.flowId` 和 `live.flowId` 必须匹配请求的 Flow，
-`flow.draftRevisionId` 必须等于 `draft.revisionId`；Live 的 `hasUnpublishedChanges` 对应该 Draft。
-该操作只读，不创建 Revision、不改变 Presentation revision，也不执行 check；不存在的 Flow 返回 `flow.not-found`。
-各资源的独立读取与修改接口继续有效。客户端忽略 editor 响应顶层与 Presentation 响应中的额外字段，
-但仍校验必需字段、字段类型、版本及上述资源一致性。
+Each field reuses its resource read contract. `flow.flowId`, `draft.flowId`, and `live.flowId` must match the requested Flow. `flow.draftRevisionId` must equal `draft.revisionId`; Live `hasUnpublishedChanges` refers to that Draft. This read creates no Revision, changes no Presentation revision, and runs no check. A missing Flow returns `flow.not-found`. Independent resource read/write interfaces remain available. Clients ignore extra fields at the editor response root and in Presentation responses, but validate required fields, types, versions, and resource consistency.
 
-### 执行图与输入来源
+### Execution graphs and input sources
 
-Revision 的 graph 必须包含 `nodes` 和 `edges`；没有执行边时显式保存 `edges: []`。
-为兼容旧 Draft，解码时将缺失的 `edges` 补为 `[]`；显式提供的 `edges` 仍须通过数组及边结构校验。
-Value Node 没有数据输入端口。解码时将其 `inputs` 统一归一化为 `{}`，忽略缺失或任意旧输入数据；执行入边保持不变，仍决定节点何时执行。
-执行边使用 `{ source: nodeId, target: nodeId, sourceHandle?: branch }`。普通节点不得设置 `sourceHandle`；Condition 和 Wait 必须指定已声明的分支或 action。
-边不含目标 input handle。重复边、缺失端点和指向 Trigger 的边不能通过 validation；允许自连接和回边。边集合按规范顺序参与 Revision digest。
+Node titles must be nonempty and unique within each Flow graph. `nodeId` is stable across title changes. Correct naming violations through normal Draft changes that create a new Revision. Reads do not rewrite existing versions.
 
-`inputs[handle]` 使用 `{ kind: 'value', value }` 或 `{ kind: 'sources', sources }`。Node source 使用
-`{ kind: 'node', nodeId, output, field?: string }`；省略 `field` 选择整个输出，提供时选择输出对象 schema 声明的一级属性，字段名按原始 key 处理（包括空字符串、点号和斜杠），不支持多级路径或数组下标。字段选择统一用于 Inputs 和 Condition 操作数。候选字段来自对象 schema 的直接 `properties`，不解析 `$ref`，不展开 `allOf`、`anyOf`、`oneOf` 分支；无法直接列出字段时仍可选择整个输出。父对象为 null 或自身属性缺失视为无可用来源，显式字段 null 仍是可用来源。Variable binding 的 source 形式保持不变。Node source 必须指向经执行边可达的祖先，
-不要求覆盖目标的每一条执行路径。每条被选中的执行入边分别启动一次 invocation，不等待其他前驱。输入只读取这次到达路径上的结果快照，多个 source 不能在该快照同时提供值；并行前驱的结果分别传给各自触发的 invocation。
-所有可执行节点支持可选正整数 `maxExecutions`，默认 1000；按一次 Flow Run 中的节点累计。下一次到达会超过上限时，Run 报错终止。Wait/Agent 决议恢复不增加次数。
-调度仅依据执行连线及分支状态；输入来源缺失不导致跳过。零个可用来源补 `null`，一个来源取其值，多个来源报错；实际输出 `null` 仍算一个已提供的值。收集后按端口声明校验，失败则报错。
+Execution nodes own `node.task` directly. There is no independent Task ID or shared Task table. Copy, edit, delete, and undo affect only the specified node. CodeModules remain referenceable by `moduleId`. Task port groups are stored with ordered definitions and included in the digest. They create no semantic ports and do not participate in connections, validation, or Runs.
 
-`graph.edge.connect` 与 `graph.edge.disconnect` 只修改执行边，`graph.node.input.set` 独立修改数据映射。节点不保存 `concurrency`。
+Revision graphs require `nodes` and `edges`; save `edges: []` explicitly when there are no execution edges. For legacy Drafts, decoding supplies `[]` for missing `edges`. Explicit edges still undergo array and edge-structure validation. Value nodes have no data input ports. Decoding normalizes their `inputs` to `{}`, ignoring missing or arbitrary legacy input data. Incoming execution edges remain and determine execution timing. Edges use `{ source: nodeId, target: nodeId, sourceHandle?: branch }`.
 
-Agent 的 `edge.connect/disconnect` 与 `input.set` 独立修改执行关系与数据来源，参见 [Flow 命令合同](../../authoring/flow-command.md)。
-不提供旧数据流边、节点 concurrency 或旧 checkpoint 的兼容转换。
+Ordinary nodes must omit `sourceHandle`; Condition and Wait require a declared branch or action. Edges have no target input handle. Duplicate edges, missing endpoints, and edges targeting Triggers fail validation. Self-edges and back edges are allowed. Edge sets use canonical order in Revision digests.
 
-## 4. Validation、Publication 与 Live
+`inputs[handle]` uses `{ kind: 'value', value }` or `{ kind: 'sources', sources }`. Node sources use `{ kind: 'node', nodeId, output, field?: string }`. Omit `field` for the whole output; supply it for a direct property declared by the output object schema. Keys are literal, including empty strings, dots, and slashes. Nested paths and array indexes are unsupported. Inputs and Condition operands share field selection.
+
+Candidates come from direct schema `properties`; `$ref` and `allOf`/`anyOf`/`oneOf` are not expanded. Whole-output selection remains available when fields cannot be listed. A null parent or absent own property is unavailable; an explicit null field remains available. Variable binding source syntax is unchanged. Node sources must target ancestors reachable through execution edges, but need not cover every execution path. Each selected incoming edge starts a separate invocation without waiting for other predecessors.
+
+Inputs read only that arrival path’s result snapshot; multiple sources cannot supply values in the same snapshot. Parallel predecessors pass results to their own invocations. Executable nodes accept optional positive integer `maxExecutions`, default 1000, counted per node within one Flow Run. An arrival that would exceed the limit fails the Run. Wait/Agent decision resumption does not increment it. Scheduling depends only on execution edges and branch state.
+
+Missing input sources do not skip nodes. Zero available sources produce `null`, one supplies its value, and multiple sources cause an error. Actual output `null` counts as supplied. Collected inputs undergo port validation; failure is an error.
+
+`graph.edge.connect` and `graph.edge.disconnect` modify only execution edges. `graph.node.input.set` independently modifies data mappings. Nodes store no `concurrency`.
+
+Agent `edge.connect/disconnect` and `input.set` independently modify execution relationships and data sources. See [Node authoring](#node-authoring). No compatibility conversion is provided for old dataflow edges, node concurrency, or old checkpoints.
+
+## 4. Validation, Publication, and Live
 
 ```ts
 interface FlowCheck {
@@ -274,11 +332,9 @@ interface FlowCheck {
 }
 ```
 
-Check body 是 `{ engineContract: 'open-flow-engine/v5', version: 1 }`，始终验证 path 中固定的 Flow Revision。
-`message` 是稳定的 canonical English fallback；Workbench 可以使用 `code`、可选 `values.variant` 和其余 `values` 显示本地化文案，未知 code 或 variant
-必须回退到 `message`。
+Check bodies use `{ engineContract: 'open-flow-engine/v5', version: 1 }` and always validate the Flow Revision pinned in the path. `message` is a stable canonical English fallback. Workbench may localize using `code`, optional `values.variant`, and other `values`. Unknown codes or variants must fall back to `message`.
 
-Publication 的 `liveEnd` 记录该版本被新 Live 替换瞬间的启用状态和结束时间，由普通发布或回滚切换 Live 的事务原子写入。异步准备期间不写入，失败和幂等重放不改写；回滚创建的新 Publication 不继承来源的结束状态。当前版本及无历史记录的旧版本省略此字段，不能据此推断触发器健康状态。
+Publication `liveEnd` records enabled state and end time when a new Live replaces that version. The ordinary publish/rollback transaction writes it atomically. Asynchronous preparation does not write it; failure and idempotent replay do not rewrite it. A new rollback Publication does not inherit its source’s end state. Current Publications and older records without history omit it. It does not indicate Trigger health.
 
 ```ts
 interface Publication {
@@ -339,20 +395,13 @@ interface Live {
 }
 ```
 
-Publish body 是 `{ engineContract, expectedLivePublicationId, version: 1 }`。接受与幂等重放都返回 `202` 和同一 `PublishOperation`。客户端通过
-`GET /v1/flows/{flowId}/publish-operations/{operationId}` 读取其状态。pending 时不创建
-Publication、不移动 Live；succeeded 后可以用 `publicationId` 读取 Publication 与 Live；failed 只返回安全 issue。
+Publish bodies use `{ engineContract, expectedLivePublicationId, version: 1 }`. Acceptance and idempotent replay both return `202` with the same `PublishOperation`. Query status through `GET /v1/flows/{flowId}/publish-operations/{operationId}`. Pending operations create no Publication and do not move Live. After success, use `publicationId` to read Publication and Live. Failure returns only a safe issue.
 
-新的 Integration subscription 与新建或变更 Poll 的 baseline 都在 pending operation 内准备。Poll baseline 返回的事件不会创建 Run，最终 checkpoint
-只在 operation 激活时安装。完全未变化且健康的 Integration/Poll 运行状态可以复用；已有 Integration 不能安全 staged replacement 时，Publish 在建立
-operation 前返回 `publication.unsupported`，旧 Live 与现有 subscription 保持不变。
+Pending operations prepare new Integration subscriptions and baselines for new or changed Polls. Baseline events do not create Runs. The final checkpoint installs only on activation. Completely unchanged, healthy Integration/Poll runtime state may be reused. If an existing Integration cannot support safe staged replacement, Publish returns `publication.unsupported` before creating an operation. Old Live and its subscription remain unchanged.
 
-Rollback body 是 `{ expectedLivePublicationId, version: 1 }`，使用 Live CAS。首次提交返回 `201`，幂等重放返回 `200`。Rollback 创建新
-Publication 并设置 `sourcePublicationId`，不修改历史和 Draft head。
-首次 Publish 或 Rollback 必须在创建 Publication 的权威 transaction 中确认固定 closure 使用的 Variable 均存在；缺失时返回
-`binding.unresolved`。相同 operation identity 的幂等重放先返回原 Publication，不因 Variable 后续被删除而改变结果。
+Rollback bodies use `{ expectedLivePublicationId, version: 1 }` with Live CAS. First submission returns `201`; idempotent replay returns `200`. Rollback creates a new Publication with `sourcePublicationId`, preserving history and Draft head. First Publish or Rollback must verify all Variables used by the pinned closure inside the authoritative Publication-creation transaction. Missing Variables return `binding.unresolved`. Idempotent replay returns the original Publication before checking later Variable deletion.
 
-Publication 的展示快照通过 `GET /v1/flows/:flowId/publications/:publicationId/presentation` 读取：
+Read a Publication’s presentation snapshot through `GET /v1/flows/:flowId/publications/:publicationId/presentation`:
 
 ```ts
 interface PublicationPresentation {
@@ -361,19 +410,15 @@ interface PublicationPresentation {
 }
 ```
 
-首次接受发布操作的事务固定已保存的 Presentation，异步完成和幂等重放不重新读取布局。Rollback 继承来源快照且不写入草稿 Presentation。
-旧记录和升级前的 pending operation 没有快照时返回 `null`；不得用当前 Presentation 代替。Publication 不存在或不属于指定 Flow 时返回 `publication.not-found`。
+The transaction that first accepts publication pins the saved Presentation. Asynchronous completion and replay do not reread layout. Rollback inherits the source snapshot without writing Draft Presentation. Old records and pre-upgrade pending operations without snapshots return `null`; never substitute current Presentation. Missing Publications or those outside the specified Flow return `publication.not-found`.
 
-发布者头像和名称不属于 Publication 快照。Workbench 通过可选的宿主接口
-`resolveActor(actorId, signal): Promise<{ name: string; avatarUrl?: string } | null>` 读取展示资料。
-显式宿主解析器优先。浏览器会话入口仅在 `https://console.oomol.com` / `https://console.oomol.dev` 来源下默认启用 OOMOL 解析器，
-直接请求对应 `https://api.oomol.com` / `https://api.oomol.dev` 的 `GET /v1/users/summaries?user_ids=...`，携带上游 Cookie 和取消信号，
-把 `nickname || username` 映射为名称、`url` 映射为头像。此请求不经过宿主的 Control API request，也不附带 Flow / Team 请求头。
-其它来源不默认查询 OOMOL；未接入解析器、用户不存在或请求失败时显示原始 actorId。
-独立 ActorStore 按 actorId 缓存完整响应（包括 null），每个 Workbench 会话最多 128 项、有效期 24 小时；
-读取命中更新 LRU 次序，同一身份的在途请求合并，失败不缓存。会话销毁清空缓存并取消请求，不持久化用户资料。
+Publisher names and avatars are outside Publication snapshots. Workbench reads display profiles through optional host `resolveActor(actorId, signal): Promise<{ name: string; avatarUrl?: string } | null>`. Explicit host resolvers take precedence. Browser session entry points enable the default OOMOL resolver only on `https://console.oomol.com` / `https://console.oomol.dev`. They directly call the matching `https://api.oomol.com` / `https://api.oomol.dev` endpoint `GET /v1/users/summaries?user_ids=...` with upstream Cookies and cancellation signals. `nickname || username` maps to name and `url` to avatar.
 
-Publication list 按 `createdAt`、`publicationId` 逆序稳定分页：
+This bypasses host Control API requests and includes no Flow/Team headers. Other origins do not query OOMOL by default. Missing resolvers, missing users, or failed requests display raw actorId. An independent ActorStore caches complete responses, including null, by actorId. Each Workbench session holds at most 128 entries for 24 hours. Hits update LRU order, same-identity in-flight requests coalesce, and failures are not cached. Session destruction clears the cache and cancels requests.
+
+Profiles are not persisted.
+
+Publication lists paginate stably in descending `createdAt`, then `publicationId` order:
 
 ```ts
 interface PublicationPage {
@@ -400,10 +445,9 @@ interface Run {
 }
 ```
 
-Run detail 增加固定的 `closureDigest`、`engineContract`、`engineDigest`、`modelVersion`、`sharedAccessDigest` 和 `revisionDigest`。Live Run 增加
-`publicationId`；自动触发的运行同样归类为 Live，并额外携带 `occurrenceId` 和 `triggerNodeId`。
+Run details add pinned `closureDigest`, `engineContract`, `engineDigest`, `modelVersion`, `sharedAccessDigest`, and `revisionDigest`. Live Runs add `publicationId`. Automatically triggered Runs are also Live and include `occurrenceId` and `triggerNodeId`.
 
-`RunStatus` 包含 `queued | starting | running | waiting | canceled | completed | failed | indeterminate`。所有 Run detail 必须返回待决议集合：
+`RunStatus` includes `queued | starting | running | waiting | canceled | completed | failed | indeterminate`. Every Run detail must return its pending decision collection:
 
 ```ts
 waits: readonly {
@@ -416,24 +460,26 @@ waits: readonly {
 }[]
 ```
 
-集合只包含未决议等待，按登记时间和 waitId 排序。running、waiting、queued、starting 都可能包含多个等待；终态返回空集合。
-客户端用 nodeId 定位、用 waitId 决议。waiting 状态要求集合非空，旧单个 waiting 字段不再接受。历史由 RunEvent 表达。
+The collection contains only unresolved waits, ordered by registration time and waitId. running, waiting, queued, and starting may each contain multiple waits. Terminal states return an empty collection. Clients locate nodes with nodeId and resolve waits with waitId. The waiting state requires a nonempty collection; the old single waiting field is rejected. RunEvents represent history.
 
-Draft Run body 是 `{ engineContract, inputs, trigger, version: 2 }`。Live Run body 是 `{ publicationId, inputs, trigger, version: 2 }`。首次接受返回 `202`，
-幂等重放返回 `200`。Run 接受后不受后续 Draft change、Publish 或 Rollback 影响。
+Draft Run bodies use `{ engineContract, inputs, trigger, version: 2 }`. Live Run bodies use `{ publicationId, inputs, trigger, version: 2 }`. First acceptance returns `202`; replay returns `200`. Later Draft changes, Publish, or Rollback do not affect accepted Runs.
 
-`trigger` 必填，形如 `{ nodeId: string, outputs: Record<string, JsonValue> }`，固定本次运行的起始 Trigger 和完整输出。缺少入口、入口不是固定 Revision 中的 Trigger，或 outputs 缺失、包含额外端口或不符合各端口 schema 时返回 `run.invalid`。nullable 允许端口值为 null，不允许缺失端口。入口及完整 outputs 参与 Control API 幂等 request digest，并随 Run 持久化；不会自动选择入口或退回整图运行。
+Required `trigger` uses `{ nodeId: string, outputs: Record<string, JsonValue> }` and pins the starting Trigger and complete outputs. Either condition returns `run.invalid`:
 
-Draft Run 只对选中 Trigger 沿执行边可达的节点及其依赖进行语义校验、能力检查和 Variable 准入检查。其他分支的未配置 Trigger、无效代码和缺失资源仍出现在全图 check 中，但不阻断此次测试。
-共享下游输入的多来源映射忽略本次不可达的已有节点来源；剩余来源缺失时补 `null` 并校验，不影响执行边调度；不能同时提供多个值。缺失节点引用、选中分支内的环、无效代码仍返回 `flow.invalid`。
-Draft Run 的 `revisionDigest` 标识完整 Revision，`closureDigest` 标识本次入口的执行 closure，可以与全图 check 的 `closureDigest` 不同。读取和恢复 Run 不修改原 Revision。
-Publish 和 Live Run 保持完整 Flow 校验。
+- The entry is missing or is not a Trigger in the pinned Revision.
+- Outputs are missing, include extra ports, or violate port schemas.
 
-Manual Trigger 的节点结构为 `{ kind: "manual", name: string, description?: string, icon?: string }`，无输入和调度配置。其执行出口沿普通执行边连接下游，不提供数据输出字段，运行请求中的 `trigger.outputs` 和执行结果均为 `{}`。Cron 直接声明 `scheduledAt` 字符串端口；Poll 和 Integration 通过各自定义声明输出端口。其他 Trigger 可通过显式 outputs 模拟执行，仍保留 Draft/Live Run source，不伪造外部 occurrence。
+Nullable permits null values, not missing ports. The entry and complete outputs participate in the Control API idempotency request digest and persist with the Run. The API neither selects an entry automatically nor falls back to whole-graph execution.
 
-Flow Error 使用 Flow model 5，节点为 `{ kind: 'error', name: string, sourceFlowIds?: readonly string[], description?: string, icon?: string }`，仅根图可放置且最多一个。`sourceFlowIds` 为监听的上游 flowId 列表，禁止重复、空 ID、自身以及未发布的 Flow。通过 `{ kind: 'graph.trigger.sources.set', nodeId: string, before?: readonly string[], value?: readonly string[] }` 修改；省略 value 清除，before 是原值前置条件。监听列表由错误处理 Flow 保存并发布，上游不再保存处理目标。旧 model 2/4 Revision 的正文和 digest 保持不变，新的修改升级到 model 5。
+Draft Runs validate semantics, capabilities, and Variable admission only for nodes reachable from the selected Trigger through execution edges and their dependencies. Unconfigured Triggers, invalid code, and missing resources on other branches remain visible in whole-graph checks but do not block this test. Multi-source mappings for shared downstream inputs ignore existing node sources unreachable in this Run. Missing remaining sources produce `null` and undergo validation without affecting edge scheduling.
 
-仅自动 occurrence Run 的 failed/indeterminate 终态触发错误处理，手动 Run 可以提供样例 outputs 测试分支。一个上游可以被多个处理 Flow 监听，每个源 Run 对每个处理 Flow 至多派发一次。Flow Error 的固定必需输出为：
+Multiple simultaneous values are forbidden. Missing node references, cycles within the selected branch, and invalid code still return `flow.invalid`. Draft Run `revisionDigest` identifies the complete Revision; `closureDigest` identifies the entry’s execution closure and may differ from the whole-graph check. Reads and recovery do not modify the original Revision. Publish and Live Runs retain complete Flow validation.
+
+Manual Trigger structure is `{ kind: "manual", name: string, description?: string, icon?: string }`, with no inputs or schedule. It connects downstream through ordinary execution edges and provides no data output fields. Both request `trigger.outputs` and execution results are `{}`. Cron declares a `scheduledAt` string port. Poll and Integration declare outputs through their definitions. Explicit outputs can simulate other Triggers while retaining Draft/Live Run source without inventing external occurrences.
+
+Flow Error uses Flow model 5 and `{ kind: 'error', name: string, sourceFlowIds?: readonly string[], description?: string, icon?: string }`. Only the root graph may contain it, at most once. `sourceFlowIds` lists upstream flowIds to watch. Duplicate, empty, self, and unpublished Flow IDs are forbidden. Update through `{ kind: 'graph.trigger.sources.set', nodeId: string, before?: readonly string[], value?: readonly string[] }`. Omitted value clears the list; before checks the previous value. The error-handling Flow stores and publishes its watch list; upstream Flows no longer store handler targets. Existing model 2/4 Revision bytes and digests remain unchanged. New edits upgrade to model 5.
+
+Only failed/indeterminate terminal states of automatic occurrence Runs trigger error handling. Manual Runs may supply sample outputs to test the branch. Multiple handlers can watch one upstream Flow. Each source Run dispatches at most once per handler Flow. Flow Error has these fixed required outputs:
 
 ```ts
 {
@@ -443,17 +489,24 @@ Flow Error 使用 Flow model 5，节点为 `{ kind: 'error', name: string, sourc
 }
 ```
 
-时间字段使用 ISO 8601。`path` 为空列表。系统层失败没有节点上下文。最终失败原因独立于事件日志保存，错误文本复用现有脱敏规则。
+Time fields use ISO 8601. `path` is an empty list. System-level failures have no node context. Final failure reasons persist independently of event logs; error text uses existing redaction rules.
 
-Run detail 返回可选 `errorSource: { flowId, runId }`，以及可选 `errorDispatches` 数组，元素为：`{ status: 'pending', flowId }`、`{ status: 'dispatched', flowId, runId }` 或 `{ status: 'failed', flowId, message }`。派发状态变化通知源 Run，创建处理 Run 通知目标 Flow。Run 的失败结果可携带相同的 nodeId/jobId/path；源终态不会因处理成功而改变。Workbench host 的 Runs location 接受可选 runId，以定位两端的运行记录。
+Run details may return `errorSource: { flowId, runId }` and an `errorDispatches` array containing `{ status: 'pending', flowId }`, `{ status: 'dispatched', flowId, runId }`, or `{ status: 'failed', flowId, message }`. Dispatch changes notify the source Run; handler Run creation notifies the target Flow. Failed results may include the same nodeId/jobId/path. Successful handling does not change the source terminal state. Workbench host Runs locations accept optional runId to locate either Run.
 
-Webhook 声明四个必需输出，顺序为 `headers`、`query`、`body`、`webhookUrl`。headers 为小写名称的字符串映射；query 单值为字符串，重复值为有序字符串数组；body 是由 `bodyFields` 定义的严格 JSON 对象；webhookUrl 是服务端 Request URL 去除 query 和 fragment 后的绝对地址。空请求体按 `{}` 校验，不填充字段默认值。请求头完整保存，不在 Trigger 层脱敏。
+Webhook declares four required outputs in this order: `headers`, `query`, `body`, `webhookUrl`:
 
-Webhook HTTP 准入的幂等规则独立于 Control API：没有 `Idempotency-Key` 时每次创建 Run；有 key 时在 endpoint 和运行版本范围内查重。摘要包含固定目标身份、协议版本及规范化后的 method、query、body，排除 headers 和 webhookUrl。相同 key 与摘要重放原 Run，摘要不同返回 409。重试不覆盖首次保存的 outputs；并发准入由数据库事务和唯一约束协调。通过请求头区分业务事件的调用方必须使用不同的 key。
+- headers: a string map with lowercase names.
+- query: a string for one value, an ordered string array for repeated values.
+- body: a strict JSON object defined by `bodyFields`.
+- webhookUrl: the absolute server Request URL without query or fragment.
 
-首次 Run admission 在创建 Run 的权威 transaction 中确认固定 closure 使用的 Variable 均存在；缺失返回 `binding.unresolved`。幂等重放先于
-该 eligibility 检查。Run 真正开始时再在一个读取 snapshot 中解析所有 Variable value，所以排队期间的更新会用于本次执行；开始后的更新不影响
-该 Run。Variable value 不进入持久化 Run request，也不由平台写入 `node.started` 的 inputs 投影。
+Empty bodies validate as `{}` without field defaults. Headers are retained in full without Trigger-layer redaction.
+
+Webhook HTTP admission uses idempotency rules separate from Control API. Without `Idempotency-Key`, each request creates a Run. With a key, admission deduplicates within endpoint and runtime-version scope.
+
+The digest includes pinned target identity, protocol version, and normalized method, query, and body. It excludes headers and webhookUrl. The same key and digest replay the original Run; a changed digest returns 409. Retries preserve the original outputs. Transactions and unique constraints coordinate concurrent admission. Callers that distinguish business events by headers must use different keys for different events.
+
+First Run admission verifies all Variables required by the pinned closure in the authoritative Run-creation transaction. Missing Variables return `binding.unresolved`. Replay precedes this eligibility check. At actual execution start, one read snapshot resolves all Variable values. Updates while queued therefore apply; later updates do not affect the Run. Variable values enter neither persisted Run requests nor platform `node.started` input projections.
 
 ```ts
 interface RunPage {
@@ -474,14 +527,13 @@ interface RunEvents {
 }
 ```
 
-Run list 按 `createdAt`、`runId` 逆序稳定分页。查询可按单个 `status`、`source`、精确 `runId`、`createdFrom`（包含）和 `createdBefore`（不包含）组合筛选；时间参数使用 RFC 3339，范围必须递增。`status=waiting` 只查询已冻结 Run；`pendingWait=true` 查询所有有待决议项的非终态 Run，包含运行中和排队中，`false` 查询其补集。后续页面继续传同一组筛选参数；cursor 只表达 Flow 范围和分页位置。
+Run lists paginate stably in descending `createdAt`, then `runId` order. Queries may combine one `status`, `source`, exact `runId`, inclusive `createdFrom`, and exclusive `createdBefore`. Time parameters use RFC 3339 and must form an increasing range.
 
-`after` 是已观察的最后 sequence，只返回更大的事件。terminal Run 最多有一个 terminal event。非 terminal Run 的 result 返回
-`run.not-terminal`；取消成功与重复取消分别返回 `cancelAccepted: true` 和 `false`。
+`status=waiting` selects only frozen Runs. `pendingWait=true` selects all nonterminal Runs with unresolved decisions, including running and queued Runs. `false` selects the complement. Continue with identical filters on later pages. Cursors encode only Flow scope and page position.
 
-公共 `RunEvent` 按 `kind` 区分 payload；`decodeRunEvent` 与 Control client 复用同一 decoder，拒绝缺失或类型错误的必需字段。
-事件 envelope 为 `{ createdAt, kind, payload, sequence }`，`sequence` 是非负安全整数；不提供独立的 source sequence。
-平台字段按下表投影，用户 `outputs` 和 terminal `result` 内部保持自由 JSON。
+`after` is the last observed sequence; only higher sequences return. A terminal Run has at most one terminal event. Reading a nonterminal result returns `run.not-terminal`. Successful and repeated cancellation return `cancelAccepted: true` and `false`, respectively.
+
+Public `RunEvent` discriminates payloads by `kind`. `decodeRunEvent` and Control client share a decoder that rejects missing or incorrectly typed required fields. The envelope is `{ createdAt, kind, payload, sequence }`, where `sequence` is a nonnegative safe integer. There is no separate source sequence. Platform fields follow this table; user `outputs` and terminal `result` remain arbitrary JSON.
 
 | kind                                                            | payload                                                                                 |
 | --------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -489,27 +541,23 @@ Run list 按 `createdAt`、`runId` 逆序稳定分页。查询可按单个 `stat
 | `run.started`                                                   | `{ flowId, scopeId, parentScopeId? }`                                                   |
 | `run.progress`                                                  | `{ flowId, scopeId, progress }`                                                         |
 | `run.completed / run.canceled / run.failed / run.indeterminate` | `{ result: JsonValue }`                                                                 |
-| `run.events-truncated`                                          | JSON object；保留给事件明细截断通知。                                                   |
-| `node.started`                                                  | Node context，加可选的 `nodeKind`、`nodeTitle`、`operation`。                           |
-| `node.completed`                                                | Node context，加 `outputs: Record<string, JsonValue>`。                                 |
-| `node.failed`                                                   | Node context，加 `error: { code, message }`。                                           |
-| `node.log`                                                      | Node context，加 `level: 'debug' / 'info' / 'warn' / 'error'` 和 `message`。            |
-| `node.progress`                                                 | Node context，加 `progress`。                                                           |
-| `node.artifact`                                                 | Node context，加 `artifact: { kind: 'artifact', id, name, size, digest, mediaType? }`。 |
+| `run.events-truncated`                                          | JSON object reserved for event-detail truncation notices.                               |
+| `node.started`                                                  | Node context plus optional `nodeKind`, `nodeTitle`, and `operation`.                    |
+| `node.completed`                                                | Node context plus `outputs: Record<string, JsonValue>`.                                 |
+| `node.failed`                                                   | Node context plus `error: { code, message }`.                                           |
+| `node.log`                                                      | Node context plus `level: 'debug' / 'info' / 'warn' / 'error'` and `message`.           |
+| `node.progress`                                                 | Node context plus `progress`.                                                           |
+| `node.artifact`                                                 | Node context plus `artifact: { kind: 'artifact', id, name, size, digest, mediaType? }`. |
 
-Node context 固定为 `{ flowId, scopeId, nodeId, executionId }`，各 identity 为非空字符串。
-`progress` 为 0–100 的有限数值；Artifact `size` 为非负安全整数，`digest` 为 `sha256:` 加 64 位小写十六进制。
-`nodeKind` 为 `agent / approval / condition / connector / decision / javascript / openapi / llm / value / wait`。
-Runtime projector 不接受旧的 `node.cache-hit`、`node.preview` 或 `run.output` 事件。
+Node context is `{ flowId, scopeId, nodeId, executionId }`, with nonempty identities. `progress` is a finite number from 0–100. Artifact `size` is a nonnegative safe integer; `digest` is `sha256:` followed by 64 lowercase hexadecimal characters. `nodeKind` is `agent / approval / condition / connector / decision / javascript / openapi / llm / value / wait`. Runtime projection rejects legacy `node.cache-hit`, `node.preview`, and `run.output` events.
 
-等待登记、整图冻结和决议分别追加事件：
+Wait registration, whole-graph freezing, and resolution append these events:
 
-- `wait.created` payload 为 `{ expiresAt, nodeId, waitId, waitingSince }`；
-- `run.waiting` payload 为 `{ waitIds }`，仅在完整 checkpoint 提交时产生；
-- `run.resolved` payload 为 `{ action, resolvedAt, waitId }`。
+- `wait.created`: `{ expiresAt, nodeId, waitId, waitingSince }`.
+- `run.waiting`: `{ waitIds }`, emitted only when a complete checkpoint commits.
+- `run.resolved`: `{ action, resolvedAt, waitId }`.
 
-已认证客户端通过 `POST /v1/runs/:runId/waits/:waitId/resolve` 决议当前 Wait，body 固定为
-`{ action: 'continue' | 'approve' | 'reject', version: 1 }`。Action 必须属于固定 Revision 中该 Wait 的 `actions`。响应为：
+Authenticated clients resolve a Wait through `POST /v1/runs/:runId/waits/:waitId/resolve` with `{ action: 'continue' | 'approve' | 'reject', version: 1 }`. The action must belong to the Wait’s `actions` in the pinned Revision. Response:
 
 ```ts
 {
@@ -523,23 +571,17 @@ Runtime projector 不接受旧的 `node.cache-hit`、`node.preview` 或 `run.out
 }
 ```
 
-同一 waitId 接受第一个合法、未过期的决议；running 中唤醒原 session，waiting 进入 queued，queued/starting 保持状态并由执行者读取最新决议。同一 action 重放返回
-`resolutionAccepted: true`，竞争的另一 action 返回 `false`，两者都返回已经提交的 `action` 和 `resolvedAt`。不存在的 Wait 返回
-`run.wait-not-found`，不属于该 Wait 的 action 返回 `run.invalid`。Wait 到期后 Run 以 `run.wait-expired` 失败，不产生新的 Run。
+Each waitId accepts the first valid, unexpired decision. A running Run wakes its original session; waiting becomes queued; queued/starting retain their state while the executor reads the latest decision. Replaying the same action returns `resolutionAccepted: true`; a competing action returns `false`. Both return committed `action` and `resolvedAt`. Missing Waits return `run.wait-not-found`; invalid actions return `run.invalid`. Expiry fails the Run with `run.wait-expired` without creating another Run.
 
 ### Run lifecycle conformance
 
-`run-lifecycle` 的状态模型包含 `fail-start` 与 `fail-resume`：两者仅能在 `starting` 提交，分别产生 `failed` 与
-`indeterminate`。普通 `commit` 在 `running` 接受 terminal，在任意非 terminal 状态接受取消，并在任意非 terminal 状态接受失败。
-已经提交的 terminal 不可覆盖。部署的 lifecycle conformance 必须操作真实权威 store，覆盖首次启动、Wait 恢复、启动失败、
-恢复失败、幂等准入与 terminal 竞争；不能以另一套测试专用持久化实现代替部署实现。
+The `run-lifecycle` model includes `fail-start` and `fail-resume`. Both commit only from `starting`, producing `failed` and `indeterminate`, respectively. Ordinary `commit` accepts terminal results from `running`, cancellation from any nonterminal state, and failure from any nonterminal state. Committed terminal states cannot be overwritten. Deployment lifecycle conformance must use its real authoritative store and cover initial start, Wait recovery, start/resume failures, idempotent admission, and terminal races. A test-only persistence implementation is not a substitute.
 
-公共 Scheduler 的 `RunLaunch` 为首次启动与 Wait 恢复的互斥联合。首次启动必须包含 `trigger`，可包含 `inputs` 和
-`bindingValues`；恢复只能包含 `resume: { checkpoint }`，不能重新提供这三项启动数据。决议通过 WaitHost 的权威读取接口取得。Run list 摘要不包含等待详情。
+Public Scheduler `RunLaunch` is a mutually exclusive union for initial start and Wait recovery. Initial start requires `trigger` and permits `inputs` and `bindingValues`. Recovery accepts only `resume: { checkpoint }`, not those three launch fields. Decisions come from authoritative WaitHost reads. Run list summaries omit wait details.
 
-## 6. Trigger 与 Connector
+## 6. Trigger and Connector
 
-Trigger Key catalog 是 deployment scope 资源：
+The Trigger Key catalog is deployment-scoped:
 
 ```ts
 { keys: readonly TriggerKeySummary[]; version: 1 }
@@ -562,25 +604,19 @@ Trigger Key catalog 是 deployment scope 资源：
 { definition: TriggerKeySnapshot; version: 1 }
 ```
 
-`GET /v1/trigger-keys` 与 `GET /v1/trigger-keys/catalog` 接受可选 `locale` query；query 优先于
-`Accept-Language`，缺省与不支持的语言回退英文，非法 BCP 47 query 返回 400。语言映射复用公共 localization
-契约。摘要返回翻译后的名称与描述；完整 catalog 的 v3 `display` 按 Trigger key 保存触发器、配置字段标签与描述、输出字段描述。
-`configInputLabels` 只包含有本地化标签的字段；Workbench 在配置面板和诊断提示中复用这些标签，缺少标签时不显示内部字段 handle。
-`definitions` 始终保留原始英文定义。单条 definition、CLI 与持久化的 Flow definition 不因界面语言改变。
+`GET /v1/trigger-keys` and `GET /v1/trigger-keys/catalog` accept optional `locale` queries, taking precedence over `Accept-Language`. Missing or unsupported languages fall back to English. Invalid BCP 47 queries return 400. Mapping uses the public localization contract. Summaries return translated names and descriptions. Full catalog v3 `display` maps Trigger keys to Trigger text, configuration labels/descriptions, and output descriptions. `configInputLabels` includes only localized fields. Workbench reuses them in configuration panels and diagnostics; absent labels do not expose internal handles. `definitions` always retain original English. Individual definitions, CLI, and persisted Flow definitions do not change with UI language.
 
-公共 `provider-triggers` entry 的 `localizeTrigger(definition, locale)` 返回 `Promise<TriggerDisplay>`，调用方需等待
-本地化结果。非英文翻译按语言延迟加载并缓存；英文使用原始定义，不加载翻译资源。
+`localizeTrigger(definition, locale)` from public `provider-triggers` returns `Promise<TriggerDisplay>`; callers must await it. Non-English resources load lazily per language and cache. English uses original definitions without translation resources.
 
-这两个接口返回 `Content-Language`、`Vary: Accept-Language`、`Cache-Control: private, no-cache` 与根据最终响应
-生成的 `ETag`。匹配 `If-None-Match` 时返回无 body 的 304，并保留语言与缓存响应头。翻译更新也会使 ETag 失效。
+Both endpoints return `Content-Language`, `Vary: Accept-Language`, `Cache-Control: private, no-cache`, and an `ETag` derived from the final response. Matching `If-None-Match` returns bodyless 304 with language/cache headers. Translation changes also invalidate ETags.
 
-Workbench 使用 `@oomol-lab/resource-cache` 管理 catalog 缓存，持久化后端由缓存包选择。列表先显示有效缓存，再用 ETag 刷新；后台失败保留缓存并显示重试提示。
+Workbench uses `@oomol-lab/resource-cache` for catalog caching; that package selects persistence. Lists show valid cached data first, then refresh with ETags. Background failure retains data and shows a retry prompt.
 
-成功 Publication 为 Flow graph 中每个 Trigger node 提交 Live binding：
+Successful Publication commits a Live binding for every Trigger node in the Flow graph:
 
-Trigger 节点的 `name`、`description`、`icon` 只影响呈现。仅修改这些字段的发布保留已有 Poll / Integration 进度、订阅和去重状态；配置、定义、调度与 Connection 仍参与运行语义判断。历史 Revision 和 digest 不改写。
+Trigger `name`, `description`, and `icon` affect only presentation. Publications changing only these fields retain Poll/Integration progress, subscriptions, and deduplication state. Configuration, definitions, schedules, and Connections still determine runtime equivalence. Historical Revisions and digests remain unchanged.
 
-具备统一监听能力的 binding 通过 `listener` 返回独立的变化读取状态。顶层 `health` 仍表示订阅状态；订阅失败且 `listener.health` 为 `healthy` 时，定期读取继续工作。暂停和退役优先于两种健康状态。
+Bindings with unified listening expose independent change-read state through `listener`. Top-level `health` still describes subscription status. Periodic reads continue when subscriptions fail but `listener.health` is `healthy`. Pause and retirement take precedence over both health states.
 
 ```ts
 interface TriggerBinding {
@@ -600,67 +636,53 @@ interface TriggerBinding {
 }
 ```
 
-列表 response 是 `{ bindings, flowId, version: 1 }`。pause/resume body 固定为 `{ version: 1 }`。状态改变递增 `runtimeVersion`，使旧版本
-occurrence 无法通过最终 admission guard。Poll test 不推进 checkpoint、不写 dedupe、不创建 Run。
+Lists return `{ bindings, flowId, version: 1 }`. Pause/resume bodies are `{ version: 1 }`. State changes increment `runtimeVersion`, preventing old-version occurrences from passing final admission guards. Poll tests do not advance checkpoints, write deduplication records, or create Runs.
 
-Connector credential 不进入响应、Revision 或 RunEvent。
-`ConnectorAction.authenticated` 是必需的 boolean；`false` 表示 Action 可以不绑定 Connection 直接执行，客户端不得显示账号连接要求，
-执行请求也不得为了该 Action 合成 Connection identity。`true` 表示执行需要有效 Connection。
-部署没有配置 Connector 时，catalog、Connection 请求和 Connector Task 运行失败返回 `connector.unconfigured`；已经配置但上游不可用或响应无效时返回
-`connector.unavailable`，客户端不能把两者合并为同一配置提示。
+Connector credentials enter neither responses, Revisions, nor RunEvents. Required boolean `ConnectorAction.authenticated` is `false` when an Action executes without a Connection. Clients must not request an account or synthesize Connection identity for it. `true` requires a valid Connection. Without Connector configuration, catalog/Connection requests and Connector Task execution return `connector.unconfigured`. Configured but unavailable or invalid upstream responses return `connector.unavailable`. Clients must not collapse both into one configuration prompt.
 
-### 事件源管理
+### Trigger configuration and outputs
 
-事件源是部署资源，当前创建接口支持 `feishu_app_bot` 应用。管理接口复用 Control API 认证；响应不包含 Verification Token 或 Encrypt Key。
-`teamId` 是显式 Connector Team identity；无 Team 的部署传 `null`。Flow scope 用 `flowId` 表达，不能用 Team identity 替代。
+Event-type Integration callbacks return `outputs`; listener pages return `outputs` or `null` for no event. Providers construct complete port maps. Server validates them against the pinned Trigger contract and admits them unchanged. Poll retains raw events and per-event deduplication. Provider `buildOutputs(events)` converts nonempty deduplicated batches into one Run’s complete outputs. Baselines, empty pages, and fully duplicate pages do not call it. Provider configuration reuses node `InputPort | Group` definitions through `configInputs`. Persistence uses node input fixed assignments:
 
-| Method   | 路由                            | 请求                               | 成功响应                                                 |
+- `value` stores explicit JSON.
+- `unset` explicitly clears a value.
+- Missing overrides use definition defaults.
+
+Clearing writes `unset`; resetting removes the override. Forms preserve unset state. Before calling Providers, runtime resolves configuration to plain JSON. Missing values become `null` and undergo `nullable`/schema validation. Configuration supports no source bindings. Provider outputs directly declare first-level fields of the former `payload`; nested business objects do not expand recursively. Existing Poll Providers explicitly use `eventsPollOutputs` to return `{ events }`. Generic runtime assumes no output names and does not merge port values across events.
+
+### Event source management
+
+Event sources are deployment resources. Creation currently supports `feishu_app_bot` apps. Management reuses Control API authentication. Responses contain no Verification Token or Encrypt Key. `teamId` is an explicit Connector Team identity; deployments without Teams use `null`. `flowId` expresses Flow scope and cannot be replaced by Team identity.
+
+| Method   | Route                           | Request                            | Success                                                  |
 | -------- | ------------------------------- | ---------------------------------- | -------------------------------------------------------- |
-| `GET`    | `/v1/event-sources`             | 可选 `flowId` query                | `200 { version: 1, sources: EventSource[], teamId? }`    |
-| `GET`    | `/v1/event-sources/connections` | 可选 `teamId` query                | `200 { version: 1, connections: ConnectorConnection[] }` |
+| `GET`    | `/v1/event-sources`             | Optional `flowId` query            | `200 { version: 1, sources: EventSource[], teamId? }`    |
+| `GET`    | `/v1/event-sources/connections` | Optional `teamId` query            | `200 { version: 1, connections: ConnectorConnection[] }` |
 | `POST`   | `/v1/event-sources`             | `CreateEventSource`                | `201 EventSource`                                        |
 | `PUT`    | `/v1/event-sources/:sourceId`   | `UpdateEventSource`                | `200 EventSource`                                        |
 | `DELETE` | `/v1/event-sources/:sourceId`   | `{ version: 1, expectedRevision }` | `200 { version: 1 }`                                     |
 
-`CreateEventSource` 为 `{ version: 1, name, connectionId, teamId: string | null, verificationToken, encryptKey, eventTypes: string[], manageSubscriptions: boolean }`。
-`UpdateEventSource` 为 `{ version: 1, expectedRevision, name, enabled: boolean, eventTypes: string[], verificationToken?, encryptKey? }`；省略 secret 时保留原值。
-更新不能修改 Connection、Team 或应用身份。创建不接受调用方传入 `appId` 或 `provider`，应用身份来自所选 active Connection。
+`CreateEventSource` is `{ version: 1, name, connectionId, teamId: string | null, verificationToken, encryptKey, eventTypes: string[], manageSubscriptions: boolean }`. `UpdateEventSource` is `{ version: 1, expectedRevision, name, enabled: boolean, eventTypes: string[], verificationToken?, encryptKey? }`; omitted secrets retain existing values. Updates cannot change Connection, Team, or app identity. Creation rejects caller-supplied `appId` or `provider`; the selected active Connection supplies identity.
 
-请求不接受额外字段。`name` trim 后为 1–128 字符；Connection / Team ID 为 1–256 字符；secret 为 1–256 字符。
-`eventTypes` 包含 1–200 个互不重复的值，各值匹配 `^[a-z][a-z0-9_.]{0,127}$`；`expectedRevision` 为正整数。
-非法请求返回 `400 event-source.invalid`；无法获取可信应用身份返回 `409 event-source.identity-unavailable`。
+Requests reject extra fields. Trimmed `name` permits 1–128 characters; Connection/Team IDs and secrets permit 1–256 characters. `eventTypes` contains 1–200 distinct values matching `^[a-z][a-z0-9_.]{0,127}$`. `expectedRevision` is a positive integer. Invalid requests return `400 event-source.invalid`; unavailable trusted app identity returns `409 event-source.identity-unavailable`.
 
-`EventSource` 为 `{ version: 1, sourceId, revision, name, provider, appId, connectionId, teamId, enabled, eventTypes, manageSubscriptions,
-verificationTokenConfigured, encryptKeyConfigured, endpointUrl, verifiedAt, lastReceivedAt, updatedAt, consumers }`。
-`provider` 为 `feishu` 或 `feishu_app_bot`；`endpointUrl`、`verifiedAt`、`lastReceivedAt` 可为 `null`。
-`consumers` 为 `{ flowId, flowName, triggerNodeId }[]`。secret 只通过两个 `*Configured` boolean 投影，不回传原文。
+`EventSource` is `{ version: 1, sourceId, revision, name, provider, appId, connectionId, teamId, enabled, eventTypes, manageSubscriptions, verificationTokenConfigured, encryptKeyConfigured, endpointUrl, verifiedAt, lastReceivedAt, updatedAt, consumers }`. `provider` is `feishu` or `feishu_app_bot`; `endpointUrl`, `verifiedAt`, and `lastReceivedAt` may be `null`. `consumers` is `{ flowId, flowName, triggerNodeId }[]`. Only the two `*Configured` booleans expose secret status, never plaintext.
 
-带 `flowId` 的列表先检查 Flow 存在，仅返回该 Flow 所属 Team 的事件源，并始终包含 `teamId`（可为 `null`）；
-不存在的 Flow 返回 `404 flow.not-found`。省略 `flowId` 时返回当前管理身份可见的事件源。
-连接列表使用显式 Team scope；需要选择 Team 时不能静默采用不同 Team。
+Lists with `flowId` first verify the Flow, then return only sources in its Team and always include `teamId`, possibly `null`. Missing Flows return `404 flow.not-found`. Without `flowId`, lists return sources visible to the management identity. Connection lists use explicit Team scope. If Team selection is required, do not silently choose another Team.
 
-更新成功后递增 `revision`；过期的更新或删除返回 `409 event-source.conflict`，不得修改原状态。
-应用已有事件源、资源上限、删除仍被发布中或已发布 Trigger 使用的事件源，以及删除这些 Trigger 仍需要的事件类型，也返回该 conflict。
-不存在的事件源返回 `404 event-source.not-found`。这些管理接口不使用 `Idempotency-Key`，并发控制由 `expectedRevision` 负责。
+Successful updates increment `revision`. Stale update/delete requests return `409 event-source.conflict` without mutation. The same conflict covers existing app sources, resource limits, deleting sources used by pending or published Triggers, and removing event types those Triggers still require. Missing sources return `404 event-source.not-found`. These endpoints use `expectedRevision`, not `Idempotency-Key`, for concurrency control.
 
 ### Provider Access Binding
 
-模型分层、调用范围与生命周期说明见 [Flow 鉴权模型](../flow-authorization.md)；本节定义序列化结构与接口合同。
+See [Flow authorization model](../flow-authorization.md) for data layers, call scope, and lifecycle. This section defines serialization and interfaces.
 
-Binding 和 candidate 都携带 `connectionId`、`providerId`、`accessBindingId` 和显式 `source`：
-`{ kind: 'admin-delegation' }` 为管理员委托；`{ kind: 'policy', ruleId: null }` 为团队默认 grant；
-`{ kind: 'policy', ruleId: string }` 为具名规则。`null` 不表示未知或尚未配置。普通规则 ID 可以为 `team-admin`、`team-default` 等任意非空字符串。
-公共 `providerAccessBindingId` 按 canonical JSON 对 `['provider-access', 2, teamId, connectionId, providerId, source]` 求 SHA-256，返回 `sha256:<hex>`。
-规则名称、内容和 policy revision 不参与身份。解析时校验身份与其来源及 Connection 一致，再直接解析指定来源；规则删除、Connection 失效或身份不匹配必须拒绝，不能回退其他授权。
-客户端写入仍只提交候选 ID 和 CAS revision；部署验证候选可分配性后保存完整身份，并将其复制到 Publication、Run 和后台工作快照。不得信任客户端自报的来源。
-旧的无类型 binding ID 不能用于执行。读取已保存的列表时，单条不符合当前协议但仍有合法 `accessBindingId` 和 `providerId` 的记录投影为
-`status: 'invalid', connectionId: null, source: null`，保留可用展示名称，提示重新授权；不能据此恢复或推断任何 grant。
-无法识别的条目被跳过，响应通过可选的 `discardedBindingCount` 提示需要重新配置。合法记录继续显示；响应 envelope 不合法仍报错。
-候选列表继续严格校验，不能把损坏的候选转成可选授权。后台执行也必须拒绝缺少身份的引用。升级与远端资源清理仍按运行手册进行。
+Bindings and candidates include `connectionId`, `providerId`, `accessBindingId`, and explicit `source`. `{ kind: 'admin-delegation' }` means administrator delegation; `{ kind: 'policy', ruleId: null }` means the Team default grant; `{ kind: 'policy', ruleId: string }` means a named rule. `null` does not mean unknown or unconfigured. Rule IDs can be any nonempty string, including `team-admin` or `team-default`. Public `providerAccessBindingId` hashes canonical JSON of `['provider-access', 2, teamId, connectionId, providerId, source]` with SHA-256 and returns `sha256:<hex>`.
 
-Code 的共享 Provider access 是 deployment-owned Flow 状态，不进入 Revision。Connector、Agent 固定工具、Trigger 和通知在 Revision 中显式选择连接，不需要添加 Code 使用。公共 API 支持两种模式：`implicit` 使用部署已配置的 scoped Connector authority；
-`selectable` 由部署按 Provider 返回并保存 opaque access binding。公共合同和 Workbench 不解析权限组内容、不接收 credential，也不创建 Flow service account；
-具体 deployment adapter 负责把外部权限组投影成 opaque candidate 和 binding。
+Names, rule content, and policy revisions do not affect identity. Resolution verifies source/Connection consistency, then resolves that exact source. Deleted rules, invalid Connections, and identity mismatches reject without authorization fallback. Clients submit only candidate IDs and CAS revisions. Deployments verify assignability, store full identities, and copy them into Publication, Run, and background-work snapshots. Never trust client-reported sources. Legacy untyped binding IDs cannot execute. On saved-list reads, protocol-invalid records with valid `accessBindingId` and `providerId` project as `status: 'invalid', connectionId: null, source: null`, preserving usable display names and requiring reauthorization.
+
+They cannot restore or imply grants. Unrecognizable entries are skipped; optional `discardedBindingCount` signals reconfiguration. Valid records remain visible; invalid envelopes still fail. Candidate lists remain strict and must not convert corrupt records into selectable grants. Background execution also rejects references without identity. Follow operational procedures for upgrades and remote cleanup.
+
+Shared Code Provider access is deployment-owned Flow state outside Revision. Connector, Agent fixed tools, Triggers, and notifications explicitly select Connections in Revision and need no shared Code entry. Public modes are `implicit`, using configured scoped Connector authority, and `selectable`, returning/storing opaque bindings per Provider. Public contracts and Workbench neither parse permission groups nor accept credentials or create Flow service accounts. Deployment adapters project external groups into opaque candidates and bindings.
 
 ```ts
 type ConnectorAccessMode = 'implicit' | 'selectable'
@@ -686,15 +708,12 @@ interface ConnectorAccess {
 
 | Method   | Path                                                  | Body                                                      |
 | -------- | ----------------------------------------------------- | --------------------------------------------------------- |
-| `GET`    | `/v1/flows/:flowId/connector-access`                  | 无                                                        |
+| `GET`    | `/v1/flows/:flowId/connector-access`                  | None                                                      |
 | `POST`   | `/v1/flows/:flowId/connector-access/candidates/query` | `{ providerIds: string[], version: 1 }`                   |
 | `PUT`    | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
 | `DELETE` | `/v1/flows/:flowId/connector-access/:providerId`      | `{ accessBindingId, expectedAccessRevision, version: 1 }` |
 
-`bindings` 是整个 Flow 的 Code 共享允许列表。`sharedAccessDigest` 只计算排序后的 `[providerId, accessBindingId]` 共享选择，
-用于配置变更检测、发布状态与请求身份；不包含节点选择、展示名称、上游即时权限或 Provider 展示列表，不是完整执行快照摘要。
-`GET /v1/flows/:flowId/connector-access?publicationId=...` 读取归属此 Flow 的已发布 `ConnectorAccessSnapshot`，只读；不带参数读取 Draft `ConnectorAccess` 配置。
-客户端分别使用 `getPublishedConnectorAccess` 与 `getConnectorAccess`。
+`bindings` is the whole Flow’s shared Code allowlist. `sharedAccessDigest` hashes only sorted `[providerId, accessBindingId]` selections for change detection, publication state, and request identity. It excludes node selections, display names, current upstream permissions, and Provider display lists. It is not a complete execution snapshot digest. `GET /v1/flows/:flowId/connector-access?publicationId=...` reads a read-only published `ConnectorAccessSnapshot` belonging to this Flow. Without the parameter, it reads Draft `ConnectorAccess`. Clients use `getPublishedConnectorAccess` and `getConnectorAccess`, respectively.
 
 ```ts
 interface ConnectorAccessGrant {
@@ -715,77 +734,49 @@ interface ConnectorAccessSnapshot {
 }
 ```
 
-两个授权集合必填，分别供共享 Code 与显式选择连接的消费者使用。它们按授权身份去重，不表示节点白名单；宿主必须从固定声明建立单次调用范围。
-快照不包含 `accessRevision`、`providerIds`、`status` 或 `policyRevision`，名称仅用于历史展示。`implicit` 快照的两个集合均为空。
-Run、Publication、后台订阅与通知恢复均严格解码快照；不能将可编辑配置对象当作执行快照，也不支持通过缺失字段启用旧共享语义。
+Both grant collections are required: one serves shared Code, the other consumers with explicit Connections. They deduplicate by grant identity and are not node allowlists. Hosts must derive each call’s scope from pinned declarations. Snapshots omit `accessRevision`, `providerIds`, `status`, and `policyRevision`. Names serve historical display only. Both collections are empty in `implicit` snapshots. Run, Publication, background subscription, and notification recovery strictly decode snapshots. Editable configuration cannot substitute for a snapshot; missing fields cannot enable legacy shared semantics.
 
-`POST /v1/flows/:flowId/connection-usage/remove` 接收 `{ version: 1, connectionId, expectedRevisionId, expectedAccessRevision }`，
-通过标准 `Idempotency-Key` 固定请求身份，返回 `DraftChange`。部署在单个事务中检查两个版本并清除该账号的所有节点选择和 Code 使用。
-保留节点、代码、输入与连线，不改上游授权、Publication 或已接受 Run。发生任一冲突时全部失败；成功发送 `draft.changed` 与 `access.changed`。
-重试同一幂等请求返回原结果；不同请求不得复用 key。移除之后可以保存待配置 Draft，不能靠默认连接自动恢复使用。
+`POST /v1/flows/:flowId/connection-usage/remove` accepts `{ version: 1, connectionId, expectedRevisionId, expectedAccessRevision }`, pins identity through standard `Idempotency-Key`, and returns `DraftChange`. One transaction checks both revisions and clears all node selections and shared Code usage for that account. Nodes, code, inputs, and edges remain, as do upstream authorization, Publications, and accepted Runs. Any conflict fails the whole operation. Success emits `draft.changed` and `access.changed`. Identical retries return the original result; different requests must not reuse the key. Drafts may remain unconfigured after removal. Default Connections must not automatically restore usage.
 
-MCP 提供 `flow_code_connections`、`flow_connection_candidates`、`flow_code_connection_set` 和 `flow_connection_usage_remove`，复用上述业务操作。
-CLI 对应 `oo flow connector code-access <flow> [--publication <publicationId>]`、`candidates <flow> <provider> [provider ...]`、`code-allow|code-remove <flow> <provider> <binding> <access-revision>`，
-以及 `remove-usage <flow> <connection> <access-revision>`（沿用编辑命令的 Revision 和幂等参数）。所有修改仅作用于 Draft。
+MCP exposes `flow_code_connections`, `flow_connection_candidates`, `flow_code_connection_set`, and `flow_connection_usage_remove` through the same operations. CLI equivalents are `oo flow connector code-access <flow> [--publication <publicationId>]`, `candidates <flow> <provider> [provider ...]`, `code-allow|code-remove <flow> <provider> <binding> <access-revision>`, and `remove-usage <flow> <connection> <access-revision>` with existing edit Revision/idempotency arguments. All writes affect only Draft.
 
-候选查询按需批量提交非空、无重复的 `providerIds`（单个 ID 长度不超过 256）。响应为 `{ results, version: 1 }`，每个请求的 Provider 恰好对应一个结果：
-成功项为 `{ candidates, mode, providerId, version: 1 }`，失败项为 `{ providerId, error: { code, message } }`。共享的团队身份、账号目录或权限策略读取失败时，整次请求按常规错误契约失败；某个 Provider 的候选计算失败不影响其他结果。
-多 Provider 查询共用团队成员身份、操作者身份、团队账号目录和权限策略；单 Provider 查询只读取对应服务账号。Workbench 首次展开时批量加载缺失项，新增服务只补查新增项，缓存命中和正在加载的项不重复请求；失败项通过显式重试重新加载，切换 Flow 时取消旧查询。
+Candidate queries batch nonempty, unique `providerIds` on demand. Each ID permits at most 256 characters. Responses are `{ results, version: 1 }`, with exactly one item per requested Provider: `{ candidates, mode, providerId, version: 1 }` on success or `{ providerId, error: { code, message } }` on failure. Shared Team identity, account catalog, or policy read failures fail the whole request under normal error rules.
 
-candidate 使用 `connectionDisplayName`、可为空的 `permissionGroupName` 和可选的 `isDefault`
-分别投影连接、权限组名称与部署的默认连接，但不包含 credential 或原始权限规则。`permissionGroupName` 仅用于展示，不决定权限来源。candidate 可提供只读的
-`permissions: { actionIds, allActions, configured, proxy }` 摘要供 Workbench 展示和筛选；`actionIds` 使用完整 Action ID，`configured` 只表示权限组包含托管访问配置，
-不得投影配置内容。该摘要不是授权依据，也不得写入 Flow binding。Workbench 添加 Connector Action 时先排除摘要明确不允许该 Action 的 candidate，再优先分配
-`isDefault: true` 的 candidate；兼容未提供摘要、或未提供 `isDefault` 但只有一个可用 candidate 的部署。多个 candidate 没有明确默认项时不自动分配。
-同一 Provider 可以保存多个 binding，
-每个 binding 授权一个 Connection 及该操作者可分配给 Flow 的权限组；`PUT` 增加一个 binding，`DELETE` 删除 body 指定的 binding。更新成功返回完整
-`ConnectorAccess` snapshot。
-`expectedAccessRevision` 使用单调 revision 防止覆盖并发修改；冲突返回 `connector.access-conflict`。缺失、无权分配、失效和部署不支持写入分别使用
-`connector.access-required`、`connector.access-invalid` 和 `connector.access-unsupported`。并发冲突使用 HTTP `412`。access 改变通过 `{ kind: 'access.changed', flowId,
-accessRevision, version: 1 }` 通知客户端失效缓存。
+One Provider’s candidate calculation failure does not affect others. Multi-Provider queries share membership, operator identity, account catalog, and policies. Single-Provider queries read only that service’s accounts. Workbench batches missing entries on first expansion, fetches only newly added services later, and does not repeat cached/in-flight queries. Failed entries require explicit retry; Flow switches cancel old queries.
 
-开源 Server 根据 Connector endpoint 选择模式：OpenConnector 使用 `implicit`，snapshot 固定为 revision `0`、空 bindings 和 digest `implicit`，候选列表为空，
-PUT/DELETE 返回 `connector.access-unsupported`；`connector.oomol.com` 和 `connector.oomol.dev` 使用 `selectable`。托管模式用配置的 OOMOL 用户 token 从
-`api.oomol.{com|dev}/v1/users/profile` 取得当前用户 UID，从 relation-control 读取 Flow Team 的 app-access，校验该用户可分配的 candidate，并只保存 opaque
-binding。app-access 投影缓存五分钟；Action、Connection、catalog、execute 和 proxy 都按同一 binding fail closed。
-Connection catalog 保留当前操作者有权限查看的非 active 账号及其健康状态，用于展示已绑定账号和恢复授权；可分配的 candidate 和执行仍要求账号为 active。
-账号未配置 `role::connector-app:<connectionId>` 时，沿用 Connector 的团队默认语义：全部 Action 可用，生成 `source: { kind: 'policy', ruleId: null }`。
-已配置账号严格采用其权限规则；空 Action 列表表示禁用，格式错误不得回退为全量权限。后续执行重新解析当前规则，已删除的具名权限组不得回退到团队默认。
-开源 Server 以用户 token 调用托管 Connector，因此不会伪造只允许 Team token 携带的 `accessGrant`；包含 `appAccessConfig` 的 binding 必须由具备 Team token
-transport 的托管 Flow runtime 执行，开源 Server 对这类执行返回 `connector.access-invalid`。
+Candidates use `connectionDisplayName`, nullable `permissionGroupName`, and optional `isDefault` for account/group display and deployment default selection. They contain no credentials or raw rules. `permissionGroupName` affects display only, not authorization source. Optional read-only `permissions: { actionIds, allActions, configured, proxy }` supports display/filtering. `actionIds` are full IDs. `configured` indicates managed access configuration exists without exposing it. This summary is not authorization evidence and must not enter Flow bindings.
 
-Workbench 的 `onManageConnectorAccess(flowId)` 是可选宿主导航钩子，只负责打开部署自己的权限管理界面；权限规则和 token 不进入 Workbench props。
-Workbench 的 `connectionHref(flowId, providerId, connectionId?)` 是同步宿主导航接口。宿主根据已有团队绑定和部署 Console 配置构造链接；Workbench 不请求地址，也不推断部署域名。OOMOL Console 使用 `/team/:teamName/connections/:providerId`，自部署 Console 使用 `/providers/:providerId`，无需团队信息。账号详情追加 `app=:connectionId`。未提供导航上下文时显示普通名称。Server Shell 的 `/connector/teams` 初始化响应携带 `console: { origin, teamScoped } | null`；配置由部署层解析，团队名称复用该响应的 teams 和 bindings。
+When adding Connector Actions, Workbench excludes candidates whose summaries explicitly forbid the Action, then prefers `isDefault: true`. It supports deployments without summaries, or without `isDefault` when exactly one candidate remains. Multiple candidates without an explicit default are not assigned automatically. A Provider may have multiple bindings, each granting one Connection and an operator-assignable permission group. `PUT` adds a binding; `DELETE` removes the body’s binding. Success returns complete `ConnectorAccess`.
 
-### Connector 原样透传
+Monotonic `expectedAccessRevision` prevents concurrent overwrites; conflicts use `connector.access-conflict` and HTTP `412`. Missing access uses `connector.access-required`; unassignable or invalid access uses `connector.access-invalid`; unsupported writes use `connector.access-unsupported`. Changes invalidate clients through `{ kind: 'access.changed', flowId, accessRevision, version: 1 }`.
 
-以下 GET 接口独立于 Flow catalog 接口实现，直接访问部署配置的 Connector：
+Open-source Server selects mode by Connector endpoint. OpenConnector uses `implicit`, revision `0`, empty bindings, digest `implicit`, and empty candidates. PUT/DELETE return `connector.access-unsupported`. `connector.oomol.com` and `connector.oomol.dev` use `selectable`. Hosted mode obtains the current UID from `api.oomol.{com|dev}/v1/users/profile` with the configured OOMOL user token, reads Flow Team app-access from relation-control, verifies assignable candidates, and stores only opaque bindings. App-access projections cache for five minutes. Action, Connection, catalog, execute, and proxy all fail closed under the same binding.
 
-| Flow 接口                       | 上游接口        |
-| ------------------------------- | --------------- |
-| `/v1/connector/proxy/providers` | `/v1/providers` |
-| `/v1/connector/proxy/actions`   | `/v1/actions`   |
-| `/v1/connector/proxy/apps`      | `/v1/apps`      |
+Connection catalogs retain visible non-active accounts and health for display and reauthorization; assignable candidates and execution still require active accounts. Without `role::connector-app:<connectionId>`, Team defaults permit all Actions with `source: { kind: 'policy', ruleId: null }`. Configured accounts strictly follow their rules. Empty Action lists disable access; malformed rules must not fall back to full access. Later execution resolves current rules again; deleted named groups cannot fall back to Team defaults.
 
-三个接口均要求 Flow 认证。可选 `flowId` 必须非空且只提供一次，由 Flow 校验并解析团队范围，不传给上游。
-其余查询参数（包括重复项）原样透传，由上游解释和校验；不转换 `locale`、`q`，也不按服务展开目录。
-使用部署的 Connector token 和解析后的 `x-oo-team-id`，不接受客户端覆盖凭据或团队。
-请求头 `Accept-Language`、`If-None-Match` 透传。
+Open-source Server uses user tokens for hosted Connector and must not forge Team-token-only `accessGrant`. Bindings with `appAccessConfig` require a hosted Flow runtime with Team token transport; open-source Server returns `connector.access-invalid` for such execution.
 
-参数和响应结构遵循当前部署的 oomol-connector 或 open-connector 对应非 proxy 接口：Provider、Action、App 的原始字段及
-`success` / `data` 等上游封装保持不变，不转换成 Flow 的 `ConnectorProvider`、`ConnectorAction`、`ConnectorConnection`，不添加 `version`。
-`apps` 对应运行时账号发现，不对应上游连接管理接口 `/v1/connections`。
+Optional Workbench `onManageConnectorAccess(flowId)` only navigates to deployment-owned permission management. Rules and tokens never enter Workbench props. Synchronous `connectionHref(flowId, providerId, connectionId?)` builds links from existing Team bindings and Console configuration. Workbench neither requests URLs nor infers domains. OOMOL Console uses `/team/:teamName/connections/:providerId`; self-hosted Console uses `/providers/:providerId` without Team data. Account details append `app=:connectionId`. Without navigation context, display plain names. Server Shell `/connector/teams` initialization returns `console: { origin, teamScoped } | null`. Deployment code resolves configuration; Team names reuse the response’s teams and bindings.
 
-上游 HTTP 状态码、响应体和 `ETag` 原样返回，错误响应也不改写；304 保持空响应体。
-不使用 Flow catalog 缓存或生成本地 ETag，也不覆盖上游 `Cache-Control`、`Vary`、`Content-Language`。
-过滤逐跳响应头及 fetch 解压后的 `Content-Encoding`、`Content-Length`；重定向原样返回，不自动跟随。
-请求超时为 30 秒，覆盖响应体读取，并支持客户端取消。响应体直接流式转发，保留背压和下游取消传播，
-不全量缓冲、不设置响应体总大小限制。返回响应头之前的传输失败使用 Flow 错误格式；响应开始后的读取失败或超时中断响应流，不能再改写状态码。
-本地未配置、Flow 校验与传输失败仍使用 Flow 错误格式；其中返回响应头之前的传输失败或超时返回 `connector.unavailable`。
+### Connector passthrough
 
-## 7. 实时通知
+These GET endpoints directly access the configured Connector, independently of Flow catalog endpoints:
 
-公共 Workbench Host 合同包含两个独立 subscriber：
+| Flow endpoint                   | Upstream endpoint |
+| ------------------------------- | ----------------- |
+| `/v1/connector/proxy/providers` | `/v1/providers`   |
+| `/v1/connector/proxy/actions`   | `/v1/actions`     |
+| `/v1/connector/proxy/apps`      | `/v1/apps`        |
+
+All three require Flow authentication. Optional `flowId` must be nonempty and appear once. Flow validates it and resolves Team scope without forwarding it upstream. Other query parameters, including duplicates, pass unchanged for upstream validation. Do not transform `locale` or `q` or expand catalogs by service. Requests use the deployment’s Connector token and resolved `x-oo-team-id`; clients cannot override credentials or Teams. Forward `Accept-Language` and `If-None-Match`.
+
+Parameters and responses follow the deployed oomol-connector/open-connector non-proxy endpoints. Preserve raw Provider, Action, and App fields and upstream wrappers such as `success` / `data`. Do not convert to Flow `ConnectorProvider`, `ConnectorAction`, or `ConnectorConnection`, or add `version`. `apps` discovers runtime accounts; it is not upstream `/v1/connections` management.
+
+Return upstream status, body, and `ETag` unchanged, including errors. Keep 304 bodies empty. Use no Flow catalog cache or local ETag, and preserve upstream `Cache-Control`, `Vary`, and `Content-Language`. Filter hop-by-hop headers and post-decompression `Content-Encoding`/`Content-Length`. Return redirects without following them. The 30-second timeout includes body reads and supports client cancellation. Stream bodies directly with backpressure and downstream cancellation, without full buffering or a total body-size limit. Transport failures before headers use Flow errors. Failures/timeouts after response start abort the stream without changing status. Local configuration and Flow validation failures also use Flow errors. Pre-header transport failures/timeouts return `connector.unavailable`.
+
+## 7. Realtime notifications
+
+The public Workbench Host contract has two independent subscribers:
 
 ```ts
 subscribeFlowCatalog(listener: (event?: FlowCatalogEvent) => void): { ready: Promise<void>; stop(): void }
@@ -801,172 +792,135 @@ type FlowChangeEvent =
   | { flowId: string; kind: 'run.changed'; runId: string; version: 1 }
 ```
 
-`ready` 在首次订阅连接建立后 resolve；首次成功连接不再额外调用 `listener(undefined)`。
-Flow 列表首次读取与订阅建立并行，列表返回后即可完成列表页初始化和开放操作，不等待实时连接。
-若列表读取开始时 `ready` 尚未 settle，客户端在 `ready` settle 且首次读取结束后后台重新读取列表，补齐连接建立前可能遗漏的变化；
-后台刷新保留已有列表，不推断新建或导航。若读取前订阅已就绪，仅需首次读取。Flow 编辑器仍在对应 Flow 的 `ready` settle 后读取初始状态。
-首次连接失败或等待超时时，宿主也必须 resolve `ready`；取消订阅时同样必须 settle `ready`。
-`stop()` 关闭连接、取消重试，并停止后续回调。
-`undefined` 表示首次等待结束后连接重新建立，包含失败或超时后的第一次成功连接，客户端必须 refetch。
-在初始 snapshot 读取期间收到的 invalidation 不能丢弃；Draft revision 与 snapshot 相同时无需重复同步，否则读取当前 Draft。
-事件不携带资源快照，客户端仍通过读取 API 获取内容。`flow.created` 仅在新 Flow 首次创建成功时发送，幂等重放不重复发送。
-Workbench 已完成初始化并停留在 Flows 列表时，收到该事件自动打开新 Flow；已经打开详情、正在本地创建或已开始自动导航时不抢占当前操作。
-初次列表加载、普通 `flows.changed` 和重连 invalidation 只刷新列表，不推断新建并跳转。Server 的首次连接等待上限为 5 秒，之后继续尝试连接。Server 同源宿主使用两个独立 SSE 请求：
+`ready` resolves when the first subscription connects. That success does not additionally call `listener(undefined)`. Initial Flow list reading runs in parallel with subscription setup. A returned list initializes the page and enables operations without waiting for realtime connection. If `ready` was unsettled when reading began, reread in the background after both settle to cover missed changes. Preserve the existing list and infer no creation/navigation. If subscription was already ready, one read is enough.
+
+Flow editors still read initial state after their Flow’s `ready` settles. Hosts must resolve `ready` on initial failure, timeout, or unsubscription. `stop()` closes connections, cancels retries, and prevents later callbacks. `undefined` means reconnection after initial waiting ends, including the first success after failure/timeout, and requires refetch. Do not drop invalidation received during initial snapshot reads. Matching Draft revisions require no repeat sync; otherwise read current Draft.
+
+Events carry no resource snapshots; clients fetch content through read APIs. `flow.created` emits only on first successful creation, not replay. An initialized Workbench on the Flows list automatically opens the new Flow. It does not interrupt open details, local creation, or automatic navigation already underway. Initial loading, ordinary `flows.changed`, and reconnect invalidation refresh lists without inferring creation/navigation. Server waits at most 5 seconds initially, then keeps reconnecting.
+
+Its same-origin host uses two independent SSE requests:
 
 - `GET /v1/flows/notifications`
 - `GET /v1/flows/:flowId/notifications`
 
-两者返回 `text/event-stream`，要求 operator 认证，并在 session 失效或 Server shutdown 时结束。其他部署可以使用不同实时 transport，但必须维持
-相同的两个独立逻辑通道和事件合同。
+Both return `text/event-stream`, require Operator authentication, and end on session invalidation or Server shutdown. Other deployments may use different transports but must retain two independent logical channels and the same event contract.
 
 ## 8. Routes
 
-| Method    | Path                                                         | 成功状态 | 说明                                              |
-| --------- | ------------------------------------------------------------ | -------: | ------------------------------------------------- |
-| `GET`     | `/v1/flows`                                                  |      200 | `cursor`、`limit`、`includeTotal`                 |
-| `POST`    | `/v1/flows`                                                  |  201/200 | `{ name, teamId?, version: 1 }`                   |
-| `GET`     | `/v1/flows/:flowId`                                          |      200 | Flow 与 Draft head                                |
-| `PATCH`   | `/v1/flows/:flowId`                                          |      200 | `{ name, version: 1 }`                            |
-| `DELETE`  | `/v1/flows/:flowId`                                          |      202 | 进入 `retiring`                                   |
-| `GET`     | `/v1/flows/:flowId/editor`                                   |      200 | Flow、Draft、Live 与 Presentation 聚合读取        |
-| `GET`     | `/v1/flows/:flowId/draft`                                    |      200 | 当前 Draft snapshot                               |
-| `GET`     | `/v1/flows/:flowId/draft/sync`                               |      200 | 当前完整 snapshot                                 |
-| `POST`    | `/v1/flows/:flowId/draft/changes`                            |      200 | `Idempotency-Key` 与 change batch                 |
-| `POST`    | `/v1/flows/:flowId/draft/repair`                             |      200 | 宽容修复并创建新的 Draft Revision                 |
-| `GET`     | `/v1/flows/:flowId/revisions/:revisionId`                    |      200 | immutable Revision                                |
-| `GET/PUT` | `/v1/flows/:flowId/presentation`                             |      200 | Presentation CAS                                  |
-| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/check`              |      200 | 固定 Revision validation                          |
-| `GET`     | `/v1/flows/:flowId/live`                                     |      200 | Live projection                                   |
-| `GET`     | `/v1/flows/:flowId/publications/:publicationId/presentation` |      200 | Immutable presentation snapshot, or null          |
-| `GET`     | `/v1/flows/:flowId/publications`                             |      200 | Publication page                                  |
-| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/publications`       |      202 | Publish operation                                 |
-| `GET`     | `/v1/flows/:flowId/publish-operations/:operationId`          |      200 | Publish operation                                 |
-| `POST`    | `/v1/flows/:flowId/publications/:publicationId/rollback`     |  201/200 | Rollback                                          |
-| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/runs`               |  202/200 | Draft Run                                         |
-| `POST`    | `/v1/runs`                                                   |  202/200 | Live Run                                          |
-| `GET`     | `/v1/flows/:flowId/runs`                                     |      200 | Run page filters                                  |
-| `GET`     | `/v1/runs/:runId`                                            |      200 | Run detail                                        |
-| `GET`     | `/v1/runs/:runId/events`                                     |      200 | `after`、`limit`                                  |
-| `GET`     | `/v1/runs/:runId/result`                                     |      200 | terminal result                                   |
-| `POST`    | `/v1/runs/:runId/cancel`                                     |      200 | `{ version: 1 }`                                  |
-| `POST`    | `/v1/runs/:runId/waits/:waitId/resolve`                      |      200 | `{ action, version: 1 }`                          |
-| `GET`     | `/v1/trigger-keys`                                           |      200 | Trigger summaries                                 |
-| `GET`     | `/v1/trigger-keys/catalog`                                   | 200, 304 | definitions, display, locale                      |
-| `GET`     | `/v1/trigger-keys/:key`                                      |      200 | definition detail                                 |
-| `GET`     | `/v1/flows/:flowId/triggers`                                 |      200 | Trigger bindings                                  |
-| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId`                  |      200 | binding detail                                    |
-| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId/activities`       |      200 | Activity page                                     |
-| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/pause`            |      200 | pause                                             |
-| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/resume`           |      200 | resume                                            |
-| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/test`             |      200 | Poll test                                         |
-| `GET`     | `/v1/connector/teams`                                        |      200 | 可用 Team 目录：enabled、teams、version           |
-| `GET`     | `/v1/connector/providers`                                    |      200 | Provider catalog；可选 `flowId`                   |
-| `GET`     | `/v1/connector/actions`                                      |      200 | `service` 或 `q`；可选 `flowId`                   |
-| `GET`     | `/v1/connector/actions/:actionId`                            |      200 | Action detail；可选 `flowId`                      |
-| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId/options/:field`   |      200 | 草稿 Trigger 的动态配置选项；由已保存连接限定范围 |
-| `GET`     | `/v1/connector/connections`                                  |      200 | 当前 scope 的全部 Connections；可选 `flowId`      |
-| `GET`     | `/v1/connector/connections/:serviceId`                       |      200 | Connections；可选 `flowId`                        |
-| `POST`    | `/v1/connector/connections/:serviceId/page`                  |      200 | 外部授权页 URL；可选 `flowId` 或 `teamId`         |
+| Method    | Path                                                         | Success status | Description                                                    |
+| --------- | ------------------------------------------------------------ | -------------: | -------------------------------------------------------------- |
+| `GET`     | `/v1/flows`                                                  |            200 | `cursor`, `limit`, `includeTotal`                              |
+| `POST`    | `/v1/flows`                                                  |        201/200 | `{ name, teamId?, version: 1 }`                                |
+| `GET`     | `/v1/flows/:flowId`                                          |            200 | Flow and Draft head                                            |
+| `PATCH`   | `/v1/flows/:flowId`                                          |            200 | `{ name, version: 1 }`                                         |
+| `DELETE`  | `/v1/flows/:flowId`                                          |            202 | Enter `retiring`                                               |
+| `GET`     | `/v1/flows/:flowId/editor`                                   |            200 | Combined Flow, Draft, Live, and Presentation read              |
+| `GET`     | `/v1/flows/:flowId/draft`                                    |            200 | Current Draft snapshot                                         |
+| `GET`     | `/v1/flows/:flowId/draft/sync`                               |            200 | Current complete snapshot                                      |
+| `POST`    | `/v1/flows/:flowId/draft/changes`                            |            200 | `Idempotency-Key` and change batch                             |
+| `POST`    | `/v1/flows/:flowId/draft/repair`                             |            200 | Tolerant repair creating a new Draft Revision                  |
+| `GET`     | `/v1/flows/:flowId/revisions/:revisionId`                    |            200 | immutable Revision                                             |
+| `GET/PUT` | `/v1/flows/:flowId/presentation`                             |            200 | Presentation CAS                                               |
+| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/check`              |            200 | Pinned Revision validation                                     |
+| `GET`     | `/v1/flows/:flowId/live`                                     |            200 | Live projection                                                |
+| `GET`     | `/v1/flows/:flowId/publications/:publicationId/presentation` |            200 | Immutable presentation snapshot, or null                       |
+| `GET`     | `/v1/flows/:flowId/publications`                             |            200 | Publication page                                               |
+| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/publications`       |            202 | Publish operation                                              |
+| `GET`     | `/v1/flows/:flowId/publish-operations/:operationId`          |            200 | Publish operation                                              |
+| `POST`    | `/v1/flows/:flowId/publications/:publicationId/rollback`     |        201/200 | Rollback                                                       |
+| `POST`    | `/v1/flows/:flowId/revisions/:revisionId/runs`               |        202/200 | Draft Run                                                      |
+| `POST`    | `/v1/runs`                                                   |        202/200 | Live Run                                                       |
+| `GET`     | `/v1/flows/:flowId/runs`                                     |            200 | Run page filters                                               |
+| `GET`     | `/v1/runs/:runId`                                            |            200 | Run detail                                                     |
+| `GET`     | `/v1/runs/:runId/events`                                     |            200 | `after`, `limit`                                               |
+| `GET`     | `/v1/runs/:runId/result`                                     |            200 | terminal result                                                |
+| `POST`    | `/v1/runs/:runId/cancel`                                     |            200 | `{ version: 1 }`                                               |
+| `POST`    | `/v1/runs/:runId/waits/:waitId/resolve`                      |            200 | `{ action, version: 1 }`                                       |
+| `GET`     | `/v1/trigger-keys`                                           |            200 | Trigger summaries                                              |
+| `GET`     | `/v1/trigger-keys/catalog`                                   |       200, 304 | definitions, display, locale                                   |
+| `GET`     | `/v1/trigger-keys/:key`                                      |            200 | definition detail                                              |
+| `GET`     | `/v1/flows/:flowId/triggers`                                 |            200 | Trigger bindings                                               |
+| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId`                  |            200 | binding detail                                                 |
+| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId/activities`       |            200 | Activity page                                                  |
+| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/pause`            |            200 | pause                                                          |
+| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/resume`           |            200 | resume                                                         |
+| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/test`             |            200 | Poll test                                                      |
+| `GET`     | `/v1/connector/teams`                                        |            200 | Available Team catalog: enabled, teams, version                |
+| `GET`     | `/v1/connector/providers`                                    |            200 | Provider catalog; optional `flowId`                            |
+| `GET`     | `/v1/connector/actions`                                      |            200 | `service` or `q`; optional `flowId`                            |
+| `GET`     | `/v1/connector/actions/:actionId`                            |            200 | Action detail; optional `flowId`                               |
+| `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId/options/:field`   |            200 | Dynamic Draft Trigger options scoped by its saved Connection   |
+| `GET`     | `/v1/connector/connections`                                  |            200 | All Connections in the current scope; optional `flowId`        |
+| `GET`     | `/v1/connector/connections/:serviceId`                       |            200 | Connections; optional `flowId`                                 |
+| `POST`    | `/v1/connector/connections/:serviceId/page`                  |            200 | External authorization page URL; optional `flowId` or `teamId` |
 
-Connector route 的 `flowId` 是 opaque Flow identity。提供时部署必须先确认 Flow 存在，并在该 Flow 的 Connector scope 内解析 Provider、Action 与
-Connection；客户端不能改用 Team ID、Connection owner 或其他外部 identity 代替 Flow scope。省略时使用部署的未限定 Connector catalog。
+Connector route `flowId` is an opaque Flow identity. When supplied, deployments must verify the Flow and resolve Providers, Actions, and Connections within its Connector scope. Clients cannot substitute Team IDs, Connection owners, or other external identities. Omission uses the deployment’s unscoped Connector catalog.
 
-授权页接口例外：`POST /v1/connector/connections/:serviceId/page` 接受可选的 `flowId` 或 `teamId`，两者不能同时提供。
-`teamId` 供独立事件源表单使用，必须对应当前 Connector 身份可访问的团队；不会修改已有 Flow 的团队。
-对于 OOMOL 托管 Connector，Server 查询团队名称并生成 `https://console.oomol.com/team/:teamName/connections/:serviceId`（开发环境使用 `.dev`）；
-省略两者时选择当前身份的默认团队。托管入口从受支持的 runtime 域名推导，不使用自部署 Console 配置。
-自部署 Connector 使用显式配置的 Console origin 和 `/providers/:serviceId` 路径。未配置 Console origin 时返回
-`503 connector.console-unconfigured`；它与 Connector 请求失败的 `connector.unavailable` 分开，客户端应提示配置授权控制台地址。
+Authorization pages are an exception: `POST /v1/connector/connections/:serviceId/page` accepts optional, mutually exclusive `flowId` or `teamId`. Independent event-source forms use `teamId`, which must be accessible to the current Connector identity and does not modify an existing Flow’s Team. For OOMOL-hosted Connector, Server resolves Team names and builds `https://console.oomol.com/team/:teamName/connections/:serviceId` (using `.dev` in development). Omitting both selects the identity’s default Team. Hosted entry points derive from supported runtime domains, ignoring self-hosted Console settings. Self-hosted Connector uses its explicit Console origin and `/providers/:serviceId`. Missing Console origins return `503 connector.console-unconfigured`, separate from request failure `connector.unavailable`. Clients should prompt for a Console URL.
 
-`POST /v1/event-sources` 创建飞书事件源时，从所选 active Connection 获取应用身份；
-缺少可信的 App ID 时返回 `409 event-source.identity-unavailable`。事件源以应用为边界，不绑定企业，
-不查询企业信息，也不要求 `tenant:tenant:readonly` 权限。事件源响应不含 `tenantKey`。
-接收事件时校验加密内容、Verification Token、签名和 App ID；事件自身的 `tenant_key` 作为触发器输出保留，不用于企业匹配。
+`POST /v1/event-sources` obtains Feishu app identity from the selected active Connection. Missing trusted App IDs return `409 event-source.identity-unavailable`. Sources are app-scoped, not tenant-bound. Creation neither queries tenant information nor requires `tenant:tenant:readonly`. Responses omit `tenantKey`. Event receipt validates encrypted content, Verification Token, signature, and App ID. Event `tenant_key` remains Trigger output, not a tenant-matching input.
 
-`GET /v1/connector/connections` 返回 `{ version: 1, connections: ConnectorConnection[] }`，与按服务读取的接口使用相同的 Flow scope 校验。
-Provider 列表接受可选 `locale`，省略时按 `Accept-Language` 解析默认语言；响应携带 `Content-Language` 和 `Vary: Accept-Language`。
-Workbench 将界面语言写入 Provider 请求 URL，按语言分别持久化响应及 ETag；部署将相同语言传递至上游，Action 中的应用名称也采用该语言。
-Provider 仅描述应用目录；面板独立加载 Connections，并根据 active Connection 在展示层计算应用排序。
+`GET /v1/connector/connections` returns `{ version: 1, connections: ConnectorConnection[] }` with the same Flow scope checks as service-specific reads. Provider lists accept optional `locale`, otherwise resolve `Accept-Language`, and return `Content-Language` and `Vary: Accept-Language`. Workbench includes UI language in Provider URLs and persists responses/ETags per language. Deployments forward that language upstream, including app names in Actions. Providers describe only the app catalog. Panels load Connections separately and derive app ordering from active Connections in the display layer.
 
-Connector Provider、Action（列表、搜索和详情）及 Connection GET 响应使用 `Cache-Control: private, no-cache` 和内容生成的
-`ETag`。服务端在完成当前身份、Flow scope 校验及数据读取后比较 `If-None-Match`；匹配时返回无 body 的 304。
+Connector Provider, Action list/search/detail, and Connection GET responses use `Cache-Control: private, no-cache` and content-derived `ETag`. Servers compare `If-None-Match` after identity/scope checks and data reads. Matches return bodyless 304.
 
-Providers、Actions、Triggers 和 Connections 均由 `@oomol-lab/resource-cache` 管理，WorkbenchHost 不再接收自定义 storage。
-Providers 按环境和语言共享，Actions 还按 service 隔离；Connections 按稳定的非敏感登录 `sessionKey`、Connector Team 和 Flow scope 隔离。
-各数据 Store 独立持有稳定的 `ReadonlyVal<{ data, refreshing, error }>`，请求只负责传输和解码。
+`@oomol-lab/resource-cache` manages Providers, Actions, Triggers, and Connections. WorkbenchHost no longer accepts custom storage. Providers share by environment/language; Actions also isolate by service. Connections isolate by stable nonsensitive login `sessionKey`, Connector Team, and Flow scope. Each Store independently owns stable `ReadonlyVal<{ data, refreshing, error }>` state. Requests only transport and decode.
 
-缓存键包含资源类型、环境和格式版本。OOMOL Connector 的 Providers 按环境和语言共享，Actions 按 service 和语言隔离；Connections 还包含登录 session 与 Connector Team。open-connector 使用 session cache，并保留 Flow scope。
-请求仍携带原来的 flowId，各服务视图从完整响应派生；搜索请求使用临时 cache，不写入目录缓存。
+Cache keys include resource type, environment, and format version. OOMOL Providers share by environment/language; Actions isolate by service/language; Connections also include login session and Connector Team. open-connector uses session cache and retains Flow scope. Requests still carry original flowId. Service views derive from complete responses. Search uses temporary caches without modifying catalog caches.
 
-首次访问异步恢复目录并校验数据，再以 ETag 进行条件请求。缓存读取最多等待一秒，失败或超时按未命中处理；迟到的恢复结果不会覆盖新数据。
-网络数据先发布到内存，持久化写入不阻塞调用方，同 key 写入按顺序执行。存储超时后当前页面停用该后端，其他缓存故障同样不影响正常请求。
-不设 LRU 或定时过期清理。
+First access asynchronously restores and validates catalogs, then conditionally requests with ETags. Cache reads wait at most one second; failure/timeout is a miss. Late restoration cannot overwrite newer data. Network data reaches memory first; persistence does not block callers, and same-key writes execute in order. Storage timeout disables that backend for the page. Other cache failures also leave requests working. There is no LRU or timed expiry cleanup.
 
-Actions 保存完整 service 列表响应；画布、节点面板与代码节点所需的单个 Action 从该列表派生。
-浏览器 proxy 列表不按 Flow 已选授权过滤；成功加载完整列表后才能判断 Action 不存在。默认连接与连接状态从独立的 Connections Store 组合。
-Action metadata 保留上游可选的 `operationType` 字段（`read`、`write`、`destructive`）；缺失或未知值在节点面板显示为其他接口。
+Actions store complete service-list responses. Canvas, node panels, and Code nodes derive individual Actions from them. Browser proxy lists are not filtered by Flow-selected access. Absence is determined only after a full successful list load. Default Connections and status combine from the independent Connections Store. Action metadata retains optional upstream `operationType` (`read`, `write`, `destructive`). Missing/unknown values display as other interfaces.
 
-元数据接口 `/v1/connector/action-metadata`（可选 `service` 或 `q`）及其 `/:actionId` 详情接口继续可用；浏览器仅在搜索时使用 `q` 入口。它们接受 `flowId` 和 `locale`，
-遵循相同鉴权、语言协商及条件请求规则。响应分别为 `{ version: 1, actions: ConnectorActionMetadata[] }` 和 `{ version: 1, action: ConnectorActionMetadata }`，
-不包含 `defaultConnection`，读取时不查询 Connections。
-Workbench 使用独立的 `ConnectorActionView` 表示组合后的展示数据。
-CLI 和 MCP 继续使用原 `/v1/connector/actions` 对应的组合接口；它们在响应时选择 active 默认账号或唯一 active 账号，
-保留 `ConnectorAction.defaultConnection`。这些组合响应的 ETag 仍随账号变化，浏览器不使用它们作为 Action 缓存。
-全局搜索使用独立的临时查询状态，不持久化，也不写入 service 列表。Connections Store 读取 `/v1/connector/connections`：带 `flowId` 时返回其固定 Team 下当前用户有权选择的账号（不受 Code 共享列表限制），不带时返回团队账号；同一 scope 的全量与按服务视图共享完整响应。账号缓存使用独立键，不复用原始 proxy Apps 缓存。
-画布按 provider 读取 Action 列表并派生所需详情；应用排序使用全量 Connections，账号选择使用对应服务的 Connections。
+`/v1/connector/action-metadata` with optional `service` or `q`, and its `/:actionId` detail endpoint, remain available. Browsers use `q` only for search. They accept `flowId` and `locale` with the same authentication, language, and conditional-read rules. Responses are `{ version: 1, actions: ConnectorActionMetadata[] }` and `{ version: 1, action: ConnectorActionMetadata }`. They omit `defaultConnection` and do not query Connections. Workbench uses separate `ConnectorActionView` combined display data. CLI/MCP retain composed `/v1/connector/actions` interfaces, selecting an active default or sole active account and preserving `ConnectorAction.defaultConnection`.
 
-业务访问 Store 接口时检查刷新间隔：Providers、Triggers 为 5 分钟，Actions、Connections 为 30 秒。
-没有定时轮询或额外的聚焦刷新；授权完成和手动重试按业务需要强制刷新。普通读取合并同一条目的进行中请求，由 Store 管理取消。
-强制刷新遇到进行中的旧请求时，等待旧请求结束后重新读取；旧结果不写入缓存，刷新状态保持到新请求完成。新请求开始前的多次强制刷新合并。
-恢复持久化数据时校验结构，首次访问立即重验证。刷新期间保留数据，失败保留数据并发布 error，自动重试延后 30 秒。
-ETag 与数据共同持有；304 保留数据并采用返回的新 ETag，200 没有 ETag 时清除旧验证器。
-未配置持久化、存储损坏或不可用时以内存运行。浏览器业务禁止绕过数据 Store 调用这四类底层请求，由边界检查约束。
+Their ETags still change with accounts; browsers do not use them as Action caches. Global search uses independent temporary state without persistence or service-list writes. Connections Store reads `/v1/connector/connections`: with `flowId`, it returns accounts the user can select in the fixed Team, unrestricted by shared Code lists; otherwise it returns Team accounts. Full and service-specific views in one scope share complete responses. Account caches use separate keys from raw proxy Apps.
 
-部署的 Connector 客户端每次直接读取上游 Providers、Actions（列表、搜索、详情）及 Apps（全量、按服务）的完整响应，
-不保存响应体或 ETag，不发送上游条件请求；失败时不复用历史数据。Action 目录的单响应和总响应大小限制仍然生效。
-三个浏览器 proxy 接口独立透传上游缓存协议，不经过此客户端。
-Open Flow 对转换后的响应生成自己的 ETag，不直接透传上游 ETag。
+Canvas loads Actions per Provider and derives details. App ordering uses all Connections; account selection uses service-specific Connections.
 
-分页 cursor 是 opaque、scope-bound token。跨 Flow、Trigger 或资源类型使用 cursor 返回 `page.invalid-cursor`。
+Store access checks refresh intervals: 5 minutes for Providers/Triggers, 30 seconds for Actions/Connections. There is no periodic polling or extra focus refresh. Authorization completion and manual retry force refresh as needed. Ordinary reads coalesce same-entry requests; Stores own cancellation. Forced refresh waits for an old in-flight request, then rereads. The old result does not enter cache, and refreshing remains active until the new request completes.
 
-## 9. 公开 Wait action hook
+Multiple force requests before that start coalesce. Restored data undergoes structural validation and immediate revalidation on first access. Refresh retains data; failure retains it with an error and delays automatic retry by 30 seconds. Data and ETags stay together. A 304 retains data and adopts a returned new ETag; a 200 without ETag clears the old validator. Without configured or usable persistence, caches run in memory.
 
-配置了公开 origin 的部署可以把一次 Wait 的 opaque capability URL 放进 Connector 通知。该路由不使用 Operator session 或 bearer token：
+Boundary checks forbid browser business code from bypassing these Stores for the four resource types.
+
+The deployment Connector client directly reads complete upstream Providers, Actions (list/search/detail), and Apps (all/by service) on every request. It stores neither bodies nor ETags, sends no upstream conditional requests, and reuses no old data after failures. Per-response and aggregate Action catalog limits still apply. The three browser proxy endpoints independently forward upstream cache protocols without using this client. Open Flow generates its own ETags for transformed responses instead of forwarding upstream ETags.
+
+Pagination cursors are opaque, scope-bound tokens. Reusing them across Flows, Triggers, or resource types returns `page.invalid-cursor`.
+
+## 9. Public Wait action hook
+
+Deployments with a public origin may include a Wait’s opaque capability URL in Connector notifications. This route uses neither Operator sessions nor bearer tokens:
 
 ```text
 /v1/wait-actions/:capability/:action
 ```
 
-`action` 固定为 `continue | approve | reject`，并且必须属于 capability 绑定的 Wait。响应始终是 JSON，不返回 HTML、不跳转、不设置 cookie，
-并带 `Cache-Control: no-store`：
+`action` is `continue | approve | reject` and must belong to the capability-bound Wait. Responses are always JSON with `Cache-Control: no-store`, no HTML, redirects, or cookies:
 
-- `GET` 只检查 action，成功时返回 `{ action, expiresAt, prompt, state: 'waiting' | 'resolved', version: 1 }`；
-- `HEAD` 与 `GET` 使用相同检查和状态码，但没有 response body；
-- `POST` 才提交 action，成功时返回
-  `{ action, resolutionAccepted, resolvedAt, state: 'waiting' | 'resolved' | 'unavailable', version: 1 }`。
+- `GET` only checks the action and returns `{ action, expiresAt, prompt, state: 'waiting' | 'resolved', version: 1 }` on success.
+- `HEAD` uses the same checks/status as `GET` without a body.
+- Only `POST` submits an action. Success returns `{ action, resolutionAccepted, resolvedAt, state: 'waiting' | 'resolved' | 'unavailable', version: 1 }`.
 
-`POST` 服从与认证 resolve route 相同的 first-writer-wins 和幂等重放语义。capability、action 或原等待记录不匹配，以及 capability 已到期时返回
-`404 wait-action.not-found`；其他方法返回 `405 wait-action.method-not-allowed` 并携带 `Allow: GET, HEAD, POST`。服务端只持久化
-capability 摘要；完整 capability 是 bearer credential，消费端不得把它作为普通可公开 URL 记录或转发。
+`POST` uses the authenticated resolve route’s first-writer-wins and replay rules. Mismatched capabilities, actions, or wait records, and expired capabilities, return `404 wait-action.not-found`. Other methods return `405 wait-action.method-not-allowed` with `Allow: GET, HEAD, POST`. Server persists only capability digests. Complete capabilities are bearer credentials; consumers must not log or forward them as ordinary public URLs.
 
-请求被限流时返回 `429 wait-action.rate-limited`，携带表示剩余等待秒数的 `Retry-After`；被限流的 `POST` 不提交决议。
-`HEAD` 的限流响应同样没有 response body。
+Rate-limited requests return `429 wait-action.rate-limited` with remaining wait seconds in `Retry-After`. Rate-limited `POST` submits no decision. Rate-limited `HEAD` also has no body.
 
-已决议等待的独立 receipt 随 Flow 删除清理，不受事件 retention 影响。进入下一个等待或 Run terminal 后，原 waitId
-仍返回胜出 action 与原 resolvedAt；相同决议 `resolutionAccepted: true`，相反决议为 `false`，均不再排队执行。
-未决议的取消或到期等待不生成决议事实。外部 capability 到期后不能因 receipt 保留而继续授权。
+Independent resolution receipts survive event retention and are removed with Flow deletion. After another wait or terminal Run state, the old waitId still returns the winning action and original resolvedAt. The same decision returns `resolutionAccepted: true`; an opposing one returns `false`. Neither queues more execution. Canceled or expired unresolved waits create no resolution fact. Retained receipts do not extend expired external capabilities.
 
-### Wait 局部执行与冻结
+### Wait local execution and freezing
 
-Wait 移除内联 notification 配置，声明固定 pending 出口，在等待建立时触发一次。该输出为 `{ value, prompt, actions: [{ action, url }], expiresAt }`，actions 使用节点固定操作集合，value 保持输入 schema。
-通知边和所选 action 边可同时执行，不互斥；approve/reject 互斥。通知后续按普通节点执行，决议不取消通知，没有通知专属时限。
-图静止且尚有等待时保留 session 120,000 ms，期间不序列化或保存完整 checkpoint、不扣执行预算。再次静止重新计时，无效唤醒不续期。
-到期重新读取决议再提交 checkpoint，竞争中的已决议 Run 重新排队。Wait 记录及决议立即持久化；原地批准无需保存 checkpoint。
-Scheduler WaitHost 提供 `create(WaitRequest)`、`resolutions(waitIds, block)`；部署保证固定输入、权限、持久化与唤醒。恢复时读取最新决议，不依赖 claim 时快照。
+Wait and Approval `inputDefinitions` declare multiple editable inputs; `inputs` stores bindings. New nodes may have zero inputs. Both have non-null pending outputs emitted once at wait creation, containing inputs, prompt, and expiresAt. Wait adds continueUrl; Approval adds approveUrl and rejectUrl. Decision outputs are non-null `{ inputs, action, resolvedAt, comment }`. inputs preserves the execution snapshot; its schema declares all configured keys without mapping their types. resolvedAt is the persisted actual decision time.
 
-### Scheduler checkpoint 与节点事件
+Optional plaintext comment is trimmed, normalized to null when blank, and limited to 2,000 Unicode code points. Decisions/comments persist atomically; retries cannot overwrite the first decision. Ordinary Wait and Approval store no inline notification configuration. Deployments supply public origins. Ordinary Wait has no special Run/Publish admission check; execution fails if it needs links without an origin. Unconnected and unreferenced pending outputs generate no links. Complete notification outputs are access-controlled recovery data.
 
-Scheduler checkpoint 的精确对象为：
+Public capability indexes store only digests; URLs enter neither Revisions nor ordinary service logs. Notification and selected action edges may execute together; approve/reject are mutually exclusive. Notification descendants execute as ordinary nodes. Resolution does not cancel them, and they have no special deadline. When the graph becomes idle with pending waits, retain the session for 120,000 ms without serializing/saving a full checkpoint or consuming execution budget.
+
+A later idle transition restarts the timer; invalid wakeups do not extend it. On expiry, reread decisions before committing the checkpoint. Concurrently resolved Runs requeue. Wait records and decisions persist immediately; in-place approval needs no checkpoint. Scheduler WaitHost provides `create(WaitRequest)` and `resolutions(waitIds, block)`. Deployments guarantee pinned inputs, permissions, persistence, and wakeups. Recovery reads current decisions rather than relying on claim-time snapshots.
+
+### Scheduler checkpoints and node events
+
+The exact Scheduler checkpoint object is:
 
 ```json
 {
@@ -981,37 +935,31 @@ Scheduler checkpoint 的精确对象为：
 }
 ```
 
-`inputs` 保存按 node ID 和 input handle 索引的启动输入，`bindingValues` 保存本次 Run 的 Variable binding 快照。
-`results` 保存各节点最后一次完成的 output。`counts` 按 node ID 保存累计执行次数，外层 scope 固定为 `""`。
-`frames` 按等待 job ID 保存其到达时的节点结果快照。`waits` 保存所有待应用决议的等待，允许同一 node ID 的多个不同 job；已释放 pending 时每项还保存完整 `pending` 输出。`agents` 按 job ID 保存
-`{ invocationId, input, remainingMs?, checkpoint }`，其中 checkpoint 是 Agent continuation 合同。配置了节点 timeoutMs 时，
-remainingMs 必须为正且不得超过原上限。总 JSON 大小不得超过 16 MiB。
-恢复必须验证精确字段、job/wait identity 唯一、计数符合节点上限、结果符合声明、等待输入与保存路径一致，以及 Agent continuation 的输入和剩余预算。旧版检查点不能按 v5 恢复。
+`inputs` stores launch inputs by node ID/input handle. `bindingValues` stores this Run’s Variable binding snapshot. `results` stores each node’s last completed outputs. `counts` stores cumulative executions by node ID with outer scope fixed to `""`. `frames` stores arrival-time node result snapshots by waiting job ID. `waits` stores all waits whose decisions remain to be applied, allowing multiple jobs per node. Entries also store complete `pending` outputs once released.
 
-未进入执行路径的节点不创建 job 或 execution identity，也不产生节点事件。每次到达创建独立 identity，暂停恢复保持原 identity。
-普通 Task 已声明但缺失或为 `undefined` 的 output 补为 `null`；整个返回值为 `undefined` 时按空对象处理，显式非对象返回值仍非法。端口内部的数据不递归归一化，Condition、Wait 未选中的分支端口保持缺失。
-Runtime 在 JSON 传输前校验并复制返回数据；仅允许整个返回值及顶层端口的 `undefined`，拒绝函数、Symbol、BigInt、非有限数字、循环引用、非普通对象及端口内部的 `undefined` 或稀疏数组。传输不调用返回对象的 `toJSON`，不依赖 JSON 序列化静默丢弃或转换非法值。
-`node.completed` 仅在节点完整 output 校验成功后产生，payload 的 `outputs` 是按 handle 索引的完整最终结果对象，无输出时为 `{}`。
-每次节点 invocation 只产生一条完成事件，且先于其完成阶段释放的下游节点的 `node.started`；不再产生逐 handle 的 `node.output`，普通 Task 不支持运行中的中间 output。Wait 的 pending 出口在登记后可用，Wait 本身仍只在决议后完成一次。
+`agents` maps job IDs to `{ invocationId, input, remainingMs?, checkpoint }`, where checkpoint follows the Agent continuation contract. With node timeoutMs, remainingMs must be positive and no greater than the original limit. Total JSON is limited to 16 MiB. Recovery verifies exact fields, unique job/wait identities, node execution limits, declared results, wait-input/path consistency, and Agent continuation inputs/budgets. Older checkpoints cannot recover as v5.
 
-Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 只保存已执行完成的图末端节点的最后一次完成结果，按 node ID 排序；每次 invocation 的完整输出保存在运行事件中。
-每项为 `{ nodeId, status: 'completed', jobId, outputs }`，不包含未执行节点或重复执行的 jobs 数组；没有已执行完成的末端节点时为 `[]`。
+Nodes outside the execution path create no jobs, execution identities, or events. Each arrival gets a separate identity, retained through suspension/recovery. Ordinary Task outputs declared but missing or `undefined` become `null`. An entirely `undefined` return becomes an empty object; explicit non-object returns remain invalid. Port contents are not recursively normalized. Unselected Condition/Wait branch ports remain absent. Runtime validates and copies return data before JSON transport.
 
-## 10. Code Action 合同
+It permits `undefined` only for the entire return or top-level ports. Functions, Symbols, BigInt, non-finite numbers, cycles, non-plain objects, nested `undefined`, and sparse arrays are rejected. Transport calls no `toJSON` and does not rely on serialization to discard or convert invalid values. `node.completed` emits only after complete output validation. Its `outputs` is the full final handle-indexed object, or `{}` with no outputs. Each invocation emits one completion event before `node.started` for downstream nodes released at completion.
 
-当前脚本合同为 `open-flow-engine/v5`，执行调度采用每条入边到达分别执行和每节点累计次数限制；v4 及更早的 Publication / Run 不能按此合同执行，需要重新发布或新建 Run。它用 `context.actions` 替代 v1 的 `context.connector`，不提供旧名转发；
-固定为 v1 的 Publication / Run 必须由相应 Engine 执行，当前 Server 对 v1 明确返回不支持。
-新 Code 节点的 Revision 保存账号模式，只有独立模式保存节点级 Action 白名单；部署的 Provider Access Binding 或 implicit Connector authority 仍是最终授权来源。
+There are no per-handle `node.output` events or ordinary Task intermediate outputs. Wait pending outputs become available after registration; the Wait still completes once, after resolution.
 
-### Revision 与编辑 operation
+Flow terminal results use `{ kind: 'node-results', nodes }`. `nodes` contains only the last completed result for executed terminal graph nodes, sorted by node ID. Run events retain complete per-invocation outputs. Entries are `{ nodeId, status: 'completed', jobId, outputs }`, without unexecuted nodes or repeated-job arrays. If no terminal node completed, the list is `[]`.
 
-新建 Inline Code Task 默认保存以下声明；共享模式直接使用 Flow 共享账号已授权的全部 Actions，不保存节点清单。独立模式保存 `actions`，每条 Action 可保存 `connectionId`，Draft 中允许暂缺：
+## 10. Code Action contract
+
+The script contract is `open-flow-engine/v5`, with one execution per incoming-edge arrival and cumulative per-node execution limits. v4 and earlier Publications/Runs require republication or a new Run. `context.actions` replaces v1 `context.connector` without aliases. v1-pinned Publications/Runs require their matching Engine; current Server explicitly rejects v1. New Code node Revisions store account mode. Only independent mode stores a node Action allowlist. Deployment Provider Access Bindings or implicit Connector authority remain the final authorization source.
+
+### Revision and edit operations
+
+New Inline Code Tasks save this declaration by default. Shared mode directly uses all Actions authorized by Flow shared accounts without a node list. Independent mode stores `actions`; each may specify `connectionId`, which may remain absent in Draft:
 
 ```json
 { "kind": "connector", "mode": "shared" }
 ```
 
-`mode` 可为 `shared` 或 `independent`。独立模式的 Action ID 必须合法且不可重复；`shared` 不接受 `actions` 字段。模式、清单及账号选择参加 Revision digest。旧 Revision 的 `capabilities` 可省略或为空数组，也可包含原有提示声明：
+`mode` is `shared` or `independent`. Independent Action IDs must be valid and unique. `shared` rejects `actions`. Mode, list, and account selection enter the Revision digest. Legacy `capabilities` may be omitted, empty, or contain earlier hint declarations:
 
 ```json
 {
@@ -1019,34 +967,35 @@ Flow terminal result 使用 `{ kind: 'node-results', nodes }`，`nodes` 只保�
 }
 ```
 
-没有 `mode` 的旧声明继续使用动态 Connector API，不能静默视为空白名单。严格 decoder 仍读取旧 immutable Revision 的
-`action`、`connections` 和 `connectionId` 结构，但这些字段不再授权，alias/default 仅转换为按 Action 查找的调用提示。
-新的可选 `actionHints` 只保存 Action ID 以恢复 schema typing，`connectionHints` 只保存 alias/default 解析提示；两者都不是允许集合，也不参与 Provider 授权。所有对象拒绝未知字段。
+Legacy declarations without `mode` retain the dynamic Connector API and must not become empty allowlists implicitly. Strict decoders still read old immutable Revision `action`, `connections`, and `connectionId` structures, but those fields no longer authorize. Alias/default values become Action lookup hints only. Optional `actionHints` stores only Action IDs for schema typing; `connectionHints` stores alias/default resolution hints. Neither is an allowlist or grants Provider authority. All objects reject unknown fields.
 
-通过既有 Draft changes 提交：
+Submit through existing Draft changes:
 
 ```ts
 {
   kind: 'graph.node.task.capabilities.set',
   nodeId: 'code-node',
-  before: previousCapabilities, // 原声明不存在时省略。
-  value: nextCapabilities, // 省略时删除整个 capabilities 属性。
+  before: previousCapabilities, // Omit if no previous declaration exists.
+  value: nextCapabilities, // Omit to remove the entire capabilities property.
 }
 ```
 
-operation 检查目标是 inline Code Task，并精确比较 `before`，沿既有 expected Revision 和 change identity 提交。
-公开 `setCodeActions(content, nodeId, capabilities)` 生成该 operation；`createCodeTask` 的端口配置参数也接受 `capabilities`。
-Agent 的 `node.add/update` 在 Code 节点的 `config.capabilities` 中接受同一声明。
-普通源码、端口修改和复制保留声明。
+The operation requires an inline Code Task and an exact `before` match, using existing expected Revision/change identity. Public `setCodeActions(content, nodeId, capabilities)` generates it. `createCodeTask` port configuration also accepts `capabilities`. Agent `node.add/update` accepts the same declaration at Code `config.capabilities`. Ordinary source/port edits and copying preserve declarations.
 
-### 脚本 API
+### Script API
+
+Script `context` provides cancellation, logs, progress, Artifacts, network, Connector and other host capabilities, read-only Run identity, and the same `inputs` as the first argument. On demand, `context.getPrevious()` returns the direct predecessor that triggered this invocation as `{ id, name, outputs, outputDefs }`, or `null`. outputs comes from the arrival path snapshot; outputDefs reuses pinned Revision declarations with handle, jsonSchema, nullable, and optional description. Declarations do not guarantee a value was produced.
+
+Condition returns empty outputs/outputDefs. Data is copied into isolation only on read; returned values are independent. Example: `const previous = await context.getPrevious(); const value = previous?.outputs.items`. `context` exposes no intermediate output submission, dynamic cross-node Run store, Variable queries, or arbitrary node output queries. Deployments may privately store Run values for scheduling, debugging, and recovery, but cannot expose a second user data channel. Final results and successful completion publish through one event before downstream nodes released at completion start.
+
+Wait pending branches may execute after wait creation.
 
 ```js
 export default async (inputs, context) => {
-  // 动态 Provider 方法。
+  // Dynamic Provider method.
   const user = await context.actions.github.get_current_user({})
 
-  // 完整 ID 与显式 call 进入同一个 validator 和 Capability host。
+  // Full IDs and explicit calls use the same validator and Capability host.
   const getUser = context.actions['github.get_current_user']
   const work = await getUser({}, { connectionId: 'connection-work' })
   const message = await context.actions.call('slack.send_message', { text: inputs.text }, { connectionId: 'connection-work' })
@@ -1054,53 +1003,39 @@ export default async (inputs, context) => {
 }
 ```
 
-非 JavaScript 标识符名称使用方括号，如 `context.actions['google-drive'].list_files({})`；剩余动作名含点时也只占第二级键。
-根表和 provider 表使用空原型并冻结，通过 Proxy 动态构造稳定的方法引用。
+Use brackets for non-JavaScript identifiers, such as `context.actions['google-drive'].list_files({})`. Dots in the remaining action name stay within the second-level key. Root and Provider tables have null prototypes, are frozen, and use Proxy to construct stable method references dynamically.
 
-省略第一个参数或传入 `undefined` 等价于传入 `{}`，必填字段仍由 Action schema 校验。业务参数必须是 JSON 对象，保留字段中的显式 `null`，不套用图端口的 null/default 归一化。循环引用、`undefined` 属性、非有限数字、函数、BigInt、
-Date 等非 JSON 值在进入 transport 前失败。方法返回 Connector Action data，直接 `await` 取得；失败抛出含稳定 `code` 的 Error。
+Omitting the first argument or supplying `undefined` means `{}`; Action schemas still validate required fields. Business arguments must be JSON objects, preserving explicit `null` without graph port null/default normalization. Cycles, `undefined` properties, non-finite numbers, functions, BigInt, Date, and other non-JSON values fail before transport. Methods return Connector Action data through `await`; failures throw Errors with stable `code`.
 
-第二参数可以省略，或恰为 `{ connectionId: string }` / `{ connectionAlias: string }`，两个字段互斥。空对象、空字符串、null 和未知字段返回
-`capability.invalid`。新共享模式直接使用固定 Flow bindings 的账号已授权的全部 Actions，显式账号须属于该 bindings；省略账号时沿用单账号或默认账号选择。新独立模式使用清单中固定的账号，脚本传入不同账号返回 `capability.denied`。旧 Revision 的显式 `connectionId` 不经过 Revision 白名单，Connector 按固定 Provider access 独立授权。未知 alias 返回
-`capability.denied`。authenticated Action 未提供 Connection 时返回 `connector.connection-required`；伪造桥接请求仍由宿主拒绝。
+The second argument is omitted or exactly `{ connectionId: string }` / `{ connectionAlias: string }`, mutually exclusive. Empty objects/strings, null, and unknown fields return `capability.invalid`. New shared mode uses all Actions authorized by pinned Flow bindings; explicit accounts must belong to them. Omission uses single/default account selection. Independent mode uses the listed fixed account; another script account returns `capability.denied`. Legacy explicit `connectionId` is not checked against a Revision allowlist; Connector authorizes under pinned Provider access. Unknown aliases return `capability.denied`. Authenticated Actions without Connections return `connector.connection-required`. Hosts still reject forged bridge requests.
 
-旧 alias/default 提示按 Revision 内的原值精确匹配并解析为固定 ID。Connector 目录中的改名、默认变更或 alias 重用不改变这份映射；
-它们不能扩大 Provider binding 的权限。每次调用都可以选择不同账号，允许循环和并发。
+Legacy alias/default hints match exact Revision values and resolve to fixed IDs. Catalog renaming, default changes, or alias reuse do not change this mapping or expand Provider binding authority. Calls may select different accounts and run in loops or concurrently.
 
-公开 `TaskContext<Actions>` 和 `Task<Inputs, Outputs, Actions>` 接受节点对应的 Action 方法表类型；默认表为空。
-Workbench 对共享模式使用 Flow 授权目录生成 Action 补全，对独立模式仅生成节点清单的补全；旧声明保留动态调用类型。
-节点面板提供共享权限组开关；开启时隐藏节点 Action 清单和添加按钮，关闭时逐个添加 Action 并选择固定账号。
+Public `TaskContext<Actions>` and `Task<Inputs, Outputs, Actions>` accept the node’s Action method table type, empty by default. Workbench generates shared-mode completion from the Flow-authorized catalog and independent-mode completion only from the node list. Legacy declarations retain dynamic call typing. The node panel’s shared-permission switch hides the Action list/add button when enabled. When disabled, users add Actions individually and select fixed accounts.
 
-### 调用身份、生命周期与目录投影
+### Call identity, lifecycle, and catalog projection
 
-`RuntimeInvocation.capabilities` 固定直接程序的声明，Flow 执行从固定 Inline Task 取得声明。
-每个 `RuntimeCapabilityCall` 都携带独立 `callId`，`invocationId` 继续标识 Task。Server 从可信桥接请求身份构造 call ID，
-将它作为 Connector 幂等键；不同业务调用互不去重，同一传输请求保留身份。宿主日志记录 Action、Connection ID 和两种调用身份，不记录业务参数。
+`RuntimeInvocation.capabilities` pins direct-program declarations. Flow execution reads declarations from the pinned Inline Task. Each `RuntimeCapabilityCall` has independent `callId`; `invocationId` still identifies the Task. Server derives call IDs from trusted bridge request identity and uses them as Connector idempotency keys. Different business calls do not deduplicate; one transport request retains identity. Host logs contain Action, Connection ID, and both invocation identities, not business arguments.
 
-用户可以捕获普通 Connector 错误并返回成功，之后抛出的其他错误不会被已捕获的旧错误覆盖。能力数量或响应大小超限导致节点失败，捕获不能将其变成成功。
-Run 取消、deadline、兄弟节点失败和节点退出沿既有执行生命周期终止能力；未等待的请求也会清理。取消请求不承诺撤销已发生的外部副作用。
+Users may catch ordinary Connector errors and return success. Previously caught errors do not replace later thrown errors. Capability-count or response-size violations fail the node even if caught. Run cancellation, deadlines, sibling failure, and node exit terminate capabilities through the existing lifecycle, including unawaited requests. Cancellation does not guarantee reversal of external side effects.
 
-`ConnectorProvider` 可选 `noSetup` 表示 Provider 仅支持 `no_auth`，不包含 Connection 状态。`ConnectorConnection` 可选 `builtInAccount` 表示上游账号包含 `marketplace` 元数据；`connectionId` 的 `no_auth:` 前缀标识免配置虚拟账号。节点面板按有效普通账号、有效内置账号、免配置、未配置排序，组合独立获取的 Provider 和 Connection 数据。
+Optional `ConnectorProvider` field `noSetup` means only `no_auth` is supported and contains no Connection state. Optional `ConnectorConnection` field `builtInAccount` indicates upstream `marketplace` metadata. A `no_auth:` connectionId prefix identifies a virtual account requiring no setup. Node panels combine independently fetched Provider/Connection data and sort by valid ordinary accounts, valid built-in accounts, no setup, then unconfigured.
 
-`ConnectorConnection` 额外投影可选 `alias`，缺省时仍可按 ID 绑定；`ConnectorAction` 额外投影可选 `inputSchema` / `outputSchema` 原始 JSON Schema。
-旧的 `inputs` / `outputs` 仍是图端口 projection。schema 的暂时缺失不移除声明，也不扩大运行权限。
+`ConnectorConnection` optionally projects `alias`; missing aliases still permit ID binding. `ConnectorAction` optionally projects raw `inputSchema` / `outputSchema`. Existing `inputs` / `outputs` remain graph port projections. Temporarily missing schemas neither remove declarations nor expand runtime permissions.
 
-### 当前 Server 的上游身份选择
+### Current Server upstream identity selection
 
-当前 Connector adapter 先按稳定 Connection ID 查询账号状态，再用 `x-oo-connector-app-id` 执行。
-网关将该 header 转成下游的 `x-oomol-connector-app-id`；下游在执行请求中按 Team、service 和 app ID 解析账号，不依赖可变 alias。
+The Connector adapter first queries account status by stable Connection ID, then executes with `x-oo-connector-app-id`. The gateway maps it to downstream `x-oomol-connector-app-id`. Downstream execution resolves accounts by Team, service, and app ID without mutable aliases.
 
-### Draft 操作结构发现
+### Draft operation schema discovery
 
-公开 `flow-change` 的 `changeOperationsSchema()` 返回 ChangeOperation 数组的 JSON Schema，传入 operation kind 时返回单个操作的独立 schema。
-`decodeChangeOperations()` 与该 schema 使用相同的字段定义，忽略并移除未知字段，拒绝未知 kind、已知字段类型错误和不完整结构；Server 在 Draft change HTTP 边界调用它。
-结构校验不替代操作顺序、before 值、图语义或 Revision 并发校验。
+Public `flow-change` function `changeOperationsSchema()` returns JSON Schema for a ChangeOperation array, or a standalone operation schema when passed a kind. `decodeChangeOperations()` shares its field definitions, strips unknown fields, and rejects unknown kinds, incorrect known-field types, and incomplete structures. Server calls it at the Draft change HTTP boundary. Structural validation does not replace operation-order, before-value, graph-semantic, or Revision concurrency checks.
 
-公共解码入口、版本兼容和部署一致性验证见[公共契约与版本演进](compatibility.md)。
+See [Public contracts and version evolution](compatibility.md) for public decoding, compatibility, and deployment conformance.
 
 ## 11. Agent Task
 
-Agent 使用 Managed Task：`executor.kind: "agent"`，直接保存在 Flow 节点的 `node.task` 中。确定性配置错误产生 `agent.config-invalid`。
+Agent uses a Managed Task with `executor.kind: "agent"`, stored directly in `node.task`. Deterministic configuration errors produce `agent.config-invalid`.
 
 ```json
 {
@@ -1130,160 +1065,94 @@ Agent 使用 Managed Task：`executor.kind: "agent"`，直接保存在 Flow 节�
 }
 ```
 
-`model` 为部署模型网关的模型 ID；无 fallback。`maxRounds` 是 1–100 的整数，Connector 工具数最多 64；可以不配置工具或代码计算。
-工具 `id` 非空且在 Task 内唯一；`name` 在 Task 内唯一并匹配 `[A-Za-z][A-Za-z0-9_-]{0,63}`。
-最终输出的 `jsonSchema` 和 `description` 会提供给模型。最终答案的 JSON 解析或 schema 校验失败时，模型收到具体错误并修正答案；修正阶段不提供工具，不重放已执行操作，并计入 `maxRounds`。
-`read_result` 与 `run_code` 为保留名称。可选 `executor.code` 默认为 false，随 Revision 固定。
-Action 与 Connection 固定在 Revision；无需认证的 Action 可以省略 `connectionId`。工具输入不能再声明端口 `value`，
-只能通过 `source` 声明 `{ kind: "value", value }`、`{ kind: "input", input }` 或 `{ kind: "model" }`。
-`prompt` 是字符串模板，使用 `{{输入名称}}` 引用节点输入。字符串原样插入，其他 JSON 值序列化；未知引用保留原文，不递归展开输入值。渲染结果作为用户消息发送，宿主执行约束保留在系统消息中。
+`model` is a deployment model-gateway ID with no fallback. `maxRounds` is an integer from 1–100. There are at most 64 Connector tools; tools and code computation are optional. Tool `id` is nonempty and unique within the Task. `name` is unique and matches `[A-Za-z][A-Za-z0-9_-]{0,63}`. Final output `jsonSchema` and `description` go to the model. If final JSON parsing or schema validation fails, the model receives the specific error and corrects its answer without tools or replaying executed operations.
 
-工具输入与最终输出接受布尔 schema，以及下列 JSON Schema 写法：
+Corrections count toward `maxRounds`. `read_result` and `run_code` are reserved. Optional `executor.code` defaults to false and is pinned in Revision. Action/Connection are pinned; unauthenticated Actions may omit `connectionId`. Tool inputs cannot declare port `value`; their `source` must be `{ kind: "value", value }`, `{ kind: "input", input }`, or `{ kind: "model" }`. `prompt` is a string template using `{{inputName}}` for node inputs. Strings insert unchanged; other JSON serializes.
 
-- 基础类型与取值：单个或数组形式的 `type`、`enum`、`const`。
-- 组合与条件：`allOf`、`anyOf`、`oneOf`、`not`、`if/then/else`。
-- 字符串与数值：`minLength/maxLength`、`pattern`、已知的 `format`、`minimum/maximum`、
-  `exclusiveMinimum/exclusiveMaximum`、`multipleOf`。
-- 对象：`properties`、`required`、schema 形式的 `additionalProperties`、`patternProperties`、
-  `propertyNames`、`minProperties/maxProperties`、`dependentRequired`、`dependentSchemas`、
-  `dependencies`、`unevaluatedProperties`。
-- 数组：schema 或元组形式的 `items`、`prefixItems`、`additionalItems`、`minItems/maxItems`、
-  `uniqueItems`、`contains`、`minContains/maxContains`、`unevaluatedItems`。
-- 引用：`$defs`、`definitions` 与当前参数 schema 内的 JSON Pointer `$ref`。支持声明 Draft 7、2019-09、
-  2020-12；未声明时按 2019-09 校验。Draft 7 的 `$ref` 忽略同级约束，较新版本保留同级约束。
+Unknown references remain literal; input values do not expand recursively. Rendered text is a user message; host execution constraints stay in system messages.
 
-原始定义还接受 `description`、`title`、`default`、`examples`、`readOnly`、`writeOnly`、`deprecated`、
-`$comment`，并完整保留在 Revision 中。生成模型工具 schema 时保留 `description`、移除其他说明性元数据，
-展开本地引用并移除定义表和 dialect 声明；不会把 `default` 注入模型参数或覆盖固定值。
-展开限制为 4096 个 schema 节点、64 层深度。模型参数的递归引用、外部引用和 anchor 引用明确拒绝；
-固定参数及最终输出允许可解析的本地递归引用。未知关键词、未知 `format`、非法正则和不可解析的引用均报告配置错误，
-工具输入诊断包含具体原因及可用的嵌套路径。模型 provider 仍须接受生成的工具 schema，宿主不会删除验证约束来迎合 provider。
+Tool inputs and final outputs accept boolean schemas and these JSON Schema forms:
 
-只将模型生成字段暴露给 provider，全部字段必填；nullable 字段允许显式 null。
-合并参数后按原始 schema 校验，包括组合、格式和引用约束；未知字段或覆盖固定字段在实际调用前拒绝。
-校验不修改 Revision 中的 schema 或实际参数。
+- Types and values: scalar or array `type`, `enum`, `const`.
+- Composition and conditions: `allOf`, `anyOf`, `oneOf`, `not`, `if/then/else`.
+- Strings and numbers: `minLength/maxLength`, `pattern`, known `format`, `minimum/maximum`, `exclusiveMinimum/exclusiveMaximum`, `multipleOf`.
+- Objects: `properties`, `required`, schema-valued `additionalProperties`, `patternProperties`, `propertyNames`, `minProperties/maxProperties`, `dependentRequired`, `dependentSchemas`, `dependencies`, `unevaluatedProperties`.
+- Arrays: schema/tuple `items`, `prefixItems`, `additionalItems`, `minItems/maxItems`, `uniqueItems`, `contains`, `minContains/maxContains`, `unevaluatedItems`.
+- References: `$defs`, `definitions`, and JSON Pointer `$ref` within the parameter schema. Declared Draft 7, 2019-09, and 2020-12 are supported; undeclared schemas use 2019-09. Draft 7 `$ref` ignores sibling constraints; newer dialects retain them.
 
-最终输出恰为一个非 nullable 的 `output`。`type: "string"` 使用最终文本；其他 schema 要求最终文本可解码为 JSON，
-并验证整体输出后才提交节点完成。Agent 工具结果独立保存，模型只取得有界预览；框架与 Scheduler 的完整 checkpoint 上限为 16 MiB。
+Original definitions also accept `description`, `title`, `default`, `examples`, `readOnly`, `writeOnly`, `deprecated`, and `$comment`, all retained in Revision. Generated model tool schemas retain `description`, remove other annotations, expand local references, and remove definition tables/dialect declarations. `default` is never injected into model arguments or used to overwrite fixed values. Expansion permits 4096 schema nodes and 64 levels. Model parameters reject recursive, external, and anchor references. Fixed parameters/final outputs permit resolvable local recursive references.
 
-可选 `executor.notification` 为 `{ action, connectionId?, inputDefinitions, messageHandle, inputs }`。通知配置由 Agent 节点独立持有；通知输入的 source
-只能是固定值或此次节点输入，消息字段由宿主填写。通知配置随 Agent 节点进入 closure，独立进行 Action、Connection 和公共通知 origin 检查。
-待审批的完整调用以 JSON 展示在 `RunDetails.waits[].prompt`，包含 `callId`、`toolId`、Action、可选 Connection 和完整 `input`。
-通知消息追加原等待的到期时间和决议链接。
+Unknown keywords/formats, invalid regexes, and unresolved references are configuration errors. Tool input diagnostics include specific reasons and available nested paths. Model Providers must accept generated schemas; hosts do not remove constraints to accommodate them.
 
-修改 Agent 使用 change operation `{ kind: "graph.node.task.set", nodeId, before, value }`。
-`before` 与 `value` 是完整 Managed Task；前者必须与当前定义相等，后者提交该节点的新执行配置。
-语义无效配置可保存在 Draft，但 Run 与 Publish 必须通过 validation。
+Only model-generated fields are exposed to Providers, all required. Nullable fields accept explicit null. Merged arguments validate against original schemas, including composition, format, and references. Unknown fields or overrides of fixed fields reject before invocation. Validation changes neither Revision schemas nor actual arguments.
 
-### 执行与恢复
+Final output is exactly one non-nullable `output`. `type: "string"` uses final text; other schemas require JSON-decodable text and complete validation before completion. Agent tool results persist separately; models receive bounded previews. Framework and Scheduler checkpoints are limited to 16 MiB.
 
-Task callback 的 Agent 返回值为 `{ kind: "completed", output }` 或
-`{ kind: "suspended", checkpoint: { version: 1, callId, toolId, input, rounds, state } }`。
-`state` 是部署私有 JSON continuation，不能出现在 Revision 或公开事件中。恢复 Task invocation 携带
-`agent: { action: "approve" | "reject", checkpoint }`，保持原 `invocationId`、`jobId` 和 `runId`。
+Optional `executor.notification` is `{ action, connectionId?, inputDefinitions, messageHandle, inputs }`, independently owned by the Agent node. Notification sources are only fixed values or this node’s inputs; the host supplies the message field. Notification configuration enters the closure and independently checks Action, Connection, and public notification origin. `RunDetails.waits[].prompt` displays the complete pending call as JSON with `callId`, `toolId`, Action, optional Connection, and full `input`. Messages append the original wait expiry and decision links.
 
-Server 的首个 adapter 固定使用 Mastra 1.64.0，私有 continuation 带 `framework: "mastra/1.64.0"` 、结果引用 `{ resultId, digest }[]` 与全部 workflow snapshots。
-快照直接包含在 Run store 的同一等待事务中，不依赖另一个持久化框架数据库。工具调用身份由 invocation、模型轮数和
-provider tool-call ID 共同组成；相同参数不会合并。
+Update Agents through `{ kind: "graph.node.task.set", nodeId, before, value }`. `before` and `value` are complete Managed Tasks. The former must equal the current definition; the latter replaces this node’s execution configuration. Semantically invalid Drafts may save, but Run and Publish require validation.
 
-工具按当前模型批次中的次序串行执行，全部结果或拒绝事实齐全后才请求下一轮模型。节点 `timeoutMs` 累计所有 active segment，
-在 checkpoint 的节点记录中保存剩余预算；审批等待、队列等待与其他节点执行不消耗该节点预算。Run 总预算独立累计。
-超过模型轮数、超时、取消或资源限制不会作为可恢复工具错误交回模型。
+### Execution and recovery
 
-Connector 明确返回 `success: false` 和 `errorCode: "invalid_input"` 时记录为 `connector.input-invalid`，按参数拒绝处理并可交回模型。
-该分类不依赖 `data` 的形状：Schema 校验错误数组中的诊断会保留，Provider 错误对象、空值或缺失详情使用通用参数错误提示。
-仅有 HTTP 400 而没有上述错误标识时，不视为可恢复参数错误。
-请求发出后无法确认执行结果时记录 `connector.indeterminate`，Run 以 `indeterminate` 和 `execution.terminal-unknown` 结束。
-节点错误保留请求超时、传输失败、响应格式或大小异常、上游失败等原因，以及已收到的 HTTP 状态；不透传上游原始响应正文。
-Agent 工具失败事件包含 `code` 和 `message`；`executed` 为 `true` 表示已确认返回成功结果，为 `false` 表示已确认拒绝执行，
-为 `null` 表示无法确认执行结果。
-已确认返回的工具结果在 JSON 校验、大小检查或记录阶段失败时终止 Agent，不能继续同批其他工具或再次请求模型。
+Agent Task callbacks return `{ kind: "completed", output }` or `{ kind: "suspended", checkpoint: { version: 1, callId, toolId, input, rounds, state } }`. `state` is deployment-private JSON continuation and never enters Revision or public events. Recovery carries `agent: { action: "approve" | "reject", checkpoint }` while preserving `invocationId`, `jobId`, and `runId`.
 
-过程记录复用 `node.log`，`message` 为 JSON：模型记录 `{ kind: "model", round }`；工具记录包含
-`kind: "tool"`、`callId`、`toolId`、`status`（`started/completed/failed/approval/approved/rejected`），
-并按状态包含完整 input、output 或错误 code。失败记录的 `executed` 表示实际调用是否已成功返回。
-这些记录仅供观察，不能用于恢复或重放。
+Server’s first adapter pins Mastra 1.64.0. Private continuation includes `framework: "mastra/1.64.0"`, `{ resultId, digest }[]` references, and all workflow snapshots. Snapshots enter the same Run-store wait transaction without a separate framework database. Tool-call identity combines invocation, model round, and Provider tool-call ID. Equal arguments do not merge calls.
 
-### Agent 保存的工具结果
+Tools execute serially in current model-batch order. The next model round waits for all results or rejection facts. Node `timeoutMs` accumulates across active segments, with remaining budget in checkpoint node records. Approval waits, queue waits, and other nodes’ execution consume none of this node’s budget. Run budget accumulates separately. Round limits, timeout, cancellation, and resource limits are not recoverable tool errors sent to the model.
 
-Agent 保留的每份结果属于一个 Run 和一个 invocation。`resultId` 是 opaque identity，不是访问 capability。
-所有下列路由复用 Run 的认证和资源读取边界，结果与 Run 不匹配时返回 not-found。结果不随日志过期，随所属 Flow 物理删除清理。
+Explicit Connector `success: false` with `errorCode: "invalid_input"` becomes `connector.input-invalid`, a parameter rejection returnable to the model. Classification does not depend on `data`: schema error-array diagnostics remain; Provider error objects, null, or missing details use a generic parameter message. HTTP 400 alone is not recoverable without that identifier. An unconfirmed outcome after sending becomes `connector.indeterminate`; the Run ends `indeterminate` with `execution.terminal-unknown`. Node errors retain timeout, transport, format/size, or upstream failure reasons and received HTTP status without raw upstream bodies.
 
-- `GET /v1/runs/:runId/results?after=<resultId>` 返回 `{ version: 1, runId, results, nextAfter? }`。
-  每页最多 50 项，按 resultId 升序；运行中新增结果后可从第一页刷新列表。
-- `GET /v1/runs/:runId/results/:resultId?pointer=&offset=0&limit=20&maxBytes=15000` 返回 `{ version: 1, runId, result, page }`。
-  `pointer` 是最长 4096 字符的 JSON Pointer，默认根；`offset` 是非负整数；`limit` 是 1–100 的整数，用于对象或数组成员分页。
-  `maxBytes` 是 1–1,048,576 的整数，默认 15,000，限制 UTF-8 编码后的完整 `page` JSON，外层 result 元数据另计。
-  字符串按 Unicode code point 偏移分页，片段随页面预算变化，不再另设 8192 bytes 上限；预算无法容纳元数据与一个字符或成员时拒绝。
-  模型 `read_result` 只允许申请最多 65,536 bytes，默认仍为 15,000。
-  无效 pointer、越界 offset 或非法参数返回 `run.invalid`。
-- `GET /v1/runs/:runId/results/:resultId/content` 返回完整 JSON，使用 `application/json`、附件下载和 `no-store` 响应头。
+Tool failure events include `code`, `message`, and `executed`: `true` confirms a successful result, `false` confirms execution rejection, and `null` means unknown outcome. If a confirmed result fails JSON validation, size checks, or recording, terminate the Agent without running later batch tools or requesting another model round.
 
-结果描述为 `{ resultId, callId, toolId, source, bytes, digest, createdAt }`。
-`source` 为 `{ kind: "connector", action }` 或 `{ kind: "code" }`，不通过工具名称推断来源。`bytes` 为保存的 JSON UTF-8 字节数，
-`digest` 为保存正文的 SHA-256 十六进制摘要，`createdAt` 为 ISO 时间戳。
+Progress uses `node.log` with JSON `message`. Model records are `{ kind: "model", round }`. Tool records contain `kind: "tool"`, `callId`, `toolId`, and `status` (`started/completed/failed/approval/approved/rejected`), plus complete input, output, or error code as appropriate. Failure `executed` indicates whether the call successfully returned. These records are observational, never recovery or replay sources.
 
-页面为 `{ pointer, type, complete, value?, length?, offset, nextOffset?, entries? }`。
-`type` 为 JSON 类型；小值以完整 `value` 返回。较大对象或数组返回 `entries`，每项包含
-`{ pointer, type, complete, value?, length? }`；未提供 value 的成员可通过它的 pointer 继续读取。
-字符串的 offset/nextOffset 按 Unicode code point 计数，value 为当前连续片段，单页文本按编码后大小限制。
-`complete: false` 表示不能把当前 value 或 entries 当作原始完整 JSON；nextOffset 存在时可以继续翻页。
+### Stored Agent tool results
 
-模型业务工具输出统一为 `{ kind: "stored-result", result, page }`。宿主预留工具名 `read_result`，输入为
-`{ resultId, pointer?, offset?, limit?, maxBytes? }`，输出相同 envelope；只允许访问当前 invocation 已取得的结果。
-读取不执行外部 Action，不要求业务审批，仍消耗正常模型轮数和运行预算。
-模型历史预览被压缩时返回 `{ kind: "stored-result", result, previewOmitted: true }`，结果仍可读取。
+Each retained result belongs to one Run and invocation. `resultId` is an opaque identity, not an access capability. All routes below reuse Run authentication/resource boundaries and return not-found for mismatched ownership. Results survive log expiry and are removed with physical Flow deletion.
 
-Server 动作响应保护上限为 32 MiB，单 Run 工具结果正文配额为 128 MiB；目录与 Proxy 限制独立。
-读取页默认最多 15,000 bytes，显式 `maxBytes` 可调整；预算内的值完整返回，不设单项 2 KiB 限制。对象和数组按页预算返回完整成员，
-放不下的成员留到下一页；单个成员超过页预算时只提供元信息，可通过其 pointer 继续读取。
-页面的 `complete: false` 不影响其中 `complete: true` 成员的完整性，无需逐项重读这些成员。
-模型历史和框架快照中保留的预览使用 128 KiB 总量预算，
-优先保留较新的预览，保留旧调用配对和结果引用。该字节预算不等于模型 tokenizer 或精确上下文窗口。
-成功结果必须先持久化再交给模型；存储或完整性失败不能作为可修正工具错误重试外部调用。
+- `GET /v1/runs/:runId/results?after=<resultId>` returns `{ version: 1, runId, results, nextAfter? }`. Pages contain at most 50 items in ascending resultId order. Refresh from the first page for new results during execution.
+- `GET /v1/runs/:runId/results/:resultId?pointer=&offset=0&limit=20&maxBytes=15000` returns `{ version: 1, runId, result, page }`. `pointer` is a JSON Pointer up to 4096 characters, defaulting to root. `offset` is a nonnegative integer. `limit` is 1–100 for object/array members. `maxBytes` is 1–1,048,576, default 15,000, limiting complete UTF-8 `page` JSON; outer result metadata is separate. String offsets count Unicode code points. Fragment size follows page budget without a separate 8192-byte cap. Reject budgets that cannot fit metadata plus one character/member. Model `read_result` permits at most 65,536 bytes, still defaulting to 15,000. Invalid pointers, out-of-range offsets, or invalid arguments return `run.invalid`.
+- `GET /v1/runs/:runId/results/:resultId/content` returns complete JSON with `application/json`, attachment download, and `no-store` headers.
 
-### Agent 代码计算
+Result metadata is `{ resultId, callId, toolId, source, bytes, digest, createdAt }`. `source` is `{ kind: "connector", action }` or `{ kind: "code" }`, never inferred from tool names. `bytes` counts stored JSON UTF-8 bytes; `digest` is its SHA-256 hexadecimal digest; `createdAt` is an ISO timestamp.
 
-`executor.code: true` 注册内置工具 `run_code`，输入为 `{ code, inputs }`。
-`code` 是 default export 函数的 JavaScript ES module；函数只接收解析后的输入对象，返回 JSON 或 Promise<JSON>。
-`inputs` 的每个值为严格来源声明之一：`{ kind: "value", value }`、`{ kind: "input", input }` 或 `{ kind: "result", resultId }`。
-input 必须是当前 invocation 已有的节点输入；resultId 必须位于当前 invocation 的引用集合，且存储归属与 digest 校验通过。
-宿主读取完整数据后注入执行器，不经过模型消息。输出先持久化，再以 stored-result envelope 返回，并可作为后续计算的输入。
+Pages use `{ pointer, type, complete, value?, length?, offset, nextOffset?, entries? }`. `type` is a JSON type. Small values return complete `value`; larger objects/arrays return `entries` with `{ pointer, type, complete, value?, length? }`. Entries without values can be read through their pointers. String offset/nextOffset count Unicode code points; value is the current contiguous fragment, limited by encoded size. `complete: false` means value/entries are not the complete original JSON. Continue with nextOffset when present.
 
-每次执行使用独立 isolate，无节点 context、Connector 或网络权限，不允许第三方或其他 Flow 模块导入。
-输入总量与结果上限分别为 32 MiB，源码为 64 KiB，内存为 256 MiB，V8 执行调用 timeout 为 1 秒、单次墙钟为 5 秒，
-同时服从节点和 Run 的剩余预算。无效 JSON 输出（含 undefined、BigInt、非有限数、循环引用及非普通对象）返回明确错误。
-语法和普通执行错误可交回模型，修正提交计为新调用；取消、资源限制、执行器崩溃、结果丢失、完整性或存储失败终止 Agent。
+Model business tools return `{ kind: "stored-result", result, page }`. Reserved host tool `read_result` accepts `{ resultId, pointer?, offset?, limit?, maxBytes? }` and returns that envelope. It accesses only results obtained by the current invocation. Reads execute no external Actions and need no business approval, but consume normal model rounds and runtime budget. Compressed historical previews become `{ kind: "stored-result", result, previewOmitted: true }`; results remain readable.
 
-代码调用沿用 tool 日志结构，并包含 `source: { kind: "code" }`；输入保留源码和来源声明，输出保留结果引用。
-调用身份、成功结果复用与恢复沿用普通 Agent 工具语义。代码工具无需逐次审批，也不依赖部署 Connector；
-Agent 声明的业务工具和审批通知仍独立执行能力检查。
+Server limits Action responses to 32 MiB and per-Run tool-result bodies to 128 MiB. Catalog and Proxy limits are separate. Read pages default to 15,000 bytes, adjustable through `maxBytes`. Values fitting the budget return whole, without a per-item 2 KiB limit. Object/array pages return complete members that fit; remaining members continue on later pages. A single oversized member returns metadata for pointer-based reading. Page `complete: false` does not invalidate members with `complete: true`; they need no reread.
 
-### Trigger 动态配置选项
+Previews in model history/framework snapshots share a 128 KiB budget, favoring recent previews while retaining older call pairs and result references. This is not a tokenizer or exact context-window limit. Successful results must persist before reaching the model. Storage/integrity failures cannot trigger external-call retries as correctable tool errors.
 
-`GET /v1/flows/:flowId/triggers/:triggerNodeId/options/:field` 返回
-`{ version: 1, options: [{ value: string, label: string, color?: string }] }`。
-`value` 是保存到配置中的稳定 ID，`label` 是当前显示名称，`color` 若存在则为六位十六进制颜色。
-一次成功响应包含完整选项，最多 1000 项；上游失败或超出限制必须报错，不能把截断列表伪装成完整结果。
+### Agent code computation
 
-服务端从当前 Draft 解析 Trigger、Connection binding 和 Provider 配置，按 Flow 固定的 Connector Team scope 查询。
-接口只允许 Provider 声明的配置字段，不接收任意外部 URL、GraphQL 或凭据，不创建 Run、订阅或生产 binding。
-目前 Linear 提供 `teamId` 和依赖已保存 Team 的 `stateIds` 两组选择。
+`executor.code: true` registers built-in `run_code` with `{ code, inputs }`. `code` is a JavaScript ES module exporting a default function. It accepts only resolved inputs and returns JSON or Promise<JSON>. Each input is strictly `{ kind: "value", value }`, `{ kind: "input", input }`, or `{ kind: "result", resultId }`. Named inputs must exist in the invocation. resultIds must be in its reference set and pass ownership/digest checks. Hosts inject complete data into the executor without model messages. Outputs persist before returning a stored-result envelope and may feed later computations.
 
-Workbench 切换连接时原子清除 Linear 的 `teamId` 与 `stateIds`；切换 Team 时原子清除 `stateIds`。
-失效的已选项必须保留并明确提示，不能自动替换或清空而扩大筛选范围。
+Each call uses an independent isolate without node context, Connector, network, third-party imports, or other Flow modules. Inputs and results each permit 32 MiB; source permits 64 KiB; memory is 256 MiB. V8 execution-call timeout is 1 second; wall-clock limit is 5 seconds, also constrained by remaining node/Run budgets. Invalid JSON output, including undefined, BigInt, non-finite numbers, cycles, and non-plain objects, returns explicit errors. Syntax/ordinary execution errors may return to the model; corrections are new calls. Cancellation, resource limits, executor crashes, lost results, integrity failures, and storage failures terminate the Agent.
 
-Flow 服务列表与账号授权分别保存。`ConnectorAccess.providerIds` 保存显式添加的服务，允许服务尚无账号或尚未勾选授权；旧快照没有此字段时按空列表处理，已有 bindings 仍提供其所属服务。Code 配置合并显式添加服务和 Code binding 所属服务，不混入节点引用服务；总览从节点配置与 Code binding 派生使用关系。新增服务不授予账号权限，也不改变仅由授权绑定计算的 `sharedAccessDigest`。
+Code calls use ordinary tool logs with `source: { kind: "code" }`. Inputs retain source code and source declarations; outputs retain result references. Identity, successful-result reuse, and recovery follow Agent tool semantics. Code calls require neither per-call approval nor deployment Connector. Business tools and approval notifications retain independent capability checks.
 
-`PUT /v1/flows/:flowId/connector-access/:providerId/service` 添加服务；`DELETE` 同一路径原子移除服务及其全部授权绑定。请求为 `{ version: 1, expectedAccessRevision }`，返回更新后的 `ConnectorAccess`，沿用访问版本冲突和 `access.changed` 通知。添加前校验服务存在且需要授权；服务配置持久化到 Flow，刷新或重新打开后保留。
+### Dynamic Trigger configuration options
 
-开源 Server 的 OOMOL selectable 模式在列举及保存候选时实时验证 `/v1/me/teams` 的成员身份。正常且未删除的团队中，`creator` 和 `admin` 可为有效账号创建 `admin-delegation`，无需 app-access policy；`member` 继续按 UID 对应的 policy 权限生成候选。成员身份缺失、失效或无法验证时拒绝授权。保存后的管理员委托使用固定身份校验当前账号有效性，不重新查询成员角色或 app-access；上游 Connector 仍按部署配置的用户 token 执行最终授权，Server 不伪造 Team token 或绕过上游限制。
+`GET /v1/flows/:flowId/triggers/:triggerNodeId/options/:field` returns `{ version: 1, options: [{ value: string, label: string, color?: string }] }`. `value` is the stable saved ID; `label` is its current name; optional `color` is six-digit hexadecimal. Success returns all options, up to 1000. Upstream failure or excess size must error rather than present truncation as complete.
 
-### CLI/MCP Team 选择
+Server resolves the Trigger, Connection binding, and Provider configuration from current Draft and queries within the Flow’s fixed Connector Team. Only Provider-declared fields are allowed. The interface accepts no arbitrary URLs, GraphQL, or credentials and creates no Runs, subscriptions, or production bindings. Linear currently provides `teamId` and `stateIds`, the latter depending on the saved Team.
 
-`POST /v1/flows` 的创建请求接受 `{ name, teamId?: string, version: 1 }`；teamId 必须是非空字符串，并由部署验证可访问性。省略时保留部署的默认 Team 选择规则。相同 Idempotency-Key 对不同 Team 的创建请求返回冲突。
+Workbench atomically clears Linear `teamId` and `stateIds` on Connection changes, and `stateIds` on Team changes. Invalid selected options must remain with explicit notices. Do not replace or clear them automatically and thereby broaden filtering.
 
-Server 提供认证后的 `GET /v1/connector/teams`，返回 `{ enabled: boolean, teams: { id: string, name: string, systemCreated: boolean }[], version: 1 }`。不支持 Team 的部署返回 enabled=false 和空 teams。此目录不返回 Flow-Team 绑定列表。公共 ControlClient 通过 listConnectorTeams 读取，并通过 createFlow 的可选第三参数传入 teamId。
+Flow service lists and account authorization are separate. `ConnectorAccess.providerIds` stores explicitly added services. A service may have no account or selected authorization. Older snapshots without this field use an empty list; existing bindings still contribute their services.
+
+Code configuration combines explicitly added services with services from Code bindings, excluding node-referenced services. Overview derives usage from node configuration and Code bindings. Adding a service grants no account access and does not change `sharedAccessDigest`, which uses only authorization bindings.
+
+`PUT /v1/flows/:flowId/connector-access/:providerId/service` adds a service. `DELETE` at the same path atomically removes it and all its bindings. Bodies use `{ version: 1, expectedAccessRevision }`; responses return updated `ConnectorAccess` with existing access conflicts and `access.changed` notifications. Addition verifies that the service exists and needs authorization. Service configuration persists on the Flow across refresh/reopening.
+
+Open-source Server OOMOL selectable mode checks current `/v1/me/teams` membership when listing/saving candidates. In valid, nondeleted Teams, `creator` and `admin` can create `admin-delegation` for active accounts without app-access policies. `member` candidates still follow UID policies. Missing, invalid, or unverifiable membership rejects authorization. Saved administrator delegation checks current account validity using pinned identity without rereading roles/app-access. Upstream Connector still authorizes with the configured user token; Server does not forge Team tokens or bypass upstream limits.
+
+### CLI/MCP Team selection
+
+`POST /v1/flows` accepts `{ name, teamId?: string, version: 1 }`. teamId must be nonempty and deployment-verified as accessible. Omission retains default Team rules. The same Idempotency-Key with different Team creation requests conflicts.
+
+Authenticated `GET /v1/connector/teams` returns `{ enabled: boolean, teams: { id: string, name: string, systemCreated: boolean }[], version: 1 }`. Deployments without Teams return enabled=false and empty teams. This catalog omits Flow-Team bindings. Public ControlClient reads through listConnectorTeams and passes teamId through createFlow’s optional third argument.
 
 ### Flow Error deletion impact
 
@@ -1300,42 +1169,26 @@ snapshot, not a deletion lock: subscriptions can change after the query. Deletio
 still retires the source and eventually removes its subscriptions; handler draft
 references remain available for manual removal.
 
-## OpenAPI 文档与 Task
+## OpenAPI documents and Tasks
 
-`POST /v1/openapi/document` 要求 Operator 认证。请求为 `{ "version": 1, "url": "https://example.com/openapi.json" }`，响应为
-`{ "version": 1, "document": <OpenAPI JSON> }`。地址限制为无内嵌凭证的 HTTP(S)，仅支持公开 OpenAPI 3.0/3.1 JSON；不跟随重定向，读取上限 4 MiB，超时 15 秒。
-无效请求或加载失败返回 `flow.invalid`，不返回上游响应体。该操作不修改 Flow。
+`POST /v1/openapi/document` requires Operator authentication. Request: `{ "version": 1, "url": "https://example.com/openapi.json" }`. Response: `{ "version": 1, "document": <OpenAPI JSON> }`. URLs must use HTTP(S) without embedded credentials. Only public OpenAPI 3.0/3.1 JSON is supported. Redirects are not followed; reads are limited to 4 MiB and 15 seconds. Invalid requests/loading failures return `flow.invalid` without upstream bodies. The operation changes no Flow.
 
-Managed Task 新增 `executor.kind: "openapi"`，包含 `sourceUrl`、`method`（小写）、`path`、`serverUrl`、`document`（所选接口与引用依赖快照）、`auth`。
-鉴权项为 `{ id, type: "bearer" | "basic" | "apiKey", name?, in?: "header" | "query" }`。
-`graph.node.task.set` 原子提交 `nodeId`、完整 `before` 与 `value` Task，支持草稿并发检查和撤销。未选择接口的空 Task 可保存，不能运行。
-参数输入标识为 `path.<name>`、`query.<name>`、`header.<name>`，JSON 请求体为 `body`；鉴权使用 `auth.<id>.token` 或 Basic 的 `username`、`password`。
-鉴权输入禁止固定值；可清空，运行时必须具有有效部署变量或上游输出。
-输出为 `body`、`statusCode`、`headers`，`node.started.nodeKind` 新增 `openapi`，启动事件不包含鉴权输入。
+Managed Tasks add `executor.kind: "openapi"` with `sourceUrl`, lowercase `method`, `path`, `serverUrl`, `document` (selected operation/dependency snapshot), and `auth`. Authentication entries are `{ id, type: "bearer" | "basic" | "apiKey", name?, in?: "header" | "query" }`. `graph.node.task.set` atomically commits `nodeId` and complete `before`/`value` Tasks with concurrency checks and undo. Empty Tasks without an operation may save but cannot run. Inputs use `path.<name>`, `query.<name>`, `header.<name>`, and JSON `body`.
 
-首版支持 simple path/header 和 form query 参数编码、文档内部引用和 JSON body；外部引用、二进制、流式响应、其它参数编码与 OAuth 登录不支持。
-请求运行最多等待 30 秒（同时受节点与 Run 的更短期限约束），响应上限 4 MiB，不自动重试或重定向。非 2xx、未声明的状态或媒体类型、Schema 不匹配均使节点失败。
-无响应体为 `null`，响应头不包含 `set-cookie`。文档与 API 请求不转发 Operator 凭证；API 鉴权不用于读取文档。
+Authentication uses `auth.<id>.token` or Basic `username`/`password`. Auth inputs reject fixed values, may be cleared, and require valid deployment Variables or upstream outputs at runtime. Outputs are `body`, `statusCode`, and `headers`. `node.started.nodeKind` adds `openapi`; start events omit auth inputs.
+
+Execution uses the Revision’s saved operation snapshot without rereading remote documents. Definitions change only through explicit Draft updates. Inputs/outputs derive from that snapshot and cannot be edited as independent contracts.
+
+The first version supports simple path/header and form query encoding, internal document references, and JSON bodies. External references, binary/streaming responses, other parameter encodings, and OAuth login are unsupported. Requests wait at most 30 seconds, bounded by shorter node/Run deadlines. Responses are limited to 4 MiB. There are no automatic retries or redirects. Non-2xx responses, undeclared statuses/media types, and schema mismatches fail the node. Missing bodies become `null`; response headers exclude `set-cookie`. Document/API requests do not forward Operator credentials, and API authentication does not apply to document loading.
 
 ### AI Decision
 
-Managed Task 的 `executor.kind: "decision"` 保存有序 `questions` 数组。每个问题含 `name`（唯一输出名称）、
-`instructions`（纯文本）和 `type`；`noul` 可选 `criteria: { true?: string, false?: string }`，
-`choice` 使用 `criteria: { name: string, description: string }[]`，`score` 使用有序 `criteria: string[]`。
-至少一个问题，问题总数不设上限；Choice 使用前 255 个类别，Score 使用前 10 个等级，均按配置顺序截取。
-加载、Schema 派生、校验和运行共用这一规则，超出部分忽略；UI 达到对应上限时禁用添加按钮，删除后恢复。
-有效范围内仍要求 Choice 至少一个且名称唯一，Score 至少两个非空等级。未完成配置可保存草稿，不能运行或发布。
+Managed Task `executor.kind: "decision"` stores ordered `questions`. Each has unique output `name`, plaintext `instructions`, and `type`. `noul` permits optional `criteria: { true?: string, false?: string }`; `choice` uses `criteria: { name: string, description: string }[]`; `score` uses ordered `criteria: string[]`. At least one question is required with no upper question limit. Choice uses the first 255 categories; Score uses the first 10 levels, in configuration order.
 
-固定输入 `target` 接受非 null 的文本、对象或数组，支持普通输入来源绑定。输入与输出定义由公共 `decisionTask` 派生，
-不能独立更改。每个问题的同名端口保留完整答案：Noul 的 `type/noul`，Choice 的
-`type/choice/probabilities/confidence`，Score 的 `type/score/legend/probabilities/confidence`。
-不增加 `answers` 包装，不自动转换布尔值或选择执行分支。Condition 可通过既有一级字段 Source 引用判断结果。
+Loading, schema derivation, validation, and execution share this truncation rule. Excess entries are ignored. UI add buttons disable at limits and reenable after deletion. Effective Choice categories require at least one and unique names; Score requires at least two nonempty levels. Incomplete Drafts may save but cannot run or publish.
 
-`graph.node.task.set` 使用完整 `before/value` Task 进行并发校验与原子替换，支持撤销重做。
-`@oomol-lab/open-flow/decision` 导出问题类型、Task/Schema 派生、配置校验及请求响应转换；
-`flow-authoring` 导出 `createDecisionTask`，authoring example 名称为 `decision`。
-`node.started.nodeKind` 增加 `decision`。
+Fixed input `target` accepts non-null text, objects, or arrays and ordinary source bindings. Public `decisionTask` derives input/output definitions, which cannot change independently. Each question’s named port retains the full answer: Noul `type/noul`, Choice `type/choice/probabilities/confidence`, and Score `type/score/legend/probabilities/confidence`. There is no `answers` wrapper, automatic boolean conversion, or execution-branch selection. Condition may inspect results through existing direct-property Sources.
 
-部署通过 LLM host 的可选 `decision` 方法调用 `/v1/systemone`，复用部署 origin/token，固定模型 `typesafe/jev`。
-节点的 `target` 映射为网关请求的 `state`。所有问题使用相同待判断内容，在单次请求中独立判断。不支持提示词插值、问题间依赖或输入数组逐项遍历。
-答案缺失、类型或范围错误导致整个节点失败，不产生部分输出。调用遵守节点取消与超时，未配置能力时拒绝准入。
+`graph.node.task.set` uses complete `before/value` Tasks for concurrency checks, atomic replacement, and undo/redo. `@oomol-lab/open-flow/decision` exports question types, Task/schema derivation, configuration validation, and request/response conversion. `flow-authoring` exports `createDecisionTask`; the authoring example is `decision`. `node.started.nodeKind` adds `decision`.
+
+Deployments call `/v1/systemone` through optional LLM host `decision`, reusing deployment origin/token and fixed model `typesafe/jev`. Node `target` maps to gateway `state`. All questions independently evaluate the same content in one request. Prompt interpolation, question dependencies, and per-item input-array iteration are unsupported. Missing answers or invalid types/ranges fail the whole node without partial outputs. Calls obey node cancellation/timeouts; missing capability rejects admission.

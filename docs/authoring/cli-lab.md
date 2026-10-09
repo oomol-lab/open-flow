@@ -59,12 +59,14 @@ bun run lab --session SESSION_ID flow read FLOW_ID --json
 bun run lab --session SESSION_ID report --json
 ```
 
-Offline help and local schema commands may run concurrently within a session, including alongside
-one deployment command. Each call retains its own input/output and cost record. Commands that
-access the deployment remain sequential. Reset and acceptance verification require every active
-command to finish, including offline commands, and block new registrations while running.
-Ctrl+C stops the backend and the read-only page's
-development server while preserving the experiment database and reports.
+Offline help and local schema commands can run concurrently within a session. They can also run
+alongside one deployment command. Each call keeps its own input/output and cost record.
+Commands that access the deployment run sequentially.
+
+Before reset or acceptance verification starts, all active commands must finish, including offline
+commands. Reset and verification block new command registrations while they run.
+Ctrl+C stops the backend and the read-only page's development server. It preserves the experiment
+database and reports.
 
 ```bash
 bun run lab report --attempt ATTEMPT_ID
@@ -77,11 +79,13 @@ Lab does not read the regular development server's data or configuration. Restar
 after changing backend source. CLI source changes take effect on the next invocation; frontend
 changes update through Vite.
 
-Comparisons require the same scenario version and fixture/verifier identity. Reports default to readable text; `--json` returns the full structure. Each command record includes
-arguments, input sources, request paths, statuses, and byte counts. Raw stdout/stderr are saved
-separately in files named with the attempt and command IDs. Git HEAD, working-tree status, and a
-diff digest help identify the source version, but the digest cannot reconstruct uncommitted or
-untracked files. Pin source and script versions when strict comparisons are required.
+Compare reports only when they use the same scenario version and fixture/verifier identity.
+Reports default to readable text. `--json` returns the full structure.
+Each command record includes arguments, input sources, request paths, statuses, and byte counts.
+Lab saves raw stdout/stderr in separate files named with the attempt and command IDs.
+
+Git HEAD, working-tree status, and a diff digest help identify the source version. The digest cannot
+reconstruct uncommitted or untracked files. For strict comparisons, pin the source and script versions.
 
 The first successful verification freezes the task result. Later commands are recorded under
 `after` and do not change the completed cost totals. Run `reset` to start another comparison.
@@ -202,7 +206,16 @@ fulfillment workflow:
 | `concurrent-edit`          | After the first read containing the notification target, a deterministic gate commits an operator note edit. Require a stale write rejection with an unchanged Draft, a successful retry preserving the note, and no duplicate nodes or unnecessary Runs. |
 | `fulfillment-ops`          | Maintain one Flow across four accepted tasks: batch reporting, overdue alerts, manager/supplier follow-up and an upstream data migration. Each stage retains the previous Flow and checks cumulative behavior.                                            |
 
-Both drivers use the same task, fixture and verifier. Reference scripts call only public Agent tools through `driver.ts`; they cannot read fixture data, the database or the service to obtain answers. CLI calls use production argument/file handling; MCP calls use the real HTTP transport. Each scenario declares its entry: existing fixtures name their initial trigger; the blank-flow task requires one newly created Manual trigger. The verifier uses those entries and sample sets, supports independent Runs and expected failures, and inspects actual mock calls. Model outputs are deterministic; model request records establish correct prompt/configuration transmission, not generation quality.
+Both drivers use the same task, fixture and verifier. Reference scripts call only public Agent tools
+through `driver.ts`. They cannot read fixture data, the database or the service to obtain answers.
+CLI calls use production argument/file handling. MCP calls use the real HTTP transport.
+
+Each scenario declares its entry. Existing fixtures name their initial trigger. The blank-flow task
+requires one newly created Manual trigger. The verifier uses those entries and sample sets. It supports
+independent Runs and expected failures, and inspects actual mock calls.
+
+Model outputs are deterministic. Model request records verify prompt/configuration transmission.
+They do not verify generation quality.
 
 The old four scenario IDs have left the default set. Historical reports retain their original IDs and versions. Compare interfaces on the same new task and verifier; an old interface unable to complete a task has a capability gap. Script regression scores do not measure real Agent success rates.
 
@@ -234,18 +247,23 @@ All sizes are measured in UTF-8 bytes. Argument text is calculated by joining ar
 a single space. It excludes shell quoting, the Lab invocation prefix, and the shell's own output.
 The original argv array is also retained.
 
-Files are identified by their resolved filesystem paths. Repeated reads within one command count
-once; resubmitting the same file in another command counts again. File and stdin content are
-counted separately from paths in command arguments. A full Revision fetched internally but not
-shown to the caller counts only at the HTTP layer. HTTP sizes measure bodies consumed by the
-transport adapter, excluding headers, TLS overhead, and compression overhead. Responses and
-terminal output are counted incrementally as they stream.
+Lab identifies files by their resolved filesystem paths. Repeated reads within one command count
+once. If another command reads the same file, that read counts again.
+Lab counts file and stdin content separately from paths in command arguments.
 
-Initialization, seeded failure Runs, mock operator edits and Lab acceptance verification are separately recorded under `excluded` and excluded from task costs. The seed failure is a substep of initialization. The concurrency gate reports its own time separately from the caller command and HTTP duration. Explicit
-`check`, `run`, and status polling calls made by task scripts are included. Requests are marked
-as replays only when their method, path, idempotency key, and body match exactly. Repair attempts count edits submitted after a rejected edit; they do not imply the same request identity. Nonzero exit codes are reported
-separately; they include production CLI waiting/timeout states and do not always indicate a
-failed edit.
+A full Revision fetched internally but not shown to the caller counts only at the HTTP layer.
+HTTP sizes measure bodies consumed by the transport adapter. They exclude headers, TLS overhead,
+and compression overhead. Lab counts responses and terminal output as they stream.
+
+Lab records initialization, seeded failure Runs, mock operator edits and acceptance verification
+under `excluded`. These operations do not contribute to task costs. The seed failure is part of
+initialization. The concurrency gate reports its own time separately from command and HTTP duration.
+Explicit `check`, `run`, and status polling calls made by task scripts contribute to task costs.
+
+Lab marks requests as replays only when their method, path, idempotency key, and body match exactly.
+Repair attempts count edits submitted after a rejected edit. They do not imply the same request identity.
+Lab reports nonzero exit codes separately. These codes include production CLI waiting/timeout states,
+so they do not always indicate a failed edit.
 
 Summed command duration and task wall-clock time are reported separately. Human thinking time
 is part of wall-clock time. Successful verification freezes task wall-clock time at the moment

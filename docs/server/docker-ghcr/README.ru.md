@@ -64,9 +64,9 @@ docker run -d \
 
 Откройте [http://127.0.0.1:3000](http://127.0.0.1:3000) и войдите с этим токеном. Если опустить `OPEN_FLOW_TOKEN`, при первом запуске в
 логах появится одноразовый setup code, и Workbench запросит его перед установкой токена; процесс описан в разделе
-[Запуск](../container-delivery.md#3-启动).
+[Запуск](../container-delivery.md#3-startup).
 
-Чтобы подключить Connector или LLM-сервис, добавьте переменные из [таблицы конфигурации](../container-delivery.md#4-配置).
+Чтобы подключить Connector или LLM-сервис, добавьте переменные из [таблицы конфигурации](../container-delivery.md#4-configuration).
 [Руководство по self-hosted стеку](../self-hosted-stack/README.ru.md) показывает запуск Open Flow вместе с OpenConnector и oo CLI.
 
 ### Docker Compose
@@ -102,4 +102,4 @@ docker compose up -d
 ```
 
 Одновременно записывать в volume данных может только один контейнер Server. Не запускайте новый контейнер, пока старый ещё работает с тем
-же volume, и сделайте [quiesced backup](../container-delivery.md#6-持久化与恢复) перед обновлением production.
+же volume, и сделайте [quiesced backup](../container-delivery.md#6-persistence-and-recovery) перед обновлением production.

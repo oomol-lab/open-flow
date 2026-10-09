@@ -11,7 +11,7 @@ Open Flow は単体でも動作します。次の 2 つの機能には、ほか�
   [oo CLI](https://github.com/oomol-lab/oo-cli) が提供し、1 つの Open Flow の Control API に接続します。
 
 このガイドでは、Docker を使って 3 つすべてを 1 台のマシンで起動し、それらを接続して、ターミナルから最初の Flow を
-作ります。環境変数は[コンテナ配布リファレンス](../container-delivery.md#4-配置)と同じです。このガイドが追加するのは、
+作ります。環境変数は[コンテナ配布リファレンス](../container-delivery.md#4-configuration)と同じです。このガイドが追加するのは、
 操作の順序と、プロジェクト間で一致させなければならない値だけです。
 
 ```mermaid
@@ -236,7 +236,7 @@ oo flow publish "GitHub digest"
 oo flow open "GitHub digest"
 ```
 
-- `edits.json` に `baseRevision`、`requestId`、ノード・入力・接続の編集を記述し、Manual Trigger を含めます。Connector の設定で Connection ID を明示します。[編集仕様](../../authoring/flow-command.md)を参照してください。
+- `edits.json` に `baseRevision`、`requestId`、ノード・入力・接続の編集を記述し、Manual Trigger を含めます。Connector の設定で Connection ID を明示します。[編集仕様](../../control/contracts/control-api.md#node-authoring)を参照してください。
 - `check` は Revision が正しいかを確認します。認証情報が使えるか、Provider 側で実際に実行されるかは、`run` でのみ分かります。
 - `run --wait` は OpenConnector に対して Draft を実行し、結果を出力します。`oo flow runs events <run>` で完全なイベント履歴を
   確認できます。
@@ -270,7 +270,7 @@ oo connector search "send an email"
 - すべての token は、secret またはデプロイ担当者だけが読める env ファイルを通じて渡してください。OpenConnector の runtime
   token を Access ページで更新するときは、`OPEN_FLOW_CONNECTOR_TOKEN` も合わせて更新します。
 - 各サービスはそれぞれ独自のデータを持ちます。Open Flow は `/data/open-flow`、OpenConnector は `/app/data` です。
-  それぞれ別々にバックアップしてください。[コンテナ配布リファレンス](../container-delivery.md#6-持久化与恢复) を参照してください。
+  それぞれ別々にバックアップしてください。[コンテナ配布リファレンス](../container-delivery.md#6-persistence-and-recovery) を参照してください。
 - Fly.io では、OpenConnector と Open Flow を 1 つの organization 内の 2 つの app として実行し、runtime origin には Fly の
   プライベートネットワーク、たとえば `http://my-open-connector.internal:3000` を使用します。
   [Fly.io デプロイガイド](../fly-io/README.ja.md) と

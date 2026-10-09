@@ -90,7 +90,7 @@ fly secrets set \
 ```
 
 `fly secrets set` повторно развёртывает machine. Полный список переменных окружения и ограничения
-для каждого origin см. в [справочнике по доставке контейнера](../container-delivery.md#4-配置).
+для каждого origin см. в [справочнике по доставке контейнера](../container-delivery.md#4-configuration).
 
 ## Развёртывание
 

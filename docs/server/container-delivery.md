@@ -1,57 +1,53 @@
-# Server 容器交付参考
+# Server container delivery reference
 
-## 1. 当前镜像边界
+## 1. Image boundaries
 
-`apps/server/Dockerfile` 只交付一个 Server Flow application 进程，包含同源 Workbench、Control API、MCP HTTP endpoint、Run runtime、Trigger runtime 和 SQLite migration。镜像不包含 Connector service、Connector 数据库或多进程 supervisor。
+`apps/server/Dockerfile` delivers one Server Flow application process. It includes same-origin Workbench, Control API, the MCP HTTP endpoint, Run runtime, Trigger runtime, and SQLite migrations. The image contains no Connector service, Connector database, or multiprocess supervisor.
 
-Server 可以通过配置的 Connector runtime API 使用 Provider/Action catalog、获准 Connection、Action execution 和 Provider proxy。镜像仍不包含
-Connector service；具体 Provider transport、credential、Connection lifecycle 和管理界面不属于 Open Flow Server。未配置 Connector 时相关能力稳定
-返回 `connector.unavailable`。
+Through a configured Connector runtime API, Server can use Provider/Action catalogs, authorized Connections, Action execution, and Provider proxying. The image still contains no Connector service. Provider transport, credentials, Connection lifecycle, and management UI are outside Open Flow Server. Without a configured Connector, these capabilities consistently return `connector.unavailable`.
 
-当前部署边界是单个 Server 容器、单个 SQLite writer。不能让多个容器并发挂载并写入同一个数据卷。
+The deployment supports one Server container and one SQLite writer. Do not let multiple containers mount and write the same data volume concurrently.
 
-## 2. 构建和交付验证
+## 2. Build and delivery verification
 
-从仓库根目录构建镜像：
+Build the image from the repository root:
 
 ```bash
 docker build --file apps/server/Dockerfile --tag open-flow-server:dev .
 ```
 
-Dockerfile 使用多阶段构建。builder 生成可脱离 monorepo 运行的 `dist`，最终 Node.js 镜像只复制以下 release artifact：
+The Dockerfile uses multiple stages. The builder produces a `dist` that runs outside the monorepo. The final Node.js image copies only these release artifacts:
 
-- `server/main.js`、`server/isolated-vm.js` 和 `server/isolated-vm-executor.js`：服务端 bundle、Isolated VM host 与其长驻 Executor 进程；
-- `public/`：Workbench 静态资源；
-- `migrations/`：按顺序执行的独立 SQL migration；
-- `node_modules/isolated-vm` 和 `node_modules/node-gyp-build`：当前平台的原生 Isolated VM runtime；
-- `LICENSE`、`NOTICE` 和用于声明 ESM 布局的 `package.json`。
+- `server/main.js`, `server/isolated-vm.js`, and `server/isolated-vm-executor.js`: the server bundle, Isolated VM host, and persistent Executor process.
+- `public/`: Workbench static assets.
+- `migrations/`: standalone SQL migrations executed in order.
+- `node_modules/isolated-vm` and `node_modules/node-gyp-build`: the platform’s native Isolated VM runtime.
+- `LICENSE`, `NOTICE`, and `package.json`, which declares the ESM layout.
 
-`isolated-vm` host、Executor、资源限制和 Engine digest 属于 Server release，不从公共 `@oomol-lab/open-flow` package 导出。公共 package
-只提供它必须满足的 Engine/Runtime contract 和 conformance cases。
+The `isolated-vm` host, Executor, resource limits, and Engine digest belong to the Server release. They are not exported from the public `@oomol-lab/open-flow` package. The public package provides only the required Engine/Runtime contract and conformance cases.
 
-显式 Docker smoke 会构建临时镜像，并验证 Workbench、operator session、Flow 创建、真实 Code 节点执行、Docker health check、优雅退出和 SQLite volume 重启恢复：
+The explicit Docker smoke test builds a temporary image and verifies Workbench, Operator sessions, Flow creation, real Code node execution, Docker health checks, graceful shutdown, and SQLite volume recovery after restart:
 
 ```bash
 bun run --filter @oomol-lab/open-flow-server test:docker
 ```
 
-该命令创建带随机后缀的临时镜像、四个容器和一个 volume，并在结束时清理。它不进入默认单元测试，因为开发机和 CI 不一定提供 Docker daemon。
+The command creates an image with a random suffix, four containers, and one volume, then cleans them up. It is excluded from default unit tests because developer machines and CI may lack a Docker daemon.
 
-## 3. 启动
+## 3. Startup
 
-Server 可以在启动环境中读取 operator token，也可以在第一次启动后由部署者通过 Workbench 认领。Operator token 至少包含 32 UTF-8 bytes，既用于浏览器
-建立 operator session，也可由 machine client 作为 Control API Bearer token 使用。Browser session 使用 Server 独立生成并保存在数据卷中的签名 secret，
-不会直接使用 operator token 签名。管理员登录后可在“设置 → 用户管理”中创建邮箱账号并生成密码。所有账号的工作流相互隔离，普通用户只能使用管理员配置的能力，不能修改部署设置；详见 [用户系统](users.md)。
+Server can read an Operator token from its startup environment, or a deployer can claim it through Workbench after first startup. The token requires at least 32 UTF-8 bytes. Browsers use it to establish Operator sessions; machine clients use it as a Control API Bearer token.
 
-需要由外部 Secret 管理固定 credential 时，通过只供部署者读取的 env file 注入，不要把 token 写入 Dockerfile、镜像层或仓库文件。例如
-`.env.server` 可以包含：
+Server generates a separate browser session signing secret and stores it in the data volume. It does not sign directly with the Operator token. After login, administrators can create email accounts and generate passwords in Settings → User management. Account workflows are isolated. Ordinary users can use administrator-configured capabilities but cannot change deployment settings. See [Server users](users.md).
+
+If an external Secret system manages a fixed credential, inject it through an env file readable only by the deployer. Do not put tokens in Dockerfiles, image layers, or repository files. For example, `.env.server` can contain:
 
 ```dotenv
 OPEN_FLOW_TOKEN=replace-with-at-least-32-random-bytes
 OPEN_FLOW_LOG_LEVEL=info
 ```
 
-创建数据卷并启动：
+Create a data volume and start Server:
 
 ```bash
 docker volume create open-flow-data
@@ -63,12 +59,11 @@ docker run --detach \
   open-flow-server:dev
 ```
 
-MCP 与 Server 共用监听端口，通过 `/v1/mcp` 接入；使用现有 Operator 凭据逐请求认证。协议版本、工具与客户端示例见 [MCP 接入参考](mcp.md)。
+MCP shares Server’s listening port at `/v1/mcp` and authenticates each request with existing Operator credentials. See [MCP integration reference](mcp.md) for protocol versions, tools, and client examples.
 
-Workbench 和 API 位于 `http://127.0.0.1:3000`；登录后 `/variables` 提供该 deployment 的 Variable 管理面，`/settings` 提供外部 capability 管理面。最终镜像默认监听
-`0.0.0.0:3000`，以 root 用户运行，并把 SQLite 保存为 `/data/open-flow/open-flow.sqlite`。
+Workbench and API are at `http://127.0.0.1:3000`. After login, `/variables` manages deployment Variables and `/settings` manages external capabilities. The final image listens on `0.0.0.0:3000` by default, runs as root, and stores SQLite at `/data/open-flow/open-flow.sqlite`.
 
-也可以不提供 `OPEN_FLOW_TOKEN` 直接启动：
+You can also start without `OPEN_FLOW_TOKEN`:
 
 ```bash
 docker run --detach \
@@ -78,144 +73,132 @@ docker run --detach \
   open-flow-server:dev
 ```
 
-全新数据卷会在启动日志的 `operator.setup.required` 记录中输出一次性 setup code。打开 Workbench 后先输入该 code，再设置至少 32 UTF-8 bytes 的
-Operator token。Setup code 只对当前未认领进程有效；第一步授权有效期为 10 分钟，认领成功或 Server 重启后旧 code 失效。认领 operation 在 SQLite 中
-原子执行，并发请求最多一个成功。不要把未认领的 Server 暴露给无法读取部署日志的用户，也不要把包含 setup code 的启动日志公开。
+With a new data volume, Server prints a one-time setup code in the startup log’s `operator.setup.required` record. Claim the deployment in this order:
 
-认领后，Operator token 的不可逆摘要和独立 Browser session signing secret 保存在数据卷中；原 token 不落盘。容器使用同一数据卷重启后继续使用该
-credential。设置 `OPEN_FLOW_TOKEN` 时环境配置锁定当前认证来源并跳过 setup；如果数据卷从未被认领，随后移除该环境变量会让 Server 重新进入未认领状态。
+1. Open Workbench.
+2. Enter the setup code from the startup log.
+3. Set an Operator token with at least 32 UTF-8 bytes.
 
-## 4. 配置
+The setup code is valid only for the current unclaimed process. Initial authorization lasts 10 minutes. A successful claim or Server restart invalidates the old code. SQLite claims atomically, so at most one concurrent request succeeds. Do not expose an unclaimed Server to users who cannot read deployment logs. Do not publish startup logs containing the code.
 
-| 环境变量                                       | 用途                                                                                                        |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `OPEN_FLOW_HOST`                               | HTTP 监听地址；镜像默认 `0.0.0.0`。                                                                         |
-| `OPEN_FLOW_PORT`                               | HTTP 监听端口；镜像默认 `3000`。                                                                            |
-| `OPEN_FLOW_DATA_DIR`                           | SQLite 持久目录；镜像默认 `/data/open-flow`。                                                               |
-| `OPEN_FLOW_TOKEN`                              | 可选的 env-managed Operator credential；至少 32 UTF-8 bytes，存在时跳过并锁定 deployment setup。            |
-| `OPEN_FLOW_SESSION_COOKIE_SECURE`              | TLS ingress 后应设为 `true`；只接受 `true` 或 `false`。                                                     |
-| `OPEN_FLOW_LOG_LEVEL`                          | Pino 日志级别；默认 `info`。                                                                                |
-| `OPEN_FLOW_CONNECTOR_ORIGIN`                   | Server 可访问的 Connector runtime origin。                                                                  |
-| `OPEN_FLOW_CONNECTOR_TOKEN`                    | Server 调用 Connector runtime API 的受限 token；本地未启用认证时可以为空。OOMOL-hosted token 同时用于 LLM。 |
-| `OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN`           | 用户浏览器可访问的 Connector Console 公网 origin。                                                          |
-| `OPEN_FLOW_LLM_ORIGIN`                         | OpenAI-compatible LLM 服务的 root origin；Server 会请求其 `/v1/chat/completions`。                          |
-| `OPEN_FLOW_LLM_TOKEN`                          | Server 调用显式配置 LLM 服务的 bearer token。                                                               |
-| `OPEN_FLOW_INTEGRATION_PUBLIC_ORIGIN`          | Provider 可访问的 Integration callback 公网 origin。                                                        |
-| `OPEN_FLOW_INTEGRATION_CALLBACK_KEY`           | 派生 Integration callback secret 的至少 32 UTF-8 bytes 密钥。                                               |
-| `OPEN_FLOW_PUBLIC_ORIGIN`                      | Wait 通知消费端可访问的 Server 公网 origin。                                                                |
-| `OPEN_FLOW_RUN_EVENT_RETENTION_DAYS`           | terminal Run 详细事件的保留天数；默认 `30`。                                                                |
-| `OPEN_FLOW_MAX_PENDING_RUNS`                   | 全部署尚未 terminal 的 Run 上限；默认 `1000`。                                                              |
-| `OPEN_FLOW_MAX_CONCURRENT_RUNS`                | 全部署同时执行的 Run 上限；同一 Flow 最多执行一个；默认 `4`。                                               |
-| `OPEN_FLOW_RUN_TIMEOUT_MS`                     | 单个 Run 从开始执行到 terminal 的最长毫秒数；默认 `1800000`。                                               |
-| `OPEN_FLOW_CALLBACK_REQUESTS_PER_MINUTE`       | 每个 Webhook / Integration endpoint 或 Wait capability 的每分钟请求上限；默认 `120`。                       |
-| `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE` | 全部署每分钟允许的 operator 登录尝试数；默认 `10`。                                                         |
+After a claim, the data volume stores an irreversible Operator token digest and a separate browser session signing secret. The original token is not written to disk. Containers restarted with the same volume keep using this credential. `OPEN_FLOW_TOKEN` locks authentication to the environment and bypasses setup. If the volume was never claimed, removing that variable returns Server to the unclaimed state.
 
-`OPEN_FLOW_CONNECTOR_ORIGIN` 用于启用 Connector。`OPEN_FLOW_CONNECTOR_TOKEN` 可选；Connector 本地未启用 runtime 认证时可以省略或设为空字符串，此时
-Server 不发送 `Authorization` header。不能只配置 token 而不配置 origin。内部 runtime origin 与 Browser 使用的 Console origin 相互独立；
-后者不能使用只在容器网络中可访问的地址，也不能包含 credential、path、query 或 fragment；除 loopback 本地开发外必须使用 HTTPS。Connector runtime
-origin 可以在受信任的容器私网使用 HTTP；跨不受信任网络部署时必须由 TLS 保护 bearer token。
+## 4. Configuration
 
-使用带 token 的 OOMOL 托管 Connector（`connector.oomol.com` / `connector.oomol.dev`）时，连接入口自动使用相应的
-`console.oomol.com` / `console.oomol.dev`，并按 Flow 或事件源表单的团队生成页面链接；无需配置 `OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN`。
-`/providers/:serviceId` 仅用于自部署 OpenConnector Console，不能拼接到托管 runtime 域名上。
+| Environment variable                           | Purpose                                                                                                                                       |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OPEN_FLOW_HOST`                               | HTTP listening address. Image default: `0.0.0.0`.                                                                                             |
+| `OPEN_FLOW_PORT`                               | HTTP listening port. Image default: `3000`.                                                                                                   |
+| `OPEN_FLOW_DATA_DIR`                           | SQLite persistence directory. Image default: `/data/open-flow`.                                                                               |
+| `OPEN_FLOW_TOKEN`                              | Optional environment-managed Operator credential. Requires at least 32 UTF-8 bytes; bypasses and locks deployment setup.                      |
+| `OPEN_FLOW_SESSION_COOKIE_SECURE`              | Set to `true` behind TLS ingress. Accepts only `true` or `false`.                                                                             |
+| `OPEN_FLOW_LOG_LEVEL`                          | Pino log level. Default: `info`.                                                                                                              |
+| `OPEN_FLOW_CONNECTOR_ORIGIN`                   | Connector runtime origin reachable by Server.                                                                                                 |
+| `OPEN_FLOW_CONNECTOR_TOKEN`                    | Restricted token for Connector runtime API calls. May be empty if local authentication is disabled. OOMOL-hosted tokens also serve LLM calls. |
+| `OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN`           | Public Connector Console origin reachable by users’ browsers.                                                                                 |
+| `OPEN_FLOW_LLM_ORIGIN`                         | Root origin of an OpenAI-compatible LLM service. Server calls its `/v1/chat/completions`.                                                     |
+| `OPEN_FLOW_LLM_TOKEN`                          | Bearer token for the explicitly configured LLM service.                                                                                       |
+| `OPEN_FLOW_INTEGRATION_PUBLIC_ORIGIN`          | Public Integration callback origin reachable by Providers.                                                                                    |
+| `OPEN_FLOW_INTEGRATION_CALLBACK_KEY`           | Key of at least 32 UTF-8 bytes for deriving Integration callback secrets.                                                                     |
+| `OPEN_FLOW_PUBLIC_ORIGIN`                      | Public Server origin reachable by Wait notification consumers.                                                                                |
+| `OPEN_FLOW_RUN_EVENT_RETENTION_DAYS`           | Detailed event retention for terminal Runs, in days. Default: `30`.                                                                           |
+| `OPEN_FLOW_MAX_PENDING_RUNS`                   | Deployment-wide limit on nonterminal Runs. Default: `1000`.                                                                                   |
+| `OPEN_FLOW_MAX_CONCURRENT_RUNS`                | Deployment-wide concurrent execution limit, with at most one per Flow. Default: `4`.                                                          |
+| `OPEN_FLOW_RUN_TIMEOUT_MS`                     | Maximum milliseconds from Run execution start to terminal state. Default: `1800000`.                                                          |
+| `OPEN_FLOW_CALLBACK_REQUESTS_PER_MINUTE`       | Per-minute request limit for each Webhook/Integration endpoint or Wait capability. Default: `120`.                                            |
+| `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE` | Deployment-wide Operator login attempts per minute. Default: `10`.                                                                            |
 
-`OPEN_FLOW_LLM_ORIGIN` 和 `OPEN_FLOW_LLM_TOKEN` 必须同时提供或同时省略。显式配置优先，origin 必须是不带 credential、path、query 或 fragment 的
-HTTPS origin；只有 loopback 本地开发可以使用 HTTP。Server 在该 origin 下调用 `/v1/chat/completions`。未显式配置时，如果 Connector runtime
-origin 的 hostname 精确为 `connector.oomol.com` 或 `connector.oomol.dev` 且 token 非空，Server 会分别使用
-`https://llm.oomol.com/v1` 或 `https://llm.oomol.dev/v1`，并复用 Connector token。Console origin 不参与推导；自建 OpenConnector、自定义域名和
-空 token 都不会隐式启用 LLM。
+`OPEN_FLOW_CONNECTOR_ORIGIN` enables Connector. `OPEN_FLOW_CONNECTOR_TOKEN` is optional. If local Connector runtime authentication is disabled, omit it or use an empty string; Server then sends no `Authorization` header. A token without an origin is invalid. The internal runtime origin is independent of the browser’s Console origin. The Console origin must be browser-reachable and contain no credentials, path, query, or fragment. It requires HTTPS except for loopback development. A runtime origin may use HTTP on a trusted private container network. Across untrusted networks, TLS must protect the bearer token.
 
-Connector runtime、Connector Console、LLM 和 Integration callback 也可以在登录后的 `/settings` 中配置。每个配置块独立使用 env-managed 或
-SQLite-managed 来源：对应的完整 env 配置存在时锁定该块，不能修改、清除或与 SQLite 按字段混合；外部服务暂时不可用也不会 fallback 到 SQLite。Connector
-runtime 的 origin/token、Integration 的 public origin/callback key，以及显式 LLM 的 origin/token 都作为完整配置块保存。Connector Console 只有公开 origin，
-与 Connector runtime 独立。
+For OOMOL-hosted Connector with a token (`connector.oomol.com` / `connector.oomol.dev`), connection entry points automatically use `console.oomol.com` / `console.oomol.dev`. They build page links using the Flow or event-source form’s Team. `OPEN_FLOW_CONNECTOR_CONSOLE_ORIGIN` is unnecessary. `/providers/:serviceId` applies only to self-hosted OpenConnector Console and must not be appended to hosted runtime domains.
 
-`/settings` 中的 Connector 设置分为「OOMOL 托管」与「自定义配置」。OOMOL 托管支持设备授权或直接填写 API key，runtime 和 Console 地址由托管服务确定，
-无需填写域名；自定义配置保留独立的 runtime origin/token 与 Console origin。选择连接方式本身不修改已保存配置，完成授权或保存 runtime 后才切换。
-使用设备授权时点击「连接 OOMOL」，在打开的 OOMOL 页面确认授权。验证码会自动填入，Server 等待授权完成后保存
-`https://connector.oomol.com` 和 API key，不需要手动复制 key 或再次保存。当前 runtime 为 `connector.oomol.dev` 时使用对应开发环境。
-API key 和设备授权的私有 state 只留在 Server，Browser 仅接收验证码、授权链接和公开配置状态。授权可取消，过期后需要重新开始；授权期间配置 revision
-发生变化时拒绝覆盖。环境变量管理的 runtime 不提供此入口。自部署 OpenConnector 继续通过 runtime 和 Console 配置块设置。
+Provide or omit `OPEN_FLOW_LLM_ORIGIN` and `OPEN_FLOW_LLM_TOKEN` together. Explicit configuration takes precedence. The origin must use HTTPS without credentials, path, query, or fragment; only loopback development may use HTTP. Server calls `/v1/chat/completions` under that origin. Without explicit configuration, an exact Connector hostname of `connector.oomol.com` or `connector.oomol.dev` with a nonempty token selects `https://llm.oomol.com/v1` or `https://llm.oomol.dev/v1` and reuses that token. Console origin does not affect this derivation. Self-hosted OpenConnector, custom domains, and empty tokens do not implicitly enable LLM.
 
-Settings-managed 配置保存后立即用于新的 request、Run、Poll 或 Integration operation，已经开始的 operation 继续使用开始时取得的配置快照，不要求重启。
-读取配置只返回公开 origin、来源和 credential 是否已配置，token 与 callback key 不会返回 Browser。Settings update 使用全局预期 revision，stale update
-返回冲突。LLM 的生效顺序为显式 LLM env、SQLite LLM settings、从当前生效的 OOMOL Connector 推导、未配置；其他配置块的顺序为对应 env、SQLite、未配置。
+After login, `/settings` can also configure Connector runtime, Connector Console, LLM, and Integration callbacks. Each block independently uses an environment-managed or SQLite-managed source.
 
-Provider Trigger definitions 由公共 Open Flow package 内置，不需要用户或部署者注册。Poll 与 Integration 通过 Connector 的
-`POST /v1/proxy/:service` 运行面执行；OpenConnector 与 OOMOL Connector 都支持该接口。具体可用的 Provider、Connection 和授权范围以当前配置的
-Connector 为准。
+A complete environment configuration locks its block. Users cannot change or clear it, and Server cannot mix its fields with SQLite configuration. Temporary external service failure does not cause a fallback to SQLite settings.
 
-`OPEN_FLOW_INTEGRATION_PUBLIC_ORIGIN` 与 `OPEN_FLOW_INTEGRATION_CALLBACK_KEY` 必须同时提供或同时省略。前者必须是 Provider 可访问且不带
-credential、path、query 或 fragment 的 HTTPS origin；只有 loopback 本地开发可以使用 HTTP。callback key 至少包含 32 UTF-8 bytes。两者也可作为一个
-完整配置块在 Settings 中保存；未配置时 Integration definition 仍可用于 authoring，但 Publish 会 fail closed。
+These field groups are stored as complete blocks:
 
-`OPEN_FLOW_PUBLIC_ORIGIN` 为 Wait Connector 通知生成 action URL。它必须是不带 credential、path、query 或 fragment 的 HTTPS origin；只有
-loopback 本地开发可以使用 HTTP。普通 Wait 不需要该配置；固定 Revision 中只要有 Wait 配置了通知，Draft Run admission、Live Run admission 和
-Publish 就会在缺少该 origin 时 fail closed。公开 action 路由不使用 Operator session，URL 中的 opaque capability 是只绑定当前 Wait 的 bearer
-credential；不要让 reverse proxy access log、消息预览或分析工具采集完整 path。
+- Connector runtime origin/token.
+- Integration public origin/callback key.
+- Explicit LLM origin/token.
 
-没有 env-managed 或持久化 operator credential 时，health、callback 和已持久化的 runtime 工作仍可运行，但 Control API fail closed，Workbench 进入
-setup。Operator 登录与 setup authorization 共享部署实例级限速，超过 `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE` 后返回 429 和 `Retry-After`。
-`POST /auth/setup` 必须持有有效的 setup session；缺失、篡改或过期的 session 返回 401，不占用上述额度。已授权的认领操作不受该额度限制，
-即使 setup authorization 刚好耗尽窗口额度，也能继续完成认领。
+Connector Console contains only a public origin and is independent of Connector runtime.
 
-达到 `OPEN_FLOW_MAX_PENDING_RUNS` 后，新 Run admission 返回 429；已接受请求的幂等重放仍返回原 Run。Cron 与 Poll 保留当前调度位置并短暂重试。
-Cron 所属 Flow 已有未终结 Run 时同样保留当前调度位置；前一个 Run 结束后只补入最早未处理 occurrence，并把下一次计划推进到当前时间之后。
-Cron 的已发布 Revision 无法读取或校验失败时，仅停止该 binding 的调度，并记录 failed health 与错误活动；其他后台任务继续运行。升级或修复 Draft 后重新发布可恢复调度，历史 Publication 不变。
-Callback 请求限流只为已存在的 Webhook / Integration endpoint 或验证通过的 Wait capability 建立内存窗口，超过限制时返回 429 和 `Retry-After`。
-Wait 的 `GET`、`HEAD`、`POST` 及其不同 action 共用该 capability 的额度，不同 capability 独立计数；无效 capability 或不属于该 Wait 的 action 不占用额度。
-被限流的 Wait `POST` 不提交决议。限流状态属于当前 Server app 实例，进程重启后重置。
+Connector settings offer OOMOL-hosted and custom configuration modes. OOMOL-hosted supports device authorization or direct API key entry; the service determines runtime and Console addresses, so no domain entry is needed. Custom configuration retains separate runtime origin/token and Console origin. Selecting a mode alone does not change saved settings; completing authorization or saving the runtime switches modes. For device authorization, select Connect OOMOL and confirm on the OOMOL page.
 
-## 5. 健康检查与停止
+The verification code is filled automatically. Server waits for authorization, then saves `https://connector.oomol.com` and the API key without manual copying or another save. An existing `connector.oomol.dev` runtime uses the development environment. API keys and private authorization state stay on Server; browsers receive only the verification code, authorization URL, and public configuration status. Authorization can be canceled and must restart after expiry. A changed configuration revision prevents overwrite.
 
-镜像的 Docker `HEALTHCHECK` 请求 `GET /healthz`，只表示 Server 进程能够响应。部署入口应另外使用 `GET /readyz` 判断是否接收新流量；Server 尚未
-启动、Run/Trigger/Maintenance 后台处理已停止或配置的外部 Connector 不可用时，readiness 返回 503，但 liveness 仍保持 200。
+Environment-managed runtimes do not offer this entry point. Self-hosted OpenConnector continues to use runtime and Console configuration blocks.
 
-收到 `SIGINT` 或 `SIGTERM` 后，Server 先结束所有 Flow notification SSE、停止接收新连接，再等待现有请求和运行时工作完成。连接在 30 秒内未结束时
-会被强制关闭；因此容器编排器的 termination grace period 应大于 30 秒。
+Saved settings apply immediately to new requests, Runs, Polls, and Integration operations without a restart. Operations already started keep their initial configuration snapshot.
 
-检查状态：
+Configuration reads return only public origins, sources, and whether credentials are configured. They never return tokens or callback keys to browsers. Settings updates use a global expected revision; stale updates return a conflict.
+
+LLM precedence is explicit LLM environment configuration, SQLite LLM settings, derivation from the effective OOMOL Connector, then unconfigured. Other blocks use their environment configuration, SQLite, then unconfigured.
+
+The public Open Flow package includes Provider Trigger definitions. Users and deployers do not register them. Poll and Integration execute through Connector’s `POST /v1/proxy/:service` runtime interface, supported by OpenConnector and OOMOL Connector. Available Providers, Connections, and permissions depend on the configured Connector.
+
+Provide or omit `OPEN_FLOW_INTEGRATION_PUBLIC_ORIGIN` and `OPEN_FLOW_INTEGRATION_CALLBACK_KEY` together. The origin must be Provider-reachable HTTPS without credentials, path, query, or fragment; only loopback development may use HTTP. The callback key requires at least 32 UTF-8 bytes. Settings can store both as one complete block. Without configuration, Integration definitions remain available for authoring, but Publish fails closed.
+
+`OPEN_FLOW_PUBLIC_ORIGIN` generates action URLs for Wait Connector notifications. It must use HTTPS without credentials, path, query, or fragment; only loopback development may use HTTP. Ordinary Waits do not require it. If any Wait in the pinned Revision has a notification, Draft Run admission, Live Run admission, and Publish fail closed when this origin is missing. Public action routes do not use Operator sessions. The opaque capability in the URL is a bearer credential bound only to that Wait. Prevent reverse-proxy access logs, message previews, and analytics from collecting the complete path.
+
+Without an environment-managed or persisted Operator credential, health checks, callbacks, and persisted runtime work can still operate. Control API fails closed and Workbench enters setup. Operator login and setup authorization share an instance-wide rate limit. Exceeding `OPEN_FLOW_OPERATOR_LOGIN_ATTEMPTS_PER_MINUTE` returns 429 and `Retry-After`. `POST /auth/setup` requires a valid setup session. Missing, tampered, or expired sessions return 401 without consuming this quota. Authorized claims are exempt and can finish even if setup authorization used the last attempt in the window.
+
+At `OPEN_FLOW_MAX_PENDING_RUNS`, new Run admission returns 429. Idempotent replay of an accepted request still returns its original Run. Cron and Poll retain their scheduling position and retry shortly. Cron also retains its position while its Flow has a nonterminal Run. After that Run ends, Cron admits only the earliest unprocessed occurrence, then advances the next schedule beyond the current time. An unreadable or invalid published Cron Revision stops only that binding’s schedule and records failed health and error activity.
+
+Other background work continues. Republishing after an upgrade or Draft repair restores scheduling without changing historical Publications. Callback rate limiting creates in-memory windows only for existing Webhook/Integration endpoints or verified Wait capabilities. Exceeding the limit returns 429 and `Retry-After`. Wait `GET`, `HEAD`, `POST`, and different actions share one capability’s quota; capabilities count separately. Invalid capabilities or actions outside the Wait consume no quota. A rate-limited Wait `POST` submits no decision.
+
+Rate-limit state belongs to the current Server app instance and resets on restart.
+
+## 5. Health checks and shutdown
+
+The image’s Docker `HEALTHCHECK` calls `GET /healthz` and checks only that Server responds. Deployment ingress should use `GET /readyz` to decide whether to accept traffic.
+
+Readiness returns 503 if Server has not started, Run/Trigger/Maintenance background processing has stopped, or a configured external Connector is unavailable. Liveness remains 200.
+
+On `SIGINT` or `SIGTERM`, Server stops in this order:
+
+1. End all Flow notification SSE streams.
+2. Stop accepting new connections.
+3. Wait for existing requests and runtime work to finish.
+
+Server forcibly closes connections that remain after 30 seconds. Set the container orchestrator’s termination grace period above 30 seconds.
+
+Check status:
 
 ```bash
 docker inspect --format '{{.State.Health.Status}}' open-flow-server
 curl --fail http://127.0.0.1:3000/readyz
 ```
 
-正常停止应给 Run drain 和 SQLite 关闭留出宽限期：
+Allow time for Run draining and SQLite closure during normal shutdown:
 
 ```bash
 docker stop --time 45 open-flow-server
 ```
 
-镜像声明 `SIGTERM` 为停止信号。进程停止接受 HTTP 请求，等待已接受的工作结束，然后关闭 SQLite 并以 0 退出。超过部署宽限期后再由容器运行时强制终止。
+The image declares `SIGTERM` as its stop signal. The process stops accepting HTTP requests, waits for accepted work, closes SQLite, and exits with 0. The container runtime forcibly terminates it only after the deployment grace period.
 
-## 6. 持久化与恢复
+## 6. Persistence and recovery
 
-Flow、Revision、Publication、Run、RunEvent、Wait checkpoint、Wait notification outbox、Variable、Trigger binding、Provider callback verifier、deployment
-capability settings、持久化 Operator credential 摘要、Browser session signing secret 和 migration version 都位于数据卷中的 SQLite 文件。callback
-verifier 只属于 Trigger runtime state，不进入 Flow Revision、Workbench 或 RunEvent。
+The data volume’s SQLite file stores Flows, Revisions, Publications, Runs, RunEvents, Wait checkpoints, the Wait notification outbox, Variables, Trigger bindings, Provider callback verifiers, deployment capability settings, persisted Operator credential digests, browser session signing secrets, and migration versions. Callback verifiers belong only to Trigger runtime state and do not enter Flow Revisions, Workbench, or RunEvents.
 
-Server 在提交 `waiting` 后通过持久化 outbox 发送 Connector 通知。崩溃恢复会重新 claim 未完成或 lease 已过期的 work，因此 Connector action 可能收到
-相同 invocation identity 的重复请求；Run 状态和决议仍由 SQLite 中唯一的 Wait 记录约束。通知失败只记录 delivery failure，Run 保持等待，直到被决议、
-取消或在进入等待 7 天后到期。SQLite 只保存 capability 的 SHA-256 摘要，通知发送时生成的完整 capability URL 会离开 Server 数据卷并进入所选 Connector 和消息系统的
-信任边界。
-当前只承诺 quiesced backup：先停止入口流量并让容器正常退出，再备份 volume；恢复时把完整数据目录挂载到相同路径后启动一个 Server 容器。
+After committing `waiting`, Server sends Connector notifications through a persistent outbox. Crash recovery reclaims unfinished work or expired leases, so a Connector action may receive repeated requests with the same invocation identity. A unique SQLite Wait record still constrains Run state and decisions. Notification failure records only a delivery failure; the Run keeps waiting until resolution, cancellation, or expiry 7 days after entering the wait.
 
-Variable value 和 Settings-managed 外部 service credential 以明文存在于 SQLite 主文件、WAL 和备份中。Variable 可由已认证 Operator 通过 Control API 和管理面
-读取；外部 service credential 不通过读取 API 返回。两者都不是加密存储或不可导出的 Secret Manager；部署者必须把数据卷、备份、Operator token 和管理网络
-视为同一信任边界。
+SQLite stores only the capability’s SHA-256 digest. Complete capability URLs generated for notification leave the Server volume and enter the selected Connector and messaging system’s trust boundary. Only quiesced backups are supported: stop ingress traffic, shut down the container normally, then back up the volume. Restore the complete data directory at the same path and start one Server container.
 
-不能只复制主 `.sqlite` 文件而遗漏同目录中的 WAL/SHM 状态，也不能在一个仍写入的容器和一个恢复容器之间共享数据卷。Connector 持久化是外部服务自己的备份边界，不属于 `/data/open-flow`。
+Variable values and settings-managed external service credentials are plaintext in SQLite files, WAL, and backups. Authenticated Operators can read Variables through Control API and management UI. Read APIs do not return external service credentials.
 
-## PostHog 浏览器分析
+Neither provides encrypted storage or nonexportable Secret Manager guarantees. Deployers must treat data volumes, backups, Operator tokens, and the management network as one trust boundary.
 
-Server 的浏览器宿主集成 PostHog；公开 SDK token 对应 `openflow.run` 项目（ID `607951`，US Cloud）。
-默认仅在 `openflow.run` 和 `www.openflow.run` 域名启用，因此普通本地开发和其他自建部署不会向该项目发送事件。
-公开 token 随浏览器源码构建，现有 CI 和 Docker 构建无需额外凭据。
+Do not copy only the main `.sqlite` file while omitting WAL/SHM state in the same directory. Do not share a volume between a writing container and a restored container. Connector persistence has its own external backup boundary and is outside `/data/open-flow`.
 
-其他部署可在 Vite 构建时设置 `VITE_POSTHOG_KEY` 和 `VITE_POSTHOG_HOST` 使用自己的项目；显式空 key 禁用分析。
-这些是构建配置，容器启动后设置同名环境变量不会修改已构建的静态资源。
+## PostHog browser analytics
 
-分析使用浏览器匿名标识，不将所有部署共用的 Operator 标识作为 PostHog 用户 ID。
-记录页面访问、未处理浏览器异常，以及成功创建 Flow、保存或删除配置、创建或更新或删除 Variable 的事件。
-业务事件不携带 Variable 名称、值、凭据或 Flow 内容；关闭 DOM 自动采集和会话录制。
+The Server browser host integrates PostHog. Its public SDK token belongs to the `openflow.run` project (ID `607951`, US Cloud). It is enabled by default only on `openflow.run` and `www.openflow.run`. Ordinary local development and other self-hosted deployments send no events to that project. The public token is built into browser source; existing CI and Docker builds need no extra credentials.
+
+Other deployments can set `VITE_POSTHOG_KEY` and `VITE_POSTHOG_HOST` at Vite build time to use their own project. An explicitly empty key disables analytics. These are build settings. Setting them after container startup does not change built static assets.
+
+Analytics uses anonymous browser identity rather than the Operator identity shared across deployments. It records page views, unhandled browser exceptions, successful Flow creation, configuration save/delete, and Variable create/update/delete events. Business events contain no Variable names, values, credentials, or Flow content. DOM autocapture and session recording are disabled.

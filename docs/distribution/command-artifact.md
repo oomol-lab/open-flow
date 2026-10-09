@@ -1,12 +1,11 @@
-# Command Artifact v2 分发合同
+# Command Artifact v2 distribution contract
 
-本文定义 Open Flow 交付给 `oo flow` 宿主的 immutable Command Artifact、入口 host contract 和验证规则。产品边界以
-[产品与架构边界](../architecture.md)为准。Command Artifact 是 CLI 的代码分发载体，不包含 Workbench、Server 或本地持久化实现。
-其可编辑源码、构建、验证和发布入口只属于 `packages/command`；`packages/open-flow` 只提供 Command 消费的公开产品 API。
+This document defines the immutable Command Artifact delivered to the `oo flow` host, its entry host contract, and verification rules. See [Product and architecture boundaries](../architecture.md) for product ownership. The artifact distributes CLI code. It contains no Workbench, Server, or local persistence implementation.
+`packages/command` owns its editable source, build, verification, and release entry points. `packages/open-flow` provides the public product API consumed by Command.
 
-## 版本与发布记录
+## Versions and release records
 
-每个宿主 release 固定一个 Open Flow artifact：
+Each host release pins one Open Flow artifact:
 
 ```ts
 interface OpenFlowCommandRelease {
@@ -22,12 +21,11 @@ interface OpenFlowCommandRelease {
 }
 ```
 
-`url` 指向 immutable object，`length` 和 `digest` 分别是 gzip archive 的精确字节数与 64 位小写 SHA-256。更新 artifact 必须先上传新
-digest object，再由宿主固定新的 release record；不得覆盖旧 object 或使用可变 `latest` 地址。
+`url` identifies an immutable object. `length` is the exact gzip archive size in bytes. `digest` is its 64-character lowercase SHA-256. To update an artifact, upload the new digest object first, then pin the new release record in the host. Do not overwrite an old object or use a mutable `latest` URL.
 
-## Archive 与 manifest
+## Archive and manifest
 
-Artifact 是 deterministic gzip-compressed USTAR archive，只包含一个 `open-flow-command/` 根目录：
+The artifact is a deterministic gzip-compressed USTAR archive with one `open-flow-command/` root:
 
 ```text
 open-flow-command/
@@ -38,8 +36,7 @@ open-flow-command/
 └── LICENSE.md
 ```
 
-文件集合是封闭的。Manifest 没有列出的文件、link、directory entry、device、PAX metadata 和其他特殊 entry 全部非法。`entry.js` mode
-固定为 `0755`，其余文件固定为 `0644`。
+The file set is closed. Files absent from the manifest, links, directory entries, devices, PAX metadata, and other special entries are invalid. The mode is `0755` for `entry.js` and `0644` for all other files.
 
 ```ts
 interface CommandArtifactManifest {
@@ -56,15 +53,13 @@ interface CommandArtifactManifest {
 }
 ```
 
-Manifest 使用 UTF-8、LF 结尾和 canonical JSON。Object key 与 `files` 使用 Unicode code-point 顺序；禁止未知字段、重复 path、非有限
-number 和非 canonical 表达。合法 path 必须是非空的相对 POSIX path，禁止绝对路径、Windows drive prefix、反斜杠、NUL、空 segment、
-`.` 和 `..`，并且必须能由不使用扩展头的 USTAR 表达。
+The manifest uses UTF-8, LF endings, and canonical JSON. Object keys and `files` use Unicode code-point order. Unknown fields, duplicate paths, non-finite numbers, and non-canonical representations are forbidden. A path must be a nonempty relative POSIX path that USTAR can represent without extension headers. Absolute paths, Windows drive prefixes, backslashes, NUL, empty segments, `.` and `..` are forbidden.
 
-Builder 固定 uid、gid、mode、mtime、gzip header 和文件顺序；相同 source tree 与固定工具版本必须产生完全相同的 archive bytes。
+The builder fixes uid, gid, mode, mtime, gzip headers, and file order. The same source tree and pinned tool versions must produce identical archive bytes.
 
 ## Command entry
 
-`entry.js` 是使用固定 Bun version 构建的单文件 ESM bundle。入口导出：
+`entry.js` is a single-file ESM bundle built with a pinned Bun version. It exports:
 
 ```ts
 export const commandArtifactVersion = 2
@@ -78,51 +73,100 @@ interface OpenFlowCommandHost {
 export function runOpenFlowCommand(args: readonly string[], host: OpenFlowCommandHost): Promise<number>
 ```
 
-`args` 是删除 `oo flow` 前缀后的参数，返回值是 `0..255` 的整数 exit code，entry 不调用 `process.exit()`。`cloudRequest` 只能请求当前
-deployment 的 `/v1/` Control API path，不是通用 authenticated fetch；`getWorkbenchUrl` 只返回当前 deployment 的正式 Workbench deep
-link。Artifact 不保存 Flow 或 deployment 选择，也不从当前工作目录推断资源 scope。
+`args` contains arguments after the `oo flow` prefix. The entry returns an integer exit code in `0..255` and does not call `process.exit()`. `cloudRequest` accepts only `/v1/` Control API paths in the current deployment; it is not a general authenticated fetch function. `getWorkbenchUrl` returns the official Workbench deep link for that deployment. The artifact does not store Flow or deployment selection and does not infer resource scope from the working directory.
 
-`language` 接受任意 BCP 47 tag，entry 会把它解析成 en、zh-CN、zh-TW、ja、ko、ru、fr 之一（fr-CA 归到 fr，zh-HK 与 zh-Hant-\*
-归到 zh-TW，其余 zh\* 归到 zh-CN），无法识别的 tag 回退到 en。
+`language` accepts any BCP 47 tag. The entry resolves it to en, zh-CN, zh-TW, ja, ko, ru, or fr. It maps fr-CA to fr, zh-HK and zh-Hant-\* to zh-TW, and other zh\* tags to zh-CN. Unrecognized tags fall back to en.
 
-CLI 的本地化标题与选项提示来自 `packages/command/src/cli/node/locales/<tag>.json`，由 val-i18n 加载并在构建时内联进 `entry.js`，
-artifact 不额外分发 locale 文件。根 `--help` 返回命令索引，子命令返回对应的选项与示例；`--help --json` 返回机器可读合同。
-Help、schema 和 version 无需宿主；其他命令按需使用 cloudRequest，open/workbench 另需 getWorkbenchUrl。
-命令参数、退出码、事务重试和等待语义见 [Flow 命令调用合同](../authoring/flow-command.md)。
+Localized CLI titles and option hints come from `packages/command/src/cli/node/locales/<tag>.json`. val-i18n loads them, and the build inlines them into `entry.js`. The artifact distributes no separate locale files. Root `--help` returns the command index. Subcommands return their options and examples. `--help --json` returns the machine-readable contract.
+Help, schema, and version require no host. Other commands use cloudRequest as needed; open/workbench also require getWorkbenchUrl.
+The sections below define argument adaptation, output, exit codes, and waiting. See [Node authoring](../control/contracts/control-api.md#node-authoring) for public editing semantics.
 
-Artifact 与宿主在同一个受信任 Bun process 中运行，不构成 JavaScript sandbox。宿主负责注入当前身份，并拒绝跨 origin、非 Control API
-path 和 Artifact 伪造的授权 header。Artifact 不能直连 Connector、Provider 或 Cloud 返回的任意 URL。
+The artifact runs in the same trusted Bun process as the host. This is not a JavaScript sandbox. The host injects the current identity and rejects cross-origin requests, non-Control API paths, and authorization headers forged by the artifact. The artifact cannot directly call a Connector, Provider, or arbitrary URL returned by Cloud.
 
-## 下载、验证与 cache
+## CLI invocation contract
 
-宿主安装 artifact 时必须：
+[The oo-cli Flow skill reference](https://github.com/oomol-lab/oo-cli/blob/main/contrib/skills/shared/oo/references/flow-authoring.md) owns CLI workflows and Agent instructions. This document defines the artifact behavior observable by hosts and scripts. Use the matching artifact’s `--help` and public schema for command arguments, node fields, and examples.
 
-1. 使用 release record 的固定 URL；
-2. 校验 HTTP 成功、精确 archive length 和 SHA-256；
-3. 下载到 cache filesystem 内的临时文件；
-4. 对相同 digest 使用跨进程 lock；
-5. 严格解码 gzip、USTAR metadata、entry type 和 path；
-6. 验证 manifest、完整 file set、每个文件 length 和 digest；
-7. 只在全部验证通过后通过 atomic rename 提交 cache directory；
-8. cache hit 不访问网络；损坏 entry 只重新下载同一个固定 archive；
-9. 失败时不执行部分内容，也不回退到旧协议或未验证版本。
+The CLI stores no current Flow or local transaction. The host selects the team and deployment. Flow references accept an ID or a unique full name.
 
-Cache 使用独立 namespace：
+### Arguments and request adaptation
+
+`read/search/edit` accept two mutually exclusive input forms:
+
+- `--input`: JSON, `@file`, or `-`.
+- `--file path|-`: read from a file or stdin.
+
+MCP accepts the same request directly, with an additional `flowId`. `schema TYPE` and request schemas are available offline. Action queries require a deployment.
+
+`read/search/edit/check --help --json` includes the command’s request schema, constraints, and examples. Text help includes the same instructions and examples. `schema check` describes the public request field `revisionId`; the CLI supplies it through `--revision`.
+
+`--help --json` does not access the deployment. Options accept `--option value` or `--option=value`. Use the latter for values that start with `-`; a standalone `-` means stdin. Unsupported options, repeated single-value options, and missing values are rejected before a request is sent.
+
+See [Node authoring](../control/contracts/control-api.md#node-authoring) for public read, edit, validation response, and idempotent retry semantics. The CLI does not expose the underlying ChangeOperation to callers.
+
+Flow creation, execution, publication, and rollback retain their existing responsibilities and `--idempotency-key`. Draft Run and Publish pin `--expected-revision`. Publish, Rollback, and Live Run pin `--expected-publication`; use `none` for the first publication.
+
+### Output and errors
+
+The CLI writes normal results to stdout and invocation errors to stderr. `--json` makes both machine-readable. A failed `check` writes structured diagnostics once to stdout and exits with 1. Event following uses NDJSON.
+
+`read/search/edit` return the same business objects as MCP and HTTP directly. Other existing commands retain their wrappers, such as `check.check` and `runs show.run`.
+
+| Exit code | Meaning                                                                                                                                                 |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 0         | Operation succeeded, asynchronous creation was accepted, or waiting reached a successful terminal state. Check validation separately for Edit validity. |
+| 1         | Invocation error, failed validation, or a wait/result query returned failed, canceled, or indeterminate.                                                |
+| 2         | The Run is waiting. Handle the returned actions.                                                                                                        |
+| 3         | Waiting timed out, or the queried publication operation is still pending. The underlying operation continues.                                           |
+
+### Execution and waiting
+
+A Run pins one Trigger. The CLI selects it automatically if the graph has exactly one Manual Trigger. Otherwise, use `--trigger`. `--outputs` accepts a JSON object indexed by port name. Its default, `{}`, is suitable for Manual. Other Triggers require complete outputs.
+
+When a pending decision is detected, wait commands return the Run detail’s `waits` array. Each item includes `waitId`, `nodeId`, `prompt`, `actions`, and an expiry time. The Run can still be running. Use `runs list --pending-wait` to find all Runs with pending waits.
+
+`runs resolve` requires an explicit run, wait, and action (continue/approve/reject). The CLI does not decide for the user.
+
+`--timeout` is a wait budget in milliseconds, with a default of 60000. It limits CLI waiting and does not cancel a Run or publication. `runs events --follow --json` writes one line per page without accumulating the full history. Resume with the returned `nextAfter`. If a later read fails, the error retains the run ID and the cursor already emitted.
+
+`publish` waits until the publication operation completes or times out. A timeout result retains `flowId` and `operation.operationId`. Query it with `publications operation FLOW_ID OPERATION_ID`, or continue waiting with `publications wait FLOW_ID OPERATION_ID --timeout 60000`.
+
+### Result pagination
+
+`runs results` returns the `resultId` of a complete tool result. `runs read-result` supports JSON Pointer and pagination. `runs download-result` writes raw JSON to stdout. Reading an existing result does not call the external tool again.
+
+If a list includes `nextAfter`, pass it to `runs results RUN_ID --after NEXT_AFTER`. If a page includes `nextOffset`, use that value as the next `read-result` offset. Offsets in long strings count Unicode code points.
+
+## Download, verification, and cache
+
+When installing an artifact, the host must:
+
+1. Use the pinned URL in the release record.
+2. Verify HTTP success, exact archive length, and SHA-256.
+3. Download to a temporary file on the cache filesystem.
+4. Use a cross-process lock for the same digest.
+5. Strictly decode gzip, USTAR metadata, entry types, and paths.
+6. Verify the manifest, complete file set, and each file’s length and digest.
+7. Commit the cache directory by atomic rename only after all checks pass.
+8. Use cache hits without network access. Redownload only the same pinned archive for a corrupt entry.
+9. On failure, execute no partial content and do not fall back to an old protocol or unverified version.
+
+The cache uses a separate namespace:
 
 ```text
 <oo-cache>/open-flow/command-artifact-v2/<archiveDigest>/
 ```
 
-## 发布验收
+## Release acceptance
 
-发布前至少验证：
+Before release, verify at least:
 
-- 两次 clean build 的 archive bytes 完全一致；
-- archive exact file set、manifest 和每个文件 digest；
-- 解压后的 entry 可以 import；
-- fake host 完成主要 Flow 读取、创建和校验命令；
-- 不同 cwd 读取相同远端 Flow 时得到相同结果；
-- 宿主拒绝跨 origin/path，并覆盖伪造的身份 header；
-- 旧 cache namespace 不会被当前 loader 执行。
+- Two clean builds produce identical archive bytes.
+- The archive has the exact file set, manifest, and per-file digests.
+- The extracted entry can be imported.
+- A fake host completes the main Flow read, create, and check commands.
+- Reads of the same remote Flow return the same result from different working directories.
+- The host rejects cross-origin/path requests and overrides forged identity headers.
+- The current loader does not execute the old cache namespace.
 
-上传必须先于 release record 修改。任何 byte 变化都生成新的 digest object；已发布宿主版本不能静默执行新代码。
+Upload the artifact before changing the release record. Any byte change requires a new digest object. A released host version must not silently execute new code.

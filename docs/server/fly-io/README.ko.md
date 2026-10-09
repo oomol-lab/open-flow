@@ -90,7 +90,7 @@ fly secrets set \
 ```
 
 `fly secrets set`은 machine을 다시 배포합니다. 전체 환경 변수 목록과 각 origin의 제약은
-[컨테이너 배포 참조](../container-delivery.md#4-配置)를 참고하세요.
+[컨테이너 배포 참조](../container-delivery.md#4-configuration)를 참고하세요.
 
 ## 배포
 

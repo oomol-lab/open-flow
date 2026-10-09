@@ -64,9 +64,9 @@ docker run -d \
 
 Ouvrez [http://127.0.0.1:3000](http://127.0.0.1:3000) et connectez-vous avec le token. Si vous omettez `OPEN_FLOW_TOKEN`, le premier
 démarrage affiche un setup code à usage unique dans les logs et le Workbench le demande avant de définir un token ; voir
-[Démarrage](../container-delivery.md#3-启动) pour la procédure de revendication.
+[Démarrage](../container-delivery.md#3-startup) pour la procédure de revendication.
 
-Pour connecter un Connector ou un service LLM, ajoutez les variables du [tableau de configuration](../container-delivery.md#4-配置).
+Pour connecter un Connector ou un service LLM, ajoutez les variables du [tableau de configuration](../container-delivery.md#4-configuration).
 Le [guide de la pile auto-hébergée](../self-hosted-stack/README.fr.md) détaille l'exécution d'Open Flow avec OpenConnector et la oo CLI.
 
 ### Docker Compose
@@ -102,4 +102,4 @@ docker compose up -d
 ```
 
 Un seul conteneur Server peut écrire dans un volume de données à la fois. Ne démarrez pas le nouveau conteneur tant que l'ancien tourne
-encore sur le même volume, et faites une [sauvegarde quiesced](../container-delivery.md#6-持久化与恢复) avant de mettre à niveau la production.
+encore sur le même volume, et faites une [sauvegarde quiesced](../container-delivery.md#6-persistence-and-recovery) avant de mettre à niveau la production.

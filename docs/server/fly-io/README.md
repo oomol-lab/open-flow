@@ -90,7 +90,7 @@ fly secrets set \
 ```
 
 `fly secrets set` redeploys the machine. See the
-[container delivery reference](../container-delivery.md#4-配置) for the full environment variable list
+[container delivery reference](../container-delivery.md#4-configuration) for the full environment variable list
 and the constraints on each origin.
 
 ## Deploy

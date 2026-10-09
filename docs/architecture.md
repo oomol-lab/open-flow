@@ -1,361 +1,213 @@
-# 产品与架构边界
+# Product and architecture boundaries
 
-本文记录 Open Flow 的产品边界、模块所有权和跨模块不变量。模型的详细解释属于专项文档；精确字段、路由、错误码和分页属于
-[Control API 技术参考](control/contracts/control-api.md)；部署配置、存储布局和升级步骤属于对应实现文档。
-架构约束在本文定义一次，其他文档引用并展开，不在此重复维护字段清单、操作步骤或迁移记录。
+This document defines Open Flow's system boundaries, sources of truth, module ownership, and cross-module invariants.
+[Technical references](#5-technical-references-and-document-ownership) own exact fields, limits, interface behavior, and deployment procedures.
 
-## 1. 产品边界
+## 1. System boundaries and source ownership
 
-Open Flow 由一套公共产品合同和多个彼此独立的部署实现组成。Workbench 与 CLI 只通过版本化 Control API 操作当前选定的一个部署，
-不拥有第二套持久化或执行模型，也不能在部署之间静默 fallback。
+Open Flow consists of one public product contract and independent deployment implementations.
+Workbench, CLI, and MCP clients operate on one selected deployment. That deployment owns persistence, authorization, publication, and execution.
+Clients must not create a second source of truth or silently fall back to another deployment.
 
 ```text
-Workbench ─┐
-           ├── Control API protocol ── deployment implementation
-CLI ───────┘
+Workbench ── Control API ─┐
+CLI ──────── Control API ─┼── Deployment application services ── Persistence, execution, and external capabilities
+MCP client ── MCP adapter ┘
 ```
 
-公共 package 拥有完整 Revision 解码、节点 authoring 视图/配置/编辑编译/诊断映射、Control API 写请求和 MCP 工具定义；部署适配器复用这些契约，并运行对应的一致性测试。
-Server 同时提供 MCP Streamable HTTP 入口。MCP adapter 与 Control API adapter 共享 Server application service；认证主体、
-Flow 修改、幂等准入、持久化和执行语义由同一个部署负责，不能形成第二套 authoring 或 Run 状态机。
+Control API and MCP adapters share deployment application services. They use the same identity checks, edit compiler, idempotent admission, and lifecycle.
+Protocol adapters must not create a second authoring or Run state machine.
 
-节点 authoring 区分业务配置、输入来源与内部定义。调用方提供业务选择和数据契约，公共包负责装配固定端口、能力派生定义及内部身份；读取、编辑、schema、搜索和诊断使用同一公开视图。输入来源限制遵循节点的实际执行能力，不能为统一接口而允许触发器依赖尚未执行的节点。新增节点的实现与验证要求见[节点 authoring 开发指引](authoring/node-authoring.md)。
+| Owner                | Responsibility                                                                                                                                                                      |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/open-flow` | Public models and decoding, node authoring, Control API and MCP contracts, deterministic validation and graph execution, conformance tests, product-neutral Workbench and shared UI |
+| `packages/command`   | CLI arguments and output, the Command Host boundary, Command Artifact builds and distribution                                                                                       |
+| `apps/server`        | Server lifecycle, authentication, persistence, scheduling, isolated execution host, HTTP/MCP adapters, Workbench host, and container delivery                                       |
+| Other deployments    | Their infrastructure, authentication, application lifecycle, external capability mediation, and production Workbench host                                                           |
 
-### Flow 与 Revision
+Cross-workspace and deployment integrations consume only public package entries. Deployments pin the public package version and run its conformance tests.
+They must not maintain another editable copy through source copying, deep imports, or synchronization scripts.
+Common code is independent of Browser and Node. Browser code is independent of Node.
 
-Flow 是部署生成的顶层产品资源和稳定 opaque identity，不从属于 Project。每个 Flow 独立拥有名称、生命周期、Draft head、Revision 历史、
-Presentation、Publication、Live、Run 和 Trigger binding。
+### Nodes and Workbench
 
-每个 Flow graph 内的 Node title 是非空且唯一的用户标识；`nodeId` 是稳定的内部 identity，继续用于连线、binding、运行事件和机器协议，
-不能随 title 修改。Workbench 读取不满足约束的 Draft 后，必须通过正常的 Draft change 创建修正 Revision，不能在读取时改写既有 Revision。
+Node authoring separates business configuration, input sources, and internal definitions. Callers supply business choices and data contracts.
+The public package assembles fixed ports, capability-derived definitions, and internal identities.
+Read, edit, schema, search, and diagnostics use the same public view. Input sources follow each node's execution capabilities.
+CLI, MCP, and deployments must not compensate for missing node conversions.
 
-Flow 有一个可变 Draft head 和不可变的 Revision 历史。Revision 是该 Flow 的 graph（包含节点执行配置）、binding 和 CodeModule source 的完整事实来源；
-语义修改必须以预期 Revision 为前提并使用稳定 change identity 原子提交，不能静默覆盖 stale head；幂等重放必须先于 Draft head 比较返回已经接受的
-Revision。Draft 同步只返回当前完整 Revision snapshot，不提供持久化 authoring operation history。内部索引、缓存、增量记录和存储布局不能成为第二个事实来源。
-不可变约束适用于仍保留的 Revision 内容；Server 可以将草稿正文存为基于父版本的有界增量，读取时还原并校验 digest，对外仍返回完整快照。Run 和 Publish operation 准入时将固定版本物化为完整正文。旧内容可按 Server 的保留策略清理，但 Run 结果与 Draft change 幂等记录不依赖被清理的内容。
+Workbench owns Flow editing and its product UI. The deployment host owns login, account roles, deployment settings, and browser analytics.
+Hosts integrate through public props, shared UI, and product theme contracts. They must not override internal product selectors or copy Workbench implementations.
+The host manages Variable values. Public Workbench consumes only variable name projections.
+Self-hosted Server deployments do not send data to the official analytics project by default.
 
-Flow 可维护当前 Draft 的资源引用投影，用于列表与详情读取；投影从完整 Revision 派生，与 Draft head 原子更新，不能参与执行或替代 Revision 事实来源。
-共享账号授权保留独立的存储与版本，在查询层组合，不复制进 Draft 投影。资源投影只包含引用，不拥有 Variable 值、账号实时状态或凭证。
+Provider, Action, Connection, and Trigger data each own fetching, caching, refresh, and invalidation. Consumers derive combined views.
+Caches store complete responses by request identity. They must not merge responses into another source of business truth or couple independent data lifecycles.
+Display profiles and catalog visibility during editing do not grant execution authority.
 
-Presentation 独立保存布局、viewport 和 Comment 等展示状态；每个 Flow 图只有一个画布和 viewport，节点配置由侧栏承载。Presentation
-不进入 Revision digest，也不影响 validation、Run 或 Live 的执行语义。Publication 在首次接受发布操作时固定已保存的 Presentation，随异步操作持久化，成功后作为不可变展示快照提供独立读取；回滚继承来源 Publication 的快照而不修改草稿布局。旧 Publication 缺少快照时，历史查看使用自动布局。历史查看的节点移动和视口只属于查看会话，不进入保存与撤销历史。
-执行节点直接拥有 `node.task` 配置，不存在独立 Task ID 或可共享的 Task 定义表。复制节点复制配置；编辑、删除、撤销只作用于指定节点。Code 节点仍通过 `moduleId` 引用 CodeModule。
-Task 的端口分组随有序端口定义保存在 Revision 并参与 digest；分组不创建语义端口，也不参与连接、validation 或 Run。
-Revision 不保存 credential、Run、Engine IR、Provider 状态或部署缓存。
+## 2. Core resources and sources of truth
 
-### Deployment Variable
+### Flow, Revision, and Presentation
 
-Variable 是 deployment scope 配置，不属于任何 Flow。Flow Revision 只保存大小写敏感的 Variable name binding，digest 包含 binding 与 name，
-不包含 value。Variable 删除不修改 Revision；需要该 name 的首次 Publish、Rollback 或 Run admission 必须在资源创建的权威 operation boundary
-内 fail closed，幂等重放必须先返回已经接受的资源。
+Flow is a deployment-generated top-level resource with a stable identity and independent lifecycle. It does not belong to a Project.
+Each Flow has one mutable Draft head. Revisions are immutable execution definitions that store the graph, node configuration, variable references, and code.
+Node identities do not change when names change. Each node owns its execution configuration. A local edit must not change other nodes' behavior.
 
-普通 Run 开始时从一个 deployment store snapshot 解析固定 closure 实际使用的 Variable，并把同一份值注入节点调用。平台不能把
-解析值隐式写入 Revision、Publication、持久化 Run input 或 `node.started`；Flow 代码显式返回、记录、发送或抛出该值时，它仍可进入用户数据流、
-RunEvent、日志或外部系统。Variable 是 Operator 可读取的 deployment configuration，不是不可导出的 Secret Manager。
+Semantic changes commit atomically with an expected Revision and a stable request identity. They must not silently overwrite concurrent changes.
+Idempotent replay returns an accepted result before checking the current Draft head. Clients synchronize through complete Revision snapshots.
+Internal delta storage, indexes, resource projections, and caches cannot replace the Revision or become another authoring history.
+Projections update consistently with their sources. Execution always uses the complete facts from a fixed version.
 
-旧 Project schema 与 Project API 不属于当前产品合同，也不再支持导入。遇到旧 schema 时应停止启动并保留原始数据库，
-不得在启动过程中隐式重建或删除数据。
+Presentation stores layout, viewport, comments, and other display state independently of the execution definition. It does not affect validation or execution.
+Publication fixes the corresponding display snapshot. Rollback and historical views do not rewrite the Draft's display state.
+Revisions do not store credentials, execution state, Engine IR, current Provider state, or deployment caches.
 
-### Deployment capability settings
+### Deployment configuration and execution snapshots
 
-Connector runtime、Connector Console、显式 LLM 和 Integration callback 等部署能力配置不属于 Flow 或 Revision。Server 可以从启动环境或自己的 deployment store 解析每个完整配置块；启动环境
-存在时锁定该配置块，不能与 store 按字段混合，也不能在外部服务不可用时静默 fallback。配置来源必须能由 Operator 区分为 environment、settings、derived
-或 unconfigured。
+Variable, Connector, LLM, and callback configuration belong to the deployment, not to Flow Revisions.
+Flows store only the required references. The deployment resolves and validates configuration at the relevant operation boundary.
+Configuration sources must be explicit. A configuration block must not mix sources or silently fall back to another source.
+An operation already in progress keeps its fixed configuration. New configuration applies only to later operations.
 
-Store-managed 配置原子提交并在保存后用于新的 capability operation；已经开始的 operation 继续使用开始时取得的固定配置快照。Secret value 不通过读取 API、
-Workbench 或日志返回，但可恢复的外部 service credential 会进入 Server 数据卷、WAL 和备份的信任边界，不是不可导出的 Secret Manager。
+Variable values are resolved and fixed for the actual execution scope. The platform must not implicitly write them into Revisions or public Run inputs and events.
+User code can explicitly return, log, or send values into business data and external systems. Variables do not provide non-exportable secret protection.
+Agent recovery uses the fixed variable values and model configuration. Model credentials remain private deployment data.
 
-包含 Agent 的 Run 在准入事务中固定其执行 closure 所使用的 Variable 值与模型部署配置，首次执行和审批恢复均使用同一快照。
-模型 credential 属于部署私有持久化，不进入 Revision、公开 Run input 或运行事件。
+Shared connection access configuration is maintained independently of Revisions. Publications and Runs fix the required authorization identities and execution snapshots.
+Later Draft or deployment configuration changes must not rewrite accepted execution facts. A fixed identity does not freeze upstream permissions.
 
-### Scope、身份与通知
+### Notifications and persistent results
 
-部署必须从认证 principal 确定稳定 scope。客户端选择的 scope、operator identity、workload authority 和 callback endpoint identity 不能互相替代。
-切换 deployment scope 必须销毁旧 session、请求和实时订阅。
+Realtime notifications only signal invalidation. Clients recover authoritative state through normal reads and must handle changes during initial subscription and reconnection.
+Notifications do not act as Revisions, RunEvents, collaboration logs, or reliable message queues.
+Flow catalog subscriptions and individual Flow subscriptions have independent lifecycles.
 
-Server operator credential 可以由启动环境锁定，也可以在 deployment store 中持久化；启动环境存在时必须成为唯一 active auth source，不能与持久化
-credential 混合验证。全新 Server 在两种来源都不存在时进入未认领状态，只能通过部署者从进程启动日志取得的一次性 setup authorization 建立首个持久化
-credential。认领必须原子且最多成功一次，不能把第一个访问管理面的匿名请求直接提升为 Operator。Operator credential verification、Browser session
-signing 和 callback endpoint identity 使用彼此独立的秘密与生命周期。
+Run terminal results, Wait decisions, and complete Agent tool results are retained independently of event logs.
+Log or preview truncation and expiry must not change execution results or destroy facts required for recovery.
 
-开源 Server 的账号与角色属于部署宿主。Operator token 对应固定管理员身份；管理员创建的邮箱账号通过密码登录，并有独立、稳定的账号 ID。
-每个 Flow 固定一个不可变的账号归属；管理员也只能访问自己的 Flow。Revision、Publication、Run、结果、错误订阅和实时通知沿所属 Flow 继承该边界，
-Control API 与 MCP 使用同一个服务端授权判断，客户端不能通过资源 ID、Team 或请求参数改变归属。升级前的 Flow 归属 Operator。
+## 3. Execution, publication, and lifecycle
 
-管理员管理本地用户和部署能力，包括 Connector、LLM、Integration、Variable 和 Event Source。普通用户可在自己的 Flow 中使用已配置能力与账号，
-但不能修改部署配置或建立外部连接。Open Flow 本地角色不替代 Connector 的上游身份和执行权限。账号停用、密码重置与会话到期使登录失效，
-实时通道在发送下一条数据前重新检查登录状态。具体认证和管理接口见 [Server 用户系统](server/users.md)。
+### Validation and admission
 
-Workbench 使用两个彼此独立的实时通知通道：
+The public package performs deterministic validation using a fixed Revision, model version, and Engine Contract.
+It does not read current credentials, upstream permissions, or service state.
+The deployment checks resource eligibility and permissions at the authoritative Run and Publish admission boundaries. Missing requirements reject the operation.
+The deployment can add diagnostics for missing static capabilities. It must not put external service probes into Revisions or deterministic validation.
 
-- Flow catalog 通道只发送 `flows.changed`，用于重新读取顶层 Flow 列表；
-- 当前 Flow 通道发送该 Flow 的 `draft.changed`、`run.created` 和 `run.changed`。
+Draft tests validate and prepare only the execution scope reachable from the selected Trigger and its dependencies.
+Full-graph checks and Publish validate the complete Flow.
+Admission, execution, and recovery use the same fixed scope and version. Clients must not block an entry test because of full-graph diagnostics on unrelated branches.
 
-CLI、Workbench 或其他客户端通过 Control API 创建、改名、修改 Draft、发布、回滚、启停或删除 Flow 时，部署必须使 catalog 通道可观察到变化。两个通道必须能独立连接、
-断线和重连。宿主显式报告首次订阅就绪。Flow 列表读取与订阅建立并行，不依赖实时连接完成初始化；订阅就绪后校准连接建立前开始的读取。
-Flow 编辑器等待自身订阅就绪再读取初始状态。客户端保留读取期间收到的 invalidation；首次连接失败不能无限阻塞加载，
-恢复连接或重连后客户端通过普通 Control API 恢复权威状态。通知只是 invalidation，不是 Revision、RunEvent、协作日志或消息队列。
+The Engine Contract defines public execution semantics. The deployment owns the isolation environment, resource limits, and recovery coordination.
+Recovery must validate the execution contract, runtime environment, and checkpoint compatibility. It must not guess or replay from damaged or incomplete state.
 
-### 生命周期与 retention
+### Graph execution and side effects
 
-Flow 删除先进入 `retiring`，立即阻断新的 mutation、Run、Publish 和 Trigger admission，再由该部署唯一的 lifecycle owner 清理关联资源并物理删除。
-完成后不保留可恢复 tombstone 或 authoring history；失败恢复只能继续同一个删除流程，不能形成第二条清理状态机。
+Each Run starts at one Trigger. Execution edges determine node arrivals. Input mappings determine data sources. These are edited independently.
+Each incoming edge arrival creates a separate invocation. A join does not implicitly wait for or combine predecessors.
+Loops permit repeated arrivals within execution budgets. Each invocation uses the result snapshot from its triggering path. Parallel paths do not share mutable results.
 
-RunEvent 明细可以按部署声明的 retention 到期，但唯一 terminal result 必须独立保留，直到所属 Flow 的物理删除流程清理该 Run。
+An ordinary Task commits its result once, after the complete output passes validation.
+Internal Run storage must not become a second data channel through which scripts can read arbitrary node results.
+Node execution, events, and capability calls share cancellation and deadlines. Catching an ordinary business error cannot disable resource limits or termination requirements.
 
-Server 的 Run owner 统一处理 Wait 到期、事件清理、通知 work 领取及下一到期时间；发布等待不能阻断 Run 的到期维护。
-维护调度统一提供下一工作时间，Supervisor 只据此启动维护，不另行解释 Wait 或通知的持久状态。
+The deployment owns the Run's sole execution authority and terminal state. Admission fixes the version, execution scope, and runtime identity.
+Retries must not duplicate accepted execution. If side-effect outcomes cannot be confirmed, execution ends as indeterminate and is not automatically replayed.
+Cancellation and completion races must produce one authoritative terminal state.
+The deployment limits concurrency and execution budgets and owns queuing and recovery. Clients must not take ownership of scheduling facts.
 
-## 2. 源码与模块所有权
-
-本仓库是公共合同、可移植实现、Workbench runtime 和 Server 的唯一可编辑源码事实源。
-
-- `packages/open-flow` 拥有公共类型、严格 decoder、Control API client、black-box conformance、Flow/Run/Trigger 的确定性语义、程序化
-  authoring API、产品中立 Workbench runtime 和内层 UI。
-- `packages/command` 拥有 CLI 行为、Command Host boundary、Command Artifact 协议、确定性 archive 构建和发布。它只通过
-  `packages/open-flow` 的公开 package entry 消费产品合同。
-- `apps/server` 拥有 Server application lifecycle、SQLite、HTTP adapter、本地调度、具体 `isolated-vm` host、MCP adapter、同源 Workbench host 和 Docker 交付。
-- 其他部署只拥有自己的基础设施接入、认证、application lifecycle、Capability mediation 和正式 Workbench 宿主。
-
-部署的浏览器分析由各自宿主持有，不进入公共 Workbench runtime 或 Control API 身份合同；开源 Server 的自建部署默认不向官方站点的分析项目发送数据。
-
-部署必须消费精确版本的公开 package artifact 并运行其中的 conformance cases，不能通过源码复制、deep import 或同步脚本保留公共实现的第二份
-可编辑副本。Workbench runtime、类型声明和样式只通过 `@oomol-lab/open-flow/workbench`、`workbench.css` 与 `theme.css` 同版本发布。
-`theme.css` 是部署宿主与 Workbench 共用的产品语义主题合同；Canvas Content 的 Designer token 仍由 Designer 独立拥有，只有 Canvas Chrome
-显式桥接产品主题。宿主操作通过公开 Workbench props 进入 Workbench 持有的共享 UI composition，部署宿主不能通过绝对定位或内部 selector
-覆盖 Workbench Header。部署宿主的 pre-auth 页面复用公开的共享 UI primitive 与适用的 Workbench composition；宿主持有认证请求、状态和账号表单，公共 Workbench 不拥有宿主用户与角色。
-
-产品中立 Workbench 拥有 Flow authoring 所需的 Variable name selector，只接收 name projection。deployment Variable 的 value 管理面属于正式
-Workbench 宿主：开源 Server 在自己的 Browser host 中提供，其他部署可以使用自己的既有管理面，不能为此复制或分叉公共 Workbench runtime。
-
-Common 代码不能依赖 Browser 或 Node，Browser 代码不能依赖 Node。部署应用通过公开 subpath 消费 package，不 deep-import 另一个 workspace 的源码。
-
-## 3. Validation 与执行
-
-Flow Revision 和 change operation 在公共解码边界忽略并移除未声明的对象字段；已知字段、必填项和版本仍须满足合同，任意 JSON 数据内容保持不变。
-
-权威 validation 的输入是固定 Flow Revision、model version 和 Engine Contract。它必须确定性检查 graph、Module、Task 和 closure，不读取
-credential value、Provider 当前状态、调用权限或部署资源。非确定性 eligibility 必须在 Run 或 Publish 的 operation boundary 重新检查。
-部署 Control check 可以在确定性 validation 之后追加静态 capability 配置缺失的 diagnostic，例如 Flow 使用 LLM Task 但 Server 没有 LLM host；
-这类 diagnostic 不进入 Revision 或 digest，也不能通过探测外部服务状态产生。
-
-草稿从指定 Trigger 测试运行时，只校验并准备该入口沿执行边可达的节点及其 Task、Module 和 binding 依赖；无关分支的语义错误或部署能力缺失不阻断本次运行。
-准入、队列执行和 Wait 恢复必须使用同一入口范围，固定完整 Revision 身份及本次执行 closure。全图 check 和 Publish 仍检查完整 Flow，Workbench 不得用全图诊断禁用草稿入口测试。
-
-Engine Contract、部署中立 Runtime invocation、Scheduler 图执行语义、RunEvent 投影和 conformance 属于 `packages/open-flow`。具体执行隔离、
-隔离运行时 digest、资源限制和恢复编排属于部署实现；`isolated-vm` RuntimeHost 只属于 Server。
-`engineContract` 约束公共图执行语义；`engineDigest` 标识具体 RuntimeHost 的隔离环境与宿主能力，不编码分支、Wait 或输入来源调度规则。
-checkpoint 的格式版本和状态一致性由 Scheduler decoder 校验，恢复时同时检查所需 Engine Contract 与隔离运行时是否受支持。
-
-Flow graph 允许自连接和回边。连线表示执行触发，输入映射独立声明数据来源；保存或删除执行边不会隐式创建或删除输入映射。
-
-输入映射区分固定值 `value`、来源 `sources` 与明确未设置 `unset`。清空输入保存 `{ kind: "unset" }`，阻止字段默认值回退；只有缺少映射时才继承字段默认值。显示和执行共用此解析规则，保存、复制与撤销保留该状态。
-每条被选中的入边到达都创建一次独立节点 invocation，不等待其他前驱，也不合并多个到达。Flow Run 固定一个 Trigger 起始节点；未被该 Trigger 路径触达的节点不执行。不同到达可以并行。
-Condition 的每个 Case 由 AND 表达式组组成，组间使用 OR。`first` 按保存顺序选择首个匹配 Case，`all` 选择所有匹配 Case；零匹配时选择固定 `otherwise` 路由端口。分支端口不提供数据输出，Source 选择器不列出 Condition。左右操作数独立保存固定值或公共 Source，不声明节点级统一 Input，可引用节点输出对象中 schema 声明的一级字段，不支持多级路径或数组下标。所有操作数 Source 在匹配前解析；缺失值、不完整配置和类型不兼容都报错，不转入 Otherwise。每次 Wait invocation 登记后释放 pending，决议后释放所选 action，同一次 invocation 的 pending 只触发一次。未选中的分支不产生到达或公开节点事件。
-
-每个可执行节点可设置正整数 `maxExecutions`，未设置时为 1000。计数按一次 Flow Run 累计，并按 node ID 区分。
-达到上限后，下一次到达使 Run 报错终止，不再执行该节点。每次 invocation 有独立 job/execution identity；Wait 和 Agent 的决议恢复继续原 invocation，不额外计次。暂停检查点保留累计次数、各等待 invocation 的输入路径和 Agent continuation。
-
-节点输入只能引用本图中经执行边可达的 output，包括回边上之前执行的自身 output。每次 invocation 继承触发路径上的结果快照，重复节点更新该路径中的自身结果；并行路径的结果不共享。
-Node Source 可用可选 `field` 引用输出对象中 schema 声明的一级字段；字段名是原始 key，不解释为路径。取值只读取对象自身属性，父对象为 null 或字段不存在时视为来源缺失，字段显式为 null 仍算可用来源。
-多个 source 表示当前路径上的备选值；零个可用来源补 `null`，一个来源取其值，同时有多个值时报错；实际输出 `null` 仍算一个来源。输入按端口声明校验，失败时报错，不跳过节点。首次进入循环时尚未产生的回边来源也按缺失处理。
-Flow 最终结果保留每个已完成末端节点的最后一次完成结果，完整执行次数和每次输出由运行事件记录。循环的最终执行次数无法预知，Scheduler 不按已完成节点数估算进度，仅在图执行完成时报告 100%。
-
-Task 仅通过返回对象一次性提交最终 output，全部声明和可序列化性校验成功后才向下游提供结果。已声明但缺失或为 `undefined` 的 output 补为 `null` 后按端口声明校验；整个返回值为 `undefined` 时按空对象处理，显式 `null` 等非对象返回值仍非法。
-归一化仅作用于端口值，不改写内部对象字段或数组元素；Condition、Wait 未选中的控制分支不补输出。普通 Flow 数据在 Runtime invocation、Scheduler、RunEvent 和 terminal result 边界保持可序列化。
-脚本 `context` 提供取消、日志、进度、Artifact、网络、Connector 等宿主能力、只读运行身份，以及与第一个参数相同的 `inputs`。
-`context.getPrevious()` 按需返回触发本次执行的直接前驱 `{ id, name, outputs, outputDefs }`，无前驱时返回 `null`。
-outputs 来自本次到达的路径快照，outputDefs 复用固定 Revision 的输出端口声明（handle、jsonSchema、nullable 与可选 description）；声明不保证本次产生该端口值。
-Condition 返回空 outputs 和 outputDefs。读取时才复制数据进入代码隔离环境，各次返回值互不影响。
-例如 `const previous = await context.getPrevious(); const value = previous?.outputs.items`。
-`context` 不提供运行中的 output 提交、跨节点的动态 Run store、Variable 查询或任意节点输出查询。部署可以为调度、调试和恢复私有保存 Run value，
-但不能把内部存储变成第二条用户数据通道。节点最终结果与成功完成通过同一个完成事件发布，先于完成阶段释放的下游节点启动；Wait 的 pending 分支在等待建立后即可执行。
-
-Server 将一次 Flow Run 作为一个逻辑 Runtime session 交给 Executor，Scheduler 和内联 Code Task 执行都在该 session 内；SQLite、RunEvent 投影、
-外部 Task 和 Capability mediation 仍由 Host 持有。Executor process 可以承载多个并发 session，但每次 Code Task invocation 使用新的 isolate；process
-与 isolate 的物理拓扑不是公共执行语义。
-
-Scheduler 的事件和 Task callback 与 Run 处于同一个 Effect Fiber 生命周期。Run 取消、deadline 和 sibling failure 通过 Fiber interruption 传播；只有
-连接 Promise 或 callback API 的部署边界可以把 interruption 转成 `AbortSignal`，内部执行合同不维护第二套取消状态。
-
-Run admission 通过固定 Draft Revision path 或当前 Live Publication identity 固定 Flow、Revision、closure 和 Engine identity。接受后，`runId` 是部署
-scope 内唯一资源 identity。用户代码开始执行后不能通过重试创建第二次执行；无法确认的恢复结果必须显式结束为不确定失败。取消与完成竞争时，
-权威 Run store 中只能有一个 terminal。
-
-部署必须限制并行 Run 数量和单个 Run 的总执行时间。同一 Flow 的 Run 串行 claim，不同 Flow 在全局并发上限内按最早可执行顺序推进，避免一个
-Flow 的长 Run 阻塞其他 Flow。
-
-Wait 在同一个 Run 内局部等待。Run owner 先持久化独立等待记录，再向 Scheduler 返回通知输出；通知后续节点按普通图执行，批准不会取消它们。
-所有等待同时可决议，未确定的 action 边阻止其下游，其他就绪工作照常执行。汇合节点按每条入边到达分别执行，不等待或合并其他到达。
-图没有运行中或可执行工作且仍有等待时，固定在内存中驻留 120,000 ms，保留 session 与同 Flow 执行槽，Run 状态仍为 running。
-窗口内决议原地推进，不序列化或保存完整 checkpoint；纯等待不扣 Run 执行预算。图再次静止重新计时，无效唤醒不续期。
-到期重新检查权威决议，仍静止才原子提交完整 checkpoint 和剩余预算并释放 session。冻结与决议竞争时重新排队，不能丢失工作。
-已冻结 Run 收到决议进入 queued；queued、starting 中其他等待仍可决议和过期。恢复读取最新决议，保留结果、到达路径快照、pending 输出及 Agent continuation，不重放副作用。
-活动执行或内存等待期间崩溃，无安全 checkpoint 时按既有规则标记 indeterminate。损坏、不完整或旧版 checkpoint 均不得从起点猜测性重放。
-
-Wait 与 Approval 使用同一个等待执行机制，分别提供固定的 `continue` 与 `approve/reject` 决议出口，不属于部署认证机制。部署内部的 Control API resolve 使用 Operator
-认证；外部通知可以携带只绑定一个 Wait 的 opaque capability。公开 hook 只提供 JSON inspection 和显式 POST action，不拥有 HTML 页面或特定消费端
-界面。一次 Wait 的所有 resolve 入口共享同一个 first-writer-wins 决议事实。
-各等待保留独立决议事实，后续等待和 Run terminal 不覆盖旧决议；这些事实不受 RunEvent retention 影响，随 Flow 物理删除清理。
-
-Agent 是根 Flow 中持有 Managed Task 配置的节点，拥有显式输入、固定模型、Connector 工具与可选代码计算能力声明。提示词为支持 `{{输入名称}}` 的字符串模板，与 LLM 共用单次替换语义；渲染结果作为用户消息，宿主控制执行约束与输出格式。模型不能改变工具 Action、Connection、固定参数或审批策略。
-Connector 工具和代码计算均可不配置；Agent 可以仅根据模型和提示词生成结果，仍须满足声明的输出 schema。Connector 工具最多 64 个。最终输出的 schema（包括文本约束）和用途说明作为生成要求传给模型；JSON 解析或 schema 校验失败时，将具体错误反馈给模型修正。修正沿用已有对话与结果，禁用工具调用，累计占用同一个最大执行轮数；耗尽后失败。
-Agent 的可选通知由该节点直接保存 Action、Connection、输入定义和参数映射，不引用其他节点或 Task 定义。
-Agent 的工具批次串行处理，批准或拒绝只处理该次固定调用。框架 continuation 属于部署私有数据；Run owner 持久化审批等待与通知 work，在安全冻结时保存完整 continuation 和 Scheduler 状态。并行 Agent 的等待独立可决议，框架不拥有另一套 Run 状态机。
-Agent 节点超时累计各次实际执行段，审批与排队不消耗节点预算；Run 总预算独立保留。执行结果不明时终止为不确定失败，不能让模型自动重试。
-
-Agent 临时代码属于此次 Run 的调用数据，不修改 Revision 或图结构。宿主只注入当前节点输入、明确值和当前 invocation 已取得的结果，
-每次计算使用独立隔离 realm，不授予 Connector、网络或其他业务 Capability。代码成功结果沿用工具结果持久化与恢复边界，
-不能通过重启或审批恢复重跑已完成计算；普通源码错误可由模型修正，取消、资源限制和宿主完整性失败仍终止 Agent。
-
-Agent 工具的完整结果属于 Run，由部署独立持久化，不依赖日志保留期。模型消息、日志和框架 continuation 使用结果引用与有界预览，
-不能通过复制完整正文传递恢复事实。宿主结果读取工具仅可访问当前 invocation 已取得的结果；Operator 通过同一 Run 读取权限查看和下载。
-恢复必须验证引用与完整性，不能通过重新调用外部工具补回缺失结果。结果随所属 Flow 的物理删除清理。
-
-Wait 与 Approval 的 `inputDefinitions` 定义可编辑的多个输入，`inputs` 保存输入绑定；新节点允许零输入。
-两种节点都有非空 pending 出口，等待建立时触发一次，输出包含 inputs、prompt、expiresAt；Wait 固定输出 continueUrl，Approval 固定输出 approveUrl 和 rejectUrl。
-决议出口输出非空对象 `{ inputs, action, resolvedAt, comment }`。inputs 保留执行时的输入快照；其输出 schema 声明配置的全部 key，但不映射字段类型。
-resolvedAt 为持久化的实际决议时间；可选纯文本 comment 去除首尾空白，空白归一为 null，最多 2,000 个 Unicode 码点。决议和备注原子保存，重复提交不得覆盖首次决议。
-用户将通知处理连接为普通图节点；其失败、取消、超时和恢复遵守普通执行规则。
-公开 origin 由部署提供，普通 Wait 不在 Run/Publish 准入阶段特判；实际需要输出链接却缺少 origin 时执行失败。没有连接或引用通知出口时不生成链接。
-完整通知输出属于有权限边界的 Run 恢复数据；公开 capability 查找索引只存摘要，URL 不写入 Revision 或普通服务日志。
-Agent 仍可使用内联 Connector 通知，先登记等待和通知 work，再在事务外至少一次发送，稳定 invocation identity 支持幂等。Agent 通知发送失败不自动决议，原有重试和次数上限保留。
-
-用户代码只在隔离 realm 中获得目标 closure、固定 platform module、所选 Engine Contract 声明的内置模块和当前 Task invocation 明确声明的窄 Capability。内置模块不授予宿主存储、身份或外部访问权限。
-部署只声明自己实现的 Engine Contract；Node 兼容合同的内存文件系统属于单次 Task invocation，不在 Task 之间共享或持久化。Capability host 必须校验当前
-Flow、Run、Task、invocation、binding 和 Run 状态；Task 或 Run 结束后旧 Capability 必须 fail closed。
-
-Code 的 Connector 调用受固定声明和宿主授权范围约束，脚本不能改变账号模式或扩大权限；详细模型见 [Flow 鉴权模型](control/flow-authorization.md)。
-每次业务调用有独立身份，用于外部幂等处理，不复用 Task invocation identity。Action 调用仍属于当前节点的生命周期，不创建图节点或独立 Run。
-普通调用错误可以被代码捕获，取消、deadline 和资源限制不能因用户捕获错误而失效。
-
-## 4. Publication、Connector 与 Trigger
-
-Flow 的线上启用状态独立于 Publication 和单个 Trigger 的暂停状态。停用阻断新的线上 Run 与所有生产 Trigger admission，保留已接受的 Run、发布版本与草稿测试能力；重新启用不能改写单个 Trigger 的暂停状态。首次发布默认启用，之后发布与回滚保留总开关状态。
-
-Publication 是 Flow 在固定 Revision 上的不可变成功记录。每个 Flow 独立拥有 Publication 历史和最多一个 Live pointer。Publish 在同步接受前固定
-Revision、closure、Engine、预期 Live 和必要 binding，并完成 validation 与非确定性 eligibility；之后由持久化 publish operation 表达
-`pending | succeeded | failed`。同一个 Flow 最多有一个 pending publish operation，幂等重放返回同一个 operation。
-
-只有需要外部或异步准备的 Trigger 才建立持久化 work。外部请求不进入本地事务；所有必需 work Ready 后，一个权威 transaction 才能创建
-Publication、比较并移动 Live、安装 current Trigger binding 并把 operation 标为 succeeded。pending 或 failed operation 不创建 Publication、不移动
-Live，旧 Live 继续作为 Run 和 Trigger admission 的事实来源。Rollback 创建新 Publication，不修改历史记录。
-
-PublicationStore 拥有发布总事务；PollStore 与 IntegrationStore 各自拥有候选准备、binding 复用判断和安装，在该事务内重新检查激活条件。
-候选准备成功或失败与对应 publish work 的状态在同一事务中提交。PublicationStore 从持久化 operation 与 work 推导下一次推进时间，
-Maintenance 将它纳入调度；暂时无法激活的 operation 持久化重试时间，不阻塞其他 Flow，重启后仍按该时间与准备期限恢复。
-
-current Trigger binding 与 Live pointer 共同构成 Trigger admission authority。候选 Integration callback、Poll baseline event 和旧 runtime claim 在激活前后
-都不能绕过该 authority 创建 Run；Poll baseline checkpoint 只在激活 transaction 中安装。不能使用独立候选 endpoint 安全替换的 Integration 变更必须
-fail closed，不能先修改 current provider resource 再依赖补偿恢复。
-
-### Flow 授权
-
-Connector 拥有账号凭据、连接生命周期和上游授权；账号与目录是部署范围资源，不从属于单个 Flow。
-Flow Revision 只保存连接使用声明，部署拥有共享访问配置，并在发布和运行准入时固定授权身份；这些数据不能携带凭据或演化为 Flow service account。
-
-可编辑配置与执行快照分离。修改 Draft 不改变已接受的执行记录；回滚和恢复使用对应记录的固定授权，不能重新读取当前 Draft 配置。
-固定授权身份不冻结上游权限；授权缺失、来源不匹配、撤权或连接失效时必须拒绝执行，不能回退到其他授权。
-
-宿主从固定声明建立单次调用范围。共享 Code 与显式选择账号的消费者不能互相借权，节点不能借用其他节点的权限，
-客户端与脚本不能扩大调用范围。编辑期可见的目录或待配置声明不构成执行授权。
-
-身份作用域由部署固定，不能随默认账号或团队设置漂移，也不能由节点覆盖。Connector adapter 必须明确其执行身份保证，
-不能把本地名称解析当作上游按稳定身份执行。授权配置与后台工作的清理由各自生命周期所有者负责，不建立第二套权限来源。
-
-数据结构、消费者差异、账号使用操作和兼容升级规则见 [Flow 鉴权模型](control/flow-authorization.md)。
-
-Connector 与 LLM 是独立部署能力，未配置时分别拒绝调用；外部服务不可用不能被误报为尚未配置。
-能力配置的来源和推导规则见 [Server 容器交付](server/container-delivery.md)。
-
-### Error workflow
-
-Flow Error 节点通过 `sourceFlowIds` 多选监听已发布的上游 Flow，不能包含自身。每个 Flow 最多一个 Flow Error。监听列表随处理 Flow 的 Revision 保存，发布时在同一事务中替换 `error_subscriptions` 索引，草稿修改不影响线上。上游失败时查询当前可用监听者，每个源 Run 与处理 Flow 至多一条派发记录；派发准入再次验证监听关系并固定处理 Flow 当前 Live 与 Flow Error。多个处理 Flow 可监听同一个上游。
-
-仅生产 occurrence 准入的 Run 在 `failed` 或 `indeterminate` 终态产生错误处理；手动 Draft/Live、成功与取消不触发。终态和持久化派发意图原子提交，Maintenance 在队列满时保留意图重试，并以源 Run 与处理 Flow 的组合身份去重。目标不可用时记录派发失败，不改变源 Run 终态。Flow Error 准入的 Run 持久化来源标记，失败后不再派发，避免跨 Flow 递归。
-
-错误上下文来自最终选中的失败原因，独立于可截断、可过期的事件日志。派发状态属于 Run detail 的动态关系，不能写回不可变的终态结果。输出与操作合同见 [Control API 契约](control/contracts/control-api.md)，使用方法见 [Flow Error](error-trigger.md)。
-
-### Trigger
-
-Trigger 是 Flow graph 中的 source node。每张图最多有一个 Manual Trigger，由用户显式启动，不建立外部订阅或调度 binding。Webhook、Cron、Poll 和 Integration 的确定性协议、展示快照、Registry 与 conformance 属于公共
-package；业务 checkpoint、调度持久化、endpoint routing 和 admission 事务属于部署实现。
-
-用户自部署的 Open Flow 是 connector 的不可信调用方。第三方 Trigger 的请求构造、凭据使用、配置校验与远端订阅状态由 connector 拥有；
-Open Flow 调用已注册操作，connector 沿用 Action execute 的授权语义：用户／服务账号按当前 app-access 校验，部署用 team-token 按 Team 权限执行并检查可选 grant。客户端不能自报远端资源 ID。
-Trigger 权限与 Action、通用 proxy 分离。公共包从 connector 生成展示快照，只持有服务端订阅 ID，并保留流程调度和事件准入。
-飞书共享事件源在部署接收回调，资源订阅和跨主体引用计数由 connector 管理。接口、权限组与升级步骤见 [Trigger 权限与执行](control/trigger-permissions.md)。
-
-Trigger 的有序数据输出由公共 contract 统一定义和校验。接入适配器在准入前构造完整输出；Scheduler 和 checkpoint 只消费通用端口映射，不承担 Webhook 或 Provider 的事件投影。HTTP 请求重试身份由 Webhook 准入层定义，与 Flow 可见输出的数据范围分别管理。
-
-Integration 的事件型 callback 返回 `outputs`，listener 页面返回 `outputs` 或 `null`（无事件）。两者都由 Provider 构造完整端口映射，Server 按固定 Trigger contract 校验后原样准入。
-Poll 保留原始事件和逐事件去重，Provider 的 `buildOutputs(events)` 将非空的已去重事件批次转换为一次 Run 的完整输出；基线、空页面与全部重复的页面不调用它。
-Provider 配置通过 `configInputs` 复用节点的 `InputPort | Group` 定义，并以与节点输入相同的固定赋值结构持久化：`value` 保存显式 JSON 值，`unset` 表示明确清空，缺少覆盖才使用定义默认值。清空写入 `unset`，重置删除覆盖。表单保留未设置状态；调用 Provider 前解析成普通 JSON，无值时为 `null`，由 `nullable` 和字段 Schema 校验。配置不支持来源绑定。
-Provider 输出直接声明原 `payload` 的一级字段，内部业务对象不递归展开。现有 Poll Provider 显式使用 `eventsPollOutputs` 返回 `{ events }`；通用运行时不预设输出端口名称，也不合并不同事件的端口值。
-
-一次有效 Trigger occurrence 只能准入普通 Flow Run，之后复用相同的 Run、执行、事件、取消和 terminal 语义。重投 occurrence 必须通过稳定 identity
-和权威 store 约束为最多一个 Run。
-
-Integration callback 的处理生命周期同时受请求取消、部署关闭和整次 delivery deadline 约束，并向 Provider 与 Connector 传播取消。
-这些取消只能停止尚未完成的回调处理，不能撤销已准入的 Run；部署不能自动重试整段 callback，以免重放 Provider 的外部副作用。
-
-具有 `listener` 能力的 Integration 定义将已验证通知转为持久唤醒；通知与定期扫描共用同一 cursor reader，
-回调不能推进扫描游标。Server 在同一事务中提交页面准入、checkpoint 与工作完成，并保留领取后新增的通知。
-扫描使用独立租约和健康状态；订阅故障不能单独撤销仍然可用的扫描准入资格。事件型 Integration callback 返回完整 `outputs`，由准入层按声明端口校验。
-
-Server 的 Poll 读取与 Integration listener 扫描由同一个监听运行时调度，共用 Connector 作用域、取消与读取 deadline。
-订阅准备、续期与事件型 callback 由 Integration owner 处理，不能持有扫描调度锁。已有 Poll 的调度配置、checkpoint 与事件级去重继续作为其权威持久状态，
-运行时接管不改写历史 Revision 或重新建立基线；不同读取合同分别在自己的准入事务中提交结果。
-
-监听配置与 Connection 未变的发布保留最新进度、待处理工作与身份作用域，并以 Live publication 拒绝旧 worker 的提交。
-监听范围改变时先准备独立候选，再原子切换；切换终止旧范围尚未准入的扫描工作，新范围从自己的基线开始，不承接旧范围工作。
-旧订阅继续作为持久清理任务处理。Google Drive `watch_changes` 首版以同一 change stream 的 cursor/page 身份准入，
-不把对象 ID 当作变化 ID，不承诺还原上游未保留的所有状态转换。
-
-Cron 不为同一 Flow 创建重叠的未终结 Run。已有未终结 Run 时保留当前到期位置并重试；前一个 Run terminal 后最多补入一个最早未处理
-occurrence，再把计划推进到当前时间之后。手动 Run 和其他 Trigger 保留各自的 admission 与 backpressure 语义。
-
-Callback response 不能在承载 Workbench 或 Control API 的 origin 上成为 Flow 控制的可执行内容，也不能修改 cookie、跳转、CORS 或其他部署级
-安全响应头。需要完整自定义 HTTP responder 时必须使用与管理面隔离的 origin。
-
-## 5. 文档所有权
-
-- 修改产品事实、跨模块 owner、安全边界或运行时不变量时更新本文。
-- 模型分层、生命周期说明、行为示例和实现入口放在专项文档，例如 [Flow 鉴权模型](control/flow-authorization.md)；本文只保留相关架构约束和入口。
-- 修改 serialized model、HTTP、错误、分页或 conformance profile 时更新
-  [Control API 技术参考](control/contracts/control-api.md)。
-- Server 容器、环境变量、SQLite、备份和运维约束写入 [Server 容器交付](server/container-delivery.md)。
-- 具体迁移编号与转换规则由迁移代码和相应兼容说明承接，不写入架构约束；已有文档覆盖的细节通过链接引用，不再重复维护。
-- 前端交互约束写入 [Workbench 与 Designer 前端注意事项](../.agents/skills/frontend-ui/SKILL.md)。
-- 实现步骤和采纳历史只保存在 Git 历史或阶段计划中，不属于当前架构合同。
-
-## 浏览器目录数据
-
-Workbench 的 Providers、Actions、Connections、Triggers 数据分别由所属 Store 管理。Store 对外提供稳定的只读 Val，拥有刷新协调、ETag 和持久化；传输层保持无状态。业务访问触发刷新条件检查，消费者订阅实际数据变化，不使用 URL 缓存或 revision 通知计数。Actions 详情从按 provider 缓存的完整目录派生，浏览器目录不按 Flow 已选授权过滤；未授权仍可读取定义以编辑 Draft，连接状态在消费处组合。浏览器业务通过静态边界检查限制为从 Store 访问这些数据。存储位置与刷新间隔见 [Control API 契约](control/contracts/control-api.md)。
-
-Publication 被替换时，在切换 Live 的事务中固定 `liveEnd`（结束时间与切换前启用状态）。它不包含 Trigger 健康状态；当前版本和迁移前未记录的历史版本无此快照。回滚创建独立 Publication，其结束状态从空值开始。
-
-Workbench 的发布者展示资料在浏览器会话入口确定身份解析器：优先使用可选的 `WorkbenchHost.resolveActor`；未提供时，仅在 `https://console.oomol.com` 与 `https://console.oomol.dev` 上启用内置 OOMOL 适配，直接请求同环境的 `api.oomol.com` / `api.oomol.dev` 用户 summaries API，不经过 Console 代码或 Control API。其它来源（包括 localhost）不自动查询 OOMOL，展示记录中的 actorId；不得根据 actorId 格式猜测身份空间。独立的会话级 ActorStore 用 LRU 缓存完整资料响应，不向 Publication 快照写入或合并用户资料；会话结束时清空并取消在途请求。
-
-### OpenAPI Task
-
-OpenAPI 是 Managed Task executor。公共 package 拥有文档解析、所选接口及传递引用的裁剪、端口派生和请求响应转换；部署提供有界网络传输。
-Revision 保存来源 URL、接口 method/path、服务地址、鉴权方案与固定接口快照，不保存完整接口目录或凭证值。运行不重新读取文档，远端定义变化仅通过显式草稿更新生效。
-输入输出由快照派生，不能作为独立接口合同编辑。鉴权输入仅接受部署变量或上游输出，节点启动事件不投影这些字段。
-完整文档由当前属性面板临时持有；打开接口或服务地址选择器时按需加载，关闭或切换面板释放，浏览候选目录不更新 Revision。
-
-属性面板统一使用“更新”按钮读取文档；已有接口时直接更新其快照，未选择接口时展示候选列表。选择接口直接保存，不设置单独的差异确认或应用步骤；请求失败保留已有配置，并通过字段浮托显示错误。
-
-OpenAPI 配置按进度展示：URL 右侧提供紧凑更新按钮，空白时按必填字段显示错误。文档成功加载后显示可搜索、按 tag 分组的接口选择浮层；选定接口后展示服务地址、鉴权和生成端口。未配置接口不展示空端口区块。编辑 URL 清除候选列表；重新打开已有节点直接显示保存的配置，展开选择器才重新获取完整文档。
-
-节点校验和 OpenAPI 面板共用带字段位置的配置校验；未加载文档时，缺少接口的下一步提示挂在 URL 上，加载成功后转到接口选择框。远端刷新错误仅属于面板请求状态，不改变已有快照的有效性，已有接口仍保持可见。
-
-服务地址统一为可编辑地址及同一行的文档候选入口，候选展示解析后的完整地址，选择直接保存；选中含变量的服务时才展开变量字段。鉴权统一为方案选择框，包含文档方案与手动类型，选择直接保存，API Key 的名称和位置仅在需要时显示。
-
-Authentication 独立位于 OpenAPI 配置段落下方：首项为方案选择，下方按方案显示参数及凭证 Source。鉴权端口继续参与既有输入解析和绑定合同，但不在 Inputs 表格展示。
-
-### AI Decision
-
-AI Decision 是 Managed Task。公共 package 拥有问题配置、固定输入与答案输出的派生及校验；部署复用 LLM
-访问配置，提供独立的 System One 调用。每个问题对应一个完整答案对象输出，判断结果不隐式改变图执行路径；
-阈值、组合条件与分支仍由 Condition 拥有。配置与接口合同见 Control API 技术参考。
+### Wait and Agent
+
+Wait suspends a local branch within the same Run. The deployment persists the Wait before releasing its notification branch.
+Unresolved action branches remain blocked while other ready work continues.
+All decision entry points share one first-writer-wins fact. Repeated submissions neither overwrite the accepted decision nor resume execution again.
+
+Freezing must save complete recovery state and the remaining budget. A race between freezing and a decision must not lose work.
+Recovery preserves completed results, path snapshots, Waits, and Agent continuations. It must not repeat side effects that already occurred.
+Execution and deployment references define process, session, checkpoint, and in-memory waiting policies.
+
+An Agent's model and tool permissions come from the fixed node declaration. The model cannot change Actions, accounts, fixed parameters, or approval policies.
+Framework continuations are private deployment recovery data. The same Run owner remains responsible for approval and Run state.
+Temporary code computation does not modify the Revision. It can access only data explicitly supplied to the current invocation and does not automatically receive external business capabilities.
+Complete tool results are persisted separately. Recovery must not repeat external tool calls to replace missing results.
+
+### Publication and Trigger
+
+A Publication represents only a fully successful publication. Live points to the current production version.
+A publish operation can prepare external resources asynchronously. Only after all preparation succeeds can it atomically create the Publication, switch Live, and activate Trigger bindings.
+The previous Live remains valid during preparation and after failure. Rollback creates a new Publication without changing historical versions.
+Changes that cannot prepare independent candidate resources must be rejected. They must not damage live resources and rely on compensation to recover.
+
+The Flow enable switch, Live version, and individual Trigger pause states are independent.
+Disabling a Flow blocks new production admission but does not cancel accepted Runs.
+Live and the current Trigger binding jointly determine admission authority. Old workers and candidate callbacks cannot bypass this boundary.
+
+The public package owns deterministic Trigger definitions, output validation, and conformance tests.
+The deployment owns progress, deduplication, scheduling, routing, and admission transactions.
+A valid occurrence uses a stable identity to admit at most one ordinary Run. It then uses the same execution, cancellation, and terminal-state mechanisms.
+Notification wakeups and scan progress are persisted separately. Progress advancement and page admission commit consistently.
+A listener switch must prevent the old scope from submitting further work.
+Callback cancellation does not revoke an accepted Run. Retrying an entire callback must not repeat external side effects.
+
+Connector owns third-party Trigger request construction, credential use, and remote subscriptions. A self-hosted Open Flow deployment is an untrusted caller of Connector.
+Open Flow consumes registered operations and opaque subscription identities. It retains responsibility for its own scheduling and event admission.
+
+Flow Error delegates a production Run failure to a separate handler Flow without changing the source Run's failure.
+Terminal state and dispatch intent are saved atomically. Dispatch is deduplicated and checks target eligibility again.
+A handler failure does not recursively trigger more error handling.
+
+### Deletion and maintenance
+
+Flow deletion first blocks new mutations, Runs, publications, and Trigger admission.
+One lifecycle owner then cleans up resources and physically deletes the Flow.
+Failure recovery continues the same deletion process instead of creating a second cleanup state machine.
+Completed deletion does not provide implicit recovery or authoring history.
+
+Run expiry, Waits, notifications, and publication advancement each have a state owner that determines the next work.
+The deployment schedules maintenance centrally. The scheduler must not reinterpret persisted state or block other due work while waiting for a publication.
+
+## 4. Identity and capability boundaries
+
+The deployment derives a stable resource scope from the authenticated principal.
+Operator identity, Flow ownership, external execution authority, and callback identity cannot substitute for one another.
+A scope change clears old sessions, requests, caches, and subscriptions.
+Server-side authorization covers every resource entry point. Clients cannot change ownership through IDs or parameters.
+
+In the open-source Server, the host owns accounts and administrative roles. Each Flow has a fixed account owner.
+Administrator status does not expand visibility into other accounts' Flows. Administrative permissions are independent of upstream Connector permissions.
+Claiming a deployment requires authorization held by its deployer. The first anonymous visitor must not become an administrator.
+Login verification, session signing, and callback identity use separate secrets and lifecycles.
+
+Connector owns connection credentials and upstream authorization. A Flow declares connection use, and the deployment fixes the caller identity and permitted scope.
+Shared Code, consumers with explicitly selected accounts, and different nodes must not borrow one another's authority.
+Revocation, identity mismatch, or connection failure rejects execution without falling back to another account.
+Catalog visibility, name resolution, and display profiles are not authorization evidence.
+
+User code receives only the narrow capabilities declared for its current invocation inside an isolated environment.
+Builtin modules do not grant host storage, identity, or external access.
+The host validates caller identity, scope, and current execution state. It revokes old capabilities when the node or Run ends.
+Business calls and node executions have separate identities. External-call idempotency must not deduplicate an entire node as one call.
+
+A public Wait capability authorizes only its specified Wait. It is not a deployment login.
+Complete capabilities and private recovery data must not enter ordinary logs.
+Flow-controlled HTTP responses must not execute content or change deployment security headers on the management origin.
+A fully custom HTTP responder requires a separate origin.
+
+## 5. Technical references and document ownership
+
+Update this document only when a change affects system boundaries, sources of truth, module responsibilities, security boundaries, or cross-module invariants.
+Do not maintain exact fields, numeric limits, usage examples, storage algorithms, or component layouts here.
+
+| Content                                                                | Authoritative document or implementation                                                                                 |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Public models, interfaces, node configuration, and execution protocols | [Control API reference](control/contracts/control-api.md)                                                                |
+| Versions and compatibility                                             | [Public contracts and version evolution](control/contracts/compatibility.md)                                             |
+| Node-compatible execution environment                                  | [Node runtime contract](control/contracts/nodejs-runtime.md)                                                             |
+| Connection use and execution authorization                             | [Flow authorization](control/flow-authorization.md), [Trigger permissions and execution](control/trigger-permissions.md) |
+| Node development and verification                                      | [Node authoring](authoring/node-authoring.md), [CLI Lab](authoring/cli-lab.md)                                           |
+| CLI delivery and invocation contracts                                  | [Command Artifact](distribution/command-artifact.md)                                                                     |
+| Server configuration, authentication, and deployment                   | [Container delivery](server/container-delivery.md), [User system](server/users.md), [MCP](server/mcp.md)                 |
+| Trigger usage                                                          | [Flow Error](triggers/error-trigger.md), [Linear Issue Trigger](triggers/linear-trigger.md)                              |
+| Frontend integration and component interaction                         | [frontend-ui skill](../.agents/skills/frontend-ui/SKILL.md), production components, and Lab stories                      |
+
+Migration code and compatibility notes define specific migration rules. Git history preserves implementation history and verification records.

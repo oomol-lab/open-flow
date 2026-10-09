@@ -1,67 +1,101 @@
-# 节点 authoring 开发指引
+# Node authoring development guide
 
-新增节点或修改既有节点时，同时设计其面向 Agent 的读取与编辑合同。CLI、MCP 和 HTTP 的调用方应能通过业务配置、数据来源和公开 schema 完成任务，不需要还原持久化节点定义。
+When adding or changing a node, design its Agent-facing read and edit contract at the same time.
+CLI, MCP, and HTTP callers must be able to complete tasks with business configuration, data sources, and public schemas.
+They must not need to reconstruct persisted node definitions.
 
-产品所有权见[架构](../architecture.md)，请求与操作语法见[Flow 命令合同](flow-command.md)，场景运行与成本统计见[CLI Lab](cli-lab.md)。本文说明节点开发必须处理的边界；具体字段以公共 schema 和对应技术合同为准。
+See [architecture](../architecture.md) for product ownership, the [node authoring contract](../control/contracts/control-api.md#node-authoring) for request and operation syntax, and [CLI Lab](cli-lab.md) for scenarios and cost accounting.
+This guide defines the boundaries node developers must handle. Public schemas and technical contracts define exact fields.
 
-## 设计公开配置
+## Design public configuration
 
-为节点的每个可配置项确认其来源，再决定是否公开。
+Identify the source of each configurable node property before deciding whether to expose it.
 
-| 类别         | 调用方负责                                                   | 产品负责                                                         |
-| ------------ | ------------------------------------------------------------ | ---------------------------------------------------------------- |
-| 业务选择     | 操作、账号、模型、规则、提示词、时间与策略等有实际意义的选择 | 验证选择并生成执行配置                                           |
-| 输入数据     | 命名字段的值、上游输出、变量或其他受支持来源                 | 解析来源、装配 binding 并校验数据                                |
-| 业务数据契约 | 无法可靠推导的自定义代码结果、请求内容或结构化模型结果       | 将字段或 schema 转为运行时端口定义                               |
-| 能力定义     | 选择 Action、Trigger 或 OpenAPI 操作                         | 从权威目录或文档解析参数、结果和鉴权定义                         |
-| 固定运行结构 | 无需提供                                                     | 固定输出、内部标识、节点执行配置、Module、imports 和底层变更操作 |
+| Category                | Caller responsibility                                                                             | Product responsibility                                                                                     |
+| ----------------------- | ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Business choices        | Meaningful choices such as operation, account, model, rules, prompts, timing, and policies        | Validate choices and generate execution configuration                                                      |
+| Input data              | Named values, upstream outputs, variables, or other supported sources                             | Resolve sources, assemble bindings, and validate data                                                      |
+| Business data contracts | Custom code results, request content, or structured model results that cannot be derived reliably | Convert fields or schemas into runtime port definitions                                                    |
+| Capability definitions  | Select an Action, Trigger, or OpenAPI operation                                                   | Derive parameters, results, and authentication definitions from the authoritative catalog or document      |
+| Fixed runtime structure | None                                                                                              | Fixed outputs, internal identifiers, node execution configuration, Modules, imports, and low-level changes |
 
-公开配置不能直接复制内部定义 schema。即使内部类型可以复用，也要确认其中每个字段是否属于调用方必须做出的业务选择。类型完整不代表接口易用；在文档中解释如何构造内部包装不能代替工具的装配职责。
+Public configuration must not copy internal definition schemas directly.
+Even when an internal type is reusable, check whether each field represents a choice the caller must make.
+A complete type does not guarantee a usable interface. Instructions for building internal wrappers cannot replace the tool's assembly responsibility.
 
-固定单一结果由工具生成输出定义，引用唯一数据输出时允许省略端口名。多个业务输出仍需显式选择，返回可用名称供调用方修正；执行分支与数据输出分别建模。只有运行时实际产生的数据输出才可绑定；Condition 分支等控制信号不能虚构成数据端口，Wait 实际提供的等待与决议数据则按其运行时契约公开。
+Tools generate output definitions for fixed single results. Callers can omit the port name when referencing the only data output.
+When a node has multiple business outputs, the caller must select one. The tool returns available names to help correct the request.
 
-需要自定义数据契约时，提供业务字段映射或结果 schema。不要根据一条样本推断永久类型，也不要为了使一次绑定成功而放宽既有约束。对允许自由命名输入的节点，可由新绑定声明输入；对目录定义的固定输入，未知名称应报错并提供候选项。新建节点不注入演示数据；业务默认值必须具有明确语义。
+Model execution branches and data outputs separately. Only data outputs produced at runtime can be bound.
+Condition branches and other control signals cannot act as data ports. Expose Wait data and decisions according to their runtime contract.
 
-## 尊重执行能力
+For custom data contracts, accept business field maps or result schemas. Do not infer permanent types from one sample.
+Do not weaken existing constraints to make one binding succeed.
 
-统一输入操作的形式，不意味着所有节点支持相同来源。每个节点的公开 schema、编译器和诊断都必须说明并执行其实际限制。
+If a node permits freely named inputs, a new binding can declare an input.
+If the catalog fixes the inputs, the tool must reject unknown names and return candidates.
+New nodes must not inject sample business data. Business defaults must have an explicit meaning.
 
-- 普通运行节点按已有执行路径规则消费上游结果；数据绑定不隐式创建执行边，执行边不隐式绑定数据。
-- Trigger 配置在触发 Run 前使用，只能接受其运行机制支持的配置来源，不能绑定本次 Run 的下游结果。
-- 鉴权字段遵守既有凭据来源与事件可见性限制；简化配置不得绕过这些限制。
-- 能力或操作未改变时，局部修改保留既有定义快照。刷新目录、切换 Action 或重新选择操作造成的契约变化必须由明确操作触发，不能因修改名称或说明而隐式发生。
-- 本接口仅编辑当前模型的单个 Flow 图。Subflow 已退役，包含旧子图的 Revision 按模型合同明确拒绝读取和修复；新增节点不能恢复旧子图入口，也不能静默丢弃旧内容后继续编辑。
+## Respect execution capabilities
 
-## 实现公共转换
+A common input-operation format does not mean that every node supports the same sources.
+Each node's public schema, compiler, and diagnostics must describe and enforce its actual limits.
 
-`packages/open-flow` 拥有节点的公共配置、读取视图、请求 schema、编译、操作生成和诊断映射。CLI 与 MCP 调用同一部署服务，部署继续使用既有 Revision 和提交 owner；客户端只负责传输、参数与文件适配，不维护另一套默认值或状态机。
+- Ordinary execution nodes consume upstream results according to existing execution-path rules. Data bindings do not implicitly create execution edges, and execution edges do not implicitly bind data.
+- Trigger configuration is used before a Run starts. It can accept only sources supported by its runtime mechanism, not outputs from downstream nodes in that Run.
+- Authentication fields must preserve credential-source and event-visibility limits. Simpler configuration must not bypass these limits.
+- When the capability or operation is unchanged, local edits preserve the existing definition snapshot. Catalog refreshes, Action changes, and operation reselection must be explicit. Changing a name or description must not silently change a contract.
+- This interface edits one Flow graph in the current model. Subflow is retired. The model contract rejects reads and repairs of Revisions with old subgraphs. New nodes must not restore a subgraph entry point or silently discard old content before editing.
 
-一次节点改动需要同步考虑以下接口。
+## Implement public conversion
 
-| 接口          | 开发要求                                                                             |
-| ------------- | ------------------------------------------------------------------------------------ |
-| `flow_schema` | 返回业务配置、受支持来源、必要约束和最小可运行示例；说明节点差异而非让调用方试错     |
-| `flow_read`   | 概要保持简短，详情聚合实际业务配置与输入来源；长文本按需读取，隐藏内部定义身份       |
-| `flow_edit`   | 将公开配置转换为底层变更；只修改目标节点，必要时复制共享代码模块并保持节点与连线身份 |
-| `flow_search` | 按公开字段和源码定位对象，返回可继续读取的引用与有限上下文                           |
-| `flow_check`  | 将内部诊断映射到公开节点、字段、端口和代码位置，提供可据此修正的错误                 |
+`packages/open-flow` owns public node configuration, read views, request schemas, compilation, operation generation, and diagnostic mapping.
+CLI and MCP call the same deployment service. The deployment uses the existing Revision and commit implementation.
+Clients handle only transport, arguments, and file adaptation. They must not maintain separate defaults or state machines.
 
-从详情读取的业务配置应可用于同类节点的局部修改，无需补上隐藏字段。各执行节点独立保存 `node.task`；配置相同或复制产生的节点也不共享 Task 定义。检查“未修改”时比较业务语义，允许代码模块等内部资源合法重分配。已有端口分组、描述和其他未公开元数据不能因一次无关修改而丢失。
+For each node change, consider these interfaces together.
 
-更新继续使用公共合并合同：未提供字段保留，数组整体替换，显式 `clear` 与 JSON `null` 区分。输入的显式值、未设置、默认值继承、多来源和变量绑定不得互相折叠。Schema 也是配置对象，空对象不表示清空已有约束；帮助和示例应说明如何显式移除字段。
+| Interface     | Development requirement                                                                                                                                          |
+| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `flow_schema` | Return business configuration, supported sources, required constraints, and minimal runnable examples. Explain node differences so callers do not have to guess. |
+| `flow_read`   | Keep outlines short. Combine actual business configuration and input sources in details. Read long text on demand and hide internal definition identities.       |
+| `flow_edit`   | Convert public configuration into low-level changes. Modify only the target node. Copy shared code modules when necessary and preserve node and edge identities. |
+| `flow_search` | Locate objects by public fields and source text. Return references for further reads and bounded context.                                                        |
+| `flow_check`  | Map internal diagnostics to public nodes, fields, ports, and code locations. Return errors that callers can use to correct a request.                            |
 
-编译按顺序处理批次和新节点别名，应用失败不产生部分持久化。保存状态与语义校验结果分别返回，允许保存带诊断的草稿。复用整图版本检查与幂等记录；响应丢失的相同请求先查询幂等结果，旧版本新请求不能自动合并。
+Callers must be able to use configuration from a detail response to update a node of the same type without adding hidden fields.
+Each execution node stores its own `node.task`. Nodes do not share Task definitions, even when their configuration is identical or they were copied.
 
-## 验证新节点
+Compare business semantics when determining whether configuration changed. Internal resources such as code modules can be reassigned legitimately.
+Unrelated edits must preserve existing port groups, descriptions, and other metadata that the public interface does not expose.
 
-先通过公共接口执行一个最小任务，确认调用方无需了解内部定义。再按本次改动影响的边界补充验证，不建立静态文件清单或与实现逐字段相同的测试。
+Updates use the public merge contract: omitted fields are preserved, arrays replace as a whole, and explicit `clear` differs from JSON `null`.
+Do not collapse explicit values, unset inputs, inherited defaults, multiple sources, or variable bindings into one state.
+Schemas are configuration objects too. An empty object does not clear existing constraints. Help and examples must explain explicit field removal.
 
-1. **创建与发现。** 公共 schema 中的示例可编译；能力定义来自正确目录和作用域；新节点可以通过别名绑定数据和连接执行边；创建结果的实际配置可读取。
-2. **局部编辑与保留。** 修改一个业务字段后，其余字段、绑定、连线和初始配置相同的其他节点保持语义不变；读取配置与修改配置的含义一致。共享代码模块的局部编辑不能改变其他节点的源码。覆盖该节点支持的默认、null、unset、变量、多来源及约束失败。
-3. **错误与恢复。** 无效字段、未知输入、歧义输出和受限来源给出公开字段诊断；批次失败不写入；版本冲突、幂等重放和响应丢失复用公共合同测试。文本节点覆盖唯一匹配与零匹配、多匹配。
-4. **实际执行。** 对受支持的节点验证输入、结果、分支、调用次数、账号和预期错误。等待类节点覆盖等待与决议行为，触发器覆盖其准入与配置来源；不能仅凭编译成功推断运行正确。
-5. **消费边界。** HTTP、CLI 与 MCP 对同一请求产生相同语义结果，Workbench 能读取新 Revision。影响分发产物时运行对应包产物测试。
+The compiler processes batches and new-node aliases in order. If application fails, no part of the batch is persisted.
 
-Lab 选取能观察本次能力的真实任务；无需为每个字段单独增加场景。CLI 和 MCP 共用任务、fixture 和独立验收器。参考解法只能通过 Agent 可用接口发现与编辑，不读取 fixture 或数据库来生成答案；验收器可以检查持久化结果，但不能复用参考解法的转换逻辑。
+The interface returns save state and semantic validation separately. Drafts with diagnostics can be saved.
+Commits reuse whole-graph version checks and idempotency records. If a response is lost, an identical request checks the idempotent result first.
+A new request based on an old version must not merge automatically.
 
-模型 mock 应记录实际请求并验证 prompt、模型、工具、输入脱敏及结果传递。确定性输出只证明调用合同，不能证明真实模型的生成质量。并发恢复使用明确关卡；初始化、模拟用户修改和验收成本与 Agent 成本分别记录。脚本通过与真实 Agent 试验分别报告。
+## Verify new nodes
+
+First complete a minimal task through the public interface. Confirm that callers do not need to know internal definitions.
+Then verify the boundaries affected by the change. Do not add static file inventories or tests that repeat implementation fields.
+
+1. **Creation and discovery.** Public schema examples compile. Capability definitions come from the correct catalog and scope. New nodes support alias-based data bindings and execution edges. The actual created configuration can be read.
+2. **Local edits and preservation.** Changing one business field preserves the semantics of other fields, bindings, edges, and other nodes with initially identical configuration. Read and edit configuration have the same meaning. Editing a shared code module locally does not change other nodes' source. Cover the node's supported defaults, null, unset, variables, multiple sources, and constraint failures.
+3. **Errors and recovery.** Invalid fields, unknown inputs, ambiguous outputs, and restricted sources return public field diagnostics. A failed batch writes nothing. Version conflicts, idempotent replay, and lost responses reuse public contract tests. For text nodes, cover unique, zero, and multiple matches.
+4. **Execution.** For supported nodes, verify inputs, results, branches, call counts, accounts, and expected errors. Cover waiting and decisions for Wait nodes, and admission and configuration sources for Triggers. Compilation alone does not prove correct execution.
+5. **Consumer boundaries.** HTTP, CLI, and MCP produce equivalent semantic results for the same request. Workbench can read the new Revision. Run the corresponding package tests when distribution artifacts change.
+
+Lab scenarios use real tasks that can observe the changed capability. A separate scenario for every field is unnecessary.
+CLI and MCP share tasks, fixtures, and independent verifiers.
+Reference solutions discover and edit only through interfaces available to Agents. They must not read fixtures or databases to construct answers.
+Verifiers can inspect persisted results but must not reuse the reference solution's conversion logic.
+
+Model mocks record actual requests and verify prompts, models, tools, input redaction, and result forwarding.
+Deterministic output proves only the invocation contract, not real model generation quality.
+Use explicit gates for concurrent recovery. Record initialization, simulated user edits, and verification costs separately from Agent costs.
+Report script results and real Agent trials separately.

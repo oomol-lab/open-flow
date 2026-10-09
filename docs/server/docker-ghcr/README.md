@@ -68,10 +68,10 @@ docker run -d \
 
 Open [http://127.0.0.1:3000](http://127.0.0.1:3000) and sign in with the token. If you omit
 `OPEN_FLOW_TOKEN`, the first start prints a one-time setup code in the logs and the Workbench asks for
-it before you set a token; see [Start](../container-delivery.md#3-启动) for the claim flow.
+it before you set a token; see [Start](../container-delivery.md#3-startup) for the claim flow.
 
 To connect a Connector or an LLM service, add the variables from the
-[configuration table](../container-delivery.md#4-配置). The
+[configuration table](../container-delivery.md#4-configuration). The
 [self-hosted stack guide](../self-hosted-stack/README.md) walks through running Open Flow with
 OpenConnector and the oo CLI.
 
@@ -110,4 +110,4 @@ docker compose up -d
 
 Only one Server container may write a data volume at a time. Do not start the new container while
 the old one is still running against the same volume, and take a
-[quiesced backup](../container-delivery.md#6-持久化与恢复) before upgrading production.
+[quiesced backup](../container-delivery.md#6-persistence-and-recovery) before upgrading production.

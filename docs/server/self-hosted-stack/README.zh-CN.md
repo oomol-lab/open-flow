@@ -11,7 +11,7 @@ Open Flow 可以单独运行。下面两类功能还需要另外两个项目：
   [oo CLI](https://github.com/oomol-lab/oo-cli) 提供，并连到某一套 Open Flow 的 Control API。
 
 本文用 Docker 在同一台机器上启动这三者，把它们连起来，再从终端创建第一个 Flow。环境变量与
-[容器交付参考](../container-delivery.md#4-配置)相同。这里只补充操作顺序，以及各项目之间必须一致的值。
+[容器交付参考](../container-delivery.md#4-configuration)相同。这里只补充操作顺序，以及各项目之间必须一致的值。
 
 ```mermaid
 flowchart LR
@@ -218,7 +218,7 @@ oo flow publish "GitHub digest"
 oo flow open "GitHub digest"
 ```
 
-- 在 `edits.json` 中填写 `baseRevision`、`requestId` 和节点、输入、连线操作，包含手动触发器，并在 Connector 配置中选择明确的 Connection ID。见[编辑合同](../../authoring/flow-command.md)。
+- 在 `edits.json` 中填写 `baseRevision`、`requestId` 和节点、输入、连线操作，包含手动触发器，并在 Connector 配置中选择明确的 Connection ID。见[编辑合同](../../control/contracts/control-api.md#node-authoring)。
 - `check` 检查 Revision 是否合法。账号是否可用、会不会在 Provider 上真正执行，只有 `run` 才会碰到。
 - `run --wait` 通过 OpenConnector 执行 Draft 并打印结果。`oo flow runs events <run>` 显示完整事件历史。
 - `open` 打印该 Flow 的 Workbench URL 并在浏览器中打开。operator token 不会放进 URL，浏览器用自己的 session 登录。
@@ -248,7 +248,7 @@ oo connector search "send an email"
 - 所有 token 都通过 secret 或只有部署者可读的 env file 注入。在 Access 页面更换 OpenConnector runtime token 时，要同步更新
   `OPEN_FLOW_CONNECTOR_TOKEN`。
 - 每个服务拥有自己的数据：Open Flow 在 `/data/open-flow`，OpenConnector 在 `/app/data`。分别备份，见
-  [容器交付参考](../container-delivery.md#6-持久化与恢复)。
+  [容器交付参考](../container-delivery.md#6-persistence-and-recovery)。
 - 在 Fly.io 上，把 OpenConnector 和 Open Flow 作为同一 organization 下的两个 app 运行，runtime origin 使用 Fly 私网，例如
   `http://my-open-connector.internal:3000`。见 [Fly.io 部署指南](../fly-io/README.zh-CN.md) 和
   [OpenConnector Fly.io 指南](https://github.com/oomol-lab/open-connector/blob/main/docs/fly-io.md)。

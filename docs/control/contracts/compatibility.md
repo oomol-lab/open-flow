@@ -1,112 +1,101 @@
-# 公共契约与版本演进
+# Public contracts and version evolution
 
-## Flow model v6：移除共享 Task 和旧 Subflow
+## Flow model v6: removal of shared Tasks and legacy Subflows
 
-Flow model v6 删除 `document.tasks` 和节点的 `taskId`。所有执行节点通过 `node.task` 保存自己的配置；
-Managed Task 修改使用 `{ kind: 'graph.node.task.set', nodeId, before, value }`，旧 `task.*` 操作不再接受。
-复制节点后配置独立，修改端口只更新该节点及其下游引用。Agent notification 直接保存 Action、Connection、输入定义与参数映射。
+Flow model v6 removes `document.tasks` and node `taskId`. Each execution node stores its configuration in `node.task`.
+Managed Task changes use `{ kind: 'graph.node.task.set', nodeId, before, value }`; legacy `task.*` operations are rejected.
+Copied nodes have independent configurations. Port changes update only the node and its downstream references. Agent notifications store Action, Connection, input definitions, and argument mappings directly.
 
-旧引用式 Task 数据需要通过现有草稿升级操作生成 v6 Revision；每个引用展开为独立配置，通知引用同步展开。
-缺失或无效的引用会拒绝升级。读取不会静默改写原始 Revision。没有独立 Task 定义的 v2/v4/v5 数据仍保留原始编码与摘要。
+Use the existing draft upgrade operation to convert legacy Task references into a v6 Revision. Each reference expands into independent configuration, including notification references. Missing or invalid references prevent the upgrade. Reads do not silently rewrite the original Revision. v2/v4/v5 data without separate Task definitions retain their original encoding and digest.
 
-同一次版本升级删除 `document.subflows`、Subflow 节点、子图输入来源，以及 `subflow.*` 编辑操作。
-图操作直接作用于当前 Flow，不再接受 graph target。Workbench、CLI 和 MCP 不再提供旧子图入口；CLI 的
-`--subflow` 和 MCP `flow_node_get.subflowId` 已移除。该版本不增加 Flow 调用能力。
+The same upgrade removes `document.subflows`, Subflow nodes, subgraph input sources, and `subflow.*` edit operations. Graph operations act directly on the current Flow and no longer accept a graph target. Workbench, CLI, and MCP no longer expose legacy subgraph entry points. CLI `--subflow` and MCP `flow_node_get.subflowId` are removed. This version adds no Flow invocation capability.
 
-包含旧子图或 Subflow 节点的 Revision 明确拒绝读取和修复，不会静默删除后当作完整 Flow 使用。
-旧版纯根图 Revision 仍可读取，model v2/v4/v5 的不可变编码和 closure digest 保持不变；该版本的新编辑生成 model v6。
-以下条目记录历史版本变化，不代表已移除接口仍受支持。
+Revisions with legacy subgraphs or Subflow nodes cannot be read or repaired. The system must not silently remove them and treat the remaining data as a complete Flow. Legacy root-only Revisions remain readable. Immutable encodings and closure digests for model v2/v4/v5 remain unchanged; new edits produce model v6. The entries below record historical changes and do not imply support for removed interfaces.
 
-公共入口、序列化格式、Control API 和运行语义分别拥有版本，不能互相替代。
+Public entry points, serialization formats, Control API, and execution semantics have separate versions. One version cannot substitute for another.
 
-| 版本              | 当前值                                              | 约束                                                             |
-| ----------------- | --------------------------------------------------- | ---------------------------------------------------------------- |
-| npm package       | package manifest 的精确版本                         | 固定实现、类型、Workbench 资产和一致性测试集。部署锁定同一版本。 |
-| Revision envelope | `kind: open-flow-flow-revision`、`version: 1`       | 固定 UTF-8 JSON 信封字段和 canonical bytes 规则。                |
-| Flow model        | `modelVersion: 6`                                   | 固定 document、modules、节点和端口的序列化结构。                 |
-| Control API       | `/v1`、Run 创建请求 `version: 2`，其他 `version: 1` | 固定请求字段、响应、错误码、CAS 和幂等行为。                     |
-| Engine Contract   | `open-flow-engine/v5`                               | 固定执行、Trigger、Task 返回、Wait 和取消语义。                  |
-| MCP               | `2026-07-28`                                        | 固定 Streamable HTTP 协商；工具的产品语义复用 Control API。      |
+| Version           | Current value                                                     | Contract                                                                                                   |
+| ----------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| npm package       | Exact version in the package manifest                             | Pins implementation, types, Workbench assets, and the conformance suite. Deployments pin the same version. |
+| Revision envelope | `kind: open-flow-flow-revision`, `version: 1`                     | UTF-8 JSON envelope fields and canonical byte rules.                                                       |
+| Flow model        | `modelVersion: 6`                                                 | Serialization of documents, modules, nodes, and ports.                                                     |
+| Control API       | `/v1`; Run creation request `version: 2`, all others `version: 1` | Request fields, responses, error codes, CAS, and idempotency.                                              |
+| Engine Contract   | `open-flow-engine/v5`                                             | Execution, Trigger, Task return, Wait, and cancellation semantics.                                         |
+| MCP               | `2026-07-28`                                                      | Streamable HTTP negotiation; tool product semantics reuse Control API.                                     |
 
-这些数字相同或不同都不表示兼容。旧版本也可能曾使用 `modelVersion: 1`；不得仅凭版本字段接受其内容。完整结构解码必须先于语义验证和执行。
-已有不符合当前结构的 Revision 不得在读取时改写或重新计算其原有 digest；必须拒绝执行，并通过独立、可审核的数据迁移或重建产生新 Revision。
-升级部署前，应先完成或取消旧 Engine 的活动 Run，或明确保留能够执行固定旧 Engine 的恢复环境。新的公共解码器不提供隐式模型迁移。
+Equal or different version numbers do not establish compatibility. Older formats may also have used `modelVersion: 1`; do not accept content based only on this field. Decode the complete structure before semantic validation and execution. Reject execution of Revisions that do not match the current structure. Do not rewrite them or recompute their original digest on read. Create a new Revision through a separate, auditable migration or rebuild.
 
-## 解码边界
+Before upgrading a deployment, finish or cancel active Runs on the old Engine, or explicitly retain a recovery environment that can execute the pinned old Engine. Public decoders provide no implicit model migration.
 
-`@oomol-lab/open-flow/flow-encoding` 提供：
+## Legacy Project data
 
-- `decodeFlowDocument(value)`：完整 Flow document 的结构解码。
-- `decodeRevisionContent(value)`：解码 `{ modelVersion, document, modules }`。
-- `decodeRevision(bytes)`：严格 UTF-8、JSON、信封和内容解码，与 `encodeRevision` 配对。
+The legacy Project schema and API are outside the current product contract and cannot be imported. If Server encounters an unsupported legacy schema, it stops startup and preserves the original database. Startup must not implicitly rebuild or delete data.
 
-普通对象忽略并移除未声明字段；Wait 节点使用严格字段校验，拒绝旧内联 notification。三者，继续校验已知字段的类型、必填项和支持的版本，嵌套深度上限为 `maxJsonDepth`。JSON 数据值和 JSON Schema 内的自定义键保持不变。结构合法不意味着图可执行：引用、标题、环、端口和模块语义继续由 Flow validation 检查。
-解码不填充缺失字段、不迁移旧节点、不规范化用户源代码。`encodeRevision(decodeRevision(bytes))` 产生 canonical bytes；只有输入不含未知字段且本来就是 canonical bytes 时才保证字节不变。
+## Decoding boundaries
 
-`@oomol-lab/open-flow/control-requests` 提供 `controlRequests` 解码函数和 `controlRequestSchema`，覆盖 Flow 创建、改名、Draft changes、Live 启停、Presentation、检查、发布、回滚、Draft/Live Run、Wait resolution、Variable 写入和仅版本请求。
-部署把解码异常映射到相应的公共 invalid 错误。HTTP body 大小、身份、scope、权限、路由参数、分页 cursor 和存储事务仍由部署负责。
+`@oomol-lab/open-flow/flow-encoding` provides:
 
-`@oomol-lab/open-flow/mcp` 提供工具参数、描述、annotations、协议版本与服务说明。部署通过 Standard Schema 注册 `mcpTools`，只实现操作调用、身份和错误映射。
-不能在某个部署自行增加参数默认值、改变同名工具定义或放松请求校验。业务错误保留 Control 错误码，未确认的写操作结果必须要求原参数和原幂等键重试。
+- `decodeFlowDocument(value)`: structurally decodes a complete Flow document.
+- `decodeRevisionContent(value)`: decodes `{ modelVersion, document, modules }`.
+- `decodeRevision(bytes)`: strictly decodes UTF-8, JSON, the envelope, and content. It pairs with `encodeRevision`.
 
-## 一致性验证
+Decoders ignore and remove undeclared fields from ordinary objects. Wait nodes use strict field validation and reject legacy inline notifications. All three functions validate known field types, required fields, and supported versions. `maxJsonDepth` limits nesting depth. Custom keys in JSON values and JSON Schema remain unchanged.
 
-- Control API 基础用例包括同时创建、CAS 编辑、同键重放与丢失响应后的重试。创建重放固定 Flow identity，但可以返回 Flow 当前元数据；Draft change 重放固定已提交 Revision。
-- `controlRecoveryConformanceCases` 要求额外的 `restart()` 驱动：关闭部署服务，丢弃进程内状态，保留持久存储并重新打开。重启后必须保留 Flow identity、Draft head 和变更 receipt。它不等价于杀进程后的未知执行恢复；后者还需部署运行时的故障注入测试。
-- `mcpConformanceCases` 通过真实 `/v1/mcp` 请求核对发现结果、结构和 annotations，并验证 MCP 写入、重试、错误及 REST 读取的一致性。
-- `verifyWorkbenchHost` 由部署提供连接、故障、通知和时间驱动，验证首次失败不能无限阻塞加载、恢复后重新读取、正常首次连接只完成 ready、停止后不再收事件及重复 stop。
+A valid structure does not establish that the graph can execute. Flow validation checks references, titles, cycles, ports, and module semantics. Decoding does not fill missing fields, migrate old nodes, or normalize user source code. `encodeRevision(decodeRevision(bytes))` produces canonical bytes. Bytes remain identical only if the input was already canonical and contained no unknown fields.
 
-部署通过全部适用用例才可声明符合该 package 的对应 profile。测试未执行、依赖替身缺失或跳过恢复驱动时，不能声称已经验证这些保证。身份隔离、远程网关和真实基础设施的故障恢复继续由部署集成测试负责。
+`@oomol-lab/open-flow/control-requests` provides `controlRequests` decoders and `controlRequestSchema`. They cover Flow creation and renaming, Draft changes, Live enable/disable, Presentation, checks, publication, rollback, Draft/Live Runs, Wait resolution, Variable writes, and version-only requests. Deployments map decoding exceptions to the corresponding public invalid errors. Deployments still own HTTP body limits, identity, scope, permissions, route parameters, pagination cursors, and storage transactions.
 
-新增可选响应字段可以在保持现有读语义时增量发布。删除、重命名、改变字段类型、收紧合法输入、改变默认值或执行结果属于兼容性变更；必须明确提升对应合同版本或在预发布版本说明中声明断点，并提供迁移与拒绝路径。不得只升级 npm 版本后沿用旧版本标识而静默接受不同含义的数据。
+`@oomol-lab/open-flow/mcp` provides tool parameters, descriptions, annotations, protocol versions, and service instructions. Deployments register `mcpTools` through Standard Schema and implement only operation invocation, identity, and error mapping. A deployment must not add parameter defaults, change the definition of a tool with the same name, or weaken request validation. Business errors retain Control error codes. For an unconfirmed write outcome, require a retry with the original arguments and idempotency key.
 
-## Wait 局部执行升级
+## Conformance verification
 
-Wait 局部执行在此前 beta 同步升级公共包、Command、Server，当时 Engine 为 v3、checkpoint 为 version 3。Control API 保留 /v1 信封，详情改为必需 waits 数组，新增 wait.created，run.waiting 改为 waitIds；这些是本次 beta 的显式不兼容变更，客户端和部署须一起升级。
-SQLite migration 18 分离 run_checkpoints 与 wait_receipts，将 Agent 通知 work 主键改为 runId/waitId。旧 checkpoint 保留原始字节供恢复校验，当前 Engine 不执行旧 checkpoint，标记 indeterminate；不得自动重放或改写旧 Revision。
-发布前需完成或取消旧活动 Run，或者保留匹配的旧执行环境。当前工作只验证本地 fixture，未读取或升级任何已部署数据库。
+- Control API base cases cover concurrent creation, CAS editing, replay with the same key, and retries after a lost response. Creation replay pins Flow identity but may return current metadata. Draft change replay pins the committed Revision.
+- `controlRecoveryConformanceCases` also requires a `restart()` driver. Close the deployment service, discard in-memory state, preserve storage, and reopen the service. Flow identity, Draft head, and change receipts must survive. This does not test recovery from unknown execution after a killed process; that requires deployment runtime fault injection.
+- `mcpConformanceCases` sends real `/v1/mcp` requests to check discovery, structure, and annotations. It verifies consistency between MCP writes, retries, errors, and REST reads.
+- `verifyWorkbenchHost` uses deployment-provided connection, fault, notification, and time drivers. It verifies that initial failure cannot block loading indefinitely, recovery triggers a reread, a normal first connection only completes ready, no events arrive after stop, and repeated stop is supported.
 
-## 执行语义与隔离运行时标识
+A deployment may claim a package profile only after all applicable cases pass. Unrun tests, missing test doubles, or a skipped recovery driver do not verify those guarantees. Deployment integration tests still own identity isolation, remote gateways, and recovery on real infrastructure.
 
-`engineContract` 属于公共执行合同；`engineDigest` 字段保留现有名称，标识部署的隔离运行时与宿主能力。
-Server 的 `isolatedVmEngineDigest` 由隔离执行器协议、isolated-vm／Node 版本、Web globals 和 Action host 能力版本构成，
-不包含 Wait、分支汇合或输入来源等 Scheduler 规则。图规则变更不单独修改该 digest。
-checkpoint 使用自己的格式版本和状态一致性校验，不能用隔离运行时 digest 代替这些检查。
+Optional response fields may be added if existing read semantics remain unchanged. Removing or renaming fields, changing types, narrowing valid inputs, changing defaults, or changing execution results are compatibility changes.
 
-此前 Engine v4 将执行调度与输入来源分离。节点仅因执行分支关闭而跳过；缺失输入及普通数据输出补 `null` 后按端口声明校验，实际 `null` 仍算一个可用来源。
-当时直接替换 v3，不提供旧执行合同或旧运行迁移。公共包、Command、Server 和客户端同步升级；当时 checkpoint 结构为 version 4，恢复验证采用 v4 语义并要求完整的归一化输出。
+For a compatibility change, increment the affected contract version or declare the break in prerelease notes and provide migration and rejection paths. Do not only increment the npm version while retaining an old contract identifier and silently accepting data with different meanings.
 
-此前移除 digest 中历史的图语义标签曾使隔离运行时标识变化一次。固定旧 digest 的 Run 沿用既有不匹配拒绝路径；
-不重写历史 Run 的标识，也不增加旧标识别名。此后仅修改 Scheduler 规则不会再造成隔离运行时 digest 变化。
+## Wait local execution upgrade
 
-Trigger 输出协议使用有序 outputs 定义，Provider definitionVersion 和 Webhook revision 为 2；定义摘要协议版本为 2。该次升级的 Scheduler checkpoint 版本为 4；当前为 version 5，拒绝旧版本恢复。SQLite migration 19 只重命名输出存储列，不将旧内容转换成新契约。
+An earlier beta upgraded the public package, Command, and Server together for Wait local execution. It used Engine v3 and checkpoint version 3. Control API retained the /v1 envelope, required a waits array in detail responses, added wait.created, and changed run.waiting to waitIds. These were explicit beta breaks requiring clients and deployments to upgrade together. SQLite migration 18 separated run_checkpoints from wait_receipts and changed Agent notification work keys to runId/waitId.
 
-## 未发布阶段的 Wait pending 修订
+Old checkpoint bytes remain available for recovery validation. The current Engine does not execute them and marks them indeterminate. Do not automatically replay or rewrite old Revisions. Before release, finish or cancel old active Runs, or retain their matching execution environment. That work verified only local fixtures; it did not read or upgrade any deployed database.
 
-当前 Engine Contract 保持 `open-flow-engine/v5`，Scheduler checkpoint 保持 version 5。
-Wait 的提前输出端口及等待记录中的输出字段直接由 `notification` 改为 `pending`，表示等待建立时触发一次并提供确认链接及相关数据。
-本次是未发布阶段的合同修订，同版本号不保证兼容此前开发快照；不提供旧名称别名、隐式转换或兼容恢复。
-旧 Wait 端口和数据引用由图语义校验拒绝，checkpoint 等待记录中的旧 `notification` 字段由严格解码拒绝，不静默丢弃或重放通知。
-历史 Revision 和 Run 不改写；Flow model、Control API 信封和隔离运行时 digest 不变。Agent 的 notification 配置仍表示实际通知，不受此次端口改名影响。
+## Execution semantics and isolated runtime identity
 
-## beta.39 MCP 与 CLI 读取合同升级
+`engineContract` identifies the public execution contract. `engineDigest` retains its existing name and identifies the deployment’s isolated runtime and host capabilities. Server computes `isolatedVmEngineDigest` from the isolated executor protocol, isolated-vm/Node versions, Web globals, and Action host capability versions. It excludes Scheduler rules such as Wait, branch joins, and input sources. Graph rule changes alone do not change this digest. Checkpoints have their own format version and state consistency checks; the runtime digest cannot replace them.
 
-公共包与 Command 升至 `0.1.0-beta.39`，Server 升至 `0.1.0-beta.16`。本次 beta 包含显式不兼容的工具与命令调整，客户端脚本和部署需一起升级：
+Engine v4 separated execution scheduling from input sources. A node is skipped only when its execution branch is closed. Missing inputs and ordinary data outputs receive `null` and are then validated against port declarations. An actual `null` remains an available source. That release directly replaced v3 without an old execution contract or Run migration. The public package, Command, Server, and clients upgraded together. Checkpoint version 4 recovery used v4 semantics and required complete normalized outputs.
 
-- Agent 接口使用 `flow_read/search/schema/edit/check`，CLI 对应 `read/search/schema/edit/check`；旧 flow_get/flow_node_get/flow_apply 和低层 CLI authoring 命令退出公共入口。Workbench 低层 Revision/ChangeOperation 合同保留。
-- MCP `connector_list` 改为 `connector_providers`，`trigger_list` 改为支持可选 query 的 `trigger_search`；CLI `connector list` 改为 `connector providers`。旧名称不保留别名。
-- Connector 搜索仅返回 Action 摘要，完整 Schema 使用 `connector_get` / `connector show`；Team 目录不再返回 Flow-Team 绑定清单。
-- CLI `connector set --name` 不再接受，改用 `node set --name`。结果列表和结果读取的旧位置参数改为 `--after`、`--pointer`、`--offset` 等命名选项。
-- MCP `flow_run` 在输入 Schema 中明确 Draft 与 Live 身份互斥，混用字段会在调用验证时拒绝。
+Removing historical graph semantics labels from the digest previously changed isolated runtime identity once. Runs pinned to the old digest use the existing mismatch rejection path. Historical Run identities are not rewritten, and old identity aliases are not added. Subsequent Scheduler-only changes do not change the isolated runtime digest.
 
-具体参数与迁移后的用法见 [CLI 命令](../../authoring/flow-command.md) 和 [MCP 接口](../../server/mcp.md)。本次不改变 Flow 持久化模型、Engine Contract 或 Run checkpoint 格式。
+The Trigger output protocol uses ordered output definitions. Provider definitionVersion and Webhook revision are 2, and the definition digest protocol version is 2. That upgrade used Scheduler checkpoint version 4. The current version is 5 and rejects recovery from older versions. SQLite migration 19 only renames output storage columns; it does not convert old content to the new contract.
 
-## beta.47 CLI 与 MCP 精确读取对齐
+## Unreleased Wait pending revision
 
-公共包与 Command 同步升至 `0.1.0-beta.47`。CLI `node show` 新增 `--revision` 和 `--subflow`，
-`connector code-access` 新增 `--publication`，`connector candidates` 支持多个 Provider。
+The current Engine Contract remains `open-flow-engine/v5`, and the Scheduler checkpoint remains version 5. The early Wait output port and output field in wait records change directly from `notification` to `pending`. They fire once when the wait is created and provide confirmation links and related data. This is an unreleased contract revision. Equal version numbers do not guarantee compatibility with earlier development snapshots. There are no old-name aliases, implicit conversions, or compatible recovery.
 
-本次预发布包含两处 CLI JSON 断点：`trigger search` 的 `definitions` 改为 `keys`；`node show` 的
-`nodeId`、`node`、`task?`、`module?` 从原来的 `node` 包装中展开到结果顶层。旧字段和嵌套不保留别名，
-消费方需按 [CLI 结果合同](../../authoring/flow-command.md#输出与错误) 更新读取路径。
-MCP 工具合同、Flow model 和 Engine Contract 不变。
+Graph validation rejects old Wait ports and data references. Strict decoding rejects the old `notification` field in checkpoint wait records instead of silently discarding it or replaying notifications. Historical Revisions and Runs remain unchanged, as do Flow model, Control API envelopes, and the isolated runtime digest. Agent notification configuration still represents actual notifications and is unaffected.
+
+## beta.39 MCP and CLI read contract upgrade
+
+The public package and Command upgraded to `0.1.0-beta.39`; Server upgraded to `0.1.0-beta.16`. This beta includes explicit tool and command breaks. Client scripts and deployments must upgrade together:
+
+- Agent interfaces use `flow_read/search/schema/edit/check`; the CLI uses `read/search/schema/edit/check`. Legacy flow_get/flow_node_get/flow_apply and low-level CLI authoring commands leave the public interface. Workbench retains its low-level Revision/ChangeOperation contract.
+- MCP renames `connector_list` to `connector_providers` and `trigger_list` to `trigger_search`, which accepts an optional query. CLI renames `connector list` to `connector providers`. Old names have no aliases.
+- Connector search returns only Action summaries. Use `connector_get` / `connector show` for full schemas. The Team directory no longer returns Flow-Team bindings.
+- CLI rejects `connector set --name`; use `node set --name`. Result list/read commands replace old positional arguments with named options such as `--after`, `--pointer`, and `--offset`.
+- MCP `flow_run` declares Draft and Live identities mutually exclusive in its input schema. Invocation validation rejects mixed fields.
+
+See the [CLI invocation contract](../../distribution/command-artifact.md#cli-invocation-contract) and [MCP interface](../../server/mcp.md) for parameters and updated usage. This release does not change the Flow persistence model, Engine Contract, or Run checkpoint format.
+
+## beta.47 CLI and MCP precise-read alignment
+
+The public package and Command upgraded together to `0.1.0-beta.47`. CLI `node show` adds `--revision` and `--subflow`; `connector code-access` adds `--publication`; `connector candidates` supports multiple Providers.
+
+This prerelease has two CLI JSON breaks: `trigger search` renames `definitions` to `keys`; `node show` moves `nodeId`, `node`, `task?`, and `module?` from the old `node` wrapper to the result root. Old fields and nesting have no aliases. Consumers must update read paths using the [CLI result contract](../../distribution/command-artifact.md#output-and-errors). MCP tool contracts, Flow model, and Engine Contract remain unchanged.

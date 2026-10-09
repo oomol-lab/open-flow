@@ -62,9 +62,9 @@ docker run -d \
 ```
 
 [http://127.0.0.1:3000](http://127.0.0.1:3000)을 열고 그 token으로 로그인합니다. `OPEN_FLOW_TOKEN`을 생략하면 첫 시작 시 로그에 일회성
-setup code가 출력되고, Workbench는 token을 설정하기 전에 그 code를 요구합니다. 클레임 절차는 [시작](../container-delivery.md#3-启动)을 참고하세요.
+setup code가 출력되고, Workbench는 token을 설정하기 전에 그 code를 요구합니다. 클레임 절차는 [시작](../container-delivery.md#3-startup)을 참고하세요.
 
-Connector나 LLM 서비스를 연결하려면 [구성 표](../container-delivery.md#4-配置)의 변수를 추가하세요.
+Connector나 LLM 서비스를 연결하려면 [구성 표](../container-delivery.md#4-configuration)의 변수를 추가하세요.
 [셀프 호스팅 스택 가이드](../self-hosted-stack/README.ko.md)는 OpenConnector와 oo CLI로 Open Flow를 실행하는 과정을 안내합니다.
 
 ### Docker Compose
@@ -100,4 +100,4 @@ docker compose up -d
 ```
 
 데이터 volume에 쓸 수 있는 Server 컨테이너는 한 번에 하나뿐입니다. 이전 컨테이너가 같은 volume을 사용하는 동안 새 컨테이너를 시작하지 마세요.
-프로덕션을 업그레이드하기 전에 [quiesced backup](../container-delivery.md#6-持久化与恢复)을 받으세요.
+프로덕션을 업그레이드하기 전에 [quiesced backup](../container-delivery.md#6-persistence-and-recovery)을 받으세요.

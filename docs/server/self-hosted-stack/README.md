@@ -14,7 +14,7 @@ Open Flow can run on its own. Two features need other OOMOL projects:
 
 This guide starts all three on one machine with Docker, connects them, and builds a first Flow from
 the terminal. The environment variables match the
-[container delivery reference](../container-delivery.md#4-配置). This guide only adds the order of
+[container delivery reference](../container-delivery.md#4-configuration). This guide only adds the order of
 steps and the values that must match across the projects.
 
 ```mermaid
@@ -240,7 +240,7 @@ oo flow publish "GitHub digest"
 oo flow open "GitHub digest"
 ```
 
-- Prepare `edits.json` with `baseRevision`, `requestId` and node/input/edge edits, including a Manual trigger. Select an explicit Connection ID in the Connector configuration. See the [authoring contract](../../authoring/flow-command.md).
+- Prepare `edits.json` with `baseRevision`, `requestId` and node/input/edge edits, including a Manual trigger. Select an explicit Connection ID in the Connector configuration. See the [authoring contract](../../control/contracts/control-api.md#node-authoring).
 - `check` validates the Revision. Whether credentials work, and whether the provider actually
   runs the Action, is only tested by `run`.
 - `run --wait` executes the Draft through OpenConnector and prints the result.
@@ -279,7 +279,7 @@ settings. See the
   same time.
 - Each service owns its own data: `/data/open-flow` for Open Flow and `/app/data` for
   OpenConnector. Back them up separately. See the
-  [container delivery reference](../container-delivery.md#6-持久化与恢复).
+  [container delivery reference](../container-delivery.md#6-persistence-and-recovery).
 - On Fly.io, run OpenConnector and Open Flow as two apps in one organization and use the Fly private
   network for the runtime origin, for example `http://my-open-connector.internal:3000`. See the
   [Fly.io deployment guide](../fly-io/README.md) and the

@@ -88,7 +88,7 @@ fly secrets set \
 ```
 
 `fly secrets set` は machine を再デプロイします。環境変数の完全な一覧と各 origin の制約については、
-[コンテナ配布リファレンス](../container-delivery.md#4-配置) を参照してください。
+[コンテナ配布リファレンス](../container-delivery.md#4-configuration) を参照してください。
 
 ## デプロイする
 

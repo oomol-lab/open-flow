@@ -1,89 +1,117 @@
-# Trigger 权限与执行
+# Trigger permissions and execution
 
-## 权限来源
+## Permission sources
 
-### 开源 OpenConnector
+### Open-source OpenConnector
 
-自托管 OpenConnector 使用独立的 `allowedTriggers` 授权，部署和运行时策略还可设置 `blockedTriggers`。多层 allow 取交集，block 优先；旧 runtime token 未设置 `allowedTriggers` 时不能执行 Trigger。Action 和通用 proxy 授权不授予 Trigger 权限。请求通过 `x-oo-connector-app-id` 选择稳定连接 ID；同时提供 alias 时必须指向同一连接。
+Self-hosted OpenConnector uses separate `allowedTriggers` authorization. Deployment and runtime policies may also set `blockedTriggers`. Allow rules intersect across layers; block rules take precedence. A legacy runtime token without `allowedTriggers` cannot execute Triggers. Action and general proxy permissions do not grant Trigger access.
 
-`reconcile`、`receive` 和 `resource` 必须使用管理 API 创建的持久化 runtime token，订阅按 token ID、连接、已验证的 provider 账号和 Trigger 隔离。环境 token 和 JWT 不作为远端订阅 owner。请求体不接受 `accessGrant`。首版仅执行本地连接，不支持 SaaS 或 Marketplace 来源；所需第三方权限由各 provider 的权限元数据说明，实际请求沿用该连接的上游权限。
+Requests select a stable connection ID through `x-oo-connector-app-id`. If a request also supplies an alias, it must resolve to the same connection.
 
-OpenConnector 在 SQLite、PostgreSQL 或 D1 中保存订阅状态，并沿用部署配置的 secret codec 加密，通过租约串行化控制操作。Token 撤销或当前策略不再允许该订阅时，维护任务清理已拥有的远端资源；正常续订仍由 Open Flow 驱动。断开或换账号前必须完成清理，原账号的已验证重新授权可用于恢复清理；管理员可显式 abandon 保留未清理账本。管理接口为 `/api/trigger-subscriptions` 及每条记录的 `/cancel`、`/abandon`。
+`reconcile`, `receive`, and `resource` require a persistent runtime token created through the management API. Subscriptions are isolated by token ID, connection, verified provider account, and Trigger. Environment tokens and JWTs cannot own remote subscriptions. Request bodies reject `accessGrant`.
 
-轮换 OpenConnector token 前，先按旧 token ID 清理订阅，并排空 Open Flow 的 webhook/watch 订阅 ID 和飞书 `source_subscriptions` ready 缓存，再切换 token 并显式重建 binding。保留业务 checkpoint，避免沿用属于旧 token 的远端订阅身份。详细部署步骤见[自托管指南](../server/self-hosted-stack/README.zh-CN.md)。
+The first version executes only local connections. It does not support SaaS or Marketplace sources. Each provider’s permission metadata describes required third-party permissions. Requests use the connection’s upstream permissions.
 
-### 托管 connector
+OpenConnector stores subscription state in SQLite, PostgreSQL, or D1. It encrypts state with the deployment’s secret codec and serializes control operations through leases. Maintenance cleans up a subscription’s remote resources if its Token is revoked or current policy no longer permits it. Open Flow still drives normal renewal.
 
-Open Flow 可以由用户自行部署。connector 使用与 Action execute 相同的 Token 身份与授权链路，认证头仍只能来自可信网关：
+Complete cleanup before disconnecting or changing accounts. Reauthorization of the verified original account can restore cleanup access. Administrators may explicitly abandon a subscription while retaining a ledger of resources not cleaned up. Management endpoints are `/api/trigger-subscriptions` and each record’s `/cancel` and `/abandon`.
 
-| 身份                           | 授权方式                                                               |
-| ------------------------------ | ---------------------------------------------------------------------- |
-| 用户／服务账号 Token           | 按实际主体查询当前 relation-control app-access，禁止提交 `accessGrant` |
-| team-token，带 `accessGrant`   | 在已认证 Team 范围内检查 grant 是否允许当前 Trigger                    |
-| team-token，不带 `accessGrant` | 按 Team 执行权限调用，不查询某个用户的 app-access                      |
+Rotate an OpenConnector token in this order:
 
-所有路径仍检查连接所属 Team、provider、凭据及 scopes。部署后的 Open Flow 使用 team-token；与当前 Action 客户端一致，普通 Trigger 调用不自动提交 grant。Team token 持有者可以省略 grant，因此客户端提交的 grant 只是本次调用的收窄条件，不能视作不可信部署无法绕过的用户权限证明。
+1. Clean up subscriptions by the old token ID.
+2. Drain Open Flow webhook/watch subscription IDs and the Feishu `source_subscriptions` ready cache.
+3. Switch tokens.
+4. Explicitly rebuild bindings.
 
-权限组新增 `triggers: "*" | string[]`，列表使用完整 Trigger ID。默认组、自定义组和成员分配沿用现有 app-access 模型。例如仅允许某连接的新邮件 Trigger：
+Preserve business checkpoints. Do not reuse remote subscription identities owned by the old token. See the [self-hosting guide](../server/self-hosted-stack/README.md) for deployment steps.
+
+### Managed connector
+
+Users can deploy Open Flow themselves. The connector uses the same Token identity and authorization chain as Action execute. Authentication headers must still come only from a trusted gateway:
+
+| Identity                         | Authorization                                                                             |
+| -------------------------------- | ----------------------------------------------------------------------------------------- |
+| User/service-account Token       | Query current relation-control app-access for the actual principal. Reject `accessGrant`. |
+| team-token with `accessGrant`    | Check that the grant permits the Trigger within the authenticated Team.                   |
+| team-token without `accessGrant` | Use Team execution permissions without querying a user’s app-access.                      |
+
+All paths check the connection’s Team, provider, credentials, and scopes. Deployed Open Flow uses a team-token. Like the current Action client, ordinary Trigger calls do not automatically submit a grant. A Team token holder can omit the grant. A client-supplied grant therefore narrows only that call; it is not proof of user permissions that an untrusted deployment cannot bypass.
+
+Permission groups add `triggers: "*" | string[]`, with full Trigger IDs in lists. Default groups, custom groups, and member assignments use the existing app-access model. For example, allow only the new-mail Trigger on one connection:
 
 ```json
 { "actions": [], "triggers": ["gmail.on_message_received"] }
 ```
 
-省略 `actions` 保留全部 Action 语义。省略 `triggers` 时，仅旧完全不受限授权保留全部 Trigger；原有受限 Action 授权不会自动获得 Trigger。`triggers` 不改变通用 proxy 或 `call_tool` 的既有判定：只有 `actions` 和 `appAccessConfig` 均未设置时才允许；Trigger-only 授权必须显式使用 `actions: []`。拥有宽权限 Token 的用户仍具有该 Token 原本的权限，Open Flow 的界面选择不能缩小 Token 的权限。
+Omitting `actions` retains access to all Actions. Omitting `triggers` retains all Triggers only for legacy unrestricted authorization. Existing restricted Action grants do not automatically gain Trigger access.
 
-## 元数据与操作
+`triggers` does not change existing general proxy or `call_tool` rules. Those calls are allowed only when both `actions` and `appAccessConfig` are unset. Trigger-only grants must explicitly set `actions: []`.
 
-`GET /v1/providers/:service/trigger-permissions?locale=zh-CN` 返回 Trigger ID、名称、描述、认证类型、内部 requiredScopes、第三方 providerPermissions 及 instructions。内部 scope 不等同于第三方平台全部细粒度权限；前端应同时展示说明。
+A user holding a broad Token retains its original permissions. Open Flow UI selections cannot narrow the Token’s authority.
 
-`POST /v1/providers/:service/triggers/:triggerId/execute` 使用既有连接选择头／查询参数；请求体为严格的 `operation` 联合：
+## Metadata and operations
 
-| operation   | 字段                                                                                 | 作用                                 |
-| ----------- | ------------------------------------------------------------------------------------ | ------------------------------------ |
-| `options`   | `config`, `field`                                                                    | 查询已注册的配置选项                 |
-| `read`      | `config`, `checkpoint`                                                               | 执行固定的单页 Poll 或 listener 读取 |
-| `reconcile` | `config`, `endpointUrl`, `requestKey`, `active`, 可选 `subscriptionId`               | 创建、维护或删除服务端拥有的 webhook |
-| `receive`   | `subscriptionId`, `method`, `headers`, `query`, Base64 `rawBody`, `admit`, `current` | 用服务端配置和密钥处理第三方回调     |
-| `resource`  | `config`, `requestKey`, `active`                                                     | 管理飞书共享资源订阅                 |
+`GET /v1/providers/:service/trigger-permissions?locale=zh-CN` returns Trigger IDs, names, descriptions, authentication types, internal requiredScopes, third-party providerPermissions, and instructions. Internal scopes do not represent all fine-grained third-party permissions. The frontend should also display the instructions.
 
-只有托管 connector 的 team-token 可以在上述各操作的请求体中附带可选 `accessGrant`，其格式与 Action execute 相同。用户／服务账号不能提交该字段。所有调用方都不能提交上游 endpoint/method/body、远端 hook/channel ID 或 cleanup 特权。`receive` 的请求信息仅作为回调验证输入。未知字段和不支持的操作被拒绝；没有原始 proxy 回退。底层第三方传输仍复用 connector 的 proxy、凭据解析与执行生命周期。
+`POST /v1/providers/:service/triggers/:triggerId/execute` uses existing connection selection headers/query parameters. Its body is a strict `operation` union:
 
-配置字段与游标在服务端校验，上游请求由 provider 实现构造。授权粒度为连接加 Trigger ID，配置中的仓库、标签、时间窗口等是业务筛选条件，不是管理员授予的独立资源 ACL。
+| operation   | Fields                                                                               | Purpose                                                              |
+| ----------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------- |
+| `options`   | `config`, `field`                                                                    | Query registered configuration options.                              |
+| `read`      | `config`, `checkpoint`                                                               | Execute a fixed single-page Poll or listener read.                   |
+| `reconcile` | `config`, `endpointUrl`, `requestKey`, `active`, optional `subscriptionId`           | Create, maintain, or delete a server-owned webhook.                  |
+| `receive`   | `subscriptionId`, `method`, `headers`, `query`, Base64 `rawBody`, `admit`, `current` | Process third-party callbacks with server configuration and secrets. |
+| `resource`  | `config`, `requestKey`, `active`                                                     | Manage shared Feishu resource subscriptions.                         |
 
-## 状态与清理
+Only managed connector team-tokens may include optional `accessGrant` in these request bodies, using the Action execute format. User/service-account callers cannot submit it. No caller can submit an upstream endpoint/method/body, remote hook/channel ID, or cleanup privilege. Request information in `receive` is only callback verification input. Unknown fields and unsupported operations are rejected, with no raw proxy fallback. Third-party transport still reuses connector proxying, credential resolution, and the execution lifecycle.
 
-connector 加密保存团队、主体、连接、Trigger、不可变配置、callback、远端资源 ID 和验证密钥。用户／服务账号订阅绑定真实主体；team-token 订阅绑定已认证 Team，审计 actor 不参与归属。同一 Team 的 team-token 具有同一团队执行权限，不按客户端自报的部署名称隔离。幂等键按团队、主体、连接及 Trigger 隔离。后续操作可携带 connector 返回的订阅 ID，服务端重新核对归属。调用方不能通过换幂等键复用其他主体的订阅，也不能改变已绑定的配置或 callback。
+The server validates configuration fields and cursors. Provider implementations construct upstream requests. Authorization is scoped to a connection and Trigger ID. Repositories, labels, and time windows in configuration are business filters, not separate resource ACLs granted by an administrator.
 
-服务端给 callback 附加每条记录独立生成的随机标识。远端创建结果丢失时，只通过该记录的完整 callback 地址恢复；不会依据调用方原始 URL 接管已有 webhook。Telegram 保留单 webhook 冲突拒绝。飞书按连接与资源维护共享引用计数，最后一个使用者退出时才取消订阅。
+## State and cleanup
 
-租约阻止同一记录的并发控制操作，过期执行不能提交状态。Open Flow 保存不透明订阅 ID，保留业务 checkpoint、去重、Run 和调度；listener 续订不覆盖已推进的扫描 checkpoint，回调只持久化唤醒及订阅调度。
+The connector encrypts stored Team, principal, connection, Trigger, immutable configuration, callback, remote resource ID, and verification secrets. User/service-account subscriptions belong to the actual principal. team-token subscriptions belong to the authenticated Team; the audit actor does not affect ownership. team-tokens for the same Team share execution authority and are not isolated by client-reported deployment names.
 
-新的操作按 Token 类型使用上表中的授权方式。connector Trigger worker 对用户／服务账号订阅检查当前主体授权，撤权后以受限的内部清理操作删除记录拥有的资源；此能力不通过 HTTP 暴露。Team 订阅不查询用户 app-access，已开始但未完成的删除由 worker 重试；客户端传入的 grant 不被保存为持续授权来源，也不把某个用户撤权解释成整个 Team 撤权。
+Idempotency keys are scoped by Team, principal, connection, and Trigger. Later operations may supply a connector-issued subscription ID; the server rechecks ownership. Changing a key cannot reuse another principal’s subscription or alter bound configuration or callbacks.
 
-清理是异步的，受维护周期和第三方可用性影响，不承诺撤权瞬间停止所有在途 webhook。Team token 本身失效不会被此维护任务推断成远端订阅应当删除；正常退出应显式清理订阅。凭据失效或上游失败时待清理记录保留并重试。
+The server adds a separately generated random identifier to each record’s callback. If a remote creation response is lost, recovery uses only that record’s complete callback URL. It does not claim an existing webhook by the caller’s original URL. Telegram still rejects conflicts with its single webhook. Feishu maintains shared reference counts by connection and resource, canceling only when the last consumer leaves.
 
-## 实现与更新
+Leases prevent concurrent control operations on one record. Expired executions cannot commit state. Open Flow stores opaque subscription IDs and retains business checkpoints, deduplication, Runs, and scheduling. Listener renewal does not overwrite an advanced scan checkpoint. Callbacks only persist wakeups and subscription scheduling.
 
-开源第三方实现、静态快照和权限元数据由 OpenConnector 的 `src/providers/<service>/trigger-*.ts` 拥有。Open Flow 的 `catalog.generated.json` 是生成物；更新目录时只需要公开仓库和其已安装依赖，在 Open Flow 根目录运行：
+New operations use the authorization rules above for their Token type. For user/service-account subscriptions, the connector Trigger worker checks the principal’s current permissions. After revocation, it uses a restricted internal cleanup operation to delete resources owned by that record. This capability is not exposed over HTTP.
+
+Team subscriptions do not query user app-access. The worker retries deletions that started but have not finished. Client grants are not stored as ongoing authorization sources. Revoking one user does not revoke the entire Team.
+
+Cleanup is asynchronous and depends on maintenance intervals and third-party availability. It does not guarantee that all in-flight webhooks stop immediately on revocation. This maintenance task does not infer that remote subscriptions must be deleted when a Team token expires. Normal shutdown must explicitly clean up subscriptions. Pending cleanup records remain and retry after credential or upstream failures.
+
+## Implementation and updates
+
+OpenConnector owns open-source third-party implementations, static snapshots, and permission metadata in `src/providers/<service>/trigger-*.ts`. Open Flow’s `catalog.generated.json` is generated. Updating the catalog requires only the public repository and its installed dependencies. Run from the Open Flow root:
 
 ```sh
 bun run --cwd packages/open-flow generate:provider-triggers /path/to/open-connector
 ```
 
-该命令调用 OpenConnector 的 `scripts/export-flow-trigger-catalog.ts`，导出已注册的 snapshot、options、listener interval 与 eventSource 信息，不需要私有 connector checkout。
+This command invokes OpenConnector’s `scripts/export-flow-trigger-catalog.ts` to export registered snapshots, options, listener intervals, and eventSource information. It requires no private connector checkout.
 
-随后在 Open Flow 运行格式、类型、本地化及相关测试。飞书事件入口仍由 Open Flow 处理；展示快照同样来自生成物。不要把第三方请求实现重新加入 Open Flow。
+Then run formatting, type, localization, and relevant test checks in Open Flow. Open Flow still handles Feishu event ingestion; display snapshots also come from generated data. Do not reintroduce third-party request implementations into Open Flow.
 
-## 部署与旧订阅
+## Deployment and legacy subscriptions
 
-1. 使用旧版 Open Flow 清理已有远端 webhook／watch channel 和飞书托管资源订阅，再升级执行端。旧版记录中的远端 ID 不能直接导入为 connector 的可信所有权。
-2. 对 connector 应用 `0021_daily_jackal.sql`，部署 API 与 Trigger worker。维护 worker 必须具有现有 relation-control 配置，才能检查撤权和执行清理。
-3. 部署权限组前端及新版 Open Flow，为使用者分配需要的 Trigger，并重新发布流程以创建服务端订阅。
+1. Use the old Open Flow version to clean up existing remote webhooks/watch channels and managed Feishu resource subscriptions before upgrading the executor. Remote IDs in old records cannot be imported directly as trusted connector ownership.
+2. Apply `0021_daily_jackal.sql` to the connector and deploy the API and Trigger worker. The maintenance worker needs the existing relation-control configuration to check revocation and perform cleanup.
+3. Deploy the permission-group frontend and new Open Flow version. Assign required Triggers to users and republish flows to create server-owned subscriptions.
 
-Poll 的业务 checkpoint 结构保持不变。发现非空的旧 webhook 控制状态但没有 connector 订阅 ID 时，新版 Open Flow 明确报错，不静默再创建一份订阅。升级前未清理的旧远端资源需要由原部署或连接管理员清理。
+Poll business checkpoint structure remains unchanged. If the new Open Flow finds nonempty legacy webhook control state without a connector subscription ID, it returns an explicit error instead of silently creating another subscription. The original deployment or connection administrator must clean up remote resources left before the upgrade.
 
-自动化验证覆盖权限、固定请求构造、订阅生命周期、内存和 PostgreSQL 存储、Open Flow 发布／恢复／去重及包产物。第三方真实账号、生产网关和生产部署需要在相应环境验收；本地测试不代表已执行生产迁移。
+Automated verification covers permissions, fixed request construction, subscription lifecycles, memory and PostgreSQL storage, Open Flow publication/recovery/deduplication, and package artifacts. Real third-party accounts, production gateways, and production deployments require acceptance in those environments. Local tests do not establish that production migration occurred.
 
-回调订阅完成删除后，可以使用同一 requestKey 重新启用。重建时重置远端状态并轮换回调验证信息与上游创建幂等键；已删除记录的重复取消不因配置变化产生冲突，归属校验仍然执行。
+After a callback subscription is deleted, the same requestKey may enable it again. Rebuilding resets remote state and rotates callback verification data and the upstream creation idempotency key. Repeated cancellation of a deleted record does not conflict because of configuration changes; ownership checks still apply.
 
-Trigger 执行错误保留分类：已识别的连接问题返回 `trigger_connection_error`（409），暂时性 provider 故障返回 `proxy_upstream_error`（503）；输入解析错误返回 `invalid_input`（400），未预期的内部错误返回通用 `provider_error`（500），不暴露内部异常消息。Open Flow 将连接问题识别为 `connector.connection-required`。
+Trigger execution errors are classified as follows:
+
+- Recognized connection problems return `trigger_connection_error` (409).
+- Temporary provider failures return `proxy_upstream_error` (503).
+- Input parsing errors return `invalid_input` (400).
+- Unexpected internal errors return generic `provider_error` (500), without internal exception messages.
+
+Open Flow maps connection problems to `connector.connection-required`.

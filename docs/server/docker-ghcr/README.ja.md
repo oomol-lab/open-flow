@@ -62,10 +62,10 @@ docker run -d \
 ```
 
 [http://127.0.0.1:3000](http://127.0.0.1:3000) を開き、その token でサインインします。`OPEN_FLOW_TOKEN` を省略した場合、初回起動時にログへ
-ワンタイムの setup code が出力され、Workbench は token を設定する前にその code を求めます。クレームの流れは[起動](../container-delivery.md#3-启动)を
+ワンタイムの setup code が出力され、Workbench は token を設定する前にその code を求めます。クレームの流れは[起動](../container-delivery.md#3-startup)を
 参照してください。
 
-Connector や LLM サービスに接続するには、[設定表](../container-delivery.md#4-配置)の変数を追加します。
+Connector や LLM サービスに接続するには、[設定表](../container-delivery.md#4-configuration)の変数を追加します。
 [セルフホストスタックガイド](../self-hosted-stack/README.ja.md)では、OpenConnector と oo CLI で Open Flow を動かす手順を説明しています。
 
 ### Docker Compose
@@ -101,4 +101,4 @@ docker compose up -d
 ```
 
 データ volume に書き込める Server コンテナは同時に 1 つだけです。古いコンテナが同じ volume を使っている間に新しいコンテナを起動しないでください。
-本番をアップグレードする前に [quiesced backup](../container-delivery.md#6-持久化与恢复) を取ってください。
+本番をアップグレードする前に [quiesced backup](../container-delivery.md#6-persistence-and-recovery) を取ってください。
