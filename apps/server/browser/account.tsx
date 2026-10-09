@@ -2,8 +2,8 @@ import type { FormEvent, ReactElement } from 'react'
 import type { SessionUser, UserToken } from '../common/users.ts'
 
 import { mcpProtocolVersion } from '@oomol-lab/open-flow/mcp'
-import { Button, Input, Label } from '@oomol-lab/open-flow/ui'
-import { useCallback, useEffect, useState } from 'react'
+import { Button, Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Input, Label } from '@oomol-lab/open-flow/ui'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useTranslate } from 'val-i18n-react'
 import { z } from 'zod'
@@ -68,7 +68,10 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
   const t = useTranslate()
   const [tokens, setTokens] = useState<readonly UserToken[]>()
   const [name, setName] = useState('')
-  const [secret, setSecret] = useState<{ readonly tokenId: string; readonly token: string }>()
+  const [secret, setSecret] = useState<string>()
+  const [creating, setCreating] = useState(false)
+  const portal = useRef<HTMLElement>(null)
+  const nameInput = useRef<HTMLInputElement>(null)
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string>()
   const [revoking, setRevoking] = useState<string>()
@@ -118,8 +121,7 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
       if (!response.ok) throw new Error('Token creation failed.')
       const result = createdSchema.parse(await response.json())
       setTokens((current) => [...(current ?? []), result.credential])
-      setSecret({ tokenId: result.credential.tokenId, token: result.token })
-      setName('')
+      setSecret(result.token)
     } catch {
       setError('account.saveFailed')
     } finally {
@@ -139,7 +141,6 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
       }
       if (!response.ok) throw new Error('Token revocation failed.')
       setTokens((current) => current?.filter((token) => token.tokenId != tokenId))
-      setSecret((current) => (current?.tokenId == tokenId ? undefined : current))
       setRevoking(undefined)
     } catch {
       setError('account.saveFailed')
@@ -151,7 +152,7 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
   async function copy(): Promise<void> {
     if (secret == null) return
     try {
-      await navigator.clipboard.writeText(secret.token)
+      await navigator.clipboard.writeText(secret)
       toast.success(t('account.copied'))
     } catch {
       toast.error(t('settings.mcpCopyFailed'))
@@ -159,48 +160,103 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
   }
 
   return (
-    <section className="settings-section" aria-labelledby="personal-tokens-title" aria-busy={pending}>
-      <div className="settings-heading">
-        <div className="settings-heading-copy">
-          <h2 id="personal-tokens-title">{t('account.tokens')}</h2>
-          <p>{t('account.description')}</p>
+    <section ref={portal} className="settings-section" aria-labelledby="personal-tokens-title" aria-busy={pending}>
+      <Dialog
+        open={creating}
+        onOpenChange={(open) => {
+          if (pending || secret != null) return
+          setCreating(open)
+          setName('')
+          setError(undefined)
+          setRevoking(undefined)
+        }}
+      >
+        <div className="settings-heading">
+          <div className="settings-heading-copy">
+            <h2 id="personal-tokens-title">{t('account.tokens')}</h2>
+            <p>{t('account.description')}</p>
+          </div>
+          <DialogTrigger render={<Button size="sm" />} disabled={pending || tokens == null} type="button">
+            {t('account.create')}
+          </DialogTrigger>
         </div>
-      </div>
-      <div className="settings-form">
-        {secret != null && (
-          <div className="grid gap-2" aria-live="polite">
-            <Label htmlFor="personal-token-secret">{t('account.created')}</Label>
-            <Input
-              id="personal-token-secret"
-              className="font-mono"
-              readOnly
-              value={secret.token}
-              onFocus={(event) => event.target.select()}
-              aria-describedby="personal-token-hint"
-            />
-            <p className="settings-hint" id="personal-token-hint">
-              {t('account.once')}
-            </p>
-            <div className="settings-actions">
-              <Button type="button" size="sm" variant="outline" onClick={() => void copy()}>
-                {t('account.copy')}
-              </Button>
-              <Button type="button" size="sm" variant="outline" onClick={() => setSecret(undefined)}>
-                {t('account.saved')}
-              </Button>
+        <DialogContent
+          container={portal.current}
+          initialFocus={() => nameInput.current}
+          showCloseButton={!pending && secret == null}
+          closeLabel={t('settings.cancel')}
+        >
+          {secret == null ? (
+            <form className="flex flex-col gap-4" onSubmit={(event) => void create(event)}>
+              <DialogHeader>
+                <DialogTitle>{t('account.create')}</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-2">
+                <Label htmlFor="personal-token-name">{t('account.name')}</Label>
+                <Input
+                  ref={nameInput}
+                  id="personal-token-name"
+                  value={name}
+                  required
+                  maxLength={100}
+                  disabled={pending}
+                  onChange={(event) => setName(event.target.value)}
+                />
+              </div>
+              {error != null && (
+                <p role="alert" className="text-sm text-destructive">
+                  {t(error)}
+                </p>
+              )}
+              <DialogFooter>
+                <DialogClose render={<Button variant="outline" />} disabled={pending} type="button">
+                  {t('settings.cancel')}
+                </DialogClose>
+                <Button type="submit" disabled={pending || name.trim().length == 0}>
+                  {t('account.create')}
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : (
+            <div className="flex flex-col gap-4">
+              <DialogHeader>
+                <DialogTitle>{t('account.created')}</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-2">
+                <Label htmlFor="personal-token-secret">{name.trim()}</Label>
+                <Input
+                  id="personal-token-secret"
+                  className="font-mono"
+                  readOnly
+                  value={secret}
+                  onFocus={(event) => event.target.select()}
+                  aria-describedby="personal-token-hint"
+                />
+                <p className="m-0 text-sm text-muted-foreground" id="personal-token-hint">
+                  {t('account.once')}
+                </p>
+              </div>
+              <DialogFooter>
+                <Button autoFocus type="button" variant="outline" onClick={() => void copy()}>
+                  {t('account.copy')}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setSecret(undefined)
+                    setCreating(false)
+                    setName('')
+                  }}
+                >
+                  {t('account.saved')}
+                </Button>
+              </DialogFooter>
             </div>
-          </div>
-        )}
-        <form className="grid gap-2" onSubmit={(event) => void create(event)}>
-          <Label htmlFor="personal-token-name">{t('account.name')}</Label>
-          <div className="settings-mcp-address">
-            <Input id="personal-token-name" value={name} required maxLength={100} disabled={pending} onChange={(event) => setName(event.target.value)} />
-            <Button type="submit" disabled={pending || tokens == null || name.trim().length == 0}>
-              {t('account.create')}
-            </Button>
-          </div>
-        </form>
-        {error != null && (
+          )}
+        </DialogContent>
+      </Dialog>
+      <div className="settings-form">
+        {error != null && !creating && (
           <p role="alert" className="text-sm text-destructive">
             {t(error)}
           </p>
