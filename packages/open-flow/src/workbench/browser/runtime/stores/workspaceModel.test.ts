@@ -1,3 +1,5 @@
+import type { TaskNode } from '../../../../flow/common/change.ts'
+import type { ManagedTaskDefinition } from '../../../../flow/common/change.ts'
 import type { Draft } from '../api.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
@@ -20,15 +22,7 @@ function draft(): Draft {
       modules: {},
       document: {
         bindings: {},
-        subflows: {},
-        tasks: {
-          task: {
-            name: 'Task',
-            executor: { kind: 'connector', action: 'test' },
-            inputs: Array.from({ length: 16 }, (_, index) => ({ handle: `input${index}`, jsonSchema: { type: 'string' }, nullable: true })),
-            outputs: [],
-          },
-        },
+
         graph: {
           edges: [{ source: 'source', target: 'task' }],
           nodes: {
@@ -37,8 +31,26 @@ function draft(): Draft {
               inputs: {},
               values: [{ description: 'Plain text', handle: 'text', jsonSchema: { type: 'string' }, nullable: false, value: 'hello' }],
             },
-            task: { kind: 'task', taskId: 'task', inputs: {} },
-            other: { kind: 'task', taskId: 'task', inputs: {} },
+            task: {
+              kind: 'task',
+              task: {
+                name: 'Task',
+                executor: { kind: 'connector', action: 'test' },
+                inputs: Array.from({ length: 16 }, (_, index) => ({ handle: `input${index}`, jsonSchema: { type: 'string' }, nullable: true })),
+                outputs: [],
+              },
+              inputs: {},
+            },
+            other: {
+              kind: 'task',
+              task: {
+                name: 'Task',
+                executor: { kind: 'connector', action: 'test' },
+                inputs: Array.from({ length: 16 }, (_, index) => ({ handle: `input${index}`, jsonSchema: { type: 'string' }, nullable: true })),
+                outputs: [],
+              },
+              inputs: {},
+            },
           },
         },
       },
@@ -47,50 +59,6 @@ function draft(): Draft {
 }
 
 describe('Connector providers', () => {
-  it('ignores orphan connector and Agent definitions when reporting service usage', () => {
-    const base = draft()
-    const source: Draft = {
-      ...base,
-      content: {
-        ...base.content,
-        document: {
-          ...base.content.document,
-          tasks: {
-            ...base.content.document.tasks,
-            orphan: { name: 'Mail', inputs: [], outputs: [], executor: { kind: 'connector', action: 'netease_mail.list_folders' } },
-            agent: {
-              name: 'Agent',
-              inputs: [],
-              outputs: [],
-              executor: {
-                kind: 'agent',
-                model: 'test',
-                prompt: '',
-                maxRounds: 10,
-                tools: [{ id: 'user', name: 'User', description: '', approval: false, inputs: [], action: 'github.get_current_user' }],
-              },
-            },
-          },
-        },
-      },
-    }
-    expect([...revisionView(source).connectorProviderIds]).toEqual([])
-    const referenced: Draft = {
-      ...source,
-      content: {
-        ...source.content,
-        document: {
-          ...source.content.document,
-          graph: {
-            ...source.content.document.graph,
-            nodes: { ...source.content.document.graph.nodes, agent: { kind: 'task', name: 'Agent', taskId: 'agent', inputs: {} } },
-          },
-        },
-      },
-    }
-    expect([...revisionView(referenced).connectorProviderIds]).toEqual(['github'])
-  })
-
   it('derives Providers used by Actions and Triggers in the revision view', () => {
     const base = draft()
     const source: Draft = {
@@ -103,6 +71,7 @@ describe('Connector providers', () => {
             ...base.content.document.graph,
             nodes: {
               ...base.content.document.graph.nodes,
+              mail: { kind: 'task', inputs: {}, task: { name: 'Mail', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send' } } },
               watch: {
                 config: {},
                 definition: {
@@ -122,10 +91,6 @@ describe('Connector providers', () => {
               },
             },
           },
-          tasks: {
-            ...base.content.document.tasks,
-            task: { ...base.content.document.tasks.task!, executor: { action: 'mail.send', kind: 'connector' } },
-          },
         },
       },
     }
@@ -137,9 +102,8 @@ describe('Connector providers', () => {
 describe('Per-field input sources', () => {
   it('describes node outputs through the revision view', () => {
     const view = revisionView(draft())
-    expect(view.outputDescription({ kind: 'flow' }, 'source', 'text')).toBe('Plain text')
-    expect(view.outputDescription({ kind: 'flow' }, 'source', 'missing')).toBeUndefined()
-    expect(view.outputDescription({ kind: 'subflow', id: 'missing' }, 'source', 'text')).toBeUndefined()
+    expect(view.outputDescription('source', 'text')).toBe('Plain text')
+    expect(view.outputDescription('source', 'missing')).toBeUndefined()
   })
 
   it('does no compatibility work until requested and caches each field independently', () => {
@@ -147,17 +111,17 @@ describe('Per-field input sources', () => {
     const check = vi.spyOn(graph, 'checkInputSources')
     try {
       const view = revisionView(draft())
-      const query = view.inputSource({ kind: 'flow' }, 'task', 'input0')
+      const query = view.inputSource('task', 'input0')
       expect(calculate).not.toHaveBeenCalled()
       expect(check).not.toHaveBeenCalled()
       expect(query.check()).toEqual({ conflict: false, sources: [] })
       expect(check).not.toHaveBeenCalled()
       expect(query.candidates()).toEqual({ source: [{ description: 'Plain text', output: 'text', check: { kind: 'available' } }] })
       expect(calculate).toHaveBeenCalledTimes(1)
-      expect(view.inputSource({ kind: 'flow' }, 'task', 'input0')).toBe(query)
+      expect(view.inputSource('task', 'input0')).toBe(query)
       expect(query.candidates()).toBe(query.candidates())
       expect(calculate).toHaveBeenCalledTimes(1)
-      view.inputSource({ kind: 'flow' }, 'task', 'input1').candidates()
+      view.inputSource('task', 'input1').candidates()
       expect(calculate).toHaveBeenCalledTimes(2)
     } finally {
       calculate.mockRestore()
@@ -179,7 +143,12 @@ describe('Per-field input sources', () => {
               ...base.content.document.graph.nodes,
               task: {
                 kind: 'task',
-                taskId: 'task',
+                task: {
+                  name: 'Task',
+                  executor: { kind: 'connector', action: 'test' },
+                  inputs: Array.from({ length: 16 }, (_, index) => ({ handle: `input${index}`, jsonSchema: { type: 'string' }, nullable: true })),
+                  outputs: [],
+                },
                 inputs: {
                   input0: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'text' }] },
                   input1: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'missing' }] },
@@ -195,10 +164,10 @@ describe('Per-field input sources', () => {
     const check = vi.spyOn(graph, 'checkInputSources')
     try {
       const view = revisionView(source)
-      expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual({ conflict: false, sources: [{ kind: 'available' }] })
-      expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual({ conflict: false, sources: [{ kind: 'available' }] })
+      expect(view.inputSource('task', 'input0').check()).toEqual({ conflict: false, sources: [{ kind: 'available' }] })
+      expect(view.inputSource('task', 'input0').check()).toEqual({ conflict: false, sources: [{ kind: 'available' }] })
       expect(check).toHaveBeenCalledTimes(1)
-      expect(view.inputSource({ kind: 'flow' }, 'task', 'input1').check()).toEqual({ conflict: false, sources: [{ kind: 'output-missing' }] })
+      expect(view.inputSource('task', 'input1').check()).toEqual({ conflict: false, sources: [{ kind: 'output-missing' }] })
       expect(calculate).not.toHaveBeenCalled()
       const changed: Draft = {
         ...source,
@@ -206,19 +175,30 @@ describe('Per-field input sources', () => {
           ...source.content,
           document: {
             ...source.content.document,
-            tasks: {
-              ...source.content.document.tasks,
-              task: { ...source.content.document.tasks.task!, inputs: [{ handle: 'input0', jsonSchema: { type: 'number' }, nullable: true }] },
+            graph: {
+              ...source.content.document.graph,
+              nodes: {
+                ...source.content.document.graph.nodes,
+                ['task']: {
+                  ...source.content.document.graph.nodes['task'],
+                  kind: 'task',
+                  inputs: (source.content.document.graph.nodes.task as TaskNode).inputs,
+                  task: {
+                    ...((source.content.document.graph.nodes['task'] as TaskNode).task as ManagedTaskDefinition)!,
+                    inputs: [{ handle: 'input0', jsonSchema: { type: 'number' }, nullable: true }],
+                  },
+                },
+              },
             },
           },
         },
       }
 
-      expect(revisionView(changed).inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual({
+      expect(revisionView(changed).inputSource('task', 'input0').check()).toEqual({
         conflict: false,
         sources: [{ kind: 'schema', mismatch: { kind: 'keyword', keyword: 'type', path: [], source: 'string', target: 'number' } }],
       })
-      expect(revisionView(changed).inputSource({ kind: 'flow' }, 'task', 'input0').candidates()).toEqual({
+      expect(revisionView(changed).inputSource('task', 'input0').candidates()).toEqual({
         source: [
           {
             description: 'Plain text',
@@ -241,24 +221,20 @@ describe('Per-field input sources', () => {
         ...base.content,
         document: {
           ...base.content.document,
-          subflows: {
-            nested: { name: 'Nested', inputs: [], outputs: [], graph: { ...base.content.document.graph, edges: [] } },
-          },
         },
       },
     }
 
     const view = revisionView(source)
-    expect(view.inputSource({ kind: 'flow' }, 'task', 'input0').candidates()).toEqual({
+    expect(view.inputSource('task', 'input0').candidates()).toEqual({
       source: [{ description: 'Plain text', output: 'text', check: { kind: 'available' } }],
     })
-    expect(view.inputSource({ kind: 'flow' }, 'other', 'input0').candidates()).toEqual({})
-    expect(view.inputSource({ kind: 'subflow', id: 'nested' }, 'task', 'input0').candidates()).toEqual({})
+    expect(view.inputSource('other', 'input0').candidates()).toEqual({})
     const changed: Draft = {
       ...source,
       content: { ...source.content, document: { ...source.content.document, graph: { ...source.content.document.graph, edges: [] } } },
     }
-    expect(revisionView(changed).inputSource({ kind: 'flow' }, 'task', 'input0').candidates()).toEqual({})
+    expect(revisionView(changed).inputSource('task', 'input0').candidates()).toEqual({})
   })
 
   it('distinguishes a source that is not upstream from a schema mismatch', () => {
@@ -276,7 +252,12 @@ describe('Per-field input sources', () => {
               ...base.content.document.graph.nodes,
               task: {
                 kind: 'task',
-                taskId: 'task',
+                task: {
+                  name: 'Task',
+                  executor: { kind: 'connector', action: 'test' },
+                  inputs: Array.from({ length: 16 }, (_, index) => ({ handle: `input${index}`, jsonSchema: { type: 'string' }, nullable: true })),
+                  outputs: [],
+                },
                 inputs: { input0: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'text' }] } },
               },
             },
@@ -285,7 +266,7 @@ describe('Per-field input sources', () => {
       },
     }
 
-    expect(revisionView(source).inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual({ conflict: false, sources: [{ kind: 'not-ready' }] })
+    expect(revisionView(source).inputSource('task', 'input0').check()).toEqual({ conflict: false, sources: [{ kind: 'not-ready' }] })
   })
 
   it('allows sources supplied on separate incoming execution paths', () => {
@@ -306,7 +287,12 @@ describe('Per-field input sources', () => {
               second: { kind: 'value', inputs: {}, values: [{ handle: 'text', jsonSchema: { type: 'string' }, nullable: false, value: 'world' }] },
               task: {
                 kind: 'task',
-                taskId: 'task',
+                task: {
+                  name: 'Task',
+                  executor: { kind: 'connector', action: 'test' },
+                  inputs: Array.from({ length: 16 }, (_, index) => ({ handle: `input${index}`, jsonSchema: { type: 'string' }, nullable: true })),
+                  outputs: [],
+                },
                 inputs: {
                   input0: {
                     kind: 'sources',
@@ -323,7 +309,7 @@ describe('Per-field input sources', () => {
       },
     }
 
-    expect(revisionView(source).inputSource({ kind: 'flow' }, 'task', 'input0').check()).toEqual({
+    expect(revisionView(source).inputSource('task', 'input0').check()).toEqual({
       conflict: false,
       sources: [{ kind: 'available' }, { kind: 'available' }],
     })

@@ -1,3 +1,5 @@
+import type { TaskNode } from '../../flow/common/change.ts'
+import type { ManagedTaskDefinition } from '../../flow/common/change.ts'
 import type { JsonValue, RevisionContent } from '../../flow/common/change.ts'
 
 import { describe, expect, it } from 'vitest'
@@ -105,21 +107,18 @@ describe('OpenAPI fixed operations', () => {
       modelVersion: currentFlowModelVersion,
       document: {
         bindings: {},
-        subflows: {},
-        tasks: { api: task },
-        graph: { nodes: { node: { kind: 'task' as const, taskId: 'api', name: 'API', inputs: {} } }, edges: [] },
+
+        graph: { nodes: { node: { kind: 'task' as const, task, name: 'API', inputs: {} } }, edges: [] },
       },
       modules: {},
     }
     const next = openApiTask({ ...config(), serverUrl: 'https://other.example' })
-    const operation = { kind: 'task.openapi.set' as const, taskId: 'api', before: task, value: next }
+    const operation = { kind: 'graph.node.task.set' as const, nodeId: 'node', before: task, value: next }
     const updated = applyFlowChanges(content, [operation])
-    expect(decodeRevisionContent(updated).document.tasks.api).toEqual(next)
+    expect((decodeRevisionContent(updated).document.graph.nodes['node'] as TaskNode).task as ManagedTaskDefinition).toEqual(next)
     expect(() => applyFlowChanges(updated, [operation])).toThrow('changed')
     expect(() =>
-      applyFlowChanges(content, [
-        { kind: 'graph.node.input.set', target: { kind: 'flow' }, nodeId: 'node', handle: 'auth.manual.token', value: { kind: 'value', value: 'secret' } },
-      ]),
+      applyFlowChanges(content, [{ kind: 'graph.node.input.set', nodeId: 'node', handle: 'auth.manual.token', value: { kind: 'value', value: 'secret' } }]),
     ).toThrow()
   })
 })

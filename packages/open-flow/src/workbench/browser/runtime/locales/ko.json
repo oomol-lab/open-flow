@@ -26,8 +26,6 @@
     "llmStructured": "LLM JSON",
     "llmStructuredDescription": "메시지와 프롬프트 템플릿으로 구조화된 JSON을 생성합니다.",
     "generatedResponse": "생성된 응답.",
-    "subflowDescription": "기존 Subflow를 추가합니다.",
-    "subflows": "Subflow",
     "triggerAddConnection": "Connection 추가",
     "triggerBrowse": "Provider Trigger 살펴보기…",
     "triggerBrowseDescription": "Trigger 카탈로그를 열어 Provider 이벤트와 Connection을 선택합니다.",
@@ -61,7 +59,7 @@
     "clear": "지우기",
     "collapse": "접기",
     "deploymentManaged": "서비스 권한은 현재 배포 환경에서 관리합니다.",
-    "description": "하위 흐름을 포함한 이 Flow의 모든 Code 노드가 이 연결을 공유합니다. 다른 노드에서 연결을 선택해도 Code 사용이 허용되지는 않습니다.",
+    "description": "이 Flow의 모든 Code 노드가 이 연결을 공유합니다. 다른 노드에서 연결을 선택해도 Code 사용이 허용되지는 않습니다.",
     "empty": "이 흐름은 아직 서비스를 사용하지 않습니다.",
     "loadFailed": "서비스 인증 정보를 불러오지 못했습니다.",
     "loading": "액세스 불러오는 중…",
@@ -92,7 +90,7 @@
     "pendingAccountReferences": "계정 선택 필요:",
     "nodeReferences": "참조:",
     "moreReferences": "{{count}}개 더",
-    "dynamicCodeReferences": "하위 흐름을 포함한 이 Flow의 모든 Code 노드가 이 연결을 공유합니다. 다른 노드에서 연결을 선택해도 Code 사용이 허용되지는 않습니다.",
+    "dynamicCodeReferences": "이 Flow의 모든 Code 노드가 이 연결을 공유합니다. 다른 노드에서 연결을 선택해도 Code 사용이 허용되지는 않습니다.",
     "noAccountSelected": "선택한 계정 없음",
     "removeAuthorization": "권한 제거",
     "saving": "저장 중…",
@@ -114,7 +112,6 @@
     "rename": "이름 바꾸기",
     "refresh": "새로 고침",
     "save": "저장",
-    "subflow": "Subflow",
     "unset": "설정 안 됨"
   },
   "designer": {
@@ -266,14 +263,6 @@
     },
     "selectNode": "확인하고 편집할 초안 노드를 하나 선택하세요.",
     "locateNode": "캔버스에서 이 노드 위치 보기",
-    "subflow": {
-      "definition": "Subflow 정의",
-      "inputPorts": "입력 포트(JSON)",
-      "open": "Subflow 열기",
-      "outputPorts": "출력 포트 및 소스(JSON)",
-      "referenced": "참조된 Subflow",
-      "save": "Subflow 저장"
-    },
     "task": {
       "sharedPermissions": "Flow 공유 권한 그룹 사용",
       "sharedPermissionsHint": "Flow 공유 권한 그룹에서 승인한 모든 Action을 사용합니다. 개별적으로 추가할 필요가 없습니다.",
@@ -761,7 +750,6 @@
     "renameFlow": "{{name}} 이름 바꾸기",
     "search": "검색",
     "searchResources": "{{kind}} 검색",
-    "subflows": "Subflow",
     "listenersLoading": "오류 트리거 확인 중…",
     "listenersFailed": "오류 트리거를 확인하지 못했습니다. 다시 시도하거나 삭제를 계속할 수 있습니다.",
     "listenersTitle": "다음 게시된 오류 트리거 설정이 이 워크플로를 감시합니다:",
@@ -808,12 +796,6 @@
           "node": "상위 노드 ‘{{nodeId}}’이(가) 없습니다.",
           "output": "상위 노드 ‘{{nodeId}}’에 출력 ‘{{output}}’이(가) 없습니다."
         },
-        "target-missing": {
-          "subflow": "Subflow ‘{{subflowId}}’이(가) 없습니다.",
-          "task": "Task ‘{{taskId}}’이(가) 없습니다."
-        },
-        "subflow-output-incompatible": "소스가 Subflow 출력 ‘{{output}}’의 선언된 형식과 호환되지 않습니다.",
-        "subflow-output-schema-incompatible": "Subflow 출력 ‘{{output}}’의 데이터 형식이 일치하지 않습니다: {{issue}}",
         "trigger-not-allowed": "Trigger 노드는 Flow에서만 사용할 수 있습니다.",
         "variable-incompatible": "환경 변수 바인딩 ‘{{bindingId}}’이(가) 이 입력과 호환되지 않습니다.",
         "variable-source-mixed": "환경 변수는 입력의 유일한 소스여야 합니다."
@@ -838,14 +820,11 @@
           "reexport": "CodeModule ‘{{moduleId}}’은(는) 값을 다시 export하기 전에 import해야 합니다."
         }
       },
-      "subflow": {
-        "cycle": "Subflow 순환은 실행할 수 없습니다: {{subflows}}."
-      },
       "task": {
         "capability-incomplete": "Inline Task ‘{{nodeId}}’의 Connector Capability 구성이 완료되지 않았습니다.",
         "action-connection-required": "도구 \"{{action}}\"을 실행하려면 계정을 선택하세요.",
-        "connector-connection-required": "Connector Task ‘{{taskId}}’에는 활성 Connection이 필요합니다.",
-        "connector-incomplete": "Connector Task ‘{{taskId}}’에는 action이 필요합니다.",
+        "connector-connection-required": "Connector Task ‘{{nodeId}}’에는 활성 Connection이 필요합니다.",
+        "connector-incomplete": "Connector Task ‘{{nodeId}}’에는 action이 필요합니다.",
         "missing-entry": "Inline Task에서 사용하는 CodeModule ‘{{moduleId}}’은(는) default function을 export해야 합니다.",
         "module-missing": "Inline Task ‘{{nodeId}}’이(가) 존재하지 않는 CodeModule ‘{{moduleId}}’을(를) 참조합니다."
       },
@@ -941,8 +920,6 @@
       "saving": "초안 저장 중…",
       "failed": "저장 실패"
     },
-    "subflowDraft": "Subflow 초안",
-    "subflowPublishHelp": "Subflow는 Flow를 통해 게시됩니다.",
     "unpublishedChanges": "게시되지 않은 변경 사항",
     "valid": "유효함",
     "views": "작업 영역 보기",

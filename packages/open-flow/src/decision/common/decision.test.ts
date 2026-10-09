@@ -1,3 +1,5 @@
+import type { TaskNode } from '../../flow/common/change.ts'
+import type { ManagedTaskDefinition } from '../../flow/common/change.ts'
 import type { RevisionContent } from '../../flow/common/change.ts'
 import type { DecisionQuestion } from './decision.ts'
 
@@ -39,7 +41,7 @@ const answers = {
 const empty: RevisionContent = {
   modelVersion: currentFlowModelVersion,
   modules: {},
-  document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } },
+  document: { bindings: {}, graph: { edges: [], nodes: {} } },
 }
 
 describe('AI Decision contracts', () => {
@@ -98,10 +100,15 @@ describe('AI Decision contracts', () => {
     expect(decisionTaskIssues({ ...task, outputs: [] })).toContainEqual({ field: 'ports', message: 'AI Decision ports must match its questions.' })
   })
   it('round-trips revisions and supports undo/redo of question edits', () => {
-    const created = applyFlowChanges(empty, createDecisionTask({ kind: 'flow' }, { taskId: 'decision', nodeId: 'decision' }, 'AI Decision', questions))
+    const created = applyFlowChanges(empty, createDecisionTask({ nodeId: 'decision' }, 'AI Decision', questions))
     expect(decodeRevision(encodeRevision(created))).toEqual(created)
     const operations = [
-      { kind: 'task.decision.set' as const, taskId: 'decision', before: created.document.tasks.decision!, value: decisionTask(questions.slice(0, 1)) },
+      {
+        kind: 'graph.node.task.set' as const,
+        nodeId: 'decision',
+        before: ((created.document.graph.nodes['decision'] as TaskNode).task as ManagedTaskDefinition)!,
+        value: decisionTask(questions.slice(0, 1)),
+      },
     ]
     const changed = applyFlowChanges(created, operations)
     expect(applyFlowChanges(changed, inverseFlowChanges(created, operations))).toEqual(created)
@@ -187,14 +194,28 @@ describe('AI Decision collection limits', () => {
       executor: { kind: 'decision' as const, questions: [score] },
       outputs: [{ handle: score.name, nullable: false, jsonSchema: legacySchema }],
     }
-    const content = { ...empty, document: { ...empty.document, tasks: { decision: task } } }
+    const content = {
+      ...empty,
+      document: {
+        ...empty.document,
+        graph: {
+          ...empty.document.graph,
+          nodes: { ...empty.document.graph.nodes, ['decision']: { kind: 'task' as const, name: 'Decision', inputs: {}, task } },
+        },
+      },
+    }
     const decoded = decodeRevision(encodeRevision(content))
-    expect(decoded.document.tasks.decision).toEqual(decisionTask([score]))
+    expect((decoded.document.graph.nodes['decision'] as TaskNode).task as ManagedTaskDefinition).toEqual(decisionTask([score]))
     expect(decisionTaskIssues(task)).toEqual([])
     expect(limitDecisionTask(task)).toEqual(decisionTask([score]))
     expect(decisionTaskIssues({ ...task, outputs: [] })).toContainEqual({ field: 'ports', message: 'AI Decision ports must match its questions.' })
     const operations = [
-      { kind: 'task.decision.set' as const, taskId: 'decision', before: decoded.document.tasks.decision!, value: decisionTask([questions[0]!]) },
+      {
+        kind: 'graph.node.task.set' as const,
+        nodeId: 'decision',
+        before: ((decoded.document.graph.nodes['decision'] as TaskNode).task as ManagedTaskDefinition)!,
+        value: decisionTask([questions[0]!]),
+      },
     ]
     const changed = applyFlowChanges(decoded, operations)
     expect(applyFlowChanges(changed, inverseFlowChanges(decoded, operations))).toEqual(decoded)

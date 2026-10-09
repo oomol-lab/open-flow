@@ -153,8 +153,8 @@ describe('CLI Lab', () => {
         lab.manifest.flowId,
         head.revisionId,
         [
-          { kind: 'graph.node.field.set', target: { kind: 'flow' }, nodeId: 'notify', field: 'name', before: 'Send notification', value: 'Partial' },
-          { kind: 'task.delete', taskId: 'missing' },
+          { kind: 'graph.node.field.set', nodeId: 'notify', field: 'name', before: 'Send notification', value: 'Partial' },
+          { kind: 'graph.node.delete', nodeId: 'missing' },
         ],
         'bad',
       ),
@@ -191,7 +191,7 @@ describe('CLI Lab', () => {
       base.revisionId,
       [
         ...referenceChanges(lab.scenarioId, base.content),
-        { kind: 'graph.node.field.set', target: { kind: 'flow' }, nodeId: 'notify', field: 'name', before: 'Send notification', value: 'Unexpected rename' },
+        { kind: 'graph.node.field.set', nodeId: 'notify', field: 'name', before: 'Send notification', value: 'Unexpected rename' },
       ],
       'edit',
     )
@@ -275,14 +275,13 @@ it('rejects verification while an existing Run is waiting, and reset removes tha
     lab.manifest.flowId,
     base.revisionId,
     [
-      { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
+      { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
       {
         kind: 'graph.node.create',
-        target: { kind: 'flow' },
         nodeId: 'wait',
         node: { kind: 'wait', name: 'Pause', inputs: {}, inputDefinitions: [], prompt: 'Wait' },
       },
-      { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'start', target: 'wait' } },
+      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'wait' } },
     ],
     'waiting',
   )

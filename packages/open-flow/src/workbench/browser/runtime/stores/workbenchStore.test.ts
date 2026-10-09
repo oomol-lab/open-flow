@@ -74,7 +74,7 @@ function catalogSession(initialFlowId?: string, catalogReady: Promise<void> = Pr
       modelVersion: currentFlowModelVersion,
       parentRevisionId: null,
       version: 1,
-      content: { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { nodes: {}, edges: [] } } },
+      content: { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] } } },
     },
     live: { flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 },
     presentation: { revision: 1, updatedAt: timestamp, value: {}, version: 1 },
@@ -289,8 +289,17 @@ describe('Flow creation notifications', () => {
           ...editor.draft.content,
           document: {
             ...editor.draft.content.document,
-            tasks: { send: { name: 'Send', executor: { kind: 'connector', action: 'mail.send', connectionId: 'mail-account' }, inputs: [], outputs: [] } },
-            graph: { nodes: { send: { kind: 'task', taskId: 'send', inputs: {} } }, edges: [] },
+
+            graph: {
+              nodes: {
+                send: {
+                  kind: 'task',
+                  task: { name: 'Send', executor: { kind: 'connector', action: 'mail.send', connectionId: 'mail-account' }, inputs: [], outputs: [] },
+                  inputs: {},
+                },
+              },
+              edges: [],
+            },
           },
         },
       },
@@ -966,15 +975,15 @@ it.each(['unchanged', 'deleted', 'account selected', 'flow switched', 'failed'] 
     try {
       await navigation.start()
       const revision = store.workspace.$.revision.value!
-      vi.spyOn(revision, 'node').mockReturnValue(
-        scenario == 'deleted' ? undefined : { id: 'new-node', kind: 'task', node: { kind: 'task', taskId: 'task-1', inputs: {} } },
-      )
-      vi.spyOn(revision, 'task').mockReturnValue({
+      const task = {
         name: 'Send',
         inputs: [],
         outputs: [],
-        executor: { kind: 'connector', action: 'mail.send', ...(scenario == 'account selected' ? { connectionId: 'chosen-by-user' } : {}) },
-      })
+        executor: { kind: 'connector' as const, action: 'mail.send', ...(scenario == 'account selected' ? { connectionId: 'chosen-by-user' } : {}) },
+      }
+      vi.spyOn(revision, 'node').mockReturnValue(
+        scenario == 'deleted' ? undefined : { id: 'new-node', kind: 'task', node: { kind: 'task', task, inputs: {} }, definition: task },
+      )
       const option = {
         connector: { ...action, defaultConnection: connection },
         description: '',
@@ -993,7 +1002,7 @@ it.each(['unchanged', 'deleted', 'account selected', 'flow switched', 'failed'] 
       await preparation.catch(() => {})
       await Promise.resolve()
       if (scenario == 'unchanged') {
-        expect(setConnection).toHaveBeenCalledWith('task-1', 'mail-default')
+        expect(setConnection).toHaveBeenCalledWith('new-node', 'mail-default')
         expect(refresh).toHaveBeenCalled()
       } else expect(setConnection).not.toHaveBeenCalled()
       if (scenario == 'failed') expect(store.$.notice.value?.message).toBe('Authorization unavailable')
@@ -1017,10 +1026,9 @@ it.each(['connected', 'unconfigured', 'failed'] as const)('keeps new Connector a
     await navigation.start()
     const revision = store.workspace.$.revision.value!
     const definition = { name: 'Send', inputs: [], outputs: [], executor: { kind: 'connector' as const, action: 'mail.send' } }
-    const node = { id: 'new', kind: 'task' as const, node: { kind: 'task' as const, taskId: 'send', inputs: {} }, definition }
-    vi.spyOn(revision, 'selection').mockImplementation((_target, id) => ({ ...node, id }))
+    const node = { id: 'new', kind: 'task' as const, node: { kind: 'task' as const, task: definition, inputs: {} }, definition }
+    vi.spyOn(revision, 'selection').mockImplementation((id) => ({ ...node, id }))
     vi.spyOn(revision, 'node').mockReturnValue(node)
-    vi.spyOn(revision, 'task').mockReturnValue(definition)
     vi.spyOn(store.workspace, 'addNode').mockImplementation(async () => {
       store.workspace.selectNodes(['new'])
       expect(store.$.connectorSetupPending.value).toBe(true)
@@ -1041,7 +1049,7 @@ it.each(['connected', 'unconfigured', 'failed'] as const)('keeps new Connector a
         connections: outcome == 'connected' ? [connection] : [],
       })
     if (outcome == 'connected') {
-      await vi.waitFor(() => expect(save).toHaveBeenCalledWith('send', 'work'))
+      await vi.waitFor(() => expect(save).toHaveBeenCalledWith('new', 'work'))
       expect(store.$.connectorSetupPending.value).toBe(true)
       saving.resolve(true)
     }

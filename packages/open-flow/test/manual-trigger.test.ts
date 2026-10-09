@@ -15,8 +15,7 @@ it('requires an entry and skips unrelated roots and other trigger branches', asy
     modules: {},
     document: {
       bindings: {},
-      subflows: {},
-      tasks: {},
+
       graph: {
         edges: [
           { source: 'manual', target: 'selected' },
@@ -63,11 +62,11 @@ it('rejects adding a second manual trigger and allows replacing the existing one
   const content: RevisionContent = {
     modelVersion: currentFlowModelVersion,
     modules: {},
-    document: { bindings: {}, subflows: {}, tasks: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
+    document: { bindings: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
   }
-  const create = { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'other', node: { kind: 'manual', name: 'Other' } } as const
+  const create = { kind: 'graph.node.create', nodeId: 'other', node: { kind: 'manual', name: 'Other' } } as const
   expect(() => applyFlowChanges(content, [create])).toThrow('only one manual Trigger')
-  const replaced = applyFlowChanges(content, [{ kind: 'graph.node.delete', target: { kind: 'flow' }, nodeId: 'start' }, create])
+  const replaced = applyFlowChanges(content, [{ kind: 'graph.node.delete', nodeId: 'start' }, create])
   expect(Object.keys(replaced.document.graph.nodes)).toEqual(['other'])
   expect(Object.keys(content.document.graph.nodes)).toEqual(['start'])
 })
@@ -78,8 +77,7 @@ it('rejects imported graphs with multiple manual triggers during preparation', a
     modules: {},
     document: {
       bindings: {},
-      subflows: {},
-      tasks: {},
+
       graph: {
         edges: [],
         nodes: {

@@ -1,3 +1,5 @@
+import type { TaskNode } from '../../../../flow/common/change.ts'
+import type { ManagedTaskDefinition } from '../../../../flow/common/change.ts'
 import type { FlowDocument, GraphNode, RevisionContent } from '../../../../flow/common/change.ts'
 import type { Draft } from '../api.ts'
 
@@ -13,17 +15,22 @@ function connectorAccessReferences(document: FlowDocument) {
 function flowDocument(): FlowDocument {
   return {
     bindings: {},
-    tasks: {
-      send: { name: 'Send mail', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send', connectionId: 'work' } },
-      pending: { name: 'Pending', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send' } },
-      unused: { name: 'Unused', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send', connectionId: 'other' } },
-    },
+
     graph: {
       edges: [],
       nodes: {
-        first: { kind: 'task', inputs: {}, taskId: 'send', name: 'Send receipt' },
-        second: { kind: 'task', inputs: {}, taskId: 'send' },
-        pending: { kind: 'task', inputs: {}, taskId: 'pending' },
+        first: {
+          kind: 'task',
+          inputs: {},
+          task: { name: 'Send mail', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send', connectionId: 'work' } },
+          name: 'Send receipt',
+        },
+        second: {
+          kind: 'task',
+          inputs: {},
+          task: { name: 'Send mail', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send', connectionId: 'work' } },
+        },
+        pending: { kind: 'task', inputs: {}, task: { name: 'Pending', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send' } } },
         code: {
           kind: 'task',
           inputs: {},
@@ -49,21 +56,14 @@ function flowDocument(): FlowDocument {
         },
       },
     },
-    subflows: { child: { name: 'Follow-up', inputs: [], outputs: [], graph: { edges: [], nodes: { first: { kind: 'task', inputs: {}, taskId: 'send' } } } } },
   }
 }
 
-it('matches explicit account IDs across nodes, triggers and subflows without inferring dynamic code or unused tasks', () => {
+it('matches explicit account IDs across nodes and triggers without inferring dynamic code permissions', () => {
   const result = connectorAccessReferences(flowDocument())
   expect(result.hasCode).toBe(true)
-  expect(result.accounts.filter((item) => item.connectionId == 'work').map((item) => item.name)).toEqual([
-    'Send receipt',
-    'Send mail',
-    'New mail',
-    'Follow-up / Send mail',
-  ])
+  expect(result.accounts.filter((item) => item.connectionId == 'work').map((item) => item.name)).toEqual(['Send receipt', 'Send mail', 'New mail'])
   expect(result.accounts.filter((item) => item.connectionId == null).map((item) => item.nodeId)).toEqual(['pending'])
-  expect(result.accounts.at(-1)?.target).toEqual({ kind: 'subflow', id: 'child' })
   expect(result.accounts.some((item) => item.nodeId == 'code' || item.connectionId == 'other')).toBe(false)
 })
 
@@ -71,21 +71,25 @@ it('distinguishes agent tools and notifications using the same account', () => {
   const source = flowDocument()
   const document: FlowDocument = {
     ...source,
-    graph: { edges: [], nodes: { agent: { kind: 'task', inputs: {}, taskId: 'agent' } } },
-    subflows: {},
-    tasks: {
-      ...source.tasks,
-      agent: {
-        name: 'Assistant',
-        inputs: [],
-        outputs: [],
-        executor: {
-          kind: 'agent',
-          model: 'model',
-          prompt: '',
-          maxRounds: 1,
-          tools: [{ id: 'send', action: 'mail.send', name: 'Send', connectionId: 'work', inputs: [], approval: false, description: '' }],
-          notification: { taskId: 'send', messageHandle: 'message', inputs: {} },
+    graph: {
+      edges: [],
+      nodes: {
+        agent: {
+          kind: 'task',
+          inputs: {},
+          task: {
+            name: 'Assistant',
+            inputs: [],
+            outputs: [],
+            executor: {
+              kind: 'agent',
+              model: 'model',
+              prompt: '',
+              maxRounds: 1,
+              tools: [{ id: 'send', action: 'mail.send', name: 'Send', connectionId: 'work', inputs: [], approval: false, description: '' }],
+              notification: { action: 'mail.send', connectionId: 'work', inputDefinitions: [], messageHandle: 'message', inputs: {} },
+            },
+          },
         },
       },
     },
@@ -93,7 +97,9 @@ it('distinguishes agent tools and notifications using the same account', () => {
   const result = connectorAccessReferences(document)
   const removed = removeConnectionUsage({ modelVersion: currentFlowModelVersion, document, modules: {} }, 'work')
   expect(connectorAccessReferences(removed.document).accounts.every((use) => use.connectionId == null)).toBe(true)
-  expect(removed.document.tasks.agent?.executor).toMatchObject({ tools: [{ id: 'send', action: 'mail.send' }] })
+  expect(((removed.document.graph.nodes['agent'] as TaskNode).task as ManagedTaskDefinition)?.executor).toMatchObject({
+    tools: [{ id: 'send', action: 'mail.send' }],
+  })
   expect(result.hasCode).toBe(false)
   expect(result.accounts.map(({ kind, connectionId, nodeId }) => ({ kind, connectionId, nodeId }))).toEqual([
     { kind: 'agent', connectionId: 'work', nodeId: 'agent' },
@@ -101,7 +107,7 @@ it('distinguishes agent tools and notifications using the same account', () => {
   ])
 })
 
-it('removes account usage across subflows and triggers while preserving graph, code and other accounts', () => {
+it('removes account usage across nodes and triggers while preserving graph, code and other accounts', () => {
   const document = flowDocument()
   const content: RevisionContent = {
     modelVersion: currentFlowModelVersion,
@@ -110,13 +116,17 @@ it('removes account usage across subflows and triggers while preserving graph, c
   }
   const changed = removeConnectionUsage(content, 'work')
   const { connectionId: _, ...event } = document.graph.nodes.event as Extract<GraphNode, { kind: 'poll' }>
-  expect(changed.document.graph).toEqual({ ...document.graph, nodes: { ...document.graph.nodes, event } })
-  expect(changed.document.subflows).toEqual(document.subflows)
+  expect(changed.document.graph.edges).toEqual(document.graph.edges)
+  expect(changed.document.graph.nodes.event).toEqual(event)
+  expect(changed.document.graph.nodes.code).toEqual(document.graph.nodes.code)
+  expect(changed.document.graph.nodes.pending).toEqual(document.graph.nodes.pending)
+  for (const id of ['first', 'second']) {
+    expect(changed.document.graph.nodes[id]).toMatchObject({ task: { executor: { kind: 'connector', action: 'mail.send' } } })
+    expect((changed.document.graph.nodes[id] as TaskNode).task).not.toHaveProperty('executor.connectionId')
+  }
   expect(changed.modules).toEqual(content.modules)
   expect(changed.document.bindings).toEqual({})
-  expect(changed.document.tasks.send?.executor).not.toHaveProperty('connectionId')
-  expect(changed.document.tasks.unused).toEqual(document.tasks.unused)
   expect(connectorAccessReferences(changed.document).accounts.every((use) => use.connectionId == null)).toBe(true)
   expect(removeConnectionUsage(changed, 'work')).toEqual(changed)
-  expect(document.tasks.send?.executor).toHaveProperty('connectionId', 'work')
+  expect(document.graph.nodes.first).toHaveProperty('task.executor.connectionId', 'work')
 })

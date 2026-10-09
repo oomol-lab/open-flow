@@ -131,7 +131,6 @@ function NodeStory({ fixture, dark, language, log, active = true, onActivate }: 
         samples.set(entry.id, { id: `${fixture.id}-${entry.id}`, trigger: sample, outputs: fixture.outputs })
         const base = designerGraph(
           triggerDraft(sample).draft,
-          { kind: 'flow' },
           {},
           entry.id === 'disconnected'
             ? [
@@ -424,7 +423,7 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
   const revision = useVal(session?.workspace.$.revision)
   const triggerCatalog = useVal(session?.triggers.catalog.state)
   const createdConnection = useVal(session?.triggers.$.selectedConnection)
-  const selection = revision?.selection({ kind: 'flow' }, `trigger-${fixture.id}-${state}`)
+  const selection = revision?.selection(`trigger-${fixture.id}-${state}`)
   useEffect(() => {
     // Open the production disclosure for simultaneous visual inspection, without changing its contents.
     if (fixture.trigger.kind === 'webhook') {
@@ -461,7 +460,7 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
               selection={selection}
               store={session.workspace}
               theme={dark ? 'dark' : 'light'}
-              target={{ kind: 'flow' }}
+
               triggerActiveConnections={state === 'unconfigured' ? [] : state.startsWith('created-') ? session.allowedAccounts : [session.account]}
               triggerAuthorizationPending={false}
               triggerConnection={state === 'unconfigured' ? undefined : state.startsWith('created-') ? createdConnection : session.account}

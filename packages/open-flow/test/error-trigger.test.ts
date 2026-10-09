@@ -13,7 +13,7 @@ import { sampleErrorOutputs } from '../src/trigger/common/contract.ts'
 const content: RevisionContent = {
   modelVersion: currentFlowModelVersion,
   modules: {},
-  document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: { error: { kind: 'error', name: 'Flow Error' } } } },
+  document: { bindings: {}, graph: { edges: [], nodes: { error: { kind: 'error', name: 'Flow Error' } } } },
 }
 
 describe('Flow Error contract', () => {
@@ -37,18 +37,8 @@ describe('Flow Error contract', () => {
     expect(() => decodeRevisionContent({ ...content, modelVersion: 4 })).toThrow('version 5')
   })
 
-  it('rejects duplicate Flow Error nodes and Subflow placement', () => {
-    expect(() =>
-      applyFlowChanges(content, [{ kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'another', node: { kind: 'error', name: 'Another' } }]),
-    ).toThrow('only one')
-    const withSubflow = applyFlowChanges(content, [
-      { kind: 'subflow.create', subflowId: 'sub', subflow: { name: 'Sub', inputs: [], outputs: [], graph: { edges: [], nodes: {} } } },
-    ])
-    expect(() =>
-      applyFlowChanges(withSubflow, [
-        { kind: 'graph.node.create', target: { kind: 'subflow', id: 'sub' }, nodeId: 'error', node: { kind: 'error', name: 'Error' } },
-      ]),
-    ).toThrow('Subflow')
+  it('rejects duplicate Flow Error nodes', () => {
+    expect(() => applyFlowChanges(content, [{ kind: 'graph.node.create', nodeId: 'another', node: { kind: 'error', name: 'Another' } }])).toThrow('only one')
   })
 
   it('rejects duplicate or empty upstream IDs at the input boundary', () => {

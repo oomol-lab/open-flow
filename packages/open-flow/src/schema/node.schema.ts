@@ -10,12 +10,6 @@ import { HandleSchemaOverridesItemSchema } from './schema-overrides.schema.ts'
 
 export const NodeIdSchema = /* @__PURE__ */ z.string().describe('Node ID. Unique in current Flow.')
 
-export const HandleFromFlowSchema = /* @__PURE__ */ z
-  .strictObject({
-    input_handle: HandleNameSchema.describe('Input Handle of current Subflow Block'),
-  })
-  .describe('Data source from the input Handle of current Subflow Block')
-
 export const HandleFromNodeSchema = /* @__PURE__ */ z
   .strictObject({
     node_id: /* @__PURE__ */ NodeIdSchema.describe('Node ID in current Flow'),
@@ -26,14 +20,12 @@ export const HandleFromNodeSchema = /* @__PURE__ */ z
 export const HandleInputFromSchema = /* @__PURE__ */ z.strictObject({
   handle: HandleNameSchema,
   value: z.any().optional().describe('Provide static value for block, default is null.'),
-  from_flow: z.array(HandleFromFlowSchema).optional(),
   from_node: z.array(HandleFromNodeSchema).optional(),
   schema_overrides: z.array(HandleSchemaOverridesItemSchema).optional().describe('Override block schema for specific JSON path'),
 })
 
 export const HandleOutputFromSchema = /* @__PURE__ */ z.strictObject({
   handle: HandleNameSchema,
-  from_flow: z.array(HandleFromFlowSchema).optional(),
   from_node: z.array(HandleFromNodeSchema).optional(),
 })
 
@@ -74,13 +66,6 @@ export const TaskNodeSchema = /* @__PURE__ */ z.strictObject({
   inputs_def: z.array(InputHandleDefSchema).optional().describe("Additional inputs def if the task's additional_inputs is set"),
   outputs_def: z.array(OutputHandleDefSchema).optional().describe("Additional outputs def if the task's additional_outputs is set"),
 })
-
-export const SubflowNodeSchema = /* @__PURE__ */ z
-  .strictObject({
-    ...ScheduledNodeBase,
-    subflow: z.string().regex(LOCAL_BLOCK_REFERENCE_PATTERN).describe('Location of a Subflow Block manifest'),
-  })
-  .describe('Subflow Node points to a Subflow Block manifest')
 
 export const ConditionNodeSchema = /* @__PURE__ */ z
   .strictObject({
@@ -155,5 +140,5 @@ export const TriggerNodeSchema = /* @__PURE__ */ z.strictObject({
   trigger: TriggerDescriptorSchema,
 })
 
-export const NodeSchema = /* @__PURE__ */ z.union([TaskNodeSchema, SubflowNodeSchema, ValueNodeSchema, ConditionNodeSchema])
-export const FlowNodeSchema = /* @__PURE__ */ z.union([TaskNodeSchema, SubflowNodeSchema, ValueNodeSchema, ConditionNodeSchema, TriggerNodeSchema])
+export const NodeSchema = /* @__PURE__ */ z.union([TaskNodeSchema, ValueNodeSchema, ConditionNodeSchema])
+export const FlowNodeSchema = /* @__PURE__ */ z.union([TaskNodeSchema, ValueNodeSchema, ConditionNodeSchema, TriggerNodeSchema])

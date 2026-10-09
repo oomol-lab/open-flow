@@ -53,7 +53,7 @@ function pause(store: Store, clock: () => number, flowId: string, notify = false
     runId,
     { ...wait, value: null, actions: ['continue'], prompt: 'Continue?', notify: false },
     'https://flows.example',
-    notify ? { action: 'send', input: {}, messageHandle: 'message', taskId: 'send' } : undefined,
+    notify ? { action: 'send', input: {}, messageHandle: 'message' } : undefined,
   )
   expect(
     store.runs.wait(

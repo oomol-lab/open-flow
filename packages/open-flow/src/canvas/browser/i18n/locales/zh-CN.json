@@ -12,7 +12,7 @@
     "connectorNoActiveConnection": "没有可用连接",
     "llmChat": "LLM 对话",
     "llmStructured": "LLM 结构化输出",
-    "sharedBlocks": "任务与子流程",
+    "sharedBlocks": "任务",
     "triggers": "触发器",
     "value": "固定值"
   },
@@ -402,17 +402,13 @@
     "value": "值"
   },
   "scriptlet": "小脚本",
-  "subflowSettings": {
-    "forwardPreview": "转发预览",
-    "title": "子流配置"
-  },
   "workbench": {
     "conflict": {
       "keepLocal": "保留本地修改",
       "reload": "从磁盘重新加载"
     },
     "empty": {
-      "description": "添加工作流、Subflow 或 Task 源文件，然后重新加载工作台。",
+      "description": "添加工作流或 Task 源文件，然后重新加载工作台。",
       "title": "当前项目还没有可运行的目标。"
     },
     "noTargets": "没有可运行的目标",
@@ -604,7 +600,6 @@
       "condition": "条件判断",
       "approval": "审批",
       "wait": "等待继续",
-      "subflow": "子流程",
       "value": "固定值",
       "input": "流程输入",
       "output": "流程输出"

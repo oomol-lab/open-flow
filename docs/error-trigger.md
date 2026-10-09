@@ -32,7 +32,7 @@ Flow Error 提供三个对象输出：
 
 - `workflow`：源 Flow 名称、ID、固定 Revision 和 Publication。
 - `execution`：源 Run ID、终态、开始与结束时间。
-- `error`：错误码、消息，以及可取得的失败节点、执行 ID 和 Subflow 调用路径。
+- `error`：错误码、消息，以及可取得的失败节点、执行 ID。
 
 在错误处理 Flow 的运行菜单选择 Flow Error，可用预填的样例数据手动测试下游分支。此操作不会伪造生产失败，也不会再次派发错误处理。
 

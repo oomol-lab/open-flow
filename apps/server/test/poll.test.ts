@@ -94,8 +94,6 @@ function revision(source = 'primary', definition: PollDefinition['snapshot'] = s
           },
         },
       },
-      subflows: {},
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: { 'module-main': { imports: [], name: 'Main', source: 'export default function run() { return {} }' } },
@@ -147,7 +145,7 @@ describe('Server Poll Trigger', () => {
       const original = revision().document.graph.nodes.poll!
       if (original.kind != 'poll') throw new Error('Expected Poll fixture.')
       await service.control.changeDraft('operator', flow.flowId, flow.draftRevisionId, [
-        { kind: 'graph.node.create', nodeId: 'linear', target: { kind: 'flow' }, node: { ...original, definition: linear.snapshot, config: {} } },
+        { kind: 'graph.node.create', nodeId: 'linear', node: { ...original, definition: linear.snapshot, config: {} } },
       ])
       const before = service.control.getDraft(flow.flowId)
       expect(await service.control.listTriggerConfigOptions(flow.flowId, 'linear', 'teamId', new AbortController().signal)).toEqual([
@@ -377,7 +375,7 @@ describe('Server Poll Trigger', () => {
       const created = await service.control.createFlow('operator', 'Poll control', 'poll-control-flow')
       const content = revision()
       const changed = await service.control.changeDraft('operator', created.flow.flowId, created.flow.draftRevisionId, [
-        { kind: 'graph.node.create', node: content.document.graph.nodes.poll!, nodeId: 'poll', target: { kind: 'flow' } },
+        { kind: 'graph.node.create', node: content.document.graph.nodes.poll!, nodeId: 'poll' },
       ])
       await service.control.publishFlow('operator', created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v5', null, 'poll-control-publication')
       await service.tickListeners()
@@ -441,7 +439,7 @@ describe('Server Poll Trigger', () => {
       const created = await service.control.createFlow('operator', 'Poll preview', 'poll-preview-flow')
       const flowId = created.flow.flowId
       const changed = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
-        { kind: 'graph.node.create', node: revision().document.graph.nodes.poll!, nodeId: 'poll', target: { kind: 'flow' } },
+        { kind: 'graph.node.create', node: revision().document.graph.nodes.poll!, nodeId: 'poll' },
       ])
       await service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v5', null, 'poll-preview-publication')
       await service.tickListeners()

@@ -54,8 +54,7 @@ describe('fixed trigger inputs', () => {
       modules: {},
       document: {
         bindings: {},
-        tasks: {},
-        subflows: {},
+
         graph: {
           edges: [],
           nodes: {

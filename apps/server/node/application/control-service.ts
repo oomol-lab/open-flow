@@ -44,6 +44,7 @@ import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/
 import { randomUUID } from 'node:crypto'
 import { ConnectorTaskError, ConnectorClient } from '../deployment/connector.ts'
 import { AcceptanceError, ControlError, serverErrorCode } from '../error.ts'
+import { RevisionIntegrityError } from '../storage/revision-store.ts'
 import { Store } from '../storage/store.ts'
 import { actionAccountDiagnostics } from './action-account-diagnostics.ts'
 import {
@@ -754,17 +755,24 @@ export class ControlService {
       return { revision: revisionMetadata(previous), version: 1 }
     }
     if (currentFlow.draftRevisionId != expectedRevisionId) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
-    let content: RevisionContent
+    let base: StoredFlowRevision | undefined
     try {
-      const base = this.store.flows.revision(flowId, expectedRevisionId)
-      if (base == null) throw new TypeError('The stored Draft is missing.')
+      base = this.store.flows.revision(flowId, expectedRevisionId)
+    } catch (error) {
+      if (!(error instanceof RevisionIntegrityError)) throw error
+    }
+    let content = emptyRevision()
+    if (base != null) {
       const source = new TextEncoder().encode(base.content)
-      if ((await digestBytes(source)) != base.digest) throw new TypeError('The stored Draft digest does not match its content.')
-      content = repairRevision(source)
-    } catch {
-      // The source Revision remains immutable. When none of it is readable, create a blank
-      // child Draft so the user can still enter the workspace and rebuild the Flow.
-      content = emptyRevision()
+      if ((await digestBytes(source)) == base.digest) {
+        try {
+          content = repairRevision(source)
+        } catch (error) {
+          // Only unreadable JSON can fall back to a blank child Draft.
+          if (!(error instanceof SyntaxError))
+            throw new ControlError(controlErrorCode.flowInvalid, 'The stored Draft cannot be repaired or upgraded.', { cause: error })
+        }
+      }
     }
     const bytes = encodeRevision(content)
     const digest = await digestBytes(bytes)
@@ -1006,8 +1014,9 @@ export class ControlService {
       const teamId = await this.resolveConnectorScope(flowId)
       return connector.getAction(actionId, undefined, this.#connectorContext(flowId, teamId))
     })
-    const llmDiagnostics = [...checked.closure.dependencies.tasks].toSorted().flatMap((taskId) => {
-      const kind = content.document.tasks[taskId]?.executor.kind
+    const llmDiagnostics = [...checked.closure.dependencies.nodes].toSorted().flatMap((nodeId) => {
+      const node = content.document.graph.nodes[nodeId]
+      const kind = node?.kind == 'task' && 'executor' in node.task ? node.task.executor.kind : undefined
       if ((kind != 'llm' && kind != 'agent' && kind != 'decision') || this.llmAvailable(kind == 'llm' ? undefined : kind)) return []
       return [
         {
@@ -1015,7 +1024,7 @@ export class ControlService {
           column: 0,
           line: 0,
           message: 'LLM is not configured for this deployment. Configure OPEN_FLOW_LLM_ORIGIN and OPEN_FLOW_LLM_TOKEN.',
-          path: `/document/tasks/${taskId}/executor`,
+          path: `/document/graph/nodes/${nodeId}/task/executor`,
           values: {},
         },
       ]
@@ -1113,7 +1122,7 @@ export class ControlService {
 
 function emptyRevision(): RevisionContent {
   return {
-    document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} },
+    document: { bindings: {}, graph: { edges: [], nodes: {} } },
     modelVersion: currentFlowModelVersion,
     modules: {},
   }

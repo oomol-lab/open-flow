@@ -1,3 +1,4 @@
+import type { ManagedTaskDefinition } from '../../flow/common/change.ts'
 import type { ConditionOperand, FlowDocument, Graph, GraphNode, Group, InputPort, RevisionContent } from '../../flow/common/change.ts'
 import type { ConnectorAction, Draft, Flow, Live } from './api.ts'
 
@@ -27,17 +28,6 @@ export function flowInspection(inspected: Awaited<ReturnType<typeof inspectFlowD
     draft: {
       revisionId: draft.revisionId,
       graph: inspectGraph(document, document.graph),
-      subflows: Object.fromEntries(
-        Object.entries(document.subflows).map(([id, subflow]) => [
-          id,
-          {
-            name: subflow.name,
-            inputs: inspectPorts(subflow.inputs),
-            outputs: subflow.outputs.map((port) => ({ handle: port.handle, sources: port.sources })),
-            graph: inspectGraph(document, subflow.graph),
-          },
-        ]),
-      ),
       bindings: document.bindings,
       modules: Object.fromEntries(Object.entries(modules).map(([id, module]) => [id, { name: module.name, imports: module.imports }])),
     },
@@ -71,8 +61,8 @@ function inspectGraph(document: FlowDocument, graph: Graph) {
   }
 }
 
-function inspectNode(document: FlowDocument, node: GraphNode): Record<string, unknown> {
-  const inputs = nodeInputPorts(document, node)
+function inspectNode(_document: FlowDocument, node: GraphNode): Record<string, unknown> {
+  const inputs = nodeInputPorts(node)
   const defaults = Object.fromEntries(
     Object.entries(inputs).flatMap(([handle, port]) =>
       Object.hasOwn(port, 'value') && !('inputs' in node && Object.hasOwn(node.inputs, handle)) ? [[handle, port.value]] : [],
@@ -80,13 +70,12 @@ function inspectNode(document: FlowDocument, node: GraphNode): Record<string, un
   )
   const ports = {
     inputHandles: Object.keys(inputs),
-    outputHandles: Object.keys(nodeOutputPorts(document, node)),
+    outputHandles: Object.keys(nodeOutputPorts(node)),
     ...(Object.keys(defaults).length == 0 ? {} : { inputDefaults: defaults }),
   }
   switch (node.kind) {
     case 'task': {
-      const { task: inline, additionalInputs: _additional, ...instance } = node
-      const task = inline ?? document.tasks[node.taskId]
+      const { task, additionalInputs: _additional, ...instance } = node
       return {
         ...instance,
         ...ports,
@@ -137,7 +126,6 @@ function inspectNode(document: FlowDocument, node: GraphNode): Record<string, un
     case 'error':
     case 'manual':
     case 'cron':
-    case 'subflow':
       return { ...node, ...ports }
   }
 }
@@ -176,13 +164,13 @@ export function nodeDetails(
   node: GraphNode
   nodeId: string
   module?: RevisionContent['modules'][string]
-  task?: FlowDocument['tasks'][string]
+  task?: ManagedTaskDefinition
 } {
   if (node.kind != 'task') return { node, nodeId }
-  if (node.task != null) {
+  if ('moduleId' in node.task) {
     const module = content.modules[node.task.moduleId]
     return { node, nodeId, ...(module == null ? {} : { module }) }
   }
-  const task = content.document.tasks[node.taskId]
+  const task = node.task
   return { node, nodeId, ...(task == null ? {} : { task }) }
 }

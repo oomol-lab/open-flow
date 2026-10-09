@@ -62,9 +62,7 @@ function pollNode(source: string): Extract<TriggerNode, { readonly kind: 'poll' 
 }
 
 async function addPoll(service: ServerService, flowId: string, revisionId: string, source: string): Promise<string> {
-  const changed = await service.control.changeDraft('operator', flowId, revisionId, [
-    { kind: 'graph.node.create', node: pollNode(source), nodeId: 'poll', target: { kind: 'flow' } },
-  ])
+  const changed = await service.control.changeDraft('operator', flowId, revisionId, [{ kind: 'graph.node.create', node: pollNode(source), nodeId: 'poll' }])
   return changed.revision.revisionId
 }
 
@@ -86,7 +84,6 @@ async function addMarker(service: ServerService, flowId: string, revisionId: str
         values: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
       },
       nodeId: 'marker',
-      target: { kind: 'flow' },
     },
   ])
   return changed.revision.revisionId

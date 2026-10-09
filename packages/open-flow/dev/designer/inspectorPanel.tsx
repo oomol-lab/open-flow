@@ -43,26 +43,19 @@ const content: RevisionContent = {
   },
   document: {
     bindings: {},
-    tasks: {
-      github: {
-        name: 'Read GitHub profile',
-        executor: { kind: 'connector', action: 'github.get_current_user', connectionId: 'github-work' },
-        inputs: [],
-        outputs: [],
-      },
-    },
-    subflows: {
-      child: {
-        name: 'Follow-up',
-        inputs: [],
-        outputs: [],
-        graph: { edges: [], nodes: { profile: { kind: 'task', inputs: {}, taskId: 'github', name: 'Read child profile' } } },
-      },
-    },
+
     graph: {
       nodes: {
-        profile: { kind: 'task', inputs: {}, taskId: 'github' },
-        child: { kind: 'subflow', subflowId: 'child', inputs: {} },
+        profile: {
+          kind: 'task',
+          inputs: {},
+          task: {
+            name: 'Read GitHub profile',
+            executor: { kind: 'connector', action: 'github.get_current_user', connectionId: 'github-work' },
+            inputs: [],
+            outputs: [],
+          },
+        },
         data: {
           kind: 'value',
           name: 'Issue text',

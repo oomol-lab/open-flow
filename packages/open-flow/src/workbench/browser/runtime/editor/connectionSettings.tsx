@@ -233,7 +233,7 @@ export function ConnectorAccount({
   disabled,
   fieldIdPrefix,
   loading,
-  taskId,
+  nodeId,
 }: {
   readonly onConfigureAccess?: (() => void) | undefined
   readonly accessError?: string | undefined
@@ -249,7 +249,7 @@ export function ConnectorAccount({
   readonly disabled: boolean
   readonly fieldIdPrefix: string
   readonly loading: boolean
-  readonly taskId: string
+  readonly nodeId: string
 }): ReactElement {
   const t = useTranslate()
   const available = activeConnections ?? []
@@ -320,7 +320,7 @@ export function ConnectorAccount({
             id={`${fieldIdPrefix}-connection`}
             selectedConnection={connection}
             selectedId={connectionId}
-            onChange={(next) => void connectors.setConnection(taskId, next)}
+            onChange={(next) => void connectors.setConnection(nodeId, next)}
             onManage={onConfigureAccess}
           />
         </Field>

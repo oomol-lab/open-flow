@@ -17,7 +17,7 @@ import { revisionView } from '../src/workbench/browser/runtime/revisionView.ts'
 import { advanceWaiting, waitHost } from './waitHost.ts'
 
 const engine = findEngineContract(currentEngineContract)!
-const target = { kind: 'flow' } as const
+
 const reference = (field?: string): NodeSource => ({ kind: 'node', nodeId: 'data', output: 'payload', ...(field === undefined ? {} : { field }) })
 const outputSchema = {
   type: 'object',
@@ -30,8 +30,7 @@ function fixture(value: JsonValue = { name: 'Ada', count: 2 }, schema: JsonValue
     modules: { main: { name: 'Main', imports: [], source: 'export default (inputs) => inputs' } },
     document: {
       bindings: {},
-      tasks: {},
-      subflows: {},
+
       graph: {
         edges: [
           { source: 'start', target: 'data' },
@@ -128,15 +127,15 @@ describe('Source object fields', () => {
   it('checks the field independently of the whole object and preserves missing-field diagnostics', async () => {
     const content = fixture()
     const { document } = content
-    const candidates = inputSourceCandidates(document, document.graph, 'sink', 'value').data!
+    const candidates = inputSourceCandidates(document.graph, 'sink', 'value').data!
     expect(candidates[0]?.check.kind).toBe('schema')
     expect(candidates[0]?.description).toBe('Structured customer payload.')
     expect(candidates[0]?.fields).toMatchObject([
       { field: 'name', description: 'Customer display name.', check: { kind: 'available' } },
       { field: 'count', check: { kind: 'schema' } },
     ])
-    expect(checkInputSource(document, document.graph, 'sink', 'value', reference('removed'))).toEqual({ kind: 'field-missing' })
-    expect(view(content).sourceType(target, reference('name'))).toBe('string')
+    expect(checkInputSource(document.graph, 'sink', 'value', reference('removed'))).toEqual({ kind: 'field-missing' })
+    expect(view(content).sourceType(reference('name'))).toBe('string')
     expect((await validateFlow(fixture({ name: 'Ada' }, outputSchema, 'removed'), engine)).diagnostics).toContainEqual(
       expect.objectContaining({ code: 'graph.source-missing', values: expect.objectContaining({ variant: 'field', field: 'removed' }) }),
     )
@@ -147,7 +146,6 @@ describe('Source object fields', () => {
     const operations = decodeChangeOperations([
       {
         kind: 'graph.node.input.set',
-        target,
         nodeId: 'sink',
         handle: 'value',
         before: { kind: 'sources', sources: [reference('name')] },
@@ -163,9 +161,9 @@ describe('Source object fields', () => {
     expect(encodeRevision(decodeRevision(encodeRevision(changed)))).toEqual(encodeRevision(changed))
     expect(await digestBytes(encodeRevision(changed))).not.toEqual(await digestBytes(encodeRevision(original)))
     expect(applyFlowChanges(changed, inverseFlowChanges(original, operations))).toEqual(original)
-    const clipboard = copyNodes(view(changed), target, ['data', 'sink'])
+    const clipboard = copyNodes(view(changed), ['data', 'sink'])
     let id = 0
-    const pasted = pasteNodes(view(changed), target, clipboard, () => `copy${++id}`)
+    const pasted = pasteNodes(view(changed), clipboard, () => `copy${++id}`)
     const copied = applyFlowChanges(changed, pasted.changes)
     const sink = copied.document.graph.nodes[pasted.nodeIds[pasted.sourceIds.indexOf('sink')]!]!
     expect('inputs' in sink && sink.inputs.value).toEqual({
@@ -192,7 +190,7 @@ describe('Source object fields', () => {
   it('does not read inherited properties', async () => {
     const content = fixture({}, { type: 'object', properties: { constructor: true } }, 'constructor')
     const sink = content.document.graph.nodes.sink
-    if (sink?.kind !== 'task' || sink.task == null) throw new Error('Missing task')
+    if (sink?.kind !== 'task' || !('moduleId' in sink.task)) throw new Error('Missing task')
     const revision = {
       ...content,
       document: {
@@ -276,31 +274,6 @@ describe('Source object fields', () => {
     await expect(
       execute({ ...absent, document: { ...absent.document, graph: { ...absent.document.graph, nodes: { ...absent.document.graph.nodes, sink: condition } } } }),
     ).rejects.toThrow('Source has no value')
-  })
-
-  it('projects Subflow outputs using the same Source contract', async () => {
-    const content = fixture()
-    const data = content.document.graph.nodes.data!
-    const revision: RevisionContent = {
-      ...content,
-      document: {
-        ...content.document,
-        graph: {
-          nodes: { start: { kind: 'manual', name: 'Start' }, child: { kind: 'subflow', name: 'Child', subflowId: 'child', inputs: {} } },
-          edges: [{ source: 'start', target: 'child' }],
-        },
-        subflows: {
-          child: {
-            name: 'Child',
-            inputs: [],
-            outputs: [{ handle: 'name', jsonSchema: { type: 'string' }, nullable: true, sources: [reference('name')] }],
-            graph: { nodes: { data }, edges: [] },
-          },
-        },
-      },
-    }
-    expect(decodeRevision(encodeRevision(revision))).toEqual(revision)
-    expect(await execute(revision)).toMatchObject({ nodes: [{ nodeId: 'child', outputs: { name: 'Ada' } }] })
   })
 
   it('keeps complete objects in checkpoints and projects after Wait resumes', async () => {

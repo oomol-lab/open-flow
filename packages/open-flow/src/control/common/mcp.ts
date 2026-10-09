@@ -53,13 +53,13 @@ export const mcpTools = {
     true,
   ),
   flow_get: tool(
-    'Read a compact Draft graph with input bindings, port handles, subflows and Live status. Use full=true for complete Revision content, schemas, source code and exact before values required by complex edits. Unreadable Drafts return draft=null and draftIssue; flow.live still identifies the published version. Use draft.revisionId as the base of an edit.',
+    'Read a compact Draft graph with input bindings, port handles and Live status. Use full=true for complete Revision content, schemas, source code and exact before values required by complex edits. Unreadable Drafts return draft=null and draftIssue; flow.live still identifies the published version. Use draft.revisionId as the base of an edit.',
     z.strictObject({ flowId: flow, full: z.boolean().optional() }),
     true,
   ),
   flow_node_get: tool(
-    'Read one node and its Task definition or code module from a fixed Revision. Omit subflowId for the root graph. Use revisionId from flow_get; the returned node contains exact before values for edits.',
-    z.strictObject({ flowId: flow, revisionId: id, nodeId: id, subflowId: id.optional() }),
+    'Read one node and its Task definition or code module from a fixed Revision. Use revisionId from flow_get; the returned node contains exact before values for edits.',
+    z.strictObject({ flowId: flow, revisionId: id, nodeId: id }),
     true,
   ),
   flow_schema: tool(

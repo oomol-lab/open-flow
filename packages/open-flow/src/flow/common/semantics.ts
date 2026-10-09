@@ -1,4 +1,4 @@
-import { decisionTaskIssues, limitDecisionTask } from '../../decision/common/decision.ts'
+import { decisionTaskIssues } from '../../decision/common/decision.ts'
 import { openApiIssues, authHandles } from '../../openapi/common/openapi.ts'
 export { renderPrompt } from './promptTemplate.ts'
 export { connectionUsage, removeConnectionUsage } from './connectionUsage.ts'
@@ -7,20 +7,12 @@ import { nodeInputMappings } from './condition.ts'
 export { matchesTriggerOutputs, triggerOutputDefinitions, triggerOutputPorts } from '../../trigger/common/contract.ts'
 import type { EngineContract } from '../../execution/common/engineContract.ts'
 import type { RuntimeProgram } from '../../execution/common/runtime.ts'
-import type { ConnectorActionCapability, ConnectorCapability, FlowDocument, Graph, InputMapping, RevisionContent, SchemaMismatch } from './change.ts'
+import type { ConnectorActionCapability, ConnectorCapability, Graph, InputMapping, RevisionContent, SchemaMismatch } from './change.ts'
 
 import { findEngineContract } from '../../execution/common/engineContract.ts'
 import { agentConfigIssues } from './agent.ts'
 import { decodeConnectorCapabilities } from './change.ts'
-import {
-  canonicalJsonBytes,
-  canonicalModule,
-  canonicalPorts,
-  canonicalRevisionGraph,
-  canonicalRevisionOutputs,
-  canonicalTask,
-  digestBytes,
-} from './encoding.ts'
+import { canonicalJsonBytes, canonicalModule, canonicalRevisionGraph, digestBytes } from './encoding.ts'
 import { nodeInputPorts, validateFlowGraph } from './graph.ts'
 import { compareDiagnostics, validateModuleGraph } from './modules.ts'
 import { hasRetiredRef } from './schema.ts'
@@ -32,10 +24,8 @@ export { agentInput, agentToolInput, agentToolSchema } from './agent.ts'
 export interface SemanticClosure {
   readonly dependencies: {
     readonly bindings: ReadonlySet<string>
-    readonly inputBindings: ReadonlySet<string>
+    readonly nodes: ReadonlySet<string>
     readonly modules: ReadonlySet<string>
-    readonly subflows: ReadonlySet<string>
-    readonly tasks: ReadonlySet<string>
   }
   readonly digest: string
 }
@@ -49,14 +39,7 @@ function entries<T>(value: Readonly<Record<string, T>>): readonly (readonly [str
 export function flowDependencies(content: RevisionContent, triggerId?: string): SemanticClosure['dependencies'] {
   if (triggerId != null) return flowDependencies(runRevision(content, triggerId))
   const bindings = new Set<string>()
-  const inputBindings = new Set<string>()
   const modules = new Set<string>()
-  const subflows = new Set<string>()
-  const tasks = new Set<string>()
-
-  function visitBinding(id: string): void {
-    bindings.add(id)
-  }
 
   function visitModule(id: string): void {
     if (modules.has(id)) return
@@ -71,8 +54,7 @@ export function flowDependencies(content: RevisionContent, triggerId?: string): 
       if (mapping.kind != 'sources') continue
       for (const source of mapping.sources) {
         if (source.kind != 'binding') continue
-        inputBindings.add(source.bindingId)
-        visitBinding(source.bindingId)
+        bindings.add(source.bindingId)
       }
     }
   }
@@ -83,16 +65,8 @@ export function flowDependencies(content: RevisionContent, triggerId?: string): 
       switch (node.kind) {
         case 'condition':
           break
-        case 'subflow':
-          visitSubflow(node.subflowId)
-          break
         case 'task':
-          if (node.task != null) visitModule(node.task.moduleId)
-          else {
-            tasks.add(node.taskId)
-            const executor = content.document.tasks[node.taskId]?.executor
-            if (executor?.kind == 'agent' && executor.notification != null) tasks.add(executor.notification.taskId)
-          }
+          if ('moduleId' in node.task) visitModule(node.task.moduleId)
           break
         case 'value':
           break
@@ -110,44 +84,23 @@ export function flowDependencies(content: RevisionContent, triggerId?: string): 
     }
   }
 
-  function visitSubflow(id: string): void {
-    if (subflows.has(id)) return
-    subflows.add(id)
-    const subflow = content.document.subflows[id]
-    if (subflow != null) visitGraph(subflow.graph)
-  }
-
   visitGraph(content.document.graph)
 
-  return { bindings, inputBindings, modules, subflows, tasks }
+  return { bindings, modules, nodes: new Set(Object.keys(content.document.graph.nodes)) }
 }
 
 export async function flowClosure(content: RevisionContent): Promise<SemanticClosure> {
   const dependencies = flowDependencies(content)
-  const { bindings, modules, subflows, tasks } = dependencies
+  const { bindings, modules } = dependencies
 
   const bytes = canonicalJsonBytes({
     bindings: Object.fromEntries([...bindings].toSorted().map((id) => [id, content.document.bindings[id] ?? null])),
     graph: canonicalRevisionGraph(content, content.document.graph),
     kind: 'open-flow-semantic-closure',
+    ...(content.modelVersion < 6 ? { subflows: {} } : {}),
     modelVersion: content.modelVersion,
     modules: Object.fromEntries([...modules].toSorted().map((id) => [id, content.modules[id] == null ? null : canonicalModule(content.modules[id])])),
-    tasks: Object.fromEntries([...tasks].toSorted().map((id) => [id, content.document.tasks[id] == null ? null : canonicalTask(content.document.tasks[id])])),
-    subflows: Object.fromEntries(
-      [...subflows].toSorted().map((id) => {
-        const subflow = content.document.subflows[id]
-        if (subflow == null) return [id, null]
-        return [
-          id,
-          {
-            graph: canonicalRevisionGraph(content, subflow.graph),
-            inputs: canonicalPorts(subflow.inputs),
-            name: subflow.name,
-            outputs: canonicalRevisionOutputs(content, subflow.outputs, subflow.graph),
-          },
-        ]
-      }),
-    ),
+    ...(content.modelVersion < 6 ? { tasks: {} } : {}),
     version: 2,
   })
   return { dependencies, digest: await digestBytes(bytes) }
@@ -198,7 +151,7 @@ export function validateFlowInputs(revision: RevisionContent, value: unknown): F
     if (node == null || !('inputs' in node) || node.kind == 'condition' || candidate == null || typeof candidate != 'object' || Array.isArray(candidate)) {
       return 'invalid'
     }
-    const inputs = nodeInputPorts(revision.document, node)
+    const inputs = nodeInputPorts(node)
     for (const handle of Object.keys(candidate)) {
       const port = inputs[handle]
       if (port == null || hasRetiredRef(port.jsonSchema) || node.inputs[handle] != null || Object.hasOwn(port, 'value')) return 'invalid'
@@ -210,103 +163,81 @@ export function validateFlowInputs(revision: RevisionContent, value: unknown): F
 export async function validateFlow(revision: RevisionContent, engine: EngineContract): Promise<FlowValidation> {
   const closure = await flowClosure(revision)
   const checked = validateModuleGraph(revision, [...closure.dependencies.modules], engine)
-  checked.diagnostics.push(...validateFlowGraph(revision, closure))
-  const graphs = [
-    ['/document/graph', revision.document.graph] as const,
-    ...[...closure.dependencies.subflows].toSorted().flatMap((subflowId) => {
-      const subflow = revision.document.subflows[subflowId]
-      return subflow == null ? [] : [[`/document/subflows/${subflowId}/graph`, subflow.graph] as const]
-    }),
-  ]
+  checked.diagnostics.push(...validateFlowGraph(revision))
   const missingEntryModules = new Set<string>()
-  for (const [graphPath, graph] of graphs) {
-    for (const [nodeId, node] of Object.entries(graph.nodes)) {
-      if (node.kind != 'task' || node.task == null) continue
-      if (revision.modules[node.task.moduleId] == null) {
-        checked.diagnostics.push({
-          code: 'task.module-missing',
-          column: 0,
-          line: 1,
-          message: `Inline Task "${nodeId}" references missing CodeModule "${node.task.moduleId}".`,
-          path: `${graphPath}/nodes/${nodeId}/task/moduleId`,
-          values: { moduleId: node.task.moduleId, nodeId },
-        })
-      } else if (checked.analysis.get(node.task.moduleId)?.exports.has('default') == false && !missingEntryModules.has(node.task.moduleId)) {
-        missingEntryModules.add(node.task.moduleId)
-        checked.diagnostics.push({
-          code: 'task.missing-entry',
-          column: 0,
-          line: 1,
-          message: `CodeModule "${node.task.moduleId}" used by an Inline Task must export a default function.`,
-          path: `/modules/${node.task.moduleId}/source`,
-          values: { moduleId: node.task.moduleId },
-        })
-      }
-      try {
-        decodeConnectorCapabilities(node.task.capabilities === undefined ? [] : node.task.capabilities)
-      } catch {
-        checked.diagnostics.push({
-          code: 'task.capability-incomplete',
-          column: 0,
-          line: 1,
-          message: `Inline Task "${nodeId}" has an incomplete Connector Capability.`,
-          path: `${graphPath}/nodes/${nodeId}/task/capabilities`,
-          values: { nodeId },
-        })
-      }
+  for (const [nodeId, node] of Object.entries(revision.document.graph.nodes)) {
+    if (node.kind != 'task' || !('moduleId' in node.task)) continue
+    if (revision.modules[node.task.moduleId] == null) {
+      checked.diagnostics.push({
+        code: 'task.module-missing',
+        column: 0,
+        line: 1,
+        message: `Inline Task "${nodeId}" references missing CodeModule "${node.task.moduleId}".`,
+        path: `/document/graph/nodes/${nodeId}/task/moduleId`,
+        values: { moduleId: node.task.moduleId, nodeId },
+      })
+    } else if (checked.analysis.get(node.task.moduleId)?.exports.has('default') == false && !missingEntryModules.has(node.task.moduleId)) {
+      missingEntryModules.add(node.task.moduleId)
+      checked.diagnostics.push({
+        code: 'task.missing-entry',
+        column: 0,
+        line: 1,
+        message: `CodeModule "${node.task.moduleId}" used by an Inline Task must export a default function.`,
+        path: `/modules/${node.task.moduleId}/source`,
+        values: { moduleId: node.task.moduleId },
+      })
+    }
+    try {
+      decodeConnectorCapabilities(node.task.capabilities === undefined ? [] : node.task.capabilities)
+    } catch {
+      checked.diagnostics.push({
+        code: 'task.capability-incomplete',
+        column: 0,
+        line: 1,
+        message: `Inline Task "${nodeId}" has an incomplete Connector Capability.`,
+        path: `/document/graph/nodes/${nodeId}/task/capabilities`,
+        values: { nodeId },
+      })
     }
   }
-  for (const taskId of [...closure.dependencies.tasks].toSorted()) {
-    const task = revision.document.tasks[taskId]
-    if (task == null) continue
+  for (const [nodeId, node] of Object.entries(revision.document.graph.nodes)) {
+    if (node.kind != 'task' || !('executor' in node.task)) continue
+    const task = node.task
     for (const issue of decisionTaskIssues(task))
-      checked.diagnostics.push({ code: 'decision.config-invalid', column: 0, line: 1, message: issue.message, path: `/document/tasks/${taskId}/executor` })
+      checked.diagnostics.push({
+        code: 'decision.config-invalid',
+        column: 0,
+        line: 1,
+        message: issue.message,
+        path: `/document/graph/nodes/${nodeId}/task/executor`,
+      })
     for (const message of openApiIssues(task))
-      checked.diagnostics.push({ code: 'openapi.config-invalid', column: 0, line: 1, message, path: `/document/tasks/${taskId}/executor` })
+      checked.diagnostics.push({ code: 'openapi.config-invalid', column: 0, line: 1, message, path: `/document/graph/nodes/${nodeId}/task/executor` })
     if (task.executor.kind == 'openapi') {
       const handles = authHandles(task.executor.auth)
-      for (const [graphPath, graph] of graphs) {
-        for (const [nodeId, node] of Object.entries(graph.nodes))
-          if (node.kind == 'task' && node.taskId == taskId) {
-            for (const handle of handles) {
-              const mapping = node.inputs[handle]
-              if (mapping?.kind != 'sources' || mapping.sources.length == 0 || mapping.sources.some((source) => source.kind == 'flow'))
-                checked.diagnostics.push({
-                  code: 'openapi.auth-source',
-                  column: 0,
-                  line: 1,
-                  message: 'Authentication requires a deployment variable or upstream output.',
-                  path: `${graphPath}/nodes/${nodeId}/inputs/${handle}`,
-                })
-            }
-          }
+      for (const handle of handles) {
+        const mapping = node.inputs[handle]
+        if (mapping?.kind != 'sources' || mapping.sources.length == 0)
+          checked.diagnostics.push({
+            code: 'openapi.auth-source',
+            column: 0,
+            line: 1,
+            message: 'Authentication requires a deployment variable or upstream output.',
+            path: `/document/graph/nodes/${nodeId}/inputs/${handle}`,
+          })
       }
     }
-    for (const message of agentConfigIssues(task, revision.document.tasks)) {
-      checked.diagnostics.push({ code: 'agent.config-invalid', column: 0, line: 1, message, path: `/document/tasks/${taskId}/executor` })
-    }
-    if (task.executor.kind == 'agent') {
-      for (const subflowId of closure.dependencies.subflows) {
-        for (const [nodeId, node] of Object.entries(revision.document.subflows[subflowId]?.graph.nodes ?? {})) {
-          if (node.kind == 'task' && node.taskId == taskId)
-            checked.diagnostics.push({
-              code: 'agent.subflow-unsupported',
-              column: 0,
-              line: 1,
-              message: 'Agent Tasks are only supported in the root Flow.',
-              path: `/document/subflows/${subflowId}/graph/nodes/${nodeId}`,
-            })
-        }
-      }
+    for (const message of agentConfigIssues(task)) {
+      checked.diagnostics.push({ code: 'agent.config-invalid', column: 0, line: 1, message, path: `/document/graph/nodes/${nodeId}/task/executor` })
     }
     if (task.executor.kind == 'connector' && task.executor.action.length == 0) {
       checked.diagnostics.push({
         code: 'task.connector-incomplete',
         column: 0,
         line: 1,
-        message: `Connector Task "${taskId}" requires an action.`,
-        path: `/document/tasks/${taskId}/executor`,
-        values: { taskId },
+        message: `Connector Task "${nodeId}" requires an action.`,
+        path: `/document/graph/nodes/${nodeId}/task/executor`,
+        values: { nodeId },
       })
     }
   }
@@ -319,8 +250,6 @@ export interface PreparedFlow {
   readonly engineContract: string
   readonly graph: Graph
   readonly modules: RevisionContent['modules']
-  readonly subflows: FlowDocument['subflows']
-  readonly tasks: FlowDocument['tasks']
 }
 
 export type PrepareFlowResult =
@@ -407,8 +336,6 @@ export async function prepareFlow(revision: RevisionContent, engineContract: str
       engineContract,
       graph: revision.document.graph,
       modules: Object.fromEntries([...closure.dependencies.modules].toSorted().map((id) => [id, revision.modules[id]!])),
-      subflows: Object.fromEntries([...closure.dependencies.subflows].toSorted().map((id) => [id, revision.document.subflows[id]!])),
-      tasks: Object.fromEntries([...closure.dependencies.tasks].toSorted().map((id) => [id, limitDecisionTask(revision.document.tasks[id]!)])),
     },
     kind: 'prepared',
     validation,
@@ -425,24 +352,13 @@ export function createRuntimeProgram(prepared: PreparedFlow, entryModuleId: stri
   }
 }
 
-export function referencedTaskIds(flow: Pick<FlowDocument, 'graph' | 'subflows' | 'tasks'>): ReadonlySet<string> {
-  const ids = new Set<string>()
-  for (const graph of [flow.graph, ...Object.values(flow.subflows).map((subflow) => subflow.graph)]) {
-    for (const node of Object.values(graph.nodes)) {
-      if (node.kind != 'task' || node.taskId == null) continue
-      ids.add(node.taskId)
-      const executor = flow.tasks[node.taskId]?.executor
-      if (executor?.kind == 'agent' && executor.notification != null) ids.add(executor.notification.taskId)
-    }
-  }
-  return ids
-}
-
-export function agentActions(flow: Pick<PreparedFlow, 'tasks'>): readonly ConnectorActionCapability[] {
-  return Object.values(flow.tasks).flatMap((task) => {
+export function agentActions(flow: Pick<PreparedFlow, 'graph'>): readonly ConnectorActionCapability[] {
+  return Object.values(flow.graph.nodes).flatMap((node) => {
+    if (node.kind != 'task' || !('executor' in node.task)) return []
+    const task = node.task
     if (task.executor.kind != 'agent') return []
-    const notice = task.executor.notification == null ? undefined : flow.tasks[task.executor.notification.taskId]?.executor
-    return [...task.executor.tools, ...(notice?.kind == 'connector' ? [notice] : [])].map((tool) => ({
+    const notice = task.executor.notification
+    return [...task.executor.tools, ...(notice != null ? [notice] : [])].map((tool) => ({
       kind: 'connector' as const,
       action: tool.action,
       connections: tool.connectionId == null ? [] : [{ connectionId: tool.connectionId }],
@@ -450,8 +366,6 @@ export function agentActions(flow: Pick<PreparedFlow, 'tasks'>): readonly Connec
   })
 }
 
-export function codeActions(flow: Pick<PreparedFlow, 'graph' | 'subflows'>): readonly ConnectorCapability[] {
-  return [flow.graph, ...Object.values(flow.subflows).map((subflow) => subflow.graph)].flatMap((graph) =>
-    Object.values(graph.nodes).flatMap((node) => (node.kind == 'task' && node.task != null ? (node.task.capabilities ?? []) : [])),
-  )
+export function codeActions(flow: Pick<PreparedFlow, 'graph'>): readonly ConnectorCapability[] {
+  return Object.values(flow.graph.nodes).flatMap((node) => (node.kind == 'task' && 'moduleId' in node.task ? (node.task.capabilities ?? []) : []))
 }

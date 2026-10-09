@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'vitest'
 import { parse } from 'yaml'
-import { ExecutorSchema, FlowSchema, SubflowBlockSchema, TaskBlockSchema } from '../src/schema/index.ts'
+import { ExecutorSchema, FlowSchema, TaskBlockSchema } from '../src/schema/index.ts'
 
 describe('Workflow schema', () => {
   it('parses a flow manifest', () => {
@@ -10,31 +10,6 @@ nodes: []
 `
 
     assert.deepEqual(FlowSchema.parse(parse(source)), { nodes: [] })
-  })
-
-  it('parses a subflow block manifest with its schema defaults', () => {
-    const source = `
-inputs_def:
-  - handle: input
-nodes:
-  - node_id: task
-    task: self::task
-outputs_def:
-  - handle: output
-outputs_from:
-  - handle: output
-    from_node:
-      - node_id: task
-        output_handle: output
-`
-
-    assert.deepEqual(SubflowBlockSchema.parse(parse(source)), {
-      inputs_def: [{ handle: 'input' }],
-      nodes: [{ node_id: 'task', task: 'self::task', progress_weight: 1 }],
-      outputs_def: [{ handle: 'output' }],
-      outputs_from: [{ handle: 'output', from_node: [{ node_id: 'task', output_handle: 'output' }] }],
-      private: false,
-    })
   })
 
   it('rejects unknown fields at descriptor boundaries', () => {
@@ -73,7 +48,6 @@ outputs_from:
     const executor = { name: 'javascript' as const, options: { entry: 'task.ts' } }
     const ui = { default_width: 450 }
     assert.deepEqual(TaskBlockSchema.parse({ executor, ui }), { executor, ui, private: false })
-    assert.deepEqual(SubflowBlockSchema.parse({ nodes: [], ui }), { nodes: [], ui, private: false })
     assert.throws(() => FlowSchema.parse({ nodes: [{ node_id: 'task', task: { executor, ui } }] }), /Unrecognized key/)
   })
 
@@ -110,6 +84,5 @@ outputs_from:
     }
     const executor = { name: 'javascript', options: { entry: 'task.ts' } }
     assert.throws(() => TaskBlockSchema.parse({ executor, timeout: 1 }))
-    assert.throws(() => SubflowBlockSchema.parse({ nodes: [], outputs_from: [], timeout: 1 }))
   })
 })

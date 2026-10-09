@@ -13,7 +13,6 @@ import { ConnectorStore } from '../../src/workbench/browser/runtime/stores/conne
 import { TriggerStore } from '../../src/workbench/browser/runtime/stores/triggerStore.ts'
 import { WorkspaceStore } from '../../src/workbench/browser/runtime/stores/workspaceStore.ts'
 
-const target = { kind: 'flow' } as const
 // Only transport responses are fixtures; saves use the production Store and Flow reducer.
 export function createInspectorTransport(
   log: LogAction,
@@ -50,7 +49,6 @@ export function createInspectorTransport(
 
   let presentation = setNodePositions(
     {},
-    target,
     Object.fromEntries(Object.keys(initialContent.document.graph.nodes).map((id, index) => [id, { x: 30 + index * 360, y: 40 + index * 40 }])),
   )
   const flow = { flowId: 'inspector-lab', name: 'Properties', draftRevisionId: 'r1', createdAt: timestamp, updatedAt: timestamp, version: 1, status: 'active' }

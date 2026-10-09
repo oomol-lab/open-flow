@@ -129,7 +129,6 @@ function addValueNode(harness: ControlApiConformanceHarness, flowId: string, rev
           values: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
         },
         nodeId,
-        target: { kind: 'flow' },
       },
     ],
     changeId,
@@ -139,9 +138,7 @@ function addValueNode(harness: ControlApiConformanceHarness, flowId: string, rev
 async function addManualTrigger(harness: ControlApiConformanceHarness, flowId: string, revisionId: string): Promise<string> {
   return changedRevisionId(
     await json(
-      await changeRequest(harness, flowId, revisionId, [
-        { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start', target: { kind: 'flow' } },
-      ]),
+      await changeRequest(harness, flowId, revisionId, [{ kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start' }]),
       200,
       'Add manual trigger',
     ),
@@ -375,7 +372,6 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
             before: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
             kind: 'graph.node.values.set',
             nodeId: 'marker',
-            target: { kind: 'flow' },
             value: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
           },
         ]),
@@ -488,14 +484,13 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       const initial = await addManualTrigger(harness, flowId, requiredString(flow.draftRevisionId, 'Partial Draft identity'))
       const changed = await json(
         await changeRequest(harness, flowId, initial, [
-          { kind: 'graph.node.create', nodeId: 'other', target: { kind: 'flow' }, node: { kind: 'webhook', method: 'POST', name: 'Other', bodyFields: [] } },
+          { kind: 'graph.node.create', nodeId: 'other', node: { kind: 'webhook', method: 'POST', name: 'Other', bodyFields: [] } },
           {
             kind: 'graph.node.create',
             nodeId: 'broken',
-            target: { kind: 'flow' },
             node: { kind: 'task', name: 'Broken', inputs: {}, task: { name: 'Broken', moduleId: 'missing', inputs: [], outputs: [] } },
           },
-          { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'other', target: 'broken' } },
+          { kind: 'graph.edge.connect', edge: { source: 'other', target: 'broken' } },
         ]),
         200,
         'Add unfinished branch',
@@ -705,9 +700,8 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
               prompt: 'Approve request 1?',
             },
             nodeId: 'approval',
-            target: { kind: 'flow' },
           },
-          { kind: 'graph.edge.connect', edge: { source: 'start', target: 'approval' }, target: { kind: 'flow' } },
+          { kind: 'graph.edge.connect', edge: { source: 'start', target: 'approval' } },
         ]),
         200,
         'Create Wait',
@@ -1107,13 +1101,11 @@ export const triggerControlApiConformanceCases: readonly ControlApiConformanceCa
             kind: 'graph.node.create',
             node: { cronTimes: [{ type: 'every', unit: 'hour', value: 1 }], kind: 'cron', name: 'Scheduled' },
             nodeId: 'cron',
-            target: { kind: 'flow' },
           },
           {
             kind: 'graph.node.create',
             node: { bodyFields: [], kind: 'webhook', method: 'POST', name: 'Incoming' },
             nodeId: 'webhook',
-            target: { kind: 'flow' },
           },
         ]),
         200,
@@ -1173,7 +1165,7 @@ export const triggerControlApiConformanceCases: readonly ControlApiConformanceCa
       )
 
       const removed = await json(
-        await changeRequest(harness, flowId, triggerRevisionId, [{ kind: 'graph.node.delete', nodeId: 'webhook', target: { kind: 'flow' } }]),
+        await changeRequest(harness, flowId, triggerRevisionId, [{ kind: 'graph.node.delete', nodeId: 'webhook' }]),
         200,
         'Delete Webhook',
       )
@@ -1719,7 +1711,6 @@ export function pollControlApiConformanceCases(fixture: {
             {
               kind: 'graph.node.create',
               nodeId: 'poll',
-              target: { kind: 'flow' },
               node: {
                 kind: 'poll',
                 name: 'Poll',

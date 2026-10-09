@@ -146,8 +146,7 @@ function content(live: boolean): RevisionContent {
     modules: {},
     document: {
       bindings: { token: { kind: 'variable', target: 'API_TOKEN' } },
-      tasks: { api: task },
-      subflows: {},
+
       graph: {
         nodes: {
           upstream: {
@@ -159,7 +158,7 @@ function content(live: boolean): RevisionContent {
           api: {
             kind: 'task',
             name: 'API',
-            taskId: 'api',
+            task: task,
             inputs: live
               ? {}
               : { 'path.id': { kind: 'value', value: 'sample' }, 'auth.token.token': { kind: 'sources', sources: [{ kind: 'binding', bindingId: 'token' }] } },
@@ -256,7 +255,7 @@ function OpenApiPanel({
   disabled: boolean
 }) {
   const revision = useVal(session.store.$.revision)
-  const selection = revision?.node({ kind: 'flow' }, 'api')
+  const selection = revision?.node('api')
   return (
     <I18nProvider i18n={session.i18n}>
       <div className="open-flow-workbench open-flow-theme" data-theme={dark ? 'dark' : 'light'} style={{ height: '100%', width: '100%' }}>
@@ -270,7 +269,7 @@ function OpenApiPanel({
               revision={revision}
               selection={selection}
               store={session.store}
-              target={{ kind: 'flow' }}
+
               theme={dark ? 'dark' : 'light'}
             />
           </InspectorSamplePanel>

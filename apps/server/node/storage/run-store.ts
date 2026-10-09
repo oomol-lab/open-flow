@@ -405,7 +405,6 @@ export class RunStore {
       readonly connectionId?: string
       readonly input: Readonly<Record<string, JsonValue>>
       readonly messageHandle: string
-      readonly taskId: string
     },
   ): JsonValue | undefined {
     return this.#transaction(() => {
@@ -462,7 +461,7 @@ export class RunStore {
         const message = [wait.prompt, `Expires at: ${new Date(expiresAt).toISOString()}`, ...links.map(({ action, url }) => `${action}: ${url}`)].join('\n')
         this.#database
           .prepare(
-            `INSERT INTO wait_notifications (run_id, wait_id, invocation_id, action, connection_id, task_id, input_json, status, attempts, retry_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?)`,
+            `INSERT INTO wait_notifications (run_id, wait_id, invocation_id, action, connection_id, input_json, status, attempts, retry_at, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 'pending', 0, ?, ?, ?)`,
           )
           .run(
             runId,
@@ -470,7 +469,6 @@ export class RunStore {
             `wait:${runId}:${wait.waitId}`,
             notification.action,
             notification.connectionId ?? null,
-            notification.taskId,
             JSON.stringify({ ...notification.input, [notification.messageHandle]: message }),
             waitingSince,
             waitingSince,
@@ -783,7 +781,7 @@ export class RunStore {
       else if (target == null) reason = 'The error workflow is unavailable. It must be published, enabled and have an active Flow Error node.'
       else {
         const revision = decodeRevision(encoder.encode(target.content))
-        const names = Object.values(variableBindings(revision, flowDependencies(revision, target.triggerNodeId).inputBindings))
+        const names = Object.values(variableBindings(revision, flowDependencies(revision, target.triggerNodeId).bindings))
         if (!this.#deps.variables.hasAll(names)) reason = 'The error workflow requires an unavailable Variable.'
       }
       if (reason == null && target != null) {

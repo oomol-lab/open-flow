@@ -18,9 +18,9 @@ it.each(['list_tools', '列出可用工具'])('uses the connector node title %s 
               code: 'task.connector-connection-required',
               column: 0,
               line: 1,
-              message: 'Connector Task "internal-task-id" requires an active Connection.',
-              path: '/document/tasks/internal-task-id/executor/connectionId',
-              values: { taskId: 'internal-task-id' },
+              message: 'Connector Task "connector-node" requires an active Connection.',
+              path: '/document/graph/nodes/connector-node/task/executor/connectionId',
+              values: { nodeId: 'connector-node' },
             },
             location: { nodeId: 'connector-node', section: 'account' },
             scope: 'task',
@@ -36,7 +36,7 @@ it.each(['list_tools', '列出可用工具'])('uses the connector node title %s 
   )
 
   expect(html).toContain(`请为连接器节点“${title}”选择连接账号。`)
-  expect(html).not.toContain('internal-task-id')
+  expect(html).not.toContain('connector-node')
   i18n.dispose()
 })
 

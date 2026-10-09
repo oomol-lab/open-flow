@@ -77,7 +77,7 @@ try {
 | ------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------ |
 | `flow_list`                    | `cursor?`、`limit?`                                                                        | Flow 列表和 `nextCursor?`                        |
 | `flow_get`                     | `flowId`、可选 `full`                                                                      | 默认精简 Draft 和 Live；`full=true` 返回完整内容 |
-| `flow_node_get`                | `flowId`、`revisionId`、`nodeId`、`subflowId?`                                             | 固定版本节点、Task 定义或代码模块                |
+| `flow_node_get`                | `flowId`、`revisionId`、`nodeId`                                                           | 固定版本节点、Task 定义或代码模块                |
 | `flow_schema`                  | `kind?` 或 `example?`                                                                      | Draft operations schema 或完整创建批次           |
 | `flow_create`                  | `name`、`idempotencyKey`、`teamId?`                                                        | Flow，包含初始 `draftRevisionId`                 |
 | `flow_apply`                   | `flowId`、`expectedRevisionId`、`idempotencyKey`、`operations`                             | 新 Revision identity                             |
@@ -175,7 +175,7 @@ mutation 内部发生无法确定结果的异常时返回 `flow.mutation-outcome
 
 事件源是独立于 Flow 的部署资源。`event_source_list({})` 列出当前身份可见的事件源；实际使用关系见各项的 `consumers`。配置飞书 Trigger 时，调用 `connector_connections({ serviceId: "feishu_app_bot", flowId })` 对照 Connection。空列表附带引导信息：在 Workbench 创建并验证事件源后再查询；工具不会接收或返回事件源密钥。返回的 `sourceId`、`teamId`、`connectionId`、`eventTypes`、`enabled` 和 `verifiedAt` 用于选择和确认来源。
 
-`flow_node_get({ flowId, revisionId, nodeId, subflowId? })` 返回固定 Revision 的单个节点及其使用的 Task 定义或代码 module。省略 subflowId 读取根图；指定时仅读取对应子流程图，不回退到根图。代码 Task 定义保留在 node.task，不重复返回顶层 task。Draft 后续变化不影响历史版本详情。找不到目标时返回错误，不自动读取最新版本。
+`flow_node_get({ flowId, revisionId, nodeId })` 返回固定 Revision 的单个节点及其使用的 Task 定义或代码 module。代码 Task 定义保留在 node.task，不重复返回顶层 task。Draft 后续变化不影响历史版本详情。找不到目标时返回错误，不自动读取最新版本。
 
 `flow_run` 的输入 Schema 按 source 区分互斥分支：draft 要求 flowId/revisionId，live 要求 publicationId，另一分支字段不允许出现。该约束同时用于工具发现的 JSON Schema 与调用验证。
 
@@ -183,8 +183,8 @@ mutation 内部发生无法确定结果的异常时返回 `flow.mutation-outcome
 
 ### CLI 对应入口与返回包装
 
-固定版本节点读取对应 `oo flow node show FLOW_ID NODE_ID --revision REVISION_ID [--subflow SUBFLOW_ID] --json`。
-两端都把 `nodeId`、`node`、`task?`、`module?` 放在结果顶层，CLI 另有 `kind: "node.show"`；指定子流程时不回退根图。
+固定版本节点读取对应 `oo flow node show FLOW_ID NODE_ID --revision REVISION_ID --json`。
+两端都把 `nodeId`、`node`、`task?`、`module?` 放在结果顶层，CLI 另有 `kind: "node.show"`。
 CLI 省略 revision 时读取当前 Draft，并额外支持无歧义的节点名称（含 Trigger）。
 
 `flow_code_connections` 对应 `connector code-access FLOW_ID [--publication PUBLICATION_ID]`；

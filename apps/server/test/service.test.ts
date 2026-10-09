@@ -1,6 +1,8 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { ProjectedRunEvent } from '@oomol-lab/open-flow/run-events'
 import type { InvokeLlmTask } from '@oomol-lab/open-flow/runtime-contract'
+import type { TaskNode } from '../../../packages/open-flow/src/flow/common/change.ts'
+import type { ManagedTaskDefinition } from '../../../packages/open-flow/src/flow/common/change.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
@@ -62,29 +64,11 @@ function fullFlow(value = 2): RevisionContent {
           },
           nested: {
             inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'increment', output: 'value' }] } },
-            kind: 'subflow',
-            subflowId: 'double',
+            kind: 'task',
+            task: { inputs: [{ ...port, handle: 'value' }], moduleId: 'double', name: 'Double', outputs: [{ ...port, handle: 'value' }] },
           },
         },
       },
-      subflows: {
-        double: {
-          graph: {
-            edges: [],
-            nodes: {
-              task: {
-                inputs: { value: { kind: 'sources', sources: [{ input: 'value', kind: 'flow' }] } },
-                kind: 'task',
-                task: { inputs: [{ ...port, handle: 'value' }], moduleId: 'double', name: 'Double', outputs: [{ ...port, handle: 'value' }] },
-              },
-            },
-          },
-          inputs: [{ ...port, handle: 'value' }],
-          name: 'Double',
-          outputs: [{ ...port, handle: 'value', sources: [{ kind: 'node', nodeId: 'task', output: 'value' }] }],
-        },
-      },
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {
@@ -118,8 +102,6 @@ function hangingFlow(): RevisionContent {
           },
         },
       },
-      subflows: {},
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {
@@ -147,8 +129,6 @@ function oversizedOutputsFlow(): RevisionContent {
           },
         },
       },
-      subflows: {},
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {
@@ -176,8 +156,6 @@ function variableFlow(): RevisionContent {
           },
         },
       },
-      subflows: {},
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: { main: { imports: [], name: 'Main', source: 'export default ({ token }) => ({ token })' } },
@@ -200,8 +178,6 @@ function waitFlow(): RevisionContent {
           },
         },
       },
-      subflows: {},
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {},
@@ -271,17 +247,13 @@ function llmFlow(): RevisionContent {
 
             inputs: { prompt: { kind: 'value', value: 'Hello' }, topic: { kind: 'value', value: 'Open Flow' } },
             kind: 'task',
-            taskId: 'llm',
+            task: {
+              executor: { kind: 'llm', mode: 'json' },
+              inputs: [{ ...port, handle: 'prompt' }],
+              name: 'Generate',
+              outputs: [{ ...port, handle: 'answer' }],
+            },
           },
-        },
-      },
-      subflows: {},
-      tasks: {
-        llm: {
-          executor: { kind: 'llm', mode: 'json' },
-          inputs: [{ ...port, handle: 'prompt' }],
-          name: 'Generate',
-          outputs: [{ ...port, handle: 'answer' }],
         },
       },
     },
@@ -302,17 +274,13 @@ function connectorFlow(): RevisionContent {
 
             inputs: { message: { kind: 'value', value: 'Hello' }, start: { kind: 'value', value: 'manual' } },
             kind: 'task',
-            taskId: 'connector',
+            task: {
+              executor: { action: 'send', kind: 'connector' },
+              inputs: [{ ...port, handle: 'message' }],
+              name: 'Send',
+              outputs: [{ ...port, handle: 'sent' }],
+            },
           },
-        },
-      },
-      subflows: {},
-      tasks: {
-        connector: {
-          executor: { action: 'send', kind: 'connector' },
-          inputs: [{ ...port, handle: 'message' }],
-          name: 'Send',
-          outputs: [{ ...port, handle: 'sent' }],
         },
       },
     },
@@ -337,7 +305,6 @@ describe('Server application service', () => {
     const changed = await service.control.changeDraft('test', stored.flowId, stored.revisionId, [
       {
         kind: 'graph.node.create',
-        target: { kind: 'flow' },
         nodeId: 'other',
         node: {
           kind: 'poll',
@@ -361,7 +328,6 @@ describe('Server application service', () => {
       { kind: 'binding.create', bindingId: 'unused', binding: { kind: 'variable', target: 'MISSING' } },
       {
         kind: 'graph.node.create',
-        target: { kind: 'flow' },
         nodeId: 'unused',
         node: {
           kind: 'task',
@@ -378,7 +344,6 @@ describe('Server application service', () => {
       },
       {
         kind: 'graph.node.create',
-        target: { kind: 'flow' },
         nodeId: 'unused-wait',
         node: {
           kind: 'wait',
@@ -812,50 +777,6 @@ describe('Server application service', () => {
     await closeService(service)
   })
 
-  it('reads independent previous snapshots in an isolate and keeps Subflow roots isolated', async () => {
-    const source = fullFlow()
-    const revision: RevisionContent = {
-      ...source,
-      modules: {
-        ...source.modules,
-        increment: {
-          ...source.modules.increment!,
-          source: `export default async (inputs, context) => {
-  const previous = await context.getPrevious()
-  if (previous.id !== 'value' || previous.outputs.value !== inputs.value) throw new Error('Previous output is incorrect.')
-  if (previous.outputDefs[0].handle !== 'value' || previous.outputDefs[0].nullable !== false || 'value' in previous.outputDefs[0]) throw new Error('Previous schema is incorrect.')
-  previous.outputs.value = 'changed'
-  previous.outputDefs[0].jsonSchema.changed = true
-  const again = await context.getPrevious()
-  if (again.outputs.value !== inputs.value || again.outputDefs[0].jsonSchema.changed) throw new Error('Previous reads share mutable state.')
-  return { value: inputs.value + 1 }
-}`,
-        },
-        double: {
-          ...source.modules.double!,
-          source: `export default async ({ value }, context) => {
-  if (await context.getPrevious() !== null) throw new Error('Subflow root has a previous node.')
-  return { value: value * 2 }
-}`,
-        },
-      },
-    }
-    const service = await openService(await databaseFile())
-    await startService(service)
-    const accepted = await acceptRun(service, {
-      flowId: 'main',
-      idempotencyKey: 'previous',
-      revision,
-      revisionId: 'revision-previous',
-    })
-    if (accepted.kind !== 'accepted') throw new Error('Run was not accepted.')
-    await service.waitForIdle()
-    expect(service.run(accepted.runId)).toMatchObject({
-      status: 'completed',
-      result: { nodes: [{ nodeId: 'nested', outputs: { value: 6 } }] },
-    })
-  })
-
   it('executes a fixed full Flow through Scheduler and isolated-vm and persists public events', async () => {
     const service = await openService(await databaseFile())
     await startService(service)
@@ -880,18 +801,18 @@ describe('Server application service', () => {
     const kinds = events.map((event) => event.kind)
     expect(kinds[0]).toBe('run.queued')
     expect(kinds.at(-1)).toBe('run.completed')
-    expect(kinds.filter((kind) => kind == 'run.started')).toHaveLength(2)
-    expect(kinds.filter((kind) => kind == 'node.started')).toHaveLength(4)
-    expect(kinds.filter((kind) => kind == 'node.completed')).toHaveLength(4)
-    expect(kinds.filter((kind) => kind == 'run.progress')).toHaveLength(2)
-    expect(events.filter((event) => event.kind == 'run.progress').map((event) => event.payload.progress)).toEqual([100, 100])
+    expect(kinds.filter((kind) => kind == 'run.started')).toHaveLength(1)
+    expect(kinds.filter((kind) => kind == 'node.started')).toHaveLength(3)
+    expect(kinds.filter((kind) => kind == 'node.completed')).toHaveLength(3)
+    expect(kinds.filter((kind) => kind == 'run.progress')).toHaveLength(1)
+    expect(events.filter((event) => event.kind == 'run.progress').map((event) => event.payload.progress)).toEqual([100])
     expect(events.map((event) => event.cursor)).toEqual(events.map((_, index) => index + 1))
     expect(JSON.stringify(events.filter((event) => event.kind != 'run.completed'))).not.toContain('jobId')
     expect(service.control.runs.getRunResult(accepted.runId)).toMatchObject({ result: { kind: 'node-results' }, status: 'completed' })
     const projected = service.control.runs.getRunEvents(accepted.runId, 0, 100)
     expect(projected.done).toBe(true)
     expect(projected.nextAfter).toBe(events.length)
-    expect(projected.events.filter((event) => event.kind == 'node.completed')).toHaveLength(4)
+    expect(projected.events.filter((event) => event.kind == 'node.completed')).toHaveLength(3)
     expect(projected.events.find((event) => event.kind == 'node.completed' && event.payload.nodeId == 'nested')).toMatchObject({
       payload: { outputs: { value: 6 } },
     })
@@ -1030,7 +951,7 @@ describe('Server application service', () => {
     await startService(service)
     await service.waitForIdle()
     expect(service.run(accepted.runId)?.status).toBe('completed')
-    expect(service.events(accepted.runId).filter((event) => event.kind == 'run.started')).toHaveLength(2)
+    expect(service.events(accepted.runId).filter((event) => event.kind == 'run.started')).toHaveLength(1)
     expect(service.events(accepted.runId).filter((event) => event.kind == 'run.completed')).toHaveLength(1)
     await closeService(service)
   })
@@ -1362,7 +1283,7 @@ describe('Server application service', () => {
     const service = await openService(await databaseFile(), { capabilities: { connector: () => createConnectorHost({ getAction }) } })
     const source = fullFlow()
     const increment = source.document.graph.nodes.increment!
-    if (increment.kind !== 'task' || increment.task == null) throw new Error('Missing fixture task')
+    if (increment.kind !== 'task' || !('moduleId' in increment.task)) throw new Error('Missing fixture task')
     const entry = { action: 'mail.send', ...(connectionId == null ? {} : { connectionId }) }
     const revision: RevisionContent =
       kind === 'code'
@@ -1383,22 +1304,29 @@ describe('Server application service', () => {
             ...source,
             document: {
               ...source.document,
-              tasks: {
-                ...source.document.tasks,
-                agent: {
-                  name: 'Agent',
-                  inputs: [],
-                  outputs: [{ handle: 'output', nullable: false, jsonSchema: { type: 'string' } }],
-                  executor: {
-                    kind: 'agent',
-                    model: 'fixture',
-                    prompt: 'Go',
-                    maxRounds: 3,
-                    tools: [{ ...entry, id: 'send', name: 'send', description: '', approval: false, inputs: [] }],
+
+              graph: {
+                ...source.document.graph,
+                nodes: {
+                  ...source.document.graph.nodes,
+                  agent: {
+                    kind: 'task',
+                    task: {
+                      name: 'Agent',
+                      inputs: [],
+                      outputs: [{ handle: 'output', nullable: false, jsonSchema: { type: 'string' } }],
+                      executor: {
+                        kind: 'agent',
+                        model: 'fixture',
+                        prompt: 'Go',
+                        maxRounds: 3,
+                        tools: [{ ...entry, id: 'send', name: 'send', description: '', approval: false, inputs: [] }],
+                      },
+                    },
+                    inputs: {},
                   },
                 },
               },
-              graph: { ...source.document.graph, nodes: { ...source.document.graph.nodes, agent: { kind: 'task', taskId: 'agent', inputs: {} } } },
             },
           }
     const stored = await storeRevision(service, revision, `account-check-${kind}-${authenticated}-${connectionId}`)
@@ -1411,7 +1339,7 @@ describe('Server application service', () => {
         path:
           kind === 'code'
             ? '/document/graph/nodes/increment/task/capabilities/0/actions/0/connectionId'
-            : '/document/tasks/agent/executor/tools/0/connectionId',
+            : '/document/graph/nodes/agent/task/executor/tools/0/connectionId',
         values: { action: 'mail.send' },
       })
     }
@@ -1427,7 +1355,7 @@ describe('Server application service', () => {
         {
           code: 'llm.unconfigured',
           message: 'LLM is not configured for this deployment. Configure OPEN_FLOW_LLM_ORIGIN and OPEN_FLOW_LLM_TOKEN.',
-          path: '/document/tasks/llm/executor',
+          path: '/document/graph/nodes/llm/task/executor',
         },
       ],
       valid: false,
@@ -1462,7 +1390,7 @@ describe('Server application service', () => {
     }
   })
 
-  it.each([1, 3])('repairs a model %s Draft into a new Revision without changing its source', async (modelVersion) => {
+  it.each([1, 3, 5])('repairs a model %s Draft into a new Revision without changing its source', async (modelVersion) => {
     const file = await databaseFile()
     const service = await openService(file)
     const created = await service.control.createFlow('test', 'Repairable', 'repairable')
@@ -1475,11 +1403,13 @@ describe('Server application service', () => {
       document: {
         ...source.content.document,
         bindings: { account: { kind: 'connection', target: 'connection' } },
+        tasks: modelVersion == 5 ? { task: { name: 'LLM', inputs: [], outputs: [], executor: { kind: 'llm', mode: 'json' } } } : {},
         graph: {
           edges: [],
           nodes: {
             start: { kind: 'manual', name: 'Start' },
             other: { kind: 'manual', name: 'Other' },
+            ...(modelVersion == 5 ? { llm: { kind: 'task', taskId: 'task', inputs: {} } } : {}),
             broken: { kind: 'unknown' },
             poll: {
               kind: 'poll',
@@ -1521,6 +1451,12 @@ describe('Server application service', () => {
           },
         },
       })
+      if (modelVersion == 5)
+        expect((await service.control.getEditor(source.flowId)).draft.content.document.graph.nodes.llm).toEqual({
+          kind: 'task',
+          inputs: {},
+          task: { name: 'LLM', inputs: [], outputs: [], executor: { kind: 'llm', mode: 'json' } },
+        })
       expect(database.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(source.revisionId)).toEqual({ content: legacy })
       await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'repair-request')).resolves.toEqual(repaired)
       await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'another-repair')).rejects.toMatchObject({
@@ -1530,6 +1466,70 @@ describe('Server application service', () => {
       database.close()
     }
   })
+
+  it.each(['missing Task', 'invalid notification', 'retired Subflow', 'future model'])(
+    'rejects a Draft repair with %s without changing the head or source',
+    async (failure) => {
+      const file = await databaseFile()
+      const service = await openService(file)
+      const created = await service.control.createFlow('test', 'Rejected upgrade', 'rejected-upgrade')
+      const source = service.control.getRevision(created.flow.flowId, created.flow.draftRevisionId)
+      const legacy = JSON.stringify({
+        kind: 'open-flow-flow-revision',
+        version: 1,
+        modelVersion: failure == 'future model' ? currentFlowModelVersion + 1 : 5,
+        modules: {},
+        document: {
+          bindings: { token: { kind: 'variable', target: 'TOKEN' } },
+          subflows: failure == 'retired Subflow' ? { nested: { graph: { nodes: {}, edges: [] }, inputs: [], outputs: [] } } : {},
+          tasks: {
+            agent: {
+              name: 'Agent',
+              inputs: [],
+              outputs: [],
+              executor: {
+                kind: 'agent',
+                model: 'test',
+                prompt: 'Review',
+                maxRounds: 3,
+                tools: [],
+                notification: { taskId: 'missing', messageHandle: 'text', inputs: {} },
+              },
+            },
+          },
+          graph: {
+            edges: [],
+            nodes: {
+              start: { kind: 'manual', name: 'Start' },
+              value: { kind: 'value', inputs: {}, values: [{ ...port, handle: 'value', value: 42 }] },
+              ...(failure == 'missing Task' || failure == 'invalid notification'
+                ? { task: { kind: 'task', taskId: failure == 'missing Task' ? 'missing' : 'agent', inputs: {} } }
+                : {}),
+            },
+          },
+        },
+      })
+      const database = new DatabaseSync(file)
+      try {
+        database
+          .prepare('UPDATE revisions SET content = ?, digest = ? WHERE revision_id = ?')
+          .run(legacy, await digestBytes(new TextEncoder().encode(legacy)), source.revisionId)
+
+        await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'rejected-repair')).rejects.toMatchObject({
+          code: controlErrorCode.flowInvalid,
+          status: 400,
+        })
+
+        expect(service.control.getFlow(source.flowId).draftRevisionId).toBe(source.revisionId)
+        await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'rejected-repair')).rejects.toMatchObject({
+          code: controlErrorCode.flowInvalid,
+        })
+        expect(database.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(source.revisionId)).toEqual({ content: legacy })
+      } finally {
+        database.close()
+      }
+    },
+  )
 
   it('replaces an unreadable Draft with an empty child Revision so the editor can open', async () => {
     const file = await databaseFile()
@@ -1552,7 +1552,7 @@ describe('Server application service', () => {
           revisionId: repaired.revision.revisionId,
           content: {
             modelVersion: currentFlowModelVersion,
-            document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} },
+            document: { bindings: {}, graph: { edges: [], nodes: {} } },
             modules: {},
           },
         },
@@ -1575,8 +1575,7 @@ describe('Server application service', () => {
       modules: {},
       document: {
         bindings: {},
-        tasks: {},
-        subflows: {},
+
         graph: {
           nodes: {
             start: { kind: 'manual', name: 'Start' },
@@ -1654,7 +1653,7 @@ describe('Server application service', () => {
   it('ignores unreferenced LLM Tasks when the deployment has no LLM host', async () => {
     const unavailable = await openService(await databaseFile())
     const content = variableFlow()
-    const unused = llmFlow().document.tasks.llm
+    const unused = (llmFlow().document.graph.nodes['llm'] as TaskNode).task as ManagedTaskDefinition
     if (unused == null) throw new Error('LLM Task fixture is missing.')
     const stored = await storeRevision(
       unavailable,
@@ -1662,7 +1661,7 @@ describe('Server application service', () => {
         ...content,
         document: {
           ...content.document,
-          tasks: { unused },
+          graph: { ...content.document.graph, nodes: { ...content.document.graph.nodes } },
         },
       },
       'llm-check-unreferenced',

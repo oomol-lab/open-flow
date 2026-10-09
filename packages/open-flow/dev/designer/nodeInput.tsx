@@ -64,8 +64,7 @@ function ObjectSourceSample({ variables }: { variables: InputVariables }) {
     modules: {},
     document: {
       bindings: {},
-      tasks: {},
-      subflows: {},
+
       graph: {
         edges: [{ source: 'data', target: 'sink' }],
         nodes: {
@@ -104,7 +103,7 @@ function ObjectSourceSample({ variables }: { variables: InputVariables }) {
     },
   }
   const { document } = content
-  const outputs = inputSourceCandidates(document, document.graph, 'sink', 'customer').data ?? []
+  const outputs = inputSourceCandidates(document.graph, 'sink', 'customer').data ?? []
   return (
     <div className="editor-context-panel" style={{ width: 320, maxWidth: '100%' }}>
       <NodeInputValue
@@ -116,7 +115,7 @@ function ObjectSourceSample({ variables }: { variables: InputVariables }) {
         onValue={() => {}}
         onVariable={() => {}}
         upstream={{
-          current: [{ ...selected, nodeName: 'Customer', check: checkInputSource(document, document.graph, 'sink', 'customer', selected) }],
+          current: [{ ...selected, nodeName: 'Customer', check: checkInputSource(document.graph, 'sink', 'customer', selected) }],
           groups: [{ nodeId: 'data', nodeName: 'Customer', outputs }],
           onChange: (source) => setSelected({ kind: 'node', ...source }),
         }}

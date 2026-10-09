@@ -102,13 +102,13 @@ it('replays an accepted Draft change after its full Revision was pruned', () => 
 it('returns a pruned Revision as missing while preserving Draft change replay', async () => {
   const service = await openService(':memory:')
   const flow = (await service.control.createFlow('operator', 'Flow', 'create')).flow
-  const firstChange = [{ kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'first', node: { kind: 'manual', name: 'First' } }] as const
+  const firstChange = [{ kind: 'graph.node.create', nodeId: 'first', node: { kind: 'manual', name: 'First' } }] as const
   const first = await service.control.changeDraft('operator', flow.flowId, flow.draftRevisionId, firstChange, 'first-change')
   const second = await service.control.changeDraft(
     'operator',
     flow.flowId,
     first.revision.revisionId,
-    [{ kind: 'graph.node.delete', target: { kind: 'flow' }, nodeId: 'first' }],
+    [{ kind: 'graph.node.delete', nodeId: 'first' }],
     'second-change',
   )
   await service.control.repairDraft('operator', flow.flowId, second.revision.revisionId, 'checkpoint')

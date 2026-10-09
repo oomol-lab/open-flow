@@ -26,16 +26,7 @@ async function fixture(
     modules: {},
     document: {
       bindings: {},
-      subflows: {},
-      tasks: {
-        send: {
-          name: 'Send',
-          inputs: [{ handle: 'notice', jsonSchema: { type: 'object' }, nullable: true }],
-          outputs: [],
-          executor: { kind: 'connector', action: 'test.send' },
-        },
-        after: { name: 'After', inputs: [], outputs: [], executor: { kind: 'connector', action: 'test.after' } },
-      },
+
       graph: {
         nodes: {
           start: { kind: 'manual', name: 'Start' },
@@ -49,12 +40,17 @@ async function fixture(
             ? {
                 send: {
                   kind: 'task' as const,
-                  taskId: 'send',
+                  task: {
+                    name: 'Send',
+                    inputs: [{ handle: 'notice', jsonSchema: {}, nullable: true }],
+                    outputs: [],
+                    executor: { kind: 'connector' as const, action: 'test.send' },
+                  },
                   inputs: { notice: { kind: 'sources' as const, sources: [{ kind: 'node' as const, nodeId: 'wait', output: 'pending' }] } },
                 },
               }
             : {}),
-          after: { kind: 'task', taskId: 'after', inputs: {} },
+          after: { kind: 'task', task: { name: 'After', inputs: [], outputs: [], executor: { kind: 'connector', action: 'test.after' } }, inputs: {} },
         },
         edges: [
           { source: 'start', target: 'wait' },

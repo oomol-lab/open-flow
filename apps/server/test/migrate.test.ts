@@ -80,11 +80,11 @@ it('accepts databases already rebuilt with the new column names and snapshot for
   const file = await databaseFile()
   const database = Database.open(file)
   database.connection.exec(
-    'DROP TABLE user_tokens; DROP TABLE users; DROP INDEX flows_owner_list; ALTER TABLE flows DROP COLUMN owner_id; DROP TABLE error_subscriptions; DROP TABLE error_bindings; DROP TABLE error_dispatches; ALTER TABLE runs DROP COLUMN failure_detail; ALTER TABLE runs DROP COLUMN error_source_run_id; ALTER TABLE runs DROP COLUMN error_source_flow_id; ALTER TABLE publications DROP COLUMN live_enabled_at_end; ALTER TABLE publications DROP COLUMN live_ended_at; ALTER TABLE poll_candidates DROP COLUMN retry_count; ALTER TABLE publications DROP COLUMN presentation_snapshot; PRAGMA user_version = 29',
+    "ALTER TABLE wait_notifications ADD COLUMN task_id TEXT NOT NULL DEFAULT ''; DROP TABLE user_tokens; DROP TABLE users; DROP INDEX flows_owner_list; ALTER TABLE flows DROP COLUMN owner_id; DROP TABLE error_subscriptions; DROP TABLE error_bindings; DROP TABLE error_dispatches; ALTER TABLE runs DROP COLUMN failure_detail; ALTER TABLE runs DROP COLUMN error_source_run_id; ALTER TABLE runs DROP COLUMN error_source_flow_id; ALTER TABLE publications DROP COLUMN live_enabled_at_end; ALTER TABLE publications DROP COLUMN live_ended_at; ALTER TABLE poll_candidates DROP COLUMN retry_count; ALTER TABLE publications DROP COLUMN presentation_snapshot; PRAGMA user_version = 29",
   )
   database.close()
   const upgraded = Database.open(file)
-  expect(version(upgraded.connection)).toBe(38)
+  expect(version(upgraded.connection)).toBe(39)
   expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
   upgraded.close()
 })
@@ -133,7 +133,7 @@ it('backfills Revision metadata needed after old content is pruned', async () =>
 
   const upgraded = Database.open(file)
   try {
-    expect(version(upgraded.connection)).toBe(38)
+    expect(version(upgraded.connection)).toBe(39)
     expect(upgraded.connection.prepare('SELECT digest, model_version AS modelVersion FROM flow_revisions WHERE revision_id = ?').get('revision')).toEqual({
       digest: 'digest',
       modelVersion: 3,
@@ -189,7 +189,7 @@ it('applies the Flow-first schema without foreign keys', async () => {
   Database.open(file).close()
   const database = new DatabaseSync(file)
   try {
-    expect(version(database)).toBe(38)
+    expect(version(database)).toBe(39)
     const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as {
       readonly name: string
     }[]
@@ -231,7 +231,7 @@ it('upgrades a version 1 Flow database without changing its data', async () => {
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(38)
+    expect(version(reopened)).toBe(39)
     expect(reopened.prepare('SELECT revision_id AS revisionId FROM revisions').all()).toEqual([{ revisionId: 'revision-a' }])
     expect(reopened.prepare('SELECT name FROM variables').all()).toEqual([])
   } finally {
@@ -261,7 +261,7 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(38)
+    expect(version(reopened)).toBe(39)
     expect(reopened.prepare('SELECT flow_id AS flowId, team_id AS teamId FROM flow_connector_teams').all()).toEqual([{ flowId: 'flow-a', teamId: null }])
     expect(reopened.prepare("SELECT name FROM pragma_table_info('runs') WHERE name = 'connector_team_id'").get()).toEqual({ name: 'connector_team_id' })
   } finally {
@@ -309,13 +309,13 @@ it('rejects a newer Flow schema version without modifying it', async () => {
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
-  database.exec('PRAGMA user_version = 39')
+  database.exec('PRAGMA user_version = 40')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('SQLite schema version 39 is newer than the supported version 38.')
+  expect(() => Database.open(file)).toThrow('SQLite schema version 40 is newer than the supported version 39.')
 
   const reopened = new DatabaseSync(file)
-  expect(version(reopened)).toBe(39)
+  expect(version(reopened)).toBe(40)
   reopened.close()
 })
 
@@ -353,7 +353,7 @@ it('preserves old checkpoint bytes for explicit recovery validation', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(38)
+    expect(version(reopened)).toBe(39)
     expect(reopened.prepare('SELECT * FROM run_checkpoints').get()).toEqual({
       run_id: 'run-a',
       checkpoint_json: '{"value":42}',
@@ -386,7 +386,7 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   Database.open(file).close()
   const upgraded = new DatabaseSync(file)
   try {
-    expect(version(upgraded)).toBe(38)
+    expect(version(upgraded)).toBe(39)
     const after = tables.map((table) => upgraded.prepare('SELECT * FROM ' + table).all())
     expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
     expect(after[2]).toEqual(
@@ -574,10 +574,27 @@ it('adds personal token storage to version 37 without changing existing accounts
   old.close()
   const upgraded = Database.open(file)
   try {
-    expect(version(upgraded.connection)).toBe(38)
+    expect(version(upgraded.connection)).toBe(39)
     expect(upgraded.connection.prepare('SELECT * FROM users').all()).toEqual(before)
     expect(upgraded.connection.prepare('SELECT * FROM user_tokens').all()).toEqual([])
     expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
+  } finally {
+    upgraded.close()
+  }
+})
+
+it('removes the obsolete Task identity without changing queued notification delivery state', async () => {
+  const file = await databaseFile()
+  const old = legacyDatabase(file, 38)
+  old.exec(`INSERT INTO wait_notifications
+    (run_id, wait_id, invocation_id, action, connection_id, task_id, input_json, status, attempts, retry_at, created_at, updated_at)
+    VALUES ('run', 'wait', 'invocation', 'mail.send', 'work', 'legacy-task', '{"text":"Review"}', 'pending', 2, 100, 1, 2)`)
+  const { task_id: _, ...before } = old.prepare('SELECT * FROM wait_notifications').get()!
+  old.close()
+  const upgraded = Database.open(file)
+  try {
+    expect(upgraded.connection.prepare('SELECT * FROM wait_notifications').get()).toEqual(before)
+    expect(upgraded.connection.prepare("SELECT name FROM pragma_table_info('wait_notifications') WHERE name = 'task_id'").get()).toBeUndefined()
   } finally {
     upgraded.close()
   }

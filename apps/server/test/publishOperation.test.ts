@@ -32,7 +32,6 @@ async function addMarker(service: ServerService, flowId: string, revisionId: str
         values: [{ handle: 'ready', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
       },
       nodeId,
-      target: { kind: 'flow' },
     },
   ])
   return changed.revision.revisionId

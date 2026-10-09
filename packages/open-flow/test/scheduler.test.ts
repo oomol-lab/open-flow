@@ -101,8 +101,7 @@ describe('revision graph scheduler', () => {
     const source = revision(
       {
         bindings: {},
-        tasks: {},
-        subflows: {},
+
         graph: {
           nodes: {
             left: { name: 'Left', kind: 'task', inputs: {}, task: task('left', [], ['value']) },
@@ -141,44 +140,6 @@ describe('revision graph scheduler', () => {
       })
   })
 
-  it('exposes only the declared Subflow boundary', async () => {
-    const prepared = await prepareFlow(
-      revision(
-        {
-          bindings: {},
-          tasks: {},
-          subflows: {
-            nested: {
-              name: 'Nested',
-              inputs: [],
-              outputs: [{ handle: 'result', ...port, sources: [{ kind: 'node', nodeId: 'inner', output: 'value' }] }],
-              graph: { edges: [], nodes: { inner: { kind: 'value', inputs: {}, values: [{ handle: 'value', ...port, value: 42 }] } } },
-            },
-          },
-          graph: {
-            nodes: {
-              nested: { kind: 'subflow', subflowId: 'nested', inputs: {} },
-              sink: { kind: 'task', inputs: {}, task: task('sink', [], []) },
-            },
-            edges: [{ source: 'nested', target: 'sink' }],
-          },
-        },
-        ['run'],
-      ),
-      'main',
-      engine,
-    )
-    await runFlow(prepared, {
-      runId: 'nested-previous',
-      invokeTask: (invocation) =>
-        Effect.sync(() => {
-          if (!('moduleId' in invocation)) throw new Error('Expected Code')
-          expect(invocation.getPrevious()).toEqual({ id: 'nested', name: 'Nested', outputs: { result: 42 }, outputDefs: [{ handle: 'result', ...port }] })
-          return {}
-        }),
-    })
-  })
-
   it('injects a Variable once without projecting it into node.started inputs', async () => {
     const source = revision(
       {
@@ -193,8 +154,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        subflows: {},
-        tasks: {},
       },
       ['capture'],
     )
@@ -224,81 +183,6 @@ describe('revision graph scheduler', () => {
     })
   })
 
-  it('injects the shared Run Variable snapshot into every Subflow invocation', async () => {
-    const source = revision(
-      {
-        bindings: { token: { kind: 'variable', target: 'TOKEN' } },
-        graph: {
-          edges: [
-            { source: 'first', target: 'worker' },
-            { source: 'second', target: 'other' },
-          ],
-          nodes: {
-            first: {
-              inputs: {},
-              kind: 'value',
-              values: [{ handle: 'call', jsonSchema: {}, nullable: false, value: 1 }],
-            },
-            second: {
-              inputs: {},
-              kind: 'value',
-              values: [{ handle: 'call', jsonSchema: {}, nullable: false, value: 2 }],
-            },
-            worker: {
-              inputs: { call: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'first', output: 'call' }] } },
-              kind: 'subflow',
-              subflowId: 'worker',
-            },
-            other: {
-              inputs: { call: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'second', output: 'call' }] } },
-              kind: 'subflow',
-              subflowId: 'worker',
-            },
-          },
-        },
-        subflows: {
-          worker: {
-            graph: {
-              edges: [],
-              nodes: {
-                capture: {
-                  inputs: {
-                    call: { kind: 'sources', sources: [{ input: 'call', kind: 'flow' }] },
-                    token: { kind: 'sources', sources: [{ bindingId: 'token', kind: 'binding' }] },
-                  },
-                  kind: 'task',
-                  task: task('capture', ['call', 'token'], []),
-                },
-              },
-            },
-            inputs: [{ handle: 'call', jsonSchema: {}, nullable: false }],
-            name: 'Worker',
-            outputs: [],
-          },
-        },
-        tasks: {},
-      },
-      ['capture'],
-    )
-    const prepared = await prepareFlow(source, 'main', engine)
-    const inputs: Readonly<Record<string, JsonValue>>[] = []
-
-    await runFlow(prepared, {
-      bindingValues: { token: 'shared' },
-      invokeTask: (invocation) =>
-        Effect.sync(() => {
-          inputs.push(invocation.input)
-          return {}
-        }),
-      runId: 'run-subflow-variable',
-    })
-
-    expect(inputs.toSorted((left, right) => Number(left.call) - Number(right.call))).toEqual([
-      { call: 1, token: 'shared' },
-      { call: 2, token: 'shared' },
-    ])
-  })
-
   it.each(['missing', 'capture'])('rejects Trigger input for non-Trigger node %s', async (nodeId) => {
     const source = revision(
       {
@@ -313,8 +197,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        subflows: {},
-        tasks: {},
       },
       ['capture'],
     )
@@ -358,8 +240,6 @@ describe('revision graph scheduler', () => {
             scheduled: { cronTimes: [{ type: 'every', unit: 'minute', value: 1 }], kind: 'cron', name: 'Scheduled' },
           },
         },
-        subflows: {},
-        tasks: {},
       },
       ['capture'],
     )
@@ -411,8 +291,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        subflows: {},
-        tasks: {},
       },
       [],
     )
@@ -462,8 +340,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        subflows: {},
-        tasks: {},
       },
       ['after'],
     )
@@ -544,8 +420,6 @@ describe('revision graph scheduler', () => {
               },
             },
           },
-          subflows: {},
-          tasks: {},
         },
         ['a'],
       ),
@@ -609,8 +483,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        subflows: {},
-        tasks: {},
       },
       ['approved', 'rejected'],
     )
@@ -664,8 +536,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        subflows: {},
-        tasks: {},
       },
       [],
     )
@@ -697,140 +567,6 @@ describe('revision graph scheduler', () => {
       ],
     })
     expect(events.filter((event) => event.type == 'run.started')).toHaveLength(1)
-  })
-
-  it('routes first-match Conditions through nested Subflows and preserves empty branches', async () => {
-    const source = revision(
-      {
-        bindings: {},
-        graph: {
-          edges: [
-            { source: 'source', target: 'branch' },
-            { source: 'branch', sourceHandle: 'high', target: 'nested' },
-            { source: 'branch', sourceHandle: 'otherwise', target: 'low' },
-          ],
-          nodes: {
-            source: {
-              inputs: {},
-              kind: 'task',
-              task: task('source', ['value'], ['value']),
-            },
-            branch: {
-              kind: 'condition',
-              cases: [
-                {
-                  output: 'high',
-                  groups: [
-                    {
-                      expressions: [
-                        {
-                          left: { kind: 'source' as const, source: { kind: 'node', nodeId: 'source', output: 'value' } },
-                          operator: '>',
-                          right: { kind: 'value' as const, value: 5 },
-                        },
-                      ],
-                    },
-                  ],
-                },
-              ],
-              inputs: {},
-              matchMode: 'first' as const,
-            },
-            nested: {
-              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
-              kind: 'subflow',
-              subflowId: 'double-flow',
-            },
-            low: {
-              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
-              kind: 'task',
-              task: task('low', ['value'], ['value']),
-            },
-          },
-        },
-        subflows: {
-          'double-flow': {
-            graph: {
-              edges: [],
-              nodes: {
-                double: {
-                  inputs: { value: { kind: 'sources', sources: [{ input: 'value', kind: 'flow' }] } },
-                  kind: 'task',
-                  task: task('double', ['value'], ['value']),
-                },
-              },
-            },
-            inputs: [{ ...port, handle: 'value' }],
-            name: 'Double',
-            outputs: [{ ...port, handle: 'value', sources: [{ kind: 'node', nodeId: 'double', output: 'value' }] }],
-          },
-        },
-        tasks: {},
-      },
-      ['double', 'low', 'source'],
-    )
-    const prepared = await prepareFlow(source, 'main', engine)
-    const events: SchedulerEvent[] = []
-    const invoked: string[] = []
-    const result = await runFlow(prepared, {
-      emit: (event) => Effect.sync(() => void events.push(event)),
-      inputs: { source: { value: 7 } },
-      invokeTask(invocation) {
-        return Effect.sync(() => {
-          invoked.push(invocation.nodeId)
-          if (invocation.nodeId == 'source') return { value: invocation.input.value }
-          if (invocation.nodeId == 'double' && 'moduleId' in invocation) expect(invocation.getPrevious()).toBeNull()
-          if (invocation.nodeId == 'double') return { value: (invocation.input.value as number) * 2 }
-          return { value: 'low' }
-        })
-      },
-      runId: 'run-condition',
-    })
-
-    expect(invoked).toEqual(['source', 'double'])
-    expect(result).toEqual({
-      kind: 'node-results',
-      nodes: [{ status: 'completed', jobId: expect.any(String), outputs: { value: 14 }, nodeId: 'nested' }],
-    })
-    expect(events.filter((event) => event.type == 'run.started').map((event) => event.flowId)).toEqual(['main', 'double-flow'])
-    expect(events).toContainEqual(expect.objectContaining({ nodeId: 'branch', type: 'node.completed', outputs: {} }))
-    expect(events.some((event) => 'nodeId' in event && event.nodeId == 'low')).toBe(false)
-  })
-
-  it('passes a Subflow input directly to a Subflow output', async () => {
-    const source = revision(
-      {
-        bindings: {},
-        graph: {
-          edges: [{ source: 'source', target: 'nested' }],
-          nodes: {
-            source: { inputs: {}, kind: 'task', task: task('source', [], ['value']) },
-            nested: {
-              inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] } },
-              kind: 'subflow',
-              subflowId: 'passthrough',
-            },
-          },
-        },
-        subflows: {
-          passthrough: {
-            graph: { edges: [], nodes: {} },
-            inputs: [{ ...port, handle: 'value' }],
-            name: 'Passthrough',
-            outputs: [{ ...port, handle: 'value', sources: [{ input: 'value', kind: 'flow' }] }],
-          },
-        },
-        tasks: {},
-      },
-      ['source'],
-    )
-    const prepared = await prepareFlow(source, 'main', engine)
-    const result = await runFlow(prepared, {
-      invokeTask: () => Effect.succeed({ value: 42 }),
-      runId: 'run-passthrough',
-    })
-
-    expect(result.nodes).toEqual([{ status: 'completed', jobId: expect.any(String), outputs: { value: 42 }, nodeId: 'nested' }])
   })
 
   it.each([
@@ -901,8 +637,6 @@ describe('revision graph scheduler', () => {
               },
             },
           },
-          subflows: {},
-          tasks: {},
         },
         ['fallback', 'matched'],
       )
@@ -975,8 +709,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        subflows: {},
-        tasks: {},
       },
       ['all', 'any', 'later'],
     )
@@ -1019,8 +751,6 @@ describe('revision graph scheduler', () => {
             },
           },
         },
-        subflows: {},
-        tasks: {},
       },
       ['a', 'b', 'collect'],
     )
@@ -1058,8 +788,6 @@ describe('revision graph scheduler', () => {
               after: { inputs: {}, kind: 'task', task: task('after', [], []) },
             },
           },
-          subflows: {},
-          tasks: {},
         },
         ['source', 'after'],
       ),
@@ -1101,8 +829,6 @@ describe('revision graph scheduler', () => {
             collect: { inputs: {}, kind: 'task', task: task('collect', [], []) },
           },
         },
-        subflows: {},
-        tasks: {},
       },
       ['source', 'collect'],
     )
@@ -1131,14 +857,19 @@ describe('revision graph scheduler', () => {
     const source = revision(
       {
         bindings: {},
-        graph: { edges: [], nodes: { news: { inputs: {}, kind: 'task', taskId: 'news' } } },
-        subflows: {},
-        tasks: {
-          news: {
-            executor: { action: 'hacker-news.get-latest-posts', kind: 'connector' },
-            inputs: [],
-            name: 'Get Latest Posts',
-            outputs: [{ handle: 'posts', jsonSchema: { type: 'array' }, nullable: false }],
+        graph: {
+          edges: [],
+          nodes: {
+            news: {
+              inputs: {},
+              kind: 'task',
+              task: {
+                executor: { action: 'hacker-news.get-latest-posts', kind: 'connector' },
+                inputs: [],
+                name: 'Get Latest Posts',
+                outputs: [{ handle: 'posts', jsonSchema: { type: 'array' }, nullable: false }],
+              },
+            },
           },
         },
       },
@@ -1164,8 +895,6 @@ describe('revision graph scheduler', () => {
       {
         bindings: {},
         graph: { edges: [], nodes: { slow: { inputs: {}, kind: 'task', task: task('slow', [], []), timeoutMs: 10 } } },
-        subflows: {},
-        tasks: {},
       },
       ['slow'],
     )
@@ -1218,8 +947,6 @@ describe('revision graph scheduler', () => {
             slow: { inputs: {}, kind: 'task', task: task('slow', [], []) },
           },
         },
-        subflows: {},
-        tasks: {},
       },
       ['fail', 'slow'],
     )
@@ -1253,8 +980,6 @@ describe('revision graph scheduler', () => {
       {
         bindings: {},
         graph: { edges: [], nodes: { task: { inputs: {}, kind: 'task', task: task('task', [], []) } } },
-        subflows: {},
-        tasks: {},
       },
       ['task'],
     )
@@ -1278,14 +1003,19 @@ describe('revision graph scheduler', () => {
     const source = revision(
       {
         bindings: {},
-        graph: { edges: [], nodes: { task: { inputs: {}, kind: 'task', taskId: 'task-main' } } },
-        subflows: {},
-        tasks: {
-          'task-main': {
-            executor: { kind: 'llm', mode: 'chat' },
-            inputs: [],
-            name: 'Managed',
-            outputs: [],
+        graph: {
+          edges: [],
+          nodes: {
+            task: {
+              inputs: {},
+              kind: 'task',
+              task: {
+                executor: { kind: 'llm', mode: 'chat' },
+                inputs: [],
+                name: 'Managed',
+                outputs: [],
+              },
+            },
           },
         },
       },
@@ -1312,8 +1042,7 @@ describe('port null normalization', () => {
         revision(
           {
             bindings: {},
-            tasks: {},
-            subflows: {},
+
             graph: {
               edges: [{ source: 'source', target: 'consumer' }],
               nodes: {
@@ -1367,8 +1096,7 @@ describe('port null normalization', () => {
       revision(
         {
           bindings: {},
-          tasks: {},
-          subflows: {},
+
           graph: {
             edges: [],
             nodes: {
@@ -1389,8 +1117,7 @@ describe('port null normalization', () => {
       revision(
         {
           bindings: {},
-          tasks: {},
-          subflows: {},
+
           graph: {
             edges: [
               { source: 'choice', sourceHandle: 'yes', target: 'consumer' },
@@ -1440,56 +1167,11 @@ describe('port null normalization', () => {
   })
 })
 
-it.each([true, false])('normalizes absent Subflow outputs with nullable=%s', async (nullable) => {
-  const prepared = await prepareFlow(
-    revision(
-      {
-        bindings: {},
-        tasks: {},
-        graph: { edges: [], nodes: { nested: { kind: 'subflow', subflowId: 'branch', inputs: {} } } },
-        subflows: {
-          branch: {
-            name: 'Branch',
-            inputs: [],
-            outputs: [{ handle: 'result', jsonSchema: { type: 'string' }, nullable, sources: [{ kind: 'node', nodeId: 'skipped', output: 'value' }] }],
-            graph: {
-              edges: [{ source: 'choice', sourceHandle: 'otherwise', target: 'skipped' }],
-              nodes: {
-                skipped: { kind: 'value', inputs: {}, values: [{ handle: 'value', jsonSchema: { type: 'string' }, nullable: false, value: 'unused' }] },
-                choice: {
-                  kind: 'condition',
-                  cases: [
-                    {
-                      output: 'yes',
-                      groups: [
-                        { expressions: [{ left: { kind: 'value' as const, value: 'yes' }, operator: '==', right: { kind: 'value' as const, value: 'yes' } }] },
-                      ],
-                    },
-                  ],
-                  inputs: {},
-                  matchMode: 'first' as const,
-                },
-              },
-            },
-          },
-        },
-      },
-      [],
-    ),
-    'main',
-    engine,
-  )
-  const running = runFlow(prepared, { runId: 'subflow-null', invokeTask: () => Effect.die('Unexpected Task') })
-  if (nullable) expect((await running).nodes).toEqual([expect.objectContaining({ nodeId: 'nested', outputs: { result: null } })])
-  else await expect(running).rejects.toThrow('Subflow output "result" does not match its declared schema')
-})
-
 it('validates formed Webhook outputs at launch and checkpoint recovery without projection', async () => {
   const source = revision(
     {
       bindings: {},
-      subflows: {},
-      tasks: {},
+
       graph: {
         nodes: {
           start: { kind: 'webhook', method: 'POST', name: 'Webhook', bodyFields: [] },
@@ -1535,8 +1217,7 @@ it.each([true, false])('does not execute with a cleared collection default (null
   const source = revision(
     {
       bindings: {},
-      subflows: {},
-      tasks: {},
+
       graph: {
         edges: [],
         nodes: {

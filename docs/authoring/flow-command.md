@@ -9,7 +9,7 @@ Flow 创建命令不再单独指定 Team ID。
 - `oo flow --help --json` 返回命令索引；`oo flow node add --help --json` 等子命令返回参数、选项、退出码和示例。Help、schema、version 不需要已配置的宿主。
 - `oo flow schema apply --json` 返回完整事务输入的 JSON Schema；`schema operations` 返回 ChangeOperation 数组的 schema；`schema graph.node.input.set` 等返回单个操作的独立 schema。
 - `schema input` 描述 Run 输入覆盖（node ID → handle → JSON value）；`schema outputs` 描述 Trigger 输出对象。节点实际端口与 Trigger 合同仍由 Revision 决定。
-- `inspect <flow> --json` 默认返回与 MCP `flow_get` 相同的精简视图（CLI 另有 `kind: "flow.inspect"`）：`flow`、`draft.revisionId`、`draft.graph`、`draft.subflows`、`draft.bindings`、模块摘要与 Live 状态。节点保留输入绑定、端口 handle、未被覆盖的输入默认值和执行配置；省略完整 Schema、代码源码和审计元数据。`--full` 返回完整 `draft.content`、修订元数据和 Live 详情，供需要精确 before 值的编辑使用。原 `--summary` 已由默认行为取代。Inspect 不执行 check。
+- `inspect <flow> --json` 默认返回与 MCP `flow_get` 相同的精简视图（CLI 另有 `kind: "flow.inspect"`）：`flow`、`draft.revisionId`、`draft.graph`、`draft.bindings`、模块摘要与 Live 状态。节点保留输入绑定、端口 handle、未被覆盖的输入默认值和执行配置；省略完整 Schema、代码源码和审计元数据。`--full` 返回完整 `draft.content`、修订元数据和 Live 详情，供需要精确 before 值的编辑使用。原 `--summary` 已由默认行为取代。Inspect 不执行 check。
 - `check <flow> --json` 单独校验当前 Draft，返回 `valid`、`revisionId` 和 `check`。无效时退出码为 1，诊断只随 stdout 的这一份结果返回。
 - `event-source list --json` 列出当前身份可见、独立于 Flow 的事件源及其 Team、Connection、事件类型和验证状态。实际使用关系见 `consumers`；给 Flow 配置 Trigger 时可对照 `connector connections <service> --flow <flow>` 的 Connection。空列表提示到 Workbench 创建并验证事件源。
 - Flow 引用接受 ID 或唯一的完整名称。名称歧义返回候选 identity；保存后续调用所需的 ID 可以避免名称查找。
@@ -22,7 +22,7 @@ Flow 创建命令不再单独指定 Team ID。
 
 ## 编辑与重试
 
-完整批量编辑复用公开的 `ChangeOperation`，包含节点、执行边、输入映射、模块、Task、Wait、Subflow 和 Binding 操作：
+完整批量编辑复用公开的 `ChangeOperation`，包含节点、执行边、输入映射、模块、Task、Wait 和 Binding 操作：
 
 ```json
 {
@@ -30,7 +30,6 @@ Flow 创建命令不再单独指定 Team ID。
   "operations": [
     {
       "kind": "graph.node.create",
-      "target": { "kind": "flow" },
       "nodeId": "start",
       "node": { "kind": "manual", "name": "Start" }
     }
@@ -60,7 +59,7 @@ oo flow schema example.poll-notification --json > changes.json
 MCP 对应 `flow_schema {"example":"connector"}` 和 `flow_schema {"example":"poll-notification"}`。返回的 `{version,operations}` 可直接作为 CLI apply 文件；MCP flow_apply 使用其中的 operations，并另传 flowId、expectedRevisionId 和 idempotencyKey。
 示例中的 `ACTION_ID`、`CONNECTION_ID` 必须替换为目标 Flow 作用域内的真实 identity，Connector 输入输出端口必须按 `connector show` / `connector_get` 的定义调整。示例通过结构和图语义检查，不证明外部账号可用。
 
-已有 Connector Action 使用 `task.create`（executor.kind 为 connector）与引用 taskId 的节点。JavaScript 计算使用 `module.create` 与引用 moduleId 的 Code Task；仅做已有 Action 调用时无需写 JS。`poll-notification` 示例展示 events 数组转换为文本、执行连线及独立输入映射。
+已有 Connector Action 使用 `graph.node.create`，执行配置直接放在 `node.task`（executor.kind 为 connector）。JavaScript 计算使用 `module.create` 与引用 moduleId 的 Code Task；仅做已有 Action 调用时无需写 JS。`poll-notification` 示例展示 events 数组转换为文本、执行连线及独立输入映射。
 
 `graph.trigger.create` 是 Draft 请求操作，用 key 创建 Provider Trigger：
 
@@ -116,7 +115,7 @@ Run 即使仍为 `running`，也可能包含需要决议的 `waits`。决议时�
 
 ## Agent 节点
 
-`oo flow node add <flow> agent <name>` 创建可继续配置的 Agent 草稿。完整配置通过 `task.agent.set` 原子更新，`before` 是读取到的完整 Task；模型、任务说明、工具与参数来源属于同一个配置。使用 `oo flow schema task.agent.set --json` 查看操作结构。
+`oo flow node add <flow> agent <name>` 创建可继续配置的 Agent 草稿。完整配置通过 `graph.node.task.set` 原子更新，`before` 是读取到的完整 Task；模型、任务说明、工具与参数来源属于同一个配置。使用 `oo flow schema graph.node.task.set --json` 查看操作结构。
 
 快速建图形式也接受 `nodes.<id> = { "kind": "agent", "task": <完整 ManagedTaskDefinition> }`，其中 `task.executor.kind` 必须为 `agent`。它保留显式工具定义与账号，不重新解释当前 Connector 目录。精确字段、参数约束与审批语义见 [Agent Task 合同](../control/contracts/control-api.md#11-agent-task)。
 
@@ -199,14 +198,13 @@ Team 选择由宿主解析为请求身份，并保留创建幂等语义。启停
 
 ```bash
 oo flow node show FLOW_ID NODE_ID --revision REVISION_ID --json
-oo flow node show FLOW_ID NODE_ID --revision REVISION_ID --subflow SUBFLOW_ID --json
+oo flow node show FLOW_ID NODE_ID --revision REVISION_ID --json
 oo flow connector code-access FLOW_ID --publication PUBLICATION_ID --json
 oo flow connector candidates FLOW_ID PROVIDER_ID OTHER_PROVIDER_ID --json
 ```
 
 `node show` 对应 MCP `flow_node_get`，支持普通节点和 Trigger，引用可以是 ID 或无歧义的完整名称。
-省略 `--revision` 使用当前 Draft；省略 `--subflow` 使用根图。指定子流程时只在该图查找，节点、子流程或 Revision
-不存在时返回错误，不回退根图或当前 Draft。结果顶层为 `flowId`、`revisionId`、`subflowId?`、`nodeId`、`node`、`task?`、`module?`，
+省略 `--revision` 使用当前 Draft。节点或 Revision 不存在时返回错误，不回退到其他节点或当前 Draft。结果顶层为 `flowId`、`revisionId`、`nodeId`、`node`、`task?`、`module?`，
 与 MCP 相同，CLI 另有 `kind: "node.show"`。代码 Task 保留在 `node.task`，不重复返回顶层 task。
 
 `connector code-access` 省略 `--publication` 时读取 Draft 共享 Code 连接；指定时读取不可编辑的发布快照。

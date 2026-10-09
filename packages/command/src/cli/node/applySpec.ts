@@ -211,13 +211,18 @@ export function applySpec(source: string): ApplySpec {
           applyKeys(node, ['kind', 'task'], `nodes.${reference}`)
           let operation
           try {
-            ;[operation] = decodeChangeOperations([{ kind: 'task.create', taskId: reference, task: node.task }])
+            ;[operation] = decodeChangeOperations([{ kind: 'graph.node.create', nodeId: reference, node: { kind: 'task', inputs: {}, task: node.task } }])
           } catch (error) {
             throw new CliError('flow.apply-invalid', `nodes.${reference}.task: ${error instanceof Error ? error.message : String(error)}`)
           }
-          if (operation?.kind != 'task.create' || operation.task.executor.kind != 'agent')
+          if (
+            operation?.kind != 'graph.node.create' ||
+            operation.node.kind != 'task' ||
+            !('executor' in operation.node.task) ||
+            operation.node.task.executor.kind != 'agent'
+          )
             throw new CliError('flow.apply-invalid', 'Agent configuration is required.')
-          return [reference, { kind, task: operation.task }] as const
+          return [reference, { kind, task: operation.node.task }] as const
         }
         case 'llm-chat':
         case 'llm-json': {

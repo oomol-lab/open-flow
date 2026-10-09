@@ -38,8 +38,6 @@ const draft: Draft = {
           },
         },
       },
-      subflows: {},
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: { module: { imports: [], name: 'Code', source: 'export default () => ({})' } },

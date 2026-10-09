@@ -56,8 +56,7 @@ describe('CLI', () => {
       modules: {},
       document: {
         bindings: {},
-        tasks: {},
-        subflows: {},
+
         graph: {
           edges: [],
           nodes: {
@@ -296,8 +295,7 @@ it.each([
           modules: {},
           document: {
             bindings: {},
-            tasks: {},
-            subflows: {},
+
             graph: {
               edges: [],
               nodes: {
@@ -366,7 +364,7 @@ const revisionFixture = {
   content: {
     modelVersion: currentFlowModelVersion,
     modules: {},
-    document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
+    document: { bindings: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
   },
 } as const
 
@@ -489,7 +487,6 @@ describe('agent command contract', () => {
   })
 
   it.each([
-    { command: ['node', 'show', 'flow-1', 'start'], option: '--subflow', next: '--json' },
     { command: ['connector', 'code-access', 'flow-1'], option: '--publication', next: '--json' },
     { command: ['node', 'show', 'flow-1', 'start'], option: '--revision', next: '--subflow=child' },
   ])('reports a missing value before consuming a flag: $option $next', async ({ command, option, next }) => {
@@ -644,12 +641,11 @@ it('applies a complete operation batch atomically and reports validation separat
   const operations = [
     {
       kind: 'graph.node.create',
-      target: { kind: 'flow' },
       nodeId: 'value',
       node: { kind: 'value', name: 'Value', inputs: {}, values: [{ handle: 'value', jsonSchema: {}, nullable: false, value: 42 }] },
     },
-    { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'start', target: 'value' } },
-    { kind: 'graph.node.field.set', target: { kind: 'flow' }, nodeId: 'value', field: 'name', before: 'Value', value: 'Answer' },
+    { kind: 'graph.edge.connect', edge: { source: 'start', target: 'value' } },
+    { kind: 'graph.node.field.set', nodeId: 'value', field: 'name', before: 'Value', value: 'Answer' },
   ]
   output.value.readFile = async () => JSON.stringify({ version: 1, operations })
   let changes = 0
@@ -870,17 +866,9 @@ it('discovers Provider and Trigger summaries and creates a Flow in the host scop
 it.each([
   { reference: 'format', nodeId: 'format', revision: 'historical' },
   { reference: 'Start', nodeId: 'start', revision: 'historical' },
-  { reference: 'start', nodeId: 'start', revision: 'historical', subflow: 'child' },
   { reference: 'start', nodeId: 'start' },
-])('reads the same node detail shape as MCP from the selected graph: %j', async ({ reference, nodeId, subflow, revision }) => {
-  const content = applyFlowChanges(revisionFixture.content, [
-    ...decodeChangeOperations(authoringExample('code').operations),
-    {
-      kind: 'subflow.create',
-      subflowId: 'child',
-      subflow: { name: 'Child', inputs: [], outputs: [], graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Nested start' } } } },
-    },
-  ])
+])('reads the same node detail shape as MCP from the selected graph: %j', async ({ reference, nodeId, revision }) => {
+  const content = applyFlowChanges(revisionFixture.content, [...decodeChangeOperations(authoringExample('code').operations)])
   const request = vi.fn(async (path: string) => {
     if (path == '/v1/flows/flow-1') return Response.json({ ...flow, draftRevisionId: 'new-head' })
     if (path == `/v1/flows/flow-1/revisions/${revision ?? 'new-head'}`)
@@ -889,53 +877,34 @@ it.each([
   })
   const output = runtime()
   expect(
-    await runCli(
-      [
-        'node',
-        'show',
-        'flow-1',
-        reference,
-        ...(revision == null ? [] : ['--revision', revision]),
-        ...(subflow == null ? [] : ['--subflow', subflow]),
-        '--json',
-      ],
-      { request },
-      output.value,
-    ),
+    await runCli(['node', 'show', 'flow-1', reference, ...(revision == null ? [] : ['--revision', revision]), '--json'], { request }, output.value),
     output.stderr(),
   ).toBe(0)
-  const graph = subflow == null ? content.document.graph : content.document.subflows[subflow]!.graph
+  const graph = content.document.graph
   expect(JSON.parse(output.stdout())).toEqual({
     ...nodeDetails(content, nodeId, graph.nodes[nodeId]!),
     flowId: flow.flowId,
     revisionId: revision ?? 'new-head',
-    ...(subflow == null ? {} : { subflowId: subflow }),
     kind: 'node.show',
     version: 1,
   })
   expect(request).toHaveBeenCalledTimes(2)
 })
 
-it.each([
-  { node: 'start', subflow: 'missing' },
-  { node: 'start', subflow: 'empty' },
-  { node: 'missing', subflow: undefined },
-  { node: '__proto__', subflow: undefined },
-  { node: 'constructor', subflow: 'empty' },
-  { node: 'toString', subflow: undefined },
-])('does not fall back to the root graph or another node: %j', async ({ node, subflow }) => {
-  const content = applyFlowChanges(revisionFixture.content, [
-    { kind: 'subflow.create', subflowId: 'empty', subflow: { name: 'Empty', inputs: [], outputs: [], graph: { edges: [], nodes: {} } } },
-  ])
-  const request = async (path: string) => {
-    if (path == '/v1/flows/flow-1') return Response.json(flow)
-    if (path == '/v1/flows/flow-1/revisions/revision-1') return Response.json({ ...revisionFixture, content })
-    throw new Error(path)
-  }
-  const output = runtime()
-  expect(await runCli(['node', 'show', 'flow-1', node, ...(subflow == null ? [] : ['--subflow', subflow]), '--json'], { request }, output.value)).toBe(1)
-  expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'node.not-found' } })
-})
+it.each([{ node: 'missing' }, { node: '__proto__' }, { node: 'constructor' }, { node: 'toString' }])(
+  'does not fall back to another node: %j',
+  async ({ node }) => {
+    const content = applyFlowChanges(revisionFixture.content, [])
+    const request = async (path: string) => {
+      if (path == '/v1/flows/flow-1') return Response.json(flow)
+      if (path == '/v1/flows/flow-1/revisions/revision-1') return Response.json({ ...revisionFixture, content })
+      throw new Error(path)
+    }
+    const output = runtime()
+    expect(await runCli(['node', 'show', 'flow-1', node, '--json'], { request }, output.value)).toBe(1)
+    expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'node.not-found' } })
+  },
+)
 
 it.each([true, false])('resolves prototype-like node names and gives own IDs precedence (own ID=%s)', async (ownId) => {
   const reference = ownId ? 'constructor' : '__proto__'
@@ -1082,4 +1051,12 @@ it('removes Draft connection usage through one CAS request with the caller idemp
     output.stderr(),
   ).toBe(0)
   expect(JSON.parse(output.stdout())).toMatchObject({ kind: 'connector.remove-usage', revision: { revisionId: 'revision-2' } })
+})
+
+it('rejects the removed subflow selector without making a request', async () => {
+  const request = vi.fn()
+  const output = runtime()
+  expect(await runCli(['node', 'show', 'flow-1', 'start', '--subflow', 'child', '--json'], { request }, output.value)).toBe(1)
+  expect(JSON.parse(output.stderr())).toMatchObject({ error: { code: 'cli.invalid-arguments', message: 'Unknown option "--subflow".' } })
+  expect(request).not.toHaveBeenCalled()
 })

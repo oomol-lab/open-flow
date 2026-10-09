@@ -33,9 +33,9 @@ export function InspectorSamplePanel({
 }) {
   const [open, setOpen] = useState(true)
   const t = useTranslate()
-  const target = { kind: 'flow' } as const
-  const icon = inspectorIcon(selection, target)
-  const canvasNode = designerGraph(revision.revision, target, undefined, [], {}, {}, t).nodes.find((node) => node.id === selection?.id)
+
+  const icon = inspectorIcon(selection)
+  const canvasNode = designerGraph(revision.revision, undefined, [], {}, {}, t).nodes.find((node) => node.id === selection?.id)
   if (!open)
     return (
       <Button variant="outline" onClick={() => setOpen(true)}>
@@ -59,7 +59,7 @@ export function InspectorSamplePanel({
           titleReadOnly: selection.kind === 'trigger' && selection.trigger.kind === 'manual',
           fallback: <Icon name={icon} />,
           validate: (name) => {
-            const graph = revision.graph(target)
+            const graph = revision.graph()
             if (!graph) return
             const issue = nodeNameIssue(graph, selection.id, name)
             return issue == null ? undefined : t(`inspector.node.${issue === 'empty' ? 'nameEmpty' : 'nameDuplicate'}`)

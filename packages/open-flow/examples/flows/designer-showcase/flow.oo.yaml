@@ -37,11 +37,3 @@ nodes:
       default:
         handle: missing
         description: Empty greeting
-  - node_id: personalized-greeting
-    title: Personalized greeting
-    subflow: self::designer-showcase
-    inputs_from:
-      - handle: name
-        from_node:
-          - node_id: message-ready
-            output_handle: ready

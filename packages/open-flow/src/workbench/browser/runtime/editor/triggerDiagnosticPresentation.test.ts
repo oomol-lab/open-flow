@@ -12,7 +12,6 @@ import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
 import { presentTriggerDiagnostics } from './triggerDiagnosticPresentation.ts'
 
-const target = { kind: 'flow' } as const
 const revision = revisionView({
   actorId: 'actor',
   content: {
@@ -26,8 +25,6 @@ const revision = revisionView({
           airtable: { kind: 'poll', name: 'Record Changed', config: {}, definition: airtableRecordChanged.snapshot, pollTimes: [] },
         },
       },
-      subflows: {},
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {},
@@ -68,7 +65,7 @@ it('uses catalog field labels for different Trigger providers and hides unknown 
     item('github', ['externalField']),
   ]
 
-  expect(presentTriggerDiagnostics(items, revision, target, displays, 'zh-CN', i18n.t).map((entry) => entry.message)).toEqual([
+  expect(presentTriggerDiagnostics(items, revision, displays, 'zh-CN', i18n.t).map((entry) => entry.message)).toEqual([
     '请完成触发器的必填配置：事件源和接收的事件。',
     '请完成触发器的必填配置：事件、仓库所有者和仓库。',
     '请完成触发器的必填配置：Base、数据表和触发字段。',

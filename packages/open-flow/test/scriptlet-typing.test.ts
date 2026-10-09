@@ -2,21 +2,11 @@ import type { HandleName } from '../src/schema/interface.ts'
 
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { generateTyping, mergeTypingIntoSourceFile, typescriptOf } from '../src/manifest/common/meta/block/generateTyping.ts'
+import { generateTyping, typescriptOf } from '../src/workbench/browser/runtime/editor/generateTyping.ts'
 
 function handle(name: string): HandleName {
   return name as HandleName
 }
-
-test('replaces only a complete generated scriptlet metadata region', () => {
-  const source = ['//#region generated meta', 'type Inputs = {}', '//#endregion', '', 'export default async function () {}', ''].join('\n')
-  const typing = ['type Inputs = {', '  name: string;', '};', ''].join('\n')
-  assert.equal(
-    mergeTypingIntoSourceFile(source, typing),
-    ['//#region generated meta', 'type Inputs = {', '  name: string;', '};', '//#endregion', '', 'export default async function () {}', ''].join('\n'),
-  )
-  assert.equal(mergeTypingIntoSourceFile('export default 1\n', typing), 'export default 1\n')
-})
 
 test('generates the public ArtifactRef type for Artifact handles', () => {
   assert.equal(typescriptOf({ contentMediaType: 'oomol/artifact' }, false), 'ArtifactRef')

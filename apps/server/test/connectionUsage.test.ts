@@ -8,9 +8,17 @@ import { checkCodePermissions, ConnectorClient } from '../node/deployment/connec
 
 const document: FlowDocument = {
   bindings: {},
-  subflows: {},
-  graph: { edges: [], nodes: { send: { kind: 'task', taskId: 'send', name: 'Send', inputs: {} } } },
-  tasks: { send: { name: 'Send', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send', connectionId: 'account' } } },
+  graph: {
+    edges: [],
+    nodes: {
+      send: {
+        kind: 'task',
+        task: { name: 'Send', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send', connectionId: 'account' } },
+        name: 'Send',
+        inputs: {},
+      },
+    },
+  },
 }
 const access: ConnectorAccess = { version: 1, mode: 'selectable', accessRevision: 0, bindings: [], sharedAccessDigest: 'empty' }
 const candidate = {
@@ -60,34 +68,6 @@ it('captures only selected node connections without adding Code usage and reject
     ],
   })
   await expect(captureConnectorAccess(host, 'flow', document, access)).rejects.toMatchObject({ code: 'connector.access-invalid' })
-})
-
-it('captures independent Code connections in root graphs and Subflows', async () => {
-  const host = new ImplicitConnectorAccessHost()
-  vi.spyOn(host, 'listCandidates').mockResolvedValue({
-    version: 1,
-    results: [{ version: 1, providerId: 'mail', mode: 'selectable', candidates: [candidate] }],
-  })
-  const code = {
-    kind: 'task' as const,
-    name: 'Code',
-    inputs: {},
-    task: {
-      name: 'Code',
-      moduleId: 'code',
-      inputs: [],
-      outputs: [],
-      capabilities: [{ kind: 'connector' as const, mode: 'independent' as const, actions: [{ action: 'mail.send', connectionId: 'account' }] }],
-    },
-  }
-  const source = {
-    ...document,
-    graph: { edges: [], nodes: { code } },
-    subflows: { child: { name: 'Child', inputs: [], outputs: [], graph: { edges: [], nodes: { code } } } },
-  } as FlowDocument
-  const snapshot = await captureConnectorAccess(host, 'flow', source, access)
-  expect(snapshot.sharedBindings).toEqual([])
-  expect(snapshot.selectedBindings).toMatchObject([{ connectionId: 'account', providerId: 'mail' }])
 })
 
 it('executes nodes with fixed bindings while denying Code the same account, without resolving a new membership', async () => {
@@ -188,7 +168,23 @@ it('captures Agent tools, notifications and Trigger proxy usage without Code per
     graph: {
       edges: [],
       nodes: {
-        agent: { kind: 'task', taskId: 'agent', inputs: {} },
+        agent: {
+          kind: 'task',
+          task: {
+            name: 'Agent',
+            inputs: [],
+            outputs: [],
+            executor: {
+              kind: 'agent',
+              model: 'model',
+              prompt: '',
+              maxRounds: 1,
+              tools: [{ id: 'send', action: 'mail.send', name: 'Send', connectionId: 'account', inputs: [], approval: false, description: '' }],
+              notification: { action: 'mail.send', connectionId: 'account', inputDefinitions: [], messageHandle: 'message', inputs: {} },
+            },
+          },
+          inputs: {},
+        },
         poll: {
           name: 'Received',
           kind: 'poll',
@@ -206,22 +202,6 @@ it('captures Agent tools, notifications and Trigger proxy usage without Code per
             configInputs: [],
             outputs: [],
           },
-        },
-      },
-    },
-    tasks: {
-      ...document.tasks,
-      agent: {
-        name: 'Agent',
-        inputs: [],
-        outputs: [],
-        executor: {
-          kind: 'agent',
-          model: 'model',
-          prompt: '',
-          maxRounds: 1,
-          tools: [{ id: 'send', action: 'mail.send', name: 'Send', connectionId: 'account', inputs: [], approval: false, description: '' }],
-          notification: { taskId: 'send', messageHandle: 'message', inputs: {} },
         },
       },
     },

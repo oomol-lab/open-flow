@@ -1,7 +1,6 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
 import type { InteractiveMode } from '../../../../canvas/browser/stores/canvas/canvas.store.ts'
-import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { ConnectorConnection, WorkbenchClient, Draft, FlowCheck, Run, RunEvent } from '../api.ts'
 import type { Point } from '../canvasPresentation.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
@@ -17,7 +16,7 @@ import { compute, derive, val } from 'value-enhancer'
 import { randomId } from '../../../../control/common/random.ts'
 import { createAuthoringId } from '../../../../flow/common/authoring.ts'
 import { resolveUiLanguage } from '../../../../localization/common/languages.ts'
-import { targetPresentation } from '../canvasPresentation.ts'
+import { flowPresentation } from '../canvasPresentation.ts'
 import { actionWithConnections } from '../connectionCatalog.ts'
 import { diagnosticItems } from '../editor/diagnostics.ts'
 import { presentTriggerDiagnostics } from '../editor/triggerDiagnosticPresentation.ts'
@@ -61,18 +60,17 @@ function indexNodes(designer: DesignerGraph): ReadonlyMap<string, DesignerNode> 
   return new Map(designer.nodes.map((node) => [node.id, node]))
 }
 
-function designerRevisionInputs(draft: Draft | undefined, target: GraphTarget | undefined): readonly unknown[] {
-  return draft == null || target == null ? [] : revisionView(draft).designerInputs(target)
+function designerRevisionInputs(draft: Draft | undefined): readonly unknown[] {
+  return draft == null ? [] : revisionView(draft).designerInputs()
 }
 
 function indexRunEventNodes(
   draft: Draft | undefined,
-  target: GraphTarget | undefined,
   run: Run | undefined,
   events: readonly RunEvent[],
   nodes: ReadonlyMap<string, DesignerNode>,
 ): ReadonlyMap<number, string> {
-  if (draft == null || target?.kind != 'flow' || run?.revisionId != draft.revisionId || run.flowId != draft.flowId) return new Map()
+  if (draft == null || run?.revisionId != draft.revisionId || run.flowId != draft.flowId) return new Map()
   const scopeId = events.find((event) => event.kind == 'run.started' && event.payload.flowId == draft.flowId)?.payload.scopeId
   if (typeof scopeId != 'string') return new Map()
   return new Map(
@@ -105,7 +103,7 @@ export class WorkbenchStore {
   readonly #variableNamesLoading = val(false)
   #variableNamesStale = true
   #variableRequest: Promise<void> | undefined
-  readonly #connectorSetups = val<readonly { readonly flowId: string; readonly target: GraphTarget; readonly actionId: string; nodeId?: string }[]>([])
+  readonly #connectorSetups = val<readonly { readonly flowId: string; readonly actionId: string; nodeId?: string }[]>([])
   #disposed = false
   #openingCreatedFlow = false
   readonly #stopAccessReaction: () => void
@@ -190,15 +188,15 @@ export class WorkbenchStore {
       if (connectorDiagnostics.length == 0) return check
       return { ...check, diagnostics: [...check.diagnostics, ...connectorDiagnostics], valid: false }
     })
-    const designerCache = new Map<string, { readonly graph: DesignerGraph; readonly inputs: readonly unknown[] }>()
+    let designerCache: { readonly graph: DesignerGraph; readonly inputs: readonly unknown[] } | undefined
     let designerFlowId: string | undefined
     const designer = compute((get) => {
       const draft = get(this.workspace.$.draft)
       if (designerFlowId != draft?.flowId) {
-        designerCache.clear()
+        designerCache = undefined
         designerFlowId = draft?.flowId
       }
-      const target = get(this.workspace.$.target)
+
       const presentation = get(this.workspace.$.presentation)?.value
       const designerDiagnostics = get(diagnostics)?.diagnostics ?? get(this.connectors.$.diagnostics)
       const providerEntries = draft == null ? undefined : get(resourceData(this.workspace.catalogs.providers.get(draft.flowId, i18n.lang)))
@@ -208,10 +206,9 @@ export class WorkbenchStore {
       const t = get(i18n.t$)
       const run = get(this.runs.$.run)
       const events = get(this.runs.$.events)
-      const key = target == null ? '' : target.kind == 'flow' ? 'flow' : `subflow:${target.id}`
       const inputs = [
-        ...designerRevisionInputs(draft, target),
-        presentation == null || target == null ? undefined : targetPresentation(presentation, target),
+        ...designerRevisionInputs(draft),
+        presentation == null ? undefined : flowPresentation(presentation),
         designerDiagnostics,
         actions,
         providerEntries,
@@ -221,17 +218,17 @@ export class WorkbenchStore {
         events,
         ...(run == null ? [] : [draft?.revisionId]),
       ]
-      const cached = designerCache.get(key)
+      const cached = designerCache
       if (cached != null && cached.inputs.length == inputs.length && cached.inputs.every((input, index) => input === inputs[index])) return cached.graph
-      const graph = designerGraph(draft, target, presentation, designerDiagnostics, actions, catalogs, t, run, events, providerCatalog)
-      designerCache.set(key, { graph, inputs })
+      const graph = designerGraph(draft, presentation, designerDiagnostics, actions, catalogs, t, run, events, providerCatalog)
+      designerCache = { graph, inputs }
       return graph
     })
     const designerNodeById = derive(designer, indexNodes)
     this.$ = {
       connectorSetupPending: compute((get) => {
         const flowId = get(this.workspace.$.flowId)
-        const target = get(this.workspace.$.target)
+
         const selection = get(this.workspace.$.selection)
         if (
           selection?.kind != 'task' ||
@@ -242,8 +239,7 @@ export class WorkbenchStore {
           return false
         const actionId = selection.definition.executor.action
         return get(this.#connectorSetups).some(
-          (setup) =>
-            setup.flowId == flowId && dequal(setup.target, target) && setup.actionId == actionId && (setup.nodeId == null || setup.nodeId == selection.id),
+          (setup) => setup.flowId == flowId && setup.actionId == actionId && (setup.nodeId == null || setup.nodeId == selection.id),
         )
       }),
       busy: compute((get) => {
@@ -257,11 +253,10 @@ export class WorkbenchStore {
       }),
       diagnosticItems: compute((get) => {
         const revision = get(this.workspace.$.revision)
-        const target = get(this.workspace.$.target)
+
         return presentTriggerDiagnostics(
-          diagnosticItems(revision, target, get(diagnostics)),
+          diagnosticItems(revision, get(diagnostics)),
           revision,
-          target,
           get(this.triggers.catalog.state).data?.display,
           resolveUiLanguage([i18n.lang]),
           get(i18n.t$),
@@ -274,9 +269,7 @@ export class WorkbenchStore {
         equal: dequal,
       }),
       notice: this.#notice,
-      runEventNodes: compute((get) =>
-        indexRunEventNodes(get(this.workspace.$.draft), get(this.workspace.$.target), get(this.runs.$.run), get(this.runs.$.events), get(designerNodeById)),
-      ),
+      runEventNodes: compute((get) => indexRunEventNodes(get(this.workspace.$.draft), get(this.runs.$.run), get(this.runs.$.events), get(designerNodeById))),
       selectedDesignerNode: compute((get) => {
         const selected = get(this.workspace.$.selectedNodeIds)
         return selected.length == 1 ? get(designerNodeById).get(selected[0]!) : undefined
@@ -416,15 +409,13 @@ export class WorkbenchStore {
         return
       }
       const flowId = this.workspace.$.flowId.value
-      const target = this.workspace.$.target.value
+
       if (option.kind == 'connector') {
         const { defaultConnection: _defaultConnection, ...metadata } = option.connector
         option = { ...option, connector: metadata }
       }
       const setup =
-        option.kind == 'connector' && flowId != null && target != null
-          ? { flowId, target, actionId: option.connector.actionId, nodeId: undefined as string | undefined }
-          : undefined
+        option.kind == 'connector' && flowId != null ? { flowId, actionId: option.connector.actionId, nodeId: undefined as string | undefined } : undefined
       if (setup != null) {
         this.#connectorSetups.set([...this.#connectorSetups.value, setup])
         finishSetup = () => this.#connectorSetups.set(this.#connectorSetups.value.filter((item) => item !== setup))
@@ -433,7 +424,7 @@ export class WorkbenchStore {
       if (nodeId != null && option.kind == 'connector' && setup != null) {
         setup.nodeId = nodeId
         this.#connectorSetups.set([...this.#connectorSetups.value])
-        void this.#configureAddedConnector(setup.flowId, setup.target, nodeId, option.connector).finally(finishSetup)
+        void this.#configureAddedConnector(setup.flowId, nodeId, option.connector).finally(finishSetup)
         finishSetup = undefined
       }
       if (nodeId != null && option.kind == 'trigger') void this.triggers.refresh()
@@ -446,17 +437,17 @@ export class WorkbenchStore {
     }
   }
 
-  async #configureAddedConnector(flowId: string, target: GraphTarget, nodeId: string, action: ConnectorActionView): Promise<void> {
+  async #configureAddedConnector(flowId: string, nodeId: string, action: ConnectorActionView): Promise<void> {
     try {
       if (this.#disposed || flowId != this.workspace.$.flowId.value) return
       const prepared = await this.prepareConnectorAction(action)
       if (prepared == null || this.#disposed || flowId != this.workspace.$.flowId.value) return
-      const node = this.workspace.$.revision.value?.node(target, nodeId)
-      if (node?.kind != 'task' || node.node.task != null) return
-      const executor = this.workspace.$.revision.value?.task(node.node.taskId)?.executor
+      const node = this.workspace.$.revision.value?.node(nodeId)
+      if (node?.kind != 'task' || 'moduleId' in node.node.task) return
+      const executor = 'executor' in node.node.task ? node.node.task.executor : undefined
       if (executor?.kind != 'connector' || executor.action != action.actionId || executor.connectionId != null) return
       const connection = prepared.action.defaultConnection
-      if (connection != null) await this.workspace.setConnectorConnection(node.node.taskId, connection.connectionId)
+      if (connection != null) await this.workspace.setConnectorConnection(node.id, connection.connectionId)
       if (!this.#disposed && flowId == this.workspace.$.flowId.value) await this.connectors.refresh()
     } catch (error) {
       if (!this.#disposed && flowId == this.workspace.$.flowId.value) this.#notice.set(errorNotice(error, this.#i18n.t))
@@ -551,7 +542,7 @@ export class WorkbenchStore {
   public async requestDraftRun(triggerId?: string) {
     const flowId = this.workspace.$.flowId.value
     if (!(await this.workspace.saveDraft()) || this.#disposed || flowId != this.workspace.$.flowId.value) return 'unavailable' as const
-    const flow = this.workspace.$.targetFlow.value
+    const flow = this.workspace.$.flow.value
     const draft = this.workspace.$.draft.value
     if (flow == null || draft == null) return 'unavailable' as const
     return await this.runRequests.requestDraft(flow, draft, triggerId)
@@ -560,35 +551,27 @@ export class WorkbenchStore {
   public async editDraftRunInputs(triggerId: string) {
     const flowId = this.workspace.$.flowId.value
     if (!(await this.workspace.saveDraft()) || this.#disposed || flowId != this.workspace.$.flowId.value) return 'unavailable' as const
-    const flow = this.workspace.$.targetFlow.value
+    const flow = this.workspace.$.flow.value
     const draft = this.workspace.$.draft.value
     if (flow == null || draft == null) return 'unavailable' as const
     return await this.runRequests.editDraft(flow, draft, triggerId)
   }
 
   public async requestLiveRun() {
-    const flow = this.workspace.$.targetFlow.value
+    const flow = this.workspace.$.flow.value
     if (flow == null) return 'unavailable' as const
     return await this.runRequests.requestLive(flow)
   }
 
   async #followExternalRun(client: Pick<WorkbenchClient, 'getRun'>, event: Extract<FlowChangeEvent, { readonly kind: 'run.created' }>): Promise<void> {
-    const target = this.workspace.$.target.value
-    if (this.#disposed || this.runRequests.$.submitting.value != null || target?.kind != 'flow' || this.workspace.$.flowId.value != event.flowId) {
+    if (this.#disposed || this.runRequests.$.submitting.value != null || this.workspace.$.flowId.value != event.flowId) {
       return
     }
     const current = this.#externalRuns.begin()
     try {
       const run = await client.getRun(event.runId)
-      const latestTarget = this.workspace.$.target.value
-      if (
-        !current() ||
-        this.#disposed ||
-        latestTarget?.kind != 'flow' ||
-        this.workspace.$.flowId.value != event.flowId ||
-        run.flowId != event.flowId ||
-        run.runId != event.runId
-      ) {
+
+      if (!current() || this.#disposed || this.workspace.$.flowId.value != event.flowId || run.flowId != event.flowId || run.runId != event.runId) {
         return
       }
       this.runs.followExternal(run)

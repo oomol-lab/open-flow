@@ -204,7 +204,7 @@ function schemaIssue(value: JsonValue, forModel = false): string | undefined {
   return `${issue.path.length == 0 ? '' : `${issue.path.map(String).join('.')}: `}${message}`
 }
 
-export function agentConfigIssues(task: ManagedTaskDefinition, tasks: Readonly<Record<string, ManagedTaskDefinition>>): readonly string[] {
+export function agentConfigIssues(task: ManagedTaskDefinition): readonly string[] {
   if (task.executor.kind != 'agent') return []
   const config = task.executor
   const issues: string[] = []
@@ -245,22 +245,19 @@ export function agentConfigIssues(task: ManagedTaskDefinition, tasks: Readonly<R
   }
   if (config.notification != null) {
     const notice = config.notification
-    const target = tasks[notice.taskId]
-    if (target?.executor.kind != 'connector') issues.push('Agent notification must reference a Connector Task.')
-    else {
-      const ports = portsByHandle(target.inputs)
-      const message = ports[notice.messageHandle]
-      if (message == null || !portsAssignable({ jsonSchema: { type: 'string' }, nullable: false }, message))
-        issues.push('Agent notification requires a string message input.')
-      if (Object.hasOwn(notice.inputs, notice.messageHandle)) issues.push('Agent notification message is supplied by the host.')
-      for (const [handle, source] of Object.entries(notice.inputs)) {
-        const port = ports[handle]
-        if (port == null || sourceIssue(source, port)) issues.push(`Agent notification input ${handle} has an incompatible source.`)
-      }
-      for (const port of Object.values(ports)) {
-        if (port.handle != notice.messageHandle && !Object.hasOwn(notice.inputs, port.handle) && !port.nullable && !Object.hasOwn(port, 'value')) {
-          issues.push(`Agent notification input ${port.handle} requires a source.`)
-        }
+    if (notice.action.length == 0) issues.push('Agent notification requires an action.')
+    const ports = portsByHandle(notice.inputDefinitions)
+    const message = ports[notice.messageHandle]
+    if (message == null || !portsAssignable({ jsonSchema: { type: 'string' }, nullable: false }, message))
+      issues.push('Agent notification requires a string message input.')
+    if (Object.hasOwn(notice.inputs, notice.messageHandle)) issues.push('Agent notification message is supplied by the host.')
+    for (const [handle, source] of Object.entries(notice.inputs)) {
+      const port = ports[handle]
+      if (port == null || sourceIssue(source, port)) issues.push(`Agent notification input ${handle} has an incompatible source.`)
+    }
+    for (const port of Object.values(ports)) {
+      if (port.handle != notice.messageHandle && !Object.hasOwn(notice.inputs, port.handle) && !port.nullable && !Object.hasOwn(port, 'value')) {
+        issues.push(`Agent notification input ${port.handle} requires a source.`)
       }
     }
   }

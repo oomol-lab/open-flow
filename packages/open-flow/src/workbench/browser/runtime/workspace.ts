@@ -9,7 +9,7 @@ import type {
   FlowCanvasViewOutput,
   FlowCanvasViewTriggerNode,
 } from '../../../canvas/browser/graph/FlowCanvas/model.ts'
-import type { ConditionOperand, GraphTarget } from '../../../flow/common/change.ts'
+import type { ConditionOperand } from '../../../flow/common/change.ts'
 import type { ConnectorProvider, Diagnostic, Draft, GraphNode, Group, JsonValue, Run, RunDetails, RunEvent, TaskDefinition, TriggerNode } from './api.ts'
 import type { Point, DesignerViewport } from './canvasPresentation.ts'
 import type { ConnectionCatalog, ConnectorActionView } from './connectionCatalog.ts'
@@ -64,7 +64,6 @@ interface NodeProjectionContext {
   readonly revision: RevisionView
   readonly runNodes: ReadonlyMap<string, FlowCanvasViewNodeRun>
   readonly t: TFunction | undefined
-  readonly target: GraphTarget
 }
 
 export function semanticNodeIcon(node: ResolvedNode, connectorActions: Readonly<Record<string, ConnectorActionView>>): string | undefined {
@@ -90,10 +89,8 @@ function nodeTitle(node: ResolvedNode, t?: TFunction): string {
       return t?.('addNode.approval') ?? 'Approval'
     case 'wait':
       return t?.('addNode.wait') ?? 'Wait'
-    case 'subflow':
-      return node.definition?.name ?? node.node.subflowId
     case 'task':
-      return node.definition?.name ?? (node.node.task != null ? node.node.task.moduleId : node.node.taskId)
+      return node.definition?.name ?? node.id
   }
 }
 
@@ -101,8 +98,6 @@ function nodeIcon(node: ResolvedNode): string | undefined {
   switch (node.kind) {
     case 'condition':
       return ':carbon:child-node:'
-    case 'subflow':
-      return ':carbon:subflow:'
     case 'value':
       return ':oomol:value:'
     case 'approval':
@@ -153,16 +148,6 @@ function nodePorts(node: ResolvedSelection): NodePorts {
         })
       for (const [handle, port] of Object.entries(resolutionOutputPorts(node.node))) outputs.set(handle, port)
       break
-    case 'subflow': {
-      const definition = node.definition
-      for (const port of definition?.inputs ?? []) {
-        inputs.set(port.handle, { defaultValue: port.value, description: port.description, jsonSchema: port.jsonSchema, nullable: port.nullable })
-      }
-      for (const port of definition?.outputs ?? []) {
-        outputs.set(port.handle, { description: port.description, jsonSchema: port.jsonSchema, nullable: port.nullable })
-      }
-      break
-    }
     case 'task': {
       const definition = node.definition
       const mappedInputs = [...inputs]
@@ -229,7 +214,6 @@ function conditionOperator(operator: import('./api.ts').ConditionOperator): Flow
 function conditionOperand(operand: ConditionOperand, context: NodeProjectionContext): FlowCanvasViewConditionOperand {
   if (operand.kind == 'value') return JSON.stringify(operand.value) ?? '…'
   const source = operand.source
-  if (source.kind == 'flow') return source.input
   if (source.kind == 'binding') return { kind: 'environment', label: context.t?.('nodeInput.variable') ?? 'Env' }
   const sourceNode = context.nodes.get(source.nodeId)
   const presentation = sourceNode == null ? undefined : sourceNodePresentation(sourceNode, context)
@@ -240,27 +224,23 @@ function conditionOperand(operand: ConditionOperand, context: NodeProjectionCont
   }
 }
 
-function nodeDiagnosticCount(target: GraphTarget, node: ResolvedNode, diagnostics: readonly Diagnostic[]): number {
-  const graphPath = target.kind == 'flow' ? `/document/graph/nodes/${node.id}` : `/document/subflows/${target.id}/graph/nodes/${node.id}`
+function nodeDiagnosticCount(node: ResolvedNode, diagnostics: readonly Diagnostic[]): number {
+  const graphPath = `/document/graph/nodes/${node.id}`
   const paths = [graphPath]
   if (node.kind == 'task') {
-    if (node.node.task != null) paths.push(`${graphPath}/task`)
-    else paths.push(`/document/tasks/${node.node.taskId}`)
+    if ('moduleId' in node.node.task) paths.push(`${graphPath}/task`)
     const moduleId = node.definition != null && 'moduleId' in node.definition ? node.definition.moduleId : undefined
     if (moduleId != null) paths.push(`/modules/${moduleId}`)
-  } else if (node.kind == 'subflow') {
-    paths.push(`/document/subflows/${node.node.subflowId}`)
   }
   return diagnostics.filter((diagnostic) => paths.some((path) => diagnostic.path.startsWith(path))).length
 }
 
 function runProjection(
   revision: RevisionView,
-  target: GraphTarget,
   run: Run | RunDetails | undefined,
   events: readonly RunEvent[],
 ): { readonly nodes: ReadonlyMap<string, FlowCanvasViewNodeRun>; readonly status?: 'idle' | 'running' } {
-  if (target.kind != 'flow' || run?.flowId != revision.revision.flowId || run.revisionId != revision.revision.revisionId) return { nodes: new Map() }
+  if (run?.flowId != revision.revision.flowId || run.revisionId != revision.revision.revisionId) return { nodes: new Map() }
   const active = run.status == 'queued' || run.status == 'starting' || run.status == 'running' || run.status == 'waiting'
   const nodes = new Map<string, FlowCanvasViewNodeRun>()
   if ('waits' in run) for (const wait of run.waits) nodes.set(wait.nodeId, { runId: run.runId, status: 'waiting' })
@@ -560,14 +540,13 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
   const connectionRequired =
     (connectorAction?.authenticated == true && (connector?.connectionId == null || (connections != null && selectedConnection?.status != 'active'))) ||
     nodeDiagnosticCount(
-      context.target,
       resolved,
       context.diagnostics.filter((diagnostic) => diagnostic.code === 'task.action-connection-required'),
     ) > 0
   const nodeRun = context.runNodes.get(nodeId)
   const common = {
     description: node.description,
-    diagnostics: nodeDiagnosticCount(context.target, resolved, context.diagnostics),
+    diagnostics: nodeDiagnosticCount(resolved, context.diagnostics),
     icon: semanticNodeIcon(resolved, context.connectorActions),
     id: nodeId,
     inputs,
@@ -595,8 +574,6 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
         matchMode: node.matchMode,
         defaultOutput: 'otherwise',
       }
-    case 'subflow':
-      return { ...common, kind: node.kind, reference: node.subflowId }
     case 'task':
       return {
         ...common,
@@ -619,7 +596,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
           ? { actionSummary: actionSummary(task.executor.tools, context.connectorActions, Object.values(context.providers)) }
           : {}),
         connectionRequired,
-        reference: node.task != null ? node.task.moduleId : node.taskId,
+        reference: 'moduleId' in node.task ? node.task.moduleId : nodeId,
       }
     case 'value':
       return { ...common, kind: node.kind, values: node.values.map((port) => Object.assign({}, port)) }
@@ -631,7 +608,6 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
 
 export function designerGraph(
   draft: Draft | undefined,
-  target: GraphTarget | undefined,
   presentation: Readonly<Record<string, JsonValue>> = {},
   diagnostics: readonly Diagnostic[] = [],
   connectorActions: Readonly<Record<string, ConnectorActionView>> = {},
@@ -642,9 +618,9 @@ export function designerGraph(
   providers: Readonly<Record<string, ConnectorProvider>> = {},
 ): DesignerGraph {
   const revision = draft == null ? undefined : revisionView(draft)
-  const graph = revision == null || target == null ? undefined : revision.graph(target)
-  if (revision == null || target == null || graph == null) return { edges: [], nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }
-  const projectedRun = runProjection(revision, target, run, runEvents)
+  const graph = revision == null ? undefined : revision.graph()
+  if (revision == null || graph == null) return { edges: [], nodes: [], viewport: { x: 0, y: 0, zoom: 1 } }
+  const projectedRun = runProjection(revision, run, runEvents)
 
   const entries = Object.entries(graph.nodes)
   const definitions = new Map(entries.map(([nodeId, node]) => [nodeId, revision.resolveNode(nodeId, node)]))
@@ -652,8 +628,8 @@ export function designerGraph(
   const ports = new Map([...definitions].map(([nodeId, node]) => [nodeId, nodePorts(node)]))
   const edgeProjection = projectEdges(graph, nodeIds)
   const layout = layoutNodes(nodeIds, edgeProjection.dependencies, edgeProjection.dependents)
-  const positions = savedPositions(presentation, target)
-  const hiddenNodeContent = savedHiddenNodeContent(presentation, target)
+  const positions = savedPositions(presentation)
+  const hiddenNodeContent = savedHiddenNodeContent(presentation)
   const context: NodeProjectionContext = {
     connectionCatalogs,
     connectorActions,
@@ -663,7 +639,6 @@ export function designerGraph(
     revision,
     runNodes: projectedRun.nodes,
     t,
-    target,
   }
   const rows = new Map<number, number>()
   const nodes: DesignerNode[] = []
@@ -683,7 +658,7 @@ export function designerGraph(
     const node = semanticDesignerNode(nodeId, resolved, ports.get(nodeId)!, position, context)
     nodes.push({ ...node, contentHidden: hiddenNodeContent?.[nodeId] === true })
   }
-  for (const [nodeId, comment] of Object.entries(savedComments(presentation, target, positions)).toSorted(([left], [right]) => left.localeCompare(right))) {
+  for (const [nodeId, comment] of Object.entries(savedComments(presentation, positions)).toSorted(([left], [right]) => left.localeCompare(right))) {
     nodes.push({
       ...comment,
       id: nodeId,
@@ -691,12 +666,12 @@ export function designerGraph(
       contentHidden: hiddenNodeContent?.[nodeId] === true,
     })
   }
-  const order = new Map(savedOrder(presentation, target).map((nodeId, index) => [nodeId, index]))
+  const order = new Map(savedOrder(presentation).map((nodeId, index) => [nodeId, index]))
   nodes.sort((left, right) => (order.get(left.id) ?? -1) - (order.get(right.id) ?? -1))
   return {
     edges: edgeProjection.edges,
     nodes,
     ...(projectedRun.status == null ? {} : { runStatus: projectedRun.status }),
-    viewport: savedViewport(presentation, target),
+    viewport: savedViewport(presentation),
   }
 }

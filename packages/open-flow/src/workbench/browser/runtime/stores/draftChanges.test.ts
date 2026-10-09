@@ -6,8 +6,6 @@ import { WorkbenchClient } from '../api.ts'
 import { createI18n } from '../i18n.ts'
 import { DraftChanges } from './draftChanges.ts'
 
-const target = { kind: 'flow' } as const
-
 function draft(revisionId: string, name?: string, description?: string): Draft {
   return {
     actorId: 'actor',
@@ -26,8 +24,6 @@ function draft(revisionId: string, name?: string, description?: string): Draft {
             },
           },
         },
-        subflows: {},
-        tasks: {},
       },
       modelVersion: currentFlowModelVersion,
       modules: { module: { imports: [], name: 'Task', source: 'export default () => ({})' } },
@@ -78,14 +74,14 @@ describe('DraftChanges', () => {
     changes.reset(applied)
     const context = { current: () => true, flowId: 'flow' }
 
-    const first = changes.change(context, applied, [{ before: undefined, field: 'name', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'L' }])
-    const second = changes.change(context, applied, [{ before: 'L', field: 'name', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'Local' }])
+    const first = changes.change(context, applied, [{ before: undefined, field: 'name', kind: 'graph.node.field.set', nodeId: 'task', value: 'L' }])
+    const second = changes.change(context, applied, [{ before: 'L', field: 'name', kind: 'graph.node.field.set', nodeId: 'task', value: 'Local' }])
     await Promise.all([first, second])
 
     expect(applied.content.document.graph.nodes.task).toMatchObject({ name: 'Local' })
     expect(request).toHaveBeenCalledOnce()
     const body = JSON.parse(String(request.mock.calls[0]?.[1]?.body))
-    expect(body.operations).toEqual([{ field: 'name', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'Local' }])
+    expect(body.operations).toEqual([{ field: 'name', kind: 'graph.node.field.set', nodeId: 'task', value: 'Local' }])
   })
 
   it('rebases an independent pending field onto the latest snapshot', async () => {
@@ -125,7 +121,7 @@ describe('DraftChanges', () => {
     changes.reset(applied)
 
     await changes.change({ current: () => true, flowId: 'flow' }, applied, [
-      { before: undefined, field: 'name', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'Local' },
+      { before: undefined, field: 'name', kind: 'graph.node.field.set', nodeId: 'task', value: 'Local' },
     ])
 
     expect(applied.content.document.graph.nodes.task).toMatchObject({ description: 'Remote', name: 'Local' })
@@ -170,7 +166,7 @@ describe('DraftChanges', () => {
     changes.reset(applied)
 
     await changes.change({ current: () => true, flowId: 'flow' }, applied, [
-      { before: undefined, field: 'name', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'Local' },
+      { before: undefined, field: 'name', kind: 'graph.node.field.set', nodeId: 'task', value: 'Local' },
     ])
 
     expect(request).toHaveBeenCalledTimes(2)
@@ -216,7 +212,7 @@ describe('DraftChanges', () => {
     changes.reset(applied)
 
     await changes.change({ current: () => true, flowId: 'flow' }, applied, [
-      { before: undefined, field: 'name', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'Local' },
+      { before: undefined, field: 'name', kind: 'graph.node.field.set', nodeId: 'task', value: 'Local' },
     ])
 
     expect(applied.content.document.graph.nodes.task).toMatchObject({ description: 'Remote', name: 'Local' })
@@ -248,7 +244,7 @@ describe('DraftChanges', () => {
     changes.reset(applied)
 
     await changes.change({ current: () => true, flowId: 'flow' }, applied, [
-      { before: undefined, field: 'name', kind: 'graph.node.field.set', nodeId: 'task', target, value: 'Local' },
+      { before: undefined, field: 'name', kind: 'graph.node.field.set', nodeId: 'task', value: 'Local' },
     ])
 
     expect(applied.content.document.graph.nodes.task).toMatchObject({ name: 'Remote' })

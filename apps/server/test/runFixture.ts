@@ -28,22 +28,19 @@ export async function storeRevision(
   if (stored == null) {
     const created = await service.control.createFlow('test', `Run fixture ${randomUUID()}`, `flow-${randomUUID()}`)
     const operations: ChangeOperation[] = [
-      { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start', target: { kind: 'flow' } },
+      { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start' },
 
       ...Object.entries(revision.document.bindings).map(([bindingId, binding]) => ({ binding, bindingId, kind: 'binding.create' as const })),
       ...Object.entries(revision.modules).map(([moduleId, module]) => ({ kind: 'module.create' as const, module, moduleId })),
-      ...Object.entries(revision.document.tasks).map(([taskId, task]) => ({ kind: 'task.create' as const, task, taskId })),
-      ...Object.entries(revision.document.subflows).map(([subflowId, subflow]) => ({ kind: 'subflow.create' as const, subflow, subflowId })),
       ...Object.entries(revision.document.graph.nodes).map(([nodeId, node]) => ({
         kind: 'graph.node.create' as const,
         node: { ...node, name: node.name ?? nodeId },
         nodeId,
-        target: { kind: 'flow' as const },
       })),
       ...Object.entries(revision.document.graph.nodes)
         .filter(([id, node]) => 'inputs' in node && !revision.document.graph.edges.some((edge) => edge.target == id))
-        .map(([target]) => ({ kind: 'graph.edge.connect' as const, edge: { source: 'start', target }, target: { kind: 'flow' as const } })),
-      ...revision.document.graph.edges.map((edge) => ({ kind: 'graph.edge.connect' as const, edge, target: { kind: 'flow' as const } })),
+        .map(([target]) => ({ kind: 'graph.edge.connect' as const, edge: { source: 'start', target } })),
+      ...revision.document.graph.edges.map((edge) => ({ kind: 'graph.edge.connect' as const, edge })),
     ]
     const revisionId =
       operations.length == 0

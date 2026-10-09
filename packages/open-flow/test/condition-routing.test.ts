@@ -30,8 +30,7 @@ function content(condition: ConditionNode): RevisionContent {
     modules: {},
     document: {
       bindings: {},
-      tasks: {},
-      subflows: {},
+
       graph: {
         nodes: {
           start: { kind: 'manual', name: 'Start' },
@@ -134,7 +133,7 @@ describe('Condition groups and routing', () => {
     ])
     const revision = content(condition)
     expect(Object.values(nodeInputMappings(condition))).toHaveLength(2)
-    expect(availableOutputs(revision.document, revision.document.graph, 'a')).toEqual({ data: ['total', 'limit'] })
+    expect(availableOutputs(revision.document.graph, 'a')).toEqual({ data: ['total', 'limit'] })
     expect((await execute(revision)).events.filter((event) => event.type === 'node.completed').map((event) => event.nodeId)).toEqual(['data', 'condition', 'a'])
   })
   it('retains later-case Variable dependencies in first mode', () => {
@@ -146,7 +145,7 @@ describe('Condition groups and routing', () => {
       },
     ])
     const revision = content(condition)
-    expect([...flowDependencies(revision).inputBindings]).toEqual(['secret'])
+    expect([...flowDependencies(revision).bindings]).toEqual(['secret'])
   })
   it('fails when a later-case Source is absent at runtime instead of selecting the first case', async () => {
     const condition = node([
@@ -235,12 +234,11 @@ describe('Condition groups and routing', () => {
 })
 
 describe('Condition editing contracts', () => {
-  const target = { kind: 'flow' as const }
   it('renames, deletes and reorders routes with reversible ordinary history', () => {
     const original = content(node([branch('a', [true]), branch('b', [true])]))
     const current = original.document.graph.nodes.condition as ConditionNode
     for (const cases of [[{ ...current.cases[0]!, output: 'renamed' }, current.cases[1]!], [current.cases[1]!], current.cases.toReversed()]) {
-      const changes = updateCondition(revisionView(draft(original)), target, 'condition', { cases, matchMode: 'all' })!
+      const changes = updateCondition(revisionView(draft(original)), 'condition', { cases, matchMode: 'all' })!
       const updated = applyFlowChanges(original, changes)
       expect(applyFlowChanges(updated, inverseFlowChanges(original, changes))).toEqual(original)
       expect(applyFlowChanges(applyFlowChanges(updated, inverseFlowChanges(original, changes)), changes)).toEqual(updated)
@@ -259,7 +257,6 @@ describe('Condition editing contracts', () => {
       {
         kind: 'graph.node.input.set',
         nodeId: 'condition',
-        target,
         handle: '0/0/0/left',
         before: { kind: 'value', value: true },
         value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'data', output: 'total' }] },
@@ -269,9 +266,9 @@ describe('Condition editing contracts', () => {
     expect((updated.document.graph.nodes.condition as ConditionNode).inputs).toEqual({})
     expect(applyFlowChanges(updated, inverseFlowChanges(original, changes))).toEqual(original)
     const view = revisionView(draft(updated))
-    const clipboard = copyNodes(view, target, ['data', 'condition'])
+    const clipboard = copyNodes(view, ['data', 'condition'])
     let id = 0
-    const pasted = pasteNodes(view, target, clipboard, () => `copy${++id}`)
+    const pasted = pasteNodes(view, clipboard, () => `copy${++id}`)
     const copied = applyFlowChanges(updated, pasted.changes)
     const copiedCondition = copied.document.graph.nodes[pasted.nodeIds[pasted.sourceIds.indexOf('condition')]!]!
     expect(Object.values(nodeInputMappings(copiedCondition))[0]).toEqual({
@@ -301,7 +298,7 @@ describe('Condition editing contracts', () => {
         },
       },
     }
-    const changes = updateTaskPorts(revisionView(draft(revision)), target, 'source', {
+    const changes = updateTaskPorts(revisionView(draft(revision)), 'source', {
       inputs: [],
       outputs: [{ handle: 'new', jsonSchema: {}, nullable: true }],
     })!

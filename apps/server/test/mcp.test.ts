@@ -19,7 +19,7 @@ import { closeService, openService, startService } from './serviceFixture.ts'
 
 const token = 'mcp-test-operator-token-000000000001'
 const version = '2026-07-28'
-const start = { kind: 'graph.node.create', target: { kind: 'flow' }, nodeId: 'start', node: { kind: 'manual', name: 'Start' } }
+const start = { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } }
 
 it('discovers independent Feishu event sources without exposing secrets', async () => {
   const connector = createConnectorHost({
@@ -104,7 +104,7 @@ it('does not commit partial compact trigger batches or accept unknown keys', asy
     control.changeDraft(
       created.flowId,
       created.draftRevisionId,
-      [...operations, { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'mail', target: 'missing' } }],
+      [...operations, { kind: 'graph.edge.connect', edge: { source: 'mail', target: 'missing' } }],
       'invalid-edge',
     ),
   ).rejects.toMatchObject({ code: 'flow.invalid' })
@@ -228,7 +228,6 @@ it('serves discovery and an atomic authoring, validation and execution workflow 
       start,
       {
         kind: 'graph.node.create',
-        target: { kind: 'flow' },
         nodeId: 'answer',
         node: {
           kind: 'value',
@@ -237,7 +236,7 @@ it('serves discovery and an atomic authoring, validation and execution workflow 
           values: [{ handle: 'answer', jsonSchema: { type: 'number' }, nullable: false, value: 42 }],
         },
       },
-      { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'start', target: 'answer' } },
+      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'answer' } },
     ],
   }
   const changed = await call('flow_apply', edit)
@@ -307,7 +306,6 @@ it('keeps admitted Runs across client disconnects and exposes Wait and cancellat
       start,
       {
         kind: 'graph.node.create',
-        target: { kind: 'flow' },
         nodeId: 'approval',
         node: {
           kind: 'approval',
@@ -317,7 +315,7 @@ it('keeps admitted Runs across client disconnects and exposes Wait and cancellat
           inputs: { value: { kind: 'value', value: 42 } },
         },
       },
-      { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'start', target: 'approval' } },
+      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'approval' } },
     ],
   })
   const args = {
@@ -357,7 +355,6 @@ it.each(['approve', 'reject', 'continue'] as const)('resolves a persisted Wait w
       start,
       {
         kind: 'graph.node.create',
-        target: { kind: 'flow' },
         nodeId: 'wait',
         node: {
           kind: action == 'continue' ? 'wait' : 'approval',
@@ -367,7 +364,7 @@ it.each(['approve', 'reject', 'continue'] as const)('resolves a persisted Wait w
           inputs: { value: { kind: 'value', value: 42 } },
         },
       },
-      { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'start', target: 'wait' } },
+      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'wait' } },
     ],
   })
   const run = await call('flow_run', {
@@ -533,7 +530,6 @@ it('executes fixed Live code revisions and keeps old Run retries stable after re
       {
         kind: 'graph.node.create',
         nodeId: 'main',
-        target: { kind: 'flow' },
         node: {
           kind: 'task',
           name: 'Main',
@@ -541,7 +537,7 @@ it('executes fixed Live code revisions and keeps old Run retries stable after re
           task: { name: 'Main', moduleId: 'main', inputs: [], outputs: [{ handle: 'answer', jsonSchema: { type: 'number' }, nullable: false }] },
         },
       },
-      { kind: 'graph.edge.connect', target: { kind: 'flow' }, edge: { source: 'start', target: 'main' } },
+      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'main' } },
     ],
   })
   const revisionId = z.object({ revisionId: z.string() }).parse(edit.revision).revisionId
@@ -698,46 +694,6 @@ for (const conformance of mcpConformanceCases) {
     })
   })
 }
-
-it('reads code and subflow nodes from the requested immutable Revision after the Draft changes', async () => {
-  const { call, control, client } = await fixture()
-  const flow = await control.createFlow('Node details')
-  const changed = await control.changeDraft(
-    flow.flowId,
-    flow.draftRevisionId,
-    [
-      ...authoringExample('code').operations,
-      {
-        kind: 'subflow.create',
-        subflowId: 'child',
-        subflow: { name: 'Child', inputs: [], outputs: [], graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Nested start' } } } },
-      },
-    ],
-    'details',
-  )
-  const revisionId = changed.revision.revisionId
-  const args = { flowId: flow.flowId, revisionId, nodeId: 'format' }
-  const detail = await call('flow_node_get', args)
-  expect(detail).toMatchObject({
-    revisionId,
-    nodeId: 'format',
-    node: { task: { moduleId: 'format-module', inputs: [{ handle: 'events' }] } },
-    module: { source: expect.stringContaining('export default') },
-  })
-  expect(detail).not.toHaveProperty('task')
-  const next = await control.changeDraft(flow.flowId, revisionId, [{ kind: 'graph.node.delete', target: { kind: 'flow' }, nodeId: 'format' }], 'delete-code')
-  expect(await call('flow_node_get', args)).toEqual(detail)
-  expect(await call('flow_node_get', { flowId: flow.flowId, revisionId, subflowId: 'child', nodeId: 'start' })).toMatchObject({
-    subflowId: 'child',
-    node: { name: 'Nested start' },
-  })
-  for (const input of [
-    { ...args, revisionId: next.revision.revisionId },
-    { ...args, subflowId: 'missing' },
-  ]) {
-    expect((await client.callTool({ name: 'flow_node_get', arguments: input })).isError).toBe(true)
-  }
-})
 
 it('discovers Trigger definitions separately from Flow instances and rejects contradictory Run identities', async () => {
   const { call, client, service } = await fixture()

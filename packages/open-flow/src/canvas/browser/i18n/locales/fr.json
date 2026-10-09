@@ -12,7 +12,7 @@
     "connectorNoActiveConnection": "Aucune Connection active",
     "llmChat": "Conversation LLM",
     "llmStructured": "Sortie structurée LLM",
-    "sharedBlocks": "Tâches et Subflows",
+    "sharedBlocks": "Tâches",
     "triggers": "Triggers",
     "value": "Valeurs fixes"
   },
@@ -402,17 +402,13 @@
     "value": "Valeur"
   },
   "scriptlet": "Mini-script",
-  "subflowSettings": {
-    "forwardPreview": "Transférer l'aperçu",
-    "title": "Configuration du Subflow"
-  },
   "workbench": {
     "conflict": {
       "keepLocal": "Conserver les modifications locales",
       "reload": "Recharger depuis le disque"
     },
     "empty": {
-      "description": "Ajoutez un fichier source Flow, Subflow ou Tâche, puis rechargez l'atelier.",
+      "description": "Ajoutez un fichier source Flow ou Tâche, puis rechargez l'atelier.",
       "title": "Ce projet n'a pas encore de cible exécutable."
     },
     "noTargets": "Aucune cible exécutable",
@@ -604,7 +600,6 @@
       "condition": "Condition",
       "approval": "Approbation",
       "wait": "Attendre la reprise",
-      "subflow": "Sous-flux",
       "value": "Valeurs fixes",
       "input": "Entrée",
       "output": "Sortie"

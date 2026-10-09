@@ -182,7 +182,7 @@ export function ConnectorAccessSettings({
   const pendingUses = pendingConnectionUses(uses, providers.data)
   const providerMetadata = Object.fromEntries((providers.data ?? []).map((provider) => [provider.serviceId, provider]))
   const referenceIcon = (reference: ConnectorAccountReference): string | undefined => {
-    const node = displayed?.node(reference.target, reference.nodeId)
+    const node = displayed?.node(reference.nodeId)
     if (node == null) return
     return node.kind == 'trigger' ? triggerNodeIcon(node.trigger, providerMetadata) : semanticNodeIcon(node, actions)
   }
@@ -700,7 +700,7 @@ function AccountReferences({
               </>
             )
             return (
-              <li key={JSON.stringify([reference.target, reference.nodeId, reference.kind])} className={hierarchy ? 'relative min-w-0 pl-4' : 'min-w-0'}>
+              <li key={JSON.stringify([reference.nodeId, reference.kind])} className={hierarchy ? 'relative min-w-0 pl-4' : 'min-w-0'}>
                 {hierarchy && (
                   <>
                     <span

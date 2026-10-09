@@ -583,7 +583,6 @@ export function decodeRunEvent(value: unknown) {
             nodeKind !== 'openapi' &&
             nodeKind !== 'llm' &&
             nodeKind !== 'agent' &&
-            nodeKind !== 'subflow' &&
             nodeKind !== 'value' &&
             nodeKind !== 'wait'
           )

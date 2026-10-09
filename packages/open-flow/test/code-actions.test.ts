@@ -2,14 +2,12 @@ import type { ConnectorActionCapability, ConnectorCapability, RevisionContent } 
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
-import { currentEngineContract } from '../src/execution/common/engineContract.ts'
 import { createActions, resolveAction } from '../src/execution/common/runtime.ts'
 import { applyFlowChanges, decodeConnectorCapabilities } from '../src/flow/common/change.ts'
 import { digestBytes, encodeRevision } from '../src/flow/common/encoding.ts'
 import { createCodeTask, setCodeActions } from '../src/flow/common/nodeChanges.ts'
-import { codeActions, flowClosure, prepareFlow } from '../src/flow/common/semantics.ts'
+import { flowClosure } from '../src/flow/common/semantics.ts'
 
-const target = { kind: 'flow' } as const
 const capability: ConnectorCapability = { kind: 'connector' }
 const legacyAction: ConnectorActionCapability = {
   kind: 'connector',
@@ -21,8 +19,8 @@ const independent = { kind: 'connector', mode: 'independent', actions: [{ action
 
 function revision(): RevisionContent {
   return applyFlowChanges(
-    { document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} }, modules: {}, modelVersion: currentFlowModelVersion },
-    createCodeTask(target, { nodeId: 'code', moduleId: 'code' }, 'Code'),
+    { document: { bindings: {}, graph: { edges: [], nodes: {} } }, modules: {}, modelVersion: currentFlowModelVersion },
+    createCodeTask({ nodeId: 'code', moduleId: 'code' }, 'Code'),
   )
 }
 
@@ -76,12 +74,12 @@ describe('Code Connector capability', () => {
 
   it('saves the capability without losing source and rejects stale edits', () => {
     const source = revision()
-    const operations = setCodeActions(source, target, 'code', [capability])
+    const operations = setCodeActions(source, 'code', [capability])
     if (operations == null) throw new Error('Expected capability edit.')
     const saved = applyFlowChanges(source, operations)
     expect(saved.modules).toEqual(source.modules)
     expect(saved.document.graph.nodes.code).toMatchObject({ task: { capabilities: [capability] } })
-    expect(setCodeActions(saved, target, 'code', [capability])).toBeUndefined()
+    expect(setCodeActions(saved, 'code', [capability])).toBeUndefined()
     expect(() => applyFlowChanges(saved, operations)).toThrow(/changed/)
   })
 
@@ -98,7 +96,7 @@ describe('Code Connector capability', () => {
       { kind: 'connector', connectionHints: [{ action: 'github.user', connectionId: 'work', alias: 'office' }] },
     ]
     const contents = variants.map((value) => {
-      const changes = setCodeActions(source, target, 'code', [value])
+      const changes = setCodeActions(source, 'code', [value])
       if (changes == null) throw new Error('Expected capability edit.')
       return applyFlowChanges(source, changes)
     })
@@ -110,31 +108,6 @@ describe('Code Connector capability', () => {
       const decoded = JSON.parse(new TextDecoder().decode(encodeRevision(content))) as RevisionContent
       expect(decoded).toEqual({ ...content, kind: 'open-flow-flow-revision', version: 1 })
     }
-  })
-
-  it('collects the capability from referenced Subflows and excludes unused definitions', async () => {
-    const source = revision()
-    const subflow = { name: 'Child', inputs: [], outputs: [], graph: { ...source.document.graph, nodes: { ...source.document.graph.nodes } } }
-    const child = source.document.graph.nodes.code
-    if (child?.kind != 'task' || child.task == null) throw new Error('Expected Code node.')
-    subflow.graph.nodes.code = { ...child, task: { ...child.task, capabilities: [capability] } }
-    const prepared = await prepareFlow(
-      {
-        ...source,
-        document: {
-          ...source.document,
-          graph: { edges: [], nodes: { child: { kind: 'subflow', subflowId: 'child', inputs: {} } } },
-          subflows: {
-            child: subflow,
-            unused: { ...subflow, graph: { edges: [], nodes: { code: { ...child, task: { ...child.task, capabilities: [capability] } } } } },
-          },
-        },
-      },
-      currentEngineContract,
-    )
-    expect(prepared.kind).toBe('prepared')
-    if (prepared.kind != 'prepared') throw new Error('Expected prepared Subflow.')
-    expect(codeActions(prepared.flow)).toEqual([capability])
   })
 })
 

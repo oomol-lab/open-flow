@@ -62,7 +62,6 @@ describe('ControlClient Flow API', () => {
         kind: 'graph.node.create' as const,
         node: { inputs: {}, kind: 'value' as const, values: [] },
         nodeId: 'value',
-        target: { kind: 'flow' as const },
       },
     ]
 
@@ -238,14 +237,14 @@ describe('ControlClient Flow API', () => {
       closureDigest: 'closure-1',
       diagnostics: [
         {
-          code: 'graph.target-missing',
+          code: 'task.connector-incomplete',
           column: 0,
           fields: ['owner', 'repo'],
           line: 1,
-          message: 'Task "missing" does not exist.',
+          message: 'Connector node requires an action.',
           mismatch: { kind: 'keyword', keyword: 'type', path: [], source: 'string', target: 'number' },
-          path: '/document/graph/nodes/task/taskId',
-          values: { taskId: 'missing', variant: 'task' },
+          path: '/document/graph/nodes/task/task/executor',
+          values: { nodeId: 'task' },
         },
       ],
       engineContract: 'open-flow-engine/v5',
@@ -260,9 +259,7 @@ describe('ControlClient Flow API', () => {
 
     await expect(client.checkFlow(flow.flowId, flow.draftRevisionId)).resolves.toEqual(checked)
 
-    const invalid = new ControlClient(async () =>
-      Response.json({ ...checked, diagnostics: [{ ...checked.diagnostics[0], values: { taskId: true, variant: 'task' } }] }),
-    )
+    const invalid = new ControlClient(async () => Response.json({ ...checked, diagnostics: [{ ...checked.diagnostics[0], values: { nodeId: true } }] }))
     await expect(invalid.checkFlow(flow.flowId, flow.draftRevisionId)).rejects.toMatchObject({ code: 'response.invalid', status: 502 })
 
     const invalidFields = new ControlClient(async () => Response.json({ ...checked, diagnostics: [{ ...checked.diagnostics[0], fields: ['owner', 1] }] }))
@@ -492,7 +489,7 @@ const editor = {
     parentRevisionId: null,
     revisionId: flow.draftRevisionId,
     version: 1,
-    content: { document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} }, modules: {}, modelVersion: currentFlowModelVersion },
+    content: { document: { bindings: {}, graph: { edges: [], nodes: {} } }, modules: {}, modelVersion: currentFlowModelVersion },
   },
   live: { flowId: flow.flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 },
   presentation: { revision: 1, updatedAt: flow.updatedAt, value: { nodes: {} }, version: 1 },

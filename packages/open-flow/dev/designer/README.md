@@ -24,7 +24,7 @@ non-production branches. Set the build variable `BUN_VERSION` to the version in 
 
 The default **Cards · Content & records** gallery uses the production card, execution status and record controls. It compares compact identity-only cards, plain text summaries and framed report previews, alongside schedule, condition, approval, running and failed examples. Empty content creates no placeholder. Execution status appears once in the footer; lightweight record actions open sample results and logs. Preview surfaces are distinct from the card shell in both themes.
 
-**Workflow components** shows the single execution canvas with a bottom command dock. It does not add an inspector or reserve a sidebar column. It includes Task, Trigger, Condition, Value, Subflow and Comment nodes, grouped inputs and connected ports. **Reset samples** restores the sample layout and selection.
+**Workflow components** shows the single execution canvas with a bottom command dock. It does not add an inspector or reserve a sidebar column. It includes Task, Trigger, Condition, Value and Comment nodes, grouped inputs and connected ports. **Reset samples** restores the sample layout and selection.
 
 **Comment / Properties** (`?story=comment-properties`) displays the production `EditorContextPanel` heading and `CommentInspector` Source/Markdown tabs, with editable, empty-content and read-only samples side by side. Each editable sample keeps its saved title and Markdown in local state. Trigger-specific property panels live under Triggers / [type] / Properties.
 
@@ -115,7 +115,7 @@ Drag the centered three-dot handle in the 8px gap to resize the sidebar. Focus t
 
 ## Node and Trigger properties
 
-Nodes / Fixed Values, Task, Condition, Wait, Subflow, Agent, and LLM each have a **Properties** story (`?story=node-[type]-properties`, using `value` for Fixed Values). Comment retains its production CommentInspector story. Read-only and editable samples appear side by side. Workbench and these galleries share `EditorContextPanel`, including NodeHeading, NodeActions, and ContextPanel; sample transports use WorkspaceStore and the production Flow reducer. Close reopens through a sample button; Reset samples restores the fixture, and Reload saved data verifies persisted edits within the session.
+Nodes / Fixed Values, Task, Condition, Wait, Agent, and LLM each have a **Properties** story (`?story=node-[type]-properties`, using `value` for Fixed Values). Comment retains its production CommentInspector story. Read-only and editable samples appear side by side. Workbench and these galleries share `EditorContextPanel`, including NodeHeading, NodeActions, and ContextPanel; sample transports use WorkspaceStore and the production Flow reducer. Close reopens through a sample button; Reset samples restores the fixture, and Reload saved data verifies persisted edits within the session.
 
 Triggers / Manual, Schedule, Webhook, and Provider use the same production panel in **Properties**. Webhook request data uses the same field-table presentation as node ports. Existing `trigger-[type]-sidebar` URLs are retained (`cron` for Schedule). Gallery widths and the read-only-first order are preserved. Trigger Node states also reuse this panel for the selected sample.
 
@@ -136,7 +136,7 @@ Node and Trigger **Properties** galleries include a **Fixed types · editable va
 ## Public preview
 
 `?story=preview` and `?story=preview-shadow` use the public `OpenFlowPreview` entry with the
-Publications fixture. Test temporary movement/restoration, properties, subflows, theme/language,
+Publications fixture. Test temporary movement/restoration, properties, theme/language,
 missing layout, and a narrow host. The Shadow DOM host is Lab-only and copies the loaded Lab
 stylesheets, including production CSS modules; independent published-CSS verification must use
 the packaged `preview.css` without Lab styles.

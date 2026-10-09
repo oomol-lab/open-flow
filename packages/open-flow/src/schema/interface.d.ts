@@ -1,4 +1,4 @@
-export type Block = TaskBlock | SubflowBlock
+export type Block = TaskBlock
 
 export type BlockUI = {
   /** Default node width */
@@ -113,14 +113,6 @@ export type GroupDividerDef = {
 }
 
 /**
- * Data source from the input Handle of current Subflow Block
- */
-export type HandleFromFlow = {
-  /** Input Handle of current Subflow Block */
-  input_handle: HandleName
-}
-
-/**
  * Data source from output Handle of another Node
  */
 export type HandleFromNode = {
@@ -135,7 +127,6 @@ export type HandleInputFrom = {
   handle: HandleName
   /** Provide static value for block, default is null. */
   value?: any | undefined
-  from_flow?: HandleFromFlow[] | undefined
   from_node?: HandleFromNode[] | undefined
   /** Override block schema for specific JSON path */
   schema_overrides?: HandleSchemaOverridesItem[] | undefined
@@ -151,7 +142,6 @@ export type HandleName = string & {
 export type HandleOutputFrom = {
   /** Handle name */
   handle: HandleName
-  from_flow?: HandleFromFlow[] | undefined
   from_node?: HandleFromNode[] | undefined
 }
 
@@ -220,7 +210,7 @@ export type NodeId = string & {
   __PHANTOM_TYPE__: Node
 }
 
-export type Node = TaskNode | SubflowNode | ValueNode | ConditionNode
+export type Node = TaskNode | ValueNode | ConditionNode
 
 /**
  * JavaScript Executor Name
@@ -300,57 +290,6 @@ export type Package = {
   description?: string | undefined
   /** Project icon URI */
   icon?: string | undefined
-}
-
-/**
- * A Subflow Block defines a Subflow that acts as a Block externally and as a Flow internally.
- */
-export type SubflowBlock = {
-  /** Block input Handles definitions */
-  inputs_def?: ((Omit<InputHandleDef, 'handle'> & { handle: string }) | GroupDividerDef)[] | undefined
-  /** Block output Handles definitions */
-  outputs_def?: (OutputHandleDef | GroupDividerDef)[] | undefined
-  /** UI settings of the block */
-  ui?: BlockUI | undefined
-  /** Block display title */
-  title?: string | undefined
-  /** Block display description */
-  description?: string | undefined
-  /** Path to a icon image for the Block */
-  icon?: string | undefined
-  /** Hide the subflow from the blocks list and exclude it from AI tools */
-  private?: boolean
-  /** Nodes in the Subflow */
-  nodes?: Node[] | undefined
-  /** Provides data sources for Subflow output handles. */
-  outputs_from?: HandleOutputFrom[] | undefined
-  /** List of nodes whose previews are forwarded to the Subflow node. */
-  forward_previews?: NodeId[] | undefined
-}
-
-/**
- * Subflow Node points to a Subflow Block manifest
- */
-export type SubflowNode = {
-  /** Node ID. Unique in current Flow. */
-  node_id: NodeId
-  /** Ignore this Node in execution */
-  ignore?: boolean | undefined
-  /** Path to a icon image for the Node */
-  icon?: string | undefined
-  /** Node title */
-  title?: string | undefined
-  /** Node description */
-  description?: string | undefined
-  /** Node execution timeout in seconds */
-  timeout?: number | undefined
-  /** Provide data source for Node input Handles. */
-  inputs_from?: HandleInputFrom[] | undefined
-  /** the maximum number of this node can be executed concurrently. default is 1. */
-  /** The weight of this node in current flow progress calculation. Flow will sum all nodes' progress divided by their weight sum. Default is 1. Set to 0 to ignore this node in flow's progress calculation. */
-  progress_weight?: number
-  /** Location of a Subflow Block manifest */
-  subflow: string
 }
 
 /**

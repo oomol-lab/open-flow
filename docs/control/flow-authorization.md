@@ -33,7 +33,7 @@ Agent 内联通知通过其引用的 Connector Task 取得固定 Action 和账�
 
 `ConnectorAccess` 是可编辑配置，当前结构版本为 `1`：
 
-- `bindings`：整个 Flow（包括 Subflow）中共享 Code 可使用的授权选择。
+- `bindings`：整个 Flow中共享 Code 可使用的授权选择。
 - `accessRevision`：共享配置的并发修改版本；写入提交 `expectedAccessRevision`，防止覆盖其他修改。
 - `sharedAccessDigest`：共享选择的确定性摘要，用于变更检测、发布状态与请求身份。
 - `providerIds`：显式添加的服务，允许服务尚未选择任何账号；添加服务本身不授予权限。

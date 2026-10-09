@@ -9,20 +9,16 @@ import { setComment, setNodePositions } from '../canvasPresentation.ts'
 import { designerGraph } from '../workspace.ts'
 import { WorkspaceStore } from './workspaceStore.ts'
 
-const target = { kind: 'flow' } as const
 const timestamp = '2026-09-10T00:00:00.000Z'
 async function session() {
   const flow = { flowId: 'flow', name: 'Flow', status: 'active', createdAt: timestamp, updatedAt: timestamp, draftRevisionId: 'r1', version: 1 } as const
   let draft: Draft = {
     actorId: 'test',
-    content: applyFlowChanges(
-      { modelVersion: currentFlowModelVersion, document: { graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {}, bindings: {} }, modules: {} },
-      [
-        ...createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Code'),
-        ...createValue(target, 'value', 'Value'),
-        { kind: 'graph.edge.connect', target, edge: { source: 'value', target: 'code' } },
-      ],
-    ),
+    content: applyFlowChanges({ modelVersion: currentFlowModelVersion, document: { graph: { nodes: {}, edges: [] }, bindings: {} }, modules: {} }, [
+      ...createCodeTask({ nodeId: 'code', moduleId: 'module' }, 'Code'),
+      ...createValue('value', 'Value'),
+      { kind: 'graph.edge.connect', edge: { source: 'value', target: 'code' } },
+    ]),
     createdAt: timestamp,
     digest: 'digest',
     flowId: 'flow',
@@ -35,7 +31,7 @@ async function session() {
     revision: 1,
     updatedAt: timestamp,
     version: 1,
-    value: setComment(setNodePositions({}, target, { code: { x: 300, y: 0 }, value: { x: 0, y: 0 } }), target, 'note', {
+    value: setComment(setNodePositions({}, { code: { x: 300, y: 0 }, value: { x: 0, y: 0 } }), 'note', {
       title: 'Note',
       content: 'Keep this',
       position: { x: 0, y: 300 },
@@ -88,7 +84,7 @@ describe('Workspace canvas history', () => {
       await store.setInputValue('code', 'input', 'old value')
       const before = saved().draft.content
       const node = before.document.graph.nodes.code
-      if (node?.kind !== 'task' || node.task == null) throw new Error('Expected code task')
+      if (node?.kind !== 'task' || !('moduleId' in node.task)) throw new Error('Expected code task')
       await store.saveTaskPorts('code', {
         inputs: [{ handle: 'input', jsonSchema: { type: 'null' }, nullable: true }],
         outputs: node.task.outputs,
@@ -248,7 +244,7 @@ describe('Workspace canvas history', () => {
       expect(notices.mock.calls.some(([notice]) => notice.message == 'Canvas history cleared after content editing.')).toBe(false)
       await store.undo()
       expect(saved().draft.content.modules.module?.source).toBe('export default () => ({result: 1})')
-      expect(designerGraph(saved().draft, target, saved().presentation.value).nodes.find((node) => node.id == 'code')?.position).toEqual({ x: 400, y: 0 })
+      expect(designerGraph(saved().draft, saved().presentation.value).nodes.find((node) => node.id == 'code')?.position).toEqual({ x: 400, y: 0 })
       expect(store.history$.value.canUndo).toBe(true)
     } finally {
       store.dispose()
@@ -263,7 +259,7 @@ describe('Workspace canvas history', () => {
       const nodeId = await store.addNode(option, { x: 600, y: 0 })
       if (nodeId == null) throw new Error('Expected added code node')
       const node = saved().draft.content.document.graph.nodes[nodeId]
-      if (node?.kind != 'task' || node.task == null || !('moduleId' in node.task)) throw new Error('Expected code task')
+      if (node?.kind != 'task' || !('moduleId' in node.task) || !('moduleId' in node.task)) throw new Error('Expected code task')
       const moduleId = node.task.moduleId
       const source = "import dependency from './dependency.mjs'\nexport default () => ({result: dependency})"
       store.updateModuleSource(source)
@@ -310,16 +306,16 @@ describe('Workspace canvas history', () => {
       await store.undo()
       expect(saved().draft.content).toEqual(hidden.draft.content)
       await store.undo()
-      expect(designerGraph(saved().draft, target, saved().presentation.value).nodes.find((node) => node.id == 'value')).toMatchObject({
+      expect(designerGraph(saved().draft, saved().presentation.value).nodes.find((node) => node.id == 'value')).toMatchObject({
         contentHidden: false,
         position: { x: 100, y: 50 },
       })
       expect(store.history$.value.undo?.action).toBe('move')
       await store.undo()
-      expect(designerGraph(saved().draft, target, saved().presentation.value)).toEqual(designerGraph(initial.draft, target, initial.presentation.value))
+      expect(designerGraph(saved().draft, saved().presentation.value)).toEqual(designerGraph(initial.draft, initial.presentation.value))
       expect(store.history$.value.canUndo).toBe(false)
       await store.redo()
-      expect(designerGraph(saved().draft, target, saved().presentation.value)).toEqual(designerGraph(moved.draft, target, moved.presentation.value))
+      expect(designerGraph(saved().draft, saved().presentation.value)).toEqual(designerGraph(moved.draft, moved.presentation.value))
       await store.redo()
       await store.redo()
       await store.redo()
@@ -434,7 +430,7 @@ describe('Workspace canvas history', () => {
         return original(...args)
       })
       const pending = store.moveNodes({ code: { x: 600, y: 0 } })
-      store.selectTarget(undefined)
+      await store.selectFlow(undefined)
       gate.resolve()
       await pending
       expect(store.history$.value.canUndo).toBe(false)
@@ -523,7 +519,7 @@ describe('Workspace canvas history', () => {
 describe('Node content presentation', () => {
   it('persists visibility across reopening without changing the draft and restores shown content', async () => {
     const { store, saved, change } = await session()
-    const contentNode = () => designerGraph(store.$.draft.value, target, store.$.presentation.value?.value).nodes.find((node) => node.id == 'value')
+    const contentNode = () => designerGraph(store.$.draft.value, store.$.presentation.value?.value).nodes.find((node) => node.id == 'value')
     try {
       const draft = saved().draft
       expect(contentNode()).toMatchObject({ kind: 'value', contentHidden: false })
@@ -548,14 +544,14 @@ describe('Node content presentation', () => {
       store.selectNodes(['value'])
       await store.duplicateSelectedNodes()
       const copy = store.$.selectedNodeIds.value[0]!
-      expect(designerGraph(saved().draft, target, saved().presentation.value).nodes.find((node) => node.id == copy)).toMatchObject({ contentHidden: true })
+      expect(designerGraph(saved().draft, saved().presentation.value).nodes.find((node) => node.id == copy)).toMatchObject({ contentHidden: true })
       await store.deleteSelectedNodes()
       const hidden = (saved().presentation.value.designer as { flow: { hiddenNodeContent: Record<string, boolean> } }).flow.hiddenNodeContent
       expect(hidden[copy]).toBeUndefined()
       await store.undo()
-      expect(designerGraph(saved().draft, target, saved().presentation.value).nodes.find((node) => node.id == copy)).toMatchObject({ contentHidden: true })
+      expect(designerGraph(saved().draft, saved().presentation.value).nodes.find((node) => node.id == copy)).toMatchObject({ contentHidden: true })
       await store.redo()
-      expect(designerGraph(saved().draft, target, saved().presentation.value).nodes.some((node) => node.id == copy)).toBe(false)
+      expect(designerGraph(saved().draft, saved().presentation.value).nodes.some((node) => node.id == copy)).toBe(false)
     } finally {
       store.dispose()
     }
@@ -568,14 +564,14 @@ it('persists generic task and comment visibility, including copying comments', a
     await store.saveNodeContentHidden('code', true)
     await store.saveNodeContentHidden('note', true)
     await store.selectFlow('flow')
-    const nodes = designerGraph(store.$.draft.value, target, store.$.presentation.value?.value).nodes
+    const nodes = designerGraph(store.$.draft.value, store.$.presentation.value?.value).nodes
     expect(nodes.find((node) => node.id == 'code')).toMatchObject({ contentHidden: true })
     expect(nodes.find((node) => node.id == 'note')).toMatchObject({ contentHidden: true })
     expect(change).not.toHaveBeenCalled()
     store.selectNodes(['note'])
     await store.duplicateSelectedNodes()
     const copy = store.$.selectedNodeIds.value[0]!
-    expect(designerGraph(saved().draft, target, saved().presentation.value).nodes.find((node) => node.id == copy)).toMatchObject({
+    expect(designerGraph(saved().draft, saved().presentation.value).nodes.find((node) => node.id == copy)).toMatchObject({
       kind: 'comment',
       contentHidden: true,
     })
@@ -593,11 +589,11 @@ it('syncs saved comment edits to the canvas immediately and retains them after r
     return persist(...args)
   })
   const comment = { title: 'Edited note', content: '## Updated\n\n**Saved from the inspector**' }
-  const canvasComment = () => designerGraph(store.$.draft.value, target, store.$.presentation.value?.value).nodes.find((node) => node.id == 'note')
+  const canvasComment = () => designerGraph(store.$.draft.value, store.$.presentation.value?.value).nodes.find((node) => node.id == 'note')
   try {
     const saving = store.saveComment('note', comment)
     expect(canvasComment()).toMatchObject({ ...comment, position: { x: 0, y: 300 } })
-    expect(designerGraph(saved().draft, target, saved().presentation.value).nodes.find((node) => node.id == 'note')).toMatchObject({ content: 'Keep this' })
+    expect(designerGraph(saved().draft, saved().presentation.value).nodes.find((node) => node.id == 'note')).toMatchObject({ content: 'Keep this' })
 
     gate.resolve()
     await saving

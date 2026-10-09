@@ -2,19 +2,6 @@ import type { InputHandleDef, OutputHandleDef } from '../../../../schema/index.t
 
 export type TypingLanguage = 'typescript' | 'javascript'
 
-const generatedMetaStart = '//#region generated meta'
-const generatedMetaEnd = '//#endregion'
-
-export function mergeTypingIntoSourceFile(contents: string, typing: string): string {
-  const start = contents.indexOf(generatedMetaStart)
-  if (start < 0) return contents
-  const beforeEnd = contents.indexOf(`\n${generatedMetaEnd}`, start)
-  if (beforeEnd < 0) return contents
-  let end = contents.indexOf('\n', beforeEnd + 1)
-  if (end < 0) end = contents.length
-  return `${contents.slice(0, start)}${generatedMetaStart}\n${typing}${generatedMetaEnd}${contents.slice(end)}`
-}
-
 export function generateTyping(
   language: TypingLanguage,
   inputsDef: readonly (Omit<InputHandleDef, 'handle'> & { readonly handle: string })[] | undefined,

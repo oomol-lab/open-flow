@@ -31,16 +31,16 @@ describe('Workbench Diagnostic messages', () => {
     i18n.dispose()
   })
 
-  it('translates code variants with structured values', () => {
+  it('translates diagnostics with structured node values', () => {
     const i18n = createI18n('zh-CN')
     const diagnostic: Diagnostic = {
       ...base,
-      code: 'graph.target-missing',
+      code: 'task.connector-incomplete',
       message: 'Task "missing" does not exist.',
-      values: { taskId: 'missing', variant: 'task' },
+      values: { nodeId: 'missing' },
     }
 
-    expect(diagnosticMessage(diagnostic, i18n.t)).toBe('Task“missing”不存在。')
+    expect(diagnosticMessage(diagnostic, i18n.t)).toBe('请为连接器任务“missing”选择操作。')
     i18n.dispose()
   })
 
@@ -123,8 +123,6 @@ describe('Workbench Diagnostic messages', () => {
               },
             },
           },
-          subflows: {},
-          tasks: {},
         },
         modelVersion: currentFlowModelVersion,
         modules: {},
@@ -159,10 +157,10 @@ describe('Workbench Diagnostic messages', () => {
       valid: false,
       version: 1 as const,
     }
-    expect(deriveInspectorDiagnostics(revision, { kind: 'flow' }, { ...check, revisionId: 'previous' }, undefined)).toEqual([])
+    expect(deriveInspectorDiagnostics(revision, { ...check, revisionId: 'previous' }, undefined)).toEqual([])
 
-    expect(diagnosticItems(revision, { kind: 'flow' }, check)).toMatchObject([{ location: { nodeId: 'trigger', section: 'account' } }, { location: undefined }])
-    expect(deriveInspectorDiagnostics(revision, { kind: 'flow' }, check, undefined)).toEqual([flowDiagnostic])
-    expect(deriveInspectorDiagnostics(revision, { kind: 'flow' }, check, revision.selection({ kind: 'flow' }, 'trigger'))).toEqual([diagnostic])
+    expect(diagnosticItems(revision, check)).toMatchObject([{ location: { nodeId: 'trigger', section: 'account' } }, { location: undefined }])
+    expect(deriveInspectorDiagnostics(revision, check, undefined)).toEqual([flowDiagnostic])
+    expect(deriveInspectorDiagnostics(revision, check, revision.selection('trigger'))).toEqual([diagnostic])
   })
 })

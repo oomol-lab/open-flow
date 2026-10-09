@@ -1,5 +1,4 @@
 import type { FlowCanvasViewProps } from '../../../../canvas/browser/graph/FlowCanvas/model.ts'
-import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { Draft, Presentation } from '../api.ts'
 import type { WorkbenchTheme } from '../contract.ts'
 import type { RevisionCanvasSession } from './revisionCanvasSession.ts'
@@ -18,6 +17,7 @@ import { changeRevisionCanvasSession } from './revisionCanvasSession.ts'
 import { WorkbenchInspectorToggle } from './workbenchInspectorToggle.tsx'
 
 /** The parent keys this session by snapshot identity. All movement is disposable view state. */
+
 export function RevisionCanvas({
   draft,
   presentation,
@@ -39,13 +39,12 @@ export function RevisionCanvas({
   const t = useTranslate()
   const language = useLang()
   const revision = useMemo(() => revisionView(draft), [draft])
-  const [target, setTarget] = useState<GraphTarget>({ kind: 'flow' })
-  const graphId = target.kind === 'flow' ? 'flow' : `subflow:${target.id}`
+  const graphId = 'flow'
   const [sessions, setSessions] = useState<RevisionCanvasSession>({})
   const [selected, setSelected] = useState<readonly string[]>([])
   const [inspectorOpen, setInspectorOpen] = useState(false)
   const [focus, setFocus] = useState<FlowCanvasViewProps['focusNodeRequest']>()
-  const baseline = useMemo(() => designerGraph(draft, target, presentation?.value, [], {}, {}, t), [draft, target, presentation, t])
+  const baseline = useMemo(() => designerGraph(draft, presentation?.value, [], {}, {}, t), [draft, presentation, t])
   const session = sessions[graphId]
   const model = useMemo(
     () => ({
@@ -60,22 +59,11 @@ export function RevisionCanvas({
     return position != null && (position.x !== node.position.x || position.y !== node.position.y)
   })
 
-  const navigate = (next: GraphTarget) => {
-    setTarget(next)
-    setSelected([])
-    setFocus(undefined)
-  }
-  const selection = selected.length === 1 ? revision.node(target, selected[0]!) : undefined
+  const selection = selected.length === 1 ? revision.node(selected[0]!) : undefined
   const comment = selected.length === 1 ? model.nodes.find((node) => node.id === selected[0] && node.kind === 'comment') : undefined
   const navigation =
-    target.kind === 'subflow' || presentation == null || moved ? (
+    presentation == null || moved ? (
       <>
-        {target.kind === 'subflow' && (
-          <Button size="xs" variant="ghost" onClick={() => navigate({ kind: 'flow' })}>
-            {t('snapshot.root')}
-          </Button>
-        )}
-        {target.kind === 'subflow' && <span className="truncate">{revision.subflow(target.id)?.name ?? target.id}</span>}
         {presentation == null && <span className="revision-viewer-hint">{t('snapshot.missingLayout')}</span>}
         {moved && (
           <Button
@@ -141,20 +129,12 @@ export function RevisionCanvas({
             className="open-flow-property-panel"
             theme={theme}
             title={selection?.node.name ?? comment?.title ?? t('inspector.title')}
-            icon={comment?.kind === 'comment' ? 'comment' : inspectorIcon(selection, target)}
+            icon={comment?.kind === 'comment' ? 'comment' : inspectorIcon(selection)}
             focusOnOpen
             onClose={() => setInspectorOpen(false)}
           >
             {selection != null ? (
-              <NodeInspector
-                readOnly
-                key={`${graphId}:${selection.id}`}
-                revision={revision}
-                selection={selection}
-                target={target}
-                theme={theme}
-                onOpenSubflow={(id) => navigate({ kind: 'subflow', id })}
-              />
+              <NodeInspector readOnly key={`${graphId}:${selection.id}`} revision={revision} selection={selection} theme={theme} />
             ) : comment?.kind === 'comment' ? (
               <CommentInspector key={comment.id} title={comment.title} content={comment.content ?? ''} dark={theme === 'dark'} readOnly />
             ) : (

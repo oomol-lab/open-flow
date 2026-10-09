@@ -12,11 +12,11 @@ const timestamp = '2026-09-07T00:00:00.000Z'
 
 async function setup() {
   const flow = { createdAt: timestamp, updatedAt: timestamp, draftRevisionId: 'r0', flowId: 'flow', name: 'Flow', status: 'active', version: 1 } as const
-  const target = { kind: 'flow' } as const
-  const content = applyFlowChanges(
-    { modelVersion: currentFlowModelVersion, document: { bindings: {}, tasks: {}, subflows: {}, graph: { nodes: {}, edges: [] } }, modules: {} },
-    [...createCodeTask(target, { moduleId: 'a', nodeId: 'a' }, 'A'), ...createCodeTask(target, { moduleId: 'b', nodeId: 'b' }, 'B')],
-  )
+
+  const content = applyFlowChanges({ modelVersion: currentFlowModelVersion, document: { bindings: {}, graph: { nodes: {}, edges: [] } }, modules: {} }, [
+    ...createCodeTask({ moduleId: 'a', nodeId: 'a' }, 'A'),
+    ...createCodeTask({ moduleId: 'b', nodeId: 'b' }, 'B'),
+  ])
   let revision: Draft = {
     actorId: 'actor',
     content,

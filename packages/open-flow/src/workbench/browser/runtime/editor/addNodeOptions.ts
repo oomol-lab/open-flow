@@ -1,5 +1,4 @@
 import type { TFunction } from 'val-i18n'
-import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { Draft, JsonValue, TriggerKeySnapshot } from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { RevisionView } from '../revisionView.ts'
@@ -59,7 +58,6 @@ export type AddNodeOption = AddNodeOptionBase &
     | { readonly kind: 'openapi' }
     | { readonly kind: 'llm' }
     | { readonly kind: 'new-task' }
-    | { readonly kind: 'subflow'; readonly referenceId: string }
     | {
         readonly choices: NonNullable<AddNodeOptionBase['choices']>
         readonly kind: 'trigger'
@@ -149,10 +147,9 @@ function builtinOptions(t: TFunction): readonly AddNodeOption[] {
   ]
 }
 
-export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarget | undefined, t: TFunction): readonly AddNodeOption[] {
-  if (draft == null || target == null) return []
+export function deriveAddNodeOptions(draft: Draft | undefined, t: TFunction): readonly AddNodeOption[] {
+  if (draft == null) return []
   const options = builtinOptions(t)
-  if (target.kind != 'flow') return options.filter((option) => option.kind != 'agent')
   const group = t('addNode.triggers')
   const triggers: readonly AddNodeOption[] = [
     {
@@ -224,27 +221,25 @@ export function deriveAddNodeOptions(draft: Draft | undefined, target: GraphTarg
       outputs: [{ handle: 'continue', jsonSchema: {} }],
     },
   ]
-  const nodes = Object.values(revisionView(draft).graph(target)?.nodes ?? {})
+  const nodes = Object.values(revisionView(draft).graph()?.nodes ?? {})
   return triggers.filter((option) => !nodes.some((node) => (node.kind == 'manual' || node.kind == 'error') && option.id == `trigger:${node.kind}`))
 }
 
-export function addNodeIntent(option: AddNodeOption, revision: RevisionView, target: GraphTarget, t: TFunction): AddNodeIntent | undefined {
+export function addNodeIntent(option: AddNodeOption, revision: RevisionView, t: TFunction): AddNodeIntent | undefined {
   switch (option.kind) {
     case 'new-task': {
       const name = t('addNode.codeTaskName', {
-        number: Object.keys(revision.graph(target)!.nodes).length + 1,
+        number: Object.keys(revision.graph()!.nodes).length + 1,
       })
       return { kind: 'code', name }
     }
     case 'agent':
-      return target.kind == 'flow'
-        ? {
-            kind: 'agent',
-            name: t('addNode.agent'),
-            prompt: t('agent.defaultPrompt', { input: '{{input}}' }),
-            outputDescription: t('agent.defaultOutputDescription'),
-          }
-        : undefined
+      return {
+        kind: 'agent',
+        name: t('addNode.agent'),
+        prompt: t('agent.defaultPrompt', { input: '{{input}}' }),
+        outputDescription: t('agent.defaultOutputDescription'),
+      }
     case 'decision':
       return { kind: 'decision', name: t('addNode.decision') }
     case 'openapi':
@@ -286,12 +281,10 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, tar
     case 'condition':
       return { kind: 'condition', name: t('addNode.condition') }
     case 'approval':
-      return target.kind == 'flow' ? { kind: 'approval', name: t('addNode.approval') } : undefined
+      return { kind: 'approval', name: t('addNode.approval') }
     case 'value':
       return { kind: 'value', name: t('addNode.value') }
     case 'wait':
-      return target.kind == 'flow' ? { kind: 'wait', name: t('addNode.wait') } : undefined
-    case 'subflow':
-      return { kind: 'subflow', subflowId: option.referenceId }
+      return { kind: 'wait', name: t('addNode.wait') }
   }
 }

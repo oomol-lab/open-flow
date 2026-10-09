@@ -129,14 +129,13 @@ it('executes upstream data → Decision → Condition using answer fields in the
         modules: {},
         document: {
           bindings: {},
-          subflows: {},
-          tasks: { decision: decisionTask(questions) },
+
           graph: {
             nodes: {
               input: { kind: 'value', inputs: {}, values: [{ handle: 'message', jsonSchema: { type: 'object' }, nullable: false, value: invocation.state }] },
               decision: {
                 kind: 'task',
-                taskId: 'decision',
+                task: decisionTask(questions),
                 inputs: { target: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'input', output: 'message' }] } },
               },
               route: {

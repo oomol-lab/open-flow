@@ -559,7 +559,7 @@ function executeFlow(
           readonly type: 'capability'
         }
       | { readonly event: SchedulerEvent; readonly type: 'event' }
-      | { readonly invocation: Extract<TaskInvocation, { readonly taskId: string }>; readonly type: 'task' }
+      | { readonly invocation: Extract<TaskInvocation, { readonly kind: 'managed' }>; readonly type: 'task' }
       | { readonly operation: WaitOperation; readonly type: 'wait' },
   ) => Effect.Effect<CapabilityResult, Error>,
 ): Effect.Effect<FlowRunOutcome, Error> {
@@ -661,7 +661,7 @@ function executeWithCapabilities(request: InvokeRequest, pending: Map<number, Pe
           readonly type: 'capability'
         }
       | { readonly event: SchedulerEvent; readonly type: 'event' }
-      | { readonly invocation: Extract<TaskInvocation, { readonly taskId: string }>; readonly type: 'task' }
+      | { readonly invocation: Extract<TaskInvocation, { readonly kind: 'managed' }>; readonly type: 'task' }
       | { readonly operation: WaitOperation; readonly type: 'wait' },
   ): Effect.Effect<CapabilityResult, Error> =>
     Effect.gen(function* () {

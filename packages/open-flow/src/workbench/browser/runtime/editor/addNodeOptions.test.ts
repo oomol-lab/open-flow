@@ -24,8 +24,7 @@ function emptyDraft(): Draft {
       modules: {},
       document: {
         bindings: {},
-        tasks: {},
-        subflows: { nested: { graph: { edges: [], nodes: {} }, inputs: [], name: 'Nested', outputs: [] } },
+
         graph: { edges: [], nodes: {} },
       },
     },
@@ -45,12 +44,12 @@ it('offers a manual trigger again after the existing one is removed', () => {
     content: {
       modelVersion: currentFlowModelVersion,
       modules: {},
-      document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
+      document: { bindings: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
     },
   }
-  expect(designerGraph(draft, { kind: 'flow' }).nodes).toEqual([expect.objectContaining({ id: 'start', outputs: [] })])
+  expect(designerGraph(draft).nodes).toEqual([expect.objectContaining({ id: 'start', outputs: [] })])
   const t = createI18n('en').t
-  const options = deriveAddNodeOptions(draft, { kind: 'flow' }, t)
+  const options = deriveAddNodeOptions(draft, t)
   expect(options.find((option) => option.id == 'wait')).toMatchObject({
     group: 'Human in the loop',
     kind: 'wait',
@@ -83,17 +82,15 @@ it('offers a manual trigger again after the existing one is removed', () => {
     },
   ])
   const cleared: Draft = { ...draft, content: { ...draft.content, document: { ...draft.content.document, graph: { edges: [], nodes: {} } } } }
-  expect(deriveAddNodeOptions(cleared, { kind: 'flow' }, t).find((option) => option.id == 'trigger:manual')).toMatchObject({ outputs: [] })
+  expect(deriveAddNodeOptions(cleared, t).find((option) => option.id == 'trigger:manual')).toMatchObject({ outputs: [] })
 })
 
 it('hides legacy LLM nodes from the node library', () => {
   const draft = emptyDraft()
   const t = createI18n('en').t
 
-  for (const target of [{ kind: 'flow' } as const, { id: 'nested', kind: 'subflow' } as const]) {
-    const options = deriveAddNodeOptions(draft, target, t)
-    expect(options.some((option) => option.id == 'llm:chat' || option.id == 'llm:json')).toBe(false)
-  }
+  const options = deriveAddNodeOptions(draft, t)
+  expect(options.some((option) => option.id == 'llm:chat' || option.id == 'llm:json')).toBe(false)
 })
 
 it.each([
@@ -125,7 +122,7 @@ it.each([
     'Décrivez la tâche à accomplir. L’AI Agent utilisera les entrées du nœud et les outils ajoutés pour la réaliser.',
   ],
 ] as const)('puts condition before AI Agent in the %s node library', (language, javascriptLabel, javascriptDescription, agentDescription) => {
-  const options = deriveAddNodeOptions(emptyDraft(), { kind: 'flow' }, createI18n(language).t).filter((option) => option.kind != 'trigger')
+  const options = deriveAddNodeOptions(emptyDraft(), createI18n(language).t).filter((option) => option.kind != 'trigger')
 
   expect(options.slice(0, 3)).toMatchObject([
     { id: 'javascript', label: javascriptLabel, description: javascriptDescription },
@@ -138,15 +135,16 @@ it.each(['en', 'zh-CN', 'zh-TW', 'fr', 'ja', 'ko', 'ru'] as const)('creates a us
   const i18n = createI18n(language)
   const draft = emptyDraft()
   const view = new RevisionView(draft)
-  const target = { kind: 'flow' } as const
-  const option = deriveAddNodeOptions(draft, target, i18n.t).find((item) => item.kind == 'agent')!
-  const intent = addNodeIntent(option, view, target, i18n.t)!
-  const changes = addNode(view, target, 'agent', intent, () => 'agent-task')!
-  const created = changes.find((operation) => operation.kind == 'task.create')
-  if (created?.kind != 'task.create' || !('executor' in created.task) || created.task.executor.kind != 'agent') throw new Error('Expected Agent creation.')
-  expect(created.task.executor.prompt).toContain('{{input}}')
-  expect(created.task.executor.prompt).toBe(i18n.t('agent.defaultPrompt', { input: '{{input}}' }))
-  const output = created.task.outputs[0]
+
+  const option = deriveAddNodeOptions(draft, i18n.t).find((item) => item.kind == 'agent')!
+  const intent = addNodeIntent(option, view, i18n.t)!
+  const changes = addNode(view, 'agent', intent)!
+  const created = changes.find((operation) => operation.kind == 'graph.node.create')
+  if (created?.kind != 'graph.node.create' || created.node.kind != 'task' || !('executor' in created.node.task) || created.node.task.executor.kind != 'agent')
+    throw new Error('Expected Agent creation.')
+  expect(created.node.task.executor.prompt).toContain('{{input}}')
+  expect(created.node.task.executor.prompt).toBe(i18n.t('agent.defaultPrompt', { input: '{{input}}' }))
+  const output = created.node.task.outputs[0]
   if (output == null || !('handle' in output)) throw new Error('Expected output port.')
   expect(output.description).toBe(i18n.t('agent.defaultOutputDescription'))
   expect(output.description?.length).toBeGreaterThan(0)
@@ -160,8 +158,8 @@ it.each([
 ] as const)('localizes the Decision option and new node name in %s', (language, label) => {
   const t = createI18n(language).t
   const draft = emptyDraft()
-  const target = { kind: 'flow' } as const
-  const option = deriveAddNodeOptions(draft, target, t).find((item) => item.kind === 'decision')!
+
+  const option = deriveAddNodeOptions(draft, t).find((item) => item.kind === 'decision')!
   expect(option.label).toBe(label)
-  expect(addNodeIntent(option, new RevisionView(draft), target, t)).toMatchObject({ kind: 'decision', name: label })
+  expect(addNodeIntent(option, new RevisionView(draft), t)).toMatchObject({ kind: 'decision', name: label })
 })

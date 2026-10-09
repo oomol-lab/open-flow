@@ -419,7 +419,7 @@ describe('FlowCanvasView model synchronization', () => {
     view.props.flowCanvasStore.dispose()
   })
 
-  it.each(['subflow', 'wait', 'task'] as const)('preserves %s input values in the canvas projection', (kind) => {
+  it.each(['wait', 'task'] as const)('preserves %s input values in the canvas projection', (kind) => {
     const view = FlowCanvasView(
       props(
         model([

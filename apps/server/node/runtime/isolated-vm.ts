@@ -99,7 +99,7 @@ export type ExecutorMessage =
       readonly type: 'capability'
     }
   | { readonly event: SchedulerEvent; readonly executionId: number; readonly id: number; readonly type: 'event' }
-  | { readonly executionId: number; readonly id: number; readonly invocation: Extract<TaskInvocation, { readonly taskId: string }>; readonly type: 'task' }
+  | { readonly executionId: number; readonly id: number; readonly invocation: Extract<TaskInvocation, { readonly kind: 'managed' }>; readonly type: 'task' }
   | { readonly executionId: number; readonly id: number; readonly type: 'call.cancel' }
   | {
       readonly code: IsolatedVmError['code']
@@ -127,7 +127,7 @@ interface PendingInvocation {
   readonly cancel: () => void
   readonly emit?: (event: SchedulerEvent) => void | Promise<void>
   readonly wait?: (operation: WaitOperation, signal: AbortSignal) => Promise<unknown>
-  readonly invokeTask?: (invocation: Extract<TaskInvocation, { readonly taskId: string }> & { readonly signal: AbortSignal }) => Promise<unknown>
+  readonly invokeTask?: (invocation: Extract<TaskInvocation, { readonly kind: 'managed' }> & { readonly signal: AbortSignal }) => Promise<unknown>
   readonly limits: IsolatedVmLimits
   readonly projectFailure: (error: unknown) => SchedulerFailure
   readonly reject: (error: unknown) => void
@@ -237,7 +237,7 @@ export class IsolatedVmHost {
       readonly flowId: string
       readonly wait?: (operation: WaitOperation, signal: AbortSignal) => Promise<unknown>
       readonly remainingMs?: number
-      readonly invokeTask: (invocation: Extract<TaskInvocation, { readonly taskId: string }> & { readonly signal: AbortSignal }) => Promise<unknown>
+      readonly invokeTask: (invocation: Extract<TaskInvocation, { readonly kind: 'managed' }> & { readonly signal: AbortSignal }) => Promise<unknown>
       readonly projectFailure: (error: unknown) => SchedulerFailure
       readonly runId: string
     },

@@ -36,7 +36,7 @@ const pickerDraft: Draft = {
   parentRevisionId: null,
   revisionId: 'lab',
   version: 1,
-  content: { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } } },
+  content: { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, graph: { edges: [], nodes: {} } } },
 }
 
 const workflowViewport = { x: 35, y: 40, zoom: 0.9 }
@@ -45,7 +45,6 @@ const workflowPositions = {
   task: { x: 430, y: 0 },
   condition: { x: 430, y: 220 },
   value: { x: 0, y: 440 },
-  subflow: { x: 430, y: 440 },
 }
 const stateViewport = { x: 45, y: 100, zoom: 0.9 }
 const statePositions = Object.fromEntries(
@@ -74,13 +73,6 @@ const workflow: FlowCanvasViewModel = {
       source: 'condition',
       sourceHandle: '$branch:matched',
       target: 'value',
-      targetHandle: '$in',
-    },
-    {
-      id: 'value-subflow',
-      source: 'value',
-      sourceHandle: '$out',
-      target: 'subflow',
       targetHandle: '$in',
     },
   ],
@@ -165,26 +157,6 @@ const workflow: FlowCanvasViewModel = {
           value: { channel: 'updates', format: 'markdown', retries: 3 },
         },
       ],
-    },
-    {
-      id: 'subflow',
-      kind: 'subflow',
-      title: 'Subflow · Build digest',
-      reference: 'lab/build-digest',
-      position: workflowPositions.subflow,
-      inputs: [
-        {
-          handle: 'records',
-          jsonSchema: { type: 'array', items: { type: 'object' } },
-          sources: [{ nodeId: 'task', output: 'records' }],
-        },
-        {
-          handle: 'settings',
-          jsonSchema: { type: 'object' },
-          sources: [{ nodeId: 'value', output: 'settings' }],
-        },
-      ],
-      outputs: [{ handle: 'text', jsonSchema: { type: 'string' } }],
     },
     {
       id: 'comment',
@@ -305,10 +277,10 @@ function WorkflowStory({
             <CanvasNodePicker
               key={`${pickerRequest.screenPosition.x}:${pickerRequest.screenPosition.y}`}
               request={pickerRequest}
-              options={deriveAddNodeOptions(pickerDraft, { kind: 'flow' }, i18n.t)}
+              options={deriveAddNodeOptions(pickerDraft, i18n.t)}
               browseOptions={async () => []}
               searchOptions={async (query) =>
-                deriveAddNodeOptions(pickerDraft, { kind: 'flow' }, i18n.t).filter((option) => option.label.toLowerCase().includes(query.toLowerCase()))
+                deriveAddNodeOptions(pickerDraft, i18n.t).filter((option) => option.label.toLowerCase().includes(query.toLowerCase()))
               }
               provideChoices={async () => []}
               disabled={!editable}
@@ -462,7 +434,7 @@ function NavigationIslandStory({ dark, language, log }: { readonly dark: boolean
   const miniMapExpanded$ = useMemo(() => val<boolean | undefined>(true), [])
   const stageRef = useRef<HTMLDivElement>(null)
   const popup = useMemo(() => ({ default: () => stageRef.current || document.body, static: () => stageRef.current || document.body }), [])
-  const publishStates: readonly PublishState[] = ['ready', 'current', 'issues', 'subflow', 'busy', 'publishing']
+  const publishStates: readonly PublishState[] = ['ready', 'current', 'issues', 'busy', 'publishing']
   const nextPublishState = publishStates[(publishStates.indexOf(publishState) + 1) % publishStates.length]!
   const saveStatuses: readonly WorkspaceStatus[] = ['saved', 'saving', 'failed']
   const nextSaveStatus = saveStatuses[(saveStatuses.indexOf(saveStatus) + 1) % saveStatuses.length]!

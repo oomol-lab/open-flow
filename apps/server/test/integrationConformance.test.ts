@@ -73,8 +73,6 @@ function revision(fixture: IntegrationConformanceFixture, enabled = true): Revis
             }
           : {},
       },
-      subflows: {},
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: { 'module-main': { imports: [], name: 'Main', source: 'export default function run() { return {} }' } },

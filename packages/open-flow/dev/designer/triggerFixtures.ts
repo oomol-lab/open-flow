@@ -133,8 +133,7 @@ export function triggerDraft(trigger: TriggerNode, downstream = false): { flow: 
       modules: {},
       document: {
         bindings: {},
-        subflows: {},
-        tasks: {},
+
         graph: {
           nodes: {
             trigger,

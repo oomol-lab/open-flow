@@ -20,21 +20,46 @@ const content: RevisionContent = {
     graph: {
       edges: [],
       nodes: {
-        mail: { inputs: {}, kind: 'task', taskId: 'mail' },
-        receipt: { inputs: {}, kind: 'task', taskId: 'mail', name: 'Send receipt', icon: ':twemoji:receipt:' },
-        reminder: { inputs: {}, kind: 'task', taskId: 'mail', name: 'Send reminder' },
-        pending: { inputs: {}, kind: 'task', taskId: 'pending', name: 'Send notification' },
+        mail: {
+          inputs: {},
+          kind: 'task',
+          task: {
+            executor: { action: 'mail.send', kind: 'connector', connectionId: 'mail-default' },
+            inputs: [],
+            name: 'Send mail',
+            outputs: [],
+          },
+        },
+        receipt: {
+          inputs: {},
+          kind: 'task',
+          task: {
+            executor: { action: 'mail.send', kind: 'connector', connectionId: 'mail-default' },
+            inputs: [],
+            name: 'Send mail',
+            outputs: [],
+          },
+          name: 'Send receipt',
+          icon: ':twemoji:receipt:',
+        },
+        reminder: {
+          inputs: {},
+          kind: 'task',
+          task: {
+            executor: { action: 'mail.send', kind: 'connector', connectionId: 'mail-default' },
+            inputs: [],
+            name: 'Send mail',
+            outputs: [],
+          },
+          name: 'Send reminder',
+        },
+        pending: {
+          inputs: {},
+          kind: 'task',
+          task: { executor: { action: 'mail.send', kind: 'connector' }, inputs: [], outputs: [], name: 'Send notification' },
+          name: 'Send notification',
+        },
         code: { inputs: {}, kind: 'task', name: 'Process response', task: { name: 'Process response', moduleId: 'code', inputs: [], outputs: [] } },
-      },
-    },
-    subflows: {},
-    tasks: {
-      pending: { executor: { action: 'mail.send', kind: 'connector' }, inputs: [], outputs: [], name: 'Send notification' },
-      mail: {
-        executor: { action: 'mail.send', kind: 'connector', connectionId: 'mail-default' },
-        inputs: [],
-        name: 'Send mail',
-        outputs: [],
       },
     },
   },
@@ -49,17 +74,17 @@ const overviewContent: RevisionContent = {
       ...content.document.graph,
       nodes: {
         ...content.document.graph.nodes,
-        issue: { inputs: {}, kind: 'task', taskId: 'issue' },
+        issue: {
+          inputs: {},
+          kind: 'task',
+          task: { name: 'Create issue', inputs: [], outputs: [], executor: { kind: 'connector', action: 'github.create_issue', connectionId: 'github-work' } },
+        },
       },
-    },
-    tasks: {
-      ...content.document.tasks,
-      issue: { name: 'Create issue', inputs: [], outputs: [], executor: { kind: 'connector', action: 'github.create_issue', connectionId: 'github-work' } },
     },
   },
 }
 const emptyContent: RevisionContent = {
-  document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} },
+  document: { bindings: {}, graph: { edges: [], nodes: {} } },
   modelVersion: currentFlowModelVersion,
   modules: {},
 }
@@ -260,7 +285,7 @@ function Sample({
                   disabled={false}
                   fieldIdPrefix="unconnected-mail"
                   loading={accountPending == 'setup'}
-                  taskId="mail"
+                  nodeId="mail"
                   onConfigureAccess={() => void store.connectors.connect('mail')}
                 />
               </div>

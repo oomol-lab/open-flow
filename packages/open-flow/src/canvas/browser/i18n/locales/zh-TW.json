@@ -12,7 +12,7 @@
     "connectorNoActiveConnection": "沒有可用的 Connection",
     "llmChat": "LLM 對話",
     "llmStructured": "LLM 結構化輸出",
-    "sharedBlocks": "任務與 Subflow",
+    "sharedBlocks": "任務",
     "triggers": "Trigger",
     "value": "固定值"
   },
@@ -402,17 +402,13 @@
     "value": "值"
   },
   "scriptlet": "小腳本",
-  "subflowSettings": {
-    "forwardPreview": "轉發預覽",
-    "title": "Subflow 設定"
-  },
   "workbench": {
     "conflict": {
       "keepLocal": "保留本機變更",
       "reload": "從磁碟重新載入"
     },
     "empty": {
-      "description": "新增 Flow、Subflow 或任務的原始檔，然後重新載入工作台。",
+      "description": "新增 Flow 或任務的原始檔，然後重新載入工作台。",
       "title": "這個專案還沒有可執行的目標。"
     },
     "noTargets": "沒有可執行的目標",
@@ -604,7 +600,6 @@
       "condition": "條件判斷",
       "approval": "審批",
       "wait": "等待繼續",
-      "subflow": "子流程",
       "value": "固定值",
       "input": "流程輸入",
       "output": "流程輸出"

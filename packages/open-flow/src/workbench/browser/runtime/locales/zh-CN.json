@@ -26,8 +26,6 @@
     "llmStructured": "LLM JSON",
     "llmStructuredDescription": "根据消息和提示词模板生成结构化 JSON。",
     "generatedResponse": "生成的回复。",
-    "subflowDescription": "添加已有的 Subflow。",
-    "subflows": "Subflow",
     "triggerAddConnection": "添加 Connection",
     "triggerBrowse": "浏览 Provider Triggers…",
     "triggerBrowseDescription": "打开 Trigger 目录，选择 Provider 事件和 Connection。",
@@ -61,7 +59,7 @@
     "clear": "清除",
     "collapse": "收起",
     "deploymentManaged": "服务权限由当前部署管理。",
-    "description": "此工作流中的所有 Code 节点（包括子流程）共享这些连接。其他节点选择连接不会自动允许 Code 使用。",
+    "description": "此工作流中的所有 Code 节点共享这些连接。其他节点选择连接不会自动允许 Code 使用。",
     "empty": "尚未为 Code 添加连接。",
     "loadFailed": "无法加载服务授权。",
     "loading": "正在加载访问权限…",
@@ -92,7 +90,7 @@
     "pendingAccountReferences": "待选账号：",
     "nodeReferences": "引用：",
     "moreReferences": "另外 {{count}} 个",
-    "dynamicCodeReferences": "此工作流中的所有 Code 节点（包括子流程）共享这些连接。其他节点选择连接不会自动允许 Code 使用。",
+    "dynamicCodeReferences": "此工作流中的所有 Code 节点共享这些连接。其他节点选择连接不会自动允许 Code 使用。",
     "noAccountSelected": "未选择账号",
     "removeAuthorization": "移除授权",
     "saving": "保存中…",
@@ -114,7 +112,6 @@
     "rename": "重命名",
     "refresh": "刷新",
     "save": "保存",
-    "subflow": "Subflow",
     "unset": "未设置"
   },
   "designer": {
@@ -266,14 +263,6 @@
     },
     "selectNode": "选择一个草稿节点以查看和编辑。",
     "locateNode": "在画布上定位该节点",
-    "subflow": {
-      "definition": "Subflow 定义",
-      "inputPorts": "输入端口（JSON）",
-      "open": "打开 Subflow",
-      "outputPorts": "输出端口与来源（JSON）",
-      "referenced": "引用的 Subflow",
-      "save": "保存 Subflow"
-    },
     "task": {
       "sharedPermissions": "使用 Flow 共享权限组",
       "sharedPermissionsHint": "直接使用 Flow 共享权限组已授权的全部 Actions，无需逐个添加。",
@@ -761,7 +750,6 @@
     "renameFlow": "重命名 {{name}}",
     "search": "搜索",
     "searchResources": "搜索{{kind}}",
-    "subflows": "Subflow",
     "listenersLoading": "正在查询工作流错误节点…",
     "listenersFailed": "无法确认哪些工作流错误节点正在监听。可重试，或继续删除。",
     "listenersTitle": "以下已发布的工作流错误节点配置正在监听此工作流：",
@@ -808,12 +796,6 @@
           "node": "上游节点“{{nodeId}}”不存在。",
           "output": "上游节点“{{nodeId}}”没有输出“{{output}}”。"
         },
-        "target-missing": {
-          "subflow": "Subflow“{{subflowId}}”不存在。",
-          "task": "Task“{{taskId}}”不存在。"
-        },
-        "subflow-output-incompatible": "有来源与 Subflow 输出“{{output}}”的声明类型不兼容。",
-        "subflow-output-schema-incompatible": "Subflow 输出“{{output}}”的数据格式不匹配：{{issue}}",
         "trigger-not-allowed": "Trigger 节点只能用于工作流。",
         "variable-incompatible": "环境变量绑定“{{bindingId}}”与此输入不兼容。",
         "variable-source-mixed": "环境变量必须是一个输入的唯一来源。"
@@ -838,14 +820,11 @@
           "reexport": "CodeModule“{{moduleId}}”必须先 import，再重新导出值。"
         }
       },
-      "subflow": {
-        "cycle": "Subflow 循环无法执行：{{subflows}}。"
-      },
       "task": {
         "capability-incomplete": "Inline Task“{{nodeId}}”的 Connector Capability 配置不完整。",
         "action-connection-required": "工具“{{action}}”需要选择账号后才能运行。",
-        "connector-connection-required": "请为连接器节点“{{taskId}}”选择连接账号。",
-        "connector-incomplete": "请为连接器任务“{{taskId}}”选择操作。",
+        "connector-connection-required": "请为连接器节点“{{nodeId}}”选择连接账号。",
+        "connector-incomplete": "请为连接器任务“{{nodeId}}”选择操作。",
         "missing-entry": "Inline Task 使用的 CodeModule“{{moduleId}}”必须导出 default function。",
         "module-missing": "Inline Task“{{nodeId}}”引用的 CodeModule“{{moduleId}}”不存在。"
       },
@@ -941,8 +920,6 @@
       "saving": "正在保存草稿…",
       "failed": "保存失败"
     },
-    "subflowDraft": "Subflow 草稿",
-    "subflowPublishHelp": "Subflow 会随工作流一起发布。",
     "unpublishedChanges": "有未发布的更改",
     "valid": "有效",
     "views": "工作区视图",

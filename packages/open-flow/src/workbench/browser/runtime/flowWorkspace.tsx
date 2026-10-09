@@ -103,9 +103,8 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   disabled,
   revision,
   selection,
-  target,
   theme,
-}: Pick<ComponentProps<typeof NodeInspector>, 'focus' | 'disabled' | 'revision' | 'selection' | 'target' | 'theme'> & {
+}: Pick<ComponentProps<typeof NodeInspector>, 'focus' | 'disabled' | 'revision' | 'selection' | 'theme'> & {
   readonly store: WorkbenchStore
 }): ReactElement {
   const t = useTranslate()
@@ -208,7 +207,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
       selection={selection}
       sourceNodeIcons={sourceNodeIcons}
       store={store.workspace}
-      target={target}
+
       theme={theme}
       triggerActiveConnections={
         connectorAccess?.mode == 'selectable'
@@ -278,11 +277,10 @@ export function FlowEditor({
   const selectedDesignerNode = useVal(store.$.selectedDesignerNode)
   const selection = useVal(store.workspace.$.selection)
   const selectedNodeIds = useVal(store.workspace.$.selectedNodeIds)
-  const target = useVal(store.workspace.$.target)
-  const initialAddNodeTab = target?.kind == 'flow' && triggers.length == 0 ? 'triggers' : 'nodes'
-  const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(`${flowId}:${target?.kind}:${target?.kind == 'subflow' ? target.id : ''}`)
+  const initialAddNodeTab = triggers.length == 0 ? 'triggers' : 'nodes'
+  const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(flowId ?? '')
   const panel = useInspectorPanel({
-    identity: JSON.stringify([flowId, target]),
+    identity: flowId ?? '',
     preferences: store.preferences,
     selectedNodeIds,
     onSelectNodes: (ids) => store.selectNodes(ids),
@@ -294,17 +292,10 @@ export function FlowEditor({
   const [accountReference, setAccountReference] = useState<ConnectorAccountReference>()
   useEffect(() => {
     if (accountReference == null) return
-    if (
-      target?.kind != accountReference.target.kind ||
-      (target?.kind == 'subflow' && accountReference.target.kind == 'subflow' && target.id != accountReference.target.id)
-    ) {
-      if (!store.workspace.selectTarget(accountReference.target)) setAccountReference(undefined)
-      return
-    }
     panel.activate([accountReference.nodeId])
     store.workspace.locateNode(accountReference.nodeId, { preserveSelection: true })
     setAccountReference(undefined)
-  }, [accountReference, target])
+  }, [accountReference])
   const designerRef = useRef<WorkbenchCanvasHandle>(null)
   const accessConfiguration = useVal(store.connectorAccess.$).configuration
   useEffect(() => {
@@ -328,7 +319,7 @@ export function FlowEditor({
     setStartId(undefined)
     focusInspectorOnOpen.current = false
     opener.current = undefined
-  }, [flowId, target?.kind == 'subflow' ? target.id : undefined, target?.kind])
+  }, [flowId])
 
   useEffect(() => {
     if (diagnosticFocus == null) return
@@ -349,11 +340,9 @@ export function FlowEditor({
         ? 'busy'
         : diagnostics?.valid == false
           ? 'issues'
-          : target?.kind == 'subflow'
-            ? 'subflow'
-            : live?.hasUnpublishedChanges == false
-              ? 'current'
-              : 'ready'
+          : live?.hasUnpublishedChanges == false
+            ? 'current'
+            : 'ready'
   const closeContextPanel = (focusTarget?: HTMLElement): void => {
     panel.close()
     focusInspectorOnOpen.current = false
@@ -390,11 +379,11 @@ export function FlowEditor({
     store.workspace.locateNode(nodeId, { preserveSelection: true })
   }
 
-  const contextPanelVisible = panel.open && target != null && revision != null
+  const contextPanelVisible = panel.open && revision != null
   const flowSelected = panel.page == 'outline'
   const multipleSelected = !flowSelected && selectedNodeIds.length > 1
   const singleSelected = !flowSelected && !multipleSelected
-  const contextPanelIcon = target == null || flowSelected || multipleSelected ? 'flow' : inspectorIcon(selection, target)
+  const contextPanelIcon = flowSelected || multipleSelected ? 'flow' : inspectorIcon(selection)
   const contextPanelTitle = flowSelected
     ? t('inspector.outline')
     : multipleSelected
@@ -411,7 +400,7 @@ export function FlowEditor({
   return (
     <CanvasHistoryScope
       history={historyControls}
-      disabled={authoringDisabled || target == null}
+      disabled={authoringDisabled}
       aria-label={t('workspace.design')}
       className={`editor-grid ${contextPanelVisible ? '' : 'context-panel-closed'}`}
       id="workspace-panel-design"
@@ -468,7 +457,7 @@ export function FlowEditor({
         ignoredNodeIds={ignoredNodeIds}
         onIgnoreNodes={onIgnoreNodes}
         runControl={
-          target?.kind == 'flow' && draft != null && selectedTrigger != null ? (
+          draft != null && selectedTrigger != null ? (
             <RunControl
               disabled={busy != null && busy != 'run' && busy != 'designer'}
               inputContent={<RunInputPanel onStarted={onRunStarted} store={store.runRequests} theme={theme} />}
@@ -491,7 +480,7 @@ export function FlowEditor({
         }
         addNodeControl={
           <NodePickerPopover
-            key={`${flowId}:${target?.kind}`}
+            key={flowId ?? ''}
             options={addNodeOptions}
             connections={connections}
             loadConnections={store.connectors.loadConnections}
@@ -501,7 +490,7 @@ export function FlowEditor({
             catalogFailed={triggerCatalogState.error != null}
             refreshCatalog={store.retryCatalog}
             initialTab={initialAddNodeTab}
-            disabled={authoringDisabled || target == null}
+            disabled={authoringDisabled}
             focusRequest={0}
             onAdd={addFromPicker}
             onRegisterDragOption={(option) => designerRef.current?.registerDraggedNode(option)}
@@ -545,7 +534,7 @@ export function FlowEditor({
         onToggleInspector={toggleInspector}
         ref={designerRef}
         selectedNodeIds={panel.canvasSelection}
-        target={target}
+
         theme={theme}
       />
       {contextPanelVisible && (
@@ -567,7 +556,7 @@ export function FlowEditor({
                   title: selection.node.name ?? selectedDesignerNode?.title ?? '',
                   icon: selectedDesignerNode != null && 'icon' in selectedDesignerNode ? selectedDesignerNode.icon : undefined,
                   disabled: authoringDisabled,
-                  fallback: <Icon name={inspectorIcon(selection, target)} />,
+                  fallback: <Icon name={inspectorIcon(selection)} />,
                   onRename: (name) => {
                     void store.workspace.saveNodeTitle(selection.id, name)
                   },
@@ -575,8 +564,8 @@ export function FlowEditor({
                     void store.workspace.saveNodeIcon(selection.id, icon)
                   },
                   validate: (name) => {
-                    if (revision == null || target == null) return
-                    const graph = revision.graph(target)
+                    if (revision == null) return
+                    const graph = revision.graph()
                     if (graph == null) return
                     const issue = nodeNameIssue(graph, selection.id, name)
                     return issue == null ? undefined : t(`inspector.node.${issue === 'empty' ? 'nameEmpty' : 'nameDuplicate'}`)
@@ -602,7 +591,7 @@ export function FlowEditor({
         >
           <div hidden={!flowSelected} className={flowSelected ? 'flex h-full min-h-0 flex-col' : 'hidden'}>
             <div className="min-h-0 flex-1">
-              <FlowNodeList key={JSON.stringify([flowId, target])} groupTriggers nodes={designer.nodes} onFocusNode={focusNode} onSelect={selectOutlineNode} />
+              <FlowNodeList key={flowId ?? ''} groupTriggers nodes={designer.nodes} onFocusNode={focusNode} onSelect={selectOutlineNode} />
             </div>
           </div>
           {multipleSelected ? (
@@ -624,7 +613,7 @@ export function FlowEditor({
                 disabled={authoringDisabled}
                 revision={revision}
                 selection={selection}
-                target={target}
+
                 theme={theme}
               />
             )

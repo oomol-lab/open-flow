@@ -12,7 +12,7 @@
     "connectorNoActiveConnection": "Нет активного Connection",
     "llmChat": "Чат LLM",
     "llmStructured": "Структурированный вывод LLM",
-    "sharedBlocks": "Задачи и Subflow",
+    "sharedBlocks": "Задачи",
     "triggers": "Triggers",
     "value": "Фиксированные значения"
   },
@@ -402,17 +402,13 @@
     "value": "Значение"
   },
   "scriptlet": "Скриптлет",
-  "subflowSettings": {
-    "forwardPreview": "Пересылать предпросмотр",
-    "title": "Настройки Subflow"
-  },
   "workbench": {
     "conflict": {
       "keepLocal": "Сохранить локальные изменения",
       "reload": "Перезагрузить с диска"
     },
     "empty": {
-      "description": "Добавьте исходный файл Flow, Subflow или задачи и перезагрузите рабочую среду.",
+      "description": "Добавьте исходный файл Flow или задачи и перезагрузите рабочую среду.",
       "title": "В этом проекте пока нет запускаемых целей."
     },
     "noTargets": "Нет запускаемых целей",
@@ -604,7 +600,6 @@
       "condition": "Условие",
       "approval": "Согласование",
       "wait": "Ожидание продолжения",
-      "subflow": "Подпроцесс",
       "value": "Фиксированные значения",
       "input": "Вход",
       "output": "Выход"

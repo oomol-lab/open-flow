@@ -16,15 +16,7 @@ function revision(): RevisionContent {
     modules: {},
     document: {
       bindings: { email: { kind: 'variable', target: 'TOKEN' } },
-      subflows: {},
-      tasks: {
-        agent: {
-          name: 'Agent',
-          inputs: [{ handle: 'email', jsonSchema: { type: 'string' }, nullable: false }],
-          outputs: [{ handle: 'output', jsonSchema: { type: 'string' }, nullable: false }],
-          executor: { kind: 'agent', model: 'fixture', prompt: 'Go.', maxRounds: 3, tools: [] },
-        },
-      },
+
       graph: {
         edges: [{ source: 'trigger', target: 'agent' }],
         nodes: {
@@ -32,7 +24,12 @@ function revision(): RevisionContent {
           agent: {
             kind: 'task',
             name: 'Agent',
-            taskId: 'agent',
+            task: {
+              name: 'Agent',
+              inputs: [{ handle: 'email', jsonSchema: { type: 'string' }, nullable: false }],
+              outputs: [{ handle: 'output', jsonSchema: { type: 'string' }, nullable: false }],
+              executor: { kind: 'agent', model: 'fixture', prompt: 'Go.', maxRounds: 3, tools: [] },
+            },
             inputs: { email: { kind: 'sources', sources: [{ bindingId: 'email', kind: 'binding' }] } },
           },
         },

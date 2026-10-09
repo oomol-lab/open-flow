@@ -26,8 +26,6 @@
     "llmStructured": "LLM JSON",
     "llmStructuredDescription": "Générer du JSON structuré à partir de messages et d'un modèle de prompt.",
     "generatedResponse": "Réponse générée.",
-    "subflowDescription": "Ajouter un Subflow existant.",
-    "subflows": "Subflows",
     "triggerAddConnection": "Ajouter une Connection",
     "triggerBrowse": "Parcourir les Triggers Provider…",
     "triggerBrowseDescription": "Ouvrir le catalogue de Triggers pour choisir un événement Provider et une Connection.",
@@ -61,7 +59,7 @@
     "clear": "Effacer",
     "collapse": "Réduire",
     "deploymentManaged": "Les autorisations des services sont gérées par ce déploiement.",
-    "description": "Tous les nœuds Code de ce Flow, y compris les sous-flux, partagent ces connexions. Les connexions sélectionnées par les autres nœuds ne donnent pas accès au Code.",
+    "description": "Tous les nœuds Code de ce Flow partagent ces connexions. Les connexions sélectionnées par les autres nœuds ne donnent pas accès au Code.",
     "empty": "Ce flux n’utilise encore aucun service.",
     "loadFailed": "Impossible de charger les autorisations des services.",
     "loading": "Chargement de l’accès…",
@@ -92,7 +90,7 @@
     "pendingAccountReferences": "Compte à choisir :",
     "nodeReferences": "Référencé par :",
     "moreReferences": "{{count}} de plus",
-    "dynamicCodeReferences": "Tous les nœuds Code de ce Flow, y compris les sous-flux, partagent ces connexions. Les connexions sélectionnées par les autres nœuds ne donnent pas accès au Code.",
+    "dynamicCodeReferences": "Tous les nœuds Code de ce Flow partagent ces connexions. Les connexions sélectionnées par les autres nœuds ne donnent pas accès au Code.",
     "noAccountSelected": "Aucun compte sélectionné",
     "removeAuthorization": "Retirer l’autorisation",
     "saving": "Enregistrement…",
@@ -114,7 +112,6 @@
     "rename": "Renommer",
     "refresh": "Actualiser",
     "save": "Enregistrer",
-    "subflow": "Subflow",
     "unset": "Non défini"
   },
   "designer": {
@@ -266,14 +263,6 @@
     },
     "selectNode": "Sélectionnez un nœud du Brouillon pour l'inspecter et le modifier.",
     "locateNode": "Localiser ce nœud sur le canevas",
-    "subflow": {
-      "definition": "Définition du Subflow",
-      "inputPorts": "Ports d'entrée (JSON)",
-      "open": "Ouvrir le Subflow",
-      "outputPorts": "Ports de sortie et sources (JSON)",
-      "referenced": "Subflow référencé",
-      "save": "Enregistrer le Subflow"
-    },
     "task": {
       "sharedPermissions": "Utiliser le groupe d’autorisations partagé du Flow",
       "sharedPermissionsHint": "Utilisez toutes les Actions autorisées par le groupe du Flow, sans les ajouter à ce nœud.",
@@ -761,7 +750,6 @@
     "renameFlow": "Renommer {{name}}",
     "search": "Rechercher",
     "searchResources": "Rechercher des {{kind}}",
-    "subflows": "Subflows",
     "listenersLoading": "Recherche des déclencheurs d’erreur…",
     "listenersFailed": "Impossible de vérifier les déclencheurs. Réessayez ou poursuivez la suppression.",
     "listenersTitle": "Ces configurations publiées de déclencheurs d’erreur surveillent ce workflow :",
@@ -808,12 +796,6 @@
           "node": "Le nœud en amont « {{nodeId}} » n’existe pas.",
           "output": "Le nœud en amont « {{nodeId}} » n’expose pas la sortie « {{output}} »."
         },
-        "target-missing": {
-          "subflow": "Le Subflow « {{subflowId}} » n’existe pas.",
-          "task": "La Task « {{taskId}} » n’existe pas."
-        },
-        "subflow-output-incompatible": "Une source n’est pas compatible avec la sortie Subflow « {{output}} ».",
-        "subflow-output-schema-incompatible": "Le format des données de la sortie Subflow « {{output}} » ne correspond pas : {{issue}}",
         "trigger-not-allowed": "Les nœuds Trigger sont uniquement autorisés dans les Flows.",
         "variable-incompatible": "La liaison de variable d’environnement « {{bindingId}} » n’est pas compatible avec cette entrée.",
         "variable-source-mixed": "Une variable d’environnement doit être l’unique source d’une entrée."
@@ -838,14 +820,11 @@
           "reexport": "Le CodeModule « {{moduleId}} » doit importer les valeurs avant de les réexporter."
         }
       },
-      "subflow": {
-        "cycle": "Le cycle de Subflows n’est pas exécutable : {{subflows}}."
-      },
       "task": {
         "capability-incomplete": "L’Inline Task « {{nodeId}} » possède une Connector Capability incomplète.",
         "action-connection-required": "L’action « {{action}} » nécessite un compte pour être exécutée.",
-        "connector-connection-required": "La Connector Task « {{taskId}} » nécessite une Connection active.",
-        "connector-incomplete": "La Connector Task « {{taskId}} » nécessite une action.",
+        "connector-connection-required": "La Connector Task « {{nodeId}} » nécessite une Connection active.",
+        "connector-incomplete": "La Connector Task « {{nodeId}} » nécessite une action.",
         "missing-entry": "Le CodeModule « {{moduleId}} » utilisé par une Inline Task doit exporter une fonction par défaut.",
         "module-missing": "L’Inline Task « {{nodeId}} » référence le CodeModule manquant « {{moduleId}} »."
       },
@@ -941,8 +920,6 @@
       "saving": "Enregistrement du Brouillon…",
       "failed": "Échec de la sauvegarde"
     },
-    "subflowDraft": "Brouillon du Subflow",
-    "subflowPublishHelp": "Les Subflows sont publiés avec un Flow.",
     "unpublishedChanges": "Modifications non publiées",
     "valid": "Valide",
     "views": "Vues de l'espace de travail",

@@ -9,7 +9,7 @@ import type {
   InputMapping,
   InputPort,
   JsonValue,
-  OutputMapping,
+  ManagedTaskDefinition,
   Port,
   RevisionContent,
   TriggerKeySnapshot,
@@ -85,16 +85,6 @@ function canonicalInputs(value: Readonly<Record<string, InputMapping>>): JsonVal
   return Object.fromEntries(entries(value).map(([handle, mapping]) => [handle, canonicalInputMapping(mapping)]))
 }
 
-export function canonicalOutputs(value: readonly (OutputMapping & Port)[]): JsonValue {
-  return value.map((output) => ({
-    ...(output.description == null ? {} : { description: output.description }),
-    handle: output.handle,
-    jsonSchema: output.jsonSchema,
-    nullable: output.nullable,
-    sources: output.sources.map((source) => ({ ...source })),
-  }))
-}
-
 function canonicalOperand(operand: ConditionOperand): JsonValue {
   return operand.kind === 'source'
     ? { kind: 'source', source: { ...operand.source } }
@@ -133,13 +123,11 @@ function canonicalNode(value: GraphNode): JsonValue {
         matchMode: value.matchMode,
         kind: value.kind,
       }
-    case 'subflow':
-      return { ...common, kind: value.kind, subflowId: value.subflowId }
     case 'task': {
       const node: Record<string, JsonValue> =
-        value.task != null
+        'moduleId' in value.task
           ? Object.assign({}, common, { kind: value.kind, task: canonicalInlineTask(value.task) })
-          : Object.assign({}, common, { kind: value.kind, taskId: value.taskId })
+          : Object.assign({}, common, { kind: value.kind, task: canonicalTask(value.task) })
       if (value.additionalInputs != null) node.additionalInputs = canonicalPorts(value.additionalInputs)
       return node
     }
@@ -226,26 +214,11 @@ function canonicalLegacyGraph(graph: Graph): JsonValue {
   }
 }
 
-function canonicalLegacyOutputs(value: readonly (OutputMapping & Port)[], graph: Graph): JsonValue {
-  const resolutionIds = resolutionNodeIds(graph)
-  return value.map((output) => ({
-    ...(output.description == null ? {} : { description: output.description }),
-    handle: output.handle,
-    jsonSchema: output.jsonSchema,
-    nullable: output.nullable,
-    sources: output.sources.map((source) => canonicalLegacySource(source as unknown as JsonValue, resolutionIds)),
-  }))
-}
-
 export function canonicalRevisionGraph(content: RevisionContent, graph: Graph): JsonValue {
   return content.modelVersion == 2 ? canonicalLegacyGraph(graph) : canonicalGraph(graph)
 }
 
-export function canonicalRevisionOutputs(content: RevisionContent, value: readonly (OutputMapping & Port)[], graph: Graph): JsonValue {
-  return content.modelVersion == 2 ? canonicalLegacyOutputs(value, graph) : canonicalOutputs(value)
-}
-
-export function canonicalTask(task: FlowDocument['tasks'][string]): JsonValue {
+export function canonicalTask(task: ManagedTaskDefinition): JsonValue {
   return {
     executor: task.executor as unknown as JsonValue,
     inputs: canonicalPorts(task.inputs),
@@ -361,39 +334,18 @@ export function canonicalDocument(document: FlowDocument): JsonValue {
   return {
     bindings: Object.fromEntries(entries(document.bindings)),
     graph: canonicalGraph(document.graph),
-    subflows: Object.fromEntries(
-      entries(document.subflows).map(([id, subflow]) => [
-        id,
-        {
-          graph: canonicalGraph(subflow.graph),
-          inputs: canonicalPorts(subflow.inputs),
-          name: subflow.name,
-          outputs: canonicalOutputs(subflow.outputs),
-        },
-      ]),
-    ),
-    tasks: Object.fromEntries(entries(document.tasks).map(([id, task]) => [id, canonicalTask(task)])),
   }
 }
 
 function canonicalRevisionDocument(content: RevisionContent): JsonValue {
-  if (content.modelVersion != 2) return canonicalDocument(content.document)
+  if (content.modelVersion >= 6) return canonicalDocument(content.document)
+  if (content.modelVersion != 2) return { ...(canonicalDocument(content.document) as Record<string, JsonValue>), subflows: {}, tasks: {} }
   const { document } = content
   return {
     bindings: Object.fromEntries(entries(document.bindings)),
     graph: canonicalLegacyGraph(document.graph),
-    subflows: Object.fromEntries(
-      entries(document.subflows).map(([id, subflow]) => [
-        id,
-        {
-          graph: canonicalLegacyGraph(subflow.graph),
-          inputs: canonicalPorts(subflow.inputs),
-          name: subflow.name,
-          outputs: canonicalLegacyOutputs(subflow.outputs, subflow.graph),
-        },
-      ]),
-    ),
-    tasks: Object.fromEntries(entries(document.tasks).map(([id, task]) => [id, canonicalTask(task)])),
+    subflows: {},
+    tasks: {},
   }
 }
 

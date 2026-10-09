@@ -6,7 +6,6 @@ import { CanvasHistory } from './canvasHistory.ts'
 const entry: CanvasHistoryEntry = {
   action: 'move',
   count: 1,
-  target: { kind: 'flow' },
   forward: [],
   inverse: [],
   beforeSelection: [],

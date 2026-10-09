@@ -145,10 +145,14 @@ export class RunExecutor {
           started,
         }
       }
-      if (Object.values(prepared.flow.tasks).some((task) => task.executor.kind == 'agent') && run.bindingValues == null)
+      if (
+        Object.values(prepared.flow.graph.nodes)
+          .flatMap((node) => (node.kind == 'task' && 'executor' in node.task ? [node.task] : []))
+          .some((task) => task.executor.kind == 'agent') &&
+        run.bindingValues == null
+      )
         return yield* Effect.fail(new Error('The fixed Agent environment variable snapshot is unavailable.'))
-      const bindingValues =
-        run.bindingValues ?? this.#store.variables.resolve(variableBindings(revision, prepared.validation.closure.dependencies.inputBindings))
+      const bindingValues = run.bindingValues ?? this.#store.variables.resolve(variableBindings(revision, prepared.validation.closure.dependencies.bindings))
       if (bindingValues == null) return { kind: 'binding-unresolved' as const }
       return { bindingValues, flow: prepared.flow, kind: 'prepared' as const, projectEvent, started }
     })
@@ -249,21 +253,15 @@ export class RunExecutor {
             const request = operation.wait
             const node = flow.graph.nodes[request.nodeId]
             if (node == null || !('inputs' in node)) throw new Error('Wait node is unavailable.')
-            let notification:
-              | { action: string; connectionId?: string; input: Readonly<Record<string, JsonValue>>; messageHandle: string; taskId: string }
-              | undefined
+            let notification: { action: string; connectionId?: string; input: Readonly<Record<string, JsonValue>>; messageHandle: string } | undefined
             if (request.notification != null) {
-              const task = flow.tasks[request.notification.taskId]
-              if (task?.executor.kind != 'connector') throw new Error('Agent notification is unavailable.')
+              const task = node.kind == 'task' && 'executor' in node.task && node.task.executor.kind == 'agent' ? node.task.executor.notification : undefined
+              if (task == null) throw new Error('Agent notification is unavailable.')
               notification = {
-                action: task.executor.action,
-                connectionId: task.executor.connectionId,
-                taskId: request.notification.taskId,
+                action: task.action,
+                connectionId: task.connectionId,
                 messageHandle: request.notification.messageHandle,
-                input: normalizeConnectorRuntimeInputs(
-                  task.inputs.filter((port) => 'handle' in port),
-                  request.notification.input,
-                ),
+                input: normalizeConnectorRuntimeInputs(task.inputDefinitions, request.notification.input),
               }
             }
             const output = this.#store.runs.createWait(run.runId, request, this.#resolveWaitPublicOrigin()?.href, notification)
@@ -272,7 +270,7 @@ export class RunExecutor {
             return output
           },
           invokeTask: (invocation) => {
-            if (!('taskId' in invocation)) throw new Error('Runtime Executor returned a Code Task to the Host.')
+            if (!('kind' in invocation)) throw new Error('Runtime Executor returned a Code Task to the Host.')
             return this.#invokeTask(flow, invocation, run, async (data) => {
               const event = await projectEvent({
                 type: 'node.log',
@@ -353,12 +351,14 @@ export class RunExecutor {
 
   async #invokeTask(
     prepared: PreparedFlow,
-    invocation: Extract<TaskInvocation, { readonly taskId: string }> & { readonly signal: AbortSignal },
+    invocation: Extract<TaskInvocation, { readonly kind: 'managed' }> & { readonly signal: AbortSignal },
     run: StoredRun,
     report: (event: Readonly<Record<string, JsonValue>>) => Promise<void>,
   ): Promise<unknown> {
     const access = this.#connectorContext(run, 'execute', 'selected')
-    const task = prepared.tasks[invocation.taskId]!
+    const node = prepared.graph.nodes[invocation.nodeId]
+    if (node?.kind != 'task' || !('executor' in node.task)) throw new Error('Managed Task node is unavailable.')
+    const task = node.task
     const executor = task.executor
     switch (executor.kind) {
       case 'openapi':

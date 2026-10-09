@@ -112,7 +112,7 @@ export async function selectedDraftFlow(client: ControlClient, flow: Flow, args:
     })
   }
   const draft = await client.getRevision(flow.flowId, args.expectedRevision ?? flow.draftRevisionId)
-  return { draft, flow, graph: draft.content.document.graph, target: { kind: 'flow' } as const }
+  return { draft, flow, graph: draft.content.document.graph }
 }
 
 export type SemanticNode = Exclude<GraphNode, TriggerNode>
@@ -260,13 +260,12 @@ export function actionText(action: ConnectorAction): string {
   return `${action.name}\t${action.actionId}\t${action.serviceName}\t${action.serviceId}`
 }
 
-export function inspectedNodeSummary(content: RevisionContent, nodeId: string, node: GraphNode) {
+export function inspectedNodeSummary(_content: RevisionContent, nodeId: string, node: GraphNode) {
   if (node.kind != 'task') return { kind: node.kind, ...(node.name == null ? {} : { name: node.name }), nodeId }
-  if (node.task != null) {
+  if ('moduleId' in node.task) {
     return { kind: 'code', moduleId: node.task.moduleId, ...(node.name == null ? {} : { name: node.name }), nodeId }
   }
-  const task = content.document.tasks[node.taskId]
-  if (task == null) return { kind: 'task', ...(node.name == null ? {} : { name: node.name }), nodeId, taskId: node.taskId }
+  const task = node.task
   return {
     ...(task.executor.kind == 'connector'
       ? { actionId: task.executor.action, ...(task.executor.connectionId == null ? {} : { connectionId: task.executor.connectionId }) }
@@ -274,7 +273,6 @@ export function inspectedNodeSummary(content: RevisionContent, nodeId: string, n
     kind: task.executor.kind,
     ...(node.name == null ? {} : { name: node.name }),
     nodeId,
-    taskId: node.taskId,
   }
 }
 

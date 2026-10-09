@@ -333,6 +333,6 @@ export const publicationsStory: FrontendStory = {
   title: 'Publications',
   standalone: true,
   description:
-    'Open the latest publication, browse history, click to replace the selected node or box-select multiple nodes. The properties panel starts closed; double-click a node or use the panel toggle to open or close it. Inspect the read-only graph, drag and restore nodes, open subflows, and confirm a rollback. Publish elsewhere replaces Live while preserving the viewed graph. The oldest version has no saved layout. Live includes trigger status, pause/resume, Webhook URL copying, polling tests and activity details. Compare unpublished, pending, failed, stopped and retry states in both themes and narrow layouts.',
+    'Open the latest publication, browse history, click to replace the selected node or box-select multiple nodes. The properties panel starts closed; double-click a node or use the panel toggle to open or close it. Inspect the read-only graph, drag and restore nodes, and confirm a rollback. Publish elsewhere replaces Live while preserving the viewed graph. The oldest version has no saved layout. Live includes trigger status, pause/resume, Webhook URL copying, polling tests and activity details. Compare unpublished, pending, failed, stopped and retry states in both themes and narrow layouts.',
   render: (log, dark, language) => <PublicationsStory language={language} dark={dark} log={log} />,
 }

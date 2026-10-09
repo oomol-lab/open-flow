@@ -24,7 +24,6 @@ import { WorkspaceStore } from '../../src/workbench/browser/runtime/stores/works
 import { designerGraph } from '../../src/workbench/browser/runtime/workspace.ts'
 import { useStoryActions } from './storyActions.tsx'
 
-const target = { kind: 'flow' } as const
 const modes = ['Empty', 'Undo', 'Redo', 'Saving', 'Failed'] as const
 function createSession(language: UiLanguage, log: LogAction, notify: SetNotice) {
   const i18n = createI18n(language)
@@ -32,18 +31,17 @@ function createSession(language: UiLanguage, log: LogAction, notify: SetNotice) 
   let sequence = 1
   let layoutRevision = 1
   let content: RevisionContent = applyFlowChanges(
-    { modelVersion: currentFlowModelVersion, document: { graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {}, bindings: {} }, modules: {} },
+    { modelVersion: currentFlowModelVersion, document: { graph: { nodes: {}, edges: [] }, bindings: {} }, modules: {} },
     [
-      ...createBuiltinTrigger(target, 'trigger', { kind: 'cron', name: 'Schedule', cronTimes: [] }),
-      ...createValue(target, 'value', 'Input'),
-      ...createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Transform'),
-      { kind: 'graph.edge.connect', target, edge: { source: 'value', target: 'code' } },
-      { kind: 'graph.edge.connect', target, edge: { source: 'trigger', target: 'code' } },
+      ...createBuiltinTrigger('trigger', { kind: 'cron', name: 'Schedule', cronTimes: [] }),
+      ...createValue('value', 'Input'),
+      ...createCodeTask({ nodeId: 'code', moduleId: 'module' }, 'Transform'),
+      { kind: 'graph.edge.connect', edge: { source: 'value', target: 'code' } },
+      { kind: 'graph.edge.connect', edge: { source: 'trigger', target: 'code' } },
     ],
   )
   let value: Readonly<Record<string, JsonValue>> = setComment(
-    setNodePositions({}, target, { trigger: { x: 430, y: 200 }, value: { x: 0, y: 0 }, code: { x: 430, y: 0 } }),
-    target,
+    setNodePositions({}, { trigger: { x: 430, y: 200 }, value: { x: 0, y: 0 }, code: { x: 430, y: 0 } }),
     'note',
     {
       title: 'Review notes',
@@ -51,7 +49,7 @@ function createSession(language: UiLanguage, log: LogAction, notify: SetNotice) 
       position: { x: 0, y: 200 },
     },
   )
-  value = setFlowViewport(value, target, { x: 36, y: 72, zoom: 0.7 })
+  value = setFlowViewport(value, { x: 36, y: 72, zoom: 0.7 })
   const flow = {
     flowId: 'history-lab',
     name: 'Canvas history',
@@ -286,7 +284,7 @@ function HistorySession({
     },
   }
   const [actionVisible, setActionVisible] = useState(true)
-  const model = designerGraph(draft, target, presentation?.value, diagnostics?.diagnostics, {}, {}, i18n.t)
+  const model = designerGraph(draft, presentation?.value, diagnostics?.diagnostics, {}, {}, i18n.t)
   return (
     <I18nProvider i18n={i18n}>
       {keyboardOnly ? (
@@ -345,7 +343,7 @@ function HistorySession({
               history={controls}
               model={model}
               theme={dark ? 'dark' : 'light'}
-              target={target}
+
               selectedNodeIds={selected}
               addNodeOptions={options}
               disabled={draft == null || history.applying || history.failed}

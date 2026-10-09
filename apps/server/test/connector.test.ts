@@ -1,5 +1,7 @@
 import type { ConnectorAction, ConnectorConnection, ConnectorProvider } from '@oomol-lab/open-flow/control-api'
 import type { ConnectorCapability, JsonValue, RevisionContent } from '@oomol-lab/open-flow/flow-change'
+import type { TaskNode } from '../../../packages/open-flow/src/flow/common/change.ts'
+import type { ManagedTaskDefinition } from '../../../packages/open-flow/src/flow/common/change.ts'
 import type { ConnectorHost } from '../node/deployment/connector.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
@@ -43,21 +45,17 @@ function connectorFlow(timeoutMs?: number, optionalNull = false): RevisionConten
               ...(optionalNull ? { tags: { kind: 'value' as const, value: null } } : {}),
             },
             kind: 'task',
-            taskId: 'connector',
+            task: {
+              executor: { action: 'example.echo', connectionId: 'connection-work', kind: 'connector' },
+              inputs: [
+                { ...port, handle: 'message' },
+                ...(optionalNull ? [{ handle: 'tags', jsonSchema: { items: { type: 'string' }, type: 'array' }, nullable: true }] : []),
+              ],
+              name: 'Echo',
+              outputs: [{ ...port, handle: 'message' }],
+            },
             ...(timeoutMs == null ? {} : { timeoutMs }),
           },
-        },
-      },
-      subflows: {},
-      tasks: {
-        connector: {
-          executor: { action: 'example.echo', connectionId: 'connection-work', kind: 'connector' },
-          inputs: [
-            { ...port, handle: 'message' },
-            ...(optionalNull ? [{ handle: 'tags', jsonSchema: { items: { type: 'string' }, type: 'array' }, nullable: true }] : []),
-          ],
-          name: 'Echo',
-          outputs: [{ ...port, handle: 'message' }],
         },
       },
     },
@@ -101,8 +99,6 @@ function capabilityFlow(
           },
         },
       },
-      subflows: {},
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {
@@ -330,12 +326,23 @@ describe('Server Connector host', () => {
     const execute = vi.fn(async (_action: string, _connectionId: string | undefined, input: Readonly<Record<string, JsonValue>>) => input)
     const service = await open(createConnectorHost({ execute }))
     const source = connectorFlow()
-    const task = source.document.tasks.connector!
+    const task = ((source.document.graph.nodes['connector'] as TaskNode).task as ManagedTaskDefinition)!
     const revision: RevisionContent = {
       ...source,
       document: {
         ...source.document,
-        tasks: { ...source.document.tasks, connector: { ...task, executor: { action: 'example.echo', kind: 'connector' } } },
+        graph: {
+          ...source.document.graph,
+          nodes: {
+            ...source.document.graph.nodes,
+            ['connector']: {
+              ...source.document.graph.nodes['connector'],
+              kind: 'task',
+              inputs: (source.document.graph.nodes.connector as TaskNode).inputs,
+              task: { ...task, executor: { action: 'example.echo', kind: 'connector' } },
+            },
+          },
+        },
       },
     }
     const runId = await run(service, revision)
@@ -369,13 +376,24 @@ describe('Server Connector host', () => {
       }),
     )
     const source = connectorFlow()
-    const task = source.document.tasks.connector
+    const task = (source.document.graph.nodes['connector'] as TaskNode).task as ManagedTaskDefinition
     if (task == null) throw new Error('Connector Task fixture is missing.')
     const revision: RevisionContent = {
       ...source,
       document: {
         ...source.document,
-        tasks: { ...source.document.tasks, connector: { ...task, executor: { action: 'example.echo', kind: 'connector' } } },
+        graph: {
+          ...source.document.graph,
+          nodes: {
+            ...source.document.graph.nodes,
+            ['connector']: {
+              ...source.document.graph.nodes['connector'],
+              kind: 'task',
+              inputs: (source.document.graph.nodes.connector as TaskNode).inputs,
+              task: { ...task, executor: { action: 'example.echo', kind: 'connector' } },
+            },
+          },
+        },
       },
     }
 
@@ -406,13 +424,24 @@ describe('Server Connector host', () => {
       }),
     )
     const source = connectorFlow()
-    const task = source.document.tasks.connector
+    const task = (source.document.graph.nodes['connector'] as TaskNode).task as ManagedTaskDefinition
     if (task == null) throw new Error('Connector Task fixture is missing.')
     const revision: RevisionContent = {
       ...source,
       document: {
         ...source.document,
-        tasks: { ...source.document.tasks, connector: { ...task, executor: { action: 'example.echo', kind: 'connector' } } },
+        graph: {
+          ...source.document.graph,
+          nodes: {
+            ...source.document.graph.nodes,
+            ['connector']: {
+              ...source.document.graph.nodes['connector'],
+              kind: 'task',
+              inputs: (source.document.graph.nodes.connector as TaskNode).inputs,
+              task: { ...task, executor: { action: 'example.echo', kind: 'connector' } },
+            },
+          },
+        },
       },
     }
 
@@ -463,15 +492,13 @@ describe('Server Connector host', () => {
     await service.control.addProviderAccessBinding('test', created.flow.flowId, 'example', candidates.candidates[0]!.accessBindingId, 0)
     const revision = connectorFlow()
     const changed = await service.control.changeDraft('test', created.flow.flowId, created.flow.draftRevisionId, [
-      { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start', target: { kind: 'flow' } },
-      { kind: 'task.create', task: revision.document.tasks.connector!, taskId: 'connector' },
+      { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start' },
       {
         kind: 'graph.node.create',
         node: { ...revision.document.graph.nodes.connector!, name: 'Connector' },
         nodeId: 'connector',
-        target: { kind: 'flow' },
       },
-      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'connector' }, target: { kind: 'flow' } },
+      { kind: 'graph.edge.connect', edge: { source: 'start', target: 'connector' } },
     ])
     const accepted = await service.control.runs.createDraftRun(created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v5', {}, 'team-run', {
       nodeId: 'start',

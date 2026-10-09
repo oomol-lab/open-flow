@@ -24,16 +24,17 @@ Flow 修改、幂等准入、持久化和执行语义由同一个部署负责，
 Flow 是部署生成的顶层产品资源和稳定 opaque identity，不从属于 Project。每个 Flow 独立拥有名称、生命周期、Draft head、Revision 历史、
 Presentation、Publication、Live、Run 和 Trigger binding。
 
-每个 Flow 或 Subflow graph 内的 Node title 是非空且唯一的用户标识；`nodeId` 是稳定的内部 identity，继续用于连线、binding、运行事件和机器协议，
+每个 Flow graph 内的 Node title 是非空且唯一的用户标识；`nodeId` 是稳定的内部 identity，继续用于连线、binding、运行事件和机器协议，
 不能随 title 修改。Workbench 读取不满足约束的 Draft 后，必须通过正常的 Draft change 创建修正 Revision，不能在读取时改写既有 Revision。
 
-Flow 有一个可变 Draft head 和不可变的 Revision 历史。Revision 是该 Flow 的 graph、Subflow、Task、binding 和 CodeModule source 的完整事实来源；
+Flow 有一个可变 Draft head 和不可变的 Revision 历史。Revision 是该 Flow 的 graph（包含节点执行配置）、binding 和 CodeModule source 的完整事实来源；
 语义修改必须以预期 Revision 为前提并使用稳定 change identity 原子提交，不能静默覆盖 stale head；幂等重放必须先于 Draft head 比较返回已经接受的
 Revision。Draft 同步只返回当前完整 Revision snapshot，不提供持久化 authoring operation history。内部索引、缓存、增量记录和存储布局不能成为第二个事实来源。
 不可变约束适用于仍保留的 Revision 内容；Server 可以将草稿正文存为基于父版本的有界增量，读取时还原并校验 digest，对外仍返回完整快照。Run 和 Publish operation 准入时将固定版本物化为完整正文。旧内容可按 Server 的保留策略清理，但 Run 结果与 Draft change 幂等记录不依赖被清理的内容。
 
-Presentation 独立保存布局、viewport 和 Comment 等展示状态；每个 Flow 或 Subflow 图只有一个画布和 viewport，节点配置由侧栏承载。Presentation
+Presentation 独立保存布局、viewport 和 Comment 等展示状态；每个 Flow 图只有一个画布和 viewport，节点配置由侧栏承载。Presentation
 不进入 Revision digest，也不影响 validation、Run 或 Live 的执行语义。Publication 在首次接受发布操作时固定已保存的 Presentation，随异步操作持久化，成功后作为不可变展示快照提供独立读取；回滚继承来源 Publication 的快照而不修改草稿布局。旧 Publication 缺少快照时，历史查看使用自动布局。历史查看的节点移动和视口只属于查看会话，不进入保存与撤销历史。
+执行节点直接拥有 `node.task` 配置，不存在独立 Task ID 或可共享的 Task 定义表。复制节点复制配置；编辑、删除、撤销只作用于指定节点。Code 节点仍通过 `moduleId` 引用 CodeModule。
 Task 的端口分组随有序端口定义保存在 Revision 并参与 digest；分组不创建语义端口，也不参与连接、validation 或 Run。
 Revision 不保存 credential、Run、Engine IR、Provider 状态或部署缓存。
 
@@ -43,7 +44,7 @@ Variable 是 deployment scope 配置，不属于任何 Flow。Flow Revision 只�
 不包含 value。Variable 删除不修改 Revision；需要该 name 的首次 Publish、Rollback 或 Run admission 必须在资源创建的权威 operation boundary
 内 fail closed，幂等重放必须先返回已经接受的资源。
 
-普通 Run 开始时从一个 deployment store snapshot 解析固定 closure 实际使用的 Variable，并把同一份值注入根图和每次 Subflow invocation。平台不能把
+普通 Run 开始时从一个 deployment store snapshot 解析固定 closure 实际使用的 Variable，并把同一份值注入节点调用。平台不能把
 解析值隐式写入 Revision、Publication、持久化 Run input 或 `node.started`；Flow 代码显式返回、记录、发送或抛出该值时，它仍可进入用户数据流、
 RunEvent、日志或外部系统。Variable 是 Operator 可读取的 deployment configuration，不是不可导出的 Secret Manager。
 
@@ -133,7 +134,7 @@ credential value、Provider 当前状态、调用权限或部署资源。非确�
 部署 Control check 可以在确定性 validation 之后追加静态 capability 配置缺失的 diagnostic，例如 Flow 使用 LLM Task 但 Server 没有 LLM host；
 这类 diagnostic 不进入 Revision 或 digest，也不能通过探测外部服务状态产生。
 
-草稿从指定 Trigger 测试运行时，只校验并准备该入口沿执行边可达的节点及其 Task、Module、Subflow 和 binding 依赖；无关分支的语义错误或部署能力缺失不阻断本次运行。
+草稿从指定 Trigger 测试运行时，只校验并准备该入口沿执行边可达的节点及其 Task、Module 和 binding 依赖；无关分支的语义错误或部署能力缺失不阻断本次运行。
 准入、队列执行和 Wait 恢复必须使用同一入口范围，固定完整 Revision 身份及本次执行 closure。全图 check 和 Publish 仍检查完整 Flow，Workbench 不得用全图诊断禁用草稿入口测试。
 
 Engine Contract、部署中立 Runtime invocation、Scheduler 图执行语义、RunEvent 投影和 conformance 属于 `packages/open-flow`。具体执行隔离、
@@ -141,26 +142,26 @@ Engine Contract、部署中立 Runtime invocation、Scheduler 图执行语义、
 `engineContract` 约束公共图执行语义；`engineDigest` 标识具体 RuntimeHost 的隔离环境与宿主能力，不编码分支、Wait 或输入来源调度规则。
 checkpoint 的格式版本和状态一致性由 Scheduler decoder 校验，恢复时同时检查所需 Engine Contract 与隔离运行时是否受支持。
 
-Flow 和 Subflow graph 允许自连接和回边。连线表示执行触发，输入映射独立声明数据来源；保存或删除执行边不会隐式创建或删除输入映射。
+Flow graph 允许自连接和回边。连线表示执行触发，输入映射独立声明数据来源；保存或删除执行边不会隐式创建或删除输入映射。
 
 输入映射区分固定值 `value`、来源 `sources` 与明确未设置 `unset`。清空输入保存 `{ kind: "unset" }`，阻止字段默认值回退；只有缺少映射时才继承字段默认值。显示和执行共用此解析规则，保存、复制与撤销保留该状态。
-每条被选中的入边到达都创建一次独立节点 invocation，不等待其他前驱，也不合并多个到达。Flow Run 固定一个 Trigger 起始节点；未被该 Trigger 路径触达的节点不执行。Subflow 的无入边普通根节点由调用启动，不同到达可以并行。
+每条被选中的入边到达都创建一次独立节点 invocation，不等待其他前驱，也不合并多个到达。Flow Run 固定一个 Trigger 起始节点；未被该 Trigger 路径触达的节点不执行。不同到达可以并行。
 Condition 的每个 Case 由 AND 表达式组组成，组间使用 OR。`first` 按保存顺序选择首个匹配 Case，`all` 选择所有匹配 Case；零匹配时选择固定 `otherwise` 路由端口。分支端口不提供数据输出，Source 选择器不列出 Condition。左右操作数独立保存固定值或公共 Source，不声明节点级统一 Input，可引用节点输出对象中 schema 声明的一级字段，不支持多级路径或数组下标。所有操作数 Source 在匹配前解析；缺失值、不完整配置和类型不兼容都报错，不转入 Otherwise。每次 Wait invocation 登记后释放 pending，决议后释放所选 action，同一次 invocation 的 pending 只触发一次。未选中的分支不产生到达或公开节点事件。
 
-每个可执行节点可设置正整数 `maxExecutions`，未设置时为 1000。计数按一次 Flow Run 累计，并按 graph 与 node ID 区分；同一 Subflow 中的节点跨多次调用累计。
+每个可执行节点可设置正整数 `maxExecutions`，未设置时为 1000。计数按一次 Flow Run 累计，并按 node ID 区分。
 达到上限后，下一次到达使 Run 报错终止，不再执行该节点。每次 invocation 有独立 job/execution identity；Wait 和 Agent 的决议恢复继续原 invocation，不额外计次。暂停检查点保留累计次数、各等待 invocation 的输入路径和 Agent continuation。
 
 节点输入只能引用本图中经执行边可达的 output，包括回边上之前执行的自身 output。每次 invocation 继承触发路径上的结果快照，重复节点更新该路径中的自身结果；并行路径的结果不共享。
 Node Source 可用可选 `field` 引用输出对象中 schema 声明的一级字段；字段名是原始 key，不解释为路径。取值只读取对象自身属性，父对象为 null 或字段不存在时视为来源缺失，字段显式为 null 仍算可用来源。
 多个 source 表示当前路径上的备选值；零个可用来源补 `null`，一个来源取其值，同时有多个值时报错；实际输出 `null` 仍算一个来源。输入按端口声明校验，失败时报错，不跳过节点。首次进入循环时尚未产生的回边来源也按缺失处理。
-Subflow 的输入和最终输出保持显式声明，不能越过图边界直接引用内部或外部节点。Flow 最终结果保留每个已完成末端节点的最后一次完成结果，完整执行次数和每次输出由运行事件记录。循环的最终执行次数无法预知，Scheduler 不按已完成节点数估算进度，仅在图执行完成时报告 100%。
+Flow 最终结果保留每个已完成末端节点的最后一次完成结果，完整执行次数和每次输出由运行事件记录。循环的最终执行次数无法预知，Scheduler 不按已完成节点数估算进度，仅在图执行完成时报告 100%。
 
 Task 仅通过返回对象一次性提交最终 output，全部声明和可序列化性校验成功后才向下游提供结果。已声明但缺失或为 `undefined` 的 output 补为 `null` 后按端口声明校验；整个返回值为 `undefined` 时按空对象处理，显式 `null` 等非对象返回值仍非法。
-归一化仅作用于端口值，不改写内部对象字段或数组元素；Condition、Wait 未选中的控制分支不补输出。普通 Flow 数据在 Runtime invocation、Scheduler、Subflow、RunEvent 和 terminal result 边界保持可序列化。
+归一化仅作用于端口值，不改写内部对象字段或数组元素；Condition、Wait 未选中的控制分支不补输出。普通 Flow 数据在 Runtime invocation、Scheduler、RunEvent 和 terminal result 边界保持可序列化。
 脚本 `context` 提供取消、日志、进度、Artifact、网络、Connector 等宿主能力、只读运行身份，以及与第一个参数相同的 `inputs`。
 `context.getPrevious()` 按需返回触发本次执行的直接前驱 `{ id, name, outputs, outputDefs }`，无前驱时返回 `null`。
 outputs 来自本次到达的路径快照，outputDefs 复用固定 Revision 的输出端口声明（handle、jsonSchema、nullable 与可选 description）；声明不保证本次产生该端口值。
-Condition 返回空 outputs 和 outputDefs；Subflow 不跨图暴露内部节点。读取时才复制数据进入代码隔离环境，各次返回值互不影响。
+Condition 返回空 outputs 和 outputDefs。读取时才复制数据进入代码隔离环境，各次返回值互不影响。
 例如 `const previous = await context.getPrevious(); const value = previous?.outputs.items`。
 `context` 不提供运行中的 output 提交、跨节点的动态 Run store、Variable 查询或任意节点输出查询。部署可以为调度、调试和恢复私有保存 Run value，
 但不能把内部存储变成第二条用户数据通道。节点最终结果与成功完成通过同一个完成事件发布，先于完成阶段释放的下游节点启动；Wait 的 pending 分支在等待建立后即可执行。
@@ -192,8 +193,9 @@ Wait 与 Approval 使用同一个等待执行机制，分别提供固定的 `con
 界面。一次 Wait 的所有 resolve 入口共享同一个 first-writer-wins 决议事实。
 各等待保留独立决议事实，后续等待和 Run terminal 不覆盖旧决议；这些事实不受 RunEvent retention 影响，随 Flow 物理删除清理。
 
-Agent 是根 Flow 中的 Managed Task，拥有显式输入、固定模型、Connector 工具与可选代码计算能力声明。提示词为支持 `{{输入名称}}` 的字符串模板，与 LLM 共用单次替换语义；渲染结果作为用户消息，宿主控制执行约束与输出格式。模型不能改变工具 Action、Connection、固定参数或审批策略。
+Agent 是根 Flow 中持有 Managed Task 配置的节点，拥有显式输入、固定模型、Connector 工具与可选代码计算能力声明。提示词为支持 `{{输入名称}}` 的字符串模板，与 LLM 共用单次替换语义；渲染结果作为用户消息，宿主控制执行约束与输出格式。模型不能改变工具 Action、Connection、固定参数或审批策略。
 Connector 工具和代码计算均可不配置；Agent 可以仅根据模型和提示词生成结果，仍须满足声明的输出 schema。Connector 工具最多 64 个。最终输出的 schema（包括文本约束）和用途说明作为生成要求传给模型；JSON 解析或 schema 校验失败时，将具体错误反馈给模型修正。修正沿用已有对话与结果，禁用工具调用，累计占用同一个最大执行轮数；耗尽后失败。
+Agent 的可选通知由该节点直接保存 Action、Connection、输入定义和参数映射，不引用其他节点或 Task 定义。
 Agent 的工具批次串行处理，批准或拒绝只处理该次固定调用。框架 continuation 属于部署私有数据；Run owner 持久化审批等待与通知 work，在安全冻结时保存完整 continuation 和 Scheduler 状态。并行 Agent 的等待独立可决议，框架不拥有另一套 Run 状态机。
 Agent 节点超时累计各次实际执行段，审批与排队不消耗节点预算；Run 总预算独立保留。执行结果不明时终止为不确定失败，不能让模型自动重试。
 
@@ -263,7 +265,7 @@ Connector 与 LLM 是独立部署能力，未配置时分别拒绝调用；外�
 
 ### Error workflow
 
-Flow Error 节点通过 `sourceFlowIds` 多选监听已发布的上游 Flow，不能包含自身。根图最多一个 Flow Error，Subflow 不允许放置。监听列表随处理 Flow 的 Revision 保存，发布时在同一事务中替换 `error_subscriptions` 索引，草稿修改不影响线上。上游失败时查询当前可用监听者，每个源 Run 与处理 Flow 至多一条派发记录；派发准入再次验证监听关系并固定处理 Flow 当前 Live 与 Flow Error。多个处理 Flow 可监听同一个上游。
+Flow Error 节点通过 `sourceFlowIds` 多选监听已发布的上游 Flow，不能包含自身。每个 Flow 最多一个 Flow Error。监听列表随处理 Flow 的 Revision 保存，发布时在同一事务中替换 `error_subscriptions` 索引，草稿修改不影响线上。上游失败时查询当前可用监听者，每个源 Run 与处理 Flow 至多一条派发记录；派发准入再次验证监听关系并固定处理 Flow 当前 Live 与 Flow Error。多个处理 Flow 可监听同一个上游。
 
 仅生产 occurrence 准入的 Run 在 `failed` 或 `indeterminate` 终态产生错误处理；手动 Draft/Live、成功与取消不触发。终态和持久化派发意图原子提交，Maintenance 在队列满时保留意图重试，并以源 Run 与处理 Flow 的组合身份去重。目标不可用时记录派发失败，不改变源 Run 终态。Flow Error 准入的 Run 持久化来源标记，失败后不再派发，避免跨 Flow 递归。
 

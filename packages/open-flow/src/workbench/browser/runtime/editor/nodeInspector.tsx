@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react'
 import type { TFunction } from 'val-i18n'
 import type { TriggerDisplay } from '../../../../control/common/triggerCatalog.ts'
-import type { GraphNode, GraphTarget } from '../../../../flow/common/change.ts'
+import type { GraphNode } from '../../../../flow/common/change.ts'
 import type { ConnectorAccess, ConnectorAccessCandidates, ConnectorAction, ConnectorConnection, Diagnostic, Group, InputPort } from '../api.ts'
 import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { WorkbenchTheme } from '../contract.ts'
@@ -19,7 +19,6 @@ import { useTranslate } from 'val-i18n-react'
 import { decisionModel } from '../../../../decision/common/decision.ts'
 import { nodeInputMappings } from '../../../../flow/common/condition.ts'
 import { inputValue } from '../../../../flow/common/inputValue.ts'
-import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
@@ -46,19 +45,17 @@ import { OpenApiSection } from './openApiSection.tsx'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 import { presentProviderOutputDescription, presentProviderSourceCandidates, presentProviderTriggerConfig } from './providerTriggerPresentation.ts'
 import { ResolutionDefinition } from './resolutionDefinition.tsx'
-import { SubflowDefinition } from './subflowDefinition.tsx'
 import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
 import { TriggerScheduleEditor } from './triggerScheduleEditor.tsx'
 import { TriggerSummary } from './triggerSummary.tsx'
 import { WebhookEditor } from './webhookEditor.tsx'
 
-export function inspectorIcon(node: ResolvedSelection | undefined, target: GraphTarget): IconName {
+export function inspectorIcon(node: ResolvedSelection | undefined): IconName {
   if (node?.kind == 'trigger') return 'trigger'
   if (node?.kind == 'condition') return 'condition'
   if (node?.kind == 'value') return 'value'
   if (node?.kind == 'approval') return 'check'
   if (node?.kind == 'wait') return 'wait'
-  if (node?.kind == 'subflow' || (node == null && target.kind == 'subflow')) return 'subflow'
   if (node?.kind == 'task' && node.definition != null && 'executor' in node.definition) {
     if (node.definition.executor.kind == 'decision') return 'decision'
     if (node.definition.executor.kind == 'openapi') return 'task'
@@ -82,8 +79,6 @@ function nodePurposePlaceholder(
       return t('addNode.approvalDescription')
     case 'wait':
       return t('addNode.waitDescription')
-    case 'subflow':
-      return t('addNode.subflowDescription')
     case 'trigger': {
       const node = selection.node
       switch (node.kind) {
@@ -123,18 +118,17 @@ function nodePurposePlaceholder(
 function inputUpstreamSources({
   revision,
   sourceNodeIcons,
-  target,
   selection,
   store,
   handleName,
   t,
   triggerDisplays,
-}: Pick<Props, 'revision' | 'sourceNodeIcons' | 'target' | 'store' | 'triggerDisplays'> & {
+}: Pick<Props, 'revision' | 'sourceNodeIcons' | 'store' | 'triggerDisplays'> & {
   readonly selection: ResolvedNode
   readonly handleName: string
   readonly t: TFunction
 }): NodeInputUpstreamSources | undefined {
-  const graph = revision.graph(target)!
+  const graph = revision.graph()!
   const mapping = nodeInputMappings(selection.node)[handleName]
   const sources = mapping?.kind == 'sources' ? mapping.sources.filter((source) => source.kind == 'node') : []
   const providerDisplay = (node: GraphNode | undefined) =>
@@ -145,11 +139,11 @@ function inputUpstreamSources({
       return {
         description:
           node == null
-            ? revision.outputDescription(target, source.nodeId, source.output)
+            ? revision.outputDescription(source.nodeId, source.output)
             : presentProviderOutputDescription(
                 node,
                 source.output,
-                presentBuiltInOutputDescription(node, source.output, revision.outputDescription(target, source.nodeId, source.output), t),
+                presentBuiltInOutputDescription(node, source.output, revision.outputDescription(source.nodeId, source.output), t),
                 providerDisplay(node),
               ),
         icon: sourceNodeIcons?.[source.nodeId],
@@ -160,7 +154,7 @@ function inputUpstreamSources({
         check: undefined,
       }
     }),
-    query: revision.inputSource(target, selection.id, handleName),
+    query: revision.inputSource(selection.id, handleName),
     groups: [],
     describeGroups: (candidates) =>
       Object.entries(candidates).map(([nodeId, outputs]) => {
@@ -183,7 +177,6 @@ function inputUpstreamSources({
 
 interface Props {
   readonly readOnly?: boolean
-  readonly onOpenSubflow?: (id: string) => void
   readonly variables?: InputVariables
   readonly connectorAction?: ConnectorAction
   readonly connectorActionError?: ConnectorActionError
@@ -208,7 +201,7 @@ interface Props {
   readonly sourceNodeIcons?: Readonly<Record<string, string | undefined>>
   readonly store?: WorkspaceStore
   readonly theme: WorkbenchTheme
-  readonly target: GraphTarget
+
   readonly triggerActiveConnections?: readonly ConnectorConnection[]
   readonly triggerAuthorizationPending?: boolean
   readonly triggerConnection?: ConnectorConnection
@@ -233,7 +226,6 @@ type InspectorProps = Props &
 export function NodeInspector({
   variables = { enabled: false, loaded: false, loading: false, names: [], onOpen: undefined },
   readOnly = false,
-  onOpenSubflow,
   connectorAction,
   connectorActionError,
   connectorAccessError,
@@ -255,7 +247,6 @@ export function NodeInspector({
   sourceNodeIcons,
   store: writableStore,
   theme,
-  target,
   triggerActiveConnections,
   triggerAuthorizationPending = false,
   triggerConnection,
@@ -277,7 +268,7 @@ export function NodeInspector({
   const unconfiguredOpenApi = task != null && 'executor' in task && task.executor.kind == 'openapi' && !task.executor.path
   const isLlm = task != null && 'executor' in task && task.executor.kind == 'llm'
   const connector = task != null && 'executor' in task && task.executor.kind == 'connector' ? task.executor : undefined
-  const taskId = selection?.kind == 'task' && selection.node.task == null ? selection.node.taskId : undefined
+  const nodeId = selection?.kind == 'task' ? selection.id : undefined
   const locatedRequest = useRef<number>()
   useEffect(() => {
     if (focus == null) return
@@ -317,7 +308,7 @@ export function NodeInspector({
             onConfigureAccess={(providerId) => void triggers.connect(providerId)}
           />
         )}
-        {!readOnly && connectors != null && connector != null && taskId != null && connectorAction?.authenticated !== false && (
+        {!readOnly && connectors != null && connector != null && nodeId != null && connectorAction?.authenticated !== false && (
           <ConnectorAccount
             action={connectorAction}
             actionError={connectorActionError}
@@ -333,7 +324,7 @@ export function NodeInspector({
             disabled={disabled}
             fieldIdPrefix={`task-${selection?.id}`}
             loading={connectorLoading}
-            taskId={taskId}
+            nodeId={nodeId}
           />
         )}
         {selection != null && (
@@ -503,7 +494,6 @@ export function NodeInspector({
                         upstream={inputUpstreamSources({
                           revision,
                           sourceNodeIcons,
-                          target,
                           selection,
                           store,
                           handleName: definition.handle,
@@ -530,14 +520,10 @@ export function NodeInspector({
           />
         )}
         {!unconfiguredOpenApi &&
-          (selection?.kind === 'approval' || selection?.kind === 'wait' || selection?.kind === 'subflow' || selection?.kind === 'task') &&
+          (selection?.kind === 'approval' || selection?.kind === 'wait' || selection?.kind === 'task') &&
           (() => {
             const definitions: (InputPort | Group)[] =
-              selection.kind === 'task'
-                ? [...(selection.definition?.inputs ?? [])]
-                : selection.kind === 'subflow'
-                  ? [...(selection.definition?.inputs ?? [])]
-                  : [...selection.node.inputDefinitions]
+              selection.kind === 'task' ? [...(selection.definition?.inputs ?? [])] : [...selection.node.inputDefinitions]
             const handles = new Set(definitions.flatMap((definition) => ('handle' in definition ? [definition.handle] : [])))
             for (const handle of Object.keys(selection.node.inputs)) {
               if (!handles.has(handle) && !(selection.kind === 'task' && selection.node.additionalInputs?.some((port) => port.handle === handle)))
@@ -581,7 +567,7 @@ export function NodeInspector({
                   )
                 }}
                 onDefinitions={
-                  selection.kind === 'task' && selection.definition != null && (selection.node.task != null || isAgent)
+                  selection.kind === 'task' && selection.definition != null && ('moduleId' in selection.node.task || isAgent)
                     ? (inputs, deletion, values) => {
                         void store?.saveTaskPorts(selection.id, { inputs, outputs: selection.definition!.outputs }, deletion, values)
                       }
@@ -600,7 +586,7 @@ export function NodeInspector({
                         }
                       : undefined
                 }
-                renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t, triggerDisplays })}
+                renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, selection, store, handleName: handle, t, triggerDisplays })}
                 variables={variables}
                 disabled={disabled}
                 onValue={(handle, value, deletion) => {
@@ -614,7 +600,7 @@ export function NodeInspector({
             return (
               <section className="inspector-port-section" data-inspector-section="inputs">
                 {fields}
-                {selection.kind === 'task' && selection.definition != null && selection.node.task == null && isLlm && (
+                {selection.kind === 'task' && selection.definition != null && !('moduleId' in selection.node.task) && isLlm && (
                   <section className="inspector-nested-port-section">
                     <NodeInputs
                       readOnly={readOnly}
@@ -651,9 +637,7 @@ export function NodeInspector({
                       onVariable={(handle, name) => {
                         void store?.setInputVariable(selection.id, handle, name)
                       }}
-                      renderSource={(handle) =>
-                        inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t, triggerDisplays })
-                      }
+                      renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, selection, store, handleName: handle, t, triggerDisplays })}
                     />
                   </section>
                 )}
@@ -667,9 +651,9 @@ export function NodeInspector({
             value={selection.node}
             disabled={disabled}
             variables={variables}
-            renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, target, selection, store, handleName: handle, t, triggerDisplays })}
+            renderSource={(handle) => inputUpstreamSources({ revision, sourceNodeIcons, selection, store, handleName: handle, t, triggerDisplays })}
             variableName={(source) => (source.kind === 'binding' ? revision.binding(source.bindingId)?.target : undefined)}
-            sourceType={(source) => revision.sourceType(target, source)}
+            sourceType={(source) => revision.sourceType(source)}
             onVariable={(handle, name) => {
               void store?.setInputVariable(selection.id, handle, name)
             }}
@@ -700,14 +684,14 @@ export function NodeInspector({
               title={t('inspector.ports.outputsTitle')}
               output
               values={presentDecisionOutputs(selection.definition, t)}
-              disabled={disabled || !(selection.node.task != null || isAgent)}
+              disabled={disabled || !('moduleId' in selection.node.task || isAgent)}
               onChange={(outputs, deletion) => {
                 void store?.saveTaskPorts(selection.id, { inputs: selection.definition!.inputs, outputs }, deletion)
               }}
             />
           </section>
         )}
-        {(selection?.kind === 'subflow' || selection?.kind === 'approval' || selection?.kind === 'wait') && (
+        {(selection?.kind === 'approval' || selection?.kind === 'wait') && (
           <section className="inspector-port-section">
             <PortDefinitionEditor
               readOnly={readOnly}
@@ -716,17 +700,13 @@ export function NodeInspector({
               title={t('inspector.ports.outputsTitle')}
               output
               disabled
-              values={selection.kind === 'subflow' ? (selection.definition?.outputs ?? []) : presentResolutionOutputs(selection.node, t)}
+              values={presentResolutionOutputs(selection.node, t)}
               onChange={() => {}}
             />
           </section>
         )}
         {selection == null ? (
-          target.kind == 'subflow' ? (
-            <SubflowDefinition definition={revision.subflow(target.id)!} disabled={disabled} store={store} subflowId={target.id} />
-          ) : (
-            <div className="inspector-empty">{t('inspector.selectNode')}</div>
-          )
+          <div className="inspector-empty">{t('inspector.selectNode')}</div>
         ) : (
           <>
             {selection.kind == 'trigger' ? null : selection.kind == 'task' ? (
@@ -758,17 +738,6 @@ export function NodeInspector({
             ) : null}
             {selection.kind != 'trigger' && selection.kind != 'task' && (
               <GeneralSettings readOnly={readOnly} disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
-            )}
-            {selection.kind == 'subflow' && (
-              <section className="inspector-section">
-                <h3>{t('inspector.subflow.referenced')}</h3>
-                <p className="reference-value">{selection.definition?.name ?? selection.node.subflowId}</p>
-                {onOpenSubflow != null && selection.definition != null && (
-                  <Button className="self-start" size="sm" variant="outline" onClick={() => onOpenSubflow(selection.node.subflowId)}>
-                    {t('inspector.subflow.open')}
-                  </Button>
-                )}
-              </section>
             )}
           </>
         )}

@@ -1,6 +1,5 @@
 import type { TFunction } from 'val-i18n'
 import type { TriggerDisplay } from '../../../../control/common/triggerCatalog.ts'
-import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { UiLanguage } from '../../../../localization/common/languages.ts'
 import type { RevisionView } from '../revisionView.ts'
 import type { DiagnosticItem } from './diagnostics.ts'
@@ -8,15 +7,14 @@ import type { DiagnosticItem } from './diagnostics.ts'
 export function presentTriggerDiagnostics(
   items: readonly DiagnosticItem[],
   revision: RevisionView | undefined,
-  target: GraphTarget | undefined,
   displays: Readonly<Record<string, TriggerDisplay>> | undefined,
   language: UiLanguage,
   t: TFunction,
 ): readonly DiagnosticItem[] {
-  if (revision == null || target == null) return items
+  if (revision == null) return items
   return items.map((item) => {
     if (item.diagnostic.code != 'trigger.config-incomplete' || item.location == null) return item
-    const node = revision.node(target, item.location.nodeId)?.node
+    const node = revision.node(item.location.nodeId)?.node
     if (node?.kind != 'integration' && node?.kind != 'poll') return item
     const labels = displays?.[node.definition.key]?.configInputLabels
     const names = item.diagnostic.fields?.map((field) => labels?.[field])

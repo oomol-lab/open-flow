@@ -33,7 +33,7 @@ export async function validatedFlow(revision: RevisionContent): Promise<Validate
         content: new TextDecoder().decode(bytes),
         prepared: prepared.flow,
         revisionDigest: await digestBytes(bytes),
-        variableBindings: variableBindings(revision, prepared.validation.closure.dependencies.inputBindings),
+        variableBindings: variableBindings(revision, prepared.validation.closure.dependencies.bindings),
       }
     }
   }

@@ -56,33 +56,7 @@ function content(sample: string): RevisionContent {
     modules: {},
     document: {
       bindings: {},
-      subflows: {},
-      tasks: {
-        decision: {
-          ...decisionTask(
-            sample === 'overflow'
-              ? overflowQuestions
-              : sample === 'invalid'
-                ? [
-                    { name: 'missing_question', type: 'noul', instructions: '' },
-                    { name: 'invalid_choice', type: 'choice', instructions: 'Pick a team.', criteria: [{ name: '', description: '' }] },
-                    { name: 'invalid_score', type: 'score', instructions: 'How urgent is it?', criteria: ['Low'] },
-                  ]
-                : sample === 'none'
-                  ? []
-                  : sample === 'empty'
-                    ? undefined
-                    : sample === 'single'
-                      ? questions.slice(0, 1)
-                      : sample === 'score'
-                        ? questions.slice(2)
-                        : sample === 'choice'
-                          ? questions.slice(1, 2)
-                          : questions,
-          ),
-          ...(sample === 'overflow' ? { executor: { kind: 'decision' as const, questions: overflowQuestions } } : {}),
-        },
-      },
+
       graph: {
         nodes: {
           message: {
@@ -93,7 +67,30 @@ function content(sample: string): RevisionContent {
           },
           decision: {
             kind: 'task',
-            taskId: 'decision',
+            task: {
+              ...decisionTask(
+                sample === 'overflow'
+                  ? overflowQuestions
+                  : sample === 'invalid'
+                    ? [
+                        { name: 'missing_question', type: 'noul', instructions: '' },
+                        { name: 'invalid_choice', type: 'choice', instructions: 'Pick a team.', criteria: [{ name: '', description: '' }] },
+                        { name: 'invalid_score', type: 'score', instructions: 'How urgent is it?', criteria: ['Low'] },
+                      ]
+                    : sample === 'none'
+                      ? []
+                      : sample === 'empty'
+                        ? undefined
+                        : sample === 'single'
+                          ? questions.slice(0, 1)
+                          : sample === 'score'
+                            ? questions.slice(2)
+                            : sample === 'choice'
+                              ? questions.slice(1, 2)
+                              : questions,
+              ),
+              ...(sample === 'overflow' ? { executor: { kind: 'decision' as const, questions: overflowQuestions } } : {}),
+            },
             name: 'AI Decision',
             inputs: { target: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'message', output: 'message' }] } },
           },
@@ -130,7 +127,7 @@ function DecisionStory({ dark, language, log }: { dark: boolean; language: UiLan
 }
 function DecisionPanel({ session, dark, disabled }: { session: ReturnType<typeof createInspectorSession>; dark: boolean; disabled: boolean }) {
   const revision = useVal(session.store.$.revision)
-  const selection = revision?.node({ kind: 'flow' }, 'decision')
+  const selection = revision?.node('decision')
   return (
     <I18nProvider i18n={session.i18n}>
       <div
@@ -152,7 +149,7 @@ function DecisionPanel({ session, dark, disabled }: { session: ReturnType<typeof
               disabled={disabled}
               revision={revision}
               selection={selection}
-              target={{ kind: 'flow' }}
+
               theme={dark ? 'dark' : 'light'}
             />
           </InspectorSamplePanel>

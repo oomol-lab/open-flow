@@ -5,7 +5,6 @@ import type {
   ConnectorCapability,
   Graph,
   GraphNode,
-  GraphTarget,
   InputMapping,
   InputValues,
   JsonValue,
@@ -24,7 +23,6 @@ import { applyFlowChanges, nextNodeName, normalizeNodeName } from './change.ts'
 import { codeSharedPermissionsEnabled } from './codePermissions.ts'
 import { nodeInputMappings } from './condition.ts'
 import { fixedInputValue, inputValues } from './inputValue.ts'
-import { referencedTaskIds } from './semantics.ts'
 
 const codeTaskTemplate = `export default async function (inputs, context) {
   return { result: inputs.value }
@@ -44,7 +42,7 @@ export interface LlmTaskOptions {
 
 export type LlmInputHandle = 'input' | 'messages' | 'model' | 'template'
 
-export function defaultNodeName(content: RevisionContent, node: GraphNode): string {
+export function defaultNodeName(_content: RevisionContent, node: GraphNode): string {
   switch (node.kind) {
     case 'condition':
       return 'Condition'
@@ -54,10 +52,8 @@ export function defaultNodeName(content: RevisionContent, node: GraphNode): stri
       return 'Approval'
     case 'wait':
       return 'Wait'
-    case 'subflow':
-      return normalizeNodeName(content.document.subflows[node.subflowId]?.name ?? '') || 'Subflow'
     case 'task':
-      return normalizeNodeName(node.task != null ? node.task.name : (content.document.tasks[node.taskId]?.name ?? '')) || 'Task'
+      return normalizeNodeName(node.task.name) || 'Task'
     case 'error':
       return 'Flow Error'
     case 'manual':
@@ -72,7 +68,7 @@ export function defaultNodeName(content: RevisionContent, node: GraphNode): stri
   }
 }
 
-function graphNameRepairs(content: RevisionContent, targetGraph: Graph, target: GraphTarget): readonly ChangeOperation[] {
+function graphNameRepairs(content: RevisionContent, targetGraph: Graph): readonly ChangeOperation[] {
   const names = new Set<string>()
   const changed: { readonly nodeId: string; readonly node: GraphNode; readonly name: string }[] = []
   for (const [nodeId, node] of Object.entries(targetGraph.nodes)) {
@@ -81,14 +77,11 @@ function graphNameRepairs(content: RevisionContent, targetGraph: Graph, target: 
     names.add(name)
     if (node.name != name) changed.push({ name, node, nodeId })
   }
-  return changed.toReversed().map(({ name, node, nodeId }) => ({ before: node.name, field: 'name', kind: 'graph.node.field.set', nodeId, target, value: name }))
+  return changed.toReversed().map(({ name, node, nodeId }) => ({ before: node.name, field: 'name', kind: 'graph.node.field.set', nodeId, value: name }))
 }
 
 export function repairNodeNames(content: RevisionContent): readonly ChangeOperation[] {
-  return [
-    ...graphNameRepairs(content, content.document.graph, { kind: 'flow' }),
-    ...Object.entries(content.document.subflows).flatMap(([id, subflow]) => graphNameRepairs(content, subflow.graph, { id, kind: 'subflow' })),
-  ]
+  return graphNameRepairs(content, content.document.graph)
 }
 
 interface TriggerSettingsBase {
@@ -114,7 +107,6 @@ export type TriggerSettings =
   | (TriggerSettingsBase & { readonly config: InputValues; readonly kind: 'integration' })
 
 export function createCodeTask(
-  target: GraphTarget,
   identity: { readonly moduleId: string; readonly nodeId: string },
   name: string,
   module: Pick<CodeModule, 'imports' | 'source'> | undefined = undefined,
@@ -150,40 +142,34 @@ export function createCodeTask(
         },
       },
       nodeId: identity.nodeId,
-      target,
     },
   ]
 }
 
 export function createManagedTask(
-  target: GraphTarget,
-  identity: { readonly nodeId: string; readonly taskId: string },
+  identity: { readonly nodeId: string },
   task: Extract<TaskDefinition, { readonly executor: unknown }>,
 ): readonly ChangeOperation[] {
   return [
-    { kind: 'task.create', task, taskId: identity.taskId },
     {
       kind: 'graph.node.create',
       node: {
         inputs: defaultInputs(task.inputs),
         kind: 'task',
         name: task.name,
-        taskId: identity.taskId,
+        task,
       },
       nodeId: identity.nodeId,
-      target,
     },
   ]
 }
 
 export function createAgentTask(
-  target: GraphTarget,
-  identity: { readonly nodeId: string; readonly taskId: string },
+  identity: { readonly nodeId: string },
   name: string,
   defaults: { readonly prompt?: string; readonly outputDescription?: string } = {},
 ): readonly ChangeOperation[] {
-  if (target.kind != 'flow') throw new Error('Agent nodes are only supported in the root Flow.')
-  return createManagedTask(target, identity, {
+  return createManagedTask(identity, {
     name,
     inputs: [{ handle: 'input', jsonSchema: { type: 'string' }, nullable: false, value: '' }],
     outputs: [
@@ -205,15 +191,14 @@ export function createAgentTask(
 }
 
 export function createLlmTask(
-  target: GraphTarget,
-  identity: { readonly nodeId: string; readonly taskId: string },
+  identity: { readonly nodeId: string },
   name: string,
   mode: 'chat' | 'json',
   outputDescription: string,
   options: LlmTaskOptions = {},
 ): readonly ChangeOperation[] {
   const values = options.inputs ?? {}
-  return createManagedTask(target, identity, {
+  return createManagedTask(identity, {
     executor: { kind: 'llm', mode },
     inputs: [
       { handle: 'messages', jsonSchema: { items: { type: 'object' }, type: 'array' }, nullable: true, value: llmInputValue(values, 'messages', null) },
@@ -239,7 +224,7 @@ export function createLlmTask(
   })
 }
 
-export function createCondition(target: GraphTarget, nodeId: string, name: string): readonly ChangeOperation[] {
+export function createCondition(nodeId: string, name: string): readonly ChangeOperation[] {
   return [
     {
       kind: 'graph.node.create',
@@ -251,23 +236,21 @@ export function createCondition(target: GraphTarget, nodeId: string, name: strin
         name,
       },
       nodeId,
-      target,
     },
   ]
 }
 
-export function createValue(target: GraphTarget, nodeId: string, name: string): readonly ChangeOperation[] {
+export function createValue(nodeId: string, name: string): readonly ChangeOperation[] {
   return [
     {
       kind: 'graph.node.create',
       node: { inputs: {}, kind: 'value', name, values: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }] },
       nodeId,
-      target,
     },
   ]
 }
 
-export function createWait(target: Extract<GraphTarget, { readonly kind: 'flow' }>, nodeId: string, name: string): readonly ChangeOperation[] {
+export function createWait(nodeId: string, name: string): readonly ChangeOperation[] {
   return [
     {
       kind: 'graph.node.create',
@@ -279,12 +262,11 @@ export function createWait(target: Extract<GraphTarget, { readonly kind: 'flow' 
         prompt: name,
       },
       nodeId,
-      target,
     },
   ]
 }
 
-export function createApproval(target: Extract<GraphTarget, { readonly kind: 'flow' }>, nodeId: string, name: string): readonly ChangeOperation[] {
+export function createApproval(nodeId: string, name: string): readonly ChangeOperation[] {
   return [
     {
       kind: 'graph.node.create',
@@ -296,21 +278,18 @@ export function createApproval(target: Extract<GraphTarget, { readonly kind: 'fl
         prompt: name,
       },
       nodeId,
-      target,
     },
   ]
 }
 
 export function createBuiltinTrigger(
-  target: Extract<GraphTarget, { readonly kind: 'flow' }>,
   nodeId: string,
   node: Extract<TriggerNode, { readonly kind: 'error' | 'cron' | 'manual' | 'webhook' }>,
 ): readonly ChangeOperation[] {
-  return [{ kind: 'graph.node.create', node, nodeId, target }]
+  return [{ kind: 'graph.node.create', node, nodeId }]
 }
 
 export function createProviderTrigger(
-  target: Extract<GraphTarget, { readonly kind: 'flow' }>,
   nodeId: string,
   definition: TriggerKeySnapshot,
   options: {
@@ -338,106 +317,93 @@ export function createProviderTrigger(
           kind: 'integration',
           name,
         }
-  return [{ kind: 'graph.node.create', node, nodeId, target }]
+  return [{ kind: 'graph.node.create', node, nodeId }]
 }
 
-export function deleteNodes(content: RevisionContent, target: GraphTarget, nodeIds: readonly string[]): readonly ChangeOperation[] {
-  const nodes = graph(content, target)?.nodes
+export function deleteNodes(content: RevisionContent, nodeIds: readonly string[]): readonly ChangeOperation[] {
+  const nodes = content.document.graph?.nodes
   if (nodes == null) return []
   const operations: ChangeOperation[] = nodeIds.flatMap((nodeId) => {
     const node = nodes[nodeId]
     if (node == null) return []
     return [
-      { kind: 'graph.node.delete' as const, nodeId, target },
-      ...(node.kind == 'task' && node.task != null ? [{ kind: 'module.delete' as const, moduleId: node.task.moduleId }] : []),
+      { kind: 'graph.node.delete' as const, nodeId },
+      ...(node.kind == 'task' && 'moduleId' in node.task ? [{ kind: 'module.delete' as const, moduleId: node.task.moduleId }] : []),
     ]
   })
-  const remaining = referencedTaskIds(applyFlowChanges(content, operations).document)
-  for (const taskId of referencedTaskIds(content.document)) {
-    if (!remaining.has(taskId) && content.document.tasks[taskId] != null) operations.push({ kind: 'task.delete', taskId })
-  }
   return cleanVariableBindings(content, operations)
 }
 
-export function updateSettings(content: RevisionContent, target: GraphTarget, nodeId: string, settings: Settings): readonly ChangeOperation[] | undefined {
-  const node = graph(content, target)?.nodes[nodeId]
+export function updateSettings(content: RevisionContent, nodeId: string, settings: Settings): readonly ChangeOperation[] | undefined {
+  const node = content.document.graph?.nodes[nodeId]
   if (node == null || !('inputs' in node)) return
   const operations: ChangeOperation[] = []
 
-  if (node.name != settings.name) operations.push({ before: node.name, field: 'name', kind: 'graph.node.field.set', nodeId, target, value: settings.name })
+  if (node.name != settings.name) operations.push({ before: node.name, field: 'name', kind: 'graph.node.field.set', nodeId, value: settings.name })
   if (node.maxExecutions != settings.maxExecutions) {
-    operations.push({ before: node.maxExecutions, field: 'maxExecutions', kind: 'graph.node.field.set', nodeId, target, value: settings.maxExecutions })
+    operations.push({ before: node.maxExecutions, field: 'maxExecutions', kind: 'graph.node.field.set', nodeId, value: settings.maxExecutions })
   }
   if (node.timeoutMs != settings.timeoutMs) {
-    operations.push({ before: node.timeoutMs, field: 'timeoutMs', kind: 'graph.node.field.set', nodeId, target, value: settings.timeoutMs })
+    operations.push({ before: node.timeoutMs, field: 'timeoutMs', kind: 'graph.node.field.set', nodeId, value: settings.timeoutMs })
   }
   return operations
 }
 
-export function setInputValue(
-  content: RevisionContent,
-  target: GraphTarget,
-  nodeId: string,
-  handle: string,
-  value: JsonValue | undefined,
-): readonly ChangeOperation[] | undefined {
-  return setInputValues(content, target, nodeId, { [handle]: value })
+export function setInputValue(content: RevisionContent, nodeId: string, handle: string, value: JsonValue | undefined): readonly ChangeOperation[] | undefined {
+  return setInputValues(content, nodeId, { [handle]: value })
 }
 
 export function setInputValues(
   content: RevisionContent,
-  target: GraphTarget,
   nodeId: string,
   values: Readonly<Record<string, JsonValue | undefined>>,
 ): readonly ChangeOperation[] | undefined {
-  const node = graph(content, target)?.nodes[nodeId]
+  const node = content.document.graph?.nodes[nodeId]
   if (node == null || !('inputs' in node)) return
   const operations: ChangeOperation[] = []
   for (const [handle, value] of Object.entries(values)) {
     const before = nodeInputMappings(node)[handle]
     const next = fixedInputValue(value)
     if (dequal(before, next)) continue
-    operations.push({ before, handle, kind: 'graph.node.input.set', nodeId, target, value: next })
+    operations.push({ before, handle, kind: 'graph.node.input.set', nodeId, value: next })
   }
   return cleanVariableBindings(content, operations)
 }
 
 /** Restore inheritance for this form in one undoable change. */
-export function resetInputValues(content: RevisionContent, target: GraphTarget, nodeId: string, handles: readonly string[]): readonly ChangeOperation[] {
-  const node = graph(content, target)?.nodes[nodeId]
+export function resetInputValues(content: RevisionContent, nodeId: string, handles: readonly string[]): readonly ChangeOperation[] {
+  const node = content.document.graph?.nodes[nodeId]
   if (node == null || !('inputs' in node)) return []
   const mappings = nodeInputMappings(node)
   return cleanVariableBindings(
     content,
     [...new Set(handles)].flatMap((handle): ChangeOperation[] =>
-      mappings[handle] == null ? [] : [{ kind: 'graph.node.input.set', target, nodeId, handle, before: mappings[handle], value: undefined }],
+      mappings[handle] == null ? [] : [{ kind: 'graph.node.input.set', nodeId, handle, before: mappings[handle], value: undefined }],
     ),
   )
 }
 
 export function setInputSources(
   content: RevisionContent,
-  target: GraphTarget,
   nodeId: string,
   handle: string,
   sources: Extract<InputMapping, { readonly kind: 'sources' }>['sources'],
 ): readonly ChangeOperation[] {
-  const node = (target.kind == 'flow' ? content.document.graph : content.document.subflows[target.id]?.graph)?.nodes[nodeId]
+  const node = content.document.graph?.nodes[nodeId]
   if (node == null || !('inputs' in node)) return []
   return cleanVariableBindings(content, [
-    { kind: 'graph.node.input.set', nodeId, handle, target, before: nodeInputMappings(node)[handle], value: { kind: 'sources', sources } },
+    { kind: 'graph.node.input.set', nodeId, handle, before: nodeInputMappings(node)[handle], value: { kind: 'sources', sources } },
   ])
 }
 
 export function setInputVariable(
   content: RevisionContent,
-  target: GraphTarget,
   nodeId: string,
   handle: string,
   name: string,
   bindingId: string,
 ): readonly ChangeOperation[] | undefined {
-  const node = graph(content, target)?.nodes[nodeId]
+  const node = content.document.graph?.nodes[nodeId]
   if (node == null || !('inputs' in node)) return
   const mapping = nodeInputMappings(node)[handle]
   const currentId =
@@ -451,7 +417,7 @@ export function setInputVariable(
   const next: InputMapping = { kind: 'sources', sources: [{ bindingId, kind: 'binding' }] }
   return [
     { binding: { kind: 'variable', target: name }, bindingId, kind: 'binding.create' },
-    ...cleanVariableBindings(content, [{ before: mapping, handle, kind: 'graph.node.input.set', nodeId, target, value: next }]),
+    ...cleanVariableBindings(content, [{ before: mapping, handle, kind: 'graph.node.input.set', nodeId, value: next }]),
   ]
 }
 
@@ -472,40 +438,43 @@ function bindingReferences(document: RevisionContent['document']): Map<string, n
   const add = (bindingId: string): void => {
     references.set(bindingId, (references.get(bindingId) ?? 0) + 1)
   }
-  for (const currentGraph of [document.graph, ...Object.values(document.subflows).map((subflow) => subflow.graph)]) {
-    for (const node of Object.values(currentGraph.nodes)) {
-      if (!('inputs' in node)) continue
-      const inputs = Object.values(nodeInputMappings(node))
-      for (const mapping of inputs) {
-        if (mapping.kind != 'sources') continue
-        for (const source of mapping.sources) if (source.kind == 'binding') add(source.bindingId)
-      }
+  for (const node of Object.values(document.graph.nodes)) {
+    if (!('inputs' in node)) continue
+    const inputs = Object.values(nodeInputMappings(node))
+    for (const mapping of inputs) {
+      if (mapping.kind != 'sources') continue
+      for (const source of mapping.sources) if (source.kind == 'binding') add(source.bindingId)
     }
   }
   return references
 }
 
-export function setConnectorConnection(content: RevisionContent, taskId: string, connectionId: string | undefined): readonly ChangeOperation[] | undefined {
-  const task = content.document.tasks[taskId]
-  if (task == null || !('executor' in task) || task.executor.kind != 'connector') return
+export function setConnectorConnection(content: RevisionContent, nodeId: string, connectionId: string | undefined): readonly ChangeOperation[] | undefined {
+  const node = content.document.graph.nodes[nodeId]
+  if (node?.kind != 'task' || !('executor' in node.task) || node.task.executor.kind != 'connector') return
+  const task = node.task
+  if (task.executor.kind != 'connector') return
   if (task.executor.connectionId == connectionId) return []
-  return [{ before: task.executor.connectionId, kind: 'task.connector.connection.set', taskId, value: connectionId }]
+  const { connectionId: _, ...executor } = task.executor
+  return [
+    {
+      before: task,
+      kind: 'graph.node.task.set',
+      nodeId,
+      value: { ...task, executor: { ...executor, ...(connectionId == null ? {} : { connectionId }) } },
+    },
+  ]
 }
 
-export function updateTrigger(
-  content: RevisionContent,
-  target: { readonly kind: 'flow' },
-  nodeId: string,
-  settings: TriggerSettings,
-): readonly ChangeOperation[] | undefined {
+export function updateTrigger(content: RevisionContent, nodeId: string, settings: TriggerSettings): readonly ChangeOperation[] | undefined {
   const trigger = content.document.graph.nodes[nodeId]
   if (trigger == null) return
   const operations: ChangeOperation[] = []
   if (trigger.name != settings.name) {
-    operations.push({ before: trigger.name, field: 'name', kind: 'graph.node.field.set', nodeId, target, value: settings.name })
+    operations.push({ before: trigger.name, field: 'name', kind: 'graph.node.field.set', nodeId, value: settings.name })
   }
   if (trigger.description != settings.description) {
-    operations.push({ before: trigger.description, field: 'description', kind: 'graph.node.field.set', nodeId, target, value: settings.description })
+    operations.push({ before: trigger.description, field: 'description', kind: 'graph.node.field.set', nodeId, value: settings.description })
   }
   switch (settings.kind) {
     case 'error':
@@ -520,7 +489,7 @@ export function updateTrigger(
         options: Object.keys(settings.options).length == 0 ? undefined : settings.options,
       }
       const before = { bodyFields: trigger.bodyFields, method: trigger.method, options: trigger.options }
-      if (!dequal(before, value)) operations.push({ before, kind: 'graph.node.webhook.set', nodeId, target, value })
+      if (!dequal(before, value)) operations.push({ before, kind: 'graph.node.webhook.set', nodeId, value })
       break
     }
     case 'cron':
@@ -554,7 +523,6 @@ export function updateTrigger(
 
 export function updateTriggerConfig(
   content: RevisionContent,
-  _target: { readonly kind: 'flow' },
   nodeId: string,
   name: string,
   value: JsonValue | undefined,
@@ -566,12 +534,7 @@ export function updateTriggerConfig(
   return [{ before: trigger.config[name], kind: 'graph.trigger.config.set', name, nodeId, value: next }]
 }
 
-export function updateTriggerSchedule(
-  content: RevisionContent,
-  _target: { readonly kind: 'flow' },
-  nodeId: string,
-  schedule: readonly TriggerSchedule[],
-): readonly ChangeOperation[] | undefined {
+export function updateTriggerSchedule(content: RevisionContent, nodeId: string, schedule: readonly TriggerSchedule[]): readonly ChangeOperation[] | undefined {
   const trigger = content.document.graph.nodes[nodeId]
   if (trigger == null) return
   switch (trigger.kind) {
@@ -588,20 +551,11 @@ export function updateTriggerSchedule(
   }
 }
 
-export function setTriggerConnection(
-  content: RevisionContent,
-  target: { readonly kind: 'flow' },
-  nodeId: string,
-  connectionId: string | undefined,
-): readonly ChangeOperation[] | undefined {
+export function setTriggerConnection(content: RevisionContent, nodeId: string, connectionId: string | undefined): readonly ChangeOperation[] | undefined {
   const trigger = content.document.graph.nodes[nodeId]
   if (trigger == null || (trigger.kind != 'poll' && trigger.kind != 'integration')) return
   if (trigger.connectionId == connectionId) return []
-  return [{ before: trigger.connectionId, kind: 'graph.node.field.set', field: 'connectionId', nodeId, target, value: connectionId }]
-}
-
-function graph(content: RevisionContent, target: GraphTarget) {
-  return target.kind == 'flow' ? content.document.graph : content.document.subflows[target.id]?.graph
+  return [{ before: trigger.connectionId, kind: 'graph.node.field.set', field: 'connectionId', nodeId, value: connectionId }]
 }
 
 function defaultInputs(ports: TaskDefinition['inputs']): Readonly<Record<string, InputMapping>> {
@@ -616,23 +570,17 @@ function llmInputValue(values: LlmTaskOptions['inputs'], handle: LlmInputHandle,
   return values != null && Object.hasOwn(values, handle) ? values[handle]! : fallback
 }
 
-export function setCodeActions(
-  content: RevisionContent,
-  target: GraphTarget,
-  nodeId: string,
-  capabilities: readonly ConnectorCapability[],
-): readonly ChangeOperation[] | undefined {
-  const selected = target.kind == 'flow' ? content.document.graph : content.document.subflows[target.id]?.graph
+export function setCodeActions(content: RevisionContent, nodeId: string, capabilities: readonly ConnectorCapability[]): readonly ChangeOperation[] | undefined {
+  const selected = content.document.graph
   const node = selected?.nodes[nodeId]
-  if (node?.kind != 'task' || node.task == null || dequal(node.task.capabilities ?? [], capabilities)) return
-  return [{ kind: 'graph.node.task.capabilities.set', target, nodeId, before: node.task.capabilities, value: capabilities }]
+  if (node?.kind != 'task' || !('moduleId' in node.task) || dequal(node.task.capabilities ?? [], capabilities)) return
+  return [{ kind: 'graph.node.task.capabilities.set', nodeId, before: node.task.capabilities, value: capabilities }]
 }
 
 export function createDecisionTask(
-  target: GraphTarget,
-  identity: { readonly nodeId: string; readonly taskId: string },
+  identity: { readonly nodeId: string },
   name = 'AI Decision',
   questions?: readonly DecisionQuestion[],
 ): readonly ChangeOperation[] {
-  return createManagedTask(target, identity, decisionTask(questions, name))
+  return createManagedTask(identity, decisionTask(questions, name))
 }

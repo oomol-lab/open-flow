@@ -8,7 +8,6 @@ export const NODE_TYPES: NodeTypes = {
   default: BasicNode,
   [NODE_TYPE.TaskNode]: BasicNode,
   [NODE_TYPE.ValueNode]: BasicNode,
-  [NODE_TYPE.SubflowNode]: BasicNode,
   [NODE_TYPE.ConditionNode]: BasicNode,
   [NODE_TYPE.CommentNode]: BasicNode,
   [NODE_TYPE.TriggerNode]: BasicNode,

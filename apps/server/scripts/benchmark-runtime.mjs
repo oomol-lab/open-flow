@@ -137,8 +137,6 @@ if (typeof IsolatedVmHost.prototype.run == 'function') {
       },
     },
     modules: { main: { imports: [], name: 'Main', source: 'export default () => ({ value: 1 })' } },
-    subflows: {},
-    tasks: {},
   }
   let runId = 0
   const run = () =>

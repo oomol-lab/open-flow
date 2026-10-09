@@ -1,3 +1,5 @@
+import type { TaskNode } from '../../../../flow/common/change.ts'
+import type { ManagedTaskDefinition } from '../../../../flow/common/change.ts'
 import type { Draft } from '../api.ts'
 
 import { expect, it } from 'vitest'
@@ -16,20 +18,23 @@ it('keeps queued deletions distinct from additions and associates undo feedback 
     finish = resolve
   })
   const feedback: (string | undefined)[] = []
-  const queue = new TaskExecutorChanges<string>(current.content.document.tasks.decision!.executor, async (before, value, removed) => {
-    if (!feedback.length) await firstWrite
-    if (before.kind !== 'decision' || value.kind !== 'decision') throw new Error('Expected Decision')
-    const task = decisionTask(value.questions)
-    const operations = updateTask(revisionView(current), { kind: 'flow' }, 'decision', {
-      kind: 'decision',
-      name: task.name,
-      before: decisionTask(before.questions),
-      task,
-    })!
-    current = applyFlowChanges(current, operations)
-    feedback.push(removed)
-    return true
-  })
+  const queue = new TaskExecutorChanges<string>(
+    ((current.content.document.graph.nodes['decision'] as TaskNode).task as ManagedTaskDefinition)!.executor,
+    async (before, value, removed) => {
+      if (!feedback.length) await firstWrite
+      if (before.kind !== 'decision' || value.kind !== 'decision') throw new Error('Expected Decision')
+      const task = decisionTask(value.questions)
+      const operations = updateTask(revisionView(current), 'decision', {
+        kind: 'decision',
+        name: task.name,
+        before: decisionTask(before.questions),
+        task,
+      })!
+      current = applyFlowChanges(current, operations)
+      feedback.push(removed)
+      return true
+    },
+  )
   queue.value = decisionTask([{ name: 'result', type: 'noul', instructions: 'Updated requirements' }]).executor
   const saved = queue.save()
   queue.value = decisionTask([]).executor
@@ -39,7 +44,7 @@ it('keeps queued deletions distinct from additions and associates undo feedback 
   finish(true)
   expect(await saved).toBe(true)
   expect(feedback).toEqual([undefined, 'result', undefined])
-  expect(current.content.document.tasks.decision!.executor).toEqual(queue.value)
+  expect(((current.content.document.graph.nodes['decision'] as TaskNode).task as ManagedTaskDefinition)!.executor).toEqual(queue.value)
   expect(current.content.document.graph.nodes.route).toMatchObject({
     cases: [{ groups: [{ expressions: [{ left: { source: { output: 'result' } } }] }] }],
   })
@@ -93,11 +98,15 @@ function draft(): Draft {
       modules: {},
       document: {
         bindings: {},
-        subflows: {},
-        tasks: { decision: decisionTask([{ name: 'result', type: 'noul', instructions: 'Needs support?' }]) },
+
         graph: {
           nodes: {
-            decision: { kind: 'task', name: 'AI Decision', taskId: 'decision', inputs: { target: { kind: 'value', value: 'Help' } } },
+            decision: {
+              kind: 'task',
+              name: 'AI Decision',
+              task: decisionTask([{ name: 'result', type: 'noul', instructions: 'Needs support?' }]),
+              inputs: { target: { kind: 'value', value: 'Help' } },
+            },
             route: {
               kind: 'condition',
               name: 'Route',
@@ -130,10 +139,10 @@ function draft(): Draft {
 it('renames answer references in Condition and restores the entire edit with undo', () => {
   const before = draft()
   const task = decisionTask([{ name: 'needs_support', type: 'noul', instructions: 'Needs support?' }])
-  const operations = updateTask(revisionView(before), { kind: 'flow' }, 'decision', {
+  const operations = updateTask(revisionView(before), 'decision', {
     kind: 'decision',
     name: task.name,
-    before: before.content.document.tasks.decision!,
+    before: ((before.content.document.graph.nodes['decision'] as TaskNode).task as ManagedTaskDefinition)!,
     task,
   })!
   const after = applyFlowChanges(before, operations)
@@ -142,36 +151,40 @@ it('renames answer references in Condition and restores the entire edit with und
   })
   expect(applyFlowChanges(after, inverseFlowChanges(before.content, operations)).content).toEqual(before.content)
 })
-it('preserves missing references after deletion and copies node references using the existing shared Managed Task contract', () => {
+it('preserves missing references after deletion and copies node-owned configurations and their references', () => {
   const before = draft()
   const task = decisionTask([])
   const removed = applyFlowChanges(
     before,
-    updateTask(revisionView(before), { kind: 'flow' }, 'decision', {
+    updateTask(revisionView(before), 'decision', {
       kind: 'decision',
       name: task.name,
-      before: before.content.document.tasks.decision!,
+      before: ((before.content.document.graph.nodes['decision'] as TaskNode).task as ManagedTaskDefinition)!,
       task,
     })!,
   )
   expect(removed.content.document.graph.nodes.route).toMatchObject({ cases: [{ groups: [{ expressions: [{ left: { source: { output: 'result' } } }] }] }] })
   const view = revisionView(before)
   let sequence = 0
-  const pasted = pasteNodes(view, { kind: 'flow' }, copyNodes(view, { kind: 'flow' }, ['decision', 'route']), () => `copy-${++sequence}`)
+  const pasted = pasteNodes(view, copyNodes(view, ['decision', 'route']), () => `copy-${++sequence}`)
   const after = applyFlowChanges(before, pasted.changes)
-  expect(Object.values(after.content.document.tasks).filter((item) => item.executor.kind === 'decision')).toHaveLength(1)
-  expect(after.content.document.graph.nodes[pasted.nodeIds[0]!]).toMatchObject({ taskId: 'decision' })
+  expect(
+    Object.values(after.content.document.graph.nodes).filter(
+      (node) => node.kind === 'task' && 'executor' in node.task && node.task.executor.kind === 'decision',
+    ),
+  ).toHaveLength(2)
+  expect(after.content.document.graph.nodes[pasted.nodeIds[0]!]).toMatchObject({ task: (before.content.document.graph.nodes.decision as TaskNode).task })
   expect(after.content.document.graph.nodes[pasted.nodeIds[1]!]).toMatchObject({
     cases: [{ groups: [{ expressions: [{ left: { source: { nodeId: pasted.nodeIds[0], output: 'result', field: 'noul' } } }] }] }],
   })
   expect(pasted.nodeIds).toHaveLength(2)
 })
 
-it('renames references to every shared task instance, including subflow exports', () => {
+it('renames only the edited node and preserves copied configurations and references', () => {
   const initial = draft()
   const view = revisionView(initial)
   let sequence = 0
-  const pasted = pasteNodes(view, { kind: 'flow' }, copyNodes(view, { kind: 'flow' }, ['decision', 'route']), () => `copy-${++sequence}`)
+  const pasted = pasteNodes(view, copyNodes(view, ['decision', 'route']), () => `copy-${++sequence}`)
   const copied = applyFlowChanges(initial, pasted.changes)
   const before: Draft = {
     ...copied,
@@ -179,31 +192,21 @@ it('renames references to every shared task instance, including subflow exports'
       ...copied.content,
       document: {
         ...copied.content.document,
-        subflows: {
-          child: {
-            name: 'Child',
-            inputs: [],
-            outputs: [{ handle: 'answer', jsonSchema: { type: 'object' }, nullable: false, sources: [{ kind: 'node', nodeId: 'decision', output: 'result' }] }],
-            graph: initial.content.document.graph,
-          },
-        },
       },
     },
   }
   const task = decisionTask([{ name: 'support', type: 'noul', instructions: 'Needs support?' }])
-  const operations = updateTask(revisionView(before), { kind: 'flow' }, 'decision', {
+  const operations = updateTask(revisionView(before), 'decision', {
     kind: 'decision',
     name: task.name,
-    before: before.content.document.tasks.decision!,
+    before: ((before.content.document.graph.nodes['decision'] as TaskNode).task as ManagedTaskDefinition)!,
     task,
   })!
   const after = applyFlowChanges(before, operations)
-  for (const graph of [after.content.document.graph, after.content.document.subflows.child!.graph]) {
-    for (const node of Object.values(graph.nodes)) {
-      if (node.kind === 'condition')
-        expect(node).toMatchObject({ cases: [{ groups: [{ expressions: [{ left: { source: { output: 'support', field: 'noul' } } }] }] }] })
-    }
-  }
-  expect(after.content.document.subflows.child!.outputs[0]!.sources[0]).toMatchObject({ output: 'support' })
+  expect(after.content.document.graph.nodes.route).toMatchObject({
+    cases: [{ groups: [{ expressions: [{ left: { source: { output: 'support', field: 'noul' } } }] }] }],
+  })
+  for (const id of pasted.nodeIds) expect(after.content.document.graph.nodes[id]).toEqual(before.content.document.graph.nodes[id])
+  expect(after.content.document.graph.nodes.decision).toHaveProperty('task.outputs.0.handle', 'support')
   expect(applyFlowChanges(after, inverseFlowChanges(before.content, operations)).content).toEqual(before.content)
 })

@@ -1,5 +1,4 @@
 import type { TFunction } from 'val-i18n'
-import type { GraphTarget } from '../../../../flow/common/change.ts'
 import type { Diagnostic, FlowCheck, GraphNode } from '../api.ts'
 import type { ResolvedSelection, RevisionView } from '../revisionView.ts'
 
@@ -55,12 +54,6 @@ export function diagnosticMessage(
         })
       }
     }
-    if (diagnostic.code == 'graph.flow-input-incompatible' && target != null && typeof diagnostic.values?.input == 'string') {
-      return t('diagnostics.messages.graph.flow-input-schema-incompatible', { input: diagnostic.values.input, issue, target })
-    }
-    if (diagnostic.code == 'graph.subflow-output-incompatible' && typeof diagnostic.values?.output == 'string') {
-      return t('diagnostics.messages.graph.subflow-output-schema-incompatible', { issue, output: diagnostic.values.output })
-    }
   }
   const variant = diagnostic.values?.variant
   const key = `diagnostics.messages.${diagnostic.code}${typeof variant == 'string' ? `.${variant}` : ''}`
@@ -68,7 +61,7 @@ export function diagnosticMessage(
   const title = nodeId == null ? undefined : nodeTitle?.(nodeId)
   let values = title == null ? diagnostic.values : { ...diagnostic.values, nodeId: title }
   if (diagnostic.code == 'task.connector-connection-required' && affectedNodeTitle != null) {
-    values = { ...values, taskId: affectedNodeTitle }
+    values = { ...values, nodeId: affectedNodeTitle }
   }
   const translated = t(key, values)
   return translated == key ? diagnostic.message : translated
@@ -80,14 +73,13 @@ function within(path: string, candidate: string): boolean {
 
 export function deriveInspectorDiagnostics(
   revision: RevisionView | undefined,
-  target: GraphTarget | undefined,
   diagnostics: FlowCheck | undefined,
   selection: ResolvedSelection | undefined,
 ): readonly Diagnostic[] {
-  if (revision == null || target == null || diagnostics == null || diagnostics.revisionId != revision.revision.revisionId) return []
-  if (selection != null) return diagnosticsForNode(target, selection, diagnostics.diagnostics)
-  const targetPath = target.kind == 'flow' ? '/document/graph' : `/document/subflows/${target.id}`
-  const nodePath = target.kind == 'flow' ? '/document/graph/nodes/' : `/document/subflows/${target.id}/graph/nodes/`
+  if (revision == null || diagnostics == null || diagnostics.revisionId != revision.revision.revisionId) return []
+  if (selection != null) return diagnosticsForNode(selection, diagnostics.diagnostics)
+  const targetPath = '/document/graph'
+  const nodePath = '/document/graph/nodes/'
   return diagnostics.diagnostics.filter((diagnostic) => within(targetPath, diagnostic.path) && !diagnostic.path.startsWith(nodePath))
 }
 
@@ -95,13 +87,15 @@ function scope(path: string): DiagnosticScope {
   if (path.startsWith('/modules/')) return 'code'
   if (/\/graph\/nodes\/[^/]+\/task(?:\/|$)/.test(path)) return 'task'
   if (path.includes('/graph/nodes/')) return 'node'
-  if (path.startsWith('/document/tasks/')) return 'task'
   return 'flow'
 }
 
 function nodeSection(node: GraphNode, suffix: string): InspectorSection {
   if (suffix.startsWith('/inputs/')) return node.kind === 'condition' ? 'condition' : 'inputs'
-  if (node.kind == 'task' && suffix.startsWith('/task')) return 'task'
+  if (node.kind == 'task' && suffix.startsWith('/task')) {
+    if ('executor' in node.task && node.task.executor.kind == 'connector' && suffix.startsWith('/task/executor')) return 'account'
+    return 'task'
+  }
   if ((node.kind == 'poll' || node.kind == 'integration') && suffix.startsWith('/connectionId')) return 'account'
   if (node.kind == 'condition' && (suffix.startsWith('/cases/') || suffix.startsWith('/input') || suffix.startsWith('/matchMode'))) {
     return 'condition'
@@ -109,14 +103,14 @@ function nodeSection(node: GraphNode, suffix: string): InspectorSection {
   return 'node'
 }
 
-function location(revision: RevisionView | undefined, target: GraphTarget | undefined, diagnostic: Diagnostic): DiagnosticLocation | undefined {
-  if (revision == null || target == null) return
-  const graphPrefix = target.kind == 'flow' ? '/document/graph/nodes/' : `/document/subflows/${target.id}/graph/nodes/`
+function location(revision: RevisionView | undefined, diagnostic: Diagnostic): DiagnosticLocation | undefined {
+  if (revision == null) return
+  const graphPrefix = '/document/graph/nodes/'
   if (diagnostic.path.startsWith(graphPrefix)) {
     const path = diagnostic.path.slice(graphPrefix.length)
     const slash = path.indexOf('/')
     const nodeId = slash < 0 ? path : path.slice(0, slash)
-    const node = revision.node(target, nodeId)
+    const node = revision.node(nodeId)
     if (node != null)
       return {
         nodeId,
@@ -125,44 +119,30 @@ function location(revision: RevisionView | undefined, target: GraphTarget | unde
     return
   }
 
-  const taskMatch = /^\/document\/tasks\/([^/]+)(.*)$/.exec(diagnostic.path)
-  if (taskMatch != null) {
-    const nodeId = revision.findTaskNode(target, new Set([taskMatch[1]!]))
-    if (nodeId == null) return
-    const suffix = taskMatch[2]!
-    return {
-      nodeId,
-      section: revision.task(taskMatch[1]!)?.executor.kind == 'agent' ? 'task' : suffix.startsWith('/executor') ? 'account' : 'task',
-    }
-  }
-
   const moduleMatch = /^\/modules\/([^/]+)\/source$/.exec(diagnostic.path)
   if (moduleMatch != null) {
-    const nodeId = revision.findModuleNode(target, moduleMatch[1]!)
+    const nodeId = revision.findModuleNode(moduleMatch[1]!)
     if (nodeId != null) return { nodeId, section: 'module' }
   }
 }
 
-export function diagnosticItems(revision: RevisionView | undefined, target: GraphTarget | undefined, check: FlowCheck | undefined): readonly DiagnosticItem[] {
+export function diagnosticItems(revision: RevisionView | undefined, check: FlowCheck | undefined): readonly DiagnosticItem[] {
   return (
     check?.diagnostics.map((diagnostic) => ({
       diagnostic,
-      location: location(revision, target, diagnostic),
+      location: location(revision, diagnostic),
       scope: scope(diagnostic.path),
     })) ?? []
   )
 }
 
-function diagnosticsForNode(target: GraphTarget, node: ResolvedSelection, diagnostics: readonly Diagnostic[]): readonly Diagnostic[] {
-  const nodePath = target.kind == 'flow' ? `/document/graph/nodes/${node.id}` : `/document/subflows/${target.id}/graph/nodes/${node.id}`
+function diagnosticsForNode(node: ResolvedSelection, diagnostics: readonly Diagnostic[]): readonly Diagnostic[] {
+  const nodePath = `/document/graph/nodes/${node.id}`
   const paths = [nodePath]
   if (node.kind == 'task') {
-    if (node.node.task != null) paths.push(`${nodePath}/task`)
-    else paths.push(`/document/tasks/${node.node.taskId}`)
+    if ('moduleId' in node.node.task) paths.push(`${nodePath}/task`)
     const moduleId = node.definition != null && 'moduleId' in node.definition ? node.definition.moduleId : undefined
     if (moduleId != null) paths.push(`/modules/${moduleId}`)
-  } else if (node.kind == 'subflow') {
-    paths.push(`/document/subflows/${node.node.subflowId}`)
   }
   return diagnostics.filter((diagnostic) => paths.some((path) => within(path, diagnostic.path)))
 }

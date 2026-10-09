@@ -21,8 +21,6 @@ const draft = {
     document: {
       bindings: {},
       graph: { edges: [], nodes: {} },
-      subflows: {},
-      tasks: {},
     },
     modelVersion: currentFlowModelVersion,
     modules: {},
@@ -165,7 +163,6 @@ describe('WorkspaceStore', () => {
       await store.start('missing-flow')
 
       expect(store.$.flowId.value).toBe('missing-flow')
-      expect(store.$.target.value).toEqual({ kind: 'flow' })
       expect(store.$.workspaceLoadFailed.value).toBe(true)
       expect(store.$.workspaceLoadProblem.value).toMatchObject({ kind: 'failed' })
       expect(setNotice).not.toHaveBeenCalled()

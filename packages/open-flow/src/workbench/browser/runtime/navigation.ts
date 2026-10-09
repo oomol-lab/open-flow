@@ -73,18 +73,6 @@ export class NavigationStore {
     }
   }
 
-  public async createSubflow(name: string): Promise<boolean> {
-    const change = ++this.#change
-    this.#syncing = true
-    try {
-      const created = await this.#store.workspace.createResource(name)
-      if (created && change == this.#change) this.#write('design', false)
-      return created
-    } finally {
-      if (change == this.#change) this.#syncing = false
-    }
-  }
-
   public async selectFlow(flow: Flow): Promise<void> {
     const change = ++this.#change
     this.#syncing = true
@@ -97,7 +85,7 @@ export class NavigationStore {
   }
 
   public openMainFlow(): void {
-    if (this.#store.workspace.selectTarget({ kind: 'flow' })) this.#write('design', false)
+    this.#write('design', false)
   }
 
   public async openFlows(): Promise<void> {

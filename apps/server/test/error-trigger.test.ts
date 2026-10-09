@@ -53,8 +53,7 @@ function fixture(capacity = 10) {
         modules: {},
         document: {
           bindings: {},
-          subflows: {},
-          tasks: {},
+
           graph: { nodes: { start: kind == 'error' ? { kind, name: 'Start', sourceFlowIds } : { kind, name: 'Start' } }, edges: [] },
         },
       }

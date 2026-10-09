@@ -21,7 +21,7 @@ function revision(graph: Graph): RevisionContent {
   return {
     modelVersion: currentFlowModelVersion,
     modules: { counter: { name: 'Counter', imports: [], source: 'export default () => ({ count: 1 })' } },
-    document: { bindings: {}, tasks: {}, subflows: {}, graph },
+    document: { bindings: {}, graph },
   }
 }
 async function prepare(source: RevisionContent) {
@@ -291,30 +291,6 @@ describe('Repeated node executions', () => {
     expect(requests).toHaveLength(2)
     expect(notifications()).toHaveLength(2)
     expect(events.filter((event) => event.type == 'node.completed' && event.nodeId == 'pause')).toHaveLength(2)
-  })
-
-  it('shares the per-node budget across repeated calls of a Subflow in one Run', async () => {
-    const source = revision({
-      nodes: {
-        start: { kind: 'manual', name: 'Start' },
-        a: { kind: 'subflow', inputs: {}, subflowId: 'sub' },
-        b: { kind: 'subflow', inputs: {}, subflowId: 'sub' },
-      },
-      edges: [
-        { source: 'start', target: 'a' },
-        { source: 'start', target: 'b' },
-      ],
-    })
-    const prepared = await prepare({
-      ...source,
-      document: {
-        ...source.document,
-        subflows: {
-          sub: { name: 'Sub', inputs: [], outputs: [], graph: { edges: [], nodes: { limited: { kind: 'value', inputs: {}, values: [], maxExecutions: 1 } } } },
-        },
-      },
-    })
-    await expect(Effect.runPromise(runFlow(prepared, options()))).rejects.toThrow('maximum execution count (1)')
   })
 })
 
