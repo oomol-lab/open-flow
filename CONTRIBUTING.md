@@ -26,6 +26,31 @@ Server on `http://127.0.0.1:3001`. The first run writes an operator token to
 `apps/server/.open-flow-dev/operator-token`; later runs reuse it. Set `OPEN_FLOW_TOKEN` to use an
 explicit token instead.
 
+## Local Flow CLI and skill
+
+With `bun run dev` already running, use the production Flow commands from the repository root:
+
+```bash
+bun run flow -- list --json
+bun run flow -- read FLOW_ID --json
+bun run flow -- edit FLOW_ID --file edits.json --json
+bun run skill:generate
+```
+
+The CLI shares the development API port (`OPEN_FLOW_PORT`, default `3001`) and reads the root `.env`.
+It uses `OPEN_FLOW_TOKEN`, or reads the existing `apps/server/.open-flow-dev/operator-token`.
+It never starts the Server or creates a token. Workbench links use `http://localhost:5174`.
+To connect to another deployment, set both `OPEN_FLOW_URL` and `OPEN_FLOW_TOKEN`; an explicit URL
+never falls back to the local token. Help, version and local schemas work without a Server.
+
+`skill:generate` renders the maintained npm skill resources with `agentic-markdown` into
+`.agents/skills/open-flow/`. This generated directory is Git-ignored. Regenerate after editing
+`packages/open-flow/skills/open-flow/`; reload your agent's skills as required by that agent.
+The generated skill uses `bun run flow --`. The oo CLI renders the same references with `oo flow`.
+A successful generation or scripted scenario proves packaging and command behavior, not agent
+quality. Evaluate the generated skill with real tasks against an isolated deployment before
+claiming its authoring strategy succeeds.
+
 ## CLI Lab
 
 Run `bun run lab start fix-notification` for an isolated CLI session with a read-only workflow preview, mock accounts and

@@ -30,6 +30,8 @@
     "vitest": "^5.0.0"
   },
   "exports": {
-    "./lab": "./src/cli/node/lab.ts"
+    "./lab": "./src/cli/node/lab.ts",
+    "./development": "./src/cli/node/runtime.ts",
+    "./package.json": "./package.json"
   }
 }

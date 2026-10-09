@@ -105,13 +105,13 @@ const optionDetails: Record<
   'help': { description: 'Show this command contract without contacting the host.' },
 }
 
-export function commandHelp(path: readonly string[]) {
+export function commandHelp(path: readonly string[], prefix = 'oo flow') {
   const name = path.join(' ')
   return commands
     .filter(([key]) => name == '' || key == name || key.startsWith(`${name} `))
     .map(([key, operands, flags]) => ({
       command: key,
-      usage: `oo flow ${key} ${operands} [--json]`,
+      usage: `${prefix} ${key} ${operands} [--json]`,
       options: [...flags, 'json', 'help'].map((flag) =>
         Object.assign(
           {
@@ -158,23 +158,27 @@ export function commandContract(name: string) {
   return authoringRequestContract(name)
 }
 
-export function examplesForCommand(name: string) {
+export function examplesForCommand(name: string, prefix = 'oo flow') {
   if (name == 'schema')
-    return ['oo flow schema read --json', 'oo flow schema agent --json', `oo flow schema --flow FLOW_ID --input '{"action":"ACTION_ID"}' --json`]
+    return [`${prefix} schema read --json`, `${prefix} schema agent --json`, `${prefix} schema --flow FLOW_ID --input '{"action":"ACTION_ID"}' --json`]
   const contract = commandContract(name)
-  if (contract == null) return commandExamples
-  if (name == 'check') return ['oo flow check FLOW_ID --revision REVISION --json']
-  return contract.examples.map((example) => `oo flow ${name} FLOW_ID${Object.keys(example).length == 0 ? '' : ` --input '${JSON.stringify(example)}'`} --json`)
+  if (contract == null) return commandExamples(prefix)
+  if (name == 'check') return [`${prefix} check FLOW_ID --revision REVISION --json`]
+  return contract.examples.map(
+    (example) => `${prefix} ${name} FLOW_ID${Object.keys(example).length == 0 ? '' : ` --input '${JSON.stringify(example)}'`} --json`,
+  )
 }
 
-export const commandExamples = [
-  'oo flow list --limit 20 --json',
-  'oo flow read FLOW_ID --json',
-  'oo flow schema code --json',
-  'oo flow edit FLOW_ID --file edits.json --json',
-  'oo flow connector search email --flow FLOW_ID --json',
-  'oo flow run FLOW_ID --expected-revision REVISION_ID --idempotency-key RUN_KEY --wait --timeout 60000 --json',
-  'oo flow runs wait RUN_ID --timeout 60000 --json',
-  'oo flow runs resolve RUN_ID WAIT_ID approve --json',
-  'oo flow runs events RUN_ID --after 0 --follow --timeout 60000 --json',
-]
+function commandExamples(prefix: string) {
+  return [
+    `${prefix} list --limit 20 --json`,
+    `${prefix} read FLOW_ID --json`,
+    `${prefix} schema code --json`,
+    `${prefix} edit FLOW_ID --file edits.json --json`,
+    `${prefix} connector search email --flow FLOW_ID --json`,
+    `${prefix} run FLOW_ID --expected-revision REVISION_ID --idempotency-key RUN_KEY --wait --timeout 60000 --json`,
+    `${prefix} runs wait RUN_ID --timeout 60000 --json`,
+    `${prefix} runs resolve RUN_ID WAIT_ID approve --json`,
+    `${prefix} runs events RUN_ID --after 0 --follow --timeout 60000 --json`,
+  ]
+}

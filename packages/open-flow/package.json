@@ -55,7 +55,11 @@
     "./preview": "./src/workbench/browser/runtime/openFlowPreview.tsx",
     "./preview.css": "./src/workbench/browser/runtime/preview.css",
     "./decision": "./src/decision/common/decision.ts",
-    "./openapi": "./src/openapi/common/openapi.ts"
+    "./openapi": "./src/openapi/common/openapi.ts",
+    "./skills/open-flow/SKILL.md": "./skills/open-flow/SKILL.md",
+    "./skills/open-flow/references/flow-authoring.md": "./skills/open-flow/references/flow-authoring.md",
+    "./skills/open-flow/references/flow-n8n-conversion.md": "./skills/open-flow/references/flow-n8n-conversion.md",
+    "./package.json": "./package.json"
   },
   "scripts": {
     "build": "bun scripts/build.ts",
@@ -65,7 +69,7 @@
     "designer:build": "vite build --config dev/designer/vite.config.ts",
     "designer:deploy": "bun run designer:build && wrangler deploy --config dev/designer/wrangler.jsonc",
     "designer:dev": "vite --config dev/designer/vite.config.ts",
-    "format": "oxfmt README.md NOTICE src test scripts dev vitest.config.ts package.json tsconfig.json",
+    "format": "oxfmt README.md NOTICE skills src test scripts dev vitest.config.ts package.json tsconfig.json",
     "lint": "oxlint --deny-warnings src test scripts dev vitest.config.ts",
     "test": "bun run test:vitest",
     "test:coverage": "vitest run --config vitest.config.ts --coverage src/flow/common test/flow- test/designer/schema-compare.test.ts test/designer/schema-subset-comparer.test.ts test/provider-triggers.test.ts test/run-events.test.ts test/scheduler.test.ts test/agent.test.ts test/code-actions.test.ts test/local-wait.test.ts test/manual-trigger.test.ts test/google-drive-change-source.test.ts test/resource-name.test.ts",
@@ -73,7 +77,8 @@
     "test:package": "bun scripts/check-npm-package.ts",
     "generate:trigger-locales": "bun scripts/trigger-locales.ts",
     "check:trigger-locales": "bun scripts/trigger-locales.ts --check",
-    "generate:provider-triggers": "bun scripts/update-trigger-catalog.ts"
+    "generate:provider-triggers": "bun scripts/update-trigger-catalog.ts",
+    "skill:generate": "bun scripts/generate-skill.ts"
   },
   "devDependencies": {
     "@babel/parser": "8.0.4",
@@ -179,6 +184,7 @@
     "vitest": "^5.0.0",
     "yaml": "^2.9.0",
     "zod": "4.6.5",
-    "zustand": "^4.4.0"
+    "zustand": "^4.4.0",
+    "agentic-markdown": "0.0.4"
   }
 }

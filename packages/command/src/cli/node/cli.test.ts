@@ -50,6 +50,29 @@ function runtime(language: UiLanguage = 'en') {
 }
 
 describe('CLI', () => {
+  it('uses the host command prefix in help, examples and usage errors without contacting the Server', async () => {
+    const request = vi.fn()
+    for (const args of [
+      ['--help', '--json'],
+      ['edit', '--help', '--json'],
+      ['runs', 'show', '--json'],
+      ['open', 'flow', 'extra', '--json'],
+      ['workbench', 'flow', 'extra', '--json'],
+      ['unknown', '--json'],
+    ]) {
+      const output = runtime()
+      const code = await runCli(args, { request }, { ...output.value, commandPrefix: 'bun run flow --', scopeGuidance: ['Local Server'] })
+      expect(code).toBe(args.includes('--help') ? 0 : 1)
+      expect(output.stdout() + output.stderr()).toContain('bun run flow --')
+      expect(output.stdout() + output.stderr()).not.toContain('oo flow')
+      expect(output.stdout()).not.toContain('--team')
+    }
+    const output = runtime()
+    expect(await runCli(['schema', 'edit', '--json'], { request }, output.value)).toBe(0)
+    expect(JSON.parse(output.stdout())).toHaveProperty('request')
+    expect(request).not.toHaveBeenCalled()
+  })
+
   it('prints help without making a Control API request', async () => {
     const output = runtime()
     const request = vi.fn()

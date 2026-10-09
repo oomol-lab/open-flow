@@ -14,7 +14,7 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
     case 'read':
     case 'search':
     case 'edit': {
-      requireCount(operands, 1, `oo flow ${operation} <flow> [--input JSON|@file|-] [--file path|-] --json`)
+      requireCount(operands, 1, `${runtime.commandPrefix ?? 'oo flow'} ${operation} <flow> [--input JSON|@file|-] [--file path|-] --json`)
       const flow = await referencedFlow(client, operands[0]!)
       if (args.file != null && args.input != null) throw new CliError('cli.invalid-arguments', 'Choose --input or --file.')
       const source = args.file == null ? args.input : args.file == '-' ? '-' : `@${args.file}`
@@ -34,9 +34,10 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
       return await connectorCommand(client, flow, operands, args, runtime)
     }
     case 'event-source': {
-      if (operands.length != 1 || operands[0] != 'list') throw new CliError('cli.invalid-arguments', 'Usage: oo flow event-source list [--json]')
+      if (operands.length != 1 || operands[0] != 'list')
+        throw new CliError('cli.invalid-arguments', `Usage: ${runtime.commandPrefix ?? 'oo flow'} event-source list [--json]`)
       const sources = await client.listEventSources()
-      const guidance = 'No event sources are visible to this identity. Run "oo flow workbench" to create and verify a Feishu event source, then list again.'
+      const guidance = `No event sources are visible to this identity. Run "${runtime.commandPrefix ?? 'oo flow'} workbench" to create and verify a Feishu event source, then list again.`
       write(
         runtime,
         args.json,
@@ -73,7 +74,7 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
     }
     case 'open':
     case 'workbench': {
-      if (operands.length > 1) throw new CliError('cli.invalid-arguments', `Usage: oo flow ${operation} [flow] [--json]`)
+      if (operands.length > 1) throw new CliError('cli.invalid-arguments', `Usage: ${runtime.commandPrefix ?? 'oo flow'} ${operation} [flow] [--json]`)
       if (host.getWorkbenchUrl == null) throw new CliError('workbench.unavailable', 'This CLI host cannot provide a Workbench URL.')
       const flow = operands[0] == null ? undefined : await referencedFlow(client, operands[0])
       const url = await host.getWorkbenchUrl(flow?.flowId)
@@ -82,32 +83,32 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
       return
     }
     case 'list': {
-      requireCount(operands, 0, 'oo flow list [--json]')
+      requireCount(operands, 0, `${runtime.commandPrefix ?? 'oo flow'} list [--json]`)
       const page = await client.listFlows({ cursor: args.cursor, limit: args.limit ?? 100 })
       write(runtime, args.json, { ...page, kind: 'flow.list', version: 1 }, page.flows.map(flowText).join('\n'))
       return
     }
     case 'create': {
-      requireCount(operands, 1, 'oo flow create <name> [--json]')
+      requireCount(operands, 1, `${runtime.commandPrefix ?? 'oo flow'} create <name> [--json]`)
       const flow = await client.createFlow(checkedResourceName(operands[0]!, 'Flow'), args.idempotencyKey)
       write(runtime, args.json, { flow, idempotencyKey: args.idempotencyKey, kind: 'flow.create', version: 1 }, flowText(flow))
       return
     }
     case 'show': {
-      requireCount(operands, 1, 'oo flow show <flow> [--json]')
+      requireCount(operands, 1, `${runtime.commandPrefix ?? 'oo flow'} show <flow> [--json]`)
       const flow = await referencedFlow(client, operands[0]!)
       write(runtime, args.json, { flow, kind: 'flow.show', version: 1 }, flowText(flow))
       return
     }
     case 'rename': {
-      requireCount(operands, 2, 'oo flow rename <flow> <new-name> [--json]')
+      requireCount(operands, 2, `${runtime.commandPrefix ?? 'oo flow'} rename <flow> <new-name> [--json]`)
       const current = await referencedFlow(client, operands[0]!)
       const flow = await client.renameFlow(current.flowId, checkedResourceName(operands[1]!, 'Flow'))
       write(runtime, args.json, { flow, kind: 'flow.rename', version: 1 }, flowText(flow))
       return
     }
     case 'delete': {
-      requireCount(operands, 1, 'oo flow delete <flow> --yes [--json]')
+      requireCount(operands, 1, `${runtime.commandPrefix ?? 'oo flow'} delete <flow> --yes [--json]`)
       if (!args.yes) throw new CliError('flow.confirmation-required', 'Flow deletion requires --yes.')
       const current = await referencedFlow(client, operands[0]!)
       const flow = await client.deleteFlow(current.flowId)
@@ -116,7 +117,7 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
     }
     case 'enable':
     case 'disable': {
-      requireCount(operands, 1, `oo flow ${operation} <flow> --expected-publication <publicationId>`)
+      requireCount(operands, 1, `${runtime.commandPrefix ?? 'oo flow'} ${operation} <flow> --expected-publication <publicationId>`)
       if (args.expectedPublication == null || args.expectedPublication == 'none')
         throw new CliError('cli.invalid-arguments', '--expected-publication must identify the observed Live publication.')
       const current = await referencedFlow(client, operands[0]!)
@@ -125,7 +126,7 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
       return
     }
     case 'check': {
-      requireCount(operands, 1, 'oo flow check <flow> [--revision <revisionId>] [--json]')
+      requireCount(operands, 1, `${runtime.commandPrefix ?? 'oo flow'} check <flow> [--revision <revisionId>] [--json]`)
       const flow = await referencedFlow(client, operands[0]!)
       const revisionId = args.revision ?? flow.draftRevisionId
       const check = await client.checkAuthoring(flow.flowId, revisionId)
@@ -140,7 +141,7 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
     default:
       throw new CliError(
         'cli.invalid-arguments',
-        'Usage: oo flow <list|create|show|read|search|edit|schema|rename|delete|check|enable|disable|connector|event-source|trigger|run|runs|publish|publications|rollback|workbench>',
+        `Usage: ${runtime.commandPrefix ?? 'oo flow'} <list|create|show|read|search|edit|schema|rename|delete|check|enable|disable|connector|event-source|trigger|run|runs|publish|publications|rollback|workbench>`,
       )
   }
 }

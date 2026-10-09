@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 
 const action = await import('@oomol-lab/open-flow/connector-action')
 if (typeof action.connectorActionPorts !== 'function') throw new Error('Missing Connector Action contract.')
@@ -119,3 +120,9 @@ assert.deepEqual(
   decision.decisionAnswers([{ name: 'result', type: 'noul', instructions: 'Is it true?' }], { answers: { result: { type: 'noul', noul: 0.8 } } }),
   { result: { type: 'noul', noul: 0.8 } },
 )
+
+// Public resources must resolve in the installed tarball, not just the workspace.
+for (const name of ['SKILL.md', 'references/flow-authoring.md', 'references/flow-n8n-conversion.md']) {
+  const resource = import.meta.resolve(`@oomol-lab/open-flow/skills/open-flow/${name}`)
+  assert.ok((await readFile(new URL(resource), 'utf8')).length > 0)
+}

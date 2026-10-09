@@ -11,6 +11,7 @@ import path from 'node:path'
 import { defineConfig } from 'vite'
 import { serverPaths } from './node/transport/server-paths.ts'
 import { developmentBackendAgent, developmentBackendPlugin } from './scripts/dev.ts'
+import { developmentApiOrigin } from './scripts/development-config.ts'
 
 const serverPathPattern = `^(?:${serverPaths.join('|')})(?:/|$)`
 
@@ -49,7 +50,7 @@ export default defineConfig(({ command }) => {
     server: {
       proxy: {
         [serverPathPattern]: {
-          target: process.env.OPEN_FLOW_DEV_API_ORIGIN ?? 'http://127.0.0.1:3001',
+          target: process.env.OPEN_FLOW_DEV_API_ORIGIN ?? developmentApiOrigin(process.env),
           agent: developmentBackendAgent(),
         },
       },

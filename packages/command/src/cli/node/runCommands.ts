@@ -27,7 +27,7 @@ export async function createRunCommand(client: ControlClient, operands: readonly
   requireCount(
     operands,
     1,
-    'oo flow run <flow> [--source draft|live] [--trigger <name|id>] [--outputs <json|@file|->] [--input <json|@file|->] [--wait] [--json]',
+    `${runtime.commandPrefix ?? 'oo flow'} run <flow> [--source draft|live] [--trigger <name|id>] [--outputs <json|@file|->] [--input <json|@file|->] [--wait] [--json]`,
   )
   const flow = await referencedFlow(client, operands[0]!)
   const inputs = await runInputs(args, runtime)
@@ -72,8 +72,12 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
   const [operation, ...references] = operands
   switch (operation) {
     case 'list': {
-      requireCount(references, 0, 'oo flow runs list --flow <flow> [--status <status>] [--pending-wait] [--cursor <cursor>] [--limit <count>] [--json]')
-      if (args.flow == null) throw new CliError('cli.invalid-arguments', 'oo flow runs list requires --flow <flow>.')
+      requireCount(
+        references,
+        0,
+        `${runtime.commandPrefix ?? 'oo flow'} runs list --flow <flow> [--status <status>] [--pending-wait] [--cursor <cursor>] [--limit <count>] [--json]`,
+      )
+      if (args.flow == null) throw new CliError('cli.invalid-arguments', `${runtime.commandPrefix ?? 'oo flow'} runs list requires --flow <flow>.`)
       const flow = await referencedFlow(client, args.flow)
       const page = await client.listRuns(flow.flowId, {
         ...(args.cursor == null ? {} : { cursor: args.cursor }),
@@ -85,13 +89,13 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
       return
     }
     case 'show': {
-      requireCount(references, 1, 'oo flow runs show <run> [--json]')
+      requireCount(references, 1, `${runtime.commandPrefix ?? 'oo flow'} runs show <run> [--json]`)
       const run = await client.getRun(references[0]!)
       write(runtime, args.json, { kind: 'run.show', run, version: 1 }, runText(run))
       return
     }
     case 'wait': {
-      requireCount(references, 1, 'oo flow runs wait <run> [--timeout <milliseconds>] [--json]')
+      requireCount(references, 1, `${runtime.commandPrefix ?? 'oo flow'} runs wait <run> [--timeout <milliseconds>] [--json]`)
       const runId = references[0]!
       const deadline = Date.now() + (args.timeoutMs ?? 60_000)
       try {
@@ -109,7 +113,7 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
       }
     }
     case 'resolve': {
-      requireCount(references, 3, 'oo flow runs resolve <run> <wait> <continue|approve|reject> [--comment <text>] [--json]')
+      requireCount(references, 3, `${runtime.commandPrefix ?? 'oo flow'} runs resolve <run> <wait> <continue|approve|reject> [--comment <text>] [--json]`)
       const [runId, waitId, action] = references
       if (action != 'continue' && action != 'approve' && action != 'reject') throw new CliError('cli.invalid-arguments', 'Invalid Wait action.')
       const resolution = await client.resolveRunWait(runId!, waitId!, action, args.comment)
@@ -117,7 +121,11 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
       return
     }
     case 'events': {
-      requireCount(references, 1, 'oo flow runs events <run> [--after <sequence>] [--limit <count>] [--follow] [--timeout <milliseconds>] [--json]')
+      requireCount(
+        references,
+        1,
+        `${runtime.commandPrefix ?? 'oo flow'} runs events <run> [--after <sequence>] [--limit <count>] [--follow] [--timeout <milliseconds>] [--json]`,
+      )
       const runId = references[0]!
       let after = args.after ?? 0
       const deadline = Date.now() + (args.timeoutMs ?? 60_000)
@@ -154,13 +162,17 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
       return 3
     }
     case 'results': {
-      requireCount(references, 1, 'oo flow runs results <run> [--after <resultId>]')
+      requireCount(references, 1, `${runtime.commandPrefix ?? 'oo flow'} runs results <run> [--after <resultId>]`)
       const page = await client.listRunResults(references[0]!, args.resultAfter)
       write(runtime, args.json, { kind: 'run.results', ...page }, JSON.stringify(page))
       return
     }
     case 'read-result': {
-      requireCount(references, 2, 'oo flow runs read-result <run> <result> [--pointer <pointer>] [--offset <offset>] [--limit <limit>] [--max-bytes <bytes>]')
+      requireCount(
+        references,
+        2,
+        `${runtime.commandPrefix ?? 'oo flow'} runs read-result <run> <result> [--pointer <pointer>] [--offset <offset>] [--limit <limit>] [--max-bytes <bytes>]`,
+      )
       const page = await client.readRunResult(references[0]!, references[1]!, {
         pointer: args.pointer ?? '',
         offset: args.offset ?? 0,
@@ -171,19 +183,19 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
       return
     }
     case 'download-result': {
-      requireCount(references, 2, 'oo flow runs download-result <run> <result>')
+      requireCount(references, 2, `${runtime.commandPrefix ?? 'oo flow'} runs download-result <run> <result>`)
       const content = await client.downloadRunResult(references[0]!, references[1]!)
       runtime.stdout.write(await content.text())
       return
     }
     case 'result': {
-      requireCount(references, 1, 'oo flow runs result <run> [--json]')
+      requireCount(references, 1, `${runtime.commandPrefix ?? 'oo flow'} runs result <run> [--json]`)
       const result = await client.getRunResult(references[0]!)
       write(runtime, args.json, { kind: 'run.result', result, version: 1 }, JSON.stringify(result))
       return result.status == 'completed' ? 0 : 1
     }
     case 'cancel': {
-      requireCount(references, 1, 'oo flow runs cancel <run> [--json]')
+      requireCount(references, 1, `${runtime.commandPrefix ?? 'oo flow'} runs cancel <run> [--json]`)
       const cancellation = await client.cancelRun(references[0]!)
       write(
         runtime,
@@ -194,12 +206,15 @@ export async function runsCommand(client: ControlClient, operands: readonly stri
       return
     }
     default:
-      throw new CliError('cli.invalid-arguments', 'Usage: oo flow runs <list|show|wait|resolve|events|result|results|read-result|download-result|cancel>')
+      throw new CliError(
+        'cli.invalid-arguments',
+        `Usage: ${runtime.commandPrefix ?? 'oo flow'} runs <list|show|wait|resolve|events|result|results|read-result|download-result|cancel>`,
+      )
   }
 }
 
 export async function publishCommand(client: ControlClient, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<number | void> {
-  requireCount(operands, 1, 'oo flow publish <flow> [--json]')
+  requireCount(operands, 1, `${runtime.commandPrefix ?? 'oo flow'} publish <flow> [--json]`)
   const flow = await referencedFlow(client, operands[0]!)
   const expectedPublicationId =
     args.expectedPublication == 'none' ? null : (args.expectedPublication ?? (await client.getLive(flow.flowId)).publication?.publicationId ?? null)
@@ -246,10 +261,12 @@ export async function publishCommand(client: ControlClient, operands: readonly s
 
 export async function publicationsCommand(client: ControlClient, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<number | void> {
   const [operation, flowReference, publicationId, ...extra] = operands
-  if (flowReference == null || extra.length > 0) throw new CliError('cli.invalid-arguments', 'Usage: oo flow publications <list|show> <flow> [publication]')
+  if (flowReference == null || extra.length > 0)
+    throw new CliError('cli.invalid-arguments', `Usage: ${runtime.commandPrefix ?? 'oo flow'} publications <list|show> <flow> [publication]`)
   const flow = await referencedFlow(client, flowReference)
   if (operation == 'list') {
-    if (publicationId != null) throw new CliError('cli.invalid-arguments', 'Usage: oo flow publications list <flow> [--cursor <cursor>] [--limit <count>]')
+    if (publicationId != null)
+      throw new CliError('cli.invalid-arguments', `Usage: ${runtime.commandPrefix ?? 'oo flow'} publications list <flow> [--cursor <cursor>] [--limit <count>]`)
     const page = await client.listPublications(flow.flowId, {
       ...(args.cursor == null ? {} : { cursor: args.cursor }),
       limit: args.limit ?? publicationPageLimit,
@@ -290,11 +307,11 @@ export async function publicationsCommand(client: ControlClient, operands: reado
     write(runtime, args.json, { kind: 'publication.show', publication, version: 1 }, publicationText(publication))
     return
   }
-  throw new CliError('cli.invalid-arguments', 'Usage: oo flow publications <list|show> <flow> [publication]')
+  throw new CliError('cli.invalid-arguments', `Usage: ${runtime.commandPrefix ?? 'oo flow'} publications <list|show> <flow> [publication]`)
 }
 
 export async function rollbackCommand(client: ControlClient, operands: readonly string[], args: ParsedArguments, runtime: Runtime): Promise<number | void> {
-  requireCount(operands, 2, 'oo flow rollback <flow> <publication> [--json]')
+  requireCount(operands, 2, `${runtime.commandPrefix ?? 'oo flow'} rollback <flow> <publication> [--json]`)
   const flow = await referencedFlow(client, operands[0]!)
   const source = await publicationById(client, flow.flowId, operands[1]!)
   const expectedPublicationId = args.expectedPublication ?? (await client.getLive(flow.flowId)).publication?.publicationId
