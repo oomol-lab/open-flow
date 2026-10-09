@@ -41,6 +41,7 @@ const migrations = [
   '0035_error_trigger.sql',
   '0036_error_subscriptions.sql',
   '0037_users.sql',
+  '0038_user_tokens.sql',
 ] as const
 const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 

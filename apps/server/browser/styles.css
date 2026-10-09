@@ -532,6 +532,50 @@ body {
   flex-wrap: wrap;
 }
 
+.settings-mcp-address {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.settings-mcp-address input {
+  min-width: 0;
+  flex: 1;
+}
+
+.settings-mcp-address button {
+  flex-shrink: 0;
+}
+
+.settings-mcp-details {
+  display: grid;
+  gap: 12px;
+  margin: 8px 0;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.settings-mcp-details > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+}
+
+.settings-mcp-details dt {
+  width: 96px;
+  color: var(--ui-muted-foreground);
+}
+
+.settings-mcp-details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-form > p.settings-hint {
+  margin: 0;
+  line-height: 18px;
+}
+
 .settings-form-actions {
   justify-content: flex-end;
 }

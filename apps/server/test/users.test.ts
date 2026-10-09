@@ -16,6 +16,7 @@ import { Settings } from '../node/deployment/settings.ts'
 import { Database } from '../node/storage/database.ts'
 import { OperatorStore } from '../node/storage/operator-store.ts'
 import { SettingsStore } from '../node/storage/settings-store.ts'
+import { UserStore } from '../node/storage/user-store.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
@@ -76,6 +77,7 @@ async function fixture(attempts = 100, options: Parameters<typeof openService>[1
   }
   return {
     app,
+    file,
     mcp,
     request,
     create,
@@ -351,4 +353,80 @@ it('limits concurrent password logins while verification is running', async () =
   ])
   expect(responses.map((response) => response.status).toSorted()).toEqual([200, 429])
   expect((await f.request('/auth/user-session', {}, 'POST', { email: account.user.email, password: account.password })).status).toBe(200)
+})
+
+it('issues private, persistent personal tokens and enforces owner isolation through REST and MCP', async () => {
+  const f = await fixture()
+  const alice = await f.create('token-alice@example.com')
+  const bob = await f.create('token-bob@example.com', 'admin')
+  const ah = await f.login(alice.user.email, alice.password)
+  const bh = await f.login(bob.user.email, bob.password)
+  const own = await f.flow(ah)
+  const other = await f.flow(bh)
+  const response = await f.request('/auth/tokens', ah, 'POST', { name: '  My MCP client  ' })
+  expect(response.status).toBe(201)
+  expect(response.headers.get('cache-control')).toBe('no-store')
+  const created = (await response.json()) as { token: string; credential: { tokenId: string; name: string; createdAt: number } }
+  expect(created.credential.name).toBe('My MCP client')
+  const headers = { authorization: `Bearer ${created.token}` }
+  const operatorStore = new OperatorStore(f.database)
+  operatorStore.claim(token)
+  const storedSession = new OperatorSession(operatorStore, undefined, false, undefined, Date.now, f.service.control.users)
+  expect(await storedSession.actor(new Request('http://localhost/v1/mcp', { headers }))).toBe(alice.user.userId)
+  expect(await storedSession.actor(new Request('http://localhost/v1/mcp', { headers: administrator }))).toBe('operator')
+  const listed = await (await f.request('/auth/tokens', ah)).json()
+  expect(listed).toEqual({ version: 1, tokens: [created.credential] })
+  expect(JSON.stringify(f.database.connection.prepare('SELECT * FROM user_tokens').all())).not.toContain(created.token)
+  expect(await (await f.request('/auth/tokens', bh)).json()).toEqual({ version: 1, tokens: [] })
+  expect((await f.request('/config', headers)).status).toBe(403)
+  expect((await f.request(`/v1/flows/${other.flowId}`, headers)).status).toBe(404)
+  const mcp = await f.mcp('flow_list', {}, headers)
+  expect(mcp.isError).not.toBe(true)
+  expect(JSON.stringify(mcp.structuredContent)).toContain(own.flowId)
+  expect(JSON.stringify(mcp.structuredContent)).not.toContain(other.flowId)
+  const denied = await f.mcp('flow_get', { flowId: other.flowId }, headers)
+  expect(denied.isError).toBe(true)
+  expect(JSON.stringify(denied)).toContain('flow.not-found')
+  const reopened = Database.open(f.file)
+  expect(new UserStore(reopened.connection).tokenActor(created.token)).toBe(alice.user.userId)
+  reopened.close()
+  expect((await f.request(`/auth/tokens/${created.credential.tokenId}`, bh, 'DELETE')).status).toBe(204)
+  expect((await f.request('/v1/flows', headers)).status).toBe(200)
+  expect((await f.request(`/auth/tokens/${created.credential.tokenId}`, ah, 'DELETE')).status).toBe(204)
+  expect((await f.request('/v1/flows', headers)).status).toBe(401)
+  expect((await f.request('/v1/flows', { ...ah, ...headers })).status).toBe(401)
+})
+
+it('requires email login to manage tokens and validates names and request origins', async () => {
+  const f = await fixture()
+  const account = await f.create('token-login@example.com')
+  const cookie = await f.login(account.user.email, account.password)
+  const created = (await (await f.request('/auth/tokens', cookie, 'POST', { name: 'Client' })).json()) as { token: string }
+  for (const headers of [{}, administrator, { authorization: `Bearer ${created.token}` }]) {
+    expect((await f.request('/auth/tokens', headers)).status).toBe(401)
+    expect((await f.request('/auth/tokens', headers, 'POST', { name: 'No' })).status).toBe(401)
+  }
+  for (const body of [{ name: '' }, { name: '  ' }, { name: 'x'.repeat(101) }, { name: 'Name', userId: 'operator' }]) {
+    expect((await f.request('/auth/tokens', cookie, 'POST', body)).status).toBe(400)
+  }
+  expect((await f.request('/auth/tokens', { ...cookie, origin: 'https://evil.example' }, 'POST', { name: 'No' })).status).toBe(403)
+  expect((await f.request('/v1/flows', { authorization: `Bearer ${created.token}x` })).status).toBe(401)
+})
+
+it('invalidates every personal token on password reset or account disable, without reviving tokens on re-enable', async () => {
+  const f = await fixture()
+  const account = await f.create('token-reset@example.com')
+  let cookie = await f.login(account.user.email, account.password)
+  const first = (await (await f.request('/auth/tokens', cookie, 'POST', { name: 'First' })).json()) as { token: string }
+  const reset = (await (await f.request(`/auth/users/${account.user.userId}/password`, administrator, 'POST', { expectedRevision: 1 })).json()) as {
+    password: string
+  }
+  expect((await f.request('/v1/flows', { authorization: `Bearer ${first.token}` })).status).toBe(401)
+  cookie = await f.login(account.user.email, reset.password)
+  expect(await (await f.request('/auth/tokens', cookie)).json()).toEqual({ version: 1, tokens: [] })
+  const second = (await (await f.request('/auth/tokens', cookie, 'POST', { name: 'Second' })).json()) as { token: string }
+  expect((await f.request(`/auth/users/${account.user.userId}`, administrator, 'PUT', { enabled: false, expectedRevision: 2 })).status).toBe(200)
+  expect((await f.request('/v1/flows', { authorization: `Bearer ${second.token}` })).status).toBe(401)
+  expect((await f.request(`/auth/users/${account.user.userId}`, administrator, 'PUT', { enabled: true, expectedRevision: 3 })).status).toBe(200)
+  expect((await f.request('/v1/flows', { authorization: `Bearer ${second.token}` })).status).toBe(401)
 })

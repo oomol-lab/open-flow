@@ -66,7 +66,7 @@
       "none": "Not configured",
       "settings": "Managed in Server settings"
     },
-    "title": "Settings",
+    "title": "Service configuration",
     "token": "Token",
     "tokenHint": "The existing token is never shown. Saving replaces it.",
     "eventSources": "Event sources",
@@ -91,7 +91,17 @@
     "connectorSwitchOomol": "The custom Connector remains active until you connect OOMOL or save an API key.",
     "oomolConfigured": "OOMOL connected. API key saved.",
     "apiKeyDescription": "You can also enter an OOMOL API key directly.",
-    "apiKeyHint": "The API key is stored only on this instance’s server and is not shown after saving."
+    "apiKeyHint": "The API key is stored only on this instance’s server and is not shown after saving.",
+    "mcpDescription": "Connect an MCP client to create, edit, and run workflows.",
+    "mcpAddress": "Server URL",
+    "mcpCopy": "Copy URL",
+    "mcpCopied": "MCP URL copied.",
+    "mcpCopyFailed": "Could not copy. Select and copy the URL manually.",
+    "mcpTransport": "Transport",
+    "mcpProtocol": "Protocol version",
+    "mcpAuthentication": "Authentication",
+    "mcpTokenHint": "Replace <operator-token> with this Server’s Operator token in your client. This credential accesses only Operator-owned workflows, not workflows owned by email accounts.",
+    "mcpCompatibility": "The client must support this protocol version and custom Authorization headers. Legacy initialize handshakes and OAuth sign-in are not supported."
   },
   "team": {
     "createFailed": "The Flow could not be created for this Connector Team.",
@@ -154,5 +164,23 @@
     "count": "{{count}} users",
     "status": "Status",
     "actions": "Actions"
+  },
+  "account": {
+    "title": "MCP access",
+    "tokens": "Personal access tokens",
+    "description": "Tokens have your account’s API and MCP permissions. They remain valid until revoked, your password is reset, or your account is disabled.",
+    "tokenHint": "Replace <personal-token> with a token created below. It accesses only your own workflows.",
+    "name": "Token name",
+    "create": "Create token",
+    "created": "New token",
+    "once": "Copy and save this token now. It will only be shown once.",
+    "copy": "Copy token",
+    "copied": "Token copied",
+    "revoke": "Revoke",
+    "revokeConfirm": "Clients using this token will lose access. Revoke it?",
+    "empty": "No personal tokens yet.",
+    "loadFailed": "Could not load tokens. Please retry.",
+    "saveFailed": "Could not save the change. Please retry.",
+    "saved": "Token saved"
   }
 }

@@ -12,3 +12,9 @@ export interface SessionUser {
   readonly email: string | null
   readonly role: 'admin' | 'user'
 }
+
+export interface UserToken {
+  readonly tokenId: string
+  readonly name: string
+  readonly createdAt: number
+}

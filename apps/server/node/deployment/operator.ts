@@ -16,6 +16,7 @@ const userCookieName = 'open_flow_user_session'
 const emailSchema = z.string().trim().max(254).toLowerCase().pipe(z.email())
 const loginSchema = z.strictObject({ version: z.literal(1), email: emailSchema, password: z.string().min(1).max(1024) })
 const createUserSchema = z.strictObject({ version: z.literal(1), email: emailSchema, role: z.enum(['admin', 'user']) })
+const createTokenSchema = z.strictObject({ version: z.literal(1), name: z.string().trim().min(1).max(100) })
 const userRevisionSchema = z.strictObject({ version: z.literal(1), expectedRevision: z.number().int().positive() })
 const enabledSchema = userRevisionSchema.extend({ enabled: z.boolean() })
 const cookieName = 'open_flow_operator_session'
@@ -57,7 +58,12 @@ export class OperatorSession {
 
   async actor(request: Request): Promise<string | undefined> {
     const authorization = request.headers.get('authorization')
-    if (authorization?.startsWith('Bearer ') && (await this.matches(authorization.slice(7)))) return actorId
+    if (authorization != null) {
+      if (!authorization.startsWith('Bearer ')) return
+      const token = authorization.slice(7)
+      const userId = this.users?.tokenActor(token)
+      return userId ?? ((await this.matches(token)) ? actorId : undefined)
+    }
 
     const cookie = request.headers.get('cookie')
     if (cookie == null) return
@@ -239,6 +245,32 @@ export function createOperatorApp(session?: OperatorSession, attemptsPerMinute =
       loggingIn = false
     }
   })
+
+  const tokens = new Hono<{ Variables: { userId: string } }>()
+  tokens.use('*', async (context, next) => {
+    const origin = context.req.header('origin')
+    if (origin != null && origin != new URL(context.req.url).origin)
+      return json(403, { error: { code: serverErrorCode.authorizationDenied, message: 'Cross-origin requests are not allowed.' }, version: 1 })
+    const user = context.req.header('authorization') == null ? await session?.currentUser(context.req.raw) : undefined
+    if (user == null) return json(401, { error: { code: serverErrorCode.authenticationInvalid, message: 'Sign in to manage personal tokens.' }, version: 1 })
+    if (user.email == null || session?.users == null)
+      return json(403, { error: { code: serverErrorCode.authorizationDenied, message: 'Personal tokens require an email account.' }, version: 1 })
+    context.set('userId', user.userId)
+    await next()
+  })
+  tokens.get('/', (context) => json(200, { tokens: session!.users!.listTokens(context.get('userId')), version: 1 }))
+  tokens.post('/', async (context) => {
+    const body = createTokenSchema.safeParse(await objectRequest(context.req.raw))
+    if (!body.success) return json(400, { error: { code: serverErrorCode.requestInvalid, message: 'Token name is invalid.' }, version: 1 })
+    if ((await session!.actor(context.req.raw)) != context.get('userId'))
+      return json(401, { error: { code: serverErrorCode.authenticationInvalid, message: 'Sign in to manage personal tokens.' }, version: 1 })
+    return json(201, { ...session!.users!.createToken(context.get('userId'), body.data.name), version: 1 })
+  })
+  tokens.delete('/:tokenId', (context) => {
+    session!.users!.revokeToken(context.get('userId'), context.req.param('tokenId'))
+    return new Response(null, { status: 204, headers: noStore(new Headers()) })
+  })
+  app.route('/tokens', tokens)
 
   app.use('/users*', async (context, next) => {
     const user = await session?.currentUser(context.req.raw)

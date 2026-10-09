@@ -66,7 +66,7 @@
       "none": "未設定",
       "settings": "Server 設定で管理"
     },
-    "title": "設定",
+    "title": "サービス設定",
     "token": "Token",
     "tokenHint": "既存の token は表示されません。保存すると置き換えられます。",
     "eventSources": "イベントソース",
@@ -91,7 +91,17 @@
     "connectorSwitchOomol": "OOMOL に接続するか API キーを保存するまでは、カスタム Connector が使用されます。",
     "oomolConfigured": "OOMOL に接続済みです。API キーは保存されています。",
     "apiKeyDescription": "OOMOL の API キーを直接入力することもできます。",
-    "apiKeyHint": "API キーはこのインスタンスのサーバーにのみ保存され、保存後は表示されません。"
+    "apiKeyHint": "API キーはこのインスタンスのサーバーにのみ保存され、保存後は表示されません。",
+    "mcpDescription": "MCP クライアントを接続して、ワークフローを作成・編集・実行します。",
+    "mcpAddress": "サーバー URL",
+    "mcpCopy": "URL をコピー",
+    "mcpCopied": "MCP URL をコピーしました。",
+    "mcpCopyFailed": "コピーできませんでした。URL を選択して手動でコピーしてください。",
+    "mcpTransport": "通信方式",
+    "mcpProtocol": "プロトコルバージョン",
+    "mcpAuthentication": "認証方式",
+    "mcpTokenHint": "クライアントの <operator-token> を、この Server の Operator token に置き換えてください。この認証情報でアクセスできるのは Operator 所有のワークフローのみで、メールアカウント所有のものにはアクセスできません。",
+    "mcpCompatibility": "クライアントは上記のプロトコルバージョンとカスタム Authorization ヘッダーに対応している必要があります。従来の initialize ハンドシェイクと OAuth ログインには対応していません。"
   },
   "team": {
     "createFailed": "この Connector チームで Flow を作成できませんでした。",
@@ -154,5 +164,23 @@
     "count": "{{count}} 人のユーザー",
     "status": "状態",
     "actions": "操作"
+  },
+  "account": {
+    "title": "MCP 接続",
+    "tokens": "個人アクセストークン",
+    "description": "トークンはアカウントの API と MCP 権限を持ちます。取り消し、パスワードのリセット、アカウントの無効化で失効します。",
+    "tokenHint": "<personal-token> を下で作成したトークンに置き換えてください。自分のワークフローにのみアクセスできます。",
+    "name": "トークン名",
+    "create": "トークンを作成",
+    "created": "新しいトークン",
+    "once": "今すぐコピーして保存してください。トークンは一度だけ表示されます。",
+    "copy": "トークンをコピー",
+    "copied": "トークンをコピーしました",
+    "revoke": "取り消す",
+    "revokeConfirm": "このトークンを使用するクライアントはアクセスできなくなります。取り消しますか？",
+    "empty": "個人トークンはまだありません。",
+    "loadFailed": "トークンを読み込めませんでした。再試行してください。",
+    "saveFailed": "変更を保存できませんでした。再試行してください。",
+    "saved": "トークンを保存しました"
   }
 }

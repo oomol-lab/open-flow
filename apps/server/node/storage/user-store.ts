@@ -1,7 +1,7 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { User } from '../../common/users.ts'
+import type { User, UserToken } from '../../common/users.ts'
 
-import { randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto'
+import { createHash, randomBytes, randomUUID, scrypt, timingSafeEqual } from 'node:crypto'
 import { ControlError, serverErrorCode } from '../error.ts'
 
 const columns = 'user_id AS userId, email, role, enabled, revision, created_at AS createdAt'
@@ -77,6 +77,45 @@ export class UserStore {
     const passwordHash = await hash(password, salt)
     this.#update(userId, revision, 'password_hash = ?, password_salt = ?', passwordHash.toString('base64url'), salt)
     return { user: this.get(userId)!, password }
+  }
+
+  listTokens(userId: string): readonly UserToken[] {
+    return this.#database
+      .prepare(`
+      SELECT t.token_id AS tokenId, t.name, t.created_at AS createdAt FROM user_tokens t
+      JOIN users u ON u.user_id = t.user_id AND u.revision = t.user_revision
+      WHERE t.user_id = ? AND u.enabled = 1 ORDER BY t.created_at, t.token_id
+    `)
+      .all(userId) as unknown as UserToken[]
+  }
+
+  createToken(userId: string, name: string): { readonly credential: UserToken; readonly token: string } {
+    const token = `ofp_${randomBytes(32).toString('base64url')}`
+    const credential = { tokenId: randomUUID(), name, createdAt: Date.now() }
+    const inserted = this.#database
+      .prepare(`
+      INSERT INTO user_tokens (token_id, user_id, name, token_hash, user_revision, created_at)
+      SELECT ?, user_id, ?, ?, revision, ? FROM users WHERE user_id = ? AND enabled = 1
+    `)
+      .run(credential.tokenId, name, createHash('sha256').update(token).digest('hex'), credential.createdAt, userId)
+    if (inserted.changes == 0) throw new ControlError(serverErrorCode.authenticationInvalid, 'The account is unavailable.')
+    return { credential, token }
+  }
+
+  tokenActor(token: string): string | undefined {
+    if (!/^ofp_[A-Za-z0-9_-]{43}$/.test(token)) return
+    const row = this.#database
+      .prepare(`
+      SELECT t.user_id AS userId FROM user_tokens t
+      JOIN users u ON u.user_id = t.user_id AND u.revision = t.user_revision
+      WHERE t.token_hash = ? AND u.enabled = 1
+    `)
+      .get(createHash('sha256').update(token).digest('hex')) as { readonly userId: string } | undefined
+    return row?.userId
+  }
+
+  revokeToken(userId: string, tokenId: string): void {
+    this.#database.prepare('DELETE FROM user_tokens WHERE user_id = ? AND token_id = ?').run(userId, tokenId)
   }
 
   #update(userId: string, revision: number, assignment: string, ...values: (string | number)[]): void {

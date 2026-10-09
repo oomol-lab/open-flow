@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { connectorAccess, connectorAccessSnapshot, connectorAccessCandidates } from './connectorDecoders.ts'
+import { connectorAccess, connectorAccessSnapshot, connectorAccessCandidates, connectorAccessCandidatesBatch } from './connectorDecoders.ts'
 
 const candidate = {
   accessBindingId: 'binding',
@@ -12,6 +12,32 @@ const candidate = {
 const response = (binding: unknown) => ({ candidates: [binding], mode: 'selectable', providerId: 'mail', version: 1 })
 
 const snapshot = { version: 2, mode: 'selectable', sharedAccessDigest: 'shared', sharedBindings: [], selectedBindings: [candidate] }
+
+const permissions = { actionIds: [], allActions: true, triggerIds: [], allTriggers: true, configured: false, proxy: true }
+
+it('accepts administrator candidates with complete action and trigger permissions', () => {
+  const value = { results: [response({ ...candidate, source: { kind: 'admin-delegation' }, isDefault: true, permissions })], version: 1 }
+  expect(connectorAccessCandidatesBatch(value, ['mail'])).toEqual(value)
+})
+
+it.each([
+  [{ ...permissions, allTriggers: 'true' }, 'permissions.allTriggers: expected a boolean.'],
+  [{ ...permissions, allActions: false }, 'permissions.proxy: requires allActions=true, allTriggers=true and configured=false.'],
+  [{ ...permissions, triggerIds: ['trigger'] }, 'permissions.triggerIds: must be empty when allTriggers is true.'],
+  [{ ...permissions, triggerIds: ['trigger', 'trigger'] }, 'permissions.triggerIds: duplicate IDs.'],
+  [{ ...permissions, extra: 'private value' }, 'Unexpected fields: extra.'],
+  [{ actionIds: [], allActions: true, configured: false, proxy: true }, 'Missing fields: triggerIds, allTriggers.'],
+])('explains invalid permission summaries %#', (summary, detail) => {
+  expect(() => connectorAccessCandidates(response({ ...candidate, permissions: summary }), 'mail')).toThrow(expect.objectContaining({ detail }))
+})
+
+it.each([
+  [{ results: [], version: 1 }, 'results: missing requested providers.'],
+  [{ results: [response(candidate), response(candidate)], version: 1 }, 'results[].providerId: duplicate or unrequested provider.'],
+  [{ results: [response(candidate)], version: 2 }, 'version: expected 1.'],
+])('explains incompatible candidate batches %#', (value, detail) => {
+  expect(() => connectorAccessCandidatesBatch(value, ['mail'])).toThrow(expect.objectContaining({ detail }))
+})
 
 it('decodes fixed access separately from editable shared configuration', () => {
   expect(connectorAccessSnapshot(snapshot)).toEqual(snapshot)

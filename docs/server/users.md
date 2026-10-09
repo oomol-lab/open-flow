@@ -64,3 +64,23 @@ SQLite migration 0037 在启动事务中创建账号存储，并将旧 Flow 固�
 旧的 Flow 创建和 Draft/Live Run 幂等键归入 Operator 作用域，既有客户端可继续重试相同请求。
 Revision 正文、Publication、Run、结果及外部 Trigger 身份保持不变；本地账号归属不修改固定的执行能力快照。
 账号和会话签名秘密随 Server 数据卷持久化，重启不会重新生成账号密码或改变 Flow 归属。
+
+## 个人访问 Token 与 MCP
+
+邮箱用户登录后，进入“设置 → MCP 接入”，填写客户端名称并创建个人访问 Token。
+明文只在创建成功时显示一次，页面提供复制和撤销操作。Token 列表和数据库不保存可恢复的明文；数据库保存 SHA-256 摘要。
+
+客户端使用 `/v1/mcp` 和 `Authorization: Bearer <personal-token>`，无需携带浏览器 Cookie。
+Token 也可调用该账号有权访问的 Server API，权限与账号一致：仅访问自己的 Flow，管理员角色仍不扩大 Flow 可见范围。
+Token 没有固定过期时间，撤销、重置密码、停用账号后失效；重新启用账号不会恢复旧 Token。
+退出网页登录不会撤销 Token。Operator 继续使用 Operator token。
+
+以下管理接口仅接受邮箱账号的登录 Cookie，不接受 Bearer Token，也不允许指定其他账号：
+
+| 方法     | 路径                    | 请求体                 | 响应                                                                  |
+| -------- | ----------------------- | ---------------------- | --------------------------------------------------------------------- |
+| `GET`    | `/auth/tokens`          | 无                     | `{ version: 1, tokens: [{ tokenId, name, createdAt }] }`              |
+| `POST`   | `/auth/tokens`          | `{ version: 1, name }` | `201 { version: 1, credential: { tokenId, name, createdAt }, token }` |
+| `DELETE` | `/auth/tokens/:tokenId` | 无                     | `204`，幂等撤销当前账号的 Token                                       |
+
+名称去除首尾空白后须为 1–100 个字符。响应使用 `Cache-Control: no-store`，跨域 Origin 请求被拒绝。

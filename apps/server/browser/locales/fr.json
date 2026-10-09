@@ -66,7 +66,7 @@
       "none": "Non configuré",
       "settings": "Géré dans les paramètres du Server"
     },
-    "title": "Paramètres",
+    "title": "Configuration du service",
     "token": "Token",
     "tokenHint": "Le token existant n’est jamais affiché. L’enregistrement le remplace.",
     "eventSources": "Sources d’événements",
@@ -91,7 +91,17 @@
     "connectorSwitchOomol": "Le Connector personnalisé reste actif jusqu’à la connexion OOMOL ou l’enregistrement d’une clé API.",
     "oomolConfigured": "OOMOL connecté. Clé API enregistrée.",
     "apiKeyDescription": "Vous pouvez aussi saisir directement une clé API OOMOL.",
-    "apiKeyHint": "La clé API est conservée uniquement sur le serveur de cette instance et n’est plus affichée après l’enregistrement."
+    "apiKeyHint": "La clé API est conservée uniquement sur le serveur de cette instance et n’est plus affichée après l’enregistrement.",
+    "mcpDescription": "Connectez un client MCP pour créer, modifier et exécuter des workflows.",
+    "mcpAddress": "URL du serveur",
+    "mcpCopy": "Copier l’URL",
+    "mcpCopied": "URL MCP copiée.",
+    "mcpCopyFailed": "Échec de la copie. Sélectionnez et copiez l’URL manuellement.",
+    "mcpTransport": "Transport",
+    "mcpProtocol": "Version du protocole",
+    "mcpAuthentication": "Authentification",
+    "mcpTokenHint": "Remplacez <operator-token> dans votre client par le jeton Operator de ce Server. Ce jeton donne uniquement accès aux workflows de l’Operator, pas à ceux des comptes avec adresse e-mail.",
+    "mcpCompatibility": "Le client doit prendre en charge cette version du protocole et les en-têtes Authorization personnalisés. Les échanges initialize hérités et la connexion OAuth ne sont pas pris en charge."
   },
   "team": {
     "createFailed": "Impossible de créer le Flow pour cette équipe du Connector.",
@@ -154,5 +164,23 @@
     "count": "{{count}} utilisateurs",
     "status": "Statut",
     "actions": "Actions"
+  },
+  "account": {
+    "title": "Connexion MCP",
+    "tokens": "Jetons d’accès personnels",
+    "description": "Les jetons disposent des droits API et MCP de votre compte. Ils expirent après révocation, réinitialisation du mot de passe ou désactivation du compte.",
+    "tokenHint": "Remplacez <personal-token> par un jeton créé ci-dessous. Il donne accès uniquement à vos propres workflows.",
+    "name": "Nom du jeton",
+    "create": "Créer un jeton",
+    "created": "Nouveau jeton",
+    "once": "Copiez et conservez ce jeton maintenant. Il ne sera affiché qu’une seule fois.",
+    "copy": "Copier le jeton",
+    "copied": "Jeton copié",
+    "revoke": "Révoquer",
+    "revokeConfirm": "Les clients utilisant ce jeton perdront l’accès. Le révoquer ?",
+    "empty": "Aucun jeton personnel pour le moment.",
+    "loadFailed": "Impossible de charger les jetons. Réessayez.",
+    "saveFailed": "Impossible d’enregistrer la modification. Réessayez.",
+    "saved": "Jeton conservé"
   }
 }

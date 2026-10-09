@@ -10,6 +10,7 @@ import { EventSourcesPage, OpenFlowSessionGate, OpenFlowWorkbench } from '@oomol
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { Toaster } from 'sonner'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
+import { AccountPage } from './account.tsx'
 import { connectionHref } from './connectionNavigation.ts'
 import { createBrowserHost } from './host.ts'
 import { createI18n } from './i18n.ts'
@@ -151,7 +152,8 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
   const route = routeContext.location
   const eventSourcesOpen = pathname == '/settings/event-sources'
   const usersOpen = pathname == '/settings/users'
-  const settingsOpen = pathname == '/settings' || eventSourcesOpen || usersOpen
+  const accountOpen = pathname == '/settings/account'
+  const settingsOpen = pathname == '/settings' || eventSourcesOpen || usersOpen || accountOpen
   const variablesOpen = pathname == '/variables'
   const [session, setSession] = useState<Session>({ kind: 'checking' })
   const administrator = session.kind == 'signed-in' && session.user.role == 'admin'
@@ -263,12 +265,15 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
     setRouteUrl(path)
   }
 
-  function openPage(path: '/' | '/settings' | '/settings/users' | '/settings/event-sources' | '/variables'): void {
+  function openPage(path: '/' | '/settings/account' | '/settings' | '/settings/users' | '/settings/event-sources' | '/variables'): void {
     if (path != window.location.pathname + window.location.search) window.history.pushState(null, '', path)
     setRouteUrl(path)
   }
 
-  function followPage(event: MouseEvent<HTMLAnchorElement>, path: '/' | '/settings' | '/settings/users' | '/settings/event-sources' | '/variables'): void {
+  function followPage(
+    event: MouseEvent<HTMLAnchorElement>,
+    path: '/' | '/settings/account' | '/settings' | '/settings/users' | '/settings/event-sources' | '/variables',
+  ): void {
     if (event.defaultPrevented || event.button != 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
     event.preventDefault()
     openPage(path)
@@ -444,11 +449,13 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
                   {t('shell.variables')}
                 </a>
               )}
-              {administrator && (
-                <a aria-current={settingsOpen ? 'page' : undefined} href="/settings" onClick={(event) => followPage(event, '/settings')}>
-                  {t('shell.settings')}
-                </a>
-              )}
+              <a
+                aria-current={settingsOpen ? 'page' : undefined}
+                href={administrator ? '/settings' : '/settings/account'}
+                onClick={(event) => followPage(event, administrator ? '/settings' : '/settings/account')}
+              >
+                {t('shell.settings')}
+              </a>
             </nav>
             <div className="server-nav-actions">
               <span className="server-account">{session.user.email ?? t('users.admin')}</span>
@@ -471,7 +478,7 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
             </div>
           </header>
           <div className="workbench-frame">
-            {(settingsOpen || variablesOpen) && !administrator ? (
+            {(eventSourcesOpen || usersOpen || variablesOpen) && !administrator ? (
               <main className="settings-page">
                 <div className="settings-content">
                   <p>{t('users.adminRequired')}</p>
@@ -481,22 +488,39 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
             ) : settingsOpen ? (
               <div className="settings-layout">
                 <nav className="settings-nav" aria-label={t('shell.settings')}>
-                  <a href="/settings" aria-current={eventSourcesOpen || usersOpen ? undefined : 'page'} onClick={(event) => followPage(event, '/settings')}>
-                    {t('shell.settings')}
-                  </a>
-                  <a href="/settings/users" aria-current={usersOpen ? 'page' : undefined} onClick={(event) => followPage(event, '/settings/users')}>
-                    {t('users.title')}
-                  </a>
                   <a
-                    href="/settings/event-sources"
-                    aria-current={eventSourcesOpen ? 'page' : undefined}
-                    onClick={(event) => followPage(event, '/settings/event-sources')}
+                    href="/settings/account"
+                    aria-current={accountOpen || !administrator ? 'page' : undefined}
+                    onClick={(event) => followPage(event, '/settings/account')}
                   >
-                    {t('settings.eventSources')}
+                    {t('account.title')}
                   </a>
+                  {administrator && (
+                    <>
+                      <a
+                        href="/settings"
+                        aria-current={eventSourcesOpen || usersOpen || accountOpen ? undefined : 'page'}
+                        onClick={(event) => followPage(event, '/settings')}
+                      >
+                        {t('settings.title')}
+                      </a>
+                      <a href="/settings/users" aria-current={usersOpen ? 'page' : undefined} onClick={(event) => followPage(event, '/settings/users')}>
+                        {t('users.title')}
+                      </a>
+                      <a
+                        href="/settings/event-sources"
+                        aria-current={eventSourcesOpen ? 'page' : undefined}
+                        onClick={(event) => followPage(event, '/settings/event-sources')}
+                      >
+                        {t('settings.eventSources')}
+                      </a>
+                    </>
+                  )}
                 </nav>
                 <div className="settings-body">
-                  {usersOpen ? (
+                  {accountOpen || !administrator ? (
+                    <AccountPage key={session.user.userId} user={session.user} onUnauthorized={sessionExpired} />
+                  ) : usersOpen ? (
                     <UsersPage currentUserId={session.user.userId} onUnauthorized={sessionExpired} />
                   ) : eventSourcesOpen ? (
                     <EventSourcesPage client={client} language={language} teams={team.kind == 'ready' ? team.teams : []} />
