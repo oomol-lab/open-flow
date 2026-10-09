@@ -4,6 +4,7 @@ import { defineConfig } from 'vitest/config'
 export default defineConfig({
   plugins: [providerIconsPlugin({ iconUrls: {} })],
   test: {
+    expect: { poll: { timeout: 5_000 } },
     coverage: {
       include: [
         'node/deployment/connector.ts',

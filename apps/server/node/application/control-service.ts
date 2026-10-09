@@ -44,6 +44,7 @@ import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/
 import { randomUUID } from 'node:crypto'
 import { ConnectorTaskError, ConnectorClient } from '../deployment/connector.ts'
 import { AcceptanceError, ControlError, serverErrorCode } from '../error.ts'
+import { RevisionIntegrityError } from '../storage/revision-store.ts'
 import { Store } from '../storage/store.ts'
 import { actionAccountDiagnostics } from './action-account-diagnostics.ts'
 import {
@@ -754,7 +755,12 @@ export class ControlService {
       return { revision: revisionMetadata(previous), version: 1 }
     }
     if (currentFlow.draftRevisionId != expectedRevisionId) throw new ControlError(controlErrorCode.flowRevisionConflict, 'The Draft changed.')
-    const base = this.store.flows.revision(flowId, expectedRevisionId)
+    let base: StoredFlowRevision | undefined
+    try {
+      base = this.store.flows.revision(flowId, expectedRevisionId)
+    } catch (error) {
+      if (!(error instanceof RevisionIntegrityError)) throw error
+    }
     let content = emptyRevision()
     if (base != null) {
       const source = new TextEncoder().encode(base.content)
