@@ -1,7 +1,6 @@
 export type NodeType = `${NODE_TYPE}`
 export enum NODE_TYPE {
   TaskNode = 'task_node',
-  SubflowNode = 'subflow_node',
   ValueNode = 'value_node',
   ConditionNode = 'condition_node',
   CommentNode = 'comment_node',

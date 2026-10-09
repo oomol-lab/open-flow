@@ -27,10 +27,10 @@ function finite(value: JsonValue | undefined): number | undefined {
   return typeof value == 'number' && Number.isFinite(value) ? value : undefined
 }
 
-export function targetPresentation(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): Readonly<Record<string, JsonValue>> | undefined {
+export function targetPresentation(value: Readonly<Record<string, JsonValue>>, _target: GraphTarget): Readonly<Record<string, JsonValue>> | undefined {
   const designer = record(value.designer)
   if (designer?.version != 1) return undefined
-  return presentationTarget(designer, target)
+  return record(designer.flow)
 }
 
 export function savedPositions(
@@ -91,18 +91,13 @@ function designerPresentation(value: Readonly<Record<string, JsonValue>>): Reado
   return designer?.version == 1 ? designer : { version: 1 }
 }
 
-function presentationTarget(designer: Readonly<Record<string, JsonValue>>, target: GraphTarget): Readonly<Record<string, JsonValue>> | undefined {
-  return target.kind == 'flow' ? record(designer.flow) : record(record(designer.subflows)?.[target.id])
-}
-
 function replacePresentationTarget(
   designer: Readonly<Record<string, JsonValue>>,
   target: GraphTarget,
   value: Readonly<Record<string, JsonValue>>,
 ): Readonly<Record<string, JsonValue>> {
   if (target.kind == 'flow') return { ...designer, flow: value, version: 1 }
-  const subflows = record(designer.subflows) ?? {}
-  return { ...designer, subflows: { ...subflows, [target.id]: value }, version: 1 }
+  return { ...designer, version: 1 }
 }
 
 function normalizedTarget(value: Readonly<Record<string, JsonValue>>, target: GraphTarget): Record<string, JsonValue> {
@@ -172,7 +167,7 @@ export function setComment(
 ): Readonly<Record<string, JsonValue>> {
   const positioned = setNodePositions(value, target, { [nodeId]: comment.position })
   const designer = designerPresentation(positioned)
-  const current = presentationTarget(designer, target) ?? {}
+  const current = record(designer.flow) ?? {}
   const comments = record(current.comments) ?? {}
   return {
     ...positioned,

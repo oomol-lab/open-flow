@@ -7,7 +7,7 @@ import { checkJsonDepth } from './json.ts'
 import { triggerScheduleSchema } from './triggerScheduleSchema.ts'
 import { webhookMethods } from './webhookMethod.ts'
 
-export const currentFlowModelVersion = 5
+export const currentFlowModelVersion = 6
 const text = z.string()
 const json = z.json()
 const strings = z.array(text)
@@ -15,8 +15,7 @@ const port = z.object({ description: text.optional(), jsonSchema: json, nullable
 const input = port.extend({ value: json.optional() })
 const group = z.object({ collapsed: z.boolean().optional(), group: text })
 const nodeSource = z.object({ kind: z.literal('node'), nodeId: text, output: text, field: text.optional() })
-const flowSource = z.object({ kind: z.literal('flow'), input: text })
-const source = z.union([nodeSource, flowSource, z.object({ kind: z.literal('binding'), bindingId: text })])
+const source = z.union([nodeSource, z.object({ kind: z.literal('binding'), bindingId: text })])
 const fixedInput = z.union([z.object({ kind: z.literal('unset') }), z.object({ kind: z.literal('value'), value: json })])
 const mapping = z.union([fixedInput, z.object({ kind: z.literal('sources'), sources: z.array(source) })])
 const inputs = z.record(text, mapping)
@@ -193,7 +192,6 @@ const node = z.union([
     kind: z.literal('value'),
     values: z.array(input),
   }),
-  z.object({ ...base, kind: z.literal('subflow'), subflowId: text }),
   z.object({ ...base, kind: z.literal('task'), task: inline, additionalInputs: z.array(input).optional() }),
   z.object({ ...base, kind: z.literal('task'), taskId: text, additionalInputs: z.array(input).optional() }),
   z.strictObject({ ...base, kind: z.literal('approval'), ...wait }).omit({ timeoutMs: true }),
@@ -218,25 +216,36 @@ const node = z.union([
     definition: z.object({ ...definition, type: z.literal('integration'), endpoint }),
   }),
 ])
-const target = z.union([z.object({ kind: z.literal('flow') }), z.object({ kind: z.literal('subflow'), id: text })])
+const target = z.object({ kind: z.literal('flow') })
 const edge = z.object({ source: text, target: text, sourceHandle: text.optional() })
 const at = { nodeId: text, target }
-const subflow = z.object({ name: text, inputs: z.array(input), outputs: z.array(port.extend({ sources: z.array(z.union([nodeSource, flowSource])) })) })
 const graph = z.object({ nodes: z.record(text, node), edges: z.array(edge).default([]) })
 const binding = z.object({ kind: z.literal('variable'), target: text })
 const module = z.object({ name: text, imports: strings, source: text })
-const document = z.object({
-  bindings: z.record(text, binding),
-  graph,
-  subflows: z.record(text, subflow.extend({ graph })),
-  tasks: z.record(text, managed),
-})
+const document = z.preprocess(
+  rejectSubflows,
+  z.object({
+    bindings: z.record(text, binding),
+    graph,
+    tasks: z.record(text, managed),
+  }),
+)
 const revision = z.object({
-  modelVersion: z.union([z.literal(2), z.literal(4), z.literal(currentFlowModelVersion)]),
+  modelVersion: z.union([z.literal(2), z.literal(4), z.literal(5), z.literal(currentFlowModelVersion)]),
   document,
   modules: z.record(text, module),
 })
 const envelope = revision.extend({ kind: z.literal('open-flow-flow-revision'), version: z.literal(1) })
+
+function rejectSubflows(value: unknown): unknown {
+  const candidate = record(value)
+  const subflows = candidate.subflows
+  if (subflows !== undefined && (subflows === null || typeof subflows !== 'object' || Array.isArray(subflows) || Object.keys(subflows).length > 0))
+    throw new TypeError('Subflows are no longer supported.')
+  if (Object.values(record(record(candidate.graph).nodes)).some((candidateNode) => record(candidateNode).kind === 'subflow'))
+    throw new TypeError('Subflow nodes are no longer supported.')
+  return value
+}
 
 function record(value: unknown): Record<string, unknown> {
   return value != null && typeof value == 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : {}
@@ -297,20 +306,7 @@ function upgradeLegacyGraph(value: unknown): { readonly graph: unknown; readonly
 function upgradeLegacyDocument(value: unknown): unknown {
   const candidate = record(value)
   const root = upgradeLegacyGraph(candidate.graph)
-  const subflows = Object.fromEntries(
-    Object.entries(record(candidate.subflows)).map(([id, subflowCandidate]) => {
-      const legacySubflow = record(subflowCandidate)
-      const upgraded = upgradeLegacyGraph(legacySubflow.graph)
-      const outputs = Array.isArray(legacySubflow.outputs)
-        ? legacySubflow.outputs.map((outputCandidate) => {
-            const output = record(outputCandidate)
-            return { ...output, sources: upgradeLegacySources(output.sources, upgraded.resolutionIds) }
-          })
-        : legacySubflow.outputs
-      return [id, { ...legacySubflow, graph: upgraded.graph, outputs }]
-    }),
-  )
-  return { ...candidate, graph: root.graph, subflows }
+  return { ...candidate, graph: root.graph }
 }
 
 function repairedEntries<Value>(value: unknown, schema: z.ZodType<Value>, repair?: (value: unknown) => unknown): Record<string, Value> {
@@ -380,21 +376,14 @@ export function repairRevisionEnvelope(value: unknown): RevisionContent {
   const sourceDocument = record(
     envelopeSource.modelVersion == 1 || envelopeSource.modelVersion == 2 ? upgradeLegacyDocument(envelopeSource.document) : envelopeSource.document,
   )
+  rejectSubflows(sourceDocument)
   const bindings = record(sourceDocument.bindings)
   const sourceGraph = repairGraph(sourceDocument.graph, bindings)
-  const subflows = Object.fromEntries(
-    Object.entries(record(sourceDocument.subflows)).flatMap(([id, subflowCandidate]) => {
-      const legacySubflow = record(subflowCandidate)
-      const result = subflow.extend({ graph }).safeParse({ ...legacySubflow, graph: repairGraph(legacySubflow.graph, bindings) })
-      return result.success ? [[id, result.data] as const] : []
-    }),
-  )
   return decodeRevisionContent({
     modelVersion: currentFlowModelVersion,
     document: {
       bindings: repairedEntries(sourceDocument.bindings, binding),
       graph: sourceGraph,
-      subflows,
       tasks: repairedEntries(sourceDocument.tasks, managed),
     },
     modules: repairedEntries(envelopeSource.modules, module),
@@ -483,9 +472,6 @@ const shapes = {
   'module.delete': { moduleId: text },
   'module.rename': { moduleId: text, before: text, name: text },
   'module.source.replace': { moduleId: text, beforeImports: strings, beforeSource: text, imports: strings, source: text },
-  'subflow.create': { subflowId: text, subflow: subflow.extend({ graph }) },
-  'subflow.definition.set': { subflowId: text, before: subflow, definition: subflow },
-  'subflow.delete': { subflowId: text },
   'task.create': { taskId: text, task: managed },
   'task.delete': { taskId: text },
   'task.connector.connection.set': { taskId: text, before: text.optional(), value: text.optional() },
@@ -528,11 +514,6 @@ export function changeOperationsSchema(kind?: string): JsonValue {
 }
 
 function checkErrorModelVersion(content: RevisionContent): void {
-  if (
-    content.modelVersion < 5 &&
-    [content.document.graph, ...Object.values(content.document.subflows).map((item) => item.graph)].some((item) =>
-      Object.values(item.nodes).some((itemNode) => itemNode.kind == 'error'),
-    )
-  )
+  if (content.modelVersion < 5 && Object.values(content.document.graph.nodes).some((itemNode) => itemNode.kind == 'error'))
     throw new TypeError('Error workflows require Flow model version 5.')
 }

@@ -98,7 +98,7 @@ function createSession(language: UiLanguage, log: LogAction) {
     version: 1,
   }
   let content: RevisionContent = applyFlowChanges(
-    { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] }, subflows: {}, tasks: {} } },
+    { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, graph: { nodes: {}, edges: [] }, tasks: {} } },
     [
       ...createAgentTask({ kind: 'flow' }, { nodeId: 'agent', taskId: 'agent-task' }, 'Research agent', {
         prompt: i18n.t('agent.defaultPrompt', { input: '{{request}}' }),

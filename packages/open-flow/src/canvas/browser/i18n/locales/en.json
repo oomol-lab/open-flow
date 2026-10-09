@@ -12,7 +12,7 @@
     "connectorNoActiveConnection": "No active connection",
     "llmChat": "LLM Chat",
     "llmStructured": "LLM Structured Output",
-    "sharedBlocks": "Tasks and subflows",
+    "sharedBlocks": "Tasks",
     "triggers": "Triggers",
     "value": "Fixed Values"
   },
@@ -402,17 +402,13 @@
     "value": "Value"
   },
   "scriptlet": "Scriptlet",
-  "subflowSettings": {
-    "forwardPreview": "Forward Preview",
-    "title": "Subflow Configs"
-  },
   "workbench": {
     "conflict": {
       "keepLocal": "Keep local changes",
       "reload": "Reload from disk"
     },
     "empty": {
-      "description": "Add a Flow, Subflow, or Task source file and reload the workbench.",
+      "description": "Add a Flow or Task source file and reload the workbench.",
       "title": "This project has no runnable targets yet."
     },
     "noTargets": "No runnable targets",
@@ -604,7 +600,6 @@
       "condition": "Condition",
       "approval": "Approval",
       "wait": "Wait",
-      "subflow": "Subflow",
       "value": "Fixed Values",
       "input": "Flow input",
       "output": "Flow output"

@@ -152,7 +152,7 @@ The offline Publications viewer is available as \`OpenFlowPreview\` from
 \`@oomol-lab/open-flow/preview\`, with standalone \`@oomol-lab/open-flow/preview.css\`.
 Supply \`draft\`, \`presentation\` (or null), \`language\` and \`theme\`; the entry also exports
 \`Draft\`, \`Presentation\` and \`OpenFlowPreviewProps\` types. Give its parent an explicit height.
-It supports temporary node movement, restore layout, read-only properties and subflows without
+It supports temporary node movement, restore layout, read-only properties without
 fetching or saving a workflow. Use a new React key to reset the session when switching examples.
 A Shadow DOM host must load the stylesheet inside its shadow root before mounting the component;
 Vite hosts can import \`@oomol-lab/open-flow/preview.css?url\` for the stylesheet URL.

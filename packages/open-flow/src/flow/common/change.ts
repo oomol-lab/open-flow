@@ -108,11 +108,6 @@ export interface NodeSource {
   readonly output: string
 }
 
-export interface FlowSource {
-  readonly input: string
-  readonly kind: 'flow'
-}
-
 export interface BindingSource {
   readonly bindingId: string
   readonly kind: 'binding'
@@ -121,11 +116,7 @@ export interface BindingSource {
 export type FixedInputValue = { readonly kind: 'unset' } | { readonly kind: 'value'; readonly value: JsonValue }
 export type InputValues = Readonly<Record<string, FixedInputValue>>
 
-export type InputMapping = FixedInputValue | { readonly kind: 'sources'; readonly sources: readonly (BindingSource | FlowSource | NodeSource)[] }
-
-export interface OutputMapping {
-  readonly sources: readonly (FlowSource | NodeSource)[]
-}
+export type InputMapping = FixedInputValue | { readonly kind: 'sources'; readonly sources: readonly (BindingSource | NodeSource)[] }
 
 interface GraphNodeBase {
   readonly description?: string
@@ -134,11 +125,6 @@ interface GraphNodeBase {
   readonly name?: string
   readonly maxExecutions?: number
   readonly timeoutMs?: number
-}
-
-export interface SubflowNode extends GraphNodeBase {
-  readonly kind: 'subflow'
-  readonly subflowId: string
 }
 
 export interface ValueNode extends GraphNodeBase {
@@ -186,7 +172,7 @@ export type ConditionOperator =
   | 'notHasValue'
   | 'startsWith'
 
-export type Source = BindingSource | FlowSource | NodeSource
+export type Source = BindingSource | NodeSource
 
 export type ConditionOperand =
   | { readonly kind: 'value'; readonly value?: JsonValue; readonly jsonSchema?: JsonValue }
@@ -490,22 +476,11 @@ export type TriggerNode =
       readonly kind: 'integration'
     })
 
-export type GraphNode = ApprovalNode | ConditionNode | SubflowNode | TaskNode | TriggerNode | ValueNode | WaitNode
+export type GraphNode = ApprovalNode | ConditionNode | TaskNode | TriggerNode | ValueNode | WaitNode
 
 export interface FlowDocument {
   readonly bindings: Readonly<Record<string, { readonly kind: 'variable'; readonly target: string }>>
   readonly graph: Graph
-  readonly subflows: Readonly<
-    Record<
-      string,
-      {
-        readonly graph: Graph
-        readonly inputs: readonly InputPort[]
-        readonly name: string
-        readonly outputs: readonly (OutputMapping & Port)[]
-      }
-    >
-  >
   readonly tasks: Readonly<Record<string, ManagedTaskDefinition>>
 }
 
@@ -517,11 +492,11 @@ export interface CodeModule {
 
 export interface RevisionContent {
   readonly document: FlowDocument
-  readonly modelVersion: 2 | 4 | typeof currentFlowModelVersion
+  readonly modelVersion: 2 | 4 | 5 | typeof currentFlowModelVersion
   readonly modules: Readonly<Record<string, CodeModule>>
 }
 
-export type GraphTarget = { readonly kind: 'flow' } | { readonly id: string; readonly kind: 'subflow' }
+export type GraphTarget = { readonly kind: 'flow' }
 
 export interface GraphEdge {
   readonly source: string
@@ -659,14 +634,6 @@ export type ChangeOperation =
       readonly moduleId: string
       readonly source: string
     }
-  | { readonly kind: 'subflow.create'; readonly subflow: FlowDocument['subflows'][string]; readonly subflowId: string }
-  | {
-      readonly before: Omit<FlowDocument['subflows'][string], 'graph'>
-      readonly definition: Omit<FlowDocument['subflows'][string], 'graph'>
-      readonly kind: 'subflow.definition.set'
-      readonly subflowId: string
-    }
-  | { readonly kind: 'subflow.delete'; readonly subflowId: string }
   | { readonly kind: 'task.create'; readonly task: FlowDocument['tasks'][string]; readonly taskId: string }
   | { readonly before?: string; readonly kind: 'task.connector.connection.set'; readonly taskId: string; readonly value?: string }
   | { readonly kind: 'task.delete'; readonly taskId: string }
@@ -685,20 +652,6 @@ export class FlowChangeError extends Error {
 
 function invalid(message: string): never {
   throw new FlowChangeError(message)
-}
-
-function selectedGraph(document: FlowDocument, target: GraphTarget): Graph {
-  if (target.kind == 'flow') return document.graph
-  const subflow = document.subflows[target.id]
-  if (subflow == null) invalid('The target Subflow does not exist.')
-  return subflow.graph
-}
-
-function replaceGraph(document: FlowDocument, target: GraphTarget, value: Graph): FlowDocument {
-  if (target.kind == 'flow') return { ...document, graph: value }
-  const subflow = document.subflows[target.id]
-  if (subflow == null) invalid('The target Subflow does not exist.')
-  return { ...document, subflows: { ...document.subflows, [target.id]: { ...subflow, graph: value } } }
 }
 
 export function applyFlowChanges(content: RevisionContent, operations: readonly ChangeOperation[]): RevisionContent {
@@ -735,46 +688,45 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         break
       }
       case 'graph.edge.connect': {
-        const graph = selectedGraph(document, operation.target)
+        const graph = document.graph
         if (graph.nodes[operation.edge.source] == null) invalid('The source Node does not exist.')
         const node = graph.nodes[operation.edge.target]
         if (node == null || !('inputs' in node)) invalid('The target Node does not accept execution dependencies.')
         if (graph.edges.some((edge) => dequal(edge, operation.edge))) invalid('The Nodes are already connected.')
-        Object.assign(document, replaceGraph(document, operation.target, { ...graph, edges: [...graph.edges, operation.edge] }))
+        Object.assign(document, { graph: { ...graph, edges: [...graph.edges, operation.edge] } })
         break
       }
       case 'graph.edge.disconnect': {
-        const graph = selectedGraph(document, operation.target)
+        const graph = document.graph
         const edges = graph.edges.filter((edge) => !dequal(edge, operation.edge))
         if (edges.length == graph.edges.length) invalid('The Nodes are not connected.')
-        Object.assign(document, replaceGraph(document, operation.target, { ...graph, edges }))
+        Object.assign(document, { graph: { ...graph, edges } })
         break
       }
       case 'graph.node.additional-inputs.set': {
-        const graph = selectedGraph(document, operation.target)
+        const graph = document.graph
         const node = graph.nodes[operation.nodeId]
         if (node?.kind != 'task') invalid('The Task Node does not exist.')
         if (!dequal(node.additionalInputs, operation.before)) invalid('The Task Node inputs changed before this operation was applied.')
         const { additionalInputs: _, ...rest } = node
         const updated: TaskNode = operation.value == null ? rest : { ...rest, additionalInputs: operation.value }
-        Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
+        Object.assign(document, { graph: { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } } })
         break
       }
       case 'graph.node.condition.set': {
-        const graph = selectedGraph(document, operation.target)
+        const graph = document.graph
         const node = graph.nodes[operation.nodeId]
         if (node?.kind != 'condition') invalid('The Condition Node does not exist.')
         if (!dequal(node.cases, operation.before.cases) || node.matchMode != operation.before.matchMode) {
           invalid('The Condition Node changed before this operation was applied.')
         }
         const updated: ConditionNode = { ...node, ...operation.value }
-        Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
+        Object.assign(document, { graph: { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } } })
         break
       }
       case 'graph.node.create': {
-        const graph = selectedGraph(document, operation.target)
+        const graph = document.graph
         if (graph.nodes[operation.nodeId] != null) invalid('A Node with this ID already exists in the target graph.')
-        if (operation.target.kind == 'subflow' && !('inputs' in operation.node)) invalid('Trigger Nodes cannot be created inside a Subflow.')
         if (operation.node.kind == 'error' && Object.values(graph.nodes).some((node) => node.kind == 'error'))
           invalid('A graph can contain only one Flow Error node.')
         if (operation.node.kind == 'manual' && Object.values(graph.nodes).some((node) => node.kind == 'manual')) {
@@ -787,26 +739,25 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         if (issue == 'empty') invalid('A Node name cannot be empty.')
         if (issue == 'duplicate') invalid('A Node with this name already exists in the target graph.')
         const node = name == operation.node.name ? operation.node : { ...operation.node, name }
-        Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: node } }))
+        Object.assign(document, { graph: { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: node } } })
         break
       }
       case 'graph.node.delete': {
-        const graph = selectedGraph(document, operation.target)
+        const graph = document.graph
         if (graph.nodes[operation.nodeId] == null) invalid('The Node does not exist in the target graph.')
         const removed = new Set([operation.nodeId])
         const nodes = Object.fromEntries(Object.entries(graph.nodes).filter(([nodeId]) => !removed.has(nodeId)))
-        Object.assign(
-          document,
-          replaceGraph(document, operation.target, {
+        Object.assign(document, {
+          graph: {
             ...graph,
             edges: graph.edges.filter((edge) => !removed.has(edge.source) && !removed.has(edge.target)),
             nodes,
-          }),
-        )
+          },
+        })
         break
       }
       case 'graph.node.field.set': {
-        const graph = selectedGraph(document, operation.target)
+        const graph = document.graph
         const node = graph.nodes[operation.nodeId]
         if (node == null) invalid('The Node does not exist in the target graph.')
         if (operation.field == 'connectionId' && node.kind != 'poll' && node.kind != 'integration') invalid('Only provider Triggers select a node Connection.')
@@ -821,69 +772,65 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
           Object.assign(updated, { name })
         } else if (operation.value == null) Reflect.deleteProperty(updated, operation.field)
         else Object.assign(updated, { [operation.field]: operation.value })
-        Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
+        Object.assign(document, { graph: { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } } })
         break
       }
       case 'graph.node.input.set': {
-        const graph = selectedGraph(document, operation.target)
+        const graph = document.graph
         const node = graph.nodes[operation.nodeId]
         if (node == null || !('inputs' in node)) invalid('The Node does not accept inputs.')
         if (!dequal(nodeInputMappings(node)[operation.handle], operation.before)) invalid('The Node input changed before this operation was applied.')
         const inputs = { ...node.inputs }
         if (operation.value == null) delete inputs[operation.handle]
         else inputs[operation.handle] = operation.value
-        Object.assign(
-          document,
-          replaceGraph(document, operation.target, {
+        Object.assign(document, {
+          graph: {
             ...graph,
             nodes: {
               ...graph.nodes,
               [operation.nodeId]: node.kind == 'condition' ? setConditionInput(node, operation.handle, operation.value) : { ...node, inputs },
             },
-          }),
-        )
+          },
+        })
         break
       }
       case 'graph.node.task.capabilities.set': {
-        const graph = selectedGraph(document, operation.target)
+        const graph = document.graph
         const node = graph.nodes[operation.nodeId]
         if (node?.kind != 'task' || node.task == null) invalid('The inline Task Node does not exist.')
         if (!dequal(node.task.capabilities, operation.before)) invalid('The inline Task capabilities changed before this operation was applied.')
         const task = { ...node.task }
         if (operation.value === undefined) delete task.capabilities
         else task.capabilities = decodeConnectorCapabilities(operation.value)
-        Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: { ...node, task } } }))
+        Object.assign(document, { graph: { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: { ...node, task } } } })
         break
       }
       case 'graph.node.task.name.set': {
-        const graph = selectedGraph(document, operation.target)
+        const graph = document.graph
         const node = graph.nodes[operation.nodeId]
         if (node?.kind != 'task' || node.task == null) invalid('The inline Task Node does not exist.')
         if (node.task.name != operation.before) invalid('The inline Task name changed before this operation was applied.')
         const updated = { ...node, task: { ...node.task, name: operation.value } }
-        Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
+        Object.assign(document, { graph: { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } } })
         break
       }
       case 'graph.node.task.ports.set': {
-        const graph = selectedGraph(document, operation.target)
+        const graph = document.graph
         const node = graph.nodes[operation.nodeId]
         if (node?.kind != 'task' || node.task == null) invalid('The inline Task Node does not exist.')
         if (!dequal({ inputs: node.task.inputs, outputs: node.task.outputs }, operation.before)) {
           invalid('The inline Task ports changed before this operation was applied.')
         }
         const updated = { ...node, task: { ...node.task, inputs: operation.value.inputs, outputs: operation.value.outputs } }
-        Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
+        Object.assign(document, { graph: { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } } })
         break
       }
       case 'graph.node.values.set': {
-        const graph = selectedGraph(document, operation.target)
+        const graph = document.graph
         const node = graph.nodes[operation.nodeId]
         if (node?.kind != 'value') invalid('The Value Node does not exist.')
         if (!dequal(node.values, operation.before)) invalid('The Value Node changed before this operation was applied.')
-        Object.assign(
-          document,
-          replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: { ...node, values: operation.value } } }),
-        )
+        Object.assign(document, { graph: { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: { ...node, values: operation.value } } } })
         break
       }
       case 'graph.node.resolution.set': {
@@ -897,7 +844,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         break
       }
       case 'graph.node.webhook.set': {
-        const graph = selectedGraph(document, operation.target)
+        const graph = document.graph
         const node = graph.nodes[operation.nodeId]
         if (node?.kind != 'webhook') invalid('The Webhook Node does not exist.')
         if (
@@ -912,7 +859,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
           operation.value.options == null
             ? { ...rest, bodyFields: operation.value.bodyFields, method: operation.value.method }
             : { ...node, ...operation.value }
-        Object.assign(document, replaceGraph(document, operation.target, { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } }))
+        Object.assign(document, { graph: { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } } })
         break
       }
       case 'graph.trigger.config.set': {
@@ -958,29 +905,6 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
           invalid('The CodeModule source changed before this operation was applied.')
         }
         modules[operation.moduleId] = { ...module, imports: operation.imports, source: operation.source }
-        break
-      }
-      case 'subflow.create':
-        if (document.subflows[operation.subflowId] != null) invalid('A Subflow with this ID already exists.')
-        for (const node of Object.values(operation.subflow.graph.nodes)) {
-          if (node.kind == 'task' && node.task?.capabilities !== undefined) decodeConnectorCapabilities(node.task.capabilities)
-        }
-        document.subflows = { ...document.subflows, [operation.subflowId]: operation.subflow }
-        break
-      case 'subflow.definition.set': {
-        const subflow = document.subflows[operation.subflowId]
-        if (subflow == null) invalid('The Subflow does not exist.')
-        if (!dequal({ inputs: subflow.inputs, name: subflow.name, outputs: subflow.outputs }, operation.before)) {
-          invalid('The Subflow definition changed before this operation was applied.')
-        }
-        document.subflows = { ...document.subflows, [operation.subflowId]: { ...operation.definition, graph: subflow.graph } }
-        break
-      }
-      case 'subflow.delete': {
-        if (document.subflows[operation.subflowId] == null) invalid('The Subflow does not exist.')
-        const subflows = { ...document.subflows }
-        delete subflows[operation.subflowId]
-        document.subflows = subflows
         break
       }
       case 'task.create':

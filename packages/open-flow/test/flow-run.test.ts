@@ -20,7 +20,7 @@ function revision(graph: Graph): RevisionContent {
   return {
     modelVersion: currentFlowModelVersion,
     modules: { main: { name: 'Main', imports: [], source: 'export default () => ({})' } },
-    document: { bindings: {}, subflows: {}, tasks: {}, graph },
+    document: { bindings: {}, tasks: {}, graph },
   }
 }
 
@@ -34,7 +34,6 @@ it('prepares and executes an entry while unrelated nodes remain invalid', async 
       start,
       code: task,
       broken: { ...task, task: { ...task.task, moduleId: 'missing' } },
-      unused: { kind: 'subflow', subflowId: 'missing', inputs: {} },
       other: {
         kind: 'poll',
         name: 'Unconfigured',
@@ -130,36 +129,6 @@ it.each(['other', 'missing', 'code'])('rejects a required input from unavailable
     nodes: { start, other, code: { ...task, inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId, output: 'body' }] } } } },
   })
   expect((await prepareFlow(content, currentEngineContract, 'start')).kind).toBe('flow-invalid')
-})
-
-it('checks reachable subflows and includes only their required bindings and modules', async () => {
-  const source = revision({ edges: [{ source: 'start', target: 'child' }], nodes: { start, child: { kind: 'subflow', subflowId: 'child', inputs: {} } } })
-  const content: RevisionContent = {
-    ...source,
-    document: {
-      ...source.document,
-      bindings: { used: { kind: 'variable', target: 'TOKEN' }, unused: { kind: 'variable', target: 'bad-name' } },
-      subflows: {
-        child: {
-          name: 'Child',
-          inputs: [],
-          outputs: [],
-          graph: {
-            edges: [],
-            nodes: {
-              code: { ...task, inputs: { value: { kind: 'sources', sources: [{ kind: 'binding', bindingId: 'used' }] } } },
-            },
-          },
-        },
-      },
-    },
-  }
-  const prepared = await prepareFlow(content, currentEngineContract, 'start')
-  if (prepared.kind != 'prepared') throw new Error(JSON.stringify(prepared))
-  expect([...prepared.validation.closure.dependencies.inputBindings]).toEqual(['used'])
-  expect(Object.keys(prepared.flow.modules)).toEqual(['main'])
-  expect(Object.keys(prepared.flow.subflows)).toEqual(['child'])
-  expect((await prepareFlow({ ...content, modules: {} }, currentEngineContract, 'start')).kind).toBe('flow-invalid')
 })
 
 it.each(['missing', 'code'])('rejects selecting %s as the trigger', async (nodeId) => {

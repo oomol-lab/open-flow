@@ -48,7 +48,6 @@ function connectorFlow(timeoutMs?: number, optionalNull = false): RevisionConten
           },
         },
       },
-      subflows: {},
       tasks: {
         connector: {
           executor: { action: 'example.echo', connectionId: 'connection-work', kind: 'connector' },
@@ -101,7 +100,6 @@ function capabilityFlow(
           },
         },
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,

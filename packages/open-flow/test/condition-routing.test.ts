@@ -31,7 +31,6 @@ function content(condition: ConditionNode): RevisionContent {
     document: {
       bindings: {},
       tasks: {},
-      subflows: {},
       graph: {
         nodes: {
           start: { kind: 'manual', name: 'Start' },

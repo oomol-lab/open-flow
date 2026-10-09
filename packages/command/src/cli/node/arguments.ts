@@ -10,7 +10,6 @@ export interface ParsedArguments {
   readonly trigger?: string
   readonly outputs?: string
   readonly revision?: string
-  readonly subflow?: string
   readonly publication?: string
   readonly pointer?: string
   readonly offset?: number
@@ -56,7 +55,6 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
   let trigger: string | undefined
   let outputs: string | undefined
   let revision: string | undefined
-  let subflow: string | undefined
   let publication: string | undefined
   let pointer: string | undefined
   let offset: number | undefined
@@ -118,7 +116,6 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       argument == '--idempotency-key' ||
       argument == '--expected-publication' ||
       argument == '--revision' ||
-      argument == '--subflow' ||
       argument == '--publication' ||
       argument == '--pointer' ||
       argument == '--offset' ||
@@ -153,7 +150,6 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
       if (argument == '--idempotency-key') idempotencyKey = value
       else if (argument == '--expected-publication') expectedPublication = value
       else if (argument == '--revision') revision = value
-      else if (argument == '--subflow') subflow = value
       else if (argument == '--publication') publication = value
       else if (argument == '--pointer') pointer = value
       else if (argument == '--after') rawAfter = value
@@ -217,7 +213,6 @@ export function parseArguments(args: readonly string[]): ParsedArguments {
     ...(offset == null ? {} : { offset }),
     ...(pointer == null ? {} : { pointer }),
     ...(revision == null ? {} : { revision }),
-    ...(subflow == null ? {} : { subflow }),
     ...(publication == null ? {} : { publication }),
     ...(comment == null ? {} : { comment }),
     ...(expectedPublication == null ? {} : { expectedPublication }),

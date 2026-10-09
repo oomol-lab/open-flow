@@ -87,7 +87,6 @@ const portsContent: RevisionContent = {
   document: {
     bindings: {},
     tasks: {},
-    subflows: {},
     graph: {
       nodes: {
         source: {

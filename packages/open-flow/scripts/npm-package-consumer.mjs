@@ -12,7 +12,6 @@ const result = await Effect.runPromise(
       engineContract: 'open-flow-engine/v5',
       graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } },
       modules: {},
-      subflows: {},
       tasks: {},
     },
     {

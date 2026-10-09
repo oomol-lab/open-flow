@@ -153,7 +153,7 @@ export function referenceChanges(id: string, content: RevisionContent): ChangeOp
 export const emptyContent: RevisionContent = {
   modelVersion: currentFlowModelVersion,
   modules: {},
-  document: { bindings: {}, tasks: {}, subflows: {}, graph: { nodes: {}, edges: [] } },
+  document: { bindings: {}, tasks: {}, graph: { nodes: {}, edges: [] } },
 }
 /** Checks intent and preservation independently from the reference command sequence. */
 export function assertions(id: string, base: RevisionContent, current: RevisionContent): string[] {

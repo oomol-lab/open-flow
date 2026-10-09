@@ -8,7 +8,6 @@ import type {
   GraphNode,
   GraphTarget,
   FlowDocument,
-  SubflowNode,
   TaskDefinition,
   TaskNode,
   TriggerNode,
@@ -27,11 +26,8 @@ export interface InputSourceQuery {
   readonly candidates: () => Readonly<Record<string, readonly InputSourceCandidate[]>>
 }
 
-type SubflowDefinition = FlowDocument['subflows'][string]
-
 export type ResolvedNode =
   | { readonly id: string; readonly kind: 'condition'; readonly node: ConditionNode }
-  | { readonly id: string; readonly kind: 'subflow'; readonly node: SubflowNode; readonly definition?: SubflowDefinition }
   | {
       readonly definition?: TaskDefinition
       readonly id: string
@@ -93,24 +89,16 @@ export class RevisionView {
       const separator = actionId.indexOf('.')
       if (separator > 0) connectorProviderIds.add(actionId.slice(0, separator))
     }
-    for (const graph of [this.#document.graph, ...Object.values(this.#document.subflows).map((subflow) => subflow.graph)]) {
-      for (const node of Object.values(graph.nodes)) {
-        if (node.kind == 'integration' || node.kind == 'poll') connectorProviderIds.add(node.definition.provider)
-      }
+    for (const node of Object.values(this.#document.graph.nodes)) {
+      if (node.kind == 'integration' || node.kind == 'poll') connectorProviderIds.add(node.definition.provider)
     }
     this.connectorProviderIds = connectorProviderIds
-  }
-
-  public subflow(subflowId: string): SubflowDefinition | undefined {
-    return this.#document.subflows[subflowId]
   }
 
   public graph(target: GraphTarget): Graph | undefined {
     switch (target.kind) {
       case 'flow':
         return this.#document.graph
-      case 'subflow':
-        return this.#document.subflows[target.id]?.graph
     }
   }
 
@@ -149,13 +137,11 @@ export class RevisionView {
     return graph == null ? undefined : nodeOutputDescription(this.#document, graph, nodeId, output)
   }
 
-  public designerInputs(target: GraphTarget): readonly unknown[] {
-    const resource = target.kind == 'flow' ? { graph: this.#document.graph } : this.#document.subflows[target.id]
-    if (resource == null) return []
-    const inputs: unknown[] = [resource]
-    for (const [nodeId, node] of Object.entries(resource.graph.nodes)) {
+  public designerInputs(): readonly unknown[] {
+    const inputs: unknown[] = [this.#document.graph]
+    for (const [nodeId, node] of Object.entries(this.#document.graph.nodes)) {
       const resolved = this.resolveNode(nodeId, node)
-      if (resolved.kind == 'task' || resolved.kind == 'subflow') inputs.push(resolved.definition)
+      if (resolved.kind == 'task') inputs.push(resolved.definition)
     }
     return inputs
   }
@@ -178,9 +164,6 @@ export class RevisionView {
     switch (node.kind) {
       case 'condition':
         resolved = { id: nodeId, kind: node.kind, node }
-        break
-      case 'subflow':
-        resolved = { definition: this.#document.subflows[node.subflowId], id: nodeId, kind: node.kind, node }
         break
       case 'task': {
         const definition = node.task != null ? node.task : this.#document.tasks[node.taskId]
@@ -238,28 +221,12 @@ export class RevisionView {
     return node != null && !('inputs' in node) ? node : undefined
   }
 
-  public usesSubflow(subflowId: string): boolean {
-    return this.#graphUsesSubflow(this.#document.graph, subflowId, new Set())
-  }
-
   #taskNodes(graph: Graph): readonly TaskNodeReference[] {
     let taskNodes = this.#taskNodesByGraph.get(graph)
     if (taskNodes != null) return taskNodes
     taskNodes = Object.entries(graph.nodes).flatMap(([nodeId, node]) => (node.kind == 'task' && node.task == null ? [{ nodeId, taskId: node.taskId }] : []))
     this.#taskNodesByGraph.set(graph, taskNodes)
     return taskNodes
-  }
-
-  #graphUsesSubflow(graph: Graph, subflowId: string, visited: Set<string>): boolean {
-    for (const node of Object.values(graph.nodes)) {
-      if (node.kind != 'subflow') continue
-      if (node.subflowId == subflowId) return true
-      if (visited.has(node.subflowId)) continue
-      visited.add(node.subflowId)
-      const nested = this.#document.subflows[node.subflowId]
-      if (nested != null && this.#graphUsesSubflow(nested.graph, subflowId, visited)) return true
-    }
-    return false
   }
 }
 
@@ -285,8 +252,6 @@ function connectorAccessReferences(document: FlowDocument): { readonly accounts:
   const accounts = [
     ...new Map(connectionUsage(document).map((use) => [JSON.stringify([use.target, use.nodeId, use.kind, use.providerId, use.connectionId]), use])).values(),
   ]
-  const hasCode = [document.graph, ...Object.values(document.subflows).map((subflow) => subflow.graph)].some((graph) =>
-    Object.values(graph.nodes).some((node) => node.kind == 'task' && node.task != null),
-  )
+  const hasCode = Object.values(document.graph.nodes).some((node) => node.kind == 'task' && node.task != null)
   return { accounts, hasCode }
 }

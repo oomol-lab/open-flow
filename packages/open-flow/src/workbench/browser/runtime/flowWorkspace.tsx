@@ -280,7 +280,7 @@ export function FlowEditor({
   const selectedNodeIds = useVal(store.workspace.$.selectedNodeIds)
   const target = useVal(store.workspace.$.target)
   const initialAddNodeTab = target?.kind == 'flow' && triggers.length == 0 ? 'triggers' : 'nodes'
-  const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(`${flowId}:${target?.kind}:${target?.kind == 'subflow' ? target.id : ''}`)
+  const { ignoredNodeIds, onIgnoreNodes } = useIgnoredNodes(`${flowId}:${target?.kind}`)
   const panel = useInspectorPanel({
     identity: JSON.stringify([flowId, target]),
     preferences: store.preferences,
@@ -294,10 +294,7 @@ export function FlowEditor({
   const [accountReference, setAccountReference] = useState<ConnectorAccountReference>()
   useEffect(() => {
     if (accountReference == null) return
-    if (
-      target?.kind != accountReference.target.kind ||
-      (target?.kind == 'subflow' && accountReference.target.kind == 'subflow' && target.id != accountReference.target.id)
-    ) {
+    if (target?.kind != accountReference.target.kind) {
       if (!store.workspace.selectTarget(accountReference.target)) setAccountReference(undefined)
       return
     }
@@ -328,7 +325,7 @@ export function FlowEditor({
     setStartId(undefined)
     focusInspectorOnOpen.current = false
     opener.current = undefined
-  }, [flowId, target?.kind == 'subflow' ? target.id : undefined, target?.kind])
+  }, [flowId, target?.kind])
 
   useEffect(() => {
     if (diagnosticFocus == null) return
@@ -349,11 +346,9 @@ export function FlowEditor({
         ? 'busy'
         : diagnostics?.valid == false
           ? 'issues'
-          : target?.kind == 'subflow'
-            ? 'subflow'
-            : live?.hasUnpublishedChanges == false
-              ? 'current'
-              : 'ready'
+          : live?.hasUnpublishedChanges == false
+            ? 'current'
+            : 'ready'
   const closeContextPanel = (focusTarget?: HTMLElement): void => {
     panel.close()
     focusInspectorOnOpen.current = false
@@ -394,7 +389,7 @@ export function FlowEditor({
   const flowSelected = panel.page == 'outline'
   const multipleSelected = !flowSelected && selectedNodeIds.length > 1
   const singleSelected = !flowSelected && !multipleSelected
-  const contextPanelIcon = target == null || flowSelected || multipleSelected ? 'flow' : inspectorIcon(selection, target)
+  const contextPanelIcon = target == null || flowSelected || multipleSelected ? 'flow' : inspectorIcon(selection)
   const contextPanelTitle = flowSelected
     ? t('inspector.outline')
     : multipleSelected
@@ -567,7 +562,7 @@ export function FlowEditor({
                   title: selection.node.name ?? selectedDesignerNode?.title ?? '',
                   icon: selectedDesignerNode != null && 'icon' in selectedDesignerNode ? selectedDesignerNode.icon : undefined,
                   disabled: authoringDisabled,
-                  fallback: <Icon name={inspectorIcon(selection, target)} />,
+                  fallback: <Icon name={inspectorIcon(selection)} />,
                   onRename: (name) => {
                     void store.workspace.saveNodeTitle(selection.id, name)
                   },

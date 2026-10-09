@@ -91,7 +91,7 @@ export class PackageMeta {
 
     this.#createScriptletsManager = () => this.dispose.add(new ScriptletsManager(ctx))
 
-    this.sharedBlocks = this.dispose.add(new SharedBlocksManager(this, ctx, this.resolveSharedBlockMeta$))
+    this.sharedBlocks = this.dispose.add(new SharedBlocksManager(this, ctx))
 
     const name = this.dispose.add(manifest.$.name.ref())
     const displayName = this.dispose.add(this.l10n.display$(manifest.$.displayName))
@@ -115,27 +115,17 @@ export class PackageMeta {
 
   public readonly resolveSharedBlockMeta$ = this.dispose.add(
     createWeakMemoizedFunction(
-      (blockResourceName: BlockResourceName, blockType: SharedBlockType): ReadonlyVal<SharedBlockMeta | undefined> => {
+      (blockResourceName: BlockResourceName, _blockType: SharedBlockType): ReadonlyVal<SharedBlockMeta | undefined> => {
         const { blockName } = decodeBlockResourceName(blockResourceName)
-        return compute((get) => {
-          if (blockType === 'subflow') {
-            return get(this.sharedBlocks.subflowBlocksByName).get(blockName)
-          } else {
-            return get(this.sharedBlocks.taskBlocksByName).get(blockName)
-          }
-        })
+        return compute((get) => get(this.sharedBlocks.taskBlocksByName).get(blockName))
       },
       (blockResourceName, blockType) => `${blockResourceName}|${blockType}`,
     ),
   ) as ResolveSharedBlockMeta$
 
-  public resolveSharedBlockMeta(blockResourceName: BlockResourceName, blockType: SharedBlockType): SharedBlockMeta | undefined {
+  public resolveSharedBlockMeta(blockResourceName: BlockResourceName, _blockType: SharedBlockType): SharedBlockMeta | undefined {
     const { blockName } = decodeBlockResourceName(blockResourceName)
-    if (blockType === 'subflow') {
-      return this.sharedBlocks.subflowBlocksByName.get(blockName)
-    } else {
-      return this.sharedBlocks.taskBlocksByName.get(blockName)
-    }
+    return this.sharedBlocks.taskBlocksByName.get(blockName)
   }
 
   public toJSON(): object {

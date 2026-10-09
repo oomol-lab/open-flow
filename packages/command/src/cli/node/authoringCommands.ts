@@ -236,10 +236,9 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
   if (flowReference == null) throw new CliError('cli.invalid-arguments', 'Usage: oo flow node <list|show|add|set|input|remove> <flow> ...')
   if (operation == 'show') {
     if (nodeReference == null || extra.length > 0)
-      throw new CliError('cli.invalid-arguments', 'Usage: oo flow node show <flow> <node> [--revision <revisionId>] [--subflow <subflowId>] [--json]')
+      throw new CliError('cli.invalid-arguments', 'Usage: oo flow node show <flow> <node> [--revision <revisionId>] [--json]')
     const draft = await client.getRevision(flow.flowId, args.revision ?? flow.draftRevisionId)
-    const graph = args.subflow == null ? draft.content.document.graph : draft.content.document.subflows[args.subflow]?.graph
-    if (graph == null) throw new CliError('node.not-found', 'The selected subflow was not found in this Revision.')
+    const graph = draft.content.document.graph
     const byId = Object.hasOwn(graph.nodes, nodeReference) ? graph.nodes[nodeReference] : undefined
     const matches = byId == null ? Object.entries(graph.nodes).filter(([, node]) => node.name == nodeReference) : [[nodeReference, byId] as const]
     if (matches.length == 0) throw new CliError('node.not-found', `Node ${JSON.stringify(nodeReference)} was not found in the selected Revision and graph.`)
@@ -256,7 +255,6 @@ export async function nodeCommand(client: ControlClient, flow: Flow, operands: r
         kind: 'node.show',
         ...nodeDetails(draft.content, nodeId, node),
         revisionId: draft.revisionId,
-        ...(args.subflow == null ? {} : { subflowId: args.subflow }),
         version: 1,
       },
       nodeText(nodeId, node),

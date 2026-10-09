@@ -282,7 +282,6 @@ function codeFlow(): RevisionContent {
           },
         },
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,

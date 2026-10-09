@@ -117,7 +117,6 @@ function revision(mode: 'connection' | 'permanent' | 'ready' | 'transient', defi
           },
         },
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,
@@ -913,7 +912,6 @@ describe('Server change listener', () => {
           document: {
             bindings: {},
             tasks: {},
-            subflows: {},
             graph: {
               edges: [],
               nodes: {

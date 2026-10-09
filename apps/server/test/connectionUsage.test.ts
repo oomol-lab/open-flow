@@ -8,7 +8,6 @@ import { checkCodePermissions, ConnectorClient } from '../node/deployment/connec
 
 const document: FlowDocument = {
   bindings: {},
-  subflows: {},
   graph: { edges: [], nodes: { send: { kind: 'task', taskId: 'send', name: 'Send', inputs: {} } } },
   tasks: { send: { name: 'Send', inputs: [], outputs: [], executor: { kind: 'connector', action: 'mail.send', connectionId: 'account' } } },
 }
@@ -60,34 +59,6 @@ it('captures only selected node connections without adding Code usage and reject
     ],
   })
   await expect(captureConnectorAccess(host, 'flow', document, access)).rejects.toMatchObject({ code: 'connector.access-invalid' })
-})
-
-it('captures independent Code connections in root graphs and Subflows', async () => {
-  const host = new ImplicitConnectorAccessHost()
-  vi.spyOn(host, 'listCandidates').mockResolvedValue({
-    version: 1,
-    results: [{ version: 1, providerId: 'mail', mode: 'selectable', candidates: [candidate] }],
-  })
-  const code = {
-    kind: 'task' as const,
-    name: 'Code',
-    inputs: {},
-    task: {
-      name: 'Code',
-      moduleId: 'code',
-      inputs: [],
-      outputs: [],
-      capabilities: [{ kind: 'connector' as const, mode: 'independent' as const, actions: [{ action: 'mail.send', connectionId: 'account' }] }],
-    },
-  }
-  const source = {
-    ...document,
-    graph: { edges: [], nodes: { code } },
-    subflows: { child: { name: 'Child', inputs: [], outputs: [], graph: { edges: [], nodes: { code } } } },
-  } as FlowDocument
-  const snapshot = await captureConnectorAccess(host, 'flow', source, access)
-  expect(snapshot.sharedBindings).toEqual([])
-  expect(snapshot.selectedBindings).toMatchObject([{ connectionId: 'account', providerId: 'mail' }])
 })
 
 it('executes nodes with fixed bindings while denying Code the same account, without resolving a new membership', async () => {

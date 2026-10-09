@@ -105,7 +105,6 @@ describe('OpenAPI fixed operations', () => {
       modelVersion: currentFlowModelVersion,
       document: {
         bindings: {},
-        subflows: {},
         tasks: { api: task },
         graph: { nodes: { node: { kind: 'task' as const, taskId: 'api', name: 'API', inputs: {} } }, edges: [] },
       },

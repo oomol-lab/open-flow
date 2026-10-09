@@ -7,7 +7,7 @@ import { stringify } from 'yaml'
 import { FlowEditOperationsSchema, planFlowEdit } from '../../src/manifest/common/flowEdit.ts'
 import { WritableTriggerNodeManifest } from '../../src/manifest/common/writable/node/writableTriggerNodeManifest.ts'
 import { WritableFlowManifest } from '../../src/manifest/common/writable/writableFlowManifest.ts'
-import { FlowSchema, SubflowBlockSchema } from '../../src/schema/index.ts'
+import { FlowSchema } from '../../src/schema/index.ts'
 import { createMemoryPackage, memoryFile } from '../support/memory-package-meta.ts'
 
 const triggerDefinition = {
@@ -81,7 +81,6 @@ describe('Trigger node authoring', () => {
       trigger_definitions: [triggerDefinition],
       nodes: [displayed],
     })
-    expect(() => SubflowBlockSchema.parse({ nodes: [triggerNode] })).toThrow()
 
     for (const field of ['inputs_from', 'progress_weight', 'concurrency', 'timeout']) {
       expect(() =>

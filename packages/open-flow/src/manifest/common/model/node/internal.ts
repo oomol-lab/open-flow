@@ -4,9 +4,6 @@ export type NodeManifestKind = typeof NodeManifestKind
 export const TaskNodeManifestKind: unique symbol = Symbol('TaskNodeManifest')
 export type TaskNodeManifestKind = typeof TaskNodeManifestKind
 
-export const SubflowNodeManifestKind: unique symbol = Symbol('SubflowNodeManifest')
-export type SubflowNodeManifestKind = typeof SubflowNodeManifestKind
-
 export const ValueNodeManifestKind: unique symbol = Symbol('ValueNodeManifest')
 export type ValueNodeManifestKind = typeof ValueNodeManifestKind
 

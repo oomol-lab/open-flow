@@ -65,7 +65,6 @@ export type {
   JsonValue,
   PortDefinition,
   FlowDocument,
-  SubflowNode,
   TaskDefinition,
   TaskNode,
   TriggerKeySnapshot,

@@ -39,7 +39,6 @@ it('upgrades legacy trigger connection bindings without losing accounts or varia
       bindings: { account: { kind: 'connection', target: 'connection' }, variable: { kind: 'variable', target: 'TOKEN' } },
       graph: { nodes: { poll, missing: { ...poll, bindingId: 'missing' }, direct: { ...poll, connectionId: 'explicit' } }, edges: [] },
       tasks: {},
-      subflows: { child: { name: 'Child', inputs: [], outputs: [], graph: { nodes: { poll }, edges: [] } } },
     },
   }
   const bytes = new TextEncoder().encode(JSON.stringify(source))
@@ -51,7 +50,6 @@ it('upgrades legacy trigger connection bindings without losing accounts or varia
   expect(upgraded.document.graph.nodes.poll).not.toHaveProperty('bindingId')
   expect(upgraded.document.graph.nodes.direct).toMatchObject({ connectionId: 'explicit' })
   expect(upgraded.document.graph.nodes.missing).not.toHaveProperty('connectionId')
-  expect(upgraded.document.subflows.child!.graph.nodes.poll).toMatchObject({ connectionId: 'connection' })
   expect(decodeRevision(encodeRevision(upgraded))).toEqual(upgraded)
   expect(JSON.parse(new TextDecoder().decode(bytes))).toEqual(source)
 })
@@ -95,14 +93,6 @@ function revision(reverse = false): RevisionContent {
     document: {
       bindings: { variable: { kind: 'variable', target: 'TOKEN' } },
       graph: { edges: [], nodes: reverse ? { value: nodes.value, condition: nodes.condition } : nodes },
-      subflows: {
-        child: {
-          graph: { edges: [], nodes: {} },
-          inputs: [{ ...port, handle: 'input' }],
-          name: 'Child',
-          outputs: [{ ...port, handle: 'output', sources: [{ input: 'input', kind: 'flow' }] }],
-        },
-      },
       tasks: {
         managed: {
           executor: { kind: 'llm', mode: 'json' },
@@ -153,7 +143,6 @@ describe('Flow Revision encoding', () => {
       document: {
         bindings: { variable: { kind: 'variable', target: 'TOKEN' } },
         graph: { edges: [], nodes: { condition: { cases: [{ description: 'Qualified order' }] }, value: {} } },
-        subflows: { child: { name: 'Child' } },
         tasks: { managed: { executor: { kind: 'llm', mode: 'json' }, name: 'LLM' } },
       },
       kind: 'open-flow-flow-revision',
@@ -161,7 +150,7 @@ describe('Flow Revision encoding', () => {
       modules: { helper: { imports: [] }, main: { imports: ['helper'] } },
       version: 1,
     })
-    await expect(digestBytes(first)).resolves.toBe('sha256:d64665341990696a1d59259bae25fc7dbd0faf816247bd7a10a9f30bc3bd7335')
+    await expect(digestBytes(first)).resolves.toBe('sha256:3bcdfc4f3eb6ef4bb1f0802a3828f664194da03ceef59682a2e36ec968ce9a2c')
   })
 
   it('changes the encoded Revision when workflow semantics change', () => {
@@ -292,6 +281,7 @@ describe('Revision decoding', () => {
       modules: {},
       document: {
         bindings: {},
+        subflows: {},
         tasks: {
           sink: {
             name: 'Sink',
@@ -313,25 +303,6 @@ describe('Revision decoding', () => {
           },
           edges: [{ source: 'pause', sourceHandle: 'notification', target: 'sink' }],
         },
-        subflows: {
-          child: {
-            name: 'Child',
-            inputs: [],
-            outputs: [{ handle: 'notice', jsonSchema: {}, nullable: false, sources: [{ kind: 'node', nodeId: 'pause', output: 'notification' }] }],
-            graph: {
-              nodes: {
-                pause: {
-                  kind: 'wait',
-                  actions: ['continue'],
-                  inputs: {},
-                  input: { handle: 'value', jsonSchema: {}, nullable: true },
-                  prompt: 'Continue?',
-                },
-              },
-              edges: [],
-            },
-          },
-        },
       },
     }
     const bytes = canonicalJsonBytes(legacy as JsonValue)
@@ -347,12 +318,6 @@ describe('Revision decoding', () => {
             sink: { inputs: { notice: { sources: [{ nodeId: 'pause', output: 'pending' }] } } },
           },
           edges: [{ source: 'pause', sourceHandle: 'pending', target: 'sink' }],
-        },
-        subflows: {
-          child: {
-            graph: { nodes: { pause: { kind: 'wait' } } },
-            outputs: [{ sources: [{ nodeId: 'pause', output: 'pending' }] }],
-          },
         },
       },
     })
@@ -426,7 +391,7 @@ describe('Revision decoding', () => {
     expect(revisionRepairKind(bytes)).toBe('repair')
     expect(repairRevision(bytes)).toEqual({
       modelVersion: currentFlowModelVersion,
-      document: { bindings: {}, graph: { nodes: { valid: { kind: 'manual', name: 'Start' } }, edges: [] }, subflows: {}, tasks: {} },
+      document: { bindings: {}, graph: { nodes: { valid: { kind: 'manual', name: 'Start' } }, edges: [] }, tasks: {} },
       modules: {},
     })
     for (const value of [{ ...damaged, modelVersion: currentFlowModelVersion + 1 }, { ...damaged, kind: 'other' }, 'not json']) {
@@ -440,7 +405,6 @@ describe('Revision decoding', () => {
     const content = revision()
     const legacy = JSON.parse(decoder.decode(encodeRevision(content)))
     delete legacy.document.graph.edges
-    delete legacy.document.subflows.child.graph.edges
 
     expect(decodeFlowDocument(legacy.document)).toEqual(content.document)
     expect(decodeRevisionContent(legacy)).toEqual(content)
@@ -448,7 +412,6 @@ describe('Revision decoding', () => {
     expect(decoded).toEqual(content)
     expect(encodeRevision(decoded)).toEqual(encodeRevision(content))
     expect(legacy.document.graph).not.toHaveProperty('edges')
-    expect(legacy.document.subflows.child.graph).not.toHaveProperty('edges')
   })
 
   it.each([undefined, null, 'invalid', { stale: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'missing', output: 'out' }] } }])(
@@ -462,11 +425,10 @@ describe('Revision decoding', () => {
         document: {
           ...content.document,
           graph: expectedGraph,
-          subflows: { child: { ...content.document.subflows.child!, graph: expectedGraph } },
         },
       }
       const legacy = JSON.parse(decoder.decode(encodeRevision(expected)))
-      for (const graph of [legacy.document.graph, legacy.document.subflows.child.graph]) {
+      for (const graph of [legacy.document.graph]) {
         graph.nodes.value.inputs = inputs
       }
       const before = structuredClone(legacy)
@@ -483,19 +445,13 @@ describe('Revision decoding', () => {
   it.each([null, {}, 'invalid', [{ source: 'a' }]])('rejects malformed graph edges: %j', (edges) => {
     const content = revision()
     expect(() => decodeFlowDocument({ ...content.document, graph: { ...content.document.graph, edges } })).toThrow()
-    expect(() =>
-      decodeFlowDocument({
-        ...content.document,
-        subflows: { child: { ...content.document.subflows.child, graph: { nodes: {}, edges } } },
-      }),
-    ).toThrow()
   })
 
   it('ignores unknown fields before validation and canonical encoding', () => {
     const content = {
       modelVersion: currentFlowModelVersion,
       modules: {},
-      document: { bindings: {}, subflows: {}, tasks: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
+      document: { bindings: {}, tasks: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
     } as const
     const extended = {
       ...content,
@@ -550,4 +506,46 @@ it('round trips explicit unset input mappings through canonical persistence', ()
     },
   }
   expect(decodeRevision(encodeRevision(next))).toEqual(next)
+})
+
+it.each([
+  { subflows: { child: { name: 'Child', inputs: [], outputs: [], graph: { nodes: {}, edges: [] } } } },
+  { graph: { nodes: { child: { kind: 'subflow', subflowId: 'child', inputs: {} } }, edges: [] } },
+])('rejects retired Subflow content instead of silently dropping it: %j', (retired) => {
+  const content = revision()
+  const document = { ...content.document, ...retired }
+  const envelope = { ...content, document, kind: 'open-flow-flow-revision', version: 1 }
+  const bytes = new TextEncoder().encode(JSON.stringify(envelope))
+  expect(() => decodeFlowDocument(document)).toThrow(/Subflow/)
+  expect(() => decodeRevisionContent({ ...content, document })).toThrow(/Subflow/)
+  expect(() => decodeRevision(bytes)).toThrow(/Subflow/)
+  expect(() => repairRevision(bytes)).toThrow(/Subflow/)
+})
+
+it.each([2, 4, 5] as const)('preserves immutable bytes and identity for root-only model v%s', async (modelVersion) => {
+  const legacy = {
+    kind: 'open-flow-flow-revision',
+    version: 1,
+    modelVersion,
+    document: { bindings: {}, tasks: {}, subflows: {}, graph: { nodes: { start: { kind: 'manual', name: 'Start' } }, edges: [] } },
+    modules: {},
+  }
+  const bytes = canonicalJsonBytes(legacy as JsonValue)
+  const decoded = decodeRevision(bytes)
+  expect(decoded.document).not.toHaveProperty('subflows')
+  expect(encodeRevision(decoded)).toEqual(bytes)
+  expect(await flowClosure(decoded)).toMatchObject({
+    digest: await digestBytes(
+      canonicalJsonBytes({
+        bindings: {},
+        graph: legacy.document.graph,
+        kind: 'open-flow-semantic-closure',
+        modelVersion,
+        modules: {},
+        tasks: {},
+        subflows: {},
+        version: 2,
+      }),
+    ),
+  })
 })

@@ -1,7 +1,6 @@
 import type { BlockResourceName } from '../../manifestTypes.ts'
 import type { FlowLikeMeta } from './flowLikeMeta.ts'
 
-import { WritableSubflowNodeManifest } from '../../writable/node/writableSubflowNodeManifest.ts'
 import { WritableTaskNodeManifest } from '../../writable/node/writableTaskNodeManifest.ts'
 
 export function renameNodeRefSharedBlockResource(
@@ -14,10 +13,6 @@ export function renameNodeRefSharedBlockResource(
       if (WritableTaskNodeManifest.is(nodeMeta.manifest)) {
         if (nodeMeta.manifest.$.task.value === oldResourceName) {
           nodeMeta.manifest.$$.task.set(newResourceName)
-        }
-      } else if (WritableSubflowNodeManifest.is(nodeMeta.manifest)) {
-        if (nodeMeta.manifest.$.subflow.value === oldResourceName) {
-          nodeMeta.manifest.$$.subflow.set(newResourceName)
         }
       }
     }

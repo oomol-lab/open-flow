@@ -125,21 +125,6 @@ const fixtures: readonly Fixture[] = [
     },
   },
   {
-    id: 'subflow',
-    group: 'Subflow',
-    node: { kind: 'subflow', name: 'Format report', subflowId: 'format', inputs: { message: { kind: 'value', value: 'Release summary' } } },
-    content: {
-      subflows: {
-        format: {
-          name: 'Report formatter',
-          inputs: [field('message')],
-          outputs: [{ ...field('result'), sources: [{ kind: 'flow', input: 'message' }] }],
-          graph: { nodes: {}, edges: [] },
-        },
-      },
-    },
-  },
-  {
     id: 'agent',
     group: 'Agent',
     node: {
@@ -197,7 +182,7 @@ function contentFor(fixture: Fixture): RevisionContent {
   return {
     modelVersion: currentFlowModelVersion,
     modules: { module: { name: 'Prepare report', imports: [], source: 'export default (inputs) => ({ report: inputs.message, count: inputs.count })' } },
-    document: { bindings: {}, tasks: {}, subflows: {}, ...fixture.content, graph: { nodes: { sample: fixture.node }, edges: [] } },
+    document: { bindings: {}, tasks: {}, ...fixture.content, graph: { nodes: { sample: fixture.node }, edges: [] } },
   }
 }
 

@@ -39,7 +39,7 @@ const answers = {
 const empty: RevisionContent = {
   modelVersion: currentFlowModelVersion,
   modules: {},
-  document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } },
+  document: { bindings: {}, tasks: {}, graph: { edges: [], nodes: {} } },
 }
 
 describe('AI Decision contracts', () => {

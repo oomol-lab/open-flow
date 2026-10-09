@@ -16,7 +16,7 @@ export type WSId = string & {
   readonly __PHANTOM_TYPE__: unique symbol
 }
 
-/** A Block reference stored by a Node, such as a Subflow Node's `subflow` value. */
+/** A Task Block reference stored by a Node. */
 export type BlockResourceName = string & {
   readonly __PHANTOM_TYPE__: unique symbol
 }
@@ -62,9 +62,9 @@ export type FlowLikeName = FlowName | BlockName
 
 export type FlowLikePath = FlowPath | BlockPath
 
-export type FlowLikeType = 'flow' | 'subflow'
+export type FlowLikeType = 'flow'
 
-export type SharedBlockType = 'task' | 'subflow'
+export type SharedBlockType = 'task'
 
 export type InPackageManifestPath = FlowPath | BlockPath
 

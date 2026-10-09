@@ -190,7 +190,7 @@ describe('FlowWorkspace run drawer', () => {
       name: 'Read mail',
     } as const
     const revision = new RevisionView({
-      content: { document: { bindings: {}, graph: { nodes: { mail: node }, edges: [] }, subflows: {}, tasks: { mail: definition } }, modules: {} },
+      content: { document: { bindings: {}, graph: { nodes: { mail: node }, edges: [] }, tasks: { mail: definition } }, modules: {} },
     } as never)
     Object.assign(store.$, { connectorSetupPending: value(false), sourceNodeIcons: value({}) })
     Object.assign(store.workspace.$.revision, { value: revision })

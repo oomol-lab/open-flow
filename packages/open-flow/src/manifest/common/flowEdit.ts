@@ -6,7 +6,6 @@ import { z } from 'zod'
 import { isJsonValue } from '../../base/common/json.ts'
 import { FlowNodeSchema, FlowSchema, HandleNameSchema, NodeIdSchema, TriggerDefinitionSnapshotSchema } from '../../schema/index.ts'
 import { WritableConditionNodeManifest } from './writable/node/writableConditionNodeManifest.ts'
-import { WritableSubflowNodeManifest } from './writable/node/writableSubflowNodeManifest.ts'
 import { WritableTaskNodeManifest } from './writable/node/writableTaskNodeManifest.ts'
 import { WritableTriggerNodeManifest } from './writable/node/writableTriggerNodeManifest.ts'
 import { WritableValueNodeManifest } from './writable/node/writableValueNodeManifest.ts'
@@ -211,7 +210,6 @@ function createNode(node: z.input<typeof FlowNodeSchema>): WritableNodeManifest 
   const yamlParent = getYamlNode(doc, 'node').filter(isYamlMap).unwrap()
   const nodeId = node.node_id as NodeId
   if ('trigger' in node) return new WritableTriggerNodeManifest(nodeId, yamlParent)
-  if ('subflow' in node) return new WritableSubflowNodeManifest(nodeId, yamlParent)
   if ('values' in node) return new WritableValueNodeManifest(nodeId, yamlParent)
   if ('conditions' in node) return new WritableConditionNodeManifest(nodeId, yamlParent)
   return new WritableTaskNodeManifest(nodeId, yamlParent)
@@ -270,9 +268,7 @@ function disconnect(manifest: WritableFlowManifest, connection: z.infer<typeof c
   const { from_node: _removed, ...rest } = input
   const next = sources.length == 0 ? rest : { ...rest, from_node: sources }
   const replacement =
-    sources.length == 0 && next.value === undefined && !next.from_flow?.length && !next.schema_overrides?.length
-      ? inputs.toSpliced(inputIndex, 1)
-      : inputs.toSpliced(inputIndex, 1, next)
+    sources.length == 0 && next.value === undefined && !next.schema_overrides?.length ? inputs.toSpliced(inputIndex, 1) : inputs.toSpliced(inputIndex, 1, next)
   target.$$.inputs_from.set(replacement.length == 0 ? undefined : replacement)
 }
 

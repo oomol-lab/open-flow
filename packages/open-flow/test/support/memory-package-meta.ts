@@ -10,11 +10,10 @@ import { val } from 'value-enhancer'
 import { PackageMeta } from '../../src/manifest/common/meta/package/packageMeta.ts'
 import { ManifestSession } from '../../src/manifest/common/session.ts'
 import { createYamlSourceValidator } from '../../src/manifest/common/sourceValidator.ts'
-import { WritableSubflowBlockManifest } from '../../src/manifest/common/writable/block/writableSubflowBlockManifest.ts'
 import { WritableTaskBlockManifest } from '../../src/manifest/common/writable/block/writableTaskBlockManifest.ts'
 import { WritableFlowManifest } from '../../src/manifest/common/writable/writableFlowManifest.ts'
 import { WritablePackageManifest } from '../../src/manifest/common/writable/writablePackageManifest.ts'
-import { FlowSchema, SubflowBlockSchema, TaskBlockSchema } from '../../src/schema/index.ts'
+import { FlowSchema, TaskBlockSchema } from '../../src/schema/index.ts'
 
 export interface MemoryPackageFile {
   readonly path: string
@@ -51,7 +50,6 @@ export class MemoryPackageMetaContext implements PackageMetaContext {
 
   private readonly files: Map<string, ManifestSource>
   private readonly flowSessions = new Map<string, ManifestSession<WritableFlowManifest>>()
-  private readonly subflowSessions = new Map<string, ManifestSession<WritableSubflowBlockManifest>>()
   private readonly taskSessions = new Map<string, ManifestSession<WritableTaskBlockManifest>>()
 
   public constructor(files: readonly MemoryPackageFile[]) {
@@ -95,22 +93,6 @@ export class MemoryPackageMetaContext implements PackageMetaContext {
         watch: false,
       })
       this.taskSessions.set(path, session)
-    }
-    return session?.manifest
-  }
-
-  public async openSubflowManifest(path: BlockPath): Promise<WritableSubflowBlockManifest | undefined> {
-    this.throwOpenError(path)
-    let session = this.subflowSessions.get(path)
-    if (!session && this.files.has(path)) {
-      session = await ManifestSession.open({
-        path,
-        sourceService: this,
-        validateSource: createYamlSourceValidator(SubflowBlockSchema),
-        createManifest: (initial) => new WritableSubflowBlockManifest(initial.source, initial.revision),
-        watch: false,
-      })
-      this.subflowSessions.set(path, session)
     }
     return session?.manifest
   }
@@ -185,7 +167,7 @@ export class MemoryPackageMetaContext implements PackageMetaContext {
   }
 
   public async refreshManifest(path: string): Promise<ManifestRefreshResult> {
-    const session = this.flowSessions.get(path) ?? this.taskSessions.get(path) ?? this.subflowSessions.get(path)
+    const session = this.flowSessions.get(path) ?? this.taskSessions.get(path)
     if (!session) throw new Error(`Manifest is not open: ${path}`)
     return session.refresh()
   }
@@ -193,7 +175,6 @@ export class MemoryPackageMetaContext implements PackageMetaContext {
   public dispose(): void {
     for (const session of this.flowSessions.values()) session.dispose()
     for (const session of this.taskSessions.values()) session.dispose()
-    for (const session of this.subflowSessions.values()) session.dispose()
     this.lang$.dispose()
   }
 

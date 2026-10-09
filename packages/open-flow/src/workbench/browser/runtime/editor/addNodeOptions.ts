@@ -59,7 +59,6 @@ export type AddNodeOption = AddNodeOptionBase &
     | { readonly kind: 'openapi' }
     | { readonly kind: 'llm' }
     | { readonly kind: 'new-task' }
-    | { readonly kind: 'subflow'; readonly referenceId: string }
     | {
         readonly choices: NonNullable<AddNodeOptionBase['choices']>
         readonly kind: 'trigger'
@@ -237,14 +236,12 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, tar
       return { kind: 'code', name }
     }
     case 'agent':
-      return target.kind == 'flow'
-        ? {
-            kind: 'agent',
-            name: t('addNode.agent'),
-            prompt: t('agent.defaultPrompt', { input: '{{input}}' }),
-            outputDescription: t('agent.defaultOutputDescription'),
-          }
-        : undefined
+      return {
+        kind: 'agent',
+        name: t('addNode.agent'),
+        prompt: t('agent.defaultPrompt', { input: '{{input}}' }),
+        outputDescription: t('agent.defaultOutputDescription'),
+      }
     case 'decision':
       return { kind: 'decision', name: t('addNode.decision') }
     case 'openapi':
@@ -286,12 +283,10 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, tar
     case 'condition':
       return { kind: 'condition', name: t('addNode.condition') }
     case 'approval':
-      return target.kind == 'flow' ? { kind: 'approval', name: t('addNode.approval') } : undefined
+      return { kind: 'approval', name: t('addNode.approval') }
     case 'value':
       return { kind: 'value', name: t('addNode.value') }
     case 'wait':
-      return target.kind == 'flow' ? { kind: 'wait', name: t('addNode.wait') } : undefined
-    case 'subflow':
-      return { kind: 'subflow', subflowId: option.referenceId }
+      return { kind: 'wait', name: t('addNode.wait') }
   }
 }

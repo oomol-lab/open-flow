@@ -69,7 +69,6 @@ describe('writable condition node', () => {
         handle: 'score',
         value: undefined,
         schema_overrides: [{ schema: { type: 'number' } }],
-        from_flow: undefined,
         from_node: [{ node_id: 'producer', output_handle: 'result' }],
       },
     ])
@@ -93,7 +92,7 @@ describe('writable condition node', () => {
     ]
     const inputsFrom: HandleInputFrom[] = [
       { handle: handle('score'), value: 95, schema_overrides: [{ 'schema': { type: 'number' }, 'ui:options': { selected: 1 } }] },
-      { handle: handle('attempt'), from_flow: [{ input_handle: handle('retry') }] },
+      { handle: handle('attempt'), value: 1 },
     ]
     const cases: ConditionHandleDef[] = [
       {
@@ -133,14 +132,12 @@ describe('writable condition node', () => {
         handle: 'score',
         value: 95,
         schema_overrides: [{ 'schema': { type: 'number' }, 'ui:options': { selected: 1 } }],
-        from_flow: undefined,
         from_node: undefined,
       },
       {
         handle: 'attempt',
-        value: undefined,
+        value: 1,
         schema_overrides: undefined,
-        from_flow: [{ input_handle: 'retry' }],
         from_node: undefined,
       },
     ])

@@ -7,11 +7,10 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Popover, PopoverContent, PopoverDescription, PopoverHeader, PopoverTitle, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
 
-export type PublishState = 'ready' | 'current' | 'issues' | 'subflow' | 'busy' | 'publishing'
+export type PublishState = 'ready' | 'current' | 'issues' | 'busy' | 'publishing'
 
 const blockedReasonKey = {
   issues: 'workspace.publishIssuesReason',
-  subflow: 'workspace.subflowPublishHelp',
   busy: 'workspace.publishActionInProgress',
   publishing: 'workspace.publishInProgress',
 } as const

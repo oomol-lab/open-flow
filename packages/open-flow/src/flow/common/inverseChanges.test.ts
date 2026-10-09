@@ -10,7 +10,7 @@ const target = { kind: 'flow' } as const
 const empty: RevisionContent = {
   modelVersion: currentFlowModelVersion,
   modules: {},
-  document: { bindings: {}, graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {} },
+  document: { bindings: {}, graph: { nodes: {}, edges: [] }, tasks: {} },
 }
 function roundTrip(before: RevisionContent, operations: readonly ChangeOperation[]) {
   const after = applyFlowChanges(before, operations)
@@ -75,20 +75,6 @@ describe('inverse canvas changes', () => {
     const operations = deleteNodes(content, target, ['a', 'b'])
     expect(applyFlowChanges(content, operations).document.tasks).toEqual({ orphan: task })
     roundTrip(content, operations)
-    const shared: RevisionContent = {
-      ...content,
-      document: {
-        ...content.document,
-        subflows: {
-          sub: { name: 'Sub', inputs: [], outputs: [], graph: { edges: [], nodes: { c: { kind: 'task', name: 'C', taskId: 'mail', inputs: {} } } } },
-        },
-      },
-    }
-    const remaining = applyFlowChanges(shared, deleteNodes(shared, target, ['a', 'b']))
-    expect(remaining.document.tasks.mail).toEqual(task)
-    const removeLast = deleteNodes(remaining, { kind: 'subflow', id: 'sub' }, ['c'])
-    expect(applyFlowChanges(remaining, removeLast).document.tasks.mail).toBeUndefined()
-    roundTrip(remaining, removeLast)
   })
 
   it('preserves Agent notification tasks until the Agent is removed', () => {
@@ -163,25 +149,6 @@ describe('inverse canvas changes', () => {
     roundTrip(content, [{ kind: 'graph.edge.disconnect', target, edge: { source: 'a', target: 'b' } }])
   })
 
-  it('restores subflow output sources after deletion', () => {
-    const subTarget = { kind: 'subflow', id: 'sub' } as const
-    let content = applyFlowChanges(empty, [
-      { kind: 'subflow.create', subflowId: 'sub', subflow: { name: 'Sub', inputs: [], outputs: [], graph: { nodes: {}, edges: [] } } },
-      ...createValue(subTarget, 'a', 'A'),
-    ])
-    const subflow = content.document.subflows.sub!
-    const { graph: _graph, ...before } = subflow
-    content = applyFlowChanges(content, [
-      {
-        kind: 'subflow.definition.set',
-        subflowId: 'sub',
-        before,
-        definition: { ...before, outputs: [{ handle: 'value', jsonSchema: {}, nullable: true, sources: [{ kind: 'node', nodeId: 'a', output: 'value' }] }] },
-      },
-    ])
-    roundTrip(content, deleteNodes(content, subTarget, ['a']))
-  })
-
   it('restores optional fields, input values and code port definitions across a batch', () => {
     const content = applyFlowChanges(empty, createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Code'))
     const node = content.document.graph.nodes.code!
@@ -205,16 +172,9 @@ describe('inverse canvas changes', () => {
     ])
   })
 
-  it('restores binding targets and subflow definitions', () => {
-    const definition = { name: 'Sub', inputs: [], outputs: [] }
-    const content = applyFlowChanges(empty, [
-      { kind: 'binding.create', bindingId: 'connection', binding: { kind: 'variable', target: 'old' } },
-      { kind: 'subflow.create', subflowId: 'sub', subflow: { ...definition, graph: { nodes: {}, edges: [] } } },
-    ])
-    roundTrip(content, [
-      { kind: 'binding.target.set', bindingId: 'connection', before: 'old', value: 'new' },
-      { kind: 'subflow.definition.set', subflowId: 'sub', before: definition, definition: { ...definition, name: 'Renamed' } },
-    ])
+  it('restores binding targets', () => {
+    const content = applyFlowChanges(empty, [{ kind: 'binding.create', bindingId: 'connection', binding: { kind: 'variable', target: 'old' } }])
+    roundTrip(content, [{ kind: 'binding.target.set', bindingId: 'connection', before: 'old', value: 'new' }])
   })
 
   it('replays creation using the same node and module identities', () => {

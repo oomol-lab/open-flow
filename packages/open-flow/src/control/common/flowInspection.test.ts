@@ -66,27 +66,8 @@ const draft = {
               outputs: [port],
             },
           },
-          child: {
-            kind: 'subflow',
-            name: 'Child',
-            subflowId: 'child',
-            inputs: { limit: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'code', output: 'limit' }] } },
-          },
         },
         edges: [{ source: 'start', target: 'mail' }],
-      },
-      subflows: {
-        child: {
-          name: 'Child',
-          inputs: [port],
-          outputs: [{ ...port, sources: [{ kind: 'node', nodeId: 'nested', output: 'messages' }] }],
-          graph: {
-            nodes: {
-              nested: { kind: 'task', name: 'Nested', taskId: 'mail', inputs: { limit: { kind: 'sources', sources: [{ kind: 'flow', input: 'limit' }] } } },
-            },
-            edges: [],
-          },
-        },
       },
     },
   },
@@ -115,19 +96,12 @@ it('preserves editable graph relationships and defaults without catalog schemas 
           defaults: { inputDefaults: { limit: 20 } },
           unset: { inputs: { limit: { kind: 'unset' } } },
           code: { moduleId: 'script', inputs: draft.content.document.graph.nodes.code!.inputs },
-          child: { subflowId: 'child', inputs: draft.content.document.graph.nodes.child!.inputs },
           poll: {
             config: { limit: { kind: 'value', value: 10 } },
             connectionId: 'connection',
             pollTimes: [{ type: 'every', unit: 'minute', value: 5 }],
             definition: { key: 'mail.received', definitionVersion: 1 },
           },
-        },
-      },
-      subflows: {
-        child: {
-          graph: { nodes: { nested: { taskId: 'mail', inputs: { limit: { kind: 'sources', sources: [{ kind: 'flow', input: 'limit' }] } } } } },
-          outputs: [{ handle: 'limit', sources: [{ kind: 'node', nodeId: 'nested', output: 'messages' }] }],
         },
       },
       bindings: draft.content.document.bindings,

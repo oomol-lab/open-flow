@@ -26,7 +26,6 @@ const revision = revisionView({
           airtable: { kind: 'poll', name: 'Record Changed', config: {}, definition: airtableRecordChanged.snapshot, pollTimes: [] },
         },
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,

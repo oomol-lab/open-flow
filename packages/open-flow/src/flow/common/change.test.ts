@@ -22,7 +22,6 @@ function revision(): RevisionContent {
     document: {
       bindings: {},
       graph: { edges: [], nodes: {} },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,
@@ -77,14 +76,6 @@ describe('Flow changes', () => {
             d: { inputs: {}, kind: 'value', name: 'Review (2)', values: [] },
           },
         },
-        subflows: {
-          child: {
-            graph: { edges: [], nodes: { task: { inputs: {}, kind: 'task', taskId: 'shared' } } },
-            inputs: [],
-            name: 'Child',
-            outputs: [],
-          },
-        },
         tasks: { shared: { executor: { kind: 'llm', mode: 'chat' }, inputs: [], name: 'Summarize', outputs: [] } },
       },
     }
@@ -95,7 +86,6 @@ describe('Flow changes', () => {
     expect(changed.document.graph.nodes.b?.name).toBe('Review')
     expect(changed.document.graph.nodes.c?.name).toBe('Fixed Values')
     expect(changed.document.graph.nodes.d?.name).toBe('Review (3)')
-    expect(changed.document.subflows.child?.graph.nodes.task?.name).toBe('Summarize')
     expect(repairNodeNames(changed)).toEqual([])
   })
 
@@ -132,12 +122,6 @@ describe('Flow changes', () => {
   })
 
   it('applies every resource lifecycle operation in order', () => {
-    const subflow = {
-      graph: { edges: [], nodes: {} },
-      inputs: [{ ...port, handle: 'input' }],
-      name: 'Child',
-      outputs: [{ ...port, handle: 'output', sources: [] }],
-    }
     const task = { executor: { kind: 'llm' as const, mode: 'chat' as const }, inputs: [], name: 'Managed', outputs: [] }
     const operations: readonly ChangeOperation[] = [
       { binding: { kind: 'variable', target: 'connection-a' }, bindingId: 'binding', kind: 'binding.create' },
@@ -152,13 +136,6 @@ describe('Flow changes', () => {
         source: 'export default () => 2',
       },
       { before: 'Module', kind: 'module.rename', moduleId: 'module', name: 'Renamed module' },
-      { kind: 'subflow.create', subflow, subflowId: 'child' },
-      {
-        before: { inputs: subflow.inputs, name: subflow.name, outputs: subflow.outputs },
-        definition: { inputs: [], name: 'Renamed child', outputs: [] },
-        kind: 'subflow.definition.set',
-        subflowId: 'child',
-      },
       { kind: 'task.create', task, taskId: 'managed' },
       { before: 'Managed', kind: 'task.name.set', taskId: 'managed', value: 'Replaced' },
       { before: 'chat', kind: 'task.llm.mode.set', taskId: 'managed', value: 'json' },
@@ -168,13 +145,11 @@ describe('Flow changes', () => {
 
     expect(changed.document.bindings.binding).toEqual({ kind: 'variable', target: 'connection-b' })
     expect(changed.modules.module).toEqual({ imports: ['helper'], name: 'Renamed module', source: 'export default () => 2' })
-    expect(changed.document.subflows.child).toEqual({ graph: { edges: [], nodes: {} }, inputs: [], name: 'Renamed child', outputs: [] })
     expect(changed.document.tasks.managed).toMatchObject({ executor: { kind: 'llm', mode: 'json' }, name: 'Replaced' })
 
     const removed = applyFlowChanges(changed, [
       { bindingId: 'binding', kind: 'binding.delete' },
       { kind: 'module.delete', moduleId: 'module' },
-      { kind: 'subflow.delete', subflowId: 'child' },
       { kind: 'task.delete', taskId: 'managed' },
     ])
     expect(removed).toEqual(revision())
@@ -263,39 +238,10 @@ describe('Flow changes', () => {
     })
   })
 
-  it('preserves deleted Subflow node sources in its boundary outputs', () => {
-    const source = revision()
-    const withSubflow = applyFlowChanges(source, [
-      {
-        kind: 'subflow.create',
-        subflow: {
-          graph: { edges: [], nodes: { source: valueNode(1) } },
-          inputs: [],
-          name: 'Child',
-          outputs: [{ ...port, handle: 'output', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] }],
-        },
-        subflowId: 'child',
-      },
-      { kind: 'graph.node.delete', nodeId: 'source', target: { id: 'child', kind: 'subflow' } },
-    ])
-
-    expect(withSubflow.document.subflows.child).toMatchObject({
-      graph: { edges: [], nodes: {} },
-      outputs: [{ handle: 'output', sources: [{ kind: 'node', nodeId: 'source', output: 'value' }] }],
-    })
-  })
-
   it.each([
     { before: 'OLD', bindingId: 'missing', kind: 'binding.target.set', value: 'TOKEN' },
     { kind: 'module.delete', moduleId: 'missing' },
-    { kind: 'subflow.delete', subflowId: 'missing' },
     { kind: 'task.delete', taskId: 'missing' },
-    {
-      kind: 'graph.node.create',
-      node: { bodyFields: [], kind: 'webhook', method: 'POST', name: 'Invalid' },
-      nodeId: 'trigger',
-      target: { id: 'missing', kind: 'subflow' },
-    },
   ] satisfies readonly ChangeOperation[])('rejects invalid operation %#', (operation) => {
     expect(() => applyFlowChanges(revision(), [operation])).toThrow(FlowChangeError)
   })

@@ -34,7 +34,7 @@ export function InspectorSamplePanel({
   const [open, setOpen] = useState(true)
   const t = useTranslate()
   const target = { kind: 'flow' } as const
-  const icon = inspectorIcon(selection, target)
+  const icon = inspectorIcon(selection)
   const canvasNode = designerGraph(revision.revision, target, undefined, [], {}, {}, t).nodes.find((node) => node.id === selection?.id)
   if (!open)
     return (

@@ -252,7 +252,6 @@ describe('Connector access settings', () => {
         content: {
           document: {
             graph: { edges: [], nodes: {} },
-            subflows: {},
           },
         },
       },

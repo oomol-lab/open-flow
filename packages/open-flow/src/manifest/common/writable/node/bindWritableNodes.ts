@@ -9,7 +9,6 @@ import { isNodeId } from '../../utils.ts'
 import { bindWritableSeqMap } from '../../writableFileManifest.ts'
 import { isYamlMap, getYamlNodeValue } from '../../yaml.ts'
 import { WritableConditionNodeManifest } from './writableConditionNodeManifest.ts'
-import { WritableSubflowNodeManifest } from './writableSubflowNodeManifest.ts'
 import { WritableTaskNodeManifest } from './writableTaskNodeManifest.ts'
 import { WritableTriggerNodeManifest } from './writableTriggerNodeManifest.ts'
 import { WritableValueNodeManifest } from './writableValueNodeManifest.ts'
@@ -43,10 +42,6 @@ function parseNodeType(nodeYaml: YamlMap): NodeType {
     return 'trigger'
   }
 
-  if (getYamlNodeValue(nodeYaml, 'subflow').isSome()) {
-    return 'subflow'
-  }
-
   if (getYamlNodeValue(nodeYaml, 'values').isSome()) {
     return 'value'
   }
@@ -60,8 +55,6 @@ function parseNodeType(nodeYaml: YamlMap): NodeType {
 
 function parseWritableNode(nodeYaml: YamlMap, nodeId: NodeId, nodeType: NodeType): WritableNodeManifest {
   switch (nodeType) {
-    case 'subflow':
-      return new WritableSubflowNodeManifest(nodeId, nodeYaml)
     case 'value':
       return new WritableValueNodeManifest(nodeId, nodeYaml)
     case 'condition':

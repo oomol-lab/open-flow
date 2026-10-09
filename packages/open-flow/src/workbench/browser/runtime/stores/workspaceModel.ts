@@ -217,10 +217,7 @@ export class WorkspaceModel {
       targetFlow: compute((get) => (get(target)?.kind == 'flow' ? get(flows.$.flows).find((flow) => flow.flowId == get(flowId)) : undefined)),
       targetName: derive(this.#state, (state) => {
         if (state.target == null) return
-        if (state.target.kind == 'flow') return flows.flow(state.flowId ?? '')?.name
-        if (state.draft == null) return state.target.id
-        const currentRevision = revisionView(state.draft)
-        return currentRevision.subflow(state.target.id)?.name ?? state.target.id
+        return flows.flow(state.flowId ?? '')?.name
       }),
       workspaceLoadFailed,
       workspaceLoadProblem,

@@ -51,18 +51,9 @@ const content: RevisionContent = {
         outputs: [],
       },
     },
-    subflows: {
-      child: {
-        name: 'Follow-up',
-        inputs: [],
-        outputs: [],
-        graph: { edges: [], nodes: { profile: { kind: 'task', inputs: {}, taskId: 'github', name: 'Read child profile' } } },
-      },
-    },
     graph: {
       nodes: {
         profile: { kind: 'task', inputs: {}, taskId: 'github' },
-        child: { kind: 'subflow', subflowId: 'child', inputs: {} },
         data: {
           kind: 'value',
           name: 'Issue text',

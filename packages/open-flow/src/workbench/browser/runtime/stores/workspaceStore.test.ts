@@ -21,7 +21,6 @@ const draft = {
     document: {
       bindings: {},
       graph: { edges: [], nodes: {} },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,

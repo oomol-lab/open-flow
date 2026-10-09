@@ -15,14 +15,11 @@ async function session() {
   const flow = { flowId: 'flow', name: 'Flow', status: 'active', createdAt: timestamp, updatedAt: timestamp, draftRevisionId: 'r1', version: 1 } as const
   let draft: Draft = {
     actorId: 'test',
-    content: applyFlowChanges(
-      { modelVersion: currentFlowModelVersion, document: { graph: { nodes: {}, edges: [] }, tasks: {}, subflows: {}, bindings: {} }, modules: {} },
-      [
-        ...createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Code'),
-        ...createValue(target, 'value', 'Value'),
-        { kind: 'graph.edge.connect', target, edge: { source: 'value', target: 'code' } },
-      ],
-    ),
+    content: applyFlowChanges({ modelVersion: currentFlowModelVersion, document: { graph: { nodes: {}, edges: [] }, tasks: {}, bindings: {} }, modules: {} }, [
+      ...createCodeTask(target, { nodeId: 'code', moduleId: 'module' }, 'Code'),
+      ...createValue(target, 'value', 'Value'),
+      { kind: 'graph.edge.connect', target, edge: { source: 'value', target: 'code' } },
+    ]),
     createdAt: timestamp,
     digest: 'digest',
     flowId: 'flow',

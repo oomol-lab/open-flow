@@ -3,16 +3,13 @@ import type { ReactiveMap, ReadonlyReactiveMap } from 'value-enhancer/collection
 import type { ResourceUriResolver } from '../../../../base/common/resource.ts'
 import type { BlockName, BlockPath, SharedBlockType } from '../../manifestTypes.ts'
 import type { ManifestSource, PackageManifestKind } from '../../source.ts'
-import type { WritableSubflowBlockManifest } from '../../writable/block/writableSubflowBlockManifest.ts'
 import type { WritableTaskBlockManifest } from '../../writable/block/writableTaskBlockManifest.ts'
 import type { SharedBlockMeta } from '../block/shared/sharedBlockMeta.ts'
-import type { ResolveSharedBlockMeta$ } from '../nodeMeta.ts'
 import type { PackageMeta } from './packageMeta.ts'
 
 import { disposableStore, dispose } from '@wopjs/disposable'
 import { reactiveMap } from 'value-enhancer/collections'
 import { basename, dirname, isParent, join } from '../../../../base/common/posixPath.ts'
-import { SubflowBlockMeta } from '../block/subflowBlockMeta.ts'
 import { TaskBlockMeta } from '../block/taskBlockMeta.ts'
 import { renameNodeRefSharedBlockResource } from '../flowLike/tools.ts'
 
@@ -22,17 +19,10 @@ interface TaskBlockRefreshCandidate {
   readonly manifest: WritableTaskBlockManifest
 }
 
-interface SubflowBlockRefreshCandidate {
-  readonly blockMeta: SubflowBlockMeta | undefined
-  readonly blockPath: BlockPath
-  readonly manifest: WritableSubflowBlockManifest
-}
-
 export interface SharedBlocksManagerContext {
   readonly resolveResourceUri: ResourceUriResolver
   listManifestPaths(kind: PackageManifestKind): Promise<readonly string[]>
   openTaskManifest(path: BlockPath): Promise<WritableTaskBlockManifest | undefined>
-  openSubflowManifest(path: BlockPath): Promise<WritableSubflowBlockManifest | undefined>
   fileDirExists(fileOrDirPath: string): Promise<boolean>
   removeFileDir(fileOrDirPath: string): Promise<void>
   copyFileDir(srcPath: string, destPath: string): Promise<string>
@@ -46,19 +36,14 @@ export class SharedBlocksManager {
   public readonly taskBlocksByName: ReadonlyReactiveMap<BlockName, TaskBlockMeta>
   readonly #taskBlocksByName: ReactiveMap<BlockName, TaskBlockMeta>
 
-  public readonly subflowBlocksByName: ReadonlyReactiveMap<BlockName, SubflowBlockMeta>
-  readonly #subflowBlocksByName: ReactiveMap<BlockName, SubflowBlockMeta>
-
   public readonly sharedBlocksByPath: ReadonlyReactiveMap<BlockPath, SharedBlockMeta>
   readonly #sharedBlocksByPath: ReactiveMap<BlockPath, SharedBlockMeta>
 
   public constructor(
     private readonly packageMeta: PackageMeta,
     private readonly ctx: SharedBlocksManagerContext,
-    private readonly resolveSharedBlockMeta$: ResolveSharedBlockMeta$,
   ) {
     this.taskBlocksByName = this.#taskBlocksByName = this.dispose.add(reactiveMap(null, { onDeleted: dispose }))
-    this.subflowBlocksByName = this.#subflowBlocksByName = this.dispose.add(reactiveMap(null, { onDeleted: dispose }))
     this.sharedBlocksByPath = this.#sharedBlocksByPath = this.dispose.add(reactiveMap())
   }
 
@@ -66,18 +51,10 @@ export class SharedBlocksManager {
     return join(this.packageMeta.packageDir, 'tasks', blockName, 'task.oo.yaml') as BlockPath
   }
 
-  public getSubflowBlockPath(blockName: BlockName): BlockPath {
-    return join(this.packageMeta.packageDir, 'subflows', blockName, 'subflow.oo.yaml') as BlockPath
-  }
-
   public async refreshSharedBlock(blockType: 'task', blockPath: BlockPath): Promise<TaskBlockMeta | undefined>
-  public async refreshSharedBlock(blockType: 'subflow', blockPath: BlockPath): Promise<SubflowBlockMeta | undefined>
   public async refreshSharedBlock(blockType: SharedBlockType, blockPath: BlockPath): Promise<SharedBlockMeta | undefined>
   public async refreshSharedBlock(blockType: SharedBlockType, blockPath: BlockPath): Promise<SharedBlockMeta | undefined> {
     switch (blockType) {
-      case 'subflow': {
-        return this.refreshSubflowBlock(blockPath)
-      }
       case 'task':
       default: {
         return this.refreshTaskBlock(blockPath)
@@ -90,26 +67,12 @@ export class SharedBlocksManager {
     if (manifest) return this.#upsertTaskBlockMeta(blockPath, manifest)
   }
 
-  public async refreshSubflowBlock(blockPath: BlockPath): Promise<SubflowBlockMeta | undefined>
-  public async refreshSubflowBlock(blockPath: BlockPath): Promise<SubflowBlockMeta | undefined> {
-    const manifest = await this.ctx.openSubflowManifest(blockPath)
-    if (manifest) return this.#upsertSubflowBlockMeta(blockPath, manifest)
-  }
-
   public async writeNewTaskBlock(blockName: BlockName, yamlContent: string): Promise<TaskBlockMeta> {
     const blockPath = this.getTaskBlockPath(blockName)
     await this.ctx.createFile(blockPath, yamlContent)
     const manifest = await this.ctx.openTaskManifest(blockPath)
     if (!manifest) throw new Error(`Task manifest failed to open after creation: ${blockPath}`)
     return this.#upsertTaskBlockMeta(blockPath, manifest)
-  }
-
-  public async writeNewSubflowBlock(blockName: BlockName, yamlContent: string): Promise<SubflowBlockMeta> {
-    const blockPath = this.getSubflowBlockPath(blockName)
-    await this.ctx.createFile(blockPath, yamlContent)
-    const manifest = await this.ctx.openSubflowManifest(blockPath)
-    if (!manifest) throw new Error(`Subflow manifest failed to open after creation: ${blockPath}`)
-    return this.#upsertSubflowBlockMeta(blockPath, manifest)
   }
 
   /** Removes a shared block after an explicit authoring action. */
@@ -128,10 +91,6 @@ export class SharedBlocksManager {
 
   public onSharedBlockFilesDidRemove(blockMeta: SharedBlockMeta): void {
     switch (blockMeta.blockType) {
-      case 'subflow': {
-        this.#subflowBlocksByName.delete(blockMeta.blockName)
-        break
-      }
       case 'task': {
         this.#taskBlocksByName.delete(blockMeta.blockName)
         break
@@ -149,20 +108,6 @@ export class SharedBlocksManager {
     let newBlockMeta: SharedBlockMeta | undefined
 
     switch (blockMeta.blockType) {
-      case 'subflow': {
-        if (this.subflowBlocksByName.has(newName)) {
-          return
-        }
-        const newBlockDir = await this.ctx.renameFileDir(blockMeta.blockDir, join(blockMeta.blockDir, '..', newName))
-
-        const newBlockPath = join(newBlockDir, basename(blockMeta.blockPath)) as BlockPath
-
-        newBlockMeta = await this.refreshSubflowBlock(newBlockPath)
-
-        this.onSharedBlockFilesDidRemove(blockMeta)
-
-        break
-      }
       case 'task': {
         if (this.taskBlocksByName.has(newName)) {
           return
@@ -187,7 +132,6 @@ export class SharedBlocksManager {
     const oldBlockResourceName = blockMeta.blockResourceName
     const newBlockResourceName = newBlockMeta.blockResourceName
     renameNodeRefSharedBlockResource(this.packageMeta.flows.flowsByName.values(), oldBlockResourceName, newBlockResourceName)
-    renameNodeRefSharedBlockResource(this.packageMeta.sharedBlocks.subflowBlocksByName.values(), oldBlockResourceName, newBlockResourceName)
     await this.removeSharedBlockMeta(blockMeta)
 
     return newBlockMeta as T
@@ -201,10 +145,6 @@ export class SharedBlocksManager {
 
     let newBlockMeta: SharedBlockMeta | undefined
     switch (blockMeta.blockType) {
-      case 'subflow': {
-        newBlockMeta = await this.refreshSubflowBlock(newBlockPath)
-        break
-      }
       case 'task': {
         newBlockMeta = await this.refreshTaskBlock(newBlockPath)
         break
@@ -217,14 +157,11 @@ export class SharedBlocksManager {
   }
 
   public async isBlockNameAvailable(blockName: string): Promise<boolean> {
-    if (this.taskBlocksByName.has(blockName as BlockName) || this.subflowBlocksByName.has(blockName as BlockName)) {
+    if (this.taskBlocksByName.has(blockName as BlockName)) {
       return false
     }
 
-    if (
-      (await this.ctx.fileDirExists(join(this.packageMeta.packageDir, 'tasks', blockName))) ||
-      (await this.ctx.fileDirExists(join(this.packageMeta.packageDir, 'subflows', blockName)))
-    ) {
+    if (await this.ctx.fileDirExists(join(this.packageMeta.packageDir, 'tasks', blockName))) {
       return false
     }
 
@@ -237,8 +174,6 @@ export class SharedBlocksManager {
 
     const taskCandidates = await this.#listTaskBlocks()
     if (refreshId !== this.#refreshId) return
-
-    const subflowCandidates = await this.#listSubflowBlocks()
     if (refreshId !== this.#refreshId) return
 
     const taskBlocks = taskCandidates.map((candidate) => {
@@ -248,17 +183,9 @@ export class SharedBlocksManager {
         return this.#createTaskBlockMeta(candidate.blockPath, candidate.manifest)
       }
     })
-    const subflowBlocks = subflowCandidates.map((candidate) => {
-      if (candidate.blockMeta?.manifest == candidate.manifest) {
-        return candidate.blockMeta
-      } else {
-        return this.#createSubflowBlockMeta(candidate.blockPath, candidate.manifest)
-      }
-    })
 
     this.#taskBlocksByName.replace(taskBlocks.map((taskBlock) => [taskBlock.blockName, taskBlock] as const))
-    this.#subflowBlocksByName.replace(subflowBlocks.map((subflowBlock) => [subflowBlock.blockName, subflowBlock] as const))
-    this.#sharedBlocksByPath.replace([...taskBlocks, ...subflowBlocks].map((blockMeta) => [blockMeta.blockPath, blockMeta] as const))
+    this.#sharedBlocksByPath.replace(taskBlocks.map((blockMeta) => [blockMeta.blockPath, blockMeta] as const))
   }
 
   async #listTaskBlocks(): Promise<TaskBlockRefreshCandidate[]> {
@@ -270,19 +197,6 @@ export class SharedBlocksManager {
         const manifest = await this.ctx.openTaskManifest(taskBlockPath)
         if (!manifest) throw new Error(`Listed Task manifest does not exist: ${taskBlockPath}`)
         return { blockMeta, blockPath: taskBlockPath, manifest }
-      }),
-    )
-  }
-
-  async #listSubflowBlocks(): Promise<SubflowBlockRefreshCandidate[]> {
-    const paths = await this.ctx.listManifestPaths('subflow')
-    return Promise.all(
-      paths.map(async (path): Promise<SubflowBlockRefreshCandidate> => {
-        const subflowPath = path as BlockPath
-        const blockMeta = SubflowBlockMeta.to(this.sharedBlocksByPath.get(subflowPath))
-        const manifest = await this.ctx.openSubflowManifest(subflowPath)
-        if (!manifest) throw new Error(`Listed Subflow manifest does not exist: ${subflowPath}`)
-        return { blockMeta, blockPath: subflowPath, manifest }
       }),
     )
   }
@@ -306,34 +220,6 @@ export class SharedBlocksManager {
   #createTaskBlockMeta(blockPath: BlockPath, manifest: WritableTaskBlockManifest): TaskBlockMeta {
     const taskBlockMeta = new TaskBlockMeta(blockPath, this.packageMeta, this.packageMeta.searchPath, manifest, this.ctx.resolveResourceUri)
     return taskBlockMeta
-  }
-
-  #insertSubflowBlockMeta(blockPath: BlockPath, manifest: WritableSubflowBlockManifest): SubflowBlockMeta {
-    const subflowBlockMeta = this.#createSubflowBlockMeta(blockPath, manifest)
-    this.#subflowBlocksByName.set(subflowBlockMeta.blockName, subflowBlockMeta)
-    this.#sharedBlocksByPath.set(subflowBlockMeta.blockPath, subflowBlockMeta)
-    return subflowBlockMeta
-  }
-
-  #upsertSubflowBlockMeta(blockPath: BlockPath, manifest: WritableSubflowBlockManifest): SubflowBlockMeta {
-    const subflowBlockMeta = this.sharedBlocksByPath.get(blockPath)
-    if (SubflowBlockMeta.is(subflowBlockMeta) && subflowBlockMeta.manifest == manifest) {
-      return subflowBlockMeta
-    } else {
-      return this.#insertSubflowBlockMeta(blockPath, manifest)
-    }
-  }
-
-  #createSubflowBlockMeta(blockPath: BlockPath, manifest: WritableSubflowBlockManifest): SubflowBlockMeta {
-    const subflowBlockMeta = new SubflowBlockMeta(
-      blockPath,
-      this.packageMeta,
-      this.packageMeta.searchPath,
-      manifest,
-      this.resolveSharedBlockMeta$,
-      this.ctx.resolveResourceUri,
-    )
-    return subflowBlockMeta
   }
 
   #isInScope(blockPath: BlockPath): boolean {

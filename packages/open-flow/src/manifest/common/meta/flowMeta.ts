@@ -1,6 +1,14 @@
 import type { ReadonlyVal } from 'value-enhancer'
 import type { ResourceUriResolver } from '../../../base/common/resource.ts'
-import type { InputHandleDef, OutputHandleDef, TriggerDefinition, TriggerDefinitionSnapshot, TriggerDescriptor, TriggerNode } from '../../../schema/index.ts'
+import type {
+  HandleName,
+  InputHandleDef,
+  OutputHandleDef,
+  TriggerDefinition,
+  TriggerDefinitionSnapshot,
+  TriggerDescriptor,
+  TriggerNode,
+} from '../../../schema/index.ts'
 import type { FlowEditOperation } from '../flowEdit.ts'
 import type { FlowName, FlowPath, SearchPath } from '../manifestTypes.ts'
 import type { WritableFlowManifest } from '../writable/writableFlowManifest.ts'
@@ -14,7 +22,7 @@ import { arrayShallowEqual, attachSetter, combine, derive, val } from 'value-enh
 import { applyFlowEditOperations } from '../flowEdit.ts'
 import { getHandleNames } from '../model/block/base/blockManifest.ts'
 import { WritableTriggerNodeManifest } from '../writable/node/writableTriggerNodeManifest.ts'
-import { createConnectedInputHandles$, FlowLikeMeta, isFlowLikeMeta } from './flowLike/flowLikeMeta.ts'
+import { FlowLikeMeta, isFlowLikeMeta } from './flowLike/flowLikeMeta.ts'
 
 export interface FlowMeta$ extends FlowLikeMeta$ {
   readonly icon: ReadonlyVal<string | undefined>
@@ -76,7 +84,7 @@ export class FlowMeta extends FlowLikeMeta<WritableFlowManifest> {
     const outputHandleNames = derive(outputHandleDefs, getHandleNames, {
       equal: arrayShallowEqual,
     })
-    const connectedInputHandles = createConnectedInputHandles$(this.nodes, inputHandleNames, handleOutputsFrom)
+    const connectedInputHandles = val<HandleName[] | undefined>()
 
     this.$ = {
       title,

@@ -34,7 +34,6 @@ function hangingFlow(): RevisionContent {
           },
         },
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,

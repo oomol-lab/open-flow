@@ -26,8 +26,6 @@
     "llmStructured": "LLM JSON",
     "llmStructuredDescription": "Generate structured JSON from messages and a prompt template.",
     "generatedResponse": "Generated response.",
-    "subflowDescription": "Add an existing subflow.",
-    "subflows": "Subflows",
     "triggerAddConnection": "Add Connection",
     "triggerBrowse": "Browse Provider Triggers…",
     "triggerBrowseDescription": "Open the Trigger catalog to choose a Provider event and Connection.",
@@ -61,7 +59,7 @@
     "clear": "Clear",
     "collapse": "Collapse",
     "deploymentManaged": "Service permissions are managed by this deployment.",
-    "description": "All Code nodes in this Flow, including Subflows, share these connections. Node connection selections do not grant Code access.",
+    "description": "All Code nodes in this Flow share these connections. Node connection selections do not grant Code access.",
     "empty": "No connections have been added for Code.",
     "loadFailed": "Service authorization could not be loaded.",
     "loading": "Loading access…",
@@ -92,7 +90,7 @@
     "pendingAccountReferences": "Awaiting account:",
     "nodeReferences": "Referenced by:",
     "moreReferences": "{{count}} more",
-    "dynamicCodeReferences": "All Code nodes in this Flow, including Subflows, share these connections. Node connection selections do not grant Code access.",
+    "dynamicCodeReferences": "All Code nodes in this Flow share these connections. Node connection selections do not grant Code access.",
     "noAccountSelected": "No account selected",
     "removeAuthorization": "Remove authorization",
     "saving": "Saving…",
@@ -114,7 +112,6 @@
     "rename": "Rename",
     "refresh": "Refresh",
     "save": "Save",
-    "subflow": "Subflow",
     "unset": "Unset"
   },
   "designer": {
@@ -266,14 +263,6 @@
     },
     "selectNode": "Select one Draft node to inspect and edit it.",
     "locateNode": "Locate this node on the canvas",
-    "subflow": {
-      "definition": "Subflow definition",
-      "inputPorts": "Input ports (JSON)",
-      "open": "Open subflow",
-      "outputPorts": "Output ports and sources (JSON)",
-      "referenced": "Referenced subflow",
-      "save": "Save subflow"
-    },
     "task": {
       "sharedPermissions": "Use Flow shared permission group",
       "sharedPermissionsHint": "Use all Actions authorized by the Flow permission group. No need to add them to this node.",
@@ -761,7 +750,6 @@
     "renameFlow": "Rename {{name}}",
     "search": "Search",
     "searchResources": "Search {{kind}}",
-    "subflows": "Subflows",
     "listenersLoading": "Checking error listeners…",
     "listenersFailed": "Could not check error listeners. Retry or continue deleting.",
     "listenersTitle": "These published Flow Error configurations listen to this workflow:",
@@ -809,11 +797,8 @@
           "output": "Upstream node \"{{nodeId}}\" does not expose output \"{{output}}\"."
         },
         "target-missing": {
-          "subflow": "Subflow \"{{subflowId}}\" does not exist.",
           "task": "Task \"{{taskId}}\" does not exist."
         },
-        "subflow-output-incompatible": "A source is not compatible with Subflow output \"{{output}}\".",
-        "subflow-output-schema-incompatible": "The data format for Subflow output \"{{output}}\" does not match: {{issue}}",
         "trigger-not-allowed": "Trigger nodes are only allowed in Flows.",
         "variable-incompatible": "Environment variable binding \"{{bindingId}}\" is not compatible with this input.",
         "variable-source-mixed": "An environment variable must be the only source for an input."
@@ -837,9 +822,6 @@
           "import": "CodeModule \"{{moduleId}}\" cannot import \"{{specifier}}\".",
           "reexport": "CodeModule \"{{moduleId}}\" must import before re-exporting values."
         }
-      },
-      "subflow": {
-        "cycle": "Subflow cycle is not executable: {{subflows}}."
       },
       "task": {
         "capability-incomplete": "Inline Task \"{{nodeId}}\" has an incomplete Connector Capability.",
@@ -941,8 +923,6 @@
       "saving": "Saving Draft…",
       "failed": "Save failed"
     },
-    "subflowDraft": "Subflow Draft",
-    "subflowPublishHelp": "Subflows are published through a Flow.",
     "unpublishedChanges": "Unpublished changes",
     "valid": "Valid",
     "views": "Workspace views",

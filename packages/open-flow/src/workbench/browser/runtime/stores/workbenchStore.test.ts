@@ -74,7 +74,7 @@ function catalogSession(initialFlowId?: string, catalogReady: Promise<void> = Pr
       modelVersion: currentFlowModelVersion,
       parentRevisionId: null,
       version: 1,
-      content: { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, tasks: {}, subflows: {}, graph: { nodes: {}, edges: [] } } },
+      content: { modelVersion: currentFlowModelVersion, modules: {}, document: { bindings: {}, tasks: {}, graph: { nodes: {}, edges: [] } } },
     },
     live: { flowId, hasUnpublishedChanges: true, publication: null, revision: 0, status: 'not-published', version: 1 },
     presentation: { revision: 1, updatedAt: timestamp, value: {}, version: 1 },

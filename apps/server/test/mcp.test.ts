@@ -699,46 +699,6 @@ for (const conformance of mcpConformanceCases) {
   })
 }
 
-it('reads code and subflow nodes from the requested immutable Revision after the Draft changes', async () => {
-  const { call, control, client } = await fixture()
-  const flow = await control.createFlow('Node details')
-  const changed = await control.changeDraft(
-    flow.flowId,
-    flow.draftRevisionId,
-    [
-      ...authoringExample('code').operations,
-      {
-        kind: 'subflow.create',
-        subflowId: 'child',
-        subflow: { name: 'Child', inputs: [], outputs: [], graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Nested start' } } } },
-      },
-    ],
-    'details',
-  )
-  const revisionId = changed.revision.revisionId
-  const args = { flowId: flow.flowId, revisionId, nodeId: 'format' }
-  const detail = await call('flow_node_get', args)
-  expect(detail).toMatchObject({
-    revisionId,
-    nodeId: 'format',
-    node: { task: { moduleId: 'format-module', inputs: [{ handle: 'events' }] } },
-    module: { source: expect.stringContaining('export default') },
-  })
-  expect(detail).not.toHaveProperty('task')
-  const next = await control.changeDraft(flow.flowId, revisionId, [{ kind: 'graph.node.delete', target: { kind: 'flow' }, nodeId: 'format' }], 'delete-code')
-  expect(await call('flow_node_get', args)).toEqual(detail)
-  expect(await call('flow_node_get', { flowId: flow.flowId, revisionId, subflowId: 'child', nodeId: 'start' })).toMatchObject({
-    subflowId: 'child',
-    node: { name: 'Nested start' },
-  })
-  for (const input of [
-    { ...args, revisionId: next.revision.revisionId },
-    { ...args, subflowId: 'missing' },
-  ]) {
-    expect((await client.callTool({ name: 'flow_node_get', arguments: input })).isError).toBe(true)
-  }
-})
-
 it('discovers Trigger definitions separately from Flow instances and rejects contradictory Run identities', async () => {
   const { call, client, service } = await fixture()
   expect(await call('connector_teams')).toEqual({ enabled: false, teams: [], version: 1 })

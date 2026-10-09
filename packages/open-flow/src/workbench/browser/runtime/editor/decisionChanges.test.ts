@@ -93,7 +93,6 @@ function draft(): Draft {
       modules: {},
       document: {
         bindings: {},
-        subflows: {},
         tasks: { decision: decisionTask([{ name: 'result', type: 'noul', instructions: 'Needs support?' }]) },
         graph: {
           nodes: {
@@ -167,7 +166,7 @@ it('preserves missing references after deletion and copies node references using
   expect(pasted.nodeIds).toHaveLength(2)
 })
 
-it('renames references to every shared task instance, including subflow exports', () => {
+it('renames references to every shared task instance', () => {
   const initial = draft()
   const view = revisionView(initial)
   let sequence = 0
@@ -179,14 +178,6 @@ it('renames references to every shared task instance, including subflow exports'
       ...copied.content,
       document: {
         ...copied.content.document,
-        subflows: {
-          child: {
-            name: 'Child',
-            inputs: [],
-            outputs: [{ handle: 'answer', jsonSchema: { type: 'object' }, nullable: false, sources: [{ kind: 'node', nodeId: 'decision', output: 'result' }] }],
-            graph: initial.content.document.graph,
-          },
-        },
       },
     },
   }
@@ -198,12 +189,11 @@ it('renames references to every shared task instance, including subflow exports'
     task,
   })!
   const after = applyFlowChanges(before, operations)
-  for (const graph of [after.content.document.graph, after.content.document.subflows.child!.graph]) {
+  for (const graph of [after.content.document.graph]) {
     for (const node of Object.values(graph.nodes)) {
       if (node.kind === 'condition')
         expect(node).toMatchObject({ cases: [{ groups: [{ expressions: [{ left: { source: { output: 'support', field: 'noul' } } }] }] }] })
     }
   }
-  expect(after.content.document.subflows.child!.outputs[0]!.sources[0]).toMatchObject({ output: 'support' })
   expect(applyFlowChanges(after, inverseFlowChanges(before.content, operations)).content).toEqual(before.content)
 })

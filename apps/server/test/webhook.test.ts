@@ -60,7 +60,6 @@ function webhookFlow(): RevisionContent {
           },
         },
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,
@@ -335,7 +334,6 @@ it('runs the published Flow Error after an automatic failure and exposes both Ru
       document: {
         bindings: {},
         tasks: {},
-        subflows: {},
         graph: {
           nodes: {
             error: { kind: 'error', name: 'Flow Error' },

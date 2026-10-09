@@ -54,8 +54,6 @@ export function defaultNodeName(content: RevisionContent, node: GraphNode): stri
       return 'Approval'
     case 'wait':
       return 'Wait'
-    case 'subflow':
-      return normalizeNodeName(content.document.subflows[node.subflowId]?.name ?? '') || 'Subflow'
     case 'task':
       return normalizeNodeName(node.task != null ? node.task.name : (content.document.tasks[node.taskId]?.name ?? '')) || 'Task'
     case 'error':
@@ -85,10 +83,7 @@ function graphNameRepairs(content: RevisionContent, targetGraph: Graph, target: 
 }
 
 export function repairNodeNames(content: RevisionContent): readonly ChangeOperation[] {
-  return [
-    ...graphNameRepairs(content, content.document.graph, { kind: 'flow' }),
-    ...Object.entries(content.document.subflows).flatMap(([id, subflow]) => graphNameRepairs(content, subflow.graph, { id, kind: 'subflow' })),
-  ]
+  return graphNameRepairs(content, content.document.graph, { kind: 'flow' })
 }
 
 interface TriggerSettingsBase {
@@ -342,7 +337,7 @@ export function createProviderTrigger(
 }
 
 export function deleteNodes(content: RevisionContent, target: GraphTarget, nodeIds: readonly string[]): readonly ChangeOperation[] {
-  const nodes = graph(content, target)?.nodes
+  const nodes = content.document.graph?.nodes
   if (nodes == null) return []
   const operations: ChangeOperation[] = nodeIds.flatMap((nodeId) => {
     const node = nodes[nodeId]
@@ -360,7 +355,7 @@ export function deleteNodes(content: RevisionContent, target: GraphTarget, nodeI
 }
 
 export function updateSettings(content: RevisionContent, target: GraphTarget, nodeId: string, settings: Settings): readonly ChangeOperation[] | undefined {
-  const node = graph(content, target)?.nodes[nodeId]
+  const node = content.document.graph?.nodes[nodeId]
   if (node == null || !('inputs' in node)) return
   const operations: ChangeOperation[] = []
 
@@ -390,7 +385,7 @@ export function setInputValues(
   nodeId: string,
   values: Readonly<Record<string, JsonValue | undefined>>,
 ): readonly ChangeOperation[] | undefined {
-  const node = graph(content, target)?.nodes[nodeId]
+  const node = content.document.graph?.nodes[nodeId]
   if (node == null || !('inputs' in node)) return
   const operations: ChangeOperation[] = []
   for (const [handle, value] of Object.entries(values)) {
@@ -404,7 +399,7 @@ export function setInputValues(
 
 /** Restore inheritance for this form in one undoable change. */
 export function resetInputValues(content: RevisionContent, target: GraphTarget, nodeId: string, handles: readonly string[]): readonly ChangeOperation[] {
-  const node = graph(content, target)?.nodes[nodeId]
+  const node = content.document.graph?.nodes[nodeId]
   if (node == null || !('inputs' in node)) return []
   const mappings = nodeInputMappings(node)
   return cleanVariableBindings(
@@ -422,7 +417,7 @@ export function setInputSources(
   handle: string,
   sources: Extract<InputMapping, { readonly kind: 'sources' }>['sources'],
 ): readonly ChangeOperation[] {
-  const node = (target.kind == 'flow' ? content.document.graph : content.document.subflows[target.id]?.graph)?.nodes[nodeId]
+  const node = content.document.graph?.nodes[nodeId]
   if (node == null || !('inputs' in node)) return []
   return cleanVariableBindings(content, [
     { kind: 'graph.node.input.set', nodeId, handle, target, before: nodeInputMappings(node)[handle], value: { kind: 'sources', sources } },
@@ -437,7 +432,7 @@ export function setInputVariable(
   name: string,
   bindingId: string,
 ): readonly ChangeOperation[] | undefined {
-  const node = graph(content, target)?.nodes[nodeId]
+  const node = content.document.graph?.nodes[nodeId]
   if (node == null || !('inputs' in node)) return
   const mapping = nodeInputMappings(node)[handle]
   const currentId =
@@ -472,14 +467,12 @@ function bindingReferences(document: RevisionContent['document']): Map<string, n
   const add = (bindingId: string): void => {
     references.set(bindingId, (references.get(bindingId) ?? 0) + 1)
   }
-  for (const currentGraph of [document.graph, ...Object.values(document.subflows).map((subflow) => subflow.graph)]) {
-    for (const node of Object.values(currentGraph.nodes)) {
-      if (!('inputs' in node)) continue
-      const inputs = Object.values(nodeInputMappings(node))
-      for (const mapping of inputs) {
-        if (mapping.kind != 'sources') continue
-        for (const source of mapping.sources) if (source.kind == 'binding') add(source.bindingId)
-      }
+  for (const node of Object.values(document.graph.nodes)) {
+    if (!('inputs' in node)) continue
+    const inputs = Object.values(nodeInputMappings(node))
+    for (const mapping of inputs) {
+      if (mapping.kind != 'sources') continue
+      for (const source of mapping.sources) if (source.kind == 'binding') add(source.bindingId)
     }
   }
   return references
@@ -600,10 +593,6 @@ export function setTriggerConnection(
   return [{ before: trigger.connectionId, kind: 'graph.node.field.set', field: 'connectionId', nodeId, target, value: connectionId }]
 }
 
-function graph(content: RevisionContent, target: GraphTarget) {
-  return target.kind == 'flow' ? content.document.graph : content.document.subflows[target.id]?.graph
-}
-
 function defaultInputs(ports: TaskDefinition['inputs']): Readonly<Record<string, InputMapping>> {
   return Object.fromEntries(
     ports.flatMap((port) =>
@@ -622,7 +611,7 @@ export function setCodeActions(
   nodeId: string,
   capabilities: readonly ConnectorCapability[],
 ): readonly ChangeOperation[] | undefined {
-  const selected = target.kind == 'flow' ? content.document.graph : content.document.subflows[target.id]?.graph
+  const selected = content.document.graph
   const node = selected?.nodes[nodeId]
   if (node?.kind != 'task' || node.task == null || dequal(node.task.capabilities ?? [], capabilities)) return
   return [{ kind: 'graph.node.task.capabilities.set', target, nodeId, before: node.task.capabilities, value: capabilities }]

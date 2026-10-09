@@ -14,7 +14,7 @@ const commands = [
   ['enable', '<flow> --expected-publication <publicationId>', ['expected-publication']],
   ['disable', '<flow> --expected-publication <publicationId>', ['expected-publication']],
   ['node list', '<flow>', []],
-  ['node show', '<flow> <node> [--revision <revisionId>] [--subflow <subflowId>]', ['revision', 'subflow']],
+  ['node show', '<flow> <node> [--revision <revisionId>]', ['revision']],
   ['node add', '<flow> <agent|code|condition|value|llm-chat|llm-json> <name>', [...edit, 'code']],
   ['node set', '<flow> <node>', [...edit, 'name', 'timeout']],
   ['node input', '<flow> <node> <input> <source> <output> [<source> <output> ...]', edit],
@@ -71,7 +71,6 @@ const optionDetails: Record<
   { description: string; type?: string; enum?: readonly string[]; default?: string | number; minimum?: number; maximum?: number }
 > = {
   'revision': { description: 'Exact Revision to read or check; defaults to the current Draft.', type: 'string' },
-  'subflow': { description: 'Exact subflow ID in the selected Revision; defaults to the root graph.', type: 'string' },
   'publication': { description: 'Exact Publication ID whose fixed Code connections are read; defaults to the Draft.', type: 'string' },
   'pointer': { description: 'JSON Pointer within the stored result; defaults to the root.', type: 'string' },
   'offset': { description: 'Page offset at the selected pointer.', type: 'integer', minimum: 0, default: 0 },

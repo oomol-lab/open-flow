@@ -65,7 +65,6 @@ function ObjectSourceSample({ variables }: { variables: InputVariables }) {
     document: {
       bindings: {},
       tasks: {},
-      subflows: {},
       graph: {
         edges: [{ source: 'data', target: 'sink' }],
         nodes: {

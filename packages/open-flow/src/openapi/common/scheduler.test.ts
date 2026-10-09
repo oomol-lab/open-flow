@@ -36,7 +36,6 @@ it('resolves authentication sources privately, keeps defaults and omits explicit
     modules: {},
     document: {
       bindings: { key: { kind: 'variable', target: 'API_KEY' } },
-      subflows: {},
       tasks: { api: task },
       graph: {
         edges: [

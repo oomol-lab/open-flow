@@ -123,7 +123,6 @@ describe('Workbench Diagnostic messages', () => {
               },
             },
           },
-          subflows: {},
           tasks: {},
         },
         modelVersion: currentFlowModelVersion,

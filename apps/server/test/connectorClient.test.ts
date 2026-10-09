@@ -51,7 +51,6 @@ function connectorFlow(options: { readonly action?: string; readonly connectionI
           },
         },
       },
-      subflows: {},
       tasks: {
         connector: {
           executor: {
@@ -101,7 +100,6 @@ function capabilityFlow(declared = true): RevisionContent {
           },
         },
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,

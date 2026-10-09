@@ -579,7 +579,6 @@ it('resumes a streamed gateway batch after restart and retains earlier receipts 
         modules: {},
         document: {
           bindings: {},
-          subflows: {},
           tasks: { agent: { ...task, executor: { ...task.executor, code: true } } },
           graph: {
             edges: [],
@@ -815,7 +814,6 @@ it('runs a code-only Agent through the service without a Connector deployment', 
         modules: {},
         document: {
           bindings: {},
-          subflows: {},
           tasks: { agent: source },
           graph: { edges: [], nodes: { agent: { kind: 'task', name: 'Agent', taskId: 'agent', inputs: {} } } },
         },

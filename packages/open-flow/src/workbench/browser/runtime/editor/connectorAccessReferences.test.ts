@@ -49,21 +49,15 @@ function flowDocument(): FlowDocument {
         },
       },
     },
-    subflows: { child: { name: 'Follow-up', inputs: [], outputs: [], graph: { edges: [], nodes: { first: { kind: 'task', inputs: {}, taskId: 'send' } } } } },
   }
 }
 
-it('matches explicit account IDs across nodes, triggers and subflows without inferring dynamic code or unused tasks', () => {
+it('matches explicit account IDs across nodes and triggers without inferring dynamic code or unused tasks', () => {
   const result = connectorAccessReferences(flowDocument())
   expect(result.hasCode).toBe(true)
-  expect(result.accounts.filter((item) => item.connectionId == 'work').map((item) => item.name)).toEqual([
-    'Send receipt',
-    'Send mail',
-    'New mail',
-    'Follow-up / Send mail',
-  ])
+  expect(result.accounts.filter((item) => item.connectionId == 'work').map((item) => item.name)).toEqual(['Send receipt', 'Send mail', 'New mail'])
   expect(result.accounts.filter((item) => item.connectionId == null).map((item) => item.nodeId)).toEqual(['pending'])
-  expect(result.accounts.at(-1)?.target).toEqual({ kind: 'subflow', id: 'child' })
+  expect(result.accounts.at(-1)?.target).toEqual({ kind: 'flow' })
   expect(result.accounts.some((item) => item.nodeId == 'code' || item.connectionId == 'other')).toBe(false)
 })
 
@@ -72,7 +66,6 @@ it('distinguishes agent tools and notifications using the same account', () => {
   const document: FlowDocument = {
     ...source,
     graph: { edges: [], nodes: { agent: { kind: 'task', inputs: {}, taskId: 'agent' } } },
-    subflows: {},
     tasks: {
       ...source.tasks,
       agent: {
@@ -101,7 +94,7 @@ it('distinguishes agent tools and notifications using the same account', () => {
   ])
 })
 
-it('removes account usage across subflows and triggers while preserving graph, code and other accounts', () => {
+it('removes account usage across nodes and triggers while preserving graph, code and other accounts', () => {
   const document = flowDocument()
   const content: RevisionContent = {
     modelVersion: currentFlowModelVersion,
@@ -111,7 +104,6 @@ it('removes account usage across subflows and triggers while preserving graph, c
   const changed = removeConnectionUsage(content, 'work')
   const { connectionId: _, ...event } = document.graph.nodes.event as Extract<GraphNode, { kind: 'poll' }>
   expect(changed.document.graph).toEqual({ ...document.graph, nodes: { ...document.graph.nodes, event } })
-  expect(changed.document.subflows).toEqual(document.subflows)
   expect(changed.modules).toEqual(content.modules)
   expect(changed.document.bindings).toEqual({})
   expect(changed.document.tasks.send?.executor).not.toHaveProperty('connectionId')

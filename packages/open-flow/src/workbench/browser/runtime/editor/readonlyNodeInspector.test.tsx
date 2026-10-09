@@ -93,7 +93,6 @@ it('inspects saved values and definitions without exposing writable controls or 
             selection={selection}
             target={{ kind: 'flow' }}
             theme="light"
-            onOpenSubflow={vi.fn()}
           />
         </I18nProvider>,
       )

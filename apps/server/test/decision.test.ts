@@ -129,7 +129,6 @@ it('executes upstream data → Decision → Condition using answer fields in the
         modules: {},
         document: {
           bindings: {},
-          subflows: {},
           tasks: { decision: decisionTask(questions) },
           graph: {
             nodes: {

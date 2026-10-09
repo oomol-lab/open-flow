@@ -19,7 +19,6 @@ import { useTranslate } from 'val-i18n-react'
 import { decisionModel } from '../../../../decision/common/decision.ts'
 import { nodeInputMappings } from '../../../../flow/common/condition.ts'
 import { inputValue } from '../../../../flow/common/inputValue.ts'
-import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { ScrollArea } from '../../../../ui/browser/scroll-area.tsx'
@@ -46,19 +45,17 @@ import { OpenApiSection } from './openApiSection.tsx'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 import { presentProviderOutputDescription, presentProviderSourceCandidates, presentProviderTriggerConfig } from './providerTriggerPresentation.ts'
 import { ResolutionDefinition } from './resolutionDefinition.tsx'
-import { SubflowDefinition } from './subflowDefinition.tsx'
 import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
 import { TriggerScheduleEditor } from './triggerScheduleEditor.tsx'
 import { TriggerSummary } from './triggerSummary.tsx'
 import { WebhookEditor } from './webhookEditor.tsx'
 
-export function inspectorIcon(node: ResolvedSelection | undefined, target: GraphTarget): IconName {
+export function inspectorIcon(node: ResolvedSelection | undefined): IconName {
   if (node?.kind == 'trigger') return 'trigger'
   if (node?.kind == 'condition') return 'condition'
   if (node?.kind == 'value') return 'value'
   if (node?.kind == 'approval') return 'check'
   if (node?.kind == 'wait') return 'wait'
-  if (node?.kind == 'subflow' || (node == null && target.kind == 'subflow')) return 'subflow'
   if (node?.kind == 'task' && node.definition != null && 'executor' in node.definition) {
     if (node.definition.executor.kind == 'decision') return 'decision'
     if (node.definition.executor.kind == 'openapi') return 'task'
@@ -82,8 +79,6 @@ function nodePurposePlaceholder(
       return t('addNode.approvalDescription')
     case 'wait':
       return t('addNode.waitDescription')
-    case 'subflow':
-      return t('addNode.subflowDescription')
     case 'trigger': {
       const node = selection.node
       switch (node.kind) {
@@ -183,7 +178,6 @@ function inputUpstreamSources({
 
 interface Props {
   readonly readOnly?: boolean
-  readonly onOpenSubflow?: (id: string) => void
   readonly variables?: InputVariables
   readonly connectorAction?: ConnectorAction
   readonly connectorActionError?: ConnectorActionError
@@ -233,7 +227,6 @@ type InspectorProps = Props &
 export function NodeInspector({
   variables = { enabled: false, loaded: false, loading: false, names: [], onOpen: undefined },
   readOnly = false,
-  onOpenSubflow,
   connectorAction,
   connectorActionError,
   connectorAccessError,
@@ -530,14 +523,10 @@ export function NodeInspector({
           />
         )}
         {!unconfiguredOpenApi &&
-          (selection?.kind === 'approval' || selection?.kind === 'wait' || selection?.kind === 'subflow' || selection?.kind === 'task') &&
+          (selection?.kind === 'approval' || selection?.kind === 'wait' || selection?.kind === 'task') &&
           (() => {
             const definitions: (InputPort | Group)[] =
-              selection.kind === 'task'
-                ? [...(selection.definition?.inputs ?? [])]
-                : selection.kind === 'subflow'
-                  ? [...(selection.definition?.inputs ?? [])]
-                  : [...selection.node.inputDefinitions]
+              selection.kind === 'task' ? [...(selection.definition?.inputs ?? [])] : [...selection.node.inputDefinitions]
             const handles = new Set(definitions.flatMap((definition) => ('handle' in definition ? [definition.handle] : [])))
             for (const handle of Object.keys(selection.node.inputs)) {
               if (!handles.has(handle) && !(selection.kind === 'task' && selection.node.additionalInputs?.some((port) => port.handle === handle)))
@@ -707,7 +696,7 @@ export function NodeInspector({
             />
           </section>
         )}
-        {(selection?.kind === 'subflow' || selection?.kind === 'approval' || selection?.kind === 'wait') && (
+        {(selection?.kind === 'approval' || selection?.kind === 'wait') && (
           <section className="inspector-port-section">
             <PortDefinitionEditor
               readOnly={readOnly}
@@ -716,17 +705,13 @@ export function NodeInspector({
               title={t('inspector.ports.outputsTitle')}
               output
               disabled
-              values={selection.kind === 'subflow' ? (selection.definition?.outputs ?? []) : presentResolutionOutputs(selection.node, t)}
+              values={presentResolutionOutputs(selection.node, t)}
               onChange={() => {}}
             />
           </section>
         )}
         {selection == null ? (
-          target.kind == 'subflow' ? (
-            <SubflowDefinition definition={revision.subflow(target.id)!} disabled={disabled} store={store} subflowId={target.id} />
-          ) : (
-            <div className="inspector-empty">{t('inspector.selectNode')}</div>
-          )
+          <div className="inspector-empty">{t('inspector.selectNode')}</div>
         ) : (
           <>
             {selection.kind == 'trigger' ? null : selection.kind == 'task' ? (
@@ -758,17 +743,6 @@ export function NodeInspector({
             ) : null}
             {selection.kind != 'trigger' && selection.kind != 'task' && (
               <GeneralSettings readOnly={readOnly} disabled={disabled} node={selection.node} nodeId={selection.id} store={store} />
-            )}
-            {selection.kind == 'subflow' && (
-              <section className="inspector-section">
-                <h3>{t('inspector.subflow.referenced')}</h3>
-                <p className="reference-value">{selection.definition?.name ?? selection.node.subflowId}</p>
-                {onOpenSubflow != null && selection.definition != null && (
-                  <Button className="self-start" size="sm" variant="outline" onClick={() => onOpenSubflow(selection.node.subflowId)}>
-                    {t('inspector.subflow.open')}
-                  </Button>
-                )}
-              </section>
             )}
           </>
         )}

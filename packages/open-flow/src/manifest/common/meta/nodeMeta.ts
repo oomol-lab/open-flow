@@ -5,7 +5,6 @@ import type { HandleInputFrom, HandleName, HandleOutputFrom, InputHandleDef, Nod
 import type { BlockResourceName, SharedBlockType } from '../manifestTypes.ts'
 import type { WritableNodeManifest } from '../writable/node/writableNodeManifest.ts'
 import type { SharedBlockMeta } from './block/shared/sharedBlockMeta.ts'
-import type { SubflowBlockMeta } from './block/subflowBlockMeta.ts'
 import type { FlowLikeMeta } from './flowLike/flowLikeMeta.ts'
 
 import { inertFilterMap } from '@wopjs/cast'
@@ -15,7 +14,6 @@ import { arrayShallowEqual, attachSetter, combine, compute, derive, flatten, val
 import { isAbsolute, isParent, join } from '../../../base/common/posixPath.ts'
 import { getHandleNames } from '../model/block/base/blockManifest.ts'
 import { isConditionNodeManifest } from '../model/node/conditionNodeManifest.ts'
-import { isSubflowNodeManifest } from '../model/node/subflowNodeManifest.ts'
 import { isTaskNodeManifest } from '../model/node/taskNodeManifest.ts'
 import { isTriggerNodeManifest } from '../model/node/triggerNodeManifest.ts'
 import { isValueNodeManifest } from '../model/node/valueNodeManifest.ts'
@@ -36,7 +34,6 @@ type NodeMetaKind = typeof NodeMetaKind
 
 export interface ResolveSharedBlockMeta$ {
   (blockResourceName: BlockResourceName, blockType: 'task'): ReadonlyVal<TaskBlockMeta | undefined>
-  (blockResourceName: BlockResourceName, blockType: 'subflow'): ReadonlyVal<SubflowBlockMeta | undefined>
   (blockResourceName: BlockResourceName, blockType: SharedBlockType): ReadonlyVal<SharedBlockMeta | undefined>
 }
 
@@ -110,12 +107,6 @@ export class NodeMeta<TNodeManifest extends WritableNodeManifest = WritableNodeM
 
     const blockMeta$ = this.dispose.add(
       compute((get) => {
-        if (isSubflowNodeManifest(manifest)) {
-          const subflow = get(manifest.$.subflow)
-          if (subflow) {
-            return get(resolveSharedBlockMeta$(subflow, 'subflow'))
-          }
-        }
         if (isTaskNodeManifest(manifest)) {
           const task = get(manifest.$.task)
           const inlineTask = WritableInlineTaskBlockManifest.to(task)
@@ -420,22 +411,6 @@ export class NodeMeta<TNodeManifest extends WritableNodeManifest = WritableNodeM
         inf = {
           ...inf,
           from_node: fromNode,
-        }
-      }
-    }
-
-    if (inf.from_flow) {
-      const inputHandleNames = get(this.flowLikeMeta.$.inputHandleDefs)?.map((def) => def.handle)
-
-      const fromFlow = inertFilterMap(inf.from_flow, (f) => {
-        if (!inputHandleNames?.includes(f.input_handle)) return undefined
-        return f
-      })
-
-      if (fromFlow !== inf.from_flow) {
-        inf = {
-          ...inf,
-          from_flow: fromFlow,
         }
       }
     }

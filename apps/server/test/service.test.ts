@@ -62,26 +62,9 @@ function fullFlow(value = 2): RevisionContent {
           },
           nested: {
             inputs: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'increment', output: 'value' }] } },
-            kind: 'subflow',
-            subflowId: 'double',
+            kind: 'task',
+            task: { inputs: [{ ...port, handle: 'value' }], moduleId: 'double', name: 'Double', outputs: [{ ...port, handle: 'value' }] },
           },
-        },
-      },
-      subflows: {
-        double: {
-          graph: {
-            edges: [],
-            nodes: {
-              task: {
-                inputs: { value: { kind: 'sources', sources: [{ input: 'value', kind: 'flow' }] } },
-                kind: 'task',
-                task: { inputs: [{ ...port, handle: 'value' }], moduleId: 'double', name: 'Double', outputs: [{ ...port, handle: 'value' }] },
-              },
-            },
-          },
-          inputs: [{ ...port, handle: 'value' }],
-          name: 'Double',
-          outputs: [{ ...port, handle: 'value', sources: [{ kind: 'node', nodeId: 'task', output: 'value' }] }],
         },
       },
       tasks: {},
@@ -118,7 +101,6 @@ function hangingFlow(): RevisionContent {
           },
         },
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,
@@ -147,7 +129,6 @@ function oversizedOutputsFlow(): RevisionContent {
           },
         },
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,
@@ -176,7 +157,6 @@ function variableFlow(): RevisionContent {
           },
         },
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,
@@ -200,7 +180,6 @@ function waitFlow(): RevisionContent {
           },
         },
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,
@@ -275,7 +254,6 @@ function llmFlow(): RevisionContent {
           },
         },
       },
-      subflows: {},
       tasks: {
         llm: {
           executor: { kind: 'llm', mode: 'json' },
@@ -306,7 +284,6 @@ function connectorFlow(): RevisionContent {
           },
         },
       },
-      subflows: {},
       tasks: {
         connector: {
           executor: { action: 'send', kind: 'connector' },
@@ -812,50 +789,6 @@ describe('Server application service', () => {
     await closeService(service)
   })
 
-  it('reads independent previous snapshots in an isolate and keeps Subflow roots isolated', async () => {
-    const source = fullFlow()
-    const revision: RevisionContent = {
-      ...source,
-      modules: {
-        ...source.modules,
-        increment: {
-          ...source.modules.increment!,
-          source: `export default async (inputs, context) => {
-  const previous = await context.getPrevious()
-  if (previous.id !== 'value' || previous.outputs.value !== inputs.value) throw new Error('Previous output is incorrect.')
-  if (previous.outputDefs[0].handle !== 'value' || previous.outputDefs[0].nullable !== false || 'value' in previous.outputDefs[0]) throw new Error('Previous schema is incorrect.')
-  previous.outputs.value = 'changed'
-  previous.outputDefs[0].jsonSchema.changed = true
-  const again = await context.getPrevious()
-  if (again.outputs.value !== inputs.value || again.outputDefs[0].jsonSchema.changed) throw new Error('Previous reads share mutable state.')
-  return { value: inputs.value + 1 }
-}`,
-        },
-        double: {
-          ...source.modules.double!,
-          source: `export default async ({ value }, context) => {
-  if (await context.getPrevious() !== null) throw new Error('Subflow root has a previous node.')
-  return { value: value * 2 }
-}`,
-        },
-      },
-    }
-    const service = await openService(await databaseFile())
-    await startService(service)
-    const accepted = await acceptRun(service, {
-      flowId: 'main',
-      idempotencyKey: 'previous',
-      revision,
-      revisionId: 'revision-previous',
-    })
-    if (accepted.kind !== 'accepted') throw new Error('Run was not accepted.')
-    await service.waitForIdle()
-    expect(service.run(accepted.runId)).toMatchObject({
-      status: 'completed',
-      result: { nodes: [{ nodeId: 'nested', outputs: { value: 6 } }] },
-    })
-  })
-
   it('executes a fixed full Flow through Scheduler and isolated-vm and persists public events', async () => {
     const service = await openService(await databaseFile())
     await startService(service)
@@ -880,18 +813,18 @@ describe('Server application service', () => {
     const kinds = events.map((event) => event.kind)
     expect(kinds[0]).toBe('run.queued')
     expect(kinds.at(-1)).toBe('run.completed')
-    expect(kinds.filter((kind) => kind == 'run.started')).toHaveLength(2)
-    expect(kinds.filter((kind) => kind == 'node.started')).toHaveLength(4)
-    expect(kinds.filter((kind) => kind == 'node.completed')).toHaveLength(4)
-    expect(kinds.filter((kind) => kind == 'run.progress')).toHaveLength(2)
-    expect(events.filter((event) => event.kind == 'run.progress').map((event) => event.payload.progress)).toEqual([100, 100])
+    expect(kinds.filter((kind) => kind == 'run.started')).toHaveLength(1)
+    expect(kinds.filter((kind) => kind == 'node.started')).toHaveLength(3)
+    expect(kinds.filter((kind) => kind == 'node.completed')).toHaveLength(3)
+    expect(kinds.filter((kind) => kind == 'run.progress')).toHaveLength(1)
+    expect(events.filter((event) => event.kind == 'run.progress').map((event) => event.payload.progress)).toEqual([100])
     expect(events.map((event) => event.cursor)).toEqual(events.map((_, index) => index + 1))
     expect(JSON.stringify(events.filter((event) => event.kind != 'run.completed'))).not.toContain('jobId')
     expect(service.control.runs.getRunResult(accepted.runId)).toMatchObject({ result: { kind: 'node-results' }, status: 'completed' })
     const projected = service.control.runs.getRunEvents(accepted.runId, 0, 100)
     expect(projected.done).toBe(true)
     expect(projected.nextAfter).toBe(events.length)
-    expect(projected.events.filter((event) => event.kind == 'node.completed')).toHaveLength(4)
+    expect(projected.events.filter((event) => event.kind == 'node.completed')).toHaveLength(3)
     expect(projected.events.find((event) => event.kind == 'node.completed' && event.payload.nodeId == 'nested')).toMatchObject({
       payload: { outputs: { value: 6 } },
     })
@@ -1030,7 +963,7 @@ describe('Server application service', () => {
     await startService(service)
     await service.waitForIdle()
     expect(service.run(accepted.runId)?.status).toBe('completed')
-    expect(service.events(accepted.runId).filter((event) => event.kind == 'run.started')).toHaveLength(2)
+    expect(service.events(accepted.runId).filter((event) => event.kind == 'run.started')).toHaveLength(1)
     expect(service.events(accepted.runId).filter((event) => event.kind == 'run.completed')).toHaveLength(1)
     await closeService(service)
   })
@@ -1552,7 +1485,7 @@ describe('Server application service', () => {
           revisionId: repaired.revision.revisionId,
           content: {
             modelVersion: currentFlowModelVersion,
-            document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} },
+            document: { bindings: {}, graph: { edges: [], nodes: {} }, tasks: {} },
             modules: {},
           },
         },
@@ -1576,7 +1509,6 @@ describe('Server application service', () => {
       document: {
         bindings: {},
         tasks: {},
-        subflows: {},
         graph: {
           nodes: {
             start: { kind: 'manual', name: 'Start' },

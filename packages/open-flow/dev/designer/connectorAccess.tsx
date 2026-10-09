@@ -27,7 +27,6 @@ const content: RevisionContent = {
         code: { inputs: {}, kind: 'task', name: 'Process response', task: { name: 'Process response', moduleId: 'code', inputs: [], outputs: [] } },
       },
     },
-    subflows: {},
     tasks: {
       pending: { executor: { action: 'mail.send', kind: 'connector' }, inputs: [], outputs: [], name: 'Send notification' },
       mail: {
@@ -59,7 +58,7 @@ const overviewContent: RevisionContent = {
   },
 }
 const emptyContent: RevisionContent = {
-  document: { bindings: {}, graph: { edges: [], nodes: {} }, subflows: {}, tasks: {} },
+  document: { bindings: {}, graph: { edges: [], nodes: {} }, tasks: {} },
   modelVersion: currentFlowModelVersion,
   modules: {},
 }

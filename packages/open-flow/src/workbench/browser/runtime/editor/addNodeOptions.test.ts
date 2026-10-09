@@ -25,7 +25,6 @@ function emptyDraft(): Draft {
       document: {
         bindings: {},
         tasks: {},
-        subflows: { nested: { graph: { edges: [], nodes: {} }, inputs: [], name: 'Nested', outputs: [] } },
         graph: { edges: [], nodes: {} },
       },
     },
@@ -45,7 +44,7 @@ it('offers a manual trigger again after the existing one is removed', () => {
     content: {
       modelVersion: currentFlowModelVersion,
       modules: {},
-      document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
+      document: { bindings: {}, tasks: {}, graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } } },
     },
   }
   expect(designerGraph(draft, { kind: 'flow' }).nodes).toEqual([expect.objectContaining({ id: 'start', outputs: [] })])
@@ -90,7 +89,7 @@ it('hides legacy LLM nodes from the node library', () => {
   const draft = emptyDraft()
   const t = createI18n('en').t
 
-  for (const target of [{ kind: 'flow' } as const, { id: 'nested', kind: 'subflow' } as const]) {
+  for (const target of [{ kind: 'flow' } as const]) {
     const options = deriveAddNodeOptions(draft, target, t)
     expect(options.some((option) => option.id == 'llm:chat' || option.id == 'llm:json')).toBe(false)
   }

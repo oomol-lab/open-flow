@@ -115,11 +115,6 @@ export interface FlowCanvasViewTaskNode extends FlowCanvasViewNodeBase {
   readonly reference: string
 }
 
-export interface FlowCanvasViewSubflowNode extends FlowCanvasViewNodeBase {
-  readonly kind: 'subflow'
-  readonly reference: string
-}
-
 export interface FlowCanvasViewConditionNode extends FlowCanvasViewNodeBase {
   readonly matchMode: 'first' | 'all'
   readonly cases: readonly FlowCanvasViewConditionCase[]
@@ -168,7 +163,6 @@ export interface FlowCanvasViewCommentNode {
 export type FlowCanvasViewNode =
   | FlowCanvasViewCommentNode
   | FlowCanvasViewConditionNode
-  | FlowCanvasViewSubflowNode
   | FlowCanvasViewTaskNode
   | FlowCanvasViewTriggerNode
   | FlowCanvasViewValueNode

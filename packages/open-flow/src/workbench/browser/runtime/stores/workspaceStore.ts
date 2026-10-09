@@ -8,7 +8,7 @@ import type { DesignerViewport, Point } from '../canvasPresentation.ts'
 import type { FlowChangeEvent } from '../contract.ts'
 import type { AddNodeOption } from '../editor/addNodeOptions.ts'
 import type { DiagnosticItem } from '../editor/diagnostics.ts'
-import type { ConditionSettings, TaskPorts, FlowChanges, SubflowSettings, TaskSettings, ValueSettings, WebhookSettings } from '../editor/flowChanges.ts'
+import type { ConditionSettings, TaskPorts, FlowChanges, TaskSettings, ValueSettings, WebhookSettings } from '../editor/flowChanges.ts'
 import type { NodeClipboard } from '../editor/nodeClipboard.ts'
 import type { PropertyDeletion } from '../editor/propertyDeletion.ts'
 import type { RevisionView } from '../revisionView.ts'
@@ -60,13 +60,11 @@ import {
   updateNodeIcon,
   updateNodeSettings,
   updateNodeName,
-  updateSubflow,
   updateTask,
   updateValue,
   updateResolution,
   updateWebhook,
   addNode as addFlowNode,
-  createResource as createFlowResource,
   setInputVariable as changeInputVariable,
   setInputValue as changeInputValue,
 } from '../editor/flowChanges.ts'
@@ -113,11 +111,6 @@ interface ReconciledRevision {
   readonly revision: RevisionView
   readonly selectedNodeIds: readonly string[]
   readonly target?: GraphTarget
-}
-
-function reconcileTarget(revision: RevisionView, target: GraphTarget | undefined): GraphTarget | undefined {
-  if (target == null) return
-  return target.kind == 'flow' || revision.subflow(target.id) != null ? target : { kind: 'flow' }
 }
 
 export class WorkspaceStore {
@@ -449,22 +442,6 @@ export class WorkspaceStore {
     } finally {
       this.#set({ busy: undefined })
     }
-  }
-
-  public async createResource(name: string): Promise<boolean> {
-    if (!(await this.saveModuleEditor())) return false
-    if (this.#model.value.draft == null) return false
-    const id = this.#identity()
-    this.#set({ busy: 'resource' })
-    const changed = await this.#changeDraft(createFlowResource(id, name), false)
-    this.#set({ busy: undefined })
-    if (changed == null) return false
-    this.selectTarget({ id, kind: 'subflow' })
-    this.#setNotice({
-      kind: 'success',
-      message: this.#i18n.t('notice.createdInDraft', { name }),
-    })
-    return true
   }
 
   public async renameFlow(flowId: string, name: string): Promise<boolean> {
@@ -953,13 +930,6 @@ export class WorkspaceStore {
     return (await this.#editDraft(changes)) != null
   }
 
-  public async saveSubflowSettings(subflowId: string, settings: SubflowSettings): Promise<boolean> {
-    const revision = this.$.revision.value
-    if (revision == null) return false
-    const changes = updateSubflow(revision, subflowId, settings)
-    return changes != null && (await this.#editDraft(changes)) != null
-  }
-
   public updateModuleSource(source: string): void {
     const editor = this.#model.value.moduleEditor
     if (this.#history.applying || this.#history.failed || editor == null || editor.source == source) return
@@ -1373,7 +1343,7 @@ export class WorkspaceStore {
 
   #reconcileRevision(draft: Draft): ReconciledRevision {
     const revision = revisionView(draft)
-    const target = reconcileTarget(revision, this.#model.value.target)
+    const target = this.#model.value.target
     const selectedNodeIds = this.#model.value.selectedNodeIds.filter((nodeId) => target != null && revision.selection(target, nodeId) != null)
     return { revision, selectedNodeIds, target }
   }

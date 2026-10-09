@@ -147,7 +147,6 @@ function content(live: boolean): RevisionContent {
     document: {
       bindings: { token: { kind: 'variable', target: 'API_TOKEN' } },
       tasks: { api: task },
-      subflows: {},
       graph: {
         nodes: {
           upstream: {

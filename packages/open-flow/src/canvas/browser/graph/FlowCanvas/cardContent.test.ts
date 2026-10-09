@@ -19,7 +19,6 @@ describe('Canvas content', () => {
     expect(nodeSummary({ ...base, kind: 'task', reference: 'normalize', description: '  ' })).toBe('')
     expect(nodeSummary({ ...base, kind: 'trigger', presentation: { kind: 'webhook', schedules: [] } })).toBe('')
     expect(nodeSummary({ ...base, kind: 'value', values: [] })).toBe('')
-    expect(nodeSummary({ ...base, kind: 'subflow', reference: 'prepare' })).toBe('')
   })
   it('keeps the value description separate from its structured content', () => {
     expect(
@@ -135,7 +134,6 @@ describe('Collapsible card content', () => {
       { ...base, kind: 'trigger' as const, presentation: { kind: 'cron' as const, schedules: [{ type: 'every' as const, value: 1, unit: 'day' as const }] } },
       { ...base, kind: 'task' as const, reference: 'task', description: 'Task description' },
       { ...base, kind: 'task' as const, reference: 'task', description: 'Task tools are summarized in the header.' },
-      { ...base, kind: 'subflow' as const, reference: 'sub', description: 'Subflow description' },
       { ...base, kind: 'wait' as const, notice: { text: 'Approve the report' } },
       { ...base, kind: 'task' as const, reference: 'task', run: { status: 'success' as const, outputs: { image: 'https://example.com/image.png' } } },
     ]) {

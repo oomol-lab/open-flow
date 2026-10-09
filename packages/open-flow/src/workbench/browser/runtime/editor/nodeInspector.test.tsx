@@ -306,7 +306,7 @@ describe('Resolution Inspector', () => {
 describe('Node execution settings', () => {
   it('saves execution limits and timeout, preserves sibling settings, and rejects invalid values', () => {
     const saveNodeSettings = vi.fn()
-    const node = { inputs: {}, kind: 'subflow', name: 'Review', subflowId: 'review', timeoutMs: 100, maxExecutions: 25 }
+    const node = { inputs: {}, kind: 'task', name: 'Review', taskId: 'review', timeoutMs: 100, maxExecutions: 25 }
     const revision = {
       graph: () => ({ nodes: { current: node, other: { inputs: {}, kind: 'value', name: 'Review', values: [] } } }),
     }
@@ -318,7 +318,7 @@ describe('Node execution settings', () => {
       connectors: {} as never,
       disabled: false,
       revision: revision as never,
-      selection: { id: 'current', kind: 'subflow', node, definition: { inputs: [], outputs: [] } } as never,
+      selection: { id: 'current', kind: 'task', node, definition: { inputs: [], outputs: [], executor: { kind: 'llm', mode: 'chat' } } } as never,
       store: { $: { flowId: { value: 'flow' } }, saveNodeSettings } as never,
       target: { kind: 'flow' },
       theme: 'light',
@@ -640,7 +640,7 @@ describe('Node input ownership', () => {
     expect(upstream.current[0]?.nodeName).toBeUndefined()
   })
 
-  it.each(['approval', 'wait', 'subflow', 'task'] as const)('resolves %s variable bindings and sends edits directly to the workspace', (kind) => {
+  it.each(['approval', 'wait', 'task'] as const)('resolves %s variable bindings and sends edits directly to the workspace', (kind) => {
     const setInputSource = vi.fn()
     const setInputValue = vi.fn()
     const setInputVariable = vi.fn()

@@ -5,7 +5,7 @@ export interface ManifestSource {
   readonly revision: Revision
 }
 
-export type PackageManifestKind = 'flow' | 'subflow' | 'task'
+export type PackageManifestKind = 'flow' | 'task'
 
 export type UnchangedManifestSource = 'unchanged'
 

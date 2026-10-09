@@ -14,7 +14,7 @@ async function setup() {
   const flow = { createdAt: timestamp, updatedAt: timestamp, draftRevisionId: 'r0', flowId: 'flow', name: 'Flow', status: 'active', version: 1 } as const
   const target = { kind: 'flow' } as const
   const content = applyFlowChanges(
-    { modelVersion: currentFlowModelVersion, document: { bindings: {}, tasks: {}, subflows: {}, graph: { nodes: {}, edges: [] } }, modules: {} },
+    { modelVersion: currentFlowModelVersion, document: { bindings: {}, tasks: {}, graph: { nodes: {}, edges: [] } }, modules: {} },
     [...createCodeTask(target, { moduleId: 'a', nodeId: 'a' }, 'A'), ...createCodeTask(target, { moduleId: 'b', nodeId: 'b' }, 'B')],
   )
   let revision: Draft = {

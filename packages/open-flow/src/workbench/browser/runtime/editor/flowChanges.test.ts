@@ -48,7 +48,6 @@ function draft(source: string): Draft {
             },
           },
         },
-        subflows: {},
         tasks: {},
       },
       modelVersion: currentFlowModelVersion,
@@ -409,7 +408,7 @@ describe('Condition changes', () => {
 })
 
 describe('Resolution node changes', () => {
-  it('creates separate Wait and Approval nodes, updates prompts, and allows them only in the root graph', () => {
+  it('creates separate Wait and Approval nodes, updates prompts', () => {
     const current = draft('export default (input) => ({ result: input.value })\n')
     const wait = addNode(revisionView(current), { kind: 'flow' }, 'wait', { kind: 'wait', name: 'Wait' }, () => 'unused')
     if (wait == null) throw new Error('Expected Wait changes.')
@@ -426,10 +425,6 @@ describe('Resolution node changes', () => {
 
     expect(changed.content.document.graph.nodes.wait).toMatchObject({ kind: 'wait', prompt: 'Wait' })
     expect(changed.content.document.graph.nodes.approval).toMatchObject({ kind: 'approval', name: 'Release approval', prompt: 'Approve this request?' })
-    expect(addNode(revisionView(changed), { id: 'child', kind: 'subflow' }, 'nested-wait', { kind: 'wait', name: 'Wait' }, () => 'unused')).toBeUndefined()
-    expect(
-      addNode(revisionView(changed), { id: 'child', kind: 'subflow' }, 'nested-approval', { kind: 'approval', name: 'Approval' }, () => 'unused'),
-    ).toBeUndefined()
   })
 })
 

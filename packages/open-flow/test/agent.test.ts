@@ -43,7 +43,6 @@ function revision(agent = task()): RevisionContent {
     modules: {},
     document: {
       bindings: {},
-      subflows: {},
       tasks: { agent },
       graph: {
         edges: [{ source: 'trigger', target: 'agent' }],
@@ -226,25 +225,10 @@ describe('Agent tool contracts', () => {
     expect(agentConfigIssues(agent, { agent })).toContain('Agent notification must reference a Connector Task.')
   })
 
-  it('accepts root Agents and rejects Agents in referenced Subflows', async () => {
+  it('accepts root Agents', async () => {
     const engine = findEngineContract(currentEngineContract)!
     const value = revision()
     expect((await validateFlow(value, engine)).diagnostics).toEqual([])
-    const nested: RevisionContent = {
-      ...value,
-      document: {
-        ...value.document,
-        graph: {
-          edges: [{ source: 'trigger', target: 'child' }],
-          nodes: {
-            trigger: value.document.graph.nodes.trigger!,
-            child: { kind: 'subflow', name: 'Child', subflowId: 'child', inputs: {} },
-          },
-        },
-        subflows: { child: { name: 'Child', inputs: [], outputs: [], graph: { edges: [], nodes: { agent: value.document.graph.nodes.agent! } } } },
-      },
-    }
-    expect((await validateFlow(nested, engine)).diagnostics.map((item) => item.code)).toContain('agent.subflow-unsupported')
   })
 })
 

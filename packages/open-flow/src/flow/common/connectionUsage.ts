@@ -13,39 +13,35 @@ export interface ConnectionUsage {
 
 export function connectionUsage(document: FlowDocument): readonly ConnectionUsage[] {
   const uses: ConnectionUsage[] = []
-  const graphs = [
-    { graph: document.graph, target: { kind: 'flow' } as GraphTarget, name: '' },
-    ...Object.entries(document.subflows).map(([id, subflow]) => ({ graph: subflow.graph, target: { kind: 'subflow', id } as GraphTarget, name: subflow.name })),
-  ]
-  for (const { graph, target, name: graphName } of graphs) {
-    for (const [nodeId, node] of Object.entries(graph.nodes)) {
-      const task = node.kind == 'task' && node.taskId != null ? document.tasks[node.taskId] : undefined
-      const name = [graphName, node.name ?? task?.name ?? nodeId].filter(Boolean).join(' / ')
-      const add = (kind: ConnectionUsage['kind'], actionId: string, connectionId?: string) => {
-        uses.push({ kind, providerId: actionId.split('.')[0]!, actionId, connectionId, nodeId, name, target })
+  const target: GraphTarget = { kind: 'flow' }
+
+  for (const [nodeId, node] of Object.entries(document.graph.nodes)) {
+    const task = node.kind == 'task' && node.taskId != null ? document.tasks[node.taskId] : undefined
+    const name = node.name ?? task?.name ?? nodeId
+    const add = (kind: ConnectionUsage['kind'], actionId: string, connectionId?: string) => {
+      uses.push({ kind, providerId: actionId.split('.')[0]!, actionId, connectionId, nodeId, name, target })
+    }
+    if (node.kind == 'poll' || node.kind == 'integration') {
+      uses.push({
+        kind: 'trigger',
+        triggerId: node.definition.key,
+        providerId: node.definition.provider,
+        connectionId: node.connectionId,
+        nodeId,
+        name,
+        target,
+      })
+    }
+    if (task?.executor.kind == 'connector') add('connector', task.executor.action, task.executor.connectionId)
+    if (node.kind == 'task' && node.task != null) {
+      for (const capability of node.task.capabilities ?? []) {
+        if ('mode' in capability && capability.mode == 'independent') for (const action of capability.actions) add('code', action.action, action.connectionId)
       }
-      if (node.kind == 'poll' || node.kind == 'integration') {
-        uses.push({
-          kind: 'trigger',
-          triggerId: node.definition.key,
-          providerId: node.definition.provider,
-          connectionId: node.connectionId,
-          nodeId,
-          name,
-          target,
-        })
-      }
-      if (task?.executor.kind == 'connector') add('connector', task.executor.action, task.executor.connectionId)
-      if (node.kind == 'task' && node.task != null) {
-        for (const capability of node.task.capabilities ?? []) {
-          if ('mode' in capability && capability.mode == 'independent') for (const action of capability.actions) add('code', action.action, action.connectionId)
-        }
-      }
-      if (task?.executor.kind == 'agent') {
-        for (const tool of task.executor.tools) add('agent', tool.action, tool.connectionId)
-        const notification = task.executor.notification == null ? undefined : document.tasks[task.executor.notification.taskId]?.executor
-        if (notification?.kind == 'connector') add('notification', notification.action, notification.connectionId)
-      }
+    }
+    if (task?.executor.kind == 'agent') {
+      for (const tool of task.executor.tools) add('agent', tool.action, tool.connectionId)
+      const notification = task.executor.notification == null ? undefined : document.tasks[task.executor.notification.taskId]?.executor
+      if (notification?.kind == 'connector') add('notification', notification.action, notification.connectionId)
     }
   }
   return uses
@@ -83,9 +79,6 @@ export function removeConnectionUsage(content: RevisionContent, connectionId: st
         }),
       ),
       graph: clearNodeConnections(document.graph, connectionId),
-      subflows: Object.fromEntries(
-        Object.entries(document.subflows).map(([id, subflow]) => [id, { ...subflow, graph: clearNodeConnections(subflow.graph, connectionId) }]),
-      ),
     },
   }
 }

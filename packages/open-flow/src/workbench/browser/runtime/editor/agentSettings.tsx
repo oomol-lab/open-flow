@@ -66,7 +66,7 @@ function EditableAgentSettingsProvider({
         const decoded = decodeRevisionContent({
           modelVersion: currentFlowModelVersion,
           modules: {},
-          document: { bindings: {}, subflows: {}, graph: { nodes: {}, edges: [] }, tasks: { agent: { ...definition, executor: value } } },
+          document: { bindings: {}, graph: { nodes: {}, edges: [] }, tasks: { agent: { ...definition, executor: value } } },
         }).document.tasks.agent!
         return store.saveTaskSettings(nodeId, { kind: 'agent', name: definition.name, before: definition, task: decoded })
       }),

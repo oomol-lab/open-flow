@@ -12,7 +12,7 @@
     "connectorNoActiveConnection": "利用可能な Connection がありません",
     "llmChat": "LLM チャット",
     "llmStructured": "LLM 構造化出力",
-    "sharedBlocks": "タスクと Subflow",
+    "sharedBlocks": "タスク",
     "triggers": "Trigger",
     "value": "固定値"
   },
@@ -402,17 +402,13 @@
     "value": "値"
   },
   "scriptlet": "スクリプトレット",
-  "subflowSettings": {
-    "forwardPreview": "プレビューを転送",
-    "title": "Subflow 設定"
-  },
   "workbench": {
     "conflict": {
       "keepLocal": "ローカルの変更を保持",
       "reload": "ディスクから再読み込み"
     },
     "empty": {
-      "description": "Flow、Subflow、Task のソースファイルを追加してから、ワークベンチを再読み込みしてください。",
+      "description": "Flow または Task のソースファイルを追加してから、ワークベンチを再読み込みしてください。",
       "title": "このプロジェクトには実行できるターゲットがまだありません。"
     },
     "noTargets": "実行できるターゲットがありません",
@@ -604,7 +600,6 @@
       "condition": "条件",
       "approval": "承認",
       "wait": "続行待ち",
-      "subflow": "サブフロー",
       "value": "固定値",
       "input": "入力",
       "output": "出力"

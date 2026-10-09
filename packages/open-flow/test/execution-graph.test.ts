@@ -15,7 +15,7 @@ const value = { inputs: {}, kind: 'value' as const, values: [{ ...port, handle: 
 const task = { inputs: {}, kind: 'task' as const, task: { inputs: [{ ...port, handle: 'input', value: null }], moduleId: 'main', name: 'Task', outputs: [] } }
 function revision(graph: Graph): RevisionContent {
   return {
-    document: { bindings: {}, graph, subflows: {}, tasks: {} },
+    document: { bindings: {}, graph, tasks: {} },
     modelVersion: currentFlowModelVersion,
     modules: { main: { imports: [], name: 'Main', source: 'export default () => ({})' } },
   }

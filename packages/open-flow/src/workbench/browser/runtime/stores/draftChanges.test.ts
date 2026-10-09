@@ -26,7 +26,6 @@ function draft(revisionId: string, name?: string, description?: string): Draft {
             },
           },
         },
-        subflows: {},
         tasks: {},
       },
       modelVersion: currentFlowModelVersion,

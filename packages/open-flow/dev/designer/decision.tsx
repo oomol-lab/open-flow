@@ -56,7 +56,6 @@ function content(sample: string): RevisionContent {
     modules: {},
     document: {
       bindings: {},
-      subflows: {},
       tasks: {
         decision: {
           ...decisionTask(

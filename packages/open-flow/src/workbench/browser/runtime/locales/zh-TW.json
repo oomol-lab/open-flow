@@ -26,8 +26,6 @@
     "llmStructured": "LLM JSON",
     "llmStructuredDescription": "依訊息和提示詞範本產生結構化 JSON。",
     "generatedResponse": "產生的回覆。",
-    "subflowDescription": "加入現有的 Subflow。",
-    "subflows": "Subflow",
     "triggerAddConnection": "新增 Connection",
     "triggerBrowse": "瀏覽 Provider Trigger…",
     "triggerBrowseDescription": "開啟 Trigger 目錄，選擇 Provider 事件和 Connection。",
@@ -61,7 +59,7 @@
     "clear": "清除",
     "collapse": "收合",
     "deploymentManaged": "服務權限由目前的部署管理。",
-    "description": "此 Flow 中的所有 Code 節點（包括子流程）共用這些連線。其他節點選擇連線不會自動允許 Code 使用。",
+    "description": "此 Flow 中的所有 Code 節點共用這些連線。其他節點選擇連線不會自動允許 Code 使用。",
     "empty": "尚未为 Code 添加连接。",
     "loadFailed": "無法載入服務授權。",
     "loading": "正在載入存取權限…",
@@ -92,7 +90,7 @@
     "pendingAccountReferences": "待選帳號：",
     "nodeReferences": "引用：",
     "moreReferences": "另外 {{count}} 個",
-    "dynamicCodeReferences": "此 Flow 中的所有 Code 節點（包括子流程）共用這些連線。其他節點選擇連線不會自動允許 Code 使用。",
+    "dynamicCodeReferences": "此 Flow 中的所有 Code 節點共用這些連線。其他節點選擇連線不會自動允許 Code 使用。",
     "noAccountSelected": "未選擇帳號",
     "removeAuthorization": "移除授權",
     "saving": "儲存中…",
@@ -114,7 +112,6 @@
     "rename": "重新命名",
     "refresh": "重新整理",
     "save": "儲存",
-    "subflow": "Subflow",
     "unset": "未設定"
   },
   "designer": {
@@ -266,14 +263,6 @@
     },
     "selectNode": "選取一個草稿節點即可檢視並編輯它。",
     "locateNode": "在畫布上定位此節點",
-    "subflow": {
-      "definition": "Subflow 定義",
-      "inputPorts": "輸入埠（JSON）",
-      "open": "開啟 Subflow",
-      "outputPorts": "輸出埠與來源（JSON）",
-      "referenced": "引用的 Subflow",
-      "save": "儲存 Subflow"
-    },
     "task": {
       "sharedPermissions": "使用 Flow 共用權限群組",
       "sharedPermissionsHint": "直接使用 Flow 共用權限群組已授權的所有 Actions，無需逐一新增。",
@@ -761,7 +750,6 @@
     "renameFlow": "重新命名 {{name}}",
     "search": "搜尋",
     "searchResources": "搜尋 {{kind}}",
-    "subflows": "Subflow",
     "listenersLoading": "正在查詢錯誤觸發器…",
     "listenersFailed": "無法確認哪些錯誤觸發器正在監聽。可重試，或繼續刪除。",
     "listenersTitle": "以下已發佈的錯誤觸發器設定正在監聽此工作流程：",
@@ -809,11 +797,8 @@
           "output": "上游節點「{{nodeId}}」沒有輸出「{{output}}」。"
         },
         "target-missing": {
-          "subflow": "Subflow「{{subflowId}}」不存在。",
           "task": "Task「{{taskId}}」不存在。"
         },
-        "subflow-output-incompatible": "有來源與 Subflow 輸出「{{output}}」的宣告類型不相容。",
-        "subflow-output-schema-incompatible": "Subflow 輸出「{{output}}」的資料格式不相符：{{issue}}",
         "trigger-not-allowed": "Trigger 節點只能用於 Flow。",
         "variable-incompatible": "環境變數繫結「{{bindingId}}」與此輸入不相容。",
         "variable-source-mixed": "環境變數必須是輸入的唯一來源。"
@@ -837,9 +822,6 @@
           "import": "CodeModule「{{moduleId}}」不能 import「{{specifier}}」。",
           "reexport": "CodeModule「{{moduleId}}」必須先 import，再重新匯出值。"
         }
-      },
-      "subflow": {
-        "cycle": "Subflow 循環無法執行：{{subflows}}。"
       },
       "task": {
         "capability-incomplete": "Inline Task「{{nodeId}}」的 Connector Capability 設定不完整。",
@@ -941,8 +923,6 @@
       "saving": "正在儲存草稿…",
       "failed": "儲存失敗"
     },
-    "subflowDraft": "Subflow 草稿",
-    "subflowPublishHelp": "Subflow 會隨著 Flow 一起發布。",
     "unpublishedChanges": "有未發布的變更",
     "valid": "有效",
     "views": "工作區檢視",

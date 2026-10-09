@@ -26,8 +26,6 @@
     "llmStructured": "LLM JSON",
     "llmStructuredDescription": "Генерировать структурированный JSON по сообщениям и шаблону промпта.",
     "generatedResponse": "Сгенерированный ответ.",
-    "subflowDescription": "Добавить существующий Subflow.",
-    "subflows": "Subflow",
     "triggerAddConnection": "Добавить Connection",
     "triggerBrowse": "Обзор Provider Triggers…",
     "triggerBrowseDescription": "Откройте каталог Trigger, чтобы выбрать событие Provider и Connection.",
@@ -61,7 +59,7 @@
     "clear": "Очистить",
     "collapse": "Свернуть",
     "deploymentManaged": "Права сервисов управляются текущим развёртыванием.",
-    "description": "Все узлы Code этого Flow, включая подпотоки, используют общий список подключений. Выбор подключения в другом узле не даёт Code доступ к нему.",
+    "description": "Все узлы Code этого Flow используют общий список подключений. Выбор подключения в другом узле не даёт Code доступ к нему.",
     "empty": "Этот процесс пока не использует сервисы.",
     "loadFailed": "Не удалось загрузить авторизации сервисов.",
     "loading": "Загрузка доступа…",
@@ -92,7 +90,7 @@
     "pendingAccountReferences": "Ожидают выбора аккаунта:",
     "nodeReferences": "Используется:",
     "moreReferences": "Ещё {{count}}",
-    "dynamicCodeReferences": "Все узлы Code этого Flow, включая подпотоки, используют общий список подключений. Выбор подключения в другом узле не даёт Code доступ к нему.",
+    "dynamicCodeReferences": "Все узлы Code этого Flow используют общий список подключений. Выбор подключения в другом узле не даёт Code доступ к нему.",
     "noAccountSelected": "Аккаунт не выбран",
     "removeAuthorization": "Удалить авторизацию",
     "saving": "Сохранение…",
@@ -114,7 +112,6 @@
     "rename": "Переименовать",
     "refresh": "Обновить",
     "save": "Сохранить",
-    "subflow": "Subflow",
     "unset": "Не задано"
   },
   "designer": {
@@ -266,14 +263,6 @@
     },
     "selectNode": "Выберите один узел черновика, чтобы просмотреть и изменить его.",
     "locateNode": "Найти этот узел на холсте",
-    "subflow": {
-      "definition": "Определение Subflow",
-      "inputPorts": "Входные порты (JSON)",
-      "open": "Открыть Subflow",
-      "outputPorts": "Выходные порты и источники (JSON)",
-      "referenced": "Связанный Subflow",
-      "save": "Сохранить Subflow"
-    },
     "task": {
       "sharedPermissions": "Использовать общую группу разрешений Flow",
       "sharedPermissionsHint": "Используйте все Actions, разрешённые общей группой Flow. Добавлять их в узел по отдельности не нужно.",
@@ -761,7 +750,6 @@
     "renameFlow": "Переименовать {{name}}",
     "search": "Поиск",
     "searchResources": "Поиск {{kind}}",
-    "subflows": "Subflow",
     "listenersLoading": "Проверка обработчиков ошибок…",
     "listenersFailed": "Не удалось проверить обработчики. Повторите попытку или продолжите удаление.",
     "listenersTitle": "Эти опубликованные настройки триггеров ошибок отслеживают процесс:",
@@ -809,11 +797,8 @@
           "output": "Вышестоящий узел «{{nodeId}}» не предоставляет выход «{{output}}»."
         },
         "target-missing": {
-          "subflow": "Subflow «{{subflowId}}» не существует.",
           "task": "Task «{{taskId}}» не существует."
         },
-        "subflow-output-incompatible": "Источник несовместим с выходом Subflow «{{output}}».",
-        "subflow-output-schema-incompatible": "Формат данных выхода Subflow «{{output}}» не совпадает: {{issue}}",
         "trigger-not-allowed": "Узлы Trigger разрешены только во Flow.",
         "variable-incompatible": "Привязка переменной среды «{{bindingId}}» несовместима с этим входом.",
         "variable-source-mixed": "Переменная среды должна быть единственным источником входа."
@@ -837,9 +822,6 @@
           "import": "CodeModule «{{moduleId}}» не может импортировать «{{specifier}}».",
           "reexport": "CodeModule «{{moduleId}}» должен импортировать значения перед их повторным экспортом."
         }
-      },
-      "subflow": {
-        "cycle": "Цикл Subflow нельзя выполнить: {{subflows}}."
       },
       "task": {
         "capability-incomplete": "Inline Task «{{nodeId}}» содержит незавершенную Connector Capability.",
@@ -941,8 +923,6 @@
       "saving": "Сохранение черновика…",
       "failed": "Ошибка сохранения"
     },
-    "subflowDraft": "Черновик Subflow",
-    "subflowPublishHelp": "Subflow публикуется вместе с Flow.",
     "unpublishedChanges": "Неопубликованные изменения",
     "valid": "Корректно",
     "views": "Виды рабочей области",

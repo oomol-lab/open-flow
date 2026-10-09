@@ -26,7 +26,6 @@ const storyGroupIcons: Readonly<Record<string, `i-${string}`>> = {
   'Node Task': 'i-carbon:code',
   'Node Wait': 'i-carbon:hourglass',
   'Node Approval': 'i-carbon:stamp',
-  'Node Subflow': 'i-carbon:subflow',
   'Node AI Decision': 'i-carbon:ml-model-reference',
   'Node OpenAPI': 'i-logos:openapi-icon',
   'Node LLM': 'i-carbon:machine-learning-model',

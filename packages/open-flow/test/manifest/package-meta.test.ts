@@ -3,7 +3,6 @@ import type { Revision } from '../../src/base/common/revision.ts'
 import type { BlockPath, FlowPath, PackageName, PackagePath, SearchPath } from '../../src/manifest/common/manifestTypes.ts'
 import type { PackageMetaContext } from '../../src/manifest/common/meta/package/packageMeta.ts'
 import type { ManifestReadResult, ManifestSource } from '../../src/manifest/common/source.ts'
-import type { WritableSubflowBlockManifest } from '../../src/manifest/common/writable/block/writableSubflowBlockManifest.ts'
 import type { WritableTaskBlockManifest } from '../../src/manifest/common/writable/block/writableTaskBlockManifest.ts'
 import type { WritableFlowManifest } from '../../src/manifest/common/writable/writableFlowManifest.ts'
 
@@ -25,10 +24,6 @@ class TestPackageMetaContext implements PackageMetaContext {
   }
 
   public async openTaskManifest(_path: BlockPath): Promise<WritableTaskBlockManifest | undefined> {
-    return undefined
-  }
-
-  public async openSubflowManifest(_path: BlockPath): Promise<WritableSubflowBlockManifest | undefined> {
     return undefined
   }
 

@@ -201,7 +201,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
     pendingAdd.current = undefined
     dynamicOptions.current.clear()
     draggedNode.current.clear()
-  }, [target?.kind == 'subflow' ? target.id : undefined, target?.kind])
+  }, [target?.kind])
 
   const canvasCenter = (): Point => ({
     x: (canvas.current?.clientWidth ?? 184) / 2,
@@ -317,7 +317,7 @@ export const WorkbenchCanvas = forwardRef<WorkbenchCanvasHandle, Props>(function
         dark={theme == 'dark'}
         editable={!disabled}
         focusNodeRequest={readyFocusNodeRequest}
-        identity={target == null ? 'empty' : target.kind == 'flow' ? 'flow' : `subflow:${target.id}`}
+        identity={target == null ? 'empty' : 'flow'}
         interactiveMode$={interactiveMode$}
         isValidConnection={isValidConnection}
         language={language}

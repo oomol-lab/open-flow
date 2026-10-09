@@ -34,7 +34,7 @@ it.each([
   const operation = { kind: 'graph.node.create', target, nodeId: 'code', node }
   expect(() => decodeChangeOperations([operation])).toThrow()
   expect(new Validator(changeOperationsSchema() as object).validate([operation]).valid).toBe(false)
-  expect(() => decodeFlowDocument({ bindings: {}, tasks: {}, subflows: {}, graph: { nodes: { code: node }, edges: [] } })).toThrow()
+  expect(() => decodeFlowDocument({ bindings: {}, tasks: {}, graph: { nodes: { code: node }, edges: [] } })).toThrow()
 })
 
 it.each([
@@ -57,7 +57,7 @@ describe('ChangeOperation wire contract', () => {
     const content: RevisionContent = {
       modelVersion: currentFlowModelVersion,
       modules: {},
-      document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: {} } },
+      document: { bindings: {}, tasks: {}, graph: { edges: [], nodes: {} } },
     }
     expect(applyFlowChanges(content, decodeChangeOperations(operations)).document.graph.nodes.pause).toMatchObject({
       kind: 'wait',
@@ -133,4 +133,16 @@ it('rejects a field value with the wrong primitive type', () => {
   const invalid = [{ kind: 'graph.node.field.set', target, nodeId: 'start', field: 'name', before: 'Start', value: 42 }]
   expect(() => decodeChangeOperations(invalid)).toThrow()
   expect(new Validator(changeOperationsSchema() as object).validate(invalid).valid).toBe(false)
+})
+
+it.each([
+  { kind: 'subflow.create', subflowId: 'child', subflow: { name: 'Child', inputs: [], outputs: [], graph: { nodes: {}, edges: [] } } },
+  { kind: 'subflow.delete', subflowId: 'child' },
+  { kind: 'subflow.definition.set', subflowId: 'child', before: {}, definition: {} },
+  { kind: 'graph.node.create', target, nodeId: 'child', node: { kind: 'subflow', subflowId: 'child', inputs: {} } },
+  { kind: 'graph.node.delete', target: { kind: 'subflow', id: 'child' }, nodeId: 'node' },
+  { kind: 'graph.node.input.set', target, nodeId: 'node', handle: 'value', value: { kind: 'sources', sources: [{ kind: 'flow', input: 'value' }] } },
+])('rejects retired Subflow operations at the public boundary: %j', (operation) => {
+  expect(() => decodeChangeOperations([operation])).toThrow()
+  expect(new Validator(changeOperationsSchema() as object).validate([operation]).valid).toBe(false)
 })

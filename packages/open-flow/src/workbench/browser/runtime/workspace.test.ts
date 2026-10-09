@@ -1,7 +1,8 @@
 import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
-import { setComment, setFlowViewport, setNodePositions, setNodeContentHidden, targetPresentation } from './canvasPresentation.ts'
+import { setNodeContentHidden, targetPresentation } from './canvasPresentation.ts'
+import { setComment, setFlowViewport, setNodePositions } from './canvasPresentation.ts'
 import { createI18n } from './i18n.ts'
 import { providerIcon } from './providerIcon.ts'
 import { designerGraph } from './workspace.ts'
@@ -37,7 +38,7 @@ describe('Designer port projection', () => {
       content: {
         modelVersion: currentFlowModelVersion,
         modules: { module: { name: 'Code', source: 'export default () => ({})', imports: [] } },
-        document: { bindings: {}, tasks: {}, subflows: {}, graph: { edges: [], nodes: { code, other: code } } },
+        document: { bindings: {}, tasks: {}, graph: { edges: [], nodes: { code, other: code } } },
       },
     }
     const issue = {
@@ -81,7 +82,6 @@ describe('Designer port projection', () => {
               second: { inputs: {}, kind: 'value', name: 'Second', values: [] },
             },
           },
-          subflows: {},
           tasks: {},
         },
         modelVersion: currentFlowModelVersion,
@@ -136,7 +136,6 @@ describe('Designer port projection', () => {
               },
             },
           },
-          subflows: {},
           tasks: {},
         },
         modelVersion: currentFlowModelVersion,
@@ -205,7 +204,6 @@ describe('Designer port projection', () => {
               },
             },
           },
-          subflows: {},
           tasks: {},
         },
         modelVersion: currentFlowModelVersion,
@@ -245,7 +243,6 @@ describe('Designer port projection', () => {
               },
             },
           },
-          subflows: {},
           tasks: {
             news: {
               executor: { action: 'hacker-news.get-ask-stories', kind: 'connector' },
@@ -326,7 +323,6 @@ describe('Designer port projection', () => {
               },
             },
           },
-          subflows: {},
           tasks: {
             notify: {
               executor: { action: 'feishu.send-text-message', kind: 'connector' },
@@ -413,7 +409,6 @@ describe('Designer port projection', () => {
               },
             },
           },
-          subflows: {},
           tasks: {},
         },
         modelVersion: currentFlowModelVersion,
@@ -515,7 +510,6 @@ describe('Designer presentation', () => {
               'z-old': { inputs: {}, kind: 'value', name: 'Old', values: [] },
             },
           },
-          subflows: {},
           tasks: {},
         },
         modelVersion: currentFlowModelVersion,
@@ -534,17 +528,6 @@ describe('Designer presentation', () => {
 
     expect(designerGraph(draft, target, current).nodes.map((node) => node.id)).toEqual(['z-old', 'a-new'])
   })
-
-  it('keeps independent viewports for the root graph and a subflow', () => {
-    const root = setFlowViewport({}, { kind: 'flow' }, { x: 0, y: 0, zoom: 1 })
-    const child = setFlowViewport(root, { kind: 'subflow', id: 'child' }, { x: 50, y: 60, zoom: 0.5 })
-    expect(child).toMatchObject({
-      designer: {
-        flow: { viewport: { x: 0, y: 0, zoom: 1 } },
-        subflows: { child: { viewport: { x: 50, y: 60, zoom: 0.5 } } },
-      },
-    })
-  })
 })
 
 describe('Canvas run records', () => {
@@ -562,7 +545,6 @@ describe('Canvas run records', () => {
       modules: { module: { imports: [], name: 'Task', source: 'export default () => ({ result: 42 })' } },
       document: {
         bindings: {},
-        subflows: {},
         tasks: {},
         graph: {
           edges: [],
@@ -679,7 +661,6 @@ it('projects Agent tools through the shared action summary', () => {
       modules: {},
       document: {
         bindings: {},
-        subflows: {},
         tasks: {
           agent: {
             name: 'Agent',
@@ -717,17 +698,13 @@ it('projects Agent tools through the shared action summary', () => {
   expect(designerGraph(removed, { kind: 'flow' }).nodes[0]).toMatchObject({ actionSummary: { count: 0, providers: [] } })
 })
 
-describe('Value content visibility scope', () => {
-  it('isolates matching node IDs in flow and subflow presentations and preserves unrelated settings', () => {
-    const flow = { kind: 'flow' } as const
-    const subflow = { kind: 'subflow', id: 'nested' } as const
-    const initial = { custom: 'preserved' }
-    const hidden = setNodeContentHidden(initial, flow, 'value', true)
-    const bothHidden = setNodeContentHidden(hidden, subflow, 'value', true)
-    const shown = setNodeContentHidden(bothHidden, flow, 'value', false)
-    expect(targetPresentation(shown, flow)?.hiddenNodeContent).toEqual({})
-    expect(targetPresentation(shown, subflow)?.hiddenNodeContent).toEqual({ value: true })
-    expect(shown.custom).toBe('preserved')
-    expect(setNodeContentHidden(initial, flow, 'value', false)).toBe(initial)
-  })
+it('keeps node content visibility independent and preserves unrelated presentation settings', () => {
+  const target = { kind: 'flow' } as const
+  const initial = { custom: 'preserved' }
+  const hidden = setNodeContentHidden(initial, target, 'value', true)
+  const bothHidden = setNodeContentHidden(hidden, target, 'other', true)
+  const shown = setNodeContentHidden(bothHidden, target, 'value', false)
+  expect(targetPresentation(shown, target)?.hiddenNodeContent).toEqual({ other: true })
+  expect(shown.custom).toBe('preserved')
+  expect(setNodeContentHidden(initial, target, 'value', false)).toBe(initial)
 })

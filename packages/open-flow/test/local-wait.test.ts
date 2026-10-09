@@ -26,7 +26,6 @@ async function fixture(
     modules: {},
     document: {
       bindings: {},
-      subflows: {},
       tasks: {
         send: {
           name: 'Send',

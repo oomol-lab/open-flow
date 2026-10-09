@@ -38,7 +38,6 @@ const draft: Draft = {
           },
         },
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,

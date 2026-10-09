@@ -77,12 +77,6 @@ export type TaskSettings =
 
 export type TaskPorts = Pick<TaskDefinition, 'inputs' | 'outputs'>
 
-export interface SubflowSettings {
-  readonly inputs: NonNullable<ReturnType<RevisionView['subflow']>>['inputs']
-  readonly name: string
-  readonly outputs: NonNullable<ReturnType<RevisionView['subflow']>>['outputs']
-}
-
 export type AddNodeIntent =
   | { readonly kind: 'decision'; readonly name: string }
   | { readonly kind: 'openapi'; readonly name: string }
@@ -96,7 +90,6 @@ export type AddNodeIntent =
   | { readonly kind: 'cron'; readonly name: string }
   | { readonly kind: 'llm'; readonly mode: 'chat' | 'json'; readonly name: string; readonly outputDescription: string }
   | { readonly kind: 'provider-trigger'; readonly connectionId?: string; readonly definition: TriggerKeySnapshot }
-  | { readonly kind: 'subflow'; readonly subflowId: string }
   | { readonly kind: 'value'; readonly name: string }
   | { readonly kind: 'wait'; readonly name: string }
   | { readonly kind: 'webhook'; readonly name: string }
@@ -128,35 +121,13 @@ export function agentTool(action: ConnectorActionView, id: string, connectionId?
   }
 }
 
-export function createResource(id: string, name: string): FlowChanges {
-  return [
-    {
-      kind: 'subflow.create',
-      subflow: {
-        graph: { edges: [], nodes: {} },
-        inputs: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
-        name,
-        outputs: [
-          {
-            handle: 'result',
-            jsonSchema: {},
-            nullable: true,
-            sources: [{ input: 'value', kind: 'flow' }],
-          },
-        ],
-      },
-      subflowId: id,
-    },
-  ]
-}
-
 export function nameCreatedNodes(revision: RevisionView, target: GraphTarget, changes: FlowChanges): FlowChanges {
   const graph = revision.graph(target)
   if (graph == null) return changes
   const names = new Set(Object.values(graph.nodes).flatMap((node) => (node.name == null ? [] : [node.name])))
   return changes.map((operation) => {
     if (operation.kind != 'graph.node.create' || operation.target.kind != target.kind) return operation
-    if (target.kind == 'subflow' && (operation.target.kind != 'subflow' || operation.target.id != target.id)) return operation
+
     const requested = normalizeNodeName(operation.node.name ?? '') || defaultNodeName(revision.revision.content, operation.node)
     const name = nextNodeName(requested, names)
     names.add(name)
@@ -186,7 +157,7 @@ export function addNode(revision: RevisionView, target: GraphTarget, nodeId: str
       changes = createCodeTask(target, { moduleId: nodeId, nodeId }, intent.name, undefined, intent.ports)
       break
     case 'agent':
-      changes = target.kind == 'flow' ? createAgentTask(target, { nodeId, taskId: identity() }, intent.name, intent) : undefined
+      changes = createAgentTask(target, { nodeId, taskId: identity() }, intent.name, intent)
       break
     case 'llm':
       changes = createLlmTask(target, { nodeId, taskId: identity() }, intent.name, intent.mode, intent.outputDescription)
@@ -198,38 +169,29 @@ export function addNode(revision: RevisionView, target: GraphTarget, nodeId: str
       changes = createCondition(target, nodeId, intent.name)
       break
     case 'approval':
-      changes = target.kind == 'flow' ? createApproval(target, nodeId, intent.name) : undefined
+      changes = createApproval(target, nodeId, intent.name)
       break
     case 'value':
       changes = createValue(target, nodeId, intent.name)
       break
     case 'wait':
-      changes = target.kind == 'flow' ? createWait(target, nodeId, intent.name) : undefined
+      changes = createWait(target, nodeId, intent.name)
       break
-    case 'subflow': {
-      const subflow = revision.subflow(intent.subflowId)
-      if (subflow == null) return
-      changes = createSubflowNode(target, nodeId, intent.subflowId, subflow.inputs)
-      break
-    }
     case 'error':
-      changes = target.kind == 'flow' ? createBuiltinTrigger(target, nodeId, { kind: 'error', name: intent.name }) : undefined
+      changes = createBuiltinTrigger(target, nodeId, { kind: 'error', name: intent.name })
       break
     case 'manual':
-      changes = target.kind == 'flow' ? createBuiltinTrigger(target, nodeId, { kind: 'manual', name: intent.name }) : undefined
+      changes = createBuiltinTrigger(target, nodeId, { kind: 'manual', name: intent.name })
       break
     case 'webhook':
-      changes = target.kind == 'flow' ? createBuiltinTrigger(target, nodeId, { bodyFields: [], kind: 'webhook', method: 'POST', name: intent.name }) : undefined
+      changes = createBuiltinTrigger(target, nodeId, { bodyFields: [], kind: 'webhook', method: 'POST', name: intent.name })
       break
     case 'cron':
-      changes =
-        target.kind == 'flow'
-          ? createBuiltinTrigger(target, nodeId, {
-              cronTimes: [{ type: 'every', unit: 'hour', value: 1 }],
-              kind: 'cron',
-              name: intent.name,
-            })
-          : undefined
+      changes = createBuiltinTrigger(target, nodeId, {
+        cronTimes: [{ type: 'every', unit: 'hour', value: 1 }],
+        kind: 'cron',
+        name: intent.name,
+      })
       break
     case 'provider-trigger': {
       if (target.kind != 'flow') return
@@ -369,16 +331,9 @@ export function updateTask(revision: RevisionView, target: GraphTarget, nodeId: 
   switch (settings.kind) {
     case 'decision': {
       if (node.taskId == null || !dequal(revision.task(node.taskId), settings.before)) return
-      const changes: ChangeOperation[] = []
-      const document = revision.revision.content.document
-      const targets: GraphTarget[] = [{ kind: 'flow' }, ...Object.keys(document.subflows).map((subflowId) => ({ kind: 'subflow' as const, id: subflowId }))]
-      for (const graphTarget of targets) {
-        const instance = Object.entries(revision.graph(graphTarget)!.nodes).find(
-          ([, candidate]) => candidate.kind === 'task' && candidate.taskId === node.taskId,
-        )
-        if (instance == null) continue
-        changes.push(...(replaceTaskPorts(revision, graphTarget, instance[0], settings.task) ?? []).filter((change) => change.kind !== 'task.decision.set'))
-      }
+      const changes: ChangeOperation[] = (replaceTaskPorts(revision, target, nodeId, settings.task) ?? []).filter(
+        (change) => change.kind !== 'task.decision.set',
+      )
       if (!dequal(settings.before, settings.task))
         changes.push({ kind: 'task.decision.set', taskId: node.taskId, before: settings.before, value: settings.task })
       return changes
@@ -483,33 +438,6 @@ export function updateWebhook(
   const value = { bodyFields: settings.bodyFields, method: settings.method, options: Object.keys(settings.options).length == 0 ? undefined : settings.options }
   if (dequal(before, value)) return []
   return [{ before, kind: 'graph.node.webhook.set', nodeId: triggerId, target, value }]
-}
-
-export function updateSubflow(revision: RevisionView, subflowId: string, settings: SubflowSettings): FlowChanges | undefined {
-  const subflow = revision.subflow(subflowId)
-  if (subflow == null) return
-  const before = { inputs: subflow.inputs, name: subflow.name, outputs: subflow.outputs }
-  if (dequal(before, settings)) return []
-  return [{ before, definition: settings, kind: 'subflow.definition.set', subflowId }]
-}
-
-function createSubflowNode(target: GraphTarget, nodeId: string, subflowId: string, inputs: TaskDefinition['inputs']): FlowChanges {
-  return [
-    {
-      kind: 'graph.node.create',
-      node: { inputs: defaultInputs(inputs), kind: 'subflow', subflowId },
-      nodeId,
-      target,
-    },
-  ]
-}
-
-function defaultInputs(ports: TaskDefinition['inputs']): Readonly<Record<string, InputMapping>> {
-  return Object.fromEntries(
-    ports.flatMap((port) =>
-      'handle' in port && Object.hasOwn(port, 'value') ? [[port.handle, { kind: 'value' as const, value: port.value as JsonValue }]] : [],
-    ),
-  ) as Readonly<Record<string, InputMapping>>
 }
 
 function renamedPort(
@@ -638,16 +566,7 @@ function replaceTaskPorts(
     }
     changes.push(...changedInputs(nodeInputMappings(node), inputs, target, currentNodeId))
   }
-  if (target.kind === 'subflow' && outputRename != null) {
-    const { graph: _graph, ...before } = revision.revision.content.document.subflows[target.id]!
-    const outputs = before.outputs.map((output) => ({
-      ...output,
-      sources: output.sources.map((source) =>
-        source.kind === 'node' && instances.has(source.nodeId) && source.output === outputRename[0] ? { ...source, output: outputRename[1] } : source,
-      ),
-    }))
-    if (!dequal(outputs, before.outputs)) changes.push({ kind: 'subflow.definition.set', subflowId: target.id, before, definition: { ...before, outputs } })
-  }
+
   if (current.task == null && 'executor' in task && task.executor.kind == 'decision' && 'executor' in previous && !dequal(previous, task))
     changes.unshift({ kind: 'task.decision.set', taskId: current.taskId, before: previous, value: task })
   if (current.task == null && 'executor' in task && task.executor.kind == 'agent' && 'executor' in previous) {

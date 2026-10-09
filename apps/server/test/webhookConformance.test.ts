@@ -36,7 +36,6 @@ function revision(fixture: WebhookConformanceFixture, enabled = true): RevisionC
             }
           : {},
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,

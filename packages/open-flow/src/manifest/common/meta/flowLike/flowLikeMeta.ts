@@ -10,7 +10,6 @@ import type {
   InputHandleDef,
   NodeId,
   OutputHandleDef,
-  SubflowNode,
   TaskNode,
   TriggerDefinition,
   TriggerDescriptor,
@@ -34,7 +33,6 @@ import { getReactiveValue } from '../../../../base/common/reactivity.ts'
 import { createWeakMemoizedFunction } from '../../../../base/common/weakMemoize.ts'
 import { getManifestName } from '../../manifestName.ts'
 import { WritableConditionNodeManifest } from '../../writable/node/writableConditionNodeManifest.ts'
-import { WritableSubflowNodeManifest } from '../../writable/node/writableSubflowNodeManifest.ts'
 import { WritableTaskNodeManifest } from '../../writable/node/writableTaskNodeManifest.ts'
 import { WritableTriggerNodeManifest } from '../../writable/node/writableTriggerNodeManifest.ts'
 import { WritableValueNodeManifest } from '../../writable/node/writableValueNodeManifest.ts'
@@ -51,9 +49,7 @@ export interface FlowLikeMeta$ {
   readonly title: ReadonlyVal<string | undefined>
   readonly icon: ReadonlyVal<string | undefined>
 
-  /** Flow is undefined. Subflow uses the block input handles. */
   readonly inputHandleDefs: ReadonlyVal<InputHandleDef[] | undefined>
-  /** Flow is undefined. Subflow uses the block output handles. */
   readonly outputHandleDefs: ReadonlyVal<OutputHandleDef[] | undefined>
 
   readonly inputHandleNames: ReadonlyVal<HandleName[]>
@@ -145,16 +141,6 @@ export abstract class FlowLikeMeta<TManifest extends WritableFlowLikeManifest = 
           entries.push([data.node_id, nodeManifest])
           break
         }
-        case 'subflow': {
-          let nodeManifest = WritableSubflowNodeManifest.to(flowLikeManifest.nodes.get(data.node_id))
-          if (nodeManifest) {
-            nodeManifest.onYamlParentUpdated(yamlParent)
-          } else {
-            nodeManifest = new WritableSubflowNodeManifest(data.node_id, yamlParent)
-          }
-          entries.push([data.node_id, nodeManifest])
-          break
-        }
         case 'value': {
           let nodeManifest = WritableValueNodeManifest.to(flowLikeManifest.nodes.get(data.node_id))
           if (nodeManifest) {
@@ -197,16 +183,6 @@ export abstract class FlowLikeMeta<TManifest extends WritableFlowLikeManifest = 
             taskNodeManifest = new WritableTaskNodeManifest(nodeId, yamlMap)
           }
           entries.push([nodeId, taskNodeManifest])
-          break
-        }
-        case 'subflow': {
-          let subflowNodeManifest = WritableSubflowNodeManifest.to(flowLikeManifest.nodes.get(nodeId))
-          if (subflowNodeManifest) {
-            subflowNodeManifest.onYamlParentUpdated(yamlMap)
-          } else {
-            subflowNodeManifest = new WritableSubflowNodeManifest(nodeId, yamlMap)
-          }
-          entries.push([nodeId, subflowNodeManifest])
           break
         }
         case 'value': {
@@ -384,11 +360,6 @@ export interface UpsertTaskNodeOptions {
   data: TaskNode
 }
 
-export interface UpsertSubflowNodeOptions {
-  type: 'subflow'
-  data: SubflowNode
-}
-
 export interface UpsertValueNodeOptions {
   type: 'value'
   data: ValueNode
@@ -399,89 +370,10 @@ export interface UpsertConditionNodeOptions {
   data: ConditionNode
 }
 
-export type UpsertNodeOptions = UpsertTaskNodeOptions | UpsertSubflowNodeOptions | UpsertValueNodeOptions | UpsertConditionNodeOptions
+export type UpsertNodeOptions = UpsertTaskNodeOptions | UpsertValueNodeOptions | UpsertConditionNodeOptions
 
 export interface UpsertNodeYamlOptions {
   nodeId: NodeId
   type: NodeType
   yamlMap: YamlMap
-}
-
-export const sanitizeHandleOutputsFrom$ = (
-  outputsFrom$: ReadonlyVal<readonly HandleOutputFrom[] | undefined>,
-  inputHandleDefs$: ReadonlyVal<readonly InputHandleDef[] | undefined>,
-  outputHandleDefs$: ReadonlyVal<OutputHandleDef[] | undefined>,
-  isNodeOutputHandleExist$: (nodeId: NodeId, outputHandle: HandleName) => ReadonlyVal<boolean>,
-): ReadonlyVal<readonly HandleOutputFrom[] | undefined> => {
-  return compute((get) => {
-    const outputsFrom = get(outputsFrom$)
-    if (!outputsFrom) return
-
-    const outputHandleDefs = get(outputHandleDefs$)
-    if (!outputHandleDefs) return
-
-    return inertFilterMap(outputsFrom, (outputFrom) => {
-      if (outputHandleDefs.every((def) => def.handle !== outputFrom.handle)) {
-        return undefined
-      }
-
-      if (outputFrom.from_node) {
-        const fromNode = inertFilter(outputFrom.from_node, (f) => get(isNodeOutputHandleExist$(f.node_id, f.output_handle)))
-        if (fromNode !== outputFrom.from_node) {
-          return {
-            ...outputFrom,
-            from_node: fromNode,
-          }
-        }
-      }
-
-      if (outputFrom.from_flow) {
-        const inputHandleDefs = get(inputHandleDefs$)
-        const fromFlow = inertFilter(outputFrom.from_flow, (f) => !inputHandleDefs?.every((def) => def.handle !== f.input_handle))
-        if (fromFlow !== outputFrom.from_flow) {
-          return {
-            ...outputFrom,
-            from_flow: fromFlow,
-          }
-        }
-      }
-
-      return outputFrom
-    })
-  })
-}
-
-export function createConnectedInputHandles$(
-  nodes: ReadonlyReactiveMap<NodeId, NodeMeta>,
-  inputHandleNames: ReadonlyVal<HandleName[]>,
-  handleOutputsFrom: ReadonlyVal<readonly HandleOutputFrom[] | undefined>,
-): ReadonlyVal<HandleName[] | undefined> {
-  return compute((get) => {
-    const allInputNames = get(inputHandleNames)
-    if (!allInputNames.length) return
-
-    let result: HandleName[] | undefined
-
-    const extract = (inoutFrom?: readonly (HandleInputFrom | HandleOutputFrom)[] | undefined) => {
-      if (inoutFrom) {
-        for (const inf of inoutFrom) {
-          if (inf.from_flow) {
-            for (const fromFlow of inf.from_flow) {
-              if (allInputNames.includes(fromFlow.input_handle)) {
-                ;(result ??= []).push(fromFlow.input_handle)
-              }
-            }
-          }
-        }
-      }
-    }
-
-    for (const nodeMeta of get(nodes).values()) {
-      extract(get(nodeMeta.$.handleInputsFrom))
-    }
-
-    extract(get(handleOutputsFrom))
-
-    return result
-  })
 }

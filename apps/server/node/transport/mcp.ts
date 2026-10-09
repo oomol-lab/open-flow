@@ -105,12 +105,12 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
     const inspected = await inspectFlowDraft(metadata, () => control.getRevision(flowId, metadata.draftRevisionId))
     return flowInspection(inspected, inspected.draft == null ? undefined : await control.getLive(flowId), full)
   })
-  register('flow_node_get', mcpTools.flow_node_get, ({ flowId, revisionId, nodeId, subflowId }) => {
+  register('flow_node_get', mcpTools.flow_node_get, ({ flowId, revisionId, nodeId }) => {
     const draft = control.getRevision(flowId, revisionId)
-    const graph = subflowId == null ? draft.content.document.graph : draft.content.document.subflows[subflowId]?.graph
+    const graph = draft.content.document.graph
     const node = graph?.nodes[nodeId]
     if (node == null) throw new ControlError(controlErrorCode.flowInvalid, 'Node was not found in the selected Revision and graph.')
-    return { flowId, revisionId, ...(subflowId == null ? {} : { subflowId }), ...nodeDetails(draft.content, nodeId, node), version: 1 }
+    return { flowId, revisionId, ...nodeDetails(draft.content, nodeId, node), version: 1 }
   })
   register('flow_schema', mcpTools.flow_schema, ({ kind, example }) => {
     try {

@@ -90,8 +90,6 @@ function nodeTitle(node: ResolvedNode, t?: TFunction): string {
       return t?.('addNode.approval') ?? 'Approval'
     case 'wait':
       return t?.('addNode.wait') ?? 'Wait'
-    case 'subflow':
-      return node.definition?.name ?? node.node.subflowId
     case 'task':
       return node.definition?.name ?? (node.node.task != null ? node.node.task.moduleId : node.node.taskId)
   }
@@ -101,8 +99,6 @@ function nodeIcon(node: ResolvedNode): string | undefined {
   switch (node.kind) {
     case 'condition':
       return ':carbon:child-node:'
-    case 'subflow':
-      return ':carbon:subflow:'
     case 'value':
       return ':oomol:value:'
     case 'approval':
@@ -153,16 +149,6 @@ function nodePorts(node: ResolvedSelection): NodePorts {
         })
       for (const [handle, port] of Object.entries(resolutionOutputPorts(node.node))) outputs.set(handle, port)
       break
-    case 'subflow': {
-      const definition = node.definition
-      for (const port of definition?.inputs ?? []) {
-        inputs.set(port.handle, { defaultValue: port.value, description: port.description, jsonSchema: port.jsonSchema, nullable: port.nullable })
-      }
-      for (const port of definition?.outputs ?? []) {
-        outputs.set(port.handle, { description: port.description, jsonSchema: port.jsonSchema, nullable: port.nullable })
-      }
-      break
-    }
     case 'task': {
       const definition = node.definition
       const mappedInputs = [...inputs]
@@ -229,7 +215,6 @@ function conditionOperator(operator: import('./api.ts').ConditionOperator): Flow
 function conditionOperand(operand: ConditionOperand, context: NodeProjectionContext): FlowCanvasViewConditionOperand {
   if (operand.kind == 'value') return JSON.stringify(operand.value) ?? '…'
   const source = operand.source
-  if (source.kind == 'flow') return source.input
   if (source.kind == 'binding') return { kind: 'environment', label: context.t?.('nodeInput.variable') ?? 'Env' }
   const sourceNode = context.nodes.get(source.nodeId)
   const presentation = sourceNode == null ? undefined : sourceNodePresentation(sourceNode, context)
@@ -240,16 +225,14 @@ function conditionOperand(operand: ConditionOperand, context: NodeProjectionCont
   }
 }
 
-function nodeDiagnosticCount(target: GraphTarget, node: ResolvedNode, diagnostics: readonly Diagnostic[]): number {
-  const graphPath = target.kind == 'flow' ? `/document/graph/nodes/${node.id}` : `/document/subflows/${target.id}/graph/nodes/${node.id}`
+function nodeDiagnosticCount(node: ResolvedNode, diagnostics: readonly Diagnostic[]): number {
+  const graphPath = `/document/graph/nodes/${node.id}`
   const paths = [graphPath]
   if (node.kind == 'task') {
     if (node.node.task != null) paths.push(`${graphPath}/task`)
     else paths.push(`/document/tasks/${node.node.taskId}`)
     const moduleId = node.definition != null && 'moduleId' in node.definition ? node.definition.moduleId : undefined
     if (moduleId != null) paths.push(`/modules/${moduleId}`)
-  } else if (node.kind == 'subflow') {
-    paths.push(`/document/subflows/${node.node.subflowId}`)
   }
   return diagnostics.filter((diagnostic) => paths.some((path) => diagnostic.path.startsWith(path))).length
 }
@@ -560,14 +543,13 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
   const connectionRequired =
     (connectorAction?.authenticated == true && (connector?.connectionId == null || (connections != null && selectedConnection?.status != 'active'))) ||
     nodeDiagnosticCount(
-      context.target,
       resolved,
       context.diagnostics.filter((diagnostic) => diagnostic.code === 'task.action-connection-required'),
     ) > 0
   const nodeRun = context.runNodes.get(nodeId)
   const common = {
     description: node.description,
-    diagnostics: nodeDiagnosticCount(context.target, resolved, context.diagnostics),
+    diagnostics: nodeDiagnosticCount(resolved, context.diagnostics),
     icon: semanticNodeIcon(resolved, context.connectorActions),
     id: nodeId,
     inputs,
@@ -595,8 +577,6 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
         matchMode: node.matchMode,
         defaultOutput: 'otherwise',
       }
-    case 'subflow':
-      return { ...common, kind: node.kind, reference: node.subflowId }
     case 'task':
       return {
         ...common,

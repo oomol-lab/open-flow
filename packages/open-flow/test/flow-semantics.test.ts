@@ -21,7 +21,6 @@ function revision(source: string, imports: readonly string[] = [], modules: Revi
           task: { inputs: {}, kind: 'task', task: { inputs: [], moduleId: 'module-main', name: 'Main', outputs: [] } },
         },
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,
@@ -51,7 +50,6 @@ it('rejects request body fields on a GET Webhook', async () => {
           },
         },
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,
@@ -327,7 +325,6 @@ export default () => value`,
       document: {
         bindings: {},
         graph: { edges: [], nodes: { news: { inputs: {}, kind: 'task', taskId: 'news' } } },
-        subflows: {},
         tasks: {
           news: {
             executor: { action: 'hacker-news.get-ask-stories', kind: 'connector' },
@@ -374,7 +371,6 @@ export default () => value`,
             },
           },
         },
-        subflows: {},
         tasks: {},
       },
       modelVersion: currentFlowModelVersion,
@@ -438,7 +434,6 @@ export default () => value`,
             },
           },
         },
-        subflows: {},
         tasks: {},
       },
       modelVersion: currentFlowModelVersion,
@@ -663,174 +658,6 @@ export default () => value`,
     })
   })
 
-  it('rejects incompatible Subflow boundary sources', async () => {
-    const invalid: RevisionFixture = {
-      document: {
-        bindings: {},
-        graph: {
-          edges: [],
-          nodes: {
-            call: {
-              inputs: { text: { kind: 'value', value: 'ok' } },
-              kind: 'subflow',
-              name: 'Subflow',
-              subflowId: 'subflow',
-            },
-          },
-        },
-        subflows: {
-          subflow: {
-            graph: {
-              edges: [],
-              nodes: {
-                check: {
-                  kind: 'condition',
-                  name: 'Check',
-                  cases: [
-                    {
-                      output: 'yes',
-                      groups: [
-                        {
-                          expressions: [
-                            {
-                              left: { kind: 'source' as const, source: { input: 'text', kind: 'flow' } },
-                              operator: '>',
-                              right: { kind: 'value' as const, value: 0 },
-                            },
-                          ],
-                        },
-                      ],
-                    },
-                  ],
-                  inputs: {},
-                  matchMode: 'first' as const,
-                },
-                number: {
-                  inputs: {},
-                  kind: 'value',
-                  name: 'Number',
-                  values: [{ handle: 'value', jsonSchema: { type: 'number' }, nullable: false, value: 1 }],
-                },
-              },
-            },
-            inputs: [{ handle: 'text', jsonSchema: { type: 'string' }, nullable: false }],
-            name: 'Subflow',
-            outputs: [
-              {
-                handle: 'result',
-                jsonSchema: { type: 'string' },
-                nullable: false,
-                sources: [{ kind: 'node', nodeId: 'number', output: 'value' }],
-              },
-            ],
-          },
-        },
-        tasks: {},
-      },
-      modelVersion: currentFlowModelVersion,
-      modules: {},
-    }
-
-    await expect(validateFlow(invalid, engine)).resolves.toMatchObject({
-      diagnostics: [
-        expect.objectContaining({ code: 'condition.invalid', path: '/document/subflows/subflow/graph/nodes/check/cases/0/groups/0/expressions/0' }),
-        expect.objectContaining({ code: 'graph.subflow-output-incompatible', path: '/document/subflows/subflow/outputs/result/sources' }),
-      ],
-      valid: false,
-    })
-  })
-
-  it('validates Flow input operands and Subflow data output boundaries', async () => {
-    const source = revision('export default ({ input }) => ({ input })')
-    const task = source.document.graph.nodes.task
-    if (task?.kind != 'task' || task.task == null) throw new Error('Fixture inline Task is missing.')
-    const valid: RevisionFixture = {
-      ...source,
-      document: {
-        ...source.document,
-        graph: {
-          edges: [{ source: 'call', target: 'task' }],
-          nodes: {
-            call: {
-              inputs: { text: { kind: 'value', value: 'hello' } },
-              kind: 'subflow',
-              name: 'Subflow',
-              subflowId: 'subflow',
-            },
-            task: {
-              ...task,
-              inputs: { input: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'call', output: 'result' }] } },
-              task: { ...task.task, inputs: [{ handle: 'input', jsonSchema: { type: 'string' }, nullable: false }] },
-            },
-          },
-        },
-        subflows: {
-          subflow: {
-            graph: {
-              edges: [],
-              nodes: {
-                check: {
-                  kind: 'condition',
-                  name: 'Check',
-                  cases: [
-                    {
-                      output: 'yes',
-                      groups: [
-                        {
-                          expressions: [
-                            {
-                              left: { kind: 'source' as const, source: { input: 'text', kind: 'flow' } },
-                              operator: '==',
-                              right: { kind: 'value' as const, value: 'hello' },
-                            },
-                          ],
-                        },
-                      ],
-                    },
-                  ],
-                  inputs: {},
-                  matchMode: 'first' as const,
-                },
-              },
-            },
-            inputs: [{ handle: 'text', jsonSchema: { type: 'string' }, nullable: false }],
-            name: 'Subflow',
-            outputs: [
-              {
-                handle: 'result',
-                jsonSchema: { type: 'string' },
-                nullable: false,
-                sources: [{ kind: 'flow', input: 'text' }],
-              },
-            ],
-          },
-        },
-      },
-    }
-
-    await expect(validateFlow(valid, engine)).resolves.toMatchObject({ diagnostics: [], valid: true })
-
-    const target = valid.document.graph.nodes.task
-    if (target?.kind != 'task' || target.task == null) throw new Error('Fixture inline Task is missing.')
-    const invalid: RevisionFixture = {
-      ...valid,
-      document: {
-        ...valid.document,
-        graph: {
-          edges: valid.document.graph.edges,
-          nodes: {
-            ...valid.document.graph.nodes,
-            task: { ...target, task: { ...target.task, inputs: [{ handle: 'input', jsonSchema: { type: 'number' }, nullable: false }] } },
-          },
-        },
-      },
-    }
-    await expect(validateFlow(invalid, engine)).resolves.toMatchObject({
-      diagnostics: [expect.objectContaining({ code: 'graph.node-output-incompatible', path: '/document/graph/nodes/task/inputs/input' })],
-      valid: false,
-    })
-  })
-
   it('rejects incomplete Connector Capability declarations on inline Tasks', async () => {
     const source = revision('export default () => ({})')
     const task = source.document.graph.nodes.task
@@ -895,7 +722,7 @@ export default () => value`,
                     kind: 'sources',
                     sources: [
                       { bindingId: 'token', kind: 'binding' },
-                      { input: 'token', kind: 'flow' },
+                      { bindingId: 'token', kind: 'binding' },
                     ],
                   },
                 },
@@ -939,7 +766,6 @@ export default () => value`,
             },
           },
         },
-        subflows: {},
         tasks: {
           notify: {
             executor: { action: 'mail.send', connectionId: 'connection-1', kind: 'connector' },
@@ -1022,7 +848,6 @@ export default () => value`,
             } as RevisionFixture['document']['graph']['nodes'][string],
           },
         },
-        subflows: {},
         tasks: {},
       },
       modelVersion: currentFlowModelVersion,
@@ -1031,62 +856,5 @@ export default () => value`,
 
     const result = await validateFlow(source, engine)
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code }))
-  })
-
-  it('rejects Wait in a Subflow', async () => {
-    const source: RevisionFixture = {
-      document: {
-        bindings: {},
-        graph: {
-          edges: [],
-          nodes: {
-            call: {
-              inputs: {},
-              kind: 'subflow',
-              subflowId: 'child',
-            },
-            wait: {
-              inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
-              inputs: { value: { kind: 'value', value: null } },
-              kind: 'wait',
-              prompt: 'Continue?',
-            },
-          },
-        },
-        subflows: {
-          child: {
-            graph: {
-              edges: [],
-              nodes: {
-                wait: {
-                  inputDefinitions: [{ handle: 'value', jsonSchema: {}, nullable: true, value: null }],
-                  inputs: { value: { kind: 'value', value: null } },
-                  kind: 'wait',
-                  prompt: 'Not allowed here',
-                },
-              },
-            },
-            inputs: [],
-            name: 'Child',
-            outputs: [],
-          },
-        },
-        tasks: {
-          notify: {
-            executor: { kind: 'llm', mode: 'chat' },
-            inputs: [{ handle: 'message', jsonSchema: { type: 'string' }, nullable: false }],
-            name: 'Not a Connector',
-            outputs: [],
-          },
-        },
-      },
-      modelVersion: currentFlowModelVersion,
-      modules: {},
-    }
-
-    const result = await validateFlow(source, engine)
-    expect(result.diagnostics).toEqual(
-      expect.arrayContaining([expect.objectContaining({ code: 'wait.not-allowed', path: '/document/subflows/child/graph/nodes/wait' })]),
-    )
   })
 })

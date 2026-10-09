@@ -65,7 +65,6 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
                   ]),
                 ),
               },
-              subflows: {},
               tasks: {},
             },
             modelVersion: currentFlowModelVersion,

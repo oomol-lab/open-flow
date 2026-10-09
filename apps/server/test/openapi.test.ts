@@ -63,7 +63,6 @@ it('uses a fixed definition to call a local server without requesting the docume
         document: {
           bindings: { token: { kind: 'variable', target: 'API_TOKEN' } },
           tasks: { api: task },
-          subflows: {},
           graph: {
             nodes: {
               start: { kind: 'manual', name: 'Start' },

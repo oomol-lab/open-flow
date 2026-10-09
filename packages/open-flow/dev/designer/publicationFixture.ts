@@ -59,32 +59,12 @@ export function publicationFixture(flowId: string, revisionId: string): { draft:
               },
             },
             review: { kind: 'approval', name: 'Review message', inputs: {}, inputDefinitions: [], prompt: 'Approve the welcome message before sending.' },
-            nested: { kind: 'subflow', name: 'Delivery', inputs: {}, subflowId: 'delivery' },
           },
           edges: [
             { source: 'start', target: 'prepare' },
             { source: 'customer', target: 'prepare' },
             { source: 'prepare', target: 'review' },
-            { source: 'review', sourceHandle: 'approve', target: 'nested' },
           ],
-        },
-        subflows: {
-          delivery: {
-            name: 'Delivery',
-            inputs: [],
-            outputs: [],
-            graph: {
-              nodes: {
-                receipt: {
-                  kind: 'value',
-                  name: 'Receipt',
-                  inputs: {},
-                  values: [{ handle: 'sent', jsonSchema: { type: 'boolean' }, nullable: false, value: true }],
-                },
-              },
-              edges: [],
-            },
-          },
         },
       },
     },
@@ -92,7 +72,7 @@ export function publicationFixture(flowId: string, revisionId: string): { draft:
   const positions = setNodePositions(
     {},
     { kind: 'flow' },
-    { start: { x: 30, y: 20 }, customer: { x: 30, y: 210 }, prepare: { x: 470, y: 40 }, review: { x: 470, y: 370 }, nested: { x: 880, y: 210 } },
+    { start: { x: 30, y: 20 }, customer: { x: 30, y: 210 }, prepare: { x: 470, y: 40 }, review: { x: 470, y: 370 } },
   )
   const value = setComment(positions, { kind: 'flow' }, 'note', {
     title: 'Release notes',

@@ -62,7 +62,7 @@ function indexNodes(designer: DesignerGraph): ReadonlyMap<string, DesignerNode> 
 }
 
 function designerRevisionInputs(draft: Draft | undefined, target: GraphTarget | undefined): readonly unknown[] {
-  return draft == null || target == null ? [] : revisionView(draft).designerInputs(target)
+  return draft == null || target == null ? [] : revisionView(draft).designerInputs()
 }
 
 function indexRunEventNodes(
@@ -208,7 +208,7 @@ export class WorkbenchStore {
       const t = get(i18n.t$)
       const run = get(this.runs.$.run)
       const events = get(this.runs.$.events)
-      const key = target == null ? '' : target.kind == 'flow' ? 'flow' : `subflow:${target.id}`
+      const key = target == null ? '' : 'flow'
       const inputs = [
         ...designerRevisionInputs(draft, target),
         presentation == null || target == null ? undefined : targetPresentation(presentation, target),

@@ -20,7 +20,6 @@ function draft(): Draft {
       modules: {},
       document: {
         bindings: {},
-        subflows: {},
         tasks: {
           task: {
             name: 'Task',
@@ -139,7 +138,6 @@ describe('Per-field input sources', () => {
     const view = revisionView(draft())
     expect(view.outputDescription({ kind: 'flow' }, 'source', 'text')).toBe('Plain text')
     expect(view.outputDescription({ kind: 'flow' }, 'source', 'missing')).toBeUndefined()
-    expect(view.outputDescription({ kind: 'subflow', id: 'missing' }, 'source', 'text')).toBeUndefined()
   })
 
   it('does no compatibility work until requested and caches each field independently', () => {
@@ -241,9 +239,6 @@ describe('Per-field input sources', () => {
         ...base.content,
         document: {
           ...base.content.document,
-          subflows: {
-            nested: { name: 'Nested', inputs: [], outputs: [], graph: { ...base.content.document.graph, edges: [] } },
-          },
         },
       },
     }
@@ -253,7 +248,6 @@ describe('Per-field input sources', () => {
       source: [{ description: 'Plain text', output: 'text', check: { kind: 'available' } }],
     })
     expect(view.inputSource({ kind: 'flow' }, 'other', 'input0').candidates()).toEqual({})
-    expect(view.inputSource({ kind: 'subflow', id: 'nested' }, 'task', 'input0').candidates()).toEqual({})
     const changed: Draft = {
       ...source,
       content: { ...source.content, document: { ...source.content.document, graph: { ...source.content.document.graph, edges: [] } } },

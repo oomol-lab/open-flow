@@ -13,9 +13,6 @@ export type InlineBlockManifestKind = typeof InlineBlockManifestKind
 export const TaskBlockManifestKind: unique symbol = Symbol('TaskBlockManifest')
 export type TaskBlockManifestKind = typeof TaskBlockManifestKind
 
-export const SubflowBlockManifestKind: unique symbol = Symbol('SubflowBlockManifest')
-export type SubflowBlockManifestKind = typeof SubflowBlockManifestKind
-
 export const InlineTaskBlockManifestKind: unique symbol = Symbol('InlineTaskBlockManifest')
 export type InlineTaskBlockManifestKind = typeof InlineTaskBlockManifestKind
 

@@ -16,8 +16,6 @@ function nodeTypeForKind(kind: CanvasNodeIconData['kind']): NodeType {
       return NODE_TYPE.TaskNode
     case 'condition':
       return NODE_TYPE.ConditionNode
-    case 'subflow':
-      return NODE_TYPE.SubflowNode
     case 'trigger':
       return NODE_TYPE.TriggerNode
     case 'comment':

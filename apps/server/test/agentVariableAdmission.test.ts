@@ -16,7 +16,6 @@ function revision(): RevisionContent {
     modules: {},
     document: {
       bindings: { email: { kind: 'variable', target: 'TOKEN' } },
-      subflows: {},
       tasks: {
         agent: {
           name: 'Agent',

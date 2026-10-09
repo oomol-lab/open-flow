@@ -26,8 +26,6 @@
     "llmStructured": "LLM JSON",
     "llmStructuredDescription": "メッセージとプロンプトテンプレートから構造化された JSON を生成します。",
     "generatedResponse": "生成された応答。",
-    "subflowDescription": "既存の Subflow を追加します。",
-    "subflows": "Subflow",
     "triggerAddConnection": "Connection を追加",
     "triggerBrowse": "Provider Trigger を参照…",
     "triggerBrowseDescription": "Trigger カタログを開いて、Provider のイベントと Connection を選択します。",
@@ -61,7 +59,7 @@
     "clear": "クリア",
     "collapse": "折りたたむ",
     "deploymentManaged": "サービスの権限はこのデプロイ環境で管理されています。",
-    "description": "サブフローを含む、この Flow のすべての Code ノードで接続を共有します。他のノードで選択した接続は、Code に自動で許可されません。",
+    "description": "この Flow のすべての Code ノードで接続を共有します。他のノードで選択した接続は、Code に自動で許可されません。",
     "empty": "このフローではまだサービスを使用していません。",
     "loadFailed": "サービスの認証情報を読み込めませんでした。",
     "loading": "アクセスを読み込み中…",
@@ -92,7 +90,7 @@
     "pendingAccountReferences": "アカウント未選択：",
     "nodeReferences": "参照元：",
     "moreReferences": "他 {{count}} 件",
-    "dynamicCodeReferences": "サブフローを含む、この Flow のすべての Code ノードで接続を共有します。他のノードで選択した接続は、Code に自動で許可されません。",
+    "dynamicCodeReferences": "この Flow のすべての Code ノードで接続を共有します。他のノードで選択した接続は、Code に自動で許可されません。",
     "noAccountSelected": "アカウント未選択",
     "removeAuthorization": "承認を削除",
     "saving": "保存中…",
@@ -114,7 +112,6 @@
     "rename": "名前を変更",
     "refresh": "更新",
     "save": "保存",
-    "subflow": "Subflow",
     "unset": "未設定"
   },
   "designer": {
@@ -266,14 +263,6 @@
     },
     "selectNode": "ドラフトのノードを 1 つ選択すると、内容を確認して編集できます。",
     "locateNode": "キャンバス上でこのノードを表示",
-    "subflow": {
-      "definition": "Subflow 定義",
-      "inputPorts": "入力ポート（JSON）",
-      "open": "Subflow を開く",
-      "outputPorts": "出力ポートと参照元（JSON）",
-      "referenced": "参照している Subflow",
-      "save": "Subflow を保存"
-    },
     "task": {
       "sharedPermissions": "Flow の共有権限グループを使用",
       "sharedPermissionsHint": "Flow の共有権限グループで許可されたすべての Action を使用します。個別の追加は不要です。",
@@ -761,7 +750,6 @@
     "renameFlow": "{{name}} の名前を変更",
     "search": "検索",
     "searchResources": "{{kind}} を検索",
-    "subflows": "Subflow",
     "listenersLoading": "エラートリガーを確認中…",
     "listenersFailed": "エラートリガーを確認できませんでした。再試行するか、削除を続行できます。",
     "listenersTitle": "次の公開済みエラートリガー設定がこのワークフローを監視しています：",
@@ -809,11 +797,8 @@
           "output": "上流ノード「{{nodeId}}」に出力「{{output}}」はありません。"
         },
         "target-missing": {
-          "subflow": "Subflow「{{subflowId}}」は存在しません。",
           "task": "Task「{{taskId}}」は存在しません。"
         },
-        "subflow-output-incompatible": "ソースが Subflow 出力「{{output}}」の宣言型と互換性がありません。",
-        "subflow-output-schema-incompatible": "Subflow 出力「{{output}}」のデータ形式が一致しません：{{issue}}",
         "trigger-not-allowed": "Trigger ノードは Flow 内でのみ使用できます。",
         "variable-incompatible": "環境変数バインディング「{{bindingId}}」はこの入力と互換性がありません。",
         "variable-source-mixed": "環境変数は入力の唯一のソースである必要があります。"
@@ -837,9 +822,6 @@
           "import": "CodeModule「{{moduleId}}」は「{{specifier}}」を import できません。",
           "reexport": "CodeModule「{{moduleId}}」は、値を再 export する前に import する必要があります。"
         }
-      },
-      "subflow": {
-        "cycle": "Subflow の循環は実行できません：{{subflows}}。"
       },
       "task": {
         "capability-incomplete": "Inline Task「{{nodeId}}」の Connector Capability が未設定です。",
@@ -941,8 +923,6 @@
       "saving": "ドラフトを保存中…",
       "failed": "保存に失敗"
     },
-    "subflowDraft": "Subflow ドラフト",
-    "subflowPublishHelp": "Subflow は Flow を通じて公開されます。",
     "unpublishedChanges": "未公開の変更あり",
     "valid": "問題なし",
     "views": "ワークスペースのビュー",

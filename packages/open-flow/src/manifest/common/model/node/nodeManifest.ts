@@ -4,7 +4,7 @@ import type { HandleInputFrom, NodeId } from '../../../../schema/index.ts'
 
 import { NodeManifestKind } from './internal.ts'
 
-export type NodeType = 'task' | 'subflow' | 'value' | 'condition' | 'trigger'
+export type NodeType = 'task' | 'value' | 'condition' | 'trigger'
 
 export interface NodeManifest$ {
   readonly title: ReadonlyVal<string | undefined>

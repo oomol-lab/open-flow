@@ -27,17 +27,6 @@ export function flowInspection(inspected: Awaited<ReturnType<typeof inspectFlowD
     draft: {
       revisionId: draft.revisionId,
       graph: inspectGraph(document, document.graph),
-      subflows: Object.fromEntries(
-        Object.entries(document.subflows).map(([id, subflow]) => [
-          id,
-          {
-            name: subflow.name,
-            inputs: inspectPorts(subflow.inputs),
-            outputs: subflow.outputs.map((port) => ({ handle: port.handle, sources: port.sources })),
-            graph: inspectGraph(document, subflow.graph),
-          },
-        ]),
-      ),
       bindings: document.bindings,
       modules: Object.fromEntries(Object.entries(modules).map(([id, module]) => [id, { name: module.name, imports: module.imports }])),
     },
@@ -137,7 +126,6 @@ function inspectNode(document: FlowDocument, node: GraphNode): Record<string, un
     case 'error':
     case 'manual':
     case 'cron':
-    case 'subflow':
       return { ...node, ...ports }
   }
 }

@@ -1,4 +1,4 @@
-import type { HandleOutputFrom, HandleInputFrom, HandleFromFlow, HandleFromNode } from '../../../../schema/index.ts'
+import type { HandleOutputFrom, HandleInputFrom, HandleFromNode } from '../../../../schema/index.ts'
 
 import { Some, None, Option } from '@wopjs/tsur'
 import { parseArray } from '../../../../base/common/parse.ts'
@@ -16,7 +16,6 @@ function parseHandleOutputFrom(data: unknown): Option<HandleOutputFrom> {
     if (handle.isSome()) {
       return Some({
         handle: handle.unwrap(),
-        from_flow: parseArray(data.from_flow, parseHandleFromFlow).unwrapOr(),
         from_node: parseArray(data.from_node, parseHandleFromNode).unwrapOr(),
       })
     }
@@ -34,16 +33,9 @@ function parseHandleInputFrom(data: unknown): Option<HandleInputFrom> {
       handle,
       value: record.value,
       schema_overrides: parseHandleSchemaOverrides(record.schema_overrides),
-      from_flow: parseArray(record.from_flow, parseHandleFromFlow).unwrapOr(),
       from_node: parseArray(record.from_node, parseHandleFromNode).unwrapOr(),
     })),
   )
-}
-
-function parseHandleFromFlow(data: unknown): Option<HandleFromFlow> {
-  return Option.from(data, isUnknownRecord)
-    .andThen((record) => parseHandleName(record.input_handle))
-    .map((input_handle) => ({ input_handle }))
 }
 
 function parseHandleFromNode(data: unknown): Option<HandleFromNode> {

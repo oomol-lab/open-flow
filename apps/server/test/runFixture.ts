@@ -33,7 +33,6 @@ export async function storeRevision(
       ...Object.entries(revision.document.bindings).map(([bindingId, binding]) => ({ binding, bindingId, kind: 'binding.create' as const })),
       ...Object.entries(revision.modules).map(([moduleId, module]) => ({ kind: 'module.create' as const, module, moduleId })),
       ...Object.entries(revision.document.tasks).map(([taskId, task]) => ({ kind: 'task.create' as const, task, taskId })),
-      ...Object.entries(revision.document.subflows).map(([subflowId, subflow]) => ({ kind: 'subflow.create' as const, subflow, subflowId })),
       ...Object.entries(revision.document.graph.nodes).map(([nodeId, node]) => ({
         kind: 'graph.node.create' as const,
         node: { ...node, name: node.name ?? nodeId },

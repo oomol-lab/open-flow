@@ -125,7 +125,6 @@ function fallbackIcon(item: LibraryNodeItem): IconName {
     case 'wait':
       return 'wait'
     case 'new-task':
-    case 'subflow':
     case 'comment':
       return 'task'
   }

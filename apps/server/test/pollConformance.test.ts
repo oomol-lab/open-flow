@@ -67,7 +67,6 @@ function revision(config: Readonly<Record<string, JsonValue>>, connectionId: str
             }
           : {},
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,

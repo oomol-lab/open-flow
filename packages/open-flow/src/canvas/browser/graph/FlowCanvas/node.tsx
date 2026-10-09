@@ -72,7 +72,6 @@ export function createNodeEntry(node: FlowCanvasViewSemanticNode, contentKey: st
   const types = {
     approval: NODE_TYPE.TaskNode,
     condition: NODE_TYPE.ConditionNode,
-    subflow: NODE_TYPE.SubflowNode,
     task: NODE_TYPE.TaskNode,
     trigger: NODE_TYPE.TriggerNode,
     value: NODE_TYPE.ValueNode,

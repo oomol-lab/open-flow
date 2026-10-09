@@ -73,7 +73,6 @@ function revision(fixture: IntegrationConformanceFixture, enabled = true): Revis
             }
           : {},
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,

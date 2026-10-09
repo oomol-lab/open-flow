@@ -94,7 +94,6 @@ function revision(source = 'primary', definition: PollDefinition['snapshot'] = s
           },
         },
       },
-      subflows: {},
       tasks: {},
     },
     modelVersion: currentFlowModelVersion,

@@ -31,7 +31,6 @@ function fixture(value: JsonValue = { name: 'Ada', count: 2 }, schema: JsonValue
     document: {
       bindings: {},
       tasks: {},
-      subflows: {},
       graph: {
         edges: [
           { source: 'start', target: 'data' },
@@ -276,31 +275,6 @@ describe('Source object fields', () => {
     await expect(
       execute({ ...absent, document: { ...absent.document, graph: { ...absent.document.graph, nodes: { ...absent.document.graph.nodes, sink: condition } } } }),
     ).rejects.toThrow('Source has no value')
-  })
-
-  it('projects Subflow outputs using the same Source contract', async () => {
-    const content = fixture()
-    const data = content.document.graph.nodes.data!
-    const revision: RevisionContent = {
-      ...content,
-      document: {
-        ...content.document,
-        graph: {
-          nodes: { start: { kind: 'manual', name: 'Start' }, child: { kind: 'subflow', name: 'Child', subflowId: 'child', inputs: {} } },
-          edges: [{ source: 'start', target: 'child' }],
-        },
-        subflows: {
-          child: {
-            name: 'Child',
-            inputs: [],
-            outputs: [{ handle: 'name', jsonSchema: { type: 'string' }, nullable: true, sources: [reference('name')] }],
-            graph: { nodes: { data }, edges: [] },
-          },
-        },
-      },
-    }
-    expect(decodeRevision(encodeRevision(revision))).toEqual(revision)
-    expect(await execute(revision)).toMatchObject({ nodes: [{ nodeId: 'child', outputs: { name: 'Ada' } }] })
   })
 
   it('keeps complete objects in checkpoints and projects after Wait resumes', async () => {
