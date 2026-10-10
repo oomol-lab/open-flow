@@ -93,125 +93,123 @@ function EventSources({ client, teams, onSourcesChange }: Props) {
   }
 
   return (
-    <main className="h-full w-full overflow-auto bg-background px-6 pt-8 pb-16 text-sm text-foreground">
-      <div className="mx-auto flex max-w-[720px] flex-col gap-6">
-        <header className="flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="m-0 text-2xl leading-8 font-semibold">{t('eventSources.title')}</h1>
-            <p className="m-0 mt-2 text-sm leading-5 text-muted-foreground">{t('eventSources.description')}</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => void load()} disabled={pending}>
-              {t('eventSources.refresh')}
-            </Button>
-            <Button onClick={() => setEditing('new')} disabled={sources == null || editing != null || pending}>
-              {t('eventSources.add')}
-            </Button>
-          </div>
-        </header>
-        {error != null && (
-          <p role="alert" className="text-sm text-destructive">
-            {error}
-          </p>
-        )}
-        {sources == null && error == null && <p role="status">{t('eventSources.loading')}</p>}
-        {editing != null && (
-          <SourceForm
-            existingNames={sources?.map((source) => source.name)}
-            key={editing == 'new' ? 'new' : editing.sourceId}
-            source={editing == 'new' ? undefined : editing}
-            client={client}
-            teams={teams}
-            onCancel={() => setEditing(undefined)}
-            onSaved={() => {
-              setEditing(undefined)
-              void load()
-            }}
-          />
-        )}
-        {sources?.length == 0 && editing == null && (
-          <section className="rounded-lg border border-border p-6">
-            <h2 className="m-0 text-base leading-6 font-medium">{t('eventSources.empty')}</h2>
-            <p className="m-0 mt-2 text-sm leading-5 text-muted-foreground">{t('eventSources.emptyDescription')}</p>
-          </section>
-        )}
-        {sources?.map((source) => (
-          <section key={source.sourceId} className="flex flex-col gap-4 rounded-lg border border-border p-5" aria-label={source.name}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="m-0 text-base leading-6 font-medium">{source.name}</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {source.appId} ·{' '}
-                  {t(
-                    source.enabled
-                      ? source.verifiedAt == null
-                        ? 'eventSources.unverified'
-                        : source.lastReceivedAt == null
-                          ? 'eventSources.ready'
-                          : 'eventSources.receiving'
-                      : 'eventSources.disabled',
-                  )}
-                </p>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" disabled={pending} onClick={() => setEditing(source)}>
-                  {t('eventSources.edit')}
-                </Button>
-                <Button variant="outline" size="sm" disabled={pending} onClick={() => void toggle(source)}>
-                  {t(source.enabled ? 'eventSources.disable' : 'eventSources.enable')}
-                </Button>
-              </div>
-            </div>
-            <EventSourceSetup
-              source={source}
-              client={client}
-              onChange={(updated) => setSources((current) => current?.map((item) => (item.sourceId == updated.sourceId ? updated : item)))}
-            />
-            <dl className="grid gap-2 text-sm sm:grid-cols-2">
-              <div>
-                <dt className="text-muted-foreground">{t('eventSources.connection')}</dt>
-                <dd className="break-all">{source.connectionId}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">{t('eventSources.lastReceived')}</dt>
-                <dd>{source.lastReceivedAt == null ? t('eventSources.never') : new Date(source.lastReceivedAt).toLocaleString()}</dd>
-              </div>
-            </dl>
+    <div className="flex flex-col gap-5 text-sm text-foreground">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="m-0 text-2xl leading-8 font-semibold">{t('eventSources.title')}</h1>
+          <p className="m-0 mt-2 text-sm leading-5 text-muted-foreground">{t('eventSources.description')}</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => void load()} disabled={pending}>
+            {t('eventSources.refresh')}
+          </Button>
+          <Button onClick={() => setEditing('new')} disabled={sources == null || editing != null || pending}>
+            {t('eventSources.add')}
+          </Button>
+        </div>
+      </header>
+      {error != null && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      {sources == null && error == null && <p role="status">{t('eventSources.loading')}</p>}
+      {editing != null && (
+        <SourceForm
+          existingNames={sources?.map((source) => source.name)}
+          key={editing == 'new' ? 'new' : editing.sourceId}
+          source={editing == 'new' ? undefined : editing}
+          client={client}
+          teams={teams}
+          onCancel={() => setEditing(undefined)}
+          onSaved={() => {
+            setEditing(undefined)
+            void load()
+          }}
+        />
+      )}
+      {sources?.length == 0 && editing == null && (
+        <section className="rounded-lg border border-border p-6">
+          <h2 className="m-0 text-base leading-6 font-medium">{t('eventSources.empty')}</h2>
+          <p className="m-0 mt-2 text-sm leading-5 text-muted-foreground">{t('eventSources.emptyDescription')}</p>
+        </section>
+      )}
+      {sources?.map((source) => (
+        <section key={source.sourceId} className="flex flex-col gap-4 rounded-lg border border-border p-5" aria-label={source.name}>
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <h3 className="text-sm font-medium">{t('eventSources.consumers')}</h3>
-              {source.consumers.length == 0 ? (
-                <p className="mt-1 text-sm text-muted-foreground">{t('eventSources.noConsumers')}</p>
-              ) : (
-                <ul className="mt-1 space-y-1">
-                  {source.consumers.map((consumer) => (
-                    <li className="text-sm" key={`${consumer.flowId}:${consumer.triggerNodeId}`}>
-                      {consumer.flowName} · {consumer.triggerNodeId}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <h2 className="m-0 text-base leading-6 font-medium">{source.name}</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {source.appId} ·{' '}
+                {t(
+                  source.enabled
+                    ? source.verifiedAt == null
+                      ? 'eventSources.unverified'
+                      : source.lastReceivedAt == null
+                        ? 'eventSources.ready'
+                        : 'eventSources.receiving'
+                    : 'eventSources.disabled',
+                )}
+              </p>
             </div>
-            <div className="flex items-center gap-2">
-              {removing == source.sourceId ? (
-                <>
-                  <span className="text-sm">{t('eventSources.deleteConfirm')}</span>
-                  <Button variant="destructive" size="sm" disabled={pending} onClick={() => void remove(source)}>
-                    {t('eventSources.delete')}
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setRemoving(undefined)}>
-                    {t('eventSources.cancel')}
-                  </Button>
-                </>
-              ) : (
-                <Button variant="ghost" size="sm" disabled={pending || source.consumers.length > 0} onClick={() => setRemoving(source.sourceId)}>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm" disabled={pending} onClick={() => setEditing(source)}>
+                {t('eventSources.edit')}
+              </Button>
+              <Button variant="outline" size="sm" disabled={pending} onClick={() => void toggle(source)}>
+                {t(source.enabled ? 'eventSources.disable' : 'eventSources.enable')}
+              </Button>
+            </div>
+          </div>
+          <EventSourceSetup
+            source={source}
+            client={client}
+            onChange={(updated) => setSources((current) => current?.map((item) => (item.sourceId == updated.sourceId ? updated : item)))}
+          />
+          <dl className="grid gap-2 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-muted-foreground">{t('eventSources.connection')}</dt>
+              <dd className="break-all">{source.connectionId}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">{t('eventSources.lastReceived')}</dt>
+              <dd>{source.lastReceivedAt == null ? t('eventSources.never') : new Date(source.lastReceivedAt).toLocaleString()}</dd>
+            </div>
+          </dl>
+          <div>
+            <h3 className="text-sm font-medium">{t('eventSources.consumers')}</h3>
+            {source.consumers.length == 0 ? (
+              <p className="mt-1 text-sm text-muted-foreground">{t('eventSources.noConsumers')}</p>
+            ) : (
+              <ul className="mt-1 space-y-1">
+                {source.consumers.map((consumer) => (
+                  <li className="text-sm" key={`${consumer.flowId}:${consumer.triggerNodeId}`}>
+                    {consumer.flowName} · {consumer.triggerNodeId}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            {removing == source.sourceId ? (
+              <>
+                <span className="text-sm">{t('eventSources.deleteConfirm')}</span>
+                <Button variant="destructive" size="sm" disabled={pending} onClick={() => void remove(source)}>
                   {t('eventSources.delete')}
                 </Button>
-              )}
-            </div>
-          </section>
-        ))}
-      </div>
-    </main>
+                <Button variant="ghost" size="sm" onClick={() => setRemoving(undefined)}>
+                  {t('eventSources.cancel')}
+                </Button>
+              </>
+            ) : (
+              <Button variant="ghost" size="sm" disabled={pending || source.consumers.length > 0} onClick={() => setRemoving(source.sourceId)}>
+                {t('eventSources.delete')}
+              </Button>
+            )}
+          </div>
+        </section>
+      ))}
+    </div>
   )
 }
 

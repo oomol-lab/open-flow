@@ -502,7 +502,9 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
                 {usersOpen ? (
                   <UsersPage currentUserId={session.user.userId} onUnauthorized={sessionExpired} />
                 ) : eventSourcesOpen ? (
-                  <EventSourcesPage client={client} language={language} teams={team.kind == 'ready' ? team.teams : []} />
+                  <HostPage>
+                    <EventSourcesPage client={client} language={language} teams={team.kind == 'ready' ? team.teams : []} />
+                  </HostPage>
                 ) : (
                   <SettingsPage
                     user={session.user}

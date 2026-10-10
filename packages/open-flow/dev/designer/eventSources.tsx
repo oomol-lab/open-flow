@@ -9,7 +9,7 @@ import { CreateEventSourceDialog } from '../../src/workbench/browser/runtime/cre
 import { EditorContextPanel } from '../../src/workbench/browser/runtime/editor/editorContextPanel.tsx'
 import { FeishuEventFilters } from '../../src/workbench/browser/runtime/editor/feishuEventFilters.tsx'
 import { TriggerSummary } from '../../src/workbench/browser/runtime/editor/triggerSummary.tsx'
-import { SourceForm } from '../../src/workbench/browser/runtime/eventSources.tsx'
+import { EventSourcesPage, SourceForm } from '../../src/workbench/browser/runtime/eventSources.tsx'
 import { EventSourceSetup } from '../../src/workbench/browser/runtime/eventSourceSetup.tsx'
 import { FeishuEventPicker } from '../../src/workbench/browser/runtime/feishuEventPicker.tsx'
 import { createI18n } from '../../src/workbench/browser/runtime/i18n.ts'
@@ -70,6 +70,10 @@ function Forms({ language, dark, log }: { language: Parameters<FrontendStory['re
   return (
     <I18nProvider i18n={i18n}>
       <div className="open-flow-theme grid gap-6 p-6 text-sm text-foreground xl:grid-cols-2" data-theme={dark ? 'dark' : 'light'}>
+        <section className="xl:col-span-2">
+          <h2 className="m-0 mb-4 text-sm font-medium">Page content · host supplies the container</h2>
+          <EventSourcesPage client={client} language={language} teams={[]} />
+        </section>
         {(
           [
             ['Available account', client],
