@@ -11,12 +11,12 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { onTestFinished, expect, it, vi } from 'vitest'
 import { createLlm } from '../node/deployment/llm.ts'
-import { OperatorSession } from '../node/deployment/operator.ts'
+import { createOperatorApp, OperatorSession } from '../node/deployment/operator.ts'
 import { Settings } from '../node/deployment/settings.ts'
 import { Database } from '../node/storage/database.ts'
 import { OperatorStore } from '../node/storage/operator-store.ts'
+import { PersonalTokenStore } from '../node/storage/personal-token-store.ts'
 import { SettingsStore } from '../node/storage/settings-store.ts'
-import { UserStore } from '../node/storage/user-store.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
@@ -409,7 +409,7 @@ it('issues private, persistent personal tokens and enforces owner isolation thro
   }
   expect(f.service.control.getDraft(other.flowId)).toEqual(before)
   const reopened = Database.open(f.file)
-  expect(new UserStore(reopened.connection).tokenActor(created.token)).toBe(alice.user.userId)
+  expect(new PersonalTokenStore(reopened.connection).tokenActor(created.token)).toBe(alice.user.userId)
   reopened.close()
   expect((await f.request(`/auth/tokens/${created.credential.tokenId}`, bh, 'DELETE')).status).toBe(204)
   expect((await f.request('/v1/flows', headers)).status).toBe(200)
@@ -418,7 +418,7 @@ it('issues private, persistent personal tokens and enforces owner isolation thro
   expect((await f.request('/v1/flows', { ...ah, ...headers })).status).toBe(401)
 })
 
-it('requires email login to manage tokens and validates names and request origins', async () => {
+it('requires browser login to manage tokens and validates names and request origins', async () => {
   const f = await fixture()
   const account = await f.create('token-login@example.com')
   const cookie = await f.login(account.user.email, account.password)
@@ -450,4 +450,68 @@ it('invalidates every personal token on password reset or account disable, witho
   expect((await f.request('/v1/flows', { authorization: `Bearer ${second.token}` })).status).toBe(401)
   expect((await f.request(`/auth/users/${account.user.userId}`, administrator, 'PUT', { enabled: true, expectedRevision: 3 })).status).toBe(200)
   expect((await f.request('/v1/flows', { authorization: `Bearer ${second.token}` })).status).toBe(401)
+})
+
+it('lets the Operator issue, list and revoke private tokens with REST and MCP ownership intact', async () => {
+  const f = await fixture()
+  const login = await f.request('/auth/session', {}, 'POST', { token })
+  const cookie = { cookie: login.headers.get('set-cookie')!.match(/open_flow_operator_session=[^;]+/)![0] }
+  const own = await f.flow(administrator)
+  const other = await f.create('operator-token-other@example.com')
+  const otherCookie = await f.login(other.user.email, other.password)
+  const foreign = await f.flow(otherCookie)
+  const response = await f.request('/auth/tokens', cookie, 'POST', { name: 'Operator Agent' })
+  expect(response.status).toBe(201)
+  expect(response.headers.get('cache-control')).toBe('no-store')
+  const created = (await response.json()) as { token: string; credential: { tokenId: string } }
+  const headers = { authorization: `Bearer ${created.token}` }
+  expect(await (await f.request('/auth/tokens', cookie)).json()).toEqual({ version: 1, tokens: [created.credential] })
+  expect(JSON.stringify(f.database.connection.prepare('SELECT * FROM user_tokens').all())).not.toContain(created.token)
+  expect((await f.request('/v1/flows', headers)).status).toBe(200)
+  expect((await f.request(`/v1/flows/${foreign.flowId}`, headers)).status).toBe(404)
+  expect(await (await f.request('/auth/session', headers)).json()).toMatchObject({ user: { userId: 'operator', role: 'admin' } })
+  const mcp = await f.mcp('flow_list', {}, headers)
+  expect(mcp.isError).not.toBe(true)
+  expect(JSON.stringify(mcp.structuredContent)).toContain(own.flowId)
+  expect(JSON.stringify(mcp.structuredContent)).not.toContain(foreign.flowId)
+  expect((await f.request('/auth/tokens', headers)).status).toBe(401)
+  expect((await f.request('/auth/tokens', { ...cookie, origin: 'https://evil.example' }, 'POST', { name: 'No' })).status).toBe(403)
+  expect((await f.request('/auth/tokens', cookie, 'POST', { name: 'No', userId: other.user.userId })).status).toBe(400)
+  expect(await (await f.request('/auth/tokens', otherCookie)).json()).toEqual({ version: 1, tokens: [] })
+  await f.request(`/auth/tokens/${created.credential.tokenId}`, otherCookie, 'DELETE')
+  expect((await f.request('/v1/flows', headers)).status).toBe(200)
+  const reopened = Database.open(f.file)
+  try {
+    const restored = new OperatorSession(new OperatorStore(reopened), token, false)
+    expect(await restored.actor(new Request('http://localhost/v1/flows', { headers }))).toBe('operator')
+    const rotated = new OperatorSession(new OperatorStore(reopened), token + '-rotated', false)
+    expect(await rotated.actor(new Request('http://localhost/v1/flows', { headers }))).toBeUndefined()
+    const unconfigured = new OperatorSession(new OperatorStore(reopened), undefined, false)
+    expect(await unconfigured.actor(new Request('http://localhost/v1/flows', { headers }))).toBeUndefined()
+  } finally {
+    reopened.close()
+  }
+  expect((await f.request(`/auth/tokens/${created.credential.tokenId}`, cookie, 'DELETE')).status).toBe(204)
+  expect((await f.request('/v1/flows', headers)).status).toBe(401)
+  expect((await f.request('/v1/flows', administrator)).status).toBe(200)
+})
+
+it('supports personal tokens for a claimed Operator without an email user store', async () => {
+  const f = await fixture()
+  const store = new OperatorStore(f.database)
+  expect(store.claim(token)).toBe(true)
+  const session = new OperatorSession(store, undefined, false)
+  const app = createOperatorApp(session)
+  const login = await app.request('/session', { method: 'POST', body: JSON.stringify({ version: 1, token }) })
+  const cookie = login.headers.get('set-cookie')!.match(/open_flow_operator_session=[^;]+/)![0]
+  const response = await app.request('/tokens', { method: 'POST', headers: { cookie }, body: JSON.stringify({ version: 1, name: 'Agent' }) })
+  expect(response.status).toBe(201)
+  const created = (await response.json()) as { token: string; credential: { tokenId: string } }
+  const request = new Request('http://localhost/v1/mcp', { headers: { authorization: `Bearer ${created.token}` } })
+  expect(await session.actor(request)).toBe('operator')
+  expect(await new OperatorSession(new OperatorStore(f.database), undefined, false).actor(request)).toBe('operator')
+  expect(await new OperatorSession(new OperatorStore(f.database), token, false).actor(request)).toBeUndefined()
+  expect((await app.request('/session', { method: 'POST', body: JSON.stringify({ version: 1, token: created.token }) })).status).toBe(401)
+  await app.request(`/tokens/${created.credential.tokenId}`, { method: 'DELETE', headers: { cookie } })
+  expect(await session.actor(request)).toBeUndefined()
 })

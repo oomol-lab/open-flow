@@ -78,6 +78,7 @@ Disabling an account preserves its Flows and historical execution data. It does 
 
 ## Existing data upgrades
 
+SQLite migration 0041 extends personal Token storage with Operator credential binding, preserving existing email account Tokens.
 SQLite migration 0037 creates account storage in the startup transaction and assigns old Flows to `operator`.
 Existing Flow creation and Draft/Live Run idempotency keys move into Operator scope. Existing clients can retry the same requests.
 Revision content, Publications, Runs, results, and external Trigger identities remain unchanged.
@@ -86,17 +87,19 @@ Accounts and session signing secrets persist in the Server data volume. Restarti
 
 ## Personal access Tokens and MCP
 
-After email login, open Settings → MCP integration, enter a client name, and create a personal access Token.
+After Operator or email login, open Agent access, enter a client name, and create a personal access Token.
+CLI and MCP clients use these Tokens.
 The plaintext Token appears only once after creation. The page provides copy and revoke actions.
 The Token list and database do not store recoverable plaintext. The database stores a SHA-256 digest.
 
 Clients use `/v1/mcp` with `Authorization: Bearer <personal-token>` and do not need a browser Cookie.
 The Token can also call Server APIs that the account can access. It has the account's permissions and can access only that account's Flows.
 Administrator status does not expand Flow visibility.
-Tokens have no fixed expiry. Revocation, password reset, or account disablement invalidates them. Re-enabling an account does not restore old Tokens.
-Browser logout does not revoke Tokens. Operator continues to use the Operator token.
+Tokens have no fixed expiry and can be revoked individually. Email account Tokens are also invalidated by password reset or account disablement; re-enabling an account does not restore them.
+Operator personal Tokens are bound to the active Operator credential fingerprint: the environment token digest or the stored credential revision. They authenticate only while that fingerprint matches. Switching credential sources also invalidates them for the new source.
+Browser logout does not revoke Tokens. The deployment Operator credential remains available for Operator login and existing machine clients. Personal Tokens cannot be used as Operator login credentials.
 
-The following management interfaces accept only an email account's login Cookie.
+The following management interfaces accept only an Operator or email account's login Cookie.
 They do not accept Bearer Tokens or allow callers to select another account:
 
 | Method   | Path                    | Request body           | Response                                                              |

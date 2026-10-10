@@ -91,17 +91,7 @@
     "connectorSwitchOomol": "当前仍使用自定义配置，连接 OOMOL 或保存 API key 后切换。",
     "oomolConfigured": "已连接 OOMOL，API key 已保存。",
     "apiKeyDescription": "也可以直接填写 OOMOL API key。",
-    "apiKeyHint": "API key 仅保存在本实例服务端，保存后不会显示。",
-    "mcpDescription": "连接 MCP 客户端，创建、编辑和运行工作流。",
-    "mcpAddress": "服务地址",
-    "mcpCopy": "复制地址",
-    "mcpCopied": "已复制 MCP 地址。",
-    "mcpCopyFailed": "复制失败，请选中地址手动复制。",
-    "mcpTransport": "传输方式",
-    "mcpProtocol": "协议版本",
-    "mcpAuthentication": "认证方式",
-    "mcpTokenHint": "在客户端中用此 Server 的 Operator token 替换 <operator-token>。此凭据只能访问 Operator 的工作流，不能访问邮箱账号的工作流。",
-    "mcpCompatibility": "客户端需支持上述协议版本和自定义 Authorization 请求头。不支持旧版 initialize 握手或 OAuth 登录。"
+    "apiKeyHint": "API key 仅保存在本实例服务端，保存后不会显示。"
   },
   "team": {
     "createFailed": "无法在这个 Connector 团队中创建工作流。",
@@ -168,9 +158,8 @@
     "actions": "操作"
   },
   "account": {
-    "title": "MCP 接入",
     "tokens": "个人访问 Token",
-    "description": "Token 拥有你账号的 API 和 MCP 权限，在撤销、重置密码或停用账号后失效。",
+    "description": "Token 拥有当前账号的 API 和 MCP 权限，可随时撤销。",
     "tokenHint": "将 <personal-token> 替换为下方创建的 Token，只能访问你自己的工作流。",
     "name": "Token 名称",
     "create": "创建 Token",
@@ -184,5 +173,23 @@
     "loadFailed": "无法加载 Token，请重试。",
     "saveFailed": "操作未能保存，请重试。",
     "saved": "已保存 Token"
+  },
+  "agentAccess": {
+    "title": "Agent 接入",
+    "cliDescription": "通过 oo flow 命令行，让 AI Agent 操作 Open Flow。",
+    "install": "1. 安装 oo CLI",
+    "connect": "2. 连接当前 Server",
+    "environmentHint": "在 Agent 的运行环境中配置服务地址和 Token，无需运行 oo login。",
+    "mcpDescription": "连接 MCP 客户端，让 AI Agent 操作 Open Flow。",
+    "mcpAddress": "服务地址",
+    "mcpCopy": "复制地址",
+    "mcpCopied": "已复制 MCP 地址。",
+    "mcpCopyFailed": "复制失败，请选中地址手动复制。",
+    "mcpTransport": "传输方式",
+    "mcpProtocol": "协议版本",
+    "mcpAuthentication": "认证方式",
+    "cliTitle": "通过 CLI 编辑工作流",
+    "mcpTitle": "通过 MCP 编辑工作流",
+    "openSource": "{{repository}} 是开源命令行工具，运行下方命令即可安装。"
   }
 }

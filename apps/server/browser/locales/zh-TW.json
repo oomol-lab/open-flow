@@ -91,17 +91,7 @@
     "connectorSwitchOomol": "目前仍使用自訂設定，連接 OOMOL 或儲存 API key 後切換。",
     "oomolConfigured": "已連接 OOMOL，API key 已儲存。",
     "apiKeyDescription": "也可以直接填寫 OOMOL API key。",
-    "apiKeyHint": "API key 僅儲存在本實例伺服器端，儲存後不會顯示。",
-    "mcpDescription": "連接 MCP 用戶端，建立、編輯及執行工作流程。",
-    "mcpAddress": "服務位址",
-    "mcpCopy": "複製位址",
-    "mcpCopied": "已複製 MCP 位址。",
-    "mcpCopyFailed": "複製失敗，請選取位址手動複製。",
-    "mcpTransport": "傳輸方式",
-    "mcpProtocol": "協定版本",
-    "mcpAuthentication": "驗證方式",
-    "mcpTokenHint": "在用戶端中以此 Server 的 Operator token 取代 <operator-token>。此憑證只能存取 Operator 的工作流程，無法存取電子郵件帳號的工作流程。",
-    "mcpCompatibility": "用戶端需支援上述協定版本及自訂 Authorization 標頭。不支援舊版 initialize 交握或 OAuth 登入。"
+    "apiKeyHint": "API key 僅儲存在本實例伺服器端，儲存後不會顯示。"
   },
   "team": {
     "createFailed": "無法在這個 Connector 團隊中建立 Flow。",
@@ -168,9 +158,8 @@
     "actions": "操作"
   },
   "account": {
-    "title": "MCP 連線",
     "tokens": "個人存取 Token",
-    "description": "Token 擁有你帳號的 API 和 MCP 權限，在撤銷、重設密碼或停用帳號後失效。",
+    "description": "Token 擁有目前帳號的 API 和 MCP 權限，可隨時撤銷。",
     "tokenHint": "將 <personal-token> 替換為下方建立的 Token，只能存取你自己的工作流程。",
     "name": "Token 名稱",
     "create": "建立 Token",
@@ -184,5 +173,23 @@
     "loadFailed": "無法載入 Token，請重試。",
     "saveFailed": "無法儲存操作，請重試。",
     "saved": "已儲存 Token"
+  },
+  "agentAccess": {
+    "title": "Agent 接入",
+    "cliDescription": "透過 oo flow 命令列，讓 AI Agent 操作 Open Flow。",
+    "install": "1. 安裝 oo CLI",
+    "connect": "2. 連接目前的 Server",
+    "environmentHint": "在 Agent 的執行環境中設定服務位址和 Token，無需執行 oo login。",
+    "mcpDescription": "連接 MCP 用戶端，讓 AI Agent 操作 Open Flow。",
+    "mcpAddress": "服務位址",
+    "mcpCopy": "複製位址",
+    "mcpCopied": "已複製 MCP 位址。",
+    "mcpCopyFailed": "複製失敗，請選取位址手動複製。",
+    "mcpTransport": "傳輸方式",
+    "mcpProtocol": "協定版本",
+    "mcpAuthentication": "驗證方式",
+    "cliTitle": "透過 CLI 編輯工作流程",
+    "mcpTitle": "透過 MCP 編輯工作流程",
+    "openSource": "{{repository}} 是開源命令列工具，執行下方命令即可安裝。"
   }
 }

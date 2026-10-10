@@ -35,6 +35,7 @@ import { HelpButton } from '../../src/ui/browser/helpButton.tsx'
 import { Popover, PopoverContent, PopoverTrigger } from '../../src/ui/browser/popover.tsx'
 import { HostTooltip } from '../../src/ui/browser/public.ts'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '../../src/ui/browser/select.tsx'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../src/ui/browser/tabs.tsx'
 import { Textarea } from '../../src/ui/browser/textarea.tsx'
 import { WorkbenchCanvasActions } from '../../src/workbench/browser/runtime/editor/workbenchCanvas.tsx'
 import { WorkbenchInspectorToggle } from '../../src/workbench/browser/runtime/editor/workbenchInspectorToggle.tsx'
@@ -578,6 +579,38 @@ function Field({ children, label }: { readonly children: ReactNode; readonly lab
 }
 
 export const stories: readonly FrontendStory[] = [
+  {
+    group: 'Controls',
+    id: 'tabs',
+    title: 'Tabs',
+    standalone: true,
+    description: 'Compare tab variants in both themes. Use arrow keys to move focus and Enter to select a panel.',
+    render: () => (
+      <div className="grid gap-6 p-4">
+        {(['default', 'line', 'flat', 'navigation'] as const).map((variant) => (
+          <div key={variant} className="grid gap-2">
+            <span>{variant}</span>
+            <Tabs defaultValue="cli">
+              <TabsList aria-label={variant} variant={variant}>
+                <TabsTrigger value="cli">CLI</TabsTrigger>
+                <TabsTrigger value="mcp">MCP</TabsTrigger>
+              </TabsList>
+              <TabsContent value="cli">CLI commands</TabsContent>
+              <TabsContent value="mcp">MCP connection</TabsContent>
+            </Tabs>
+            <Tabs defaultValue="cli">
+              <TabsList aria-label={variant + ' small'} variant={variant} size="sm">
+                <TabsTrigger value="cli">CLI</TabsTrigger>
+                <TabsTrigger value="mcp">MCP</TabsTrigger>
+              </TabsList>
+              <TabsContent value="cli">Compact CLI commands</TabsContent>
+              <TabsContent value="mcp">Compact MCP connection</TabsContent>
+            </Tabs>
+          </div>
+        ))}
+      </div>
+    ),
+  },
   {
     group: 'Controls',
     id: 'help-button',

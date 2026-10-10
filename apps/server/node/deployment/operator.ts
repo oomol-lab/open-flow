@@ -1,6 +1,6 @@
 import type { Context } from 'hono'
 import type { CookieOptions } from 'hono/utils/cookie'
-import type { SessionUser } from '../../common/users.ts'
+import type { SessionUser, UserToken } from '../../common/users.ts'
 import type { UserStore } from '../storage/user-store.ts'
 
 import { Hono } from 'hono'
@@ -61,7 +61,7 @@ export class OperatorSession {
     if (authorization != null) {
       if (!authorization.startsWith('Bearer ')) return
       const token = authorization.slice(7)
-      const userId = this.users?.tokenActor(token)
+      const userId = this.#store.tokens.tokenActor(token, this.#fingerprint())
       return userId ?? ((await this.matches(token)) ? actorId : undefined)
     }
 
@@ -83,6 +83,18 @@ export class OperatorSession {
     if (version != '2' || extra != null || credential != fingerprint || nonce == null || nonce.length == 0) return
     const expiration = Number(expiresAt)
     return Number.isSafeInteger(expiration) && expiration > this.#now() ? actorId : undefined
+  }
+
+  listTokens(userId: string): readonly UserToken[] {
+    return this.#store.tokens.listTokens(userId, this.#fingerprint())
+  }
+
+  createToken(userId: string, name: string): { readonly credential: UserToken; readonly token: string } {
+    return this.#store.tokens.createToken(userId, name, this.#fingerprint())
+  }
+
+  revokeToken(userId: string, tokenId: string): void {
+    this.#store.tokens.revokeToken(userId, tokenId)
   }
 
   async currentUser(request: Request): Promise<SessionUser | undefined> {
@@ -253,21 +265,19 @@ export function createOperatorApp(session?: OperatorSession, attemptsPerMinute =
       return json(403, { error: { code: serverErrorCode.authorizationDenied, message: 'Cross-origin requests are not allowed.' }, version: 1 })
     const user = context.req.header('authorization') == null ? await session?.currentUser(context.req.raw) : undefined
     if (user == null) return json(401, { error: { code: serverErrorCode.authenticationInvalid, message: 'Sign in to manage personal tokens.' }, version: 1 })
-    if (user.email == null || session?.users == null)
-      return json(403, { error: { code: serverErrorCode.authorizationDenied, message: 'Personal tokens require an email account.' }, version: 1 })
     context.set('userId', user.userId)
     await next()
   })
-  tokens.get('/', (context) => json(200, { tokens: session!.users!.listTokens(context.get('userId')), version: 1 }))
+  tokens.get('/', (context) => json(200, { tokens: session!.listTokens(context.get('userId')), version: 1 }))
   tokens.post('/', async (context) => {
     const body = createTokenSchema.safeParse(await objectRequest(context.req.raw))
     if (!body.success) return json(400, { error: { code: serverErrorCode.requestInvalid, message: 'Token name is invalid.' }, version: 1 })
     if ((await session!.actor(context.req.raw)) != context.get('userId'))
       return json(401, { error: { code: serverErrorCode.authenticationInvalid, message: 'Sign in to manage personal tokens.' }, version: 1 })
-    return json(201, { ...session!.users!.createToken(context.get('userId'), body.data.name), version: 1 })
+    return json(201, { ...session!.createToken(context.get('userId'), body.data.name), version: 1 })
   })
   tokens.delete('/:tokenId', (context) => {
-    session!.users!.revokeToken(context.get('userId'), context.req.param('tokenId'))
+    session!.revokeToken(context.get('userId'), context.req.param('tokenId'))
     return new Response(null, { status: 204, headers: noStore(new Headers()) })
   })
   app.route('/tokens', tokens)

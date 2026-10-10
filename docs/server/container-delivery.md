@@ -59,7 +59,7 @@ docker run --detach \
   open-flow-server:dev
 ```
 
-MCP shares Server’s listening port at `/v1/mcp` and authenticates each request with existing Operator credentials. See [MCP integration reference](mcp.md) for protocol versions, tools, and client examples.
+MCP shares Server’s listening port at `/v1/mcp` and authenticates each request with personal access Tokens or the deployment Operator credential. See [MCP integration reference](mcp.md) for protocol versions, tools, and client examples.
 
 Workbench and API are at `http://127.0.0.1:3000`. After login, `/variables` manages deployment Variables and `/settings` manages external capabilities. The final image listens on `0.0.0.0:3000` by default, runs as root, and stores SQLite at `/data/open-flow/open-flow.sqlite`.
 

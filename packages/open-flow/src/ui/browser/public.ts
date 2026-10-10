@@ -14,6 +14,7 @@ import {
 } from './dialog.tsx'
 import { InputGroup as SharedInputGroup, InputGroupAddon as SharedInputGroupAddon, InputGroupInput as SharedInputGroupInput } from './input-group.tsx'
 import { NativeSelect as SharedNativeSelect, NativeSelectOption as SharedNativeSelectOption } from './native-select.tsx'
+import { Tabs as SharedTabs, TabsContent as SharedTabsContent, TabsList as SharedTabsList, TabsTrigger as SharedTabsTrigger } from './tabs.tsx'
 
 /** Native host button contract; Base UI composition stays internal to the product. */
 export interface ButtonProps extends ComponentPropsWithoutRef<'button'> {
@@ -48,6 +49,18 @@ export const DialogHeader: ComponentType<ComponentPropsWithoutRef<'div'>> = Shar
 export const DialogFooter: ComponentType<ComponentPropsWithoutRef<'div'>> = SharedDialogFooter
 export const DialogTitle: ComponentType<ComponentPropsWithoutRef<'h2'>> = SharedDialogTitle
 export const DialogDescription: ComponentType<ComponentPropsWithoutRef<'p'>> = SharedDialogDescription
+/** Host tabs reuse the product's keyboard navigation and panel semantics. */
+export interface TabsProps extends Omit<ComponentPropsWithoutRef<'div'>, 'defaultValue'> {
+  readonly defaultValue?: string
+  readonly value?: string
+  readonly onValueChange?: (value: string) => void
+}
+export const Tabs: ComponentType<TabsProps> = SharedTabs as ComponentType<TabsProps>
+export const TabsList: ComponentType<
+  ComponentPropsWithoutRef<'div'> & { readonly variant?: 'default' | 'line' | 'flat' | 'navigation'; readonly size?: 'default' | 'sm' }
+> = SharedTabsList
+export const TabsTrigger: ComponentType<Omit<ComponentPropsWithoutRef<'button'>, 'value'> & { readonly value: string }> = SharedTabsTrigger
+export const TabsContent: ComponentType<ComponentPropsWithoutRef<'div'> & { readonly value: string }> = SharedTabsContent
 export { Input } from './input.tsx'
 export const InputGroup: ComponentType<ComponentPropsWithoutRef<'div'>> = SharedInputGroup
 export const InputGroupAddon: ComponentType<

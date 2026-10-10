@@ -91,17 +91,7 @@
     "connectorSwitchOomol": "OOMOL に接続するか API キーを保存するまでは、カスタム Connector が使用されます。",
     "oomolConfigured": "OOMOL に接続済みです。API キーは保存されています。",
     "apiKeyDescription": "OOMOL の API キーを直接入力することもできます。",
-    "apiKeyHint": "API キーはこのインスタンスのサーバーにのみ保存され、保存後は表示されません。",
-    "mcpDescription": "MCP クライアントを接続して、ワークフローを作成・編集・実行します。",
-    "mcpAddress": "サーバー URL",
-    "mcpCopy": "URL をコピー",
-    "mcpCopied": "MCP URL をコピーしました。",
-    "mcpCopyFailed": "コピーできませんでした。URL を選択して手動でコピーしてください。",
-    "mcpTransport": "通信方式",
-    "mcpProtocol": "プロトコルバージョン",
-    "mcpAuthentication": "認証方式",
-    "mcpTokenHint": "クライアントの <operator-token> を、この Server の Operator token に置き換えてください。この認証情報でアクセスできるのは Operator 所有のワークフローのみで、メールアカウント所有のものにはアクセスできません。",
-    "mcpCompatibility": "クライアントは上記のプロトコルバージョンとカスタム Authorization ヘッダーに対応している必要があります。従来の initialize ハンドシェイクと OAuth ログインには対応していません。"
+    "apiKeyHint": "API キーはこのインスタンスのサーバーにのみ保存され、保存後は表示されません。"
   },
   "team": {
     "createFailed": "この Connector チームで Flow を作成できませんでした。",
@@ -168,9 +158,8 @@
     "actions": "操作"
   },
   "account": {
-    "title": "MCP 接続",
     "tokens": "個人アクセストークン",
-    "description": "トークンはアカウントの API と MCP 権限を持ちます。取り消し、パスワードのリセット、アカウントの無効化で失効します。",
+    "description": "Token は現在のアカウントの API と MCP の権限を持ちます。いつでも取り消せます。",
     "tokenHint": "<personal-token> を下で作成したトークンに置き換えてください。自分のワークフローにのみアクセスできます。",
     "name": "トークン名",
     "create": "トークンを作成",
@@ -184,5 +173,23 @@
     "loadFailed": "トークンを読み込めませんでした。再試行してください。",
     "saveFailed": "変更を保存できませんでした。再試行してください。",
     "saved": "トークンを保存しました"
+  },
+  "agentAccess": {
+    "title": "Agent 接続",
+    "cliDescription": "oo flow コマンドラインを通じて、AI Agent が Open Flow を操作できます。",
+    "install": "1. oo CLI をインストール",
+    "connect": "2. この Server に接続",
+    "environmentHint": "Agent の実行環境にサービスの URL とトークンを設定してください。oo login の実行は不要です。",
+    "mcpDescription": "MCP クライアントを接続して、AI Agent が Open Flow を操作できるようにします。",
+    "mcpAddress": "サーバー URL",
+    "mcpCopy": "URL をコピー",
+    "mcpCopied": "MCP URL をコピーしました。",
+    "mcpCopyFailed": "コピーできませんでした。URL を選択して手動でコピーしてください。",
+    "mcpTransport": "通信方式",
+    "mcpProtocol": "プロトコルバージョン",
+    "mcpAuthentication": "認証方式",
+    "cliTitle": "CLI でワークフローを編集する",
+    "mcpTitle": "MCP でワークフローを編集する",
+    "openSource": "{{repository}} はオープンソースのコマンドラインツールです。以下のコマンドでインストールできます。"
   }
 }

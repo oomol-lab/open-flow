@@ -91,17 +91,7 @@
     "connectorSwitchOomol": "The custom Connector remains active until you connect OOMOL or save an API key.",
     "oomolConfigured": "OOMOL connected. API key saved.",
     "apiKeyDescription": "You can also enter an OOMOL API key directly.",
-    "apiKeyHint": "The API key is stored only on this instance’s server and is not shown after saving.",
-    "mcpDescription": "Connect an MCP client to create, edit, and run workflows.",
-    "mcpAddress": "Server URL",
-    "mcpCopy": "Copy URL",
-    "mcpCopied": "MCP URL copied.",
-    "mcpCopyFailed": "Could not copy. Select and copy the URL manually.",
-    "mcpTransport": "Transport",
-    "mcpProtocol": "Protocol version",
-    "mcpAuthentication": "Authentication",
-    "mcpTokenHint": "Replace <operator-token> with this Server’s Operator token in your client. This credential accesses only Operator-owned workflows, not workflows owned by email accounts.",
-    "mcpCompatibility": "The client must support this protocol version and custom Authorization headers. Legacy initialize handshakes and OAuth sign-in are not supported."
+    "apiKeyHint": "The API key is stored only on this instance’s server and is not shown after saving."
   },
   "team": {
     "createFailed": "The Flow could not be created for this Connector Team.",
@@ -168,9 +158,8 @@
     "actions": "Actions"
   },
   "account": {
-    "title": "MCP access",
     "tokens": "Personal access tokens",
-    "description": "Tokens have your account’s API and MCP permissions. They remain valid until revoked, your password is reset, or your account is disabled.",
+    "description": "Tokens have your account’s API and MCP permissions. You can revoke them at any time.",
     "tokenHint": "Replace <personal-token> with a token created below. It accesses only your own workflows.",
     "name": "Token name",
     "create": "Create token",
@@ -184,5 +173,23 @@
     "loadFailed": "Could not load tokens. Please retry.",
     "saveFailed": "Could not save the change. Please retry.",
     "saved": "Token saved"
+  },
+  "agentAccess": {
+    "title": "Agent access",
+    "cliDescription": "Let AI agents operate Open Flow through the oo flow command line.",
+    "install": "1. Install oo CLI",
+    "connect": "2. Connect to this Server",
+    "environmentHint": "Set the server URL and token in your agent’s environment. There is no need to run oo login.",
+    "mcpDescription": "Connect an MCP client to let AI agents operate Open Flow.",
+    "mcpAddress": "Server URL",
+    "mcpCopy": "Copy URL",
+    "mcpCopied": "MCP URL copied.",
+    "mcpCopyFailed": "Could not copy. Select and copy the URL manually.",
+    "mcpTransport": "Transport",
+    "mcpProtocol": "Protocol version",
+    "mcpAuthentication": "Authentication",
+    "cliTitle": "Edit workflows through the CLI",
+    "mcpTitle": "Edit workflows through MCP",
+    "openSource": "{{repository}} is an open-source command-line tool. Run the command below to install it."
   }
 }

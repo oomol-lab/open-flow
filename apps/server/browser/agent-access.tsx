@@ -1,64 +1,165 @@
 import type { FormEvent, ReactElement } from 'react'
-import type { SessionUser, UserToken } from '../common/users.ts'
+import type { UserToken } from '../common/users.ts'
 
 import { mcpProtocolVersion } from '@oomol-lab/open-flow/mcp'
-import { Button, Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger, Input, Label } from '@oomol-lab/open-flow/ui'
+import {
+  Button,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  Input,
+  Label,
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@oomol-lab/open-flow/ui'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { useTranslate } from 'val-i18n-react'
+import { Trans, useTranslate } from 'val-i18n-react'
 import { z } from 'zod'
 
 const tokenSchema = z.object({ tokenId: z.string().min(1), name: z.string().min(1), createdAt: z.number().int() })
 const listSchema = z.object({ version: z.literal(1), tokens: z.array(tokenSchema) })
 const createdSchema = z.object({ version: z.literal(1), credential: tokenSchema, token: z.string().min(1) })
 
-function McpInformation({ personal }: { readonly personal: boolean }): ReactElement {
+function McpInformation(): ReactElement {
   const t = useTranslate()
   const endpoint = new URL('/v1/mcp', window.location.origin).href
 
   async function copyAddress(): Promise<void> {
     try {
       await navigator.clipboard.writeText(endpoint)
-      toast.success(t('settings.mcpCopied'))
+      toast.success(t('agentAccess.mcpCopied'))
     } catch {
-      toast.error(t('settings.mcpCopyFailed'))
+      toast.error(t('agentAccess.mcpCopyFailed'))
     }
   }
 
   return (
-    <section className="settings-section" aria-labelledby="settings-mcp-title">
-      <div className="settings-heading">
-        <div className="settings-heading-copy">
-          <h2 id="settings-mcp-title">MCP</h2>
-          <p>{t('settings.mcpDescription')}</p>
-        </div>
-      </div>
-      <div className="settings-form">
-        <Label htmlFor="settings-mcp-endpoint">{t('settings.mcpAddress')}</Label>
+    <section className="pt-6" aria-labelledby="settings-mcp-title">
+      <header className="settings-header">
+        <h1 id="settings-mcp-title">{t('agentAccess.mcpTitle')}</h1>
+        <p>{t('agentAccess.mcpDescription')}</p>
+      </header>
+      <div className="settings-section settings-form">
+        <Label htmlFor="settings-mcp-endpoint">{t('agentAccess.mcpAddress')}</Label>
         <div className="settings-mcp-address">
           <Input id="settings-mcp-endpoint" readOnly value={endpoint} />
           <Button variant="outline" size="sm" type="button" onClick={() => void copyAddress()}>
-            {t('settings.mcpCopy')}
+            {t('agentAccess.mcpCopy')}
           </Button>
         </div>
         <dl className="settings-mcp-details">
           <div>
-            <dt>{t('settings.mcpTransport')}</dt>
+            <dt>{t('agentAccess.mcpTransport')}</dt>
             <dd>Streamable HTTP</dd>
           </div>
           <div>
-            <dt>{t('settings.mcpProtocol')}</dt>
+            <dt>{t('agentAccess.mcpProtocol')}</dt>
             <dd>{mcpProtocolVersion}</dd>
           </div>
           <div>
-            <dt>{t('settings.mcpAuthentication')}</dt>
+            <dt>{t('agentAccess.mcpAuthentication')}</dt>
             <dd>
-              <code>Authorization: Bearer {personal ? '<personal-token>' : '<operator-token>'}</code>
+              <code>Authorization: Bearer {'<personal-token>'}</code>
             </dd>
           </div>
         </dl>
-        <p className="settings-hint">{t(personal ? 'account.tokenHint' : 'settings.mcpTokenHint')}</p>
-        <p className="settings-hint">{t('settings.mcpCompatibility')}</p>
+        <p className="settings-hint">{t('account.tokenHint')}</p>
+      </div>
+    </section>
+  )
+}
+
+const commandPlatforms = [
+  { value: 'macos', label: 'macOS' },
+  { value: 'linux', label: 'Linux' },
+  { value: 'windows', label: 'Windows PowerShell' },
+] as const
+
+function PlatformCommands({
+  label,
+  platform,
+  onPlatformChange,
+  posix,
+  windows,
+}: {
+  readonly label: string
+  readonly platform: string
+  readonly onPlatformChange: (value: string) => void
+  readonly posix: string
+  readonly windows: string
+}): ReactElement {
+  return (
+    <Tabs value={platform} onValueChange={onPlatformChange} className="my-2">
+      <TabsList aria-label={label} variant="navigation" size="sm">
+        {commandPlatforms.map(({ value, label: platformLabel }) => (
+          <TabsTrigger key={value} value={value}>
+            {platformLabel}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+      {commandPlatforms.map(({ value }) => (
+        <TabsContent key={value} value={value}>
+          <pre>
+            <code>{value == 'windows' ? windows : posix}</code>
+          </pre>
+        </TabsContent>
+      ))}
+    </Tabs>
+  )
+}
+
+function CliInformation(): ReactElement {
+  const t = useTranslate()
+  const origin = window.location.origin
+  const [platform, setPlatform] = useState(() => {
+    if (navigator.userAgent.includes('Windows')) return 'windows'
+    if (navigator.userAgent.includes('Linux')) return 'linux'
+    return 'macos'
+  })
+  const token = '<personal-token>'
+  return (
+    <section className="pt-6" aria-labelledby="agent-cli-title">
+      <header className="settings-header">
+        <h1 id="agent-cli-title">{t('agentAccess.cliTitle')}</h1>
+        <p>{t('agentAccess.cliDescription')}</p>
+      </header>
+      <div className="settings-section settings-form agent-cli">
+        <h2>{t('agentAccess.install')}</h2>
+        <div className="grid gap-2 pl-4">
+          <p className="settings-hint m-0 leading-[18px]">
+            <Trans message={t('agentAccess.openSource')}>
+              <a href="https://github.com/oomol-lab/oo-cli" target="_blank" rel="noreferrer">
+                oo-cli
+              </a>
+            </Trans>
+          </p>
+          <PlatformCommands
+            label={t('agentAccess.install')}
+            platform={platform}
+            onPlatformChange={setPlatform}
+            posix="curl -fsSL https://cli.oomol.com/install.sh | bash"
+            windows="irm https://cli.oomol.com/install.ps1 | iex"
+          />
+        </div>
+        <h2 className="pt-4">{t('agentAccess.connect')}</h2>
+        <div className="grid gap-2 pl-4">
+          <p className="settings-hint m-0 leading-[18px]">{t('agentAccess.environmentHint')}</p>
+          <PlatformCommands
+            label={t('agentAccess.connect')}
+            platform={platform}
+            onPlatformChange={setPlatform}
+            posix={`export OO_OPEN_FLOW_URL='${origin}'\nexport OO_OPEN_FLOW_TOKEN='${token}'`}
+            windows={`$env:OO_OPEN_FLOW_URL = '${origin}'\n$env:OO_OPEN_FLOW_TOKEN = '${token}'`}
+          />
+          <p className="settings-hint m-0 leading-[18px]">{t('account.tokenHint')}</p>
+        </div>
       </div>
     </section>
   )
@@ -155,7 +256,7 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
       await navigator.clipboard.writeText(secret)
       toast.success(t('account.copied'))
     } catch {
-      toast.error(t('settings.mcpCopyFailed'))
+      toast.error(t('agentAccess.mcpCopyFailed'))
     }
   }
 
@@ -304,17 +405,24 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
   )
 }
 
-export function AccountPage({ user, onUnauthorized }: { readonly user: SessionUser; readonly onUnauthorized: () => void }): ReactElement {
+export function AgentAccessPage({ onUnauthorized }: { readonly onUnauthorized: () => void }): ReactElement {
   const t = useTranslate()
   return (
-    <main className="settings-page">
+    <main className="settings-page" aria-label={t('agentAccess.title')}>
       <div className="settings-content">
-        <header className="settings-header">
-          <h1>{t('account.title')}</h1>
-          <p>{user.email ?? 'Operator'}</p>
-        </header>
-        <McpInformation personal={user.email != null} />
-        {user.email != null && <PersonalTokens onUnauthorized={onUnauthorized} />}
+        <Tabs defaultValue="cli">
+          <TabsList aria-label={t('agentAccess.title')} variant="navigation">
+            <TabsTrigger value="cli">CLI</TabsTrigger>
+            <TabsTrigger value="mcp">MCP</TabsTrigger>
+          </TabsList>
+          <TabsContent value="cli">
+            <CliInformation />
+          </TabsContent>
+          <TabsContent value="mcp">
+            <McpInformation />
+          </TabsContent>
+        </Tabs>
+        <PersonalTokens onUnauthorized={onUnauthorized} />
       </div>
     </main>
   )

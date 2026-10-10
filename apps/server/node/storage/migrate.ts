@@ -45,6 +45,7 @@ const migrations = [
   '0038_user_tokens.sql',
   '0039_node_owned_tasks.sql',
   migrateFlowResources,
+  '0041_operator_tokens.sql',
 ] as const
 const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 

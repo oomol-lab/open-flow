@@ -91,17 +91,7 @@
     "connectorSwitchOomol": "Le Connector personnalisé reste actif jusqu’à la connexion OOMOL ou l’enregistrement d’une clé API.",
     "oomolConfigured": "OOMOL connecté. Clé API enregistrée.",
     "apiKeyDescription": "Vous pouvez aussi saisir directement une clé API OOMOL.",
-    "apiKeyHint": "La clé API est conservée uniquement sur le serveur de cette instance et n’est plus affichée après l’enregistrement.",
-    "mcpDescription": "Connectez un client MCP pour créer, modifier et exécuter des workflows.",
-    "mcpAddress": "URL du serveur",
-    "mcpCopy": "Copier l’URL",
-    "mcpCopied": "URL MCP copiée.",
-    "mcpCopyFailed": "Échec de la copie. Sélectionnez et copiez l’URL manuellement.",
-    "mcpTransport": "Transport",
-    "mcpProtocol": "Version du protocole",
-    "mcpAuthentication": "Authentification",
-    "mcpTokenHint": "Remplacez <operator-token> dans votre client par le jeton Operator de ce Server. Ce jeton donne uniquement accès aux workflows de l’Operator, pas à ceux des comptes avec adresse e-mail.",
-    "mcpCompatibility": "Le client doit prendre en charge cette version du protocole et les en-têtes Authorization personnalisés. Les échanges initialize hérités et la connexion OAuth ne sont pas pris en charge."
+    "apiKeyHint": "La clé API est conservée uniquement sur le serveur de cette instance et n’est plus affichée après l’enregistrement."
   },
   "team": {
     "createFailed": "Impossible de créer le Flow pour cette équipe du Connector.",
@@ -168,9 +158,8 @@
     "actions": "Actions"
   },
   "account": {
-    "title": "Connexion MCP",
     "tokens": "Jetons d’accès personnels",
-    "description": "Les jetons disposent des droits API et MCP de votre compte. Ils expirent après révocation, réinitialisation du mot de passe ou désactivation du compte.",
+    "description": "Les jetons disposent des droits API et MCP de votre compte. Vous pouvez les révoquer à tout moment.",
     "tokenHint": "Remplacez <personal-token> par un jeton créé ci-dessous. Il donne accès uniquement à vos propres workflows.",
     "name": "Nom du jeton",
     "create": "Créer un jeton",
@@ -184,5 +173,23 @@
     "loadFailed": "Impossible de charger les jetons. Réessayez.",
     "saveFailed": "Impossible d’enregistrer la modification. Réessayez.",
     "saved": "Jeton conservé"
+  },
+  "agentAccess": {
+    "title": "Accès des agents",
+    "cliDescription": "Permettez aux agents IA de piloter Open Flow avec la ligne de commande oo flow.",
+    "install": "1. Installer oo CLI",
+    "connect": "2. Se connecter à ce Server",
+    "environmentHint": "Définissez l’URL du serveur et le jeton dans l’environnement de votre agent. Il n’est pas nécessaire d’exécuter oo login.",
+    "mcpDescription": "Connectez un client MCP pour permettre aux agents IA de piloter Open Flow.",
+    "mcpAddress": "URL du serveur",
+    "mcpCopy": "Copier l’URL",
+    "mcpCopied": "URL MCP copiée.",
+    "mcpCopyFailed": "Échec de la copie. Sélectionnez et copiez l’URL manuellement.",
+    "mcpTransport": "Transport",
+    "mcpProtocol": "Version du protocole",
+    "mcpAuthentication": "Authentification",
+    "cliTitle": "Modifier les workflows via le CLI",
+    "mcpTitle": "Modifier les workflows via MCP",
+    "openSource": "{{repository}} est un outil en ligne de commande open source. Exécutez la commande ci-dessous pour l’installer."
   }
 }

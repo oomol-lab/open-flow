@@ -329,6 +329,7 @@ body {
   width: 100%;
   height: 100%;
   overflow: auto;
+  scrollbar-gutter: stable;
 }
 
 .settings-content {
@@ -797,4 +798,31 @@ body {
 .server-user-table td,
 .server-user-table thead th {
   white-space: nowrap;
+}
+
+.agent-cli h2 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.agent-cli pre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  border-radius: var(--ui-radius);
+  background: var(--ui-muted);
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.agent-cli a {
+  color: var(--ui-primary);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.agent-cli a:focus-visible {
+  outline: 2px solid var(--ui-ring);
+  outline-offset: 2px;
 }

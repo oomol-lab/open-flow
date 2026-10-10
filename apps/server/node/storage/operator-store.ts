@@ -2,6 +2,7 @@ import type { DatabaseSync } from 'node:sqlite'
 import type { Database } from './database.ts'
 
 import { createHash, randomBytes, scrypt, scryptSync, timingSafeEqual } from 'node:crypto'
+import { PersonalTokenStore } from './personal-token-store.ts'
 
 const keyBytes = 32
 const retryDelayMs = 1_000
@@ -12,6 +13,7 @@ function digest(token: string): Buffer {
 }
 
 export class OperatorStore {
+  readonly tokens: PersonalTokenStore
   readonly #clock: () => number
   readonly #database: DatabaseSync
   #retryAt = 0
@@ -21,6 +23,7 @@ export class OperatorStore {
   constructor(database: Database, clock: () => number = Date.now) {
     this.#clock = clock
     this.#database = database.connection
+    this.tokens = new PersonalTokenStore(database.connection)
     const now = this.#clock()
     this.#database
       .prepare('INSERT OR IGNORE INTO operator_auth (id, session_secret, revision, updated_at) VALUES (1, ?, 1, ?)')

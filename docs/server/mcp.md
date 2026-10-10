@@ -10,7 +10,7 @@ The first version provides Flow authoring and execution tools. It does not dynam
 
 ## 2. Authentication and connection
 
-Email users create a personal access Token in Settings → MCP access. Configure the client with the `/v1/mcp` URL and this header:
+Operator and email users create a personal access Token in Agent access. Configure the client with the `/v1/mcp` URL and this header:
 
 ```http
 Authorization: Bearer <personal-token>
@@ -18,15 +18,11 @@ Authorization: Bearer <personal-token>
 
 See [Personal access Tokens](users.md#personal-access-tokens-and-mcp) for creation, revocation, and invalidation rules.
 
-Operators use the deployment’s Operator credential:
-
-```http
-Authorization: Bearer <operator-token>
-```
+The deployment’s Operator credential remains supported for existing clients.
 
 Credential environment locking, persistence, and invalidation follow Control API rules. The existing authentication entry point also validates same-origin browser sessions. Unauthenticated requests return HTTP 401. OAuth discovery and interactive authorization are unavailable; clients must support an Authorization header. MCP uses Server local accounts for Flow ownership and management permissions:
 
-- An Operator token can access only the Operator’s own Flows.
+- An Operator personal Token or deployment credential can access only the Operator’s own Flows.
 - An email account’s personal access Token or login session can access only that account’s Flows.
 - Administrator status does not expand Flow read access.
 - Ordinary users cannot manage deployment resources.

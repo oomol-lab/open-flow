@@ -91,17 +91,7 @@
     "connectorSwitchOomol": "OOMOL에 연결하거나 API 키를 저장할 때까지 사용자 지정 Connector가 사용됩니다.",
     "oomolConfigured": "OOMOL에 연결되었습니다. API 키가 저장되었습니다.",
     "apiKeyDescription": "OOMOL API 키를 직접 입력할 수도 있습니다.",
-    "apiKeyHint": "API 키는 이 인스턴스의 서버에만 저장되며 저장 후에는 표시되지 않습니다.",
-    "mcpDescription": "MCP 클라이언트를 연결하여 워크플로를 만들고 편집하고 실행하세요.",
-    "mcpAddress": "서버 URL",
-    "mcpCopy": "URL 복사",
-    "mcpCopied": "MCP URL을 복사했습니다.",
-    "mcpCopyFailed": "복사하지 못했습니다. URL을 선택하여 직접 복사하세요.",
-    "mcpTransport": "전송 방식",
-    "mcpProtocol": "프로토콜 버전",
-    "mcpAuthentication": "인증 방식",
-    "mcpTokenHint": "클라이언트의 <operator-token>을 이 Server의 Operator token으로 바꾸세요. 이 자격 증명은 Operator 소유의 워크플로에만 접근할 수 있으며 이메일 계정 소유의 워크플로에는 접근할 수 없습니다.",
-    "mcpCompatibility": "클라이언트는 위 프로토콜 버전과 사용자 지정 Authorization 헤더를 지원해야 합니다. 기존 initialize 핸드셰이크와 OAuth 로그인은 지원하지 않습니다."
+    "apiKeyHint": "API 키는 이 인스턴스의 서버에만 저장되며 저장 후에는 표시되지 않습니다."
   },
   "team": {
     "createFailed": "이 Connector 팀에서 Flow를 만들지 못했습니다.",
@@ -168,9 +158,8 @@
     "actions": "작업"
   },
   "account": {
-    "title": "MCP 연결",
     "tokens": "개인 액세스 토큰",
-    "description": "토큰은 계정의 API 및 MCP 권한을 가집니다. 토큰 취소, 비밀번호 재설정 또는 계정 비활성화 시 만료됩니다.",
+    "description": "토큰은 현재 계정의 API 및 MCP 권한을 가지며 언제든지 취소할 수 있습니다.",
     "tokenHint": "<personal-token>을 아래에서 만든 토큰으로 바꾸세요. 본인의 워크플로만 접근할 수 있습니다.",
     "name": "토큰 이름",
     "create": "토큰 만들기",
@@ -184,5 +173,23 @@
     "loadFailed": "토큰을 불러오지 못했습니다. 다시 시도하세요.",
     "saveFailed": "변경 사항을 저장하지 못했습니다. 다시 시도하세요.",
     "saved": "토큰 저장 완료"
+  },
+  "agentAccess": {
+    "title": "Agent 연결",
+    "cliDescription": "oo flow 명령줄을 통해 AI Agent가 Open Flow를 조작할 수 있습니다.",
+    "install": "1. oo CLI 설치",
+    "connect": "2. 이 Server에 연결",
+    "environmentHint": "Agent 실행 환경에 서버 주소와 토큰을 설정하세요. oo login은 실행하지 않아도 됩니다.",
+    "mcpDescription": "MCP 클라이언트를 연결하여 AI Agent가 Open Flow를 조작하도록 하세요.",
+    "mcpAddress": "서버 URL",
+    "mcpCopy": "URL 복사",
+    "mcpCopied": "MCP URL을 복사했습니다.",
+    "mcpCopyFailed": "복사하지 못했습니다. URL을 선택하여 직접 복사하세요.",
+    "mcpTransport": "전송 방식",
+    "mcpProtocol": "프로토콜 버전",
+    "mcpAuthentication": "인증 방식",
+    "cliTitle": "CLI로 워크플로 편집",
+    "mcpTitle": "MCP로 워크플로 편집",
+    "openSource": "{{repository}}는 오픈 소스 명령줄 도구입니다. 아래 명령으로 설치할 수 있습니다."
   }
 }
