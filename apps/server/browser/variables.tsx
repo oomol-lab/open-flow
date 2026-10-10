@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -126,11 +127,15 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
   return (
     <main ref={portal} className="variables-page">
       <div className="variables-content">
-        <section aria-busy={loading || pending} aria-labelledby="variables-title" className="variables-section rounded-lg">
+        <header className="variables-header">
+          <h1 id="variables-title">{t('variables.title')}</h1>
+          <p>{t('variables.description')}</p>
+        </header>
+        <section aria-busy={loading || pending} aria-labelledby="variables-list-title" className="variables-section rounded-lg">
           <div className="variables-toolbar">
             <div className="variables-heading">
-              <h1 id="variables-title">{t('variables.title')}</h1>
-              <span>{t('variables.count', { count: variables.length })}</span>
+              <h2 id="variables-list-title">{t('variables.listTitle')}</h2>
+              <span className="variables-count">{t('variables.count', { count: variables.length })}</span>
             </div>
             <div className="variables-actions">
               <InputGroup className="variable-search">
@@ -196,7 +201,6 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                   <i className="i-lucide-light:triangle-alert size-4" />
                 </span>
                 <strong>{t('variables.loadFailed')}</strong>
-                <span>{t('variables.description')}</span>
                 <Button variant="outline" size="default" onClick={() => void load()} type="button">
                   {t('variables.retry')}
                 </Button>
@@ -207,7 +211,6 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                   <i className="i-lucide-light:sliders-horizontal size-4" />
                 </span>
                 <strong>{t(filter.trim() == '' ? 'variables.empty' : 'variables.noMatch')}</strong>
-                <span>{t('variables.description')}</span>
                 {filter.trim() == '' && (
                   <Button variant="outline" size="default" disabled={pending || variables.length >= maxCount} onClick={createVariable} type="button">
                     {t('variables.create')}
@@ -264,6 +267,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                   {editor?.kind == 'create' ? t('variables.create') : t('variables.edit')}
                   {editor?.kind == 'edit' && <span className="ml-2">{editor.name}</span>}
                 </DialogTitle>
+                {editor?.kind == 'create' && <DialogDescription>{t('variables.limit', { count: maxCount })}</DialogDescription>}
               </DialogHeader>
               <div className="grid gap-2">
                 <Label htmlFor="variable-name">{t('variables.name')}</Label>

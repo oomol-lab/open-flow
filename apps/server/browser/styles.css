@@ -141,6 +141,7 @@ body {
 }
 
 .variables-section {
+  margin-top: 20px;
   min-width: 0;
   overflow: hidden;
   border: 1px solid var(--ui-border);
@@ -165,17 +166,13 @@ body {
   padding: 8px 16px;
 }
 
-.variables-heading {
-  align-items: baseline;
-}
-
-.variables-heading h1 {
+.variables-heading h2 {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
 }
 
-.variables-heading span {
+.variables-count {
   color: var(--ui-muted-foreground);
   font-size: 11px;
 }
@@ -279,12 +276,6 @@ body {
   font-weight: 600;
 }
 
-.variables-state > span:not(.variables-state-icon) {
-  max-width: 360px;
-  font-size: 12px;
-  line-height: 18px;
-}
-
 .variables-state [data-slot='button'] {
   margin-top: 4px;
 }
@@ -346,7 +337,8 @@ body {
   padding: 32px 0 64px;
 }
 
-.settings-header h1 {
+.settings-header h1,
+.variables-header h1 {
   margin: 0;
   font-size: 24px;
   font-weight: 650;
@@ -355,6 +347,7 @@ body {
 }
 
 .settings-header p,
+.variables-header p,
 .settings-summary p {
   color: var(--ui-muted-foreground);
   font-size: 12px;
