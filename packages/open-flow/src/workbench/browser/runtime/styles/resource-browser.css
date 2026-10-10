@@ -91,13 +91,13 @@
 
   .resource-table {
     display: grid;
-    grid-template-columns: minmax(0, 1.3fr) minmax(max-content, 0.7fr) minmax(0, 1fr) minmax(0, 1fr) max-content 64px;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) max-content minmax(max-content, 0.7fr) 64px;
     column-gap: 24px;
     min-width: 0;
   }
 
   .resource-table-with-teams {
-    grid-template-columns: minmax(0, 1.3fr) minmax(max-content, 0.7fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr) max-content 64px;
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 0.8fr) minmax(0, 1fr) max-content minmax(max-content, 0.7fr) 64px;
   }
 
   .resource-list {
@@ -170,6 +170,19 @@
     min-width: 0;
     align-items: center;
     gap: 10px;
+  }
+
+  .resource-flow-icon {
+    display: flex;
+    width: 24px;
+    height: 24px;
+    flex: none;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-control-radius, var(--ui-radius));
+    color: var(--ui-muted-foreground);
+    font-size: 14px;
   }
 
   .resource-primary-copy {
@@ -323,13 +336,6 @@
     grid-column: 1 / -2;
     grid-row: 1;
     border-bottom: 0;
-  }
-
-  .resource-skeleton-copy {
-    display: flex;
-    min-width: 0;
-    flex-direction: column;
-    gap: 7px;
   }
 
   .resource-list-footer {

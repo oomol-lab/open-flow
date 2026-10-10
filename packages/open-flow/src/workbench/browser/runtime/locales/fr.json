@@ -201,6 +201,7 @@
     "publication": "Version",
     "notPublished": "Brouillon",
     "isPublished": "Publié",
+    "runtimeUnpublished": "Non publié",
     "enabled": "En cours",
     "disabled": "Arrêtée",
     "enableFlow": "Activer {{name}}",

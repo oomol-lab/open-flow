@@ -201,6 +201,7 @@
     "publication": "Версия",
     "notPublished": "Черновик",
     "isPublished": "Опубликован",
+    "runtimeUnpublished": "Не опубликован",
     "enabled": "Выполняется",
     "disabled": "Остановлен",
     "enableFlow": "Включить {{name}}",

@@ -201,6 +201,7 @@
     "publication": "版本",
     "notPublished": "草稿",
     "isPublished": "已发布",
+    "runtimeUnpublished": "未发布",
     "enabled": "运行中",
     "disabled": "已停用",
     "enableFlow": "启用 {{name}}",

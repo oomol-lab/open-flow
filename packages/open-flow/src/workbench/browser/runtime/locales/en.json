@@ -201,6 +201,7 @@
     "publication": "Version",
     "notPublished": "Draft",
     "isPublished": "Published",
+    "runtimeUnpublished": "Unpublished",
     "enabled": "Running",
     "disabled": "Stopped",
     "enableFlow": "Enable {{name}}",

@@ -201,6 +201,7 @@
     "publication": "버전",
     "notPublished": "초안",
     "isPublished": "게시됨",
+    "runtimeUnpublished": "게시되지 않음",
     "enabled": "실행 중",
     "disabled": "중지됨",
     "enableFlow": "{{name}} 활성화",

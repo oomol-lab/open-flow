@@ -1,7 +1,7 @@
 {
   "flows": {
     "title": "My workflows",
-    "description": "Create and manage your personal workflows. Workflows are separate for each account."
+    "description": "Create and manage personal workflows. Workflows are separate for each account."
   },
   "session": {
     "checking": "Checking session…",

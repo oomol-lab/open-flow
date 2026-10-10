@@ -23,10 +23,19 @@ export function IdTooltip({
   readonly alignOffset?: number
   readonly children?: ReactNode
 }): ReactElement {
+  const [open, setOpen] = useState(false)
   const [copied, setCopied] = useState(false)
   return (
-    <Tooltip onOpenChange={() => setCopied(false)}>
-      <TooltipTrigger render={trigger}>{label}</TooltipTrigger>
+    <Tooltip
+      open={open}
+      onOpenChange={(nextOpen) => {
+        setOpen(nextOpen)
+        setCopied(false)
+      }}
+    >
+      <TooltipTrigger className="cursor-help" closeOnClick={false} onClick={() => setOpen(true)} render={trigger}>
+        {label}
+      </TooltipTrigger>
       <TooltipContent
         align="start"
         alignOffset={alignOffset}

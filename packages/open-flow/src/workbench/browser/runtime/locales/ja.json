@@ -201,6 +201,7 @@
     "publication": "バージョン",
     "notPublished": "下書き",
     "isPublished": "公開済み",
+    "runtimeUnpublished": "未公開",
     "enabled": "実行中",
     "disabled": "停止中",
     "enableFlow": "{{name}} を有効にする",

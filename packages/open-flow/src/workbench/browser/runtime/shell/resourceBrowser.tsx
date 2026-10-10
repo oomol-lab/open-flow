@@ -136,6 +136,7 @@ function FlowItem({ showTeam, badge, busy, flow, href, onSelect, store }: FlowIt
   }, [mode, flow.flowId, store, listenersRetry])
 
   const [pending, setPending] = useState<'publish' | 'enabled' | undefined>()
+  const hasTeam = showTeam && Boolean(badge?.trim())
   const changed = flow.live != null && flow.live.revisionId != flow.draftRevisionId
   const publicationStatus =
     flow.status == 'retiring'
@@ -170,28 +171,39 @@ function FlowItem({ showTeam, badge, busy, flow, href, onSelect, store }: FlowIt
 
   return (
     <div className="resource-item-row" ref={setRoot}>
-      <div className="resource-list-row flow-columns">
+      <div className="resource-list-row flow-columns" data-has-team={hasTeam}>
         <span className="resource-primary-cell">
+          <span aria-hidden="true" className="resource-flow-icon">
+            <i className="i-lucide-light:workflow" />
+          </span>
           <span className="resource-primary-copy">
             <span className="resource-primary-heading">
-              <a
-                aria-disabled={flow.status == 'retiring'}
-                className="resource-primary-title"
-                onClick={(event) => {
-                  if (flow.status == 'retiring') {
-                    event.preventDefault()
-                    return
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <a
+                      aria-disabled={flow.status == 'retiring'}
+                      className="resource-primary-title"
+                      onClick={(event) => {
+                        if (flow.status == 'retiring') {
+                          event.preventDefault()
+                          return
+                        }
+                        followWorkbenchLink(event, () => onSelect(flow))
+                      }}
+                      href={flow.status == 'retiring' ? undefined : href}
+                      tabIndex={flow.status == 'retiring' ? -1 : undefined}
+                    />
                   }
-                  followWorkbenchLink(event, () => onSelect(flow))
-                }}
-                href={flow.status == 'retiring' ? undefined : href}
-                tabIndex={flow.status == 'retiring' ? -1 : undefined}
-                title={flow.name}
-              >
-                <span className="resource-primary-name" ref={renameAnchor}>
+                >
+                  <span className="resource-primary-name" ref={renameAnchor}>
+                    {flow.name}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent container={root} collisionBoundary={[]} positionMethod="fixed">
                   {flow.name}
-                </span>
-              </a>
+                </TooltipContent>
+              </Tooltip>
               {flow.status == 'active' && (
                 <Popover
                   onOpenChange={(open) => {
@@ -247,16 +259,6 @@ function FlowItem({ showTeam, badge, busy, flow, href, onSelect, store }: FlowIt
             </span>
           </span>
         </span>
-        <span className="resource-status" aria-busy={pending == 'enabled'}>
-          {flow.live == null ? (
-            '—'
-          ) : (
-            <>
-              <span aria-hidden="true" className={cn('status-dot', flow.live.enabled ? 'success' : 'neutral')} />
-              <span>{t(flow.live.enabled ? 'resource.enabled' : 'resource.disabled')}</span>
-            </>
-          )}
-        </span>
         <span className="resource-flow-id-cell">
           <IdTooltip
             value={flow.flowId}
@@ -268,7 +270,7 @@ function FlowItem({ showTeam, badge, busy, flow, href, onSelect, store }: FlowIt
         </span>
         {showTeam && (
           <span className="resource-team-cell" title={badge}>
-            {badge?.trim() ? badge : '—'}
+            {hasTeam ? badge : '—'}
           </span>
         )}
         <Tooltip>
@@ -282,6 +284,10 @@ function FlowItem({ showTeam, badge, busy, flow, href, onSelect, store }: FlowIt
         <Badge variant="secondary" className={cn('resource-publication-status h-auto px-2.5 py-0.75', publicationTone)}>
           {t(publicationStatus)}
         </Badge>
+        <span className="resource-status" aria-busy={pending == 'enabled'}>
+          <span aria-hidden="true" className={cn('status-dot', flow.live?.enabled ? 'success' : 'neutral')} />
+          <span>{t(flow.live == null ? 'resource.runtimeUnpublished' : flow.live.enabled ? 'resource.enabled' : 'resource.disabled')}</span>
+        </span>
       </div>
       <div className="resource-live-controls" aria-busy={pending != null}>
         <DropdownMenu>
@@ -365,15 +371,18 @@ function FlowItem({ showTeam, badge, busy, flow, href, onSelect, store }: FlowIt
 function FlowSkeleton({ showTeam }: { readonly showTeam: boolean }): ReactElement {
   return (
     <div aria-hidden="true" className="resource-item-row">
-      <div className="resource-list-row resource-skeleton-row flow-columns">
-        <span className="resource-skeleton-copy">
-          <Skeleton className="h-3.5 w-36 max-w-full" />
+      <div className="resource-list-row flow-columns" data-has-team={showTeam}>
+        <span className="resource-primary-cell">
+          <Skeleton className="resource-flow-icon" />
+          <span className="resource-primary-copy">
+            <Skeleton className="h-3.5 w-36 max-w-full" />
+          </span>
         </span>
-        <Skeleton className="h-3 w-16" />
         <Skeleton className="resource-flow-id-cell h-3 w-36 max-w-full" />
         {showTeam && <Skeleton className="resource-team-cell h-3 w-24 max-w-full" />}
         <Skeleton className="resource-updated-at h-3 w-28 max-w-full" />
-        <Skeleton className="h-3 w-16" />
+        <Skeleton className="resource-publication-status h-3 w-16" />
+        <Skeleton className="resource-status h-3 w-16" />
       </div>
       <div className="resource-live-controls">
         <Skeleton className="size-7" />
@@ -471,11 +480,11 @@ export function FlowBrowser({
               <div aria-hidden="true" className="resource-list-columns-shell">
                 <div className="resource-list-columns flow-columns">
                   <span>{t('resource.name')}</span>
-                  <span>{t('resource.runtimeStatus')}</span>
                   <span className="resource-flow-id-heading">{t('resource.flowId')}</span>
                   {showTeam && <span className="resource-team-heading">{t('resource.team')}</span>}
                   <span className="resource-updated-heading">{t('resource.updated')}</span>
                   <span>{t('resource.publicationStatus')}</span>
+                  <span>{t('resource.runtimeStatus')}</span>
                 </div>
                 <span className="resource-actions-heading">{t('resource.actions')}</span>
               </div>

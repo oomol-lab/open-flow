@@ -505,7 +505,7 @@ export function RunsView({
                     key={run.runId}
                     value={run.runId}
                     label={t('run.runId', { id: shortRunId(run.runId) })}
-                    trigger={<span className="cursor-help text-xs" tabIndex={0} />}
+                    trigger={<span className="text-xs" tabIndex={0} />}
                     container={root.current}
                   >
                     {triggerRun != null && (

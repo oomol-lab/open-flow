@@ -120,7 +120,7 @@ export function PublicationsView({
     </Button>
   )
   const identifier = (value: string) => (
-    <IdTooltip key={value} value={value} label={compactId(value)} trigger={<span tabIndex={0} className="font-mono cursor-help" />} container={root.current} />
+    <IdTooltip key={value} value={value} label={compactId(value)} trigger={<span tabIndex={0} className="font-mono" />} container={root.current} />
   )
 
   return (
