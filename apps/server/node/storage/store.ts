@@ -55,7 +55,7 @@ export class Store {
     this.eventSources = new EventSourceStore(connection, transaction, clock)
     this.variables = new VariableStore(connection, transaction, clock)
     this.connectorTeams = new ConnectorTeamStore(connection)
-    this.revisions = new RevisionStore(connection, this.variables, llmConfig)
+    this.revisions = new RevisionStore(connection)
     this.results = new ResultStore(connection, transaction)
     // Trigger admission is resolved lazily because Runs are assembled after the
     // stores that report occurrences into them.
@@ -72,6 +72,7 @@ export class Store {
       {
         connectorTeams: this.connectorTeams,
         flows: this.flows,
+        llmConfig,
         publications: this.publications,
         revisions: this.revisions,
         variables: this.variables,

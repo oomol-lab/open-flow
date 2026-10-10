@@ -53,6 +53,7 @@ export interface RunStoreOptions {
 export interface RunStoreDependencies {
   readonly connectorTeams: ConnectorTeamStore
   readonly flows: FlowStore
+  readonly llmConfig: () => LlmConfig | undefined
   readonly publications: PublicationStore
   readonly revisions: RevisionStore
   readonly variables: VariableStore
@@ -984,7 +985,7 @@ export class RunStore {
   }): string {
     const runId = randomUUID()
     const connectorTeamId = this.#deps.connectorTeams.get(input.flowId)
-    const snapshot = this.#deps.revisions.agentSnapshot(input.revisionId, input.source == 'draft' ? input.trigger.nodeId : undefined)
+    const snapshot = this.#agentSnapshot(input.revisionId, input.source == 'draft' ? input.trigger.nodeId : undefined)
     this.#database
       .prepare(
         `INSERT INTO runs (
@@ -1021,6 +1022,32 @@ export class RunStore {
     const bytes = encoder.encode(JSON.stringify({ kind: 'run.queued', payload })).byteLength
     this.#database.prepare('UPDATE runs SET event_count = 1, event_bytes = ? WHERE run_id = ?').run(bytes, runId)
     return runId
+  }
+
+  /**
+   * Fixes the model deployment and resolved Variable values an Agent Run must
+   * reuse for its first execution and every approval resume.
+   */
+  #agentSnapshot(revisionId: string, triggerId?: string) {
+    const row = this.#database
+      .prepare(`SELECT content FROM revisions WHERE revision_id = ? AND EXISTS (
+      SELECT 1 FROM json_each(revisions.content, '$.document.graph.nodes') WHERE json_extract(value, '$.task.executor.kind') = 'agent'
+    )`)
+      .get(revisionId) as { readonly content: string } | undefined
+    if (row == null) return
+    const revision = decodeRevision(encoder.encode(row.content))
+    const dependencies = flowDependencies(revision, triggerId)
+    if (
+      ![...dependencies.nodes].some((id) => {
+        const node = revision.document.graph.nodes[id]
+        return node?.kind == 'task' && 'executor' in node.task && node.task.executor.kind == 'agent'
+      })
+    )
+      return
+    const model = this.#deps.llmConfig()
+    const bindings = this.#deps.variables.resolve(variableBindings(revision, dependencies.bindings))
+    if (model == null || bindings == null) throw new AcceptanceError('flow-invalid', 'Agent model or variable configuration is unavailable.')
+    return { model, bindings }
   }
 
   #hasRunCapacity(): boolean {
