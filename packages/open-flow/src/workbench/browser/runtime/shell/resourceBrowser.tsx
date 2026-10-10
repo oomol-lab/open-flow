@@ -1,6 +1,7 @@
 import type { ComponentProps, FormEvent, MouseEvent, ReactElement } from 'react'
 import type { ErrorListener, Flow } from '../api.ts'
 import type { WorkbenchLanguage } from '../contract.ts'
+import type { OpenFlowWorkbenchProps } from '../openFlowWorkbench.tsx'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 import type { WorkspaceBusy } from '../stores/workspaceModel.ts'
 
@@ -389,7 +390,7 @@ function FlowSkeleton(): ReactElement {
 }
 
 interface FlowBrowserProps extends LanguageSelectProps {
-  readonly catalogWidth?: 'default' | 'full' | undefined
+  readonly catalogWidth?: OpenFlowWorkbenchProps['catalogWidth']
   readonly createFlowDisabled?: boolean | undefined
   readonly createFlowField?: ComponentProps<typeof CreateResourceDialog>['field']
   readonly flowBadges?: Readonly<Record<string, string>> | undefined
@@ -438,7 +439,12 @@ export function FlowBrowser({
 
   return (
     <main className="resource-browser" data-tooltip-portal>
-      <div className={cn('resource-page', catalogWidth != 'default' && 'resource-page-full')}>
+      <div
+        className={cn('resource-page', {
+          'resource-page-full': catalogWidth == null || catalogWidth == 'full',
+          'resource-page-embedded': catalogWidth == 'embedded',
+        })}
+      >
         <h1 className="sr-only">{t('resource.flows')}</h1>
         <section aria-busy={loading || refreshing} aria-labelledby="flow-list-title" className="resource-list-section rounded-lg">
           <div className="resource-list-title">

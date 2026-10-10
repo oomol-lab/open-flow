@@ -313,3 +313,13 @@
   --error-inline-outset: 1px;
   visibility: visible;
 }
+
+.host-workflow-heading {
+  margin-bottom: 20px;
+}
+
+.host-workflow-editor {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}

@@ -81,6 +81,10 @@
   --open-flow-ring: #b4b4b4;
 }
 
+.open-flow-workbench .resource-browser {
+  --ui-control-radius: 8px;
+}
+
 .open-flow-workbench :is(.run-drawer, .runs-view) {
   --ui-control-radius: 6px;
 }

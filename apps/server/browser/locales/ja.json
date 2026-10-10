@@ -1,4 +1,8 @@
 {
+  "flows": {
+    "title": "マイワークフロー",
+    "description": "個人のワークフローを作成・管理します。ワークフローはアカウントごとに独立しています。"
+  },
   "session": {
     "checking": "ログイン状態を確認中…",
     "configured": "この deployment に設定されている operator token でログインします。",

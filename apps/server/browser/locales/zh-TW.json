@@ -1,4 +1,8 @@
 {
+  "flows": {
+    "title": "我的工作流程",
+    "description": "建立和管理你的個人工作流程。不同帳號的工作流程相互獨立。"
+  },
   "session": {
     "checking": "正在檢查登入狀態…",
     "configured": "使用這個部署所設定的 operator token 登入。",

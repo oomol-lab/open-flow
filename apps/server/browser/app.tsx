@@ -24,6 +24,7 @@ import { parseRouteContext, routeOwnerForFlow, routePath } from './route.ts'
 import { SettingsPage, MemberSettingsPage, useConfiguration, serviceConfigurationMissing } from './settings.tsx'
 import { UsersPage } from './users.tsx'
 import { VariablesPage } from './variables.tsx'
+import { WorkflowPage } from './workflow-page.tsx'
 
 type ThemeMode = WorkbenchTheme | 'auto'
 const themePreference = 'open-flow.workbench.server.theme'
@@ -520,28 +521,31 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
             ) : variablesOpen ? (
               <VariablesPage client={client} language={language} />
             ) : (
-              <OpenFlowWorkbench
-                createFlow={team.kind == 'ready' && team.selectedTeamId != null ? createHostedFlow : undefined}
-                createFlowDisabled={team.kind != 'hidden' && (team.kind != 'ready' || team.selectedTeamId == null)}
-                createFlowField={createFlowField}
-                flowBadges={flowBadges}
-                connectionHref={
-                  administrator
-                    ? (flowId, providerId, connectionId) => connectionHref(connectionConsole, connectorOwnerForFlow(flowId), providerId, connectionId)
-                    : undefined
-                }
-                hrefFor={(location) => routePath(location, connectorOwnerForFlow(location.flowId))}
-                host={host}
-                language={language}
-                location={route}
-                onConfigureConnector={administrator ? () => openPage('/settings') : undefined}
-                onLanguageChange={onLanguageChange}
-                onNavigate={navigate}
-                preferences={preferences}
-                sessionKey={session.user.userId}
-                theme={theme}
-                variables
-              />
+              <WorkflowPage catalog={route.flowId == null}>
+                <OpenFlowWorkbench
+                  catalogWidth="embedded"
+                  createFlow={team.kind == 'ready' && team.selectedTeamId != null ? createHostedFlow : undefined}
+                  createFlowDisabled={team.kind != 'hidden' && (team.kind != 'ready' || team.selectedTeamId == null)}
+                  createFlowField={createFlowField}
+                  flowBadges={flowBadges}
+                  connectionHref={
+                    administrator
+                      ? (flowId, providerId, connectionId) => connectionHref(connectionConsole, connectorOwnerForFlow(flowId), providerId, connectionId)
+                      : undefined
+                  }
+                  hrefFor={(location) => routePath(location, connectorOwnerForFlow(location.flowId))}
+                  host={host}
+                  language={language}
+                  location={route}
+                  onConfigureConnector={administrator ? () => openPage('/settings') : undefined}
+                  onLanguageChange={onLanguageChange}
+                  onNavigate={navigate}
+                  preferences={preferences}
+                  sessionKey={session.user.userId}
+                  theme={theme}
+                  variables
+                />
+              </WorkflowPage>
             )}
           </div>
         </>

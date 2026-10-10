@@ -121,7 +121,7 @@ function NotificationBridge({ host, store }: { readonly host: WorkbenchHost; rea
 }
 
 interface WorkbenchProps {
-  readonly catalogWidth?: 'default' | 'full' | undefined
+  readonly catalogWidth?: OpenFlowWorkbenchProps['catalogWidth']
   readonly createFlow?: ((name: string) => Promise<string>) | undefined
   readonly createFlowDisabled?: boolean | undefined
   readonly createFlowField?: OpenFlowWorkbenchProps['createFlowField']
@@ -212,7 +212,8 @@ export {
 } from '../../../localization/common/languages.ts'
 
 export interface OpenFlowWorkbenchProps {
-  readonly catalogWidth?: 'default' | 'full' | undefined
+  /** Embedded catalogs fill a host-owned page without adding width limits or page padding. */
+  readonly catalogWidth?: 'default' | 'full' | 'embedded' | undefined
   readonly createFlow?: ((name: string) => Promise<string>) | undefined
   readonly createFlowDisabled?: boolean | undefined
   readonly createFlowField?:

@@ -1,4 +1,8 @@
 {
+  "flows": {
+    "title": "My workflows",
+    "description": "Create and manage your personal workflows. Workflows are separate for each account."
+  },
   "session": {
     "checking": "Checking session…",
     "configured": "Sign in with the operator token configured for this deployment.",

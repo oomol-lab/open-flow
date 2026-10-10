@@ -1,4 +1,8 @@
 {
+  "flows": {
+    "title": "Mes workflows",
+    "description": "Créez et gérez vos workflows personnels. Les workflows de chaque compte sont indépendants."
+  },
   "session": {
     "checking": "Vérification de la session…",
     "configured": "Connectez-vous avec l'operator token configuré pour ce déploiement.",

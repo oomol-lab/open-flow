@@ -181,7 +181,7 @@
     },
     "newFlow": "新しい Flow",
     "noFlows": "Flow がまだありません",
-    "noFlowsDescription": "最初の Flow を作成しましょう。",
+    "noFlowsDescription": "最初の Flow を作成しましょう",
     "noMatchingDescription": "別の検索語をお試しください。",
     "noMatchingFlows": "一致する Flow がありません",
     "retiring": "停止処理中",

@@ -1,4 +1,8 @@
 {
+  "flows": {
+    "title": "내 워크플로",
+    "description": "개인 워크플로를 만들고 관리하세요. 계정별 워크플로는 서로 독립적입니다."
+  },
   "session": {
     "checking": "로그인 상태 확인 중…",
     "configured": "현재 deployment에 설정된 operator token으로 로그인하세요.",

@@ -17,6 +17,11 @@
     padding: 24px 0 48px;
   }
 
+  .resource-page.resource-page-embedded {
+    width: 100%;
+    padding: 0;
+  }
+
   .resource-eyebrow,
   .resource-breadcrumb {
     display: flex;

@@ -11,10 +11,14 @@ import { WorkbenchStore } from '../../src/workbench/browser/runtime/stores/workb
 import { useStoryActions } from './storyActions.tsx'
 
 function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
+  const [embedded, setEmbedded] = useState(false)
+  const [empty, setEmpty] = useState(false)
   const [initializing, setInitializing] = useState(false)
   const [connected, setConnected] = useState(false)
   const [session, setSession] = useState<{ connect: () => void; i18n: ReturnType<typeof createI18n>; store: WorkbenchStore }>()
   useStoryActions([
+    { label: embedded ? 'Standalone layout' : 'Embedded layout', onClick: () => setEmbedded(!embedded) },
+    { label: empty ? 'Show workflows' : 'Show empty list', onClick: () => setEmpty(!empty) },
     { label: initializing ? 'Finish startup' : 'Show startup', onClick: () => setInitializing(!initializing) },
     {
       label: 'Connect notifications',
@@ -52,7 +56,7 @@ function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: Ui
       async (path) => {
         if (String(path).split('?')[0] == '/v1/flows') {
           const catalog = reads++ == 0 ? flows : flows.map((flow, index) => (index == 3 ? Object.assign({}, flow, { name: 'Updated draft flow' }) : flow))
-          return Response.json({ version: 1, flows: catalog, total: catalog.length })
+          return Response.json({ version: 1, flows: empty ? [] : catalog, total: empty ? 0 : catalog.length })
         }
         return Response.json({ message: 'Unsupported story action' }, { status: 400 })
       },
@@ -66,12 +70,22 @@ function FlowBrowserStory({ dark, language, log }: { dark: boolean; language: Ui
       store.dispose()
       i18n.dispose()
     }
-  }, [language])
+  }, [empty, language])
   if (session == null) return null
   return (
     <I18nProvider i18n={session.i18n}>
       <div className="open-flow-workbench open-flow-theme h-[520px] w-full" data-theme={dark ? 'dark' : 'light'}>
         <FlowBrowser
+          catalogWidth={embedded ? 'embedded' : undefined}
+          createFlowField={{
+            state: 'ready',
+            ariaLabel: 'Team',
+            label: 'Team',
+            description: 'The workflow uses this team after creation.',
+            options: [{ label: 'Sample team', value: 'sample-team' }],
+            value: 'sample-team',
+            onValueChange: () => {},
+          }}
           initializing={initializing}
           language={language}
           store={session.store}
@@ -89,7 +103,7 @@ export const flowBrowserStory: FrontendStory = {
   id: 'flow-browser',
   title: 'Flow list',
   description:
-    'The list loads before notifications connect. Connect notifications to refresh the Draft row without clearing the list. Show startup to inspect the skeleton. Compact widths stack actions; switch language to inspect longer labels.',
+    'Embedded layout leaves page width and spacing to the host. Show empty list to inspect the empty state. New Flow includes a team field for checking modal controls. The list loads before notifications connect. Connect notifications to refresh the Draft row without clearing the list. Show startup to inspect the skeleton. Compact widths stack actions; switch language to inspect longer labels.',
   standalone: true,
   render: (log, dark, language) => <FlowBrowserStory dark={dark} language={language} log={log} />,
 }
