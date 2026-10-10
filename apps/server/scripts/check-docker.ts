@@ -239,6 +239,26 @@ try {
     readonly revision: number
   }>(claimedOrigin, '/config', { headers: { cookie: restoredCookie } }, 200)
   assert.deepEqual(configuration, {
+    services: {
+      mode: 'custom',
+      managed: false,
+      profiles: {
+        oomol: {
+          connectorOrigin: '',
+          connectorTokenConfigured: false,
+          consoleOrigin: '',
+          llmOrigin: '',
+          llmTokenConfigured: false,
+        },
+        custom: {
+          connectorOrigin: '',
+          connectorTokenConfigured: false,
+          consoleOrigin: 'https://console.example.com',
+          llmOrigin: 'https://models.example.com',
+          llmTokenConfigured: true,
+        },
+      },
+    },
     connector: {
       console: { configured: true, origin: 'https://console.example.com', source: 'settings' },
       runtime: { configured: false, source: 'none', tokenConfigured: false },
