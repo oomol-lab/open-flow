@@ -64,6 +64,22 @@ Names are case-sensitive, contain 1–256 ASCII characters, and match `^[A-Za-z_
 
 Each account, including administrators and the Operator, can enumerate and read only its own values. Variables are exportable account configuration. They provide no Secret Manager guarantees for nonexportable values, per-variable ACLs, KMS, rotation, or separate auditing.
 
+### Variable references
+
+`GET /v1/variables/:name/references` returns `{ version: 1, references, unknown }`.
+The name follows the Variable name contract; missing Variables return `404 variable.not-found`.
+Only active Flows owned by the authenticated account are inspected, without catalog pagination.
+Each reference contains `flowId`, `flowName`, `draft: boolean`, and
+`live: { publicationId: string, enabled: boolean } | null`. A Flow appears once, ordered by
+name (BINARY), then ID. Draft and current Publication references are combined; disabled Live
+publications remain included, while historical publications and retiring Flows are excluded.
+Unknown versions are returned separately as `{ flowId, flowName, scope: 'draft' | 'live' }`.
+An unknown version must not be interpreted as having no references.
+
+These are static references, not observed Run usage. No Variable values are returned.
+The response is an advisory snapshot, not a deletion lock. Deleting a referenced Variable remains
+allowed. Clients should refresh this query when opening reference or deletion UI.
+
 ## 3. Flow, Revision, and Presentation
 
 Flow is a top-level resource:

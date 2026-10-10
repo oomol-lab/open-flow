@@ -744,3 +744,26 @@ it('reads error listeners for a Flow and rejects malformed responses', async () 
   request.mockImplementation(async () => Response.json({ version: 1, listeners: [{ ...listener, enabled: 'false' }] }))
   await expect(client.getErrorListeners('flow/1')).rejects.toThrow()
 })
+
+it('decodes Variable references and forwards cancellation', async () => {
+  const result = {
+    version: 1,
+    references: [{ flowId: 'f', flowName: 'Flow', draft: true, live: { publicationId: 'p', enabled: false } }],
+    unknown: [{ flowId: 'g', flowName: 'Other', scope: 'draft' }],
+  }
+  const request = vi.fn(async () => Response.json(result))
+  const client = new ControlClient(request)
+  const controller = new AbortController()
+  expect(await client.getVariableReferences('TOKEN', controller.signal)).toEqual(result)
+  expect(request).toHaveBeenCalledWith('/v1/variables/TOKEN/references', expect.objectContaining({ signal: controller.signal }))
+  for (const invalid of [
+    { ...result, version: 2 },
+    { ...result, references: null },
+    { ...result, unknown: [{ flowId: 'f', flowName: 'Flow', scope: 'history' }] },
+    { ...result, references: [{ ...result.references[0], draft: 'yes' }] },
+    { ...result, references: [{ ...result.references[0], live: { publicationId: 'p', enabled: 1 } }] },
+  ]) {
+    request.mockImplementation(async () => Response.json(invalid))
+    await expect(client.getVariableReferences('TOKEN')).rejects.toThrow()
+  }
+})

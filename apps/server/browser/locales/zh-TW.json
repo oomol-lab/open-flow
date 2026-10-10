@@ -149,7 +149,19 @@
     "updated": "更新時間",
     "value": "值",
     "valueTooLarge": "值經 UTF-8 編碼後不能超過 64 KiB。",
-    "deleteFailed": "無法刪除變數。"
+    "deleteFailed": "無法刪除變數。",
+    "viewReferences": "查看引用",
+    "referencesTitle": "引用 {{name}} 的工作流程",
+    "referencesLoading": "正在查詢引用…",
+    "referencesFailed": "無法查詢引用，影響範圍未知。",
+    "referencesEmpty": "尚無工作流程引用此變數。",
+    "referenceDraft": "草稿",
+    "referenceLive": "已發佈",
+    "referenceDisabled": "已停用",
+    "referencesIncomplete": "結果不完整，以下版本的引用無法確定：",
+    "deleteReferencesImpact": "以下工作流程引用了此變數。刪除後，這些工作流程可能無法正常執行。",
+    "deleteUnreferenced": "尚無工作流程引用此變數。但刪除後，如果有工作流程回復到引用此變數的歷史版本，回復操作可能失敗。",
+    "actions": "操作"
   },
   "users": {
     "title": "使用者管理",

@@ -32,7 +32,7 @@ import {
 } from '../../src/ui/browser/dropdown-menu.tsx'
 import { Field as UiField, FieldLabel } from '../../src/ui/browser/field.tsx'
 import { HelpButton } from '../../src/ui/browser/helpButton.tsx'
-import { Popover, PopoverContent, PopoverTrigger } from '../../src/ui/browser/popover.tsx'
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../../src/ui/browser/popover.tsx'
 import { HostTooltip } from '../../src/ui/browser/public.ts'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '../../src/ui/browser/select.tsx'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '../../src/ui/browser/tabs.tsx'
@@ -209,7 +209,10 @@ function PopupStory({ log }: { readonly log: LogAction }) {
       </DropdownMenu>
       <Popover onOpenChange={(open) => log('popover.open', open)}>
         <PopoverTrigger render={<Button>Popover</Button>} />
-        <PopoverContent container={container}>Popup content rendered in the selected container.</PopoverContent>
+        <PopoverContent container={container}>
+          <PopoverTitle>Related resources</PopoverTitle>
+          <span>Popup content rendered in the selected container.</span>
+        </PopoverContent>
       </Popover>
       <CanvasTooltip getPopupContainer={() => container} title="Designer tooltip">
         <Button>Tooltip</Button>

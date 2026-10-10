@@ -220,6 +220,11 @@ export class ControlService {
     return { variables: this.store.variables.list(actorId).map(variable), version: 1 }
   }
 
+  getVariableReferences(actorId: string, name: string) {
+    this.getVariable(actorId, name)
+    return this.store.flows.variableReferences(actorId, name)
+  }
+
   getVariable(actorId: string, name: string): Variable {
     const stored = this.store.variables.get(actorId, name)
     if (stored == null) throw new ControlError(controlErrorCode.variableNotFound, 'The variable was not found.')

@@ -149,7 +149,19 @@
     "updated": "Updated",
     "value": "Value",
     "valueTooLarge": "Value must be no larger than 64 KiB when encoded as UTF-8.",
-    "deleteFailed": "The variable could not be deleted."
+    "deleteFailed": "The variable could not be deleted.",
+    "viewReferences": "References",
+    "referencesTitle": "Workflows referencing {{name}}",
+    "referencesLoading": "Loading references…",
+    "referencesFailed": "Could not check references. The impact is unknown.",
+    "referencesEmpty": "No workflows reference this variable.",
+    "referenceDraft": "Draft",
+    "referenceLive": "Published",
+    "referenceDisabled": "Disabled",
+    "referencesIncomplete": "Results are incomplete. References could not be checked for these versions:",
+    "deleteReferencesImpact": "The following workflows reference this variable. Deleting it may cause these workflows to fail.",
+    "deleteUnreferenced": "No workflows reference this variable. However, after deletion, if a workflow is rolled back to a historical version that references it, the rollback may fail.",
+    "actions": "Actions"
   },
   "users": {
     "title": "Users",

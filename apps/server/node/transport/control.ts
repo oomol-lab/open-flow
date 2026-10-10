@@ -128,6 +128,10 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     query(context.req.raw, [], controlErrorCode.variableInvalid)
     return response(200, service.listVariables(context.get('actorId')))
   })
+  app.get('/variables/:name/references', (context) => {
+    query(context.req.raw, [], controlErrorCode.variableInvalid)
+    return response(200, service.getVariableReferences(context.get('actorId'), variableName(context.req.param('name'))))
+  })
   app.get('/variables/:name', (context) => {
     query(context.req.raw, [], controlErrorCode.variableInvalid)
     return response(200, service.getVariable(context.get('actorId'), variableName(context.req.param('name'))))

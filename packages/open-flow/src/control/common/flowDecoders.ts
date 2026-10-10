@@ -1,4 +1,4 @@
-import type { ErrorListener, Flow, FlowPage, FlowResources, Variable } from './api.ts'
+import type { ErrorListener, Flow, FlowPage, FlowResources, Variable, VariableReferences } from './api.ts'
 
 import { exact, integer, invalidResponse, record, string } from './decoding.ts'
 
@@ -101,5 +101,36 @@ export function errorListener(value: unknown): ErrorListener {
     nodeId: string(source.nodeId),
     nodeName: string(source.nodeName),
     enabled: source.enabled,
+  }
+}
+
+export function variableReferences(input: unknown): VariableReferences {
+  const source = record(input)
+  exact(source, ['version', 'references', 'unknown'])
+  if (source.version != 1 || !Array.isArray(source.references) || !Array.isArray(source.unknown)) return invalidResponse()
+  return {
+    version: 1,
+    references: source.references.map((value) => {
+      const item = record(value)
+      exact(item, ['flowId', 'flowName', 'draft', 'live'])
+      if (typeof item.draft != 'boolean') return invalidResponse()
+      const live = item.live === null ? null : record(item.live)
+      if (live != null) {
+        exact(live, ['publicationId', 'enabled'])
+        if (typeof live.enabled != 'boolean') return invalidResponse()
+      }
+      return {
+        flowId: string(item.flowId),
+        flowName: string(item.flowName),
+        draft: item.draft,
+        live: live == null ? null : { publicationId: string(live.publicationId), enabled: live.enabled as boolean },
+      }
+    }),
+    unknown: source.unknown.map((value) => {
+      const item = record(value)
+      exact(item, ['flowId', 'flowName', 'scope'])
+      if (item.scope !== 'draft' && item.scope !== 'live') return invalidResponse()
+      return { flowId: string(item.flowId), flowName: string(item.flowName), scope: item.scope }
+    }),
   }
 }

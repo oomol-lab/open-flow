@@ -149,7 +149,19 @@
     "updated": "업데이트 시간",
     "value": "값",
     "valueTooLarge": "UTF-8로 인코딩한 값은 64 KiB 이하여야 합니다.",
-    "deleteFailed": "변수를 삭제할 수 없습니다."
+    "deleteFailed": "변수를 삭제할 수 없습니다.",
+    "viewReferences": "참조 보기",
+    "referencesTitle": "{{name}}을(를) 참조하는 워크플로",
+    "referencesLoading": "참조 확인 중…",
+    "referencesFailed": "참조를 확인할 수 없습니다. 영향 범위를 알 수 없습니다.",
+    "referencesEmpty": "이 변수를 참조하는 워크플로가 없습니다.",
+    "referenceDraft": "초안",
+    "referenceLive": "게시됨",
+    "referenceDisabled": "비활성화",
+    "referencesIncomplete": "결과가 불완전합니다. 다음 버전의 참조를 확인할 수 없습니다:",
+    "deleteReferencesImpact": "다음 워크플로가 이 변수를 참조합니다. 삭제하면 해당 워크플로 실행이 실패할 수 있습니다.",
+    "deleteUnreferenced": "이 변수를 참조하는 워크플로가 없습니다. 다만 삭제 후 워크플로를 이 변수를 참조하는 이전 버전으로 롤백하면 롤백 작업이 실패할 수 있습니다.",
+    "actions": "작업"
   },
   "users": {
     "title": "사용자 관리",

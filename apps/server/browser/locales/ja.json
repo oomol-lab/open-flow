@@ -149,7 +149,19 @@
     "updated": "更新日時",
     "value": "値",
     "valueTooLarge": "UTF-8 でエンコードした値は 64 KiB 以下にしてください。",
-    "deleteFailed": "変数を削除できませんでした。"
+    "deleteFailed": "変数を削除できませんでした。",
+    "viewReferences": "参照を表示",
+    "referencesTitle": "{{name}} を参照するワークフロー",
+    "referencesLoading": "参照を読み込み中…",
+    "referencesFailed": "参照を確認できませんでした。影響範囲は不明です。",
+    "referencesEmpty": "この変数を参照するワークフローはありません。",
+    "referenceDraft": "下書き",
+    "referenceLive": "公開済み",
+    "referenceDisabled": "無効",
+    "referencesIncomplete": "結果は不完全です。次のバージョンの参照を確認できませんでした：",
+    "deleteReferencesImpact": "以下のワークフローがこの変数を参照しています。削除すると、これらのワークフローの実行が失敗する可能性があります。",
+    "deleteUnreferenced": "この変数を参照するワークフローはありません。ただし、削除後にワークフローをこの変数を参照する過去のバージョンに戻すと、ロールバックが失敗する可能性があります。",
+    "actions": "操作"
   },
   "users": {
     "title": "ユーザー管理",

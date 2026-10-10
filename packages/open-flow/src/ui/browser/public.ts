@@ -12,8 +12,21 @@ import {
   DialogTitle as SharedDialogTitle,
   DialogTrigger as SharedDialogTrigger,
 } from './dialog.tsx'
+import {
+  DropdownMenu as SharedDropdownMenu,
+  DropdownMenuTrigger as SharedDropdownMenuTrigger,
+  DropdownMenuContent as SharedDropdownMenuContent,
+  DropdownMenuItem as SharedDropdownMenuItem,
+  DropdownMenuSeparator as SharedDropdownMenuSeparator,
+} from './dropdown-menu.tsx'
 import { InputGroup as SharedInputGroup, InputGroupAddon as SharedInputGroupAddon, InputGroupInput as SharedInputGroupInput } from './input-group.tsx'
 import { NativeSelect as SharedNativeSelect, NativeSelectOption as SharedNativeSelectOption } from './native-select.tsx'
+import {
+  Popover as SharedPopover,
+  PopoverContent as SharedPopoverContent,
+  PopoverTitle as SharedPopoverTitle,
+  PopoverTrigger as SharedPopoverTrigger,
+} from './popover.tsx'
 import { Tabs as SharedTabs, TabsContent as SharedTabsContent, TabsList as SharedTabsList, TabsTrigger as SharedTabsTrigger } from './tabs.tsx'
 
 /** Native host button contract; Base UI composition stays internal to the product. */
@@ -87,11 +100,19 @@ export const notificationToasterProps = {
 export function NotificationUndoLabel({ children }: { children: ReactNode }): ReactNode {
   return createElement(
     'span',
-    { 'className': 'inline-flex items-center gap-1.5', 'data-notification-action-icon': 'start' },
+    {
+      'className': 'inline-flex items-center gap-1.5',
+      'data-notification-action-icon': 'start',
+    },
     createElement('i', {
       'aria-hidden': true,
       'className': 'i-lucide:undo-2',
-      'style': { width: 14, height: 14, flexShrink: 0, transform: 'translateY(-1px)' },
+      'style': {
+        width: 14,
+        height: 14,
+        flexShrink: 0,
+        transform: 'translateY(-1px)',
+      },
     }),
     children,
   )
@@ -102,3 +123,52 @@ export { HostTooltip, type HostTooltipProps } from './hostTooltip.tsx'
 export { HostNavigationActions, type HostNavigationActionsProps, type HostThemeMode } from './hostNavigationActions.tsx'
 
 export { IdTooltip } from './idTooltip.tsx'
+
+/** Host popovers share positioning, dismissal and keyboard behavior with the product. */
+export interface PopoverProps {
+  readonly children?: ReactNode
+  readonly defaultOpen?: boolean
+  readonly open?: boolean
+  readonly onOpenChange?: (open: boolean, eventDetails: unknown) => void
+}
+export interface PopoverTriggerProps extends ComponentPropsWithoutRef<'button'> {
+  readonly render?: ReactElement
+}
+export interface PopoverContentProps extends ComponentPropsWithoutRef<'div'> {
+  readonly container?: HTMLElement | null
+  readonly align?: 'start' | 'center' | 'end'
+  readonly side?: 'top' | 'bottom' | 'left' | 'right'
+  readonly initialFocus?: boolean | HTMLElement | RefObject<HTMLElement | null> | (() => HTMLElement | null)
+  readonly finalFocus?: boolean | HTMLElement | RefObject<HTMLElement | null> | (() => HTMLElement | null)
+}
+export const Popover: ComponentType<PopoverProps> = SharedPopover as ComponentType<PopoverProps>
+export const PopoverTrigger: ForwardRefExoticComponent<PopoverTriggerProps & RefAttributes<HTMLButtonElement>> =
+  SharedPopoverTrigger as ForwardRefExoticComponent<PopoverTriggerProps & RefAttributes<HTMLButtonElement>>
+export const PopoverContent: ComponentType<PopoverContentProps> = SharedPopoverContent as ComponentType<PopoverContentProps>
+export const PopoverTitle: ComponentType<ComponentPropsWithoutRef<'h2'>> = SharedPopoverTitle
+
+/** Host menus reuse the product's keyboard navigation and dismissal behavior. */
+export interface DropdownMenuProps {
+  readonly children?: ReactNode
+  readonly defaultOpen?: boolean
+  readonly open?: boolean
+  readonly onOpenChange?: (open: boolean, eventDetails: unknown) => void
+}
+export interface DropdownMenuTriggerProps extends ComponentPropsWithoutRef<'button'> {
+  readonly render?: ReactElement
+}
+export interface DropdownMenuContentProps extends ComponentPropsWithoutRef<'div'> {
+  readonly container?: HTMLElement | null
+  readonly align?: 'start' | 'center' | 'end'
+  readonly finalFocus?: boolean | HTMLElement | RefObject<HTMLElement | null> | (() => HTMLElement | null)
+}
+export interface DropdownMenuItemProps extends ComponentPropsWithoutRef<'div'> {
+  readonly disabled?: boolean
+  readonly variant?: 'default' | 'destructive'
+}
+export const DropdownMenu: ComponentType<DropdownMenuProps> = SharedDropdownMenu as ComponentType<DropdownMenuProps>
+export const DropdownMenuTrigger: ForwardRefExoticComponent<DropdownMenuTriggerProps & RefAttributes<HTMLButtonElement>> =
+  SharedDropdownMenuTrigger as ForwardRefExoticComponent<DropdownMenuTriggerProps & RefAttributes<HTMLButtonElement>>
+export const DropdownMenuContent: ComponentType<DropdownMenuContentProps> = SharedDropdownMenuContent as ComponentType<DropdownMenuContentProps>
+export const DropdownMenuItem: ComponentType<DropdownMenuItemProps> = SharedDropdownMenuItem as ComponentType<DropdownMenuItemProps>
+export const DropdownMenuSeparator: ComponentType<ComponentPropsWithoutRef<'div'>> = SharedDropdownMenuSeparator

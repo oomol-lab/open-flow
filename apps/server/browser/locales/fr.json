@@ -149,7 +149,19 @@
     "updated": "Mise à jour",
     "value": "Valeur",
     "valueTooLarge": "La valeur encodée en UTF-8 ne doit pas dépasser 64 KiB.",
-    "deleteFailed": "Impossible de supprimer la variable."
+    "deleteFailed": "Impossible de supprimer la variable.",
+    "viewReferences": "Voir les références",
+    "referencesTitle": "Workflows qui référencent {{name}}",
+    "referencesLoading": "Chargement des références…",
+    "referencesFailed": "Impossible de vérifier les références. L’impact est inconnu.",
+    "referencesEmpty": "Aucun workflow ne référence cette variable.",
+    "referenceDraft": "Brouillon",
+    "referenceLive": "Publié",
+    "referenceDisabled": "Désactivée",
+    "referencesIncomplete": "Résultats incomplets. Les références de ces versions n’ont pas pu être vérifiées :",
+    "deleteReferencesImpact": "Les workflows suivants référencent cette variable. Sa suppression peut entraîner leur échec.",
+    "deleteUnreferenced": "Aucun workflow ne référence cette variable. Toutefois, après sa suppression, si un workflow est rétabli dans une version antérieure qui la référence, cette opération peut échouer.",
+    "actions": "Actions"
   },
   "users": {
     "title": "Utilisateurs",

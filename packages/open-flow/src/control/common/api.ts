@@ -48,7 +48,7 @@ import { flowCheck } from './checkDecoders.ts'
 import { connection, connectorAccess, connectorAccessSnapshot, connectorAccessCandidatesBatch, connectorAction } from './connectorDecoders.ts'
 import { allConnectorConnectionsQuery, connectorActionQuery, connectorConnectionsQuery, connectorProvidersQuery } from './connectorQueries.ts'
 import { exact, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
-import { errorListener, flow, flowPage, variable } from './flowDecoders.ts'
+import { errorListener, flow, flowPage, variable, variableReferences } from './flowDecoders.ts'
 import { live, publication, publicationPage, publishOperation } from './publicationDecoders.ts'
 import { draft, draftChange, draftSync, presentation } from './revisionDecoders.ts'
 import { runCancellation, runDetails, runPage, runResult, waitResolution } from './runDecoders.ts'
@@ -113,6 +113,19 @@ export interface FlowPage {
   readonly nextCursor?: string
   readonly total?: number
   readonly version: 1
+}
+
+export interface VariableReference {
+  readonly flowId: string
+  readonly flowName: string
+  readonly draft: boolean
+  readonly live: { readonly publicationId: string; readonly enabled: boolean } | null
+}
+
+export interface VariableReferences {
+  readonly version: 1
+  readonly references: readonly VariableReference[]
+  readonly unknown: readonly { readonly flowId: string; readonly flowName: string; readonly scope: 'draft' | 'live' }[]
 }
 
 export interface Variable {
@@ -744,6 +757,10 @@ export class ControlClient {
     exact(source, ['variables', 'version'])
     if (source.version != 1 || !Array.isArray(source.variables)) return invalidResponse()
     return { variables: source.variables.map(variable), version: 1 }
+  }
+
+  async getVariableReferences(name: string, signal?: AbortSignal): Promise<VariableReferences> {
+    return variableReferences(await this.request(`/v1/variables/${segment(name)}/references`, { signal }))
   }
 
   async getVariable(name: string): Promise<Variable> {

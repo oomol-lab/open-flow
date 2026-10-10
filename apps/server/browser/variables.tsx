@@ -13,6 +13,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  HostTooltip,
   Input,
   InputGroup,
   InputGroupAddon,
@@ -24,6 +30,7 @@ import { toast } from 'sonner'
 import { useTranslate } from 'val-i18n-react'
 import { HostPage, HostField } from './host-ui.tsx'
 import { posthog } from './posthog.ts'
+import { VariableDeletionDialog, VariableReferencesButton } from './variable-references.tsx'
 
 const maxCount = 200
 const maxValueBytes = 64 * 1024
@@ -43,6 +50,8 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
   const [filter, setFilter] = useState('')
   const [editor, setEditor] = useState<VariableEditor>()
   const [removing, setRemoving] = useState<string>()
+  const actionTrigger = useRef<HTMLButtonElement | null>(null)
+  const createTrigger = useRef<HTMLButtonElement>(null)
   const loadSequence = useRef(0)
   const portal = useRef<HTMLElement>(null)
   const nameInput = useRef<HTMLInputElement>(null)
@@ -83,6 +92,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
   const nameInvalid = editor?.kind == 'create' && (!validVariableName(editor.name) || nameExists)
 
   function createVariable(): void {
+    actionTrigger.current = null
     setEditor({ kind: 'create', name: '', value: '' })
     setRemoving(undefined)
   }
@@ -155,6 +165,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
               />
             </InputGroup>
             <Button
+              ref={createTrigger}
               className="pr-3"
               variant="default"
               size="default"
@@ -182,7 +193,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
           <span>{t('variables.name')}</span>
           <span>{t('variables.value')}</span>
           <span>{t('variables.updated')}</span>
-          <span />
+          <span className="text-right">{t('variables.actions')}</span>
         </div>
         <div className="variable-list">
           {loading ? (
@@ -223,32 +234,38 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
                 <code>{variable.value}</code>
                 <time dateTime={variable.updatedAt}>{new Date(variable.updatedAt).toLocaleString(language)}</time>
                 <div>
-                  {removing == variable.name ? (
-                    <span className="variable-confirm">
-                      {t('variables.deleteConfirm', { name: variable.name })}
-                      <Button variant="outline" size="sm" disabled={pending} onClick={() => setRemoving(undefined)} type="button">
-                        {t('variables.cancel')}
-                      </Button>
-                      <Button variant="destructive" size="sm" disabled={pending} onClick={() => void remove(variable.name)} type="button">
-                        {t('variables.delete')}
-                      </Button>
-                    </span>
-                  ) : (
-                    <>
-                      <Button variant="outline" size="sm" disabled={pending} onClick={() => editVariable(variable)} type="button">
-                        {t('variables.edit')}
-                      </Button>
-                      <Button variant="destructive" size="sm" disabled={pending} onClick={() => setRemoving(variable.name)} type="button">
-                        {t('variables.delete')}
-                      </Button>
-                    </>
-                  )}
+                  <VariableReferencesButton client={client} name={variable.name} container={portal.current} disabled={pending} />
+                  <VariableActionsMenu
+                    container={portal.current}
+                    disabled={pending}
+                    dialogOpen={editor != null || removing != null}
+                    onEdit={(trigger) => {
+                      actionTrigger.current = trigger
+                      editVariable(variable)
+                    }}
+                    onDelete={(trigger) => {
+                      actionTrigger.current = trigger
+                      setRemoving(variable.name)
+                    }}
+                  />
                 </div>
               </div>
             ))
           )}
         </div>
       </section>
+      {removing != null && (
+        <VariableDeletionDialog
+          finalFocus={() => (actionTrigger.current?.isConnected ? actionTrigger.current : createTrigger.current)}
+          key={removing}
+          client={client}
+          name={removing}
+          container={portal.current}
+          pending={pending}
+          onClose={() => setRemoving(undefined)}
+          onDelete={() => void remove(removing)}
+        />
+      )}
       <Dialog
         onOpenChange={(open) => {
           if (!open && !pending) setEditor(undefined)
@@ -258,6 +275,7 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
         <DialogContent
           closeLabel={t('variables.cancel')}
           container={portal.current}
+          finalFocus={() => (actionTrigger.current?.isConnected ? actionTrigger.current : createTrigger.current)}
           initialFocus={() => (editor?.kind == 'create' ? nameInput.current : valueInput.current)}
         >
           <form className="flex flex-col gap-4" onSubmit={(event) => void save(event)}>
@@ -319,5 +337,42 @@ export function VariablesPage({ client, language }: { readonly client: ControlCl
         </DialogContent>
       </Dialog>
     </HostPage>
+  )
+}
+
+function VariableActionsMenu({
+  container,
+  disabled,
+  dialogOpen,
+  onEdit,
+  onDelete,
+}: {
+  readonly container: HTMLElement | null
+  readonly disabled: boolean
+  readonly dialogOpen: boolean
+  readonly onEdit: (trigger: HTMLButtonElement | null) => void
+  readonly onDelete: (trigger: HTMLButtonElement | null) => void
+}): ReactElement {
+  const t = useTranslate()
+  const trigger = useRef<HTMLButtonElement>(null)
+  return (
+    <DropdownMenu>
+      <HostTooltip label={t('variables.actions')}>
+        <DropdownMenuTrigger render={<Button ref={trigger} aria-label={t('variables.actions')} variant="ghost" size="icon-sm" disabled={disabled} />}>
+          <i aria-hidden="true" className="i-lucide-light:ellipsis" />
+        </DropdownMenuTrigger>
+      </HostTooltip>
+      <DropdownMenuContent container={container} align="end" className="w-48" finalFocus={dialogOpen ? false : trigger}>
+        <DropdownMenuItem onClick={() => onEdit(trigger.current)}>
+          <i aria-hidden="true" className="i-lucide-light:square-pen size-4 shrink-0" />
+          {t('variables.edit')}
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="mx-2 bg-border/50" />
+        <DropdownMenuItem variant="destructive" onClick={() => onDelete(trigger.current)}>
+          <i aria-hidden="true" className="i-lucide-light:trash-2 size-4 shrink-0" />
+          {t('variables.delete')}
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }

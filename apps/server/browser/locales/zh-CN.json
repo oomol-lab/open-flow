@@ -149,7 +149,19 @@
     "updated": "更新时间",
     "value": "值",
     "valueTooLarge": "值经 UTF-8 编码后不能超过 64 KiB。",
-    "deleteFailed": "无法删除变量。"
+    "deleteFailed": "无法删除变量。",
+    "viewReferences": "查看引用",
+    "referencesTitle": "引用 {{name}} 的工作流",
+    "referencesLoading": "正在查询引用…",
+    "referencesFailed": "无法查询引用，影响范围未知。",
+    "referencesEmpty": "暂无工作流引用此变量。",
+    "referenceDraft": "草稿",
+    "referenceLive": "已发布",
+    "referenceDisabled": "已停用",
+    "referencesIncomplete": "结果不完整，以下版本的引用无法确定：",
+    "deleteReferencesImpact": "以下工作流引用了此变量。删除后，这些工作流可能无法正常运行。",
+    "deleteUnreferenced": "暂无工作流引用此变量。但删除后，如果有工作流回滚到引用此变量的历史版本，回滚操作可能失败。",
+    "actions": "操作"
   },
   "users": {
     "title": "用户管理",

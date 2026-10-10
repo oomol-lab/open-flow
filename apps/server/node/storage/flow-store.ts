@@ -1,10 +1,11 @@
-import type { Presentation } from '@oomol-lab/open-flow/control-api'
+import type { Presentation, VariableReferences, VariableReference } from '@oomol-lab/open-flow/control-api'
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { DatabaseSync } from 'node:sqlite'
 import type { RevisionStore } from './revision-store.ts'
 
-import { draftResourceReferences } from './flow-resources.ts'
+import { draftResourceReferences, revisionResourceReferences } from './flow-resources.ts'
+import { RevisionIntegrityError } from './revision-store.ts'
 import { requireErrorSources } from './trigger-store.ts'
 
 export interface StoredFlow {
@@ -86,6 +87,57 @@ export class FlowStore {
     this.#database = database
     this.#revisions = revisions
     this.#transaction = transaction
+  }
+
+  variableReferences(ownerId: string, name: string): VariableReferences {
+    const rows = this.#database
+      .prepare(`
+      SELECT f.flow_id AS flowId, f.name AS flowName, f.draft_resource_references AS draft,
+        p.revision_id AS revisionId, l.publication_id AS publicationId, l.enabled
+      FROM flows f
+      LEFT JOIN flow_live l ON l.flow_id = f.flow_id
+      LEFT JOIN publications p ON p.publication_id = l.publication_id
+      WHERE f.owner_id = ? AND f.status = 'active'
+      ORDER BY f.name COLLATE BINARY, f.flow_id
+    `)
+      .all(ownerId) as unknown as readonly {
+      flowId: string
+      flowName: string
+      draft: string | null
+      revisionId: string | null
+      publicationId: string | null
+      enabled: number | null
+    }[]
+    const references: VariableReference[] = []
+    const unknown: VariableReferences['unknown'][number][] = []
+    const revisions = new Map<string, ReturnType<typeof revisionResourceReferences>>()
+    for (const row of rows) {
+      const identity = { flowId: row.flowId, flowName: row.flowName }
+      if (row.draft == null) unknown.push({ ...identity, scope: 'draft' })
+      const draft = row.draft != null && (JSON.parse(row.draft).variableNames as string[]).includes(name)
+      let live: VariableReference['live'] = null
+      if (row.publicationId != null) {
+        let summary: ReturnType<typeof revisionResourceReferences> = null
+        if (row.revisionId != null) {
+          if (!revisions.has(row.revisionId)) {
+            try {
+              const revision = this.#revisions.read(row.revisionId)
+              revisions.set(row.revisionId, revision == null ? null : revisionResourceReferences(revision.content))
+            } catch (error) {
+              if (!(error instanceof RevisionIntegrityError)) throw error
+              revisions.set(row.revisionId, null)
+            }
+          }
+          summary = revisions.get(row.revisionId) ?? null
+        }
+        if (summary == null) unknown.push({ ...identity, scope: 'live' })
+        else if (summary.variableNames.includes(name)) {
+          live = { publicationId: row.publicationId, enabled: row.enabled == 1 }
+        }
+      }
+      if (draft || live != null) references.push({ ...identity, draft, live })
+    }
+    return { version: 1, references, unknown }
   }
 
   createFlow(input: {
