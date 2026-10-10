@@ -180,7 +180,7 @@
     "install": "1. Install oo CLI",
     "connect": "2. Connect to this Server",
     "environmentHint": "Set the server URL and token in your agent’s environment. There is no need to run oo login.",
-    "mcpDescription": "Connect an MCP client to let AI agents operate Open Flow.",
+    "mcpDescription": "Connect via MCP to let AI agents operate Open Flow.",
     "mcpAddress": "Server URL",
     "mcpCopy": "Copy URL",
     "mcpCopied": "MCP URL copied.",

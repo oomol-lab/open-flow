@@ -180,7 +180,7 @@
     "install": "1. oo CLI をインストール",
     "connect": "2. この Server に接続",
     "environmentHint": "Agent の実行環境にサービスの URL とトークンを設定してください。oo login の実行は不要です。",
-    "mcpDescription": "MCP クライアントを接続して、AI Agent が Open Flow を操作できるようにします。",
+    "mcpDescription": "MCP 経由で接続して、AI Agent が Open Flow を操作できるようにします。",
     "mcpAddress": "サーバー URL",
     "mcpCopy": "URL をコピー",
     "mcpCopied": "MCP URL をコピーしました。",

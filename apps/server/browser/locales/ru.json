@@ -180,7 +180,7 @@
     "install": "1. Установите oo CLI",
     "connect": "2. Подключитесь к этому Server",
     "environmentHint": "Задайте адрес сервера и токен в среде запуска агента. Выполнять oo login не требуется.",
-    "mcpDescription": "Подключите клиент MCP, чтобы ИИ-агенты могли управлять Open Flow.",
+    "mcpDescription": "Подключитесь через MCP, чтобы ИИ-агенты могли управлять Open Flow.",
     "mcpAddress": "URL сервера",
     "mcpCopy": "Копировать URL",
     "mcpCopied": "URL MCP скопирован.",

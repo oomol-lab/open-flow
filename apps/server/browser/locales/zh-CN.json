@@ -180,7 +180,7 @@
     "install": "1. 安装 oo CLI",
     "connect": "2. 连接当前 Server",
     "environmentHint": "在 Agent 的运行环境中配置服务地址和 Token，无需运行 oo login。",
-    "mcpDescription": "连接 MCP 客户端，让 AI Agent 操作 Open Flow。",
+    "mcpDescription": "通过 MCP 连接，让 AI Agent 操作 Open Flow。",
     "mcpAddress": "服务地址",
     "mcpCopy": "复制地址",
     "mcpCopied": "已复制 MCP 地址。",

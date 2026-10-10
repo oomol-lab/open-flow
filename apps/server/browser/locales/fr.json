@@ -180,7 +180,7 @@
     "install": "1. Installer oo CLI",
     "connect": "2. Se connecter à ce Server",
     "environmentHint": "Définissez l’URL du serveur et le jeton dans l’environnement de votre agent. Il n’est pas nécessaire d’exécuter oo login.",
-    "mcpDescription": "Connectez un client MCP pour permettre aux agents IA de piloter Open Flow.",
+    "mcpDescription": "Connectez-vous via MCP pour permettre aux agents IA de piloter Open Flow.",
     "mcpAddress": "URL du serveur",
     "mcpCopy": "Copier l’URL",
     "mcpCopied": "URL MCP copiée.",

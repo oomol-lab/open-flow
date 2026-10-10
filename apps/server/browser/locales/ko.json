@@ -180,7 +180,7 @@
     "install": "1. oo CLI 설치",
     "connect": "2. 이 Server에 연결",
     "environmentHint": "Agent 실행 환경에 서버 주소와 토큰을 설정하세요. oo login은 실행하지 않아도 됩니다.",
-    "mcpDescription": "MCP 클라이언트를 연결하여 AI Agent가 Open Flow를 조작하도록 하세요.",
+    "mcpDescription": "MCP를 통해 연결하여 AI Agent가 Open Flow를 조작하도록 하세요.",
     "mcpAddress": "서버 URL",
     "mcpCopy": "URL 복사",
     "mcpCopied": "MCP URL을 복사했습니다.",
