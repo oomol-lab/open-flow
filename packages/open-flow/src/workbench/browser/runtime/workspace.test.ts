@@ -221,7 +221,7 @@ describe('Designer port projection', () => {
     const node = designerGraph(draft, {}, [], {}, {}, createI18n('zh-CN').t).nodes.find((item) => item.id == 'condition')
     if (node?.kind != 'condition') throw new Error('Expected a Condition node.')
 
-    expect(node.cases[0]?.groups[0]?.expressions[0]?.left).toEqual({ kind: 'environment', label: '环境变量' })
+    expect(node.cases[0]?.groups[0]?.expressions[0]?.left).toEqual({ kind: 'environment', label: '变量' })
     expect(node.cases[0]?.groups[0]?.expressions[1]?.left).toEqual({ icon: ':carbon:code:', kind: 'node', label: 'Transform · count' })
   })
 

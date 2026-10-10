@@ -179,12 +179,10 @@ function checkSource(
       if (document.bindings[source.bindingId] == null) {
         diagnostics.push(graphDiagnostic('graph.binding-missing', `Binding "${source.bindingId}" does not exist.`, path, { bindingId: source.bindingId }))
       } else if (document.bindings[source.bindingId].kind != 'variable') {
-        diagnostics.push(
-          graphDiagnostic('graph.binding-invalid', `Binding "${source.bindingId}" must be an environment variable.`, path, { bindingId: source.bindingId }),
-        )
+        diagnostics.push(graphDiagnostic('graph.binding-invalid', `Binding "${source.bindingId}" must be a variable.`, path, { bindingId: source.bindingId }))
       } else if (targetInput != null && !variableInputCompatible(targetInput.jsonSchema)) {
         diagnostics.push(
-          graphDiagnostic('graph.variable-incompatible', `Environment variable binding "${source.bindingId}" is not compatible with this input.`, path, {
+          graphDiagnostic('graph.variable-incompatible', `Variable binding "${source.bindingId}" is not compatible with this input.`, path, {
             bindingId: source.bindingId,
           }),
         )
@@ -622,7 +620,7 @@ function validateGraph(graph: Graph, document: FlowDocument, path: string, diagn
       if (mapping.kind == 'sources') {
         const variableSources = mapping.sources.filter((source) => source.kind == 'binding' && document.bindings[source.bindingId]?.kind == 'variable')
         if (variableSources.length > 0 && (variableSources.length != 1 || mapping.sources.length != 1)) {
-          diagnostics.push(graphDiagnostic('graph.variable-source-mixed', 'An environment variable must be the only source for an input.', mappingPath))
+          diagnostics.push(graphDiagnostic('graph.variable-source-mixed', 'A variable must be the only source for an input.', mappingPath))
         }
         for (const source of mapping.sources) checkSource(source, graph, document, inputPorts[handle], mappingPath, diagnostics)
       }
@@ -679,14 +677,9 @@ export function validateFlowGraph(revision: RevisionContent): readonly Diagnosti
   for (const [bindingId, binding] of Object.entries(revision.document.bindings)) {
     if (binding.kind == 'variable' && !validVariableName(binding.target)) {
       diagnostics.push(
-        graphDiagnostic(
-          'binding.variable-invalid',
-          `Environment variable binding "${bindingId}" has an invalid target.`,
-          `/document/bindings/${bindingId}/target`,
-          {
-            bindingId,
-          },
-        ),
+        graphDiagnostic('binding.variable-invalid', `Variable binding "${bindingId}" has an invalid target.`, `/document/bindings/${bindingId}/target`, {
+          bindingId,
+        }),
       )
     }
   }

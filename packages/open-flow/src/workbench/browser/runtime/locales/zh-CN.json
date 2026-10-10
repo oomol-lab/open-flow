@@ -425,7 +425,7 @@
     "error": {
       "authenticationRequired": "请登录后继续。",
       "authorizationDenied": "你没有执行此操作的权限。",
-      "bindingUnresolved": "缺少必需的 Connection 或环境变量。请完成配置后重试。",
+      "bindingUnresolved": "缺少必需的 Connection 或变量。请完成配置后重试。",
       "connectorAccessRequired": "运行前，请为此工作流选择可用账号和权限。",
       "connectorAccessInvalid": "当前账号的权限不允许执行此操作。请选择其他账号或调整权限。",
       "connectorActionNotFound": "所选 Connector action 已不可用。请选择其他 action。",
@@ -458,9 +458,9 @@
       "triggerKeyInvalid": "此 Trigger 无法激活，请检查 Connection 和配置后重试。",
       "triggerKeyNotFound": "此 Trigger 端点已失效，请从工作流中复制最新端点。",
       "triggerNotFound": "找不到此 Trigger，请刷新 Trigger 列表。",
-      "variableInvalid": "环境变量名称或值不符合要求，请检查后重试。",
-      "variableLimitReached": "当前部署的环境变量已达到上限。",
-      "variableNotFound": "找不到此环境变量，请刷新环境变量列表。",
+      "variableInvalid": "变量名称或值不符合要求，请检查后重试。",
+      "variableLimitReached": "当前部署的变量已达到上限。",
+      "variableNotFound": "找不到此变量，请刷新变量列表。",
       "connectorConsoleUnconfigured": "尚未配置 Connector 授权控制台地址。请前往“设置 → Connector → 授权控制台地址”完成配置后重试。"
     },
     "flowDeleted": "已删除 {{name}}。",
@@ -765,7 +765,7 @@
     "locateIssue": "打开问题：{{message}}",
     "messages": {
       "binding": {
-        "variable-invalid": "环境变量绑定“{{bindingId}}”的目标无效。"
+        "variable-invalid": "变量绑定“{{bindingId}}”的目标无效。"
       },
       "condition": {
         "input-missing": "条件表达式引用了未知输入“{{input}}”。",
@@ -782,7 +782,7 @@
         }
       },
       "graph": {
-        "binding-invalid": "绑定“{{bindingId}}”必须是环境变量。",
+        "binding-invalid": "绑定“{{bindingId}}”必须是变量。",
         "binding-missing": "绑定“{{bindingId}}”不存在。",
         "cycle": "节点之间存在依赖循环：{{nodes}}。",
         "flow-input-incompatible": "工作流输入“{{input}}”与此输入不兼容。",
@@ -797,8 +797,8 @@
           "output": "上游节点“{{nodeId}}”没有输出“{{output}}”。"
         },
         "trigger-not-allowed": "Trigger 节点只能用于工作流。",
-        "variable-incompatible": "环境变量绑定“{{bindingId}}”与此输入不兼容。",
-        "variable-source-mixed": "环境变量必须是一个输入的唯一来源。"
+        "variable-incompatible": "变量绑定“{{bindingId}}”与此输入不兼容。",
+        "variable-source-mixed": "变量必须是一个输入的唯一来源。"
       },
       "llm": {
         "unconfigured": "当前部署尚未配置 LLM。请配置 OPEN_FLOW_LLM_ORIGIN 和 OPEN_FLOW_LLM_TOKEN。"
@@ -1081,7 +1081,7 @@
   },
   "nodeInput": {
     "literal": "固定值",
-    "variable": "环境变量",
+    "variable": "变量",
     "noUpstreamNodes": "暂无可引用的上游输出",
     "mode": "类型",
     "connected": "已选择输入来源，可从“选择输入来源”中修改。"

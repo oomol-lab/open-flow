@@ -388,7 +388,7 @@ export class RunControl {
   private acceptedRun(flowId: string, accepted: ReturnType<Store['runs']['acceptLiveControlRun']>) {
     switch (accepted.kind) {
       case 'binding-unresolved':
-        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required environment variable is unresolved.')
+        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required variable is unresolved.')
       case 'busy':
         throw new ControlError(controlErrorCode.flowBusy, 'The Flow is retiring.')
       case 'conflict':

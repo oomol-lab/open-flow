@@ -425,7 +425,7 @@
     "error": {
       "authenticationRequired": "Connectez-vous pour continuer.",
       "authorizationDenied": "Vous n’avez pas l’autorisation d’effectuer cette action.",
-      "bindingUnresolved": "Une Connection ou une variable d’environnement requise est manquante. Terminez la configuration, puis réessayez.",
+      "bindingUnresolved": "Une Connection ou une variable requise est manquante. Terminez la configuration, puis réessayez.",
       "connectorAccessRequired": "Avant l’exécution, choisissez un compte et ses autorisations pour ce flux.",
       "connectorAccessInvalid": "Les autorisations du compte actuel ne permettent pas cette opération. Choisissez un autre compte ou modifiez ses autorisations.",
       "connectorActionNotFound": "L’action Connector sélectionnée n’est plus disponible. Choisissez une autre action.",
@@ -458,9 +458,9 @@
       "triggerKeyInvalid": "Ce Trigger ne peut pas être activé. Vérifiez sa Connection et sa configuration, puis réessayez.",
       "triggerKeyNotFound": "Ce point de terminaison Trigger n’existe plus. Copiez le dernier point de terminaison depuis le Flow.",
       "triggerNotFound": "Ce Trigger n’existe pas ou a été supprimé. Actualisez la liste des Triggers.",
-      "variableInvalid": "Le nom ou la valeur de la variable d’environnement n’est pas valide. Vérifiez-la, puis réessayez.",
-      "variableLimitReached": "Ce déploiement a atteint sa limite de variables d’environnement.",
-      "variableNotFound": "Cette variable d’environnement n’existe pas ou a été supprimée. Actualisez la liste des variables d’environnement.",
+      "variableInvalid": "Le nom ou la valeur de la variable n’est pas valide. Vérifiez-la, puis réessayez.",
+      "variableLimitReached": "Ce déploiement a atteint sa limite de variables.",
+      "variableNotFound": "Cette variable n’existe pas ou a été supprimée. Actualisez la liste des variables.",
       "connectorConsoleUnconfigured": "L’URL de la console d’autorisation Connector n’est pas configurée. Renseignez-la dans Paramètres → Connector → URL de la console d’autorisation, puis réessayez."
     },
     "flowDeleted": "{{name}} supprimé.",
@@ -765,7 +765,7 @@
     "locateIssue": "Ouvrir le problème : {{message}}",
     "messages": {
       "binding": {
-        "variable-invalid": "La liaison de variable d’environnement « {{bindingId}} » a une cible non valide."
+        "variable-invalid": "La liaison de variable « {{bindingId}} » a une cible non valide."
       },
       "condition": {
         "input-missing": "L’expression de condition référence l’entrée inconnue « {{input}} ».",
@@ -782,7 +782,7 @@
         }
       },
       "graph": {
-        "binding-invalid": "La liaison « {{bindingId}} » doit être une variable d’environnement.",
+        "binding-invalid": "La liaison « {{bindingId}} » doit être une variable.",
         "binding-missing": "La liaison « {{bindingId}} » n’existe pas.",
         "cycle": "Le graphe contient un cycle de dépendances entre les nœuds : {{nodes}}.",
         "flow-input-incompatible": "L’entrée Flow « {{input}} » n’est pas compatible avec cette entrée.",
@@ -797,8 +797,8 @@
           "output": "Le nœud en amont « {{nodeId}} » n’expose pas la sortie « {{output}} »."
         },
         "trigger-not-allowed": "Les nœuds Trigger sont uniquement autorisés dans les Flows.",
-        "variable-incompatible": "La liaison de variable d’environnement « {{bindingId}} » n’est pas compatible avec cette entrée.",
-        "variable-source-mixed": "Une variable d’environnement doit être l’unique source d’une entrée."
+        "variable-incompatible": "La liaison de variable « {{bindingId}} » n’est pas compatible avec cette entrée.",
+        "variable-source-mixed": "Une variable doit être l’unique source d’une entrée."
       },
       "llm": {
         "unconfigured": "Aucun LLM n’est configuré pour ce déploiement. Configurez OPEN_FLOW_LLM_ORIGIN et OPEN_FLOW_LLM_TOKEN."
@@ -1081,7 +1081,7 @@
   },
   "nodeInput": {
     "literal": "Littéral",
-    "variable": "Variables d’environnement",
+    "variable": "Variables",
     "noUpstreamNodes": "Aucune sortie en amont disponible",
     "mode": "Type",
     "connected": "Une source d’entrée est sélectionnée. Utilisez « Sélectionner la source d’entrée » pour la modifier."

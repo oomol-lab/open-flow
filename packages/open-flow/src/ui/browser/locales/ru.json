@@ -5,15 +5,15 @@
     "showMore": "Развернуть"
   },
   "variablePicker": {
-    "variableUnavailableHelp": "Переменные среды сейчас недоступны.",
-    "variableMissingHelp": "Переменная среды {{name}} больше не существует.",
-    "variableIncompatibleHelp": "Переменные среды содержат текст и несовместимы с этим входом.",
+    "variableUnavailableHelp": "Переменные сейчас недоступны.",
+    "variableMissingHelp": "Переменная {{name}} больше не существует.",
+    "variableIncompatibleHelp": "Переменные содержат текст и несовместимы с этим входом.",
     "variableUnavailable": "{{name}} (недоступна)",
     "variableMissing": "{{name}} (отсутствует)",
-    "selectVariable": "Выбрать переменную среды",
-    "variablesLoading": "Загрузка переменных среды…",
+    "selectVariable": "Выбрать переменную",
+    "variablesLoading": "Загрузка переменных…",
     "search": "Поиск",
-    "empty": "Нет подходящих переменных среды.",
+    "empty": "Нет подходящих переменных.",
     "clear": "<не задано>"
   },
   "markdown": {

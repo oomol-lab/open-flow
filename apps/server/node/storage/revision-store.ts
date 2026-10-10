@@ -141,7 +141,7 @@ export class RevisionStore {
       return
     const model = this.#llmConfig()
     const bindings = this.#variables.resolve(variableBindings(revision, dependencies.bindings))
-    if (model == null || bindings == null) throw new AcceptanceError('flow-invalid', 'Agent model or environment variable configuration is unavailable.')
+    if (model == null || bindings == null) throw new AcceptanceError('flow-invalid', 'Agent model or variable configuration is unavailable.')
     return { model, bindings }
   }
 }

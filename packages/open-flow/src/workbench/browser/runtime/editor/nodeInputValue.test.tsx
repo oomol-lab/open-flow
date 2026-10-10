@@ -135,13 +135,13 @@ describe('Independent node inputs', () => {
     expect(markup).toContain('MISSING')
     expect(markup).toContain('i-lucide-light:sliders-horizontal')
     expect(markup).toContain('role="img"')
-    expect(markup).toContain('aria-label="Env"')
+    expect(markup).toContain('aria-label="Variables"')
     expect(markup).toContain('role="alert"')
     expect(onValue).not.toHaveBeenCalled()
     expect(onVariable).not.toHaveBeenCalled()
   })
 
-  it('explains an incompatible environment variable binding', () => {
+  it('explains an incompatible variable binding', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <NodeInputValue
@@ -158,7 +158,7 @@ describe('Independent node inputs', () => {
     )
 
     expect(markup).toContain('role="alert"')
-    expect(markup).toContain('Environment variables are text and are not compatible with this input.')
+    expect(markup).toContain('Variables are text and are not compatible with this input.')
   })
 
   it('renders LLM message controls through the product input without writing defaults', () => {

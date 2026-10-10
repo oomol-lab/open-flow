@@ -51,7 +51,7 @@ const conditionModel: FlowCanvasViewModel = {
           groups: [
             {
               expressions: [
-                { left: { kind: 'environment', label: 'Env' }, operator: 'is not null' },
+                { left: { kind: 'environment', label: 'Variables' }, operator: 'is not null' },
                 { left: { icon: ':carbon:code:', kind: 'node', label: 'Transform · count' }, operator: '>', right: String(0) },
               ],
             },

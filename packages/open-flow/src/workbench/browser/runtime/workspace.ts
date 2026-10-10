@@ -214,7 +214,7 @@ function conditionOperator(operator: import('./api.ts').ConditionOperator): Flow
 function conditionOperand(operand: ConditionOperand, context: NodeProjectionContext): FlowCanvasViewConditionOperand {
   if (operand.kind == 'value') return JSON.stringify(operand.value) ?? '…'
   const source = operand.source
-  if (source.kind == 'binding') return { kind: 'environment', label: context.t?.('nodeInput.variable') ?? 'Env' }
+  if (source.kind == 'binding') return { kind: 'environment', label: context.t?.('nodeInput.variable') ?? 'Variables' }
   const sourceNode = context.nodes.get(source.nodeId)
   const presentation = sourceNode == null ? undefined : sourceNodePresentation(sourceNode, context)
   return {

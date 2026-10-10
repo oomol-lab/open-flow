@@ -133,7 +133,7 @@ export class Publisher {
       case 'error-sources-unavailable':
         throw new ControlError(controlErrorCode.flowInvalid, 'Select published upstream Flows other than this Flow.')
       case 'binding-unresolved':
-        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required environment variable is unresolved.')
+        throw new ControlError(controlErrorCode.bindingUnresolved, 'A required variable is unresolved.')
       case 'busy':
         throw new ControlError(controlErrorCode.flowBusy, 'Another Publish operation is already pending for this Flow.')
       case 'conflict':
@@ -366,7 +366,7 @@ export class Publisher {
         case 'binding-unresolved':
           this.#store.publications.failPublishOperation(target.operationId, {
             code: controlErrorCode.bindingUnresolved,
-            message: 'A required environment variable is unresolved.',
+            message: 'A required variable is unresolved.',
           })
           break
         case 'busy':

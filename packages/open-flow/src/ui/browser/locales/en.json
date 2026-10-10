@@ -5,15 +5,15 @@
     "showMore": "Show more"
   },
   "variablePicker": {
-    "variableUnavailableHelp": "Environment variables are currently unavailable.",
-    "variableMissingHelp": "Environment variable {{name}} no longer exists.",
-    "variableIncompatibleHelp": "Environment variables are text and are not compatible with this input.",
+    "variableUnavailableHelp": "Variables are currently unavailable.",
+    "variableMissingHelp": "Variable {{name}} no longer exists.",
+    "variableIncompatibleHelp": "Variables are text and are not compatible with this input.",
     "variableUnavailable": "{{name}} (unavailable)",
     "variableMissing": "{{name}} (missing)",
-    "selectVariable": "Choose environment variable",
-    "variablesLoading": "Loading environment variables…",
+    "selectVariable": "Choose variable",
+    "variablesLoading": "Loading variables…",
     "search": "Search",
-    "empty": "No matching environment variables.",
+    "empty": "No matching variables.",
     "clear": "<unset>"
   },
   "markdown": {
