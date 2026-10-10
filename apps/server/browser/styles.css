@@ -320,10 +320,10 @@ body {
 }
 .settings-service-option {
   position: relative;
-  height: 160px;
   color: var(--ui-foreground);
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
   gap: 12px;
   padding: 16px;
   border: 1px solid var(--ui-border);
@@ -359,7 +359,6 @@ body {
   accent-color: var(--ui-primary);
 }
 .settings-service-option > p {
-  overflow: auto;
   color: var(--ui-muted-foreground);
 }
 .settings-service-option > button {
