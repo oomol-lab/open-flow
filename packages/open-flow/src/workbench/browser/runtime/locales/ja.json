@@ -517,7 +517,7 @@
     "loadingTriggerActivities": "アクティビティを読み込み中…",
     "lastError": "最新のエラー",
     "needsReauth": "再認証が必要",
-    "needsReauthDescription": "配信を再開する前に、ドラフトでこの Trigger の Connection を確認し、再認証してください。",
+    "needsReauthDescription": "この稼働中の Trigger の Connection は再認証が必要です。接続の管理者に再認証を依頼してください。再認証後、Trigger の稼働状態を確認してください。",
     "none": "未公開",
     "notPublished": "未公開",
     "operation": "操作",

@@ -517,7 +517,7 @@
     "loadingTriggerActivities": "正在加载活动…",
     "lastError": "最近错误",
     "needsReauth": "需要重新授权",
-    "needsReauthDescription": "请在草稿中检查此 Trigger 的 Connection，重新授权后再恢复投递。",
+    "needsReauthDescription": "此线上 Trigger 的 Connection 需要重新授权。请联系连接管理员处理。重新授权后，请检查 Trigger 的运行状态。",
     "none": "尚未发布",
     "notPublished": "尚未发布",
     "operation": "操作",

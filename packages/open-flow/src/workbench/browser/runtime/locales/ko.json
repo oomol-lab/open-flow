@@ -517,7 +517,7 @@
     "loadingTriggerActivities": "활동 불러오는 중…",
     "lastError": "마지막 오류",
     "needsReauth": "재인증 필요",
-    "needsReauthDescription": "초안에서 이 Trigger의 Connection을 확인하고 다시 인증한 뒤 전달을 재개하세요.",
+    "needsReauthDescription": "이 운영 중인 Trigger의 Connection에 재인증이 필요합니다. 연결 관리자에게 재인증을 요청하세요. 재인증 후 Trigger의 실행 상태를 확인하세요.",
     "none": "게시되지 않음",
     "notPublished": "게시되지 않음",
     "operation": "작업",

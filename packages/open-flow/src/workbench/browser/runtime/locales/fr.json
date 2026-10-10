@@ -517,7 +517,7 @@
     "loadingTriggerActivities": "Chargement de l'activité…",
     "lastError": "Dernière erreur",
     "needsReauth": "Réautorisation requise",
-    "needsReauthDescription": "Vérifiez la Connection de ce Trigger dans le Brouillon et réautorisez-la avant de reprendre la livraison.",
+    "needsReauthDescription": "La Connection de ce Trigger en production nécessite une nouvelle autorisation. Contactez la personne qui administre la connexion pour la réautoriser, puis vérifiez l’état du Trigger.",
     "none": "Non publié",
     "notPublished": "Non publié",
     "operation": "Opération",

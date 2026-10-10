@@ -517,7 +517,7 @@
     "loadingTriggerActivities": "正在載入活動…",
     "lastError": "最後一次錯誤",
     "needsReauth": "需要重新授權",
-    "needsReauthDescription": "請在草稿中檢查這個 Trigger 的 Connection，重新授權後再恢復投遞。",
+    "needsReauthDescription": "此線上 Trigger 的 Connection 需要重新授權。請聯絡連線管理員處理。重新授權後，請檢查 Trigger 的執行狀態。",
     "none": "尚未發布",
     "notPublished": "尚未發布",
     "operation": "操作",

@@ -517,7 +517,7 @@
     "loadingTriggerActivities": "Loading activity…",
     "lastError": "Last error",
     "needsReauth": "Needs reauthorization",
-    "needsReauthDescription": "Review this Trigger's Connection in the Draft and reauthorize it before resuming delivery.",
+    "needsReauthDescription": "This Live Trigger's Connection needs reauthorization. Contact the connection administrator to reauthorize it, then check the Trigger's status.",
     "none": "Not published",
     "notPublished": "Not published",
     "operation": "Operation",
