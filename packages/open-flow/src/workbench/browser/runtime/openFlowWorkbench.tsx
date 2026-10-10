@@ -177,7 +177,7 @@ function Workbench({
           language={language}
           onCreateFlow={(name) => navigation.createFlow(name, createFlow)}
           onLanguageChange={onLanguageChange}
-          onSelectFlow={(flow) => void navigation.selectFlow(flow)}
+          onSelectFlow={(flow, view) => void navigation.selectFlow(flow, view)}
           store={store}
         />
       ) : (

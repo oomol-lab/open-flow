@@ -1,6 +1,6 @@
 import type { ComponentProps, FormEvent, ReactElement } from 'react'
 import type { ErrorListener, Flow } from '../api.ts'
-import type { WorkbenchLanguage } from '../contract.ts'
+import type { WorkbenchLanguage, WorkbenchView } from '../contract.ts'
 import type { OpenFlowWorkbenchProps } from '../openFlowWorkbench.tsx'
 import type { WorkbenchStore } from '../stores/workbenchStore.ts'
 import type { WorkspaceBusy } from '../stores/workspaceModel.ts'
@@ -42,7 +42,7 @@ interface FlowItemProps {
   readonly busy: WorkspaceBusy | undefined
   readonly flow: Flow
   readonly href: string
-  readonly onSelect: (flow: Flow) => void
+  readonly onSelect: (flow: Flow, view?: WorkbenchView) => void
   readonly store: WorkbenchStore
 }
 
@@ -337,6 +337,15 @@ function FlowItem({ showTeam, badge, busy, flow, href, onSelect, store }: FlowIt
               </DropdownMenuItem>
             )}
             <DropdownMenuSeparator className="mx-2 bg-border/50" />
+            <DropdownMenuItem disabled={flow.status != 'active'} onClick={() => onSelect(flow, 'publications')}>
+              <i aria-hidden="true" className="i-lucide-light:cloud-upload size-4 shrink-0" />
+              {t('workspace.publications')}
+            </DropdownMenuItem>
+            <DropdownMenuItem disabled={flow.status != 'active'} onClick={() => onSelect(flow, 'runs')}>
+              <i aria-hidden="true" className="i-lucide-light:history size-4 shrink-0" />
+              {t('workspace.runs')}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator className="mx-2 bg-border/50" />
             <DropdownMenuItem disabled={flow.status != 'active' || busy != null || pending != null} variant="destructive" onClick={() => setMode('delete')}>
               <i aria-hidden="true" className="i-lucide-light:trash-2 size-4 shrink-0" />
               {t('common.delete')}
@@ -399,7 +408,7 @@ interface FlowBrowserProps extends LanguageSelectProps {
   readonly hrefForFlow: (flow: Flow) => string
   readonly initializing?: boolean
   readonly onCreateFlow: (name: string) => Promise<boolean>
-  readonly onSelectFlow: (flow: Flow) => void
+  readonly onSelectFlow: (flow: Flow, view?: WorkbenchView) => void
   readonly store: WorkbenchStore
 }
 

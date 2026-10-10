@@ -73,13 +73,13 @@ export class NavigationStore {
     }
   }
 
-  public async selectFlow(flow: Flow): Promise<void> {
+  public async selectFlow(flow: Flow, view: WorkbenchView = 'design'): Promise<void> {
     const change = ++this.#change
     this.#syncing = true
     this.#store.runRequests.dismissInputs()
     await this.#store.selectFlow(flow.flowId)
     if (change == this.#change) {
-      this.#write('design', false)
+      this.#write(view, false, {})
       this.#syncing = false
     }
   }

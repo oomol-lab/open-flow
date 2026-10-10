@@ -1,3 +1,4 @@
+import type { Flow } from './api.ts'
 import type { WorkbenchStore } from './stores/workbenchStore.ts'
 
 import { val } from 'value-enhancer'
@@ -7,6 +8,34 @@ import { NavigationStore } from './navigation.ts'
 import { RunStore } from './runs/runStore.ts'
 
 describe('NavigationStore', () => {
+  it.each(['design', 'publications', 'runs'] as const)('opens a selected Flow in %s after loading', async (view) => {
+    const flowId = val<string | undefined>(undefined)
+    const loading = Promise.withResolvers<void>()
+    const store = {
+      start: vi.fn(async () => {}),
+      selectFlow: vi.fn(async (id: string) => {
+        await loading.promise
+        flowId.set(id)
+      }),
+      runRequests: { dismissInputs: vi.fn() },
+      workspace: { $: { flowId } },
+    } as unknown as WorkbenchStore
+    const navigate = vi.fn()
+    const navigation = new NavigationStore(store, { view: 'design' }, navigate)
+    try {
+      await navigation.start()
+      const selecting = navigation.selectFlow({ flowId: 'selected-flow' } as Flow, view)
+      expect(navigate).not.toHaveBeenCalled()
+      loading.resolve()
+      await selecting
+      expect(navigate).toHaveBeenCalledExactlyOnceWith({ flowId: 'selected-flow', view }, { replace: false })
+      expect(navigation.$.view.value).toBe(view)
+    } finally {
+      navigation.dispose()
+      flowId.dispose()
+    }
+  })
+
   it('marks the workbench ready only after startup completes', async () => {
     const loading = Promise.withResolvers<void>()
     const flowId = val<string | undefined>(undefined)
