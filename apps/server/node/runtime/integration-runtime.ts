@@ -17,6 +17,7 @@ import type { IntegrationCandidate } from '../storage/integration-store.ts'
 import type { IntegrationHealth, StoredIntegrationBinding, StoredIntegrationState, StoredIntegrationTarget } from '../storage/trigger-store.ts'
 
 import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
+import { eventSourceDefinition } from '@oomol-lab/open-flow/event-source'
 import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { matchesTriggerOutputs } from '@oomol-lab/open-flow/flow-semantics'
@@ -854,7 +855,7 @@ export class IntegrationRuntime {
           this.#store.eventSources.finish(delivery, 'retired')
           continue
         }
-        if (source.enabled != 1 || source.verifiedAt == null || !this.#store.eventSources.deliverable(delivery)) {
+        if (source.enabled != 1 || !eventSourceDefinition(source.kind).ready(source) || !this.#store.eventSources.deliverable(delivery)) {
           this.#store.eventSources.retry(delivery, now)
           continue
         }

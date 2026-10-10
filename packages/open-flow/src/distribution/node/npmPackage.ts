@@ -64,6 +64,7 @@ function createManifest(version: string): object {
         types: './dist/common/cron-trigger.d.ts',
         import: './dist/common/cron-trigger.js',
       },
+      './event-source': { types: './dist/common/event-source.d.ts', import: './dist/common/event-source.js' },
       './integration-trigger': {
         types: './dist/common/integration-trigger.d.ts',
         import: './dist/common/integration-trigger.js',

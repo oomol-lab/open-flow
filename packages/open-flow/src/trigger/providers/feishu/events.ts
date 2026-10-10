@@ -83,7 +83,7 @@ function sameSecret(value: unknown, expected: string): boolean {
   return difference == 0
 }
 
-export function matchesFeishuEvent(config: Readonly<Record<string, JsonValue>>, event: FeishuEvent): boolean {
+export function matchesFeishuEvent(config: Readonly<Record<string, JsonValue>>, event: Pick<FeishuEvent, 'type' | 'body'>): boolean {
   if (!Array.isArray(config.eventTypes) || !config.eventTypes.includes(event.type)) return false
   const chatIds = config.chatIds
   if (Array.isArray(chatIds) && chatIds.length > 0) {

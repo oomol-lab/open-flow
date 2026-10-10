@@ -79,13 +79,13 @@ it('rolls back column changes and the schema version when a stored grant is inva
 
 it('accepts databases already rebuilt with the new column names and snapshot format', async () => {
   const file = await databaseFile()
-  const database = Database.open(file)
-  database.connection.exec(
+  const database = legacyDatabase(file, 42)
+  database.exec(
     "DROP TABLE variables; CREATE TABLE variables (name TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL) STRICT; ALTER TABLE flows DROP COLUMN draft_resource_references; ALTER TABLE wait_notifications ADD COLUMN task_id TEXT NOT NULL DEFAULT ''; DROP TABLE user_tokens; DROP TABLE users; DROP INDEX flows_owner_list; ALTER TABLE flows DROP COLUMN owner_id; DROP TABLE error_subscriptions; DROP TABLE error_bindings; DROP TABLE error_dispatches; ALTER TABLE runs DROP COLUMN failure_detail; ALTER TABLE runs DROP COLUMN error_source_run_id; ALTER TABLE runs DROP COLUMN error_source_flow_id; ALTER TABLE publications DROP COLUMN live_enabled_at_end; ALTER TABLE publications DROP COLUMN live_ended_at; ALTER TABLE poll_candidates DROP COLUMN retry_count; ALTER TABLE publications DROP COLUMN presentation_snapshot; PRAGMA user_version = 29",
   )
   database.close()
   const upgraded = Database.open(file)
-  expect(version(upgraded.connection)).toBe(42)
+  expect(version(upgraded.connection)).toBe(43)
   expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
   upgraded.close()
 })
@@ -136,7 +136,7 @@ it('backfills Revision metadata needed after old content is pruned', async () =>
 
   const upgraded = Database.open(file)
   try {
-    expect(version(upgraded.connection)).toBe(42)
+    expect(version(upgraded.connection)).toBe(43)
     expect(upgraded.connection.prepare('SELECT digest, model_version AS modelVersion FROM flow_revisions WHERE revision_id = ?').get('revision')).toEqual({
       digest: 'digest',
       modelVersion: 3,
@@ -192,7 +192,7 @@ it('applies the Flow-first schema without foreign keys', async () => {
   Database.open(file).close()
   const database = new DatabaseSync(file)
   try {
-    expect(version(database)).toBe(42)
+    expect(version(database)).toBe(43)
     const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as {
       readonly name: string
     }[]
@@ -234,7 +234,7 @@ it('upgrades a version 1 Flow database without changing its data', async () => {
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(42)
+    expect(version(reopened)).toBe(43)
     expect(reopened.prepare('SELECT revision_id AS revisionId FROM revisions').all()).toEqual([{ revisionId: 'revision-a' }])
     expect(reopened.prepare('SELECT name FROM variables').all()).toEqual([])
   } finally {
@@ -264,7 +264,7 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(42)
+    expect(version(reopened)).toBe(43)
     expect(reopened.prepare('SELECT flow_id AS flowId, team_id AS teamId FROM flow_connector_teams').all()).toEqual([{ flowId: 'flow-a', teamId: null }])
     expect(reopened.prepare("SELECT name FROM pragma_table_info('runs') WHERE name = 'connector_team_id'").get()).toEqual({ name: 'connector_team_id' })
   } finally {
@@ -312,13 +312,13 @@ it('rejects a newer Flow schema version without modifying it', async () => {
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
-  database.exec('PRAGMA user_version = 43')
+  database.exec('PRAGMA user_version = 44')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('SQLite schema version 43 is newer than the supported version 42.')
+  expect(() => Database.open(file)).toThrow('SQLite schema version 44 is newer than the supported version 43.')
 
   const reopened = new DatabaseSync(file)
-  expect(version(reopened)).toBe(43)
+  expect(version(reopened)).toBe(44)
   reopened.close()
 })
 
@@ -356,7 +356,7 @@ it('preserves old checkpoint bytes for explicit recovery validation', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(42)
+    expect(version(reopened)).toBe(43)
     expect(reopened.prepare('SELECT * FROM run_checkpoints').get()).toEqual({
       run_id: 'run-a',
       checkpoint_json: '{"value":42}',
@@ -389,7 +389,7 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   Database.open(file).close()
   const upgraded = new DatabaseSync(file)
   try {
-    expect(version(upgraded)).toBe(42)
+    expect(version(upgraded)).toBe(43)
     const after = tables.map((table) => upgraded.prepare('SELECT * FROM ' + table).all())
     expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
     expect(after[2]).toEqual(
@@ -415,7 +415,7 @@ it('removes the event source tenant binding while preserving source configuratio
     VALUES ('source', 2, 'Events', 'feishu_app_bot', 'cli_test', 'tenant', 'connection', 'token', 'key', '[]', 0, 100, 100)`)
     .run()
   database.prepare('INSERT INTO source_events VALUES (?, ?, ?, ?)').run('source', 'event', '{"tenantKey":"tenant"}', 100)
-  const { tenant_key: _tenant, ...source } = database.prepare('SELECT * FROM event_sources').get()!
+  const source = database.prepare('SELECT * FROM event_sources').get()!
   const events = database.prepare('SELECT * FROM source_events').all()
   database.close()
 
@@ -423,7 +423,23 @@ it('removes the event source tenant binding while preserving source configuratio
 
   const upgraded = new DatabaseSync(file)
   try {
-    expect(upgraded.prepare('SELECT * FROM event_sources').get()).toEqual(source)
+    expect(upgraded.prepare('SELECT * FROM event_sources').get()).toEqual({
+      source_id: source.source_id,
+      revision: source.revision,
+      name: source.name,
+      kind: 'feishu',
+      provider: source.provider,
+      external_identity: source.app_id,
+      connection_id: source.connection_id,
+      team_id: source.team_id,
+      event_types_json: source.event_types_json,
+      config_json: JSON.stringify({ manageSubscriptions: false }),
+      secrets_json: JSON.stringify({ verificationToken: source.verification_token, encryptKey: source.encrypt_key }),
+      state_json: JSON.stringify({ verifiedAt: source.verified_at }),
+      enabled: source.enabled,
+      last_received_at: source.last_received_at,
+      updated_at: source.updated_at,
+    })
     expect(upgraded.prepare('SELECT * FROM source_events').all()).toEqual(events)
   } finally {
     upgraded.close()
@@ -577,7 +593,7 @@ it('adds personal token storage to version 37 without changing existing accounts
   old.close()
   const upgraded = Database.open(file)
   try {
-    expect(version(upgraded.connection)).toBe(42)
+    expect(version(upgraded.connection)).toBe(43)
     expect(upgraded.connection.prepare('SELECT * FROM users').all()).toEqual(before)
     expect(upgraded.connection.prepare('SELECT * FROM user_tokens').all()).toEqual([])
     expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
@@ -619,7 +635,7 @@ it('preserves existing personal tokens while adding Operator credential binding'
   const upgraded = Database.open(file)
   try {
     expect(upgraded.connection.prepare('SELECT * FROM user_tokens').get()).toEqual({ ...before, operator_fingerprint: null })
-    expect(version(upgraded.connection)).toBe(42)
+    expect(version(upgraded.connection)).toBe(43)
     expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
   } finally {
     upgraded.close()
@@ -642,4 +658,49 @@ it('migrates shared Variables to the Operator without exposing or copying them t
   } finally {
     upgraded.close()
   }
+})
+
+it('migrates source definitions without changing queued deliveries, deduplication or subscription ownership', async () => {
+  const file = await databaseFile()
+  const old = legacyDatabase(file, 42)
+  for (const [sourceId, verifiedAt] of [
+    ['verified', 100],
+    ['pending', null],
+  ] as const) {
+    old
+      .prepare(`INSERT INTO event_sources
+      (source_id, revision, name, provider, app_id, connection_id, team_id, verification_token, encrypt_key,
+       event_types_json, manage_subscriptions, enabled, verified_at, last_received_at, updated_at)
+      VALUES (?, 3, 'Events', 'feishu_app_bot', ?, 'connection', 'team', 'token', 'key', '["approval_instance"]', 1, 0, ?, 200, 300)`)
+      .run(sourceId, `cli_${sourceId}`, verifiedAt)
+  }
+  old.prepare('INSERT INTO source_events VALUES (?, ?, ?, ?)').run('verified', 'event', '{"event":"approval_instance","body":{}}', 200)
+  old
+    .prepare(`INSERT INTO source_deliveries (source_id, event_id, binding_id, endpoint_id, publication_id, runtime_version, next_at)
+    VALUES ('verified', 'event', 'binding', 'endpoint', 'publication', 2, 400)`)
+    .run()
+  const access = JSON.stringify({ version: 2, mode: 'implicit', sharedAccessDigest: 'implicit', sharedBindings: [], selectedBindings: [] })
+  old.prepare(`INSERT INTO source_subscriptions VALUES ('verified', 'resource', '{"key":"resource","config":{}}', 'ready', 200, ?)`).run(access)
+  old.prepare(`INSERT INTO source_demands VALUES ('verified', 'resource', 'binding')`).run()
+  const tables = ['source_events', 'source_deliveries', 'source_subscriptions', 'source_demands']
+  const before = tables.map((table) => old.prepare(`SELECT * FROM ${table}`).all())
+  old.close()
+
+  const upgraded = Database.open(file)
+  try {
+    expect(tables.map((table) => upgraded.connection.prepare(`SELECT * FROM ${table}`).all())).toEqual(before)
+    const sources = upgraded.connection.prepare('SELECT * FROM event_sources ORDER BY source_id').all()
+    expect(sources.map((source) => JSON.parse(String(source.state_json)))).toEqual([{}, { verifiedAt: 100 }])
+    for (const source of sources) {
+      expect(source).toMatchObject({ kind: 'feishu', revision: 3, enabled: 0, team_id: 'team', last_received_at: 200, updated_at: 300 })
+      expect(source.external_identity).toBe(`cli_${source.source_id}`)
+      expect(JSON.parse(String(source.config_json))).toEqual({ manageSubscriptions: true })
+      expect(JSON.parse(String(source.secrets_json))).toEqual({ verificationToken: 'token', encryptKey: 'key' })
+    }
+  } finally {
+    upgraded.close()
+  }
+  const reopened = Database.open(file)
+  expect(tables.map((table) => reopened.connection.prepare(`SELECT * FROM ${table}`).all())).toEqual(before)
+  reopened.close()
 })
