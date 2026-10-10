@@ -42,7 +42,7 @@ Clients branch only on stable `code` values. Error domains include `authenticati
 
 ## 2. Variable
 
-Variables are deployment-scoped configuration and do not belong to a Flow:
+Variables are user-owned key/value configuration and do not belong to a Flow. All authenticated accounts can manage their own variables. The authenticated identity determines the namespace; requests cannot select another owner. Flow execution resolves names within the Flow owner’s namespace:
 
 ```ts
 interface Variable {
@@ -60,9 +60,9 @@ interface Variable {
 | `PUT`    | `/v1/variables/:name` | `{ value: string }` | `200 Variable`                              | Not applicable           |
 | `DELETE` | `/v1/variables/:name` | No body/query       | `200 { version: 1 }`                        | `404 variable.not-found` |
 
-Names are case-sensitive, contain 1–256 ASCII characters, and match `^[A-Za-z_][A-Za-z0-9_]*$`. The `OO_` prefix is reserved case-insensitively. Lists use ascending ASCII/BINARY name order. Values may contain empty strings, NUL, newlines, and Unicode, up to 64 KiB in UTF-8. Each deployment permits 200 distinct names. Existing records remain editable at the limit. PUT with the same value preserves `updatedAt`. Invalid requests return `variable.invalid`; a 201st name returns `variable.limit-reached`.
+Names are case-sensitive, contain 1–256 ASCII characters, and match `^[A-Za-z_][A-Za-z0-9_]*$`. The `OO_` prefix is reserved case-insensitively. Lists use ascending ASCII/BINARY name order. Values may contain empty strings, NUL, newlines, and Unicode, up to 64 KiB in UTF-8. Each account permits 200 distinct names. Existing records remain editable at the limit. PUT with the same value preserves `updatedAt`. Invalid requests return `variable.invalid`; a 201st name returns `variable.limit-reached`.
 
-Control API Operators can enumerate and read all values. Variables are exportable deployment configuration. They provide no Secret Manager guarantees for nonexportable values, per-variable ACLs, KMS, rotation, or separate auditing.
+Each account, including administrators and the Operator, can enumerate and read only its own values. Variables are exportable account configuration. They provide no Secret Manager guarantees for nonexportable values, per-variable ACLs, KMS, rotation, or separate auditing.
 
 ## 3. Flow, Revision, and Presentation
 
@@ -206,7 +206,7 @@ Supported input sources:
 - `{kind:"unset"}`: explicitly unset; do not inherit the port default.
 - `{kind:"default"}`: remove the override and restore default inheritance.
 - `{kind:"output",node:"NODE",port:"value",field:"name"}`: node output or its direct property.
-- `{kind:"variable",name:"TOKEN"}`: bind a deployment variable by name.
+- `{kind:"variable",name:"TOKEN"}`: bind a variable owned by the Flow owner by name.
 - `{kind:"sources",sources:[...]}`: multiple output or variable sources, resolved by existing execution rules.
 
 Omit `port` only for a node with one output, as in `{kind:"output",node:"$summary"}`. Multiple outputs require an explicit business field; omission returns candidates for correction. `field` selects a direct property within the chosen output, not the node output itself.
@@ -231,7 +231,7 @@ Condition comparison operands directly use values, node outputs, or variable sou
 
 Poll and Integration parameters come from catalog definitions. They accept only fixed `value`, explicit `unset`, or restored `default`, not other nodes’ outputs or variables. There is no separate `config.values` wrapper. Trigger catalogs and node details show input names and defaults.
 
-OpenAPI node details list supported authentication options. `authentication:{schemes:["bearer","apiKey"]}` selects one complete option requiring all its schemes. Do not combine different options or select only part of one. `{schemes:[]}` is valid only when the specification permits anonymous access. Manual choices include `{type:"bearer"}`, `{type:"basic"}`, and `{type:"apiKey",name:"X-Token",in:"header"}`. Manual bearer supports specifications declaring OAuth when the caller already has an access token. Bind credentials to deployment variables through inputs listed in node details; do not put secrets in configuration.
+OpenAPI node details list supported authentication options. `authentication:{schemes:["bearer","apiKey"]}` selects one complete option requiring all its schemes. Do not combine different options or select only part of one. `{schemes:[]}` is valid only when the specification permits anonymous access. Manual choices include `{type:"bearer"}`, `{type:"basic"}`, and `{type:"apiKey",name:"X-Token",in:"header"}`. Manual bearer supports specifications declaring OAuth when the caller already has an access token. Bind credentials to the Flow owner’s variables through inputs listed in node details; do not put secrets in configuration.
 
 At creation, omitted authentication and server URLs use the operation’s defaults. Changes to the same operation’s name, URL, or authentication reuse its saved specification snapshot.
 
@@ -1175,7 +1175,7 @@ references remain available for manual removal.
 
 Managed Tasks add `executor.kind: "openapi"` with `sourceUrl`, lowercase `method`, `path`, `serverUrl`, `document` (selected operation/dependency snapshot), and `auth`. Authentication entries are `{ id, type: "bearer" | "basic" | "apiKey", name?, in?: "header" | "query" }`. `graph.node.task.set` atomically commits `nodeId` and complete `before`/`value` Tasks with concurrency checks and undo. Empty Tasks without an operation may save but cannot run. Inputs use `path.<name>`, `query.<name>`, `header.<name>`, and JSON `body`.
 
-Authentication uses `auth.<id>.token` or Basic `username`/`password`. Auth inputs reject fixed values, may be cleared, and require valid deployment Variables or upstream outputs at runtime. Outputs are `body`, `statusCode`, and `headers`. `node.started.nodeKind` adds `openapi`; start events omit auth inputs.
+Authentication uses `auth.<id>.token` or Basic `username`/`password`. Auth inputs reject fixed values, may be cleared, and require valid Variables owned by the Flow owner or upstream outputs at runtime. Outputs are `body`, `statusCode`, and `headers`. `node.started.nodeKind` adds `openapi`; start events omit auth inputs.
 
 Execution uses the Revision’s saved operation snapshot without rereading remote documents. Definitions change only through explicit Draft updates. Inputs/outputs derive from that snapshot and cannot be edited as independent contracts.
 

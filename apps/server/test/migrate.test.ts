@@ -6,6 +6,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { afterEach, expect, it } from 'vitest'
 import { Database } from '../node/storage/database.ts'
 import { migrateConnectorAccess } from '../node/storage/migrate-connector-access.ts'
+import { migrateFlowResources } from '../node/storage/migrate-flow-resources.ts'
 
 const directories: string[] = []
 
@@ -80,11 +81,11 @@ it('accepts databases already rebuilt with the new column names and snapshot for
   const file = await databaseFile()
   const database = Database.open(file)
   database.connection.exec(
-    "ALTER TABLE flows DROP COLUMN draft_resource_references; ALTER TABLE wait_notifications ADD COLUMN task_id TEXT NOT NULL DEFAULT ''; DROP TABLE user_tokens; DROP TABLE users; DROP INDEX flows_owner_list; ALTER TABLE flows DROP COLUMN owner_id; DROP TABLE error_subscriptions; DROP TABLE error_bindings; DROP TABLE error_dispatches; ALTER TABLE runs DROP COLUMN failure_detail; ALTER TABLE runs DROP COLUMN error_source_run_id; ALTER TABLE runs DROP COLUMN error_source_flow_id; ALTER TABLE publications DROP COLUMN live_enabled_at_end; ALTER TABLE publications DROP COLUMN live_ended_at; ALTER TABLE poll_candidates DROP COLUMN retry_count; ALTER TABLE publications DROP COLUMN presentation_snapshot; PRAGMA user_version = 29",
+    "DROP TABLE variables; CREATE TABLE variables (name TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL) STRICT; ALTER TABLE flows DROP COLUMN draft_resource_references; ALTER TABLE wait_notifications ADD COLUMN task_id TEXT NOT NULL DEFAULT ''; DROP TABLE user_tokens; DROP TABLE users; DROP INDEX flows_owner_list; ALTER TABLE flows DROP COLUMN owner_id; DROP TABLE error_subscriptions; DROP TABLE error_bindings; DROP TABLE error_dispatches; ALTER TABLE runs DROP COLUMN failure_detail; ALTER TABLE runs DROP COLUMN error_source_run_id; ALTER TABLE runs DROP COLUMN error_source_flow_id; ALTER TABLE publications DROP COLUMN live_enabled_at_end; ALTER TABLE publications DROP COLUMN live_ended_at; ALTER TABLE poll_candidates DROP COLUMN retry_count; ALTER TABLE publications DROP COLUMN presentation_snapshot; PRAGMA user_version = 29",
   )
   database.close()
   const upgraded = Database.open(file)
-  expect(version(upgraded.connection)).toBe(41)
+  expect(version(upgraded.connection)).toBe(42)
   expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
   upgraded.close()
 })
@@ -110,9 +111,11 @@ function legacyDatabase(file: string, schemaVersion: number): DatabaseSync {
     .filter((fileName) => fileName.endsWith('.sql') && Number.parseInt(fileName, 10) <= schemaVersion)
     .toSorted()) {
     if (name.startsWith('0031')) migrateConnectorAccess(database)
+    if (name.startsWith('0041')) migrateFlowResources(database)
     database.exec(readFileSync(new URL(name, directory), 'utf8'))
   }
   if (schemaVersion == 30) migrateConnectorAccess(database)
+  if (schemaVersion == 40) migrateFlowResources(database)
   database.exec(`PRAGMA user_version = ${schemaVersion}`)
   return database
 }
@@ -133,7 +136,7 @@ it('backfills Revision metadata needed after old content is pruned', async () =>
 
   const upgraded = Database.open(file)
   try {
-    expect(version(upgraded.connection)).toBe(41)
+    expect(version(upgraded.connection)).toBe(42)
     expect(upgraded.connection.prepare('SELECT digest, model_version AS modelVersion FROM flow_revisions WHERE revision_id = ?').get('revision')).toEqual({
       digest: 'digest',
       modelVersion: 3,
@@ -189,7 +192,7 @@ it('applies the Flow-first schema without foreign keys', async () => {
   Database.open(file).close()
   const database = new DatabaseSync(file)
   try {
-    expect(version(database)).toBe(41)
+    expect(version(database)).toBe(42)
     const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as {
       readonly name: string
     }[]
@@ -231,7 +234,7 @@ it('upgrades a version 1 Flow database without changing its data', async () => {
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(41)
+    expect(version(reopened)).toBe(42)
     expect(reopened.prepare('SELECT revision_id AS revisionId FROM revisions').all()).toEqual([{ revisionId: 'revision-a' }])
     expect(reopened.prepare('SELECT name FROM variables').all()).toEqual([])
   } finally {
@@ -261,7 +264,7 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(41)
+    expect(version(reopened)).toBe(42)
     expect(reopened.prepare('SELECT flow_id AS flowId, team_id AS teamId FROM flow_connector_teams').all()).toEqual([{ flowId: 'flow-a', teamId: null }])
     expect(reopened.prepare("SELECT name FROM pragma_table_info('runs') WHERE name = 'connector_team_id'").get()).toEqual({ name: 'connector_team_id' })
   } finally {
@@ -309,13 +312,13 @@ it('rejects a newer Flow schema version without modifying it', async () => {
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
-  database.exec('PRAGMA user_version = 42')
+  database.exec('PRAGMA user_version = 43')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('SQLite schema version 42 is newer than the supported version 41.')
+  expect(() => Database.open(file)).toThrow('SQLite schema version 43 is newer than the supported version 42.')
 
   const reopened = new DatabaseSync(file)
-  expect(version(reopened)).toBe(42)
+  expect(version(reopened)).toBe(43)
   reopened.close()
 })
 
@@ -353,7 +356,7 @@ it('preserves old checkpoint bytes for explicit recovery validation', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(41)
+    expect(version(reopened)).toBe(42)
     expect(reopened.prepare('SELECT * FROM run_checkpoints').get()).toEqual({
       run_id: 'run-a',
       checkpoint_json: '{"value":42}',
@@ -386,7 +389,7 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   Database.open(file).close()
   const upgraded = new DatabaseSync(file)
   try {
-    expect(version(upgraded)).toBe(41)
+    expect(version(upgraded)).toBe(42)
     const after = tables.map((table) => upgraded.prepare('SELECT * FROM ' + table).all())
     expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
     expect(after[2]).toEqual(
@@ -574,7 +577,7 @@ it('adds personal token storage to version 37 without changing existing accounts
   old.close()
   const upgraded = Database.open(file)
   try {
-    expect(version(upgraded.connection)).toBe(41)
+    expect(version(upgraded.connection)).toBe(42)
     expect(upgraded.connection.prepare('SELECT * FROM users').all()).toEqual(before)
     expect(upgraded.connection.prepare('SELECT * FROM user_tokens').all()).toEqual([])
     expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
@@ -616,7 +619,25 @@ it('preserves existing personal tokens while adding Operator credential binding'
   const upgraded = Database.open(file)
   try {
     expect(upgraded.connection.prepare('SELECT * FROM user_tokens').get()).toEqual({ ...before, operator_fingerprint: null })
-    expect(version(upgraded.connection)).toBe(41)
+    expect(version(upgraded.connection)).toBe(42)
+    expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
+  } finally {
+    upgraded.close()
+  }
+})
+
+it('migrates shared Variables to the Operator without exposing or copying them to other accounts', async () => {
+  const file = await databaseFile()
+  const database = legacyDatabase(file, 41)
+  database.prepare('INSERT INTO variables (name, value, updated_at) VALUES (?, ?, ?)').run('TOKEN', 'old-secret', 123)
+  database.close()
+  const upgraded = Database.open(file)
+  try {
+    expect(upgraded.connection.prepare('SELECT * FROM variables').all()).toEqual([
+      { owner_id: 'operator', name: 'TOKEN', value: 'old-secret', updated_at: 123 },
+    ])
+    upgraded.connection.prepare('INSERT INTO variables VALUES (?, ?, ?, ?)').run('other', 'TOKEN', 'own-value', 456)
+    expect(upgraded.connection.prepare('SELECT value FROM variables WHERE owner_id = ?').get('operator')).toEqual({ value: 'old-secret' })
     expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
   } finally {
     upgraded.close()

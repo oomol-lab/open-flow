@@ -61,7 +61,7 @@ docker run --detach \
 
 MCP shares Server’s listening port at `/v1/mcp` and authenticates each request with personal access Tokens or the deployment Operator credential. See [MCP integration reference](mcp.md) for protocol versions, tools, and client examples.
 
-Workbench and API are at `http://127.0.0.1:3000`. After login, `/variables` manages deployment Variables and `/settings` manages external capabilities. The final image listens on `0.0.0.0:3000` by default, runs as root, and stores SQLite at `/data/open-flow/open-flow.sqlite`.
+Workbench and API are at `http://127.0.0.1:3000`. After login, `/variables` manages the signed-in account’s Variables and `/settings` manages external capabilities. The final image listens on `0.0.0.0:3000` by default, runs as root, and stores SQLite at `/data/open-flow/open-flow.sqlite`.
 
 You can also start without `OPEN_FLOW_TOKEN`:
 
@@ -189,7 +189,7 @@ After committing `waiting`, Server sends Connector notifications through a persi
 
 SQLite stores only the capability’s SHA-256 digest. Complete capability URLs generated for notification leave the Server volume and enter the selected Connector and messaging system’s trust boundary. Only quiesced backups are supported: stop ingress traffic, shut down the container normally, then back up the volume. Restore the complete data directory at the same path and start one Server container.
 
-Variable values and settings-managed external service credentials are plaintext in SQLite files, WAL, and backups. Authenticated Operators can read Variables through Control API and management UI. Read APIs do not return external service credentials.
+Variable values and settings-managed external service credentials are plaintext in SQLite files, WAL, and backups. Authenticated accounts can read their own Variables through Control API and management UI, including ordinary users. Administrator status does not grant access to another account’s Variables. Read APIs do not return external service credentials.
 
 Neither provides encrypted storage or nonexportable Secret Manager guarantees. Deployers must treat data volumes, backups, Operator tokens, and the management network as one trust boundary.
 

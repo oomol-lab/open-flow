@@ -459,7 +459,7 @@
       "triggerKeyNotFound": "この Trigger エンドポイントは存在しません。Flow から最新のエンドポイントをコピーしてください。",
       "triggerNotFound": "この Trigger は存在しないか、削除されています。Trigger 一覧を更新してください。",
       "variableInvalid": "変数の名前または値が無効です。確認してから再試行してください。",
-      "variableLimitReached": "このデプロイでは変数が上限に達しました。",
+      "variableLimitReached": "変数の数が上限に達しました。",
       "variableNotFound": "この変数は存在しないか、削除されています。変数一覧を更新してください。",
       "connectorConsoleUnconfigured": "Connector の認証コンソール URL が未設定です。「設定 → Connector → 認証コンソール URL」で設定してから再試行してください。"
     },

@@ -234,9 +234,9 @@
     "schemaDescription": "Описание JSON Schema…",
     "selectVariable": "Выбрать Variable",
     "variableMissing": "{{name}} (отсутствует)",
-    "variableMissingHelp": "Deployment Variable {{name}} больше не существует.",
+    "variableMissingHelp": "Variable {{name}} больше не существует.",
     "variableUnavailable": "{{name}} (недоступна)",
-    "variableUnavailableHelp": "Deployment Variables сейчас недоступны.",
+    "variableUnavailableHelp": "Variables сейчас недоступны.",
     "variablesLoading": "Загрузка Variables…",
     "unknown": "Неизвестно"
   },

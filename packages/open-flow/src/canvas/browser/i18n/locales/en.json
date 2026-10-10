@@ -234,9 +234,9 @@
     "schemaDescription": "JSON Schema description...",
     "selectVariable": "Choose Variable",
     "variableMissing": "{{name}} (missing)",
-    "variableMissingHelp": "Deployment Variable {{name}} no longer exists.",
+    "variableMissingHelp": "Variable {{name}} no longer exists.",
     "variableUnavailable": "{{name}} (unavailable)",
-    "variableUnavailableHelp": "Deployment Variables are currently unavailable.",
+    "variableUnavailableHelp": "Variables are currently unavailable.",
     "variablesLoading": "Loading Variables…",
     "unknown": "Unknown"
   },

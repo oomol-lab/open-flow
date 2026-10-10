@@ -330,7 +330,7 @@ export class PublicationStore {
         )
       )
         return { kind: 'error-sources-unavailable' }
-      if (!this.#variables.hasAll(input.variableNames)) return { kind: 'binding-unresolved' }
+      if (!this.#variables.hasAll(input.flowId, input.variableNames)) return { kind: 'binding-unresolved' }
       const live = this.#database.prepare('SELECT publication_id AS publicationId FROM flow_live WHERE flow_id = ?').get(input.flowId) as
         | { readonly publicationId: string }
         | undefined
@@ -631,7 +631,7 @@ export class PublicationStore {
           )
         )
           return { kind: 'error-sources-unavailable' }
-        if (!this.#variables.hasAll(input.variableNames)) return { kind: 'binding-unresolved' }
+        if (!this.#variables.hasAll(input.flowId, input.variableNames)) return { kind: 'binding-unresolved' }
 
         const live = this.#database.prepare('SELECT publication_id AS publicationId FROM flow_live WHERE flow_id = ?').get(input.flowId) as
           | { readonly publicationId: string }

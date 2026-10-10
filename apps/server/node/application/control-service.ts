@@ -216,26 +216,26 @@ export class ControlService {
     return this.triggerDefinitions
   }
 
-  listVariables(): { readonly variables: readonly Variable[]; readonly version: 1 } {
-    return { variables: this.store.variables.list().map(variable), version: 1 }
+  listVariables(actorId: string): { readonly variables: readonly Variable[]; readonly version: 1 } {
+    return { variables: this.store.variables.list(actorId).map(variable), version: 1 }
   }
 
-  getVariable(name: string): Variable {
-    const stored = this.store.variables.get(name)
+  getVariable(actorId: string, name: string): Variable {
+    const stored = this.store.variables.get(actorId, name)
     if (stored == null) throw new ControlError(controlErrorCode.variableNotFound, 'The variable was not found.')
     return variable(stored)
   }
 
-  putVariable(name: string, value: string): Variable {
-    const saved = this.store.variables.put(name, value)
+  putVariable(actorId: string, name: string, value: string): Variable {
+    const saved = this.store.variables.put(actorId, name, value)
     if (saved.kind == 'limit-reached') {
-      throw new ControlError(controlErrorCode.variableLimitReached, 'The deployment has reached its variable limit.')
+      throw new ControlError(controlErrorCode.variableLimitReached, 'The account has reached its variable limit.')
     }
     return variable(saved.variable)
   }
 
-  deleteVariable(name: string): void {
-    if (!this.store.variables.delete(name)) throw new ControlError(controlErrorCode.variableNotFound, 'The variable was not found.')
+  deleteVariable(actorId: string, name: string): void {
+    if (!this.store.variables.delete(actorId, name)) throw new ControlError(controlErrorCode.variableNotFound, 'The variable was not found.')
   }
 
   getTriggerKey(key: string): TriggerKeySnapshot {

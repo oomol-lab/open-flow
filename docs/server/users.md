@@ -27,7 +27,9 @@ Generated passwords have 144 bits of random entropy. The database stores a separ
 | Select configured Connector accounts and LLM capabilities in owned Flows         | Allowed, subject to upstream authorization | Allowed, subject to upstream authorization |
 | Create users, reset passwords, enable or disable accounts                        | Not allowed                                | Allowed                                    |
 | Change Connector, LLM, or Integration configuration; create external connections | Not allowed                                | Allowed                                    |
-| Read or manage global Variables; manage Event Sources                            | Not allowed                                | Allowed                                    |
+| Read or manage own Variables                                                     | Allowed                                    | Allowed                                    |
+| Read or manage another account’s Variables                                       | Not allowed                                | Not allowed                                |
+| Manage Event Sources                                                             | Not allowed                                | Allowed                                    |
 
 Deployment roles are independent of OOMOL Team membership roles. Local administrator status does not increase upstream Connector permissions.
 Cross-account resource requests return `404` for the resource without revealing whether it exists.
@@ -78,6 +80,7 @@ Disabling an account preserves its Flows and historical execution data. It does 
 
 ## Existing data upgrades
 
+SQLite migration 0042 assigns existing global Variables to `operator`, preserving names, values and timestamps. Variables are not copied to email accounts. Each account has an independent 200-variable limit; background execution resolves the Flow owner’s variables. Existing execution snapshots remain unchanged.
 SQLite migration 0041 extends personal Token storage with Operator credential binding, preserving existing email account Tokens.
 SQLite migration 0037 creates account storage in the startup transaction and assigns old Flows to `operator`.
 Existing Flow creation and Draft/Live Run idempotency keys move into Operator scope. Existing clients can retry the same requests.

@@ -1,23 +1,13 @@
 import type { DatabaseSync } from 'node:sqlite'
-import type { LlmConfig } from '../deployment/llm.ts'
-import type { VariableStore } from './variable-store.ts'
 
-import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { canonicalJsonBytes } from '@oomol-lab/open-flow/flow-encoding'
-import { flowDependencies, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { createHash } from 'node:crypto'
 import { AcceptanceError } from '../error.ts'
 import { applyRevisionPatch, createRevisionPatch } from './revision-delta.ts'
 
-const encoder = new TextEncoder()
 const maxDeltaDepth = 32
 
 export class RevisionIntegrityError extends Error {}
-
-export interface AgentSnapshot {
-  readonly bindings: Readonly<Record<string, string>>
-  readonly model: LlmConfig
-}
 
 /**
  * Revision bodies, addressed by content identity.
@@ -27,13 +17,9 @@ export interface AgentSnapshot {
  */
 export class RevisionStore {
   readonly #database: DatabaseSync
-  readonly #llmConfig: () => LlmConfig | undefined
-  readonly #variables: VariableStore
 
-  constructor(database: DatabaseSync, variables: VariableStore, llmConfig: () => LlmConfig | undefined) {
+  constructor(database: DatabaseSync) {
     this.#database = database
-    this.#llmConfig = llmConfig
-    this.#variables = variables
   }
 
   /** Stores a Revision body once, rejecting a reused identity with different content. */
@@ -117,31 +103,5 @@ export class RevisionStore {
     if (revision == null) throw new Error('Revision to materialize is missing.')
     this.#database.prepare('INSERT INTO revisions (revision_id, digest, content) VALUES (?, ?, ?)').run(revisionId, revision.digest, revision.content)
     this.#database.prepare('DELETE FROM revision_deltas WHERE revision_id = ?').run(revisionId)
-  }
-
-  /**
-   * Fixes the model deployment and resolved Variable values an Agent Run must
-   * reuse for its first execution and every approval resume.
-   */
-  agentSnapshot(revisionId: string, triggerId?: string): AgentSnapshot | undefined {
-    const row = this.#database
-      .prepare(`SELECT content FROM revisions WHERE revision_id = ? AND EXISTS (
-      SELECT 1 FROM json_each(revisions.content, '$.document.graph.nodes') WHERE json_extract(value, '$.task.executor.kind') = 'agent'
-    )`)
-      .get(revisionId) as { readonly content: string } | undefined
-    if (row == null) return
-    const revision = decodeRevision(encoder.encode(row.content))
-    const dependencies = flowDependencies(revision, triggerId)
-    if (
-      ![...dependencies.nodes].some((id) => {
-        const node = revision.document.graph.nodes[id]
-        return node?.kind == 'task' && 'executor' in node.task && node.task.executor.kind == 'agent'
-      })
-    )
-      return
-    const model = this.#llmConfig()
-    const bindings = this.#variables.resolve(variableBindings(revision, dependencies.bindings))
-    if (model == null || bindings == null) throw new AcceptanceError('flow-invalid', 'Agent model or variable configuration is unavailable.')
-    return { model, bindings }
   }
 }
