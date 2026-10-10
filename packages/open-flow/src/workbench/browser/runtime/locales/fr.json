@@ -152,6 +152,7 @@
     "retry": "Réessayer"
   },
   "resource": {
+    "team": "Équipe",
     "active": "Actif",
     "actions": "Actions",
     "breadcrumb": "Emplacement dans l'atelier",
@@ -188,6 +189,10 @@
     "retryLoadMore": "Réessayer de charger plus",
     "searchByName": "Rechercher par nom",
     "status": "Statut",
+    "publicationStatus": "Publication",
+    "runtimeStatus": "Exécution",
+    "start": "Démarrer",
+    "stop": "Arrêter",
     "suspended": "Suspendu",
     "unpublishedChanges": "En attente",
     "upToDate": "À jour",

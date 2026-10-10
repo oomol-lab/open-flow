@@ -317,14 +317,16 @@ export class ServerService {
   }
 
   async connectorTeams(signal?: AbortSignal): Promise<{
-    readonly bindings: readonly { readonly flowId: string; readonly teamId: string }[]
+    readonly bindings: readonly { readonly flowId: string; readonly teamId: string; readonly teamName?: string }[]
     readonly enabled: boolean
     readonly teams: readonly { readonly id: string; readonly name: string; readonly systemCreated: boolean }[]
     readonly version: 1
   }> {
     const connector = this.#resolveConnector()
-    if (!(connector instanceof ConnectorClient) || !connector.teamSupported()) return { bindings: [], enabled: false, teams: [], version: 1 }
+    if (!(connector instanceof ConnectorClient) || !connector.teamSupported())
+      return { bindings: this.#store.connectorTeams.list(), enabled: false, teams: [], version: 1 }
     const teams = await loadTeams(connector, signal)
+    this.#store.connectorTeams.rememberNames(teams)
     const defaultTeam = teams.find((team) => team.systemCreated)
     if (defaultTeam != null) this.#store.connectorTeams.bindUnassigned(defaultTeam.id)
     return { bindings: this.#store.connectorTeams.list(), enabled: true, teams, version: 1 }
@@ -337,6 +339,7 @@ export class ServerService {
       return
     }
     const teams = await loadTeams(connector)
+    this.#store.connectorTeams.rememberNames(teams)
     const selected = teamId == null ? teams.find((team) => team.systemCreated) : teams.find((team) => team.id == teamId)
     if (selected == null) throw new ControlError(controlErrorCode.flowInvalid, 'The selected OOMOL Team is not available.')
     return selected.id

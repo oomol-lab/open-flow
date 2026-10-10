@@ -3,6 +3,7 @@ import type { DatabaseSync } from 'node:sqlite'
 export interface ConnectorTeamBinding {
   readonly flowId: string
   readonly teamId: string
+  readonly teamName?: string
 }
 
 /**
@@ -26,9 +27,19 @@ export class ConnectorTeamStore {
   }
 
   list(): readonly ConnectorTeamBinding[] {
-    return this.#database
-      .prepare('SELECT flow_id AS flowId, team_id AS teamId FROM flow_connector_teams WHERE team_id IS NOT NULL ORDER BY flow_id')
-      .all() as unknown as readonly ConnectorTeamBinding[]
+    const rows = this.#database
+      .prepare(`SELECT b.flow_id AS flowId, b.team_id AS teamId, n.name AS teamName
+        FROM flow_connector_teams b LEFT JOIN connector_team_names n ON n.team_id = b.team_id
+        WHERE b.team_id IS NOT NULL ORDER BY b.flow_id`)
+      .all() as unknown as readonly { flowId: string; teamId: string; teamName: string | null }[]
+    return rows.map(({ flowId, teamId, teamName }) => (teamName == null ? { flowId, teamId } : { flowId, teamId, teamName }))
+  }
+
+  rememberNames(teams: readonly { readonly id: string; readonly name: string }[]): void {
+    const update = this.#database.prepare(
+      'INSERT INTO connector_team_names (team_id, name) VALUES (?, ?) ON CONFLICT(team_id) DO UPDATE SET name = excluded.name',
+    )
+    for (const team of teams) update.run(team.id, team.name)
   }
 
   bind(flowId: string, teamId: string): string | undefined {

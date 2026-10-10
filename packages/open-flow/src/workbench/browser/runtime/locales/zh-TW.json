@@ -152,6 +152,7 @@
     "retry": "重試"
   },
   "resource": {
+    "team": "團隊",
     "active": "使用中",
     "actions": "操作",
     "breadcrumb": "工作台位置",
@@ -188,6 +189,10 @@
     "retryLoadMore": "重試載入更多",
     "searchByName": "搜尋名稱",
     "status": "狀態",
+    "publicationStatus": "發佈狀態",
+    "runtimeStatus": "執行狀態",
+    "start": "啟動",
+    "stop": "停用",
     "suspended": "已暫停",
     "unpublishedChanges": "待發佈",
     "upToDate": "已是最新",

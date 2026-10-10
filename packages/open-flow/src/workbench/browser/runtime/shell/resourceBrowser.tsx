@@ -1,4 +1,4 @@
-import type { ComponentProps, FormEvent, MouseEvent, ReactElement } from 'react'
+import type { ComponentProps, FormEvent, ReactElement } from 'react'
 import type { ErrorListener, Flow } from '../api.ts'
 import type { WorkbenchLanguage } from '../contract.ts'
 import type { OpenFlowWorkbenchProps } from '../openFlowWorkbench.tsx'
@@ -9,15 +9,16 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
 import { resourceNameIssue, resourceNameMaxLength } from '../../../../flow/common/change.ts'
+import { Badge } from '../../../../ui/browser/badge.tsx'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../../../../ui/browser/dialog.tsx'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../../../../ui/browser/empty.tsx'
 import { Field, FieldError, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../../../ui/browser/input-group.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
-import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from '../../../../ui/browser/popover.tsx'
+import { Popover, PopoverContent, PopoverTitle } from '../../../../ui/browser/popover.tsx'
 import { Skeleton } from '../../../../ui/browser/skeleton.tsx'
-import { Switch } from '../../../../ui/browser/switch.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { cn } from '../../../../ui/browser/utils.ts'
 import { Icon } from '../icons.tsx'
@@ -29,7 +30,6 @@ const CreateResourceDialog = lazy(() => import('./createResourceDialog.tsx'))
 const flowIdTooltipAlignOffset = 44
 const renamePopoverAlignOffset = -12
 const renamePopoverVerticalShift = 8
-const rowControlSelector = 'a, button, input, select, textarea, [data-slot="tooltip-trigger"]'
 
 interface LanguageSelectProps {
   readonly language: WorkbenchLanguage
@@ -37,6 +37,7 @@ interface LanguageSelectProps {
 }
 
 interface FlowItemProps {
+  readonly showTeam: boolean
   readonly badge?: string | undefined
   readonly busy: WorkspaceBusy | undefined
   readonly flow: Flow
@@ -59,10 +60,6 @@ function formatUpdatedAt(updatedAt: string, locale: string): string {
     month: 'short',
     year: date.getFullYear() == current.getFullYear() ? undefined : 'numeric',
   })
-}
-
-function clickedRowControl(event: MouseEvent<HTMLDivElement>): boolean {
-  return event.target instanceof Element && event.target.closest(rowControlSelector) != null
 }
 
 export function FlowDeletionImpact({
@@ -109,10 +106,10 @@ export function FlowDeletionImpact({
   )
 }
 
-function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): ReactElement {
+function FlowItem({ showTeam, badge, busy, flow, href, onSelect, store }: FlowItemProps): ReactElement {
   const [root, setRoot] = useState<HTMLDivElement | null>(null)
   const renameAnchor = useRef<HTMLSpanElement>(null)
-  const deleteButton = useRef<HTMLButtonElement>(null)
+  const actionsButton = useRef<HTMLButtonElement>(null)
   const nameInput = useRef<HTMLInputElement>(null)
   const cancelDelete = useRef<HTMLButtonElement>(null)
   const locale = useLang()
@@ -171,23 +168,15 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
     if (await store.workspace.deleteFlow(flow.flowId)) setMode('idle')
   }
 
-  function openFromRow(event: MouseEvent<HTMLDivElement>): void {
-    if (!clickedRowControl(event)) onSelect(flow)
-  }
-
   return (
     <div className="resource-item-row" ref={setRoot}>
-      <div className="resource-list-row flow-columns" onClick={openFromRow}>
+      <div className="resource-list-row flow-columns">
         <span className="resource-primary-cell">
-          <span aria-hidden="true" className="resource-flow-icon">
-            <i className="i-lucide-light:workflow" />
-          </span>
           <span className="resource-primary-copy">
-            <span className="resource-primary-heading" ref={renameAnchor}>
-              <Button
+            <span className="resource-primary-heading">
+              <a
                 aria-disabled={flow.status == 'retiring'}
                 className="resource-primary-title"
-                nativeButton={false}
                 onClick={(event) => {
                   if (flow.status == 'retiring') {
                     event.preventDefault()
@@ -195,13 +184,14 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
                   }
                   followWorkbenchLink(event, () => onSelect(flow))
                 }}
-                render={<a href={flow.status == 'retiring' ? undefined : href} />}
+                href={flow.status == 'retiring' ? undefined : href}
                 tabIndex={flow.status == 'retiring' ? -1 : undefined}
                 title={flow.name}
-                variant="link"
               >
-                {flow.name}
-              </Button>
+                <span className="resource-primary-name" ref={renameAnchor}>
+                  {flow.name}
+                </span>
+              </a>
               {flow.status == 'active' && (
                 <Popover
                   onOpenChange={(open) => {
@@ -210,19 +200,6 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
                   }}
                   open={mode == 'rename'}
                 >
-                  <PopoverTrigger
-                    render={
-                      <Button
-                        aria-label={t('sidebar.renameFlow', { name: flow.name })}
-                        className="resource-rename-trigger"
-                        size="icon-xs"
-                        type="button"
-                        variant="ghost"
-                      />
-                    }
-                  >
-                    <i aria-hidden="true" className="i-lucide-light:pencil" />
-                  </PopoverTrigger>
                   <PopoverContent
                     align="start"
                     alignOffset={renamePopoverAlignOffset}
@@ -231,6 +208,7 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
                     collisionBoundary={[]}
                     container={root}
                     initialFocus={nameInput}
+                    finalFocus={actionsButton}
                     positionMethod="fixed"
                     side="top"
                     sideOffset={({ anchor, positioner }) => -(anchor.height + positioner.height) / 2 - renamePopoverVerticalShift}
@@ -267,12 +245,17 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
                 </Popover>
               )}
             </span>
-            {badge != null && (
-              <span className="resource-team-label" title={badge}>
-                {badge}
-              </span>
-            )}
           </span>
+        </span>
+        <span className="resource-status" aria-busy={pending == 'enabled'}>
+          {flow.live == null ? (
+            '—'
+          ) : (
+            <>
+              <span aria-hidden="true" className={cn('status-dot', flow.live.enabled ? 'success' : 'neutral')} />
+              <span>{t(flow.live.enabled ? 'resource.enabled' : 'resource.disabled')}</span>
+            </>
+          )}
         </span>
         <span className="resource-flow-id-cell">
           <IdTooltip
@@ -283,6 +266,11 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
             alignOffset={flowIdTooltipAlignOffset}
           />
         </span>
+        {showTeam && (
+          <span className="resource-team-cell" title={badge}>
+            {badge?.trim() ? badge : '—'}
+          </span>
+        )}
         <Tooltip>
           <TooltipTrigger render={<time className="resource-updated-at" dateTime={flow.updatedAt} tabIndex={0} />}>
             {formatUpdatedAt(flow.updatedAt, locale)}
@@ -291,59 +279,64 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
             {new Date(flow.updatedAt).toLocaleString(locale)}
           </TooltipContent>
         </Tooltip>
-        <span className="resource-status">
-          <span aria-hidden="true" className={cn('status-dot', publicationTone)} />
-          <span>{t(publicationStatus)}</span>
-          {flow.live != null && (
-            <span className="resource-enabled-status" aria-busy={pending == 'enabled'}>
-              <span>{t(flow.live.enabled ? 'resource.enabled' : 'resource.disabled')}</span>
-              <Switch
-                aria-label={t('resource.enableFlow', { name: flow.name })}
-                checked={flow.live.enabled}
-                disabled={flow.status != 'active' || busy != null || pending != null}
-                onCheckedChange={(enabled) => void update(enabled)}
-                size="sm"
-                title={t('resource.enabledHint')}
-              />
-            </span>
-          )}
-        </span>
+        <Badge variant="secondary" className={cn('resource-publication-status h-auto px-2.5 py-0.75', publicationTone)}>
+          {t(publicationStatus)}
+        </Badge>
       </div>
-      <div className="resource-live-controls" aria-busy={pending != null} onClick={openFromRow}>
-        {flow.status == 'active' && (
-          <Button onClick={() => onSelect(flow)} size="sm" variant="outline">
-            {t('resource.edit')}
-          </Button>
-        )}
-        <Button
-          disabled={flow.status != 'active' || busy != null || pending != null || (flow.live != null && !changed)}
-          onClick={() => void update('publish')}
-          size="sm"
-          variant="outline"
-        >
-          {t(pending == 'publish' ? 'workspace.publishing' : flow.live == null ? 'resource.publish' : 'resource.publishUpdate')}
-        </Button>
-        {flow.status == 'active' && (
+      <div className="resource-live-controls" aria-busy={pending != null}>
+        <DropdownMenu>
           <Tooltip>
             <TooltipTrigger
-              render={
-                <Button
-                  aria-label={t('sidebar.deleteFlow', { name: flow.name })}
-                  ref={deleteButton}
-                  disabled={busy != null || pending != null}
-                  onClick={() => setMode('delete')}
-                  size="icon-sm"
-                  variant="destructive"
-                />
-              }
+              render={<DropdownMenuTrigger render={<Button ref={actionsButton} aria-label={t('resource.actions')} size="icon-sm" variant="ghost" />} />}
             >
-              <i aria-hidden="true" className="i-lucide-light:trash-2" />
+              <i aria-hidden="true" className="i-lucide-light:ellipsis" />
             </TooltipTrigger>
-            <TooltipContent align="center" collisionBoundary={[]} container={root} positionMethod="fixed" side="top">
-              {t('common.delete')}
+            <TooltipContent container={root} collisionBoundary={[]} positionMethod="fixed">
+              {t('resource.actions')}
             </TooltipContent>
           </Tooltip>
-        )}
+          <DropdownMenuContent
+            align="end"
+            collisionBoundary={[]}
+            positionMethod="fixed"
+            container={root}
+            className="w-48"
+            finalFocus={mode == 'idle' ? actionsButton : false}
+          >
+            <DropdownMenuItem disabled={flow.status != 'active'} onClick={() => onSelect(flow)}>
+              <i aria-hidden="true" className="i-lucide-light:square-pen size-4 shrink-0" />
+              {t('resource.edit')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={flow.status != 'active' || busy != null || pending != null}
+              onClick={() => {
+                setName(flow.name)
+                setMode('rename')
+              }}
+            >
+              <i aria-hidden="true" className="i-lucide-light:text-cursor-input size-4 shrink-0" />
+              {t('common.rename')}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              disabled={flow.status != 'active' || busy != null || pending != null || (flow.live != null && !changed)}
+              onClick={() => void update('publish')}
+            >
+              <i aria-hidden="true" className="i-lucide-light:upload size-4 shrink-0" />
+              {t(pending == 'publish' ? 'workspace.publishing' : flow.live == null ? 'resource.publish' : 'resource.publishUpdate')}
+            </DropdownMenuItem>
+            {flow.live != null && (
+              <DropdownMenuItem disabled={flow.status != 'active' || busy != null || pending != null} onClick={() => void update(flow.live?.enabled != true)}>
+                <i aria-hidden="true" className={cn('size-4 shrink-0', flow.live.enabled ? 'i-lucide-light:square' : 'i-lucide-light:play')} />
+                {t(flow.live.enabled ? 'resource.stop' : 'resource.start')}
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator className="mx-2 bg-border/50" />
+            <DropdownMenuItem disabled={flow.status != 'active' || busy != null || pending != null} variant="destructive" onClick={() => setMode('delete')}>
+              <i aria-hidden="true" className="i-lucide-light:trash-2 size-4 shrink-0" />
+              {t('common.delete')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
       <Dialog
         open={mode == 'delete'}
@@ -351,7 +344,7 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
           if (!open) setMode('idle')
         }}
       >
-        <DialogContent container={root} initialFocus={cancelDelete} finalFocus={deleteButton} showCloseButton={false}>
+        <DialogContent container={root} initialFocus={cancelDelete} finalFocus={actionsButton} showCloseButton={false}>
           <DialogHeader>
             <DialogTitle>{t('sidebar.deleteFlowConfirm', { name: flow.name })}</DialogTitle>
             <DialogDescription>{t('resource.deleteDescription')}</DialogDescription>
@@ -369,21 +362,21 @@ function FlowItem({ badge, busy, flow, href, onSelect, store }: FlowItemProps): 
   )
 }
 
-function FlowSkeleton(): ReactElement {
+function FlowSkeleton({ showTeam }: { readonly showTeam: boolean }): ReactElement {
   return (
     <div aria-hidden="true" className="resource-item-row">
       <div className="resource-list-row resource-skeleton-row flow-columns">
         <span className="resource-skeleton-copy">
           <Skeleton className="h-3.5 w-36 max-w-full" />
-          <Skeleton className="h-3 w-24 max-w-full" />
         </span>
-        <Skeleton className="h-3 w-36 max-w-full" />
-        <Skeleton className="h-3 w-28 max-w-full" />
+        <Skeleton className="h-3 w-16" />
+        <Skeleton className="resource-flow-id-cell h-3 w-36 max-w-full" />
+        {showTeam && <Skeleton className="resource-team-cell h-3 w-24 max-w-full" />}
+        <Skeleton className="resource-updated-at h-3 w-28 max-w-full" />
         <Skeleton className="h-3 w-16" />
       </div>
       <div className="resource-live-controls">
-        <Skeleton className="h-7 w-16" />
-        <Skeleton className="h-7 w-14" />
+        <Skeleton className="size-7" />
       </div>
     </div>
   )
@@ -426,6 +419,7 @@ export function FlowBrowser({
   const [creating, setCreating] = useState(false)
   const [filter, setFilter] = useState('')
   const [name, setName] = useState('')
+  const showTeam = flows.some((flow) => (flowBadges?.[flow.flowId]?.trim().length ?? 0) > 0)
   const normalized = filter.trim().toLocaleLowerCase()
   const visible = flows.filter((flow) => flow.name.toLocaleLowerCase().includes(normalized))
 
@@ -473,19 +467,21 @@ export function FlowBrowser({
             </div>
           </div>
           <div className="resource-table-scroll">
-            <div className="resource-table">
+            <div className={cn('resource-table', showTeam && 'resource-table-with-teams')}>
               <div aria-hidden="true" className="resource-list-columns-shell">
                 <div className="resource-list-columns flow-columns">
                   <span>{t('resource.name')}</span>
+                  <span>{t('resource.runtimeStatus')}</span>
                   <span className="resource-flow-id-heading">{t('resource.flowId')}</span>
+                  {showTeam && <span className="resource-team-heading">{t('resource.team')}</span>}
                   <span className="resource-updated-heading">{t('resource.updated')}</span>
-                  <span>{t('resource.status')}</span>
+                  <span>{t('resource.publicationStatus')}</span>
                 </div>
                 <span className="resource-actions-heading">{t('resource.actions')}</span>
               </div>
               <div className="resource-list">
                 {loading ? (
-                  Array.from({ length: 5 }, (_, index) => <FlowSkeleton key={index} />)
+                  Array.from({ length: 5 }, (_, index) => <FlowSkeleton key={index} showTeam={showTeam} />)
                 ) : loadFailed ? (
                   <Empty className="min-h-64" role="alert">
                     <EmptyHeader>
@@ -522,6 +518,7 @@ export function FlowBrowser({
                 ) : (
                   visible.map((flow) => (
                     <FlowItem
+                      showTeam={showTeam}
                       badge={flowBadges?.[flow.flowId]}
                       busy={busy}
                       flow={flow}

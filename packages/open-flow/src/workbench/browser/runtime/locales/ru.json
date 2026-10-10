@@ -152,6 +152,7 @@
     "retry": "Повторить"
   },
   "resource": {
+    "team": "Команда",
     "active": "Активно",
     "actions": "Действия",
     "breadcrumb": "Расположение в рабочей среде",
@@ -188,6 +189,10 @@
     "retryLoadMore": "Повторить загрузку",
     "searchByName": "Поиск по имени",
     "status": "Статус",
+    "publicationStatus": "Публикация",
+    "runtimeStatus": "Работа",
+    "start": "Запустить",
+    "stop": "Остановить",
     "suspended": "Приостановлено",
     "unpublishedChanges": "Ожидает публикации",
     "upToDate": "Актуально",

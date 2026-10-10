@@ -152,6 +152,7 @@
     "retry": "Retry"
   },
   "resource": {
+    "team": "Team",
     "active": "Active",
     "actions": "Actions",
     "breadcrumb": "Workbench location",
@@ -188,6 +189,10 @@
     "retryLoadMore": "Retry loading more",
     "searchByName": "Search by name",
     "status": "Status",
+    "publicationStatus": "Publication",
+    "runtimeStatus": "Runtime",
+    "start": "Start",
+    "stop": "Stop",
     "suspended": "Suspended",
     "unpublishedChanges": "Changes pending",
     "upToDate": "Up to date",

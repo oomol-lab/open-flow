@@ -12,6 +12,7 @@ import { Toaster } from 'sonner'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
 import { AgentAccessPage } from './agent-access.tsx'
 import { connectionHref } from './connectionNavigation.ts'
+import { flowTeamBadges } from './flowTeamBadges.ts'
 import { HostPage, HostPageLayout, HostPageTabs } from './host-ui.tsx'
 import { createBrowserHost } from './host.ts'
 import { createI18n } from './i18n.ts'
@@ -101,15 +102,13 @@ function sessionStatus(value: unknown): SessionStatus | undefined {
 }
 
 function connectorTeams(value: unknown):
-  | ({ readonly console: ConnectionConsole | undefined } & (
-      | { readonly bindings: readonly []; readonly enabled: false; readonly teams: readonly []; readonly version: 1 }
-      | {
-          readonly bindings: readonly { readonly flowId: string; readonly teamId: string }[]
-          readonly enabled: true
-          readonly teams: readonly { readonly id: string; readonly name: string; readonly systemCreated: boolean }[]
-          readonly version: 1
-        }
-    ))
+  | {
+      readonly console: ConnectionConsole | undefined
+      readonly bindings: readonly { readonly flowId: string; readonly teamId: string; readonly teamName?: string }[]
+      readonly enabled: boolean
+      readonly teams: readonly { readonly id: string; readonly name: string; readonly systemCreated: boolean }[]
+      readonly version: 1
+    }
   | undefined {
   if (value == null || typeof value != 'object' || Array.isArray(value)) return
   const status = value as Record<string, unknown>
@@ -127,13 +126,13 @@ function connectorTeams(value: unknown):
       return
     }
   }
-  if (!status.enabled) return { bindings: [], enabled: false, teams: [], version: 1, console }
-  const bindings: { readonly flowId: string; readonly teamId: string }[] = []
+  const bindings: { readonly flowId: string; readonly teamId: string; readonly teamName?: string }[] = []
   for (const item of status.bindings) {
     if (item == null || typeof item != 'object' || Array.isArray(item)) return
     const binding = item as Record<string, unknown>
     if (typeof binding.flowId != 'string' || binding.flowId.length == 0 || typeof binding.teamId != 'string' || binding.teamId.length == 0) return
-    bindings.push({ flowId: binding.flowId, teamId: binding.teamId })
+    if (binding.teamName != null && (typeof binding.teamName != 'string' || binding.teamName.length == 0)) return
+    bindings.push({ flowId: binding.flowId, teamId: binding.teamId, ...(typeof binding.teamName == 'string' ? { teamName: binding.teamName } : {}) })
   }
   const teams: { readonly id: string; readonly name: string; readonly systemCreated: boolean }[] = []
   for (const item of status.teams) {
@@ -144,7 +143,7 @@ function connectorTeams(value: unknown):
     }
     teams.push({ id: team.id, name: team.name, systemCreated: team.systemCreated })
   }
-  return { bindings, enabled: true, teams, version: 1, console }
+  return { bindings, enabled: status.enabled, teams, version: 1, console }
 }
 
 function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange }: Props): ReactElement {
@@ -164,10 +163,11 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
   const [token, setToken] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [team, setTeam] = useState<
-    | { readonly kind: 'empty' | 'error' | 'hidden' | 'loading' }
+    | { readonly kind: 'error' | 'loading' }
+    | { readonly kind: 'hidden'; readonly bindings: readonly { readonly flowId: string; readonly teamId: string; readonly teamName?: string }[] }
     | {
-        readonly bindings: readonly { readonly flowId: string; readonly teamId: string }[]
-        readonly kind: 'ready'
+        readonly bindings: readonly { readonly flowId: string; readonly teamId: string; readonly teamName?: string }[]
+        readonly kind: 'ready' | 'empty'
         readonly selectedTeamId: string | undefined
         readonly teams: readonly { readonly id: string; readonly name: string; readonly systemCreated: boolean }[]
       }
@@ -196,7 +196,7 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
       if (!response.ok || status == null) throw new Error('Invalid Connector Team response.')
       setConnectionConsole(status.console)
       setTeam((current) => {
-        if (!status.enabled) return { kind: 'hidden' }
+        if (!status.enabled) return { kind: 'hidden', bindings: status.bindings }
         const selectedTeamId =
           current.kind == 'ready' && status.teams.some((item) => item.id == current.selectedTeamId)
             ? current.selectedTeamId
@@ -391,16 +391,7 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
     if (defaultTeam != null) teamOptions.push({ label: t('team.defaultNamed', { name: defaultTeam.name }), value: defaultTeam.id })
     teamOptions.push(...team.teams.filter((item) => item.id != defaultTeam?.id).map((item) => ({ label: item.name, value: item.id })))
   }
-  let flowBadges: Readonly<Record<string, string>> | undefined
-  if (team.kind == 'ready') {
-    const teams = new Map(team.teams.map((item) => [item.id, item]))
-    flowBadges = Object.fromEntries(
-      team.bindings.map((binding) => {
-        const bound = teams.get(binding.teamId)
-        return [binding.flowId, bound?.name ?? binding.teamId]
-      }),
-    )
-  }
+  const flowBadges = 'bindings' in team ? flowTeamBadges(team.bindings, team.kind == 'hidden' ? [] : team.teams) : undefined
   let createFlowField: OpenFlowWorkbenchProps['createFlowField']
   if (team.kind == 'ready' && team.selectedTeamId != null) {
     createFlowField = {

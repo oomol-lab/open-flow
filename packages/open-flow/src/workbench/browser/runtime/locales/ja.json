@@ -152,6 +152,7 @@
     "retry": "再試行"
   },
   "resource": {
+    "team": "チーム",
     "active": "有効",
     "actions": "操作",
     "breadcrumb": "ワークベンチ内の現在位置",
@@ -188,6 +189,10 @@
     "retryLoadMore": "再試行して続きを読み込む",
     "searchByName": "名前で検索",
     "status": "状態",
+    "publicationStatus": "公開状態",
+    "runtimeStatus": "稼働状態",
+    "start": "開始",
+    "stop": "停止",
     "suspended": "一時停止中",
     "unpublishedChanges": "公開待ち",
     "upToDate": "本番と同一",

@@ -429,8 +429,8 @@ it('fixes one OOMOL Team when each Flow is created', async () => {
     }
     expect(teamStatus.bindings).toEqual(
       expect.arrayContaining([
-        { flowId, teamId: 'team-2' },
-        { flowId: other.flow.flowId, teamId: 'team-1' },
+        { flowId, teamId: 'team-2', teamName: 'Operations' },
+        { flowId: other.flow.flowId, teamId: 'team-1', teamName: 'Engineering' },
       ]),
     )
     await service.control.listConnectorProviders(other.flow.flowId)
@@ -448,6 +448,15 @@ it('fixes one OOMOL Team when each Flow is created', async () => {
     expect(requests.at(-1)).toEqual({ teamId: 'team-2', url: 'https://connector.oomol.com/v1/providers' })
   } finally {
     await closeService(reopened)
+  }
+  const custom = await openService(file, { capabilities: { connector: () => new ConnectorClient('https://connector.example.com', 'runtime-token') } })
+  try {
+    const app = createServerApp(custom, { resolveControlActor: () => 'operator' })
+    const response = await (await app.request('/connector/teams')).json()
+    expect(response).toMatchObject({ enabled: false, teams: [] })
+    expect(response.bindings).toContainEqual({ flowId, teamId: 'team-2', teamName: 'Operations' })
+  } finally {
+    await closeService(custom)
     await cleanup(directory)
   }
 })

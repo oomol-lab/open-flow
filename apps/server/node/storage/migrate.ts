@@ -49,6 +49,7 @@ const migrations = [
   '0042_user_variables.sql',
   '0043_event_source_definitions.sql',
   '0044_service_profiles.sql',
+  '0045_connector_team_names.sql',
 ] as const
 const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 

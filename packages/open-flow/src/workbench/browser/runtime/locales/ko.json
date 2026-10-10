@@ -152,6 +152,7 @@
     "retry": "다시 시도"
   },
   "resource": {
+    "team": "팀",
     "active": "활성",
     "actions": "작업",
     "breadcrumb": "워크벤치 위치",
@@ -188,6 +189,10 @@
     "retryLoadMore": "더 불러오기 다시 시도",
     "searchByName": "이름으로 검색",
     "status": "상태",
+    "publicationStatus": "게시 상태",
+    "runtimeStatus": "실행 상태",
+    "start": "시작",
+    "stop": "중지",
     "suspended": "일시 중지됨",
     "unpublishedChanges": "게시 대기",
     "upToDate": "최신 상태",
