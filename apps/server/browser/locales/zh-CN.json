@@ -100,6 +100,7 @@
       "origin": "请输入 HTTPS 域名，不含路径、用户名、密码、查询参数或片段；本机地址可使用 HTTP。",
       "hosted": "OOMOL 服务请使用「OOMOL 托管」配置。"
     },
+    "serviceSelectionRequired": "请选择服务连接",
     "serviceIncomplete": "请编辑当前服务，补全配置",
     "hostedIncludes": "使用 OOMOL 托管的 Connector 和 LLM 服务，无需自行部署。",
     "selfHostedDescription": "连接自部署的 Connector、授权控制台和 LLM 服务。",

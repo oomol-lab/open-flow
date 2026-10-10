@@ -734,7 +734,7 @@ function ConnectorSettings({
         {missing && (
           <p className="settings-service-error" role="status">
             <i aria-hidden="true" className="i-lucide-light:triangle-alert size-4 shrink-0" />
-            {t('settings.serviceIncomplete')}
+            {t(current.services.mode == null ? 'settings.serviceSelectionRequired' : 'settings.serviceIncomplete')}
           </p>
         )}
       </div>
@@ -844,8 +844,8 @@ export function useConfiguration(onUnauthorized: () => void, enabled = true) {
 export function serviceConfigurationMissing(current: Configuration | undefined): boolean {
   return (
     current != null &&
-    current.services.mode != null &&
-    (!current.connector.runtime.configured ||
+    (current.services.mode == null ||
+      !current.connector.runtime.configured ||
       ((current.services.mode == 'oomol' || current.services.profiles.custom.llmOrigin != '') && !current.llm.configured))
   )
 }

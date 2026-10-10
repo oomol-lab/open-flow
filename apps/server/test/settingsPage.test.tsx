@@ -169,6 +169,18 @@ it.each(['https://connector.oomol.com', 'https://connector.oomol.dev'])('saves a
   expect(current.services.mode).toBe('custom')
 })
 
+it('requests a service selection when no connection is selected', () => {
+  const current = config(1)
+  Object.assign(current.services, { mode: null })
+  expect(serviceConfigurationMissing(undefined)).toBe(false)
+  expect(serviceConfigurationMissing(current)).toBe(true)
+  const view = connectorSettings(current).render()
+  expect(text(find(view, (element) => element.props.role == 'status'))).toBe('settings.serviceSelectionRequired')
+  for (const mode of ['oomol', 'custom']) {
+    expect(find(view, (element) => element.type == 'input' && element.props.value == mode)?.props.checked).toBe(false)
+  }
+})
+
 it('switches to an unconfigured service and keeps its radio selected', async () => {
   const current = config(1)
   Object.assign(current.connector.runtime, { configured: true, origin: 'https://connector.oomol.com', tokenConfigured: true })

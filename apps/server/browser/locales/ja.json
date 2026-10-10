@@ -100,6 +100,7 @@
       "origin": "パス、認証情報、クエリ、フラグメントを含まない HTTPS オリジンを入力してください。ループバックでは HTTP も使用できます。",
       "hosted": "OOMOL サービスには「OOMOL ホスト」を使用してください。"
     },
+    "serviceSelectionRequired": "サービス接続を選択してください",
     "serviceIncomplete": "選択したサービスを編集して設定を完了してください",
     "hostedIncludes": "OOMOL がホストする Connector と LLM サービスを利用できます。自分でデプロイする必要はありません。",
     "selfHostedDescription": "自分でホストする Connector、認可コンソール、LLM サービスに接続します。",

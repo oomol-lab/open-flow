@@ -100,6 +100,7 @@
       "origin": "Enter an HTTPS origin without a path, credentials, query, or fragment. Loopback addresses may use HTTP.",
       "hosted": "Use the OOMOL-hosted profile for OOMOL services."
     },
+    "serviceSelectionRequired": "Select a service connection",
     "serviceIncomplete": "Edit the selected service to complete its configuration",
     "hostedIncludes": "Use OOMOL-hosted Connector and LLM services without deploying them yourself.",
     "selfHostedDescription": "Connect your own Connector, authorization console, and LLM services.",

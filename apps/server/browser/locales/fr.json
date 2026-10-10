@@ -100,6 +100,7 @@
       "origin": "Saisissez une origine HTTPS sans chemin, identifiants, paramètres ni fragment. HTTP est autorisé en local.",
       "hosted": "Utilisez le profil hébergé par OOMOL pour les services OOMOL."
     },
+    "serviceSelectionRequired": "Sélectionnez une connexion de service",
     "serviceIncomplete": "Modifiez le service sélectionné pour compléter sa configuration",
     "hostedIncludes": "Utilisez les services Connector et LLM hébergés par OOMOL, sans les déployer vous-même.",
     "selfHostedDescription": "Connectez vos propres services Connector, console d’autorisation et LLM.",

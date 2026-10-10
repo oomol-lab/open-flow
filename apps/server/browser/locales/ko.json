@@ -100,6 +100,7 @@
       "origin": "경로, 인증 정보, 쿼리, 프래그먼트가 없는 HTTPS 주소를 입력하세요. 루프백 주소는 HTTP를 사용할 수 있습니다.",
       "hosted": "OOMOL 서비스는 OOMOL 호스팅 설정을 사용하세요."
     },
+    "serviceSelectionRequired": "서비스 연결을 선택하세요",
     "serviceIncomplete": "선택한 서비스를 편집하여 설정을 완료하세요",
     "hostedIncludes": "직접 배포할 필요 없이 OOMOL이 호스팅하는 Connector와 LLM 서비스를 사용합니다.",
     "selfHostedDescription": "직접 호스팅하는 Connector, 인증 콘솔 및 LLM 서비스를 연결합니다.",
