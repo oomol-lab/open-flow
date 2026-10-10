@@ -3,6 +3,7 @@ import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -160,6 +161,9 @@ it('backfills delta heads on upgrade and preserves unavailable summaries for dam
   create(store, 'damaged')
   expect(commit(store, content('LATEST')).kind).toBe('committed')
   old.connection.prepare("UPDATE revisions SET content = '{}' WHERE revision_id = 'damaged-initial'").run()
+  old.connection.exec('DROP TABLE event_sources')
+  old.connection.exec(readFileSync(new URL('../migrations/0017_event_sources.sql', import.meta.url), 'utf8').split('CREATE TABLE source_events')[0]!)
+  old.connection.exec(readFileSync(new URL('../migrations/0024_event_source_application_scope.sql', import.meta.url), 'utf8'))
   old.connection.exec(
     'ALTER TABLE flows DROP COLUMN draft_resource_references; ALTER TABLE user_tokens DROP COLUMN operator_fingerprint; DROP TABLE variables; CREATE TABLE variables (name TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL) STRICT; PRAGMA user_version = 39',
   )

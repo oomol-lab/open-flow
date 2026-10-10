@@ -1,6 +1,7 @@
 import type { ConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { DatabaseSync } from 'node:sqlite'
+import type { EventSourceStore } from './event-source-store.ts'
 import type {
   IntegrationHealth,
   RunAdmission,
@@ -47,16 +48,19 @@ export interface ListenerLease {
 
 export class IntegrationStore {
   readonly #acceptTriggerOccurrence: (input: TriggerOccurrenceInput) => RunAdmission
+  readonly #eventSources: EventSourceStore
   readonly #database: DatabaseSync
   readonly #transaction: <Value>(operation: () => Value) => Value
 
   constructor(
     database: DatabaseSync,
+    eventSources: EventSourceStore,
     transaction: <Value>(operation: () => Value) => Value,
     acceptTriggerOccurrence: (input: TriggerOccurrenceInput) => RunAdmission,
   ) {
     this.#acceptTriggerOccurrence = acceptTriggerOccurrence
     this.#database = database
+    this.#eventSources = eventSources
     this.#transaction = transaction
   }
 
@@ -415,14 +419,7 @@ export class IntegrationStore {
       return false
     }
     const sourceId = (JSON.parse(integration.triggerJson) as { config?: { sourceId?: { kind: string; value?: string } } }).config?.sourceId?.value
-    if (
-      sourceId != null &&
-      (this.#database.prepare('SELECT 1 FROM event_sources WHERE source_id = ? AND enabled = 1 AND verified_at IS NOT NULL').get(sourceId) == null ||
-        this.#database
-          .prepare("SELECT 1 FROM source_demands d JOIN source_subscriptions s USING (source_id, resource_key) WHERE d.binding_id = ? AND s.status != 'ready'")
-          .get(candidate.bindingId) != null)
-    )
-      return false
+    if (sourceId != null && !this.#eventSources.ready(sourceId, candidate.bindingId)) return false
     this.#database
       .prepare(
         `INSERT INTO integration_bindings (

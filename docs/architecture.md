@@ -45,6 +45,14 @@ Provider, Action, Connection, and Trigger data each own fetching, caching, refre
 Caches store complete responses by request identity. They must not merge responses into another source of business truth or couple independent data lifecycles.
 Display profiles and catalog visibility during editing do not grant execution authority.
 
+### Event sources
+
+The public package owns event source definitions: provider identity, configuration and secret handling,
+callback authentication and payloads, consumer matching, readiness, and resource subscription rules.
+The Server owns source persistence, Connector authorization, shared subscription lifecycles, durable
+receipt, deduplication, fixed delivery targets, and Run admission. Server storage and delivery code
+consume the source definition rather than interpreting provider-specific configuration or state.
+
 ## 2. Core resources and sources of truth
 
 ### Flow, Revision, and Presentation

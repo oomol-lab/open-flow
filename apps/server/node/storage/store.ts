@@ -59,7 +59,7 @@ export class Store {
     this.results = new ResultStore(connection, transaction)
     // Trigger admission is resolved lazily because Runs are assembled after the
     // stores that report occurrences into them.
-    this.integrations = new IntegrationStore(connection, transaction, (input) => this.runs.acceptTriggerOccurrence(input))
+    this.integrations = new IntegrationStore(connection, this.eventSources, transaction, (input) => this.runs.acceptTriggerOccurrence(input))
     this.polls = new PollStore(connection, transaction, (input) => this.runs.acceptTriggerOccurrence(input))
     this.flows = new FlowStore(connection, transaction, this.revisions)
     this.publications = new PublicationStore(connection, clock, transaction, this.integrations, this.polls, this.revisions, this.variables, this.flows)
