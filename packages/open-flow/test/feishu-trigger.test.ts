@@ -1,5 +1,6 @@
 import { createCipheriv, createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
+import { eventSourceDefinition } from '../src/event-source/common/index.ts'
 import { receiveFeishuEvent, matchesFeishuEvent } from '../src/trigger/providers/feishu/events.ts'
 
 const now = Date.parse('2026-09-14T08:00:00.000Z')
@@ -90,5 +91,68 @@ describe('Feishu event boundary', () => {
     })
     const parsed = await receiveFeishuEvent(raw, headers, source, now)
     expect(parsed).toMatchObject({ event: { id: 'approval_instance:approval-delivery', body: { status: 'APPROVED' } } })
+  })
+})
+
+describe('Feishu source definition', () => {
+  const definition = eventSourceDefinition('feishu')
+  const input = {
+    version: 1 as const,
+    name: 'Feishu',
+    connectionId: 'connection',
+    teamId: null,
+    verificationToken: source.verificationToken,
+    encryptKey: source.encryptKey,
+    eventTypes: ['im.message.receive_v1'],
+    manageSubscriptions: true,
+  }
+
+  it('preserves verification on ordinary edits and invalidates it only when a secret changes', async () => {
+    const configuration = definition.initialize(input, source.appId)
+    expect(definition.ready(configuration)).toBe(false)
+    const { raw, headers } = request({ token: source.verificationToken, type: 'url_verification', challenge: 'challenge' })
+    const result = await definition.receive(configuration, raw, headers, now)
+    if (!('response' in result)) throw new Error('Expected verification')
+    expect(await result.response.json()).toEqual({ challenge: 'challenge' })
+    const verified = { ...configuration, state: result.state }
+    const edit = { version: 1 as const, expectedRevision: 1, name: 'Renamed', enabled: true, eventTypes: input.eventTypes }
+    expect(definition.ready(definition.update(verified, edit))).toBe(true)
+    expect(definition.ready(definition.update(verified, { ...edit, encryptKey: source.encryptKey }))).toBe(true)
+    for (const secret of [{ encryptKey: 'new-key' }, { verificationToken: 'new-token' }]) {
+      const changed = definition.update(verified, { ...edit, ...secret })
+      expect(definition.ready(changed)).toBe(false)
+      expect(definition.view(changed).verifiedAt).toBeNull()
+    }
+    expect(definition.view(verified).verifiedAt).toBe(new Date(now).toISOString())
+    expect(JSON.stringify(definition.view(verified))).not.toContain(source.encryptKey)
+  })
+
+  it('preserves the durable payload and message identity across the generic event boundary', async () => {
+    const configuration = definition.initialize(input, source.appId)
+    const { raw, headers } = request(event())
+    const result = await definition.receive(configuration, raw, headers, now)
+    if (!('event' in result)) throw new Error('Expected event')
+    expect(JSON.stringify(result.event.payload)).toBe(
+      JSON.stringify({
+        event: 'im.message.receive_v1',
+        deliveryId: 'im.message.receive_v1:message',
+        appId: source.appId,
+        tenantKey: 'tenant',
+        occurredAt: String(now),
+        body: event().event,
+      }),
+    )
+    expect(definition.matches({ eventTypes: input.eventTypes, chatIds: ['chat'] }, result.event)).toBe(true)
+    expect(definition.matches({ eventTypes: input.eventTypes, chatIds: ['other'] }, result.event)).toBe(false)
+  })
+
+  it('owns resource subscription eligibility and rejects missing application identity', () => {
+    expect(() => definition.initialize(input, undefined)).toThrow('verified application identity')
+    const configuration = definition.initialize(input, source.appId)
+    const config = { eventTypes: ['approval_instance'], resource: { kind: 'approval', id: 'approval' } }
+    expect(definition.resources.requests(configuration, 'feishu_app_bot', config)).toEqual([{ key: '["approval","approval"]', config }])
+    expect(() => definition.resources.requests({ ...configuration, config: { manageSubscriptions: false } }, 'feishu_app_bot', config)).toThrow(
+      'does not manage resource subscriptions',
+    )
   })
 })

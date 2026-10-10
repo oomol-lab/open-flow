@@ -23,6 +23,7 @@ const controlApiConformanceEntryPath = 'src/control/common/conformance.ts'
 const controlApiErrorsEntryPath = 'src/control/common/errors.ts'
 const flowNotificationsEntryPath = 'src/control/common/flowNotifications.ts'
 const cronTriggerEntryPath = 'src/trigger/common/cron.ts'
+const eventSourceEntryPath = 'src/event-source/common/index.ts'
 const integrationTriggerEntryPath = 'src/trigger/common/integration.ts'
 const pollTriggerEntryPath = 'src/trigger/common/poll.ts'
 const providerTriggersEntryPath = 'src/trigger/providers/definitions.ts'
@@ -68,6 +69,7 @@ export async function buildBrowserPackage(options: BuildBrowserPackageOptions): 
   await buildRuntime(options, commonOutputPath, flowSemanticsEntryPath, 'flow-semantics', false)
   await buildRuntime(options, commonOutputPath, schedulerEntryPath, 'scheduler', false)
   await buildRuntime(options, commonOutputPath, cronTriggerEntryPath, 'cron-trigger', false)
+  await buildRuntime(options, commonOutputPath, eventSourceEntryPath, 'event-source', false)
   await buildRuntime(options, commonOutputPath, integrationTriggerEntryPath, 'integration-trigger', false)
   await buildRuntime(options, commonOutputPath, pollTriggerEntryPath, 'poll-trigger', false)
   await buildRuntime(options, commonOutputPath, providerTriggersEntryPath, 'provider-triggers', false)
@@ -108,11 +110,11 @@ async function buildRuntime(
       minify: false,
       outDir: outputPath,
       rolldownOptions: {
-        external: entryPath == providerTriggersEntryPath ? [...sharedTriggerPaths.keys()] : undefined,
+        external: entryPath == providerTriggersEntryPath || entryPath == eventSourceEntryPath ? [...sharedTriggerPaths.keys()] : undefined,
         output: {
           assetFileNames: '[name][extname]',
           entryFileNames: `${outputName}.js`,
-          paths: entryPath == providerTriggersEntryPath ? Object.fromEntries(sharedTriggerPaths) : undefined,
+          paths: entryPath == providerTriggersEntryPath || entryPath == eventSourceEntryPath ? Object.fromEntries(sharedTriggerPaths) : undefined,
         },
       },
     },
@@ -200,6 +202,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         path.join(options.sourceRoot, schedulerEntryPath),
         path.join(options.sourceRoot, cronTriggerEntryPath),
         path.join(options.sourceRoot, integrationTriggerEntryPath),
+        path.join(options.sourceRoot, eventSourceEntryPath),
         path.join(options.sourceRoot, pollTriggerEntryPath),
         path.join(options.sourceRoot, providerTriggersEntryPath),
         path.join(options.sourceRoot, webhookTriggerEntryPath),
@@ -221,6 +224,14 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         await writeFile(path.join(commonOutputPath, `feishu-${name}.d.ts`), declaration)
       }),
     )
+    for (const name of ['index', 'definition', 'feishu']) {
+      const declaration = (await readFile(path.join(declarationRoot, `event-source/common/${name}.d.ts`), 'utf8'))
+        .replaceAll("'./definition.ts'", "'./event-source-definition.js'")
+        .replaceAll("'./feishu.ts'", "'./event-source-feishu.js'")
+        .replaceAll("'../../control/common/eventSources.ts'", "'./event-sources.js'")
+        .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
+      await writeFile(path.join(commonOutputPath, name == 'index' ? 'event-source.d.ts' : `event-source-${name}.d.ts`), declaration)
+    }
     await writeFile(path.join(commonOutputPath, 'event-sources.d.ts'), await readFile(path.join(declarationRoot, 'control/common/eventSources.d.ts'), 'utf8'))
     await writeFile(
       path.join(browserOutputPath, 'event-sources.d.ts'),

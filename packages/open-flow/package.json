@@ -30,6 +30,7 @@
     "./provider-icons-plugin": "./src/build/node/providerIcons.ts",
     "./designer-twemoji-plugin": "./src/build/node/twemojiCollection.ts",
     "./designer-vite-config": "./src/build/node/designerUnoConfig.ts",
+    "./event-source": "./src/event-source/common/index.ts",
     "./integration-trigger": "./src/trigger/common/integration.ts",
     "./localization": "./src/localization/common/languages.ts",
     "./poll-trigger": "./src/trigger/common/poll.ts",
