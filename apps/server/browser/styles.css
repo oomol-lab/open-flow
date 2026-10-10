@@ -69,7 +69,7 @@ body {
   display: flex;
   align-items: center;
   gap: 4.16px;
-  font-size: 13px;
+  font-size: var(--ui-font-size);
   font-weight: 600;
 }
 
@@ -90,7 +90,7 @@ body {
   border-radius: var(--ui-radius);
   background: transparent;
   color: var(--ui-muted-foreground);
-  font-size: 12px;
+  font-size: var(--ui-font-size);
   text-decoration: none;
   transition:
     color 150ms ease,
@@ -174,7 +174,7 @@ body {
 
 .variables-count {
   color: var(--ui-muted-foreground);
-  font-size: 11px;
+  font-size: var(--ui-font-size);
 }
 
 .variable-search {
@@ -183,7 +183,7 @@ body {
 
 .variable-error {
   color: var(--ui-destructive);
-  font-size: 11px;
+  font-size: var(--ui-font-size);
 }
 
 .variable-columns,
@@ -199,7 +199,7 @@ body {
   min-height: 40px;
   border-top: 1px solid var(--ui-border);
   color: var(--ui-muted-foreground);
-  font-size: 12px;
+  font-size: var(--ui-font-size);
   font-weight: 500;
 }
 
@@ -227,12 +227,12 @@ body {
 
 .variable-row code {
   color: var(--ui-muted-foreground);
-  font-size: 11px;
+  font-size: var(--ui-font-size);
 }
 
 .variable-row time {
   color: var(--ui-muted-foreground);
-  font-size: 12px;
+  font-size: var(--ui-font-size);
   font-variant-numeric: tabular-nums;
 }
 
@@ -243,7 +243,7 @@ body {
 .variable-confirm {
   flex-wrap: wrap;
   justify-content: flex-end;
-  font-size: 11px;
+  font-size: var(--ui-font-size);
 }
 
 .variables-state {
@@ -301,7 +301,7 @@ body {
   padding: 8px 12px;
   border-radius: 6px;
   color: var(--ui-muted-foreground);
-  font-size: 13px;
+  font-size: var(--ui-font-size);
   text-decoration: none;
 }
 
@@ -351,7 +351,7 @@ body {
 .variables-header p,
 .settings-summary p {
   color: var(--ui-muted-foreground);
-  font-size: 12px;
+  font-size: var(--ui-font-size);
   line-height: 18px;
 }
 
@@ -393,14 +393,14 @@ body {
 }
 
 .settings-heading h3 {
-  font-size: 13px;
+  font-size: var(--ui-font-size);
 }
 
 .settings-heading-copy p {
   max-width: 65ch;
   margin: 0;
   color: var(--ui-muted-foreground);
-  font-size: 12px;
+  font-size: var(--ui-font-size);
   line-height: 18px;
 }
 
@@ -412,7 +412,7 @@ body {
   max-width: 70ch;
   margin: 4px 0 0;
   color: var(--ui-muted-foreground);
-  font-size: 12px;
+  font-size: var(--ui-font-size);
   line-height: 18px;
 }
 
@@ -431,7 +431,7 @@ body {
 .settings-oomol-status {
   margin: 0;
   color: var(--ui-muted-foreground);
-  font-size: 12px;
+  font-size: var(--ui-font-size);
   line-height: 18px;
 }
 
@@ -457,13 +457,13 @@ body {
   margin: 0;
   padding: 0 16px 16px;
   border: 0;
-  font-size: 13px;
+  font-size: var(--ui-font-size);
 }
 
 .settings-connector-mode legend {
   margin-bottom: 8px;
   color: var(--ui-muted-foreground);
-  font-size: 12px;
+  font-size: var(--ui-font-size);
 }
 
 .settings-connector-mode label {
@@ -481,7 +481,7 @@ body {
 .settings-connector-hint {
   margin: 0 16px 16px;
   color: var(--ui-muted-foreground);
-  font-size: 12px;
+  font-size: var(--ui-font-size);
   line-height: 18px;
 }
 
@@ -497,7 +497,7 @@ body {
 .settings-actions > span,
 .settings-hint {
   color: var(--ui-muted-foreground);
-  font-size: 11px;
+  font-size: var(--ui-font-size);
 }
 
 .settings-form {
@@ -510,7 +510,7 @@ body {
 
 .settings-form label {
   color: var(--ui-muted-foreground);
-  font-size: 12px;
+  font-size: var(--ui-font-size);
   font-weight: 600;
 }
 
@@ -545,7 +545,7 @@ body {
   display: grid;
   gap: 12px;
   margin: 8px 0;
-  font-size: 12px;
+  font-size: var(--ui-font-size);
   line-height: 18px;
 }
 
@@ -592,7 +592,7 @@ body {
 .settings-summary code {
   overflow: hidden;
   color: var(--ui-muted-foreground);
-  font-size: 12px;
+  font-size: var(--ui-font-size);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -757,7 +757,7 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--ui-muted-foreground);
-  font-size: 12px;
+  font-size: var(--ui-font-size);
 }
 
 .server-user-list {
@@ -768,7 +768,7 @@ body {
 .server-user-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 12px;
+  font-size: var(--ui-font-size);
   text-align: left;
 }
 
@@ -802,7 +802,7 @@ body {
 
 .agent-cli h2 {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--ui-font-size);
   font-weight: 600;
 }
 
@@ -812,7 +812,7 @@ body {
   overflow-x: auto;
   border-radius: var(--ui-radius);
   background: var(--ui-muted);
-  font-size: 12px;
+  font-size: var(--ui-font-size);
   line-height: 20px;
 }
 
