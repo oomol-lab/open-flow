@@ -1,3 +1,4 @@
+import type { EventSource } from '@oomol-lab/open-flow/control-api'
 import type { OpenFlowWorkbenchProps, WorkbenchLanguage, WorkbenchLocation, WorkbenchNavigationOptions, WorkbenchTheme } from '@oomol-lab/open-flow/workbench'
 import type { FormEvent, MouseEvent, ReactElement } from 'react'
 import type { SessionUser } from '../common/users.ts'
@@ -159,6 +160,8 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
   const administrator = session.kind == 'signed-in' && session.user.role == 'admin'
   const userId = session.kind == 'signed-in' ? session.user.userId : undefined
   const [connectionConsole, setConnectionConsole] = useState<ConnectionConsole>()
+  const [hasEventSources, setHasEventSources] = useState(false)
+  const eventSourcesChanged = useCallback((sources: readonly EventSource[]) => setHasEventSources(sources.length > 0), [])
   const [token, setToken] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [team, setTeam] = useState<
@@ -241,6 +244,22 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
   }
 
   useEffect(() => void checkSession(), [])
+  useEffect(() => {
+    if (!settingsOpen || !administrator) {
+      setHasEventSources(false)
+      return
+    }
+    // The event sources page reports its own list, including changes after deletion.
+    if (eventSourcesOpen) return
+    const controller = new AbortController()
+    void client.listEventSources(undefined, controller.signal).then(
+      ({ sources }) => {
+        if (!controller.signal.aborted) eventSourcesChanged(sources)
+      },
+      () => {},
+    )
+    return () => controller.abort()
+  }, [administrator, client, eventSourcesChanged, eventSourcesOpen, settingsOpen, userId])
   useEffect(() => {
     if (session.kind != 'signed-in') {
       setTeam({ kind: 'loading' })
@@ -507,13 +526,15 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
                       <a href="/settings/users" aria-current={usersOpen ? 'page' : undefined} onClick={(event) => followPage(event, '/settings/users')}>
                         {t('users.title')}
                       </a>
-                      <a
-                        href="/settings/event-sources"
-                        aria-current={eventSourcesOpen ? 'page' : undefined}
-                        onClick={(event) => followPage(event, '/settings/event-sources')}
-                      >
-                        {t('settings.eventSources')}
-                      </a>
+                      {hasEventSources && (
+                        <a
+                          href="/settings/event-sources"
+                          aria-current={eventSourcesOpen ? 'page' : undefined}
+                          onClick={(event) => followPage(event, '/settings/event-sources')}
+                        >
+                          {t('settings.eventSources')}
+                        </a>
+                      )}
                     </>
                   )}
                 </nav>
@@ -523,7 +544,12 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
                   ) : usersOpen ? (
                     <UsersPage currentUserId={session.user.userId} onUnauthorized={sessionExpired} />
                   ) : eventSourcesOpen ? (
-                    <EventSourcesPage client={client} language={language} teams={team.kind == 'ready' ? team.teams : []} />
+                    <EventSourcesPage
+                      client={client}
+                      language={language}
+                      teams={team.kind == 'ready' ? team.teams : []}
+                      onSourcesChange={eventSourcesChanged}
+                    />
                   ) : (
                     <SettingsPage onSignOut={() => void signOut()} onConnectorChange={() => void loadTeams()} onUnauthorized={sessionExpired} />
                   )}

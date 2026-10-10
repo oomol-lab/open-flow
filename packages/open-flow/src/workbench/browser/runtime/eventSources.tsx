@@ -20,6 +20,7 @@ interface Props {
     'listEventSources' | 'createEventSource' | 'updateEventSource' | 'deleteEventSource' | 'listEventSourceConnections' | 'createConnectorConnectionPage'
   >
   readonly language: UiLanguage
+  readonly onSourcesChange?: (sources: readonly EventSource[]) => void
   readonly teams: readonly { readonly id: string; readonly name: string }[]
 }
 
@@ -32,7 +33,7 @@ export function EventSourcesPage(props: Props) {
   )
 }
 
-function EventSources({ client, teams }: Props) {
+function EventSources({ client, teams, onSourcesChange }: Props) {
   const t = useTranslate()
   const [sources, setSources] = useState<readonly EventSource[]>()
   const [error, setError] = useState<string>()
@@ -45,11 +46,14 @@ function EventSources({ client, teams }: Props) {
     setError(undefined)
     try {
       const result = await client.listEventSources()
-      if (current == sequence.current) setSources(result.sources)
+      if (current == sequence.current) {
+        setSources(result.sources)
+        onSourcesChange?.(result.sources)
+      }
     } catch (cause) {
       if (current == sequence.current) setError(errorNotice(cause, t).message)
     }
-  }, [client, t])
+  }, [client, t, onSourcesChange])
   useEffect(() => {
     void load()
     return () => {
