@@ -83,6 +83,7 @@ function variableRevision(): RevisionContent {
 function publish(
   service: ServerService,
   input: {
+    readonly flowId?: string
     readonly expectedLivePublicationId: string | null
     readonly idempotencyKey: string
     readonly revision: RevisionContent
@@ -91,7 +92,7 @@ function publish(
 ) {
   return service.publisher.publish({
     ...input,
-    flowId: 'main',
+    flowId: input.flowId ?? 'main',
   })
 }
 
@@ -99,7 +100,9 @@ describe('Server Publication and Webhook target', () => {
   it('checks Variable eligibility after Publish idempotency replay', async () => {
     const service = await openService(await databaseFile())
     services.add(service)
+    const created = await service.control.createFlow('operator', 'Variables', 'variables')
     const input = {
+      flowId: created.flow.flowId,
       expectedLivePublicationId: null,
       idempotencyKey: 'variable-publication',
       revision: variableRevision(),
@@ -107,10 +110,10 @@ describe('Server Publication and Webhook target', () => {
     } as const
 
     await expect(publish(service, input)).resolves.toEqual({ kind: 'binding-unresolved' })
-    service.control.putVariable('TOKEN', 'value')
+    service.control.putVariable('operator', 'TOKEN', 'value')
     const accepted = await publish(service, input)
     if (accepted.kind != 'published') throw new Error('Variable Publication unexpectedly conflicted.')
-    service.control.deleteVariable('TOKEN')
+    service.control.deleteVariable('operator', 'TOKEN')
 
     await expect(publish(service, input)).resolves.toEqual({ created: false, kind: 'published', publicationId: accepted.publicationId })
     await expect(

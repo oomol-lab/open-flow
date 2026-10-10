@@ -459,7 +459,7 @@
       "triggerKeyNotFound": "Ce point de terminaison Trigger n’existe plus. Copiez le dernier point de terminaison depuis le Flow.",
       "triggerNotFound": "Ce Trigger n’existe pas ou a été supprimé. Actualisez la liste des Triggers.",
       "variableInvalid": "Le nom ou la valeur de la variable n’est pas valide. Vérifiez-la, puis réessayez.",
-      "variableLimitReached": "Ce déploiement a atteint sa limite de variables.",
+      "variableLimitReached": "La limite de variables a été atteinte.",
       "variableNotFound": "Cette variable n’existe pas ou a été supprimée. Actualisez la liste des variables.",
       "connectorConsoleUnconfigured": "L’URL de la console d’autorisation Connector n’est pas configurée. Renseignez-la dans Paramètres → Connector → URL de la console d’autorisation, puis réessayez."
     },

@@ -234,9 +234,9 @@
     "schemaDescription": "JSON Schema の説明…",
     "selectVariable": "Variable を選択",
     "variableMissing": "{{name}}（見つかりません）",
-    "variableMissingHelp": "Deployment Variable {{name}} は存在しません。",
+    "variableMissingHelp": "Variable {{name}} は存在しません。",
     "variableUnavailable": "{{name}}（現在利用できません）",
-    "variableUnavailableHelp": "Deployment Variable は現在利用できません。",
+    "variableUnavailableHelp": "Variable は現在利用できません。",
     "variablesLoading": "Variable を読み込み中…",
     "unknown": "不明"
   },

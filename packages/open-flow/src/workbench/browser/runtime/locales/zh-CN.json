@@ -459,7 +459,7 @@
       "triggerKeyNotFound": "此 Trigger 端点已失效，请从工作流中复制最新端点。",
       "triggerNotFound": "找不到此 Trigger，请刷新 Trigger 列表。",
       "variableInvalid": "变量名称或值不符合要求，请检查后重试。",
-      "variableLimitReached": "当前部署的变量已达到上限。",
+      "variableLimitReached": "变量数量已达到上限。",
       "variableNotFound": "找不到此变量，请刷新变量列表。",
       "connectorConsoleUnconfigured": "尚未配置 Connector 授权控制台地址。请前往“设置 → Connector → 授权控制台地址”完成配置后重试。"
     },

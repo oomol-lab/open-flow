@@ -463,11 +463,9 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
               <a aria-current={variablesOpen || settingsOpen || agentAccessOpen ? undefined : 'page'} href="/" onClick={(event) => followPage(event, '/')}>
                 {t('shell.flows')}
               </a>
-              {administrator && (
-                <a aria-current={variablesOpen ? 'page' : undefined} href="/variables" onClick={(event) => followPage(event, '/variables')}>
-                  {t('shell.variables')}
-                </a>
-              )}
+              <a aria-current={variablesOpen ? 'page' : undefined} href="/variables" onClick={(event) => followPage(event, '/variables')}>
+                {t('shell.variables')}
+              </a>
               <a aria-current={agentAccessOpen ? 'page' : undefined} href="/agents" onClick={(event) => followPage(event, '/agents')}>
                 {t('agentAccess.title')}
               </a>
@@ -498,7 +496,7 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
             </div>
           </header>
           <div className="workbench-frame">
-            {(settingsOpen || variablesOpen) && !administrator ? (
+            {settingsOpen && !administrator ? (
               <main className="settings-page">
                 <div className="settings-content">
                   <p>{t('users.adminRequired')}</p>
@@ -564,7 +562,7 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
                 preferences={preferences}
                 sessionKey={session.user.userId}
                 theme={theme}
-                variables={administrator}
+                variables
               />
             )}
           </div>

@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 
-/** An Agent Run whose closure reads a deployment Variable. */
+/** An Agent Run whose closure reads an owner-scoped Variable. */
 function revision(): RevisionContent {
   return {
     modelVersion: currentFlowModelVersion,
@@ -38,14 +38,14 @@ function revision(): RevisionContent {
   }
 }
 
-describe('Agent Run admission with a deployment Variable', () => {
+describe('Agent Run admission with an owner-scoped Variable', () => {
   it('admits the Run and fixes the resolved Variable inside the same transaction', async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-agent-variable-'))
     const database = Database.open(path.join(directory, 'store.sqlite'))
     const store = new Store(database, Date.now, undefined, undefined, () => ({ model: 'fixture', origin: 'https://llm.example', token: 'token' }))
     try {
       store.flows.createFlow({
-        actorId: 'operator',
+        actorId: 'owner',
         content: new TextDecoder().decode(encodeRevision(revision())),
         createdAt: Date.now(),
         digest: 'revision',
@@ -56,9 +56,9 @@ describe('Agent Run admission with a deployment Variable', () => {
         requestDigest: 'flow',
         revisionId: 'revision',
       })
-      store.variables.put('TOKEN', 'secret')
+      store.variables.put('operator', 'TOKEN', 'foreign-secret')
 
-      const result = store.runs.acceptControlRun({
+      const input = {
         closureDigest: 'closure',
         flowId: 'flow',
         idempotencyKey: 'run',
@@ -69,7 +69,11 @@ describe('Agent Run admission with a deployment Variable', () => {
         revisionId: 'revision',
         trigger: { nodeId: 'trigger', outputs: {} },
         variableNames: ['TOKEN'],
-      })
+      }
+      expect(store.runs.acceptControlRun(input)).toEqual({ kind: 'binding-unresolved' })
+      store.variables.put('owner', 'TOKEN', 'secret')
+      const result = store.runs.acceptControlRun(input)
+      store.variables.put('owner', 'TOKEN', 'changed-after-admission')
 
       expect(result).toMatchObject({ created: true, kind: 'accepted' })
       if (result.kind != 'accepted') throw new Error('Run was not accepted.')

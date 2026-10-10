@@ -722,7 +722,7 @@ describe('Server application service', () => {
       acceptRun(service, { flowId: 'main', idempotencyKey: 'variable-missing', revision: variableFlow(), revisionId: 'revision-variable' }),
     ).rejects.toMatchObject({ code: controlErrorCode.bindingUnresolved })
 
-    service.control.putVariable('TOKEN', 'first')
+    service.control.putVariable('test', 'TOKEN', 'first')
     const accepted = await acceptRun(service, {
       flowId: 'main',
       idempotencyKey: 'variable-run',
@@ -730,7 +730,7 @@ describe('Server application service', () => {
       revisionId: 'revision-variable',
     })
     if (accepted.kind != 'accepted') throw new Error('Variable Run was not accepted.')
-    service.control.deleteVariable('TOKEN')
+    service.control.deleteVariable('test', 'TOKEN')
     await expect(
       acceptRun(service, { flowId: 'main', idempotencyKey: 'variable-run', revision: variableFlow(), revisionId: 'revision-variable' }),
     ).resolves.toMatchObject({ created: false, runId: accepted.runId })
@@ -755,7 +755,7 @@ describe('Server application service', () => {
     })
     if (blocker.kind != 'accepted') throw new Error('Variable snapshot blocker Run was not accepted.')
     await waitForStatus(service, blocker.runId, 'running')
-    service.control.putVariable('TOKEN', 'queued-value')
+    service.control.putVariable('test', 'TOKEN', 'queued-value')
     const accepted = await acceptRun(service, {
       flowId: 'main',
       idempotencyKey: 'variable-snapshot',
@@ -763,7 +763,7 @@ describe('Server application service', () => {
       revisionId: 'revision-variable-snapshot',
     })
     if (accepted.kind != 'accepted') throw new Error('Variable Run was not accepted.')
-    service.control.putVariable('TOKEN', 'start-value')
+    service.control.putVariable('test', 'TOKEN', 'start-value')
 
     service.cancel(blocker.runId)
     await service.waitForIdle()

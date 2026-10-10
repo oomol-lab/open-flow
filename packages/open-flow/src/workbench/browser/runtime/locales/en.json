@@ -459,7 +459,7 @@
       "triggerKeyNotFound": "This Trigger endpoint no longer exists. Copy the latest endpoint from the Flow.",
       "triggerNotFound": "This Trigger does not exist or was deleted. Refresh the Trigger list.",
       "variableInvalid": "The variable name or value is invalid. Review it and try again.",
-      "variableLimitReached": "The deployment has reached its variable limit.",
+      "variableLimitReached": "The variable limit has been reached.",
       "variableNotFound": "This variable does not exist or was deleted. Refresh the variable list.",
       "connectorConsoleUnconfigured": "The Connector authorization console URL is not configured. Set it in Settings → Connector → Authorization console URL, then try again."
     },

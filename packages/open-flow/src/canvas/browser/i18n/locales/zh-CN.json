@@ -234,9 +234,9 @@
     "schemaDescription": "JSON Schema 说明...",
     "selectVariable": "选择 Variable",
     "variableMissing": "{{name}}（已缺失）",
-    "variableMissingHelp": "当前 deployment 中已不存在 Variable {{name}}。",
+    "variableMissingHelp": "当前已不存在 Variable {{name}}。",
     "variableUnavailable": "{{name}}（暂不可用）",
-    "variableUnavailableHelp": "当前 deployment 暂不支持 Variable。",
+    "variableUnavailableHelp": "当前暂不支持 Variable。",
     "variablesLoading": "正在加载 Variable…",
     "unknown": "未知"
   },

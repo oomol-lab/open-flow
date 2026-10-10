@@ -134,8 +134,6 @@ it('allows only administrators to manage users and deployment services', async (
     ['/config/connector', 'PUT', { expectedRevision: 1, origin: 'https://example.com', token: 'secret' }],
     ['/config/connector/oomol-login', 'POST', { expectedRevision: 1 }],
     ['/config/llm', 'DELETE', { expectedRevision: 1 }],
-    ['/v1/variables', 'GET', undefined],
-    ['/v1/variables/TOKEN', 'PUT', { value: 'changed' }],
     ['/v1/event-sources', 'GET', undefined],
     ['/v1/event-sources', 'POST', {}],
     ['/v1/connector/connections/mail/page', 'POST', {}],
@@ -514,4 +512,91 @@ it('supports personal tokens for a claimed Operator without an email user store'
   expect((await app.request('/session', { method: 'POST', body: JSON.stringify({ version: 1, token: created.token }) })).status).toBe(401)
   await app.request(`/tokens/${created.credential.tokenId}`, { method: 'DELETE', headers: { cookie } })
   expect(await session.actor(request)).toBeUndefined()
+})
+
+it('isolates environment variable CRUD for ordinary users, administrators and the Operator', async () => {
+  const f = await fixture()
+  const a = await f.create('variables-a@example.com')
+  const b = await f.create('variables-b@example.com', 'admin')
+  const ah = await f.login(a.user.email, a.password)
+  const bh = await f.login(b.user.email, b.password)
+  const accounts = [
+    [ah, 'first'],
+    [bh, 'second'],
+    [administrator, 'operator'],
+  ] as const
+  expect((await f.request('/v1/variables/TOKEN', {}, 'PUT', { version: undefined, value: 'anonymous' })).status).toBe(401)
+  for (const [headers, value] of accounts) {
+    expect(await (await f.request('/v1/variables', headers)).json()).toMatchObject({ variables: [] })
+    expect((await f.request('/v1/variables/TOKEN', headers)).status).toBe(404)
+    expect((await f.request('/v1/variables/TOKEN', headers, 'DELETE')).status).toBe(404)
+    expect((await f.request('/v1/variables/TOKEN', headers, 'PUT', { version: undefined, value })).status).toBe(200)
+  }
+  for (const [headers, value] of accounts) {
+    expect(await (await f.request('/v1/variables', headers)).json()).toMatchObject({ variables: [{ name: 'TOKEN', value }] })
+    expect(await (await f.request('/v1/variables/TOKEN', headers)).json()).toMatchObject({ name: 'TOKEN', value })
+  }
+  expect((await f.request('/v1/variables/TOKEN', ah, 'PUT', { version: undefined, value: 'changed' })).status).toBe(200)
+  expect(await (await f.request('/v1/variables/TOKEN', bh)).json()).toMatchObject({ value: 'second' })
+  expect((await f.request('/v1/variables/TOKEN', bh, 'DELETE')).status).toBe(200)
+  expect((await f.request('/v1/variables/TOKEN', bh)).status).toBe(404)
+  expect(await (await f.request('/v1/variables/TOKEN', ah)).json()).toMatchObject({ value: 'changed' })
+  expect(await (await f.request('/v1/variables/TOKEN', administrator)).json()).toMatchObject({ value: 'operator' })
+})
+
+it('publishes and runs with the Flow owner’s variables without falling back to another account', async () => {
+  const f = await fixture()
+  const account = await f.create('variables-run@example.com')
+  const headers = await f.login(account.user.email, account.password)
+  const flow = await f.flow(headers)
+  const changed = await f.service.control.changeDraft(account.user.userId, flow.flowId, flow.draftRevisionId, [
+    { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } },
+    { kind: 'binding.create', bindingId: 'token', binding: { kind: 'variable', target: 'TOKEN' } },
+    { kind: 'module.create', moduleId: 'main', module: { imports: [], name: 'Main', source: 'export default ({ token }) => ({ token })' } },
+    {
+      kind: 'graph.node.create',
+      nodeId: 'task',
+      node: {
+        kind: 'task',
+        name: 'Read variable',
+        inputs: { token: { kind: 'sources', sources: [{ bindingId: 'token', kind: 'binding' }] } },
+        task: {
+          name: 'Read variable',
+          moduleId: 'main',
+          inputs: [{ handle: 'token', jsonSchema: { type: 'string' }, nullable: false }],
+          outputs: [{ handle: 'token', jsonSchema: { type: 'string' }, nullable: false }],
+        },
+      },
+    },
+    { kind: 'graph.edge.connect', edge: { source: 'start', target: 'task' } },
+  ])
+  const revisionId = changed.revision.revisionId
+  expect((await f.request('/v1/variables/TOKEN', administrator, 'PUT', { version: undefined, value: 'operator-secret' })).status).toBe(200)
+  const publish = () => f.service.control.publishFlow(account.user.userId, flow.flowId, revisionId, currentEngineContract, null, 'publish')
+  const run = () =>
+    f.service.control.runs.createDraftRun(flow.flowId, revisionId, currentEngineContract, {}, 'run', { nodeId: 'start', outputs: {} }, account.user.userId)
+  await expect(publish()).rejects.toMatchObject({ code: 'binding.unresolved' })
+  await expect(run()).rejects.toMatchObject({ code: 'binding.unresolved' })
+  expect((await f.request('/v1/variables/TOKEN', headers, 'PUT', { version: undefined, value: 'owner-value' })).status).toBe(200)
+  const operation = await publish()
+  await f.service.tickMaintenance()
+  const publication = f.service.control.getPublishOperation(flow.flowId, operation.operationId)
+  if (publication.status != 'succeeded') throw new Error('Publication did not complete.')
+  await startService(f.service)
+  const accepted = await run()
+  await f.service.waitForIdle()
+  expect(f.service.control.runs.getRunResult(accepted.run.runId)).toMatchObject({
+    status: 'completed',
+    result: { nodes: [{ nodeId: 'task', outputs: { token: 'owner-value' } }] },
+  })
+  const liveRun = () => f.service.control.runs.createLiveRun(publication.publicationId, {}, 'live', { nodeId: 'start', outputs: {} }, account.user.userId)
+  expect((await f.request('/v1/variables/TOKEN', headers, 'DELETE')).status).toBe(200)
+  await expect(liveRun()).rejects.toMatchObject({ code: 'binding.unresolved' })
+  expect((await f.request('/v1/variables/TOKEN', headers, 'PUT', { version: undefined, value: 'live-owner-value' })).status).toBe(200)
+  const live = await liveRun()
+  await f.service.waitForIdle()
+  expect(f.service.control.runs.getRunResult(live.run.runId)).toMatchObject({
+    status: 'completed',
+    result: { nodes: [{ nodeId: 'task', outputs: { token: 'live-owner-value' } }] },
+  })
 })

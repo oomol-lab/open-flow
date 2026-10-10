@@ -137,7 +137,7 @@ export class RunStore {
         .get(input.flowId, input.revisionId) as { readonly digest: string; readonly status: 'active' | 'retiring' } | undefined
       if (revision == null || revision.digest != input.revisionDigest || this.#deps.revisions.read(input.revisionId) == null) return { kind: 'not-found' }
       if (revision.status != 'active') return { kind: 'busy' }
-      if (!this.#deps.variables.hasAll(input.variableNames)) return { kind: 'binding-unresolved' }
+      if (!this.#deps.variables.hasAll(input.flowId, input.variableNames)) return { kind: 'binding-unresolved' }
       if (!this.#hasRunCapacity()) return { kind: 'overloaded' }
 
       this.#deps.revisions.materialize(input.revisionId)
@@ -187,7 +187,7 @@ export class RunStore {
       ) {
         return { kind: 'live-conflict' }
       }
-      if (!this.#deps.variables.hasAll(input.variableNames)) return { kind: 'binding-unresolved' }
+      if (!this.#deps.variables.hasAll(input.flowId, input.variableNames)) return { kind: 'binding-unresolved' }
       if (!this.#hasRunCapacity()) return { kind: 'overloaded' }
 
       const runId = this.#queueRun({
@@ -783,7 +783,7 @@ export class RunStore {
       else {
         const revision = decodeRevision(encoder.encode(target.content))
         const names = Object.values(variableBindings(revision, flowDependencies(revision, target.triggerNodeId).bindings))
-        if (!this.#deps.variables.hasAll(names)) reason = 'The error workflow requires an unavailable Variable.'
+        if (!this.#deps.variables.hasAll(item.targetFlowId, names)) reason = 'The error workflow requires an unavailable Variable.'
       }
       if (reason == null && target != null) {
         // The savepoint keeps a rejected admission from partially creating a Run.
@@ -985,7 +985,7 @@ export class RunStore {
   }): string {
     const runId = randomUUID()
     const connectorTeamId = this.#deps.connectorTeams.get(input.flowId)
-    const snapshot = this.#agentSnapshot(input.revisionId, input.source == 'draft' ? input.trigger.nodeId : undefined)
+    const snapshot = this.#agentSnapshot(input.flowId, input.revisionId, input.source == 'draft' ? input.trigger.nodeId : undefined)
     this.#database
       .prepare(
         `INSERT INTO runs (
@@ -1028,7 +1028,7 @@ export class RunStore {
    * Fixes the model deployment and resolved Variable values an Agent Run must
    * reuse for its first execution and every approval resume.
    */
-  #agentSnapshot(revisionId: string, triggerId?: string) {
+  #agentSnapshot(flowId: string, revisionId: string, triggerId?: string) {
     const row = this.#database
       .prepare(`SELECT content FROM revisions WHERE revision_id = ? AND EXISTS (
       SELECT 1 FROM json_each(revisions.content, '$.document.graph.nodes') WHERE json_extract(value, '$.task.executor.kind') = 'agent'
@@ -1045,7 +1045,7 @@ export class RunStore {
     )
       return
     const model = this.#deps.llmConfig()
-    const bindings = this.#deps.variables.resolve(variableBindings(revision, dependencies.bindings))
+    const bindings = this.#deps.variables.resolve(flowId, variableBindings(revision, dependencies.bindings))
     if (model == null || bindings == null) throw new AcceptanceError('flow-invalid', 'Agent model or variable configuration is unavailable.')
     return { model, bindings }
   }

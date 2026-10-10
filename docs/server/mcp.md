@@ -118,7 +118,7 @@ Typical workflow:
 6. `flow_run` returns `runId`; `run_list` can find existing Runs. Query `run_get`, then call `run_result` after a terminal state. `waiting` returns Wait identity and allowed actions. Explicitly submit a permitted `approve`, `reject`, or `continue` through `run_resolve_wait`; do not approve automatically. The first resolution wins. Check `resolutionAccepted` and the authoritative returned `action`. After resumption, query the same Run instead of calling `flow_run` again.
 7. To inspect original Agent tool results, find `resultId` through `run_results`, then read paths and pages with `run_result_read`.
 
-Publication history, rollback, Flow deletion/renaming, deployment Variable management, actual Trigger management, and Presentation tools are unavailable. Use existing clients for these operations.
+Publication history, rollback, Flow deletion/renaming, account Variable management, actual Trigger management, and Presentation tools are unavailable. Use existing clients for these operations.
 
 ## 5. Conflicts, retries, and cancellation
 

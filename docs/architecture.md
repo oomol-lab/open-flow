@@ -64,7 +64,8 @@ Revisions do not store credentials, execution state, Engine IR, current Provider
 
 ### Deployment configuration and execution snapshots
 
-Variable, Connector, LLM, and callback configuration belong to the deployment, not to Flow Revisions.
+Variables are user-owned key/value configuration, independent of Flow Revisions. Each account manages its own names and values; administrator status grants no cross-account access. Flows resolve variable references using their owner, including background triggers and Agent snapshots.
+Connector, LLM, and callback configuration belong to the deployment, not to Flow Revisions.
 Flows store only the required references. The deployment resolves and validates configuration at the relevant operation boundary.
 Configuration sources must be explicit. A configuration block must not mix sources or silently fall back to another source.
 An operation already in progress keeps its fixed configuration. New configuration applies only to later operations.

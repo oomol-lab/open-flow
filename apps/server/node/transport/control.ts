@@ -83,8 +83,6 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     service.requireAdmin(context.get('actorId'))
     await next()
   }
-  app.use('/variables', administrator)
-  app.use('/variables/*', administrator)
   app.use('/event-sources', async (context, next) => {
     if (context.req.method != 'GET' || context.req.query('flowId') == null) service.requireAdmin(context.get('actorId'))
     await next()
@@ -128,20 +126,20 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
 
   app.get('/variables', (context) => {
     query(context.req.raw, [], controlErrorCode.variableInvalid)
-    return response(200, service.listVariables())
+    return response(200, service.listVariables(context.get('actorId')))
   })
   app.get('/variables/:name', (context) => {
     query(context.req.raw, [], controlErrorCode.variableInvalid)
-    return response(200, service.getVariable(variableName(context.req.param('name'))))
+    return response(200, service.getVariable(context.get('actorId'), variableName(context.req.param('name'))))
   })
   app.put('/variables/:name', async (context) => {
     query(context.req.raw, [], controlErrorCode.variableInvalid)
     const body = await decodeRequest(context.req.raw, controlErrorCode.variableInvalid, controlRequests.putVariable)
-    return response(200, service.putVariable(variableName(context.req.param('name')), body.value))
+    return response(200, service.putVariable(context.get('actorId'), variableName(context.req.param('name')), body.value))
   })
   app.delete('/variables/:name', (context) => {
     query(context.req.raw, [], controlErrorCode.variableInvalid)
-    service.deleteVariable(variableName(context.req.param('name')))
+    service.deleteVariable(context.get('actorId'), variableName(context.req.param('name')))
     return response(200, { version: 1 })
   })
 

@@ -234,9 +234,9 @@
     "schemaDescription": "JSON Schema 설명...",
     "selectVariable": "Variable 선택",
     "variableMissing": "{{name}} (누락됨)",
-    "variableMissingHelp": "현재 deployment에 Variable {{name}}이(가) 더 이상 없습니다.",
+    "variableMissingHelp": "현재 Variable {{name}}이(가) 더 이상 없습니다.",
     "variableUnavailable": "{{name}} (현재 사용할 수 없음)",
-    "variableUnavailableHelp": "현재 deployment Variable을 사용할 수 없습니다.",
+    "variableUnavailableHelp": "현재 Variable을 사용할 수 없습니다.",
     "variablesLoading": "Variable 불러오는 중…",
     "unknown": "알 수 없음"
   },

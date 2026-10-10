@@ -160,7 +160,9 @@ it('backfills delta heads on upgrade and preserves unavailable summaries for dam
   create(store, 'damaged')
   expect(commit(store, content('LATEST')).kind).toBe('committed')
   old.connection.prepare("UPDATE revisions SET content = '{}' WHERE revision_id = 'damaged-initial'").run()
-  old.connection.exec('ALTER TABLE flows DROP COLUMN draft_resource_references; PRAGMA user_version = 39')
+  old.connection.exec(
+    'ALTER TABLE flows DROP COLUMN draft_resource_references; ALTER TABLE user_tokens DROP COLUMN operator_fingerprint; DROP TABLE variables; CREATE TABLE variables (name TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at INTEGER NOT NULL) STRICT; PRAGMA user_version = 39',
+  )
   old.close()
   const upgraded = Database.open(file)
   onTestFinished(() => upgraded.close())
