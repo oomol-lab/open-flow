@@ -24,7 +24,10 @@ bun run dev
 The development Workbench listens on `http://127.0.0.1:5174` and proxies API requests to the
 Server on `http://127.0.0.1:3001`. The first run writes an operator token to
 `apps/server/.open-flow-dev/operator-token`; later runs reuse it. Set `OPEN_FLOW_TOKEN` to use an
-explicit token instead.
+explicit token instead. Open the `Sign in` link printed at startup to enter the Workbench without
+typing the token. This development-only link exchanges `#dev-token=...` for a normal session cookie
+and removes the token from the address bar before making the request. The link grants operator
+access, so treat it like the token itself. Production builds do not accept this link.
 
 ## Local Flow CLI and skill
 

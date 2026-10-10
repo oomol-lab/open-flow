@@ -79,7 +79,7 @@ export function developmentBackendPlugin(): Plugin {
       backendResult = completed(backend)
 
       process.stdout.write(
-        `Development endpoints:\n  Workbench: ${developmentWorkbenchOrigin}\n  Server API: http://127.0.0.1:${backendPort}\n  Wait actions: ${waitPublicOrigin}\n`,
+        `Development endpoints:\n  Workbench: ${developmentWorkbenchOrigin}\n  Sign in: ${developmentWorkbenchOrigin}/#dev-token=${encodeURIComponent(developmentToken.token)}\n  Server API: http://127.0.0.1:${backendPort}\n  Wait actions: ${waitPublicOrigin}\n`,
       )
       if (configuredOperatorToken == null) {
         const action = developmentToken.created ? 'created' : 'reused'
