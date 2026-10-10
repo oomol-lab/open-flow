@@ -2,6 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, expect, it, vi } from 'vitest'
+import { createConfigApp } from '../node/deployment/config.ts'
 import { OomolLogin } from '../node/deployment/oomol-login.ts'
 import { Settings } from '../node/deployment/settings.ts'
 import { Database } from '../node/storage/database.ts'
@@ -40,6 +41,7 @@ it('keeps LLM invocations on the configuration snapshot taken when they start', 
   const file = await databaseFile()
   const configured = settings(file)
   expect(configured.status()).toEqual({
+    services: { mode: null, managed: false, profiles: expect.any(Object) },
     connector: {
       console: { configured: false, source: 'none' },
       runtime: { configured: false, source: 'none', tokenConfigured: false },
@@ -77,6 +79,7 @@ it('keeps LLM invocations on the configuration snapshot taken when they start', 
   expect(authorizations).toEqual(['Bearer first-token', 'Bearer second-token'])
 
   expect(settings(file).status()).toEqual({
+    services: { mode: 'custom', managed: false, profiles: expect.any(Object) },
     connector: {
       console: { configured: false, source: 'none' },
       runtime: { configured: false, source: 'none', tokenConfigured: false },
@@ -88,7 +91,7 @@ it('keeps LLM invocations on the configuration snapshot taken when they start', 
   })
 })
 
-it('locks an environment LLM and only derives LLM when no explicit setting exists', async () => {
+it('locks an environment LLM and derives LLM in hosted mode', async () => {
   const file = await databaseFile()
   const stored = settings(file)
   expect(stored.putLlm(1, 'https://stored.example.com', 'stored-token')).toBe('saved')
@@ -179,6 +182,7 @@ it('authenticates configuration requests, hides tokens, and rejects stale or env
   try {
     expect((await anonymous.request('/config')).status).toBe(401)
     expect(await (await app.request('/config')).json()).toEqual({
+      services: { mode: null, managed: false, profiles: expect.any(Object) },
       connector: {
         console: { configured: false, source: 'none' },
         runtime: { configured: false, source: 'none', tokenConfigured: false },
@@ -281,7 +285,7 @@ it('mounts independent Connector proxies with live settings and upstream cache h
 })
 
 it.each(['http://localhost:3000', 'https://flow.example.com'])(
-  'authorizes OOMOL on %s without sending the private state or key to the browser',
+  'authorizes OOMOL on %s into a draft without persisting the API key or exposing private authorization state',
   async (origin) => {
     const file = await databaseFile()
     const service = await openService(file)
@@ -309,11 +313,11 @@ it.each(['http://localhost:3000', 'https://flow.example.com'])(
       expect(await (await app.request(endpoint, poll)).json()).toEqual({ status: 'waiting', version: 1 })
       const completed = await app.request(endpoint, poll)
       expect(completed.status).toBe(200)
-      expect(await completed.json()).toMatchObject({
-        status: 'saved',
-        configuration: { revision: 2, connector: { runtime: { origin: 'https://connector.oomol.com/', tokenConfigured: true } }, llm: { source: 'derived' } },
-      })
-      expect(settings(file).connectorConfiguration()).toEqual({ origin: 'https://connector.oomol.com/', token: 'private-oomol-key' })
+      expect(completed.headers.get('cache-control')).toBe('no-store')
+      expect(await completed.json()).toEqual({ status: 'authorized', connectorOrigin: 'https://connector.oomol.com', apiKey: 'private-oomol-key', version: 1 })
+      expect(settings(file).connectorConfiguration()).toBeUndefined()
+      expect(configured.status().revision).toBe(1)
+      expect(configured.status().services.profiles.oomol.connectorTokenConfigured).toBe(false)
       expect(JSON.stringify(configured.status())).not.toContain('private-oomol-key')
       expect((await app.request(endpoint, poll)).status).toBe(410)
       expect(fetcher.mock.calls[1]![0].searchParams.get('stat')).toBe(stat)
@@ -398,4 +402,192 @@ it('uses the configured OOMOL development environment and rejects mismatched res
   expect(fetcher.mock.calls[0]![0].origin).toBe('https://api.oomol.dev')
   await expect(login.poll('operator', session.id, signal)).rejects.toMatchObject({ code: 'configuration.login-unavailable' })
   expect(configured.connectorConfiguration()?.token).toBe('previous-key')
+})
+
+const customServices = {
+  connectorOrigin: 'https://connector.example.com',
+  connectorToken: 'connector-secret',
+  consoleOrigin: 'https://console.example.com',
+  llmOrigin: 'https://models.example.com',
+  llmToken: 'model-secret',
+}
+
+it('switches all services atomically and never mixes hosted and custom LLM credentials', async () => {
+  const file = await databaseFile()
+  const configured = settings(file)
+  const changed = vi.fn()
+  const app = createConfigApp(configured, async () => 'operator', changed)
+  const custom = await app.request('/services', configurationRequest('PUT', { ...customServices, expectedRevision: 1, version: 1 }))
+  expect(custom.status).toBe(200)
+  expect(await custom.text()).not.toMatch(/connector-secret|model-secret/)
+  expect(configured.llm()?.config).toEqual({ origin: customServices.llmOrigin, token: customServices.llmToken })
+  expect(configured.status()).toMatchObject({ revision: 2, services: { mode: 'custom' } })
+  const before = configured.status()
+  const invalid = await app.request(
+    '/services',
+    configurationRequest('PUT', {
+      ...customServices,
+      connectorOrigin: 'https://new.example.com',
+      llmToken: '',
+      expectedRevision: 2,
+      version: 1,
+    }),
+  )
+  expect(invalid.status).toBe(400)
+  expect(configured.status()).toEqual(before)
+  const stale = await app.request('/services', configurationRequest('PUT', { ...customServices, expectedRevision: 1, version: 1 }))
+  expect(stale.status).toBe(409)
+  expect(configured.status()).toEqual(before)
+  expect(changed).toHaveBeenCalledTimes(1)
+
+  expect(configured.putConnector(2, 'https://connector.oomol.com', 'hosted-secret')).toBe('saved')
+  expect(configured.llm()?.config).toEqual({ origin: 'https://llm.oomol.com', token: 'hosted-secret' })
+  expect(configured.connectorConsoleOrigin()).toBeUndefined()
+  const rejected = await app.request(
+    '/llm',
+    configurationRequest('PUT', {
+      origin: customServices.llmOrigin,
+      token: 'mixed-secret',
+      expectedRevision: 3,
+      version: 1,
+    }),
+  )
+  expect(rejected.status).toBe(400)
+  expect(settings(file).status()).toMatchObject({ services: { mode: 'oomol' }, llm: { source: 'derived' }, revision: 3 })
+  expect(configured.putServices(3, { ...customServices, llmOrigin: '', llmToken: '', consoleOrigin: '' })).toBe('saved')
+  expect(configured.llm()).toBeUndefined()
+  expect(configured.connectorConsoleOrigin()).toBeUndefined()
+  expect(configured.deleteServices(4)).toBe('saved')
+  expect(configured.connector()).toBeUndefined()
+  expect(configured.status()).toMatchObject({ revision: 5, llm: { configured: false } })
+})
+
+it('ignores legacy custom LLM and Console settings while hosted services are active', async () => {
+  const file = await databaseFile()
+  const database = Database.open(file)
+  stores.push(database)
+  const store = new SettingsStore(database)
+  store.putConnector(1, 'https://connector.oomol.dev', 'hosted-secret')
+  store.putProfile(2, 'custom', { ...store.profile('custom'), llmOrigin: customServices.llmOrigin, llmToken: 'legacy-secret' })
+  store.putProfile(3, 'custom', { ...store.profile('custom'), consoleOrigin: customServices.consoleOrigin })
+  const configured = settings(file, { llmOrigin: 'https://environment.example.com', llmToken: 'environment-secret' })
+  expect(configured.llm()?.config).toEqual({ origin: 'https://llm.oomol.dev', token: 'hosted-secret' })
+  expect(configured.status()).toMatchObject({ services: { mode: 'oomol', managed: true }, llm: { source: 'derived' } })
+  expect(configured.connectorConsoleOrigin()).toBeUndefined()
+  expect(configured.putServices(4, customServices)).toBe('environment')
+  expect(configured.putConnector(4, 'https://connector.oomol.com', 'new-secret')).toBe('environment')
+  expect(configured.deleteServices(4)).toBe('environment')
+  const unlocked = settings(file)
+  expect(unlocked.deleteConnector(4)).toBe('saved')
+  expect(unlocked.llm()).toBeUndefined()
+  expect(unlocked.connectorConsoleOrigin()).toBeUndefined()
+})
+
+it.each(['connectorOrigin', 'llmOrigin', 'connectorConsoleOrigin'] as const)('locks grouped updates when %s is managed by the environment', async (key) => {
+  const file = await databaseFile()
+  const configured = settings(file, { [key]: 'https://environment.example.com', ...(key == 'llmOrigin' ? { llmToken: 'environment-secret' } : {}) })
+  expect(configured.status().services.managed).toBe(true)
+  expect(configured.putServices(1, customServices)).toBe('environment')
+  expect(configured.deleteServices(1)).toBe('environment')
+  expect(configured.status().revision).toBe(1)
+})
+
+it('saves service profiles independently and selects them without losing credentials', async () => {
+  const file = await databaseFile()
+  const configured = settings(file)
+  const app = createConfigApp(configured, async () => 'operator')
+  const hosted = { connectorOrigin: 'https://connector.oomol.com', connectorToken: 'hosted-key', consoleOrigin: '', llmOrigin: '', llmToken: '' }
+  const custom = {
+    connectorOrigin: 'https://connector.example.com',
+    connectorToken: 'custom-key',
+    consoleOrigin: 'https://console.example.com',
+    llmOrigin: 'https://models.example.com',
+    llmToken: 'model-key',
+  }
+  expect((await app.request('/services/oomol', configurationRequest('PUT', { ...hosted, version: 1, expectedRevision: 1 }))).status).toBe(200)
+  expect((await app.request('/services/custom', configurationRequest('PUT', { ...custom, version: 1, expectedRevision: 2 }))).status).toBe(200)
+  expect(configured.connectorConfiguration()).toBeUndefined()
+  expect(configured.llm()).toBeUndefined()
+  expect(configured.status().services.mode).toBeNull()
+  expect((await app.request('/services/mode', configurationRequest('PUT', { mode: 'custom', version: 1, expectedRevision: 3 }))).status).toBe(200)
+  expect(configured.connectorConfiguration()?.token).toBe('custom-key')
+  expect(configured.llm()?.config?.token).toBe('model-key')
+  expect(
+    (
+      await app.request(
+        '/services/custom',
+        configurationRequest('PUT', { ...custom, connectorToken: null, llmToken: null, consoleOrigin: '', version: 1, expectedRevision: 4 }),
+      )
+    ).status,
+  ).toBe(200)
+  expect(configured.connectorConfiguration()?.token).toBe('custom-key')
+  expect(configured.llm()?.config?.token).toBe('model-key')
+  expect((await app.request('/services/mode', configurationRequest('PUT', { mode: 'oomol', version: 1, expectedRevision: 5 }))).status).toBe(200)
+  const reopened = settings(file)
+  expect(reopened.connectorConfiguration()?.token).toBe('hosted-key')
+  expect(reopened.connectorConsoleOrigin()).toBeUndefined()
+  expect(reopened.selectProfile(6, 'custom')).toBe('saved')
+  expect(reopened.connectorConfiguration()?.token).toBe('custom-key')
+  expect(reopened.llm()?.config?.token).toBe('model-key')
+  const publicStatus = JSON.stringify(reopened.status())
+  for (const secret of ['hosted-key', 'custom-key', 'model-key']) expect(publicStatus).not.toContain(secret)
+})
+
+it('selects unconfigured profiles and persists the selection without falling back to another service', async () => {
+  const file = await databaseFile()
+  const configured = settings(file)
+  const app = createConfigApp(configured, async () => 'operator')
+  for (const mode of ['oomol', 'custom'] as const) {
+    const revision = configured.status().revision
+    const response = await app.request('/services/mode', configurationRequest('PUT', { mode, version: 1, expectedRevision: revision }))
+    expect(response.status).toBe(200)
+    expect(configured.status().revision).toBe(revision + 1)
+    expect(settings(file).status().services.mode).toBe(mode)
+    expect(configured.connector()).toBeUndefined()
+    expect(configured.llm()).toBeUndefined()
+  }
+})
+
+it('rejects stale edits without changing the active service', async () => {
+  const configured = settings(await databaseFile())
+  expect(
+    configured.saveProfile(1, 'custom', {
+      connectorOrigin: 'https://connector.example.com',
+      connectorToken: '',
+      consoleOrigin: '',
+      llmOrigin: '',
+      llmToken: '',
+    }),
+  ).toBe('saved')
+  expect(configured.selectProfile(1, 'custom')).toBe('conflict')
+  expect(configured.status().services.mode).toBeNull()
+  expect(configured.selectProfile(2, 'custom')).toBe('saved')
+  expect(
+    configured.saveProfile(2, 'custom', { connectorOrigin: 'https://changed.example.com', connectorToken: '', consoleOrigin: '', llmOrigin: '', llmToken: '' }),
+  ).toBe('conflict')
+  expect(configured.connectorConfiguration()?.origin).toBe('https://connector.example.com/')
+})
+
+it.each(['oomol', 'custom'] as const)('persists incomplete %s profiles and exposes unavailable services without throwing', async (mode) => {
+  const file = await databaseFile()
+  const configured = settings(file)
+  const app = createConfigApp(configured, async () => 'operator')
+  const value = {
+    connectorOrigin: mode == 'oomol' ? 'https://connector.oomol.com' : '',
+    connectorToken: '',
+    consoleOrigin: '',
+    llmOrigin: mode == 'custom' ? 'https://models.example.com' : '',
+    llmToken: '',
+  }
+  const response = await app.request('/services/' + mode, configurationRequest('PUT', { ...value, version: 1, expectedRevision: 1 }))
+  expect(response.status).toBe(200)
+  expect(configured.selectProfile(2, mode)).toBe('saved')
+  const reopened = settings(file)
+  expect(reopened.status().services.mode).toBe(mode)
+  expect(reopened.status().services.profiles[mode].connectorTokenConfigured).toBe(false)
+  expect(reopened.status().llm.configured).toBe(false)
+  expect(reopened.llm()).toBeUndefined()
+  expect(
+    (await app.request('/services/' + mode, configurationRequest('PUT', { ...value, connectorOrigin: 'invalid', version: 1, expectedRevision: 3 }))).status,
+  ).toBe(400)
 })

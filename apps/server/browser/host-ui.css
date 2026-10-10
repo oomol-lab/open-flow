@@ -1,0 +1,315 @@
+/* Server-owned pages and dialogs. Do not apply this surface to Workbench content. */
+.host-surface {
+  --ui-control-radius: var(--ui-radius);
+  --ui-control-background: var(--ui-card);
+  --ui-control-hover-background: var(--ui-card);
+}
+
+.host-page-layout {
+  --host-page-top-space: 0px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+.host-page-navigation-content,
+.host-page-content {
+  width: min(960px, calc(100% - 48px));
+  margin-inline: auto;
+}
+
+@media (max-width: 640px) {
+  .host-page-navigation-content,
+  .host-page-content {
+    width: calc(100% - 32px);
+  }
+}
+
+.host-page-navigation {
+  overflow: hidden;
+  scrollbar-gutter: stable both-edges;
+  flex-shrink: 0;
+  padding: 24px 0 32px;
+}
+
+.host-page-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.host-page {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  scrollbar-gutter: stable both-edges;
+}
+
+.host-page-content {
+  padding: var(--host-page-top-space, 32px) 0 64px;
+}
+
+.host-page-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.host-page-tab {
+  padding: 8px 12px;
+  border-radius: var(--ui-radius);
+  color: var(--ui-muted-foreground);
+  font-size: var(--ui-font-size);
+  font-weight: 400;
+  text-decoration: none;
+}
+
+.host-page-tab:hover,
+.host-page-tab[aria-current='page'],
+.host-page-tab[data-active] {
+  color: var(--ui-foreground);
+  background: var(--ui-muted);
+}
+
+.host-page-tab[aria-current='page'],
+.host-page-tab[data-active] {
+  font-weight: 600;
+}
+
+.host-page-tab:focus-visible {
+  outline: 2px solid var(--ui-ring);
+  outline-offset: 2px;
+}
+
+.host-field,
+.host-field-heading {
+  display: grid;
+}
+
+.host-field {
+  gap: 8px;
+}
+.host-field-heading {
+  gap: 4px;
+}
+
+.host-field label {
+  color: var(--ui-foreground);
+  font-size: var(--ui-font-size);
+  font-weight: 600;
+}
+
+.host-field-heading p {
+  margin: 0;
+  color: var(--ui-muted-foreground);
+  font-size: var(--ui-font-size);
+  line-height: 20px;
+}
+
+.host-page-header p,
+.host-summary p {
+  color: var(--ui-muted-foreground);
+  font-size: var(--ui-font-size);
+  line-height: 18px;
+}
+
+.host-card {
+  margin-top: 20px;
+  overflow: hidden;
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius);
+  background: var(--ui-background);
+}
+
+.host-card-body {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid var(--ui-border);
+  color: var(--ui-muted-foreground);
+  font-size: var(--ui-font-size);
+  line-height: 20px;
+}
+
+.host-card-body p {
+  margin: 0;
+}
+
+.host-card-body code {
+  overflow-wrap: anywhere;
+}
+
+.host-card-heading,
+.host-actions,
+.host-form-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.host-card-heading {
+  min-height: 48px;
+  justify-content: space-between;
+  padding: 8px 16px;
+}
+
+.host-card-heading-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.host-card-heading h2,
+.host-card-heading h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.host-card-heading h3 {
+  font-size: var(--ui-font-size);
+}
+
+.host-card-heading-copy p {
+  max-width: 65ch;
+  margin: 0;
+  color: var(--ui-muted-foreground);
+  font-size: var(--ui-font-size);
+  line-height: 18px;
+}
+
+.host-card-heading span,
+.host-actions > span,
+.host-hint {
+  color: var(--ui-muted-foreground);
+  font-size: var(--ui-font-size);
+}
+
+.host-form {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid var(--ui-border);
+  background: var(--ui-card);
+}
+
+.host-form label {
+  color: var(--ui-foreground);
+  font-size: var(--ui-font-size);
+  font-weight: 600;
+}
+
+.host-form > .host-hint {
+  margin-top: -4px;
+}
+
+.host-field-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.host-form > p.host-hint {
+  margin: 0;
+  line-height: 18px;
+}
+
+.host-form-actions {
+  justify-content: flex-end;
+}
+
+.host-form input[aria-invalid='true'] + .host-hint {
+  color: var(--ui-destructive);
+}
+
+.host-summary,
+.host-state {
+  display: flex;
+  min-height: 112px;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-top: 1px solid var(--ui-border);
+}
+
+.host-summary code {
+  overflow: hidden;
+  color: var(--ui-muted-foreground);
+  font-size: var(--ui-font-size);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.host-summary p {
+  margin: 0;
+}
+
+.host-state {
+  align-items: center;
+  color: var(--ui-muted-foreground);
+  text-align: center;
+}
+
+.host-page-header h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 32px;
+}
+
+/* Keep attached feedback above adjacent fields without reserving form space. */
+.host-field-control {
+  position: relative;
+  isolation: isolate;
+}
+
+.host-field-control:hover {
+  z-index: 1;
+}
+
+.host-field-control:has(:focus-visible) {
+  z-index: 2;
+}
+
+.host-field-error {
+  --error-border-width: 1px;
+  --error-inline-outset: 0px;
+  --error-overlap: var(--ui-control-radius, var(--ui-radius));
+  position: absolute;
+  inset: 100% calc(-1 * var(--error-inline-outset)) auto;
+  z-index: -1;
+  margin: calc(-1 * var(--error-overlap)) 0 0;
+  padding: calc(var(--error-overlap) + 4px - var(--error-border-width)) 8px calc(5px - var(--error-border-width));
+  border: var(--error-border-width) solid var(--ui-destructive);
+  border-radius: 0 0 var(--error-overlap) var(--error-overlap);
+  background: color-mix(in srgb, var(--ui-destructive) 92%, white);
+  color: color-mix(in srgb, var(--ui-destructive) 3%, var(--ui-control-background, var(--ui-background)));
+  box-shadow: var(--floating-control-shadow);
+  font-size: 12px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+  visibility: hidden;
+}
+
+.host-field-feedback-scope:has(.host-field-control :focus-visible) {
+  --host-error-hover-visibility: hidden;
+}
+
+.host-field-control:hover > .host-field-error {
+  --error-border-width: 1px;
+  --error-inline-outset: 0px;
+  visibility: var(--host-error-hover-visibility, visible);
+}
+
+.host-field-control:has(:focus-visible) > .host-field-error {
+  --error-border-width: 2px;
+  --error-inline-outset: 1px;
+  visibility: visible;
+}

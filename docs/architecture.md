@@ -38,6 +38,7 @@ CLI, MCP, and deployments must not compensate for missing node conversions.
 
 Workbench owns Flow editing and its product UI. The deployment host owns login, account roles, deployment settings, and browser analytics.
 Hosts integrate through public props, shared UI, and product theme contracts. They must not override internal product selectors or copy Workbench implementations.
+Server-owned pages compose `apps/server/browser/host-ui.tsx`; its stylesheet owns page widths, fixed navigation spacing, cards, and field presentation. Feature pages own their data, actions, and content. Route tabs retain links, while local panels use the shared accessible Tabs primitives.
 The host manages Variable values. Public Workbench consumes only variable name projections.
 Self-hosted Server deployments do not send data to the official analytics project by default.
 

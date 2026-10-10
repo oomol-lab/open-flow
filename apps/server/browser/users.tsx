@@ -18,6 +18,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { z } from 'zod'
+import { HostPage, HostField } from './host-ui.tsx'
 
 const userSchema = z.object({
   userId: z.string().min(1),
@@ -111,181 +112,175 @@ export function UsersPage({ currentUserId, onUnauthorized }: { readonly currentU
   }
 
   return (
-    <main ref={portal} className="settings-page" aria-busy={pending}>
-      <div className="settings-content">
-        <Dialog
-          open={creating}
-          onOpenChange={(open) => {
-            if (!pending) {
-              setCreating(open)
-              setError(undefined)
-            }
-          }}
-        >
-          <header className="settings-header">
-            <div className="flex items-center justify-between gap-4">
-              <h1>{t('users.title')}</h1>
-              <DialogTrigger render={<Button />} disabled={pending || users == null} type="button">
-                {t('users.create')}
-              </DialogTrigger>
-            </div>
-            <p>{t('users.description')}</p>
-          </header>
-          <DialogContent closeLabel={t('settings.cancel')} container={portal.current} initialFocus={() => emailInput.current} showCloseButton={!pending}>
-            <form className="flex flex-col gap-4" onSubmit={create}>
-              <DialogHeader>
-                <DialogTitle>{t('users.create')}</DialogTitle>
-              </DialogHeader>
-              <div className="grid gap-2">
-                <Label htmlFor="new-user-email">{t('users.email')}</Label>
-                <Input
-                  ref={emailInput}
-                  id="new-user-email"
-                  name="email"
-                  type="email"
-                  autoComplete="off"
-                  required
-                  maxLength={254}
-                  value={email}
-                  disabled={pending}
-                  onChange={(event) => setEmail(event.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="new-user-role">{t('users.role')}</Label>
-                <NativeSelect
-                  className="w-full"
-                  id="new-user-role"
-                  value={role}
-                  disabled={pending}
-                  onChange={(event) => setRole(event.target.value as User['role'])}
-                >
-                  <NativeSelectOption value="user">{t('users.user')}</NativeSelectOption>
-                  <NativeSelectOption value="admin">{t('users.admin')}</NativeSelectOption>
-                </NativeSelect>
-              </div>
-              {error != null && (
-                <p className="text-sm text-destructive" role="alert">
-                  {t(error)}
-                </p>
-              )}
-              <DialogFooter>
-                <DialogClose render={<Button variant="outline" />} disabled={pending} type="button">
-                  {t('settings.cancel')}
-                </DialogClose>
-                <Button type="submit" disabled={pending || email.trim().length == 0}>
-                  {t('users.create')}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
-        {credentials != null && (
-          <section className="settings-section" aria-live="polite">
-            <div className="settings-heading">
-              <div className="settings-heading-copy">
-                <h2>{t('users.passwordCreated', { email: credentials.email })}</h2>
-              </div>
-            </div>
-            <div className="settings-form">
-              <Label htmlFor="generated-password">{t('users.password')}</Label>
+    <HostPage ref={portal} aria-busy={pending}>
+      <Dialog
+        open={creating}
+        onOpenChange={(open) => {
+          if (!pending) {
+            setCreating(open)
+            setError(undefined)
+          }
+        }}
+      >
+        <header className="host-page-header">
+          <div className="flex items-center justify-between gap-4">
+            <h1>{t('users.title')}</h1>
+            <DialogTrigger render={<Button />} disabled={pending || users == null} type="button">
+              {t('users.create')}
+            </DialogTrigger>
+          </div>
+          <p>{t('users.description')}</p>
+        </header>
+        <DialogContent closeLabel={t('settings.cancel')} container={portal.current} initialFocus={() => emailInput.current} showCloseButton={!pending}>
+          <form className="flex flex-col gap-4" onSubmit={create}>
+            <DialogHeader>
+              <DialogTitle>{t('users.create')}</DialogTitle>
+            </DialogHeader>
+            <HostField id="new-user-email" label={t('users.email')}>
               <Input
-                className="font-mono"
-                id="generated-password"
-                value={credentials.password}
-                readOnly
+                ref={emailInput}
+                id="new-user-email"
+                name="email"
+                type="email"
                 autoComplete="off"
-                onFocus={(event) => event.target.select()}
-                aria-describedby="generated-password-hint"
+                required
+                maxLength={254}
+                value={email}
+                disabled={pending}
+                onChange={(event) => setEmail(event.target.value)}
               />
-              <p className="settings-hint" id="generated-password-hint">
-                {t('users.passwordHint')}
+            </HostField>
+            <HostField id="new-user-role" label={t('users.role')}>
+              <NativeSelect
+                className="w-full"
+                id="new-user-role"
+                value={role}
+                disabled={pending}
+                onChange={(event) => setRole(event.target.value as User['role'])}
+              >
+                <NativeSelectOption value="user">{t('users.user')}</NativeSelectOption>
+                <NativeSelectOption value="admin">{t('users.admin')}</NativeSelectOption>
+              </NativeSelect>
+            </HostField>
+            {error != null && (
+              <p className="text-sm text-destructive" role="alert">
+                {t(error)}
               </p>
-              <div className="settings-form-actions">
-                <Button type="button" variant="outline" size="sm" onClick={() => setCredentials(undefined)}>
-                  {t('users.dismiss')}
-                </Button>
-              </div>
-            </div>
-          </section>
-        )}
-        {error != null && !creating && users != null && (
-          <p className="text-sm text-destructive" role="alert">
-            {t(error)}
-          </p>
-        )}
-        <section className="settings-section" aria-label={t('users.title')}>
-          <div className="settings-heading">
-            <div className="settings-heading-copy">
-              <h2>{t('users.count', { count: users?.length ?? 0 })}</h2>
+            )}
+            <DialogFooter>
+              <DialogClose render={<Button variant="outline" />} disabled={pending} type="button">
+                {t('settings.cancel')}
+              </DialogClose>
+              <Button type="submit" disabled={pending || email.trim().length == 0}>
+                {t('users.create')}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+      {credentials != null && (
+        <section className="host-card" aria-live="polite">
+          <div className="host-card-heading">
+            <div className="host-card-heading-copy">
+              <h2>{t('users.passwordCreated', { email: credentials.email })}</h2>
             </div>
           </div>
-          {users == null ? (
-            <div className="settings-state" role={error == null ? 'status' : 'alert'}>
-              <span>{t(error == null ? 'users.loading' : 'users.loadFailed')}</span>
-              {error != null && (
-                <Button variant="outline" size="sm" onClick={() => void load()}>
-                  {t('settings.retry')}
-                </Button>
-              )}
+          <div className="host-form">
+            <Label htmlFor="generated-password">{t('users.password')}</Label>
+            <Input
+              className="font-mono"
+              id="generated-password"
+              value={credentials.password}
+              readOnly
+              autoComplete="off"
+              onFocus={(event) => event.target.select()}
+              aria-describedby="generated-password-hint"
+            />
+            <p className="host-hint" id="generated-password-hint">
+              {t('users.passwordHint')}
+            </p>
+            <div className="host-form-actions">
+              <Button type="button" variant="outline" size="sm" onClick={() => setCredentials(undefined)}>
+                {t('users.dismiss')}
+              </Button>
             </div>
-          ) : users.length == 0 ? (
-            <div className="settings-state">
-              <span>{t('users.empty')}</span>
-            </div>
-          ) : (
-            <div className="server-user-list">
-              <table className="server-user-table">
-                <thead>
-                  <tr>
-                    <th scope="col">{t('users.email')}</th>
-                    <th scope="col">{t('users.role')}</th>
-                    <th scope="col">{t('users.status')}</th>
-                    <th scope="col">
-                      <span className="sr-only">{t('users.actions')}</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map((user) => (
-                    <tr key={user.userId}>
-                      <th scope="row">{user.email}</th>
-                      <td>{t(`users.${user.role}`)}</td>
-                      <td>
-                        <span className={user.enabled ? 'text-foreground' : 'text-muted-foreground'}>
-                          {t(user.enabled ? 'users.enabled' : 'users.disabled')}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="settings-actions justify-end">
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            disabled={pending}
-                            onClick={() => void save(`/auth/users/${user.userId}/password`, 'POST', { expectedRevision: user.revision })}
-                          >
-                            {t('users.resetPassword')}
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={user.enabled ? 'destructive' : 'outline'}
-                            size="sm"
-                            disabled={pending || user.userId == currentUserId}
-                            onClick={() => void save(`/auth/users/${user.userId}`, 'PUT', { enabled: !user.enabled, expectedRevision: user.revision })}
-                          >
-                            {t(user.enabled ? 'users.disable' : 'users.enable')}
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+          </div>
         </section>
-      </div>
-    </main>
+      )}
+      {error != null && !creating && users != null && (
+        <p className="text-sm text-destructive" role="alert">
+          {t(error)}
+        </p>
+      )}
+      <section className="host-card" aria-label={t('users.title')}>
+        <div className="host-card-heading">
+          <div className="host-card-heading-copy">
+            <h2>{t('users.count', { count: users?.length ?? 0 })}</h2>
+          </div>
+        </div>
+        {users == null ? (
+          <div className="host-state" role={error == null ? 'status' : 'alert'}>
+            <span>{t(error == null ? 'users.loading' : 'users.loadFailed')}</span>
+            {error != null && (
+              <Button variant="outline" size="sm" onClick={() => void load()}>
+                {t('settings.retry')}
+              </Button>
+            )}
+          </div>
+        ) : users.length == 0 ? (
+          <div className="host-state">
+            <span>{t('users.empty')}</span>
+          </div>
+        ) : (
+          <div className="server-user-list">
+            <table className="server-user-table">
+              <thead>
+                <tr>
+                  <th scope="col">{t('users.email')}</th>
+                  <th scope="col">{t('users.role')}</th>
+                  <th scope="col">{t('users.status')}</th>
+                  <th scope="col">
+                    <span className="sr-only">{t('users.actions')}</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((user) => (
+                  <tr key={user.userId}>
+                    <th scope="row">{user.email}</th>
+                    <td>{t(`users.${user.role}`)}</td>
+                    <td>
+                      <span className={user.enabled ? 'text-foreground' : 'text-muted-foreground'}>{t(user.enabled ? 'users.enabled' : 'users.disabled')}</span>
+                    </td>
+                    <td>
+                      <div className="host-actions justify-end">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={pending}
+                          onClick={() => void save(`/auth/users/${user.userId}/password`, 'POST', { expectedRevision: user.revision })}
+                        >
+                          {t('users.resetPassword')}
+                        </Button>
+                        <Button
+                          type="button"
+                          variant={user.enabled ? 'destructive' : 'outline'}
+                          size="sm"
+                          disabled={pending || user.userId == currentUserId}
+                          onClick={() => void save(`/auth/users/${user.userId}`, 'PUT', { enabled: !user.enabled, expectedRevision: user.revision })}
+                        >
+                          {t(user.enabled ? 'users.disable' : 'users.enable')}
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </HostPage>
   )
 }

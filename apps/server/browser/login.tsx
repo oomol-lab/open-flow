@@ -1,8 +1,9 @@
 import type { FormEvent, ReactElement } from 'react'
 
-import { Button, Input, Label } from '@oomol-lab/open-flow/ui'
+import { Button, Input } from '@oomol-lab/open-flow/ui'
 import { useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { HostField } from './host-ui.tsx'
 
 export type LoginCredentials = { readonly email: string; readonly password: string } | { readonly token: string }
 
@@ -27,7 +28,7 @@ export function Login({
   }
 
   return (
-    <main className="server-login">
+    <main className="host-surface server-login">
       <form className="server-login-form" onSubmit={submit} aria-busy={pending}>
         <header>
           <h1>Open Flow Server</h1>
@@ -37,8 +38,7 @@ export function Login({
           {operator ? (
             <Input autoComplete="username" name="username" type="hidden" value="open-flow" readOnly />
           ) : (
-            <div className="server-login-field">
-              <Label htmlFor="login-email">{t('users.email')}</Label>
+            <HostField id="login-email" label={t('users.email')}>
               <Input
                 autoFocus
                 autoComplete="username"
@@ -50,10 +50,9 @@ export function Login({
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
-            </div>
+            </HostField>
           )}
-          <div className="server-login-field">
-            <Label htmlFor="login-password">{t(operator ? 'session.token' : 'users.password')}</Label>
+          <HostField id="login-password" label={t(operator ? 'session.token' : 'users.password')}>
             <Input
               autoFocus={operator}
               autoComplete="current-password"
@@ -67,7 +66,7 @@ export function Login({
               value={password}
               onChange={(event) => setPassword(event.target.value)}
             />
-          </div>
+          </HostField>
           {error != null && (
             <p className="server-login-error" id="login-error" role="alert">
               {t(error == 'invalid' ? (operator ? 'session.invalid' : 'session.invalidCredentials') : 'session.unavailable')}

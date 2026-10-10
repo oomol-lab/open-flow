@@ -13,6 +13,7 @@ import { Toaster } from 'sonner'
 import { I18nProvider, useTranslate } from 'val-i18n-react'
 import { AgentAccessPage } from './agent-access.tsx'
 import { connectionHref } from './connectionNavigation.ts'
+import { HostPage, HostPageLayout, HostPageTabs } from './host-ui.tsx'
 import { createBrowserHost } from './host.ts'
 import { createI18n } from './i18n.ts'
 import { idempotencyKey } from './idempotency.ts'
@@ -21,7 +22,7 @@ import { Login } from './login.tsx'
 import { notify } from './notifications.ts'
 import { posthog } from './posthog.ts'
 import { parseRouteContext, routeOwnerForFlow, routePath } from './route.ts'
-import { SettingsPage } from './settings.tsx'
+import { SettingsPage, MemberSettingsPage, useConfiguration, serviceConfigurationMissing } from './settings.tsx'
 import { UsersPage } from './users.tsx'
 import { VariablesPage } from './variables.tsx'
 
@@ -214,6 +215,7 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
     }
   }, [])
   const sessionExpired = useCallback(() => setSession({ configured: true, kind: 'signed-out' }), [])
+  const configuration = useConfiguration(sessionExpired, administrator)
   let sessionMessage = t('session.configured')
   if (session.kind == 'signed-out') {
     if (session.setupRequired === true) {
@@ -469,17 +471,16 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
               <a aria-current={agentAccessOpen ? 'page' : undefined} href="/agents" onClick={(event) => followPage(event, '/agents')}>
                 {t('agentAccess.title')}
               </a>
-              {administrator && (
-                <a aria-current={settingsOpen ? 'page' : undefined} href="/settings" onClick={(event) => followPage(event, '/settings')}>
-                  {t('shell.settings')}
-                </a>
-              )}
+              <a
+                data-danger={(administrator && serviceConfigurationMissing(configuration.current)) || undefined}
+                aria-current={settingsOpen ? 'page' : undefined}
+                href="/settings"
+                onClick={(event) => followPage(event, '/settings')}
+              >
+                {t(administrator ? 'shell.settings' : 'shell.memberSettings')}
+              </a>
             </nav>
             <div className="server-nav-actions">
-              <span className="server-account">{session.user.email ?? t('users.admin')}</span>
-              <Button type="button" variant="ghost" size="sm" onClick={() => void signOut()}>
-                {t('session.signOut')}
-              </Button>
               <HostNavigationActions
                 language={language}
                 onLanguageChange={onLanguageChange}
@@ -496,49 +497,45 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
             </div>
           </header>
           <div className="workbench-frame">
-            {settingsOpen && !administrator ? (
-              <main className="settings-page">
-                <div className="settings-content">
-                  <p>{t('users.adminRequired')}</p>
-                  <Button onClick={() => openPage('/')}>{t('shell.flows')}</Button>
-                </div>
-              </main>
+            {(usersOpen || eventSourcesOpen) && !administrator ? (
+              <HostPage>
+                <p>{t('users.adminRequired')}</p>
+                <Button onClick={() => openPage('/')}>{t('shell.flows')}</Button>
+              </HostPage>
             ) : agentAccessOpen ? (
               <AgentAccessPage key={session.user.userId} onUnauthorized={sessionExpired} />
+            ) : settingsOpen && !administrator ? (
+              <MemberSettingsPage user={session.user} onSignOut={() => void signOut()} />
             ) : settingsOpen ? (
-              <div className="settings-layout">
-                <nav className="settings-nav" aria-label={t('shell.settings')}>
-                  <a href="/settings" aria-current={eventSourcesOpen || usersOpen ? undefined : 'page'} onClick={(event) => followPage(event, '/settings')}>
-                    {t('settings.title')}
-                  </a>
-                  <a href="/settings/users" aria-current={usersOpen ? 'page' : undefined} onClick={(event) => followPage(event, '/settings/users')}>
-                    {t('users.title')}
-                  </a>
-                  {hasEventSources && (
-                    <a
-                      href="/settings/event-sources"
-                      aria-current={eventSourcesOpen ? 'page' : undefined}
-                      onClick={(event) => followPage(event, '/settings/event-sources')}
-                    >
-                      {t('settings.eventSources')}
-                    </a>
-                  )}
-                </nav>
-                <div className="settings-body">
-                  {usersOpen ? (
-                    <UsersPage currentUserId={session.user.userId} onUnauthorized={sessionExpired} />
-                  ) : eventSourcesOpen ? (
-                    <EventSourcesPage
-                      client={client}
-                      language={language}
-                      teams={team.kind == 'ready' ? team.teams : []}
-                      onSourcesChange={eventSourcesChanged}
-                    />
-                  ) : (
-                    <SettingsPage onSignOut={() => void signOut()} onConnectorChange={() => void loadTeams()} onUnauthorized={sessionExpired} />
-                  )}
-                </div>
-              </div>
+              <HostPageLayout
+                navigation={
+                  <HostPageTabs
+                    kind="routes"
+                    label={t('shell.settings')}
+                    active={usersOpen ? '/settings/users' : eventSourcesOpen ? '/settings/event-sources' : '/settings'}
+                    onNavigate={followPage}
+                    items={[
+                      { value: '/settings', label: t('settings.title') },
+                      { value: '/settings/users', label: t('users.title') },
+                      ...(hasEventSources ? [{ value: '/settings/event-sources' as const, label: t('settings.eventSources') }] : []),
+                    ]}
+                  />
+                }
+              >
+                {usersOpen ? (
+                  <UsersPage currentUserId={session.user.userId} onUnauthorized={sessionExpired} />
+                ) : eventSourcesOpen ? (
+                  <EventSourcesPage client={client} language={language} teams={team.kind == 'ready' ? team.teams : []} onSourcesChange={eventSourcesChanged} />
+                ) : (
+                  <SettingsPage
+                    user={session.user}
+                    configuration={configuration}
+                    onSignOut={() => void signOut()}
+                    onConnectorChange={() => void loadTeams()}
+                    onUnauthorized={sessionExpired}
+                  />
+                )}
+              </HostPageLayout>
             ) : variablesOpen ? (
               <VariablesPage client={client} language={language} />
             ) : (

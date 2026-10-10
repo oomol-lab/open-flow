@@ -24,7 +24,6 @@ export function createConfigApp(settings: Settings, authenticate: (request: Requ
     const body = await objectRequest(context.req.raw)
     if (!loginRequest(body)) return invalid()
     const result = await login.poll(context.get('actorId'), body.id, context.req.raw.signal)
-    if (result.status == 'saved') changed()
     return json(200, result)
   })
   app.delete('/connector/oomol-login', async (context) => {
@@ -32,6 +31,89 @@ export function createConfigApp(settings: Settings, authenticate: (request: Requ
     if (!loginRequest(body)) return invalid()
     login.cancel(context.get('actorId'), body.id)
     return json(200, { version: 1 })
+  })
+  app.put('/services/mode', async (context) => {
+    const body = await objectRequest(context.req.raw)
+    if (
+      body == null ||
+      Object.keys(body).length != 3 ||
+      body.version !== 1 ||
+      !Number.isSafeInteger(body.expectedRevision) ||
+      Number(body.expectedRevision) <= 0 ||
+      (body.mode != 'oomol' && body.mode != 'custom')
+    )
+      return invalid()
+    const result = settings.selectProfile(Number(body.expectedRevision), body.mode == 'oomol' ? 'oomol' : 'custom')
+    return updated(result, settings, changed)
+  })
+  app.put('/services/:mode', async (context) => {
+    const mode = context.req.param('mode')
+    const body = await objectRequest(context.req.raw)
+    if (
+      (mode != 'oomol' && mode != 'custom') ||
+      body == null ||
+      Object.keys(body).length != 7 ||
+      body.version !== 1 ||
+      !Number.isSafeInteger(body.expectedRevision) ||
+      Number(body.expectedRevision) <= 0 ||
+      typeof body.connectorOrigin != 'string' ||
+      (body.connectorToken !== null && typeof body.connectorToken != 'string') ||
+      typeof body.consoleOrigin != 'string' ||
+      typeof body.llmOrigin != 'string' ||
+      (body.llmToken !== null && typeof body.llmToken != 'string')
+    )
+      return invalid()
+    try {
+      return updated(
+        settings.saveProfile(Number(body.expectedRevision), mode, {
+          connectorOrigin: body.connectorOrigin,
+          connectorToken: body.connectorToken,
+          consoleOrigin: body.consoleOrigin,
+          llmOrigin: body.llmOrigin,
+          llmToken: body.llmToken,
+        }),
+        settings,
+        changed,
+      )
+    } catch {
+      return invalid()
+    }
+  })
+  app.put('/services', async (context) => {
+    const body = await objectRequest(context.req.raw)
+    if (
+      body == null ||
+      Object.keys(body).length != 7 ||
+      body.version !== 1 ||
+      !Number.isSafeInteger(body.expectedRevision) ||
+      Number(body.expectedRevision) <= 0 ||
+      typeof body.connectorOrigin != 'string' ||
+      typeof body.connectorToken != 'string' ||
+      typeof body.consoleOrigin != 'string' ||
+      typeof body.llmOrigin != 'string' ||
+      typeof body.llmToken != 'string'
+    )
+      return invalid()
+    try {
+      return updated(
+        settings.putServices(Number(body.expectedRevision), {
+          connectorOrigin: body.connectorOrigin,
+          connectorToken: body.connectorToken,
+          consoleOrigin: body.consoleOrigin,
+          llmOrigin: body.llmOrigin,
+          llmToken: body.llmToken,
+        }),
+        settings,
+        changed,
+      )
+    } catch {
+      return invalid()
+    }
+  })
+  app.delete('/services', async (context) => {
+    const body = await objectRequest(context.req.raw)
+    if (!deleteRequest(body)) return invalid()
+    return updated(settings.deleteServices(body.expectedRevision), settings, changed)
   })
   app.put('/connector', async (context) => {
     const body = await objectRequest(context.req.raw)

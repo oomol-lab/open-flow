@@ -1,5 +1,6 @@
 import 'virtual:uno.css'
 import '@oomol-lab/open-flow/workbench.css'
+import './host-ui.css'
 import './styles.css'
 
 import { createRoot } from 'react-dom/client'

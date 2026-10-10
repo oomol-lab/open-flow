@@ -23,14 +23,16 @@ export class OomolLogin {
 
   async start(actorId: string, revision: number, signal: AbortSignal) {
     const current = this.#settings.status()
-    if (current.connector.runtime.source == 'environment')
-      throw new ControlError(serverErrorCode.configurationEnvironmentManaged, 'Configuration is managed by the environment.')
+    if (current.services.managed) throw new ControlError(serverErrorCode.configurationEnvironmentManaged, 'Configuration is managed by the environment.')
     if (current.revision != revision) throw new ControlError(serverErrorCode.configurationConflict, 'Configuration changed.')
     this.#login?.controller.abort()
     const login: Login = {
       actorId,
       controller: new AbortController(),
-      endpoint: current.connector.runtime.configured && new URL(current.connector.runtime.origin).hostname == 'connector.oomol.dev' ? 'oomol.dev' : 'oomol.com',
+      endpoint:
+        current.services.profiles.oomol.connectorOrigin != '' && new URL(current.services.profiles.oomol.connectorOrigin).hostname == 'connector.oomol.dev'
+          ? 'oomol.dev'
+          : 'oomol.com',
       expiresAt: Date.now() + 10 * 60_000,
       id: randomUUID(),
       polling: false,
@@ -79,10 +81,8 @@ export class OomolLogin {
       if (value.status != 'verified' || value.endpoint !== login.endpoint || typeof value.api_key != 'string' || value.api_key.length == 0) throw unavailable()
       this.#current(actorId, id)
       this.#login = undefined
-      const result = this.#settings.putConnector(login.revision, `https://connector.${login.endpoint}`, value.api_key)
-      if (result == 'environment') throw new ControlError(serverErrorCode.configurationEnvironmentManaged, 'Configuration is managed by the environment.')
-      if (result == 'conflict') throw new ControlError(serverErrorCode.configurationConflict, 'Configuration changed.')
-      return { status: 'saved' as const, configuration: this.#settings.status(), version: 1 as const }
+      if (this.#settings.status().revision != login.revision) throw new ControlError(serverErrorCode.configurationConflict, 'Configuration changed.')
+      return { status: 'authorized' as const, connectorOrigin: `https://connector.${login.endpoint}`, apiKey: value.api_key, version: 1 as const }
     } finally {
       login.polling = false
     }

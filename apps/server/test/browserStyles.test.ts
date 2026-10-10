@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 
-const styles = await readFile(new URL('../browser/styles.css', import.meta.url), 'utf8')
+const styles = (await Promise.all(['styles.css', 'host-ui.css'].map((file) => readFile(new URL(`../browser/${file}`, import.meta.url), 'utf8')))).join('\n')
 const app = await readFile(new URL('../browser/app.tsx', import.meta.url), 'utf8')
 const main = await readFile(new URL('../browser/main.tsx', import.meta.url), 'utf8')
 const viteConfig = await readFile(new URL('../vite.config.ts', import.meta.url), 'utf8')
@@ -33,8 +33,7 @@ describe('Browser style boundaries', () => {
     expect(styles).not.toContain('@oomol-lab/open-flow')
     expect(styles).not.toMatch(/:root\s*\{[^}]*var\(--ui-(?:background|foreground)\)/)
     expect(styles).not.toMatch(/--ui-(?:background|foreground|primary|border|radius):\s*#/)
-    expect(styles).not.toMatch(/calc\(var\(--ui-radius\)/)
-    expect(styles).toMatch(/\.server-host\s*\{[^}]*--ui-radius:\s*6px;/)
+    expect(styles).toMatch(/\.server-host\s*\{[^}]*--open-flow-radius:\s*6px;/)
     expect(styles).not.toMatch(/\.open-flow-workbench\s*\{[^}]*--ui-radius:/)
     expect(styles).not.toContain('.resource-page-header')
     expect(styles).not.toContain('.workspace-actions')

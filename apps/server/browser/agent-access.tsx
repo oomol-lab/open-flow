@@ -22,6 +22,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Trans, useTranslate } from 'val-i18n-react'
 import { z } from 'zod'
+import { HostPage, HostField, HostPageLayout, HostPageTabs } from './host-ui.tsx'
 
 const tokenSchema = z.object({ tokenId: z.string().min(1), name: z.string().min(1), createdAt: z.number().int() })
 const listSchema = z.object({ version: z.literal(1), tokens: z.array(tokenSchema) })
@@ -41,12 +42,12 @@ function McpInformation(): ReactElement {
   }
 
   return (
-    <section className="pt-6" aria-labelledby="settings-mcp-title">
-      <header className="settings-header">
+    <section aria-labelledby="settings-mcp-title">
+      <header className="host-page-header">
         <h1 id="settings-mcp-title">{t('agentAccess.mcpTitle')}</h1>
         <p>{t('agentAccess.mcpDescription')}</p>
       </header>
-      <div className="settings-section settings-form">
+      <div className="host-card host-form">
         <Label htmlFor="settings-mcp-endpoint">{t('agentAccess.mcpAddress')}</Label>
         <div className="settings-mcp-address">
           <Input id="settings-mcp-endpoint" readOnly value={endpoint} />
@@ -70,7 +71,7 @@ function McpInformation(): ReactElement {
             </dd>
           </div>
         </dl>
-        <p className="settings-hint">{t('account.tokenHint')}</p>
+        <p className="host-hint">{t('account.tokenHint')}</p>
       </div>
     </section>
   )
@@ -125,15 +126,15 @@ function CliInformation(): ReactElement {
   })
   const token = '<personal-token>'
   return (
-    <section className="pt-6" aria-labelledby="agent-cli-title">
-      <header className="settings-header">
+    <section aria-labelledby="agent-cli-title">
+      <header className="host-page-header">
         <h1 id="agent-cli-title">{t('agentAccess.cliTitle')}</h1>
         <p>{t('agentAccess.cliDescription')}</p>
       </header>
-      <div className="settings-section settings-form agent-cli">
+      <div className="host-card host-form agent-cli">
         <h2>{t('agentAccess.install')}</h2>
         <div className="grid gap-2 pl-4">
-          <p className="settings-hint m-0 leading-[18px]">
+          <p className="host-hint m-0 leading-[18px]">
             <Trans message={t('agentAccess.openSource')}>
               <a href="https://github.com/oomol-lab/oo-cli" target="_blank" rel="noreferrer">
                 oo-cli
@@ -150,7 +151,7 @@ function CliInformation(): ReactElement {
         </div>
         <h2 className="pt-4">{t('agentAccess.connect')}</h2>
         <div className="grid gap-2 pl-4">
-          <p className="settings-hint m-0 leading-[18px]">{t('agentAccess.environmentHint')}</p>
+          <p className="host-hint m-0 leading-[18px]">{t('agentAccess.environmentHint')}</p>
           <PlatformCommands
             label={t('agentAccess.connect')}
             platform={platform}
@@ -158,7 +159,7 @@ function CliInformation(): ReactElement {
             posix={`export OO_OPEN_FLOW_URL='${origin}'\nexport OO_OPEN_FLOW_TOKEN='${token}'`}
             windows={`$env:OO_OPEN_FLOW_URL = '${origin}'\n$env:OO_OPEN_FLOW_TOKEN = '${token}'`}
           />
-          <p className="settings-hint m-0 leading-[18px]">{t('account.tokenHint')}</p>
+          <p className="host-hint m-0 leading-[18px]">{t('account.tokenHint')}</p>
         </div>
       </div>
     </section>
@@ -261,7 +262,7 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
   }
 
   return (
-    <section ref={portal} className="settings-section" aria-labelledby="personal-tokens-title" aria-busy={pending}>
+    <section ref={portal} className="host-card" aria-labelledby="personal-tokens-title" aria-busy={pending}>
       <Dialog
         open={creating}
         onOpenChange={(open) => {
@@ -272,8 +273,8 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
           setRevoking(undefined)
         }}
       >
-        <div className="settings-heading">
-          <div className="settings-heading-copy">
+        <div className="host-card-heading">
+          <div className="host-card-heading-copy">
             <h2 id="personal-tokens-title">{t('account.tokens')}</h2>
             <p>{t('account.description')}</p>
           </div>
@@ -292,8 +293,7 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
               <DialogHeader>
                 <DialogTitle>{t('account.create')}</DialogTitle>
               </DialogHeader>
-              <div className="grid gap-2">
-                <Label htmlFor="personal-token-name">{t('account.name')}</Label>
+              <HostField id="personal-token-name" label={t('account.name')}>
                 <Input
                   ref={nameInput}
                   id="personal-token-name"
@@ -303,7 +303,7 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
                   disabled={pending}
                   onChange={(event) => setName(event.target.value)}
                 />
-              </div>
+              </HostField>
               {error != null && (
                 <p role="alert" className="text-sm text-destructive">
                   {t(error)}
@@ -323,8 +323,7 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
               <DialogHeader>
                 <DialogTitle>{t('account.created')}</DialogTitle>
               </DialogHeader>
-              <div className="grid gap-2">
-                <Label htmlFor="personal-token-secret">{name.trim()}</Label>
+              <HostField id="personal-token-secret" label={name.trim()}>
                 <Input
                   id="personal-token-secret"
                   className="font-mono"
@@ -336,7 +335,7 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
                 <p className="m-0 text-sm text-muted-foreground" id="personal-token-hint">
                   {t('account.once')}
                 </p>
-              </div>
+              </HostField>
               <DialogFooter>
                 <Button autoFocus type="button" variant="outline" onClick={() => void copy()}>
                   {t('account.copy')}
@@ -356,14 +355,14 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
           )}
         </DialogContent>
       </Dialog>
-      <div className="settings-form">
+      <div className="host-form">
         {error != null && !creating && (
           <p role="alert" className="text-sm text-destructive">
             {t(error)}
           </p>
         )}
         {tokens == null ? (
-          <div className="settings-actions">
+          <div className="host-actions">
             {error == null ? (
               <span role="status">{t('settings.loading')}</span>
             ) : (
@@ -373,13 +372,13 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
             )}
           </div>
         ) : tokens.length == 0 ? (
-          <p className="settings-hint">{t('account.empty')}</p>
+          <p className="host-hint">{t('account.empty')}</p>
         ) : (
           <ul className="m-0 grid list-none gap-3 p-0">
             {tokens.map((token) => (
               <li key={token.tokenId} className="flex flex-wrap items-center justify-between gap-2">
                 <span className="min-w-0 break-words">{token.name}</span>
-                <div className="settings-actions">
+                <div className="host-actions">
                   {revoking == token.tokenId ? (
                     <>
                       <span className="text-sm">{t('account.revokeConfirm')}</span>
@@ -408,22 +407,29 @@ function PersonalTokens({ onUnauthorized }: { readonly onUnauthorized: () => voi
 export function AgentAccessPage({ onUnauthorized }: { readonly onUnauthorized: () => void }): ReactElement {
   const t = useTranslate()
   return (
-    <main className="settings-page" aria-label={t('agentAccess.title')}>
-      <div className="settings-content">
-        <Tabs defaultValue="cli">
-          <TabsList aria-label={t('agentAccess.title')} variant="navigation">
-            <TabsTrigger value="cli">CLI</TabsTrigger>
-            <TabsTrigger value="mcp">MCP</TabsTrigger>
-          </TabsList>
+    <Tabs defaultValue="cli" className="h-full min-h-0">
+      <HostPageLayout
+        navigation={
+          <HostPageTabs
+            kind="panels"
+            label={t('agentAccess.title')}
+            items={[
+              { value: 'cli', label: 'CLI' },
+              { value: 'mcp', label: 'MCP' },
+            ]}
+          />
+        }
+      >
+        <HostPage aria-label={t('agentAccess.title')}>
           <TabsContent value="cli">
             <CliInformation />
           </TabsContent>
           <TabsContent value="mcp">
             <McpInformation />
           </TabsContent>
-        </Tabs>
-        <PersonalTokens onUnauthorized={onUnauthorized} />
-      </div>
-    </main>
+          <PersonalTokens onUnauthorized={onUnauthorized} />
+        </HostPage>
+      </HostPageLayout>
+    </Tabs>
   )
 }
