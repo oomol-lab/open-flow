@@ -120,6 +120,14 @@ function NotificationBridge({ host, store }: { readonly host: WorkbenchHost; rea
   return null
 }
 
+function FlowNameBridge({ store, onChange }: { readonly store: WorkbenchStore; readonly onChange: (name: string | undefined) => void }): null {
+  const flow = useVal(store.workspace.$.flow)
+  const name = flow?.name
+  useEffect(() => onChange(name), [name, onChange])
+  useEffect(() => () => onChange(undefined), [onChange])
+  return null
+}
+
 interface WorkbenchProps {
   readonly catalogWidth?: OpenFlowWorkbenchProps['catalogWidth']
   readonly createFlow?: ((name: string) => Promise<string>) | undefined
@@ -243,6 +251,8 @@ export interface OpenFlowWorkbenchProps {
     | undefined
   readonly connectionHref?: ConnectionHref | undefined
   readonly flowBadges?: Readonly<Record<string, string>> | undefined
+  /** Reports the active Flow name, including renames; clears it on exit or unmount. Hosts own document titles. */
+  readonly onFlowNameChange?: ((name: string | undefined) => void) | undefined
   readonly host: WorkbenchHost
   readonly hrefFor: (location: WorkbenchLocation) => string
   readonly language: WorkbenchLanguage
@@ -274,6 +284,7 @@ function Session({
   onManageConnectorAccess,
   onLanguageChange,
   onNavigate,
+  onFlowNameChange,
   preferences,
   sessionKey,
   theme,
@@ -334,6 +345,7 @@ function Session({
       <I18nProvider i18n={i18n}>
         <div className="open-flow-theme open-flow-workbench" data-theme={theme}>
           <NotificationBridge host={host} store={store} />
+          {onFlowNameChange != null && <FlowNameBridge store={store} onChange={onFlowNameChange} />}
           {started || location.flowId == null ? (
             <Workbench
               catalogWidth={catalogWidth}

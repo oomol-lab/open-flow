@@ -27,6 +27,10 @@ import { UsersPage } from './users.tsx'
 import { VariablesPage } from './variables.tsx'
 import { WorkflowPage } from './workflow-page.tsx'
 
+function updateWorkflowTitle(name: string | undefined): void {
+  document.title = name == null ? 'Open Flow' : `${name} · Open Flow`
+}
+
 type ThemeMode = WorkbenchTheme | 'auto'
 const themePreference = 'open-flow.workbench.server.theme'
 
@@ -531,6 +535,7 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
                   onConfigureConnector={administrator ? () => openPage('/settings') : undefined}
                   onLanguageChange={onLanguageChange}
                   onNavigate={navigate}
+                  onFlowNameChange={updateWorkflowTitle}
                   preferences={preferences}
                   sessionKey={session.user.userId}
                   theme={theme}
