@@ -212,7 +212,7 @@ it('serves the compiled Workbench, MCP and Control API in the real process', asy
   expect(index.status).toBe(200)
   expect(index.headers.get('cache-control')).toBe('no-cache')
   const html = await index.text()
-  expect(html).toContain('<title>Open Flow Server</title>')
+  expect(html).toContain('<title>Open Flow</title>')
   const assetPath = html.match(/(?:href|src)="(\/assets\/[^"]+)"/)?.[1]
   expect(assetPath).toBeDefined()
   const asset = await fetch(`${app.origin}${assetPath}`)

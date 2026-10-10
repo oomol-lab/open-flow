@@ -459,9 +459,9 @@ function Shell({ language, onLanguageChange, theme, themeMode, onThemeModeChange
           <header className="server-nav">
             <div className="server-nav-title">
               <OpenFlowLogo theme={theme} alt="" />
-              Open Flow Server
+              Open Flow
             </div>
-            <nav aria-label="Open Flow Server">
+            <nav aria-label="Open Flow">
               <a aria-current={variablesOpen || settingsOpen || agentAccessOpen ? undefined : 'page'} href="/" onClick={(event) => followPage(event, '/')}>
                 {t('shell.flows')}
               </a>

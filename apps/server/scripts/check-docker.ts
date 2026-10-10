@@ -39,7 +39,7 @@ try {
 
   const index = await fetch(firstOrigin, { headers: { accept: 'text/html' } })
   assert.equal(index.status, 200)
-  assert.match(await index.text(), /<title>Open Flow Server<\/title>/)
+  assert.match(await index.text(), /<title>Open Flow<\/title>/)
 
   const flow = await requestJson<{ readonly draftRevisionId: string; readonly flowId: string }>(
     firstOrigin,
