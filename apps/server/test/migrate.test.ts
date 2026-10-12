@@ -11,6 +11,80 @@ import { migrateFlowResources } from '../node/storage/migrate-flow-resources.ts'
 
 const directories: string[] = []
 
+it('migrates current Trigger pauses to Flow disablement and removes per-Trigger control without losing history', async () => {
+  const file = await databaseFile()
+  const old = legacyDatabase(file, 45)
+  const tables = ['webhook_bindings', 'cron_bindings', 'poll_bindings', 'integration_bindings', 'error_bindings']
+  for (const [index, table] of tables.entries()) {
+    const columns = old.prepare(`PRAGMA table_info(${table})`).all()
+    for (const [state, publication, enabled] of [
+      ['paused', 'live', 1],
+      ['active', 'live', 1],
+      ['retired', null, 1],
+      ['old', 'old', 1],
+      ['disabled', 'live', 0],
+    ] as const) {
+      const flowId = `${index}-${state}`
+      old
+        .prepare('INSERT INTO flow_live (flow_id, publication_id, revision, updated_at, enabled) VALUES (?, ?, 1, 10, ?)')
+        .run(flowId, `${flowId}-live`, enabled)
+      const values: Record<string, string | number | null> = {
+        binding_id: flowId,
+        endpoint_id: flowId,
+        flow_id: flowId,
+        trigger_node_id: 'start',
+        current_publication_id: publication == null ? null : `${flowId}-${publication}`,
+        runtime_version: 7,
+        trigger_json: '{}',
+        connection_id: 'account',
+        health: 'healthy',
+        operator_state: state == 'active' ? 'active' : 'paused',
+        updated_at: 10,
+        checkpoint_json: '{"cursor":"saved"}',
+      }
+      const entries = Object.entries(values).filter(([name]) => columns.some((column) => column.name == name))
+      old
+        .prepare(`INSERT INTO ${table} (${entries.map(([name]) => name).join(', ')}) VALUES (${entries.map(() => '?').join(', ')})`)
+        .run(...entries.map(([, value]) => value))
+    }
+  }
+  old
+    .prepare('INSERT INTO trigger_activities (activity_id, binding_id, kind, created_at, expires_at) VALUES (?, ?, ?, ?, ?)')
+    .run('old-pause', '0-paused', 'operator.paused', 10, 100)
+  const snapshots = tables.map((table) =>
+    old
+      .prepare(`SELECT * FROM ${table} ORDER BY flow_id`)
+      .all()
+      .map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => key != 'operator_state'))),
+  )
+  old.close()
+  const upgraded = Database.open(file)
+  try {
+    for (const [index, table] of tables.entries()) {
+      expect(
+        upgraded.connection
+          .prepare(`PRAGMA table_info(${table})`)
+          .all()
+          .some((column) => column.name == 'operator_state'),
+      ).toBe(false)
+      expect(upgraded.connection.prepare(`SELECT * FROM ${table} ORDER BY flow_id`).all()).toEqual(snapshots[index])
+      for (const state of ['paused', 'active', 'retired', 'old', 'disabled']) {
+        expect(upgraded.connection.prepare('SELECT enabled FROM flow_live WHERE flow_id = ?').get(`${index}-${state}`)).toEqual({
+          enabled: state == 'paused' || state == 'disabled' ? 0 : 1,
+        })
+      }
+    }
+    expect(upgraded.connection.prepare('SELECT kind FROM trigger_activities').all()).toEqual([{ kind: 'operator.paused' }])
+    expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
+    upgraded.connection.prepare('UPDATE flow_live SET enabled = 1 WHERE flow_id = ?').run('0-paused')
+  } finally {
+    upgraded.close()
+  }
+  const reopened = Database.open(file)
+  expect(reopened.connection.prepare('SELECT enabled FROM flow_live WHERE flow_id = ?').get('0-paused')).toEqual({ enabled: 1 })
+  reopened.close()
+})
+
 it.each([true, false])('migrates grants without rewriting Revision content (nodeBindings present: %s)', async (hasSelected) => {
   const file = await databaseFile()
   const old = legacyDatabase(file, 29)
@@ -86,7 +160,7 @@ it('accepts databases already rebuilt with the new column names and snapshot for
   )
   database.close()
   const upgraded = Database.open(file)
-  expect(version(upgraded.connection)).toBe(45)
+  expect(version(upgraded.connection)).toBe(46)
   expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
   upgraded.close()
 })
@@ -137,7 +211,7 @@ it('backfills Revision metadata needed after old content is pruned', async () =>
 
   const upgraded = Database.open(file)
   try {
-    expect(version(upgraded.connection)).toBe(45)
+    expect(version(upgraded.connection)).toBe(46)
     expect(upgraded.connection.prepare('SELECT digest, model_version AS modelVersion FROM flow_revisions WHERE revision_id = ?').get('revision')).toEqual({
       digest: 'digest',
       modelVersion: 3,
@@ -193,7 +267,7 @@ it('applies the Flow-first schema without foreign keys', async () => {
   Database.open(file).close()
   const database = new DatabaseSync(file)
   try {
-    expect(version(database)).toBe(45)
+    expect(version(database)).toBe(46)
     const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as {
       readonly name: string
     }[]
@@ -235,7 +309,7 @@ it('upgrades a version 1 Flow database without changing its data', async () => {
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(45)
+    expect(version(reopened)).toBe(46)
     expect(reopened.prepare('SELECT revision_id AS revisionId FROM revisions').all()).toEqual([{ revisionId: 'revision-a' }])
     expect(reopened.prepare('SELECT name FROM variables').all()).toEqual([])
   } finally {
@@ -265,7 +339,7 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(45)
+    expect(version(reopened)).toBe(46)
     expect(reopened.prepare('SELECT flow_id AS flowId, team_id AS teamId FROM flow_connector_teams').all()).toEqual([{ flowId: 'flow-a', teamId: null }])
     expect(reopened.prepare("SELECT name FROM pragma_table_info('runs') WHERE name = 'connector_team_id'").get()).toEqual({ name: 'connector_team_id' })
   } finally {
@@ -313,13 +387,13 @@ it('rejects a newer Flow schema version without modifying it', async () => {
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
-  database.exec('PRAGMA user_version = 46')
+  database.exec('PRAGMA user_version = 47')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('SQLite schema version 46 is newer than the supported version 45.')
+  expect(() => Database.open(file)).toThrow('SQLite schema version 47 is newer than the supported version 46.')
 
   const reopened = new DatabaseSync(file)
-  expect(version(reopened)).toBe(46)
+  expect(version(reopened)).toBe(47)
   reopened.close()
 })
 
@@ -357,7 +431,7 @@ it('preserves old checkpoint bytes for explicit recovery validation', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(45)
+    expect(version(reopened)).toBe(46)
     expect(reopened.prepare('SELECT * FROM run_checkpoints').get()).toEqual({
       run_id: 'run-a',
       checkpoint_json: '{"value":42}',
@@ -390,9 +464,11 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   Database.open(file).close()
   const upgraded = new DatabaseSync(file)
   try {
-    expect(version(upgraded)).toBe(45)
+    expect(version(upgraded)).toBe(46)
     const after = tables.map((table) => upgraded.prepare('SELECT * FROM ' + table).all())
-    expect(after.slice(0, 2)).toEqual(before.slice(0, 2))
+    expect(after.slice(0, 2)).toEqual(
+      before.slice(0, 2).map((rows) => rows.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => key != 'operator_state')))),
+    )
     expect(after[2]).toEqual(
       before[2]!.map((row) =>
         Object.assign({}, row, {
@@ -454,7 +530,7 @@ it('adds Cron health without changing existing schedules', async () => {
     .prepare(`INSERT INTO cron_bindings (binding_id, flow_id, trigger_node_id, current_publication_id, runtime_version, next_at, updated_at)
     VALUES ('binding', 'flow', 'cron', 'publication', 3, 60000, 0)`)
     .run()
-  const before = database.prepare('SELECT * FROM cron_bindings').get()
+  const { operator_state: _, ...before } = database.prepare('SELECT * FROM cron_bindings').get()!
   database.close()
   Database.open(file).close()
   const upgraded = new DatabaseSync(file)
@@ -594,7 +670,7 @@ it('adds personal token storage to version 37 without changing existing accounts
   old.close()
   const upgraded = Database.open(file)
   try {
-    expect(version(upgraded.connection)).toBe(45)
+    expect(version(upgraded.connection)).toBe(46)
     expect(upgraded.connection.prepare('SELECT * FROM users').all()).toEqual(before)
     expect(upgraded.connection.prepare('SELECT * FROM user_tokens').all()).toEqual([])
     expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
@@ -636,7 +712,7 @@ it('preserves existing personal tokens while adding Operator credential binding'
   const upgraded = Database.open(file)
   try {
     expect(upgraded.connection.prepare('SELECT * FROM user_tokens').get()).toEqual({ ...before, operator_fingerprint: null })
-    expect(version(upgraded.connection)).toBe(45)
+    expect(version(upgraded.connection)).toBe(46)
     expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
   } finally {
     upgraded.close()

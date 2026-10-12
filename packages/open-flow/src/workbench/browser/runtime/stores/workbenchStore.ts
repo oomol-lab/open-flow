@@ -38,7 +38,7 @@ import { TriggerStore } from './triggerStore.ts'
 import { errorNotice } from './workbenchNotice.ts'
 import { WorkspaceStore } from './workspaceStore.ts'
 
-export type Busy = WorkspaceBusy | 'cancel' | 'publish' | 'rollback' | 'run' | 'trigger'
+export type Busy = WorkspaceBusy | 'cancel' | 'publish' | 'rollback' | 'run'
 
 export interface Workbench$ {
   readonly connectorSetupPending: ReadonlyVal<boolean>
@@ -249,7 +249,6 @@ export class WorkbenchStore {
         if (get(this.runs.$.cancelingRunId) != null) return 'cancel'
         if (get(this.publications.$.publishing)) return 'publish'
         if (get(this.publications.$.rollingBackPublicationId) != null) return 'rollback'
-        if (get(this.publications.$.changingTriggerId) != null) return 'trigger'
       }),
       diagnosticItems: compute((get) => {
         const revision = get(this.workspace.$.revision)

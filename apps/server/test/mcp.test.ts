@@ -21,6 +21,41 @@ const token = 'mcp-test-operator-token-000000000001'
 const version = '2026-07-28'
 const start = { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } }
 
+it('keeps retained Trigger activity history readable and paginated after removing individual controls', async () => {
+  const { control, service, file } = await fixture()
+  const flow = await control.createFlow('Activity history')
+  const changed = await control.changeDraft(
+    flow.flowId,
+    flow.draftRevisionId,
+    decodeDraftOperations([
+      { kind: 'graph.node.create', nodeId: 'hook', node: { kind: 'webhook', name: 'Hook', method: 'POST', bodyFields: [] } },
+      { kind: 'graph.node.create', nodeId: 'other', node: { kind: 'webhook', name: 'Other', method: 'POST', bodyFields: [] } },
+    ]),
+  )
+  await control.publishFlow(flow.flowId, changed.revision.revisionId, null)
+  await service.tickMaintenance()
+  const detail = await control.getFlowTriggerBinding(flow.flowId, 'hook')
+  const bindingId = new URL(detail.binding.endpointUrl!).pathname.split('/').at(-1)!
+  const database = Database.open(file)
+  try {
+    for (const [index, kind] of ['operator.paused', 'operator.resumed', 'health.failed'].entries()) {
+      database.connection
+        .prepare('INSERT INTO trigger_activities (activity_id, binding_id, kind, created_at, expires_at) VALUES (?, ?, ?, ?, ?)')
+        .run(`history-${index}`, bindingId, kind, Date.now() + index, Date.now() + 86_400_000)
+    }
+  } finally {
+    database.close()
+  }
+  const all = await control.listFlowTriggerActivities(flow.flowId, 'hook')
+  expect(all.activities.map(({ kind }) => kind)).toEqual(['health.failed', 'operator.resumed', 'operator.paused'])
+  const first = await control.listFlowTriggerActivities(flow.flowId, 'hook', { limit: 1 })
+  expect(first.activities).toEqual(all.activities.slice(0, 1))
+  expect(first.nextCursor).toBeTruthy()
+  const next = await control.listFlowTriggerActivities(flow.flowId, 'hook', { cursor: first.nextCursor })
+  expect(next.activities).toEqual(all.activities.slice(1))
+  await expect(control.listFlowTriggerActivities(flow.flowId, 'other', { cursor: first.nextCursor })).rejects.toMatchObject({ code: 'page.invalid-cursor' })
+})
+
 it('discovers independent Feishu event sources without exposing secrets', async () => {
   const connector = createConnectorHost({
     listConnections: async () => [

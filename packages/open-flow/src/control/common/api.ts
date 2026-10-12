@@ -153,7 +153,6 @@ export interface TriggerBinding {
   readonly health: 'failed' | 'healthy' | 'initializing' | 'needs_reauth' | 'suspended'
   readonly kind: 'error' | 'cron' | 'integration' | 'poll' | 'webhook'
   readonly lastErrorCode?: string
-  readonly operatorState: 'active' | 'paused'
   readonly runtimeVersion: number
   readonly triggerNodeId: string
   readonly updatedAt: string
@@ -879,24 +878,6 @@ export class ControlClient {
     if (options.limit != null) parameters.set('limit', String(options.limit))
     const query = parameters.size == 0 ? '' : `?${parameters}`
     return triggerActivityPage(await this.request(`/v1/flows/${segment(flowId)}/triggers/${segment(triggerNodeId)}/activities${query}`))
-  }
-
-  async pauseFlowTrigger(flowId: string, triggerNodeId: string): Promise<TriggerBinding> {
-    return triggerBinding(
-      await this.request(`/v1/flows/${segment(flowId)}/triggers/${segment(triggerNodeId)}/pause`, {
-        body: JSON.stringify({ version: 1 }),
-        method: 'POST',
-      }),
-    )
-  }
-
-  async resumeFlowTrigger(flowId: string, triggerNodeId: string): Promise<TriggerBinding> {
-    return triggerBinding(
-      await this.request(`/v1/flows/${segment(flowId)}/triggers/${segment(triggerNodeId)}/resume`, {
-        body: JSON.stringify({ version: 1 }),
-        method: 'POST',
-      }),
-    )
   }
 
   async testFlowPollTrigger(flowId: string, triggerNodeId: string): Promise<PollTriggerTestResult> {

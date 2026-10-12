@@ -431,7 +431,6 @@ export class PollStore {
              AND schedule_json = ?
              AND next_at = ?
              AND health IN ('healthy', 'initializing')
-             AND operator_state = 'active'
              AND ((? IS NULL AND continuation_root_id IS NULL AND continuation_page = 0)
                OR (continuation_root_id = ? AND continuation_page = ?))
              AND (active_claim_id IS NULL OR active_lease_expires_at <= ?)
@@ -503,7 +502,6 @@ export class PollStore {
              AND bindings.schedule_json = ?
              AND bindings.next_at = ?
              AND bindings.health IN ('healthy', 'initializing')
-             AND bindings.operator_state = 'active'
              AND bindings.active_claim_id = ?
              AND bindings.active_lease_token = ?
              AND publications.revision_id = ?
@@ -696,7 +694,6 @@ export class PollStore {
              ON flow_live.enabled = 1 AND flow_live.flow_id = bindings.flow_id
             AND flow_live.publication_id = bindings.current_publication_id
            WHERE bindings.health IN ('healthy', 'initializing')
-             AND bindings.operator_state = 'active'
            UNION ALL
            SELECT candidates.next_at
            FROM poll_candidates AS candidates
@@ -812,7 +809,6 @@ export class PollStore {
            AND bindings.schedule_json IS NOT NULL
            AND bindings.next_at IS NOT NULL
            AND bindings.health IN ('healthy', 'initializing')
-           AND bindings.operator_state = 'active'
            ${condition}`,
       )
       .all(...parameters) as unknown as readonly (Omit<StoredPollTarget, 'checkpoint'> & { readonly checkpointJson: string })[]

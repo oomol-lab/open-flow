@@ -644,7 +644,6 @@ interface TriggerBinding {
   kind: 'cron' | 'error' | 'integration' | 'poll' | 'webhook'
   lastErrorCode?: string
   listener?: { health: 'healthy' | 'failed' | 'needs_reauth'; lastErrorCode?: string }
-  operatorState: 'active' | 'paused'
   runtimeVersion: number
   triggerNodeId: string
   updatedAt: string
@@ -652,7 +651,7 @@ interface TriggerBinding {
 }
 ```
 
-Lists return `{ bindings, flowId, version: 1 }`. Pause/resume bodies are `{ version: 1 }`. State changes increment `runtimeVersion`, preventing old-version occurrences from passing final admission guards. Poll tests do not advance checkpoints, write deduplication records, or create Runs.
+Lists return `{ bindings, flowId, version: 1 }`. The Flow enable switch controls all Trigger admission. Individual Trigger pause/resume routes and `operatorState` are removed. Runtime versions still fence publication and binding changes. Poll tests do not advance checkpoints, write deduplication records, or create Runs.
 
 Connector credentials enter neither responses, Revisions, nor RunEvents. Required boolean `ConnectorAction.authenticated` is `false` when an Action executes without a Connection. Clients must not request an account or synthesize Connection identity for it. `true` requires a valid Connection. Without Connector configuration, catalog/Connection requests and Connector Task execution return `connector.unconfigured`. Configured but unavailable or invalid upstream responses return `connector.unavailable`. Clients must not collapse both into one configuration prompt.
 
@@ -858,8 +857,6 @@ Both return `text/event-stream`, require Operator authentication, and end on ses
 | `GET`     | `/v1/flows/:flowId/triggers`                                 |            200 | Trigger bindings                                               |
 | `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId`                  |            200 | binding detail                                                 |
 | `GET`     | `/v1/flows/:flowId/triggers/:triggerNodeId/activities`       |            200 | Activity page                                                  |
-| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/pause`            |            200 | pause                                                          |
-| `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/resume`           |            200 | resume                                                         |
 | `POST`    | `/v1/flows/:flowId/triggers/:triggerNodeId/test`             |            200 | Poll test                                                      |
 | `GET`     | `/v1/connector/teams`                                        |            200 | Available Team catalog: enabled, teams, version                |
 | `GET`     | `/v1/connector/providers`                                    |            200 | Provider catalog; optional `flowId`                            |

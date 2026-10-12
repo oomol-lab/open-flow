@@ -1186,17 +1186,19 @@ export const triggerControlApiConformanceCases: readonly ControlApiConformanceCa
         ['cron', 'webhook'],
         'Trigger binding order',
       )
-      for (const binding of bindings) equal(binding.currentPublicationId, publicationId, 'Trigger Publication')
+      for (const binding of bindings) {
+        equal(binding.currentPublicationId, publicationId, 'Trigger Publication')
+        equal(binding.operatorState, undefined, 'No individual Trigger control state')
+      }
       const webhookPath = `${base}/webhook`
       const endpointUrl = requiredString(
         record((await json(await request(harness, webhookPath), 200, 'Read Webhook')).binding, 'Webhook').endpointUrl,
         'Webhook endpoint',
       )
-      const state = (action: 'pause' | 'resume') => request(harness, `${webhookPath}/${action}`, { body: JSON.stringify({ version: 1 }), method: 'POST' })
-      equal((await json(await state('pause'), 200, 'Pause Webhook')).operatorState, 'paused', 'Paused state')
-      equal((await harness.request(new Request(endpointUrl, { method: 'POST' }))).status, 404, 'Paused callback')
-      equal((await json(await state('resume'), 200, 'Resume Webhook')).operatorState, 'active', 'Resumed state')
-      equal((await harness.request(new Request(endpointUrl, { method: 'POST' }))).status, 200, 'Resumed callback')
+      for (const action of ['pause', 'resume']) {
+        const response = await request(harness, `${webhookPath}/${action}`, { body: JSON.stringify({ version: 1 }), method: 'POST' })
+        equal(response.status, 404, 'Individual Trigger control is unavailable')
+      }
       const enable = (enabled: boolean) =>
         request(harness, `/v1/flows/${flowId}/enabled`, {
           method: 'PUT',
@@ -1204,26 +1206,11 @@ export const triggerControlApiConformanceCases: readonly ControlApiConformanceCa
         })
       await json(await enable(false), 200, 'Disable Trigger Flow')
       equal((await harness.request(new Request(endpointUrl, { method: 'POST' }))).status, 404, 'Disabled Flow blocks callback')
-      await json(await state('pause'), 200, 'Pause binding while Flow disabled')
       await json(await enable(true), 200, 'Enable Trigger Flow')
-      equal((await harness.request(new Request(endpointUrl, { method: 'POST' }))).status, 404, 'Enabling preserves binding pause')
-      await json(await state('resume'), 200, 'Resume binding after enabling Flow')
       equal((await harness.request(new Request(endpointUrl, { method: 'POST' }))).status, 200, 'Enabled Flow permits callback')
 
       const api = client(harness)
-      const activities = await api.listFlowTriggerActivities(flowId, 'webhook')
-      if (activities.activities.length < 2) fail('Webhook fixture must record callback activities.')
-      const firstPage = await api.listFlowTriggerActivities(flowId, 'webhook', { limit: 1 })
-      equal(firstPage.activities, activities.activities.slice(0, 1), 'First Trigger activity page')
-      const cursor = requiredString(firstPage.nextCursor, 'Trigger activity cursor')
-      const nextPage = await api.listFlowTriggerActivities(flowId, 'webhook', { cursor })
-      equal(nextPage.activities, activities.activities.slice(1), 'Trigger activity continuation')
-      await error(
-        await request(harness, `${base}/cron/activities?cursor=${encodeURIComponent(cursor)}`),
-        400,
-        'page.invalid-cursor',
-        'Activity cursor belongs to one Trigger',
-      )
+      equal((await api.listFlowTriggerActivities(flowId, 'webhook')).activities, [], 'Flow toggles do not record individual Trigger operations')
 
       const removed = await json(
         await changeRequest(harness, flowId, triggerRevisionId, [{ kind: 'graph.node.delete', nodeId: 'webhook' }]),

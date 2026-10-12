@@ -32,6 +32,7 @@ function renderState({ failedLoad = false, published = false, loading = false, i
         draft: val({ revisionId: 'revision-draft' }),
         presentation: val({ revision: 1, value: {}, version: 1 }),
         revision: val(undefined),
+        live: val({ status: published ? 'runnable' : 'not-published' }),
       },
     },
     publications: {
@@ -48,7 +49,6 @@ function renderState({ failedLoad = false, published = false, loading = false, i
         loadMoreFailed: val(false),
         nextCursor: val(undefined),
         rollingBackPublicationId: val(undefined),
-        changingTriggerId: val(undefined),
         bindings: val([]),
         detail: val(undefined),
         detailLoading: val(false),

@@ -478,9 +478,7 @@
     "networkFailed": "暂时无法连接服务，请检查网络后重试。",
     "published": "已发布 {{name}}。",
     "rolledBack": "已将线上版本回滚到修订 {{revision}}。",
-    "requestFailed": "服务未能完成此操作，请稍后重试。",
-    "triggerPaused": "Trigger 激活已暂停。",
-    "triggerResumed": "Trigger 激活正在恢复。"
+    "requestFailed": "服务未能完成此操作，请稍后重试。"
   },
   "publication": {
     "active": "运行中",
@@ -521,9 +519,6 @@
     "none": "尚未发布",
     "notPublished": "尚未发布",
     "operation": "操作",
-    "operatorState": "操作状态",
-    "pauseTrigger": "暂停",
-    "pausingTrigger": "正在暂停…",
     "publishDraft": "发布到线上",
     "publishConfirm": "发布当前草稿？",
     "publishConfirmDescription": "发布后，当前草稿将成为线上版本。",
@@ -539,8 +534,6 @@
     "pollTestResult": "测试结果",
     "pollTesting": "正在测试…",
     "reconciling": "正在对账",
-    "resumeTrigger": "恢复",
-    "resumingTrigger": "正在恢复…",
     "retired": "已停用",
     "revision": "固定修订",
     "rollback": "回滚",

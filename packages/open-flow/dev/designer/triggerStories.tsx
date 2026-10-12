@@ -619,20 +619,19 @@ export const triggerStories: readonly FrontendStory[] = [
         <div className="trigger-case-grid">
           {(
             [
-              ['Healthy', 'healthy', 'healthy', 'active'],
-              ['Notifications unavailable', 'failed', 'healthy', 'active'],
-              ['Read failed', 'healthy', 'failed', 'active'],
-              ['Authorization required', 'healthy', 'needs_reauth', 'active'],
-              ['Paused', 'failed', 'healthy', 'paused'],
+              ['Healthy', 'healthy', 'healthy', true],
+              ['Notifications unavailable', 'failed', 'healthy', true],
+              ['Read failed', 'healthy', 'failed', true],
+              ['Authorization required', 'healthy', 'needs_reauth', true],
+              ['Flow disabled', 'failed', 'healthy', false],
             ] as const
-          ).map(([label, health, sourceHealth, operatorState]) => {
+          ).map(([label, health, sourceHealth, enabled]) => {
             const fixture = triggerFixtures.find((item) => item.trigger.kind == 'integration' && item.trigger.definition.key == 'github.watch_pull_request')!
             const binding: TriggerBinding = {
               flowId: 'lab',
               triggerNodeId: 'listener',
               health,
               listener: { health: sourceHealth },
-              operatorState,
               runtimeVersion: 1,
               currentPublicationId: 'live',
               updatedAt: '2026-09-11T00:00:00Z',
@@ -643,8 +642,8 @@ export const triggerStories: readonly FrontendStory[] = [
               <section key={label} className="rounded-lg border p-4">
                 <h3>{label}</h3>
                 <TriggerSummary trigger={fixture.trigger} />
-                <TriggerStatus binding={binding} />
-                <ListenerHealth binding={binding} />
+                <TriggerStatus binding={binding} enabled={enabled} />
+                <ListenerHealth binding={binding} enabled={enabled} />
               </section>
             )
           })}

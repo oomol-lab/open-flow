@@ -1087,7 +1087,7 @@ export class RunStore {
           JOIN error_bindings b ON b.flow_id = s.handler_flow_id
           JOIN flow_live l ON l.flow_id = b.flow_id AND l.publication_id = b.current_publication_id
           JOIN flows f ON f.flow_id = l.flow_id
-          WHERE s.source_flow_id = ? AND f.status = 'active' AND l.enabled = 1 AND b.operator_state = 'active'
+          WHERE s.source_flow_id = ? AND f.status = 'active' AND l.enabled = 1
           ORDER BY s.handler_flow_id`)
           .all(source.flowId) as { flowId: string }[]
         for (const target of targets) {

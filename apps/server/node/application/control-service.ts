@@ -954,15 +954,6 @@ export class ControlService {
     return triggerBinding(this.requireTriggerBinding(flowId, triggerNodeId), endpointOrigin)
   }
 
-  changeFlowTriggerState(flowId: string, triggerNodeId: string, operatorState: StoredTriggerBinding['operatorState']): TriggerBinding {
-    this.getFlow(flowId)
-    const changed = this.store.triggers.setTriggerOperatorState(flowId, triggerNodeId, operatorState, this.clock())
-    if (changed == null) triggerNotFound()
-    if (changed.kind == 'error') this.flowCatalogChanged(undefined, this.store.flows.get(flowId)?.ownerId)
-    this.triggersChanged()
-    return triggerBinding(changed)
-  }
-
   listFlowTriggerActivities(
     flowId: string,
     triggerNodeId: string,

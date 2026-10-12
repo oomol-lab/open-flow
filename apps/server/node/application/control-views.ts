@@ -107,7 +107,6 @@ export function triggerBinding(stored: StoredTriggerBinding, endpointOrigin?: st
     health: stored.health,
     kind: stored.kind,
     ...(stored.lastErrorCode == null ? {} : { lastErrorCode: stored.lastErrorCode }),
-    operatorState: stored.operatorState,
     runtimeVersion: stored.runtimeVersion,
     triggerNodeId: stored.triggerNodeId,
     updatedAt: timestamp(stored.updatedAt),

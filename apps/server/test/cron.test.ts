@@ -118,11 +118,10 @@ describe('Server Cron Trigger', () => {
         await startService(service)
         await service.waitForIdle()
         expect(database.prepare('SELECT flow_id AS flowId, status FROM runs').all()).toEqual([{ flowId: 'healthy', status: 'completed' }])
-        expect(
-          database
-            .prepare("SELECT next_at AS nextAt, last_error_code AS errorCode, operator_state AS operatorState FROM cron_bindings WHERE flow_id = 'broken'")
-            .get(),
-        ).toEqual({ nextAt: null, errorCode: 'revision-invalid', operatorState: 'active' })
+        expect(database.prepare("SELECT next_at AS nextAt, last_error_code AS errorCode FROM cron_bindings WHERE flow_id = 'broken'").get()).toEqual({
+          nextAt: null,
+          errorCode: 'revision-invalid',
+        })
         expect(database.prepare('SELECT kind, error_code AS errorCode FROM trigger_activities').all()).toEqual([
           { kind: 'health.failed', errorCode: 'revision-invalid' },
         ])

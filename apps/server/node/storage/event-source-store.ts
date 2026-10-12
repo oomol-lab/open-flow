@@ -229,7 +229,7 @@ export class EventSourceStore {
         b.runtime_version AS runtimeVersion, b.trigger_json AS triggerJson FROM integration_bindings b
         JOIN flow_live l ON l.flow_id = b.flow_id AND l.publication_id = b.current_publication_id AND l.enabled = 1
         LEFT JOIN flow_connector_teams t ON t.flow_id = b.flow_id
-        WHERE b.health = 'healthy' AND b.operator_state = 'active' AND b.connection_id = ? AND t.team_id IS ?
+        WHERE b.health = 'healthy' AND b.connection_id = ? AND t.team_id IS ?
           AND json_extract(b.trigger_json, '$.definition.provider') = ? AND json_extract(b.trigger_json, '$.config.sourceId.value') = ?`)
         .all(source.connectionId, source.teamId, source.provider, source.sourceId) as {
         bindingId: string
@@ -274,7 +274,7 @@ export class EventSourceStore {
     return (
       this.#database
         .prepare(`SELECT 1 FROM integration_bindings b JOIN flow_live l ON l.flow_id = b.flow_id
-      AND l.publication_id = b.current_publication_id WHERE b.binding_id = ? AND b.operator_state = 'active' AND b.health = 'healthy' AND l.enabled = 1`)
+      AND l.publication_id = b.current_publication_id WHERE b.binding_id = ? AND b.health = 'healthy' AND l.enabled = 1`)
         .get(delivery.bindingId) != null
     )
   }

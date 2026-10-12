@@ -35,7 +35,6 @@ export interface StoredTriggerBinding {
   readonly health: 'failed' | 'healthy' | 'initializing' | 'needs_reauth'
   readonly kind: 'error' | 'cron' | 'integration' | 'poll' | 'webhook'
   readonly lastErrorCode: string | null
-  readonly operatorState: 'active' | 'paused'
   readonly runtimeVersion: number
   readonly triggerNodeId: string
   readonly updatedAt: number
@@ -205,7 +204,6 @@ export class TriggerStore {
                   'healthy' AS health,
                   'webhook' AS kind,
                   NULL AS lastErrorCode,
-                  bindings.operator_state AS operatorState,
                   bindings.runtime_version AS runtimeVersion,
                   bindings.trigger_node_id AS triggerNodeId,
                   bindings.updated_at AS updatedAt
@@ -215,28 +213,28 @@ export class TriggerStore {
            UNION ALL
            SELECT bindings.binding_id, bindings.current_publication_id, publications.revision_id,
                   NULL, bindings.flow_id, CASE WHEN bindings.last_error_code IS NULL THEN 'healthy' ELSE 'failed' END,
-                  'cron', bindings.last_error_code, bindings.operator_state,
+                  'cron', bindings.last_error_code,
                   bindings.runtime_version, bindings.trigger_node_id, bindings.updated_at
            FROM cron_bindings AS bindings
            LEFT JOIN publications ON publications.publication_id = bindings.current_publication_id
            WHERE bindings.flow_id = ?
            UNION ALL
            SELECT bindings.binding_id, bindings.current_publication_id, publications.revision_id,
-                  NULL, bindings.flow_id, bindings.health, 'poll', bindings.last_error_code, bindings.operator_state,
+                  NULL, bindings.flow_id, bindings.health, 'poll', bindings.last_error_code,
                   bindings.runtime_version, bindings.trigger_node_id, bindings.updated_at
            FROM poll_bindings AS bindings
            LEFT JOIN publications ON publications.publication_id = bindings.current_publication_id
            WHERE bindings.flow_id = ?
            UNION ALL
            SELECT bindings.binding_id, bindings.current_publication_id, publications.revision_id,
-                  NULL, bindings.flow_id, bindings.health, 'integration', bindings.last_error_code, bindings.operator_state,
+                  NULL, bindings.flow_id, bindings.health, 'integration', bindings.last_error_code,
                   bindings.runtime_version, bindings.trigger_node_id, bindings.updated_at
            FROM integration_bindings AS bindings
            LEFT JOIN publications ON publications.publication_id = bindings.current_publication_id
            WHERE bindings.flow_id = ?
            UNION ALL
            SELECT bindings.binding_id, bindings.current_publication_id, publications.revision_id,
-                  NULL, bindings.flow_id, 'healthy', 'error', NULL, bindings.operator_state,
+                  NULL, bindings.flow_id, 'healthy', 'error', NULL,
                   bindings.runtime_version, bindings.trigger_node_id, bindings.updated_at
            FROM error_bindings AS bindings
            LEFT JOIN publications ON publications.publication_id = bindings.current_publication_id
@@ -249,67 +247,6 @@ export class TriggerStore {
 
   triggerBinding(flowId: string, triggerNodeId: string): StoredTriggerBinding | undefined {
     return this.listTriggerBindings(flowId).find((binding) => binding.triggerNodeId == triggerNodeId)
-  }
-
-  setTriggerOperatorState(
-    flowId: string,
-    triggerNodeId: string,
-    operatorState: StoredTriggerBinding['operatorState'],
-    updatedAt: number,
-  ): StoredTriggerBinding | undefined {
-    return this.#transaction(() => {
-      const current = this.triggerBinding(flowId, triggerNodeId)
-      if (current?.currentPublicationId == null) return
-      if (current.operatorState == operatorState) return current
-      switch (current.kind) {
-        case 'error':
-          this.#database
-            .prepare('UPDATE error_bindings SET operator_state = ?, runtime_version = runtime_version + 1, updated_at = ? WHERE binding_id = ?')
-            .run(operatorState, updatedAt, current.bindingId)
-          break
-        case 'webhook':
-          this.#database
-            .prepare(
-              `UPDATE webhook_bindings
-               SET operator_state = ?, runtime_version = runtime_version + 1, updated_at = ?
-               WHERE endpoint_id = ? AND current_publication_id IS NOT NULL`,
-            )
-            .run(operatorState, updatedAt, current.bindingId)
-          break
-        case 'cron':
-          this.#database
-            .prepare(
-              `UPDATE cron_bindings
-               SET operator_state = ?, runtime_version = runtime_version + 1, updated_at = ?
-               WHERE binding_id = ? AND current_publication_id IS NOT NULL`,
-            )
-            .run(operatorState, updatedAt, current.bindingId)
-          break
-        case 'poll':
-          this.#database
-            .prepare(
-              `UPDATE poll_bindings
-               SET operator_state = ?, runtime_version = runtime_version + 1, updated_at = ?,
-                   active_claim_id = NULL, active_lease_token = NULL, active_lease_expires_at = NULL
-               WHERE binding_id = ? AND current_publication_id IS NOT NULL`,
-            )
-            .run(operatorState, updatedAt, current.bindingId)
-          break
-        case 'integration':
-          this.#database
-            .prepare(
-              `UPDATE integration_bindings
-               SET operator_state = ?, runtime_version = runtime_version + 1, updated_at = ?,
-                   reconcile_at = CASE WHEN ? = 'active' THEN ? ELSE reconcile_at END
-               WHERE binding_id = ? AND current_publication_id IS NOT NULL`,
-            )
-            .run(operatorState, updatedAt, operatorState, updatedAt, current.bindingId)
-          break
-      }
-      insertTriggerActivity(this.#database, current.bindingId, operatorState == 'paused' ? 'operator.paused' : 'operator.resumed', updatedAt)
-      pruneTriggerActivities(this.#database, updatedAt, 100)
-      return this.triggerBinding(flowId, triggerNodeId)
-    })
   }
 
   listTriggerActivities(
@@ -374,7 +311,6 @@ export class TriggerStore {
              AND bindings.trigger_node_id = ?
              AND bindings.current_publication_id = ?
              AND bindings.runtime_version = ?
-             AND bindings.operator_state = 'active'
              AND bindings.trigger_json = ?
              AND publications.revision_id = ?
              AND publications.revision_digest = ?
@@ -431,7 +367,6 @@ export class TriggerStore {
              AND bindings.trigger_node_id = ?
              AND bindings.current_publication_id = ?
              AND bindings.runtime_version = ?
-             AND bindings.operator_state = 'active'
              AND bindings.trigger_json = ?
              AND bindings.schedule_json = ?
              AND bindings.next_at = ?
@@ -504,7 +439,7 @@ export class TriggerStore {
     const rows = this.#database
       .prepare(`SELECT f.flow_id AS flowId, f.name AS flowName,
       b.trigger_node_id AS nodeId, json_extract(n.value, '$.name') AS nodeName,
-      (l.enabled = 1 AND b.operator_state = 'active') AS enabled
+      l.enabled AS enabled
       FROM error_subscriptions s
       JOIN flows f ON f.flow_id = s.handler_flow_id AND f.status = 'active'
       JOIN error_bindings b ON b.flow_id = f.flow_id
@@ -559,7 +494,6 @@ export class TriggerStore {
            ON revisions.revision_id = publications.revision_id
          WHERE bindings.trigger_json IS NOT NULL
            AND bindings.schedule_json IS NOT NULL
-           AND bindings.operator_state = 'active'
            AND bindings.next_at <= ?
          ORDER BY bindings.next_at, bindings.binding_id
          LIMIT ?`,
@@ -576,8 +510,7 @@ export class TriggerStore {
            ON flow_live.enabled = 1 AND flow_live.flow_id = bindings.flow_id
           AND flow_live.publication_id = bindings.current_publication_id
          WHERE bindings.trigger_json IS NOT NULL
-           AND bindings.schedule_json IS NOT NULL
-           AND bindings.operator_state = 'active'`,
+           AND bindings.schedule_json IS NOT NULL`,
       )
       .get() as { readonly nextAt: number | null }
     return row.nextAt ?? undefined
@@ -607,8 +540,7 @@ export class TriggerStore {
          JOIN revisions
            ON revisions.revision_id = publications.revision_id
          WHERE bindings.endpoint_id = ?
-           AND bindings.trigger_json IS NOT NULL
-           AND bindings.operator_state = 'active'`,
+           AND bindings.trigger_json IS NOT NULL`,
       )
       .get(endpointId) as StoredWebhookTarget | undefined
   }
@@ -637,7 +569,7 @@ export function errorWorkflowTarget(database: DatabaseSync, flowId: string) {
     FROM error_bindings b JOIN flow_live l ON l.flow_id = b.flow_id AND l.publication_id = b.current_publication_id
     JOIN flows f ON f.flow_id = l.flow_id
     JOIN publications p ON p.publication_id = l.publication_id JOIN revisions r ON r.revision_id = p.revision_id
-    WHERE f.flow_id = ? AND f.status = 'active' AND l.enabled = 1 AND b.operator_state = 'active'`)
+    WHERE f.flow_id = ? AND f.status = 'active' AND l.enabled = 1`)
     .get(flowId) as
     | {
         triggerNodeId: string

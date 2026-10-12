@@ -14,7 +14,6 @@ const binding: TriggerBinding = {
   health: 'failed',
   listener: { health: 'healthy' },
   kind: 'integration',
-  operatorState: 'active',
   runtimeVersion: 1,
   updatedAt: '2026-09-11T00:00:00Z',
   version: 1,
@@ -30,17 +29,17 @@ describe('Listener health projection', () => {
   })
 
   it.each([
-    { input: binding, label: 'Scanning; notifications unavailable', detail: 'Periodic checks' },
-    { input: { ...binding, health: 'healthy', listener: { health: 'failed' } }, label: 'Failed', detail: 'Saved progress' },
-    { input: { ...binding, operatorState: 'paused' }, label: 'Suspended', detail: null },
-    { input: { ...binding, currentPublicationId: undefined }, label: 'Retired', detail: null },
-  ] as const)('shows $label without overriding operator state', ({ input, label, detail }) => {
+    { input: binding, enabled: true, label: 'Scanning; notifications unavailable', detail: 'Periodic checks' },
+    { enabled: true, input: { ...binding, health: 'healthy', listener: { health: 'failed' } }, label: 'Failed', detail: 'Saved progress' },
+    { input: binding, enabled: false, label: 'Suspended', detail: null },
+    { enabled: true, input: { ...binding, currentPublicationId: undefined }, label: 'Retired', detail: null },
+  ] as const)('shows $label with Flow-wide enablement', ({ input, enabled, label, detail }) => {
     const i18n = createI18n('en')
     try {
       const output = renderToStaticMarkup(
         <I18nProvider i18n={i18n}>
-          <TriggerStatus binding={input} />
-          <ListenerHealth binding={input} />
+          <TriggerStatus binding={input} enabled={enabled} />
+          <ListenerHealth binding={input} enabled={enabled} />
         </I18nProvider>,
       )
       expect(output).toContain(label)

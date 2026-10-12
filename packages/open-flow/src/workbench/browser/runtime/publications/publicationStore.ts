@@ -41,7 +41,6 @@ interface PublicationState {
   readonly activitiesLoadingMore: boolean
   readonly activitiesNextCursor?: string
   readonly bindings: readonly TriggerBinding[]
-  readonly changingTriggerId?: string
   readonly detail?: TriggerBindingDetail
   readonly detailLoading: boolean
   readonly live?: Live
@@ -71,9 +70,7 @@ type Client = Pick<
   | 'listFlowTriggerActivities'
   | 'listFlowTriggerBindings'
   | 'listPublications'
-  | 'pauseFlowTrigger'
   | 'publishFlow'
-  | 'resumeFlowTrigger'
   | 'rollbackFlow'
   | 'testFlowPollTrigger'
 >
@@ -85,7 +82,6 @@ export interface Publication$ {
   readonly activitiesLoadingMore: ReadonlyVal<boolean>
   readonly activitiesNextCursor: ReadonlyVal<string | undefined>
   readonly bindings: ReadonlyVal<readonly TriggerBinding[]>
-  readonly changingTriggerId: ReadonlyVal<string | undefined>
   readonly detail: ReadonlyVal<TriggerBindingDetail | undefined>
   readonly detailLoading: ReadonlyVal<boolean>
   readonly live: ReadonlyVal<Live | undefined>
@@ -168,7 +164,6 @@ export class PublicationStore {
       activitiesLoadingMore: derive(this.#state, (state) => state.activitiesLoadingMore),
       activitiesNextCursor: derive(this.#state, (state) => state.activitiesNextCursor),
       bindings: derive(this.#state, (state) => state.bindings),
-      changingTriggerId: derive(this.#state, (state) => state.changingTriggerId),
       detail: derive(this.#state, (state) => state.detail),
       detailLoading: derive(this.#state, (state) => state.detailLoading),
       live: derive(this.#state, (state) => state.live),
@@ -278,13 +273,7 @@ export class PublicationStore {
     if (!(await this.#workspace.saveModuleEditor()) || flowId != this.#workspace.$.flowId.value) return false
     const flow = this.#workspace.$.flow.value
     const draft = this.#workspace.$.draft.value
-    if (
-      flow == null ||
-      draft == null ||
-      this.#state.value.changingTriggerId != null ||
-      this.#state.value.publishing ||
-      this.#state.value.rollingBackPublicationId != null
-    ) {
+    if (flow == null || draft == null || this.#state.value.publishing || this.#state.value.rollingBackPublicationId != null) {
       return false
     }
     const target = { flowId: flow.flowId }
@@ -317,7 +306,6 @@ export class PublicationStore {
     if (
       target == null ||
       currentPublicationId == null ||
-      this.#state.value.changingTriggerId != null ||
       rollingBackPublicationId != null ||
       this.#state.value.publishing ||
       publication.flowId != target.flowId
@@ -459,35 +447,6 @@ export class PublicationStore {
       return false
     } finally {
       if (current() && this.#state.value.selectedTriggerId == selectedTriggerId) this.#set({ testingTriggerId: undefined })
-    }
-  }
-
-  public async toggleTrigger(binding: TriggerBinding): Promise<boolean> {
-    const target = this.#state.value.target
-    if (target == null || this.#state.value.changingTriggerId != null || this.#state.value.publishing || this.#state.value.rollingBackPublicationId != null) {
-      return false
-    }
-    this.#stopObservation()
-    const current = this.#operation.begin()
-    this.#set({ changingTriggerId: binding.triggerNodeId })
-    try {
-      if (binding.operatorState == 'active') await this.#client.pauseFlowTrigger(target.flowId, binding.triggerNodeId)
-      else await this.#client.resumeFlowTrigger(target.flowId, binding.triggerNodeId)
-      if (!current()) return false
-      const bindings = await this.#client.listFlowTriggerBindings(target.flowId)
-      if (!current()) return false
-      this.#set({ bindings })
-      if (this.#state.value.selectedTriggerId == binding.triggerNodeId) void this.openTrigger(binding.triggerNodeId)
-      this.#setNotice({
-        kind: 'success',
-        message: this.#i18n.t(binding.operatorState == 'active' ? 'notice.triggerPaused' : 'notice.triggerResumed'),
-      })
-      return true
-    } catch (error) {
-      if (current()) this.#setNotice(errorNotice(error, this.#i18n.t))
-      return false
-    } finally {
-      if (current()) this.#set({ changingTriggerId: undefined })
     }
   }
 

@@ -99,11 +99,9 @@ export function triggerBinding(value: unknown): TriggerBinding {
   const listener = source.listener == null ? undefined : record(source.listener)
   if (listener != null && listener.health != 'healthy' && listener.health != 'failed' && listener.health != 'needs_reauth') return invalidResponse()
   const kind = source.kind
-  const operatorState = source.operatorState
   const runtimeVersion = integer(source.runtimeVersion)
   if (source.version != 1 || typeof health != 'string' || !triggerHealth.has(health as TriggerBinding['health'])) return invalidResponse()
   if (typeof kind != 'string' || !triggerKinds.has(kind as TriggerBinding['kind'])) return invalidResponse()
-  if (operatorState != 'active' && operatorState != 'paused') return invalidResponse()
   if (runtimeVersion <= 0) return invalidResponse()
   return {
     ...(source.currentPublicationId == null ? {} : { currentPublicationId: string(source.currentPublicationId) }),
@@ -121,7 +119,6 @@ export function triggerBinding(value: unknown): TriggerBinding {
     health: health as TriggerBinding['health'],
     kind: kind as TriggerBinding['kind'],
     ...(source.lastErrorCode == null ? {} : { lastErrorCode: string(source.lastErrorCode) }),
-    operatorState: operatorState as TriggerBinding['operatorState'],
     runtimeVersion,
     triggerNodeId: string(source.triggerNodeId),
     updatedAt: string(source.updatedAt),

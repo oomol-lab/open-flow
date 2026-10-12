@@ -99,3 +99,16 @@ See the [CLI invocation contract](../../distribution/command-artifact.md#cli-inv
 The public package and Command upgraded together to `0.1.0-beta.47`. CLI `node show` adds `--revision` and `--subflow`; `connector code-access` adds `--publication`; `connector candidates` supports multiple Providers.
 
 This prerelease has two CLI JSON breaks: `trigger search` renames `definitions` to `keys`; `node show` moves `nodeId`, `node`, `task?`, and `module?` from the old `node` wrapper to the result root. Old fields and nesting have no aliases. Consumers must update read paths using the [CLI result contract](../../distribution/command-artifact.md#output-and-errors). MCP tool contracts, Flow model, and Engine Contract remain unchanged.
+
+## Flow-wide Trigger control
+
+Individual Trigger pause/resume routes, client methods and the `TriggerBinding.operatorState`
+field are removed. Use Flow enable/disable with the observed Live publication ID. Resource and
+Trigger queries retain configuration, runtime health, endpoints and activity history.
+
+Migration 0046 disables a Flow if any binding in its current Live publication was individually
+paused, then removes the per-Trigger state columns. Paused retired or older-publication bindings do
+not disable the current Flow. Existing disabled Flows stay disabled. Explicitly enabling an affected
+Flow restores admission through all current Triggers. Checkpoints, deduplication, subscriptions and
+historical activity records remain intact; old `operator.paused` / `operator.resumed` activity entries
+remain readable but are no longer generated. Deploy this change with a server restart.

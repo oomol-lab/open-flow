@@ -478,9 +478,7 @@
     "networkFailed": "서비스에 연결할 수 없습니다. 네트워크 연결을 확인한 뒤 다시 시도하세요.",
     "published": "{{name}} 게시를 완료했습니다.",
     "rolledBack": "라이브를 리비전 {{revision}}(으)로 롤백했습니다.",
-    "requestFailed": "서비스에서 이 작업을 완료하지 못했습니다. 나중에 다시 시도하세요.",
-    "triggerPaused": "Trigger 활성화가 일시 중지되었습니다.",
-    "triggerResumed": "Trigger 활성화를 재개하는 중입니다."
+    "requestFailed": "서비스에서 이 작업을 완료하지 못했습니다. 나중에 다시 시도하세요."
   },
   "publication": {
     "active": "활성",
@@ -521,9 +519,6 @@
     "none": "게시되지 않음",
     "notPublished": "게시되지 않음",
     "operation": "작업",
-    "operatorState": "운영자 상태",
-    "pauseTrigger": "일시 중지",
-    "pausingTrigger": "일시 중지하는 중…",
     "publishDraft": "라이브에 게시",
     "publishConfirm": "현재 초안을 게시할까요?",
     "publishConfirmDescription": "게시하면 현재 초안이 라이브 버전이 됩니다.",
@@ -539,8 +534,6 @@
     "pollTestResult": "테스트 결과",
     "pollTesting": "테스트하는 중…",
     "reconciling": "조정 중",
-    "resumeTrigger": "재개",
-    "resumingTrigger": "재개하는 중…",
     "retired": "중단됨",
     "revision": "고정 리비전",
     "rollback": "롤백",

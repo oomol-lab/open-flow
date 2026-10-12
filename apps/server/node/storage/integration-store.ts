@@ -556,7 +556,6 @@ export class IntegrationStore {
              AND bindings.trigger_json = ?
              AND bindings.connection_id = ?
              AND (bindings.health = 'healthy' OR ? = 1)
-             AND bindings.operator_state = 'active'
              AND publications.revision_id = ?
              AND publications.revision_digest = ?
              AND publications.closure_digest = ?
@@ -654,7 +653,7 @@ export class IntegrationStore {
         JOIN integration_states AS states ON states.binding_id = work.binding_id AND states.runtime_version = work.runtime_version
         JOIN flow_live ON flow_live.flow_id = bindings.flow_id AND flow_live.publication_id = bindings.current_publication_id AND flow_live.enabled = 1
         JOIN flows ON flows.flow_id = bindings.flow_id AND flows.status = 'active'
-        WHERE bindings.operator_state = 'active' AND states.checkpoint_json != 'null'
+        WHERE states.checkpoint_json != 'null'
           AND work.next_at <= ? AND (work.lease_until IS NULL OR work.lease_until <= ?)
         ORDER BY work.next_at, work.binding_id LIMIT 1`)
         .get(now, now) as (Omit<ListenerLease, 'token'> & { readonly endpointId: string }) | undefined
@@ -761,8 +760,7 @@ export class IntegrationStore {
                 current_publication_id AS currentPublicationId, runtime_version AS runtimeVersion,
                 trigger_json AS triggerJson, connection_id AS connectionId, health
          FROM integration_bindings AS bindings
-         WHERE bindings.operator_state = 'active'
-           AND (bindings.retry_at <= ?
+         WHERE (bindings.retry_at <= ?
             OR (
               bindings.retry_at IS NULL AND (
                 bindings.reconcile_at <= ? OR EXISTS (
@@ -867,8 +865,7 @@ export class IntegrationStore {
          JOIN publications ON publications.publication_id = bindings.current_publication_id
          JOIN revisions ON revisions.revision_id = publications.revision_id
          LEFT JOIN integration_states AS states ON states.binding_id = bindings.binding_id
-         WHERE bindings.endpoint_id = ?
-           AND bindings.operator_state = 'active'`,
+         WHERE bindings.endpoint_id = ?`,
       )
       .get(endpointId) as
       | (Omit<StoredIntegrationTarget, 'state'> & {
@@ -957,14 +954,14 @@ export class IntegrationStore {
     const row = this.#database
       .prepare(
         `SELECT MIN(next_at) AS nextAt FROM (
-           SELECT retry_at AS next_at FROM integration_bindings WHERE operator_state = 'active' AND retry_at IS NOT NULL
+           SELECT retry_at AS next_at FROM integration_bindings WHERE retry_at IS NOT NULL
            UNION ALL
-           SELECT reconcile_at AS next_at FROM integration_bindings WHERE operator_state = 'active' AND retry_at IS NULL
+           SELECT reconcile_at AS next_at FROM integration_bindings WHERE retry_at IS NULL
            UNION ALL
            SELECT states.reconcile_at AS next_at
            FROM integration_states AS states
            JOIN integration_bindings AS bindings USING (binding_id)
-           WHERE bindings.operator_state = 'active' AND bindings.retry_at IS NULL
+           WHERE bindings.retry_at IS NULL
            UNION ALL
            SELECT next_at FROM integration_candidates WHERE status IN ('preparing', 'cleanup') AND next_at IS NOT NULL
          )`,
@@ -981,7 +978,7 @@ export class IntegrationStore {
            JOIN integration_states AS states ON states.binding_id = work.binding_id AND states.runtime_version = work.runtime_version
            JOIN flow_live ON flow_live.flow_id = bindings.flow_id AND flow_live.publication_id = bindings.current_publication_id AND flow_live.enabled = 1
            JOIN flows ON flows.flow_id = bindings.flow_id AND flows.status = 'active'
-           WHERE bindings.operator_state = 'active' AND states.checkpoint_json != 'null'`)
+           WHERE states.checkpoint_json != 'null'`)
       .get() as { readonly nextAt: number | null }
     return row.nextAt ?? undefined
   }

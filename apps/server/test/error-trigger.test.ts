@@ -163,13 +163,12 @@ it.each(['draft', 'live'] as const)('does not dispatch manually admitted %s fail
   expect(f.store.runViews.errorHandling(run.runId).errorDispatches).toBeUndefined()
 })
 
-it.each(['paused', 'disabled', 'deleted'] as const)('reports a target becoming %s before dispatch', async (state) => {
+it.each(['disabled', 'deleted'] as const)('reports a target becoming %s before dispatch', async (state) => {
   const f = fixture()
   const source = await f.flow('source')
   await f.flow('handler', 'error', ['source'])
   const runId = f.automatic(source, 'failure')
   f.fail(runId)
-  if (state == 'paused') f.store.triggers.setTriggerOperatorState('handler', 'start', 'paused', 1_001)
   if (state == 'disabled') f.database.connection.prepare('UPDATE flow_live SET enabled = 0 WHERE flow_id = ?').run('handler')
   if (state == 'deleted') f.database.connection.prepare("UPDATE flows SET status = 'retiring' WHERE flow_id = ?").run('handler')
   const changed = f.maintain().errorDispatches
@@ -357,12 +356,11 @@ it('validates upstream availability again at publication', async () => {
   expect((await configureSources(f, handler, ['source']))?.kind).toBe('error-sources-unavailable')
 })
 
-it.each(['paused', 'disabled'] as const)('does not subscribe while the handler is %s', async (state) => {
+it('does not subscribe while the handler Flow is disabled', async () => {
   const f = fixture()
   const source = await f.flow('source')
   await f.flow('handler', 'error', ['source'])
-  if (state == 'paused') f.store.triggers.setTriggerOperatorState('handler', 'start', 'paused', 1_001)
-  else f.database.connection.prepare("UPDATE flow_live SET enabled = 0 WHERE flow_id = 'handler'").run()
+  f.database.connection.prepare("UPDATE flow_live SET enabled = 0 WHERE flow_id = 'handler'").run()
   const runId = f.automatic(source, 'failure')
   f.fail(runId)
   expect(f.store.runViews.errorHandling(runId).errorDispatches).toBeUndefined()
@@ -391,17 +389,14 @@ it('lists published error listeners with their names and disabled state for dele
   await f.flow('other')
   await f.flow('active', 'error', ['source'])
   const disabled = await f.flow('disabled', 'error', ['source'])
-  await f.flow('paused', 'error', ['source'])
   await f.flow('retiring', 'error', ['source'])
   await f.flow('unrelated', 'error', ['other'])
   f.store.flows.rename('active', 'Alerts', 2_000)
   f.store.flows.setEnabled('disabled', disabled.publicationId, false)
-  f.database.connection.prepare("UPDATE error_bindings SET operator_state = 'paused' WHERE flow_id = 'paused'").run()
   f.store.flows.retire('retiring', 2_000)
   expect(f.store.triggers.errorListeners('source')).toEqual([
     { flowId: 'active', flowName: 'Alerts', nodeId: 'start', nodeName: 'Start', enabled: true },
     { flowId: 'disabled', flowName: 'disabled', nodeId: 'start', nodeName: 'Start', enabled: false },
-    { flowId: 'paused', flowName: 'paused', nodeId: 'start', nodeName: 'Start', enabled: false },
   ])
   expect(f.store.triggers.errorListeners('active')).toEqual([])
 })

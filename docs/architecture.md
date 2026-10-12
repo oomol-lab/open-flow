@@ -148,7 +148,7 @@ A publish operation can prepare external resources asynchronously. Only after al
 The previous Live remains valid during preparation and after failure. Rollback creates a new Publication without changing historical versions.
 Changes that cannot prepare independent candidate resources must be rejected. They must not damage live resources and rely on compensation to recover.
 
-The Flow enable switch, Live version, and individual Trigger pause states are independent.
+The Flow enable switch controls all Trigger admission for the current Live version. Individual Triggers have no manual pause state.
 Disabling a Flow blocks new production admission but does not cancel accepted Runs.
 Live and the current Trigger binding jointly determine admission authority. Old workers and candidate callbacks cannot bypass this boundary.
 

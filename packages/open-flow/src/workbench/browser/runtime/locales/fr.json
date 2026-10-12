@@ -478,9 +478,7 @@
     "networkFailed": "Impossible de joindre le service. Vérifiez votre connexion, puis réessayez.",
     "published": "{{name}} publié.",
     "rolledBack": "Version en ligne restaurée à la révision {{revision}}.",
-    "requestFailed": "Le service n’a pas pu terminer cette opération. Réessayez plus tard.",
-    "triggerPaused": "L'activation du Trigger est en pause.",
-    "triggerResumed": "L'activation du Trigger reprend."
+    "requestFailed": "Le service n’a pas pu terminer cette opération. Réessayez plus tard."
   },
   "publication": {
     "active": "Actif",
@@ -521,9 +519,6 @@
     "none": "Non publié",
     "notPublished": "Non publié",
     "operation": "Opération",
-    "operatorState": "État de l'opérateur",
-    "pauseTrigger": "Mettre en pause",
-    "pausingTrigger": "Mise en pause…",
     "publishDraft": "Publier en ligne",
     "publishConfirm": "Publier ce brouillon ?",
     "publishConfirmDescription": "Le brouillon actuel deviendra la version en ligne.",
@@ -539,8 +534,6 @@
     "pollTestResult": "Résultat du test",
     "pollTesting": "Test en cours…",
     "reconciling": "Réconciliation",
-    "resumeTrigger": "Reprendre",
-    "resumingTrigger": "Reprise…",
     "retired": "Retiré",
     "revision": "Révision figée",
     "rollback": "Restaurer",

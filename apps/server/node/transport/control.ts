@@ -511,14 +511,6 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const { next, page } = service.listFlowTriggerActivities(flowId, triggerNodeId, pageSize(parameters), after)
     return response(200, { ...page, ...(next == null ? {} : { nextCursor: encodeTriggerActivityCursor(flowId, triggerNodeId, next) }) })
   })
-  app.post('/flows/:flowId/triggers/:triggerNodeId/pause', async (context) => {
-    await versionOnly(context.req.raw, controlErrorCode.flowInvalid)
-    return response(200, service.changeFlowTriggerState(context.req.param('flowId'), context.req.param('triggerNodeId'), 'paused'))
-  })
-  app.post('/flows/:flowId/triggers/:triggerNodeId/resume', async (context) => {
-    await versionOnly(context.req.raw, controlErrorCode.flowInvalid)
-    return response(200, service.changeFlowTriggerState(context.req.param('flowId'), context.req.param('triggerNodeId'), 'active'))
-  })
   app.post('/flows/:flowId/triggers/:triggerNodeId/test', async (context) => {
     await versionOnly(context.req.raw, controlErrorCode.flowInvalid)
     return response(200, await service.testFlowPollTrigger(context.req.param('flowId'), context.req.param('triggerNodeId')))

@@ -161,7 +161,7 @@ async function createHarness(
         await service.tickMaintenance()
       }
       const response = await app.request(new Request(request, { headers }))
-      if (request.method == 'POST' && new URL(request.url).pathname.endsWith('/pause') && response.ok) {
+      if (request.method == 'PUT' && new URL(request.url).pathname.endsWith('/enabled') && response.ok) {
         await closeService(service)
         service = await open()
         app = createServerApp(service, options)

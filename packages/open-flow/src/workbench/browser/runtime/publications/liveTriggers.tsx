@@ -11,9 +11,9 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { Dialog, DialogContent, DialogTitle } from '../../../../ui/browser/dialog.tsx'
 import { collapseAllNested, JSONViewer } from '../../../../ui/browser/json-viewer/index.ts'
 
-function triggerLabel(binding: TriggerBinding, t: TFunction): string {
+function triggerLabel(binding: TriggerBinding, enabled: boolean, t: TFunction): string {
   if (binding.currentPublicationId == null) return t('publication.retired')
-  if (binding.operatorState == 'paused') return t('publication.suspended')
+  if (!enabled) return t('publication.suspended')
   if (binding.listener?.health == 'healthy' && (binding.health == 'failed' || binding.health == 'needs_reauth')) return t('publication.listenerDegraded')
   switch (binding.listener?.health == 'failed' || binding.listener?.health == 'needs_reauth' ? binding.listener.health : binding.health) {
     case 'healthy':
@@ -53,8 +53,8 @@ function triggerName(binding: TriggerBinding, revision: RevisionView | undefined
   return revision.trigger(binding.triggerNodeId)?.name ?? binding.triggerNodeId
 }
 
-function triggerClass(binding: TriggerBinding): string {
-  if (binding.currentPublicationId == null || binding.operatorState == 'paused') return 'neutral'
+function triggerClass(binding: TriggerBinding, enabled: boolean): string {
+  if (binding.currentPublicationId == null || !enabled) return 'neutral'
   if (binding.listener?.health == 'healthy' && (binding.health == 'failed' || binding.health == 'needs_reauth')) return 'running'
   switch (binding.listener?.health == 'failed' || binding.listener?.health == 'needs_reauth' ? binding.listener.health : binding.health) {
     case 'healthy':
@@ -69,14 +69,14 @@ function triggerClass(binding: TriggerBinding): string {
   }
 }
 
-export function TriggerStatus({ binding }: { readonly binding: TriggerBinding }) {
+export function TriggerStatus({ binding, enabled }: { readonly binding: TriggerBinding; readonly enabled: boolean }) {
   const t = useTranslate()
-  return <span className={'trigger-binding-state ' + triggerClass(binding)}>{triggerLabel(binding, t)}</span>
+  return <span className={'trigger-binding-state ' + triggerClass(binding, enabled)}>{triggerLabel(binding, enabled, t)}</span>
 }
 
-export function ListenerHealth({ binding }: { readonly binding: TriggerBinding }) {
+export function ListenerHealth({ binding, enabled }: { readonly binding: TriggerBinding; readonly enabled: boolean }) {
   const t = useTranslate()
-  if (binding.listener == null || binding.currentPublicationId == null || binding.operatorState == 'paused') return null
+  if (binding.listener == null || binding.currentPublicationId == null || !enabled) return null
   return (
     <p className="trigger-recovery">
       {t(
@@ -105,8 +105,8 @@ export function LiveTriggers({ store }: { readonly store: WorkbenchStore }): Rea
   const selectedTriggerId = useVal(store.publications.$.selectedTriggerId)
   const testingTriggerId = useVal(store.publications.$.testingTriggerId)
   const testResult = useVal(store.publications.$.testResult)
-  const busy = useVal(store.$.busy)
-  const changingTriggerId = useVal(store.publications.$.changingTriggerId)
+  const live = useVal(store.workspace.$.live)
+  const enabled = live?.status == 'runnable'
   const revision = useVal(store.workspace.$.revision)
   const [copiedEndpoint, setCopiedEndpoint] = useState<string>()
   useEffect(() => setCopiedEndpoint(undefined), [detail?.binding.endpointUrl])
@@ -125,8 +125,6 @@ export function LiveTriggers({ store }: { readonly store: WorkbenchStore }): Rea
       ) : (
         <ul className="trigger-binding-list">
           {bindings.map((binding) => {
-            const changing = changingTriggerId == binding.triggerNodeId
-            const resumable = binding.operatorState == 'paused'
             return (
               <li className="trigger-binding-row" key={binding.triggerNodeId}>
                 <Button
@@ -139,7 +137,7 @@ export function LiveTriggers({ store }: { readonly store: WorkbenchStore }): Rea
                   variant="ghost"
                   size="sm"
                 >
-                  <span className={`status-dot mr-1 ${triggerClass(binding)}`} />
+                  <span className={`status-dot mr-1 ${triggerClass(binding, enabled)}`} />
                   <span className="trigger-binding-label">
                     <span className="trigger-binding-name" title={binding.triggerNodeId}>
                       {triggerName(binding, revision)}
@@ -147,20 +145,7 @@ export function LiveTriggers({ store }: { readonly store: WorkbenchStore }): Rea
                     <span className="trigger-binding-kind">{binding.kind}</span>
                   </span>
                 </Button>
-                <TriggerStatus binding={binding} />
-                {binding.currentPublicationId != null && (
-                  <Button disabled={busy != null} onClick={() => void store.publications.toggleTrigger(binding)} size="sm" variant="outline">
-                    {t(
-                      changing
-                        ? resumable
-                          ? 'publication.resumingTrigger'
-                          : 'publication.pausingTrigger'
-                        : resumable
-                          ? 'publication.resumeTrigger'
-                          : 'publication.pauseTrigger',
-                    )}
-                  </Button>
-                )}
+                <TriggerStatus binding={binding} enabled={enabled} />
               </li>
             )
           })}
@@ -195,11 +180,7 @@ export function LiveTriggers({ store }: { readonly store: WorkbenchStore }): Rea
                   </div>
                   <div>
                     <dt>{t('publication.triggerHealth')}</dt>
-                    <dd>{triggerLabel(detail.binding, t)}</dd>
-                  </div>
-                  <div>
-                    <dt>{t('publication.operatorState')}</dt>
-                    <dd>{t(detail.binding.operatorState == 'paused' ? 'publication.suspended' : 'publication.active')}</dd>
+                    <dd>{triggerLabel(detail.binding, enabled, t)}</dd>
                   </div>
                   <div>
                     <dt>{t('publication.updatedAt')}</dt>
@@ -212,7 +193,7 @@ export function LiveTriggers({ store }: { readonly store: WorkbenchStore }): Rea
                     </div>
                   )}
                 </dl>
-                <ListenerHealth binding={detail.binding} />
+                <ListenerHealth binding={detail.binding} enabled={enabled} />
                 {detail.binding.health == 'needs_reauth' && <p className="trigger-recovery">{t('publication.needsReauthDescription')}</p>}
                 {detail.binding.endpointUrl != null && (
                   <div className="trigger-webhook">
