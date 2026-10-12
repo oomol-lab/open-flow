@@ -25,9 +25,8 @@
     "test": "bun run --workspaces --if-present test",
     "test:coverage": "bun run --workspaces --if-present test:coverage",
     "test:docker": "bun run --filter @oomol-lab/open-flow-server test:docker",
-    "test:command-artifact": "bun run --filter @oomol-lab/open-flow-command test:package",
     "test:npm-package": "bun run --filter @oomol-lab/open-flow test:package",
-    "test:package": "bun run test:npm-package && bun run test:command-artifact",
+    "test:package": "bun run test:npm-package",
     "lab": "node --no-node-snapshot apps/server/scripts/lab/main.ts",
     "flow": "bun apps/server/scripts/flow.ts",
     "skill:generate": "bun run --filter @oomol-lab/open-flow skill:generate"

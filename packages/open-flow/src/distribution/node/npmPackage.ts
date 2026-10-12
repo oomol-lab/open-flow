@@ -32,6 +32,7 @@ function createManifest(version: string): object {
     },
     types: './dist/index.d.ts',
     exports: {
+      './command': { types: './dist/command/index.d.ts', import: './dist/command/index.js' },
       './package.json': './package.json',
       './skills/open-flow/SKILL.md': './skills/open-flow/SKILL.md',
       './skills/open-flow/references/flow-authoring.md': './skills/open-flow/references/flow-authoring.md',
@@ -182,6 +183,19 @@ Hosts can render \`OpenFlowSessionGate\` before authentication to keep login, re
 
 Deployment chrome can import \`@oomol-lab/open-flow/theme.css\` and apply \`open-flow-theme\` plus \`data-theme\` to its root.
 
-The Open Flow command and hosted Workbench applications are distributed separately.
+Embed the CLI in a Bun host through the explicit command subpath:
+
+\`\`\`ts
+import { runOpenFlowCommand, type OpenFlowCommandHost } from '@oomol-lab/open-flow/command'
+
+const exitCode = await runOpenFlowCommand(args, { cloudRequest, getWorkbenchUrl, language: 'en' })
+\`\`\`
+
+Pass arguments after the host's \`oo flow\` prefix. The host supplies authenticated
+Control API requests and Workbench URLs, and handles the returned exit code.
+The command uses process stdin/stdout/stderr and targets Bun 1.4.2 or newer.
+Importing it does not execute the CLI. Bundle it into the host at build time;
+runtime dependencies and the package version are included in the command entry.
+Skill templates ship in this same package under \`skills/open-flow/\`.
 `
 }

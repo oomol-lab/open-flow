@@ -68,6 +68,7 @@ jobs:
                 ;;
               packages/command/*)
                 command=true
+                package=true
                 ;;
               apps/server/*)
                 server=true
@@ -170,9 +171,6 @@ jobs:
 
       - name: Test command source
         run: bun run --filter @oomol-lab/open-flow-command test
-
-      - name: Verify Command Artifact
-        run: bun run test:command-artifact
 
   server:
     needs: changes

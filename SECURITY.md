@@ -52,7 +52,7 @@ A good report lets us reproduce and assess the issue quickly. Where possible, in
   CodeModule that demonstrates the issue is ideal for runtime findings.
 - The affected version, release, or commit, and **how it was deployed**: the Docker image built
   from `apps/server/Dockerfile`, a from-source `bun run dev` Server, the `@oomol-lab/open-flow`
-  npm package, or the Command Artifact used by `oo flow`.
+  npm package, or a host bundling `@oomol-lab/open-flow/command` for `oo flow`.
 - Any known mitigation or workaround.
 
 ### Protect secrets in your report
@@ -104,7 +104,7 @@ We follow a coordinated disclosure process:
 - **Resource limit bypasses.** Circumventing the concurrent Run, pending Run, or Run timeout limits
   from user code or through the API.
 - **Clients and distribution.** The Workbench (XSS, CSRF, and similar), the published
-  `@oomol-lab/open-flow` npm package, the Command Artifact build and verification rules in
+  `@oomol-lab/open-flow` npm package, its bundled command entry built by
   `packages/command`, and the Docker image defaults.
 
 **Out of scope**: please do not report these as vulnerabilities in Open Flow:

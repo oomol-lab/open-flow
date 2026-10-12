@@ -21,7 +21,7 @@ Protocol adapters must not create a second authoring or Run state machine.
 | Owner                | Responsibility                                                                                                                                                                      |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `packages/open-flow` | Public models and decoding, node authoring, Control API and MCP contracts, deterministic validation and graph execution, conformance tests, product-neutral Workbench and shared UI |
-| `packages/command`   | CLI arguments and output, the Command Host boundary, Command Artifact builds and distribution                                                                                       |
+| `packages/command`   | CLI arguments and output, the Command Host boundary, command entry builds for the public npm package                                                                                |
 | `apps/server`        | Server lifecycle, authentication, persistence, scheduling, isolated execution host, HTTP/MCP adapters, Workbench host, and container delivery                                       |
 | Other deployments    | Their infrastructure, authentication, application lifecycle, external capability mediation, and production Workbench host                                                           |
 
@@ -221,7 +221,7 @@ Do not maintain exact fields, numeric limits, usage examples, storage algorithms
 | Node-compatible execution environment                                  | [Node runtime contract](control/contracts/nodejs-runtime.md)                                                             |
 | Connection use and execution authorization                             | [Flow authorization](control/flow-authorization.md), [Trigger permissions and execution](control/trigger-permissions.md) |
 | Node development and verification                                      | [Node authoring](authoring/node-authoring.md), [CLI Lab](authoring/cli-lab.md)                                           |
-| CLI delivery and invocation contracts                                  | [Command Artifact](distribution/command-artifact.md)                                                                     |
+| CLI delivery and invocation contracts                                  | [Command distribution](distribution/command.md)                                                                          |
 | Server configuration, authentication, and deployment                   | [Container delivery](server/container-delivery.md), [User system](server/users.md), [MCP](server/mcp.md)                 |
 | Trigger usage                                                          | [Flow Error](triggers/error-trigger.md), [Linear Issue Trigger](triggers/linear-trigger.md)                              |
 | Frontend integration and component interaction                         | [frontend-ui skill](../.agents/skills/frontend-ui/SKILL.md), production components, and Lab stories                      |

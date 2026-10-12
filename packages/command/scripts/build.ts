@@ -1,18 +1,19 @@
 import { toPlainObject } from '@wopjs/cast'
-import { chmod, copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
-import { isBuiltin } from 'node:module'
+import { execFile } from 'node:child_process'
+import { copyFile, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import { createRequire, isBuiltin } from 'node:module'
 import path from 'node:path'
+import { promisify } from 'node:util'
 import { buildJavaScriptBundle } from '../src/build/node/bundle.ts'
 import { buildBunVersion } from '../src/cli/common/version.ts'
-import { encodeCommandArchive } from '../src/distribution/node/commandArchive.ts'
-import { collectCommandArchiveFiles, sha256, writeCommandArtifactManifest } from '../src/distribution/node/commandTree.ts'
 
 const rootPath = path.resolve(import.meta.dirname, '..')
 const workspaceRoot = path.resolve(rootPath, '../..')
 const openFlowRoot = path.resolve(rootPath, '../open-flow')
-const outputPath = path.join(rootPath, 'dist')
-const commandRoot = path.join(outputPath, 'command/open-flow-command')
-const releaseRoot = path.join(outputPath, 'release')
+const outputArgument = process.argv.indexOf('--output')
+if (outputArgument >= 0 && process.argv[outputArgument + 1] == null) throw new Error('--output requires a directory.')
+const outputPath = path.resolve(outputArgument < 0 ? path.join(rootPath, 'dist/command') : process.argv[outputArgument + 1]!)
+const execFileAsync = promisify(execFile)
 const quiet = process.argv.includes('--quiet')
 const packageManifest = await readManifest(path.join(rootPath, 'package.json'))
 const openFlowManifest = await readManifest(path.join(openFlowRoot, 'package.json'))
@@ -29,70 +30,50 @@ interface BundledPackageLicense {
 
 await validateVersions()
 await rm(outputPath, { force: true, recursive: true })
-await mkdir(releaseRoot, { recursive: true })
-await buildCommandArtifact()
-
-async function buildCommandArtifact(): Promise<void> {
-  await mkdir(commandRoot, { recursive: true })
-  await copyCommandFiles()
-  const result = await buildJavaScriptBundle(
-    {
-      entrypoints: [path.join(rootPath, 'src/cli/node/commandEntry.ts')],
-      define: { openFlowVersionBuildConstant: JSON.stringify(openFlowVersion) },
-      env: 'disable',
-      format: 'esm',
-      minify: true,
-      root: rootPath,
-      splitting: false,
-      target: 'bun',
-    },
-    {
-      failureMessage: 'Command entry build failed.',
-      onWarning: quiet ? undefined : (message) => process.stderr.write(`${message}\n`),
-      projectRoot: rootPath,
-    },
-  )
-
-  for (const imported of result.externalImports) {
-    if (!isBuiltin(imported)) {
-      throw new Error(`Unexpected external import ${imported}. Bundle it into the command entry.`)
-    }
-  }
-  const forbiddenInputs = ['/src/workbench/', '/src/compiler/', '/src/project/node/']
-  for (const input of result.resolvedInputPaths) {
-    const normalized = input.split(path.sep).join('/')
-    if (forbiddenInputs.some((part) => normalized.includes(part))) throw new Error(`Command entry includes forbidden product code: ${input}`)
-  }
-
-  const bunShebang = '#!/usr/bin/env bun\n'
-  const entryPath = path.join(commandRoot, 'entry.js')
-  if (!new TextDecoder().decode(result.bytes.subarray(0, bunShebang.length)).startsWith(bunShebang)) {
-    throw new Error('Command entry bundle did not preserve the required Bun shebang.')
-  }
-  await writeFile(entryPath, result.bytes)
-  await chmod(entryPath, 0o755)
-
-  const [projectLicense, nodeLicenses] = await Promise.all([
-    readFile(path.join(openFlowRoot, 'LICENSE'), 'utf8'),
-    renderNodeLicenses(result.resolvedInputPaths),
-  ])
-  await writeFile(
-    path.join(commandRoot, 'LICENSE.md'),
-    ['# Open Flow license', '', projectLicense.trim(), '', '# Licenses of bundled dependencies', '', nodeLicenses.trim(), ''].join('\n'),
-  )
-
-  await writeCommandArtifactManifest(commandRoot, { bun: buildBunVersion, openFlow: openFlowVersion })
-  const archive = await encodeCommandArchive(await collectCommandArchiveFiles(commandRoot))
-  const archiveName = `open-flow-${openFlowVersion}-${sha256(archive)}.tar.gz`
-  await writeFile(path.join(releaseRoot, archiveName), archive)
+await mkdir(outputPath, { recursive: true })
+const result = await buildJavaScriptBundle(
+  { entrypoints: [path.join(rootPath, 'src/cli/node/command.ts')], env: 'disable', format: 'esm', minify: true, splitting: false, target: 'bun' },
+  { failureMessage: 'Command entry build failed.', onWarning: quiet ? undefined : (message) => process.stderr.write(`${message}\n`), projectRoot: rootPath },
+)
+for (const imported of result.externalImports) {
+  if (!isBuiltin(imported)) throw new Error(`Unexpected external import ${imported}. Bundle it into the command entry.`)
 }
-
-async function copyCommandFiles(): Promise<void> {
-  await Promise.all([
-    copyFile(path.join(openFlowRoot, 'LICENSE'), path.join(commandRoot, 'LICENSE')),
-    copyFile(path.join(openFlowRoot, 'NOTICE'), path.join(commandRoot, 'NOTICE')),
-  ])
+for (const input of result.resolvedInputPaths) {
+  const normalized = input.split(path.sep).join('/')
+  if (['/src/workbench/', '/src/compiler/', '/src/project/node/'].some((part) => normalized.includes(part))) {
+    throw new Error(`Command entry includes forbidden product code: ${input}`)
+  }
 }
+await writeFile(path.join(outputPath, 'index.js'), result.bytes)
+const declarations = path.join(outputPath, 'declarations')
+const compiler = path.join(path.dirname(createRequire(import.meta.url).resolve('typescript/package.json')), 'bin/tsc')
+await execFileAsync(
+  process.execPath,
+  [
+    compiler,
+    '--ignoreConfig',
+    '--noCheck',
+    '--declaration',
+    '--emitDeclarationOnly',
+    '--outDir',
+    declarations,
+    '--rootDir',
+    workspaceRoot,
+    '--module',
+    'esnext',
+    '--moduleResolution',
+    'bundler',
+    '--target',
+    'esnext',
+    '--allowImportingTsExtensions',
+    '--resolveJsonModule',
+    path.join(rootPath, 'src/cli/node/command.ts'),
+  ],
+  { cwd: rootPath },
+)
+await copyFile(path.join(declarations, 'packages/command/src/cli/node/command.d.ts'), path.join(outputPath, 'index.d.ts'))
+await rm(declarations, { recursive: true, force: true })
+await writeFile(path.join(outputPath, 'licenses.md'), await renderNodeLicenses(result.resolvedInputPaths))
 
 async function validateVersions(): Promise<void> {
   const bunVersionFile = (await readFile(path.join(workspaceRoot, '.bun-version'), 'utf8')).trim()

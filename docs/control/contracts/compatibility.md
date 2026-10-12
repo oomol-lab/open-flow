@@ -92,13 +92,13 @@ The public package and Command upgraded to `0.1.0-beta.39`; Server upgraded to `
 - CLI rejects `connector set --name`; use `node set --name`. Result list/read commands replace old positional arguments with named options such as `--after`, `--pointer`, and `--offset`.
 - MCP `flow_run` declares Draft and Live identities mutually exclusive in its input schema. Invocation validation rejects mixed fields.
 
-See the [CLI invocation contract](../../distribution/command-artifact.md#cli-invocation-contract) and [MCP interface](../../server/mcp.md) for parameters and updated usage. This release does not change the Flow persistence model, Engine Contract, or Run checkpoint format.
+See the [CLI invocation contract](../../distribution/command.md#cli-invocation-contract) and [MCP interface](../../server/mcp.md) for parameters and updated usage. This release does not change the Flow persistence model, Engine Contract, or Run checkpoint format.
 
 ## beta.47 CLI and MCP precise-read alignment
 
 The public package and Command upgraded together to `0.1.0-beta.47`. CLI `node show` adds `--revision` and `--subflow`; `connector code-access` adds `--publication`; `connector candidates` supports multiple Providers.
 
-This prerelease has two CLI JSON breaks: `trigger search` renames `definitions` to `keys`; `node show` moves `nodeId`, `node`, `task?`, and `module?` from the old `node` wrapper to the result root. Old fields and nesting have no aliases. Consumers must update read paths using the [CLI result contract](../../distribution/command-artifact.md#output-and-errors). MCP tool contracts, Flow model, and Engine Contract remain unchanged.
+This prerelease has two CLI JSON breaks: `trigger search` renames `definitions` to `keys`; `node show` moves `nodeId`, `node`, `task?`, and `module?` from the old `node` wrapper to the result root. Old fields and nesting have no aliases. Consumers must update read paths using the [CLI result contract](../../distribution/command.md#output-and-errors). MCP tool contracts, Flow model, and Engine Contract remain unchanged.
 
 ## Flow-wide Trigger control
 
@@ -112,3 +112,12 @@ not disable the current Flow. Existing disabled Flows stay disabled. Explicitly 
 Flow restores admission through all current Triggers. Checkpoints, deduplication, subscriptions and
 historical activity records remain intact; old `operator.paused` / `operator.resumed` activity entries
 remain readable but are no longer generated. Deploy this change with a server restart.
+
+## Command npm entry
+
+Hosts now import `runOpenFlowCommand` and `OpenFlowCommandHost` from
+`@oomol-lab/open-flow/command` and bundle them into their own executable. Version
+`0.1.0-beta.61` ships this entry with the skill templates in one npm package.
+Command Artifact archives, manifests, release records and the OSS publication
+workflow are removed. Hosts must replace their artifact download/cache loader
+with the npm import; arguments, host callbacks and CLI exit codes remain unchanged.

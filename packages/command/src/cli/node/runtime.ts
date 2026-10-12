@@ -1,15 +1,11 @@
+import type { OpenFlowCommandHost } from './command.ts'
+export type { OpenFlowCommandHost } from './command.ts'
 import { resolveUiLanguage } from '@oomol-lab/open-flow/localization'
 import { spawn } from 'node:child_process'
 import { readFile } from 'node:fs/promises'
 import { setTimeout } from 'node:timers/promises'
 import { runCli } from './cli.ts'
 import { CliError } from './support.ts'
-
-export interface OpenFlowCommandHost {
-  readonly cloudRequest?: (path: string, init?: RequestInit) => Promise<Response>
-  getWorkbenchUrl?(flowId?: string): Promise<string>
-  readonly language?: string
-}
 
 async function openExternalUrl(url: string): Promise<void> {
   const command =

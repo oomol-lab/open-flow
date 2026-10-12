@@ -54,6 +54,11 @@ async function buildNpmPackage(): Promise<void> {
       { cwd: rootPath },
     ),
     buildBrowserPackage({ packageRoot: npmPackageRoot, quiet, sourceRoot: rootPath }),
+    execFileAsync(
+      process.execPath,
+      ['run', '--filter', '@oomol-lab/open-flow-command', 'build', '--output', path.join(npmPackageRoot, 'dist/command'), ...(quiet ? ['--quiet'] : [])],
+      { cwd: workspaceRoot },
+    ),
   ])
   await execFileAsync(
     process.execPath,

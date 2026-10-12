@@ -9,7 +9,7 @@ For the product overview and quick start, see the [project README](../README.md)
 - [Control API reference](control/contracts/control-api.md)
 - [Public contracts and version evolution](control/contracts/compatibility.md)
 - [Node compatibility runtime contract](control/contracts/nodejs-runtime.md)
-- [Command Artifact v2 distribution contract](distribution/command-artifact.md)
+- [Command distribution and invocation](distribution/command.md)
 
 ## Flow authoring and node development
 

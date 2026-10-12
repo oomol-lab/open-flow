@@ -69,8 +69,7 @@ reset, comparisons, and adding scenarios.
   It owns the public types, strict decoders, Control API client, black-box conformance,
   deterministic Flow/Run/Trigger semantics, programmatic authoring API, and the product-neutral
   Workbench runtime.
-- [`packages/command`](packages/command): the `oo flow` command runtime and the immutable Command
-  Artifact build and release. It consumes `packages/open-flow` only through its public package
+- [`packages/command`](packages/command): the `oo flow` command runtime and compiled npm entry. It consumes `packages/open-flow` only through its public package
   entries.
 - [`apps/server`](apps/server): the self-hosted Server with the same-origin Workbench, Control
   API, SQLite persistence, Trigger scheduler, `isolated-vm` runtime host, and Docker delivery.
@@ -84,8 +83,8 @@ these checks; select their scope according to the change:
 - `bun run format`: format with oxfmt. This project does not use Prettier.
 - `bun run check`, `bun run test`, `bun run build`: check, test, and build all workspaces.
 - `bun run --filter <workspace-name> <script>`: run a workspace script.
-- `bun run test:npm-package` and `bun run test:command-artifact`: verify published artifacts;
-  `bun run test:package` runs both.
+- `bun run test:npm-package` (also `bun run test:package`): verify the public npm package,
+  including the command entry bundled by hosts.
 - `bun run test:docker`: verify container delivery with a local Docker daemon.
 
 For a focused public-package test, run `bun run vitest run --config vitest.config.ts <test-file>`
@@ -111,7 +110,7 @@ CI scopes package, command, Server, and image jobs to the files a change touches
   data structures, algorithms, UI defaults, or implementation steps there.
 - Put exact serialized and protocol contracts in their technical references under
   [docs/control](docs/control/contracts/control-api.md) and
-  [docs/distribution](docs/distribution/command-artifact.md). Implementation history stays in Git.
+  [docs/distribution](docs/distribution/command.md). Implementation history stays in Git.
 - Keep [README.md](README.md) and the translated READMEs under `docs/README.<locale>.md` in sync
   when changing any of them.
 

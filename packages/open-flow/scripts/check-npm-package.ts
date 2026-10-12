@@ -43,6 +43,9 @@ for (const expected of [
   'package/skills/open-flow/references/flow-authoring.md',
   'package/skills/open-flow/references/flow-n8n-conversion.md',
 
+  'package/dist/command/index.js',
+  'package/dist/command/index.d.ts',
+  'package/dist/command/licenses.md',
   'package/LICENSE',
   'package/NOTICE',
   'package/README.md',
@@ -129,7 +132,7 @@ for (const expected of [
   assert.ok(entryNames.includes(expected), `Missing npm package entry ${expected}.`)
 }
 assert.equal(
-  entryNames.some((name) => name.includes('/command/') || name.includes('/src/')),
+  entryNames.some((name) => name.includes('/src/')),
   false,
 )
 assert.equal(
@@ -169,6 +172,7 @@ assert.deepEqual(packedManifest.repository, {
   url: 'git+https://github.com/oomol-lab/open-flow.git',
 })
 assert.deepEqual(packedManifest.exports, {
+  './command': { types: './dist/command/index.d.ts', import: './dist/command/index.js' },
   './package.json': './package.json',
   './skills/open-flow/SKILL.md': './skills/open-flow/SKILL.md',
   './skills/open-flow/references/flow-authoring.md': './skills/open-flow/references/flow-authoring.md',
@@ -311,7 +315,7 @@ assert.deepEqual(
 )
 await verifyConsumer()
 
-console.log('Verified the public npm package contract, Browser runtime exports, and package consumer.')
+console.log('Verified the public npm package, Browser runtime, and bundled command consumer.')
 
 async function verifyConsumer(): Promise<void> {
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-consumer-'))
@@ -498,7 +502,76 @@ async function verifyConsumer(): Promise<void> {
     const browserPath = path.join(directory, 'browser-consumer.mjs')
     await copyFile(path.join(rootPath, 'scripts/npm-package-browser-consumer.mjs'), browserPath)
     await execFileAsync(process.execPath, [browserPath], { cwd: directory })
+    await verifyCommandConsumer(directory, manifest.version)
   } finally {
     await rm(directory, { force: true, recursive: true })
+  }
+}
+
+async function verifyCommandConsumer(consumer: string, version: string): Promise<void> {
+  const entry = '@oomol-lab/open-flow/command'
+  const imported = await execFileAsync(process.execPath, ['-e', `await import('${entry}')`], { cwd: consumer })
+  assert.equal(imported.stdout, '', 'Import must not execute the CLI.')
+  assert.equal(imported.stderr, '')
+  await writeFile(
+    path.join(consumer, 'consumer.ts'),
+    `
+import { runOpenFlowCommand, type OpenFlowCommandHost } from '${entry}'
+const host: OpenFlowCommandHost = {
+  language: 'zh-CN',
+  cloudRequest: async (path, _init) => {
+    if (path === '/v1/flows?limit=100') return Response.json({ flows: [], version: 1 })
+    if (path === '/v1/flows/flow-1') return Response.json(${JSON.stringify(flow())})
+    throw new Error('Unexpected request: ' + path)
+  },
+  getWorkbenchUrl: async (flowId) => 'https://example.test/flows/' + flowId,
+}
+const result: Promise<number> = runOpenFlowCommand(['--version', '--json'], host)
+await result
+await runOpenFlowCommand(['list', '--json'], host)
+await runOpenFlowCommand(['workbench', 'flow-1', '--json'], host)
+if (false) {
+  // @ts-expect-error Host requests must return a Response.
+  runOpenFlowCommand([], { cloudRequest: async () => 'invalid' })
+}
+`,
+  )
+  const compiler = path.join(path.dirname(createRequire(import.meta.url).resolve('typescript/package.json')), 'bin/tsc')
+  await execFileAsync(process.execPath, [compiler, '--ignoreConfig', '--noEmit', '--strict', '--module', 'nodenext', '--target', 'esnext', 'consumer.ts'], {
+    cwd: consumer,
+  })
+  const direct = await execFileAsync(process.execPath, ['consumer.ts'], { cwd: consumer })
+  assert.equal(direct.stderr, '')
+  const outputs = direct.stdout
+    .trim()
+    .split('\n')
+    .map((line) => JSON.parse(line))
+  assert.deepEqual(outputs[0], { version })
+  assert.deepEqual(outputs[1], { flows: [], kind: 'flow.list', version: 1 })
+  assert.equal(outputs[2].url, 'https://example.test/flows/flow-1')
+  await execFileAsync(process.execPath, ['build', 'consumer.ts', '--target=bun', '--outfile=host.js'], { cwd: consumer })
+  await execFileAsync(process.execPath, ['build', 'consumer.ts', '--compile', '--outfile=host'], { cwd: consumer })
+  await rm(path.join(consumer, 'node_modules'), { recursive: true, force: true })
+  const bundled = await execFileAsync(process.execPath, ['host.js'], { cwd: consumer, env: { ...process.env, BUN_CONFIG_NO_INSTALL: '1' } })
+  assert.equal(bundled.stderr, '')
+  assert.equal(bundled.stdout, direct.stdout)
+  const executable = await execFileAsync(path.join(consumer, 'host'), [], { cwd: consumer })
+  assert.equal(executable.stderr, '')
+  assert.equal(executable.stdout, direct.stdout)
+}
+
+function flow() {
+  return {
+    createdAt: '2026-08-14T00:00:00.000Z',
+    draftRevisionId: 'revision-1',
+    resourceReferences: {
+      draft: { variableNames: [], connections: [], errorSourceFlowIds: [] },
+      sharedAccess: { accessRevision: 0, providerIds: [], bindings: [] },
+    },
+    flowId: 'flow-1',
+    name: 'Main',
+    status: 'active',
+    updatedAt: '2026-08-14T00:00:00.000Z',
+    version: 1,
   }
 }
