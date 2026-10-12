@@ -326,6 +326,7 @@ large results without requiring the whole value in one response.
 ```bash
 <!-- agentic:var flowCommand --> publish FLOW_ID --expected-revision REVISION --expected-publication PUBLICATION_OR_NONE --idempotency-key PUBLISH_KEY --json
 <!-- agentic:var flowCommand --> enable FLOW_ID --expected-publication PUBLICATION --json
+<!-- agentic:var flowCommand --> disable FLOW_ID --expected-publication PUBLICATION --json
 <!-- agentic:var flowCommand --> workbench FLOW_ID --json
 <!-- agentic:var flowCommand --> open FLOW_ID
 ```
@@ -334,9 +335,40 @@ large results without requiring the whole value in one response.
 are for a requested release or automatic execution, and are unnecessary for a
 Draft test Run. `publications wait` follows an accepted pending publication.
 
+Flow is the only manual enable/disable unit: its switch controls all current Live
+Triggers together. Individual Triggers have no pause/resume operation. Disabling
+a Flow blocks new production admission without cancelling already accepted Runs.
+Use the observed Live publication ID for `--expected-publication`; if it changed,
+read the current state before deciding whether to apply the switch to that version.
+The MCP equivalent is `flow_set_enabled({ flowId, expectedPublicationId, enabled })`.
+
 `workbench` returns a URL; `open` opens the system browser. Browser authentication
 belongs to the host. An open Workbench receives Revision notifications, so a CLI
 edit does not require a page reload.
+
+### Inspect published resources
+
+```bash
+<!-- agentic:var flowCommand --> resources FLOW_ID --json
+<!-- agentic:var flowCommand --> resources FLOW_ID RESOURCE_ID --json
+<!-- agentic:var flowCommand --> publications list FLOW_ID --json
+<!-- agentic:var flowCommand --> resources FLOW_ID --publication PUBLICATION_ID --json
+```
+
+`resources` defaults to the current Live publication and returns its managed
+Trigger resources, runtime health and Webhook URLs. The response's `enabled`
+describes the Flow switch; healthy resources can belong to a disabled Flow.
+Use a returned `resourceId` for detail, and pin `publicationId` when subsequent
+reads must refer to the same publication. Configuration comes from the fixed
+published Revision, so unpublished Draft edits do not appear here.
+
+Historical results contain configuration only, without runtime state, `enabled`
+or callable URLs. Querying history does not reactivate it; restoring a historical
+version requires an authorized rollback. Manual entry nodes are read through
+`read` and are not managed resources. `trigger search` and `trigger show` discover
+provider Trigger definitions; use `resources` to inspect a Flow's published Triggers.
+MCP equivalents are `flow_resources({ flowId, publicationId? })` and
+`flow_resource_get({ flowId, resourceId, publicationId? })`.
 
 ## Recover without losing another change or repeating an effect
 
@@ -354,13 +386,3 @@ edit does not require a page reload.
 A useful completion report identifies the Flow and Revision, what changed,
 what was actually checked or executed, and any remaining blocker. Its detail
 should match the task.
-
-## Published resources
-
-After publishing, use `resources FLOW_ID --json` to discover the current publication's managed
-Trigger resources, runtime state and Webhook URLs. Use `resources FLOW_ID RESOURCE_ID --json`
-for detail. Add `--publication PUBLICATION_ID` to pin a version; find previous IDs with
-`publications list FLOW_ID --json`. Historical results contain configuration only, without runtime
-state or callable URLs. Manual entry nodes are read through `read` and are not managed resources.
-MCP equivalents are `flow_resources({ flowId, publicationId? })` and
-`flow_resource_get({ flowId, resourceId, publicationId? })`.

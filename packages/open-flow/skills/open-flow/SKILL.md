@@ -9,7 +9,8 @@ Use `<!-- agentic:var flowCommand -->` to operate the selected deployment.
 Consult the references relevant to the task:
 
 - [Flow capabilities and examples](references/flow-authoring.md): inspect, edit,
-  connect, validate, run and publish; concurrency and Run diagnostics.
+  connect, validate, run and publish; published resources, Flow enable/disable,
+  concurrency and Run diagnostics.
 - [n8n conversion](references/flow-n8n-conversion.md): represent collections,
   branches, provider operations and state while preserving source behavior.
 
