@@ -450,6 +450,7 @@
       "pageInvalidCursor": "列表加载期间内容已发生变化，请重新加载列表。",
       "publicationConflict": "发布状态已发生变化，请刷新后重试。",
       "publicationNotFound": "找不到这条发布记录，请刷新发布列表。",
+      "resourceNotFound": "此发布版本中找不到该资源。",
       "publicationUnsupported": "现有 Trigger 订阅无法安全变更，因此无法发布此工作流。",
       "publishOperationNotFound": "本次发布状态已不可用，请重新发起发布。",
       "responseInvalid": "服务返回了无法识别的数据，请稍后重试。",

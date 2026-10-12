@@ -152,6 +152,12 @@ The Flow enable switch controls all Trigger admission for the current Live versi
 Disabling a Flow blocks new production admission but does not cancel accepted Runs.
 Live and the current Trigger binding jointly determine admission authority. Old workers and candidate callbacks cannot bypass this boundary.
 
+Published resource queries default to Live and may pin a Publication. Their configuration comes from
+that Publication's fixed Revision. Only the current Live may include matching runtime bindings and
+callable endpoints; historical queries do not reconstruct past health or borrow current bindings.
+Resources currently comprise non-Manual Triggers. They are a read view of existing owners, not a
+separate resource store or lifecycle.
+
 The public package owns deterministic Trigger definitions, output validation, and conformance tests.
 The deployment owns progress, deduplication, scheduling, routing, and admission transactions.
 A valid occurrence uses a stable identity to admit at most one ordinary Run. It then uses the same execution, cancellation, and terminal-state mechanisms.

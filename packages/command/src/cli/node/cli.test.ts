@@ -50,6 +50,43 @@ function runtime(language: UiLanguage = 'en') {
 }
 
 describe('CLI', () => {
+  it.each([false, true])('queries published resources and forwards fixed publications (detail=%s)', async (detail) => {
+    const resource = { resourceId: 'hook', kind: 'trigger', type: 'webhook', name: 'Incoming', config: { method: 'POST', body: {} }, inputs: {} }
+    for (const historical of [false, true]) {
+      const result = {
+        flowId: flow.flowId,
+        publicationId: 'pub-1',
+        revisionId: 'revision-1',
+        version: 1,
+        status: historical ? 'historical' : 'live',
+        ...(historical ? {} : { enabled: false }),
+        ...(detail ? { resource } : { resources: [resource] }),
+      }
+      const request = vi.fn(async (path: string) => {
+        if (path == `/v1/flows/${flow.flowId}`) return Response.json(flow)
+        if (path == `/v1/flows/${flow.flowId}/resources${detail ? '/hook' : ''}${historical ? '?publicationId=pub-1' : ''}`) return Response.json(result)
+        throw new Error(`Unexpected request: ${path}`)
+      })
+      for (const json of [false, true]) {
+        const output = runtime()
+        expect(
+          await runCli(
+            ['resources', flow.flowId, ...(detail ? ['hook'] : []), ...(historical ? ['--publication', 'pub-1'] : []), ...(json ? ['--json'] : [])],
+            { request },
+            output.value,
+          ),
+          output.stderr(),
+        ).toBe(0)
+        if (json) expect(JSON.parse(output.stdout())).toEqual({ ...result, kind: detail ? 'flow.resource' : 'flow.resources' })
+        else {
+          expect(output.stdout()).toContain('pub-1')
+          expect(output.stdout()).toContain('Incoming')
+          expect(output.stdout()).toContain(historical ? 'historical' : 'disabled')
+        }
+      }
+    }
+  })
+
   it('uses the host command prefix in help, examples and usage errors without contacting the Server', async () => {
     const request = vi.fn()
     for (const args of [

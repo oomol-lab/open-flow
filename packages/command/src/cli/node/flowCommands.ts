@@ -100,6 +100,36 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
       write(runtime, args.json, { flow, kind: 'flow.show', version: 1 }, flowText(flow))
       return
     }
+    case 'resources': {
+      if (operands.length < 1 || operands.length > 2)
+        throw new CliError(
+          'cli.invalid-arguments',
+          `Usage: ${runtime.commandPrefix ?? 'oo flow'} resources <flow> [resource-id] [--publication <publicationId>] [--json]`,
+        )
+      const flow = await referencedFlow(client, operands[0]!)
+      const result =
+        operands[1] == null
+          ? await client.listPublicationResources(flow.flowId, args.publication)
+          : await client.getPublicationResource(flow.flowId, operands[1], args.publication)
+      const header = `${result.status}\t${result.publicationId}\t${result.revisionId}${result.enabled == null ? '' : `\t${result.enabled ? 'enabled' : 'disabled'}`}`
+      const text =
+        'resource' in result
+          ? `${header}\n${JSON.stringify(result.resource, null, 2)}`
+          : [
+              header,
+              ...result.resources.map((resource) =>
+                [
+                  resource.resourceId,
+                  resource.name,
+                  `${resource.kind}.${resource.type}`,
+                  resource.runtime?.health ?? '-',
+                  resource.runtime?.endpointUrl ?? '-',
+                ].join('\t'),
+              ),
+            ].join('\n')
+      write(runtime, args.json, { ...result, kind: 'resource' in result ? 'flow.resource' : 'flow.resources' }, text)
+      return
+    }
     case 'rename': {
       requireCount(operands, 2, `${runtime.commandPrefix ?? 'oo flow'} rename <flow> <new-name> [--json]`)
       const current = await referencedFlow(client, operands[0]!)
@@ -141,7 +171,7 @@ export async function flowCommand(client: ControlClient, host: CommandHost, args
     default:
       throw new CliError(
         'cli.invalid-arguments',
-        `Usage: ${runtime.commandPrefix ?? 'oo flow'} <list|create|show|read|search|edit|schema|rename|delete|check|enable|disable|connector|event-source|trigger|run|runs|publish|publications|rollback|workbench>`,
+        `Usage: ${runtime.commandPrefix ?? 'oo flow'} <list|create|show|resources|read|search|edit|schema|rename|delete|check|enable|disable|connector|event-source|trigger|run|runs|publish|publications|rollback|workbench>`,
       )
   }
 }

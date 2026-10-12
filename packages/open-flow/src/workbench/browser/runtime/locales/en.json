@@ -450,6 +450,7 @@
       "pageInvalidCursor": "This list changed while it was loading. Reload the list.",
       "publicationConflict": "The publication state changed since it was loaded. Refresh and try again.",
       "publicationNotFound": "This Publication does not exist or was deleted. Refresh the Publication list.",
+      "resourceNotFound": "The resource was not found in this publication.",
       "publicationUnsupported": "This Flow cannot be published because an existing Trigger subscription cannot be changed safely.",
       "publishOperationNotFound": "The publishing status is no longer available. Start publishing again.",
       "responseInvalid": "The service returned data that Open Flow could not read. Try again later.",

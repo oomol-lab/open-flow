@@ -48,6 +48,16 @@ function tool<Args>(description: string, schema: z.ZodType<Args>, readOnly: bool
 }
 
 export const mcpTools = {
+  flow_resources: tool(
+    'List published resources, currently non-Manual Triggers. Defaults to current Live; supply publicationId for a fixed publication. Historical publications return configuration only. Live resources include current runtime state and Webhook URLs.',
+    z.strictObject({ flowId: flow, publicationId: id.optional() }),
+    true,
+  ),
+  flow_resource_get: tool(
+    'Read a published resource by resourceId from flow_resources. Defaults to current Live; supply publicationId to keep the publication fixed. Historical resources have no current runtime state or callable URL.',
+    z.strictObject({ flowId: flow, resourceId: id, publicationId: id.optional() }),
+    true,
+  ),
   flow_list: tool(
     'List Flows in this deployment. Continue with nextCursor; cursors are compatible with the Control API.',
     z.strictObject({ cursor: id.optional(), limit: pageLimit }),

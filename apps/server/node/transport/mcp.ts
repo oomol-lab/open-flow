@@ -43,7 +43,7 @@ export function createMcpApp(service: ServerService, authenticate: (request: Req
   app.all('/', async (context) => {
     const actorId = await authenticate(context.req.raw)
     if (shutdownSignal?.aborted) return context.json({ error: { code: 'mcp.unavailable', message: 'Server is shutting down.' } }, 503)
-    const handler = createMcpHandler(() => createServer(service, actorId, logger), { legacy: 'reject', responseMode: 'auto' })
+    const handler = createMcpHandler(() => createServer(service, actorId, logger, new URL(context.req.url).origin), { legacy: 'reject', responseMode: 'auto' })
     try {
       return await handler.fetch(context.req.raw)
     } finally {
@@ -53,7 +53,7 @@ export function createMcpApp(service: ServerService, authenticate: (request: Req
   return app
 }
 
-function createServer(service: ServerService, actorId: string, logger: Logger) {
+function createServer(service: ServerService, actorId: string, logger: Logger, endpointOrigin: string) {
   const control = service.control
   const server = new McpServer(
     { name: 'open-flow', version: manifest.version },
@@ -104,6 +104,10 @@ function createServer(service: ServerService, actorId: string, logger: Logger) {
     })
   }
 
+  register('flow_resources', mcpTools.flow_resources, ({ flowId, publicationId }) => control.listPublicationResources(flowId, endpointOrigin, publicationId))
+  register('flow_resource_get', mcpTools.flow_resource_get, ({ flowId, resourceId, publicationId }) =>
+    control.getPublicationResource(flowId, resourceId, endpointOrigin, publicationId),
+  )
   register('flow_list', mcpTools.flow_list, ({ cursor, limit }) => {
     const { next, page } = control.listFlows(limit, cursor == null ? undefined : decodeFlowCursor(cursor), false, actorId)
     return { ...page, ...(next == null ? {} : { nextCursor: encodeFlowCursor(next) }) }

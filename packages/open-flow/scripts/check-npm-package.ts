@@ -344,7 +344,9 @@ async function verifyConsumer(): Promise<void> {
     await writeFile(
       consumerPath,
       [
-        "import type { ConnectorAction, ControlErrorCode } from '@oomol-lab/open-flow/control-api'",
+        "import type { ConnectorAction, ControlErrorCode, ControlClient, PublicationResources, PublicationResourceDetail } from '@oomol-lab/open-flow/control-api'",
+        'export const readResources = (client: ControlClient): Promise<PublicationResources> => client.listPublicationResources("flow", "publication")',
+        'export const readResource = (client: ControlClient): Promise<PublicationResourceDetail> => client.getPublicationResource("flow", "hook", "publication")',
         "import type { DecisionExecutor } from '@oomol-lab/open-flow/decision'",
         "export const decisionKind: DecisionExecutor['kind'] = 'decision'",
         "import type { OpenApiExecutor } from '@oomol-lab/open-flow/openapi'",

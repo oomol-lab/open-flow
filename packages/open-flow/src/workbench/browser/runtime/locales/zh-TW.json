@@ -450,6 +450,7 @@
       "pageInvalidCursor": "列表載入期間內容已變更，請重新載入列表。",
       "publicationConflict": "發布狀態已變更，請重新整理後再試一次。",
       "publicationNotFound": "找不到這筆發布記錄，請重新整理發布列表。",
+      "resourceNotFound": "此發布版本中找不到該資源。",
       "publicationUnsupported": "現有的 Trigger 訂閱無法安全變更，因此無法發布此 Flow。",
       "publishOperationNotFound": "本次發布狀態已無法使用，請重新發起發布。",
       "responseInvalid": "服務傳回了無法識別的資料，請稍後再試一次。",

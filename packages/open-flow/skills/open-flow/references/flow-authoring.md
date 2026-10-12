@@ -354,3 +354,13 @@ edit does not require a page reload.
 A useful completion report identifies the Flow and Revision, what changed,
 what was actually checked or executed, and any remaining blocker. Its detail
 should match the task.
+
+## Published resources
+
+After publishing, use `resources FLOW_ID --json` to discover the current publication's managed
+Trigger resources, runtime state and Webhook URLs. Use `resources FLOW_ID RESOURCE_ID --json`
+for detail. Add `--publication PUBLICATION_ID` to pin a version; find previous IDs with
+`publications list FLOW_ID --json`. Historical results contain configuration only, without runtime
+state or callable URLs. Manual entry nodes are read through `read` and are not managed resources.
+MCP equivalents are `flow_resources({ flowId, publicationId? })` and
+`flow_resource_get({ flowId, resourceId, publicationId? })`.

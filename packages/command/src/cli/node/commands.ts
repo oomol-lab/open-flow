@@ -11,6 +11,7 @@ const commands = [
   ['list', '[--cursor <cursor>] [--limit <count>]', page],
   ['create', '<name>', ['idempotency-key']],
   ['show', '<flow>', []],
+  ['resources', '<flow> [resource-id] [--publication <publicationId>]', ['publication']],
   ['rename', '<flow> <new-name>', []],
   ['delete', '<flow> --yes', ['yes']],
   ['check', '<flow> [--revision <revisionId>]', ['revision']],
@@ -124,6 +125,9 @@ export function commandHelp(path: readonly string[], prefix = 'oo flow') {
             ? { type: 'string', minimum: undefined, default: undefined, description: 'Result ID from nextAfter on the preceding page.' }
             : {},
           key == 'runs read-result' && flag == 'limit' ? { default: 20 } : {},
+          key == 'resources' && flag == 'publication'
+            ? { description: 'Exact Publication ID to inspect; defaults to current Live. Historical resources include configuration only.' }
+            : {},
         ),
       ),
     }))

@@ -450,6 +450,7 @@
       "pageInvalidCursor": "読み込み中に一覧が変更されました。一覧を再読み込みしてください。",
       "publicationConflict": "公開状態は読み込み後に変更されました。更新してから再試行してください。",
       "publicationNotFound": "この Publication は存在しないか、削除されています。Publication 一覧を更新してください。",
+      "resourceNotFound": "この公開バージョンにリソースが見つかりません。",
       "publicationUnsupported": "既存の Trigger サブスクリプションを安全に変更できないため、この Flow は公開できません。",
       "publishOperationNotFound": "公開状況を確認できなくなりました。もう一度公開を開始してください。",
       "responseInvalid": "サービスから読み取れないデータが返されました。しばらくしてから再試行してください。",

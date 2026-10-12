@@ -417,6 +417,34 @@ Pending operations prepare new Integration subscriptions and baselines for new o
 
 Rollback bodies use `{ expectedLivePublicationId, version: 1 }` with Live CAS. First submission returns `201`; idempotent replay returns `200`. Rollback creates a new Publication with `sourcePublicationId`, preserving history and Draft head. First Publish or Rollback must verify all Variables used by the pinned closure inside the authoritative Publication-creation transaction. Missing Variables return `binding.unresolved`. Idempotent replay returns the original Publication before checking later Variable deletion.
 
+### Published resources
+
+- `GET /v1/flows/:flowId/resources?publicationId=...`
+- `GET /v1/flows/:flowId/resources/:resourceId?publicationId=...`
+
+`publicationId` is optional and defaults to the current Live. It must belong to the requested Flow.
+A Flow with no Live returns `live.not-found`; an unknown publication returns `publication.not-found`;
+a resource absent from the selected publication returns `resource.not-found`. A successful publication
+with no managed Trigger resources returns an empty list.
+
+Both responses include `flowId`, `publicationId`, `revisionId`, `status: "live" | "historical"`, and
+`version: 1`. Live responses additionally include `enabled`, the single switch controlling all Trigger admission. The list has `resources`; the detail has `resource`.
+
+Each resource has `resourceId` (the node ID), `kind: "trigger"`, `type` (`webhook`, `cron`, `poll`,
+`integration`, or `error`), `name`, optional `description`, and business `config` and `inputs` in the
+same form as authoring node reads. Manual Triggers have no managed binding and are not listed.
+Configuration always comes from the selected publication's fixed Revision, never the current Draft.
+Only resources in the current Live may contain `runtime: TriggerBinding`, restricted to bindings of
+that publication. Webhook runtime details include `endpointUrl` using the request origin.
+
+Historical publications omit `runtime` and `enabled`. They do not reconstruct historical health or
+expose current endpoints. Explicitly selecting the current Live still includes its current runtime.
+Candidate and retired bindings are excluded. Rollback creates a new publication; the original
+publication stays historical. Pin the returned `publicationId` on later reads when version consistency
+matters. Resource configuration is a projection of existing publication data, with no separate storage.
+
+### Publication presentation
+
 Read a Publication’s presentation snapshot through `GET /v1/flows/:flowId/publications/:publicationId/presentation`:
 
 ```ts

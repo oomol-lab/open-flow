@@ -496,6 +496,21 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const flowId = context.req.param('flowId')
     return response(200, { bindings: service.listFlowTriggerBindings(flowId), flowId, version: 1 })
   })
+  app.get('/flows/:flowId/resources', (context) => {
+    const parameters = query(context.req.raw, ['publicationId'], controlErrorCode.flowInvalid)
+    const publicationId = parameters.get('publicationId') ?? undefined
+    if (publicationId === '') throw new ControlError(controlErrorCode.flowInvalid, 'Publication ID must not be empty.')
+    return response(200, service.listPublicationResources(context.req.param('flowId'), new URL(context.req.url).origin, publicationId))
+  })
+  app.get('/flows/:flowId/resources/:resourceId', (context) => {
+    const parameters = query(context.req.raw, ['publicationId'], controlErrorCode.flowInvalid)
+    const publicationId = parameters.get('publicationId') ?? undefined
+    if (publicationId === '') throw new ControlError(controlErrorCode.flowInvalid, 'Publication ID must not be empty.')
+    return response(
+      200,
+      service.getPublicationResource(context.req.param('flowId'), context.req.param('resourceId'), new URL(context.req.url).origin, publicationId),
+    )
+  })
   app.get('/flows/:flowId/triggers/:triggerNodeId', (context) =>
     response(200, {
       binding: service.getFlowTriggerBinding(context.req.param('flowId'), context.req.param('triggerNodeId'), new URL(context.req.url).origin),

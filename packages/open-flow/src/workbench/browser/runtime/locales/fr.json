@@ -450,6 +450,7 @@
       "pageInvalidCursor": "La liste a changé pendant son chargement. Rechargez-la.",
       "publicationConflict": "L’état de la Publication a changé depuis son chargement. Actualisez, puis réessayez.",
       "publicationNotFound": "Cette Publication n’existe pas ou a été supprimée. Actualisez la liste des Publications.",
+      "resourceNotFound": "La ressource est introuvable dans cette publication.",
       "publicationUnsupported": "Ce Flow ne peut pas être publié, car un abonnement Trigger existant ne peut pas être modifié en toute sécurité.",
       "publishOperationNotFound": "L’état de la publication n’est plus disponible. Relancez la publication.",
       "responseInvalid": "Le service a renvoyé des données illisibles par Open Flow. Réessayez plus tard.",

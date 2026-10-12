@@ -151,6 +151,25 @@ When a pending decision is detected, wait commands return the Run detail’s `wa
 
 `publish` waits until the publication operation completes or times out. A timeout result retains `flowId` and `operation.operationId`. Query it with `publications operation FLOW_ID OPERATION_ID`, or continue waiting with `publications wait FLOW_ID OPERATION_ID --timeout 60000`.
 
+### Published resources
+
+`resources FLOW_ID [RESOURCE_ID] [--publication PUBLICATION_ID] [--json]` reads resources
+from the current Live publication by default. Supply a resource ID from the list for its detail,
+or `--publication` to select a fixed publication. Use `publications list FLOW_ID` to find historical IDs.
+
+JSON results have `kind: "flow.resources"` with `resources`, or `kind: "flow.resource"` with
+`resource`. Both include `flowId`, `publicationId`, `revisionId`, `status` (`live` or `historical`),
+and `version: 1`. Live results also include the Flow's `enabled` flag. Each resource includes
+`resourceId`, `kind`, `type`, `name`, optional `description`, business `config` and `inputs`.
+Current resources may include `runtime` with Trigger health and a Webhook `endpointUrl`.
+Use `enable` / `disable` on the Flow to control all of its Triggers together.
+
+The first resource kind is `trigger`, with types `webhook`, `cron`, `poll`, `integration`, and
+`error`. Resource IDs are the corresponding node IDs. Manual entry nodes have no runtime binding
+and are not listed. Historical results contain fixed configuration only, with no `runtime`,
+current health, or callable URL. Selecting a publication that is still Live returns its current state.
+An unpublished Flow returns `live.not-found`; a missing resource returns `resource.not-found`.
+
 ### Result pagination
 
 `runs results` returns the `resultId` of a complete tool result. `runs read-result` supports JSON Pointer and pagination. `runs download-result` writes raw JSON to stdout. Reading an existing result does not call the external tool again.

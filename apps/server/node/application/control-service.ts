@@ -17,6 +17,8 @@ import type {
   PollTriggerTestResult,
   Presentation,
   Publication,
+  PublicationResources,
+  PublicationResourceDetail,
   PublishOperation,
   TriggerActivity,
   TriggerBinding,
@@ -33,7 +35,7 @@ import type { StoredFlow, StoredFlowRevision } from '../storage/flow-store.ts'
 import type { PublicationAcceptance } from '../storage/publication-store.ts'
 import type { StoredTriggerBinding } from '../storage/trigger-store.ts'
 
-import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
+import { controlErrorCode, publicationResources } from '@oomol-lab/open-flow/control-api'
 import { readAuthoring, searchAuthoring, compileAuthoring, authoringSchema, authoringDiagnostics, AuthoringError } from '@oomol-lab/open-flow/control-requests'
 import { resolveDraftOperations } from '@oomol-lab/open-flow/control-requests'
 import { applyFlowChanges, currentFlowModelVersion, FlowChangeError } from '@oomol-lab/open-flow/flow-change'
@@ -947,6 +949,41 @@ export class ControlService {
   listFlowTriggerBindings(flowId: string): readonly TriggerBinding[] {
     this.getFlow(flowId)
     return this.store.triggers.listTriggerBindings(flowId).map((binding) => triggerBinding(binding))
+  }
+
+  listPublicationResources(flowId: string, endpointOrigin: string, publicationId?: string): PublicationResources {
+    const current = this.getFlow(flowId)
+    const selectedId = publicationId ?? current.live?.publicationId
+    if (selectedId == null) throw new ControlError(controlErrorCode.liveNotFound, 'The Flow has no Live Publication.')
+    const selected = this.store.publications.publication(flowId, selectedId)
+    if (selected == null) throw new ControlError(controlErrorCode.publicationNotFound, 'The Publication was not found.')
+    const revision = readRevisionOrRepair(() => this.store.flows.revision(flowId, selected.revisionId))
+    if (revision == null || revision.digest != selected.revisionDigest) {
+      throw new ControlError(serverErrorCode.flowRevisionStorageConflict, 'The fixed Revision does not match the Publication.')
+    }
+    const live = current.live?.publicationId == selectedId
+    const bindings = live ? this.store.triggers.listTriggerBindings(flowId) : []
+    return {
+      flowId,
+      publicationId: selectedId,
+      revisionId: selected.revisionId,
+      status: live ? 'live' : 'historical',
+      ...(live ? { enabled: current.live!.enabled } : {}),
+      resources: publicationResources(revisionContent(revision)).map((resource) => {
+        const binding = bindings.find(
+          (item) => item.triggerNodeId == resource.resourceId && item.kind == resource.type && item.currentPublicationId == selectedId,
+        )
+        return binding == null ? resource : Object.assign(resource, { runtime: triggerBinding(binding, endpointOrigin) })
+      }),
+      version: 1,
+    }
+  }
+
+  getPublicationResource(flowId: string, resourceId: string, endpointOrigin: string, publicationId?: string): PublicationResourceDetail {
+    const { resources, ...context } = this.listPublicationResources(flowId, endpointOrigin, publicationId)
+    const resource = resources.find((item) => item.resourceId == resourceId)
+    if (resource == null) throw new ControlError(controlErrorCode.resourceNotFound, 'The resource was not found in this Publication.')
+    return { ...context, resource }
   }
 
   getFlowTriggerBinding(flowId: string, triggerNodeId: string, endpointOrigin: string): TriggerBinding {

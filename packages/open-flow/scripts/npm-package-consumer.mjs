@@ -27,6 +27,11 @@ if (result.kind !== 'node-results' || result.nodes.length !== 0) throw new Error
 
 const api = await import('@oomol-lab/open-flow/control-api')
 if (typeof api.ControlClient !== 'function') throw new Error('Missing Control API client.')
+const resourcesClient = new api.ControlClient(async (url) => {
+  assert.equal(url, '/v1/flows/flow/resources?publicationId=publication')
+  return Response.json({ flowId: 'flow', publicationId: 'publication', revisionId: 'revision', status: 'historical', resources: [], version: 1 })
+})
+assert.deepEqual((await resourcesClient.listPublicationResources('flow', 'publication')).resources, [])
 if (api.controlErrorMetadata[api.controlErrorCode.runNotFound].status !== 404) throw new Error('Missing Control API errors.')
 const proxy = await import('@oomol-lab/open-flow/connector-proxy')
 if (Object.keys(proxy).length !== 0) throw new Error('Connector Proxy should be type-only.')
