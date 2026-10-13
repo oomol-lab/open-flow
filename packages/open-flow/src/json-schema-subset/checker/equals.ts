@@ -75,7 +75,7 @@ export function schemaEqualsChecker<E>(extendsContext: ExtendsContext): (schema1
     if (value1 === value2) {
       return true
     }
-    if (value1 === null) {
+    if (value1 === null || value2 === null) {
       return false
     }
     if (typeof value1 !== 'object') {

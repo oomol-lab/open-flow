@@ -447,6 +447,11 @@ it.each([null, false, 0, ''])('preserves falsy constant %j in port compatibility
   expect(comparePorts(port({ const: 'different' }), port({ const: value })).kind).toBe('incompatible')
 })
 
+it.each<JsonValue>([{}, { a: 1 }])('rejects object constant %j and null in both directions', (value) => {
+  expect(comparePorts(port({ const: value }), port({ const: null })).kind).toBe('incompatible')
+  expect(comparePorts(port({ const: null }), port({ const: value })).kind).toBe('incompatible')
+})
+
 it('accepts Sheets cells with nullable constants for identical, array and unconstrained inputs', () => {
   const source: JsonValue = {
     type: 'array',
