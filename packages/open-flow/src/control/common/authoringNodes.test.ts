@@ -349,9 +349,25 @@ it.each<{ schema: JsonValue; response: JsonValue; expected: JsonValue }>([
     ],
     { action },
   )
-  const renamed = await edit(created.content, [{ op: 'node.update', node: created.nodes.source!, set: { name: 'Renamed' } }], { action })
+  const view = await roundTrip(created.content, created.nodes.source!)
+  expect(view.config).toEqual({ action: 'test.read', connectionId: 'marketplace:oomol:test' })
+  const unavailableCatalog = {
+    action: async () => {
+      throw new Error('Catalog is unavailable')
+    },
+  }
+  const renamed = await edit(created.content, [{ op: 'node.update', node: created.nodes.source!, set: { name: 'Renamed' } }], unavailableCatalog)
   expect(task(renamed.content, created.nodes.source!)).toEqual({ ...task(created.content, created.nodes.source!), name: 'Renamed' })
-  const content = decodeRevisionContent(JSON.parse(JSON.stringify(renamed.content)))
+  const reconnected = await edit(
+    renamed.content,
+    [{ op: 'node.update', node: created.nodes.source!, set: { config: { connectionId: 'other-account' } } }],
+    unavailableCatalog,
+  )
+  const before = task(renamed.content, created.nodes.source!)
+  expect(task(reconnected.content, created.nodes.source!)).toEqual({ ...before, executor: { ...before.executor, connectionId: 'other-account' } })
+  const cleared = await edit(reconnected.content, [{ op: 'node.update', node: created.nodes.source!, clear: [['config', 'connectionId']] }], unavailableCatalog)
+  expect(authoringNode(cleared.content, created.nodes.source!).config).toEqual({ action: 'test.read' })
+  const content = decodeRevisionContent(JSON.parse(JSON.stringify(cleared.content)))
   expect((await validateFlow(content, findEngineContract(currentEngineContract)!)).diagnostics).toEqual([])
   const prepared = await prepareFlow(content, currentEngineContract)
   if (prepared.kind != 'prepared') throw new Error('Expected prepared flow')
@@ -373,4 +389,12 @@ it.each<{ schema: JsonValue; response: JsonValue; expected: JsonValue }>([
   )
   expect(result.kind).toBe('node-results')
   expect(received).toEqual([expected])
+})
+
+it('rejects caller-supplied Connector output mapping on creation and update', async () => {
+  await expect(
+    edit(empty, [{ op: 'node.add', type: 'connector', as: 'source', name: 'Source', config: { action: 'test.read', outputMode: 'value' } }]),
+  ).rejects.toThrow()
+  const created = await edit(empty, [{ op: 'node.add', type: 'connector', as: 'source', name: 'Source', config: { action: 'test.read' } }])
+  await expect(edit(created.content, [{ op: 'node.update', node: created.nodes.source!, set: { config: { outputMode: 'value' } } }])).rejects.toThrow()
 })

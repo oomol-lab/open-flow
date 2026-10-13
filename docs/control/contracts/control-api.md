@@ -1305,4 +1305,6 @@ Connector executor when the entire response belongs in `output`. An absent `outp
 named output fields. Execution uses this saved mapping, including when the response itself has an
 `output` property; it does not reinterpret the response or current catalog. Code and Agent tool
 Connector calls continue to receive the raw response. Callers configure Actions and sources, not
-this internal mapping. Existing nodes retain their snapshots until the Action is explicitly refreshed.
+this internal mapping. Public node configuration omits `outputMode` and rejects attempts to set it.
+Renaming a node or changing or clearing its connection preserves the saved mapping and ports without
+querying the catalog. Existing nodes retain their snapshots until the Action is explicitly refreshed.

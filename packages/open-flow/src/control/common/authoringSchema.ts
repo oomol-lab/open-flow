@@ -83,7 +83,7 @@ export const authoringConfigurations = {
   poll: z.strictObject({ key: id, connectionId: id.optional(), schedule: definitions.schedule }),
   integration: z.strictObject({ key: id, connectionId: id.optional() }),
   code: z.strictObject({ inputs: inputFields, outputs: outputFields, capabilities: definitions.capabilities.optional() }),
-  connector: definitions.connector.strict(),
+  connector: definitions.connector.omit({ outputMode: true }).strict(),
   openapi: authoringOpenApiSchema,
   agent: definitions.agent
     .omit({ prompt: true, tools: true })
