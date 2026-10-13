@@ -223,7 +223,7 @@ function findMismatchPath<E>(source: Schema<E>, target: Schema<E>): SchemaPath |
       break
     }
     case CompiledKind.EnumOrConst: {
-      return [...targetPath, targetSchema.const == null ? 'enum' : 'const']
+      return [...targetPath, targetSchema.const === undefined ? 'enum' : 'const']
     }
   }
   return targetPath

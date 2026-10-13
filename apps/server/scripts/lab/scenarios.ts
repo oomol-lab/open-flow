@@ -6,6 +6,13 @@ import { fulfillmentSamples, fulfillmentStages } from './fulfillment.ts'
 
 export const scenarios = [
   {
+    id: 'connector-responses',
+    entry: { kind: 'manual' },
+    name: 'Consume dynamic and spreadsheet Connector responses',
+    version: 1,
+    task: 'Build a manually triggered workflow. Read the dynamic response and spreadsheet cells from Lab Data using Data test account. Pass both results to a code node, then archive {dynamic, values} using Archive test account. Preserve the complete dynamic response, including its output field, and all spreadsheet cell types, including null. Do not hardcode response data.',
+  },
+  {
     id: 'webhook-live',
     transport: 'cli',
     entry: { kind: 'webhook' },
@@ -121,7 +128,7 @@ function source(nodeId: string, handle: string, from: string, output: string): C
   return { kind: 'graph.node.input.set', nodeId, handle, value: { kind: 'sources', sources: [{ kind: 'node', nodeId: from, output }] } }
 }
 export function initialOperations(id: string): ChangeOperation[] {
-  if (id == 'order-alert' || id == 'fulfillment-ops' || id == 'webhook-live') return []
+  if (id == 'connector-responses' || id == 'order-alert' || id == 'fulfillment-ops' || id == 'webhook-live') return []
   const start = node('start', { kind: 'manual', name: 'Manual trigger' })
   if (id.startsWith('specialize-summary')) {
     const task: ManagedTaskDefinition = {
@@ -285,6 +292,14 @@ export interface Sample {
 }
 export function samples(id: string, stage = 0): Sample[] {
   if (id == 'fulfillment-ops') return fulfillmentSamples(stage)
+  if (id == 'connector-responses')
+    return [
+      [],
+      [
+        ['term', 7, true, null],
+        ['', 0, false, null],
+      ],
+    ].map((orders, index) => ({ name: index == 0 ? 'empty' : 'mixed-cells', orders, order }))
   if (id == 'order-alert')
     return [[], [{ amount: 99 }], [{ amount: 60 }, { amount: 40 }], [{ amount: 60 }, { amount: 65 }]].map((orders, index) => ({
       name: ['empty', 'below', 'equal', 'above'][index]!,
@@ -331,7 +346,7 @@ function effectiveNode(content: RevisionContent, id: string): unknown {
 }
 /** Independent assertions: compare behavior and preserved effective configurations, not generated IDs. */
 export function assertions(id: string, base: RevisionContent, current: RevisionContent): string[] {
-  if (id == 'fulfillment-ops' || id == 'webhook-live') return []
+  if (id == 'connector-responses' || id == 'fulfillment-ops' || id == 'webhook-live') return []
   const errors: string[] = []
   const allowed = new Set(
     id.startsWith('specialize-summary') ? ['customer'] : id == 'customer-redaction' ? ['notify'] : id == 'repair-amount' ? ['format'] : ['notify', 'notes'],

@@ -1294,3 +1294,15 @@ Fixed input `target` accepts non-null text, objects, or arrays and ordinary sour
 `graph.node.task.set` uses complete `before/value` Tasks for concurrency checks, atomic replacement, and undo/redo. `@oomol-lab/open-flow/decision` exports question types, Task/schema derivation, configuration validation, and request/response conversion. `flow-authoring` exports `createDecisionTask`; the authoring example is `decision`. `node.started.nodeKind` adds `decision`.
 
 Deployments call `/v1/systemone` through optional LLM host `decision`, reusing deployment origin/token and fixed model `typesafe/jev`. Node `target` maps to gateway `state`. All questions independently evaluate the same content in one request. Prompt interpolation, question dependencies, and per-item input-array iteration are unsupported. Missing answers or invalid types/ranges fail the whole node without partial outputs. Calls obey node cancellation/timeouts; missing capability rejects admission.
+
+### Connector response ports
+
+Connector object responses with named `properties` expose those properties as output ports.
+An object without named properties that permits additional properties exposes the complete response
+as the single `output` port, as do non-object responses. A closed empty object has no output ports.
+Authoring derives this mapping from Action metadata and saves `outputMode: "value"` on the
+Connector executor when the entire response belongs in `output`. An absent `outputMode` means
+named output fields. Execution uses this saved mapping, including when the response itself has an
+`output` property; it does not reinterpret the response or current catalog. Code and Agent tool
+Connector calls continue to receive the raw response. Callers configure Actions and sources, not
+this internal mapping. Existing nodes retain their snapshots until the Action is explicitly refreshed.

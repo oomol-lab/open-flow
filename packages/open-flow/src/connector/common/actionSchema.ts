@@ -67,28 +67,25 @@ function inputPorts(schema: unknown): ConnectorActionPorts['inputs'] {
   })
 }
 
-function outputPorts(schema: unknown): ConnectorActionPorts['outputs'] {
+export function connectorOutputMode(schema: unknown): 'fields' | 'value' {
   const root = toPlainObject(schema)
   const properties = toPlainObject(root?.properties)
-  if (root != null && (root.type == 'object' || properties != null)) {
-    if (properties == null) return []
-    const required = stringSet(root.required)
-    return Object.entries(properties).map(([handle, propertySchema]) => ({
-      description: schemaDescription(root, propertySchema),
-      handle,
-      json_schema: propertySchemaWithDefinitions(root, propertySchema),
-      nullable: !required.has(handle) || schemaAllowsNull(propertySchema, root),
-    }))
-  } else {
-    return [
-      {
-        description: schemaDescription(root, schema),
-        handle: 'output',
-        json_schema: schema,
-        nullable: schemaAllowsNull(schema),
-      },
-    ]
+  return (properties != null && Object.keys(properties).length > 0) || (root?.type == 'object' && root.additionalProperties === false) ? 'fields' : 'value'
+}
+
+function outputPorts(schema: unknown): ConnectorActionPorts['outputs'] {
+  const root = toPlainObject(schema)
+  if (connectorOutputMode(schema) == 'value') {
+    return [{ description: schemaDescription(root, schema), handle: 'output', json_schema: schema, nullable: schemaAllowsNull(schema) }]
   }
+  const properties = toPlainObject(root?.properties) ?? {}
+  const required = stringSet(root?.required)
+  return Object.entries(properties).map(([handle, propertySchema]) => ({
+    description: schemaDescription(root, propertySchema),
+    handle,
+    json_schema: propertySchemaWithDefinitions(root!, propertySchema),
+    nullable: !required.has(handle) || schemaAllowsNull(propertySchema, root),
+  }))
 }
 
 function propertySchemaWithDefinitions(root: Record<string, unknown>, schema: unknown): unknown {

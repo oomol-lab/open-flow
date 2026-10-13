@@ -16,6 +16,21 @@ export function runtimeAssertions(id: string, sample: Sample, status: string, ca
     return errors
   }
   if (status != 'completed') return [`Run ${sample.name} ended ${status}.`]
+  if (id == 'connector-responses') {
+    const archives = calls.filter((call) => call.action == 'lab-archive.save')
+    if (
+      calls.length != 3 ||
+      calls.filter((call) => call.action == 'lab-data.dynamic' && call.connection == 'marketplace:oomol:lab-data').length != 1 ||
+      calls.filter((call) => call.action == 'lab-data.cells' && call.connection == 'marketplace:oomol:lab-data').length != 1
+    )
+      errors.push('Read both Connector responses exactly once using Data test account.')
+    if (
+      archives.length != 1 ||
+      archives[0]?.connection != 'archive-test' ||
+      !isDeepStrictEqual(archives[0]?.input.payload, { dynamic: { output: 'preserved', rows: sample.orders }, values: sample.orders })
+    )
+      errors.push('Archive the complete dynamic response and unchanged spreadsheet cells.')
+  }
   if (id == 'order-alert') {
     const orders = calls.filter((c) => c.action == 'lab-orders.list'),
       notifications = calls.filter((c) => c.action == 'lab-notifications.send')

@@ -1,3 +1,5 @@
+import type { JsonValue } from '../../src/flow/common/change.ts'
+
 import { describe, expect, it } from 'vitest'
 import { comparePorts } from '../../src/flow/common/schema.ts'
 import { compareJSONSchema, normalizeNullableSchemaPath } from '../../src/flow/common/schemaCompare.ts'
@@ -437,4 +439,19 @@ describe('In-process schema compare', () => {
       ),
     ).toEqual({ kind: 'compare-error', message: 'Cyclic local JSON Schema reference "#/$defs/first".' })
   })
+})
+
+it.each([null, false, 0, ''])('preserves falsy constant %j in port compatibility', (value) => {
+  expect(comparePorts(port({ const: value }), port({}))).toEqual({ kind: 'compatible' })
+  expect(comparePorts(port({ const: value }), port({ const: value }))).toEqual({ kind: 'compatible' })
+  expect(comparePorts(port({ const: 'different' }), port({ const: value })).kind).toBe('incompatible')
+})
+
+it('accepts Sheets cells with nullable constants for identical, array and unconstrained inputs', () => {
+  const source: JsonValue = {
+    type: 'array',
+    items: { type: 'array', items: { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { const: null }] } },
+  }
+  for (const target of [source, { type: 'array' }, {}] as readonly JsonValue[]) expect(comparePorts(port(source), port(target))).toEqual({ kind: 'compatible' })
+  expect(comparePorts(port(source), port({ type: 'array', items: { type: 'array', items: { type: 'string' } } })).kind).toBe('incompatible')
 })

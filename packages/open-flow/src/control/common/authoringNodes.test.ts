@@ -3,10 +3,12 @@ import type { AuthoringHost, AuthoringRequest } from './authoring.ts'
 
 import * as Effect from 'effect/Effect'
 import { describe, expect, it } from 'vitest'
+import { connectorActionPorts } from '../../connector/common/actionSchema.ts'
 import { findEngineContract } from '../../execution/common/engineContract.ts'
 import { currentEngineContract } from '../../execution/common/runtime.ts'
 import { runFlow } from '../../execution/common/scheduler.ts'
 import { currentFlowModelVersion } from '../../flow/common/change.ts'
+import { decodeRevisionContent } from '../../flow/common/changeSchema.ts'
 import { nodeInputPorts } from '../../flow/common/graph.ts'
 import { prepareFlow, validateFlow } from '../../flow/common/semantics.ts'
 import { authoringNode, authoringSchema, authoringTypes, compileAuthoring, readAuthoring } from './authoring.ts'
@@ -308,4 +310,67 @@ describe('business configuration authoring contracts', () => {
     const created = await edit(empty, [example], { trigger: (key) => trigger(type == 'integration' ? 'integration' : 'poll', key) })
     await roundTrip(created.content, created.nodes.step!)
   })
+})
+
+it.each<{ schema: JsonValue; response: JsonValue; expected: JsonValue }>([
+  {
+    schema: { type: 'object', properties: {}, additionalProperties: true },
+    response: { output: 'nested', records: [{ id: 1 }], next: null },
+    expected: { output: 'nested', records: [{ id: 1 }], next: null },
+  },
+  { schema: { type: 'array', items: {} }, response: [1, null, false], expected: [1, null, false] },
+  { schema: { type: 'object', properties: { output: { type: 'string' } }, required: ['output'] }, response: { output: 'named' }, expected: 'named' },
+])('binds Connector response schema $schema to a downstream code input', async ({ schema, response: returned, expected }) => {
+  const action = async (id: string) => {
+    const base = await host.action(id)
+    const ports = connectorActionPorts({ type: 'object' }, schema)
+    return {
+      ...base,
+      inputs: {},
+      outputSchema: schema as JsonValue,
+      outputs: Object.fromEntries(ports.outputs.map((port) => [port.handle, { jsonSchema: port.json_schema as JsonValue, nullable: port.nullable }])),
+    }
+  }
+  const created = await edit(
+    empty,
+    [
+      { op: 'node.add', type: 'manual', as: 'start', name: 'Start' },
+      { op: 'node.add', type: 'connector', as: 'source', name: 'Source', config: { action: 'test.read', connectionId: 'marketplace:oomol:test' } },
+      {
+        op: 'node.add',
+        type: 'code',
+        as: 'consumer',
+        name: 'Consumer',
+        code: 'export default () => ({})',
+        inputs: { data: { kind: 'output', node: '$source' } },
+      },
+      { op: 'edge.connect', source: '$start', target: '$source' },
+      { op: 'edge.connect', source: '$source', target: '$consumer' },
+    ],
+    { action },
+  )
+  const renamed = await edit(created.content, [{ op: 'node.update', node: created.nodes.source!, set: { name: 'Renamed' } }], { action })
+  expect(task(renamed.content, created.nodes.source!)).toEqual({ ...task(created.content, created.nodes.source!), name: 'Renamed' })
+  const content = decodeRevisionContent(JSON.parse(JSON.stringify(renamed.content)))
+  expect((await validateFlow(content, findEngineContract(currentEngineContract)!)).diagnostics).toEqual([])
+  const prepared = await prepareFlow(content, currentEngineContract)
+  if (prepared.kind != 'prepared') throw new Error('Expected prepared flow')
+  const received: unknown[] = []
+  const result = await Effect.runPromise(
+    runFlow(prepared.flow, {
+      createId: () => crypto.randomUUID(),
+      flowId: 'flow',
+      runId: 'run',
+      trigger: { nodeId: created.nodes.start!, outputs: {} },
+      invokeTask: (invocation) =>
+        Effect.sync(() => {
+          if (invocation.nodeId == created.nodes.source) return returned
+          received.push(invocation.input.data)
+          return {}
+        }),
+      emit: () => Effect.void,
+    }),
+  )
+  expect(result.kind).toBe('node-results')
+  expect(received).toEqual([expected])
 })

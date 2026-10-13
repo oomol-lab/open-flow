@@ -57,7 +57,7 @@ const managedFields = z.object({
   ...ports,
   name: text,
   executor: z.union([
-    z.object({ kind: z.literal('connector'), action: text, connectionId: text.optional() }),
+    z.object({ kind: z.literal('connector'), action: text, connectionId: text.optional(), outputMode: z.literal('value').optional() }),
     z.object({
       kind: z.literal('openapi'),
       sourceUrl: text,

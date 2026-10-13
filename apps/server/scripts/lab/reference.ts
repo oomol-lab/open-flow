@@ -29,7 +29,56 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
   }
   const dataPort = { schema: {}, nullable: true },
     stringPort = { schema: { type: 'string' }, nullable: false }
-  if (id == 'order-alert') {
+  if (id == 'connector-responses') {
+    const catalog = await call('connector_search', { flowId, query: 'Read' })
+    const available = catalog.actions as { actionId: string; name: string; serviceId: string }[]
+    const dynamic = available.find((action) => action.name == 'Read dynamic response')!
+    const cells = available.find((action) => action.name == 'Read spreadsheet cells')!
+    const archiveCatalog = await call('connector_search', { flowId, query: 'Archive order' })
+    const archive = (archiveCatalog.actions as typeof available)[0]!
+    const dataAccounts = await call('connector_connections', { flowId, serviceId: dynamic.serviceId })
+    const archiveAccounts = await call('connector_connections', { flowId, serviceId: archive.serviceId })
+    for (const action of [dynamic, cells, archive]) await call('flow_schema', { flowId, action: action.actionId })
+    const before = await read()
+    await submit(before.revision, [
+      { op: 'node.add', as: 'start', type: 'manual', name: 'Start' },
+      {
+        op: 'node.add',
+        as: 'dynamic',
+        type: 'connector',
+        name: 'Dynamic response',
+        config: { action: dynamic.actionId, connectionId: account(dataAccounts, 'Data test account') },
+      },
+      {
+        op: 'node.add',
+        as: 'cells',
+        type: 'connector',
+        name: 'Spreadsheet cells',
+        config: { action: cells.actionId, connectionId: account(dataAccounts, 'Data test account') },
+      },
+      {
+        op: 'node.add',
+        as: 'combine',
+        type: 'code',
+        name: 'Combine responses',
+        code: 'export default ({dynamic, values}) => ({payload: {dynamic, values}})',
+        config: { outputs: { payload: dataPort } },
+        inputs: { dynamic: { kind: 'output', node: '$dynamic' }, values: { kind: 'output', node: '$cells', port: 'values' } },
+      },
+      {
+        op: 'node.add',
+        as: 'archive',
+        type: 'connector',
+        name: 'Archive responses',
+        config: { action: archive.actionId, connectionId: account(archiveAccounts, 'Archive test account') },
+        inputs: { payload: { kind: 'output', node: '$combine' } },
+      },
+      { op: 'edge.connect', source: '$start', target: '$dynamic' },
+      { op: 'edge.connect', source: '$dynamic', target: '$cells' },
+      { op: 'edge.connect', source: '$cells', target: '$combine' },
+      { op: 'edge.connect', source: '$combine', target: '$archive' },
+    ])
+  } else if (id == 'order-alert') {
     const catalog = await call('connector_search', { flowId, query: 'orders' }),
       notifyCatalog = await call('connector_search', { flowId, query: 'Send notification' })
     const orderAction = (catalog.actions as { actionId: string; name: string; serviceId: string }[]).find((a) => a.name == 'List orders')!

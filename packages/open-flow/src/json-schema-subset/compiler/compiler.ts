@@ -92,7 +92,7 @@ export function compileSchema<E>(context: Context<E>, schema: InputSchema): Sche
   let shouldHandleEnumAndConst = false
   const { enum: enumList, const: constValue } = schema
 
-  if (enumList || constValue) {
+  if (enumList || constValue !== undefined) {
     const { enum: _0, const: _1, ...rest } = schema
     targetSchema = rest
     shouldHandleEnumAndConst = true

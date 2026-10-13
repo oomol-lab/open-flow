@@ -124,6 +124,19 @@ through MCP; it does not launch an Agent. External MCP clients need compatible p
 and a Lab recording adapter for comparable per-call costs. Direct external edits mark the
 attempt as mixed.
 
+## Connector response regression
+
+`connector-responses` creates a workflow through the public authoring interface, consumes a dynamic
+object response and spreadsheet rows containing string, number, boolean and null cells, and archives
+both through a downstream Code node. Acceptance checks empty and mixed rows and preserves an
+`output` property inside the dynamic response. The Connector and accounts are deterministic mocks;
+this does not verify production Marketplace authorization.
+
+```bash
+bun run lab test connector-responses
+bun run lab test connector-responses --mcp
+```
+
 ## A continuing fulfillment workflow
 
 `fulfillment-ops` tests how an Agent maintains one useful workflow as requirements evolve. Start

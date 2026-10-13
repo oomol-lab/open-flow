@@ -15,6 +15,7 @@ import type { AuthoringRead, AuthoringRequest, AuthoringSearch, AuthoringSource,
 import type { AuthoringAgentTool } from './authoringTools.ts'
 
 import { dequal } from 'dequal/lite'
+import { connectorOutputMode } from '../../connector/common/actionSchema.ts'
 import { decisionTask } from '../../decision/common/decision.ts'
 import { applyFlowChanges, decodeChangeOperations } from '../../flow/common/change.ts'
 import { nodeInputMappings } from '../../flow/common/condition.ts'
@@ -359,7 +360,12 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
     const action = await host.action(String(config.action))
     return {
       name,
-      executor: { kind: 'connector', action: action.actionId, ...(config.connectionId == null ? {} : { connectionId: String(config.connectionId) }) },
+      executor: {
+        kind: 'connector',
+        action: action.actionId,
+        ...(config.connectionId == null ? {} : { connectionId: String(config.connectionId) }),
+        ...(action.outputSchema !== undefined && connectorOutputMode(action.outputSchema) == 'value' ? { outputMode: 'value' as const } : {}),
+      },
       inputs: Object.entries(action.inputs).map(([handle, port]) => Object.assign({ handle }, port)),
       outputs: Object.entries(action.outputs).map(([handle, port]) => Object.assign({ handle }, port)),
     }

@@ -28,6 +28,8 @@ export interface WaitResolution {
   readonly comment: string | null
 }
 
+export class PortValidationError extends Error {}
+
 type ExecutableNode = Exclude<GraphNode, TriggerNode>
 
 export type SchedulerEvent =
@@ -481,10 +483,10 @@ function validateOutputs(nodeId: string, node: ExecutableNode, value: unknown): 
     const port = ports[handle]
     if (port == null) {
       if (discardUndeclared) continue
-      throw new Error(`Node "${nodeId}" output "${handle}" does not match its declaration.`)
+      throw new PortValidationError(`Node "${nodeId}" output "${handle}" does not match its declaration.`)
     }
     if (!(output === null && port.nullable) && !matchesSchema(output, port.jsonSchema))
-      throw new Error(`Node "${nodeId}" output "${handle}" does not match its declaration.`)
+      throw new PortValidationError(`Node "${nodeId}" output "${handle}" does not match its declaration.`)
     validated[handle] = output
   }
   return validated
@@ -653,7 +655,8 @@ function runGraph(
         }
         if (required && value === undefined) throw new Error(`${description} is incomplete.`)
         if (value === undefined) value = null
-        if (!(value === null && port.nullable) && !matchesSchema(value, port.jsonSchema)) throw new Error(`${description} does not match its declared schema.`)
+        if (!(value === null && port.nullable) && !matchesSchema(value, port.jsonSchema))
+          throw new PortValidationError(`${description} does not match its declared schema.`)
         return value
       }
       const resolveInputs = (nodeId: string, node: ExecutableNode, jobId: string): Readonly<Record<string, JsonValue>> => {
@@ -794,6 +797,8 @@ function runGraph(
                   }
                 }
                 outputs = { output: response.output }
+              } else if ('executor' in node.task && node.task.executor.kind == 'connector' && node.task.executor.outputMode == 'value') {
+                outputs = { output: checkpointJson(result, `Node "${nodeId}" output`) }
               } else outputs = outputRecord(result, nodeId)
               break
             }

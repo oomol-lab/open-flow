@@ -16,6 +16,7 @@ import type { ConnectorActionView } from '../connectionCatalog.ts'
 import type { RevisionView } from '../revisionView.ts'
 
 import { dequal } from 'dequal/lite'
+import { connectorOutputMode } from '../../../../connector/common/actionSchema.ts'
 import { nextNodeName, normalizeNodeName, applyFlowChanges as reduceFlowChanges } from '../../../../flow/common/change.ts'
 import { nodeInputMappings, otherwiseOutput } from '../../../../flow/common/condition.ts'
 import { fixedInputValue } from '../../../../flow/common/inputValue.ts'
@@ -98,6 +99,7 @@ function connectorTask(action: ConnectorActionView): Extract<TaskDefinition, { r
   return {
     executor: {
       action: action.actionId,
+      ...(action.outputSchema !== undefined && connectorOutputMode(action.outputSchema) == 'value' ? { outputMode: 'value' as const } : {}),
       ...(action.defaultConnection == null ? {} : { connectionId: action.defaultConnection.connectionId }),
       kind: 'connector',
     },

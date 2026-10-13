@@ -40,13 +40,13 @@ export function compileEnumAndConst<E>(
       recordWarn(context, 'all of elements from list is rejected by currently schema object', 'enum')
     }
   }
-  if (constValue && valid(schema, constValue) === ValidResult.Invalid) {
+  if (constValue !== undefined && valid(schema, constValue) === ValidResult.Invalid) {
     isNever = true
   }
   if (compiledEnum) {
     if (compiledEnum.length === 0) {
       isNever = true
-    } else if (constValue) {
+    } else if (constValue !== undefined) {
       let foundEquals = false
       for (const enumValue of compiledEnum) {
         if (isDeepEquals(enumValue, constValue)) {
@@ -68,7 +68,7 @@ export function compileEnumAndConst<E>(
   if (compiledEnum) {
     compiledSchema.enum = compiledEnum
   }
-  if (constValue) {
+  if (constValue !== undefined) {
     compiledSchema.const = wrapCompiledValue(deepCopy(constValue))
   }
   return wrapCompiledSchema(kind, compiledSchema, context.delegate, context.path)

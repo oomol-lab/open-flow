@@ -68,7 +68,7 @@ test('creates a Connector Designer node with stable title and icon behavior', ()
   assert.deepEqual(connectorActionNode(action, 'connection-1', connectorNodeId('gmail_send_email')).task, {
     executor: { name: 'connector', options: { action: 'gmail.send_email', connection: 'connection-1' } },
     inputs_def: [],
-    outputs_def: [],
+    outputs_def: [{ description: undefined, handle: 'output', json_schema: { type: 'object' }, nullable: false }],
   })
   const unconnected = connectorActionNode(action, undefined, connectorNodeId('gmail_send_email')).task
   if (typeof unconnected == 'string') throw new Error('Expected an inline Connector Task.')
@@ -76,4 +76,16 @@ test('creates a Connector Designer node with stable title and icon behavior', ()
     name: 'connector',
     options: { action: 'gmail.send_email' },
   })
+})
+
+test('exposes complete dynamic responses without confusing a declared output field', () => {
+  for (const schema of [{ type: 'object' }, { type: 'object', properties: {}, additionalProperties: true }, { type: 'array', items: {} }]) {
+    assert.deepEqual(connectorActionPorts({ type: 'object' }, schema).outputs, [
+      { description: undefined, handle: 'output', json_schema: schema, nullable: false },
+    ])
+  }
+  assert.deepEqual(connectorActionPorts({ type: 'object' }, { type: 'object', additionalProperties: false }).outputs, [])
+  assert.deepEqual(connectorActionPorts({ type: 'object' }, { type: 'object', properties: { output: { type: 'string' } }, required: ['output'] }).outputs, [
+    { description: undefined, handle: 'output', json_schema: { type: 'string' }, nullable: false },
+  ])
 })

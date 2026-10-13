@@ -6,9 +6,36 @@ import { Hono } from 'hono'
 import { createHash } from 'node:crypto'
 import { fulfillmentBatches } from './fulfillment.ts'
 
+const dynamicSchema: JsonValue = { type: 'object', properties: {}, additionalProperties: true }
+const cellsSchema: JsonValue = {
+  type: 'array',
+  items: { type: 'array', items: { anyOf: [{ type: 'string' }, { type: 'number' }, { type: 'boolean' }, { const: null }] } },
+}
+
 const data = { jsonSchema: {}, nullable: true } as const
 const text = { jsonSchema: { type: 'string' }, nullable: false } as const
 export const actions: ConnectorActionMetadata[] = [
+  {
+    actionId: 'lab-data.dynamic',
+    name: 'Read dynamic response',
+    description: 'Read a dynamic JSON object, including an output field.',
+    serviceId: 'lab-data',
+    serviceName: 'Lab Data',
+    authenticated: true,
+    inputs: {},
+    outputSchema: dynamicSchema,
+    outputs: { output: { jsonSchema: dynamicSchema, nullable: false } },
+  },
+  {
+    actionId: 'lab-data.cells',
+    name: 'Read spreadsheet cells',
+    description: 'Read spreadsheet rows with string, number, boolean and null cells.',
+    serviceId: 'lab-data',
+    serviceName: 'Lab Data',
+    authenticated: true,
+    inputs: {},
+    outputs: { values: { jsonSchema: cellsSchema, nullable: false } },
+  },
   {
     actionId: 'lab-orders.batch',
     name: 'List fulfillment batch',
@@ -82,6 +109,7 @@ export const actions: ConnectorActionMetadata[] = [
   },
 ]
 export const accounts: ConnectorConnection[] = [
+  { connectionId: 'marketplace:oomol:lab-data', displayName: 'Data test account', serviceId: 'lab-data', status: 'active', isDefault: true },
   { connectionId: 'orders-test', displayName: 'Orders test account', serviceId: 'lab-orders', status: 'active', isDefault: false },
   { connectionId: 'orders-production', displayName: 'Orders production account', serviceId: 'lab-orders', status: 'active', isDefault: true },
   { connectionId: 'notifications-test', displayName: 'Notifications test account', serviceId: 'lab-notifications', status: 'active', isDefault: false },
@@ -128,6 +156,8 @@ export function createMocks() {
         const orders = fulfillmentBatches[input.batch]!
         return orders == null ? { batch: input.batch } : { orders: structuredClone(orders), batch: input.batch }
       }
+      if (id == 'lab-data.dynamic') return { output: 'preserved', rows: structuredClone(sample.orders) }
+      if (id == 'lab-data.cells') return { values: structuredClone(sample.orders) }
       if (id == 'lab-orders.list') return { ...sample }
       if (id == 'lab-orders.customers') return { customers: [] }
       return {}
@@ -155,7 +185,7 @@ export function createMocks() {
             properties: Object.fromEntries(Object.entries(a.inputs).map(([key, port]) => [key, port.jsonSchema])),
             required: Object.keys(a.inputs),
           },
-          outputSchema: {
+          outputSchema: a.outputSchema ?? {
             type: 'object',
             properties: Object.fromEntries(Object.entries(a.outputs).map(([key, port]) => [key, port.jsonSchema])),
             required: Object.keys(a.outputs),
