@@ -19,6 +19,7 @@ import { connectorOutputMode } from '../../connector/common/actionSchema.ts'
 import { decisionTask } from '../../decision/common/decision.ts'
 import { applyFlowChanges, decodeChangeOperations } from '../../flow/common/change.ts'
 import { nodeInputMappings } from '../../flow/common/condition.ts'
+import { connect, disconnect } from '../../flow/common/edgeChanges.ts'
 import { nodeInputPorts, nodeOutputPorts } from '../../flow/common/graph.ts'
 import { imports as moduleImports } from '../../flow/common/moduleChanges.ts'
 import {
@@ -321,6 +322,7 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
   const operations: ChangeOperation[] = [],
     aliases: Record<string, string> = {}
   const touchedModules = new Set<string>()
+  const explicitMessages = new Set<string>()
   function fresh(label: string) {
     return host.id(`${index}:${label}:${sequence++}`)
   }
@@ -560,6 +562,7 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
     } else if (node.kind == 'wait' || node.kind == 'approval') replace(ref, { ...node, prompt: text })
   }
   async function setInput(ref: string, input: string, value: AuthoringSource) {
+    if (input == 'message') explicitMessages.add(ref)
     const node = nodeAt(content, ref)
     if (node.kind == 'condition')
       fail('input.unsupported', 'Edit the branch condition operands through config.branches.', { node: ref, field: 'config.branches' })
@@ -698,8 +701,8 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
           nodeAt(content, from)
           nodeAt(content, to)
           const edge = { source: from, target: to, ...(edit.branch == null ? {} : { sourceHandle: edit.branch }) }
-          const exists = content.document.graph.edges.some((e) => dequal(e, edge))
-          if ((edit.op == 'edge.connect') != exists) apply([{ kind: edit.op == 'edge.connect' ? 'graph.edge.connect' : 'graph.edge.disconnect', edge }])
+          const changes = edit.op == 'edge.connect' ? connect(content, edge) : disconnect(content, edge)
+          apply(explicitMessages.has(to) ? changes.filter((change) => change.kind != 'graph.node.input.set') : changes)
           break
         }
         case 'text.set':

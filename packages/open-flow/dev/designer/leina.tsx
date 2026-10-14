@@ -32,6 +32,7 @@ const content: RevisionContent = {
     graph: {
       edges: [],
       nodes: {
+        review: { kind: 'approval', name: 'Review', prompt: 'Publish the report?', inputs: {}, inputDefinitions: [] },
         notify: {
           kind: 'task',
           name: 'Leina notification',
@@ -85,6 +86,15 @@ function Gallery({ language, dark, log }: { language: UiLanguage; dark: boolean;
   const selection = useVal(session?.store.$.selection)
   useStoryActions([
     ...(['normal', 'empty', 'error', 'missing', 'loading'] as const).map((value) => ({ label: value, onClick: () => setMode(value) })),
+    {
+      label: 'Connect approval to empty message',
+      onClick: async () => {
+        if (session == null) return
+        await session.store.disconnect({ id: 'preview', source: 'review', target: 'notify', sourceHandle: '$branch:pending', targetHandle: '' })
+        await session.store.setInputValue('notify', 'message', undefined)
+        await session.store.connect({ source: 'review', target: 'notify', sourceHandle: '$branch:pending', targetHandle: '' })
+      },
+    },
     { label: disabled ? 'Enable editing' : 'Disable editing', onClick: () => setDisabled(!disabled) },
     {
       label: 'Reload saved data',
@@ -123,6 +133,6 @@ export const leinaStory: FrontendStory = {
   title: 'Leina notification',
   standalone: true,
   description:
-    'Choose a robot and reload saved data to verify the saved identifier. Switch response states to inspect loading, empty, failed and missing selections. Message and robot inputs retain their source selectors. Opening the list refreshes robots without changing the saved value.',
+    'Choose a robot and reload saved data to verify the saved identifier. Switch response states to inspect loading, empty, failed and missing selections. Use Connect approval to empty message to verify automatic pending.message binding. Message and robot inputs retain their source selectors. Opening the list refreshes robots without changing the saved value.',
   render: (log, dark, language) => <Gallery log={log} dark={dark} language={language} />,
 }

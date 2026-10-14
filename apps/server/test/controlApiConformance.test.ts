@@ -301,7 +301,6 @@ it('creates, edits and runs a Leina notification with a team-scoped robot select
         { op: 'node.add', type: 'approval', as: 'approval', name: 'Review', prompt: 'Publish the report?' },
         { op: 'node.add', type: 'connector', as: 'notify', name: 'Leina notification', config: { action: action.actionId } },
         { op: 'input.set', node: '$notify', input: 'leinaId', source: { kind: 'value', value: 'default' } },
-        { op: 'input.set', node: '$notify', input: 'message', source: { kind: 'output', node: '$approval', port: 'pending', field: 'message' } },
         { op: 'edge.connect', source: '$start', target: '$approval' },
         { op: 'edge.connect', source: '$approval', branch: 'pending', target: '$notify' },
       ],

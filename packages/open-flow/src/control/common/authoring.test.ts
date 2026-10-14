@@ -3,7 +3,9 @@ import type { AuthoringHost, AuthoringRequest } from './authoring.ts'
 
 import { describe, expect, it } from 'vitest'
 import { applyFlowChanges, currentFlowModelVersion } from '../../flow/common/change.ts'
+import { connect } from '../../flow/common/edgeChanges.ts'
 import { checkInputSource } from '../../flow/common/graph.ts'
+import { inverseFlowChanges } from '../../flow/common/inverseChanges.ts'
 import { authoringDiagnostics, compileAuthoring, readAuthoring, searchAuthoring } from './authoring.ts'
 const empty: RevisionContent = {
   modelVersion: currentFlowModelVersion,
@@ -531,4 +533,62 @@ it('maps source diagnostics onto nodes and code lines without storage IDs', asyn
   expect(diagnostics).toEqual([
     { code: 'module.syntax', message: 'Code for "Formatter" contains invalid JavaScript syntax.', nodes: [ref], field: 'code', line: 2, column: 7 },
   ])
+})
+
+it.each(['approval', 'wait'] as const)('binds %s pending notifications through shared connection authoring and preserves undo', async (type) => {
+  const created = await edit(empty, [
+    { op: 'node.add', type, as: 'review', name: 'Review' },
+    { op: 'node.add', type: 'connector', as: 'notify', name: 'Notify', config: { action: 'leina.send_notification' } },
+  ])
+  const edge = { source: created.nodes.review!, target: created.nodes.notify!, sourceHandle: 'pending' }
+  const changes = connect(created.content, edge)
+  const connected = applyFlowChanges(created.content, changes)
+  const expected = { kind: 'output', node: edge.source, port: 'pending', field: 'message' }
+  const viaApi = await edit(created.content, [{ op: 'edge.connect', source: edge.source, target: edge.target, branch: 'pending' }])
+  expect(viaApi.content).toEqual(connected)
+  expect(readAuthoring(connected, { nodes: [edge.target] })).toMatchObject({ nodes: [{ inputs: { message: { kind: 'sources', sources: [expected] } } }] })
+  expect(applyFlowChanges(connected, inverseFlowChanges(created.content, changes))).toEqual(created.content)
+  expect(connect(connected, edge)).toEqual([])
+})
+
+it.each([
+  { kind: 'value', value: '' },
+  { kind: 'value', value: null },
+  { kind: 'value', value: 'Custom notice' },
+  { kind: 'unset' },
+  { kind: 'default' },
+] as const)('preserves an explicit message %j regardless of edit order', async (source) => {
+  for (const first of [true, false]) {
+    const connection = { op: 'edge.connect', source: '$review', target: '$notify', branch: 'pending' } as const
+    const input = { op: 'input.set', node: '$notify', input: 'message', source } as const
+    const result = await edit(empty, [
+      { op: 'node.add', type: 'approval', as: 'review', name: 'Review' },
+      { op: 'node.add', type: 'connector', as: 'notify', name: 'Notify', config: { action: 'leina.send_notification' } },
+      ...(first ? [input, connection] : [connection, input]),
+    ])
+    const node = result.content.document.graph.nodes[result.nodes.notify!]!
+    expect('inputs' in node && node.inputs.message).toEqual(source.kind == 'default' ? undefined : source)
+  }
+})
+
+it('does not bind other branches or connector actions, or overwrite existing messages', async () => {
+  for (const [action, branch, message] of [
+    ['leina.send_notification', 'approve', undefined],
+    ['other.send', 'pending', undefined],
+    ['leina.send_notification', 'pending', 'Already configured'],
+  ] as const) {
+    const created = await edit(empty, [
+      { op: 'node.add', type: 'approval', as: 'review', name: 'Review' },
+      {
+        op: 'node.add',
+        type: 'connector',
+        as: 'notify',
+        name: 'Notify',
+        config: { action },
+        ...(message == null ? {} : { inputs: { message: { kind: 'value', value: message } } }),
+      },
+    ])
+    const changes = connect(created.content, { source: created.nodes.review!, target: created.nodes.notify!, sourceHandle: branch })
+    expect(changes).toHaveLength(1)
+  }
 })
