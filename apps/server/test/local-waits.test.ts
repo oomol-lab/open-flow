@@ -1,6 +1,7 @@
 import type { FlowRunCheckpoint, WaitRequest } from '@oomol-lab/open-flow/scheduler'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+import { withWaitNotificationMessage } from '@oomol-lab/open-flow/scheduler'
 import { createHash } from 'node:crypto'
 import { expect, it, onTestFinished, vi } from 'vitest'
 import { WaitActions } from '../node/application/wait-actions.ts'
@@ -99,6 +100,56 @@ it.each(['queued', 'starting'] as const)('accepts a second decision during %s an
   expect(f.store.runs.resume(f.runId)).toBe(true)
   expect(f.store.runs.resume(f.runId)).toBe(false)
   expect(f.store.runs.resolutions(f.runId, ['first', 'second'])).toEqual({ first: resolution('approve'), second: resolution('reject') })
+})
+
+it('freezes a remaining legacy Wait after resuming and enriching its notification', () => {
+  const f = fixture()
+  const legacy: FlowRunCheckpoint = {
+    ...f.checkpoint,
+    waits: f.checkpoint.waits.map((wait) => {
+      const pending = Object.fromEntries(Object.entries(wait.pending as Record<string, string>).filter(([key]) => key != 'pageUrl' && key != 'message'))
+      f.database.connection
+        .prepare('UPDATE wait_receipts SET notification_output = ? WHERE run_id = ? AND wait_id = ?')
+        .run(JSON.stringify(pending), f.runId, wait.waitId)
+      return { ...wait, pending }
+    }),
+  }
+  f.store.runs.wait(f.runId, { kind: 'waiting', checkpoint: legacy }, 900)
+  f.store.runs.resolveWait(f.runId, 'first', 'approve')
+  const claimed = f.store.runs.claim()!
+  expect(f.store.runs.resume(f.runId)).toBe(true)
+  const checkpoint: FlowRunCheckpoint = {
+    ...claimed.resume!.checkpoint,
+    dependencies: {
+      ...claimed.resume!.checkpoint.dependencies,
+      nodes: {
+        ...claimed.resume!.checkpoint.dependencies.nodes,
+        first: { ...claimed.resume!.checkpoint.dependencies.nodes.first!, status: 'completed', output: {} },
+      },
+    },
+    waits: claimed
+      .resume!.checkpoint.waits.filter((wait) => wait.waitId == 'second')
+      .map((wait) => Object.assign({}, wait, { pending: withWaitNotificationMessage(wait.pending!) })),
+  }
+  expect(checkpoint.waits[0]!.pending).toEqual(f.checkpoint.waits[1]!.pending)
+  expect(f.store.runs.wait(f.runId, { kind: 'waiting', checkpoint }, 800)).toBe(true)
+  expect(f.store.runViews.run(f.runId)?.status).toBe('waiting')
+  const reopened = new Store(f.database, () => 1001)
+  expect(reopened.runs.resolveWait(f.runId, 'second', 'reject')).toMatchObject({ status: 'queued', changed: true })
+  expect(reopened.runs.claim()?.resume?.checkpoint).toEqual(checkpoint)
+  expect(reopened.runs.resume(f.runId)).toBe(true)
+  expect(reopened.runs.resolutions(f.runId, ['first', 'second'])).toEqual({ first: resolution('approve'), second: resolution('reject', 1001) })
+})
+
+it.each(['prompt', 'approveUrl', 'pageUrl', 'message'])('rejects a checkpoint with a changed notification %s', (field) => {
+  const f = fixture()
+  const checkpoint: FlowRunCheckpoint = {
+    ...f.checkpoint,
+    waits: f.checkpoint.waits.map((wait) => ({ ...wait, pending: { ...(wait.pending as Record<string, string>), [field]: 'changed' } })),
+  }
+  expect(() => f.store.runs.wait(f.runId, { kind: 'waiting', checkpoint }, 900)).toThrow('Wait checkpoint changed registered values.')
+  expect(f.store.runViews.run(f.runId)?.status).toBe('running')
+  expect(f.database.connection.prepare('SELECT * FROM run_checkpoints').all()).toEqual([])
 })
 
 it.each(['before', 'after'] as const)('cannot lose a decision committed %s the freeze transaction', (order) => {

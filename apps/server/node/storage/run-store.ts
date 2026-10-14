@@ -548,12 +548,9 @@ export class RunStore {
         const row = this.#database
           .prepare('SELECT node_id AS nodeId, job_id AS jobId, value, notification_output AS output FROM wait_receipts WHERE run_id = ? AND wait_id = ?')
           .get(runId, wait.waitId) as { nodeId: string; jobId: string; value: string; output: string | null }
-        if (
-          row.nodeId != wait.nodeId ||
-          row.jobId != wait.jobId ||
-          row.value != JSON.stringify(wait.value) ||
-          row.output != (wait.pending == null ? null : JSON.stringify(wait.pending))
-        )
+        const output = row.output == null ? null : JSON.stringify(withWaitNotificationMessage(JSON.parse(row.output) as JsonValue))
+        const pending = wait.pending == null ? null : JSON.stringify(withWaitNotificationMessage(wait.pending))
+        if (row.nodeId != wait.nodeId || row.jobId != wait.jobId || row.value != JSON.stringify(wait.value) || output != pending)
           throw new Error('Wait checkpoint changed registered values.')
       }
       const unresolved = this.#database.prepare('SELECT wait_id AS waitId FROM wait_receipts WHERE run_id = ? AND action IS NULL').all(runId) as {
