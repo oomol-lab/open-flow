@@ -127,6 +127,7 @@ async function createHarness(
         connector: connector == null ? undefined : () => connector,
         connectorAccess,
         connectorConsoleOrigin: () => new URL('https://connector.example'),
+        waitPublicOrigin: () => new URL('https://server.local'),
       },
       clock: () => {
         now += 1_000
@@ -288,6 +289,40 @@ it('creates, edits and runs a Leina notification with a team-scoped robot select
     await expect.poll(async () => (await api.getRun(next.runId)).status).toBe('completed')
     expect(execute.mock.calls[2]?.[2]).toEqual({ leinaId: 'default', message: 'Upstream report' })
     expect(execute.mock.calls[2]?.[3]).not.toBe(execute.mock.calls[1]?.[3])
+    const approvalFlow = await api.createFlow('Approval notification', 'leina-approval')
+    const approval = await api.editAuthoring(approvalFlow.flowId, {
+      baseRevision: approvalFlow.draftRevisionId,
+      requestId: 'approval-message',
+      edits: [
+        { op: 'node.add', type: 'manual', as: 'start', name: 'Start' },
+        { op: 'node.add', type: 'approval', as: 'approval', name: 'Review', prompt: 'Publish the report?' },
+        { op: 'node.add', type: 'connector', as: 'notify', name: 'Leina notification', config: { action: action.actionId } },
+        { op: 'input.set', node: '$notify', input: 'leinaId', source: { kind: 'value', value: 'default' } },
+        { op: 'input.set', node: '$notify', input: 'message', source: { kind: 'output', node: '$approval', port: 'pending', field: 'message' } },
+        { op: 'edge.connect', source: '$start', target: '$approval' },
+        { op: 'edge.connect', source: '$approval', branch: 'pending', target: '$notify' },
+      ],
+    })
+    expect(approval.validation, JSON.stringify(approval.validation)).toMatchObject({ status: 'valid' })
+    expect(await api.checkAuthoring(approvalFlow.flowId, approval.revision)).toMatchObject({ valid: true })
+    const waiting = await api.createDraftRun(approvalFlow.flowId, approval.revision, {
+      trigger: { nodeId: approval.nodes.start!, outputs: {} },
+      idempotencyKey: 'approval-notification',
+    })
+    await expect.poll(() => execute.mock.calls.length).toBe(4)
+    const message = execute.mock.calls[3]![2].message
+    expect(message).toEqual(expect.stringContaining('Publish the report?'))
+    const url = String(message).match(/https:\/\/server.local\/v1\/wait-actions\/[A-Za-z0-9_-]{43}\/approve/)?.[0]
+    expect(url).toBeDefined()
+    const page = await harness.request(new Request(url!, { headers: { accept: 'text/html' } }))
+    expect(await page.text()).toContain('Publish the report?')
+    expect((await api.getRun(waiting.runId)).status).not.toBe('completed')
+    const decision = await harness.request(
+      new Request(url!, { method: 'POST', headers: { 'accept': 'text/html', 'content-type': 'application/x-www-form-urlencoded' }, body: 'comment=Reviewed' }),
+    )
+    expect(decision.status).toBe(200)
+    await expect.poll(async () => (await api.getRun(waiting.runId)).status).toBe('completed')
+    expect(execute).toHaveBeenCalledTimes(4)
   } finally {
     await harness.dispose()
   }

@@ -123,6 +123,8 @@ export function resolutionOutputPorts(node: Extract<GraphNode, { readonly kind: 
     pending: objectPort({
       inputs,
       prompt: { type: 'string' },
+      pageUrl: { type: 'string' },
+      message: { type: 'string' },
       ...Object.fromEntries(actions.map((action) => [`${action}Url`, { type: 'string' }])),
       expiresAt: { type: 'string' },
     }),

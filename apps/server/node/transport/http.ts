@@ -24,6 +24,7 @@ import { createControlApp } from './control.ts'
 import { handleIntegration } from './integration.ts'
 import { createMcpApp } from './mcp.ts'
 import { serverPaths } from './server-paths.ts'
+import { waitActionPage } from './wait-action-page.ts'
 
 const nullBodyStatuses = new Set([204, 205, 304])
 const forbiddenWebhookResponseHeaders = new Set([
@@ -157,6 +158,9 @@ export function createServerApp(service: ServerService, options: ServerAppOption
   })
   app.all('/v1/wait-actions/:capability/:action', async (context) => {
     const method = context.req.method
+    const page = context.req.header('accept')?.includes('text/html') === true && acceptsHtml(context.req.header('accept'))
+    const renderPage = (status: number, result?: Parameters<typeof waitActionPage>[3]) =>
+      waitActionPage(context.req.path, context.req.header('accept-language'), status, result)
     if (method != 'GET' && method != 'HEAD' && method != 'POST') {
       const response = json(405, { error: { code: 'wait-action.method-not-allowed', message: 'Method is not allowed.' }, version: 1 })
       response.headers.set('allow', 'GET, HEAD, POST')
@@ -167,9 +171,16 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     if (method == 'POST') {
       try {
         const bodyText = await context.req.text()
-        const body = waitActionBodySchema.parse(bodyText.trim() == '' ? {} : JSON.parse(bodyText))
+        const body = waitActionBodySchema.parse(
+          context.req.header('content-type')?.split(';')[0] == 'application/x-www-form-urlencoded'
+            ? Object.fromEntries(new URLSearchParams(bodyText))
+            : bodyText.trim() == ''
+              ? {}
+              : JSON.parse(bodyText),
+        )
         comment = body.comment
       } catch {
+        if (page) return renderPage(400)
         const response = json(400, { error: { code: 'wait-action.invalid', message: 'Invalid Wait comment request.' }, version: 1 })
         response.headers.set('cache-control', 'no-store')
         return response
@@ -186,12 +197,13 @@ export function createServerApp(service: ServerService, options: ServerAppOption
           ? service.resolveWaitAction(capability, requested, admit, comment)
           : service.inspectWaitAction(capability, requested, admit)
     if (result != null && 'retryAfter' in result) {
-      const response = json(429, { error: { code: 'wait-action.rate-limited', message: 'Too many requests.' }, version: 1 })
+      const response = page ? await renderPage(429) : json(429, { error: { code: 'wait-action.rate-limited', message: 'Too many requests.' }, version: 1 })
       response.headers.set('retry-after', String(result.retryAfter))
       return method == 'HEAD' ? new Response(null, { headers: response.headers, status: response.status }) : response
     }
-    const response =
-      result == null
+    const response = page
+      ? await renderPage(result == null ? 404 : 200, result)
+      : result == null
         ? json(404, { error: { code: 'wait-action.not-found', message: 'Wait action was not found.' }, version: 1 })
         : json(200, { ...result, version: 1 })
     response.headers.set('cache-control', 'no-store')

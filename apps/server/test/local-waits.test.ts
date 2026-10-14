@@ -3,6 +3,7 @@ import type { FlowRunCheckpoint, WaitRequest } from '@oomol-lab/open-flow/schedu
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { createHash } from 'node:crypto'
 import { expect, it, onTestFinished, vi } from 'vitest'
+import { WaitActions } from '../node/application/wait-actions.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 
@@ -237,4 +238,22 @@ it('normalizes optional comments and rejects invalid comments without resolving'
   expect(f.store.runs.resolutions(f.runId, ['first'])).toEqual({})
   expect(f.store.runs.resolveWait(f.runId, 'first', 'approve', '  \n ')).toMatchObject({ comment: null })
   expect(f.store.runs.resolveWait(f.runId, 'second', 'reject', '🙂'.repeat(2000))).toMatchObject({ comment: '🙂'.repeat(2000) })
+})
+
+it('provides a sendable message and stable review link for pending notifications', () => {
+  const f = fixture()
+  const output = f.checkpoint.waits[0]!.pending as Record<string, unknown>
+  expect(output.pageUrl).toBe(output.approveUrl)
+  expect(output.message).toBe(`first\n\nExpires at: ${output.expiresAt}\n\nReview request: ${output.pageUrl}`)
+  expect(f.store.runs.createWait(f.runId, f.waits[0]!, 'https://changed.example')).toEqual(output)
+})
+
+it('rejects inspection and submission once the review link expires', () => {
+  const f = fixture()
+  const output = f.checkpoint.waits[0]!.pending as Record<string, string>
+  const capability = new URL(output.pageUrl!).pathname.split('/')[3]!
+  const actions = new WaitActions(f.store, () => Date.parse(output.expiresAt!), vi.fn(), vi.fn())
+  expect(actions.inspect(capability, 'approve', () => undefined)).toBeUndefined()
+  expect(actions.resolve(capability, 'approve', () => undefined)).toBeUndefined()
+  expect(f.store.runs.resolutions(f.runId, ['first'])).toEqual({})
 })

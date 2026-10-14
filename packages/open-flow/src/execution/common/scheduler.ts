@@ -19,7 +19,9 @@ import { inputValue } from '../../flow/common/inputValue.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'
 import { matchesTriggerOutputs } from '../../trigger/common/contract.ts'
 import { Dependencies, dependenciesSchema, dependencyValues } from './dependencies.ts'
-import { normalizeWaitComment as normalizeComment } from './wait.ts'
+import { normalizeWaitComment as normalizeComment, withWaitNotificationMessage as notificationMessage } from './wait.ts'
+
+export const withWaitNotificationMessage: (value: JsonValue) => JsonValue = notificationMessage
 
 export const normalizeWaitComment: (value?: string | null) => string | null = normalizeComment
 
@@ -847,7 +849,7 @@ function runGraph(
           const node = target.graph.nodes[nodeId] as ExecutableNode
           const waitId = nanoid()
           const notify = isResolutionNode(node) && usesPending(target.graph, nodeId)
-          const pending = yield* context.waits.create({
+          const notification = yield* context.waits.create({
             jobId,
             nodeId,
             value,
@@ -857,6 +859,7 @@ function runGraph(
             prompt: isResolutionNode(node) ? node.prompt : JSON.stringify(value, null, 2),
             ...(isResolutionNode(node) ? {} : { notification: agentNotice(node, agents[jobId]!.input) }),
           })
+          const pending = notification == null ? notification : withWaitNotificationMessage(notification)
           if (notify) {
             validateOutputs(nodeId, node, { pending: pending! })
             dependencies.release(nodeId, { pending: pending! }, ['pending'], false)
@@ -1074,7 +1077,32 @@ export function runFlow(prepared: PreparedFlow, options: FlowRunOptions): Effect
     if (options.resume != null && (options.inputs != null || options.trigger != null || options.bindingValues != null)) {
       return yield* Effect.fail(new Error('A resumed Flow Run cannot accept launch inputs, binding values, or a Trigger seed.'))
     }
-    const checkpoint = options.resume == null ? undefined : decodeFlowRunCheckpoint(options.resume.checkpoint)
+    const decoded = options.resume == null ? undefined : decodeFlowRunCheckpoint(options.resume.checkpoint)
+    const outputs = (nodeId: string, value: Readonly<Record<string, JsonValue>>) =>
+      isResolutionNode(prepared.graph.nodes[nodeId]) && value.pending != null ? { ...value, pending: withWaitNotificationMessage(value.pending) } : value
+    const checkpoint =
+      decoded == null
+        ? undefined
+        : {
+            ...decoded,
+            results: Object.fromEntries(Object.entries(decoded.results).map(([id, result]) => [id, { ...result, outputs: outputs(id, result.outputs) }])),
+            dependencies: {
+              ...decoded.dependencies,
+              nodes: Object.fromEntries(
+                Object.entries(decoded.dependencies.nodes).map(([id, state]) => [
+                  id,
+                  {
+                    ...state,
+                    ...(state.output == null ? {} : { output: outputs(id, state.output) }),
+                    input: Object.fromEntries(
+                      Object.entries(state.input).map(([source, result]) => [source, { ...result, outputs: outputs(source, result.outputs) }]),
+                    ),
+                  },
+                ]),
+              ),
+            },
+            waits: decoded.waits.map((wait) => (wait.pending == null ? wait : Object.assign({}, wait, { pending: withWaitNotificationMessage(wait.pending) }))),
+          }
     if (checkpoint != null && new TextEncoder().encode(JSON.stringify(checkpoint)).byteLength > 16 * 1024 * 1024) {
       return yield* Effect.fail(new Error('Flow Run checkpoint exceeds 16 MiB.'))
     }

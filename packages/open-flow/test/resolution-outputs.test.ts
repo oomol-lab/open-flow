@@ -1,7 +1,7 @@
 import type { ResolutionNode } from '../src/flow/common/change.ts'
 
 import { expect, it } from 'vitest'
-import { normalizeWaitComment } from '../src/execution/common/wait.ts'
+import { normalizeWaitComment, withWaitNotificationMessage } from '../src/execution/common/wait.ts'
 import { resolutionOutputPorts } from '../src/flow/common/graph.ts'
 import { matchesSchema } from '../src/flow/common/schema.ts'
 
@@ -19,10 +19,19 @@ it.each(['wait', 'approval'] as const)('declares fixed %s outputs with named, un
   const inputs = { orderId: 42, amount: 'untyped at the output boundary' }
   const urls: Record<string, string> =
     kind == 'wait' ? { continueUrl: 'https://example.com/continue' } : { approveUrl: 'https://example.com/approve', rejectUrl: 'https://example.com/reject' }
-  const pending = { inputs, prompt: 'Ready?', ...urls, expiresAt: '2030-01-01T00:00:00.000Z' }
+  const pending = {
+    inputs,
+    prompt: 'Ready?',
+    pageUrl: Object.values(urls)[0],
+    message: 'Ready? Review request',
+    ...urls,
+    expiresAt: '2030-01-01T00:00:00.000Z',
+  }
   expect(ports.pending?.nullable).toBe(false)
   expect(matchesSchema(pending, ports.pending!.jsonSchema)).toBe(true)
   expect(matchesSchema(null, ports.pending!.jsonSchema)).toBe(false)
+  const { pageUrl: _page, message: _message, ...previousPending } = pending
+  expect(matchesSchema(withWaitNotificationMessage(previousPending), ports.pending!.jsonSchema)).toBe(true)
   expect(matchesSchema({ ...pending, inputs: { orderId: 'missing amount' } }, ports.pending!.jsonSchema)).toBe(false)
   expect(matchesSchema({ ...pending, inputs: { ...inputs, extra: 1 } }, ports.pending!.jsonSchema)).toBe(false)
   expect(matchesSchema({ ...pending, actions: [] }, ports.pending!.jsonSchema)).toBe(false)

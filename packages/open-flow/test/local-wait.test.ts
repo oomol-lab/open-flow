@@ -305,7 +305,7 @@ it.each(['continue', 'approve', 'reject'] as const)('does not replay notificatio
     runFlow(f.prepared, {
       ...options,
       invokeTask,
-      resume: { checkpoint: JSON.parse(JSON.stringify(frozen.checkpoint)) },
+      resume: { checkpoint: JSON.parse(JSON.stringify(frozen.checkpoint, (key, value) => (key == 'message' || key == 'pageUrl' ? undefined : value))) },
     }),
   )
   expect(resumed.kind).toBe('node-results')

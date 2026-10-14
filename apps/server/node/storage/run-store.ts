@@ -18,7 +18,7 @@ import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { flowDependencies, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
-import { decodeFlowRunCheckpoint, normalizeWaitComment } from '@oomol-lab/open-flow/scheduler'
+import { decodeFlowRunCheckpoint, normalizeWaitComment, withWaitNotificationMessage } from '@oomol-lab/open-flow/scheduler'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { AcceptanceError } from '../error.ts'
 import { isolatedVmEngineDigest } from '../runtime/isolated-vm.ts'
@@ -424,7 +424,7 @@ export class RunStore {
           previous.actions != JSON.stringify(wait.actions)
         )
           throw new Error('Wait identity changed.')
-        return previous.output == null ? undefined : (JSON.parse(previous.output) as JsonValue)
+        return previous.output == null ? undefined : withWaitNotificationMessage(JSON.parse(previous.output) as JsonValue)
       }
       const waitingSince = this.#clock()
       const expiresAt = waitingSince + waitDurationMs
@@ -434,12 +434,12 @@ export class RunStore {
       const links =
         capability == null ? [] : wait.actions.map((action) => ({ action, url: new URL(`/v1/wait-actions/${capability}/${action}`, publicOrigin!).href }))
       const output: JsonValue | undefined = wait.notify
-        ? {
+        ? withWaitNotificationMessage({
             inputs: wait.value,
             prompt: wait.prompt,
             ...Object.fromEntries(links.map(({ action, url }) => [`${action}Url`, url])),
             expiresAt: new Date(expiresAt).toISOString(),
-          }
+          })
         : undefined
       this.#database
         .prepare(

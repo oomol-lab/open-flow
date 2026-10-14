@@ -535,6 +535,24 @@ describe('Server application service', () => {
     const approvePath = new URL(approveUrl).pathname
     const rejectPath = new URL(rejectUrl).pathname
 
+    const browserHeaders = { 'accept': 'text/html', 'accept-language': 'zh-CN' }
+    const page = await app.request(approvePath, { headers: browserHeaders })
+    expect(page.headers.get('content-type')).toContain('text/html')
+    expect(page.headers.get('referrer-policy')).toBe('no-referrer')
+    const markup = await page.text()
+    expect(markup).toContain('Approve request 1?')
+    expect(markup).toContain('method="post"')
+    expect(markup).toContain(`formaction="${rejectPath}"`)
+    expect(markup).toContain('同意')
+    expect(markup).toContain('拒绝')
+    const missingPage = await app.request('/v1/wait-actions/invalid/approve', { headers: browserHeaders })
+    expect(missingPage.status).toBe(404)
+    expect(await missingPage.text()).toContain('此链接不可用或已过期')
+    const preview = await app.request(approvePath, { method: 'HEAD', headers: browserHeaders })
+    expect(preview.status).toBe(200)
+    expect(await preview.text()).toBe('')
+    expect(service.run(accepted.runId)?.status).toBe('running')
+
     const inspected = await app.request(approvePath)
     expect(inspected.status).toBe(200)
     expect(inspected.headers.get('cache-control')).toBe('no-store')
@@ -547,12 +565,26 @@ describe('Server application service', () => {
     for (const body of ['{', JSON.stringify({ comment: 42 }), JSON.stringify({ comment: 'x'.repeat(2001) })]) {
       expect((await app.request(approvePath, { method: 'POST', body })).status).toBe(400)
     }
-    const approved = await app.request(approvePath, { method: 'POST', body: JSON.stringify({ comment: '  Looks good  ' }) })
-    expect(await approved.json()).toMatchObject({ action: 'approve', comment: 'Looks good', resolutionAccepted: true, state: 'resolved', version: 1 })
+    const invalidPage = await app.request(approvePath, {
+      method: 'POST',
+      headers: { ...browserHeaders, 'content-type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ comment: 'x'.repeat(2001) }).toString(),
+    })
+    expect(invalidPage.status).toBe(400)
+    expect(await invalidPage.text()).toContain('2,000')
+    const approved = await app.request(approvePath, {
+      method: 'POST',
+      headers: { ...browserHeaders, 'content-type': 'application/x-www-form-urlencoded' },
+      body: 'comment=++Looks+good++',
+    })
+    expect(approved.status).toBe(200)
+    expect(await approved.text()).toContain('此请求已处理。 同意')
     const replay = await app.request(approvePath, { method: 'POST' })
     expect(await replay.json()).toMatchObject({ action: 'approve', comment: 'Looks good', resolutionAccepted: true, state: 'resolved' })
     const rejected = await app.request(rejectPath, { method: 'POST' })
     expect(await rejected.json()).toMatchObject({ action: 'approve', resolutionAccepted: false, state: 'resolved' })
+    const conflictingPage = await app.request(rejectPath, { method: 'POST', headers: browserHeaders })
+    expect(await conflictingPage.text()).toContain('此请求已处理。 同意')
     const inspectedResolved = await app.request(rejectPath)
     expect(await inspectedResolved.json()).toMatchObject({ action: 'approve', state: 'resolved' })
     await service.waitForIdle()
