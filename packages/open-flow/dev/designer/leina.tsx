@@ -54,16 +54,18 @@ const content: RevisionContent = {
 }
 
 function Gallery({ language, dark, log }: { language: UiLanguage; dark: boolean; log: LogAction }) {
-  const [mode, setMode] = useState<'normal' | 'empty' | 'error' | 'missing' | 'loading'>('normal')
+  const [mode, setMode] = useState<'normal' | 'empty' | 'error' | 'missing' | 'loading' | 'refresh-error'>('normal')
   const [disabled, setDisabled] = useState(false)
   const [session, setSession] = useState<ReturnType<typeof createInspectorSession>>()
   useEffect(() => {
+    let requests = 0
     const next = createInspectorSession(language, log, content, {
       actions: [action],
       providers: [{ authTypes: ['no_auth'], service: 'leina', displayName: 'Leina' }],
       leinaBots: async (signal) => {
+        requests += 1
         if (mode == 'loading') await new Promise<void>((_resolve, reject) => signal?.addEventListener('abort', () => reject(signal.reason), { once: true }))
-        if (mode == 'error') throw new Error('Unavailable')
+        if (mode == 'error' || (mode == 'refresh-error' && requests > 1)) throw new Error('Unavailable')
         return {
           bots:
             mode == 'empty'
@@ -85,7 +87,7 @@ function Gallery({ language, dark, log }: { language: UiLanguage; dark: boolean;
   const revision = useVal(session?.store.$.revision)
   const selection = useVal(session?.store.$.selection)
   useStoryActions([
-    ...(['normal', 'empty', 'error', 'missing', 'loading'] as const).map((value) => ({ label: value, onClick: () => setMode(value) })),
+    ...(['normal', 'empty', 'error', 'missing', 'loading', 'refresh-error'] as const).map((value) => ({ label: value, onClick: () => setMode(value) })),
     {
       label: 'Connect approval to empty message',
       onClick: async () => {
@@ -95,6 +97,7 @@ function Gallery({ language, dark, log }: { language: UiLanguage; dark: boolean;
         await session.store.connect({ source: 'review', target: 'notify', sourceHandle: '$branch:pending', targetHandle: '' })
       },
     },
+    { label: 'Clear robot', onClick: () => void session?.store.setInputValue('notify', 'leinaId', undefined) },
     { label: disabled ? 'Enable editing' : 'Disable editing', onClick: () => setDisabled(!disabled) },
     {
       label: 'Reload saved data',
@@ -133,6 +136,6 @@ export const leinaStory: FrontendStory = {
   title: 'Leina notification',
   standalone: true,
   description:
-    'Choose a robot and reload saved data to verify the saved identifier. Switch response states to inspect loading, empty, failed and missing selections. Use Connect approval to empty message to verify automatic pending.message binding. Message and robot inputs retain their source selectors. Opening the list refreshes robots without changing the saved value.',
+    'Clear the robot to inspect required-field feedback. Choose a robot and reload saved data to verify the saved identifier. Use refresh-error and reopen the list to verify the last loaded name survives a failed refresh. Switch response states to inspect loading, empty, failed and missing selections. Use Connect approval to empty message to verify automatic pending.message binding. Message and robot inputs retain their source selectors. Opening the list refreshes robots without changing the saved value.',
   render: (log, dark, language) => <Gallery log={log} dark={dark} language={language} />,
 }

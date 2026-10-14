@@ -15,6 +15,7 @@ import { agentConfigIssues } from './agent.ts'
 import { decodeConnectorCapabilities } from './change.ts'
 import { canonicalJsonBytes, canonicalModule, canonicalRevisionGraph, digestBytes } from './encoding.ts'
 import { nodeInputPorts, validateFlowGraph } from './graph.ts'
+import { inputValue } from './inputValue.ts'
 import { compareDiagnostics, validateModuleGraph } from './modules.ts'
 import { hasRetiredRef } from './schema.ts'
 export { availableOutputs, graphOrder, nodeInputPorts } from './graph.ts'
@@ -265,6 +266,19 @@ export async function validateFlow(revision: RevisionContent, engine: EngineCont
     }
     for (const message of agentConfigIssues(task)) {
       checked.diagnostics.push({ code: 'agent.config-invalid', column: 0, line: 1, message, path: `/document/graph/nodes/${nodeId}/task/executor` })
+    }
+    if (task.executor.kind == 'connector' && task.executor.action == 'leina.send_notification') {
+      const mapping = node.inputs.leinaId
+      const value = inputValue(mapping, nodeInputPorts(node).leinaId?.value)
+      if ((mapping?.kind != 'sources' || mapping.sources.length == 0) && (typeof value != 'string' || value.trim().length == 0)) {
+        checked.diagnostics.push({
+          code: 'leina.robot-required',
+          column: 0,
+          line: 1,
+          message: 'Select a Leina robot or bind its identifier to an input source.',
+          path: `/document/graph/nodes/${nodeId}/inputs/leinaId`,
+        })
+      }
     }
     if (task.executor.kind == 'connector' && task.executor.action.length == 0) {
       checked.diagnostics.push({

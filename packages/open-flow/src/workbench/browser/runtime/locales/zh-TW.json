@@ -843,6 +843,9 @@
         "connection-invalid": "Trigger 繫結「{{bindingId}}」必須是 Connection。",
         "connection-missing": "請選擇觸發器的連線帳號。",
         "input-duplicate": "Webhook Trigger 輸入「{{input}}」被重複宣告。"
+      },
+      "leina": {
+        "robot-required": "請選擇 Leina 機器人，或綁定機器人識別碼的資料來源。"
       }
     },
     "notChecked": "尚未檢查",

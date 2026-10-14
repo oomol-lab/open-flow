@@ -99,3 +99,6 @@ Model mocks record actual requests and verify prompts, models, tools, input reda
 Deterministic output proves only the invocation contract, not real model generation quality.
 Use explicit gates for concurrent recovery. Record initialization, simulated user edits, and verification costs separately from Agent costs.
 Report script results and real Agent trials separately.
+
+Leina notification nodes require a nonblank robot identifier (`leinaId`) or an input source binding.
+Drafts may retain an unselected robot for editing, but `flow_check` reports `leina.robot-required` until configured.

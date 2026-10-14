@@ -843,6 +843,9 @@
         "connection-invalid": "Привязка Trigger «{{bindingId}}» должна быть Connection.",
         "connection-missing": "Выберите подключённую учётную запись для этого триггера.",
         "input-duplicate": "Вход Webhook Trigger «{{input}}» объявлен несколько раз."
+      },
+      "leina": {
+        "robot-required": "Выберите робота Leina или привяжите его идентификатор к источнику данных."
       }
     },
     "notChecked": "Не проверено",

@@ -843,6 +843,9 @@
         "connection-invalid": "La liaison Trigger « {{bindingId}} » doit être une Connection.",
         "connection-missing": "Sélectionnez un compte connecté pour ce déclencheur.",
         "input-duplicate": "L’entrée « {{input}} » du Webhook Trigger est déclarée plusieurs fois."
+      },
+      "leina": {
+        "robot-required": "Sélectionnez un robot Leina ou liez son identifiant à une source d’entrée."
       }
     },
     "notChecked": "Non vérifié",

@@ -855,3 +855,54 @@ export default () => value`,
     expect(result.diagnostics).toContainEqual(expect.objectContaining({ code }))
   })
 })
+
+it.each([
+  undefined,
+  { kind: 'unset' },
+  { kind: 'sources', sources: [] },
+  { kind: 'value', value: null },
+  { kind: 'value', value: '' },
+  { kind: 'value', value: '   ' },
+] as const)('diagnoses an unselected Leina robot (%j)', async (mapping) => {
+  const content: RevisionFixture = {
+    modelVersion: currentFlowModelVersion,
+    modules: {},
+    document: {
+      bindings: {},
+      graph: {
+        edges: [],
+        nodes: {
+          notify: {
+            kind: 'task',
+            inputs: mapping == null ? {} : { leinaId: mapping },
+            task: {
+              name: 'Notify',
+              executor: { kind: 'connector', action: 'leina.send_notification' },
+              inputs: [{ handle: 'leinaId', jsonSchema: { type: 'string' }, nullable: false }],
+              outputs: [],
+            },
+          },
+        },
+      },
+    },
+  }
+  expect((await validateFlow(content, engine)).diagnostics).toContainEqual(
+    expect.objectContaining({ code: 'leina.robot-required', path: '/document/graph/nodes/notify/inputs/leinaId' }),
+  )
+  const node = content.document.graph.nodes.notify!
+  if (node.kind != 'task') throw new Error('Expected task')
+  for (const inputs of [
+    { leinaId: { kind: 'value', value: 'default' } },
+    { leinaId: { kind: 'sources', sources: [{ kind: 'binding', bindingId: 'robot' }] } },
+  ] as const) {
+    const configured: RevisionFixture = {
+      ...content,
+      document: {
+        ...content.document,
+        bindings: { robot: { kind: 'variable', target: 'LEINA_ROBOT' } },
+        graph: { edges: [], nodes: { notify: { ...node, inputs } } },
+      },
+    }
+    expect((await validateFlow(configured, engine)).diagnostics).not.toContainEqual(expect.objectContaining({ code: 'leina.robot-required' }))
+  }
+})

@@ -843,6 +843,9 @@
         "connection-invalid": "Trigger バインディング「{{bindingId}}」は Connection である必要があります。",
         "connection-missing": "このトリガーの接続アカウントを選択してください。",
         "input-duplicate": "Webhook Trigger の入力「{{input}}」が複数回定義されています。"
+      },
+      "leina": {
+        "robot-required": "Leina ロボットを選択するか、識別子の入力ソースを設定してください。"
       }
     },
     "notChecked": "未検査",
