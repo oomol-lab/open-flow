@@ -1449,5 +1449,16 @@
       "legend": "各评分等级编号及其配置的说明。",
       "level": "评分等级 {{level}} 对应的配置说明。"
     }
+  },
+  "leina": {
+    "notification": "Leina 通知",
+    "description": "选择团队机器人，发送通知。",
+    "message": "通知内容",
+    "loading": "正在加载机器人…",
+    "robot": "机器人",
+    "select": "选择 Leina 机器人",
+    "unavailable": "机器人不可用：{{id}}",
+    "loadFailed": "加载机器人失败，请关闭后重新打开以重试。",
+    "empty": "当前团队还没有 Leina 机器人。"
   }
 }

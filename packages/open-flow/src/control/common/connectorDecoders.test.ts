@@ -1,5 +1,22 @@
 import { expect, it } from 'vitest'
-import { connectorAccess, connectorAccessSnapshot, connectorAccessCandidates, connectorAccessCandidatesBatch } from './connectorDecoders.ts'
+import { connectorAccess, connectorAccessSnapshot, connectorAccessCandidates, connectorAccessCandidatesBatch, leinaBots } from './connectorDecoders.ts'
+
+it('keeps robot selection identities and status while ignoring additional upstream fields', () => {
+  const bot = { leinaId: 'default', name: 'Team robot', status: 'paused', platforms: ['feishu'] }
+  expect(leinaBots({ bots: [{ ...bot, avatar: 'https://example.com/avatar.png' }] })).toEqual([bot])
+  expect(leinaBots({ bots: [] })).toEqual([])
+})
+
+it.each([
+  {},
+  { bots: null },
+  { bots: [null] },
+  { bots: [{ leinaId: 'default', name: 'Robot', status: 'ready', platforms: 'feishu' }] },
+  { bots: [{ leinaId: 1, name: 'Robot', status: 'ready', platforms: [] }] },
+  { bots: Array.from({ length: 2 }, () => ({ leinaId: 'default', name: 'Robot', status: 'ready', platforms: [] })) },
+])('rejects malformed or ambiguous robot lists %#', (value) => {
+  expect(() => leinaBots(value)).toThrow(expect.objectContaining({ code: 'response.invalid' }))
+})
 
 const candidate = {
   accessBindingId: 'binding',

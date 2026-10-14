@@ -71,6 +71,7 @@ function ports(values: Readonly<Record<string, { readonly description?: string; 
 }
 
 function option(action: ConnectorActionView, t: TFunction): AddNodeOption {
+  if (action.actionId == 'leina.send_notification') action = { ...action, name: t('leina.notification'), description: t('leina.description') }
   return {
     connector: action,
     description:
@@ -170,6 +171,10 @@ function connectionDiagnostics(
 
 export class ConnectorStore {
   readonly #client: WorkbenchClient
+
+  listLeinaBots(flowId: string, signal: AbortSignal) {
+    return this.#client.listLeinaBots(flowId, signal)
+  }
   readonly #i18n: I18n
   #language: string
   readonly #host: Pick<WorkbenchHost, 'openExternalPage'>

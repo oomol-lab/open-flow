@@ -315,6 +315,27 @@ export class ControlService {
     return await this.#connectorRequest(flowId, (connector, access) => connector.listProviders(signal, access, locale), actorId)
   }
 
+  async listLeinaBots(flowId: string, actorId: string, signal: AbortSignal): Promise<JsonValue> {
+    return this.#connectorRequest(
+      flowId,
+      (connector, access) =>
+        connector.execute('leina.list_bots', undefined, {}, randomUUID(), signal, {
+          ...access,
+          scope: 'action',
+          action: 'leina.list_bots',
+          purpose: 'execute',
+          providerAccess: {
+            version: 2,
+            mode: access.providerAccess.mode,
+            sharedAccessDigest: access.providerAccess.sharedAccessDigest,
+            sharedBindings: [],
+            selectedBindings: [],
+          },
+        }),
+      actorId,
+    )
+  }
+
   getConnectorAccess(actorId: string, flowId: string, publicationId?: string): ConnectorAccess | ConnectorAccessSnapshot {
     this.getFlow(flowId)
     if (publicationId != null) {

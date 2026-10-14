@@ -3,7 +3,10 @@ import type { Draft, Flow } from '../api.ts'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it, vi } from 'vitest'
 import { WorkbenchClient } from '../api.ts'
+import { addNodeIntent } from '../editor/addNodeOptions.ts'
+import { createI18n } from '../i18n.ts'
 import { providerIcon } from '../providerIcon.ts'
+import { RevisionView } from '../revisionView.ts'
 import { ConnectorStore } from './connectorStore.ts'
 import { resourceValue } from './resource.ts'
 import { WorkspaceStore } from './workspaceStore.ts'
@@ -244,4 +247,36 @@ describe('ConnectorStore', () => {
       workspace.dispose()
     }
   })
+})
+
+it('presents Leina notifications in the selected language while preserving the connector contract', async () => {
+  const action = {
+    actionId: 'leina.send_notification',
+    serviceId: 'leina',
+    serviceName: 'Leina',
+    name: 'send_notification',
+    description: 'Send a notification.',
+    authenticated: false,
+    inputs: { leinaId: { jsonSchema: { type: 'string' }, nullable: false }, message: { jsonSchema: { type: 'string' }, nullable: false } },
+    outputs: {},
+  }
+  const request = vi.fn(async (_path: string) => Response.json({ version: 1, actions: [action] }))
+  const client = new WorkbenchClient(request)
+  const i18n = createI18n('zh-CN')
+  const workspace = new WorkspaceStore(client, vi.fn())
+  const connectors = new ConnectorStore(client, workspace, vi.fn(), { openExternalPage: async () => false }, i18n)
+  const controller = new AbortController()
+  try {
+    const options = await resourceValue(connectors.provideAddNodeOptions('通知', controller.signal))
+    expect(options).toHaveLength(1)
+    const option = options![0]!
+    expect(option).toMatchObject({ label: 'Leina 通知', description: '选择团队机器人，发送通知。', kind: 'connector' })
+    const intent = addNodeIntent(option, new RevisionView(draft('flow-a', 'revision-1')), i18n.t)
+    expect(intent).toMatchObject({ kind: 'connector', action: { ...action, name: 'Leina 通知', description: '选择团队机器人，发送通知。' } })
+    expect(request.mock.calls[0]?.[0]).toContain('q=%E9%80%9A%E7%9F%A5')
+  } finally {
+    controller.abort()
+    connectors.dispose()
+    workspace.dispose()
+  }
 })

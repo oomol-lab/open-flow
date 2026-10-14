@@ -1449,5 +1449,16 @@
       "legend": "Maps each score level number to its configured description.",
       "level": "Configured description for score level {{level}}."
     }
+  },
+  "leina": {
+    "notification": "Leina notification",
+    "description": "Send a notification through a team robot.",
+    "message": "Notification content",
+    "loading": "Loading robots…",
+    "robot": "Robot",
+    "select": "Select a Leina robot",
+    "unavailable": "Unavailable robot: {{id}}",
+    "loadFailed": "Could not load robots. Close and reopen to retry.",
+    "empty": "No Leina robots in this team."
   }
 }

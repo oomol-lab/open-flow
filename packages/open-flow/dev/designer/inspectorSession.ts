@@ -18,6 +18,7 @@ export function createInspectorTransport(
   log: LogAction,
   initialContent: RevisionContent,
   options: {
+    readonly leinaBots?: (signal?: AbortSignal) => Promise<JsonValue>
     readonly openApiDocument?: (url: string, signal?: AbortSignal) => Promise<JsonValue>
     readonly published?: boolean
     readonly access?: ConnectorAccess
@@ -110,6 +111,13 @@ export function createInspectorTransport(
   }
   const client = new WorkbenchClient(async (path, init) => {
     const url = new URL(path instanceof Request ? path.url : path, 'https://lab.invalid')
+    if (url.pathname == '/v1/connector/leina/bots' && options.leinaBots != null) {
+      try {
+        return Response.json(await options.leinaBots(init?.signal ?? undefined))
+      } catch {
+        return Response.json({ error: { code: 'connector.unavailable', message: 'Leina is unavailable.' } }, { status: 503 })
+      }
+    }
     if (url.pathname == '/v1/openapi/document' && options.openApiDocument != null) {
       const body = JSON.parse(String(init?.body))
       return Response.json({ version: 1, document: await options.openApiDocument(body.url, init?.signal ?? undefined) })

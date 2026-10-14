@@ -22,6 +22,18 @@ import { createTriggerSession } from './triggerSession.ts'
 const sampleActions = [
   {
     operationType: 'write',
+    actionId: 'leina.send_notification',
+    name: 'Send notification',
+    description: 'Send a Leina notification. 通过 Leina 发送通知。',
+    serviceId: 'leina',
+    serviceName: 'Leina',
+    icon: '',
+    authenticated: false,
+    inputs: {},
+    outputs: {},
+  },
+  {
+    operationType: 'write',
     actionId: 'gmail.send',
     name: 'Send email',
     description: 'Send an email to one or more recipients.',
@@ -46,14 +58,14 @@ const sampleActions = [
 ]
 
 sampleActions.push(
-  { ...sampleActions[0]!, actionId: 'gmail.list', name: 'List emails', description: 'Read messages in the inbox.', operationType: 'read' },
-  { ...sampleActions[0]!, actionId: 'gmail.delete', name: 'Delete email', description: 'Permanently delete a message.', operationType: 'destructive' },
-  { ...sampleActions[0]!, actionId: 'gmail.legacy', name: 'Legacy action', description: 'An action without a recognized operation type.', operationType: '' },
+  { ...sampleActions[1]!, actionId: 'gmail.list', name: 'List emails', description: 'Read messages in the inbox.', operationType: 'read' },
+  { ...sampleActions[1]!, actionId: 'gmail.delete', name: 'Delete email', description: 'Permanently delete a message.', operationType: 'destructive' },
+  { ...sampleActions[1]!, actionId: 'gmail.legacy', name: 'Legacy action', description: 'An action without a recognized operation type.', operationType: '' },
 )
 
 sampleActions.push(
   ...Array.from({ length: 12 }, (_, index) => ({
-    ...sampleActions[0]!,
+    ...sampleActions[1]!,
     actionId: 'gmail.read-sample-' + index,
     name: 'Read mailbox ' + (index + 1),
     description: 'Read messages from a sample mailbox.',
@@ -67,7 +79,7 @@ const sampleProviders = [
     .map((action) => ({
       service: action.serviceId,
       displayName: action.serviceName,
-      authTypes: ['oauth2'],
+      authTypes: [action.authenticated ? 'oauth2' : 'no_auth'],
       iconUrl: action.icon,
       iconSpritePosition: { x: action.serviceId == 'gmail' ? 2 : 54, y: 2 },
     })),

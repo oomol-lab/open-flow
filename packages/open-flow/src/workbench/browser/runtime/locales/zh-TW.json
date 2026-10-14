@@ -1449,5 +1449,16 @@
       "legend": "各評分等級編號及其設定的說明。",
       "level": "評分等級 {{level}} 對應的設定說明。"
     }
+  },
+  "leina": {
+    "notification": "Leina 通知",
+    "description": "選擇團隊機器人，傳送通知。",
+    "message": "通知內容",
+    "loading": "正在載入機器人…",
+    "robot": "機器人",
+    "select": "選擇 Leina 機器人",
+    "unavailable": "機器人無法使用：{{id}}",
+    "loadFailed": "載入機器人失敗，請關閉後重新開啟以重試。",
+    "empty": "目前團隊尚無 Leina 機器人。"
   }
 }

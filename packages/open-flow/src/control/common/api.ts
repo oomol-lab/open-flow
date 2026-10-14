@@ -56,7 +56,7 @@ import type { InputPortDefinition, JsonValue, PortDefinition, RevisionContent, T
 import type { FlowResourceReferences } from '../../flow/common/semantics.ts'
 
 import { flowCheck } from './checkDecoders.ts'
-import { connection, connectorAccess, connectorAccessSnapshot, connectorAccessCandidatesBatch, connectorAction } from './connectorDecoders.ts'
+import { connection, connectorAccess, connectorAccessSnapshot, connectorAccessCandidatesBatch, connectorAction, leinaBots } from './connectorDecoders.ts'
 import { allConnectorConnectionsQuery, connectorActionQuery, connectorConnectionsQuery, connectorProvidersQuery } from './connectorQueries.ts'
 import { exact, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 import { errorListener, flow, flowPage, variable, variableReferences } from './flowDecoders.ts'
@@ -254,6 +254,13 @@ export interface ConnectorProvider extends ProviderIconAppearance {
 }
 
 export type ConnectorAccessMode = 'implicit' | 'selectable'
+
+export interface LeinaBot {
+  readonly leinaId: string
+  readonly name: string
+  readonly status: string
+  readonly platforms: readonly string[]
+}
 export type ProviderAccessBindingStatus = 'active' | 'forbidden' | 'invalid' | 'missing'
 
 export type ProviderAccessBinding = (
@@ -1008,6 +1015,10 @@ export class ControlClient {
   async listConnectorProviders(signal?: AbortSignal, flowId?: string, locale?: string): Promise<readonly ConnectorProvider[]> {
     const query = connectorProvidersQuery(flowId, locale)
     return this.connectorRequest(query.path, 'providers', signal, query.decode)
+  }
+
+  async listLeinaBots(flowId: string, signal?: AbortSignal): Promise<readonly LeinaBot[]> {
+    return leinaBots(await this.request(`/v1/connector/leina/bots?flowId=${segment(flowId)}`, { signal }))
   }
 
   async removeConnectionUsage(

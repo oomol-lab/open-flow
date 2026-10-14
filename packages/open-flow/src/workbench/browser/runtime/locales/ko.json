@@ -1449,5 +1449,16 @@
       "legend": "각 평가 단계 번호와 설정된 설명의 대응표입니다.",
       "level": "평가 단계 {{level}}에 설정된 설명입니다."
     }
+  },
+  "leina": {
+    "notification": "Leina 알림",
+    "description": "팀 로봇을 통해 알림을 보냅니다.",
+    "message": "알림 내용",
+    "loading": "로봇 불러오는 중…",
+    "robot": "로봇",
+    "select": "Leina 로봇 선택",
+    "unavailable": "사용할 수 없는 로봇: {{id}}",
+    "loadFailed": "로봇을 불러오지 못했습니다. 닫았다가 다시 열어 재시도하세요.",
+    "empty": "이 팀에는 Leina 로봇이 없습니다."
   }
 }

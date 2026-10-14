@@ -1449,5 +1449,16 @@
       "legend": "Correspondance entre chaque numéro de niveau et sa description configurée.",
       "level": "Description configurée pour le niveau {{level}}."
     }
+  },
+  "leina": {
+    "notification": "Notification Leina",
+    "description": "Envoyez une notification via un robot de l’équipe.",
+    "message": "Contenu de la notification",
+    "loading": "Chargement des robots…",
+    "robot": "Robot",
+    "select": "Choisir un robot Leina",
+    "unavailable": "Robot indisponible : {{id}}",
+    "loadFailed": "Impossible de charger les robots. Fermez puis rouvrez pour réessayer.",
+    "empty": "Aucun robot Leina dans cette équipe."
   }
 }

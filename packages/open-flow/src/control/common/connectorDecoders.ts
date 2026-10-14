@@ -9,6 +9,7 @@ import type {
   ConnectorActionMetadata,
   ConnectorConnection,
   ConnectorProvider,
+  LeinaBot,
   ProviderAccessBinding,
   ProviderAccessBindingCandidate,
 } from './api.ts'
@@ -17,6 +18,18 @@ import { exact, integer, invalidResponse, jsonValue, record, string } from './de
 import { ApiError } from './errors.ts'
 import { parseProviderAccessSource } from './providerAccess.ts'
 import { providerIconAppearance } from './providerIconSprite.ts'
+
+export function leinaBots(value: unknown): readonly LeinaBot[] {
+  const source = record(value)
+  if (!Array.isArray(source.bots)) return invalidResponse('Leina bots: expected an array.')
+  const bots = source.bots.map((entry) => {
+    const bot = record(entry)
+    if (!Array.isArray(bot.platforms)) return invalidResponse('Leina platforms: expected an array.')
+    return { leinaId: string(bot.leinaId), name: string(bot.name), status: string(bot.status), platforms: bot.platforms.map(string) }
+  })
+  if (new Set(bots.map((bot) => bot.leinaId)).size != bots.length) return invalidResponse('Leina bots: duplicate identifiers.')
+  return bots
+}
 
 function accessPermissions(value: unknown): NonNullable<ProviderAccessBindingCandidate['permissions']> {
   const source = record(value)

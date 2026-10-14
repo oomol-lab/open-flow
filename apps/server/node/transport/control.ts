@@ -424,6 +424,10 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       version: 1,
     })
   })
+  app.get('/connector/leina/bots', async (context) => {
+    const flowId = text(query(context.req.raw, ['flowId'], controlErrorCode.flowInvalid).get('flowId'), controlErrorCode.flowInvalid)
+    return response(200, await service.listLeinaBots(flowId, context.get('actorId'), context.req.raw.signal))
+  })
   for (const metadata of [false, true]) {
     const path = metadata ? '/connector/action-metadata' : '/connector/actions'
     app.get(path, async (context) => {

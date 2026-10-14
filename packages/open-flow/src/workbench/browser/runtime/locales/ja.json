@@ -1449,5 +1449,16 @@
       "legend": "各評価段階の番号と設定された説明の対応表。",
       "level": "評価段階 {{level}} に設定された説明。"
     }
+  },
+  "leina": {
+    "notification": "Leina 通知",
+    "description": "チームのロボットから通知を送信します。",
+    "message": "通知内容",
+    "loading": "ロボットを読み込み中…",
+    "robot": "ロボット",
+    "select": "Leina ロボットを選択",
+    "unavailable": "利用できないロボット：{{id}}",
+    "loadFailed": "ロボットを読み込めません。閉じて再度開くと再試行します。",
+    "empty": "このチームには Leina ロボットがありません。"
   }
 }

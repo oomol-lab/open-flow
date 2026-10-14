@@ -25,6 +25,7 @@ import { inputErrorsStory } from './inputErrors.tsx'
 import { inspectorPanelStory } from './inspectorPanel.tsx'
 import { inspectorPortsStory } from './inspectorPorts.tsx'
 import { jsonThemeStory } from './jsonTheme.tsx'
+import { leinaStory } from './leina.tsx'
 import { libraryStory } from './library.tsx'
 import { llmStory } from './llm.tsx'
 import { markdownStory } from './markdown.tsx'
@@ -118,6 +119,7 @@ export const labStories: readonly FrontendStory[] = [
   metadataStory,
   inspectorPanelStory,
   inspectorPortsStory,
+  leinaStory,
   markdownStory,
   scheduleStory,
   triggerConfigStory,

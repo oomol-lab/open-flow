@@ -37,6 +37,7 @@ import { DecisionSection } from './decisionSection.tsx'
 import { ErrorTriggerSources, ErrorTriggerSourcesEditor } from './errorTriggerSources.tsx'
 import { FeishuTriggerConfig } from './feishuTriggerConfig.tsx'
 import { GeneralSettings } from './generalSettings.tsx'
+import { LeinaBotSelect } from './leinaBotSelect.tsx'
 import { LinearTriggerConfig } from './linearTriggerConfig.tsx'
 import { LlmTaskSection } from './llmTaskSection.tsx'
 import { NodeDescription } from './nodeDescription.tsx'
@@ -554,6 +555,23 @@ export function NodeInspector({
                 const binding = source?.kind === 'binding' ? revision.binding(source.bindingId) : undefined
                 return {
                   definition,
+                  editor:
+                    !readOnly &&
+                    connectors != null &&
+                    connector?.action == 'leina.send_notification' &&
+                    definition.handle == 'leinaId' &&
+                    mapping?.kind != 'sources' ? (
+                      <LeinaBotSelect
+                        key={revision.revision.flowId}
+                        source={connectors}
+                        flowId={revision.revision.flowId}
+                        value={inputValue(mapping, definition.value)}
+                        disabled={disabled}
+                        onChange={(value) => {
+                          void store?.setInputValue(selection.id, definition.handle, value)
+                        }}
+                      />
+                    ) : undefined,
                   value: inputValue(mapping, definition.value),
                   onReset: definition.value !== undefined && mapping != null ? () => void store?.resetInputs(selection.id, [definition.handle]) : undefined,
                   connected: mapping?.kind === 'sources' && binding?.kind !== 'variable',
@@ -567,6 +585,7 @@ export function NodeInspector({
                 allowAddGroup={selection.kind !== 'wait' && selection.kind !== 'approval'}
                 title={t('inspector.ports.inputsTitle')}
                 entries={entries}
+                fieldLabels={connector?.action == 'leina.send_notification' ? { leinaId: t('leina.robot'), message: t('leina.message') } : undefined}
                 onReset={() => {
                   return store?.resetInputs(
                     selection.id,
