@@ -164,17 +164,18 @@ export class Maintenance {
     const orphans = this.#store.flows.collectOrphanRevisions(maintenanceBatchSize)
     const orphanDeltas = this.#store.flows.collectOrphanDeltas(maintenanceBatchSize)
     const cleaned = publications > 0 || drafts > 0 || draftDeltas > 0 || orphans > 0 || orphanDeltas > 0
-    this.#logger[cleaned ? 'info' : 'debug'](
-      {
-        category: 'maintenance.cleanup.completed',
-        publishOperations: publications,
-        draftRevisions: drafts,
-        draftDeltas,
-        orphanRevisions: orphans,
-        orphanDeltas,
-      },
-      'Maintenance cleanup completed.',
-    )
+    if (cleaned)
+      this.#logger.info(
+        {
+          category: 'maintenance.cleanup.completed',
+          publishOperations: publications,
+          draftRevisions: drafts,
+          draftDeltas,
+          orphanRevisions: orphans,
+          orphanDeltas,
+        },
+        'Maintenance cleanup completed.',
+      )
     return cleaned
   }
 

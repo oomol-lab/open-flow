@@ -138,10 +138,7 @@ it('runs periodic cleanup on its own schedule despite earlier maintenance wakes'
   expect(publications).toHaveBeenCalledOnce()
   expect(orphans).toHaveBeenCalledOnce()
   expect(logged).not.toHaveBeenCalled()
-  expect(debugged).toHaveBeenCalledExactlyOnceWith(
-    { category: 'maintenance.cleanup.completed', publishOperations: 0, draftRevisions: 0, draftDeltas: 0, orphanRevisions: 0, orphanDeltas: 0 },
-    'Maintenance cleanup completed.',
-  )
+  expect(debugged).not.toHaveBeenCalled()
 
   setTime(clock() + 1_000)
   maintenance.wake()
@@ -150,7 +147,7 @@ it('runs periodic cleanup on its own schedule despite earlier maintenance wakes'
   expect(publications).toHaveBeenCalledOnce()
   expect(orphans).toHaveBeenCalledOnce()
   expect(logged).not.toHaveBeenCalled()
-  expect(debugged).toHaveBeenCalledTimes(1)
+  expect(debugged).not.toHaveBeenCalled()
   expect(maintenance.nextAt()).toBe(61_000)
 
   setTime(61_000)
@@ -159,7 +156,7 @@ it('runs periodic cleanup on its own schedule despite earlier maintenance wakes'
   expect(publications).toHaveBeenCalledTimes(2)
   expect(orphans).toHaveBeenCalledTimes(2)
   expect(logged).not.toHaveBeenCalled()
-  expect(debugged).toHaveBeenCalledTimes(2)
+  expect(debugged).not.toHaveBeenCalled()
 })
 
 it('immediately continues cleanup when a batch has more work', async () => {
@@ -193,10 +190,7 @@ it('immediately continues cleanup when a batch has more work', async () => {
   await Effect.runPromise(maintenance.run(new Date(clock()).toISOString()))
   expect(maintenance.nextAt()).toBe(clock() + 60_000)
   expect(logged).toHaveBeenCalledTimes(1)
-  expect(debugged).toHaveBeenCalledExactlyOnceWith(
-    { category: 'maintenance.cleanup.completed', publishOperations: 0, draftRevisions: 0, draftDeltas: 0, orphanRevisions: 0, orphanDeltas: 0 },
-    'Maintenance cleanup completed.',
-  )
+  expect(debugged).not.toHaveBeenCalled()
 })
 
 it('drains expired Waits in bounded batches before claiming a still-valid notification', () => {
