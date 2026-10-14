@@ -24,3 +24,19 @@ it.each([400, 404, 429])('renders an actionable %s response without decision but
   expect(body).not.toContain('<form')
   expect(body).toContain(status == 404 ? '此链接不可用或已过期' : '返回请求')
 })
+
+it.each([
+  ['constructor', 'en', 'Review request'],
+  ['__proto__', 'en', 'Review request'],
+  ['es-MX', 'en', 'Review request'],
+  [undefined, 'en', 'Review request'],
+  ['fr-CA, en;q=0.8', 'fr', 'Examiner la demande'],
+  ['zh-Hant', 'zh-TW', '處理請求'],
+  ['zh-CN', 'zh-CN', '处理请求'],
+])('resolves language %s safely and keeps the document language consistent', async (language, locale, title) => {
+  const page = await waitActionPage('/v1/wait-actions/token/approve', language, 200, { state: 'waiting', action: 'approve', prompt: 'Ready?' })
+  const body = await page.text()
+  expect(page.status).toBe(200)
+  expect(body).toContain(`<html lang="${locale}">`)
+  expect(body).toContain(`<h1>${title}</h1>`)
+})

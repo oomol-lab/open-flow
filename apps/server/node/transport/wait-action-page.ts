@@ -115,8 +115,9 @@ export async function waitActionPage(
   },
 ): Promise<Response> {
   const preferred = language?.split(',')[0]?.split(';')[0]?.trim().toLowerCase() ?? 'en'
-  const locale = preferred.startsWith('zh') ? (/tw|hk|hant/.test(preferred) ? 'zh-TW' : 'zh-CN') : preferred.split('-')[0]!
-  const [title, approve, reject, proceed, comment, help, expiry, resolved, unavailable, limited, invalid, back] = copy[locale as keyof typeof copy] ?? copy.en
+  const requested = preferred.startsWith('zh') ? (/tw|hk|hant/.test(preferred) ? 'zh-TW' : 'zh-CN') : preferred.split('-')[0]!
+  const locale = Object.hasOwn(copy, requested) ? (requested as keyof typeof copy) : 'en'
+  const [title, approve, reject, proceed, comment, help, expiry, resolved, unavailable, limited, invalid, back] = copy[locale]
   const labels = { approve, reject, continue: proceed }
   const actions: readonly WaitAction[] = result?.action == 'continue' ? ['continue'] : ['approve', 'reject']
   const body = await html`<!doctype html>

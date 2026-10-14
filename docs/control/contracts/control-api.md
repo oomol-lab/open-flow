@@ -1020,11 +1020,11 @@ Deployments with a public origin may include a Wait’s opaque capability URL in
 /v1/wait-actions/:capability/:action
 ```
 
-`action` is `continue | approve | reject` and must belong to the capability-bound Wait. Responses are always JSON with `Cache-Control: no-store`, no HTML, redirects, or cookies:
+`action` is `continue | approve | reject` and must belong to the capability-bound Wait. Responses use `Cache-Control: no-store`, without redirects or cookies. Requests explicitly accepting `text/html` receive a localized confirmation or result page; other clients receive JSON. `pending.pageUrl` points to the first available action URL (`continue` for Wait, `approve` for Approval). All valid action URLs support this content negotiation:
 
-- `GET` only checks the action and returns `{ action, expiresAt, prompt, state: 'waiting' | 'resolved', version: 1 }` on success.
+- `GET` only checks the action. HTML responses show a confirmation page with the available decisions and an optional comment, or the already processed result. JSON responses return `{ action, expiresAt, prompt, state: 'waiting' | 'resolved', version: 1 }` on success.
 - `HEAD` uses the same checks/status as `GET` without a body.
-- Only `POST` submits an action. Success returns `{ action, resolutionAccepted, resolvedAt, state: 'waiting' | 'resolved' | 'unavailable', version: 1 }`.
+- Only `POST` submits an action. The page submits a native `application/x-www-form-urlencoded` form with an optional `comment`; JSON POST bodies remain supported. HTML responses show the result of the decision. JSON success responses return `{ action, resolutionAccepted, resolvedAt, state: 'waiting' | 'resolved' | 'unavailable', version: 1 }`.
 
 `POST` uses the authenticated resolve route’s first-writer-wins and replay rules. Mismatched capabilities, actions, or wait records, and expired capabilities, return `404 wait-action.not-found`. Other methods return `405 wait-action.method-not-allowed` with `Allow: GET, HEAD, POST`. Server persists only capability digests. Complete capabilities are bearer credentials; consumers must not log or forward them as ordinary public URLs.
 
