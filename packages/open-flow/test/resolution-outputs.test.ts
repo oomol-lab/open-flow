@@ -30,6 +30,8 @@ it.each(['wait', 'approval'] as const)('declares fixed %s outputs with named, un
   expect(ports.pending?.nullable).toBe(false)
   expect(matchesSchema(pending, ports.pending!.jsonSchema)).toBe(true)
   expect(matchesSchema(null, ports.pending!.jsonSchema)).toBe(false)
+  expect(matchesSchema({ ...pending, message: '' }, ports.pending!.jsonSchema)).toBe(false)
+  expect(matchesSchema({ ...pending, message: ' \n ' }, ports.pending!.jsonSchema)).toBe(false)
   const { pageUrl: _page, message: _message, ...previousPending } = pending
   expect(matchesSchema(withWaitNotificationMessage(previousPending), ports.pending!.jsonSchema)).toBe(true)
   expect(matchesSchema({ ...pending, inputs: { orderId: 'missing amount' } }, ports.pending!.jsonSchema)).toBe(false)

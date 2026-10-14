@@ -124,7 +124,7 @@ export function resolutionOutputPorts(node: Extract<GraphNode, { readonly kind: 
       inputs,
       prompt: { type: 'string' },
       pageUrl: { type: 'string' },
-      message: { type: 'string' },
+      message: { type: 'string', minLength: 1, pattern: '\\S' },
       ...Object.fromEntries(actions.map((action) => [`${action}Url`, { type: 'string' }])),
       expiresAt: { type: 'string' },
     }),

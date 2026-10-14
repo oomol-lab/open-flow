@@ -186,7 +186,7 @@ it('creates, edits and runs a Leina notification with a team-scoped robot select
     name: 'Send notification',
     serviceId: 'leina',
     serviceName: 'Leina',
-    inputs: { leinaId: field, message: field },
+    inputs: { leinaId: field, message: { jsonSchema: { type: 'string', minLength: 1, pattern: '\\S' }, nullable: false } },
     outputs: { leinaId: field, status: field, requestId: field },
   }
   const harness = await createHarness(true, undefined, {
@@ -235,7 +235,10 @@ it('creates, edits and runs a Leina notification with a team-scoped robot select
           type: 'value',
           as: 'report',
           name: 'Report',
-          config: { outputs: { message: { schema: { type: 'string' }, nullable: false } }, values: { message: 'Upstream report' } },
+          config: {
+            outputs: { message: { schema: { type: 'string', minLength: 1, pattern: '\\S' }, nullable: false } },
+            values: { message: 'Upstream report' },
+          },
         },
         { op: 'node.add', type: 'connector', as: 'notify', name: 'Leina notification', config: { action: action.actionId } },
         { op: 'input.set', node: '$notify', input: 'leinaId', source: { kind: 'value', value: bot.leinaId } },

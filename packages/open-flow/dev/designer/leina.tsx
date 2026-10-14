@@ -17,7 +17,7 @@ const action: ConnectorAction = {
   actionId: 'leina.send_notification',
   authenticated: false,
   description: 'Send a notification through a Leina robot’s Home channels.',
-  inputs: { leinaId: input, message: input },
+  inputs: { leinaId: input, message: { jsonSchema: { type: 'string', minLength: 1, pattern: '\\S' }, nullable: false } },
   outputs: { status: input, requestId: input, leinaId: input },
   name: 'Send notification',
   serviceId: 'leina',
