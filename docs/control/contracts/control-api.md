@@ -1452,10 +1452,20 @@ execution counts count logical invocations, not attempts. Node timeout covers al
 intervals; the Run budget continues to apply. Intervals remain interruptible active execution.
 
 Only a trusted task failure classified `retryable: true` by `FlowRunOptions.projectFailure` may
-retry. Default classification forbids retry. Ordinary Code failures and model request/output errors
-may retry. LLM host failures may explicitly set `retryable: false` for invalid configuration or
-permanent HTTP rejection. Connector pre-dispatch `connector.unavailable` may retry; Action outcomes
-retain their indeterminate rules.
+retry. Default classification forbids retry. Ordinary Code execution failures may retry. LLM and
+AI Decision failures use these classes:
+
+- `llm.unavailable`: request transport and response-protocol failures, HTTP 429 and HTTP 5xx may
+  retry. Missing deployment model/host configuration, invalid request configuration or inputs, and
+  other HTTP rejections do not retry.
+- `llm.output-invalid`: invalid model JSON and model output-schema errors detected within the
+  LLM/AI Decision Host, including invalid Decision answers, may retry unless the Host explicitly
+  sets `retryable: false`. This class does not include Scheduler output-port validation failures,
+  which occur outside the invocation retry boundary and never retry.
+
+The Server bridge treats a failed `LlmTaskResult` with omitted `retryable` as retryable; an explicit
+`retryable: false` forbids retry for either LLM class. Connector pre-dispatch `connector.unavailable`
+may retry; Action outcomes retain their indeterminate rules.
 
 OpenAPI GET, HEAD and OPTIONS transport failures may retry; other transport failures remain
 indeterminate. Received HTTP 429 and 5xx statuses may retry even if reading the response body fails.
