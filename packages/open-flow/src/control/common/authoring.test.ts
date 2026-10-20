@@ -614,9 +614,30 @@ it('round trips retry settings through public authoring, preserves unrelated edi
 })
 
 it.each(['value', 'agent', 'workflow'] as const)('rejects retries on %s nodes', async (type) => {
+  const config: Record<string, string> = type == 'agent' ? { model: 'test' } : type == 'workflow' ? { flowId: 'target' } : {}
   await expect(
-    edit(empty, [{ op: 'node.add', type, as: 'unsupported', name: 'Unsupported', retry: { maxRetries: 1, intervalMs: 1000 }, config: {} }]),
-  ).rejects.toThrow()
+    compileAuthoring(
+      empty,
+      {
+        baseRevision: 'base',
+        requestId: `unsupported-${type}`,
+        edits: [{ op: 'node.add', type, as: 'unsupported', name: 'Unsupported', retry: { maxRetries: 1, intervalMs: 1000 }, config }],
+      },
+      {
+        ...host,
+        workflow: async (flowId) => ({
+          version: 1,
+          flowId,
+          name: 'Target',
+          revisionId: 'r1',
+          publicationId: 'p1',
+          triggerNodeId: 'start',
+          inputs: [],
+          outputs: [],
+        }),
+      },
+    ),
+  ).rejects.toThrow('This node does not support retries.')
 })
 
 it('validates a merged retry policy and preserves partial updates', async () => {

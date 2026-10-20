@@ -6,7 +6,7 @@ import { openApiTask, selectOperation } from '@oomol-lab/open-flow/openapi'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { createServer } from 'node:http'
 import { afterEach, expect, it, vi } from 'vitest'
-import { executeOpenApi, loadOpenApiDocument } from '../node/deployment/openapi.ts'
+import { executeOpenApi, loadOpenApiDocument, OpenApiTaskError } from '../node/deployment/openapi.ts'
 import { createControlApp } from '../node/transport/control.ts'
 
 const doc = {
@@ -118,7 +118,7 @@ it.each([400, 401, 403, 404, 429, 500, 503])('classifies a fully received HTTP %
     retryable: status == 429 || status >= 500,
   })
 })
-it('forbids retries for invalid inputs, response validation, resource limits and uncertain transport', async () => {
+it('forbids retries for invalid inputs, response validation and resource limits', async () => {
   const config = selectOperation(doc, 'https://example.test/spec', '/items', 'get')
   await expect(executeOpenApi(config, { 'query.limit': 'invalid' }, new AbortController().signal)).rejects.toMatchObject({
     code: 'openapi.input-invalid',
@@ -131,9 +131,87 @@ it('forbids retries for invalid inputs, response validation, resource limits and
   await expect(
     executeOpenApi(config, {}, new AbortController().signal, async () => new Response('{}', { headers: { 'content-length': '9000000' } })),
   ).rejects.toMatchObject({ code: 'openapi.limit-exceeded', retryable: false })
+})
+
+it.each(['get', 'head', 'options', 'post', 'put', 'patch', 'delete'])('classifies %s transport failures using the request method', async (method) => {
+  const config = selectOperation({ ...doc, paths: { '/items': { [method]: doc.paths['/items'].get } } }, 'https://example.test/spec', '/items', method)
+  const retryable = ['get', 'head', 'options'].includes(method)
   await expect(
     executeOpenApi(config, {}, new AbortController().signal, async () => {
       throw new Error('secret')
     }),
-  ).rejects.toMatchObject({ code: 'openapi.indeterminate', retryable: false })
+  ).rejects.toMatchObject({
+    code: retryable ? 'openapi.http-failed' : 'openapi.indeterminate',
+    retryable,
+  })
+})
+it.each([200, 400, 401, 429, 500, 503])('uses the received HTTP %s status when reading the body fails', async (status) => {
+  const config = selectOperation({ ...doc, paths: { '/items': { post: doc.paths['/items'].get } } }, 'https://example.test/spec', '/items', 'post')
+  await expect(
+    executeOpenApi(
+      config,
+      {},
+      new AbortController().signal,
+      async () =>
+        new Response(
+          new ReadableStream({
+            start(controller) {
+              controller.error(new Error('secret'))
+            },
+          }),
+          { status },
+        ),
+    ),
+  ).rejects.toMatchObject({
+    code: status == 200 ? 'openapi.response-invalid' : 'openapi.http-failed',
+    retryable: status == 429 || status >= 500,
+  })
+})
+it.each(['transport', 'body'])('preserves cancellation and deadlines during %s failures', async (phase) => {
+  const deadline = new AbortController()
+  vi.spyOn(AbortSignal, 'timeout').mockReturnValue(deadline.signal)
+  try {
+    const config = selectOperation(doc, 'https://example.test/spec', '/items', 'get')
+    const reason = new DOMException('Deadline exceeded', 'TimeoutError')
+    await expect(
+      executeOpenApi(config, {}, new AbortController().signal, async () => {
+        if (phase == 'transport') {
+          deadline.abort(reason)
+          throw new Error('secret')
+        }
+        return new Response(
+          new ReadableStream({
+            pull(controller) {
+              deadline.abort(reason)
+              controller.error(new Error('secret'))
+            },
+          }),
+          { status: 503 },
+        )
+      }),
+    ).rejects.toBe(reason)
+  } finally {
+    vi.restoreAllMocks()
+  }
+})
+it('preserves structured errors and resource limits instead of converting them to retryable HTTP errors', async () => {
+  const config = selectOperation(doc, 'https://example.test/spec', '/items', 'get')
+  const error = new OpenApiTaskError('openapi.input-invalid', 'Invalid request')
+  await expect(
+    executeOpenApi(config, {}, new AbortController().signal, async () => {
+      throw error
+    }),
+  ).rejects.toBe(error)
+  await expect(
+    executeOpenApi(
+      config,
+      {},
+      new AbortController().signal,
+      async () =>
+        new Response('{}', {
+          status: 503,
+          headers: { 'content-length': '9000000' },
+        }),
+    ),
+  ).rejects.toMatchObject({ code: 'openapi.limit-exceeded', retryable: false })
 })

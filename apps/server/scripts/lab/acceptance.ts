@@ -1,11 +1,20 @@
 import type { RunEvent } from '@oomol-lab/open-flow/control-api'
+import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { createMocks } from './mocks.ts'
 import type { Sample } from './scenarios.ts'
 
 import { isDeepStrictEqual } from 'node:util'
 type Calls = ReturnType<typeof createMocks>['calls']
 /** Runtime expectations are independent of the reference program and editing strategy. */
-export function runtimeAssertions(id: string, sample: Sample, status: string, calls: Calls, modelCalls: unknown[], events: readonly RunEvent[]): string[] {
+export function runtimeAssertions(
+  id: string,
+  sample: Sample,
+  status: string,
+  calls: Calls,
+  modelCalls: unknown[],
+  events: readonly RunEvent[],
+  content: RevisionContent,
+): string[] {
   const errors: string[] = []
   if (sample.failure) {
     if (
@@ -17,8 +26,19 @@ export function runtimeAssertions(id: string, sample: Sample, status: string, ca
   }
   if (status != 'completed') return [`Run ${sample.name} ended ${status}.`]
   if (id == 'node-retries') {
-    const completed = events.filter((event) => event.kind == 'node.completed' && isDeepStrictEqual(event.payload.outputs, { value: 42 }))
-    if (completed.length != 2 || calls.length || modelCalls.length) errors.push('Execute both configured tasks once without external calls.')
+    const tasks = ['Retried task updated', 'Cleared task'].map(
+      (name) => Object.entries(content.document.graph.nodes).find(([, node]) => node.kind == 'task' && 'moduleId' in node.task && node.name == name)?.[0],
+    )
+    const completions = events.filter((event) => event.kind == 'node.completed')
+    if (
+      tasks.some((nodeId) => {
+        const completed = completions.filter((event) => event.payload.nodeId == nodeId)
+        return nodeId == null || completed.length != 1 || !isDeepStrictEqual(completed[0]!.payload.outputs, { value: 42 })
+      }) ||
+      calls.length ||
+      modelCalls.length
+    )
+      errors.push('Execute both configured tasks once without external calls.')
   }
   if (id == 'workflow-call') {
     const terminal = events.findLast((event) => event.kind == 'run.completed')

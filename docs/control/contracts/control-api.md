@@ -1453,10 +1453,15 @@ intervals; the Run budget continues to apply. Intervals remain interruptible act
 
 Only a trusted task failure classified `retryable: true` by `FlowRunOptions.projectFailure` may
 retry. Default classification forbids retry. Ordinary Code failures and model request/output errors
-may retry. LLM host failures may explicitly set `retryable: false` for invalid configuration or permanent HTTP rejection. Connector pre-dispatch `connector.unavailable` may retry; Action outcomes retain their indeterminate rules. OpenAPI retries only fully received HTTP 429 and 5xx failures. Configuration, input,
-permission, account, output-port validation, resource, cancellation, timeout and unconfirmed-outcome
-failures do not retry. OpenAPI transport/read failures after dispatch are indeterminate; Connector
-keeps its existing indeterminate classification. Received oversized responses fail as resource errors.
+may retry. LLM host failures may explicitly set `retryable: false` for invalid configuration or
+permanent HTTP rejection. Connector pre-dispatch `connector.unavailable` may retry; Action outcomes
+retain their indeterminate rules.
+
+OpenAPI GET, HEAD and OPTIONS transport failures may retry; other transport failures remain
+indeterminate. Received HTTP 429 and 5xx statuses may retry even if reading the response body fails.
+Body-read failures for successful responses are non-retryable `openapi.response-invalid` errors.
+Configuration, input, permission, account, output-port validation, resource, cancellation, timeout
+and indeterminate failures do not retry. Received oversized responses fail as resource errors.
 
 Input resolution, output validation, event persistence and result commit are outside retry. A Task
 commits once and only then releases downstream dependencies. `node.started` fires once; intermediate

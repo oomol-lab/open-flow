@@ -424,7 +424,7 @@ export class LabSession {
             errors.push(
               ...(this.scenarioId == 'fulfillment-ops'
                 ? fulfillmentRuntimeAssertions(this.stage, ...actual)
-                : runtimeAssertions(this.scenarioId, ...actual)
+                : runtimeAssertions(this.scenarioId, ...actual, revision.content)
               ).map((error) => `${sample.name}: ${error}`),
             )
             this.attempt.excluded!.push({ kind: 'verification', sample: sample.name, durationMs: performance.now() - started, runId: run.runId })

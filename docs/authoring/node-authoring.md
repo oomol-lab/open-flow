@@ -122,5 +122,5 @@ Agent, workflow calls, Triggers, Wait and Approval do not support this policy. R
 schemas and diagnostics expose the node setting without requiring internal Task reconstruction.
 
 Retries repeat the whole Task with the same inputs. They may duplicate external operations. They
-never replay unconfirmed outcomes, bypass resource limits, or reset node/Run deadlines. Output
+never replay unconfirmed side effects, bypass resource limits, or reset node/Run deadlines. Output
 validation and commit failures cannot retry an already completed Task.

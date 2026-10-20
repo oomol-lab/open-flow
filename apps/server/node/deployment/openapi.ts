@@ -73,18 +73,30 @@ export async function executeOpenApi(
     throw new OpenApiTaskError('openapi.input-invalid', 'The API request configuration or inputs are invalid.')
   }
   const { url, init } = built
+  const requestSignal = AbortSignal.any([signal, AbortSignal.timeout(30000)])
   let response: Response
-  let body: string
   try {
-    response = await request(url, { ...init, signal: AbortSignal.any([signal, AbortSignal.timeout(30000)]) })
-    body = await readBody(response)
+    response = await request(url, { ...init, signal: requestSignal })
   } catch (error) {
-    if (signal.aborted) throw signal.reason
+    if (requestSignal.aborted) throw requestSignal.reason
     if (error instanceof OpenApiTaskError) throw error
+    if (['GET', 'HEAD', 'OPTIONS'].includes(config.method.toUpperCase()))
+      throw new OpenApiTaskError('openapi.http-failed', 'The API request failed before a response was received.', true)
     throw new OpenApiTaskError('openapi.indeterminate', 'The API request outcome could not be confirmed.')
   }
-  if (!response.ok)
-    throw new OpenApiTaskError('openapi.http-failed', `API request failed with HTTP ${response.status}.`, response.status == 429 || response.status >= 500)
+  const httpFailure = response.ok
+    ? undefined
+    : new OpenApiTaskError('openapi.http-failed', `API request failed with HTTP ${response.status}.`, response.status == 429 || response.status >= 500)
+  let body: string
+  try {
+    body = await readBody(response)
+  } catch (error) {
+    if (requestSignal.aborted) throw requestSignal.reason
+    if (error instanceof OpenApiTaskError) throw error
+    if (httpFailure) throw httpFailure
+    throw new OpenApiTaskError('openapi.response-invalid', 'The API response body could not be read.')
+  }
+  if (httpFailure) throw httpFailure
   try {
     return parseResponse(config, response.status, response.headers, body)
   } catch {
