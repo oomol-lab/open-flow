@@ -16,6 +16,10 @@ export function runtimeAssertions(id: string, sample: Sample, status: string, ca
     return errors
   }
   if (status != 'completed') return [`Run ${sample.name} ended ${status}.`]
+  if (id == 'node-retries') {
+    const completed = events.filter((event) => event.kind == 'node.completed' && isDeepStrictEqual(event.payload.outputs, { value: 42 }))
+    if (completed.length != 2 || calls.length || modelCalls.length) errors.push('Execute both configured tasks once without external calls.')
+  }
   if (id == 'workflow-call') {
     const terminal = events.findLast((event) => event.kind == 'run.completed')
     const result = terminal?.kind == 'run.completed' ? terminal.payload.result : undefined

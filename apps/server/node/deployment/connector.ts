@@ -153,6 +153,14 @@ export class ConnectorTaskError extends Error {
     this.code = code
     this.name = 'ConnectorTaskError'
   }
+
+  get retryable(): boolean {
+    return this.code == 'connector.unavailable'
+  }
+
+  get indeterminate(): boolean {
+    return this.code == 'connector.indeterminate'
+  }
 }
 
 class RequestError extends ConnectorTaskError {

@@ -126,7 +126,7 @@ describe('WorkspaceStore', () => {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
-          engineContract: 'open-flow-engine/v5',
+          engineContract: 'open-flow-engine/v6',
           flowId: flow.flowId,
           modelVersion: currentFlowModelVersion,
           revisionDigest: 'digest-2',
@@ -509,7 +509,7 @@ describe('WorkspaceStore', () => {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
-          engineContract: 'open-flow-engine/v5',
+          engineContract: 'open-flow-engine/v6',
           flowId: flow.flowId,
           modelVersion: currentFlowModelVersion,
           revisionDigest: path.includes('revision-2') ? 'digest-2' : sourceDraft.digest,
@@ -613,7 +613,7 @@ describe('WorkspaceStore', () => {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
-          engineContract: 'open-flow-engine/v5',
+          engineContract: 'open-flow-engine/v6',
           flowId: flow.flowId,
           modelVersion: currentFlowModelVersion,
           revisionDigest: revisionId.replace('revision', 'digest'),
@@ -655,7 +655,7 @@ describe('WorkspaceStore', () => {
       actorId: 'actor-1',
       closureDigest: 'closure-1',
       createdAt: timestamp,
-      engineContract: 'open-flow-engine/v5',
+      engineContract: 'open-flow-engine/v6',
       flowId: flow.flowId,
       modelVersion: currentFlowModelVersion,
       operation: 'publish',
@@ -791,7 +791,7 @@ describe('WorkspaceStore', () => {
         return Response.json({
           closureDigest: 'closure-1',
           diagnostics: [],
-          engineContract: 'open-flow-engine/v5',
+          engineContract: 'open-flow-engine/v6',
           flowId: flow.flowId,
           modelVersion: currentFlowModelVersion,
           revisionDigest: draft.digest,
@@ -835,7 +835,7 @@ function checked(revisionId: string): Response {
   return Response.json({
     closureDigest: `closure-${revisionId}`,
     diagnostics: [],
-    engineContract: 'open-flow-engine/v5',
+    engineContract: 'open-flow-engine/v6',
     flowId: flow.flowId,
     modelVersion: currentFlowModelVersion,
     revisionDigest: `digest-${revisionId}`,
@@ -1183,7 +1183,7 @@ it.each(['unchanged', 'resolved', 'failed'] as const)('retains diagnostics throu
   const check = (revisionId: string, diagnostics = [diagnostic]) => ({
     closureDigest: `closure-${revisionId}`,
     diagnostics,
-    engineContract: 'open-flow-engine/v5',
+    engineContract: 'open-flow-engine/v6',
     flowId: flow.flowId,
     modelVersion: currentFlowModelVersion,
     revisionDigest: `digest-${revisionId}`,
@@ -1292,7 +1292,7 @@ it('repairs the persisted title of an already upgraded Start when opening in Chi
   vi.spyOn(client, 'checkFlow').mockResolvedValue({
     closureDigest: 'digest',
     diagnostics: [],
-    engineContract: 'open-flow-engine/v5',
+    engineContract: 'open-flow-engine/v6',
     flowId: flow.flowId,
     modelVersion: currentFlowModelVersion,
     revisionDigest: 'digest',
@@ -1386,7 +1386,7 @@ it('upgrades legacy manual nodes before editing and rereads a conflicting Draft 
   vi.spyOn(client, 'checkFlow').mockResolvedValue({
     closureDigest: 'digest',
     diagnostics: [],
-    engineContract: 'open-flow-engine/v5',
+    engineContract: 'open-flow-engine/v6',
     flowId: flow.flowId,
     modelVersion: currentFlowModelVersion,
     revisionDigest: 'digest',

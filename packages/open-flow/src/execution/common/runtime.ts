@@ -124,7 +124,13 @@ export interface LlmTaskInvocation {
 
 export type LlmTaskResult =
   | { readonly kind: 'completed'; readonly value: JsonValue; readonly version: 1 }
-  | { readonly code: 'llm.output-invalid' | 'llm.unavailable'; readonly kind: 'failed'; readonly message: string; readonly version: 1 }
+  | {
+      readonly retryable?: boolean
+      readonly code: 'llm.output-invalid' | 'llm.unavailable'
+      readonly kind: 'failed'
+      readonly message: string
+      readonly version: 1
+    }
 
 export type InvokeLlmTask = (invocation: LlmTaskInvocation) => Promise<LlmTaskResult>
 

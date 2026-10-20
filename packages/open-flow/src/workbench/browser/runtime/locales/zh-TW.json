@@ -281,7 +281,16 @@
       "description": "用途說明",
       "describe": "描述這個步驟要完成什麼。",
       "icon": "圖示",
-      "name": "標題"
+      "name": "標題",
+      "retry": "失敗重試",
+      "retryCount": "最多重試 {{count}} 次",
+      "retryInterval": "重試間隔",
+      "retryError": "間隔須為 1～60 整數秒。",
+      "retryHint": "重試次數是首次執行失敗後的追加次數。重試會重新執行整個節點，可能重複外部操作。逾時包含全部嘗試和等待間隔。",
+      "retryNone": "不重試",
+      "retrySeconds": "秒",
+      "retryHelp": "重試說明",
+      "retryOnce": "最多重試 1 次"
     },
     "selectNode": "選取一個草稿節點即可檢視並編輯它。",
     "locateNode": "在畫布上定位此節點",

@@ -93,7 +93,7 @@ async function publish(context: Awaited<ReturnType<typeof setup>>, name: string,
     }),
   }
   const draft = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [{ kind: 'graph.node.create', nodeId: 'feishu', node }])
-  const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, 'open-flow-engine/v5', null, `publish-${name}`)
+  const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, 'open-flow-engine/v6', null, `publish-${name}`)
   await service.tickIntegration()
   await service.tickMaintenance()
   const completed = service.control.getPublishOperation(flowId, operation.operationId)

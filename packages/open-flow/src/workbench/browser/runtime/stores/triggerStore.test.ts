@@ -109,7 +109,7 @@ function createSetup(language: 'en' | 'zh-CN' = 'en') {
       return Response.json({
         closureDigest: 'closure',
         diagnostics: [],
-        engineContract: 'open-flow-engine/v5',
+        engineContract: 'open-flow-engine/v6',
         flowId: flow.flowId,
         modelVersion: currentFlowModelVersion,
         revisionDigest: 'digest',

@@ -119,7 +119,7 @@ describe('ConnectorStore', () => {
           return Response.json({
             closureDigest: `closure-${index}`,
             diagnostics: [],
-            engineContract: 'open-flow-engine/v5',
+            engineContract: 'open-flow-engine/v6',
             flowId: flow!.flowId,
             modelVersion: currentFlowModelVersion,
             revisionDigest: `digest-${flow!.flowId}`,

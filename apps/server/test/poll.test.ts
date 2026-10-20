@@ -377,7 +377,7 @@ describe('Server Poll Trigger', () => {
       const changed = await service.control.changeDraft('operator', created.flow.flowId, created.flow.draftRevisionId, [
         { kind: 'graph.node.create', node: content.document.graph.nodes.poll!, nodeId: 'poll' },
       ])
-      await service.control.publishFlow('operator', created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v5', null, 'poll-control-publication')
+      await service.control.publishFlow('operator', created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v6', null, 'poll-control-publication')
       await service.tickListeners()
       await service.tickMaintenance()
       const before = service.pollState(created.flow.flowId, 'poll')
@@ -441,7 +441,7 @@ describe('Server Poll Trigger', () => {
       const changed = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
         { kind: 'graph.node.create', node: revision().document.graph.nodes.poll!, nodeId: 'poll' },
       ])
-      await service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v5', null, 'poll-preview-publication')
+      await service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v6', null, 'poll-preview-publication')
       await service.tickListeners()
       await service.tickMaintenance()
       const before = service.pollState(flowId, 'poll')

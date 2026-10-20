@@ -2,13 +2,17 @@ import type { JsonValue, Port, PortDefinition } from '../../types/index.ts'
 
 import { assertOpenApiAuthBindings } from '../../openapi/common/authBindings.ts'
 export { fixedInputValue, inputValue, inputValues } from './inputValue.ts'
+import type { RetryConfiguration } from './retry.ts'
 import type { WebhookMethod } from './webhookMethod.ts'
 
 import { dequal } from 'dequal/lite'
 import { currentFlowModelVersion, decodeRevisionContent } from './changeSchema.ts'
 import { nodeInputMappings, setConditionInput } from './condition.ts'
+import { supportsNodeRetry } from './retry.ts'
 
 export { changeOperationsSchema, currentFlowModelVersion, decodeChangeOperations } from './changeSchema.ts'
+export type { RetryConfiguration } from './retry.ts'
+export { supportsNodeRetry } from './retry.ts'
 export type { WebhookMethod }
 
 export type { JsonValue, Port, PortDefinition } from '../../types/index.ts'
@@ -125,6 +129,7 @@ interface GraphNodeBase {
   readonly name?: string
   readonly maxExecutions?: number
   readonly timeoutMs?: number
+  readonly retry?: RetryConfiguration
 }
 
 export interface ValueNode extends GraphNodeBase {
@@ -506,7 +511,7 @@ export interface CodeModule {
 
 export interface RevisionContent {
   readonly document: FlowDocument
-  readonly modelVersion: 2 | 4 | 5 | 6 | 7 | typeof currentFlowModelVersion
+  readonly modelVersion: 2 | 4 | 5 | 6 | 7 | 8 | typeof currentFlowModelVersion
   readonly modules: Readonly<Record<string, CodeModule>>
 }
 
@@ -603,6 +608,13 @@ export type ChangeOperation =
       readonly nodeId: string
 
       readonly value?: number | string
+    }
+  | {
+      readonly before?: RetryConfiguration
+      readonly field: 'retry'
+      readonly kind: 'graph.node.field.set'
+      readonly nodeId: string
+      readonly value?: RetryConfiguration
     }
   | {
       readonly before?: InputMapping
@@ -820,6 +832,7 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         const graph = document.graph
         const node = graph.nodes[operation.nodeId]
         if (node == null) invalid('The Node does not exist in the target graph.')
+        if (operation.field == 'retry' && operation.value != null && !supportsNodeRetry(node)) invalid('This node does not support retries.')
         if (operation.field == 'connectionId' && node.kind != 'poll' && node.kind != 'integration') invalid('Only provider Triggers select a node Connection.')
         if (!dequal(Reflect.get(node, operation.field), operation.before)) invalid('The Node field changed before this operation was applied.')
         const updated = { ...node }

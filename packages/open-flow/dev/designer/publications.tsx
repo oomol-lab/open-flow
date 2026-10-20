@@ -22,7 +22,7 @@ function createSession(language: UiLanguage, scenario: Scenario, log: LogAction)
     actorId: index % 2 == 0 ? 'user-alex-7a36e201' : 'user-sam-3f920d54',
     closureDigest: 'closure',
     createdAt: new Date(Date.parse(timestamp) - index * 14_400_000).toISOString(),
-    engineContract: 'open-flow-engine/v5',
+    engineContract: 'open-flow-engine/v6',
     flowId,
     modelVersion: currentFlowModelVersion,
     operation: index == 2 ? 'rollback' : 'publish',
@@ -103,7 +103,7 @@ function createSession(language: UiLanguage, scenario: Scenario, log: LogAction)
     const next: Publication = {
       actorId: 'user-alex-7a36e201',
       closureDigest: 'closure',
-      engineContract: 'open-flow-engine/v5',
+      engineContract: 'open-flow-engine/v6',
       flowId,
       modelVersion: currentFlowModelVersion,
       revisionDigest: 'revision',
@@ -144,7 +144,7 @@ function createSession(language: UiLanguage, scenario: Scenario, log: LogAction)
       return Response.json({
         closureDigest: 'closure',
         diagnostics: [],
-        engineContract: 'open-flow-engine/v5',
+        engineContract: 'open-flow-engine/v6',
         flowId,
         modelVersion: currentFlowModelVersion,
         revisionDigest: 'draft',

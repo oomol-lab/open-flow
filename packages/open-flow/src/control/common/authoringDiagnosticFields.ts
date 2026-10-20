@@ -3,7 +3,7 @@ import type { GraphNode, Group, InputPort } from '../../flow/common/change.ts'
 import { conditionConfigurationFieldPath } from './authoringCondition.ts'
 
 type Ports = readonly (InputPort | Group)[]
-const metadata = new Set(['name', 'description', 'icon', 'timeoutMs', 'maxExecutions'])
+const metadata = new Set(['name', 'description', 'icon', 'timeoutMs', 'maxExecutions', 'retry'])
 
 function portField(ports: Ports, path: readonly string[], parent: string): string {
   const port = ports[Number(path[0])]

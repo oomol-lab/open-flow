@@ -94,6 +94,10 @@ export function inverseFlowChanges(content: RevisionContent, operations: readonl
         restore.push({ ...operation, before: operation.value, value: operation.before })
         break
       case 'graph.node.field.set':
+        if (operation.field == 'retry') {
+          restore.push({ ...operation, before: operation.value, value: operation.before })
+          break
+        }
         restore.push({ ...operation, before: operation.value, value: operation.before })
         break
       case 'graph.node.task.ports.set':

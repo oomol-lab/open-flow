@@ -12,6 +12,7 @@ import type {
   JsonValue,
   Port,
   PortDefinition,
+  RetryConfiguration,
   RevisionContent,
   TaskDefinition,
   TriggerKeySnapshot,
@@ -41,6 +42,7 @@ export interface Settings {
   readonly name?: string
   readonly maxExecutions?: number
   readonly timeoutMs?: number
+  readonly retry?: RetryConfiguration
 }
 
 export interface LlmTaskOptions {
@@ -379,6 +381,9 @@ export function updateSettings(content: RevisionContent, nodeId: string, setting
   }
   if (node.timeoutMs != settings.timeoutMs) {
     operations.push({ before: node.timeoutMs, field: 'timeoutMs', kind: 'graph.node.field.set', nodeId, value: settings.timeoutMs })
+  }
+  if (Object.hasOwn(settings, 'retry') && !dequal(node.retry, settings.retry)) {
+    operations.push({ before: node.retry, field: 'retry', kind: 'graph.node.field.set', nodeId, value: settings.retry })
   }
   return operations
 }

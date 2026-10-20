@@ -79,7 +79,7 @@ function fixture(capacity = 10) {
         content,
         crons: [],
         expectedLivePublicationId: null,
-        engineContract: 'open-flow-engine/v5',
+        engineContract: 'open-flow-engine/v6',
         flowId: id,
         idempotencyKey: `publish-${id}`,
         integrations: [],

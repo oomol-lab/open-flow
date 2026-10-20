@@ -12,7 +12,7 @@ import * as Queue from 'effect/Queue'
 import { nanoid } from 'nanoid'
 import { z } from 'zod'
 import { agentInput } from '../../flow/common/agent.ts'
-import { isTriggerNode, portsByHandle } from '../../flow/common/change.ts'
+import { isTriggerNode, supportsNodeRetry, portsByHandle } from '../../flow/common/change.ts'
 import { nodeInputMappings, selectConditionBranches } from '../../flow/common/condition.ts'
 import { nodeInputPorts as nodePorts, isResolutionNode, nodeOutputPorts, resolutionActions, resolutionOutputPorts } from '../../flow/common/graph.ts'
 import { inputValue } from '../../flow/common/inputValue.ts'
@@ -243,6 +243,8 @@ export interface TriggerSeed {
 }
 
 export interface SchedulerFailure {
+  /** Trusted execution classification; absent means retries are forbidden. */
+  readonly retryable?: boolean
   readonly code: string
   readonly message: string
 }
@@ -295,6 +297,32 @@ interface RunContext {
   readonly projectFailure: FlowRunOptions['projectFailure']
   readonly waits: WaitHost | undefined
   readonly remainingMs: number | undefined
+}
+
+function invokeWithRetry(context: RunContext, node: ExecutableNode, invocation: TaskInvocation): Effect.Effect<unknown, Error> {
+  const retry = supportsNodeRetry(node) ? node.retry : undefined
+  const attempt = (index: number): Effect.Effect<unknown, Error> =>
+    Effect.suspend(() =>
+      context.invokeTask(index == 0 ? invocation : { ...invocation, invocationId: context.createId() }).pipe(
+        Effect.catch((error) => {
+          const failure = nodeFailure(error, context.projectFailure)
+          if (retry == null || index >= retry.maxRetries || failure.retryable !== true) return Effect.fail(error)
+          return Effect.gen(function* () {
+            yield* context.emit({
+              type: 'node.log',
+              level: 'warn',
+              runId: invocation.runId,
+              nodeId: invocation.nodeId,
+              jobId: invocation.jobId,
+              message: `Attempt ${index + 1}/${retry.maxRetries + 1} failed (${failure.code}): ${failure.message}. Retrying attempt ${index + 2}/${retry.maxRetries + 1} in ${retry.intervalMs} ms.`,
+            })
+            yield* Effect.sleep(retry.intervalMs)
+            return yield* attempt(index + 1)
+          })
+        }),
+      ),
+    )
+  return attempt(0)
 }
 
 function nodeTitle(node: ExecutableNode): string | undefined {
@@ -806,7 +834,7 @@ function runGraph(
               const frame = dependencies.inputValues(nodeId)
               const previousIds = dependencies.state.nodes[nodeId]!.previous
               const additional = new Set((node.additionalInputs ?? []).map((port) => port.handle))
-              const result = yield* context.invokeTask({
+              const result = yield* invokeWithRetry(context, node, {
                 ...(pendingCalls.has(jobId) ? { workflowRunId: pendingCalls.get(jobId)!.childRunId } : {}),
                 additionalInputs: Object.fromEntries(Object.entries(nodeInputs).filter(([handle]) => additional.has(handle))),
                 blockId: 'moduleId' in node.task ? node.task.moduleId : nodeId,

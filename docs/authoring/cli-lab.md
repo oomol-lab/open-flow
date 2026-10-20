@@ -328,3 +328,8 @@ environment, not a general-purpose network sandbox for arbitrary untrusted code.
 remains the responsibility of the production runtime.
 
 `workflow-call` discovers a published target through the public Flow catalog, creates a Call Workflow node, edits its name, explicitly refreshes its contract, and returns the child business output. It verifies zero and signed numeric parameters and parent/child log isolation. Run `bun run lab test workflow-call` and `bun run lab test workflow-call --mcp`.
+
+`node-retries` creates retry policies through the public authoring contract, updates one interval
+without losing its count, explicitly clears another policy, and runs both Code nodes. Run
+`bun run lab test node-retries` and `bun run lab test node-retries --mcp`. Scheduler and isolated
+runtime tests separately verify actual failed attempts, deadlines and uncertain outcomes.

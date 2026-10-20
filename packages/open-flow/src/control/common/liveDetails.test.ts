@@ -17,7 +17,7 @@ const publication: Publication = {
   closureDigest: 'closure',
   revisionDigest: 'revision',
   sharedAccessDigest: 'access',
-  engineContract: 'open-flow-engine/v5',
+  engineContract: 'open-flow-engine/v6',
   modelVersion: currentFlowModelVersion,
   version: 1,
 }

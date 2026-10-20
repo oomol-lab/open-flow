@@ -74,7 +74,7 @@ function setup() {
     revisionId: 'initial',
     flowId: 'flow',
     closureDigest: 'closure',
-    engineContract: 'open-flow-engine/v5',
+    engineContract: 'open-flow-engine/v6',
     expectedLivePublicationId: null,
     idempotencyKey: 'publish',
     requestDigest: 'publish',

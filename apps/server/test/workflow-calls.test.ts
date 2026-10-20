@@ -11,7 +11,7 @@ import { expect, it, onTestFinished, vi } from 'vitest'
 import { workflowAuthoringTarget, workflowCallCompatibility } from '../node/application/workflow.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
 
-const engine = 'open-flow-engine/v5'
+const engine = 'open-flow-engine/v6'
 const number = { handle: 'answer', jsonSchema: { type: 'number' }, nullable: false } as const
 async function create(service: ServerService, name: string, operations: readonly ChangeOperation[]) {
   const created = await service.control.createFlow('operator', name, name)

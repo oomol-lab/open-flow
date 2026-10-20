@@ -42,10 +42,10 @@ const samples = {
   upgradeDraft: { expectedRevisionId: 'r1', version: 1 },
   setEnabled: { enabled: false, expectedPublicationId: 'p1', version: 1 },
   updatePresentation: { expectedRevision: 1, value: {}, version: 1 },
-  checkFlow: { engineContract: 'open-flow-engine/v5', version: 1 },
-  publishFlow: { engineContract: 'open-flow-engine/v5', expectedLivePublicationId: null, version: 1 },
+  checkFlow: { engineContract: 'open-flow-engine/v6', version: 1 },
+  publishFlow: { engineContract: 'open-flow-engine/v6', expectedLivePublicationId: null, version: 1 },
   rollbackFlow: { expectedLivePublicationId: 'p1', version: 1 },
-  createDraftRun: { engineContract: 'open-flow-engine/v5', inputs: {}, trigger: { nodeId: 'start', outputs: { payload: null } }, version: 2 },
+  createDraftRun: { engineContract: 'open-flow-engine/v6', inputs: {}, trigger: { nodeId: 'start', outputs: { payload: null } }, version: 2 },
   createLiveRun: { publicationId: 'p1', inputs: {}, trigger: { nodeId: 'start', outputs: {} }, version: 2 },
   resolveWait: { action: 'continue', version: 1 },
   putVariable: { value: '' },
@@ -106,7 +106,7 @@ it('validates MCP defaults without accepting extra arguments', () => {
 
 it('requires the versioned explicit output map for Run creation', () => {
   const run = {
-    engineContract: 'open-flow-engine/v5',
+    engineContract: 'open-flow-engine/v6',
     inputs: {},
     trigger: { nodeId: 'hook', outputs: { headers: {}, query: {}, body: {}, webhookUrl: 'https://example.com/webhook' } },
     version: 2,

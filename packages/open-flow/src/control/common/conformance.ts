@@ -4,6 +4,7 @@ import type { ConnectorConnection, CreateEventSource, ResultInfo, PollTriggerTes
 import type { ProviderAccessIdentity } from './providerAccess.ts'
 
 import { dequal } from 'dequal/lite'
+import { currentEngineContract as engineContract } from '../../execution/common/engineContract.ts'
 import { upgradeRevisionContent } from '../../flow/common/change.ts'
 import { ControlClient, decodeRunEvent } from './api.ts'
 import { allConnectorConnectionsQuery } from './connectorQueries.ts'
@@ -21,8 +22,6 @@ export interface ControlApiConformanceCase {
 }
 
 type RecordValue = Readonly<Record<string, unknown>>
-
-const engineContract = 'open-flow-engine/v5'
 
 function fail(message: string): never {
   throw new Error(message)

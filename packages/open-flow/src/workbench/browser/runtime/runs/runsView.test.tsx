@@ -14,7 +14,7 @@ describe('RunsView output', () => {
     const finishedAt = '2026-08-27T10:00:01.000Z'
     const run: RunDetails = {
       closureDigest: 'closure',
-      engineContract: 'open-flow-engine/v5',
+      engineContract: 'open-flow-engine/v6',
       engineDigest: 'engine',
       modelVersion: currentFlowModelVersion,
       sharedAccessDigest: 'implicit:test',

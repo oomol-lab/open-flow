@@ -281,7 +281,16 @@
       "description": "목적",
       "describe": "이 단계의 목적을 설명하세요.",
       "icon": "아이콘",
-      "name": "제목"
+      "name": "제목",
+      "retry": "실패 시 재시도",
+      "retryCount": "최대 {{count}}회 재시도",
+      "retryInterval": "재시도 간격",
+      "retryError": "간격은 1~60초의 정수로 입력하세요.",
+      "retryHint": "재시도 횟수는 최초 실행 실패 후 추가로 시도하는 횟수입니다. 노드 전체를 다시 실행하므로 외부 작업이 중복될 수 있습니다. 제한 시간에는 모든 시도와 대기 시간이 포함됩니다.",
+      "retryNone": "재시도 안 함",
+      "retrySeconds": "초",
+      "retryHelp": "재시도 안내",
+      "retryOnce": "최대 1회 재시도"
     },
     "selectNode": "확인하고 편집할 초안 노드를 하나 선택하세요.",
     "locateNode": "캔버스에서 이 노드 위치 보기",

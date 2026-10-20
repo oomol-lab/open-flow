@@ -107,6 +107,33 @@ it('bounds document size, rejects redirects and propagates cancellation without 
   )
   const pending = executeOpenApi(config, { 'auth.key.token': 'secret-token' }, controller.signal, request)
   controller.abort()
-  await expect(pending).rejects.toThrow('could not be completed')
+  await expect(pending).rejects.toThrow('abort')
   expect(request).toHaveBeenCalledTimes(1)
+})
+
+it.each([400, 401, 403, 404, 429, 500, 503])('classifies a fully received HTTP %s response at the request owner', async (status) => {
+  const config = selectOperation(doc, 'https://example.test/spec', '/items', 'get')
+  await expect(executeOpenApi(config, {}, new AbortController().signal, async () => new Response('{}', { status }))).rejects.toMatchObject({
+    code: 'openapi.http-failed',
+    retryable: status == 429 || status >= 500,
+  })
+})
+it('forbids retries for invalid inputs, response validation, resource limits and uncertain transport', async () => {
+  const config = selectOperation(doc, 'https://example.test/spec', '/items', 'get')
+  await expect(executeOpenApi(config, { 'query.limit': 'invalid' }, new AbortController().signal)).rejects.toMatchObject({
+    code: 'openapi.input-invalid',
+    retryable: false,
+  })
+  await expect(executeOpenApi(config, {}, new AbortController().signal, async () => Response.json({ ok: 'wrong' }))).rejects.toMatchObject({
+    code: 'openapi.response-invalid',
+    retryable: false,
+  })
+  await expect(
+    executeOpenApi(config, {}, new AbortController().signal, async () => new Response('{}', { headers: { 'content-length': '9000000' } })),
+  ).rejects.toMatchObject({ code: 'openapi.limit-exceeded', retryable: false })
+  await expect(
+    executeOpenApi(config, {}, new AbortController().signal, async () => {
+      throw new Error('secret')
+    }),
+  ).rejects.toMatchObject({ code: 'openapi.indeterminate', retryable: false })
 })

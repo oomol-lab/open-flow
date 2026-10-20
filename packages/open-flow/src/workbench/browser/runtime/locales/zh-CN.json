@@ -281,7 +281,16 @@
       "description": "用途说明",
       "describe": "描述这一步要完成什么。",
       "icon": "图标",
-      "name": "标题"
+      "name": "标题",
+      "retry": "失败重试",
+      "retryCount": "最多重试 {{count}} 次",
+      "retryInterval": "重试间隔",
+      "retryError": "间隔须为 1～60 整数秒。",
+      "retryHint": "重试次数是首次执行失败后的追加次数。重试会重新执行整个节点，可能重复外部操作。超时包含全部尝试和等待间隔。",
+      "retryNone": "不重试",
+      "retrySeconds": "秒",
+      "retryHelp": "重试说明",
+      "retryOnce": "最多重试 1 次"
     },
     "selectNode": "选择一个草稿节点以查看和编辑。",
     "locateNode": "在画布上定位该节点",

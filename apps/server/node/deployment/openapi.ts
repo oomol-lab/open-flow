@@ -3,11 +3,26 @@ import type { OpenApiExecutor } from '@oomol-lab/open-flow/openapi'
 
 import { buildRequest, httpUrl, parseOpenApi, parseResponse } from '@oomol-lab/open-flow/openapi'
 
+export class OpenApiTaskError extends Error {
+  readonly code: 'openapi.input-invalid' | 'openapi.response-invalid' | 'openapi.http-failed' | 'openapi.indeterminate' | 'openapi.limit-exceeded'
+  readonly retryable: boolean
+  constructor(code: OpenApiTaskError['code'], message: string, retryable = false) {
+    super(message)
+    this.name = 'OpenApiTaskError'
+    this.code = code
+    this.retryable = retryable
+  }
+
+  get indeterminate(): boolean {
+    return this.code == 'openapi.indeterminate'
+  }
+}
+
 const maximumBytes = 4 * 1024 * 1024
 async function readBody(response: Response): Promise<string> {
   if (Number(response.headers.get('content-length')) > maximumBytes) {
     await response.body?.cancel()
-    throw new Error('Response exceeds 4 MiB.')
+    throw new OpenApiTaskError('openapi.limit-exceeded', 'Response exceeds 4 MiB.')
   }
   const reader = response.body?.getReader()
   if (reader == null) return ''
@@ -19,7 +34,7 @@ async function readBody(response: Response): Promise<string> {
       const { done, value } = await reader.read()
       if (done) break
       size += value.byteLength
-      if (size > maximumBytes) throw new Error('Response exceeds 4 MiB.')
+      if (size > maximumBytes) throw new OpenApiTaskError('openapi.limit-exceeded', 'Response exceeds 4 MiB.')
       text += decoder.decode(value, { stream: true })
     }
     return text + decoder.decode()
@@ -55,7 +70,7 @@ export async function executeOpenApi(
   try {
     built = buildRequest(config, input)
   } catch {
-    throw new Error('The API request configuration or inputs are invalid.')
+    throw new OpenApiTaskError('openapi.input-invalid', 'The API request configuration or inputs are invalid.')
   }
   const { url, init } = built
   let response: Response
@@ -63,8 +78,16 @@ export async function executeOpenApi(
   try {
     response = await request(url, { ...init, signal: AbortSignal.any([signal, AbortSignal.timeout(30000)]) })
     body = await readBody(response)
-  } catch {
-    throw new Error('The API request could not be completed within the time and size limits.')
+  } catch (error) {
+    if (signal.aborted) throw signal.reason
+    if (error instanceof OpenApiTaskError) throw error
+    throw new OpenApiTaskError('openapi.indeterminate', 'The API request outcome could not be confirmed.')
   }
-  return parseResponse(config, response.status, response.headers, body)
+  if (!response.ok)
+    throw new OpenApiTaskError('openapi.http-failed', `API request failed with HTTP ${response.status}.`, response.status == 429 || response.status >= 500)
+  try {
+    return parseResponse(config, response.status, response.headers, body)
+  } catch {
+    throw new OpenApiTaskError('openapi.response-invalid', 'The API response does not match the saved definition.')
+  }
 }

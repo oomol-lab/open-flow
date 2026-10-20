@@ -417,7 +417,7 @@ interface FlowCheck {
 }
 ```
 
-Check bodies use `{ engineContract: 'open-flow-engine/v5', version: 1 }` and always validate the Flow Revision pinned in the path. `message` is a stable canonical English fallback. Workbench may localize using `code`, optional `values.variant`, and other `values`. Unknown codes or variants must fall back to `message`.
+Check bodies use `{ engineContract: 'open-flow-engine/v6', version: 1 }` and always validate the Flow Revision pinned in the path. `message` is a stable canonical English fallback. Workbench may localize using `code`, optional `values.variant`, and other `values`. Unknown codes or variants must fall back to `message`.
 
 Publication `liveEnd` records enabled state and end time when a new Live replaces that version. The ordinary publish/rollback transaction writes it atomically. Asynchronous preparation does not write it; failure and idempotent replay do not rewrite it. A new rollback Publication does not inherit its source’s end state. Current Publications and older records without history omit it. It does not indicate Trigger health.
 
@@ -1158,7 +1158,7 @@ Flow terminal results use `{ kind: 'node-results', nodes }`. `nodes` contains on
 
 ## 10. Code Action contract
 
-The script contract is `open-flow-engine/v5`, with dependency joins, repeated loop iterations, and cumulative per-node execution limits. This unreleased change retains the contract and checkpoint version numbers; old development checkpoint shapes are rejected without conversion. v4 and earlier Publications/Runs require republication or a new Run. `context.actions` replaces v1 `context.connector` without aliases. v1-pinned Publications/Runs require their matching Engine; current Server explicitly rejects v1. New Code node Revisions store account mode. Only independent mode stores a node Action allowlist. Deployment Provider Access Bindings or implicit Connector authority remain the final authorization source.
+The script contract is `open-flow-engine/v6`, with bounded Task retries, dependency joins, repeated loop iterations, and cumulative per-node execution limits. Scheduler checkpoints remain version 5; old development checkpoint shapes are rejected without conversion. Earlier Engine-pinned Publications/Runs require republication or a matching execution environment. `context.actions` replaces v1 `context.connector` without aliases. v1-pinned Publications/Runs require their matching Engine; current Server explicitly rejects v1. New Code node Revisions store account mode. Only independent mode stores a node Action allowlist. Deployment Provider Access Bindings or implicit Connector authority remain the final authorization source.
 
 ### Revision and edit operations
 
@@ -1435,3 +1435,34 @@ Waiting calls are saved in the optional `calls` member of the version 5 checkpoi
 `GET /v1/flows/:flowId/references?direction=incoming|outgoing&offset=0&limit=50` returns `{ version: 1, direction, total, references, nextOffset? }`; limit is 1–100. Each reference contains `flowId`, nullable `name`, `available`, `draft`, and `live: { publicationId, enabled } | null`. Draft/Live identify the source declaration scopes, with disabled Live included. Results are sorted by Flow ID, deduplicated across scopes and filtered by owner. Outgoing references retain missing/retiring target IDs. Pagination and total share a single database snapshot and never read Revision bodies.
 
 The existing resource summary adds optional `calledFlowIds`; absence in an older summary means no calls. Definition relationships use relation kind `flow` and target Flow ID in `flow_resource_references`. The index does not contain node IDs, runtime calls or unknown states. The original summary `null` semantics and independent scope counting remain unchanged. Index updates consume the already extracted resource object in Draft/Live transactions, without additional Revision reads, decoding or materialization.
+
+## Node retry policy
+
+Node authoring `node.add.retry` and `node.update.set.retry` accept
+`{ maxRetries: 0..5, intervalMs: 1000..60000 }`; milliseconds must be a multiple of 1000.
+The same optional policy is stored on the node and returned in detail reads. Omission preserves an
+existing policy during updates; `clear: [["retry"]]` removes it. Omitted policy and `maxRetries: 0`
+mean no retry. A positive policy is supported only on Code, Connector, OpenAPI, LLM and AI Decision
+Tasks. Schema, compilation, diagnostics and search share this contract. Low-level changes use
+`graph.node.field.set` with `field: "retry"`, whole-policy before/value and ordinary CAS/undo.
+
+Retries are additional attempts after the first. They reuse the invocation input snapshot, keep one
+logical job/execution identity, and use a new invocation identity for each actual attempt. Loop
+execution counts count logical invocations, not attempts. Node timeout covers all attempts and
+intervals; the Run budget continues to apply. Intervals remain interruptible active execution.
+
+Only a trusted task failure classified `retryable: true` by `FlowRunOptions.projectFailure` may
+retry. Default classification forbids retry. Ordinary Code failures and model request/output errors
+may retry. LLM host failures may explicitly set `retryable: false` for invalid configuration or permanent HTTP rejection. Connector pre-dispatch `connector.unavailable` may retry; Action outcomes retain their indeterminate rules. OpenAPI retries only fully received HTTP 429 and 5xx failures. Configuration, input,
+permission, account, output-port validation, resource, cancellation, timeout and unconfirmed-outcome
+failures do not retry. OpenAPI transport/read failures after dispatch are indeterminate; Connector
+keeps its existing indeterminate classification. Received oversized responses fail as resource errors.
+
+Input resolution, output validation, event persistence and result commit are outside retry. A Task
+commits once and only then releases downstream dependencies. `node.started` fires once; intermediate
+failures produce warning `node.log` entries with attempt numbers, code/message and delay. Only final
+failure emits `node.failed` and fails the Run. Intermediate failures do not dispatch Flow Error.
+Enabling retry permits repeated external operations; it does not guarantee exactly-once side effects.
+
+This version adds no error output port. Future error routing belongs after retry exhaustion and must
+preserve cancellation, resource limits and indeterminate outcomes.

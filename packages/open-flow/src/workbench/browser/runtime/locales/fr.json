@@ -281,7 +281,16 @@
       "description": "Objectif",
       "describe": "Décrivez le rôle de cette étape.",
       "icon": "Icône",
-      "name": "Titre"
+      "name": "Titre",
+      "retry": "Réessayer en cas d’erreur",
+      "retryCount": "Nouvelles tentatives : {{count}} max.",
+      "retryInterval": "Intervalle",
+      "retryError": "Indiquez un intervalle entier de 1 à 60 secondes.",
+      "retryHint": "Le nombre de nouvelles tentatives s’ajoute à la première exécution en cas d’échec. Chaque tentative réexécute le nœud entier et peut répéter des opérations externes. Le délai maximal inclut toutes les tentatives et les intervalles.",
+      "retryNone": "Aucune nouvelle tentative",
+      "retrySeconds": "secondes",
+      "retryHelp": "À propos des nouvelles tentatives",
+      "retryOnce": "Une nouvelle tentative max."
     },
     "selectNode": "Sélectionnez un nœud du Brouillon pour l'inspecter et le modifier.",
     "locateNode": "Localiser ce nœud sur le canevas",

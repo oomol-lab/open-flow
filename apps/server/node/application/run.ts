@@ -20,7 +20,7 @@ import * as Effect from 'effect/Effect'
 import { executeCode } from '../deployment/agent-code.ts'
 import { executeAgent } from '../deployment/agent.ts'
 import { assertConnectionNotDeferred, checkCodeActions, checkCodePermissions, ConnectorTaskError } from '../deployment/connector.ts'
-import { executeOpenApi } from '../deployment/openapi.ts'
+import { OpenApiTaskError, executeOpenApi } from '../deployment/openapi.ts'
 import { errorKind } from '../logger.ts'
 import { isolatedVmEngineDigest, IsolatedVmHost } from '../runtime/isolated-vm.ts'
 
@@ -38,6 +38,11 @@ const nodeFailureCodes: ReadonlySet<string> = new Set([
   'llm.output-invalid',
   'llm.unavailable',
   'node.failed',
+  'openapi.input-invalid',
+  'openapi.response-invalid',
+  'openapi.http-failed',
+  'openapi.indeterminate',
+  'openapi.limit-exceeded',
 ])
 
 type TaskErrorCode = 'capability.denied' | 'capability.invalid' | 'llm.output-invalid' | 'llm.unavailable'
@@ -45,10 +50,12 @@ type TaskErrorCode = 'capability.denied' | 'capability.invalid' | 'llm.output-in
 class TaskHostError extends Error {
   readonly code: TaskErrorCode
 
-  constructor(code: TaskErrorCode, message: string) {
+  readonly retryable: boolean
+  constructor(code: TaskErrorCode, message: string, retryable = false) {
     super(message)
     this.code = code
     this.name = 'TaskHostError'
+    this.retryable = retryable
   }
 }
 
@@ -286,14 +293,12 @@ export class RunExecutor {
                 message: JSON.stringify(data),
               })
               if (event != null) this.#store.runs.append(run.runId, event)
-            }).catch((error: unknown) => {
-              if (error instanceof ConnectorTaskError && error.code == 'connector.indeterminate') indeterminate = true
-              throw error
             })
           },
           projectFailure: (error) => {
-            if (error instanceof ConnectorTaskError) return { code: error.code, message: error.message }
-            if (error instanceof TaskHostError) return { code: error.code, message: error.message }
+            if (error instanceof ConnectorTaskError || error instanceof OpenApiTaskError) indeterminate ||= error.indeterminate
+            if (error instanceof ConnectorTaskError || error instanceof TaskHostError || error instanceof OpenApiTaskError)
+              return { code: error.code, message: error.message, retryable: error.retryable }
             return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
           },
           runId: run.runId,
@@ -436,9 +441,9 @@ export class RunExecutor {
           })
         } catch {
           if (invocation.signal.aborted) throw invocation.signal.reason
-          throw new TaskHostError('llm.unavailable', 'The AI Decision request could not be completed.')
+          throw new TaskHostError('llm.unavailable', 'The AI Decision request could not be completed.', true)
         }
-        if (result.kind == 'failed') throw new TaskHostError(result.code, result.message)
+        if (result.kind == 'failed') throw new TaskHostError(result.code, result.message, result.retryable !== false)
         return result.value
       }
       case 'llm':
@@ -455,9 +460,9 @@ export class RunExecutor {
           })
         } catch {
           if (invocation.signal.aborted) throw invocation.signal.reason
-          throw new TaskHostError('llm.unavailable', 'The LLM request could not be completed.')
+          throw new TaskHostError('llm.unavailable', 'The LLM request could not be completed.', true)
         }
-        if (result.kind == 'failed') throw new TaskHostError(result.code, result.message)
+        if (result.kind == 'failed') throw new TaskHostError(result.code, result.message, result.retryable !== false)
         return result.value
     }
   }

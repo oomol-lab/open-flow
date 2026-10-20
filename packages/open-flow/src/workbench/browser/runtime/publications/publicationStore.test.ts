@@ -9,7 +9,7 @@ const publication = {
   actorId: 'actor',
   closureDigest: 'closure',
   createdAt: timestamp,
-  engineContract: 'open-flow-engine/v5',
+  engineContract: 'open-flow-engine/v6',
   flowId: 'flow-1',
   modelVersion: currentFlowModelVersion,
   operation: 'publish',

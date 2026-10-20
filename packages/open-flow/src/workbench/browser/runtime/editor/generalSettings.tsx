@@ -4,9 +4,11 @@ import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 
 import { useEffect, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { supportsNodeRetry } from '../../../../flow/common/change.ts'
 import { Field, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Icon } from '../icons.tsx'
+import { RetrySettings } from './retrySettings.tsx'
 
 export function GeneralSettings({
   title,
@@ -81,6 +83,16 @@ export function GeneralSettings({
       <div className="inspector-disclosure-content node-settings">
         <FieldGroup>
           {children}
+          {supportsNodeRetry(node) && (
+            <RetrySettings
+              nodeId={nodeId}
+              retry={node.retry}
+              disabled={disabled || readOnly || store == null}
+              onSave={(retry) => {
+                void store?.nodes.saveNodeSettings(nodeId, { name: node.name, timeoutMs: node.timeoutMs, maxExecutions: node.maxExecutions, retry })
+              }}
+            />
+          )}
           <Field data-invalid={limitError != null}>
             <FieldLabel htmlFor={`node-${nodeId}-limit`}>{t('inspector.node.maxExecutions')}</FieldLabel>
             <Input

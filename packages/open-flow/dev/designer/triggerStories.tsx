@@ -269,7 +269,7 @@ function RunSample({
         version: 1,
         waits: [],
         closureDigest: 'lab',
-        engineContract: 'open-flow-engine/v5',
+        engineContract: 'open-flow-engine/v6',
         engineDigest: 'lab',
         modelVersion: currentFlowModelVersion,
         sharedAccessDigest: 'implicit:lab',

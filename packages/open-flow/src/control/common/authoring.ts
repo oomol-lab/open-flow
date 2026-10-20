@@ -18,7 +18,7 @@ import type { AuthoringAgentTool } from './authoringTools.ts'
 import { dequal } from 'dequal/lite'
 import { connectorOutputMode } from '../../connector/common/actionSchema.ts'
 import { decisionTask } from '../../decision/common/decision.ts'
-import { isTriggerNode, applyFlowChanges, decodeChangeOperations, upgradeRevisionContent } from '../../flow/common/change.ts'
+import { supportsNodeRetry, isTriggerNode, applyFlowChanges, decodeChangeOperations, upgradeRevisionContent } from '../../flow/common/change.ts'
 import { nodeInputMappings } from '../../flow/common/condition.ts'
 import { connect, disconnect } from '../../flow/common/edgeChanges.ts'
 import { nodeInputPorts, nodeOutputPorts } from '../../flow/common/graph.ts'
@@ -40,6 +40,7 @@ import {
   updateOutputsDefs,
   renameFlowOutputSources,
 } from '../../flow/common/nodeChanges.ts'
+import { retryConfigurationSchema } from '../../flow/common/retry.ts'
 import { withWorkflowTask, workflowTask, workflowSelectionTask } from '../../workflow/common/workflow.ts'
 import { conditionConfigurationView, prepareConditionConfiguration } from './authoringCondition.ts'
 import { authoringDiagnosticField } from './authoringDiagnosticFields.ts'
@@ -195,6 +196,7 @@ export function authoringNode(content: RevisionContent, ref: string) {
     ...(node.icon == null ? {} : { icon: node.icon }),
     ...('timeoutMs' in node && node.timeoutMs != null ? { timeoutMs: node.timeoutMs } : {}),
     ...('maxExecutions' in node && node.maxExecutions != null ? { maxExecutions: node.maxExecutions } : {}),
+    ...('retry' in node && node.retry != null ? { retry: node.retry } : {}),
     config: json(config),
     texts: Object.fromEntries(Object.entries(texts).map(([field, text]) => [field, { lines: text.split('\n').length, characters: text.length }])),
     inputs: outwardSource(content, inputMappings(node)),
@@ -285,6 +287,7 @@ export function searchAuthoring(content: RevisionContent, query: AuthoringSearch
     const fields = {
       name: view.name,
       description: view.description ?? '',
+      retry: JSON.stringify(view.retry ?? {}),
       inputs: JSON.stringify(view.inputs),
       config: JSON.stringify(view.config),
       ...Object.fromEntries(Object.keys(view.texts).map((field) => [field, textAt(content, node, field as 'code' | 'prompt')])),
@@ -413,6 +416,7 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
       ...(view.icon == null ? {} : { icon: view.icon }),
       ...(view.timeoutMs == null ? {} : { timeoutMs: view.timeoutMs }),
       ...(view.maxExecutions == null ? {} : { maxExecutions: view.maxExecutions }),
+      ...(view.retry == null ? {} : { retry: view.retry }),
       config: view.config,
     }
     const update = record(merge(original, patch))
@@ -421,15 +425,18 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
     for (const path of clear) clearPath(update, path)
     if (typeof update.name != 'string') fail('node.name-required', 'Node name cannot be cleared.')
     const config = authoringConfigurations[type].parse(update.config) as Record<string, unknown>
+    if (Object.hasOwn(update, 'retry')) update.retry = retryConfigurationSchema.parse(update.retry)
     const { config: _, ...metadata } = update
     const { name: _name, description: _description, icon: _icon, ...rest } = node
     let next = { ...rest, ...metadata } as GraphNode
     if (!isTriggerNode(node)) {
       const clean = { ...next } as Record<string, unknown>
+      if (!Object.hasOwn(update, 'retry')) delete clean.retry
       if (!Object.hasOwn(update, 'timeoutMs')) delete clean.timeoutMs
       if (!Object.hasOwn(update, 'maxExecutions')) delete clean.maxExecutions
       next = clean as unknown as GraphNode
     } else if (update.timeoutMs != null || update.maxExecutions != null) fail('node.invalid-field', 'Trigger nodes do not have execution limits.')
+    if (update.retry != null && !supportsNodeRetry(next)) fail('node.invalid-field', 'This node does not support retries.')
     if (node.kind == 'start' || node.kind == 'outputs') {
       replace(ref, next)
       const fields = node.kind == 'start' ? config.inputDefs : config.outputDefs
@@ -730,7 +737,7 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
               ]
           }
           apply(changes)
-          await configure(nodeId, { config })
+          await configure(nodeId, { config, ...(edit.retry == null ? {} : { retry: edit.retry }) })
           const added = nodeAt(content, nodeId)
           if (added.kind == 'task') replace(nodeId, { ...added, inputs: {} })
           if (edit.code != null) await setText(nodeId, 'code', edit.code)

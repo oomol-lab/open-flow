@@ -206,3 +206,10 @@ The Server browser host integrates PostHog. Its public SDK token belongs to the 
 Other deployments can set `VITE_POSTHOG_KEY` and `VITE_POSTHOG_HOST` at Vite build time to use their own project. An explicitly empty key disables analytics. These are build settings. Setting them after container startup does not change built static assets.
 
 Analytics uses anonymous browser identity rather than the Operator identity shared across deployments. It records page views, unhandled browser exceptions, successful Flow creation, configuration save/delete, and Variable create/update/delete events. Business events contain no Variable names, values, credentials, or Flow content. DOM autocapture and session recording are disabled.
+
+### Upgrading to node retries
+
+Flow model v9 requires Engine v6 and the matching isolated runtime digest. Finish or cancel active
+Runs on the previous Engine before replacing the deployment, unless its matching recovery runtime
+is retained. Republish old Engine-pinned Publications before executing them on the new Engine.
+Existing Revisions, Publications and Run history are preserved; Draft upgrades are explicit.

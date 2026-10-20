@@ -47,7 +47,7 @@ function invokeLlm(origin: URL, token: string): InvokeLlmTask {
       body = requestBody(input, mode)
     } catch (error) {
       // Task input validation messages are local and safe to report; other thrown values stay generic.
-      if (error instanceof TypeError) return { code: 'llm.unavailable', kind: 'failed', message: error.message, version: 1 }
+      if (error instanceof TypeError) return { code: 'llm.unavailable', kind: 'failed', message: error.message, retryable: false, version: 1 }
       throw error
     }
     try {
@@ -58,7 +58,7 @@ function invokeLlm(origin: URL, token: string): InvokeLlmTask {
         redirect: 'error',
         signal,
       })
-      if (!response.ok) return unavailable()
+      if (!response.ok) return unavailable(response.status == 429 || response.status >= 500)
       const source = record(await response.json())
       if (!Array.isArray(source.choices) || source.choices.length == 0) return unavailable()
       const choice = record(source.choices[0])
@@ -122,8 +122,14 @@ function chatMessages(value: unknown, transform: (content: string) => string): r
   })
 }
 
-function unavailable(): LlmTaskResult {
-  return { code: 'llm.unavailable', kind: 'failed', message: 'The LLM request could not be completed.', version: 1 }
+function unavailable(retryable?: boolean): LlmTaskResult {
+  return {
+    code: 'llm.unavailable',
+    kind: 'failed',
+    message: 'The LLM request could not be completed.',
+    ...(retryable === undefined ? {} : { retryable }),
+    version: 1,
+  }
 }
 
 function invokeDecision(url: URL, token: string): InvokeDecisionTask {
@@ -132,7 +138,7 @@ function invokeDecision(url: URL, token: string): InvokeDecisionTask {
     try {
       body = decisionRequest(questions, state)
     } catch (error) {
-      if (error instanceof TypeError) return { code: 'llm.unavailable', kind: 'failed', message: error.message, version: 1 }
+      if (error instanceof TypeError) return { code: 'llm.unavailable', kind: 'failed', message: error.message, retryable: false, version: 1 }
       throw error
     }
     try {
@@ -143,7 +149,7 @@ function invokeDecision(url: URL, token: string): InvokeDecisionTask {
         redirect: 'error',
         signal,
       })
-      if (!response.ok) return unavailable()
+      if (!response.ok) return unavailable(response.status == 429 || response.status >= 500)
       try {
         return { kind: 'completed', value: decisionAnswers(questions, await response.json()), version: 1 }
       } catch {

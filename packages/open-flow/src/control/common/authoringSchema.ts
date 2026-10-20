@@ -2,6 +2,7 @@ import type { JsonValue } from '../../types/index.ts'
 
 import { z } from 'zod'
 import { authoringDefinitionSchemas as definitions } from '../../flow/common/changeSchema.ts'
+import { retryConfigurationSchema, retryNodeTypes } from '../../flow/common/retry.ts'
 import { authoringLlmConfiguration } from './authoringLlm.ts'
 import { authoringOpenApiSchema } from './authoringOpenApi.ts'
 
@@ -122,6 +123,12 @@ const metadata = {
   icon: z.string().optional(),
   maxExecutions: z.int().positive().optional(),
   timeoutMs: z.number().nonnegative().optional(),
+  retry: retryConfigurationSchema
+    .partial()
+    .optional()
+    .describe(
+      'Node retry policy for Code, Connector, OpenAPI, LLM and AI Decision. Omitted update fields preserve the policy; use clear: [["retry"]] to disable it. maxRetries counts additional attempts; intervalMs is 1000–60000 in whole seconds.',
+    ),
 }
 const updates = z.strictObject({
   ...metadata,
@@ -139,6 +146,7 @@ export const authoringEditSchema = z.discriminatedUnion('op', [
       .describe('Unique batch-local alias without the $ prefix. Later edits must reference this new node as $alias; the bare alias is not its node ID.'),
     type,
     name: id,
+    retry: retryConfigurationSchema.optional(),
     config: patch.optional(),
     inputs: z
       .record(id, authoringSourceSchema)
@@ -242,6 +250,7 @@ export function authoringSchema(kind?: AuthoringType) {
       }
     : {
         type: kind,
+        retry: retryNodeTypes.some((nodeType) => nodeType == kind) ? z.toJSONSchema(retryConfigurationSchema) : false,
         inputSources: ['poll', 'integration'].includes(kind)
           ? ['value', 'unset', 'default']
           : ['start', 'outputs', 'error', 'cron', 'webhook', 'value', 'condition'].includes(kind)

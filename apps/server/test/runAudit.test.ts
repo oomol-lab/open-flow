@@ -46,7 +46,7 @@ it('records authenticated actors and channels for Draft and Live, retaining the 
 it('rejects caller-supplied actors and reserved server channels', async () => {
   const { app, flowId, revisionId } = await fixture()
   const route = `/v1/flows/${flowId}/revisions/${revisionId}/runs`
-  const body = { version: 2, engineContract: 'open-flow-engine/v5', inputs: {}, trigger: { nodeId: 'start', outputs: {} } }
+  const body = { version: 2, engineContract: 'open-flow-engine/v6', inputs: {}, trigger: { nodeId: 'start', outputs: {} } }
   for (const channel of ['mcp', 'trigger', 'workflow', 'invalid']) {
     const response = await app.request(route, {
       method: 'POST',

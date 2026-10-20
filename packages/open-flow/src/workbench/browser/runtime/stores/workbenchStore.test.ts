@@ -184,7 +184,7 @@ describe('Trigger creation permissions', () => {
     vi.spyOn(client, 'checkFlow').mockImplementation(async (flowId, revisionId) => ({
       closureDigest: 'closure',
       diagnostics: [],
-      engineContract: 'open-flow-engine/v5',
+      engineContract: 'open-flow-engine/v6',
       flowId,
       modelVersion: currentFlowModelVersion,
       revisionDigest: 'digest',

@@ -50,6 +50,22 @@ type Fixture = {
 }
 const fixtures: readonly Fixture[] = [
   {
+    id: 'retry-disabled',
+    group: 'Task',
+    node: { kind: 'task', name: 'Retry disabled', inputs: {}, task: { name: 'Task', inputs: [], outputs: [], executor: { kind: 'llm', mode: 'chat' } } },
+  },
+  {
+    id: 'retry-enabled',
+    group: 'Task',
+    node: {
+      kind: 'task',
+      name: 'Retry enabled',
+      inputs: {},
+      retry: { maxRetries: 2, intervalMs: 2000 },
+      task: { name: 'Task', inputs: [], outputs: [], executor: { kind: 'llm', mode: 'chat' } },
+    },
+  },
+  {
     id: 'provider-inputs',
     group: 'Task',
     transport: {
@@ -343,8 +359,9 @@ function PropertiesStory({ fixture, dark, language, log }: { fixture: Fixture; d
 export const nodePropertiesStories: readonly FrontendStory[] = fixtures.map((fixture) => ({
   group: `Node ${fixture.group}`,
   id: `node-${fixture.id}-properties`,
-  title:
-    fixture.id == 'provider-inputs'
+  title: fixture.id.startsWith('retry-')
+    ? fixture.node.name!
+    : fixture.id == 'provider-inputs'
       ? 'Provider inputs'
       : fixture.id == 'code-actions-loading'
         ? 'Code · Slow actions'
@@ -352,8 +369,9 @@ export const nodePropertiesStories: readonly FrontendStory[] = fixtures.map((fix
           ? 'Execution limit'
           : 'Properties',
   standalone: true,
-  description:
-    fixture.id == 'provider-inputs'
+  description: fixture.id.startsWith('retry-')
+    ? 'Open Node settings to configure retries. Choose No retries or a retry count, edit the interval, test invalid intervals and the help beside Retry on error, and reload to verify persistence. Compare editable and read-only samples in either theme.'
+    : fixture.id == 'provider-inputs'
       ? 'Provider inputs group required fields before optional fields. Optional starts collapsed, including configured values. Expand it, edit values and sources, then reload saved data; reopening panels restores the default expansion.'
       : fixture.id == 'code-actions-loading'
         ? 'Opening the editor makes no shared Action requests. Trigger completion with Ctrl+Space; Actions take four seconds to load while editing remains available. Reset samples to repeat.'

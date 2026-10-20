@@ -40,6 +40,11 @@ Each behavior has one authoritative owner. Correct defects there; clients must n
 incomplete contracts or maintain competing sources of truth. Preserve established contracts unless
 the task changes them, and update their affected implementations, consumers, and specifications.
 
+Evaluate contract version changes cumulatively against the latest published artifact for the affected
+release line. Reuse an unreleased contract revision for further changes before publication; do not
+increment it per feature or commit. Published prereleases establish compatibility boundaries too.
+Verify the publication baseline and follow [contract evolution](docs/control/contracts/compatibility.md#release-baselines-and-contract-versioning).
+
 `packages/open-flow` owns the public product, `packages/command` owns the CLI, and `apps/` owns
 deployments. Cross-workspace dependencies use public entries. Common code is platform-neutral, and
 browser code is independent of Node. Dependencies should make these boundaries visible.

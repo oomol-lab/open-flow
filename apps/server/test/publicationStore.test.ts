@@ -31,7 +31,7 @@ function fixture(providerAccess?: ConnectorAccess) {
     content: '{"modelVersion":2}',
     crons: [],
     expectedLivePublicationId: null,
-    engineContract: 'open-flow-engine/v5',
+    engineContract: 'open-flow-engine/v6',
     flowId: 'flow',
     idempotencyKey: 'publish',
     integrations: [

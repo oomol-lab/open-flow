@@ -18,6 +18,7 @@ import { missingTriggerConfig, resolveTriggerConfig } from '../../trigger/common
 import { triggerOutputDefinitions, triggerOutputPorts, webhookSupportsBody } from '../../trigger/common/contract.ts'
 import { isTriggerNode, portsByHandle, validVariableName } from './change.ts'
 import { conditionInputPorts, nodeInputMappings, otherwiseOutput, unaryOperator, comparisonIssue, valueType } from './condition.ts'
+import { supportsNodeRetry, retryConfigurationSchema } from './retry.ts'
 import { schemaObject, matchesSchema, comparePorts, portsAssignable, variableInputCompatible, hasRetiredRef } from './schema.ts'
 import { sourceFields, sourcePort, sourceOutputLabel } from './sourceField.ts'
 
@@ -576,6 +577,11 @@ function validateGraph(graph: Graph, document: FlowDocument, path: string, diagn
     const nodePath = `${path}/nodes/${nodeId}`
     if (!isTriggerNode(node) && node.maxExecutions != null && (!Number.isSafeInteger(node.maxExecutions) || node.maxExecutions < 1)) {
       diagnostics.push(graphDiagnostic('node.max-executions-invalid', 'Maximum executions must be a positive safe integer.', `${nodePath}/maxExecutions`))
+    }
+    if ('retry' in node && node.retry != null) {
+      if (!supportsNodeRetry(node)) diagnostics.push(graphDiagnostic('node.retry-unsupported', 'This node does not support retries.', `${nodePath}/retry`))
+      if (!retryConfigurationSchema.safeParse(node.retry).success)
+        diagnostics.push(graphDiagnostic('node.retry-invalid', 'Retries must be 0–5 with an interval of 1–60 whole seconds.', `${nodePath}/retry`))
     }
     if (isTriggerNode(node)) {
       validateTrigger(nodeId, node, nodePath, diagnostics)

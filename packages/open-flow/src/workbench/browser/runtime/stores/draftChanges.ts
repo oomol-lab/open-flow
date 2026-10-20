@@ -40,6 +40,8 @@ function mergeChanges(before: FlowChanges, after: FlowChanges): FlowChanges | un
   if (first?.kind == 'graph.node.field.set' && last?.kind == 'graph.node.field.set') {
     if (first.nodeId != last.nodeId || first.field != last.field) return
 
+    if (first.field == 'retry' && last.field == 'retry') return [{ ...last, before: first.before }]
+    if (first.field == 'retry' || last.field == 'retry') return
     return [{ before: first.before, field: last.field, kind: last.kind, nodeId: last.nodeId, value: last.value }]
   }
   if (first?.kind == 'graph.node.input.set' && last?.kind == 'graph.node.input.set') {

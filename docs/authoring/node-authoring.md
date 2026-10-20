@@ -111,3 +111,16 @@ Leina notification nodes require a nonblank robot identifier (`leinaId`) or an i
 Drafts may retain an unselected robot for editing, but `flow_check` reports `leina.robot-required` until configured.
 
 Action account selections use an omitted `connectionId` for unconfigured, a nonempty ID for selected, and `""` for explicitly deferred. Deferral is supported by Connector Tasks, independent Code Actions, Agent tools and notifications, but not Provider Triggers. It bypasses only account readiness checks. A deferred Action fails if called; deferred Agent tools are excluded from the callable tool set. Preserve this distinction in public reads, edits and exports.
+
+## Node retries
+
+Ordinary Code, Connector, OpenAPI, LLM and AI Decision Tasks support node-level
+`retry: { maxRetries, intervalMs }` on creation and update. The count is 0–5 additional attempts;
+intervals are 1–60 whole seconds expressed in milliseconds. Omission means no retry on creation,
+and preserves the saved policy on update. Use `clear: [["retry"]]` to disable an existing policy.
+Agent, workflow calls, Triggers, Wait and Approval do not support this policy. Reads, search, public
+schemas and diagnostics expose the node setting without requiring internal Task reconstruction.
+
+Retries repeat the whole Task with the same inputs. They may duplicate external operations. They
+never replay unconfirmed outcomes, bypass resource limits, or reset node/Run deadlines. Output
+validation and commit failures cannot retry an already completed Task.

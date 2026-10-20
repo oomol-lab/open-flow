@@ -29,6 +29,42 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
   }
   const dataPort = { schema: {}, nullable: true },
     stringPort = { schema: { type: 'string' }, nullable: false }
+  if (id == 'node-retries') {
+    await call('flow_schema', { type: 'code' })
+    const before = await read()
+    const created = await submit(before.revision, [
+      { op: 'node.add', as: 'start', type: 'start', name: 'Start' },
+      {
+        op: 'node.add',
+        as: 'retry',
+        type: 'code',
+        name: 'Retried task',
+        retry: { maxRetries: 2, intervalMs: 2000 },
+        config: { outputs: { value: { schema: { type: 'number' }, nullable: false } } },
+        code: 'export default () => ({value: 42})',
+      },
+      {
+        op: 'node.add',
+        as: 'clear',
+        type: 'code',
+        name: 'Cleared task',
+        retry: { maxRetries: 1, intervalMs: 1000 },
+        config: { outputs: { value: { schema: { type: 'number' }, nullable: false } } },
+        code: 'export default () => ({value: 42})',
+      },
+      { op: 'edge.connect', source: '$start', target: '$retry' },
+      { op: 'edge.connect', source: '$start', target: '$clear' },
+    ])
+    const refs = created.nodes as Record<string, string>
+    const details = await read([refs.retry!, refs.clear!])
+    await submit(details.revision, [
+      { op: 'node.update', node: refs.retry!, set: { name: 'Retried task updated', retry: { intervalMs: 3000 } } },
+      { op: 'node.update', node: refs.clear!, clear: [['retry']] },
+    ])
+    await read([refs.retry!, refs.clear!])
+    await call('flow_check', { flowId, revisionId: savedRevision })
+    return
+  }
   if (id == 'workflow-call') {
     await call('flow_schema', { type: 'workflow' })
     const catalog = await call('flow_list', {})

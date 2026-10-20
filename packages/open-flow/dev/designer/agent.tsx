@@ -178,7 +178,7 @@ function createSession(language: UiLanguage, log: LogAction) {
       return Response.json({
         closureDigest: 'lab',
         diagnostics: [],
-        engineContract: 'open-flow-engine/v5',
+        engineContract: 'open-flow-engine/v6',
         flowId: flow.flowId,
         modelVersion: currentFlowModelVersion,
         revisionDigest: revision().digest,

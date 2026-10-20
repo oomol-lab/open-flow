@@ -6,6 +6,13 @@ import { fulfillmentSamples, fulfillmentStages } from './fulfillment.ts'
 
 export const scenarios = [
   {
+    id: 'node-retries',
+    entry: { kind: 'start' },
+    name: 'Configure node retries',
+    version: 1,
+    task: 'Create Start and two Code nodes returning {value: 42}. Configure Retried task to retry twice with a 2-second interval on creation. Update only its interval to 3 seconds and rename it Retried task updated, preserving its retry count and outputs. Create Cleared task with one retry and a 1-second interval, then explicitly clear its retry policy. Connect Start to both tasks. Read both settings back, check and execute the workflow.',
+  },
+  {
     id: 'workflow-call',
     entry: { kind: 'start' },
     name: 'Call a published workflow',
@@ -150,6 +157,7 @@ function source(nodeId: string, handle: string, from: string, output: string): C
 }
 export function initialOperations(id: string): ChangeOperation[] {
   if (
+    id == 'node-retries' ||
     id == 'workflow-call' ||
     id == 'workflow-outputs' ||
     id == 'start-parameters' ||
@@ -321,6 +329,7 @@ export interface Sample {
   parameters?: Record<string, JsonValue>
 }
 export function samples(id: string, stage = 0): Sample[] {
+  if (id == 'node-retries') return [{ name: 'configured-and-cleared', orders: [], order }]
   if (id == 'workflow-call') return [0, -2.5, 12.5].map((amount) => ({ name: String(amount), orders: [], order, outputs: { amount } }))
   if (id == 'workflow-outputs' || id == 'start-parameters') {
     const cases: Pick<Sample, 'name' | 'outputs'>[] = [
@@ -385,6 +394,18 @@ function effectiveNode(content: RevisionContent, id: string): unknown {
 }
 /** Independent assertions: compare behavior and preserved effective configurations, not generated IDs. */
 export function assertions(id: string, base: RevisionContent, current: RevisionContent): string[] {
+  if (id == 'node-retries') {
+    const tasks = Object.values(current.document.graph.nodes).filter((candidate) => candidate.kind == 'task')
+    const configured = tasks.find((candidate) => candidate.name == 'Retried task updated')
+    const cleared = tasks.find((candidate) => candidate.name == 'Cleared task')
+    return tasks.length == 2 &&
+      configured != null &&
+      isDeepStrictEqual(configured.retry, { maxRetries: 2, intervalMs: 3000 }) &&
+      cleared != null &&
+      cleared.retry === undefined
+      ? []
+      : ['Preserve the configured retry count and explicitly clear the other retry policy.']
+  }
   if (id == 'workflow-call')
     return Object.values(current.document.graph.nodes).filter(
       (candidate) => candidate.kind == 'task' && 'executor' in candidate.task && candidate.task.executor.kind == 'workflow',

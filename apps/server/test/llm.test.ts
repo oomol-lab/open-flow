@@ -153,7 +153,7 @@ describe('OOMOL LLM host', () => {
         signal: new AbortController().signal,
         version: 1,
       }),
-    ).resolves.toEqual({ code: 'llm.unavailable', kind: 'failed', message: 'Invalid LLM max_tokens.', version: 1 })
+    ).resolves.toEqual({ code: 'llm.unavailable', kind: 'failed', message: 'Invalid LLM max_tokens.', retryable: false, version: 1 })
     await expect(
       llm({
         input: { messages: [{ content: 'Hi.', role: 'wizard' }], model: {}, template: [] },
@@ -162,7 +162,7 @@ describe('OOMOL LLM host', () => {
         signal: new AbortController().signal,
         version: 1,
       }),
-    ).resolves.toEqual({ code: 'llm.unavailable', kind: 'failed', message: 'Invalid LLM message role.', version: 1 })
+    ).resolves.toEqual({ code: 'llm.unavailable', kind: 'failed', message: 'Invalid LLM message role.', retryable: false, version: 1 })
     expect(vi.mocked(fetch)).not.toHaveBeenCalled()
   })
 
@@ -177,4 +177,21 @@ describe('OOMOL LLM host', () => {
     expect(() => createLlm('https://models.example.com/v1', 'model-token')).toThrow('OPEN_FLOW_LLM_ORIGIN')
     expect(() => createLlm('https://models.example.com', '')).toThrow('OPEN_FLOW_LLM_TOKEN')
   })
+})
+
+it.each([400, 401, 403, 429, 503])('classifies LLM HTTP %s failures without retrying permanent rejections', async (status) => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => new Response('{}', { status })),
+  )
+  const llm = createLlm('https://models.example.com', 'test')
+  await expect(
+    llm({
+      input: { model: {}, template: [{ role: 'user', content: 'Hello' }] },
+      invocationId: 'http',
+      mode: 'chat',
+      signal: new AbortController().signal,
+      version: 1,
+    }),
+  ).resolves.toMatchObject({ kind: 'failed', retryable: status == 429 || status >= 500 })
 })

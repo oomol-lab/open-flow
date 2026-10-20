@@ -120,7 +120,7 @@ describe('RunDrawer terminal result', () => {
     const run: RunDetails = {
       closureDigest: 'closure',
       createdAt: '2026-08-27T10:00:00.000Z',
-      engineContract: 'open-flow-engine/v5',
+      engineContract: 'open-flow-engine/v6',
       engineDigest: 'sha256:engine',
       flowId: 'flow',
       modelVersion: currentFlowModelVersion,

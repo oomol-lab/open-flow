@@ -19,7 +19,7 @@ afterAll(async () => await host.close())
 
 function program(source: string): RuntimeProgram {
   return {
-    engineContract: 'open-flow-engine/v5',
+    engineContract: 'open-flow-engine/v6',
     engineDigest: isolatedVmEngineDigest,
     entryModuleId: 'main',
     modules: { main: { imports: [], source } },
@@ -586,7 +586,7 @@ it('reads immutable single and merged predecessor arrays through the isolated sc
         },
       },
     },
-    'open-flow-engine/v5',
+    'open-flow-engine/v6',
   )
   if (prepared.kind != 'prepared') throw new Error(JSON.stringify(prepared))
   const outcome = await Effect.runPromise(
@@ -621,4 +621,154 @@ it('reads immutable single and merged predecessor arrays through the isolated sc
       },
     ],
   })
+})
+
+async function retryFixture(kind: 'managed' | 'code', source?: string) {
+  const port = { handle: 'value', jsonSchema: { type: 'number' }, nullable: false }
+  const prepared = await prepareFlow(
+    {
+      modelVersion: currentFlowModelVersion,
+      modules:
+        kind == 'code'
+          ? {
+              code: {
+                name: 'Code',
+                imports: [],
+                source:
+                  source ??
+                  `export default async (_, context) => {
+      const count = await context.actions.example.echo({});
+      if (count < 2) throw Object.assign(new Error('temporary'), {code: 'business.rejected'});
+      return {value: count}
+    }`,
+              },
+            }
+          : {},
+      document: {
+        bindings: {},
+        graph: {
+          nodes: {
+            start: { kind: 'manual', name: 'Start' },
+            task: {
+              kind: 'task',
+              inputs: {},
+              retry: { maxRetries: 2, intervalMs: 1000 },
+              task:
+                kind == 'code'
+                  ? {
+                      moduleId: 'code',
+                      name: 'Task',
+                      inputs: [],
+                      outputs: [port],
+                      capabilities: [{ kind: 'connector', action: 'example.echo', connections: [] }],
+                    }
+                  : { name: 'Task', inputs: [], outputs: [port], executor: { kind: 'llm', mode: 'chat' } },
+            },
+          },
+          edges: [{ source: 'start', target: 'task' }],
+        },
+      },
+    },
+    'open-flow-engine/v6',
+  )
+  if (prepared.kind != 'prepared') throw new Error(JSON.stringify(prepared))
+  return prepared.flow
+}
+
+it.each(['managed', 'code'] as const)('retries %s Tasks through the real Executor with one logical execution', async (kind) => {
+  const prepared = await retryFixture(kind)
+  let count = 0
+  const identities: string[] = []
+  const events: string[] = []
+  const result = await Effect.runPromise(
+    host.run(prepared, {
+      flowId: 'retry',
+      runId: 'retry',
+      trigger: { nodeId: 'start', outputs: {} },
+      emit: (event) => {
+        events.push(event.type)
+      },
+      capability: async (_capabilities, call) => {
+        identities.push(call.invocationId)
+        return { body: ++count, status: 200 }
+      },
+      invokeTask: async (invocation) => {
+        identities.push(invocation.invocationId)
+        if (++count < 2) throw new Error('temporary')
+        return { value: count }
+      },
+      projectFailure: (error) => ({ code: 'node.failed', message: String(error), retryable: true }),
+    }),
+  )
+  expect(result).toMatchObject({ kind: 'node-results', nodes: [{ nodeId: 'task', outputs: { value: 2 } }] })
+  expect(count).toBe(2)
+  expect(new Set(identities).size).toBe(2)
+  expect(events.filter((event) => event == 'node.started')).toHaveLength(1)
+  expect(events.filter((event) => event == 'node.failed')).toHaveLength(0)
+  expect(events.filter((event) => event == 'node.log')).toHaveLength(1)
+})
+
+it.each([
+  'export default () => ({value: "wrong"})',
+  'export default () => ({value: 1n})',
+  'export default () => { while (true) {} }',
+  `export default () => {
+    JSON.stringify = () => '{"ok":true,"engineDigest":"wrong","value":{"value":1},"retryable":true}'
+    return {value: 1}
+  }`,
+])('does not retry validation, resource or integrity failures in the real Code executor: %s', async (source) => {
+  const prepared = await retryFixture('code', source)
+  const events: string[] = []
+  await expect(
+    Effect.runPromise(
+      host.run(
+        prepared,
+        {
+          flowId: 'terminal',
+          runId: 'terminal',
+          trigger: { nodeId: 'start', outputs: {} },
+          emit: (event) => {
+            events.push(event.type)
+          },
+          capability: async () => ({ body: null, status: 200 }),
+          invokeTask: async () => ({}),
+          projectFailure: (error) => ({ code: 'node.failed', message: String(error), retryable: true }),
+        },
+        { ...isolatedVmLimits, cpuMs: 20 },
+      ),
+    ),
+  ).rejects.toThrow()
+  expect(events.filter((event) => event == 'node.log')).toHaveLength(0)
+  expect(events.filter((event) => event == 'node.failed')).toHaveLength(1)
+})
+it('does not replay an unconfirmed Code Action even when user code catches it', async () => {
+  const prepared = await retryFixture(
+    'code',
+    `export default async (_, context) => {
+    try { await context.actions.example.echo({}) } catch {}
+    throw new Error('later business failure')
+  }`,
+  )
+  let calls = 0
+  const events: string[] = []
+  await expect(
+    Effect.runPromise(
+      host.run(prepared, {
+        flowId: 'unknown',
+        runId: 'unknown',
+        trigger: { nodeId: 'start', outputs: {} },
+        emit: (event) => {
+          events.push(event.type)
+        },
+        capability: async () => {
+          calls++
+          throw new Error('outcome unknown')
+        },
+        invokeTask: async () => ({}),
+        projectFailure: () => ({ code: 'connector.indeterminate', message: 'outcome unknown' }),
+      }),
+    ),
+  ).rejects.toThrow('outcome unknown')
+  expect(calls).toBe(1)
+  expect(events.filter((event) => event == 'node.log')).toHaveLength(0)
 })

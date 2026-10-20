@@ -10,7 +10,7 @@ const result = await Effect.runPromise(
   runFlow(
     {
       closureDigest: 'consumer',
-      engineContract: 'open-flow-engine/v5',
+      engineContract: 'open-flow-engine/v6',
       graph: { edges: [], nodes: { start: { kind: 'manual', name: 'Start' } } },
       modules: {},
     },

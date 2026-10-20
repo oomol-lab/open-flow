@@ -18,7 +18,7 @@ import { createServerApp } from '../node/transport/http.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
 
 const number = { handle: 'answer', jsonSchema: { type: 'number' }, nullable: false }
-const engine = 'open-flow-engine/v5'
+const engine = 'open-flow-engine/v6'
 const encoder = new TextEncoder()
 function serialized(value: JsonValue) {
   const content = new TextDecoder().decode(canonicalJsonBytes(value))

@@ -87,7 +87,7 @@ export function createInspectorTransport(
         actorId: 'lab',
         closureDigest: 'closure',
         createdAt: timestamp,
-        engineContract: 'open-flow-engine/v5',
+        engineContract: 'open-flow-engine/v6',
         flowId: flow.flowId,
         modelVersion: currentFlowModelVersion,
         operation: 'publish',
@@ -308,7 +308,7 @@ export function createInspectorTransport(
       return Response.json({
         closureDigest: 'lab',
         diagnostics,
-        engineContract: 'open-flow-engine/v5',
+        engineContract: 'open-flow-engine/v6',
         flowId: flow.flowId,
         modelVersion: currentFlowModelVersion,
         revisionDigest: revision().digest,

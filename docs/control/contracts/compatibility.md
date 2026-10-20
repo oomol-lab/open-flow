@@ -1,5 +1,20 @@
 # Public contracts and version evolution
 
+## Node retries: Flow model v9 and Engine v6
+
+Flow model v9 adds optional node-owned `retry: { maxRetries, intervalMs }`. Only ordinary Code,
+Connector, OpenAPI, LLM and AI Decision Tasks support it. Missing policy or zero retries preserves
+single-attempt behavior. Older models cannot contain this policy. Existing model v8 Revisions remain
+readable without changing their bytes or digests; editing upgrades the Draft through the existing
+explicit upgrade path. Historical Publications and Runs are not rewritten. Older binaries cannot
+execute model v9.
+
+Engine `open-flow-engine/v6` (including `/nodejs-compat-v1`) adds bounded Task retries. The isolated
+runtime digest changes too. Before upgrading, finish or cancel active Runs on the old Engine, or keep
+the matching recovery environment. Old Engine-pinned Publications require republication before new
+execution. Scheduler checkpoints remain v5: retry intervals are active execution, not durable waits.
+No pending retry is recovered by replaying an unconfirmed side effect.
+
 ## Node-owned interfaces and Publication snapshots
 
 The current model stores required `inputDefs` on Start and required `outputDefs`/`outputMappings` on Outputs. New nodes initialize empty configuration. Configuration is deleted with its node and restored by undo. Normal reads, authoring and repair reject top-level document interface fields and legacy `Start.parameters`. The current model and envelope version numbers remain unchanged; legacy conversion is an explicit storage upgrade, not dual-format authoring.
@@ -36,9 +51,9 @@ Public entry points, serialization formats, Control API, and execution semantics
 | ----------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | npm package       | Exact version in the package manifest                             | Pins implementation, types, Workbench assets, and the conformance suite. Deployments pin the same version. |
 | Revision envelope | `kind: open-flow-flow-revision`, `version: 1`                     | UTF-8 JSON envelope fields and canonical byte rules.                                                       |
-| Flow model        | `modelVersion: 8`                                                 | Serialization of documents, modules, nodes, and ports.                                                     |
+| Flow model        | `modelVersion: 9`                                                 | Serialization of documents, modules, nodes, and ports.                                                     |
 | Control API       | `/v1`; Run creation request `version: 2`, all others `version: 1` | Request fields, responses, error codes, CAS, and idempotency.                                              |
-| Engine Contract   | `open-flow-engine/v5`                                             | Execution, Trigger, Task return, Wait, and cancellation semantics.                                         |
+| Engine Contract   | `open-flow-engine/v6`                                             | Execution, Trigger, Task return, Wait, and cancellation semantics.                                         |
 | MCP               | `2026-07-28`                                                      | Streamable HTTP negotiation; tool product semantics reuse Control API.                                     |
 
 Equal or different version numbers do not establish compatibility. Older formats may also have used `modelVersion: 1`; do not accept content based only on this field. Decode the complete structure before semantic validation and execution. Reject execution of Revisions that do not match the current structure. Do not rewrite them or recompute their original digest on read. Create a new Revision through a separate, auditable migration or rebuild.
@@ -76,7 +91,41 @@ A deployment may claim a package profile only after all applicable cases pass. U
 
 Optional response fields may be added if existing read semantics remain unchanged. Removing or renaming fields, changing types, narrowing valid inputs, changing defaults, or changing execution results are compatibility changes.
 
-For a compatibility change, increment the affected contract version or declare the break in prerelease notes and provide migration and rejection paths. Do not only increment the npm version while retaining an old contract identifier and silently accepting data with different meanings.
+## Release baselines and contract versioning
+
+Evaluate the cumulative changes since the latest published artifact on the affected release line.
+The previous commit, feature, or development snapshot is not a new compatibility baseline. Check
+each affected contract independently: a package version change does not require every contract
+version to change, and an existing pending contract revision may already cover the new work.
+
+Confirm publication using the npm artifact or published deployment release, then identify its source
+commit and contract identifiers. A version in `package.json`, a release commit, a Git tag, or an
+"unreleased" heading alone does not establish whether an artifact was published. If publication
+cannot be established, report the uncertainty before deciding to reuse or increment an identifier.
+Published beta and other prerelease artifacts establish the same boundary as stable releases.
+
+For each affected contract:
+
+- Preserve its identifier when the cumulative changes are compatible with the published baseline.
+- Allocate the next contract revision when the cumulative changes require an incompatible contract
+  or an explicit capability rejection boundary. Include the migration, rejection, and deployment
+  requirements relative to the published baseline.
+- Reuse that pending revision for additional changes until it is published. Update its specification,
+  consumers, tests, and release notes to describe the combined result. Do not add another revision
+  merely because a second feature changes the same unpublished contract.
+- Once the artifact is published, its identifiers and meanings are fixed. Further incompatible
+  changes require another revision. Release notes alone do not make incompatible meanings safe to
+  accept under the same identifier.
+
+For example, if Engine v5 is published and Engine v6 is pending, several execution changes may ship
+together as v6. A later incompatible change requires v7 only after v6 has been published. Development
+snapshots do not require compatibility aliases or migrations unless support for those snapshots was
+explicitly agreed. Existing support obligations for older published releases still apply.
+
+Runtime digests continue to identify the actual isolation protocol and environment; update them when
+those inputs change. Database migrations retain their storage upgrade rules. Neither is a per-feature
+contract counter, and sharing a pending contract revision does not permit ignoring a runtime mismatch
+or changing a migration already applied to a supported deployment.
 
 ## Wait local execution upgrade
 
@@ -96,7 +145,7 @@ The Trigger output protocol uses ordered output definitions. Provider definition
 
 ## Unreleased Wait pending revision
 
-The current Engine Contract remains `open-flow-engine/v5`, and the Scheduler checkpoint remains version 5. The early Wait output port and output field in wait records change directly from `notification` to `pending`. They fire once when the wait is created and provide confirmation links and related data. This is an unreleased contract revision. Equal version numbers do not guarantee compatibility with earlier development snapshots. There are no old-name aliases, implicit conversions, or compatible recovery.
+That earlier change retained Engine Contract `open-flow-engine/v5` and Scheduler checkpoint version 5. The early Wait output port and output field in wait records change directly from `notification` to `pending`. They fire once when the wait is created and provide confirmation links and related data. This is an unreleased contract revision. Equal version numbers do not guarantee compatibility with earlier development snapshots. There are no old-name aliases, implicit conversions, or compatible recovery.
 
 Graph validation rejects old Wait ports and data references. Strict decoding rejects the old `notification` field in checkpoint wait records instead of silently discarding it or replaying notifications. Historical Revisions and Runs remain unchanged, as do Flow model, Control API envelopes, and the isolated runtime digest. Agent notification configuration still represents actual notifications and is unaffected.
 
@@ -142,7 +191,7 @@ with the npm import; arguments, host callbacks and CLI exit codes remain unchang
 
 ### Unreleased dependency joins
 
-Engine Contract remains `open-flow-engine/v5`, and Scheduler checkpoints remain version 5. Invocations now wait for their iteration's selected or skipped predecessors, merge selected ancestor data, and repeat through loop iterations. Checkpoints require dependency progress and loop state; earlier development shapes are rejected without conversion. `context.getPrevious()` now returns an array, including for a single predecessor, and an empty array for roots. No legacy API or scheduling mode is retained. Flow model and isolated runtime digest are unchanged.
+That earlier change retained Engine Contract `open-flow-engine/v5` and Scheduler checkpoint version 5. Invocations now wait for their iteration's selected or skipped predecessors, merge selected ancestor data, and repeat through loop iterations. Checkpoints require dependency progress and loop state; earlier development shapes are rejected without conversion. `context.getPrevious()` now returns an array, including for a single predecessor, and an empty array for roots. No legacy API or scheduling mode is retained. Flow model and isolated runtime digest are unchanged.
 
 ## Workflow calls
 
