@@ -92,6 +92,7 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
   const workflowOutputs = [
     { handle: 'message', jsonSchema: { type: 'string' }, nullable: false },
     { handle: 'data', jsonSchema: { type: 'object' }, nullable: true },
+    { handle: 'business_result_message_for_the_http_response', jsonSchema: { type: 'string' }, nullable: false },
   ] as const
   const graph: Graph = {
     nodes: {
@@ -141,7 +142,8 @@ export const webhookStory: FrontendStory = {
   id: 'webhook-editor',
   propertyPanel: true,
   title: 'Webhook Editor',
-  description: 'Compare immediate and workflow responses, output selection, missing or disconnected outputs, quick creation, and read-only settings.',
+  description:
+    'Choose fixed content or workflow outputs. Compare full-object and top-level field selection, long names, missing or disconnected outputs, quick creation, and read-only settings.',
   standalone: true,
   render: (log, dark, language) => <WebhookStory dark={dark} language={language} log={log} />,
 }

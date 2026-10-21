@@ -1,7 +1,7 @@
 import type { ReactNode, ReactElement, ComponentProps } from 'react'
 
 import { Children, isValidElement, useState } from 'react'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/browser/select.tsx'
+import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '../../ui/browser/select.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../ui/browser/tooltip.tsx'
 import { FieldTypeDisplay } from './fieldTypeDisplay.tsx'
 import { selectionMenuContentClass, selectionMenuItemClass } from './selectionMenuStyles.ts'
@@ -19,6 +19,7 @@ export function FieldSelect({
   danger,
   icons,
   displayValue,
+  renderOption,
   showTooltip,
   variant,
   'aria-label': label,
@@ -35,6 +36,7 @@ export function FieldSelect({
   'danger'?: boolean
   'icons'?: Readonly<Record<string, string>>
   'displayValue'?: ReactNode
+  'renderOption'?: (value: string, label: ReactNode) => ReactNode
   'showTooltip'?: boolean
   'size'?: string
   'aria-label': string
@@ -43,12 +45,14 @@ export function FieldSelect({
 }) {
   const [open, setOpen] = useState(false)
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
-  const options = Children.toArray(children)
+  const entries = Children.toArray(children)
     .filter(isValidElement)
     .map((child) => {
+      if (child.type === 'hr') return { kind: 'separator' as const, key: child.key }
       const props = (child as ReactElement<ComponentProps<'option'>>).props
-      return { value: String(props.value ?? props.children), label: props.children, disabled: props.disabled }
+      return { kind: 'option' as const, value: String(props.value ?? props.children), label: props.children, disabled: props.disabled }
     })
+  const options = entries.filter((entry) => entry.kind === 'option')
   const selected = options.find((option) => option.value === String(value))
   if (readOnly && icons?.[value]) {
     return (
@@ -109,14 +113,22 @@ export function FieldSelect({
           alignItemWithTrigger={false}
           className={`${selectionMenuContentClass} w-max min-w-[max(9rem,var(--anchor-width))] max-w-(--available-width)`}
         >
-          {options
-            .filter((option) => !option.disabled)
-            .map((option) => (
-              <SelectItem key={option.value} value={option.value} disabled={option.disabled} className={selectionMenuItemClass}>
-                {icons?.[option.value] && <i aria-hidden="true" className={`${icons[option.value]} inline-block shrink-0 text-base`} />}
-                {option.label}
+          {entries.map((entry) =>
+            entry.kind === 'separator' ? (
+              <SelectSeparator key={entry.key} className="mx-2 bg-border/50" />
+            ) : entry.disabled ? null : (
+              <SelectItem key={entry.value} value={entry.value} className={selectionMenuItemClass}>
+                {renderOption ? (
+                  renderOption(entry.value, entry.label)
+                ) : (
+                  <>
+                    {icons?.[entry.value] && <i aria-hidden="true" className={`${icons[entry.value]} inline-block shrink-0 text-base`} />}
+                    {entry.label}
+                  </>
+                )}
               </SelectItem>
-            ))}
+            ),
+          )}
         </SelectContent>
       </Select>
     </div>

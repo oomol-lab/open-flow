@@ -6,9 +6,9 @@ import type { PropertyDeletion } from './propertyDeletion.ts'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { webhookResponseAllowsBody, webhookResponseTimeout } from '../../../../flow/common/webhookResponse.ts'
+import { editorComponentIcons } from '../../../../form/browser/editorComponentIcon.tsx'
 import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { FieldSelect } from '../../../../form/browser/fieldSelect.tsx'
-import { editorComponent } from '../../../../form/common/editorComponent.ts'
 import { webhookMethods, webhookSupportsBody } from '../../../../trigger/common/contract.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
@@ -337,9 +337,18 @@ export function WebhookEditor({
                         aria-label={t('webhookEditor.webhookResponseContent')}
                         aria-describedby={errorId}
                         danger={responseIssue != null}
-                        disabled={disabled}
+                        disabled={disabled || outputsDisconnected}
                         value={response.output == null ? 'all' : `field:${response.output}`}
                         displayValue={outputsDisconnected ? t('webhookEditor.webhookOutputsDisconnected') : undefined}
+                        renderOption={(value, label) => (
+                          <>
+                            <i
+                              aria-hidden="true"
+                              className={`${value === 'all' ? editorComponentIcons.object : 'i-lucide-light:corner-down-right'} size-3.5 shrink-0 text-muted-foreground`}
+                            />
+                            <span className={`min-w-0 flex-1 truncate ${value === 'all' ? '' : 'font-mono'}`}>{label}</span>
+                          </>
+                        )}
                         onChange={(value) =>
                           changeOption(
                             'responseBody',
@@ -350,9 +359,10 @@ export function WebhookEditor({
                         }
                       >
                         <option value="all">{t('webhookEditor.webhookAllOutputs')}</option>
+                        {(workflowOutputs.length > 0 || selectedMissing) && <hr />}
                         {workflowOutputs.map((port) => (
                           <option key={port.handle} value={`field:${port.handle}`}>
-                            {`${port.handle} · ${t(`valueEditor.components.${editorComponent(port.jsonSchema)}`)}`}
+                            {port.handle}
                           </option>
                         ))}
                         {selectedMissing && (
