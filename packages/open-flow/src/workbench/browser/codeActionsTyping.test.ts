@@ -3,7 +3,7 @@ import type { ConnectorCapability } from '../../flow/common/change.ts'
 
 import { createSystem, createVirtualTypeScriptEnvironment } from '@typescript/vfs'
 import ts from 'typescript-lsp'
-import { describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { codeTyping } from './runtime/editor/codeTyping.ts'
 import { contextName, ShadowDocument } from './typeScriptShadow.ts'
 
@@ -27,22 +27,17 @@ const definition: ConnectorAction = {
   outputSchema: { type: 'object', properties: { result: { type: 'string' } }, required: ['result'] },
 }
 
-function editorService(
-  source: string,
-  declarations = [declaration],
-  catalog: Readonly<Record<string, ConnectorAction>> = { 'example.echo': definition },
-  providerIds: readonly string[] = ['example'],
-) {
+let environment: ReturnType<typeof createVirtualTypeScriptEnvironment>
+beforeAll(() => {
   const files = new Map(Object.entries(libraries).map(([path, text]) => [`/${path.split('/').at(-1)}`, text]))
   const roots = [...files.keys()]
   const types = platform['../../types/index.ts']
   if (types == null) throw new Error('Public Task types are missing.')
   files.set('/node_modules/@oomol-lab/open-flow/index.d.ts', types)
   files.set('/node_modules/@oomol-lab/open-flow/package.json', '{ "types": "index.d.ts" }')
-  const shadow = new ShadowDocument(source, codeTyping({ inputs: [], outputs: [] }, declarations, catalog, providerIds))
-  files.set('/module.js', shadow.text)
+  files.set('/module.js', 'export {}')
   const compiler = ts as unknown as Parameters<typeof createVirtualTypeScriptEnvironment>[2]
-  const environment = createVirtualTypeScriptEnvironment(createSystem(files), [...roots, '/module.js'], compiler, {
+  environment = createVirtualTypeScriptEnvironment(createSystem(files), [...roots, '/module.js'], compiler, {
     allowJs: true,
     checkJs: true,
     strict: true,
@@ -51,6 +46,17 @@ function editorService(
     module: ts.ModuleKind.ESNext,
     moduleResolution: ts.ModuleResolutionKind.Bundler,
   })
+})
+afterAll(() => environment?.languageService.dispose())
+
+function editorService(
+  source: string,
+  declarations = [declaration],
+  catalog: Readonly<Record<string, ConnectorAction>> = { 'example.echo': definition },
+  providerIds: readonly string[] = ['example'],
+) {
+  const shadow = new ShadowDocument(source, codeTyping({ inputs: [], outputs: [] }, declarations, catalog, providerIds))
+  environment.updateFile('/module.js', shadow.text)
   return { service: environment.languageService, text: shadow.text }
 }
 
