@@ -23,6 +23,8 @@ Server schema migration 49 upgrades existing development and deployed databases 
 
 Fresh databases and migrated databases enforce Publication `interface_json` as `TEXT NOT NULL` without a default. Snapshots distinguish absent nodes (`null`) from nodes with no fields (`[]`). Databases already created with the new interface column require no content rewrite. Missing Publication Revisions, corrupt digests or deltas, conflicting configurations, duplicate special nodes, and nonempty definitions whose owning node is absent abort the entire migration without committing changes. These cases require explicit data repair rather than silently dropping configuration or inventing callable nodes.
 
+For historical Revisions that need no interface rewrite, snapshot backfill validates only the Start and Outputs nodes after verifying the stored digest. Retired Task definitions elsewhere in those Revisions do not block server startup. Their original bytes and digests remain unchanged, and normal Revision decoding and execution still reject unsupported definitions.
+
 Stop the previous server and back up the SQLite database before deploying this upgrade, including its WAL if present. Start the new server against the existing persistent data directory; startup performs the migration before serving traffic or resuming background work. Keep the backup for deployment rollback. Do not remove the Docker data volume to upgrade.
 
 Outputs retains ordinary dependency snapshots, loops, cancellation and checkpoint recovery. Run business outputs are absent when Outputs never executes and `{}` when it executes with no declared fields. Start normalizes omitted nullable arguments to null and rejects unknown or missing required arguments.

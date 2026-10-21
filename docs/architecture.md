@@ -53,6 +53,12 @@ callback authentication and payloads, consumer matching, readiness, and resource
 The Server owns source persistence, Connector authorization, shared subscription lifecycles, durable
 receipt, deduplication, fixed delivery targets, and Run admission. Server storage and delivery code
 consume the source definition rather than interpreting provider-specific configuration or state.
+Application callbacks share signing credentials and ingress across their verified installations, while
+source configuration and consumer admission retain Connector Team and connection identity. Connector
+owns managed remote resources and OAuth callback verification; Open Flow owns source readiness,
+consumer demands, durable fanout and event deduplication. A managed source can establish its first
+subscription before becoming ready, and expiry or failed reconciliation revokes readiness. See
+[shared provider event sources](triggers/shared-event-sources.md) for setup and acceptance boundaries.
 
 ## 2. Core resources and sources of truth
 
