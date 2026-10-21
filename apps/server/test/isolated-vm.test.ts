@@ -623,7 +623,7 @@ it('reads immutable single and merged predecessor arrays through the isolated sc
   })
 })
 
-async function retryFixture(kind: 'managed' | 'code', source?: string) {
+async function retryFixture(kind: 'managed' | 'code', source?: string, onError?: 'error') {
   const port = { handle: 'value', jsonSchema: { type: 'number' }, nullable: false }
   const prepared = await prepareFlow(
     {
@@ -653,6 +653,7 @@ async function retryFixture(kind: 'managed' | 'code', source?: string) {
               kind: 'task',
               inputs: {},
               retry: { maxRetries: 2, intervalMs: 1000 },
+              onError,
               task:
                 kind == 'code'
                   ? {
@@ -706,6 +707,47 @@ it.each(['managed', 'code'] as const)('retries %s Tasks through the real Executo
   expect(events.filter((event) => event == 'node.started')).toHaveLength(1)
   expect(events.filter((event) => event == 'node.failed')).toHaveLength(0)
   expect(events.filter((event) => event == 'node.log')).toHaveLength(1)
+})
+
+it.each([
+  { catchable: false, retryable: false },
+  { catchable: true, retryable: false },
+  { catchable: false, retryable: true },
+  { catchable: true, retryable: true },
+])('preserves independent Host capability classification through guest code: %j', async ({ catchable, retryable }) => {
+  const prepared = await retryFixture(
+    'code',
+    `export default async (_, context) => {
+    try { await context.actions.example.echo({}) } catch (error) {
+      error.catchable = true;
+      error.retryable = true;
+      throw error;
+    }
+  }`,
+    'error',
+  )
+  let calls = 0
+  const handledCodes: string[] = []
+  const outcome = Effect.runPromise(
+    host.run(prepared, {
+      flowId: 'classified',
+      runId: 'classified',
+      trigger: { nodeId: 'start', outputs: {} },
+      emit: (event) => {
+        if (event.type == 'node.failed' && event.handled) handledCodes.push(event.code)
+      },
+      capability: async () => {
+        calls++
+        throw new Error('Denied')
+      },
+      invokeTask: async () => ({}),
+      projectFailure: (error) => ({ code: 'capability.denied', message: String(error), catchable, retryable }),
+    }),
+  )
+  if (catchable) await expect(outcome).resolves.toMatchObject({ nodes: [{ status: 'error-handled', systemOutputs: { error: { code: 'capability.denied' } } }] })
+  else await expect(outcome).rejects.toThrow('Denied')
+  expect(calls).toBe(retryable ? 3 : 1)
+  expect(handledCodes).toEqual(catchable ? ['capability.denied'] : [])
 })
 
 it.each([

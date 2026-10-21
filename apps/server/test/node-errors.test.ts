@@ -1,11 +1,13 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
-import { createLlmTask } from '@oomol-lab/open-flow/flow-authoring'
+import { createDecisionTask, createLlmTask } from '@oomol-lab/open-flow/flow-authoring'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
+import { ConnectorTaskError } from '../node/deployment/connector.ts'
+import { createConnectorHost } from './connectorHost.ts'
 import { acceptRun } from './runFixture.ts'
 import { closeOpenServices, openService, startService } from './serviceFixture.ts'
 
@@ -69,10 +71,24 @@ it.each([
   expect(terminal).toMatchObject({
     kind: handled ? 'node.failed' : 'node.completed',
     payload: {
-      systemOutputs: { error: handled ? { nodeId: 'task', runId: accepted.runId, executionId: terminal?.payload.executionId } : null },
+      systemOutputs: {
+        error: handled
+          ? {
+              code: expect.any(String),
+              message: expect.any(String),
+              nodeName: expect.any(String),
+              executionId: expect.any(String),
+              nodeId: 'task',
+              runId: accepted.runId,
+            }
+          : null,
+      },
       ...(handled ? { handled: true } : {}),
     },
   })
+  if (terminal?.kind == 'node.failed' && terminal.payload.handled) {
+    expect(terminal.payload.systemOutputs?.error).toMatchObject({ executionId: terminal.payload.executionId })
+  }
   const completed = events.find((event) => event.kind == 'node.completed' && event.payload.nodeId == 'out')
   expect(completed).toMatchObject({
     payload: { outputs: { business: handled ? null : 'business', failure: handled ? expect.objectContaining({ nodeId: 'task' }) : null } },
@@ -92,24 +108,44 @@ it('does not handle an isolate resource limit', async () => {
   expect(service.run(accepted.runId)?.status).toBe('failed')
   expect(service.events(accepted.runId).some((event) => event.kind == 'node.failed' && event.payload.handled)).toBe(false)
 })
-it('handles a permanent model failure without retrying it through the Host bridge', async () => {
+it.each([
+  ['llm', 'llm.unavailable'],
+  ['llm', 'llm.output-invalid'],
+  ['decision', 'llm.unavailable'],
+  ['decision', 'llm.output-invalid'],
+] as const)('handles permanent %s failure %s without retrying through the Host bridge', async (kind, code) => {
   let calls = 0
+  const fail = async () => {
+    calls++
+    return { kind: 'failed' as const, code, message: 'Request rejected', retryable: false, version: 1 as const }
+  }
   const service = await openService(await file(), {
     clock: Date.now,
-    capabilities: {
-      llm: () => async () => {
-        calls++
-        return { kind: 'failed', code: 'llm.unavailable', message: 'Request rejected', retryable: false, version: 1 }
-      },
-    },
+    capabilities: { llm: () => Object.assign(fail, { decision: fail }) },
   })
-  const created = createLlmTask({ nodeId: 'task' }, 'Model', 'chat', 'A response.')
+  const created =
+    kind == 'llm'
+      ? createLlmTask({ nodeId: 'task' }, 'Model', 'chat', 'A response.')
+      : createDecisionTask({ nodeId: 'task' }, 'Decision', [{ name: 'answer', type: 'noul', instructions: 'Does this need a reply?' }])
   const change = created.find((operation) => operation.kind == 'graph.node.create')
   if (change?.kind != 'graph.node.create' || change.node.kind != 'task') throw new Error('Missing task')
   const revision: RevisionContent = {
     modelVersion: currentFlowModelVersion,
     modules: {},
-    document: { bindings: {}, graph: { nodes: { task: { ...change.node, onError: 'error', retry: { maxRetries: 2, intervalMs: 1000 } } }, edges: [] } },
+    document: {
+      bindings: {},
+      graph: {
+        nodes: {
+          task: {
+            ...change.node,
+            ...(kind == 'decision' ? { inputs: { target: { kind: 'value' as const, value: 'Evaluate this' } } } : {}),
+            onError: 'error',
+            retry: { maxRetries: 2, intervalMs: 1000 },
+          },
+        },
+        edges: [],
+      },
+    },
   }
   await startService(service)
   const accepted = await acceptRun(service, { flowId: 'flow', revisionId: 'revision', revision, idempotencyKey: 'model' })
@@ -120,7 +156,56 @@ it('handles a permanent model failure without retrying it through the Host bridg
   expect(service.events(accepted.runId)).toContainEqual(
     expect.objectContaining({
       kind: 'node.failed',
-      payload: expect.objectContaining({ handled: true, error: { code: 'llm.unavailable', message: 'Request rejected' } }),
+      payload: expect.objectContaining({ handled: true, error: { code, message: 'Request rejected' } }),
+    }),
+  )
+})
+
+it('persists a handled connector.action-not-found event from the Host', async () => {
+  const service = await openService(await file(), {
+    clock: Date.now,
+    capabilities: {
+      connector: () =>
+        createConnectorHost({
+          execute: async () => {
+            throw new ConnectorTaskError('connector.action-not-found', 'Action was removed')
+          },
+        }),
+    },
+  })
+  const revision: RevisionContent = {
+    modelVersion: currentFlowModelVersion,
+    modules: {},
+    document: {
+      bindings: {},
+      graph: {
+        nodes: {
+          task: {
+            kind: 'task',
+            name: 'Connector',
+            onError: 'error',
+            inputs: {},
+            task: {
+              name: 'Missing action',
+              executor: { kind: 'connector', action: 'example.echo' },
+              inputs: [],
+              outputs: [],
+            },
+          },
+        },
+        edges: [],
+      },
+    },
+  }
+  await startService(service)
+  const accepted = await acceptRun(service, { flowId: 'flow', revisionId: 'revision', revision, idempotencyKey: 'missing-action' })
+  if (accepted.kind != 'accepted') throw new Error('Run not accepted')
+  await service.waitForIdle()
+  expect(service.run(accepted.runId)?.status).toBe('completed')
+  expect(service.control.runs.getRunEvents(accepted.runId, 0, 100).events).toContainEqual(
+    expect.objectContaining({
+      kind: 'node.failed',
+      payload: expect.objectContaining({ handled: true, error: { code: 'connector.action-not-found', message: 'Action was removed' } }),
     }),
   )
 })

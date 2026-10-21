@@ -1138,7 +1138,7 @@ The exact Scheduler checkpoint object is:
       }
     }
   },
-  "version": 5,
+  "version": 6,
   "agents": {},
   "waits": [{ "jobId": "job-2", "nodeId": "approval", "value": { "value": 42 }, "waitId": "opaque-id" }]
 }
@@ -1154,7 +1154,7 @@ It permits `undefined` only for the entire return or top-level ports. Functions,
 
 There are no per-handle `node.output` events or ordinary Task intermediate outputs. Wait pending outputs become available after registration; the Wait still completes once, after resolution.
 
-Flow terminal results use `{ kind: 'node-results', nodes }`. `nodes` contains only the last completed result for executed terminal graph nodes, sorted by node ID. Run events retain complete per-invocation outputs. Entries are `{ nodeId, status: 'completed', jobId, outputs }`, without unexecuted nodes or repeated-job arrays. If no terminal node completed, the list is `[]`.
+Flow terminal results use `{ kind: 'node-results', nodes }`. `nodes` contains only the last completed or handled result for executed terminal graph nodes, sorted by node ID. Run events retain complete per-invocation outputs. Entries are `{ nodeId, status: 'completed' | 'error-handled', jobId, outputs, systemOutputs? }`, without unexecuted nodes or repeated-job arrays. Handled failures have empty business `outputs`; optional `systemOutputs` holds the independent system data. If no terminal node completed or handled its failure, the list is `[]`.
 
 ## 10. Code Action contract
 

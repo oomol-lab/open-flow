@@ -196,7 +196,7 @@ globalThis.console = Object.freeze({
   warn: (...values) => emitLog('warn', values),
 })
 const capabilityErrors = new WeakMap()
-export const capabilityFailureCode = (error) => capabilityErrors.get(error)
+export const capabilityFailure = (error) => capabilityErrors.get(error)
 async function invoke(kind, payload) {
   const source = await new Promise((resolve) => {
     call.applyIgnored(undefined, [JSON.stringify({ kind, payload }), resolve], { arguments: { reference: true } })
@@ -204,7 +204,7 @@ async function invoke(kind, payload) {
   const result = JSON.parse(source)
   if (!result.ok) {
     const error = Object.assign(new Error(result.error), { code: result.code })
-    capabilityErrors.set(error, result.code)
+    capabilityErrors.set(error, { code: result.code, catchable: result.catchable === true, retryable: result.retryable === true })
     throw error
   }
   return result.value
@@ -291,7 +291,9 @@ function installGlobals(
   const capability = new ivm.Reference((sourceReference: IsolatedVM.Reference<string>, settle: IsolatedVM.Reference<(source: string) => void>): void => {
     const settleResult = (result: CapabilityOutcome): void => {
       if (!active) return
-      const source = result.ok ? JSON.stringify({ ok: true, value: result.value }) : JSON.stringify({ code: result.code, error: result.error, ok: false })
+      const source = result.ok
+        ? JSON.stringify({ ok: true, value: result.value })
+        : JSON.stringify({ code: result.code, catchable: result.catchable, retryable: result.retryable, error: result.error, ok: false })
       settle.applyIgnored(undefined, [source], { arguments: { copy: true } })
       settle.release()
     }
@@ -317,6 +319,8 @@ function installGlobals(
             if (['runtime.limit-exceeded', 'connector.indeterminate'].includes(String(Reflect.get(Object(error), 'schedulerCode')))) capabilityFailure = error
             settleResult({
               code: (error as { code?: string; schedulerCode?: string }).schedulerCode ?? (error as { code?: string }).code,
+              catchable: Reflect.get(Object(error), 'catchable') === true,
+              retryable: Reflect.get(Object(error), 'retryable') === true,
               error: normalizedError(error).message,
               id: 0,
               ok: false,
@@ -328,6 +332,8 @@ function installGlobals(
       .catch((error) =>
         settleResult({
           code: (error as { code?: string; schedulerCode?: string }).schedulerCode ?? (error as { code?: string }).code,
+          catchable: Reflect.get(Object(error), 'catchable') === true,
+          retryable: Reflect.get(Object(error), 'retryable') === true,
           error: normalizedError(error).message,
           id: 0,
           ok: false,
@@ -381,7 +387,7 @@ async function compileProgram(
   }
   const mainModule = await isolate.compileModule(
     `import task from '../user/${program.entryModuleId}.mjs'
-import { capability, capabilityFailureCode } from './capability.mjs'
+import { capability, capabilityFailure } from './capability.mjs'
 const snapshotResult = ${snapshotRuntimeResult.toString()}
 const cancellation = new AbortController()
 export function cancelTask() {
@@ -406,7 +412,7 @@ export async function invoke(source) {
       ? JSON.stringify({ engineDigest: ${JSON.stringify(program.engineDigest)}, ok: true, void: true })
       : JSON.stringify({ engineDigest: ${JSON.stringify(program.engineDigest)}, ok: true, value: result })
   } catch (error) {
-    return JSON.stringify({ retryable: executing, code: capabilityFailureCode(error), error: error instanceof Error ? error.message : String(error), ok: false })
+    return JSON.stringify({ retryable: executing, ...capabilityFailure(error), error: error instanceof Error ? error.message : String(error), ok: false })
   }
 }`,
     { filename: 'open-flow:engine/main.mjs' },
@@ -458,6 +464,7 @@ function readResult(
     readonly engineDigest?: string
     readonly code?: string
     readonly retryable?: boolean
+    readonly catchable?: boolean
     readonly error?: string
     readonly ok?: boolean
     readonly value?: JsonValue
@@ -471,7 +478,11 @@ function readResult(
   const returnedVoid = !Object.hasOwn(result, 'value') && result.void === true
   if (result.ok === false) {
     if (preserveCapabilityFailure && typeof result.code == 'string')
-      throw Object.assign(new Error(result.error ?? 'Action failed.'), { schedulerCode: result.code, catchable: result.retryable === true })
+      throw Object.assign(new Error(result.error ?? 'Action failed.'), {
+        schedulerCode: result.code,
+        catchable: result.catchable === true,
+        retryable: result.retryable === true,
+      })
     throw new IsolatedVmError('task-failed', result.error ?? 'User Task failed.', result.retryable === true)
   }
   if (result.ok !== true || result.engineDigest != program.engineDigest || (!returnedValue && !returnedVoid))

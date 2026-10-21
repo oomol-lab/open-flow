@@ -30,6 +30,7 @@ const nodeFailureCodes: ReadonlySet<string> = new Set([
   'capability.invalid',
   'connector.access-invalid',
   'connector.access-required',
+  'connector.action-not-found',
   'connector.connection-required',
   'connector.input-invalid',
   'connector.indeterminate',
