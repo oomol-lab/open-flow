@@ -285,6 +285,37 @@ describe('Trigger creation permissions', () => {
     }
   })
 
+  it('preserves movement redo when a pending default connection completes', async () => {
+    const { store, navigation, add, nodes, lookup } = setup([])
+    const pending = Promise.withResolvers<Awaited<ReturnType<WorkbenchClient['listProviderAccessBindingCandidates']>>>()
+    lookup.mockReturnValue(pending.promise)
+    try {
+      await navigation.start()
+      const nodeId = (await add())!
+      await vi.waitFor(() => expect(lookup).toHaveBeenCalledOnce())
+      await store.workspace.moveNodes({ [nodeId]: { x: 100, y: 100 } })
+      await store.workspace.undo()
+      expect(store.workspace.history$.value.canRedo).toBe(true)
+      pending.resolve({
+        version: 1,
+        results: [{ version: 1, mode: 'selectable', providerId: 'mail', candidates: [candidate('default', { allTriggers: true })] }],
+      })
+      await vi.waitFor(() => expect(nodes()).toEqual([expect.objectContaining({ connectionId: 'default' })]))
+      await vi.waitFor(() => expect(store.workspace.history$.value.canRedo).toBe(true))
+      await store.workspace.redo()
+      expect(store.workspace.history$.value.undo?.action).toBe('move')
+      await store.workspace.undo()
+      await store.workspace.undo()
+      expect(nodes()).toEqual([])
+      await store.workspace.redo()
+      expect(nodes()).toEqual([expect.objectContaining({ connectionId: 'default' })])
+    } finally {
+      pending.resolve({ version: 1, results: [] })
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+
   it('uses Connector token authority in implicit mode without querying candidates', async () => {
     const { store, navigation, add, nodes, lookup } = setup([], true)
     try {

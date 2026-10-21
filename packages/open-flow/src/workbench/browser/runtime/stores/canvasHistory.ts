@@ -52,7 +52,6 @@ export class CanvasHistory {
     if (index < 0 || this.applying || this.failed) return false
     const entry = this.#undo[index]!
     this.#undo[index] = { ...entry, forward: [...entry.forward, ...changes] }
-    this.discardRedo()
     this.publish()
     return true
   }

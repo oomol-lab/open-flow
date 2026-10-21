@@ -91,20 +91,19 @@ export class EventSourceRuntime {
   async receiveApplication(kind: string, appId: string, request: Request): Promise<Response> {
     const sources = this.#store.eventSources.applicationSources(kind, appId).filter((source) => source.enabled === 1)
     if (sources.length === 0) return new Response(null, { status: 404 })
-    let response: Response | undefined
-    for (const source of sources) {
-      const result = await this.receive(source.sourceId, request.clone())
-      if (!result.ok) return result
-      response ??= result
-    }
-    return response!
+    return this.#receive(sources, request)
   }
 
   async receive(sourceId: string, request: Request): Promise<Response> {
     if (request.method != 'POST') return new Response(null, { status: 405, headers: { allow: 'POST' } })
     const source = this.#store.eventSources.get(sourceId)
     if (source == null || source.enabled != 1) return new Response(null, { status: 404 })
-    const definition = eventSourceDefinition(source.kind)
+    return this.#receive([source], request)
+  }
+
+  async #receive(sources: readonly StoredEventSource[], request: Request): Promise<Response> {
+    if (request.method != 'POST') return new Response(null, { status: 405, headers: { allow: 'POST' } })
+    const definition = eventSourceDefinition(sources[0]!.kind)
     if (request.headers.get('content-type')?.split(';')[0]?.trim().toLowerCase() != 'application/json') return new Response(null, { status: 415 })
     const reader = request.body?.getReader()
     if (reader == null) return new Response(null, { status: 400 })
@@ -130,9 +129,22 @@ export class EventSourceRuntime {
       bytes.set(chunk, offset)
       offset += chunk.length
     }
+    let response: Response | undefined
+    for (const source of sources) {
+      const result = await this.#deliver(source.sourceId, bytes, request.headers, request.signal)
+      if (!result.ok) return result
+      response ??= result
+    }
+    return response!
+  }
+
+  async #deliver(sourceId: string, bytes: Uint8Array, headers: Headers, signal: AbortSignal): Promise<Response> {
+    const source = this.#store.eventSources.get(sourceId)
+    if (source == null || source.enabled != 1) return new Response(null, { status: 404 })
+    const definition = eventSourceDefinition(source.kind)
     let received
     try {
-      received = await definition.receive(source, bytes, request.headers, this.#clock(), async (operation) => {
+      received = await definition.receive(source, bytes, headers, this.#clock(), async (operation) => {
         const connector = this.#connector()
         if (connector?.trigger == null) throw new TransientIntegrationError('Connector Trigger transport is unavailable.')
         return connector.trigger(
@@ -140,16 +152,16 @@ export class EventSourceRuntime {
           source.connectionId,
           definition.resources.triggerId,
           operation,
-          request.signal,
+          signal,
           this.#operatorContext(source.provider, source.teamId ?? undefined),
         )
       })
     } catch (error) {
-      request.signal.throwIfAborted()
+      signal.throwIfAborted()
       if (error instanceof ConnectorTaskError || error instanceof TransientIntegrationError) return new Response(null, { status: 503 })
       return new Response(null, { status: 401 })
     }
-    request.signal.throwIfAborted()
+    signal.throwIfAborted()
     if ('response' in received) {
       if (!this.#store.eventSources.saveState(source, received.state)) return new Response(null, { status: 409 })
       return received.response

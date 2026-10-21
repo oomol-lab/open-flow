@@ -69,6 +69,7 @@ it('shares an app ingress while isolating workspaces, retaining fanout, and keep
   }
   expect(sources[0]!.endpointUrl).toBe(sources[1]!.endpointUrl)
   const endpoint = new URL(sources[0]!.endpointUrl!).pathname
+  expect((await app.request(endpoint, delivery({ padding: 'x'.repeat(64 * 1024) }))).status).toBe(413)
   const challenge = await app.request(endpoint, delivery({ type: 'url_verification', challenge: 'verify' }))
   expect(challenge.status).toBe(200)
   const flows: string[] = []
