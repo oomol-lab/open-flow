@@ -25,7 +25,8 @@ export function advanceWaiting(effect: Effect.Effect<FlowRunOutcome, Error>): Pr
       const now = vi.spyOn(performance, 'now').mockImplementation(() => Number(clock.monotonicTimeNanosUnsafe()) / 1_000_000)
       return Effect.gen(function* () {
         const fiber = yield* Effect.forkChild(effect)
-        while (fiber.pollUnsafe() == null) yield* clock.adjust(waitRetentionMs)
+        for (let step = 0; step < 100 && fiber.pollUnsafe() == null; step++) yield* clock.adjust(waitRetentionMs)
+        if (fiber.pollUnsafe() == null) return yield* Effect.fail(new Error('Scheduler did not settle with the controlled clock.'))
         return yield* Fiber.join(fiber)
       }).pipe(Effect.ensuring(Effect.sync(() => now.mockRestore())))
     }).pipe(Effect.provide(TestClock.layer())),
