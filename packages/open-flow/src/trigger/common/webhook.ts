@@ -1,10 +1,23 @@
 import type { JsonValue, WebhookBodyField, WebhookMethod, WebhookOptions } from '../../flow/common/change.ts'
 
 import { dequal } from 'dequal/lite'
+import { isJsonObject } from '../../base/common/json.ts'
 
 export { webhookSupportsBody } from './contract.ts'
+export { webhookResponseAllowsBody, webhookResponseTimeout } from '../../flow/common/webhookResponse.ts'
 
 export const maximumWebhookBodyBytes = 64 * 1024
+
+/** Serialize only declared workflow business outputs, never node logs or execution metadata. */
+export function webhookResponseBody(
+  result: unknown,
+  source: NonNullable<WebhookOptions['responseBody']>,
+): { readonly body: string; readonly contentType: string } | undefined {
+  if (!isJsonObject(result) || result.kind != 'node-results' || !isJsonObject(result.outputs)) return
+  if (source.output != null && !Object.hasOwn(result.outputs, source.output)) return
+  const value = source.output == null ? result.outputs : result.outputs[source.output]!
+  return typeof value == 'string' ? { body: value, contentType: 'text/plain;charset=UTF-8' } : { body: JSON.stringify(value), contentType: 'application/json' }
+}
 
 const endpointPattern = /^\/v1\/webhooks\/(endpoint_[0-9a-f]{32})$/
 const encoder = new TextEncoder()

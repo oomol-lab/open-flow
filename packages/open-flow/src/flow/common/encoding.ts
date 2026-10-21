@@ -277,6 +277,15 @@ function canonicalTriggerDefinition(snapshot: TriggerKeySnapshot): JsonValue {
 function canonicalWebhookOptions(value: WebhookOptions): JsonValue {
   return {
     ...(value.allowedOrigins == null ? {} : { allowedOrigins: value.allowedOrigins }),
+    ...(value.responseBody == null
+      ? {}
+      : {
+          responseBody: {
+            kind: value.responseBody.kind,
+            ...(value.responseBody.output == null ? {} : { output: value.responseBody.output }),
+            ...(value.responseBody.timeoutMs == null ? {} : { timeoutMs: value.responseBody.timeoutMs }),
+          },
+        }),
     ...(value.responseData == null ? {} : { responseData: value.responseData }),
     ...(value.responseHeaders == null ? {} : { responseHeaders: value.responseHeaders }),
     ...(value.responseStatusCode == null ? {} : { responseStatusCode: value.responseStatusCode }),

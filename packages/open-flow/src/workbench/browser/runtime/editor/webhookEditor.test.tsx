@@ -1,6 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it, vi } from 'vitest'
+import { webhookResponseDiagnostics } from '../../../../flow/common/graph.ts'
 import { createI18n } from '../i18n.ts'
 import { WebhookEditor } from './webhookEditor.tsx'
 
@@ -13,6 +14,36 @@ function renderWebhook(method: 'GET' | 'POST') {
 }
 
 describe('Webhook configuration', () => {
+  it.each([false, true])('offers creation only when the Outputs node is absent (exists: %s)', (exists) => {
+    const trigger = { kind: 'webhook', name: 'Webhook', method: 'POST', bodyFields: [], options: { responseBody: { kind: 'workflow-outputs' } } } as const
+    const graph = {
+      nodes: { hook: trigger, ...(exists ? { outputs: { kind: 'outputs' as const, name: 'Outputs', outputDefs: [], outputMappings: {} } } : {}) },
+      edges: [],
+    }
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <WebhookEditor
+          bodyFields={[]}
+          method="POST"
+          options={trigger.options}
+          disabled={false}
+          responseDiagnostics={webhookResponseDiagnostics(graph, 'hook')}
+          onAddWorkflowOutputs={vi.fn()}
+          onChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    if (exists) {
+      expect(markup).not.toContain('Add workflow Outputs')
+      expect(markup).toContain('aria-label="Response content"')
+      expect(markup).toContain('Connect this Webhook to the workflow Outputs node.')
+    } else {
+      expect(markup).toContain('Add workflow Outputs')
+      expect(markup).not.toContain('aria-label="Response content"')
+      expect(markup).toContain('Add a workflow Outputs node for the HTTP response.')
+    }
+  })
+
   it.each(['GET', 'POST', 'PUT', 'PATCH', 'DELETE'] as const)('renders %s as one of the five single-select methods', (method) => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
@@ -35,7 +66,7 @@ describe('Webhook configuration', () => {
     expect(post.indexOf('Request body fields')).toBeLessThan(post.indexOf('The request body accepts an empty object.'))
   })
 
-  it('orders Request, Outputs, and collapsed Advanced settings', () => {
+  it('orders Request, Outputs, HTTP response, and collapsed Advanced settings', () => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>
         <WebhookEditor bodyFields={[]} method="POST" options={{}} disabled={false} outputSection={<section>Outputs marker</section>} onChange={vi.fn()} />
@@ -43,7 +74,9 @@ describe('Webhook configuration', () => {
     )
     expect(markup.indexOf('Request method')).toBeLessThan(markup.indexOf('Outputs marker'))
     expect(markup.indexOf('Outputs marker')).toBeLessThan(markup.indexOf('Advanced settings'))
-    expect(markup.indexOf('Allowed request origins')).toBeLessThan(markup.indexOf('Response status code'))
+    expect(markup.indexOf('Outputs marker')).toBeLessThan(markup.indexOf('HTTP response'))
+    expect(markup.indexOf('HTTP response')).toBeLessThan(markup.indexOf('Advanced settings'))
+    expect(markup.indexOf('Response status code')).toBeLessThan(markup.indexOf('Allowed request origins'))
   })
 
   it('uses an empty response body field to represent no response body', () => {

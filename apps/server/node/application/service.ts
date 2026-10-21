@@ -42,6 +42,7 @@ import { RunExecutor } from './run.ts'
 import { validateCapabilities, validateRuntime } from './service-options.ts'
 import { Supervisor } from './supervisor.ts'
 import { WaitActions } from './wait-actions.ts'
+import { waitForWebhookRun } from './webhook-response.ts'
 import { WebhookTargets } from './webhook-targets.ts'
 
 export type { ServerCapabilities, ServerRuntime, ServerServiceOptions } from './service-options.ts'
@@ -399,6 +400,18 @@ export class ServerService {
 
   run(runId: string): RunRecord | undefined {
     return this.#store.runViews.run(runId)
+  }
+
+  waitForWebhookRun(flowId: string, runId: string, timeoutMs: number, signal: AbortSignal) {
+    return waitForWebhookRun(
+      () => this.run(runId),
+      (changed) =>
+        this.subscribeFlow(flowId, (event) => {
+          if (event.kind == 'run.changed' && event.runId == runId) changed()
+        }),
+      timeoutMs,
+      signal,
+    )
   }
 
   start(): Effect.Effect<void, never, Scope.Scope> {

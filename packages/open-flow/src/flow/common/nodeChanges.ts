@@ -702,9 +702,26 @@ export function updateOutputsDefs(
 ): readonly ChangeOperation[] {
   const node = content.document.graph.nodes[nodeId]
   if (node?.kind != 'outputs') throw new TypeError('Expected an Outputs node.')
-  const mappings = outputMappings ?? remapInputMappings(node.outputMappings, value, renamedPort(node.outputDefs, value))
+  const rename = renamedPort(node.outputDefs, value)
+  const mappings = outputMappings ?? remapInputMappings(node.outputMappings, value, rename)
   const next = { ...node, outputDefs: value, outputMappings: mappings }
-  return dequal(node, next) ? [] : cleanVariableBindings(content, [{ kind: 'graph.node.replace', nodeId, before: node, node: next }])
+  if (dequal(node, next)) return []
+  const changes: ChangeOperation[] = [{ kind: 'graph.node.replace', nodeId, before: node, node: next }]
+  if (rename != null) {
+    for (const [id, trigger] of Object.entries(content.document.graph.nodes)) {
+      if (trigger.kind != 'webhook' || trigger.options?.responseBody?.output !== rename[0]) continue
+      changes.push({
+        kind: 'graph.node.replace',
+        nodeId: id,
+        before: trigger,
+        node: {
+          ...trigger,
+          options: { ...trigger.options, responseBody: { ...trigger.options.responseBody, output: rename[1] } },
+        },
+      })
+    }
+  }
+  return cleanVariableBindings(content, changes)
 }
 
 export function renameFlowOutputSources(

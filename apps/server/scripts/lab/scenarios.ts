@@ -6,6 +6,13 @@ import { fulfillmentSamples, fulfillmentStages } from './fulfillment.ts'
 
 export const scenarios = [
   {
+    id: 'webhook-response',
+    entry: { kind: 'webhook' },
+    name: 'Return workflow outputs over HTTP',
+    version: 1,
+    task: 'Create a POST Webhook named Published hook with a required string message field, an Echo code node forwarding the message, and Workflow Outputs declaring message. Configure a workflow-output response selecting message with a 30-second timeout, preserving fixed response text accepted. Rename the output field to reply through public editing and confirm the Webhook follows the rename. Change only its timeout to 15 seconds. Switch to immediate response by explicitly clearing responseBody and read back the preserved fixed text; restore the dynamic reply response. Check and publish, inspect the online configuration, then change only the Draft hook method to PUT and name to Draft hook. Leave Live enabled; its POST response must return the request message as plain text.',
+  },
+  {
     id: 'node-errors',
     entry: { kind: 'start' },
     name: 'Handle node errors',
@@ -172,6 +179,7 @@ export function initialOperations(id: string): ChangeOperation[] {
     id == 'connector-responses' ||
     id == 'order-alert' ||
     id == 'fulfillment-ops' ||
+    id == 'webhook-response' ||
     id == 'webhook-live'
   )
     return []
@@ -466,7 +474,7 @@ export function assertions(id: string, base: RevisionContent, current: RevisionC
       return ['Declare required message/amount and nullable note parameters while preserving their schemas.']
     return []
   }
-  if (id == 'connector-responses' || id == 'fulfillment-ops' || id == 'webhook-live') return []
+  if (id == 'connector-responses' || id == 'fulfillment-ops' || id == 'webhook-live' || id == 'webhook-response') return []
   const errors: string[] = []
   const allowed = new Set(
     id.startsWith('specialize-summary') ? ['customer'] : id == 'customer-redaction' ? ['notify'] : id == 'repair-amount' ? ['format'] : ['notify', 'notes'],

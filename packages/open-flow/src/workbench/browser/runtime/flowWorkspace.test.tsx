@@ -4,7 +4,7 @@ import type { Val } from 'value-enhancer'
 import type { NavigationStore } from './navigation.ts'
 import type { WorkbenchStore } from './stores/workbenchStore.ts'
 
-import { act, forwardRef } from 'react'
+import { act, Children, forwardRef, isValidElement, useImperativeHandle } from 'react'
 import { val } from 'value-enhancer'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { render, click } from '../../../../test/support/render.tsx'
@@ -20,11 +20,14 @@ const boundary = vi.hoisted(() => ({
   publish: undefined as ComponentProps<typeof WorkspacePublishIsland> | undefined,
   diagnostics: undefined as ComponentProps<typeof WorkspaceDiagnosticsIsland> | undefined,
   run: undefined as ComponentProps<typeof RunControl> | undefined,
+  addOutputs: undefined as (() => void) | undefined,
+  addNode: vi.fn(),
 }))
 const preferences = new Map<string, string>()
 vi.mock('./editor/workbenchCanvas.tsx', () => ({
   WorkbenchCanvas: forwardRef((_props: ComponentProps<typeof WorkbenchCanvas>, _ref) => {
     boundary.canvas = _props
+    useImperativeHandle(_ref, () => ({ addNode: boundary.addNode }))
     return (
       <>
         {_props.runControl}
@@ -73,12 +76,22 @@ vi.mock('./runs/runDrawer.tsx', () => ({
       </aside>
     ) : null,
 }))
-vi.mock('./editor/editorContextPanel.tsx', () => ({ EditorContextPanel: ({ title }: { title: ReactNode }) => <aside aria-label="Inspector">{title}</aside> }))
+vi.mock('./editor/editorContextPanel.tsx', () => ({
+  EditorContextPanel: ({ title, children }: { title: ReactNode; children: ReactNode }) => {
+    const inspector = Children.toArray(children).find(
+      (child) => isValidElement<{ onAddWorkflowOutputs?: () => void }>(child) && child.props.onAddWorkflowOutputs != null,
+    )
+    boundary.addOutputs = isValidElement<{ onAddWorkflowOutputs?: () => void }>(inspector) ? inspector.props.onAddWorkflowOutputs : undefined
+    return <aside aria-label="Inspector">{title}</aside>
+  },
+}))
 const value = val
 beforeEach(() => {
   preferences.clear()
   boundary.canvas = undefined
   boundary.run = undefined
+  boundary.addOutputs = undefined
+  boundary.addNode.mockReset()
 })
 function set(source: unknown, next: unknown) {
   act(() => (source as Val<unknown>).set(next))
@@ -214,6 +227,22 @@ function renderWorkspace(busy?: string, withTrigger = true, invalid = false, sel
   const button = (label: string) => [...view.container.querySelectorAll('button')].find((element) => element.textContent === label)!
   return { ...view, button, store, navigation }
 }
+
+it('routes missing Outputs creation through the canvas and ignores a stale action once Outputs exists', async () => {
+  preferences.set('open-flow:inspector-open', 'true')
+  const { store } = renderWorkspace(undefined, true, false, ['start'])
+  act(() => boundary.canvas!.onActivateSelection!(['start']))
+  const option = { id: 'outputs', kind: 'outputs', label: 'Outputs', inputs: [], outputs: [] }
+  set(store.workspace.$.addNodeOptions, [option])
+  const add = boundary.addOutputs!
+  expect(add).toBeDefined()
+  await act(async () => add())
+  expect(boundary.addNode).toHaveBeenCalledExactlyOnceWith(option)
+  expect(store.addNode).not.toHaveBeenCalled()
+  set(store.workspace.$.addNodeOptions, [])
+  await act(async () => add())
+  expect(boundary.addNode).toHaveBeenCalledOnce()
+})
 
 it('keeps Run inputs across draft saves and dismisses them on workflow changes', () => {
   const { store } = renderWorkspace()

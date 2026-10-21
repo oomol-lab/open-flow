@@ -18,6 +18,7 @@ import type { WebhookDeploymentProps } from './webhookDeployment.tsx'
 import { useEffect, useRef } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { decisionModel } from '../../../../decision/common/decision.ts'
+import { webhookResponseDiagnostics } from '../../../../flow/common/graph.ts'
 import { inputValue } from '../../../../flow/common/inputValue.ts'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
@@ -192,6 +193,7 @@ function inputUpstreamSources({
 }
 
 interface Props {
+  readonly onAddWorkflowOutputs?: () => void
   readonly webhookDeployment?: WebhookDeploymentProps
   readonly readOnly?: boolean
   readonly variables?: InputVariables
@@ -241,6 +243,7 @@ type InspectorProps = Props &
   )
 
 export function NodeInspector({
+  onAddWorkflowOutputs,
   webhookDeployment,
   variables = { enabled: false, loaded: false, loading: false, names: [], onOpen: undefined },
   readOnly = false,
@@ -531,6 +534,9 @@ export function NodeInspector({
             bodyFields={selection.trigger.bodyFields}
             method={selection.trigger.method}
             options={selection.trigger.options ?? {}}
+            workflowOutputs={Object.values(revision.graph().nodes).find((node) => node.kind === 'outputs')?.outputDefs}
+            responseDiagnostics={webhookResponseDiagnostics(revision.graph(), selection.id)}
+            onAddWorkflowOutputs={readOnly ? undefined : onAddWorkflowOutputs}
             disabled={disabled}
             outputSection={<TriggerSummary trigger={selection.trigger} />}
             onChange={(settings, deletion) => {

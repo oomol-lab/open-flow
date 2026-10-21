@@ -892,7 +892,11 @@
         "config-invalid": "Конфигурация Trigger «{{triggerId}}» не соответствует его фиксированному определению.",
         "connection-invalid": "Привязка Trigger «{{bindingId}}» должна быть Connection.",
         "connection-missing": "Выберите подключённую учётную запись для этого триггера.",
-        "input-duplicate": "Вход Webhook Trigger «{{input}}» объявлен несколько раз."
+        "input-duplicate": "Вход Webhook Trigger «{{input}}» объявлен несколько раз.",
+        "webhook-response-outputs-missing": "Добавьте узел результатов для HTTP-ответа.",
+        "webhook-response-unreachable": "Соедините этот Webhook с узлом результатов.",
+        "webhook-response-output-missing": "Результат «{{output}}» не существует.",
+        "webhook-response-status-invalid": "Выберите код состояния, допускающий тело ответа."
       },
       "leina": {
         "robot-required": "Выберите робота Leina или привяжите его идентификатор к источнику данных."
@@ -1115,7 +1119,20 @@
     "webhookStatusInvalid": "Введите целое число от 200 до 599.",
     "webhookBodyFields": "Поля тела запроса",
     "webhookNoBodyFields": "Тело запроса допускает пустой объект.",
-    "webhookNoHeaders": "Заголовки ответа не добавлены."
+    "webhookNoHeaders": "Заголовки ответа не добавлены.",
+    "webhookResponse": "HTTP-ответ",
+    "webhookResponseMode": "Источник ответа",
+    "webhookImmediate": "Фиксированное содержимое",
+    "webhookAfterWorkflow": "Выходные данные процесса",
+    "webhookResponseContent": "Содержимое ответа",
+    "webhookAllOutputs": "Полный объект результатов",
+    "webhookMissingOutput": "{{output}} (отсутствует)",
+    "webhookTimeout": "Время ожидания (секунды)",
+    "webhookTimeoutInvalid": "Введите время ожидания от 1 до 60 секунд.",
+    "webhookDynamicHint": "Возвращает результаты после успеха. При тайм-ауте возвращает 504; выполнение продолжается. Ожидание включает очередь, повторы, подтверждения и вызванные процессы.",
+    "webhookDynamicStatusInvalid": "Введите целое число от 200 до 599, кроме 204, 205 и 304.",
+    "webhookAddOutputs": "Добавить результаты процесса",
+    "webhookOutputsDisconnected": "Результаты процесса не подключены"
   },
   "conditionEditor": {
     "addCondition": "Добавить условие",

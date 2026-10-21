@@ -112,6 +112,30 @@ Drafts may retain an unselected robot for editing, but `flow_check` reports `lei
 
 Action account selections use an omitted `connectionId` for unconfigured, a nonempty ID for selected, and `""` for explicitly deferred. Deferral is supported by Connector Tasks, independent Code Actions, Agent tools and notifications, but not Provider Triggers. It bypasses only account readiness checks. A deferred Action fails if called; deferred Agent tools are excluded from the callable tool set. Preserve this distinction in public reads, edits and exports.
 
+## Webhook HTTP responses
+
+Webhook response configuration is static business configuration applied after Run admission, not
+an input binding. Set `config.options.responseBody` to
+`{ "kind": "workflow-outputs", "output": "message", "timeoutMs": 30000 }` to return a top-level
+workflow output after the Run succeeds. Omit `output` for the complete output object. Connect the
+Webhook execution path to the singleton Outputs node and define/map its fields through the ordinary
+Outputs authoring interface. Response selection does not add an execution edge or data port.
+
+The timeout accepts 1000–60000 ms, defaults to 30000 ms and includes queueing, retries, approvals and
+called workflows. HTTP timeout returns 504 and the Run continues. Keyed retries reuse the accepted
+Run. A string returns plain text; other values, including null, return JSON. An executed empty
+Outputs node returns `{}`; a skipped Outputs node or missing selected field returns 500. Failed,
+canceled and indeterminate Runs return 500; execution deadlines return 504. Errors have a fixed JSON
+body without internal exception details. Success uses the configured status (default 200); dynamic
+responses reject 204, 205 and 304. Existing response header restrictions and CORS still apply.
+
+Omitted `responseBody` retains immediate `responseData` behavior. Updating dynamic configuration
+preserves saved fixed text. Switch back with `clear: [["config", "options", "responseBody"]]`.
+Explicit output renames update response selections through shared editing; removals preserve stale
+selections for diagnostics. Drafts can retain incomplete configuration; checks and publication reject
+missing, unreachable or undeclared response outputs. Live reads expose the published configuration
+independently of later Draft edits.
+
 ## Node retries
 
 Ordinary Code, Connector, OpenAPI, LLM and AI Decision Tasks support node-level

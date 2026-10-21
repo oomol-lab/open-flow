@@ -1,12 +1,14 @@
 import type { ReactNode } from 'react'
-import type { InputPort, WebhookMethod, WebhookOptions } from '../api.ts'
+import type { Diagnostic, InputPort, WebhookMethod, WebhookOptions } from '../api.ts'
 import type { WebhookSettings } from './flowChanges.ts'
 import type { PropertyDeletion } from './propertyDeletion.ts'
 
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { webhookResponseAllowsBody, webhookResponseTimeout } from '../../../../flow/common/webhookResponse.ts'
 import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { FieldSelect } from '../../../../form/browser/fieldSelect.tsx'
+import { editorComponent } from '../../../../form/common/editorComponent.ts'
 import { webhookMethods, webhookSupportsBody } from '../../../../trigger/common/contract.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
@@ -14,6 +16,7 @@ import { Input } from '../../../../ui/browser/input.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { Icon } from '../icons.tsx'
+import { diagnosticMessage } from './diagnostics.ts'
 import { FieldSectionHeader } from './fieldSectionHeader.tsx'
 import { InspectorSection } from './inspectorSection.tsx'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
@@ -157,13 +160,13 @@ function validOriginList(value: string, issue: string, signal: AbortSignal): Pro
   }, signal)
 }
 
-function validStatus(value: string, issue: string, signal: AbortSignal): Promise<DraftInspection> {
+function validStatus(value: string, issue: string, signal: AbortSignal, dynamic = false): Promise<DraftInspection> {
   return deferInspection(() => {
     const normalized = value.trim()
     const status = Number(normalized)
     return {
       value: normalized,
-      ...(normalized !== '' && (!Number.isInteger(status) || status < 200 || status > 599) ? { issue } : {}),
+      ...(normalized !== '' && (!Number.isInteger(status) || status < 200 || status > 599 || (dynamic && !webhookResponseAllowsBody(status))) ? { issue } : {}),
     }
   }, signal)
 }
@@ -201,6 +204,9 @@ export function WebhookEditor({
   disabled,
   readOnly,
   outputSection,
+  workflowOutputs = [],
+  responseDiagnostics = [],
+  onAddWorkflowOutputs,
   onChange,
 }: {
   readonly bodyFields: readonly InputPort[]
@@ -208,11 +214,23 @@ export function WebhookEditor({
   readonly options: WebhookOptions
   readonly readOnly?: boolean
   readonly disabled: boolean
+  readonly workflowOutputs?: readonly InputPort[]
+  readonly responseDiagnostics?: readonly Diagnostic[]
+  readonly onAddWorkflowOutputs?: () => void
   readonly outputSection?: ReactNode
   readonly onChange: (settings: WebhookSettings, deletion?: PropertyDeletion) => void
 }) {
   const t = useTranslate()
   const headers = options.responseHeaders ?? {}
+  const response = options.responseBody
+  const outputsMissing = responseDiagnostics.some((issue) => issue.code === 'trigger.webhook-response-outputs-missing')
+  const outputsDisconnected = responseDiagnostics.some((issue) => issue.code === 'trigger.webhook-response-unreachable')
+  const responseIssue =
+    responseDiagnostics
+      .filter((issue) => issue.path.includes('/responseBody'))
+      .map((issue) => diagnosticMessage(issue, t))
+      .join(' ') || undefined
+  const selectedMissing = response?.output != null && !workflowOutputs.some((port) => port.handle === response.output)
   const changeOption = <K extends keyof WebhookOptions>(key: K, value: WebhookOptions[K] | undefined, deletion?: PropertyDeletion) => {
     const next = { ...options }
     if (value === undefined) delete next[key]
@@ -270,6 +288,205 @@ export function WebhookEditor({
         </FieldGroup>
       </InspectorSection>
       {outputSection}
+      <InspectorSection title={t('webhookEditor.webhookResponse')} className="inspector-form" data-inspector-section="trigger">
+        <FieldGroup>
+          <Field>
+            <FieldLabel>{t('webhookEditor.webhookResponseMode')}</FieldLabel>
+            <FieldSelect
+              aria-label={t('webhookEditor.webhookResponseMode')}
+              disabled={disabled}
+              value={response == null ? 'immediate' : 'workflow'}
+              onChange={(mode) => changeOption('responseBody', mode === 'immediate' ? undefined : { kind: 'workflow-outputs' })}
+            >
+              <option value="immediate">{t('webhookEditor.webhookImmediate')}</option>
+              <option value="workflow">{t('webhookEditor.webhookAfterWorkflow')}</option>
+            </FieldSelect>
+          </Field>
+          {response == null ? (
+            <DraftTextField
+              label={t('webhookEditor.webhookResponseData')}
+              multiline
+              value={options.responseData ?? ''}
+              disabled={disabled}
+              placeholder={t('webhookEditor.webhookResponseDataPlaceholder')}
+              onSave={(text) => changeOption('responseData', text === '' ? undefined : text)}
+            />
+          ) : (
+            <>
+              <Field data-invalid={responseIssue != null || undefined}>
+                <FieldLabel>{t('webhookEditor.webhookResponseContent')}</FieldLabel>
+                <ValueEditorFeedback error={responseIssue}>
+                  {(errorId) =>
+                    outputsMissing ? (
+                      <Button
+                        type="button"
+                        variant="field"
+                        size="field"
+                        className="w-full justify-start"
+                        data-field-control
+                        data-field-prompt
+                        aria-invalid
+                        aria-describedby={errorId}
+                        disabled={disabled || readOnly || onAddWorkflowOutputs == null}
+                        onClick={onAddWorkflowOutputs}
+                      >
+                        {t('webhookEditor.webhookAddOutputs')}
+                      </Button>
+                    ) : (
+                      <FieldSelect
+                        aria-label={t('webhookEditor.webhookResponseContent')}
+                        aria-describedby={errorId}
+                        danger={responseIssue != null}
+                        disabled={disabled}
+                        value={response.output == null ? 'all' : `field:${response.output}`}
+                        displayValue={outputsDisconnected ? t('webhookEditor.webhookOutputsDisconnected') : undefined}
+                        onChange={(value) =>
+                          changeOption(
+                            'responseBody',
+                            value === 'all'
+                              ? { kind: response.kind, ...(response.timeoutMs == null ? {} : { timeoutMs: response.timeoutMs }) }
+                              : { ...response, output: value.slice(6) },
+                          )
+                        }
+                      >
+                        <option value="all">{t('webhookEditor.webhookAllOutputs')}</option>
+                        {workflowOutputs.map((port) => (
+                          <option key={port.handle} value={`field:${port.handle}`}>
+                            {`${port.handle} · ${t(`valueEditor.components.${editorComponent(port.jsonSchema)}`)}`}
+                          </option>
+                        ))}
+                        {selectedMissing && (
+                          <option value={`field:${response.output}`}>{t('webhookEditor.webhookMissingOutput', { output: response.output })}</option>
+                        )}
+                      </FieldSelect>
+                    )
+                  }
+                </ValueEditorFeedback>
+              </Field>
+              <DraftTextField
+                label={t('webhookEditor.webhookTimeout')}
+                value={String((response.timeoutMs ?? webhookResponseTimeout.defaultMs) / 1000)}
+                disabled={disabled}
+                inputMode="numeric"
+                inspect={(draft, signal) =>
+                  deferInspection(() => {
+                    const timeoutMs = Number(draft) * 1000
+                    return {
+                      value: draft.trim(),
+                      ...(!Number.isInteger(timeoutMs) || timeoutMs < webhookResponseTimeout.minMs || timeoutMs > webhookResponseTimeout.maxMs
+                        ? { issue: t('webhookEditor.webhookTimeoutInvalid') }
+                        : {}),
+                    }
+                  }, signal)
+                }
+                onSave={(value) => changeOption('responseBody', { ...response, timeoutMs: Number(value) * 1000 })}
+              />
+              <FieldDescription>{t('webhookEditor.webhookDynamicHint')}</FieldDescription>
+            </>
+          )}
+          <DraftTextField
+            key={response == null ? 'immediate' : 'workflow'}
+            label={t('webhookEditor.webhookStatus')}
+            value={options.responseStatusCode?.toString() ?? ''}
+            disabled={disabled}
+            inputMode="numeric"
+            placeholder={t('webhookEditor.webhookStatusDefault')}
+            inspect={(draft, signal) =>
+              validStatus(
+                draft,
+                t(response == null ? 'webhookEditor.webhookStatusInvalid' : 'webhookEditor.webhookDynamicStatusInvalid'),
+                signal,
+                response != null,
+              )
+            }
+            onSave={(text) => changeOption('responseStatusCode', text === '' ? undefined : Number(text))}
+          />
+          <details className="inspector-disclosure">
+            <summary>
+              <Icon name="chevron-down" size={14} />
+              <span className="inspector-disclosure-summary">{t('webhookEditor.webhookHeaders')}</span>
+            </summary>
+            <div className="inspector-disclosure-content">
+              <Field>
+                <FieldSectionHeader
+                  compact
+                  disabled={disabled}
+                  canSort={false}
+                  sorting={false}
+                  onToggleSorting={() => {}}
+                  addLabel={t('webhookEditor.webhookAddHeader')}
+                  onAdd={addHeader}
+                />
+                {Object.keys(headers).length === 0 ? (
+                  <p className="m-0 pl-4 text-xs text-muted-foreground">{t('webhookEditor.webhookNoHeaders')}</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28px] gap-2 text-xs text-muted-foreground">
+                      <span>{t('webhookEditor.webhookHeaderName')}</span>
+                      <span>{t('webhookEditor.webhookHeaderValue')}</span>
+                      <span />
+                    </div>
+                    {Object.entries(headers).map(([name, value]) => (
+                      <div key={name} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28px] items-start gap-2 [&_[data-slot=field-label]]:sr-only">
+                        <DraftTextField
+                          label={t('webhookEditor.webhookHeaderName')}
+                          value={name}
+                          disabled={disabled}
+                          inspect={(draft, signal) =>
+                            validHeaderName(
+                              draft,
+                              name,
+                              headers,
+                              {
+                                invalid: t('webhookEditor.webhookHeaderNameInvalid'),
+                                duplicate: t('webhookEditor.webhookHeaderNameDuplicate'),
+                              },
+                              signal,
+                            )
+                          }
+                          onSave={(nextName) => {
+                            if (nextName === name) return
+                            changeHeaders(Object.fromEntries(Object.entries(headers).map(([key, content]) => [key === name ? nextName : key, content])))
+                          }}
+                        />
+                        <DraftTextField
+                          label={t('webhookEditor.webhookHeaderValue')}
+                          value={value}
+                          disabled={disabled}
+                          onSave={(text) => changeHeaders({ ...headers, [name]: text })}
+                        />
+                        {!disabled && (
+                          <Tooltip>
+                            <TooltipTrigger
+                              render={
+                                <Button
+                                  type="button"
+                                  size="icon-sm"
+                                  variant="ghost"
+                                  aria-label={t('webhookEditor.webhookDeleteHeader')}
+                                  onClick={() =>
+                                    changeHeaders(Object.fromEntries(Object.entries(headers).filter(([key]) => key !== name)), {
+                                      target: 'objectItem',
+                                      name,
+                                    })
+                                  }
+                                />
+                              }
+                            >
+                              <i aria-hidden="true" className="i-lucide-light:trash-2 text-base" />
+                            </TooltipTrigger>
+                            <TooltipContent>{t('webhookEditor.webhookDeleteHeader')}</TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </Field>
+            </div>
+          </details>
+        </FieldGroup>
+      </InspectorSection>
       <details className="inspector-disclosure" data-inspector-section="trigger">
         <summary>
           <Icon name="chevron-down" size={14} />
@@ -288,100 +505,6 @@ export function WebhookEditor({
               inspect={(draft, signal) => validOriginList(draft, t('webhookEditor.webhookOriginsInvalid'), signal)}
               onSave={(text) => changeOption('allowedOrigins', text === '' ? undefined : text.split(', '))}
             />
-            <DraftTextField
-              label={t('webhookEditor.webhookStatus')}
-              value={options.responseStatusCode?.toString() ?? ''}
-              disabled={disabled}
-              inputMode="numeric"
-              placeholder={t('webhookEditor.webhookStatusDefault')}
-              inspect={(draft, signal) => validStatus(draft, t('webhookEditor.webhookStatusInvalid'), signal)}
-              onSave={(text) => changeOption('responseStatusCode', text === '' ? undefined : Number(text))}
-            />
-            <DraftTextField
-              label={t('webhookEditor.webhookResponseData')}
-              multiline
-              value={options.responseData ?? ''}
-              disabled={disabled}
-              placeholder={t('webhookEditor.webhookResponseDataPlaceholder')}
-              onSave={(text) => changeOption('responseData', text === '' ? undefined : text)}
-            />
-            <Field>
-              <FieldSectionHeader
-                compact
-                title={t('webhookEditor.webhookHeaders')}
-                disabled={disabled}
-                canSort={false}
-                sorting={false}
-                onToggleSorting={() => {}}
-                addLabel={t('webhookEditor.webhookAddHeader')}
-                onAdd={addHeader}
-              />
-              {Object.keys(headers).length === 0 ? (
-                <p className="m-0 pl-4 text-xs text-muted-foreground">{t('webhookEditor.webhookNoHeaders')}</p>
-              ) : (
-                <div className="flex flex-col gap-2">
-                  <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28px] gap-2 text-xs text-muted-foreground">
-                    <span>{t('webhookEditor.webhookHeaderName')}</span>
-                    <span>{t('webhookEditor.webhookHeaderValue')}</span>
-                    <span />
-                  </div>
-                  {Object.entries(headers).map(([name, value]) => (
-                    <div key={name} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28px] items-start gap-2 [&_[data-slot=field-label]]:sr-only">
-                      <DraftTextField
-                        label={t('webhookEditor.webhookHeaderName')}
-                        value={name}
-                        disabled={disabled}
-                        inspect={(draft, signal) =>
-                          validHeaderName(
-                            draft,
-                            name,
-                            headers,
-                            {
-                              invalid: t('webhookEditor.webhookHeaderNameInvalid'),
-                              duplicate: t('webhookEditor.webhookHeaderNameDuplicate'),
-                            },
-                            signal,
-                          )
-                        }
-                        onSave={(nextName) => {
-                          if (nextName === name) return
-                          changeHeaders(Object.fromEntries(Object.entries(headers).map(([key, content]) => [key === name ? nextName : key, content])))
-                        }}
-                      />
-                      <DraftTextField
-                        label={t('webhookEditor.webhookHeaderValue')}
-                        value={value}
-                        disabled={disabled}
-                        onSave={(text) => changeHeaders({ ...headers, [name]: text })}
-                      />
-                      {!disabled && (
-                        <Tooltip>
-                          <TooltipTrigger
-                            render={
-                              <Button
-                                type="button"
-                                size="icon-sm"
-                                variant="ghost"
-                                aria-label={t('webhookEditor.webhookDeleteHeader')}
-                                onClick={() =>
-                                  changeHeaders(Object.fromEntries(Object.entries(headers).filter(([key]) => key !== name)), {
-                                    target: 'objectItem',
-                                    name,
-                                  })
-                                }
-                              />
-                            }
-                          >
-                            <i aria-hidden="true" className="i-lucide-light:trash-2 text-base" />
-                          </TooltipTrigger>
-                          <TooltipContent>{t('webhookEditor.webhookDeleteHeader')}</TooltipContent>
-                        </Tooltip>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </Field>
           </FieldGroup>
         </div>
       </details>

@@ -99,13 +99,14 @@ function RunDrawerContainer({
 
 // Keep inspector-only data updates out of the canvas render path.
 const NodeInspectorContainer = memo(function NodeInspectorContainer({
+  onAddWorkflowOutputs,
   store,
   focus,
   disabled,
   revision,
   selection,
   theme,
-}: Pick<ComponentProps<typeof NodeInspector>, 'focus' | 'disabled' | 'revision' | 'selection' | 'theme'> & {
+}: Pick<ComponentProps<typeof NodeInspector>, 'focus' | 'disabled' | 'revision' | 'selection' | 'theme' | 'onAddWorkflowOutputs'> & {
   readonly store: WorkbenchStore
 }): ReactElement {
   const t = useTranslate()
@@ -175,6 +176,7 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   }, [language, store])
   return (
     <NodeInspector
+      onAddWorkflowOutputs={onAddWorkflowOutputs}
       webhookDeployment={
         webhookId == null
           ? undefined
@@ -659,6 +661,10 @@ export function FlowEditor({
           ) : (
             revision != null && (
               <NodeInspectorContainer
+                onAddWorkflowOutputs={() => {
+                  const option = store.workspace.$.addNodeOptions.value.find((item) => item.kind === 'outputs')
+                  if (option != null) void addFromPicker(option)
+                }}
                 store={store}
                 focus={diagnosticFocus}
                 disabled={authoringDisabled}

@@ -455,6 +455,11 @@ export interface WebhookBodyField extends InputPort {}
 
 export interface WebhookOptions {
   readonly allowedOrigins?: readonly string[]
+  readonly responseBody?: {
+    readonly kind: 'workflow-outputs'
+    readonly output?: string
+    readonly timeoutMs?: number
+  }
   readonly responseData?: string
   readonly responseHeaders?: Readonly<Record<string, string>>
   readonly responseStatusCode?: number
@@ -517,7 +522,7 @@ export interface CodeModule {
 
 export interface RevisionContent {
   readonly document: FlowDocument
-  readonly modelVersion: 2 | 4 | 5 | 6 | 7 | 8 | typeof currentFlowModelVersion
+  readonly modelVersion: 2 | 4 | 5 | 6 | 7 | 8 | 9 | typeof currentFlowModelVersion
   readonly modules: Readonly<Record<string, CodeModule>>
 }
 

@@ -58,6 +58,22 @@ function inspector(node: GraphNode, options: Partial<ComponentProps<typeof NodeI
   return render(<NodeInspector {...(props as ComponentProps<typeof NodeInspector>)} />)
 }
 
+it('orders Webhook outputs before its response settings and forwards missing Outputs creation', async () => {
+  const addOutputs = vi.fn()
+  const { container, i18n } = inspector(
+    { kind: 'webhook', name: 'Webhook', method: 'POST', bodyFields: [], options: { responseBody: { kind: 'workflow-outputs' } } },
+    { onAddWorkflowOutputs: addOutputs },
+  )
+  const text = container.textContent!
+  expect(text).toContain(i18n.t('inspector.ports.outputsTitle'))
+  expect(text).toContain(i18n.t('webhookEditor.webhookResponse'))
+  expect(text.indexOf(i18n.t('inspector.ports.outputsTitle'))).toBeLessThan(text.indexOf(i18n.t('webhookEditor.webhookResponse')))
+  const add = [...container.querySelectorAll('button')].find((button) => button.textContent === i18n.t('webhookEditor.webhookAddOutputs'))!
+  expect(add).toBeDefined()
+  await click(add)
+  expect(addOutputs).toHaveBeenCalledOnce()
+})
+
 it.each(['mixed', 'grouped', 'required-only', 'optional-only'] as const)('groups %s Provider inputs without changing saved definitions', (kind) => {
   const i18n = createI18n('en')
   const optional = { handle: 'cc', jsonSchema: { type: 'string' }, nullable: true }

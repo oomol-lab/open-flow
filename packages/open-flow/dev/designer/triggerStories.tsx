@@ -429,6 +429,7 @@ function RunStory(props: StoryProps) {
 }
 
 type SidebarState =
+  | 'response-outputs-missing'
   | 'empty-options'
   | 'missing-status'
   | 'options-error'
@@ -453,6 +454,8 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
   logRef.current = log
   useEffect(() => {
     let trigger: TriggerNode = fixture.trigger
+    if (trigger.kind === 'webhook' && state === 'response-outputs-missing')
+      trigger = { ...trigger, options: { ...trigger.options, responseBody: { kind: 'workflow-outputs' } } }
     if (trigger.kind === 'error' && state !== 'unconfigured') trigger = { ...trigger, sourceFlowIds: ['orders', 'billing'] }
     if (state === 'description')
       trigger = {
@@ -513,6 +516,10 @@ function SidebarSample({ fixture, dark, language, log, state, framed = true }: S
             theme={dark ? 'dark' : 'light'}
           >
             <NodeInspector
+              onAddWorkflowOutputs={() => {
+                const option = session.workspace.$.addNodeOptions.value.find((item) => item.kind === 'outputs')
+                if (option != null) void session.workspace.addNode(option, { x: 320, y: 0 })
+              }}
               webhookDeployment={
                 fixture.trigger.kind === 'webhook'
                   ? {
@@ -588,7 +595,7 @@ function SidebarStory(props: StoryProps) {
           : []),
       ]
     : props.fixture.trigger.kind === 'webhook'
-      ? ['display', 'edit', 'unconfigured', 'paused', 'deployment-loading', 'deployment-error', 'retired', 'deployment-failed']
+      ? ['display', 'edit', 'unconfigured', 'response-outputs-missing', 'paused', 'deployment-loading', 'deployment-error', 'retired', 'deployment-failed']
       : ['display', 'edit', props.fixture.trigger.kind === 'manual' ? 'description' : 'unconfigured']
   return (
     <Gallery {...props}>

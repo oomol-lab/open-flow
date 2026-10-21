@@ -337,3 +337,15 @@ runtime tests separately verify actual failed attempts, deadlines and uncertain 
 `node-errors` verifies same-path error handling, independent business and system outputs named error,
 nullable success errors, setting preservation and complete failure metadata. Run
 `bun run lab test node-errors` and `bun run lab test node-errors --mcp`.
+
+## Dynamic Webhook response regression
+
+`webhook-response` builds Webhook → Code → Outputs through public authoring. The reference selects
+one response field, renames it, updates only the timeout, clears and restores dynamic mode, and
+publishes. Acceptance calls the published HTTP endpoint and verifies the response body, content type,
+renamed business output and separation from later Draft edits. Both transports share the scenario:
+
+```bash
+bun run lab test webhook-response
+bun run lab test webhook-response --mcp
+```

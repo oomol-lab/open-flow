@@ -892,7 +892,11 @@
         "config-invalid": "Trigger“{{triggerId}}”的配置与固定定义不匹配。",
         "connection-invalid": "Trigger 绑定“{{bindingId}}”必须是 Connection。",
         "connection-missing": "请选择触发器的连接账号。",
-        "input-duplicate": "Webhook Trigger 输入“{{input}}”被重复声明。"
+        "input-duplicate": "Webhook Trigger 输入“{{input}}”被重复声明。",
+        "webhook-response-outputs-missing": "请添加工作流输出节点作为 HTTP 响应。",
+        "webhook-response-unreachable": "请将此 Webhook 连接到工作流输出节点。",
+        "webhook-response-output-missing": "工作流输出字段“{{output}}”不存在。",
+        "webhook-response-status-invalid": "请选择允许返回响应体的状态码。"
       },
       "leina": {
         "robot-required": "请选择 Leina 机器人，或绑定机器人标识的数据来源。"
@@ -1115,7 +1119,20 @@
     "webhookStatusInvalid": "请输入 200 到 599 之间的整数。",
     "webhookBodyFields": "请求体字段",
     "webhookNoBodyFields": "请求体接受空对象。",
-    "webhookNoHeaders": "未添加响应头。"
+    "webhookNoHeaders": "未添加响应头。",
+    "webhookResponse": "HTTP 响应",
+    "webhookResponseMode": "响应来源",
+    "webhookImmediate": "固定内容",
+    "webhookAfterWorkflow": "工作流输出",
+    "webhookResponseContent": "响应内容",
+    "webhookAllOutputs": "完整输出对象",
+    "webhookMissingOutput": "{{output}}（已失效）",
+    "webhookTimeout": "等待超时（秒）",
+    "webhookTimeoutInvalid": "请输入 1–60 秒的等待时间。",
+    "webhookDynamicHint": "工作流成功完成后返回输出。超时返回 504，工作流继续执行。等待时间包含排队、重试、人工确认和子工作流。",
+    "webhookDynamicStatusInvalid": "请输入 200–599 的整数，204、205、304 除外。",
+    "webhookAddOutputs": "添加工作流输出",
+    "webhookOutputsDisconnected": "未连接工作流输出"
   },
   "conditionEditor": {
     "addCondition": "添加条件",

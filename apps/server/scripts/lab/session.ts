@@ -318,7 +318,8 @@ export class LabSession {
       .update(JSON.stringify([scenario(this.scenarioId, this.stage), this.baseline, samples(this.scenarioId, this.stage)]))
       .update(await readFile(new URL('./acceptance.ts', import.meta.url)))
       .update(await readFile(new URL('./scenarios.ts', import.meta.url)))
-    if (this.scenarioId == 'webhook-live') identity.update(await readFile(new URL('./liveAcceptance.ts', import.meta.url)))
+    if (this.scenarioId == 'webhook-live' || this.scenarioId == 'webhook-response')
+      identity.update(await readFile(new URL('./liveAcceptance.ts', import.meta.url)))
     if (this.scenarioId == 'fulfillment-ops')
       identity
         .update(await readFile(new URL('./fulfillment.ts', import.meta.url)))
@@ -383,8 +384,8 @@ export class LabSession {
         if (!this.attempt.rejectedEdits) errors.push('No stale edit was rejected without changing the Draft.')
         if (this.service.control.runs.listRuns(this.manifest.flowId, 1, {}).page.runs.length > 0) errors.push('Unexpected run before verification.')
       }
-      if (errors.length == 0 && this.scenarioId == 'webhook-live') {
-        const result = await verifyLiveWebhook(this)
+      if (errors.length == 0 && (this.scenarioId == 'webhook-live' || this.scenarioId == 'webhook-response')) {
+        const result = await verifyLiveWebhook(this, this.scenarioId == 'webhook-response')
         errors.push(...result.errors)
         runIds.push(...result.runIds)
       } else if (errors.length == 0) {

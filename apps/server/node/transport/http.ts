@@ -9,7 +9,15 @@ import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { waitActionBodySchema } from '@oomol-lab/open-flow/control-requests'
 import { resourceNameIssue } from '@oomol-lab/open-flow/flow-change'
 import { integrationEndpointId } from '@oomol-lab/open-flow/integration-trigger'
-import { maximumWebhookBodyBytes, webhookEndpointId, webhookOccurrenceId, webhookSupportsBody } from '@oomol-lab/open-flow/webhook-trigger'
+import {
+  maximumWebhookBodyBytes,
+  webhookEndpointId,
+  webhookOccurrenceId,
+  webhookSupportsBody,
+  webhookResponseBody,
+  webhookResponseAllowsBody,
+  webhookResponseTimeout,
+} from '@oomol-lab/open-flow/webhook-trigger'
 import { Hono } from 'hono'
 import { parseAccept } from 'hono/utils/accept'
 import { randomUUID } from 'node:crypto'
@@ -26,7 +34,6 @@ import { createMcpApp } from './mcp.ts'
 import { serverPaths } from './server-paths.ts'
 import { waitActionPage } from './wait-action-page.ts'
 
-const nullBodyStatuses = new Set([204, 205, 304])
 const forbiddenWebhookResponseHeaders = new Set([
   'connection',
   'content-encoding',
@@ -136,8 +143,8 @@ export function createServerApp(service: ServerService, options: ServerAppOption
   })
   app.all('/v1/integrations', (context) => integration(service, context.req.raw, logger, context.get('requestId'), admitCallback))
   app.all('/v1/integrations/*', (context) => integration(service, context.req.raw, logger, context.get('requestId'), admitCallback))
-  app.all('/v1/webhooks', (context) => webhook(service, context.req.raw, logger, context.get('requestId'), admitCallback))
-  app.all('/v1/webhooks/*', (context) => webhook(service, context.req.raw, logger, context.get('requestId'), admitCallback))
+  app.all('/v1/webhooks', (context) => webhook(service, context.req.raw, logger, context.get('requestId'), admitCallback, options.shutdownSignal))
+  app.all('/v1/webhooks/*', (context) => webhook(service, context.req.raw, logger, context.get('requestId'), admitCallback, options.shutdownSignal))
   const authenticate = async (request: Request): Promise<string> => {
     const actor = await resolveActor?.(request)
     if (actor == null || actor.length == 0) throw new ControlError(controlErrorCode.authenticationRequired, 'Authentication is required.')
@@ -476,6 +483,7 @@ async function webhook(
   logger: Logger,
   requestId: string,
   admitCallback: (key: string) => number | undefined,
+  shutdownSignal?: AbortSignal,
 ): Promise<Response> {
   const endpointId = webhookEndpointId(new URL(request.url))
   if (endpointId == null) return plain(404)
@@ -516,6 +524,17 @@ async function webhook(
     if (accepted == null) return plain(404)
     if (accepted.kind == 'conflict') return plain(409, undefined, origin)
     if (accepted.kind == 'overloaded') return plain(429, undefined, origin)
+    const source = target.trigger.options?.responseBody
+    if (source != null) {
+      const signal = shutdownSignal == null ? request.signal : AbortSignal.any([request.signal, shutdownSignal])
+      const outcome = await service.waitForWebhookRun(target.flowId, accepted.runId, source.timeoutMs ?? webhookResponseTimeout.defaultMs, signal)
+      if (outcome.kind == 'timeout') return webhookFailure(504, 'webhook.response-timeout', 'The workflow response timed out.', origin)
+      if (outcome.kind == 'aborted') return webhookFailure(503, 'webhook.response-unavailable', 'The workflow response is unavailable.', origin)
+      if (outcome.kind == 'failed') return webhookFailure(500, 'webhook.run-failed', 'The workflow did not complete successfully.', origin)
+      const response = webhookResponseBody(outcome.result, source)
+      if (response == null) return webhookFailure(500, 'webhook.response-missing', 'The workflow response output is unavailable.', origin)
+      return webhookSuccess(target.trigger, origin, response)
+    }
     return webhookSuccess(target.trigger, origin)
   } catch (error) {
     if (error instanceof WebhookBodyTooLarge) return plain(413, undefined, origin)
@@ -557,20 +576,34 @@ function preflight(request: Request, method: string, origin: string | undefined)
   return plain(204, headers, origin)
 }
 
-function webhookSuccess(trigger: Extract<TriggerNode, { readonly kind: 'webhook' }>, origin: string | undefined): Response {
+function webhookSuccess(
+  trigger: Extract<TriggerNode, { readonly kind: 'webhook' }>,
+  origin: string | undefined,
+  response?: { readonly body: string; readonly contentType: string },
+): Response {
   const status = trigger.options?.responseStatusCode ?? 200
-  const headers = new Headers(trigger.options?.responseHeaders)
+  const headers = webhookResponseHeaders(origin, response?.contentType ?? 'text/plain;charset=UTF-8', trigger.options?.responseHeaders)
+  const body = webhookResponseAllowsBody(status) ? (response?.body ?? trigger.options?.responseData ?? null) : null
+  return text(status, body, headers)
+}
+
+function webhookResponseHeaders(origin: string | undefined, contentType: string, configured?: Readonly<Record<string, string>>): Headers {
+  const headers = new Headers(configured)
   for (const name of forbiddenWebhookResponseHeaders) headers.delete(name)
   for (const name of headers.keys()) if (name.startsWith('access-control-')) headers.delete(name)
   headers.set('cache-control', 'no-store')
   headers.set('content-security-policy', "default-src 'none'; frame-ancestors 'none'; sandbox")
-  headers.set('content-type', 'text/plain;charset=UTF-8')
+  headers.set('content-type', contentType)
   headers.set('referrer-policy', 'no-referrer')
   headers.set('x-content-type-options', 'nosniff')
   headers.set('x-frame-options', 'DENY')
   withOrigin(headers, origin)
-  const body = nullBodyStatuses.has(status) ? null : (trigger.options?.responseData ?? null)
-  return text(status, body, headers)
+  return headers
+}
+
+function webhookFailure(status: number, code: string, message: string, origin: string | undefined): Response {
+  const headers = webhookResponseHeaders(origin, 'application/json')
+  return text(status, JSON.stringify({ error: { code, message } }), headers)
 }
 
 function plain(status: number, headers?: Headers | Readonly<Record<string, string>>, origin?: string): Response {

@@ -892,7 +892,11 @@
         "config-invalid": "Trigger \"{{triggerId}}\" config does not match its fixed definition.",
         "connection-invalid": "Trigger binding \"{{bindingId}}\" must be a Connection.",
         "connection-missing": "Select a connection account for this trigger.",
-        "input-duplicate": "Webhook Trigger input \"{{input}}\" is declared more than once."
+        "input-duplicate": "Webhook Trigger input \"{{input}}\" is declared more than once.",
+        "webhook-response-outputs-missing": "Add a workflow Outputs node for the HTTP response.",
+        "webhook-response-unreachable": "Connect this Webhook to the workflow Outputs node.",
+        "webhook-response-output-missing": "Workflow output \"{{output}}\" does not exist.",
+        "webhook-response-status-invalid": "Choose a response status code that permits a body."
       },
       "leina": {
         "robot-required": "Select a Leina robot or bind its identifier to an input source."
@@ -1115,7 +1119,20 @@
     "webhookStatusInvalid": "Enter an integer from 200 to 599.",
     "webhookBodyFields": "Request body fields",
     "webhookNoBodyFields": "The request body accepts an empty object.",
-    "webhookNoHeaders": "No response headers."
+    "webhookNoHeaders": "No response headers.",
+    "webhookResponse": "HTTP response",
+    "webhookResponseMode": "Response source",
+    "webhookImmediate": "Fixed content",
+    "webhookAfterWorkflow": "Workflow outputs",
+    "webhookResponseContent": "Response content",
+    "webhookAllOutputs": "Complete output object",
+    "webhookMissingOutput": "{{output}} (missing)",
+    "webhookTimeout": "Wait timeout (seconds)",
+    "webhookTimeoutInvalid": "Enter a timeout from 1 to 60 seconds.",
+    "webhookDynamicHint": "Returns outputs after the workflow succeeds. A timeout returns 504; the workflow continues. Waiting includes queueing, retries, approvals and called workflows.",
+    "webhookDynamicStatusInvalid": "Enter an integer from 200 to 599, except 204, 205 and 304.",
+    "webhookAddOutputs": "Add workflow Outputs",
+    "webhookOutputsDisconnected": "Workflow Outputs not connected"
   },
   "conditionEditor": {
     "addCondition": "Add condition",

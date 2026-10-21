@@ -892,7 +892,11 @@
         "config-invalid": "La configuration du Trigger « {{triggerId}} » ne correspond pas à sa définition fixe.",
         "connection-invalid": "La liaison Trigger « {{bindingId}} » doit être une Connection.",
         "connection-missing": "Sélectionnez un compte connecté pour ce déclencheur.",
-        "input-duplicate": "L’entrée « {{input}} » du Webhook Trigger est déclarée plusieurs fois."
+        "input-duplicate": "L’entrée « {{input}} » du Webhook Trigger est déclarée plusieurs fois.",
+        "webhook-response-outputs-missing": "Ajoutez un nœud de sorties pour la réponse HTTP.",
+        "webhook-response-unreachable": "Reliez ce Webhook au nœud de sorties.",
+        "webhook-response-output-missing": "La sortie « {{output}} » n’existe pas.",
+        "webhook-response-status-invalid": "Choisissez un statut autorisant un corps de réponse."
       },
       "leina": {
         "robot-required": "Sélectionnez un robot Leina ou liez son identifiant à une source d’entrée."
@@ -1115,7 +1119,20 @@
     "webhookStatusInvalid": "Saisissez un entier compris entre 200 et 599.",
     "webhookBodyFields": "Champs du corps de la requête",
     "webhookNoBodyFields": "Le corps de la requête accepte un objet vide.",
-    "webhookNoHeaders": "Aucun en-tête de réponse."
+    "webhookNoHeaders": "Aucun en-tête de réponse.",
+    "webhookResponse": "Réponse HTTP",
+    "webhookResponseMode": "Source de la réponse",
+    "webhookImmediate": "Contenu fixe",
+    "webhookAfterWorkflow": "Sorties du workflow",
+    "webhookResponseContent": "Contenu de la réponse",
+    "webhookAllOutputs": "Objet de sortie complet",
+    "webhookMissingOutput": "{{output}} (introuvable)",
+    "webhookTimeout": "Délai d’attente (secondes)",
+    "webhookTimeoutInvalid": "Saisissez un délai de 1 à 60 secondes.",
+    "webhookDynamicHint": "Renvoie les sorties après la réussite. À expiration, renvoie 504 et poursuit l’exécution. L’attente inclut la file, les nouvelles tentatives, les approbations et les workflows appelés.",
+    "webhookDynamicStatusInvalid": "Saisissez un entier de 200 à 599, sauf 204, 205 et 304.",
+    "webhookAddOutputs": "Ajouter les sorties du workflow",
+    "webhookOutputsDisconnected": "Sorties du workflow non connectées"
   },
   "conditionEditor": {
     "addCondition": "Ajouter une condition",

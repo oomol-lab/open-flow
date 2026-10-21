@@ -8,8 +8,9 @@ import { checkJsonDepth } from './json.ts'
 import { retryConfigurationSchema } from './retry.ts'
 import { triggerScheduleSchema } from './triggerScheduleSchema.ts'
 import { webhookMethods } from './webhookMethod.ts'
+import { webhookResponseTimeout } from './webhookResponse.ts'
 
-export const currentFlowModelVersion = 9
+export const currentFlowModelVersion = 10
 const text = z.string()
 const actionConnection = text.describe(
   'Account selection: omit while unconfigured; use an account ID to select it; use "" to explicitly defer configuration. Deferred Actions fail if called; deferred Agent tools are excluded from the callable tool set. Not supported by Triggers.',
@@ -160,6 +161,13 @@ const webhookOptions = z.object({
   allowedMethods: z.never().optional(),
   allowedOrigins: strings.optional(),
   noResponseBody: z.never().optional(),
+  responseBody: z
+    .strictObject({
+      kind: z.literal('workflow-outputs'),
+      output: text.optional(),
+      timeoutMs: z.number().int().min(webhookResponseTimeout.minMs).max(webhookResponseTimeout.maxMs).optional(),
+    })
+    .optional(),
   responseData: text.optional(),
   responseHeaders: z.record(text, text).optional(),
   responseStatusCode: z.number().int().min(200).max(599).optional(),
@@ -263,7 +271,7 @@ const document = z.preprocess(
   }),
 )
 const revision = z.object({
-  modelVersion: z.union([z.literal(2), z.literal(4), z.literal(5), z.literal(6), z.literal(7), z.literal(8), z.literal(currentFlowModelVersion)]),
+  modelVersion: z.union([z.literal(2), z.literal(4), z.literal(5), z.literal(6), z.literal(7), z.literal(8), z.literal(9), z.literal(currentFlowModelVersion)]),
   document,
   modules: z.record(text, module),
 })
@@ -663,6 +671,11 @@ export function changeOperationsSchema(kind?: string): JsonValue {
 }
 
 function checkModelVersion(content: RevisionContent): void {
+  if (
+    content.modelVersion < 10 &&
+    Object.values(content.document.graph.nodes).some((candidateNode) => candidateNode.kind == 'webhook' && candidateNode.options?.responseBody != null)
+  )
+    throw new TypeError('Dynamic Webhook responses require Flow model version 10.')
   if (content.modelVersion < 9 && Object.values(content.document.graph.nodes).some((candidateNode) => 'retry' in candidateNode && candidateNode.retry != null))
     throw new TypeError('Node retries require Flow model version 9.')
   if (

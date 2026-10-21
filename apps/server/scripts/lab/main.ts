@@ -127,7 +127,7 @@ async function test(id?: string, keepFailed = false, transport: 'cli' | 'mcp' = 
         .update(await readFile(path.join(import.meta.dirname, 'scenarios.ts')))
         .update(await readFile(path.join(import.meta.dirname, 'reference.ts')))
         .update(await readFile(path.join(import.meta.dirname, 'fulfillmentReference.ts')))
-      if (item.id == 'webhook-live') scriptIdentity.update(await readFile(path.join(import.meta.dirname, 'liveReference.ts')))
+      if (item.id == 'webhook-live' || item.id == 'webhook-response') scriptIdentity.update(await readFile(path.join(import.meta.dirname, 'liveReference.ts')))
       const script = `reference-v1:${scriptIdentity.digest('hex')}`
       for (let stage = 0; stage < stageCount(item.id); stage++) {
         lab.attempt.script = script

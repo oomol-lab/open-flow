@@ -1,5 +1,24 @@
 # Public contracts and version evolution
 
+## Dynamic Webhook responses: Flow model v10
+
+Model v10 adds optional Webhook `options.responseBody` with
+`{ kind: "workflow-outputs", output?: string, timeoutMs?: number }`. A missing field preserves
+immediate `responseData`; the new mode waits for the accepted Run to succeed and returns only its
+business outputs. Timeout defaults to 30000 ms and accepts 1000–60000 ms. It includes queueing and
+durable waits, and does not cancel the Run. Field omission returns the complete object; strings
+return plain text and other JSON values return JSON. Missing executed outputs are an HTTP error.
+
+The published npm `0.1.0-beta.69` artifact (gitHead
+`026f74f27383188f3f771352e10e7a84bca89550`) uses model v9. A new model boundary prevents old
+servers from discarding the response policy and acknowledging requests immediately. Model v9 and
+older readable Revisions retain their original bytes and digests; editing uses the existing explicit
+Draft upgrade. Historical Publications and Runs are unchanged. Dynamic configuration is rejected
+in older model envelopes. Engine Contract v6, checkpoint v6 and the isolated runtime digest are
+unchanged because scheduling and execution outputs are unchanged. Upgrade Server and clients
+together before publishing v10 Revisions. Existing old-model Publications retain their existing
+execution compatibility requirements and may require republication through an upgraded Draft.
+
 ## Node retries and error handling: Flow model v9 and Engine v6
 
 Flow model v9 adds optional node-owned `retry: { maxRetries, intervalMs }` and `onError` settings, plus a separate system source namespace. Only ordinary Code,
@@ -53,7 +72,7 @@ Public entry points, serialization formats, Control API, and execution semantics
 | ----------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
 | npm package       | Exact version in the package manifest                             | Pins implementation, types, Workbench assets, and the conformance suite. Deployments pin the same version. |
 | Revision envelope | `kind: open-flow-flow-revision`, `version: 1`                     | UTF-8 JSON envelope fields and canonical byte rules.                                                       |
-| Flow model        | `modelVersion: 9`                                                 | Serialization of documents, modules, nodes, and ports.                                                     |
+| Flow model        | `modelVersion: 10`                                                | Serialization of documents, modules, nodes, and ports.                                                     |
 | Control API       | `/v1`; Run creation request `version: 2`, all others `version: 1` | Request fields, responses, error codes, CAS, and idempotency.                                              |
 | Engine Contract   | `open-flow-engine/v6`                                             | Execution, Trigger, Task return, Wait, and cancellation semantics.                                         |
 | MCP               | `2026-07-28`                                                      | Streamable HTTP negotiation; tool product semantics reuse Control API.                                     |

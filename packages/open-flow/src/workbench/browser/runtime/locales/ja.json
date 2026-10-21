@@ -892,7 +892,11 @@
         "config-invalid": "Trigger「{{triggerId}}」の設定が固定定義と一致しません。",
         "connection-invalid": "Trigger バインディング「{{bindingId}}」は Connection である必要があります。",
         "connection-missing": "このトリガーの接続アカウントを選択してください。",
-        "input-duplicate": "Webhook Trigger の入力「{{input}}」が複数回定義されています。"
+        "input-duplicate": "Webhook Trigger の入力「{{input}}」が複数回定義されています。",
+        "webhook-response-outputs-missing": "HTTP 応答用に出力ノードを追加してください。",
+        "webhook-response-unreachable": "この Webhook を出力ノードに接続してください。",
+        "webhook-response-output-missing": "出力「{{output}}」が存在しません。",
+        "webhook-response-status-invalid": "本文を返せるステータスコードを選択してください。"
       },
       "leina": {
         "robot-required": "Leina ロボットを選択するか、識別子の入力ソースを設定してください。"
@@ -1115,7 +1119,20 @@
     "webhookStatusInvalid": "200 から 599 の整数を入力してください。",
     "webhookBodyFields": "リクエストボディのフィールド",
     "webhookNoBodyFields": "リクエストボディは空のオブジェクトを受け付けます。",
-    "webhookNoHeaders": "レスポンスヘッダーはありません。"
+    "webhookNoHeaders": "レスポンスヘッダーはありません。",
+    "webhookResponse": "HTTP レスポンス",
+    "webhookResponseMode": "応答元",
+    "webhookImmediate": "固定コンテンツ",
+    "webhookAfterWorkflow": "ワークフローの出力",
+    "webhookResponseContent": "応答内容",
+    "webhookAllOutputs": "出力オブジェクト全体",
+    "webhookMissingOutput": "{{output}}（見つかりません）",
+    "webhookTimeout": "待機タイムアウト（秒）",
+    "webhookTimeoutInvalid": "1〜60 秒の待機時間を入力してください。",
+    "webhookDynamicHint": "成功後に出力を返します。タイムアウト時は 504 を返し、実行は続行します。待機にはキュー、再試行、承認、子ワークフローが含まれます。",
+    "webhookDynamicStatusInvalid": "204、205、304 を除く 200〜599 の整数を入力してください。",
+    "webhookAddOutputs": "ワークフロー出力を追加",
+    "webhookOutputsDisconnected": "ワークフロー出力が未接続"
   },
   "conditionEditor": {
     "addCondition": "条件を追加",

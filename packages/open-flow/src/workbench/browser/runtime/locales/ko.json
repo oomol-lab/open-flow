@@ -892,7 +892,11 @@
         "config-invalid": "Trigger ‘{{triggerId}}’의 구성이 고정 정의와 일치하지 않습니다.",
         "connection-invalid": "Trigger 바인딩 ‘{{bindingId}}’은(는) Connection이어야 합니다.",
         "connection-missing": "이 트리거에 사용할 연결 계정을 선택하세요.",
-        "input-duplicate": "Webhook Trigger 입력 ‘{{input}}’이(가) 두 번 이상 선언되었습니다."
+        "input-duplicate": "Webhook Trigger 입력 ‘{{input}}’이(가) 두 번 이상 선언되었습니다.",
+        "webhook-response-outputs-missing": "HTTP 응답에 사용할 출력 노드를 추가하세요.",
+        "webhook-response-unreachable": "이 Webhook을 출력 노드에 연결하세요.",
+        "webhook-response-output-missing": "출력 \"{{output}}\"이 없습니다.",
+        "webhook-response-status-invalid": "응답 본문을 허용하는 상태 코드를 선택하세요."
       },
       "leina": {
         "robot-required": "Leina 로봇을 선택하거나 식별자의 입력 소스를 연결하세요."
@@ -1115,7 +1119,20 @@
     "webhookStatusInvalid": "200에서 599 사이의 정수를 입력하세요.",
     "webhookBodyFields": "요청 본문 필드",
     "webhookNoBodyFields": "요청 본문은 빈 객체를 허용합니다.",
-    "webhookNoHeaders": "응답 헤더가 없습니다."
+    "webhookNoHeaders": "응답 헤더가 없습니다.",
+    "webhookResponse": "HTTP 응답",
+    "webhookResponseMode": "응답 소스",
+    "webhookImmediate": "고정 콘텐츠",
+    "webhookAfterWorkflow": "워크플로 출력",
+    "webhookResponseContent": "응답 내용",
+    "webhookAllOutputs": "전체 출력 객체",
+    "webhookMissingOutput": "{{output}}(없음)",
+    "webhookTimeout": "대기 제한 시간(초)",
+    "webhookTimeoutInvalid": "1~60초의 대기 시간을 입력하세요.",
+    "webhookDynamicHint": "성공하면 출력을 반환합니다. 시간 초과 시 504를 반환하고 실행은 계속됩니다. 대기에는 대기열, 재시도, 승인 및 하위 워크플로가 포함됩니다.",
+    "webhookDynamicStatusInvalid": "204, 205, 304를 제외한 200~599의 정수를 입력하세요.",
+    "webhookAddOutputs": "워크플로 출력 추가",
+    "webhookOutputsDisconnected": "워크플로 출력이 연결되지 않음"
   },
   "conditionEditor": {
     "addCondition": "조건 추가",

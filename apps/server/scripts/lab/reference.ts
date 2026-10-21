@@ -8,6 +8,7 @@ const account = (result: Record<string, unknown>, name: string) =>
   (result.connections as { displayName: string; connectionId: string }[]).find((a) => a.displayName == name)!.connectionId
 /** Uses only caller-visible tools. No fixture, service, database or expected-result imports. */
 export async function reference(call: ToolCall, id: string, flowId: string, stage = 0) {
+  if (id == 'webhook-response') return referenceLive(call, flowId, true)
   if (id == 'webhook-live') return referenceLive(call, flowId)
   if (id == 'fulfillment-ops') return referenceFulfillment(call, flowId, stage)
   async function find(name: string) {

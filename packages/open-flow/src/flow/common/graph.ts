@@ -22,6 +22,7 @@ import { nodeSystemOutputPorts, supportsNodeErrorHandling } from './errorHandlin
 import { supportsNodeRetry, retryConfigurationSchema } from './retry.ts'
 import { schemaObject, matchesSchema, comparePorts, portsAssignable, variableInputCompatible, hasRetiredRef } from './schema.ts'
 import { sourceFields, sourcePort, sourceOutputLabel } from './sourceField.ts'
+import { webhookResponseAllowsBody } from './webhookResponse.ts'
 
 export function isResolutionNode(node: GraphNode | undefined): node is Extract<GraphNode, { readonly kind: 'approval' | 'wait' }> {
   return node?.kind == 'approval' || node?.kind == 'wait'
@@ -34,6 +35,32 @@ function graphDiagnostic(
   mismatch?: SchemaMismatch,
 ): Diagnostic {
   return { code, column: 0, line: 1, message, mismatch, path, ...(values == null ? {} : { values }) }
+}
+
+export function webhookResponseDiagnostics(graph: Graph, triggerId: string, path = `/document/graph/nodes/${triggerId}`): readonly Diagnostic[] {
+  const trigger = graph.nodes[triggerId]
+  if (trigger?.kind != 'webhook' || trigger.options?.responseBody == null) return []
+  const diagnostics: Diagnostic[] = []
+  const responsePath = `${path}/options/responseBody`
+  const output = Object.entries(graph.nodes).find(([, node]) => node.kind == 'outputs')
+  if (output == null) {
+    diagnostics.push(graphDiagnostic('trigger.webhook-response-outputs-missing', 'Add a workflow Outputs node for the HTTP response.', responsePath))
+  } else {
+    const reachable = new Set([triggerId])
+    for (const id of reachable) for (const edge of graph.edges) if (edge.source == id) reachable.add(edge.target)
+    if (!reachable.has(output[0]))
+      diagnostics.push(graphDiagnostic('trigger.webhook-response-unreachable', 'Connect this Webhook to the workflow Outputs node.', responsePath))
+    const field = trigger.options.responseBody.output
+    if (field != null && output[1].kind == 'outputs' && !output[1].outputDefs.some((port) => port.handle == field))
+      diagnostics.push(
+        graphDiagnostic('trigger.webhook-response-output-missing', `Workflow output "${field}" does not exist.`, `${responsePath}/output`, { output: field }),
+      )
+  }
+  if (!webhookResponseAllowsBody(trigger.options.responseStatusCode ?? 200))
+    diagnostics.push(
+      graphDiagnostic('trigger.webhook-response-status-invalid', 'Choose a response status code that permits a body.', `${path}/options/responseStatusCode`),
+    )
+  return diagnostics
 }
 
 function validateTrigger(triggerId: string, trigger: TriggerNode, path: string, diagnostics: Diagnostic[]): void {
@@ -575,6 +602,9 @@ function validateGraph(graph: Graph, document: FlowDocument, path: string, diagn
     for (const [nodeId] of errorTriggers)
       diagnostics.push(graphDiagnostic('graph.error-trigger-duplicate', 'A graph can contain only one Flow Error node.', `${path}/nodes/${nodeId}`))
   const outputNodes = Object.entries(graph.nodes).filter(([, node]) => node.kind == 'outputs')
+  for (const [nodeId, node] of Object.entries(graph.nodes)) {
+    if (node.kind == 'webhook') diagnostics.push(...webhookResponseDiagnostics(graph, nodeId, `${path}/nodes/${nodeId}`))
+  }
   if (outputNodes.length > 1)
     for (const [nodeId] of outputNodes)
       diagnostics.push(graphDiagnostic('graph.outputs-duplicate', 'A graph can contain only one Outputs node.', `${path}/nodes/${nodeId}`))
