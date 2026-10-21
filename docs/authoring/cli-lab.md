@@ -333,3 +333,7 @@ remains the responsibility of the production runtime.
 without losing its count, explicitly clears another policy, and runs both Code nodes. Run
 `bun run lab test node-retries` and `bun run lab test node-retries --mcp`. Scheduler and isolated
 runtime tests separately verify actual failed attempts, deadlines and uncertain outcomes.
+
+`node-errors` verifies same-path error handling, independent business and system outputs named error,
+nullable success errors, setting preservation and complete failure metadata. Run
+`bun run lab test node-errors` and `bun run lab test node-errors --mcp`.

@@ -6,6 +6,13 @@ import { fulfillmentSamples, fulfillmentStages } from './fulfillment.ts'
 
 export const scenarios = [
   {
+    id: 'node-errors',
+    entry: { kind: 'start' },
+    name: 'Handle node errors',
+    version: 1,
+    task: 'Create Start and two Code nodes. Successful task returns {error: "business"}; Failed task throws Error("Expected failure"). Enable system error output on both. Rename Successful task to Successful task updated, change its failure mode to stop and then back to error, preserving its business output. Connect both to Outputs. Return business from the successful ordinary error output, successError from its system error, and failure from the failed system error. Read settings and bindings, check and run. Do not add an error execution branch.',
+  },
+  {
     id: 'node-retries',
     entry: { kind: 'start' },
     name: 'Configure node retries',
@@ -157,6 +164,7 @@ function source(nodeId: string, handle: string, from: string, output: string): C
 }
 export function initialOperations(id: string): ChangeOperation[] {
   if (
+    id == 'node-errors' ||
     id == 'node-retries' ||
     id == 'workflow-call' ||
     id == 'workflow-outputs' ||
@@ -329,6 +337,7 @@ export interface Sample {
   parameters?: Record<string, JsonValue>
 }
 export function samples(id: string, stage = 0): Sample[] {
+  if (id == 'node-errors') return [{ name: 'handled-and-successful', orders: [], order }]
   if (id == 'node-retries') return [{ name: 'configured-and-cleared', orders: [], order }]
   if (id == 'workflow-call') return [0, -2.5, 12.5].map((amount) => ({ name: String(amount), orders: [], order, outputs: { amount } }))
   if (id == 'workflow-outputs' || id == 'start-parameters') {
@@ -394,6 +403,14 @@ function effectiveNode(content: RevisionContent, id: string): unknown {
 }
 /** Independent assertions: compare behavior and preserved effective configurations, not generated IDs. */
 export function assertions(id: string, base: RevisionContent, current: RevisionContent): string[] {
+  if (id == 'node-errors') {
+    const tasks = Object.values(current.document.graph.nodes).filter((candidate) => candidate.kind == 'task')
+    return tasks.length == 2 &&
+      tasks.every((candidate) => candidate.onError == 'error') &&
+      tasks.some((candidate) => candidate.name == 'Successful task updated')
+      ? []
+      : ['Enable system error output on both tasks and preserve settings when renaming.']
+  }
   if (id == 'node-retries') {
     const tasks = Object.values(current.document.graph.nodes).filter((candidate) => candidate.kind == 'task')
     const configured = tasks.find((candidate) => candidate.name == 'Retried task updated')

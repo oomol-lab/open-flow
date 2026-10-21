@@ -14,6 +14,7 @@ export interface PreviousNode {
   readonly id: string
   readonly name: string
   readonly outputs: Readonly<Record<string, JsonValue>>
+  readonly systemOutputs?: Readonly<Record<string, JsonValue>>
   readonly outputDefs: readonly Port[]
 }
 

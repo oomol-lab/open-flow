@@ -334,6 +334,7 @@ function eventIcon(event: RunEvent): string {
 }
 
 function eventTone(event: RunEvent): string {
+  if (event.kind == 'node.failed' && event.payload.handled) return 'warning'
   if (event.kind.includes('failed') || event.kind == 'run.indeterminate') return 'danger'
   if (event.kind == 'node.completed' || event.kind == 'run.completed') return 'success'
   return 'neutral'
@@ -363,6 +364,7 @@ function eventSummary(event: RunEvent, t: TFunction): string {
     case 'run.completed':
       return t('run.eventCompleted')
     case 'node.failed':
+      return t(event.payload.handled ? 'run.errorHandled' : 'run.statusFailed')
     case 'run.failed':
       return t('run.statusFailed')
     case 'run.indeterminate':
@@ -570,7 +572,7 @@ export function RunLog({
       const source = sources.get(String(event.payload.scopeId))
       return (
         <div
-          className={`run-log-event run-execution ${group.status == 'failed' ? 'danger' : group.status == 'completed' ? 'success' : 'neutral'}`}
+          className={`run-log-event run-execution ${group.terminal?.kind == 'node.failed' && group.terminal.payload.handled ? 'warning' : group.status == 'failed' ? 'danger' : group.status == 'completed' ? 'success' : 'neutral'}`}
           key={group.key}
         >
           <span className="run-log-icon">
@@ -593,7 +595,11 @@ export function RunLog({
             <div className="run-log-title">
               <strong>{subject}</strong>
               <span>{t(observation == null ? 'run.executionNumber' : 'run.recordedExecutionNumber', { count: group.count })}</span>
-              <span>{t(`run.executionStatusLabels.${group.status}`)}</span>
+              <span>
+                {group.terminal?.kind == 'node.failed' && group.terminal.payload.handled
+                  ? t('run.errorHandled')
+                  : t(`run.executionStatusLabels.${group.status}`)}
+              </span>
               <span className="run-execution-time" title={`${group.started?.createdAt ?? '?'} → ${group.terminal?.createdAt ?? '?'}`}>
                 {duration(
                   group.started == null || (group.terminal == null && group.status == 'unknown')

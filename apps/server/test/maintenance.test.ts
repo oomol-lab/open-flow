@@ -66,7 +66,7 @@ function pause(store: Store, clock: () => number, flowId: string, notify = false
           inputs: {},
           results: {},
           counts: {},
-          version: 5,
+          version: 6,
           dependencies: {
             nextId: 1,
             iterations: {},

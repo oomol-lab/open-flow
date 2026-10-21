@@ -182,6 +182,7 @@
   &[data-status='error'] > i {
     color: var(--accent-red-1);
   }
+  &[data-status='handled'] > i,
   &[data-status='waiting'] > i {
     color: var(--accent-orange-1);
   }

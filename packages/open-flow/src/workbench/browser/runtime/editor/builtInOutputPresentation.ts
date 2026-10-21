@@ -1,10 +1,12 @@
 import type { TFunction } from 'val-i18n'
-import type { GraphNode, Group, Port, ResolutionNode, TaskDefinition, TriggerNode } from '../../../../flow/common/change.ts'
+import type { GraphNode, Group, NodeSource, Port, ResolutionNode, TaskDefinition, TriggerNode } from '../../../../flow/common/change.ts'
 import type { InputSourceCandidate } from '../../../../flow/common/graph.ts'
 
 import { waitBranchDescription } from '../../../../canvas/browser/i18n/waitBranchLocales.ts'
+import { nodeErrorSchema, nodeSystemOutputPorts } from '../../../../flow/common/errorHandling.ts'
 import { resolutionOutputPorts } from '../../../../flow/common/graph.ts'
 import { schemaObject } from '../../../../flow/common/schema.ts'
+import { sourcePort } from '../../../../flow/common/sourceField.ts'
 import { triggerOutputDefinitions } from '../../../../trigger/common/contract.ts'
 
 /** Localized answer help is presentation-only; persisted Decision schemas stay language-neutral. */
@@ -74,6 +76,27 @@ export function presentDecisionOutputs(task: TaskDefinition, t: TFunction): read
   })
 }
 
+/** Localized system help stays in presentation; persisted runtime schemas remain language-neutral. */
+export function presentSystemOutputs(node: GraphNode, t: TFunction): readonly Port[] {
+  return Object.entries(nodeSystemOutputPorts(node)).map(([handle, port]) =>
+    Object.assign({ handle }, port, {
+      description: t('inspector.node.errorFields.error'),
+      jsonSchema: {
+        ...nodeErrorSchema,
+        properties: Object.fromEntries(
+          Object.entries(nodeErrorSchema.properties).map(([name, field]) => [
+            name,
+            {
+              ...field,
+              description: t(`inspector.node.errorFields.${name}`),
+            },
+          ]),
+        ),
+      },
+    }),
+  )
+}
+
 function withDescriptions(ports: readonly Port[], descriptionFor: (handle: string) => string | undefined): readonly Port[] {
   return ports.map((port) => {
     const description = descriptionFor(port.handle)
@@ -132,15 +155,31 @@ function presentedBuiltInOutputs(node: GraphNode, t: TFunction): readonly Port[]
 /** Applies localized built-in output copy to source candidates without changing graph-owned data. */
 export function presentBuiltInSourceCandidates(node: GraphNode, candidates: readonly InputSourceCandidate[], t: TFunction): readonly InputSourceCandidate[] {
   const outputs = presentedBuiltInOutputs(node, t)
-  if (outputs == null) return candidates
-  const descriptions = new Map(outputs.map((port) => [port.handle, port.description]))
+  const systemOutputs = presentSystemOutputs(node, t)
+  if (outputs == null && systemOutputs.length == 0) return candidates
   return candidates.map((candidate) => {
-    const description = descriptions.get(candidate.output)
-    return description == null || description == candidate.description ? candidate : Object.assign({}, candidate, { description })
+    const port = (candidate.system ? systemOutputs : outputs)?.find((item) => item.handle == candidate.output)
+    if (port == null) return candidate
+    const description = port.description ?? candidate.description
+    const fields = candidate.system
+      ? candidate.fields?.map((field) => Object.assign({}, field, { description: sourcePort(port, field.field)?.description }))
+      : undefined
+    if (fields == null && description == candidate.description) return candidate
+    return Object.assign({}, candidate, { description }, fields == null ? {} : { fields })
   })
 }
 
 /** Returns localized built-in copy when available, otherwise preserving the port-owned description. */
-export function presentBuiltInOutputDescription(node: GraphNode, output: string, description: string | undefined, t: TFunction): string | undefined {
+export function presentBuiltInOutputDescription(
+  node: GraphNode,
+  output: string,
+  description: string | undefined,
+  t: TFunction,
+  source?: Pick<NodeSource, 'system' | 'field'>,
+): string | undefined {
+  if (source?.system) {
+    const port = presentSystemOutputs(node, t).find((item) => item.handle == output)
+    return port == null ? description : (sourcePort(port, source.field)?.description ?? description)
+  }
   return presentedBuiltInOutputs(node, t)?.find((port) => port.handle == output)?.description ?? description
 }

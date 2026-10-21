@@ -34,6 +34,7 @@ type PortEditorProps = {
   onReset?: () => void
   expansionPolicy?: FieldValueEditorProps['expansionPolicy']
   layout?: 'values' | 'ports' | 'definition'
+  columnHeadings?: boolean
   title?: ReactNode
   titleIcon?: FieldSectionIcon
   defaultNullable?: boolean
@@ -474,6 +475,7 @@ export function PortDefinitionEditor(props: PortEditorProps) {
         className={styles.list}
         layout={props.layout}
         fixedTypes={disabled}
+        columnHeadings={props.columnHeadings}
         output={props.output}
         nullable={tableLayout}
         empty={!hasFields}

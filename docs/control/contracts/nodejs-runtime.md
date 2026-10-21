@@ -28,3 +28,11 @@ or to durable storage. Node compatibility does not grant additional business cap
 subclasses and library initialization may use mutable guest intrinsics. The runtime must isolate
 these intrinsics from other Task invocations. Task termination revokes associated asynchronous work
 and capabilities.
+
+## Handled task failures
+
+Engine v6 supports node-owned `onError` handling for ordinary Code, Connector, OpenAPI, LLM and
+AI Decision Tasks. Hosts preserve trusted `catchable` separately from `retryable`; absent
+classification forbids handling. Resource limits, cancellation, deadlines, protocol/isolation and
+indeterminate failures cannot be handled. System outputs use an independent namespace and are
+available to downstream inputs and `getPrevious().systemOutputs`; they do not add execution ports.

@@ -40,16 +40,18 @@ const output = z.strictObject({
   port: id.optional().describe('Omit for a node with one output. For multiple outputs, choose a name from node details.'),
   field: z.string().optional(),
 })
+const system = z.strictObject({ kind: z.literal('system'), node: referenceSchema, port: z.literal('error'), field: z.string().optional() })
 const variable = z.strictObject({ kind: z.literal('variable'), name: id })
 export const authoringSourceSchema = z.union([
   output,
+  system,
   variable,
   z.strictObject({ kind: z.literal('value'), value: json }),
   z.strictObject({ kind: z.literal('unset') }),
   z.strictObject({ kind: z.literal('default') }),
-  z.strictObject({ kind: z.literal('sources'), sources: z.array(z.union([output, variable])).min(1) }),
+  z.strictObject({ kind: z.literal('sources'), sources: z.array(z.union([output, system, variable])).min(1) }),
 ])
-const operand = z.union([z.strictObject({ kind: z.literal('value'), value: json.optional(), schema: json.optional() }), output, variable])
+const operand = z.union([z.strictObject({ kind: z.literal('value'), value: json.optional(), schema: json.optional() }), output, system, variable])
 const agentTool = definitions.agent.shape.tools.element
   .omit({ id: true, inputs: true })
   .extend({
@@ -118,6 +120,7 @@ export const authoringConfigurations = {
   approval: z.strictObject({ inputs: inputFields }),
 }
 const metadata = {
+  onError: z.enum(['stop', 'error']).optional(),
   name: id.optional(),
   description: z.string().optional(),
   icon: z.string().optional(),
@@ -146,6 +149,7 @@ export const authoringEditSchema = z.discriminatedUnion('op', [
       .describe('Unique batch-local alias without the $ prefix. Later edits must reference this new node as $alias; the bare alias is not its node ID.'),
     type,
     name: id,
+    onError: z.enum(['stop', 'error']).optional(),
     retry: retryConfigurationSchema.optional(),
     config: patch.optional(),
     inputs: z
@@ -250,12 +254,13 @@ export function authoringSchema(kind?: AuthoringType) {
       }
     : {
         type: kind,
+        onError: retryNodeTypes.some((nodeType) => nodeType == kind) ? { enum: ['stop', 'error'] } : false,
         retry: retryNodeTypes.some((nodeType) => nodeType == kind) ? z.toJSONSchema(retryConfigurationSchema) : false,
         inputSources: ['poll', 'integration'].includes(kind)
           ? ['value', 'unset', 'default']
           : ['start', 'outputs', 'error', 'cron', 'webhook', 'value', 'condition'].includes(kind)
             ? []
-            : ['value', 'unset', 'default', 'output', 'variable', 'sources'],
+            : ['value', 'unset', 'default', 'output', 'system', 'variable', 'sources'],
         extensibleInputs: ['code', 'agent', 'llm', 'wait', 'approval'].includes(kind),
         guidance:
           kind == 'outputs'

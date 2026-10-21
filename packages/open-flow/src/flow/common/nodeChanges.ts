@@ -42,6 +42,7 @@ export interface Settings {
   readonly name?: string
   readonly maxExecutions?: number
   readonly timeoutMs?: number
+  readonly onError?: 'stop' | 'error'
   readonly retry?: RetryConfiguration
 }
 
@@ -382,6 +383,8 @@ export function updateSettings(content: RevisionContent, nodeId: string, setting
   if (node.timeoutMs != settings.timeoutMs) {
     operations.push({ before: node.timeoutMs, field: 'timeoutMs', kind: 'graph.node.field.set', nodeId, value: settings.timeoutMs })
   }
+  if (Object.hasOwn(settings, 'onError') && node.onError != settings.onError)
+    operations.push({ before: node.onError, field: 'onError', kind: 'graph.node.field.set', nodeId, value: settings.onError })
   if (Object.hasOwn(settings, 'retry') && !dequal(node.retry, settings.retry)) {
     operations.push({ before: node.retry, field: 'retry', kind: 'graph.node.field.set', nodeId, value: settings.retry })
   }

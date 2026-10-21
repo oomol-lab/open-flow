@@ -5,7 +5,10 @@ import { z } from 'zod'
 import { isTriggerNode } from '../../flow/common/change.ts'
 
 const outputsSchema = z.record(z.string(), z.json() as z.ZodType<JsonValue>)
-const inputSchema = z.record(z.string(), z.strictObject({ execution: z.number().int().nonnegative(), outputs: outputsSchema }))
+const inputSchema = z.record(
+  z.string(),
+  z.strictObject({ execution: z.number().int().nonnegative(), outputs: outputsSchema, systemOutputs: outputsSchema.optional() }),
+)
 type InputSnapshot = DependenciesCheckpoint['nodes'][string]['input']
 
 export function dependencyValues(input: InputSnapshot): Readonly<Record<string, Readonly<Record<string, JsonValue>>>> {
@@ -17,6 +20,7 @@ const stateSchema = z.strictObject({
   status: z.enum(['pending', 'running', 'completed', 'skipped']),
   input: inputSchema,
   output: outputsSchema.optional(),
+  systemOutputs: outputsSchema.optional(),
   previous: z.array(z.string()),
   released: z.array(z.string()),
   jobId: z.string().optional(),
@@ -124,7 +128,10 @@ export class Dependencies {
       if (this.graph.nodes[id] == null || state.id >= nextId || ids.has(state.id)) throw new Error('Checkpoint dependency identity is invalid.')
       ids.add(state.id)
       if (state.status == 'running' && state.jobId == null) throw new Error('Checkpoint running dependency has no job.')
-      if ((state.status == 'pending' || state.status == 'skipped') && (state.jobId != null || state.output != null || state.released.length != 0))
+      if (
+        (state.status == 'pending' || state.status == 'skipped') &&
+        (state.jobId != null || state.output != null || state.systemOutputs != null || state.released.length != 0)
+      )
         throw new Error('Checkpoint inactive dependency contains an execution.')
       if (state.status == 'skipped' && (state.seeded || state.previous.length != 0 || Object.keys(state.input).length != 0))
         throw new Error('Checkpoint skipped dependency contains values.')
@@ -169,7 +176,12 @@ export class Dependencies {
     const merge = (id: string, result: InputSnapshot[string]) => {
       const previous = input[id]
       if (previous == null || result.execution > previous.execution) input[id] = result
-      else if (result.execution == previous.execution) input[id] = { execution: result.execution, outputs: { ...previous.outputs, ...result.outputs } }
+      else if (result.execution == previous.execution)
+        input[id] = {
+          execution: result.execution,
+          outputs: { ...previous.outputs, ...result.outputs },
+          ...(previous.systemOutputs || result.systemOutputs ? { systemOutputs: { ...previous.systemOutputs, ...result.systemOutputs } } : {}),
+        }
     }
     for (const edge of edges) {
       const source = this.state.nodes[edge.source]!
@@ -178,12 +190,18 @@ export class Dependencies {
         edge.sourceHandle != null && this.graph.nodes[edge.source]!.kind != 'condition'
           ? Object.fromEntries(Object.entries(source.output!).filter(([handle]) => handle == edge.sourceHandle))
           : source.output!
-      merge(edge.source, { execution: source.id, outputs })
+      merge(edge.source, { execution: source.id, outputs, ...(source.systemOutputs == null ? {} : { systemOutputs: source.systemOutputs }) })
     }
     for (const id of Object.keys(input)) {
       if (this.state.nodes[id]!.status == 'skipped') delete input[id]
     }
     return input
+  }
+
+  systemInputValues(nodeId: string): Readonly<Record<string, Readonly<Record<string, JsonValue>>>> {
+    return Object.fromEntries(
+      Object.entries(this.state.nodes[nodeId]!.input).flatMap(([id, value]) => (value.systemOutputs == null ? [] : [[id, value.systemOutputs]])),
+    )
   }
 
   inputValues(nodeId: string) {
@@ -300,9 +318,16 @@ export class Dependencies {
     state.jobId = jobId
   }
 
-  release(nodeId: string, outputs: Readonly<Record<string, JsonValue>>, handles: readonly string[], complete: boolean) {
+  release(
+    nodeId: string,
+    outputs: Readonly<Record<string, JsonValue>>,
+    handles: readonly string[],
+    complete: boolean,
+    systemOutputs?: Readonly<Record<string, JsonValue>>,
+  ) {
     const state = this.state.nodes[nodeId]!
     state.output = outputs
+    state.systemOutputs = systemOutputs
     state.released = [...new Set([...state.released, ...handles])]
     if (complete) state.status = 'completed'
   }

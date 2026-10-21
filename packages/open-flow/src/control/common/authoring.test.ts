@@ -648,3 +648,54 @@ it('validates a merged retry policy and preserves partial updates', async () => 
   const cleared = await edit(changed.content, [{ op: 'node.update', node: ref, clear: [['retry']] }])
   await expect(edit(cleared.content, [{ op: 'node.update', node: ref, set: { retry: { maxRetries: 1 } } }])).rejects.toThrow()
 })
+
+it('authors system error sources independently of a business output named error', async () => {
+  const created = await edit(empty, [
+    { op: 'node.add', type: 'start', as: 'start', name: 'Start' },
+    {
+      op: 'node.add',
+      type: 'code',
+      as: 'source',
+      name: 'Source',
+      onError: 'error',
+      code: 'export default () => ({error: "business"})',
+      config: { outputs: { error: { schema: { type: 'string' }, nullable: false } } },
+    },
+    {
+      op: 'node.add',
+      type: 'code',
+      as: 'target',
+      name: 'Target',
+      inputs: {
+        business: { kind: 'output', node: '$source', port: 'error' },
+        failure: { kind: 'system', node: '$source', port: 'error' },
+        code: { kind: 'system', node: '$source', port: 'error', field: 'code' },
+      },
+    },
+    { op: 'edge.connect', source: '$start', target: '$source' },
+    { op: 'edge.connect', source: '$source', target: '$target' },
+  ])
+  const ref = created.nodes.source!
+  expect(readAuthoring(created.content, { nodes: [ref] })).toMatchObject({ nodes: [{ onError: 'error', systemOutputs: { error: { nullable: true } } }] })
+  expect(readAuthoring(created.content, { nodes: [created.nodes.target!] })).toMatchObject({
+    nodes: [
+      {
+        inputs: {
+          business: { kind: 'sources', sources: [{ kind: 'output', node: ref, port: 'error' }] },
+          failure: { kind: 'sources', sources: [{ kind: 'system', node: ref, port: 'error' }] },
+        },
+      },
+    ],
+  })
+  const renamed = await edit(created.content, [{ op: 'node.update', node: ref, set: { name: 'Renamed' } }])
+  expect(renamed.content.document.graph.nodes[ref]).toMatchObject({ onError: 'error' })
+  const cleared = await edit(renamed.content, [{ op: 'node.update', node: ref, clear: [['onError']] }])
+  expect(cleared.content.document.graph.nodes[ref]).not.toHaveProperty('onError')
+  expect(cleared.content.document.graph.nodes[created.nodes.target!]).toMatchObject({ inputs: { failure: { sources: [{ system: true }] } } })
+})
+
+it('rejects error handling on unsupported nodes instead of accepting an ignored setting', async () => {
+  await expect(edit(empty, [{ op: 'node.add', type: 'value', as: 'value', name: 'Value', onError: 'error' }])).rejects.toThrow(
+    'This node does not support this error handling setting.',
+  )
+})

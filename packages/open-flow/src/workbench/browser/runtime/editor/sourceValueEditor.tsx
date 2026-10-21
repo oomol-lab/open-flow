@@ -8,7 +8,7 @@ import type { JsonValue } from '../api.ts'
 import type { InputSourceQuery } from '../revisionView.ts'
 
 import { Tooltip as TooltipPrimitive } from '@base-ui/react/tooltip'
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { variableInputCompatible } from '../../../../flow/common/schema.ts'
 import { sourceOutputLabel } from '../../../../flow/common/sourceField.ts'
@@ -46,6 +46,7 @@ export interface NodeInputUpstreamSources {
     readonly icon?: string
     readonly nodeId: string
     readonly nodeName?: string
+    readonly system?: true
     readonly output: string
     readonly field?: string
     readonly check: InputSourceCheck | undefined
@@ -56,11 +57,12 @@ export interface NodeInputUpstreamSources {
     readonly nodeName: string
     readonly outputs: readonly InputSourceCandidate[]
   }[]
-  readonly onChange?: (source: { readonly nodeId: string; readonly output: string; readonly field?: string }) => void
+  readonly onChange?: (source: { readonly nodeId: string; readonly output: string; readonly field?: string; readonly system?: true }) => void
 }
 const draftIssue = () => {}
 const variableSource = (name: string) => JSON.stringify(['variable', name])
-const upstreamSource = (nodeId: string, output: string, field?: string) => JSON.stringify(['upstream', nodeId, output, field])
+const upstreamSource = (nodeId: string, output: string, field?: string, system?: true) =>
+  JSON.stringify(system ? ['upstream', nodeId, output, field, true] : ['upstream', nodeId, output, field])
 const sourceItemClass = `${selectionMenuItemClass} gap-2 px-2`
 const sourceEmptyItemClass = `${sourceItemClass} font-normal text-muted-foreground data-disabled:opacity-100`
 const sourceSubTriggerClass = sourceItemClass
@@ -287,16 +289,16 @@ export function SourceValueEditor({
   const currentSource = bound
     ? variableSource(variableName)
     : connected && upstream?.current.length === 1
-      ? upstreamSource(upstream.current[0]!.nodeId, upstream.current[0]!.output, upstream.current[0]!.field)
+      ? upstreamSource(upstream.current[0]!.nodeId, upstream.current[0]!.output, upstream.current[0]!.field, upstream.current[0]!.system)
       : connected
         ? JSON.stringify(['upstream'])
         : literalSource
   const sourceKind = bound ? 'variable' : connected ? 'upstream' : 'literal'
   const sourcePortal = sourceContainer?.closest<HTMLElement>('.editor-context-panel') ?? sourceContainer
-  const sourceOption = (nodeId: string, { description, output, field, fields, check }: InputSourceCandidate, label: string) => {
-    const selected = sourceKind === 'upstream' && currentSource === upstreamSource(nodeId, output, field)
+  const sourceOption = (nodeId: string, { description, output, field, fields, check, system }: InputSourceCandidate, label: string) => {
+    const selected = sourceKind === 'upstream' && currentSource === upstreamSource(nodeId, output, field, system)
     const status = check.kind == 'schema' ? t('inspector.sources.incompatible') : check.kind == 'schema-error' ? t('inspector.sources.unverified') : undefined
-    const itemKey = upstreamSource(nodeId, output, field)
+    const itemKey = upstreamSource(nodeId, output, field, system)
     const sourceDescription = description?.trim()
     const item = (
       <DropdownMenuRadioItem
@@ -348,8 +350,8 @@ export function SourceValueEditor({
     )
   }
   const selectUpstream = (next: string) => {
-    const [, nodeId, output, field] = JSON.parse(next) as [string, string, string, string | null]
-    upstream?.onChange?.({ nodeId, output, ...(field == null ? {} : { field }) })
+    const [, nodeId, output, field, system] = JSON.parse(next) as [string, string, string, string | null, true?]
+    upstream?.onChange?.({ nodeId, output, ...(system ? { system } : {}), ...(field == null ? {} : { field }) })
   }
   const sourceControl =
     disabled || fixed ? undefined : (
@@ -496,14 +498,15 @@ export function SourceValueEditor({
                           !group.outputs.some(
                             (candidate) =>
                               candidate.output === source.output &&
+                              candidate.system === source.system &&
                               (source.field === undefined || candidate.fields?.some((child) => child.field === source.field)),
                           ),
                       )
                       .map((source) => (
                         <DropdownMenuRadioItem
                           className={sourceItemClass}
-                          key={upstreamSource(source.nodeId, source.output, source.field)}
-                          value={upstreamSource(source.nodeId, source.output, source.field)}
+                          key={upstreamSource(source.nodeId, source.output, source.field, source.system)}
+                          value={upstreamSource(source.nodeId, source.output, source.field, source.system)}
                           disabled
                         >
                           <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
@@ -512,29 +515,32 @@ export function SourceValueEditor({
                           </span>
                         </DropdownMenuRadioItem>
                       ))}
-                    {group.outputs.map((candidate) =>
-                      candidate.fields?.length ? (
-                        <DropdownMenuSub key={candidate.output}>
-                          <DropdownMenuSubTrigger
-                            className={`${sourceSubTriggerClass} ${connected && upstream.current.some((source) => source.nodeId === group.nodeId && source.output === candidate.output) ? 'bg-accent' : ''}`}
-                          >
-                            <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
-                            <span className="min-w-0 flex-1 truncate font-mono" title={candidate.output}>
-                              {candidate.output}
-                            </span>
-                          </DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent className={`w-56 min-w-56 ${selectionMenuContentClass}`} container={sourcePortal}>
-                            <DropdownMenuRadioGroup value={sourceKind === 'upstream' ? currentSource : ''} onValueChange={selectUpstream}>
-                              {sourceOption(group.nodeId, candidate, t('inspector.sources.wholeObject'))}
-                              <DropdownMenuSeparator className="mx-2 bg-border/50" />
-                              {candidate.fields.map((child) => sourceOption(group.nodeId, child, child.field === '' ? '""' : child.field))}
-                            </DropdownMenuRadioGroup>
-                          </DropdownMenuSubContent>
-                        </DropdownMenuSub>
-                      ) : (
-                        sourceOption(group.nodeId, candidate, candidate.output)
-                      ),
-                    )}
+                    {group.outputs.map((candidate) => (
+                      <Fragment key={JSON.stringify([candidate.system, candidate.output])}>
+                        {candidate.system && <DropdownMenuSeparator className="mx-2 bg-border/50" />}
+                        {candidate.fields?.length ? (
+                          <DropdownMenuSub key={candidate.output}>
+                            <DropdownMenuSubTrigger
+                              className={`${sourceSubTriggerClass} ${connected && upstream.current.some((source) => source.nodeId === group.nodeId && source.system === candidate.system && source.output === candidate.output) ? 'bg-accent' : ''}`}
+                            >
+                              <i aria-hidden="true" className="i-lucide-light:corner-down-right size-3.5 shrink-0 text-muted-foreground" />
+                              <span className="min-w-0 flex-1 truncate font-mono" title={candidate.output}>
+                                {candidate.system ? t('inspector.node.systemError') : candidate.output}
+                              </span>
+                            </DropdownMenuSubTrigger>
+                            <DropdownMenuSubContent className={`w-56 min-w-56 ${selectionMenuContentClass}`} container={sourcePortal}>
+                              <DropdownMenuRadioGroup value={sourceKind === 'upstream' ? currentSource : ''} onValueChange={selectUpstream}>
+                                {sourceOption(group.nodeId, candidate, t('inspector.sources.wholeObject'))}
+                                <DropdownMenuSeparator className="mx-2 bg-border/50" />
+                                {candidate.fields.map((child) => sourceOption(group.nodeId, child, child.field === '' ? '""' : child.field))}
+                              </DropdownMenuRadioGroup>
+                            </DropdownMenuSubContent>
+                          </DropdownMenuSub>
+                        ) : (
+                          sourceOption(group.nodeId, candidate, candidate.system ? t('inspector.node.systemError') : candidate.output)
+                        )}
+                      </Fragment>
+                    ))}
                   </DropdownMenuRadioGroup>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>

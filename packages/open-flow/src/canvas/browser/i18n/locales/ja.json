@@ -591,7 +591,8 @@
       "running": "実行中",
       "success": "完了",
       "error": "失敗",
-      "waiting": "待機中"
+      "waiting": "待機中",
+      "handled": "失敗を処理済み"
     },
     "triggerSource": {
       "manual": "手動",

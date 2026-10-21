@@ -199,7 +199,8 @@ export function RunEventDetail({
               ? t('run.connectorUnavailable')
               : rawMessage
       return (
-        <EventDetail label={t('run.nodeError')}>
+        <EventDetail label={t(event.payload.handled ? 'run.errorHandled' : 'run.nodeError')}>
+          {event.payload.systemOutputs != null && <JsonValueView label={t('run.errorHandled')} value={event.payload.systemOutputs} />}
           <RunError code={code} message={message}>
             {code == controlErrorCode.connectorUnconfigured && onConfigureConnector != null && (
               <Button onClick={onConfigureConnector} size="sm" type="button" variant="outline">

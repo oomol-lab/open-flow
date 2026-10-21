@@ -28,6 +28,7 @@ import {
   presentBuiltInSourceCandidates,
   presentDecisionOutputs,
   presentResolutionOutputs,
+  presentSystemOutputs,
 } from './builtInOutputPresentation.ts'
 import { CodeTaskSection } from './codeTaskSection.tsx'
 import { ConditionBranchesEditor } from './conditionBranchesEditor.tsx'
@@ -156,13 +157,14 @@ function inputUpstreamSources({
             : presentProviderOutputDescription(
                 node,
                 source.output,
-                presentBuiltInOutputDescription(node, source.output, revision.outputDescription(source.nodeId, source.output), t),
+                presentBuiltInOutputDescription(node, source.output, revision.outputDescription(source.nodeId, source.output), t, source),
                 providerDisplay(node),
               ),
         icon: sourceNodeIcons?.[source.nodeId],
         nodeId: source.nodeId,
         nodeName: node?.name,
         output: source.output,
+        system: source.system,
         field: source.field,
         check: undefined,
       }
@@ -799,6 +801,16 @@ export function NodeInspector({
                 void store?.nodes.saveTaskPorts(selection.id, { inputs: selection.definition!.inputs, outputs }, deletion)
               }}
             />
+            {selection.node.onError == 'error' && (
+              <PortDefinitionEditor
+                readOnly
+                groups
+                output
+                layout="ports"
+                columnHeadings={false}
+                values={[{ group: t('inspector.node.systemOutputs') }, ...presentSystemOutputs(selection.node, t)]}
+              />
+            )}
           </section>
         )}
         {(selection?.kind === 'approval' || selection?.kind === 'wait') && (

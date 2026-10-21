@@ -18,6 +18,7 @@ import { missingTriggerConfig, resolveTriggerConfig } from '../../trigger/common
 import { triggerOutputDefinitions, triggerOutputPorts, webhookSupportsBody } from '../../trigger/common/contract.ts'
 import { isTriggerNode, portsByHandle, validVariableName } from './change.ts'
 import { conditionInputPorts, nodeInputMappings, otherwiseOutput, unaryOperator, comparisonIssue, valueType } from './condition.ts'
+import { nodeSystemOutputPorts, supportsNodeErrorHandling } from './errorHandling.ts'
 import { supportsNodeRetry, retryConfigurationSchema } from './retry.ts'
 import { schemaObject, matchesSchema, comparePorts, portsAssignable, variableInputCompatible, hasRetiredRef } from './schema.ts'
 import { sourceFields, sourcePort, sourceOutputLabel } from './sourceField.ts'
@@ -173,6 +174,12 @@ export function nodeOutputPorts(node: GraphNode): Readonly<Record<string, PortDe
   }
 }
 
+function nodeSourceOutputPorts(node: GraphNode, system?: true): Readonly<Record<string, PortDefinition>> {
+  if (system) return nodeSystemOutputPorts(node)
+  const ports = nodeOutputPorts(node)
+  return node.onError == 'error' ? Object.fromEntries(Object.entries(ports).map(([key, port]) => [key, { ...port, nullable: true }])) : ports
+}
+
 export function nodeOutputDescription(graph: Graph, nodeId: string, output: string): string | undefined {
   const node = graph.nodes[nodeId]
   return node == null ? undefined : nodeOutputPorts(node)[output]?.description
@@ -211,7 +218,7 @@ function checkSource(
         )
         return
       }
-      const output = nodeOutputPorts(upstream)[source.output]
+      const output = nodeSourceOutputPorts(upstream, source.system)[source.output]
       if (output == null) {
         diagnostics.push(
           graphDiagnostic('graph.source-missing', `Upstream node "${source.nodeId}" does not expose output "${source.output}".`, path, {
@@ -422,6 +429,7 @@ export type InputSourceCheck =
 export type InputSourceCandidateCheck = Extract<InputSourceCheck, { readonly kind: 'available' | 'schema' | 'schema-error' }>
 
 interface InputSourceFieldCandidate {
+  readonly system?: true
   readonly description?: string
   readonly output: string
   readonly field: string
@@ -429,6 +437,7 @@ interface InputSourceFieldCandidate {
 }
 
 export interface InputSourceCandidate {
+  readonly system?: true
   readonly description?: string
   readonly field?: string
   readonly fields?: readonly InputSourceFieldCandidate[]
@@ -448,12 +457,17 @@ function sourceCompatibility(source: PortDefinition, input: PortDefinition): Inp
 }
 
 /** Check one saved binding without enumerating candidate ports. */
-export function checkInputSource(graph: Graph, target: string, handle: string, source: Pick<NodeSource, 'nodeId' | 'output' | 'field'>): InputSourceCheck {
+export function checkInputSource(
+  graph: Graph,
+  target: string,
+  handle: string,
+  source: Pick<NodeSource, 'nodeId' | 'output' | 'field' | 'system'>,
+): InputSourceCheck {
   const node = graph.nodes[source.nodeId]
   const targetNode = graph.nodes[target]
   if (node == null) return { kind: 'source-missing' }
   if (targetNode == null) return { kind: 'not-ready' }
-  const output = nodeOutputPorts(node)[source.output]
+  const output = nodeSourceOutputPorts(node, source.system)[source.output]
   const input = nodeInputPorts(targetNode)[handle]
   if (output == null) return { kind: 'output-missing' }
   if (input == null) return { kind: 'not-ready' }
@@ -469,7 +483,7 @@ export function checkInputSources(
   graph: Graph,
   target: string,
   handle: string,
-  sources: readonly Pick<NodeSource, 'nodeId' | 'output' | 'field'>[],
+  sources: readonly Pick<NodeSource, 'nodeId' | 'output' | 'field' | 'system'>[],
 ): InputSourcesCheck {
   const checks = sources.map((source) => checkInputSource(graph, target, handle, source))
   const conflict =
@@ -489,13 +503,29 @@ export function inputSourceCandidates(graph: Graph, target: string, handle: stri
     [...(analysis.ancestors.get(target) ?? [])].flatMap((nodeId) => {
       const node = graph.nodes[nodeId]
       if (node == null) return []
-      const outputs = Object.entries(nodeOutputPorts(node)).flatMap(([output, definition]) => {
-        if (!mappingAvailable(graph, target, { kind: 'sources', sources: [{ kind: 'node', nodeId, output }] }, analysis)) return []
+      const ports = [
+        ...Object.entries(nodeSourceOutputPorts(node)).map(([output, definition]) => ({ output, definition, system: undefined })),
+        ...Object.entries(nodeSystemOutputPorts(node)).map(([output, definition]) => ({ output, definition, system: true as const })),
+      ]
+      const outputs = ports.flatMap(({ output, definition, system }) => {
+        if (!mappingAvailable(graph, target, { kind: 'sources', sources: [{ kind: 'node', nodeId, output, ...(system ? { system } : {}) }] }, analysis))
+          return []
         const check = sourceCompatibility(definition, input)
         const fields = sourceFields(definition).map(({ field, port }) =>
-          Object.assign({ output, field, check: sourceCompatibility(port, input) }, port.description == null ? {} : { description: port.description }),
+          Object.assign(
+            { output, field, ...(system ? { system } : {}), check: sourceCompatibility(port, input) },
+            port.description == null ? {} : { description: port.description },
+          ),
         )
-        return [{ ...(definition.description == null ? {} : { description: definition.description }), output, check, ...(fields.length > 0 ? { fields } : {}) }]
+        return [
+          {
+            ...(system ? { system } : {}),
+            ...(definition.description == null ? {} : { description: definition.description }),
+            output,
+            check,
+            ...(fields.length > 0 ? { fields } : {}),
+          },
+        ]
       })
       return outputs.length == 0 ? [] : [[nodeId, outputs]]
     }),
@@ -578,6 +608,8 @@ function validateGraph(graph: Graph, document: FlowDocument, path: string, diagn
     if (!isTriggerNode(node) && node.maxExecutions != null && (!Number.isSafeInteger(node.maxExecutions) || node.maxExecutions < 1)) {
       diagnostics.push(graphDiagnostic('node.max-executions-invalid', 'Maximum executions must be a positive safe integer.', `${nodePath}/maxExecutions`))
     }
+    if (node.onError != null && (!supportsNodeErrorHandling(node) || !['stop', 'error'].includes(node.onError)))
+      diagnostics.push(graphDiagnostic('node.error-handling-invalid', 'This node does not support this error handling setting.', `${nodePath}/onError`))
     if ('retry' in node && node.retry != null) {
       if (!supportsNodeRetry(node)) diagnostics.push(graphDiagnostic('node.retry-unsupported', 'This node does not support retries.', `${nodePath}/retry`))
       if (!retryConfigurationSchema.safeParse(node.retry).success)

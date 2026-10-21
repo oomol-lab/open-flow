@@ -124,3 +124,19 @@ schemas and diagnostics expose the node setting without requiring internal Task 
 Retries repeat the whole Task with the same inputs. They may duplicate external operations. They
 never replay unconfirmed side effects, bypass resource limits, or reset node/Run deadlines. Output
 validation and commit failures cannot retry an already completed Task.
+
+## Node error handling
+
+The same five Task types accept optional `onError: "stop" | "error"`. Default is stop. With error
+handling enabled, successful and handled executions continue along the same execution edges.
+Enable retry independently; error handling occurs after the last attempt. Input/output validation
+errors can be handled but are not retried. Cancellation, deadlines, limits, isolation failures,
+indeterminate outcomes and persistence failures cannot be handled.
+
+System `error` is null on success or a fixed object with `code`, `message`, `nodeId`, `nodeName`,
+`runId`, `executionId` on failure. Bind it with `{kind:"system", node:"$step", port:"error"}` or
+select one field with `field`. Business `{kind:"output", node:"$step", port:"error"}` remains a
+different source. System definitions are read-only and appear separately in detail reads and the
+property panel. There is no error execution edge or canvas connection point. Use a Condition node
+to distinguish null from an error object. Business output bindings must allow missing/null values
+if downstream processing also executes after a handled failure.

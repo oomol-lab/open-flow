@@ -46,7 +46,7 @@ function fixture() {
     (waitId): WaitRequest => ({ waitId, nodeId: waitId, jobId: waitId, actions: ['approve', 'reject'], prompt: waitId, value: {}, notify: true }),
   )
   const checkpoint: FlowRunCheckpoint = {
-    version: 5,
+    version: 6,
     dependencies: {
       nextId: waits.length,
       iterations: {},

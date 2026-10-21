@@ -29,6 +29,53 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
   }
   const dataPort = { schema: {}, nullable: true },
     stringPort = { schema: { type: 'string' }, nullable: false }
+  if (id == 'node-errors') {
+    await call('flow_schema', { type: 'code' })
+    const before = await read()
+    const created = await submit(before.revision, [
+      { op: 'node.add', as: 'start', type: 'start', name: 'Start' },
+      {
+        op: 'node.add',
+        as: 'success',
+        type: 'code',
+        name: 'Successful task',
+        onError: 'error',
+        config: { outputs: { error: stringPort } },
+        code: 'export default () => ({error: "business"})',
+      },
+      {
+        op: 'node.add',
+        as: 'failure',
+        type: 'code',
+        name: 'Failed task',
+        onError: 'error',
+        config: { outputs: {} },
+        code: 'export default () => {throw new Error("Expected failure")}',
+      },
+      {
+        op: 'node.add',
+        as: 'out',
+        type: 'outputs',
+        name: 'Outputs',
+        config: { outputDefs: { business: dataPort, successError: dataPort, failure: dataPort } },
+        inputs: {
+          business: { kind: 'output', node: '$success', port: 'error' },
+          successError: { kind: 'system', node: '$success', port: 'error' },
+          failure: { kind: 'system', node: '$failure', port: 'error' },
+        },
+      },
+      { op: 'edge.connect', source: '$start', target: '$success' },
+      { op: 'edge.connect', source: '$start', target: '$failure' },
+      { op: 'edge.connect', source: '$success', target: '$out' },
+      { op: 'edge.connect', source: '$failure', target: '$out' },
+    ])
+    const refs = created.nodes as Record<string, string>
+    await submit(created.revision, [{ op: 'node.update', node: refs.success!, set: { name: 'Successful task updated', onError: 'stop' } }])
+    await submit(savedRevision, [{ op: 'node.update', node: refs.success!, set: { onError: 'error' } }])
+    await read([refs.success!, refs.failure!, refs.out!])
+    await call('flow_check', { flowId, revisionId: savedRevision })
+    return
+  }
   if (id == 'node-retries') {
     await call('flow_schema', { type: 'code' })
     const before = await read()

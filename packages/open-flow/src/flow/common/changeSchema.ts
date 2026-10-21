@@ -20,7 +20,7 @@ const port = z.object({ description: text.optional(), jsonSchema: json, nullable
 const workflowInputDefs = z.array(port.strict())
 const input = port.extend({ value: json.optional() })
 const group = z.object({ collapsed: z.boolean().optional(), group: text })
-const nodeSource = z.object({ kind: z.literal('node'), nodeId: text, output: text, field: text.optional() })
+const nodeSource = z.object({ kind: z.literal('node'), nodeId: text, output: text, system: z.literal(true).optional(), field: text.optional() })
 const source = z.union([nodeSource, z.object({ kind: z.literal('binding'), bindingId: text })])
 const fixedInput = z.union([z.object({ kind: z.literal('unset') }), z.object({ kind: z.literal('value'), value: json })])
 const mapping = z.union([fixedInput, z.object({ kind: z.literal('sources'), sources: z.array(source) })])
@@ -196,6 +196,7 @@ const base = {
   icon: text.optional(),
   timeoutMs: z.number().optional(),
   retry: retryConfigurationSchema.optional(),
+  onError: z.enum(['stop', 'error']).optional(),
 }
 const node = z.union([
   z.strictObject({ ...base, kind: z.literal('outputs'), outputDefs: z.array(port.strict()), outputMappings: inputs }).omit({ inputs: true }),
@@ -588,7 +589,7 @@ const shapes = {
     z.object({
       ...at,
       kind: z.literal('graph.node.field.set'),
-      field: z.enum(['description', 'icon', 'name']),
+      field: z.enum(['description', 'icon', 'name', 'onError']),
       before: text.optional(),
       value: text.optional(),
     }),
@@ -664,6 +665,36 @@ export function changeOperationsSchema(kind?: string): JsonValue {
 function checkModelVersion(content: RevisionContent): void {
   if (content.modelVersion < 9 && Object.values(content.document.graph.nodes).some((candidateNode) => 'retry' in candidateNode && candidateNode.retry != null))
     throw new TypeError('Node retries require Flow model version 9.')
+  if (
+    content.modelVersion < 9 &&
+    Object.values(content.document.graph.nodes).some((candidateNode) => {
+      if (candidateNode.onError != null) return true
+      const mappings = [
+        ...Object.values('inputs' in candidateNode ? candidateNode.inputs : {}),
+        ...Object.values(candidateNode.kind == 'outputs' ? candidateNode.outputMappings : {}),
+      ]
+      if (
+        mappings.some(
+          (candidateMapping) =>
+            candidateMapping.kind == 'sources' && candidateMapping.sources.some((candidateSource) => candidateSource.kind == 'node' && candidateSource.system),
+        )
+      )
+        return true
+      return (
+        candidateNode.kind == 'condition' &&
+        candidateNode.cases.some((item) =>
+          item.groups.some((candidateGroup) =>
+            candidateGroup.expressions.some((expression) =>
+              [expression.left, expression.right].some(
+                (candidateOperand) => candidateOperand?.kind == 'source' && candidateOperand.source.kind == 'node' && candidateOperand.source.system,
+              ),
+            ),
+          ),
+        )
+      )
+    })
+  )
+    throw new TypeError('Node error handling requires Flow model version 9.')
   if (content.modelVersion < 8 && Object.values(content.document.graph.nodes).some((candidateNode) => candidateNode.kind == 'outputs'))
     throw new TypeError('Workflow outputs require Flow model version 8.')
   if (content.modelVersion < 7 && Object.values(content.document.graph.nodes).some((candidateNode) => candidateNode.kind == 'start'))

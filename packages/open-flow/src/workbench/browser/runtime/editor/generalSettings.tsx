@@ -4,8 +4,10 @@ import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 
 import { useEffect, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
-import { supportsNodeRetry } from '../../../../flow/common/change.ts'
+import { supportsNodeErrorHandling, supportsNodeRetry } from '../../../../flow/common/change.ts'
+import { FieldSelect } from '../../../../form/browser/fieldSelect.tsx'
 import { Field, FieldError, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
+import { HelpButton } from '../../../../ui/browser/helpButton.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Icon } from '../icons.tsx'
 import { RetrySettings } from './retrySettings.tsx'
@@ -92,6 +94,32 @@ export function GeneralSettings({
                 void store?.nodes.saveNodeSettings(nodeId, { name: node.name, timeoutMs: node.timeoutMs, maxExecutions: node.maxExecutions, retry })
               }}
             />
+          )}
+          {supportsNodeErrorHandling(node) && (
+            <Field orientation="horizontal" className="grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-1">
+                <FieldLabel htmlFor={`node-${nodeId}-on-error`}>{t('inspector.node.onError')}</FieldLabel>
+                <HelpButton label={t('inspector.node.onErrorHelp')}>{t('inspector.node.onErrorHint')}</HelpButton>
+              </div>
+              <FieldSelect
+                id={`node-${nodeId}-on-error`}
+                aria-label={t('inspector.node.onError')}
+                value={node.onError ?? 'stop'}
+                disabled={disabled || readOnly || store == null}
+                onChange={(value) => {
+                  if (!disabled && !readOnly)
+                    void store?.nodes.saveNodeSettings(nodeId, {
+                      name: node.name,
+                      timeoutMs: node.timeoutMs,
+                      maxExecutions: node.maxExecutions,
+                      onError: value == 'error' ? 'error' : undefined,
+                    })
+                }}
+              >
+                <option value="stop">{t('inspector.node.onErrorStop')}</option>
+                <option value="error">{t('inspector.node.onErrorOutput')}</option>
+              </FieldSelect>
+            </Field>
           )}
           <Field data-invalid={limitError != null}>
             <FieldLabel htmlFor={`node-${nodeId}-limit`}>{t('inspector.node.maxExecutions')}</FieldLabel>

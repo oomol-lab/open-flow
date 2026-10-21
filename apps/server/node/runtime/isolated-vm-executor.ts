@@ -38,6 +38,7 @@ function remote(result: Effect.Effect<CapabilityResult, Error>): Effect.Effect<u
       Object.assign(new Error(response.error ?? 'Runtime Host call failed.'), {
         schedulerCode: response.code ?? 'node.failed',
         retryable: response.retryable === true,
+        catchable: response.catchable === true,
       }),
     )
   })
@@ -470,7 +471,7 @@ function readResult(
   const returnedVoid = !Object.hasOwn(result, 'value') && result.void === true
   if (result.ok === false) {
     if (preserveCapabilityFailure && typeof result.code == 'string')
-      throw Object.assign(new Error(result.error ?? 'Action failed.'), { schedulerCode: result.code })
+      throw Object.assign(new Error(result.error ?? 'Action failed.'), { schedulerCode: result.code, catchable: result.retryable === true })
     throw new IsolatedVmError('task-failed', result.error ?? 'User Task failed.', result.retryable === true)
   }
   if (result.ok !== true || result.engineDigest != program.engineDigest || (!returnedValue && !returnedVoid))
@@ -664,6 +665,7 @@ function executeFlow(
         return yield* remote(call({ invocation, type: 'task' }))
       }),
     projectFailure: (error) => ({
+      catchable: error instanceof IsolatedVmError ? error.catchable : Reflect.get(Object(error), 'catchable') === true,
       retryable: error instanceof IsolatedVmError ? error.retryable : Reflect.get(Object(error), 'retryable') === true,
       code: typeof Reflect.get(Object(error), 'schedulerCode') == 'string' ? (Reflect.get(Object(error), 'schedulerCode') as string) : 'node.failed',
       message: normalizedError(error).message,

@@ -291,6 +291,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'./inputValue.ts'", "'./flow-input-value.js'")
       .replaceAll("'./webhookMethod.ts'", "'./webhook-method.js'")
       .replaceAll("'./retry.ts'", "'../common/flow-retry.js'")
+      .replaceAll("'./errorHandling.ts'", "'../common/flow-errorHandling.js'")
     const flowInputValueDeclaration = (await readFile(path.join(declarationRoot, 'flow/common/inputValue.d.ts'), 'utf8')).replaceAll(
       "'./change.ts'",
       "'./flow-change.js'",
@@ -377,13 +378,14 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'./changeSchema.ts'", "'../browser/flow-change-schema.js'")
       .replaceAll("'./json.ts'", "'./flow-json.js'")
     await Promise.all(
-      ['agent', 'semantics', 'graph', 'schema', 'modules', 'connectionUsage', 'promptTemplate', 'workflowFile', 'retry'].map(async (name) => {
+      ['agent', 'semantics', 'graph', 'schema', 'modules', 'connectionUsage', 'promptTemplate', 'workflowFile', 'retry', 'errorHandling'].map(async (name) => {
         const declaration = (await readFile(path.join(declarationRoot, `flow/common/${name}.d.ts`), 'utf8'))
           .replaceAll("'../../execution/common/engineContract.ts'", "'./engine-contract.js'")
           .replaceAll("'../../execution/common/runtime.ts'", "'./runtime-contract.js'")
           .replaceAll("'../../trigger/common/contract.ts'", "'./trigger-contract.js'")
           .replaceAll("'./change.ts'", "'../browser/flow-change.js'")
           .replaceAll("'./semantics.ts'", "'./flow-semantics.js'")
+          .replaceAll("'./errorHandling.ts'", "'./flow-errorHandling.js'")
           .replaceAll("'./graph.ts'", "'./flow-graph.js'")
           .replaceAll("'./schema.ts'", "'./flow-schema.js'")
           .replaceAll("'./modules.ts'", "'./flow-modules.js'")

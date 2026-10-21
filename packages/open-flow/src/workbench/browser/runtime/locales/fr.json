@@ -290,7 +290,23 @@
       "retryNone": "Aucune nouvelle tentative",
       "retrySeconds": "secondes",
       "retryHelp": "À propos des nouvelles tentatives",
-      "retryOnce": "Une nouvelle tentative max."
+      "retryOnce": "Une nouvelle tentative max.",
+      "onError": "En cas d’échec",
+      "onErrorStop": "Arrêter le workflow",
+      "onErrorOutput": "Sortir vers le port error",
+      "onErrorHelp": "Gestion des échecs",
+      "onErrorHint": "Après les nouvelles tentatives, placer l’erreur dans la sortie système error et continuer par les connexions existantes. En cas de succès, error vaut null. Annulation, délais, limites de ressources et résultats indéterminés arrêtent toujours l’exécution.",
+      "systemOutputs": "Sorties système",
+      "systemError": "Erreur (système)",
+      "errorFields": {
+        "error": "Informations sur l’erreur en cas d’échec du nœud ; null en cas de réussite.",
+        "code": "Code identifiant le type d’erreur.",
+        "message": "Description de l’erreur, avec les informations sensibles masquées.",
+        "nodeId": "Identifiant du nœud ayant échoué.",
+        "nodeName": "Nom du nœud au moment de l’échec.",
+        "runId": "Identifiant de cette exécution du workflow.",
+        "executionId": "Identifiant de cette exécution du nœud, commun à toutes ses tentatives."
+      }
     },
     "selectNode": "Sélectionnez un nœud du Brouillon pour l'inspecter et le modifier.",
     "locateNode": "Localiser ce nœud sur le canevas",
@@ -767,7 +783,8 @@
       "completed": "Réussie",
       "failed": "Échec",
       "unknown": "État non confirmé"
-    }
+    },
+    "errorHandled": "Échec traité"
   },
   "sidebar": {
     "createFirstFlow": "Créer un Flow",

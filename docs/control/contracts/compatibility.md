@@ -1,18 +1,18 @@
 # Public contracts and version evolution
 
-## Node retries: Flow model v9 and Engine v6
+## Node retries and error handling: Flow model v9 and Engine v6
 
-Flow model v9 adds optional node-owned `retry: { maxRetries, intervalMs }`. Only ordinary Code,
+Flow model v9 adds optional node-owned `retry: { maxRetries, intervalMs }` and `onError` settings, plus a separate system source namespace. Only ordinary Code,
 Connector, OpenAPI, LLM and AI Decision Tasks support it. Missing policy or zero retries preserves
 single-attempt behavior. Older models cannot contain this policy. Existing model v8 Revisions remain
 readable without changing their bytes or digests; editing upgrades the Draft through the existing
 explicit upgrade path. Historical Publications and Runs are not rewritten. Older binaries cannot
 execute model v9.
 
-Engine `open-flow-engine/v6` (including `/nodejs-compat-v1`) adds bounded Task retries. The isolated
+Engine `open-flow-engine/v6` (including `/nodejs-compat-v1`) adds bounded Task retries and handled failures that continue along existing execution edges. The isolated
 runtime digest changes too. Before upgrading, finish or cancel active Runs on the old Engine, or keep
 the matching recovery environment. Old Engine-pinned Publications require republication before new
-execution. Scheduler checkpoints remain v5: retry intervals are active execution, not durable waits.
+execution. Scheduler checkpoints use v6 to retain handled failures and system output snapshots; retry intervals remain active execution, not durable waits.
 No pending retry is recovered by replaying an unconfirmed side effect.
 
 ## Node-owned interfaces and Publication snapshots
@@ -141,7 +141,7 @@ Engine v4 separated execution scheduling from input sources. A node is skipped o
 
 Removing historical graph semantics labels from the digest previously changed isolated runtime identity once. Runs pinned to the old digest use the existing mismatch rejection path. Historical Run identities are not rewritten, and old identity aliases are not added. Subsequent Scheduler-only changes do not change the isolated runtime digest.
 
-The Trigger output protocol uses ordered output definitions. Provider definitionVersion and Webhook revision are 2, and the definition digest protocol version is 2. That upgrade used Scheduler checkpoint version 4. The current version is 5 and rejects recovery from older versions. SQLite migration 19 only renames output storage columns; it does not convert old content to the new contract.
+The Trigger output protocol uses ordered output definitions. Provider definitionVersion and Webhook revision are 2, and the definition digest protocol version is 2. That upgrade used Scheduler checkpoint version 4. The current version is 6 and rejects recovery from older versions. SQLite migration 19 only renames output storage columns; it does not convert old content to the new contract.
 
 ## Unreleased Wait pending revision
 

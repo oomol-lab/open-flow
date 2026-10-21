@@ -13,6 +13,10 @@ export class OpenApiTaskError extends Error {
     this.retryable = retryable
   }
 
+  get catchable(): boolean {
+    return this.code != 'openapi.indeterminate' && this.code != 'openapi.limit-exceeded'
+  }
+
   get indeterminate(): boolean {
     return this.code == 'openapi.indeterminate'
   }

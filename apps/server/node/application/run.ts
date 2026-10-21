@@ -38,6 +38,8 @@ const nodeFailureCodes: ReadonlySet<string> = new Set([
   'llm.output-invalid',
   'llm.unavailable',
   'node.failed',
+  'node.input-invalid',
+  'node.output-invalid',
   'openapi.input-invalid',
   'openapi.response-invalid',
   'openapi.http-failed',
@@ -50,12 +52,14 @@ type TaskErrorCode = 'capability.denied' | 'capability.invalid' | 'llm.output-in
 class TaskHostError extends Error {
   readonly code: TaskErrorCode
 
+  readonly catchable: boolean
   readonly retryable: boolean
-  constructor(code: TaskErrorCode, message: string, retryable = false) {
+  constructor(code: TaskErrorCode, message: string, retryable = false, catchable = false) {
     super(message)
     this.code = code
     this.name = 'TaskHostError'
     this.retryable = retryable
+    this.catchable = catchable
   }
 }
 
@@ -298,7 +302,7 @@ export class RunExecutor {
           projectFailure: (error) => {
             if (error instanceof ConnectorTaskError || error instanceof OpenApiTaskError) indeterminate ||= error.indeterminate
             if (error instanceof ConnectorTaskError || error instanceof TaskHostError || error instanceof OpenApiTaskError)
-              return { code: error.code, message: error.message, retryable: error.retryable }
+              return { code: error.code, message: error.message, retryable: error.retryable, catchable: error.catchable }
             return { code: 'node.failed', message: error instanceof Error ? error.message : String(error) }
           },
           runId: run.runId,
@@ -441,9 +445,9 @@ export class RunExecutor {
           })
         } catch {
           if (invocation.signal.aborted) throw invocation.signal.reason
-          throw new TaskHostError('llm.unavailable', 'The AI Decision request could not be completed.', true)
+          throw new TaskHostError('llm.unavailable', 'The AI Decision request could not be completed.', true, true)
         }
-        if (result.kind == 'failed') throw new TaskHostError(result.code, result.message, result.retryable !== false)
+        if (result.kind == 'failed') throw new TaskHostError(result.code, result.message, result.retryable !== false, true)
         return result.value
       }
       case 'llm':
@@ -460,9 +464,9 @@ export class RunExecutor {
           })
         } catch {
           if (invocation.signal.aborted) throw invocation.signal.reason
-          throw new TaskHostError('llm.unavailable', 'The LLM request could not be completed.', true)
+          throw new TaskHostError('llm.unavailable', 'The LLM request could not be completed.', true, true)
         }
-        if (result.kind == 'failed') throw new TaskHostError(result.code, result.message, result.retryable !== false)
+        if (result.kind == 'failed') throw new TaskHostError(result.code, result.message, result.retryable !== false, true)
         return result.value
     }
   }

@@ -21,6 +21,7 @@ import { decisionTask } from '../../decision/common/decision.ts'
 import { supportsNodeRetry, isTriggerNode, applyFlowChanges, decodeChangeOperations, upgradeRevisionContent } from '../../flow/common/change.ts'
 import { nodeInputMappings } from '../../flow/common/condition.ts'
 import { connect, disconnect } from '../../flow/common/edgeChanges.ts'
+import { nodeSystemOutputPorts, supportsNodeErrorHandling } from '../../flow/common/errorHandling.ts'
 import { nodeInputPorts, nodeOutputPorts } from '../../flow/common/graph.ts'
 import { imports as moduleImports } from '../../flow/common/moduleChanges.ts'
 import {
@@ -96,7 +97,7 @@ function outwardSource(content: RevisionContent, value: unknown): unknown {
   if (value == null || typeof value != 'object') return value
   const v = record(value)
   if (v.kind == 'node' && typeof v.nodeId == 'string' && typeof v.output == 'string')
-    return { kind: 'output', node: v.nodeId, port: v.output, ...(v.field == null ? {} : { field: v.field }) }
+    return { kind: v.system === true ? 'system' : 'output', node: v.nodeId, port: v.output, ...(v.field == null ? {} : { field: v.field }) }
   if (v.kind == 'binding' && typeof v.bindingId == 'string')
     return { kind: 'variable', name: content.document.bindings[v.bindingId]?.target ?? '[missing variable]' }
   // Literal JSON is user data, including objects that resemble references.
@@ -196,11 +197,15 @@ export function authoringNode(content: RevisionContent, ref: string) {
     ...(node.icon == null ? {} : { icon: node.icon }),
     ...('timeoutMs' in node && node.timeoutMs != null ? { timeoutMs: node.timeoutMs } : {}),
     ...('maxExecutions' in node && node.maxExecutions != null ? { maxExecutions: node.maxExecutions } : {}),
+    ...(node.onError == null ? {} : { onError: node.onError }),
     ...('retry' in node && node.retry != null ? { retry: node.retry } : {}),
     config: json(config),
     texts: Object.fromEntries(Object.entries(texts).map(([field, text]) => [field, { lines: text.split('\n').length, characters: text.length }])),
     inputs: outwardSource(content, inputMappings(node)),
     inputPorts: fieldsView(Object.entries(inputDefinitions(node)).map(([handle, port]) => Object.assign({}, port, { handle }))),
+    ...(Object.keys(nodeSystemOutputPorts(node)).length == 0
+      ? {}
+      : { systemOutputs: fieldsView(Object.entries(nodeSystemOutputPorts(node)).map(([handle, port]) => Object.assign({ handle }, port))) }),
     outputPorts: fieldsView(Object.entries(nodeOutputPorts(node)).map(([handle, port]) => Object.assign({}, port, { handle }))),
     ...(task != null && 'executor' in task && task.executor.kind == 'openapi' ? { authenticationChoices: openApiAuthenticationChoices(task.executor) } : {}),
     incoming: edges.filter((e) => e.target == ref),
@@ -287,6 +292,7 @@ export function searchAuthoring(content: RevisionContent, query: AuthoringSearch
     const fields = {
       name: view.name,
       description: view.description ?? '',
+      onError: view.onError ?? '',
       retry: JSON.stringify(view.retry ?? {}),
       inputs: JSON.stringify(view.inputs),
       config: JSON.stringify(view.config),
@@ -356,12 +362,18 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
   function source(
     value: Exclude<AuthoringSource, { kind: 'value' | 'default' | 'unset' | 'sources' }>,
   ): Extract<InputMapping, { kind: 'sources' }>['sources'][number] {
-    if (value.kind == 'output') {
+    if (value.kind == 'output' || value.kind == 'system') {
       const ref = resolve(value.node)
       const choices = Object.keys(nodeOutputPorts(nodeAt(content, ref)))
       const port = value.port ?? (choices.length == 1 ? choices[0] : undefined)
       if (port == null) fail('source.port-required', 'Choose an output name; this node does not have exactly one output.', { node: ref, choices })
-      return { kind: 'node', nodeId: ref, output: port, ...(value.field == null ? {} : { field: value.field }) }
+      return {
+        kind: 'node',
+        ...(value.kind == 'system' ? { system: true as const } : {}),
+        nodeId: ref,
+        output: port,
+        ...(value.field == null ? {} : { field: value.field }),
+      }
     }
     const existing = Object.entries(content.document.bindings).find(([, binding]) => binding.target == value.name)
     const bindingId = existing?.[0] ?? fresh('binding')
@@ -416,6 +428,7 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
       ...(view.icon == null ? {} : { icon: view.icon }),
       ...(view.timeoutMs == null ? {} : { timeoutMs: view.timeoutMs }),
       ...(view.maxExecutions == null ? {} : { maxExecutions: view.maxExecutions }),
+      ...(view.onError == null ? {} : { onError: view.onError }),
       ...(view.retry == null ? {} : { retry: view.retry }),
       config: view.config,
     }
@@ -431,11 +444,14 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
     let next = { ...rest, ...metadata } as GraphNode
     if (!isTriggerNode(node)) {
       const clean = { ...next } as Record<string, unknown>
+      if (!Object.hasOwn(update, 'onError')) delete clean.onError
       if (!Object.hasOwn(update, 'retry')) delete clean.retry
       if (!Object.hasOwn(update, 'timeoutMs')) delete clean.timeoutMs
       if (!Object.hasOwn(update, 'maxExecutions')) delete clean.maxExecutions
       next = clean as unknown as GraphNode
     } else if (update.timeoutMs != null || update.maxExecutions != null) fail('node.invalid-field', 'Trigger nodes do not have execution limits.')
+    if (update.onError != null && (!supportsNodeErrorHandling(next) || !['stop', 'error'].includes(String(update.onError))))
+      fail('node.invalid-field', 'This node does not support this error handling setting.')
     if (update.retry != null && !supportsNodeRetry(next)) fail('node.invalid-field', 'This node does not support retries.')
     if (node.kind == 'start' || node.kind == 'outputs') {
       replace(ref, next)
@@ -737,7 +753,7 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
               ]
           }
           apply(changes)
-          await configure(nodeId, { config, ...(edit.retry == null ? {} : { retry: edit.retry }) })
+          await configure(nodeId, { config, ...(edit.onError == null ? {} : { onError: edit.onError }), ...(edit.retry == null ? {} : { retry: edit.retry }) })
           const added = nodeAt(content, nodeId)
           if (added.kind == 'task') replace(nodeId, { ...added, inputs: {} })
           if (edit.code != null) await setText(nodeId, 'code', edit.code)

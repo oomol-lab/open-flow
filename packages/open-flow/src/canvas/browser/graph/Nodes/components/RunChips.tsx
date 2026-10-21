@@ -144,15 +144,17 @@ export function RunChips({ run }: { readonly run: FlowCanvasViewNodeRun }) {
   const status = `${label}${progress}${elapsed != null && Number.isFinite(elapsed) && elapsed >= 0 ? ` · ${formatDuration(elapsed)}` : ''}`
   const state = run.status
   const icon =
-    state == 'running'
-      ? 'i-codicon:loading'
-      : state == 'success'
-        ? 'i-codicon:check'
-        : state == 'error'
-          ? 'i-codicon:error'
-          : state == 'waiting'
-            ? 'i-carbon:time'
-            : 'i-codicon:circle-outline'
+    state == 'handled'
+      ? 'i-lucide-light:triangle-alert'
+      : state == 'running'
+        ? 'i-codicon:loading'
+        : state == 'success'
+          ? 'i-codicon:check'
+          : state == 'error'
+            ? 'i-codicon:error'
+            : state == 'waiting'
+              ? 'i-carbon:time'
+              : 'i-codicon:circle-outline'
   return (
     <div className={styles.row}>
       <RecordChip label={status} run={run} icon={icon} status={state}>

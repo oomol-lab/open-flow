@@ -134,6 +134,10 @@
     grid-column: 3;
     min-width: 0;
   }
+  .run-log-event.warning > .run-log-icon {
+    color: var(--warning-foreground);
+  }
+
   .run-log-event.danger > .run-log-icon,
   .run-error {
     color: var(--ui-destructive);

@@ -154,6 +154,10 @@ export class ConnectorTaskError extends Error {
     this.name = 'ConnectorTaskError'
   }
 
+  get catchable(): boolean {
+    return this.code != 'connector.indeterminate' && this.code != 'connector.unconfigured'
+  }
+
   get retryable(): boolean {
     return this.code == 'connector.unavailable'
   }

@@ -591,7 +591,8 @@
       "running": "실행 중",
       "success": "완료",
       "error": "실패",
-      "waiting": "대기 중"
+      "waiting": "대기 중",
+      "handled": "실패 처리됨"
     },
     "triggerSource": {
       "manual": "수동",

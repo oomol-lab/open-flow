@@ -209,7 +209,7 @@ Analytics uses anonymous browser identity rather than the Operator identity shar
 
 ### Upgrading to node retries
 
-Flow model v9 requires Engine v6 and the matching isolated runtime digest. Finish or cancel active
+Flow model v9 requires Engine v6, checkpoint v6 and the matching isolated runtime digest. Finish or cancel active
 Runs on the previous Engine before replacing the deployment, unless its matching recovery runtime
 is retained. Republish old Engine-pinned Publications before executing them on the new Engine.
 Existing Revisions, Publications and Run history are preserved; Draft upgrades are explicit.

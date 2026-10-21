@@ -290,7 +290,23 @@
       "retryNone": "不重試",
       "retrySeconds": "秒",
       "retryHelp": "重試說明",
-      "retryOnce": "最多重試 1 次"
+      "retryOnce": "最多重試 1 次",
+      "onError": "失敗處理",
+      "onErrorStop": "終止工作流程",
+      "onErrorOutput": "輸出至 error 連接埠",
+      "onErrorHelp": "失敗處理說明",
+      "onErrorHint": "重試後仍失敗時，將錯誤寫入系統 error 並沿現有連線繼續。成功時 error 為 null。取消、逾時、資源限制及結果不確定仍終止工作流程。",
+      "systemOutputs": "系統輸出",
+      "systemError": "錯誤資訊（系統）",
+      "errorFields": {
+        "error": "節點失敗時的錯誤資訊；成功時為 null。",
+        "code": "用於識別錯誤類型的錯誤碼。",
+        "message": "錯誤的說明資訊，敏感內容已遮蔽。",
+        "nodeId": "發生錯誤的節點 ID。",
+        "nodeName": "發生錯誤時的節點名稱。",
+        "runId": "本次工作流程執行的 ID。",
+        "executionId": "本次節點執行的 ID，多次重試共用此 ID。"
+      }
     },
     "selectNode": "選取一個草稿節點即可檢視並編輯它。",
     "locateNode": "在畫布上定位此節點",
@@ -767,7 +783,8 @@
       "completed": "成功",
       "failed": "失敗",
       "unknown": "狀態未確認"
-    }
+    },
+    "errorHandled": "失敗已處理"
   },
   "sidebar": {
     "createFirstFlow": "建立 Flow",

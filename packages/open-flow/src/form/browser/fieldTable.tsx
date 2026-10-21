@@ -13,40 +13,46 @@ export const FieldTable = forwardRef<
   ComponentPropsWithoutRef<'div'> & {
     layout?: 'values' | 'ports' | 'definition'
     fixedTypes?: boolean
+    columnHeadings?: boolean
     typeColumn?: boolean
     output?: boolean
     nullable?: boolean
     empty?: boolean
     actionSlots?: 1 | 2
   }
->(({ layout = 'definition', fixedTypes, typeColumn = true, output, nullable, empty, actionSlots = 1, className, children, ...props }, ref) => {
-  const t = useTranslate()
-  return (
-    <div
-      {...props}
-      ref={ref}
-      className={[styles.list, className].filter(Boolean).join(' ')}
-      data-value-editor-scope
-      data-layout={layout}
-      data-type-column={typeColumn || undefined}
-      data-output={output || undefined}
-      data-fixed-types={fixedTypes || undefined}
-      data-nullable={nullable || undefined}
-      data-empty={empty || undefined}
-      data-action-slots={actionSlots}
-    >
-      {!empty && (
-        <div className={styles.columns} data-layout={layout} data-output={output || undefined}>
-          <span className={styles.nameHeading}>{t('valueEditor.columnName')}</span>
-          {typeColumn && <span className={styles.typeHeading}>{t('valueEditor.columnType')}</span>}
-          {!output && <span className={styles.valueHeading}>{t('valueEditor.columnValue')}</span>}
-          {nullable && <span className={styles.nullableHeading}>{t('valueEditor.nullable')}</span>}
-        </div>
-      )}
-      <FieldLayout layout={layout}>{children}</FieldLayout>
-    </div>
-  )
-})
+>(
+  (
+    { layout = 'definition', fixedTypes, typeColumn = true, columnHeadings = true, output, nullable, empty, actionSlots = 1, className, children, ...props },
+    ref,
+  ) => {
+    const t = useTranslate()
+    return (
+      <div
+        {...props}
+        ref={ref}
+        className={[styles.list, className].filter(Boolean).join(' ')}
+        data-value-editor-scope
+        data-layout={layout}
+        data-type-column={typeColumn || undefined}
+        data-output={output || undefined}
+        data-fixed-types={fixedTypes || undefined}
+        data-nullable={nullable || undefined}
+        data-empty={empty || undefined}
+        data-action-slots={actionSlots}
+      >
+        {columnHeadings && !empty && (
+          <div className={styles.columns} data-layout={layout} data-output={output || undefined}>
+            <span className={styles.nameHeading}>{t('valueEditor.columnName')}</span>
+            {typeColumn && <span className={styles.typeHeading}>{t('valueEditor.columnType')}</span>}
+            {!output && <span className={styles.valueHeading}>{t('valueEditor.columnValue')}</span>}
+            {nullable && <span className={styles.nullableHeading}>{t('valueEditor.nullable')}</span>}
+          </div>
+        )}
+        <FieldLayout layout={layout}>{children}</FieldLayout>
+      </div>
+    )
+  },
+)
 
 export function FieldTableRow({ className, ...props }: ComponentPropsWithoutRef<'div'>) {
   return <div {...props} className={[styles.row, className].filter(Boolean).join(' ')} />

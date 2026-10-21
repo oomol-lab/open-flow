@@ -25,6 +25,40 @@ export function runtimeAssertions(
     return errors
   }
   if (status != 'completed') return [`Run ${sample.name} ended ${status}.`]
+  if (id == 'node-errors') {
+    const terminal = events.findLast((event) => event.kind == 'run.completed')
+    const result = terminal?.kind == 'run.completed' ? terminal.payload.result : undefined
+    const output = result != null && typeof result == 'object' && 'outputs' in result ? result.outputs : undefined
+    const failure = output != null && typeof output == 'object' && 'failure' in output ? output.failure : undefined
+    const failedId = Object.entries(content.document.graph.nodes).find(([, node]) => node.name == 'Failed task')?.[0]
+    if (
+      output == null ||
+      typeof output != 'object' ||
+      !('business' in output) ||
+      !('successError' in output) ||
+      output.business != 'business' ||
+      output.successError !== null ||
+      failure == null ||
+      typeof failure != 'object' ||
+      Array.isArray(failure) ||
+      !('code' in failure) ||
+      !('message' in failure) ||
+      !('nodeId' in failure) ||
+      !('nodeName' in failure) ||
+      !('runId' in failure) ||
+      !('executionId' in failure) ||
+      failure.code != 'node.failed' ||
+      failure.message != 'Expected failure' ||
+      failure.nodeId != failedId ||
+      typeof failure.nodeName != 'string' ||
+      typeof failure.runId != 'string' ||
+      typeof failure.executionId != 'string' ||
+      events.filter((event) => event.kind == 'node.failed' && event.payload.nodeId == failedId && event.payload.handled === true).length != 1 ||
+      calls.length ||
+      modelCalls.length
+    )
+      errors.push('Preserve the business error field, output null on success and handle the failed task once with a complete system error.')
+  }
   if (id == 'node-retries') {
     const tasks = ['Retried task updated', 'Cleared task'].map(
       (name) => Object.entries(content.document.graph.nodes).find(([, node]) => node.kind == 'task' && 'moduleId' in node.task && node.name == name)?.[0],

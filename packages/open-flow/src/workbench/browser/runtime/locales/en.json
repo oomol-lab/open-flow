@@ -290,7 +290,23 @@
       "retryNone": "No retries",
       "retrySeconds": "seconds",
       "retryHelp": "About retries",
-      "retryOnce": "Retry once"
+      "retryOnce": "Retry once",
+      "onError": "On failure",
+      "onErrorStop": "Stop workflow",
+      "onErrorOutput": "Output to error port",
+      "onErrorHelp": "About failure handling",
+      "onErrorHint": "After retries fail, write the error to the system error output and continue along existing connections. On success, error is null. Cancellation, timeouts, resource limits and indeterminate outcomes still stop execution.",
+      "systemOutputs": "System outputs",
+      "systemError": "Error information (system)",
+      "errorFields": {
+        "error": "Error information when the node fails; null on success.",
+        "code": "A code identifying the type of error.",
+        "message": "A description of the error, with sensitive content redacted.",
+        "nodeId": "The ID of the node that failed.",
+        "nodeName": "The node name at the time of failure.",
+        "runId": "The ID of this workflow run.",
+        "executionId": "The ID of this node execution, shared across its retry attempts."
+      }
     },
     "selectNode": "Select one Draft node to inspect and edit it.",
     "locateNode": "Locate this node on the canvas",
@@ -767,7 +783,8 @@
       "completed": "Succeeded",
       "failed": "Failed",
       "unknown": "Unconfirmed"
-    }
+    },
+    "errorHandled": "Failure handled"
   },
   "sidebar": {
     "createFirstFlow": "Create Flow",

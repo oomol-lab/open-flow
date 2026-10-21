@@ -108,7 +108,7 @@ for (const conformance of runLifecycleConformanceCases) {
                   inputs: {},
                   results: {},
                   counts: {},
-                  version: 5,
+                  version: 6,
                   dependencies: {
                     nextId: 1,
                     iterations: {},

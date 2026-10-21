@@ -122,7 +122,11 @@ Each invocation waits for every direct predecessor in its iteration to complete 
 Loops permit repeated invocations within execution budgets. Initial entry does not wait for recurrence edges. Each recurrence starts a new iteration, retaining outer ancestors and explicit feedback while resetting its dependent continuation. Nested loops start fresh on ordinary entry. Unselected loop exits settle when the loop finishes; Wait pending notifications remain available immediately.
 Dependency progress, loop iterations, selected predecessors, and invocation input snapshots belong to the Scheduler and survive checkpoint recovery. Run-wide last-completed results are a presentation projection, not an input data source.
 
-An ordinary Task commits its result once, after the complete output passes validation.
+An ordinary Task commits its business result once, after the complete output passes validation.
+Supported Tasks may explicitly handle a final invocation or runtime input/output validation failure,
+commit a separate system error and continue through the same execution edges. Success exposes a null
+system error. Handled failure does not commit business outputs or dispatch Flow Error. System outputs
+never occupy business output names or add canvas execution ports.
 Internal Run storage must not become a second data channel through which scripts can read arbitrary node results.
 Node execution, events, and capability calls share cancellation and deadlines. Catching an ordinary business error cannot disable resource limits or termination requirements.
 

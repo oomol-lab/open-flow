@@ -288,7 +288,13 @@ function runProjection(
         break
       case 'node.failed':
         running.delete(event.payload.executionId)
-        nodes.set(nodeId, { ...current, runId: run.runId, finishedAt: event.createdAt, error: event.payload.error, status: 'error' })
+        nodes.set(nodeId, {
+          ...current,
+          runId: run.runId,
+          finishedAt: event.createdAt,
+          error: event.payload.error,
+          status: event.payload.handled ? 'handled' : 'error',
+        })
         break
       case 'node.log':
         nodes.set(nodeId, {

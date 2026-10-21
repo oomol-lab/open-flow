@@ -14,7 +14,7 @@ export function renamedPort(
 export function renameOutputMapping(mapping: InputMapping, nodeIds: ReadonlySet<string>, rename: readonly [string, string] | undefined): InputMapping {
   if (rename == null || mapping.kind != 'sources') return mapping
   const sources = mapping.sources.map((source) =>
-    source.kind == 'node' && nodeIds.has(source.nodeId) && source.output == rename[0] ? { ...source, output: rename[1] } : source,
+    source.kind == 'node' && !source.system && nodeIds.has(source.nodeId) && source.output == rename[0] ? { ...source, output: rename[1] } : source,
   )
   return sources.every((source, index) => source === mapping.sources[index]) ? mapping : { kind: 'sources', sources }
 }

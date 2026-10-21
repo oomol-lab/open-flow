@@ -106,6 +106,7 @@ function canonicalNode(value: GraphNode): JsonValue {
     ...(value.name == null ? {} : { name: value.name }),
     ...(value.maxExecutions == null ? {} : { maxExecutions: value.maxExecutions }),
     ...(value.timeoutMs == null ? {} : { timeoutMs: value.timeoutMs }),
+    ...(value.onError == null ? {} : { onError: value.onError }),
     ...(value.retry == null ? {} : { retry: { maxRetries: value.retry.maxRetries, intervalMs: value.retry.intervalMs } }),
   }
   switch (value.kind) {

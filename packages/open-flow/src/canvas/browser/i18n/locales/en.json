@@ -591,7 +591,8 @@
       "running": "Running",
       "success": "Completed",
       "error": "Failed",
-      "waiting": "Waiting"
+      "waiting": "Waiting",
+      "handled": "Failure handled"
     },
     "triggerSource": {
       "manual": "Manual",

@@ -686,11 +686,28 @@ export function decodeRunEvent(value: unknown) {
           return {
             ...base,
             kind,
-            payload: { ...node, outputs: Object.fromEntries(Object.entries(record(payload.outputs)).map(([key, item]) => [key, jsonValue(item)])) },
+            payload: {
+              ...node,
+              ...(payload.systemOutputs === undefined
+                ? {}
+                : { systemOutputs: Object.fromEntries(Object.entries(record(payload.systemOutputs)).map(([key, item]) => [key, jsonValue(item)])) }),
+              outputs: Object.fromEntries(Object.entries(record(payload.outputs)).map(([key, item]) => [key, jsonValue(item)])),
+            },
           } as const
         case 'node.failed': {
           const error = record(payload.error)
-          return { ...base, kind, payload: { ...node, error: { code: string(error.code), message: string(error.message) } } } as const
+          return {
+            ...base,
+            kind,
+            payload: {
+              ...node,
+              ...(payload.handled === true ? { handled: true as const } : {}),
+              ...(payload.systemOutputs === undefined
+                ? {}
+                : { systemOutputs: Object.fromEntries(Object.entries(record(payload.systemOutputs)).map(([key, item]) => [key, jsonValue(item)])) }),
+              error: { code: string(error.code), message: string(error.message) },
+            },
+          } as const
         }
         case 'node.log': {
           const level = payload.level

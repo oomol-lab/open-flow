@@ -8,11 +8,14 @@ import type { WebhookMethod } from './webhookMethod.ts'
 import { dequal } from 'dequal/lite'
 import { currentFlowModelVersion, decodeRevisionContent } from './changeSchema.ts'
 import { nodeInputMappings, setConditionInput } from './condition.ts'
+import { supportsNodeErrorHandling } from './errorHandling.ts'
 import { supportsNodeRetry } from './retry.ts'
 
 export { changeOperationsSchema, currentFlowModelVersion, decodeChangeOperations } from './changeSchema.ts'
 export type { RetryConfiguration } from './retry.ts'
 export { supportsNodeRetry } from './retry.ts'
+export { nodeSystemOutputPorts, supportsNodeErrorHandling, nodeErrorSchema } from './errorHandling.ts'
+export type { NodeErrorData } from './errorHandling.ts'
 export type { WebhookMethod }
 
 export type { JsonValue, Port, PortDefinition } from '../../types/index.ts'
@@ -106,6 +109,7 @@ export function portsByHandle<Value extends Port>(ports: readonly (Value | Group
 }
 
 export interface NodeSource {
+  readonly system?: true
   readonly field?: string
   readonly kind: 'node'
   readonly nodeId: string
@@ -130,6 +134,7 @@ interface GraphNodeBase {
   readonly maxExecutions?: number
   readonly timeoutMs?: number
   readonly retry?: RetryConfiguration
+  readonly onError?: 'stop' | 'error'
 }
 
 export interface ValueNode extends GraphNodeBase {
@@ -456,6 +461,7 @@ export interface WebhookOptions {
 }
 
 interface TriggerNodeBase {
+  readonly onError?: never
   readonly description?: string
   readonly icon?: string
   readonly name: string
@@ -603,7 +609,7 @@ export type ChangeOperation =
   | { readonly kind: 'graph.node.delete'; readonly nodeId: string }
   | {
       readonly before?: number | string
-      readonly field: 'connectionId' | 'description' | 'icon' | 'maxExecutions' | 'name' | 'timeoutMs'
+      readonly field: 'connectionId' | 'description' | 'icon' | 'maxExecutions' | 'name' | 'timeoutMs' | 'onError'
       readonly kind: 'graph.node.field.set'
       readonly nodeId: string
 
@@ -832,6 +838,12 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
         const graph = document.graph
         const node = graph.nodes[operation.nodeId]
         if (node == null) invalid('The Node does not exist in the target graph.')
+        if (
+          operation.field == 'onError' &&
+          operation.value != null &&
+          (!supportsNodeErrorHandling(node) || !['stop', 'error'].includes(String(operation.value)))
+        )
+          invalid('This node does not support this error handling setting.')
         if (operation.field == 'retry' && operation.value != null && !supportsNodeRetry(node)) invalid('This node does not support retries.')
         if (operation.field == 'connectionId' && node.kind != 'poll' && node.kind != 'integration') invalid('Only provider Triggers select a node Connection.')
         if (!dequal(Reflect.get(node, operation.field), operation.before)) invalid('The Node field changed before this operation was applied.')

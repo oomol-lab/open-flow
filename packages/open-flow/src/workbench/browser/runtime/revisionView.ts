@@ -17,6 +17,7 @@ import type {
 import { isTriggerNode } from '../../../flow/common/change.ts'
 import { nodeInputMappings } from '../../../flow/common/condition.ts'
 import { connectionUsage } from '../../../flow/common/connectionUsage.ts'
+import { nodeSystemOutputPorts } from '../../../flow/common/errorHandling.ts'
 import { checkInputSources, inputSourceCandidates, nodeOutputDescription, nodeOutputPorts } from '../../../flow/common/graph.ts'
 import { agentActions, codeActions } from '../../../flow/common/semantics.ts'
 import { sourcePort } from '../../../flow/common/sourceField.ts'
@@ -118,7 +119,7 @@ export class RevisionView {
   public sourceType(source: import('../../../flow/common/change.ts').Source): string | undefined {
     const graph = this.graph()
     const node = source.kind === 'node' ? graph.nodes[source.nodeId] : undefined
-    const output = source.kind === 'node' && node != null ? nodeOutputPorts(node)[source.output] : undefined
+    const output = source.kind === 'node' && node != null ? (source.system ? nodeSystemOutputPorts(node) : nodeOutputPorts(node))[source.output] : undefined
     const schema = output == null || source.kind !== 'node' ? undefined : sourcePort(output, source.field)?.jsonSchema
     if (source.kind === 'binding') return 'string'
     if (schema != null && typeof schema === 'object' && !Array.isArray(schema) && 'type' in schema && typeof schema.type === 'string') return schema.type

@@ -29,6 +29,7 @@ export function sourcePort(output: PortDefinition, field: string | undefined): P
 }
 
 /** Present a selected first-level field as a compact path from its output. */
-export function sourceOutputLabel(source: Pick<NodeSource, 'output' | 'field'>): string {
-  return source.field === undefined ? source.output : `${source.output} / ${source.field}`
+export function sourceOutputLabel(source: Pick<NodeSource, 'output' | 'field' | 'system'>): string {
+  const output = source.system ? `$system / ${source.output}` : source.output
+  return source.field === undefined ? output : `${output} / ${source.field}`
 }

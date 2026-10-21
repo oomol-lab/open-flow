@@ -50,6 +50,32 @@ type Fixture = {
 }
 const fixtures: readonly Fixture[] = [
   {
+    id: 'error-handling',
+    group: 'Task',
+    node: {
+      kind: 'task',
+      name: 'System error outputs',
+      onError: 'error',
+      task: { moduleId: 'module', name: 'Consumer', inputs: [{ handle: 'issue', jsonSchema: {}, nullable: true }], outputs: [field('error')] },
+      inputs: { issue: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'upstream', output: 'error', system: true }] } },
+    },
+    content: {
+      graph: {
+        nodes: {
+          upstream: {
+            kind: 'task',
+            name: 'Upstream task',
+            onError: 'error',
+            inputs: {},
+            task: { moduleId: 'module', name: 'Source', inputs: [], outputs: [field('error')] },
+          },
+        },
+        edges: [{ source: 'upstream', target: 'sample' }],
+      },
+    },
+  },
+
+  {
     id: 'retry-disabled',
     group: 'Task',
     node: { kind: 'task', name: 'Retry disabled', inputs: {}, task: { name: 'Task', inputs: [], outputs: [], executor: { kind: 'llm', mode: 'chat' } } },
@@ -62,6 +88,7 @@ const fixtures: readonly Fixture[] = [
       name: 'Retry enabled',
       inputs: {},
       retry: { maxRetries: 2, intervalMs: 2000 },
+      onError: 'error',
       task: { name: 'Task', inputs: [], outputs: [], executor: { kind: 'llm', mode: 'chat' } },
     },
   },
@@ -243,7 +270,11 @@ function contentFor(fixture: Fixture): RevisionContent {
   return {
     modelVersion: currentFlowModelVersion,
     modules: { module: { name: 'Prepare report', imports: [], source: 'export default (inputs) => ({ report: inputs.message, count: inputs.count })' } },
-    document: { bindings: {}, ...fixture.content, graph: { nodes: { sample: fixture.node }, edges: [] } },
+    document: {
+      bindings: {},
+      ...fixture.content,
+      graph: { nodes: { ...fixture.content?.graph?.nodes, sample: fixture.node }, edges: fixture.content?.graph?.edges ?? [] },
+    },
   }
 }
 
@@ -359,28 +390,34 @@ function PropertiesStory({ fixture, dark, language, log }: { fixture: Fixture; d
 export const nodePropertiesStories: readonly FrontendStory[] = fixtures.map((fixture) => ({
   group: `Node ${fixture.group}`,
   id: `node-${fixture.id}-properties`,
-  title: fixture.id.startsWith('retry-')
-    ? fixture.node.name!
-    : fixture.id == 'provider-inputs'
-      ? 'Provider inputs'
-      : fixture.id == 'code-actions-loading'
-        ? 'Code · Slow actions'
-        : fixture.id == 'execution-limit'
-          ? 'Execution limit'
-          : 'Properties',
+  title:
+    fixture.id == 'error-handling'
+      ? 'Error handling'
+      : fixture.id.startsWith('retry-')
+        ? fixture.node.name!
+        : fixture.id == 'provider-inputs'
+          ? 'Provider inputs'
+          : fixture.id == 'code-actions-loading'
+            ? 'Code · Slow actions'
+            : fixture.id == 'execution-limit'
+              ? 'Execution limit'
+              : 'Properties',
   standalone: true,
-  description: fixture.id.startsWith('retry-')
-    ? 'Open Node settings to configure retries. Choose No retries or a retry count, edit the interval, test invalid intervals and the help beside Retry on error, and reload to verify persistence. Compare editable and read-only samples in either theme.'
-    : fixture.id == 'provider-inputs'
-      ? 'Provider inputs group required fields before optional fields. Optional starts collapsed, including configured values. Expand it, edit values and sources, then reload saved data; reopening panels restores the default expansion.'
-      : fixture.id == 'code-actions-loading'
-        ? 'Opening the editor makes no shared Action requests. Trigger completion with Ctrl+Space; Actions take four seconds to load while editing remains available. Reset samples to repeat.'
-        : fixture.id == 'execution-limit'
-          ? 'Per-run node execution limits. Change the limit, test invalid values, or clear it to restore the default of 1000; reload verifies persistence.'
-          : fixture.id === 'value'
-            ? 'Editable and read-only properties, including typed dates, calendar selection, and time editing with timezone preservation. Use Sort to reorder fields and nested object properties; Done sorting restores disclosure arrows. Samples save independently.'
-            : fixture.id === 'task'
-              ? 'Editable and read-only task properties. Toggle the code issue to inspect its attached error above Node settings.'
-              : 'Editable, read-only and fixed-type value panels. Inspector samples save independently; reload verifies saved values.',
+  description:
+    fixture.id == 'error-handling'
+      ? 'Compare the ordinary error field with the quiet system-output group. Expand error and hover each field name to inspect localized help. Open the input source menu to inspect the separate system section, switch failure handling off and on, and reload saved data. Canvas connections are unchanged.'
+      : fixture.id.startsWith('retry-')
+        ? 'Open Node settings to configure retries. Choose No retries or a retry count, edit the interval, test invalid intervals and the help beside Retry on error, and reload to verify persistence. Compare editable and read-only samples in either theme.'
+        : fixture.id == 'provider-inputs'
+          ? 'Provider inputs group required fields before optional fields. Optional starts collapsed, including configured values. Expand it, edit values and sources, then reload saved data; reopening panels restores the default expansion.'
+          : fixture.id == 'code-actions-loading'
+            ? 'Opening the editor makes no shared Action requests. Trigger completion with Ctrl+Space; Actions take four seconds to load while editing remains available. Reset samples to repeat.'
+            : fixture.id == 'execution-limit'
+              ? 'Per-run node execution limits. Change the limit, test invalid values, or clear it to restore the default of 1000; reload verifies persistence.'
+              : fixture.id === 'value'
+                ? 'Editable and read-only properties, including typed dates, calendar selection, and time editing with timezone preservation. Use Sort to reorder fields and nested object properties; Done sorting restores disclosure arrows. Samples save independently.'
+                : fixture.id === 'task'
+                  ? 'Editable and read-only task properties. Toggle the code issue to inspect its attached error above Node settings.'
+                  : 'Editable, read-only and fixed-type value panels. Inspector samples save independently; reload verifies saved values.',
   render: (log, dark, language) => <PropertiesStory fixture={fixture} dark={dark} language={language} log={log} />,
 }))

@@ -1146,7 +1146,7 @@ The exact Scheduler checkpoint object is:
 
 `inputs` stores launch inputs by node ID/input handle. `bindingValues` stores this Run’s Variable binding snapshot. `results` stores each node’s last completed outputs. `counts` stores cumulative executions by node ID with outer scope fixed to `""`. `dependencies` owns the invocation snapshots and progress: `nextId`, per-loop `iterations`, and per-node states (`id`, `status`, `input`, optional `output`, `previous`, `released`, optional `jobId`, and `seeded`). Each `input` entry records one ancestor’s `{ execution, outputs }`; the execution identity selects newer iterations of that ancestor independently of completion order. Input snapshots remain unchanged when a node releases pending or final output. Partial joins reuse the completed predecessors’ saved input and output instead of a separate snapshot table. `waits` stores all waits whose decisions remain to be applied. Entries also store complete `pending` outputs once released.
 
-`agents` maps job IDs to `{ invocationId, input, remainingMs?, checkpoint }`, where checkpoint follows the Agent continuation contract. With node timeoutMs, remainingMs must be positive and no greater than the original limit. Total JSON is limited to 16 MiB. Recovery verifies exact fields, unique job/wait identities, node execution limits, declared results, wait-input/path consistency, and Agent continuation inputs/budgets. Older checkpoints cannot recover as v5.
+`agents` maps job IDs to `{ invocationId, input, remainingMs?, checkpoint }`, where checkpoint follows the Agent continuation contract. With node timeoutMs, remainingMs must be positive and no greater than the original limit. Total JSON is limited to 16 MiB. Recovery verifies exact fields, unique job/wait identities, node execution limits, declared results, wait-input/path consistency, and Agent continuation inputs/budgets. Older checkpoints cannot recover as v6.
 
 Nodes outside the execution path create no jobs, execution identities, or events. Each invocation gets a separate identity, retained through suspension/recovery. Ordinary Task outputs declared but missing or `undefined` become `null`. An entirely `undefined` return becomes an empty object; explicit non-object returns remain invalid. Port contents are not recursively normalized. Unselected Condition/Wait branch ports remain absent. Runtime validates and copies return data before JSON transport.
 
@@ -1158,7 +1158,7 @@ Flow terminal results use `{ kind: 'node-results', nodes }`. `nodes` contains on
 
 ## 10. Code Action contract
 
-The script contract is `open-flow-engine/v6`, with bounded Task retries, dependency joins, repeated loop iterations, and cumulative per-node execution limits. Scheduler checkpoints remain version 5; old development checkpoint shapes are rejected without conversion. Earlier Engine-pinned Publications/Runs require republication or a matching execution environment. `context.actions` replaces v1 `context.connector` without aliases. v1-pinned Publications/Runs require their matching Engine; current Server explicitly rejects v1. New Code node Revisions store account mode. Only independent mode stores a node Action allowlist. Deployment Provider Access Bindings or implicit Connector authority remain the final authorization source.
+The script contract is `open-flow-engine/v6`, with bounded Task retries, dependency joins, repeated loop iterations, and cumulative per-node execution limits. Scheduler checkpoints use version 6; old development checkpoint shapes are rejected without conversion. Earlier Engine-pinned Publications/Runs require republication or a matching execution environment. `context.actions` replaces v1 `context.connector` without aliases. v1-pinned Publications/Runs require their matching Engine; current Server explicitly rejects v1. New Code node Revisions store account mode. Only independent mode stores a node Action allowlist. Deployment Provider Access Bindings or implicit Connector authority remain the final authorization source.
 
 ### Revision and edit operations
 
@@ -1430,7 +1430,7 @@ Each invocation checks current Live and interface compatibility before admitting
 
 Run details expose optional `triggerNodeId` for all entry types, optional `caller: { flowId, runId, nodeId, executionId }`, and `calls: [{ flowId, runId, nodeId, executionId, status }]`. Call status is null if the retained target Run is unavailable. Each loop invocation has its own execution identity and child association. Parent and child logs are independent. The parent Run records the call node's normal input/output and lifecycle; the child records its internal execution. Call associations remain available independently of event logs. `source` remains `draft | live`.
 
-Waiting calls are saved in the optional `calls` member of the version 5 checkpoint; old checkpoints without it remain valid. A pending call freezes as soon as no ordinary task is active, without the manual-Wait in-memory retention delay. Its child may use ordinary Wait and Agent approval recovery. An explicit call `timeoutMs` covers queueing, execution and waiting; otherwise child execution and wait limits apply. Parent cancellation/failure cancels unfinished children; an indeterminate child makes the caller indeterminate. No interrupted unconfirmed side effect is replayed.
+Waiting calls are saved in the optional `calls` member of the version 6 checkpoint; old checkpoints without it remain valid. A pending call freezes as soon as no ordinary task is active, without the manual-Wait in-memory retention delay. Its child may use ordinary Wait and Agent approval recovery. An explicit call `timeoutMs` covers queueing, execution and waiting; otherwise child execution and wait limits apply. Parent cancellation/failure cancels unfinished children; an indeterminate child makes the caller indeterminate. No interrupted unconfirmed side effect is replayed.
 
 `GET /v1/flows/:flowId/references?direction=incoming|outgoing&offset=0&limit=50` returns `{ version: 1, direction, total, references, nextOffset? }`; limit is 1–100. Each reference contains `flowId`, nullable `name`, `available`, `draft`, and `live: { publicationId, enabled } | null`. Draft/Live identify the source declaration scopes, with disabled Live included. Results are sorted by Flow ID, deduplicated across scopes and filtered by owner. Outgoing references retain missing/retiring target IDs. Pagination and total share a single database snapshot and never read Revision bodies.
 
@@ -1479,5 +1479,47 @@ failures produce warning `node.log` entries with attempt numbers, code/message a
 failure emits `node.failed` and fails the Run. Intermediate failures do not dispatch Flow Error.
 Enabling retry permits repeated external operations; it does not guarantee exactly-once side effects.
 
-This version adds no error output port. Future error routing belongs after retry exhaustion and must
-preserve cancellation, resource limits and indeterminate outcomes.
+### Handled node errors and system outputs
+
+Code, Connector, OpenAPI, LLM and AI Decision nodes accept optional `onError: "stop" | "error"`.
+Omission means stop. Creation, reads, updates, search and diagnostics expose the setting beside retry.
+Updates preserve omitted settings; `clear: [["onError"]]` restores the default.
+
+With `onError: "error"`, the Scheduler handles trusted `catchable: true` task failures after retries
+are exhausted, plus runtime input and output validation failures (`node.input-invalid` and
+`node.output-invalid`). Retryability and catchability are independent. Cancellation, node/Run
+budgets, resource limits, isolation/protocol failures, indeterminate outcomes, event persistence and
+result commit failures still terminate execution. Static configuration and compilation errors remain
+admission errors. Host/Executor classification is structural, never inferred from error messages.
+
+Both successful and handled executions release the existing execution connections. There is no
+error execution branch or extra canvas connection point. Business outputs are committed only on
+success; handled failures provide no business outputs, so downstream inputs resolve missing values
+using the normal null/schema rules. Source compatibility reflects their conditional availability.
+
+An enabled node has an independently named system output `error`: null on success, otherwise an
+object with six required string fields `code`, `message`, `nodeId`, `nodeName`, `runId`, `executionId`.
+The execution ID matches the public node events. The message uses the existing runtime error
+redaction. Raw exceptions, stacks, input snapshots and request bodies are not included. A business
+output named `error` is independent and remains valid.
+
+Public authoring binds system data as `{ kind: "system", node, port: "error", field? }`, including
+inside a `sources` list or Condition operand. Low-level node sources use
+`{ kind: "node", nodeId, output: "error", system: true, field? }`; omitted `system` means a business
+output. All six first-level fields and the complete nullable object are selectable. Detail reads
+expose the fixed definitions in `systemOutputs`, separately from `outputPorts`.
+
+The property panel displays read-only System outputs as a quiet group below business outputs,
+without repeating the section title or column headings. Error and its fields have localized help. The source selector
+separates the upstream node's system output from its business outputs. Disabled nodes advertise no
+system output; saved references are retained and diagnosed as missing rather than silently removed.
+
+A handled failure emits `node.failed` with `handled: true` and `systemOutputs`, without a successful
+`node.completed`. Success events include `systemOutputs: { error: null }`. Durable node results use
+`status: "error-handled"` for handled terminal nodes. The Run can complete successfully and therefore
+does not dispatch Flow Error. A downstream failure follows that node's own error handling policy.
+
+Checkpoint v6 and per-execution dependency snapshots store system outputs separately from business
+outputs, including across loops and Wait recovery. Older execution snapshots are never replaced by a
+Run-wide latest value. Code `getPrevious()` returns optional `systemOutputs` beside ordinary outputs.
+Recovery never replays an already handled task, and storage failures do not release downstream work.

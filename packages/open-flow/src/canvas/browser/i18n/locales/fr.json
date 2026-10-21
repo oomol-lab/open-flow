@@ -591,7 +591,8 @@
       "running": "En cours",
       "success": "Terminé",
       "error": "Échec",
-      "waiting": "En attente"
+      "waiting": "En attente",
+      "handled": "Échec traité"
     },
     "triggerSource": {
       "manual": "Manuel",

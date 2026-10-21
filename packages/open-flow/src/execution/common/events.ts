@@ -83,6 +83,8 @@ function message(value: unknown): string {
     .replace(/\b(api[-_ ]?key|authorization|password|secret|token)\s*[:=]\s*\S+/gi, '$1=[REDACTED]')
 }
 
+export { message as sanitizeRuntimeErrorMessage }
+
 function nodeFailureCode(value: unknown, allowed: ReadonlySet<string>): string {
   const code = string(value, 'Runtime node.failed code')
   if (!allowed.has(code)) throw new TypeError('Runtime node.failed code is invalid.')
@@ -212,6 +214,8 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
         flowId: context.flowId,
         nodeId: context.nodeId,
         scopeId: await opaqueId('scope', platformRunId, context.rawRunId),
+        ...(event.systemOutputs === undefined ? {} : { systemOutputs: object(event.systemOutputs, 'Runtime system outputs') }),
+        ...(event.handled === true ? { handled: true } : {}),
       }
       switch (type) {
         case 'node.completed':

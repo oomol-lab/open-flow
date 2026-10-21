@@ -79,7 +79,7 @@ export interface FlowCanvasViewNodeRun {
   readonly logs?: readonly { readonly message: string; readonly level: string; readonly time: string }[]
   readonly artifacts?: readonly unknown[]
   readonly progress?: number
-  readonly status: 'error' | 'idle' | 'running' | 'success' | 'waiting'
+  readonly status: 'handled' | 'error' | 'idle' | 'running' | 'success' | 'waiting'
   readonly successCount?: number
 }
 

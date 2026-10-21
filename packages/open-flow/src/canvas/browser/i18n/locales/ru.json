@@ -591,7 +591,8 @@
       "running": "Выполняется",
       "success": "Завершён",
       "error": "Ошибка",
-      "waiting": "Ожидание"
+      "waiting": "Ожидание",
+      "handled": "Ошибка обработана"
     },
     "triggerSource": {
       "manual": "Вручную",

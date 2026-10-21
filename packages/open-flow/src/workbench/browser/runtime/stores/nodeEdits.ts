@@ -131,7 +131,7 @@ export class NodeEdits {
   public async setInputSource(
     nodeId: string,
     handle: string,
-    source: { readonly nodeId: string; readonly output: string; readonly field?: string },
+    source: { readonly nodeId: string; readonly output: string; readonly field?: string; readonly system?: true },
   ): Promise<boolean> {
     const revision = this.revision.value
     if (revision == null) return false

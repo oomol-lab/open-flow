@@ -290,7 +290,23 @@
       "retryNone": "不重试",
       "retrySeconds": "秒",
       "retryHelp": "重试说明",
-      "retryOnce": "最多重试 1 次"
+      "retryOnce": "最多重试 1 次",
+      "onError": "失败处理",
+      "onErrorStop": "终止工作流",
+      "onErrorOutput": "输出到 error 端口",
+      "onErrorHelp": "失败处理说明",
+      "onErrorHint": "重试后仍失败时，将错误写入系统 error 并沿现有连线继续。成功时 error 为 null。取消、超时、资源限制和结果不确定仍终止工作流。",
+      "systemOutputs": "系统输出",
+      "systemError": "错误信息（系统）",
+      "errorFields": {
+        "error": "节点失败时的错误信息；成功时为 null。",
+        "code": "用于识别错误类型的错误码。",
+        "message": "错误的说明信息，敏感内容已脱敏。",
+        "nodeId": "发生错误的节点 ID。",
+        "nodeName": "发生错误时的节点名称。",
+        "runId": "本次工作流运行的 ID。",
+        "executionId": "本次节点执行的 ID，多次重试共用此 ID。"
+      }
     },
     "selectNode": "选择一个草稿节点以查看和编辑。",
     "locateNode": "在画布上定位该节点",
@@ -767,7 +783,8 @@
       "completed": "成功",
       "failed": "失败",
       "unknown": "状态未确认"
-    }
+    },
+    "errorHandled": "失败已处理"
   },
   "sidebar": {
     "createFirstFlow": "创建工作流",

@@ -290,7 +290,23 @@
       "retryNone": "再試行しない",
       "retrySeconds": "秒",
       "retryHelp": "再試行について",
-      "retryOnce": "最大 1 回再試行"
+      "retryOnce": "最大 1 回再試行",
+      "onError": "失敗時の処理",
+      "onErrorStop": "ワークフローを停止",
+      "onErrorOutput": "error ポートに出力",
+      "onErrorHelp": "失敗時の処理について",
+      "onErrorHint": "再試行後も失敗した場合、システム error にエラーを出力して既存の接続で続行します。成功時は null です。キャンセル、タイムアウト、リソース制限、結果不明の場合は停止します。",
+      "systemOutputs": "システム出力",
+      "systemError": "エラー情報（システム）",
+      "errorFields": {
+        "error": "ノードが失敗した場合のエラー情報。成功時は null です。",
+        "code": "エラーの種類を識別するコード。",
+        "message": "機密情報をマスクしたエラーの説明。",
+        "nodeId": "エラーが発生したノードの ID。",
+        "nodeName": "エラー発生時のノード名。",
+        "runId": "今回のワークフロー実行の ID。",
+        "executionId": "今回のノード実行の ID。再試行でも同じ ID を使用します。"
+      }
     },
     "selectNode": "ドラフトのノードを 1 つ選択すると、内容を確認して編集できます。",
     "locateNode": "キャンバス上でこのノードを表示",
@@ -767,7 +783,8 @@
       "completed": "成功",
       "failed": "失敗",
       "unknown": "状態未確認"
-    }
+    },
+    "errorHandled": "失敗を処理済み"
   },
   "sidebar": {
     "createFirstFlow": "Flow を作成",
