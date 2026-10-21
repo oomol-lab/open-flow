@@ -297,7 +297,11 @@ export function WebhookEditor({
               onChange={(mode) => {
                 const next = { ...options }
                 if (mode === 'immediate') delete next.responseBody
-                else next.responseBody = mode === 'node' ? { kind: 'webhook-response' } : { kind: 'workflow-outputs' }
+                else
+                  next.responseBody = {
+                    kind: mode === 'node' ? 'webhook-response' : 'workflow-outputs',
+                    ...(policy?.timeoutMs == null ? {} : { timeoutMs: policy.timeoutMs }),
+                  }
                 delete next.responseStatusCodeOutput
                 delete next.responseHeadersSource
                 delete next.responseHeaderOutputs

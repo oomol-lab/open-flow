@@ -1,6 +1,10 @@
+// @vitest-environment happy-dom
+import type { WebhookOptions } from '../api.ts'
+
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { describe, expect, it, vi } from 'vitest'
+import { click, render } from '../../../../../test/support/render.tsx'
 import { webhookResponseDiagnostics } from '../../../../flow/common/graph.ts'
 import { createI18n } from '../i18n.ts'
 import { WebhookEditor } from './webhookEditor.tsx'
@@ -15,6 +19,42 @@ function renderWebhook(method: 'GET' | 'POST') {
 }
 
 describe('Webhook configuration', () => {
+  it.each(
+    (
+      [
+        ['workflow-outputs', 'Webhook Response', 'webhook-response'],
+        ['webhook-response', 'Workflow outputs', 'workflow-outputs'],
+        ['workflow-outputs', 'Fixed content', undefined],
+      ] as const
+    ).flatMap(([kind, label, target]) => [undefined, 12000].map((timeoutMs) => ({ kind, label, target, timeoutMs }))),
+  )('preserves timeout $timeoutMs when changing $kind to $label', async ({ kind, label, target, timeoutMs }) => {
+    const onChange = vi.fn()
+    const fixed = { responseData: 'saved', responseStatusCode: 202, responseHeaders: { 'X-Fixed': 'kept' } }
+    const options: WebhookOptions = {
+      ...fixed,
+      responseBody: {
+        kind,
+        ...(timeoutMs == null ? {} : { timeoutMs }),
+      },
+      responseStatusCodeOutput: 'status',
+      responseHeadersSource: { kind: 'workflow-outputs', output: 'headers' },
+      responseHeaderOutputs: { 'X-Dynamic': 'header' },
+    }
+    const { container } = render(<WebhookEditor bodyFields={[]} method="POST" options={options} disabled={false} onChange={onChange} />)
+    await click(container.querySelector<HTMLButtonElement>('[aria-label="Response source"]')!)
+    const choice = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find((option) => option.textContent === label)!
+    expect(choice).toBeDefined()
+    await click(choice)
+    expect(onChange).toHaveBeenLastCalledWith({
+      bodyFields: [],
+      method: 'POST',
+      options: {
+        ...fixed,
+        ...(target == null ? {} : { responseBody: { kind: target, ...(timeoutMs == null ? {} : { timeoutMs }) } }),
+      },
+    })
+  })
+
   it.each([false, true])('offers a status source only in workflow-output response mode (%s)', (dynamic) => {
     const markup = renderToStaticMarkup(
       <I18nProvider i18n={createI18n('en')}>

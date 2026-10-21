@@ -115,6 +115,7 @@ export async function verifyEarlyResponse(lab: LabSession): Promise<{ errors: st
       body: JSON.stringify({ message: 'accepted before waiting' }),
       signal: AbortSignal.timeout(20000),
     })
+  const previous = new Set(lab.service.control.runs.listRuns(lab.manifest.flowId, 100, {}).page.runs.map((run) => run.runId))
   const responses = await Promise.all([request(), request()])
   for (const response of responses) {
     if (
@@ -126,7 +127,7 @@ export async function verifyEarlyResponse(lab: LabSession): Promise<{ errors: st
     )
       errors.push('Return the selected response body, status and whole-object headers.')
   }
-  const runs = lab.service.control.runs.listRuns(lab.manifest.flowId, 100, {}).page.runs
+  const runs = lab.service.control.runs.listRuns(lab.manifest.flowId, 100, {}).page.runs.filter((run) => !previous.has(run.runId))
   if (runs.length !== 1) errors.push('Concurrent retries must reuse one Run.')
   const runId = runs[0]?.runId
   if (runId != null) {
