@@ -2,7 +2,10 @@ import type { FlowRunOutcome, WaitHost } from '../src/execution/common/scheduler
 import type { WaitAction } from '../src/flow/common/change.ts'
 
 import * as Effect from 'effect/Effect'
+import * as Fiber from 'effect/Fiber'
+import { TestClock } from 'effect/testing'
 import { vi } from 'vitest'
+import { waitRetentionMs } from '../src/execution/common/scheduler.ts'
 
 export function waitHost(decisions: Readonly<Record<string, WaitAction>> = {}): WaitHost {
   return {
@@ -16,26 +19,15 @@ export function waitHost(decisions: Readonly<Record<string, WaitAction>> = {}): 
   }
 }
 
-export async function advanceWaiting(effect: Effect.Effect<FlowRunOutcome, Error>): Promise<FlowRunOutcome> {
-  vi.useFakeTimers()
-  try {
-    const pending = Effect.runPromise(effect)
-    let settled = false
-    void pending.then(
-      () => {
-        settled = true
-      },
-      () => {
-        settled = true
-      },
-    )
-    for (let step = 0; step < 100; step++) {
-      if (settled) break
-      await vi.runOnlyPendingTimersAsync()
-    }
-    if (!settled) throw new Error('Scheduler did not settle with the controlled clock.')
-    return await pending
-  } finally {
-    vi.useRealTimers()
-  }
+export function advanceWaiting(effect: Effect.Effect<FlowRunOutcome, Error>): Promise<FlowRunOutcome> {
+  return Effect.runPromise(
+    TestClock.testClockWith((clock) => {
+      const now = vi.spyOn(performance, 'now').mockImplementation(() => Number(clock.monotonicTimeNanosUnsafe()) / 1_000_000)
+      return Effect.gen(function* () {
+        const fiber = yield* Effect.forkChild(effect)
+        while (fiber.pollUnsafe() == null) yield* clock.adjust(waitRetentionMs)
+        return yield* Fiber.join(fiber)
+      }).pipe(Effect.ensuring(Effect.sync(() => now.mockRestore())))
+    }).pipe(Effect.provide(TestClock.layer())),
+  )
 }
