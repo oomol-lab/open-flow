@@ -6,6 +6,7 @@ import { encodeFlowClosure, flowResourceReferences } from '@oomol-lab/open-flow/
 import { publishedWorkflowInterface } from '@oomol-lab/open-flow/workflow'
 import { createHash } from 'node:crypto'
 import { isDeepStrictEqual } from 'node:util'
+import { z } from 'zod'
 import { FlowResourceReferenceStore } from './flow-resource-reference-store.ts'
 import { RevisionStore } from './revision-store.ts'
 
@@ -46,13 +47,26 @@ export function migrateWorkflowInterfaces(database: DatabaseSync): void {
     }
   }
 
-  function read(revisionId: string): RevisionContent {
+  function read(revisionId: string, interfaceOnly = false): RevisionContent {
     const content = migrated.get(revisionId)
     if (content != null) return content
     const stored = revisions.read(revisionId)
     if (stored == null) throw new Error(`Cannot migrate publication interface: Revision ${revisionId} is missing.`)
     if (hash(stored.content) != stored.digest) throw new Error(`Cannot migrate publication interface: Revision ${revisionId} has an invalid digest.`)
-    return decodeRevision(new TextEncoder().encode(stored.content))
+    if (!interfaceOnly) return decodeRevision(new TextEncoder().encode(stored.content))
+    // Historical Task/Subflow definitions remain unsupported, but must not block interface snapshots.
+    const source = JSON.parse(stored.content)
+    const nodes = z.record(z.string(), z.looseObject({ kind: z.string() })).parse(source.document?.graph?.nodes)
+    return decodeRevision(
+      canonicalJsonBytes({
+        ...source,
+        document: {
+          bindings: {},
+          graph: { nodes: Object.fromEntries(Object.entries(nodes).filter(([, node]) => node.kind == 'start' || node.kind == 'outputs')), edges: [] },
+        },
+        modules: {},
+      }),
+    )
   }
 
   // Build the replacement table with the final NOT NULL constraint and no placeholder default.
@@ -73,7 +87,7 @@ export function migrateWorkflowInterfaces(database: DatabaseSync): void {
     `INSERT INTO publications_with_interfaces (interface_json, ${columns}) SELECT ?, ${columns} FROM publications WHERE publication_id = ?`,
   )
   for (const row of database.prepare('SELECT publication_id, revision_id FROM publications').all()) {
-    insert.run(JSON.stringify(publishedWorkflowInterface(read(String(row.revision_id)))), row.publication_id!)
+    insert.run(JSON.stringify(publishedWorkflowInterface(read(String(row.revision_id), true))), row.publication_id!)
   }
   database.exec('DROP TABLE publications; ALTER TABLE publications_with_interfaces RENAME TO publications;')
   for (const index of indexes) database.exec(String(index.sql))

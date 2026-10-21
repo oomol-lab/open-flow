@@ -42,8 +42,8 @@ async function fixture() {
   const file = path.join(directory, 'flow.sqlite')
   const database = Database.open(file)
   const store = new Store(database, Date.now)
-  function seed(id: string, document: JsonValue = legacyDocument()) {
-    const source = { kind: 'open-flow-flow-revision', version: 1, modelVersion: 8, document, modules: {} }
+  function seed(id: string, document: JsonValue = legacyDocument(), modelVersion = 8) {
+    const source = { kind: 'open-flow-flow-revision', version: 1, modelVersion, document, modules: {} }
     const body = serialized(source)
     store.flows.createFlow({
       actorId: 'operator',
@@ -53,7 +53,7 @@ async function fixture() {
       createdAt: Date.now(),
       idempotencyKey: id,
       requestDigest: id,
-      modelVersion: 8,
+      modelVersion,
       ...body,
     })
     return {
@@ -73,7 +73,7 @@ async function fixture() {
       publishedAt: Date.now(),
       idempotencyKey: `publish-${id}`,
       requestDigest: `request-${id}`,
-      metadata: { operation: 'publish' as const, actorId: 'operator', modelVersion: 8 },
+      metadata: { operation: 'publish' as const, actorId: 'operator', modelVersion },
     }
   }
   function closeLegacy() {
@@ -204,6 +204,39 @@ it('backfills null versus empty interfaces and resumes pending publication with 
     checkpoint_digest: 'checkpoint-digest',
   })
   upgraded.close()
+})
+
+it.each([false, true])('snapshots historical Task revisions without rewriting them (Start present: %s)', async (hasStart) => {
+  const { file, database, store, seed, closeLegacy } = await fixture()
+  const historical = seed(
+    'historical',
+    {
+      tasks: { shared: { name: 'Historical task' } },
+      bindings: {},
+      graph: {
+        nodes: {
+          task: { kind: 'task', name: 'Task', taskId: 'shared' },
+          ...(hasStart ? { start: { kind: 'start', name: 'Start', inputDefs: [number] } } : {}),
+        },
+        edges: [],
+      },
+    },
+    hasStart ? 7 : 5,
+  )
+  expect(store.publications.publish(historical).kind).toBe('published')
+  const before = database.connection.prepare('SELECT * FROM publications').get()
+  closeLegacy()
+  const upgraded = Database.open(file)
+  try {
+    const snapshot = { inputs: hasStart ? [number] : null, outputs: null }
+    expect(new Store(upgraded, Date.now).publications.interfaceForRevision('historical', 'historical')).toEqual(snapshot)
+    const stored = new RevisionStore(upgraded.connection).read('historical')!
+    expect(stored).toMatchObject({ content: historical.content, digest: historical.revisionDigest })
+    expect(upgraded.connection.prepare('SELECT * FROM publications').get()).toEqual({ ...before, interface_json: JSON.stringify(snapshot) })
+    expect(() => decodeRevision(encoder.encode(stored.content))).toThrow('Independent Task definitions are no longer supported.')
+  } finally {
+    upgraded.close()
+  }
 })
 
 it.each(['conflict', 'orphan', 'missing-revision', 'bad-digest', 'bad-delta'])(
