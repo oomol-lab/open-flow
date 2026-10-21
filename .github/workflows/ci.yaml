@@ -39,50 +39,15 @@ jobs:
         run: |
           set -euo pipefail
 
-          command=false
-          package=false
-          server=false
-          server_image=false
-
           if [[ "$BASE_SHA" =~ ^0+$ ]]; then
             changed_files="$(git ls-tree --name-only -r "$HEAD_SHA")"
           elif [ "$EVENT_NAME" = "pull_request" ]; then
-            changed_files="$(git diff --name-only --diff-filter=ACDMRT "$BASE_SHA...$HEAD_SHA")"
+            changed_files="$(git diff --name-only --no-renames --diff-filter=ACDMRT "$BASE_SHA...$HEAD_SHA")"
           else
-            changed_files="$(git diff --name-only --diff-filter=ACDMRT "$BASE_SHA..$HEAD_SHA")"
+            changed_files="$(git diff --name-only --no-renames --diff-filter=ACDMRT "$BASE_SHA..$HEAD_SHA")"
           fi
 
-          while IFS= read -r file; do
-            case "$file" in
-              .bun-version | .dockerignore | .github/workflows/* | .node-version | LICENSE | NOTICE | bun.lock | package.json)
-                command=true
-                package=true
-                server=true
-                server_image=true
-                ;;
-              packages/open-flow/*)
-                command=true
-                package=true
-                server=true
-                server_image=true
-                ;;
-              packages/command/*)
-                command=true
-                package=true
-                ;;
-              apps/server/*)
-                server=true
-                server_image=true
-                ;;
-            esac
-          done <<< "$changed_files"
-
-          {
-            echo "command=$command"
-            echo "package=$package"
-            echo "server=$server"
-            echo "server_image=$server_image"
-          } >> "$GITHUB_OUTPUT"
+          printf '%s\n' "$changed_files" | bash .github/scripts/ci-scope.sh >> "$GITHUB_OUTPUT"
 
   quality:
     runs-on: ubuntu-latest
@@ -110,8 +75,8 @@ jobs:
       - name: Check
         run: bun run check
 
-      - name: Test release CI gate
-        run: node --test .github/scripts/wait-for-ci.test.mjs
+      - name: Test CI scope and release gate
+        run: node --test .github/scripts/*.test.mjs
 
   package:
     needs: changes

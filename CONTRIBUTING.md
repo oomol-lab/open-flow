@@ -87,6 +87,13 @@ these checks; select their scope according to the change:
   including the command entry bundled by hosts.
 - `bun run test:docker`: verify container delivery with a local Docker daemon.
 
+CI runs the Server image smoke test on pull requests that change container/build inputs,
+dependencies, Server backend code, migrations, or the shared execution runtime. Test-only,
+documentation, Lab, and ordinary UI changes skip it. Main pushes also verify image delivery
+for other product/Server source and asset changes. The rules live in
+[ci-scope.sh](.github/scripts/ci-scope.sh); package manifest changes conservatively count as
+dependency changes, including edits limited to scripts.
+
 For a focused public-package test, run `bun run vitest run --config vitest.config.ts <test-file>`
 from `packages/open-flow`. The `test:vitest` script already selects `src test dev`, so appending a file
 does not narrow it. Root `bun test` is unsuitable: it loads Vitest files with Bun's test runner.
