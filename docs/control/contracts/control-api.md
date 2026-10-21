@@ -417,7 +417,7 @@ interface FlowCheck {
 }
 ```
 
-Check bodies use `{ engineContract: 'open-flow-engine/v6', version: 1 }` and always validate the Flow Revision pinned in the path. `message` is a stable canonical English fallback. Workbench may localize using `code`, optional `values.variant`, and other `values`. Unknown codes or variants must fall back to `message`.
+Check bodies use `{ engineContract: 'open-flow-engine/v7', version: 1 }` and always validate the Flow Revision pinned in the path. `message` is a stable canonical English fallback. Workbench may localize using `code`, optional `values.variant`, and other `values`. Unknown codes or variants must fall back to `message`.
 
 Publication `liveEnd` records enabled state and end time when a new Live replaces that version. The ordinary publish/rollback transaction writes it atomically. Asynchronous preparation does not write it; failure and idempotent replay do not rewrite it. A new rollback Publication does not inherit its source’s end state. Current Publications and older records without history omit it. It does not indicate Trigger health.
 
@@ -1176,7 +1176,7 @@ Flow terminal results use `{ kind: 'node-results', nodes }`. `nodes` contains on
 
 ## 10. Code Action contract
 
-The script contract is `open-flow-engine/v6`, with bounded Task retries, dependency joins, repeated loop iterations, and cumulative per-node execution limits. Scheduler checkpoints use version 6; old development checkpoint shapes are rejected without conversion. Earlier Engine-pinned Publications/Runs require republication or a matching execution environment. `context.actions` replaces v1 `context.connector` without aliases. v1-pinned Publications/Runs require their matching Engine; current Server explicitly rejects v1. New Code node Revisions store account mode. Only independent mode stores a node Action allowlist. Deployment Provider Access Bindings or implicit Connector authority remain the final authorization source.
+The script contract is `open-flow-engine/v7`, with bounded Task retries, dependency joins, repeated loop iterations, and cumulative per-node execution limits. Scheduler checkpoints use version 6; old development checkpoint shapes are rejected without conversion. Earlier Engine-pinned Publications/Runs require republication or a matching execution environment. `context.actions` replaces v1 `context.connector` without aliases. v1-pinned Publications/Runs require their matching Engine; current Server explicitly rejects v1. New Code node Revisions store account mode. Only independent mode stores a node Action allowlist. Deployment Provider Access Bindings or implicit Connector authority remain the final authorization source.
 
 ### Revision and edit operations
 

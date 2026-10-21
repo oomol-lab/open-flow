@@ -3,6 +3,7 @@ import type { RunRecord } from '../node/storage/run-view-store.ts'
 
 import { serve } from '@hono/node-server'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { once } from 'node:events'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { waitForWebhookRun } from '../node/application/webhook-response.ts'
@@ -162,7 +163,7 @@ async function fixture(
 ) {
   const service = await openService(':memory:')
   const stored = await storeRevision(service, transform(revision(options, fail)), 'response')
-  await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v6', null, 'publish')
+  await service.control.publishFlow('test', stored.flowId, stored.revisionId, currentEngineContract, null, 'publish')
   await service.tickMaintenance()
   if (start) await startService(service)
   const url = service.control.getFlowTriggerBinding(stored.flowId, 'hook', 'http://server.local').endpointUrl!
@@ -191,7 +192,20 @@ function headerRevision(schema: JsonValue): (content: RevisionContent) => Revisi
   }
 }
 
-describe('published dynamic HTTP responses', () => {
+describe('published HTTP responses', () => {
+  it.each([undefined, 'application/json; charset=utf-8', 'text/custom'])(
+    'preserves fixed response Content-Type %s with the existing text fallback',
+    async (contentType) => {
+      const body = '{"ok":true}'
+      const f = await fixture(null, { responseData: body, responseHeaders: contentType == null ? {} : { 'Content-Type': contentType } }, false)
+      const response = await f.request()
+      expect(response.status).toBe(200)
+      expect(response.headers.get('content-type')).toBe(contentType ?? 'text/plain;charset=UTF-8')
+      expect(await response.text()).toBe(body)
+      expect(f.service.control.runs.listRuns(f.stored.flowId, 100, {}).page.runs[0]?.status).toBe('queued')
+    },
+  )
+
   it.each([201, 400, 599, 199, 204, 205, 304, 600, 200.5, null])('returns a selected numeric status %s or a fixed error', async (value) => {
     const f = await fixture(
       value,
@@ -460,7 +474,7 @@ describe('published dynamic HTTP responses', () => {
       'test',
       f.stored.flowId,
       edited.revision.revisionId,
-      'open-flow-engine/v6',
+      currentEngineContract,
       live.publication!.publicationId,
       'republish',
     )
@@ -470,3 +484,197 @@ describe('published dynamic HTTP responses', () => {
     expect(await (await f.request()).text()).toBe('new publication')
   })
 })
+
+function responseNodeRevision(after: 'wait' | 'fail' | 'none' = 'none', headerSource = false): (source: RevisionContent) => RevisionContent {
+  return (source) => ({
+    ...source,
+    modules: {
+      ...source.modules,
+      failure: { name: 'Failure after response', imports: [], source: 'export default () => { throw new Error("private failure after response") }' },
+    },
+    document: {
+      ...source.document,
+      graph: {
+        nodes: {
+          ...source.document.graph.nodes,
+          reply: {
+            kind: 'webhook-response',
+            name: 'Reply',
+            inputs: {
+              body: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'echo', output: 'value' }] },
+              statusCode: { kind: 'value', value: 201 },
+              headers: headerSource
+                ? { kind: 'sources', sources: [{ kind: 'node', nodeId: 'headerData', output: 'value' }] }
+                : { kind: 'value', value: { 'X-Reply': 'selected', 'Content-Type': 'text/html', 'X-Frame-Options': 'ALLOWALL' } },
+            },
+          },
+          other: { kind: 'webhook-response', name: 'Other', inputs: { body: { kind: 'value', value: 'unselected' } } },
+          ...(headerSource
+            ? {
+                headerData: {
+                  kind: 'value' as const,
+                  name: 'Headers',
+                  inputs: {},
+                  values: [
+                    {
+                      handle: 'value',
+                      jsonSchema: { type: 'object', additionalProperties: { type: ['string', 'number', 'boolean'] } },
+                      nullable: false,
+                      value: { 'X-Count': 3, 'X-Enabled': false, 'X-Text': 'ok' },
+                    },
+                  ],
+                },
+              }
+            : {}),
+          ...(after === 'wait'
+            ? { later: { kind: 'wait' as const, name: 'Later', inputDefinitions: [], inputs: {}, prompt: 'Continue after response' } }
+            : after === 'fail'
+              ? { later: { kind: 'task' as const, name: 'Later', inputs: {}, task: { name: 'Later', moduleId: 'failure', inputs: [], outputs: [] } } }
+              : {}),
+        },
+        edges: [
+          ...source.document.graph.edges,
+          { source: 'echo', target: 'reply' },
+          { source: 'hook', target: 'other' },
+          ...(headerSource
+            ? [
+                { source: 'hook', target: 'headerData' },
+                { source: 'headerData', target: 'reply' },
+              ]
+            : []),
+          ...(after === 'none' ? [] : [{ source: 'reply', target: 'later' }]),
+        ],
+      },
+    },
+  })
+}
+
+describe('published early response nodes', () => {
+  it('responds before a durable wait, replays concurrent keys, and lets the workflow continue', async () => {
+    const f = await fixture(
+      'early',
+      {
+        responseBody: { kind: 'webhook-response', nodeId: 'reply' },
+        responseData: 'ignored',
+        responseStatusCode: 599,
+        responseHeaders: { 'X-Ignored': 'yes' },
+      },
+      true,
+      false,
+      responseNodeRevision('wait'),
+    )
+    const requests = Array.from({ length: 3 }, () => f.request({ headers: { 'content-type': 'application/json', 'idempotency-key': 'early' } }))
+    const replies = await Promise.all(requests)
+    for (const reply of replies) {
+      expect(reply.status).toBe(201)
+      expect(await reply.text()).toBe('early')
+      expect(reply.headers.get('x-reply')).toBe('selected')
+      expect(reply.headers.get('x-ignored')).toBeNull()
+      expect(reply.headers.get('content-type')).toBe('text/plain;charset=UTF-8')
+      expect(reply.headers.get('x-frame-options')).toBe('DENY')
+    }
+    const runs = () => f.service.control.runs.listRuns(f.stored.flowId, 100, {}).page.runs
+    await expect.poll(() => f.service.control.runs.getRun(runs()[0]!.runId).waits.length).toBe(1)
+    expect(runs()[0]?.status).not.toBe('completed')
+    expect(runs()).toHaveLength(1)
+    const run = f.service.control.runs.getRun(runs()[0]!.runId)
+    const replay = await f.request({ headers: { 'content-type': 'application/json', 'idempotency-key': 'early' } })
+    expect(await replay.text()).toBe('early')
+    f.service.control.runs.resolveRunWait(run.runId, run.waits[0]!.waitId, 'continue')
+    await expect.poll(() => runs()[0]?.status).toBe('completed')
+    const events = f.service.control.runs.getRunEvents(run.runId, 0, 1000).events
+    expect(events).toContainEqual(expect.objectContaining({ kind: 'node.completed', payload: expect.objectContaining({ nodeId: 'reply', outputs: {} }) }))
+  })
+
+  it('keeps the accepted response after later failure and converts whole-object scalar headers', async () => {
+    const f = await fixture({ ok: true }, { responseBody: { kind: 'webhook-response', nodeId: 'reply' } }, true, false, responseNodeRevision('fail', true))
+    const request = () => f.request({ headers: { 'content-type': 'application/json', 'idempotency-key': 'failed-later' } })
+    const response = await request()
+    expect(response.status).toBe(201)
+    expect(await response.json()).toEqual({ ok: true })
+    expect(response.headers.get('x-count')).toBe('3')
+    expect(response.headers.get('x-enabled')).toBe('false')
+    await expect.poll(() => f.service.control.runs.listRuns(f.stored.flowId, 1, {}).page.runs[0]?.status).toBe('failed')
+    expect(await (await request()).json()).toEqual({ ok: true })
+  })
+
+  it('returns unavailable when a reachable response node is skipped by a branch', async () => {
+    const f = await fixture('skip', { responseBody: { kind: 'webhook-response', nodeId: 'reply' } }, true, false, (source) => {
+      const changed = responseNodeRevision()(source)
+      return {
+        ...changed,
+        document: {
+          ...changed.document,
+          graph: {
+            nodes: {
+              ...changed.document.graph.nodes,
+              gate: {
+                kind: 'condition',
+                name: 'Gate',
+                inputs: {},
+                matchMode: 'first',
+                cases: [{ name: 'Selected', output: 'selected', groups: [{ expressions: [{ left: { kind: 'value', value: false }, operator: 'isTrue' }] }] }],
+              },
+            },
+            edges: [
+              ...changed.document.graph.edges.filter((edge) => edge.target !== 'reply'),
+              { source: 'echo', target: 'gate' },
+              { source: 'gate', sourceHandle: 'selected', target: 'reply' },
+            ],
+          },
+        },
+      }
+    })
+    const response = await f.request()
+    expect(response.status).toBe(500)
+    expect(await response.json()).toMatchObject({ error: { code: 'webhook.response-unavailable' } })
+  })
+})
+
+it('keeps an early-response Run alive after HTTP timeout and reuses its eventual response', async () => {
+  const f = await fixture(
+    'after HTTP timeout',
+    { responseBody: { kind: 'webhook-response', nodeId: 'reply', timeoutMs: 1000 } },
+    false,
+    false,
+    responseNodeRevision(),
+  )
+  const request = () => f.request({ headers: { 'content-type': 'application/json', 'idempotency-key': 'timeout-early' } })
+  const timedOut = await request()
+  expect(timedOut.status).toBe(504)
+  const run = f.service.control.runs.listRuns(f.stored.flowId, 10, {}).page.runs[0]!
+  expect(run.status).toBe('queued')
+  await startService(f.service)
+  await expect.poll(() => f.service.control.runs.getRun(run.runId).status).toBe('completed')
+  const replay = await request()
+  expect(replay.status).toBe(201)
+  expect(await replay.text()).toBe('after HTTP timeout')
+  expect(f.service.control.runs.listRuns(f.stored.flowId, 10, {}).page.runs).toHaveLength(1)
+})
+
+it.each([{ 'X-Bad': '\r\nprivate' }, { 'X-Test': 'one', 'x-test': 'two' }, { 'X-Value': '你好' }])(
+  'returns a fixed error for invalid runtime response headers %j',
+  async (headers) => {
+    const f = await fixture('hello', { responseBody: { kind: 'webhook-response', nodeId: 'reply' } }, true, false, (source) => {
+      const changed = responseNodeRevision('none', true)(source)
+      const headerData = changed.document.graph.nodes.headerData
+      if (headerData?.kind !== 'value') throw new Error('Expected header fixture')
+      return {
+        ...changed,
+        document: {
+          ...changed.document,
+          graph: {
+            ...changed.document.graph,
+            nodes: {
+              ...changed.document.graph.nodes,
+              headerData: { ...headerData, values: headerData.values.map((port) => Object.assign({}, port, { value: headers })) },
+            },
+          },
+        },
+      }
+    })
+    const response = await f.request()
+    expect(response.status).toBe(500)
+    expect(await response.json()).toMatchObject({ error: { code: 'webhook.response-headers-invalid' } })
+  },
+)

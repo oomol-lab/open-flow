@@ -44,6 +44,7 @@ function childFields(props: FieldValueEditorProps) {
     const childProps: FieldValueEditorProps = {
       readOnly: props.readOnly,
       layout: props.layout,
+      hideValueTools: props.hideValueTools,
       expansionPolicy: props.expansionPolicy,
       schema: childSchema,
       value: childValue,

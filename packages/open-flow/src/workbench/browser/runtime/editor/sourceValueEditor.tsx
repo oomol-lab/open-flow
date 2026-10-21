@@ -278,6 +278,10 @@ export function SourceValueEditor({
     | 'onDefinitionChange'
     | 'compact'
     | 'hideOptions'
+    | 'hideValueTools'
+    | 'hideChildTypes'
+    | 'valueOnly'
+    | 'validateObjectFieldName'
   >
   readonly upstream?: NodeInputUpstreamSources
   readonly embedded?: boolean

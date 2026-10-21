@@ -3,11 +3,12 @@ import type { ToolCall } from './driver.ts'
 
 import { randomUUID } from 'node:crypto'
 import { referenceFulfillment } from './fulfillmentReference.ts'
-import { referenceLive } from './liveReference.ts'
+import { referenceEarlyResponse, referenceLive } from './liveReference.ts'
 const account = (result: Record<string, unknown>, name: string) =>
   (result.connections as { displayName: string; connectionId: string }[]).find((a) => a.displayName == name)!.connectionId
 /** Uses only caller-visible tools. No fixture, service, database or expected-result imports. */
 export async function reference(call: ToolCall, id: string, flowId: string, stage = 0) {
+  if (id === 'webhook-response-node') return referenceEarlyResponse(call, flowId)
   if (id == 'webhook-response') return referenceLive(call, flowId, true)
   if (id == 'webhook-live') return referenceLive(call, flowId)
   if (id == 'fulfillment-ops') return referenceFulfillment(call, flowId, stage)

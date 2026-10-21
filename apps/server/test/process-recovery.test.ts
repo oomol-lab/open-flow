@@ -3,6 +3,7 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process'
 
 import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { spawn } from 'node:child_process'
 import { cp, mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -167,7 +168,7 @@ it('recovers a process crash after the start barrier as one indeterminate termin
   )
   const accepted = await json<{ readonly runId: string }>(
     await fetch(`${app.origin}/v1/flows/${flow.flowId}/revisions/${changed.revision.revisionId}/runs`, {
-      body: JSON.stringify({ engineContract: 'open-flow-engine/v6', inputs: {}, trigger: { nodeId: 'start', outputs: {} }, version: 2 }),
+      body: JSON.stringify({ engineContract: currentEngineContract, inputs: {}, trigger: { nodeId: 'start', outputs: {} }, version: 2 }),
       headers: { 'content-type': 'application/json', cookie, 'idempotency-key': 'crash' },
       method: 'POST',
     }),

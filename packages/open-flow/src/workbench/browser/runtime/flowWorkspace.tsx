@@ -177,6 +177,13 @@ const NodeInspectorContainer = memo(function NodeInspectorContainer({
   return (
     <NodeInspector
       onAddWorkflowOutputs={onAddWorkflowOutputs}
+      onAddResponseNode={
+        webhookId == null
+          ? undefined
+          : () => {
+              void store.workspace.addWebhookResponseNode(webhookId)
+            }
+      }
       webhookDeployment={
         webhookId == null
           ? undefined

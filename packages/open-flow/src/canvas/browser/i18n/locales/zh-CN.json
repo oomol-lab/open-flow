@@ -610,7 +610,8 @@
       "value": "固定值",
       "input": "流程输入",
       "output": "流程输出",
-      "outputs": "工作流输出"
+      "outputs": "工作流输出",
+      "webhook-response": "Webhook 响应"
     },
     "units": {
       "minute": "分钟",

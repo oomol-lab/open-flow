@@ -1,3 +1,4 @@
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -43,7 +44,7 @@ it('marks a Publication dirty when its shared access digest or graph changes', a
   services.add(service)
   const created = await service.control.createFlow('operator', 'Legacy', 'create-legacy')
   const flowId = created.flow.flowId
-  const operation = await service.control.publishFlow('operator', flowId, created.flow.draftRevisionId, 'open-flow-engine/v6', null, 'publish-legacy')
+  const operation = await service.control.publishFlow('operator', flowId, created.flow.draftRevisionId, currentEngineContract, null, 'publish-legacy')
   await service.tickMaintenance()
   expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('succeeded')
   const database = new DatabaseSync(file)
@@ -68,7 +69,7 @@ it('keeps Live fixed while persistent Publish work is pending or failed and acti
   const flowId = created.flow.flowId
   const firstRevisionId = await addMarker(service, flowId, created.flow.draftRevisionId, 'first')
 
-  const first = await service.control.publishFlow('operator', flowId, firstRevisionId, 'open-flow-engine/v6', null, 'publish-first')
+  const first = await service.control.publishFlow('operator', flowId, firstRevisionId, currentEngineContract, null, 'publish-first')
   expect(first).toMatchObject({ flowId, revisionId: firstRevisionId, status: 'pending' })
   await expect(service.control.getLive(flowId)).resolves.toMatchObject({ publication: null, status: 'not-published' })
   await service.tickMaintenance()
@@ -85,11 +86,11 @@ it('keeps Live fixed while persistent Publish work is pending or failed and acti
   `)
 
   const failedRevisionId = await addMarker(service, flowId, firstRevisionId, 'failed-candidate')
-  const failed = await service.control.publishFlow('operator', flowId, failedRevisionId, 'open-flow-engine/v6', firstPublicationId, 'publish-failed')
-  const replay = await service.control.publishFlow('operator', flowId, failedRevisionId, 'open-flow-engine/v6', firstPublicationId, 'publish-failed')
+  const failed = await service.control.publishFlow('operator', flowId, failedRevisionId, currentEngineContract, firstPublicationId, 'publish-failed')
+  const replay = await service.control.publishFlow('operator', flowId, failedRevisionId, currentEngineContract, firstPublicationId, 'publish-failed')
   expect(replay).toEqual(failed)
   await expect(
-    service.control.publishFlow('operator', flowId, failedRevisionId, 'open-flow-engine/v6', firstPublicationId, 'publish-concurrent'),
+    service.control.publishFlow('operator', flowId, failedRevisionId, currentEngineContract, firstPublicationId, 'publish-concurrent'),
   ).rejects.toMatchObject({ code: 'flow.busy' })
 
   await service.tickMaintenance()
@@ -111,7 +112,7 @@ it('keeps Live fixed while persistent Publish work is pending or failed and acti
   expect(service.control.listPublications(flowId, 10).page.publications).toHaveLength(1)
 
   const readyRevisionId = await addMarker(service, flowId, failedRevisionId, 'ready-candidate')
-  const ready = await service.control.publishFlow('operator', flowId, readyRevisionId, 'open-flow-engine/v6', firstPublicationId, 'publish-ready')
+  const ready = await service.control.publishFlow('operator', flowId, readyRevisionId, currentEngineContract, firstPublicationId, 'publish-ready')
   database.prepare("UPDATE publish_work SET status = 'ready', next_at = NULL, updated_at = updated_at + 1 WHERE operation_id = ?").run(ready.operationId)
   database.close()
 

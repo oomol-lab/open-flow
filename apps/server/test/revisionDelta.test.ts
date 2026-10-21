@@ -161,7 +161,7 @@ it('materializes a Draft Revision when admitting a Publish operation and rolls b
     closureDigest: 'closure',
     content: revision.content,
     crons: [],
-    engineContract: 'open-flow-engine/v6',
+    engineContract: currentEngineContract,
     expectedLivePublicationId: null,
     flowId: 'flow',
     idempotencyKey: 'publish',

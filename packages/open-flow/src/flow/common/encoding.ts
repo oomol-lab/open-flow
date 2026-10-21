@@ -110,6 +110,8 @@ function canonicalNode(value: GraphNode): JsonValue {
     ...(value.retry == null ? {} : { retry: { maxRetries: value.retry.maxRetries, intervalMs: value.retry.intervalMs } }),
   }
   switch (value.kind) {
+    case 'webhook-response':
+      return { ...common, kind: value.kind }
     case 'outputs':
       return { ...common, kind: value.kind, outputDefs: canonicalPorts(value.outputDefs), outputMappings: canonicalInputs(value.outputMappings) }
     case 'condition':
@@ -282,7 +284,13 @@ function canonicalWebhookOptions(value: WebhookOptions): JsonValue {
       : {
           responseBody: {
             kind: value.responseBody.kind,
-            ...(value.responseBody.output == null ? {} : { output: value.responseBody.output }),
+            ...(value.responseBody.kind === 'workflow-outputs'
+              ? value.responseBody.output == null
+                ? {}
+                : { output: value.responseBody.output }
+              : value.responseBody.nodeId == null
+                ? {}
+                : { nodeId: value.responseBody.nodeId }),
             ...(value.responseBody.timeoutMs == null ? {} : { timeoutMs: value.responseBody.timeoutMs }),
           },
         }),

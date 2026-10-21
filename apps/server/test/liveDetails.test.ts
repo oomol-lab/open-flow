@@ -1,4 +1,5 @@
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -30,7 +31,7 @@ it('reads authorized published entries independently of edits and unreadable Dra
       },
       { kind: 'graph.node.create', nodeId: 'cron', node: { kind: 'cron', name: 'Schedule', cronTimes: [{ type: 'every', unit: 'hour', value: 1 }] } },
     ])
-    const op = await service.control.publishFlow('operator', flowId, saved.revision.revisionId, 'open-flow-engine/v6', null, 'publish')
+    const op = await service.control.publishFlow('operator', flowId, saved.revision.revisionId, currentEngineContract, null, 'publish')
     await service.tickMaintenance()
     const done = service.control.getPublishOperation(flowId, op.operationId)
     if (done.status != 'succeeded') throw new Error('Publication did not succeed')
@@ -60,7 +61,7 @@ it('reads authorized published entries independently of edits and unreadable Dra
     })
     const changed = await service.control.changeDraft('operator', flowId, changedInputs.revision, [{ kind: 'graph.node.delete', nodeId: 'webhook' }])
     expect((await client.getLiveDetails(flowId)).entries.some((entry) => entry.nodeId == 'webhook')).toBe(true)
-    const second = await service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v6', done.publicationId, 'republish')
+    const second = await service.control.publishFlow('operator', flowId, changed.revision.revisionId, currentEngineContract, done.publicationId, 'republish')
     await service.tickMaintenance()
     expect(service.control.getPublishOperation(flowId, second.operationId).status).toBe('succeeded')
     expect(service.control.listFlowTriggerBindings(flowId).some((item) => item.triggerNodeId == 'webhook' && item.currentPublicationId == null)).toBe(true)

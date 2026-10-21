@@ -87,7 +87,7 @@ describe('Flow Error contract', () => {
         },
       },
     }
-    const prepared = await prepareFlow(revision, 'open-flow-engine/v6')
+    const prepared = await prepareFlow(revision, 'open-flow-engine/v7')
     if (prepared.kind != 'prepared') throw new Error(prepared.kind)
     const started: string[] = []
     await Effect.runPromise(

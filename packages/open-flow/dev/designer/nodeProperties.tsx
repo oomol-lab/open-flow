@@ -50,6 +50,42 @@ type Fixture = {
 }
 const fixtures: readonly Fixture[] = [
   {
+    id: 'webhook-response',
+    group: 'Webhook Response',
+    node: {
+      kind: 'webhook-response',
+      name: 'Webhook Response',
+      inputs: {
+        body: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'upstream', output: 'message' }] },
+        headers: { kind: 'value', value: { 'X-Result': 'accepted', 'X-Source': 'workflow' } },
+      },
+    },
+    content: {
+      graph: {
+        nodes: {
+          upstream: {
+            kind: 'value',
+            name: 'Prepare response',
+            inputs: {},
+            values: [
+              { handle: 'message', jsonSchema: { type: 'string' }, nullable: false, value: 'Accepted' },
+              {
+                handle: 'headers',
+                jsonSchema: { type: 'object', additionalProperties: { type: ['string', 'number', 'boolean'] } },
+                nullable: false,
+                value: { 'X-Count': 3 },
+              },
+              { handle: 'items', jsonSchema: { type: 'array' }, nullable: false, value: [] },
+              { handle: 'status', jsonSchema: { type: 'number' }, nullable: false, value: 201 },
+            ],
+          },
+        },
+        edges: [{ source: 'upstream', target: 'sample' }],
+      },
+    },
+  },
+
+  {
     id: 'error-handling',
     group: 'Task',
     node: {
@@ -318,38 +354,42 @@ function PropertySample({
       <section className="node-properties-case" aria-label={disabled ? 'Read only' : 'Editable'}>
         <h3>{disabled ? 'Read only' : 'Editable'}</h3>
         <InspectorSamplePanel disabled={disabled} revision={revision} selection={selection} store={session.store} theme={dark ? 'dark' : 'light'}>
-          <NodeInspector
-            key={mount}
-            connectorAction={action}
-            activeConnectorConnections={[]}
-            variables={{ enabled: true, names: ['API_TOKEN', 'TEAM_NAME'], loaded: true, loading: false, onOpen: () => {} }}
-            connectorAuthorizationPending={false}
-            connectorLoading={false}
-            connectors={session.connectors}
-            disabled={disabled}
-            diagnostics={
-              showCodeIssue && fixture.id == 'task'
-                ? [
-                    {
-                      code: 'module.syntax',
-                      column: 1,
-                      line: 2,
-                      message: 'CodeModule "module" contains invalid JavaScript syntax.',
-                      path: '/modules/module/source',
-                      values: { moduleId: 'module' },
-                    },
-                  ]
-                : undefined
-            }
-            revision={revision}
-            selection={selection}
-            store={session.store}
-            theme={dark ? 'dark' : 'light'}
+          {fixture.id === 'webhook-response' && disabled ? (
+            <NodeInspector readOnly disabled revision={revision} selection={selection} theme={dark ? 'dark' : 'light'} />
+          ) : (
+            <NodeInspector
+              key={mount}
+              connectorAction={action}
+              activeConnectorConnections={[]}
+              variables={{ enabled: true, names: ['API_TOKEN', 'TEAM_NAME'], loaded: true, loading: false, onOpen: () => {} }}
+              connectorAuthorizationPending={false}
+              connectorLoading={false}
+              connectors={session.connectors}
+              disabled={disabled}
+              diagnostics={
+                showCodeIssue && fixture.id == 'task'
+                  ? [
+                      {
+                        code: 'module.syntax',
+                        column: 1,
+                        line: 2,
+                        message: 'CodeModule "module" contains invalid JavaScript syntax.',
+                        path: '/modules/module/source',
+                        values: { moduleId: 'module' },
+                      },
+                    ]
+                  : undefined
+              }
+              revision={revision}
+              selection={selection}
+              store={session.store}
+              theme={dark ? 'dark' : 'light'}
 
-            triggerAuthorizationPending={false}
-            triggerConnectionLoading={false}
-            triggers={session.triggers}
-          />
+              triggerAuthorizationPending={false}
+              triggerConnectionLoading={false}
+              triggers={session.triggers}
+            />
+          )}
         </InspectorSamplePanel>
       </section>
     </I18nProvider>

@@ -6,6 +6,13 @@ import { fulfillmentSamples, fulfillmentStages } from './fulfillment.ts'
 
 export const scenarios = [
   {
+    id: 'webhook-response-node',
+    entry: { kind: 'webhook' },
+    name: 'Respond before the workflow completes',
+    version: 1,
+    task: 'Create a published POST Webhook with required text message. Add two Webhook Response nodes and explicitly select one reachable node with a 15-second timeout. Return the input message as plain text with status 201 and whole-object headers X-Count=3 and X-Enabled=false, prepared by an upstream Code node. Preserve fixed Webhook content/status/headers as inactive settings. Keep the second response node independently executable, but it must not respond to this Webhook. Connect a Wait after the selected response; HTTP must return before the Wait resolves, and retries with the same key must reuse the same response and Run. Publish and leave Live enabled.',
+  },
+  {
     id: 'webhook-response',
     entry: { kind: 'webhook' },
     name: 'Return workflow outputs over HTTP',
@@ -179,6 +186,7 @@ export function initialOperations(id: string): ChangeOperation[] {
     id == 'connector-responses' ||
     id == 'order-alert' ||
     id == 'fulfillment-ops' ||
+    id == 'webhook-response-node' ||
     id == 'webhook-response' ||
     id == 'webhook-live'
   )
@@ -357,6 +365,7 @@ export function samples(id: string, stage = 0): Sample[] {
     return cases.map((sample) => Object.assign({}, sample, { orders: [], order }))
   }
   if (id == 'fulfillment-ops') return fulfillmentSamples(stage)
+  if (id == 'webhook-response-node') return []
   if (id == 'connector-responses')
     return [
       [],
@@ -474,6 +483,7 @@ export function assertions(id: string, base: RevisionContent, current: RevisionC
       return ['Declare required message/amount and nullable note parameters while preserving their schemas.']
     return []
   }
+  if (id == 'webhook-response-node') return []
   if (id == 'connector-responses' || id == 'fulfillment-ops' || id == 'webhook-live' || id == 'webhook-response') return []
   const errors: string[] = []
   const allowed = new Set(

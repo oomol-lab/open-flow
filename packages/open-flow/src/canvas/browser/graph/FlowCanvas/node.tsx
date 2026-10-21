@@ -70,13 +70,14 @@ export function createNodeEntry(node: FlowCanvasViewSemanticNode, contentKey: st
   const content$ = val<NodeContent>(nodeContent(node))
   const duplicateNode = (offset?: FlowCanvasViewPosition) => canvasStore.onDuplicate?.([node.id as NodeId], offset)
   const types = {
-    approval: NODE_TYPE.TaskNode,
-    outputs: NODE_TYPE.TaskNode,
-    condition: NODE_TYPE.ConditionNode,
-    task: NODE_TYPE.TaskNode,
-    trigger: NODE_TYPE.TriggerNode,
-    value: NODE_TYPE.ValueNode,
-    wait: NODE_TYPE.TaskNode,
+    'approval': NODE_TYPE.TaskNode,
+    'outputs': NODE_TYPE.TaskNode,
+    'webhook-response': NODE_TYPE.TaskNode,
+    'condition': NODE_TYPE.ConditionNode,
+    'task': NODE_TYPE.TaskNode,
+    'trigger': NODE_TYPE.TriggerNode,
+    'value': NODE_TYPE.ValueNode,
+    'wait': NODE_TYPE.TaskNode,
   } as const
   const store = new NodeStore(node.id as NodeId, types[node.kind], {
     ignoredNodeIds: canvasStore.ignoredNodeIds,

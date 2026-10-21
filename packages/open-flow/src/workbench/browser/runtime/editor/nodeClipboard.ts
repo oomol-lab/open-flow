@@ -82,7 +82,12 @@ export function pasteNodes(revision: RevisionView, clipboard: NodeClipboard, ide
   for (const [sourceId, node] of entries) {
     const nodeId = ids.get(sourceId)!
     if (!('inputs' in node) && node.kind != 'outputs') {
-      operations.push({ kind: 'graph.node.create', node, nodeId })
+      const response = node.kind === 'webhook' ? node.options?.responseBody : undefined
+      const copy =
+        node.kind === 'webhook' && response?.kind === 'webhook-response' && response.nodeId != null
+          ? { ...node, options: { ...node.options, responseBody: { ...response, nodeId: ids.get(response.nodeId) ?? response.nodeId } } }
+          : node
+      operations.push({ kind: 'graph.node.create', node: copy, nodeId })
       continue
     }
     const remapInputs = (sourceInputs: Readonly<Record<string, InputMapping>>): Readonly<Record<string, InputMapping>> => {

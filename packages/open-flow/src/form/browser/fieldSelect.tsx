@@ -21,6 +21,7 @@ export function FieldSelect({
   displayValue,
   renderOption,
   showTooltip,
+  showDisabledOptions = false,
   variant,
   'aria-label': label,
   'aria-invalid': invalid,
@@ -38,6 +39,7 @@ export function FieldSelect({
   'displayValue'?: ReactNode
   'renderOption'?: (value: string, label: ReactNode) => ReactNode
   'showTooltip'?: boolean
+  'showDisabledOptions'?: boolean
   'size'?: string
   'aria-label': string
   'aria-invalid'?: boolean
@@ -50,7 +52,7 @@ export function FieldSelect({
     .map((child) => {
       if (child.type === 'hr') return { kind: 'separator' as const, key: child.key }
       const props = (child as ReactElement<ComponentProps<'option'>>).props
-      return { kind: 'option' as const, value: String(props.value ?? props.children), label: props.children, disabled: props.disabled }
+      return { kind: 'option' as const, value: String(props.value ?? props.children), label: props.children, disabled: props.disabled, hidden: props.hidden }
     })
   const options = entries.filter((entry) => entry.kind === 'option')
   const selected = options.find((option) => option.value === String(value))
@@ -116,8 +118,8 @@ export function FieldSelect({
           {entries.map((entry) =>
             entry.kind === 'separator' ? (
               <SelectSeparator key={entry.key} className="mx-2 bg-border/50" />
-            ) : entry.disabled ? null : (
-              <SelectItem key={entry.value} value={entry.value} className={selectionMenuItemClass}>
+            ) : entry.hidden || (entry.disabled && !showDisabledOptions) ? null : (
+              <SelectItem key={entry.value} disabled={entry.disabled} value={entry.value} className={selectionMenuItemClass}>
                 {renderOption ? (
                   renderOption(entry.value, entry.label)
                 ) : (

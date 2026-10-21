@@ -5,7 +5,9 @@ import type { FrontendStory, LogAction } from './stories.tsx'
 import { useState } from 'react'
 import { FlowCanvasView } from '../../src/canvas/browser/graph/FlowCanvas/FlowCanvasView.tsx'
 import { useIgnoredNodes } from '../../src/canvas/browser/useIgnoredNodes.ts'
+import { currentFlowModelVersion } from '../../src/flow/common/change.ts'
 import { canvasAnnotations } from '../../src/workbench/browser/runtime/editor/canvasAnnotations.ts'
+import { designerGraph } from '../../src/workbench/browser/runtime/workspace.ts'
 import { useStoryActions } from './storyActions.tsx'
 
 const longInput = 'customer_lifetime_value_across_all_completed_orders'
@@ -626,7 +628,55 @@ function NodeZoomStory({ dark, language, log }: { readonly dark: boolean; readon
   )
 }
 
+const responseGraph = designerGraph({
+  actorId: 'lab',
+  createdAt: '2026-10-21T00:00:00Z',
+  digest: 'lab-webhook-response',
+  flowId: 'webhook-response',
+  modelVersion: currentFlowModelVersion,
+  parentRevisionId: null,
+  revisionId: 'lab-webhook-response',
+  version: 1,
+  content: {
+    modelVersion: currentFlowModelVersion,
+    modules: {},
+    document: {
+      bindings: {},
+      graph: {
+        nodes: {
+          webhook: {
+            kind: 'webhook',
+            name: 'Webhook',
+            method: 'POST',
+            bodyFields: [],
+            options: { responseBody: { kind: 'webhook-response', nodeId: 'reply' } },
+          },
+          reply: { kind: 'webhook-response', name: 'Return response', inputs: {} },
+          alternative: { kind: 'webhook-response', name: 'Alternative response', inputs: {} },
+        },
+        edges: [{ source: 'webhook', target: 'reply' }],
+      },
+    },
+  },
+})
+const responseModel: FlowCanvasViewModel = {
+  ...responseGraph,
+  viewport: { x: 40, y: 80, zoom: 1 },
+  nodes: responseGraph.nodes.map((node) =>
+    Object.assign({}, node, { position: { x: node.id === 'webhook' ? 0 : 380, y: node.id === 'alternative' ? 220 : 0 } }),
+  ),
+}
+
 export const nodeStories: readonly FrontendStory[] = [
+  {
+    group: 'Node Webhook Response',
+    id: 'node-webhook-response-states',
+    title: 'Node states',
+    description:
+      'Webhook Response cards projected through the Workbench model. Compare connected and disconnected nodes, localized type labels and local icons in both themes.',
+    standalone: true,
+    render: (log, dark, language) => <NodeContentStory dark={dark} language={language} log={log} initialModel={responseModel} initialSelection="reply" />,
+  },
   {
     group: 'Canvas',
     id: 'node-annotations',

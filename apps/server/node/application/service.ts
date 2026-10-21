@@ -402,7 +402,7 @@ export class ServerService {
     return this.#store.runViews.run(runId)
   }
 
-  waitForWebhookRun(flowId: string, runId: string, timeoutMs: number, signal: AbortSignal) {
+  waitForWebhookRun(flowId: string, runId: string, timeoutMs: number, signal: AbortSignal, nodeId?: string) {
     return waitForWebhookRun(
       () => this.run(runId),
       (changed) =>
@@ -411,6 +411,7 @@ export class ServerService {
         }),
       timeoutMs,
       signal,
+      nodeId == null ? undefined : () => this.#store.runViews.webhookResponse(runId, nodeId),
     )
   }
 

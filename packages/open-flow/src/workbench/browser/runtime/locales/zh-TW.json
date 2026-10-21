@@ -47,7 +47,9 @@
     "startDescription": "透過啟動參數開始工作流程，支援手動執行和 API 呼叫。",
     "outputs": "工作流程輸出",
     "outputsDescription": "定義工作流程輸出及其取值，在上游執行相依完成後計算。",
-    "workflow": "呼叫工作流程"
+    "workflow": "呼叫工作流程",
+    "webhookResponse": "Webhook 回應",
+    "webhookResponseDescription": "傳回 HTTP 回應後繼續執行工作流程。"
   },
   "connectorAccess": {
     "searchServices": "搜尋服務",
@@ -1141,7 +1143,12 @@
     "webhookDynamicStatusInvalid": "請輸入 200–599 的整數，204、205、304 除外。",
     "webhookAddOutputs": "新增工作流程輸出",
     "webhookOutputsDisconnected": "未連接工作流程輸出",
-    "webhookStatusSource": "回應狀態碼來源"
+    "webhookStatusSource": "回應狀態碼來源",
+    "webhookAddResponse": "新增 Webhook 回應節點",
+    "webhookSelectResponse": "請選擇 Webhook 回應節點",
+    "webhookResponseDisconnected": "未連接 Webhook 回應節點",
+    "webhookConnectResponse": "請在畫布上選擇 Webhook 回應節點進行連接。",
+    "webhookMissingResponse": "所選 Webhook 回應節點已不存在"
   },
   "conditionEditor": {
     "addCondition": "新增條件",

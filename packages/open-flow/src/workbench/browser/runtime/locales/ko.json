@@ -47,7 +47,9 @@
     "startDescription": "시작 매개변수를 사용해 수동으로 또는 API 호출로 워크플로를 시작합니다.",
     "outputs": "워크플로 출력",
     "outputsDescription": "워크플로 출력과 값을 정의합니다. 상위 실행이 확정되면 계산합니다.",
-    "workflow": "워크플로 호출"
+    "workflow": "워크플로 호출",
+    "webhookResponse": "Webhook 응답",
+    "webhookResponseDescription": "HTTP 응답을 반환하고 워크플로를 계속 실행합니다."
   },
   "connectorAccess": {
     "searchServices": "서비스 검색",
@@ -1141,7 +1143,12 @@
     "webhookDynamicStatusInvalid": "204, 205, 304를 제외한 200~599의 정수를 입력하세요.",
     "webhookAddOutputs": "워크플로 출력 추가",
     "webhookOutputsDisconnected": "워크플로 출력이 연결되지 않음",
-    "webhookStatusSource": "상태 코드 소스"
+    "webhookStatusSource": "상태 코드 소스",
+    "webhookAddResponse": "Webhook 응답 노드 추가",
+    "webhookSelectResponse": "Webhook 응답 노드 선택",
+    "webhookResponseDisconnected": "Webhook 응답 노드가 연결되지 않았습니다",
+    "webhookConnectResponse": "캔버스에서 Webhook 응답 노드를 선택하여 연결하세요.",
+    "webhookMissingResponse": "선택한 Webhook 응답 노드가 없습니다"
   },
   "conditionEditor": {
     "addCondition": "조건 추가",

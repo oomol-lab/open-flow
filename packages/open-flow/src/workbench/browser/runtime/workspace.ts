@@ -17,6 +17,7 @@ import type { ResolvedNode, ResolvedSelection, RevisionView } from './revisionVi
 
 import { wrapLayout } from '../../../canvas/browser/base/wrapLayout.ts'
 import { isTriggerNode } from '../../../flow/common/change.ts'
+import { nodeInputPorts } from '../../../flow/common/graph.ts'
 import { resolutionOutputPorts } from '../../../flow/common/graph.ts'
 import { sourceOutputLabel } from '../../../flow/common/sourceField.ts'
 import { triggerOutputPorts } from '../../../trigger/common/contract.ts'
@@ -83,6 +84,8 @@ function sourceNodePresentation(node: ResolvedSelection, context: NodeProjection
 function nodeTitle(node: ResolvedNode, t?: TFunction): string {
   if (node.node.name != null) return node.node.name
   switch (node.kind) {
+    case 'webhook-response':
+      return t?.('addNode.webhookResponse') ?? 'Webhook Response'
     case 'outputs':
       return t?.('addNode.outputs') ?? 'Workflow Outputs'
     case 'condition':
@@ -100,6 +103,8 @@ function nodeTitle(node: ResolvedNode, t?: TFunction): string {
 
 function nodeIcon(node: ResolvedNode): string | undefined {
   switch (node.kind) {
+    case 'webhook-response':
+      return ':lucide-light:reply:'
     case 'outputs':
       return ':lucide-light:log-out:'
     case 'condition':
@@ -135,6 +140,9 @@ function nodePorts(node: ResolvedSelection, revision: RevisionView): NodePorts {
   )
   const outputs = new Map<string, Omit<FlowCanvasViewOutput, 'handle'>>()
   switch (node.kind) {
+    case 'webhook-response':
+      for (const [handle, port] of Object.entries(nodeInputPorts(node.node))) inputs.set(handle, { ...port, defaultValue: port.value })
+      break
     case 'outputs':
       for (const port of node.node.outputDefs) inputs.set(port.handle, { description: port.description, jsonSchema: port.jsonSchema, nullable: port.nullable })
       break
@@ -630,6 +638,7 @@ function semanticDesignerNode(nodeId: string, resolved: ResolvedNode, ports: Nod
       }
     case 'value':
       return { ...common, kind: node.kind, values: node.values.map((port) => Object.assign({}, port)) }
+    case 'webhook-response':
     case 'outputs':
     case 'approval':
     case 'wait':

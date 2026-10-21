@@ -3,6 +3,7 @@ import type { ServerService } from '../node/application/service.ts'
 import type { Store } from '../node/storage/store.ts'
 
 import { digestBytes, encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { workflowTask } from '@oomol-lab/open-flow/workflow'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -11,7 +12,7 @@ import { expect, it, onTestFinished, vi } from 'vitest'
 import { workflowAuthoringTarget, workflowCallCompatibility } from '../node/application/workflow.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
 
-const engine = 'open-flow-engine/v6'
+const engine = currentEngineContract
 const number = { handle: 'answer', jsonSchema: { type: 'number' }, nullable: false } as const
 async function create(service: ServerService, name: string, operations: readonly ChangeOperation[]) {
   const created = await service.control.createFlow('operator', name, name)

@@ -67,6 +67,7 @@ export type AddNodeOption = AddNodeOptionBase &
     | { readonly kind: 'value' }
     | { readonly kind: 'wait' }
     | { readonly kind: 'outputs' }
+    | { readonly kind: 'webhook-response' }
   )
 
 export function indexAddNodeOptions(options: readonly AddNodeOption[]): ReadonlyMap<string, AddNodeOption> {
@@ -145,6 +146,16 @@ function builtinOptions(_draft: Draft, t: TFunction): readonly AddNodeOption[] {
       outputs: [],
       kind: 'workflow',
       label: t('addNode.workflow'),
+    },
+    {
+      id: 'webhook-response',
+      kind: 'webhook-response',
+      group,
+      label: t('addNode.webhookResponse'),
+      description: t('addNode.webhookResponseDescription'),
+      icon: ':lucide-light:reply:',
+      inputs: [],
+      outputs: [],
     },
     {
       id: 'outputs',
@@ -257,6 +268,8 @@ export function addNodeIntent(option: AddNodeOption, revision: RevisionView, t: 
   switch (option.kind) {
     case 'workflow':
       return { kind: 'workflow', name: t('addNode.workflow') }
+    case 'webhook-response':
+      return { kind: 'webhook-response', name: t('addNode.webhookResponse') }
     case 'outputs':
       return { kind: 'outputs', name: t('addNode.outputs') }
     case 'new-task': {

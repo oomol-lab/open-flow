@@ -10,6 +10,7 @@ import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { IntegrationConnectionError, PermanentIntegrationError, TransientIntegrationError } from '@oomol-lab/open-flow/integration-trigger'
 import { eventsPollOutputs } from '@oomol-lab/open-flow/poll-trigger'
 import { integrationDefinitions } from '@oomol-lab/open-flow/provider-triggers'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
 import * as Scope from 'effect/Scope'
@@ -1348,7 +1349,7 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
         },
       },
     ])
-    const operation = await service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v6', null, 'publish-drive')
+    const operation = await service.control.publishFlow('operator', flowId, changed.revision.revisionId, currentEngineContract, null, 'publish-drive')
     await service.tickIntegration()
     expect(changesRead).toBe(0)
     expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('pending')
@@ -1394,7 +1395,7 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
       'operator',
       flowId,
       scoped.revision.revisionId,
-      'open-flow-engine/v6',
+      currentEngineContract,
       live.publication!.publicationId,
       'replace-drive',
     )
@@ -1539,7 +1540,7 @@ it('prepares a GitHub repository webhook before activating Live and rejects an u
     config: inputValues({ owner: 'octocat', repo: 'repository', events: ['issues'] }),
   }
   const draft = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [{ kind: 'graph.node.create', nodeId: 'github', node }])
-  const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, 'open-flow-engine/v6', null, 'publish-github')
+  const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, currentEngineContract, null, 'publish-github')
   expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('pending')
   await service.tickIntegration()
   await service.tickMaintenance()
@@ -1551,7 +1552,7 @@ it('prepares a GitHub repository webhook before activating Live and rejects an u
   ])
   const live = service.control.getFlow(flowId).live!.publicationId
   await expect(
-    service.control.publishFlow('operator', flowId, changed.revision.revisionId, 'open-flow-engine/v6', live, 'replace-github'),
+    service.control.publishFlow('operator', flowId, changed.revision.revisionId, currentEngineContract, live, 'replace-github'),
   ).rejects.toMatchObject({
     code: 'publication.unsupported',
   })

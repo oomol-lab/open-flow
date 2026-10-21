@@ -3,6 +3,7 @@ import type { RunAcceptance } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunOptions } from '@oomol-lab/open-flow/scheduler'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { randomUUID } from 'node:crypto'
 import { ServerService } from '../node/application/service.ts'
 import { ControlError } from '../node/error.ts'
@@ -60,7 +61,7 @@ export async function acceptRun(service: ServerService, input: Input): Promise<R
     const accepted = await service.control.runs.createDraftRun(
       stored.flowId,
       stored.revisionId,
-      'open-flow-engine/v6',
+      currentEngineContract,
       input.inputs ?? {},
       input.idempotencyKey,
       {

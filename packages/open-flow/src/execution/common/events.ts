@@ -1,5 +1,9 @@
+import type { WebhookResponseSnapshot } from '../../flow/common/webhookResponse.ts'
+
+import { validWebhookStatus, webhookHeaderValues } from '../../flow/common/webhookResponse.ts'
 export type ProjectedRunEvent =
   | {
+      readonly response?: WebhookResponseSnapshot
       readonly kind: 'node.completed'
       readonly payload: Readonly<Record<string, unknown>>
       readonly value: unknown
@@ -10,7 +14,21 @@ export type ProjectedRunEvent =
     }
 
 const encoder = new TextEncoder()
-const nodeKinds = new Set(['agent', 'approval', 'condition', 'connector', 'decision', 'javascript', 'openapi', 'llm', 'value', 'wait', 'outputs', 'workflow'])
+const nodeKinds = new Set([
+  'agent',
+  'approval',
+  'condition',
+  'connector',
+  'decision',
+  'javascript',
+  'openapi',
+  'llm',
+  'value',
+  'wait',
+  'outputs',
+  'workflow',
+  'webhook-response',
+])
 
 function object(value: unknown, description: string): Record<string, unknown> {
   if (value == null || typeof value != 'object' || Array.isArray(value)) throw new TypeError(`${description} must be an object.`)
@@ -28,12 +46,39 @@ function optionalString(value: unknown, description: string): string | undefined
 
 function nodeKind(
   value: unknown,
-): 'agent' | 'approval' | 'condition' | 'connector' | 'decision' | 'javascript' | 'openapi' | 'llm' | 'value' | 'wait' | 'outputs' | 'workflow' | undefined {
+):
+  | 'agent'
+  | 'approval'
+  | 'condition'
+  | 'connector'
+  | 'decision'
+  | 'javascript'
+  | 'openapi'
+  | 'llm'
+  | 'value'
+  | 'wait'
+  | 'outputs'
+  | 'workflow'
+  | 'webhook-response'
+  | undefined {
   if (value === undefined) return
   if (!nodeKinds.has(value as string)) {
     throw new TypeError('Runtime node.started nodeKind is invalid.')
   }
-  return value as 'agent' | 'approval' | 'condition' | 'connector' | 'decision' | 'javascript' | 'openapi' | 'llm' | 'value' | 'wait' | 'outputs' | 'workflow'
+  return value as
+    | 'agent'
+    | 'approval'
+    | 'condition'
+    | 'connector'
+    | 'decision'
+    | 'javascript'
+    | 'openapi'
+    | 'llm'
+    | 'value'
+    | 'wait'
+    | 'outputs'
+    | 'workflow'
+    | 'webhook-response'
 }
 
 function runId(event: Record<string, unknown>): string {
@@ -223,6 +268,7 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
             kind: type,
             payload,
             value: object(event.outputs, 'Runtime node.completed outputs'),
+            ...(event.response == null || context.rawRunId !== platformRunId ? {} : { response: responseSnapshot(event.response) }),
           }
         case 'node.started': {
           jobs.set(JSON.stringify([context.rawRunId, event.jobId]), context.nodeId)
@@ -266,4 +312,17 @@ export function createEventProjector(platformRunId: string, nodeFailureCodes: Re
 
     throw new TypeError(`Runtime event type ${JSON.stringify(type)} is not supported.`)
   }
+}
+
+function responseSnapshot(value: unknown): WebhookResponseSnapshot {
+  const source = object(value, 'Runtime response')
+  const headers = webhookHeaderValues(source.headers)
+  if (
+    !validWebhookStatus(source.status) ||
+    typeof source.body !== 'string' ||
+    !['text/plain;charset=UTF-8', 'application/json'].includes(String(source.contentType)) ||
+    headers == null
+  )
+    throw new TypeError('Invalid runtime response.')
+  return { status: source.status, body: source.body, contentType: String(source.contentType), headers }
 }

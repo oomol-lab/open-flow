@@ -667,6 +667,7 @@ export function decodeRunEvent(value: unknown) {
             nodeKind !== 'agent' &&
             nodeKind !== 'value' &&
             nodeKind !== 'outputs' &&
+            nodeKind !== 'webhook-response' &&
             nodeKind !== 'workflow' &&
             nodeKind !== 'wait'
           )

@@ -94,3 +94,55 @@ export async function verifyLiveWebhook(lab: LabSession, dynamic = false): Promi
   })
   return { errors, runIds }
 }
+
+/** Observe early HTTP completion while a later Wait keeps the accepted Run alive. */
+export async function verifyEarlyResponse(lab: LabSession): Promise<{ errors: string[]; runIds: string[] }> {
+  const started = performance.now()
+  const errors: string[] = [],
+    runIds: string[] = []
+  const details = lab.service.control.getLiveDetails(lab.manifest.flowId, lab.manifest.origin)
+  const entry = details.entries.find((item) => item.type === 'webhook')
+  if (entry?.type !== 'webhook' || details.publication == null) return { errors: ['Publish an enabled Webhook entry.'], runIds }
+  const policy = entry.config.options?.responseBody
+  if (policy?.kind !== 'webhook-response' || policy.nodeId == null) return { errors: ['Select one Webhook Response node.'], runIds }
+  const published = lab.service.control.getRevision(lab.manifest.flowId, details.publication.revisionId).content
+  if (Object.values(published.document.graph.nodes).filter((node) => node.kind === 'webhook-response').length !== 2)
+    errors.push('Keep two independent response nodes.')
+  const request = () =>
+    lab.app.request(entry.binding.endpointUrl!, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'idempotency-key': 'early-lab' },
+      body: JSON.stringify({ message: 'accepted before waiting' }),
+      signal: AbortSignal.timeout(20000),
+    })
+  const responses = await Promise.all([request(), request()])
+  for (const response of responses) {
+    if (
+      response.status !== 201 ||
+      (await response.text()) !== 'accepted before waiting' ||
+      response.headers.get('x-count') !== '3' ||
+      response.headers.get('x-enabled') !== 'false' ||
+      response.headers.get('x-ignored') != null
+    )
+      errors.push('Return the selected response body, status and whole-object headers.')
+  }
+  const runs = lab.service.control.runs.listRuns(lab.manifest.flowId, 100, {}).page.runs
+  if (runs.length !== 1) errors.push('Concurrent retries must reuse one Run.')
+  const runId = runs[0]?.runId
+  if (runId != null) {
+    runIds.push(runId)
+    for (let attempt = 0; attempt < 100 && lab.service.control.runs.getRun(runId).waits.length === 0; attempt++)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+    const run = lab.service.control.runs.getRun(runId)
+    if (!['running', 'waiting'].includes(run.status) || run.waits.length !== 1) errors.push('HTTP must finish before the downstream Wait is resolved.')
+    else {
+      lab.service.control.runs.resolveRunWait(runId, run.waits[0]!.waitId, 'continue')
+      for (let attempt = 0; attempt < 100 && lab.service.control.runs.getRun(runId).status !== 'completed'; attempt++)
+        await new Promise((resolve) => setTimeout(resolve, 20))
+      if (lab.service.control.runs.getRun(runId).status !== 'completed') errors.push('The workflow must continue after responding.')
+    }
+    if ((await (await request()).text()) !== 'accepted before waiting') errors.push('Replay must preserve the original response.')
+  }
+  lab.attempt.excluded!.push({ kind: 'verification', sample: 'early-webhook', durationMs: performance.now() - started, ...(runId == null ? {} : { runId }) })
+  return { errors, runIds }
+}

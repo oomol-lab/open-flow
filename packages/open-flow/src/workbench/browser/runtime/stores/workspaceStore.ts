@@ -39,7 +39,7 @@ import {
 import { connectionCatalog } from '../connectionCatalog.ts'
 import { addNodeIntent } from '../editor/addNodeOptions.ts'
 import { CanvasClipboard } from '../editor/canvasClipboard.ts'
-import { applyFlowChanges, deleteSelection, addNode as addFlowNode, setTriggerConnection } from '../editor/flowChanges.ts'
+import { applyFlowChanges, deleteSelection, addNode as addFlowNode, selectWebhookResponse, setTriggerConnection } from '../editor/flowChanges.ts'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
 import { designerGraph } from '../workspace.ts'
@@ -475,7 +475,12 @@ export class WorkspaceStore {
     }
   }
 
-  public async addNode(option: AddNodeOption, position: Point, connection?: (nodeId: string) => Omit<DesignerEdge, 'id'>): Promise<string | undefined> {
+  public async addNode(
+    option: AddNodeOption,
+    position: Point,
+    connection?: (nodeId: string) => Omit<DesignerEdge, 'id'>,
+    relatedChanges?: (nodeId: string, revision: RevisionView) => FlowChanges,
+  ): Promise<string | undefined> {
     if (!(await this.saveModuleEditor())) return
     const draft = this.#model.value.draft
     if (draft == null) return
@@ -485,7 +490,8 @@ export class WorkspaceStore {
     const intent = addNodeIntent(option, revision, this.#i18n.t)
     if (intent == null) return
     const edge = connection?.(nodeId)
-    const nodeChanges = addFlowNode(revision, nodeId, intent)
+    const created = addFlowNode(revision, nodeId, intent)
+    const nodeChanges = created == null ? undefined : [...created, ...(relatedChanges?.(nodeId, revision) ?? [])]
     if (nodeChanges == null) return
     const changes =
       edge == null
@@ -503,6 +509,18 @@ export class WorkspaceStore {
     this.#set({ nodeFocus: { nodeId, requestId: ++this.#nodeFocusId } })
     if (intent.kind == 'provider-trigger' && intent.connectionId == null) void this.#configureAddedTrigger(draft.flowId, nodeId, intent.definition)
     return nodeId
+  }
+
+  public async addWebhookResponseNode(triggerId: string): Promise<string | undefined> {
+    const option = this.$.addNodeOptions.value.find((item) => item.kind === 'webhook-response')
+    const position = this.#designer().nodes.find((node) => node.id === triggerId)?.position
+    if (option == null || position == null) return
+    return this.addNode(
+      option,
+      { x: position.x + 320, y: position.y },
+      undefined,
+      (nodeId, revision) => selectWebhookResponse(revision, triggerId, nodeId) ?? [],
+    )
   }
 
   async #configureAddedTrigger(flowId: string, nodeId: string, definition: TriggerKeySnapshot): Promise<void> {

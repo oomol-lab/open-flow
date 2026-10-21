@@ -28,6 +28,7 @@ export interface InputSourceQuery {
 }
 
 export type ResolvedNode =
+  | { readonly id: string; readonly kind: 'webhook-response'; readonly node: Extract<GraphNode, { kind: 'webhook-response' }> }
   | { readonly id: string; readonly kind: 'outputs'; readonly node: import('../../../flow/common/change.ts').OutputsNode }
   | { readonly id: string; readonly kind: 'condition'; readonly node: ConditionNode }
   | {
@@ -165,6 +166,9 @@ export class RevisionView {
         resolved = { definition, id: nodeId, kind: node.kind, module, node }
         break
       }
+      case 'webhook-response':
+        resolved = { id: nodeId, kind: node.kind, node }
+        break
       case 'outputs':
         resolved = { id: nodeId, kind: node.kind, node }
         break

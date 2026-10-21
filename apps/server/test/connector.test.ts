@@ -5,6 +5,7 @@ import type { ManagedTaskDefinition } from '../../../packages/open-flow/src/flow
 import type { ConnectorHost } from '../node/deployment/connector-contract.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -286,12 +287,12 @@ describe('Server Connector host', () => {
     ])
     const stored = await storeRevision(service, revision, 'multi-account-publish')
     active = false
-    const accepted = await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v6', null, 'publish')
+    const accepted = await service.control.publishFlow('test', stored.flowId, stored.revisionId, currentEngineContract, null, 'publish')
     await expect(
-      service.control.runs.createDraftRun(stored.flowId, stored.revisionId, 'open-flow-engine/v6', {}, 'run', { nodeId: 'start', outputs: {} }),
+      service.control.runs.createDraftRun(stored.flowId, stored.revisionId, currentEngineContract, {}, 'run', { nodeId: 'start', outputs: {} }),
     ).resolves.toMatchObject({ created: true })
     const checks = listConnections.mock.calls.length
-    const replay = await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v6', null, 'publish')
+    const replay = await service.control.publishFlow('test', stored.flowId, stored.revisionId, currentEngineContract, null, 'publish')
     expect(replay.operationId).toBe(accepted.operationId)
     expect(listConnections).toHaveBeenCalledTimes(checks)
   })
@@ -540,7 +541,7 @@ describe('Server Connector host', () => {
       },
       { kind: 'graph.edge.connect', edge: { source: 'start', target: 'connector' } },
     ])
-    const accepted = await service.control.runs.createDraftRun(created.flow.flowId, changed.revision.revisionId, 'open-flow-engine/v6', {}, 'team-run', {
+    const accepted = await service.control.runs.createDraftRun(created.flow.flowId, changed.revision.revisionId, currentEngineContract, {}, 'team-run', {
       nodeId: 'start',
       outputs: {},
     })
@@ -780,9 +781,9 @@ it.each(['connector', 'code-call', 'code-unused'] as const)('admits and publishe
     ])
   }
   const stored = await storeRevision(service, revision, `deferred-${kind}`)
-  expect(await service.control.checkFlow(stored.flowId, stored.revisionId, 'open-flow-engine/v6')).toMatchObject({ valid: true })
-  await expect(service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v6', null, 'publish-deferred')).resolves.toBeDefined()
-  const accepted = await service.control.runs.createDraftRun(stored.flowId, stored.revisionId, 'open-flow-engine/v6', {}, 'run-deferred', {
+  expect(await service.control.checkFlow(stored.flowId, stored.revisionId, currentEngineContract)).toMatchObject({ valid: true })
+  await expect(service.control.publishFlow('test', stored.flowId, stored.revisionId, currentEngineContract, null, 'publish-deferred')).resolves.toBeDefined()
+  const accepted = await service.control.runs.createDraftRun(stored.flowId, stored.revisionId, currentEngineContract, {}, 'run-deferred', {
     nodeId: 'start',
     outputs: {},
   })

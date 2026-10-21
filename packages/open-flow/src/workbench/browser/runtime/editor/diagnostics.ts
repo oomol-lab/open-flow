@@ -36,6 +36,8 @@ export function diagnosticMessage(
   nodeTitle?: (nodeId: string) => string | undefined,
   affectedNodeTitle?: string,
 ): string {
+  if (diagnostic.code === 'trigger.webhook-response-node-missing' || diagnostic.code === 'trigger.webhook-response-node-unreachable')
+    return t('webhookEditor.webhookConnectResponse')
   if (diagnostic.code == 'agent.config-invalid' && diagnostic.message == 'Declare at most 64 Agent tools.') return t('agent.toolsLimit')
   if (diagnostic.code == 'graph.source-missing' && diagnostic.values?.variant == 'field')
     return t('inspector.sources.fieldMissing', { field: JSON.stringify(diagnostic.values.field), output: diagnostic.values.output })

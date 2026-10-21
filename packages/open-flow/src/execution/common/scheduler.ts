@@ -2,6 +2,7 @@ import type { AgentConfig } from '../../flow/common/agent.ts'
 import type { ConnectorCapability, Graph, GraphNode, InputMapping, InputPortDefinition, JsonValue, TriggerNode, WaitAction } from '../../flow/common/change.ts'
 import type { NodeErrorData } from '../../flow/common/errorHandling.ts'
 import type { PreparedFlow } from '../../flow/common/semantics.ts'
+import type { WebhookResponseSnapshot } from '../../flow/common/webhookResponse.ts'
 import type { PreviousNode } from '../../types/index.ts'
 import type { AgentCheckpoint, AgentResult } from './runtime.ts'
 
@@ -19,6 +20,7 @@ import { nodeErrorSchema, nodeSystemOutputPorts, supportsNodeErrorHandling } fro
 import { nodeInputPorts as nodePorts, isResolutionNode, nodeOutputPorts, resolutionActions, resolutionOutputPorts } from '../../flow/common/graph.ts'
 import { inputValue } from '../../flow/common/inputValue.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'
+import { validWebhookStatus, webhookHeaderValues, encodeWebhookBody } from '../../flow/common/webhookResponse.ts'
 import { matchesTriggerOutputs, normalizeTriggerOutputs } from '../../trigger/common/contract.ts'
 import { Dependencies, dependenciesSchema, dependencyValues } from './dependencies.ts'
 import { projectExecutionId, sanitizeRuntimeErrorMessage } from './events.ts'
@@ -70,6 +72,7 @@ export type SchedulerEvent =
         | 'wait'
         | 'outputs'
         | 'workflow'
+        | 'webhook-response'
       readonly nodeTitle?: string
       readonly runId: string
       readonly type: 'node.started'
@@ -80,6 +83,7 @@ export type SchedulerEvent =
       readonly outputs: Readonly<Record<string, JsonValue>>
       readonly runId: string
       readonly systemOutputs?: Readonly<Record<string, JsonValue>>
+      readonly response?: WebhookResponseSnapshot
       readonly type: 'node.completed'
     }
   | {
@@ -305,7 +309,7 @@ interface RunGraph {
 }
 
 class NodeValidationError extends PortValidationError {
-  readonly code: 'node.input-invalid' | 'node.output-invalid'
+  readonly code: 'node.input-invalid' | 'node.output-invalid' | 'webhook.response-status-invalid' | 'webhook.response-headers-invalid'
   constructor(code: NodeValidationError['code'], error: unknown) {
     super(error instanceof Error ? error.message : String(error))
     this.code = code
@@ -376,7 +380,20 @@ function nodeTitle(node: GraphNode): string | undefined {
 
 function nodeKind(
   node: ExecutableNode,
-): 'agent' | 'approval' | 'condition' | 'connector' | 'decision' | 'javascript' | 'openapi' | 'llm' | 'value' | 'wait' | 'outputs' | 'workflow' {
+):
+  | 'agent'
+  | 'approval'
+  | 'condition'
+  | 'connector'
+  | 'decision'
+  | 'javascript'
+  | 'openapi'
+  | 'llm'
+  | 'value'
+  | 'wait'
+  | 'outputs'
+  | 'workflow'
+  | 'webhook-response' {
   if (node.kind != 'task') return node.kind
   return 'moduleId' in node.task ? 'javascript' : node.task.executor.kind
 }
@@ -751,7 +768,12 @@ function validateCheckpoint(
 
 type NodeResult =
   | { readonly kind: 'calling'; readonly childRunId: string; readonly input: Readonly<Record<string, JsonValue>> }
-  | { readonly kind: 'completed'; readonly releasedHandles?: readonly string[]; readonly outputs: Readonly<Record<string, JsonValue>> }
+  | {
+      readonly kind: 'completed'
+      readonly releasedHandles?: readonly string[]
+      readonly outputs: Readonly<Record<string, JsonValue>>
+      readonly response?: WebhookResponseSnapshot
+    }
   | { readonly kind: 'suspended'; readonly value: JsonValue; readonly agent: FlowRunCheckpoint['agents'][string] }
 
 function runGraph(
@@ -852,6 +874,7 @@ function runGraph(
         outputs: Readonly<Record<string, JsonValue>>,
         releasedHandles: readonly string[] = Object.keys(outputs),
         failure?: SchedulerFailure,
+        response?: WebhookResponseSnapshot,
       ) =>
         Effect.uninterruptible(
           Effect.gen(function* () {
@@ -876,7 +899,7 @@ function runGraph(
             const handled = failure == null ? {} : { handled: true as const }
             yield* context.emit(
               failure == null
-                ? { jobId, nodeId, outputs, runId, ...system, type: 'node.completed' }
+                ? { jobId, nodeId, outputs, runId, ...system, ...(response == null ? {} : { response }), type: 'node.completed' }
                 : { ...failure, jobId, nodeId, runId, ...system, handled: true, type: 'node.failed' },
             )
             completed.set(nodeId, { jobId, outputs, ...system, ...handled })
@@ -916,6 +939,14 @@ function runGraph(
             })
           let outputs: Readonly<Record<string, JsonValue>>
           switch (node.kind) {
+            case 'webhook-response': {
+              const status = nodeInputs.statusCode
+              if (!validWebhookStatus(status))
+                return yield* Effect.fail(new NodeValidationError('webhook.response-status-invalid', 'Invalid HTTP response status.'))
+              const headers = webhookHeaderValues(nodeInputs.headers)
+              if (headers == null) return yield* Effect.fail(new NodeValidationError('webhook.response-headers-invalid', 'Invalid HTTP response headers.'))
+              return { kind: 'completed' as const, outputs: {}, response: { ...encodeWebhookBody(nodeInputs.body!), status, headers } }
+            }
             case 'outputs': {
               outputs = nodeInputs
               break
@@ -1073,7 +1104,7 @@ function runGraph(
         pendingCalls.delete(jobId)
         if (result.kind == 'completed') {
           delete agents[jobId]
-          return commit(nodeId, jobId, result.outputs, result.releasedHandles)
+          return commit(nodeId, jobId, result.outputs, result.releasedHandles, undefined, result.response)
         }
         agents[jobId] = result.agent
         return createWait(nodeId, jobId, result.value)

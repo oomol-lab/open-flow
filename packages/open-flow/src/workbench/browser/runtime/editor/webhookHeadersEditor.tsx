@@ -122,7 +122,6 @@ export function WebhookHeadersEditor({
             return (
               <FieldValueEditor
                 {...props}
-                hideValueTools
                 valueAddon={source(name)}
                 editor={reference == null ? undefined : selected(reference.output, reference.error, name)}
               />

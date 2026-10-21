@@ -2,6 +2,7 @@ import type { EventSource } from '@oomol-lab/open-flow/control-api'
 
 import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { integrationDefinitions } from '@oomol-lab/open-flow/provider-triggers'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { expect, it } from 'vitest'
 import { ConnectorTaskError } from '../node/deployment/connector-contract.ts'
 import { createServerApp } from '../node/transport/http.ts'
@@ -122,7 +123,7 @@ it('shares a managed Jira project subscription and deduplicates fanout without e
         },
       },
     ])
-    const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, 'open-flow-engine/v6', null, `publish-${flows.length}`)
+    const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, currentEngineContract, null, `publish-${flows.length}`)
     await service.tickIntegration()
     await service.tickMaintenance()
     expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('succeeded')

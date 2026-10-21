@@ -124,6 +124,8 @@ function fallbackIcon(item: LibraryNodeItem): IconName {
       return 'trigger'
     case 'value':
       return 'value'
+    case 'webhook-response':
+      return 'response'
     case 'outputs':
       return 'outputs'
     case 'wait':

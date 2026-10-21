@@ -152,6 +152,29 @@ selections for diagnostics. Drafts can retain incomplete configuration; checks a
 missing, unreachable or undeclared response outputs. Live reads expose the published configuration
 independently of later Draft edits.
 
+### Early Webhook response nodes
+
+Public type `webhook-response` has fixed inputs `body` (any JSON, default empty text),
+`statusCode` (number, default 200), and `headers` (default `{}`). Create multiple nodes without
+changing the singleton Outputs contract. Set Webhook `options.responseBody` to
+`{ kind: "webhook-response", nodeId: "selected-node", timeoutMs: 30000 }` and connect its execution
+path. Same-batch authoring supports `$alias` in `nodeId`. Clear the old responseBody and its
+workflow-output-specific status/header policies before switching modes through recursive updates.
+Static Webhook content, status and headers remain saved but inactive in this mode.
+
+Each node accepts ordinary upstream and variable sources; it exposes no business outputs and
+allows downstream execution edges. Headers accept fixed text entries or one whole-object source;
+per-entry sources are not supported. Object-source values support text, number and boolean.
+The first successful execution commits an immutable response snapshot, before continuing execution.
+HTTP returns that snapshot without waiting for the Run to end. Later failures, loop executions and
+idempotent retries do not replace it. A successful Run which skips the selected node returns 500.
+Timeout, disconnect and shutdown retain the existing HTTP waiting and cleanup policies.
+
+New nodes and selectors share pending model v10; execution uses Engine v7 with unchanged checkpoint
+v6 structure. The response receipt is committed independently of logs and retained for the Run’s
+lifetime, including across recovery and log truncation. Nested workflow scopes cannot respond for
+an enclosing Run. Existing workflow-output responses continue to wait for complete Run success.
+
 ## Node retries
 
 Ordinary Code, Connector, OpenAPI, LLM and AI Decision Tasks support node-level

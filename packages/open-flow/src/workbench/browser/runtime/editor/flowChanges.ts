@@ -140,6 +140,7 @@ export type TaskSettings =
 export type TaskPorts = Pick<TaskDefinition, 'inputs' | 'outputs'>
 
 export type AddNodeIntent =
+  | { readonly kind: 'webhook-response'; readonly name: string }
   | { readonly kind: 'outputs'; readonly name: string }
   | { readonly kind: 'decision'; readonly name: string }
   | { readonly kind: 'openapi'; readonly name: string }
@@ -240,6 +241,9 @@ export function addNode(revision: RevisionView, nodeId: string, intent: AddNodeI
       break
     case 'value':
       changes = createValue(nodeId, intent.name)
+      break
+    case 'webhook-response':
+      changes = [{ kind: 'graph.node.create', nodeId, node: { kind: 'webhook-response', name: intent.name, inputs: {} } }]
       break
     case 'outputs':
       changes = [{ kind: 'graph.node.create', nodeId, node: { outputDefs: [], outputMappings: {}, kind: 'outputs', name: intent.name } }]
@@ -486,6 +490,24 @@ export function updateWebhook(revision: RevisionView, triggerId: string, setting
   const value = { bodyFields: settings.bodyFields, method: settings.method, options: Object.keys(settings.options).length == 0 ? undefined : settings.options }
   if (dequal(before, value)) return []
   return [{ before, kind: 'graph.node.webhook.set', nodeId: triggerId, value }]
+}
+
+/** Choosing a response node deactivates only workflow-output references. */
+export function selectWebhookResponse(revision: RevisionView, triggerId: string, nodeId: string): FlowChanges | undefined {
+  const trigger = revision.trigger(triggerId)
+  if (trigger?.kind !== 'webhook') return
+  const options = {
+    ...trigger.options,
+    responseBody: {
+      kind: 'webhook-response' as const,
+      nodeId,
+      ...(trigger.options?.responseBody?.timeoutMs == null ? {} : { timeoutMs: trigger.options.responseBody.timeoutMs }),
+    },
+  }
+  delete options.responseStatusCodeOutput
+  delete options.responseHeadersSource
+  delete options.responseHeaderOutputs
+  return updateWebhook(revision, triggerId, { bodyFields: trigger.bodyFields, method: trigger.method, options })
 }
 
 function updatedInputMappings(

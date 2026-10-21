@@ -2,26 +2,28 @@ import type { JsonValue, WebhookBodyField, WebhookMethod, WebhookOptions } from 
 
 import { dequal } from 'dequal/lite'
 import { isJsonObject } from '../../base/common/json.ts'
-import { webhookHeaderNameIssue, webhookResponseAllowsBody } from '../../flow/common/webhookResponse.ts'
+import { webhookHeaderNameIssue, validWebhookStatus, webhookHeaderValues, encodeWebhookBody } from '../../flow/common/webhookResponse.ts'
 
 export { webhookSupportsBody } from './contract.ts'
 export { webhookResponseAllowsBody, webhookResponseTimeout } from '../../flow/common/webhookResponse.ts'
+
+export type { WebhookResponseSnapshot } from '../../flow/common/webhookResponse.ts'
 
 export const maximumWebhookBodyBytes = 64 * 1024
 
 /** Serialize only declared workflow business outputs, never node logs or execution metadata. */
 export function webhookResponseBody(
   result: unknown,
-  source: NonNullable<WebhookOptions['responseBody']>,
+  source: Extract<NonNullable<WebhookOptions['responseBody']>, { kind: 'workflow-outputs' }>,
 ): { readonly body: string; readonly contentType: string } | undefined {
   const value = workflowOutputValue(result, source.output)
   if (value === undefined) return
-  return typeof value == 'string' ? { body: value, contentType: 'text/plain;charset=UTF-8' } : { body: JSON.stringify(value), contentType: 'application/json' }
+  return encodeWebhookBody(value)
 }
 
 export function webhookResponseStatusCode(result: unknown, output: string): number | undefined {
   const value = workflowOutputValue(result, output)
-  if (typeof value == 'number' && Number.isInteger(value) && value >= 200 && value <= 599 && webhookResponseAllowsBody(value)) return value
+  if (validWebhookStatus(value)) return value
 }
 
 /** Project business headers before the HTTP layer applies its deployment-owned header policy. */
@@ -48,19 +50,7 @@ export function webhookResponseHeaders(result: unknown, options: WebhookOptions)
       values.set(name.toLowerCase(), { name, value: workflowOutputValue(result, output) })
     }
   }
-  const headers: [string, string][] = []
-  for (const { name, value } of values.values()) {
-    if (typeof value != 'string' && typeof value != 'boolean' && !(typeof value == 'number' && Number.isFinite(value))) return
-    const text = String(value)
-    try {
-      const parsed = new Headers([[name, text]])
-      void parsed
-    } catch {
-      return
-    }
-    headers.push([name, text])
-  }
-  return Object.fromEntries(headers)
+  return webhookHeaderValues(Object.fromEntries([...values.values()].map(({ name, value }) => [name, value])))
 }
 
 function workflowOutputValue(result: unknown, output?: string): JsonValue | undefined {
@@ -291,7 +281,7 @@ export const webhookConformanceCases: readonly WebhookConformanceCase[] = [
           headers: {
             'access-control-allow-credentials': null,
             'content-security-policy': "default-src 'none'; frame-ancestors 'none'; sandbox",
-            'content-type': 'text/plain;charset=UTF-8',
+            'content-type': 'text/html',
             'location': null,
             'referrer-policy': 'no-referrer',
             'set-cookie': null,

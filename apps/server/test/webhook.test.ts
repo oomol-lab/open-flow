@@ -1,6 +1,7 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { webhookEndpointId } from '@oomol-lab/open-flow/webhook-trigger'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -70,7 +71,7 @@ function webhookFlow(): RevisionContent {
 
 async function publishedWebhook(service: ServerService, key = 'webhook') {
   const stored = await storeRevision(service, webhookFlow(), `revision-${key}`)
-  await service.control.publishFlow('test', stored.flowId, stored.revisionId, 'open-flow-engine/v6', null, `publication-${key}`)
+  await service.control.publishFlow('test', stored.flowId, stored.revisionId, currentEngineContract, null, `publication-${key}`)
   await service.tickMaintenance()
   const binding = service.control.getFlowTriggerBinding(stored.flowId, 'incoming', 'http://server.local')
   const endpointId = binding.endpointUrl == null ? undefined : webhookEndpointId(new URL(binding.endpointUrl))
@@ -356,12 +357,12 @@ it('runs the published Flow Error after an automatic failure and exposes both Ru
     { ...revision, modules: { capture: { imports: [], name: 'Capture', source: 'export default () => { throw new Error("Automatic task failed") }' } } },
     'failed-source',
   )
-  await service.control.publishFlow('test', source.flowId, source.revisionId, 'open-flow-engine/v6', null, 'publish-source')
+  await service.control.publishFlow('test', source.flowId, source.revisionId, currentEngineContract, null, 'publish-source')
   await service.tickMaintenance()
   const configured = await service.control.changeDraft('test', handler.flowId, handler.revisionId, [
     { kind: 'graph.trigger.sources.set', nodeId: 'error', value: [source.flowId] },
   ])
-  await service.control.publishFlow('test', handler.flowId, configured.revision.revisionId, 'open-flow-engine/v6', null, 'publish-handler')
+  await service.control.publishFlow('test', handler.flowId, configured.revision.revisionId, currentEngineContract, null, 'publish-handler')
   await service.tickMaintenance()
   const binding = service.control.getFlowTriggerBinding(source.flowId, 'incoming', 'http://server.local')
   const target = service.webhookTarget(webhookEndpointId(new URL(binding.endpointUrl!))!)!

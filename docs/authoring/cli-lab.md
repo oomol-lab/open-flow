@@ -350,3 +350,12 @@ renamed business output and separation from later Draft edits. Both transports s
 bun run lab test webhook-response
 bun run lab test webhook-response --mcp
 ```
+
+`webhook-response-node` builds two response nodes, selects one, supplies its body and complete
+headers from upstream outputs, and puts a Wait after it. Its independent verifier checks early
+HTTP completion, continued execution, scalar header conversion and concurrent idempotent replay.
+
+```bash
+bun run lab test webhook-response-node
+bun run lab test webhook-response-node --mcp
+```

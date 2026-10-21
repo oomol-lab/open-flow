@@ -47,7 +47,9 @@
     "startDescription": "開始パラメーターを指定して、手動または API 呼び出しでワークフローを開始します。",
     "outputs": "ワークフロー出力",
     "outputsDescription": "ワークフローの出力と値を定義します。上流の実行が確定すると計算します。",
-    "workflow": "ワークフローを呼び出す"
+    "workflow": "ワークフローを呼び出す",
+    "webhookResponse": "Webhook レスポンス",
+    "webhookResponseDescription": "HTTP レスポンスを返し、ワークフローを続行します。"
   },
   "connectorAccess": {
     "searchServices": "サービスを検索",
@@ -1141,7 +1143,12 @@
     "webhookDynamicStatusInvalid": "204、205、304 を除く 200〜599 の整数を入力してください。",
     "webhookAddOutputs": "ワークフロー出力を追加",
     "webhookOutputsDisconnected": "ワークフロー出力が未接続",
-    "webhookStatusSource": "ステータスコードのソース"
+    "webhookStatusSource": "ステータスコードのソース",
+    "webhookAddResponse": "Webhook レスポンスノードを追加",
+    "webhookSelectResponse": "Webhook レスポンスノードを選択",
+    "webhookResponseDisconnected": "Webhook レスポンスノードが未接続です",
+    "webhookConnectResponse": "キャンバス上で Webhook レスポンスノードを選択して接続してください。",
+    "webhookMissingResponse": "選択した Webhook レスポンスノードがありません"
   },
   "conditionEditor": {
     "addCondition": "条件を追加",

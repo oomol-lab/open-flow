@@ -41,6 +41,8 @@ const nodeFailureCodes: ReadonlySet<string> = new Set([
   'llm.unavailable',
   'node.failed',
   'node.input-invalid',
+  'webhook.response-status-invalid',
+  'webhook.response-headers-invalid',
   'node.output-invalid',
   'openapi.input-invalid',
   'openapi.response-invalid',
@@ -258,7 +260,7 @@ export class RunExecutor {
           emit: async (event) => {
             if (event.type == 'run.started' && event.runId == run.runId) return
             const projected = await projectEvent(event)
-            if (projected != null) this.#store.runs.append(run.runId, projected)
+            if (projected != null && this.#store.runs.append(run.runId, projected)) this.#runChanged(run.flowId, run.runId)
           },
           flowId: run.flowId,
           ...launch,

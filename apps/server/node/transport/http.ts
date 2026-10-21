@@ -529,10 +529,21 @@ async function webhook(
     const source = target.trigger.options?.responseBody
     if (source != null) {
       const signal = shutdownSignal == null ? request.signal : AbortSignal.any([request.signal, shutdownSignal])
-      const outcome = await service.waitForWebhookRun(target.flowId, accepted.runId, source.timeoutMs ?? webhookResponseTimeout.defaultMs, signal)
+      const outcome = await service.waitForWebhookRun(
+        target.flowId,
+        accepted.runId,
+        source.timeoutMs ?? webhookResponseTimeout.defaultMs,
+        signal,
+        source.kind === 'webhook-response' ? source.nodeId : undefined,
+      )
       if (outcome.kind == 'timeout') return webhookFailure(504, 'webhook.response-timeout', 'The workflow response timed out.', origin)
       if (outcome.kind == 'aborted') return webhookFailure(503, 'webhook.response-unavailable', 'The workflow response is unavailable.', origin)
+      if (outcome.kind === 'responded') return webhookSuccess(target.trigger, origin, outcome.response)
+      if (outcome.kind === 'unavailable') return webhookFailure(500, 'webhook.response-unavailable', 'The selected response is unavailable.', origin)
+      if (outcome.kind === 'failed' && (outcome.code === 'webhook.response-status-invalid' || outcome.code === 'webhook.response-headers-invalid'))
+        return webhookFailure(500, outcome.code, 'The workflow response is invalid.', origin)
       if (outcome.kind == 'failed') return webhookFailure(500, 'webhook.run-failed', 'The workflow did not complete successfully.', origin)
+      if (source.kind !== 'workflow-outputs') return webhookFailure(500, 'webhook.response-unavailable', 'The selected response is unavailable.', origin)
       const response = webhookResponseBody(outcome.result, source)
       if (response == null) return webhookFailure(500, 'webhook.response-missing', 'The workflow response output is unavailable.', origin)
       const statusOutput = target.trigger.options?.responseStatusCodeOutput
@@ -590,18 +601,18 @@ function webhookSuccess(
   response?: { readonly body: string; readonly contentType: string; readonly status?: number; readonly headers: Readonly<Record<string, string>> },
 ): Response {
   const status = response?.status ?? trigger.options?.responseStatusCode ?? 200
-  const headers = webhookResponseHeaders(origin, response?.contentType ?? 'text/plain;charset=UTF-8', response?.headers ?? trigger.options?.responseHeaders)
+  const headers = webhookResponseHeaders(origin, response?.contentType, response?.headers ?? trigger.options?.responseHeaders)
   const body = webhookResponseAllowsBody(status) ? (response?.body ?? trigger.options?.responseData ?? null) : null
   return text(status, body, headers)
 }
 
-function webhookResponseHeaders(origin: string | undefined, contentType: string, configured?: Readonly<Record<string, string>>): Headers {
+function webhookResponseHeaders(origin: string | undefined, contentType?: string, configured?: Readonly<Record<string, string>>): Headers {
   const headers = new Headers(configured)
   for (const name of forbiddenWebhookResponseHeaders) headers.delete(name)
   for (const name of headers.keys()) if (name.startsWith('access-control-')) headers.delete(name)
   headers.set('cache-control', 'no-store')
   headers.set('content-security-policy', "default-src 'none'; frame-ancestors 'none'; sandbox")
-  headers.set('content-type', contentType)
+  if (contentType != null) headers.set('content-type', contentType)
   headers.set('referrer-policy', 'no-referrer')
   headers.set('x-content-type-options', 'nosniff')
   headers.set('x-frame-options', 'DENY')

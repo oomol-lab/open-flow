@@ -743,3 +743,24 @@ it('creates Start and saves parameter edits through the existing undo and redo h
     store.dispose()
   }
 })
+
+it('adds and selects a response node without an execution edge in one undoable change', async () => {
+  const { store, saved } = await session()
+  try {
+    const option = store.$.addNodeOptions.value.find((item) => item.id === 'trigger:webhook')!
+    const hook = await store.addNode(option, { x: 900, y: 0 })
+    if (hook == null) throw new Error('Expected Webhook')
+    const before = saved().draft.content
+    const reply = await store.addWebhookResponseNode(hook)
+    expect(reply).toBeDefined()
+    const after = saved().draft.content
+    expect(after.document.graph.nodes[hook]).toMatchObject({ options: { responseBody: { kind: 'webhook-response', nodeId: reply } } })
+    expect(after.document.graph.edges).toEqual(before.document.graph.edges)
+    await store.undo()
+    expect(saved().draft.content).toEqual(before)
+    await store.redo()
+    expect(saved().draft.content).toEqual(after)
+  } finally {
+    store.dispose()
+  }
+})

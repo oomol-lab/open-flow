@@ -2,6 +2,7 @@ import type { EventSource } from '@oomol-lab/open-flow/control-api'
 
 import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { integrationDefinitions } from '@oomol-lab/open-flow/provider-triggers'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { expect, it } from 'vitest'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
@@ -99,7 +100,7 @@ it('shares an app ingress while isolating workspaces, retaining fanout, and keep
         },
       },
     ])
-    const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, 'open-flow-engine/v6', null, `publish-${flows.length}`)
+    const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, currentEngineContract, null, `publish-${flows.length}`)
     await service.tickIntegration()
     await service.tickMaintenance()
     expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('succeeded')

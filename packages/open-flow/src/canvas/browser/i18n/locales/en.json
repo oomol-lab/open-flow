@@ -610,7 +610,8 @@
       "value": "Fixed Values",
       "input": "Flow input",
       "output": "Flow output",
-      "outputs": "Workflow Outputs"
+      "outputs": "Workflow Outputs",
+      "webhook-response": "Webhook Response"
     },
     "units": {
       "minute": "minutes",

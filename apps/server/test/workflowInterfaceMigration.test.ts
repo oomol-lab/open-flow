@@ -3,6 +3,7 @@ import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { canonicalJsonBytes, decodeRevision, digestBytes, encodeRevision, upgradeWorkflowInterfaceDocument } from '@oomol-lab/open-flow/flow-encoding'
 import { flowClosure, prepareFlow } from '@oomol-lab/open-flow/flow-semantics'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { runFlow } from '@oomol-lab/open-flow/scheduler'
 import * as Effect from 'effect/Effect'
 import { createHash } from 'node:crypto'
@@ -18,7 +19,7 @@ import { createServerApp } from '../node/transport/http.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
 
 const number = { handle: 'answer', jsonSchema: { type: 'number' }, nullable: false }
-const engine = 'open-flow-engine/v6'
+const engine = currentEngineContract
 const encoder = new TextEncoder()
 function serialized(value: JsonValue) {
   const content = new TextDecoder().decode(canonicalJsonBytes(value))
@@ -78,7 +79,7 @@ async function fixture() {
   }
   function closeLegacy() {
     database.connection.exec(
-      "UPDATE publish_operations SET input_json = json_remove(input_json, '$.interface'); ALTER TABLE publications DROP COLUMN interface_json; ALTER TABLE runs DROP COLUMN initiator_actor_id; ALTER TABLE runs DROP COLUMN initiator_channel; DROP TABLE event_source_apps; DROP TABLE source_event_versions; PRAGMA user_version = 48;",
+      "UPDATE publish_operations SET input_json = json_remove(input_json, '$.interface'); ALTER TABLE publications DROP COLUMN interface_json; ALTER TABLE runs DROP COLUMN initiator_actor_id; ALTER TABLE runs DROP COLUMN initiator_channel; DROP TABLE webhook_responses; DROP TABLE event_source_apps; DROP TABLE source_event_versions; PRAGMA user_version = 48;",
     )
     database.close()
   }
@@ -173,7 +174,7 @@ it('upgrades full and delta Revisions, preserves identities and Live history, an
   })
   await closeService(service)
   const reopened = Database.open(file)
-  expect(reopened.connection.prepare('PRAGMA user_version').get()).toEqual({ user_version: 51 })
+  expect(reopened.connection.prepare('PRAGMA user_version').get()).toEqual({ user_version: 52 })
   reopened.close()
 })
 

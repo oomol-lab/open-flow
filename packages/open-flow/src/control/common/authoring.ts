@@ -174,6 +174,7 @@ export function authoringNode(content: RevisionContent, ref: string) {
         config = { inputs: fieldsView(node.inputDefinitions) }
         texts.prompt = node.prompt
         break
+      case 'webhook-response':
       case 'manual':
         config = {}
         break
@@ -579,6 +580,10 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
           break
         case 'webhook': {
           const { body, ...settings } = config
+          const responseOptions = record(settings.options)
+          const responsePolicy = record(responseOptions.responseBody)
+          if (responsePolicy.kind === 'webhook-response' && typeof responsePolicy.nodeId === 'string')
+            settings.options = { ...responseOptions, responseBody: { ...responsePolicy, nodeId: resolve(responsePolicy.nodeId) } }
           const { options: _options, ...withoutOptions } = next as Extract<GraphNode, { kind: 'webhook' }>
           next = { ...withoutOptions, ...settings, bodyFields: fieldsToPorts(body, node.bodyFields) } as GraphNode
           break
@@ -686,6 +691,9 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
           switch (edit.type) {
             case 'workflow':
               changes = createManagedTask(identity, await resolveWorkflow(String(authoringConfigurations.workflow.parse(config).flowId), name))
+              break
+            case 'webhook-response':
+              changes = [{ kind: 'graph.node.create', nodeId, node: { kind: 'webhook-response', name, inputs: {} } }]
               break
             case 'outputs':
               changes = [{ kind: 'graph.node.create', nodeId, node: { outputDefs: [], outputMappings: {}, kind: 'outputs', name } }]

@@ -23,6 +23,7 @@ const themeLabels = { auto: 'System', light: 'Light', dark: 'Dark' } as const
 const storyGroupIcons: Readonly<Record<string, `i-${string}`>> = {
   'Undo & Redo': 'i-lucide:undo-2',
   'Node Fixed Values': 'i-oomol:value',
+  'Node Webhook Response': 'i-lucide-light:reply',
   'Node Outputs': 'i-lucide-light:log-out',
   'Node Task': 'i-carbon:code',
   'Node Wait': 'i-carbon:hourglass',

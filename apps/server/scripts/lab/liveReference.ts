@@ -183,3 +183,73 @@ export async function referenceLive(call: ToolCall, flowId: string, dynamic = fa
   const after = await readLive()
   if (!isDeepStrictEqual(after, live)) throw new Error('Draft edit changed online entries')
 }
+
+export async function referenceEarlyResponse(call: ToolCall, flowId: string) {
+  await call('flow_schema', { type: 'webhook-response' })
+  const before = await call('flow_read', { flowId })
+  const saved = await call('flow_edit', {
+    flowId,
+    baseRevision: before.revision,
+    requestId: randomUUID(),
+    edits: [
+      {
+        op: 'node.add',
+        as: 'hook',
+        type: 'webhook',
+        name: 'Published hook',
+        config: { method: 'POST', body: { message: { schema: { type: 'string' }, nullable: false } } },
+      },
+      {
+        op: 'node.add',
+        as: 'echo',
+        type: 'code',
+        name: 'Prepare response',
+        inputs: { body: { kind: 'output', node: '$hook', port: 'body' } },
+        config: {
+          outputs: {
+            message: { schema: { type: 'string' }, nullable: false },
+            headers: { schema: { type: 'object', additionalProperties: { type: ['string', 'number', 'boolean'] } }, nullable: false },
+          },
+        },
+        code: 'export default ({body}) => ({message: body.message, headers: {"X-Count": 3, "X-Enabled": false}})',
+      },
+      {
+        op: 'node.add',
+        as: 'reply',
+        type: 'webhook-response',
+        name: 'Selected reply',
+        inputs: {
+          body: { kind: 'output', node: '$echo', port: 'message' },
+          statusCode: { kind: 'value', value: 201 },
+          headers: { kind: 'output', node: '$echo', port: 'headers' },
+        },
+      },
+      { op: 'node.add', as: 'other', type: 'webhook-response', name: 'Other reply', inputs: { body: { kind: 'value', value: 'unselected' } } },
+      { op: 'node.add', as: 'later', type: 'wait', name: 'Continue after response', prompt: 'Continue the workflow after HTTP response' },
+      {
+        op: 'node.update',
+        node: '$hook',
+        set: {
+          config: {
+            options: {
+              responseBody: { kind: 'webhook-response', nodeId: '$reply', timeoutMs: 15000 },
+              responseData: 'saved fixed text',
+              responseStatusCode: 202,
+              responseHeaders: { 'X-Ignored': 'fixed' },
+            },
+          },
+        },
+      },
+      { op: 'edge.connect', source: '$hook', target: '$echo' },
+      { op: 'edge.connect', source: '$hook', target: '$other' },
+      { op: 'edge.connect', source: '$echo', target: '$reply' },
+      { op: 'edge.connect', source: '$reply', target: '$later' },
+    ],
+  })
+  await call('flow_read', { flowId, nodes: Object.values(saved.nodes as Record<string, string>) })
+  await call('flow_check', { flowId, revisionId: saved.revision })
+  const published = await call('flow_publish', { flowId, revisionId: saved.revision, expectedLivePublicationId: null, idempotencyKey: randomUUID() })
+  const result = published.live == null ? await call('flow_live', { flowId }) : published
+  const live = (result.live ?? result) as unknown as LiveDetails
+  if (!live.entries.some((entry) => entry.type === 'webhook')) throw new Error('Published response entry is missing.')
+}

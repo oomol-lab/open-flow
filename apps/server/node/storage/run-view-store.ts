@@ -2,6 +2,7 @@ import type { ErrorDispatch, RunInitiator } from '@oomol-lab/open-flow/control-a
 import type { RunEventKind } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
+import type { WebhookResponseSnapshot } from '@oomol-lab/open-flow/webhook-trigger'
 import type { DatabaseSync } from 'node:sqlite'
 
 export interface RunEvent {
@@ -76,6 +77,13 @@ export class RunViewStore {
       runId: row.runId,
       status: row.status,
     }
+  }
+
+  webhookResponse(runId: string, nodeId: string): WebhookResponseSnapshot | undefined {
+    const row = this.#database.prepare('SELECT response FROM webhook_responses WHERE run_id = ? AND node_id = ?').get(runId, nodeId) as
+      | { response: string }
+      | undefined
+    return row == null ? undefined : (JSON.parse(row.response) as WebhookResponseSnapshot)
   }
 
   request(idempotencyKey: string): StoredRunRequest | undefined {

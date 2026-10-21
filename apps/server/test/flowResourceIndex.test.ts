@@ -1,6 +1,7 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
 import { encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { createHash } from 'node:crypto'
 import { expect, it, onTestFinished, vi } from 'vitest'
 import { Database } from '../node/storage/database.ts'
@@ -74,7 +75,7 @@ function setup() {
     revisionId: 'initial',
     flowId: 'flow',
     closureDigest: 'closure',
-    engineContract: 'open-flow-engine/v6',
+    engineContract: currentEngineContract,
     expectedLivePublicationId: null,
     idempotencyKey: 'publish',
     requestDigest: 'publish',

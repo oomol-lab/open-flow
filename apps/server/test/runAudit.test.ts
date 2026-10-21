@@ -1,4 +1,5 @@
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -46,7 +47,7 @@ it('records authenticated actors and channels for Draft and Live, retaining the 
 it('rejects caller-supplied actors and reserved server channels', async () => {
   const { app, flowId, revisionId } = await fixture()
   const route = `/v1/flows/${flowId}/revisions/${revisionId}/runs`
-  const body = { version: 2, engineContract: 'open-flow-engine/v6', inputs: {}, trigger: { nodeId: 'start', outputs: {} } }
+  const body = { version: 2, engineContract: currentEngineContract, inputs: {}, trigger: { nodeId: 'start', outputs: {} } }
   for (const channel of ['mcp', 'trigger', 'workflow', 'invalid']) {
     const response = await app.request(route, {
       method: 'POST',
@@ -76,7 +77,7 @@ it('retains audit after restart and migrates old Runs without inventing identiti
   const database = new DatabaseSync(file)
   database.exec('ALTER TABLE runs DROP COLUMN initiator_actor_id')
   database.exec('ALTER TABLE runs DROP COLUMN initiator_channel')
-  database.exec('DROP TABLE event_source_apps; DROP TABLE source_event_versions; PRAGMA user_version = 49')
+  database.exec('DROP TABLE webhook_responses; DROP TABLE event_source_apps; DROP TABLE source_event_versions; PRAGMA user_version = 49')
   database.close()
   const migrated = await openService(file)
   const { initiator: _initiator, ...legacy } = run

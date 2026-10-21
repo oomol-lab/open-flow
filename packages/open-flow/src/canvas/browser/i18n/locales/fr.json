@@ -610,7 +610,8 @@
       "value": "Valeurs fixes",
       "input": "Entrée",
       "output": "Sortie",
-      "outputs": "Sorties du workflow"
+      "outputs": "Sorties du workflow",
+      "webhook-response": "Réponse Webhook"
     },
     "units": {
       "minute": "minutes",

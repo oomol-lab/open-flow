@@ -1,8 +1,11 @@
+import type { WebhookResponseSnapshot } from '@oomol-lab/open-flow/webhook-trigger'
 import type { RunRecord } from '../storage/run-view-store.ts'
 
 export type WebhookRunOutcome =
   | { readonly kind: 'completed'; readonly result: unknown }
-  | { readonly kind: 'failed' }
+  | { readonly kind: 'responded'; readonly response: WebhookResponseSnapshot }
+  | { readonly kind: 'unavailable' }
+  | { readonly kind: 'failed'; readonly code?: string }
   | { readonly kind: 'timeout' }
   | { readonly kind: 'aborted' }
 
@@ -12,6 +15,7 @@ export function waitForWebhookRun(
   subscribe: (changed: () => void) => () => void,
   timeoutMs: number,
   signal: AbortSignal,
+  readResponse?: () => WebhookResponseSnapshot | undefined,
 ): Promise<WebhookRunOutcome> {
   return new Promise((resolve) => {
     let settled = false
@@ -29,10 +33,13 @@ export function waitForWebhookRun(
     const inspect = () => {
       const run = read()
       if (run == null) return finish({ kind: 'failed' })
+      const response = readResponse?.()
+      if (response != null) return finish({ kind: 'responded', response })
+      if (run.status === 'completed' && readResponse != null) return finish({ kind: 'unavailable' })
       if (run.status == 'completed') return finish({ kind: 'completed', result: run.result })
       if (run.status == 'failed' || run.status == 'canceled' || run.status == 'indeterminate') {
         const error = run.result as { error?: { code?: string } } | undefined
-        finish({ kind: error?.error?.code == 'run.timeout' ? 'timeout' : 'failed' })
+        finish(error?.error?.code === 'run.timeout' ? { kind: 'timeout' } : { kind: 'failed', code: error?.error?.code })
       }
     }
     unsubscribe = subscribe(inspect)

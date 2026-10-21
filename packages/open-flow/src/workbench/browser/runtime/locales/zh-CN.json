@@ -47,7 +47,9 @@
     "startDescription": "通过启动参数开始工作流，支持手动运行和 API 调用。",
     "outputs": "工作流输出",
     "outputsDescription": "定义工作流输出及其取值，在上游执行依赖完成后计算。",
-    "workflow": "调用工作流"
+    "workflow": "调用工作流",
+    "webhookResponse": "Webhook 响应",
+    "webhookResponseDescription": "返回 HTTP 响应后继续执行工作流。"
   },
   "connectorAccess": {
     "searchServices": "搜索服务",
@@ -1141,7 +1143,12 @@
     "webhookDynamicStatusInvalid": "请输入 200–599 的整数，204、205、304 除外。",
     "webhookAddOutputs": "添加工作流输出",
     "webhookOutputsDisconnected": "未连接工作流输出",
-    "webhookStatusSource": "响应状态码来源"
+    "webhookStatusSource": "响应状态码来源",
+    "webhookAddResponse": "添加 Webhook 响应节点",
+    "webhookSelectResponse": "请选择 Webhook 响应节点",
+    "webhookResponseDisconnected": "未连接 Webhook 响应节点",
+    "webhookConnectResponse": "请在画布上选择 Webhook 响应节点进行连接。",
+    "webhookMissingResponse": "所选 Webhook 响应节点已不存在"
   },
   "conditionEditor": {
     "addCondition": "添加条件",

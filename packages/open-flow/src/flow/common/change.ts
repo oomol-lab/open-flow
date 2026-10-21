@@ -455,11 +455,9 @@ export interface WebhookBodyField extends InputPort {}
 
 export interface WebhookOptions {
   readonly allowedOrigins?: readonly string[]
-  readonly responseBody?: {
-    readonly kind: 'workflow-outputs'
-    readonly output?: string
-    readonly timeoutMs?: number
-  }
+  readonly responseBody?:
+    | { readonly kind: 'workflow-outputs'; readonly output?: string; readonly timeoutMs?: number }
+    | { readonly kind: 'webhook-response'; readonly nodeId?: string; readonly timeoutMs?: number }
   readonly responseData?: string
   readonly responseHeaders?: Readonly<Record<string, string>>
   readonly responseHeadersSource?: {
@@ -513,7 +511,13 @@ export function isTriggerNode(node: GraphNode): node is TriggerNode {
   return ['manual', 'start', 'error', 'webhook', 'cron', 'poll', 'integration'].includes(node.kind)
 }
 
-export type GraphNode = OutputsNode | ApprovalNode | ConditionNode | TaskNode | TriggerNode | ValueNode | WaitNode
+export interface WebhookResponseNode extends GraphNodeBase {
+  readonly kind: 'webhook-response'
+  readonly retry?: never
+  readonly onError?: never
+}
+
+export type GraphNode = WebhookResponseNode | OutputsNode | ApprovalNode | ConditionNode | TaskNode | TriggerNode | ValueNode | WaitNode
 
 export interface FlowDocument {
   readonly bindings: Readonly<Record<string, { readonly kind: 'variable'; readonly target: string }>>

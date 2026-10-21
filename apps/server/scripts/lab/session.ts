@@ -26,7 +26,7 @@ import { SettingsStore } from '../../node/storage/settings-store.ts'
 import { createServerApp } from '../../node/transport/http.ts'
 import { runtimeAssertions } from './acceptance.ts'
 import { fulfillmentRuntimeAssertions } from './fulfillmentAcceptance.ts'
-import { verifyLiveWebhook } from './liveAcceptance.ts'
+import { verifyEarlyResponse, verifyLiveWebhook } from './liveAcceptance.ts'
 import { createMocks } from './mocks.ts'
 import { labOrigins } from './network.ts'
 import { diff, summary } from './report.ts'
@@ -318,7 +318,7 @@ export class LabSession {
       .update(JSON.stringify([scenario(this.scenarioId, this.stage), this.baseline, samples(this.scenarioId, this.stage)]))
       .update(await readFile(new URL('./acceptance.ts', import.meta.url)))
       .update(await readFile(new URL('./scenarios.ts', import.meta.url)))
-    if (this.scenarioId == 'webhook-live' || this.scenarioId == 'webhook-response')
+    if (this.scenarioId == 'webhook-response-node' || this.scenarioId == 'webhook-live' || this.scenarioId == 'webhook-response')
       identity.update(await readFile(new URL('./liveAcceptance.ts', import.meta.url)))
     if (this.scenarioId == 'fulfillment-ops')
       identity
@@ -384,8 +384,9 @@ export class LabSession {
         if (!this.attempt.rejectedEdits) errors.push('No stale edit was rejected without changing the Draft.')
         if (this.service.control.runs.listRuns(this.manifest.flowId, 1, {}).page.runs.length > 0) errors.push('Unexpected run before verification.')
       }
-      if (errors.length == 0 && (this.scenarioId == 'webhook-live' || this.scenarioId == 'webhook-response')) {
-        const result = await verifyLiveWebhook(this, this.scenarioId == 'webhook-response')
+      if (errors.length == 0 && (this.scenarioId == 'webhook-response-node' || this.scenarioId == 'webhook-live' || this.scenarioId == 'webhook-response')) {
+        const result =
+          this.scenarioId === 'webhook-response-node' ? await verifyEarlyResponse(this) : await verifyLiveWebhook(this, this.scenarioId == 'webhook-response')
         errors.push(...result.errors)
         runIds.push(...result.runIds)
       } else if (errors.length == 0) {

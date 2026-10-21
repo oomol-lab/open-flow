@@ -166,7 +166,7 @@ export interface FlowCanvasViewCommentNode {
 }
 
 export type FlowCanvasViewNode =
-  | (FlowCanvasViewNodeBase & { readonly kind: 'outputs' })
+  | (FlowCanvasViewNodeBase & { readonly kind: 'outputs' | 'webhook-response' })
   | FlowCanvasViewCommentNode
   | FlowCanvasViewConditionNode
   | FlowCanvasViewTaskNode

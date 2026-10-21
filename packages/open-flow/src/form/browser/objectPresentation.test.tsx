@@ -58,3 +58,23 @@ describe('read-only object values', () => {
     }
   })
 })
+
+it.each([true, false])('inherits hideValueTools=%s for object child editors', (hideValueTools) => {
+  const markup = renderToStaticMarkup(
+    <I18nProvider i18n={createI18n('en')}>
+      <ObjectValueFields
+        layout="values"
+        schema={{ type: 'object', additionalProperties: { type: 'string' } }}
+        value={{ 'X-Test': 'value' }}
+        label="headers"
+        path="/headers"
+        disabled={false}
+        hideValueTools={hideValueTools}
+        onChange={vi.fn()}
+        onDraftIssue={vi.fn()}
+      />
+    </I18nProvider>,
+  )
+  expect(markup.includes('aria-label="Clear headers.X-Test"')).toBe(!hideValueTools)
+  expect(markup).toContain('aria-label="headers.X-Test"')
+})

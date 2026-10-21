@@ -47,7 +47,9 @@
     "startDescription": "Start the workflow manually or through an API call with startup parameters.",
     "outputs": "Workflow Outputs",
     "outputsDescription": "Define the workflow outputs and their values. Runs after its upstream dependencies settle.",
-    "workflow": "Call Workflow"
+    "workflow": "Call Workflow",
+    "webhookResponse": "Webhook Response",
+    "webhookResponseDescription": "Prepare an HTTP response and continue the workflow."
   },
   "connectorAccess": {
     "searchServices": "Search services",
@@ -1141,7 +1143,12 @@
     "webhookDynamicStatusInvalid": "Enter an integer from 200 to 599, except 204, 205 and 304.",
     "webhookAddOutputs": "Add workflow Outputs",
     "webhookOutputsDisconnected": "Workflow Outputs not connected",
-    "webhookStatusSource": "Response status code source"
+    "webhookStatusSource": "Response status code source",
+    "webhookAddResponse": "Add Webhook Response node",
+    "webhookSelectResponse": "Select a Webhook Response node",
+    "webhookResponseDisconnected": "Webhook Response node is not connected",
+    "webhookConnectResponse": "Select a Webhook Response node on the canvas to connect it.",
+    "webhookMissingResponse": "Selected Webhook Response node is missing"
   },
   "conditionEditor": {
     "addCondition": "Add condition",

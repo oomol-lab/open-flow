@@ -1,6 +1,6 @@
 # Public contracts and version evolution
 
-## Dynamic Webhook responses: Flow model v10
+## Dynamic Webhook responses: Flow model v10 and Engine v7
 
 Model v10 adds optional Webhook `options.responseBody` with
 `{ kind: "workflow-outputs", output?: string, timeoutMs?: number }`. A missing field preserves
@@ -22,8 +22,13 @@ The published npm `0.1.0-beta.69` artifact (gitHead
 servers from discarding the response policy and acknowledging requests immediately. Model v9 and
 older readable Revisions retain their original bytes and digests; editing uses the existing explicit
 Draft upgrade. Historical Publications and Runs are unchanged. Dynamic configuration is rejected
-in older model envelopes. Engine Contract v6, checkpoint v6 and the isolated runtime digest are
-unchanged because scheduling and execution outputs are unchanged. Upgrade Server and clients
+in older model envelopes. The workflow-output response projection alone preserves Engine v6. This release also adds
+`webhook-response` nodes and `responseBody: { kind: "webhook-response", nodeId?, timeoutMs? }`,
+requiring Engine v7 and a new isolation digest. A node completes with response metadata separately
+from its empty business outputs. Its first committed root-Run response is persisted independently
+of event history; HTTP returns immediately while execution continues. Checkpoint shape remains v6.
+Finish or cancel old-Engine active Runs before deploying; pinned historical Runs and Revisions are
+not rewritten. Upgrade clients and servers together. Upgrade Server and clients
 together before publishing v10 Revisions. Existing old-model Publications retain their existing
 execution compatibility requirements and may require republication through an upgraded Draft.
 
@@ -82,7 +87,7 @@ Public entry points, serialization formats, Control API, and execution semantics
 | Revision envelope | `kind: open-flow-flow-revision`, `version: 1`                     | UTF-8 JSON envelope fields and canonical byte rules.                                                       |
 | Flow model        | `modelVersion: 10`                                                | Serialization of documents, modules, nodes, and ports.                                                     |
 | Control API       | `/v1`; Run creation request `version: 2`, all others `version: 1` | Request fields, responses, error codes, CAS, and idempotency.                                              |
-| Engine Contract   | `open-flow-engine/v6`                                             | Execution, Trigger, Task return, Wait, and cancellation semantics.                                         |
+| Engine Contract   | `open-flow-engine/v7`                                             | Execution, Trigger, Task return, Wait, and cancellation semantics.                                         |
 | MCP               | `2026-07-28`                                                      | Streamable HTTP negotiation; tool product semantics reuse Control API.                                     |
 
 Equal or different version numbers do not establish compatibility. Older formats may also have used `modelVersion: 1`; do not accept content based only on this field. Decode the complete structure before semantic validation and execution. Reject execution of Revisions that do not match the current structure. Do not rewrite them or recompute their original digest on read. Create a new Revision through a separate, auditable migration or rebuild.

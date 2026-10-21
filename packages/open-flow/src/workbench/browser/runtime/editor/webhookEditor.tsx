@@ -192,8 +192,12 @@ export function WebhookEditor({
   workflowOutputs,
   responseDiagnostics = [],
   onAddWorkflowOutputs,
+  responseNodes = [],
+  onAddResponseNode,
   onChange,
 }: {
+  readonly responseNodes?: readonly { readonly id: string; readonly name: string; readonly reachable: boolean }[]
+  readonly onAddResponseNode?: () => void
   readonly bodyFields: readonly InputPort[]
   readonly method: WebhookMethod
   readonly options: WebhookOptions
@@ -206,7 +210,9 @@ export function WebhookEditor({
   readonly onChange: (settings: WebhookSettings, deletion?: PropertyDeletion) => void
 }) {
   const t = useTranslate()
-  const response = options.responseBody
+  const policy = options.responseBody
+  const response = policy?.kind === 'workflow-outputs' ? policy : undefined
+  const responseNode = policy?.kind === 'webhook-response' ? policy : undefined
   const outputsMissing = responseDiagnostics.some((issue) => issue.code === 'trigger.webhook-response-outputs-missing')
   const outputsDisconnected = responseDiagnostics.some((issue) => issue.code === 'trigger.webhook-response-unreachable')
   const responseIssue =
@@ -287,11 +293,11 @@ export function WebhookEditor({
             <FieldSelect
               aria-label={t('webhookEditor.webhookResponseMode')}
               disabled={disabled}
-              value={response == null ? 'immediate' : 'workflow'}
+              value={policy?.kind === 'webhook-response' ? 'node' : response == null ? 'immediate' : 'workflow'}
               onChange={(mode) => {
-                if (mode !== 'immediate') return changeOption('responseBody', { kind: 'workflow-outputs' })
                 const next = { ...options }
-                delete next.responseBody
+                if (mode === 'immediate') delete next.responseBody
+                else next.responseBody = mode === 'node' ? { kind: 'webhook-response' } : { kind: 'workflow-outputs' }
                 delete next.responseStatusCodeOutput
                 delete next.responseHeadersSource
                 delete next.responseHeaderOutputs
@@ -300,9 +306,64 @@ export function WebhookEditor({
             >
               <option value="immediate">{t('webhookEditor.webhookImmediate')}</option>
               <option value="workflow">{t('webhookEditor.webhookAfterWorkflow')}</option>
+              <option value="node">{t('addNode.webhookResponse')}</option>
             </FieldSelect>
           </Field>
-          {response == null ? (
+          {responseNode != null ? (
+            <Field data-invalid={responseIssue != null || undefined}>
+              <FieldLabel>{t('addNode.webhookResponse')}</FieldLabel>
+              <ValueEditorFeedback error={responseIssue}>
+                {(errorId) =>
+                  responseNodes.length === 0 ? (
+                    <Button
+                      type="button"
+                      variant="field"
+                      size="field"
+                      className="w-full justify-start"
+                      data-field-control
+                      data-field-prompt
+                      aria-invalid={responseIssue != null || undefined}
+                      aria-describedby={errorId}
+                      disabled={disabled || readOnly || onAddResponseNode == null}
+                      onClick={onAddResponseNode}
+                    >
+                      {t('webhookEditor.webhookAddResponse')}
+                    </Button>
+                  ) : (
+                    <FieldSelect
+                      showDisabledOptions
+                      aria-label={t('addNode.webhookResponse')}
+                      aria-describedby={errorId}
+                      danger={responseIssue != null}
+                      disabled={disabled || !responseNodes.some((node) => node.reachable)}
+                      value={responseNode.nodeId ?? ''}
+                      displayValue={
+                        (responseNode.nodeId == null && !responseNodes.some((node) => node.reachable)) ||
+                        responseNodes.some((node) => node.id === responseNode.nodeId && !node.reachable)
+                          ? t('webhookEditor.webhookResponseDisconnected')
+                          : undefined
+                      }
+                      onChange={(nodeId) => changeOption('responseBody', { ...responseNode, nodeId })}
+                    >
+                      <option value="" disabled hidden>
+                        {t('webhookEditor.webhookSelectResponse')}
+                      </option>
+                      {responseNodes.map((node) => (
+                        <option key={node.id} value={node.id} disabled={!node.reachable}>
+                          {node.name}
+                        </option>
+                      ))}
+                      {responseNode.nodeId != null && !responseNodes.some((node) => node.id === responseNode.nodeId) && (
+                        <option value={responseNode.nodeId} disabled>
+                          {t('webhookEditor.webhookMissingResponse')}
+                        </option>
+                      )}
+                    </FieldSelect>
+                  )
+                }
+              </ValueEditorFeedback>
+            </Field>
+          ) : response == null ? (
             <DraftTextField
               label={t('webhookEditor.webhookResponseData')}
               multiline
@@ -373,71 +434,77 @@ export function WebhookEditor({
                   }
                 </ValueEditorFeedback>
               </Field>
+            </>
+          )}
+          {policy != null && (
+            <DraftTextField
+              label={t('webhookEditor.webhookTimeout')}
+              description={t('webhookEditor.webhookTimeoutDescription')}
+              value={String((policy.timeoutMs ?? webhookResponseTimeout.defaultMs) / 1000)}
+              disabled={disabled}
+              inputMode="numeric"
+              inspect={(draft, signal) =>
+                deferInspection(() => {
+                  const timeoutMs = Number(draft) * 1000
+                  return {
+                    value: draft.trim(),
+                    ...(!Number.isInteger(timeoutMs) || timeoutMs < webhookResponseTimeout.minMs || timeoutMs > webhookResponseTimeout.maxMs
+                      ? { issue: t('webhookEditor.webhookTimeoutInvalid') }
+                      : {}),
+                  }
+                }, signal)
+              }
+              onSave={(value) => changeOption('responseBody', { ...policy, timeoutMs: Number(value) * 1000 })}
+            />
+          )}
+          {responseNode == null && (
+            <>
               <DraftTextField
-                label={t('webhookEditor.webhookTimeout')}
-                description={t('webhookEditor.webhookTimeoutDescription')}
-                value={String((response.timeoutMs ?? webhookResponseTimeout.defaultMs) / 1000)}
+                key={response == null ? 'immediate' : 'workflow'}
+                label={t('webhookEditor.webhookStatus')}
+                value={options.responseStatusCode?.toString() ?? ''}
                 disabled={disabled}
                 inputMode="numeric"
+                placeholder={t('webhookEditor.webhookStatusDefault')}
                 inspect={(draft, signal) =>
-                  deferInspection(() => {
-                    const timeoutMs = Number(draft) * 1000
-                    return {
-                      value: draft.trim(),
-                      ...(!Number.isInteger(timeoutMs) || timeoutMs < webhookResponseTimeout.minMs || timeoutMs > webhookResponseTimeout.maxMs
-                        ? { issue: t('webhookEditor.webhookTimeoutInvalid') }
-                        : {}),
-                    }
-                  }, signal)
+                  validStatus(
+                    draft,
+                    t(response == null ? 'webhookEditor.webhookStatusInvalid' : 'webhookEditor.webhookDynamicStatusInvalid'),
+                    signal,
+                    response != null,
+                  )
                 }
-                onSave={(value) => changeOption('responseBody', { ...response, timeoutMs: Number(value) * 1000 })}
+                onSave={(text) => changeOption('responseStatusCode', text === '' ? undefined : Number(text))}
+                addon={statusSource}
+                error={statusIssue}
+                editor={
+                  response != null && statusOutput != null
+                    ? (id, errorId) => (
+                        <Input
+                          id={id}
+                          controlSize="field"
+                          readOnly
+                          disabled={disabled}
+                          aria-label={t('webhookEditor.webhookStatus')}
+                          aria-invalid={statusIssue != null}
+                          aria-describedby={errorId}
+                          value={`${workflowOutputs?.name ?? t('addNode.outputs')} · ${statusOutput}`}
+                        />
+                      )
+                    : undefined
+                }
+              />
+              <WebhookHeadersEditor
+                options={options}
+                outputs={workflowOutputs}
+                disabled={disabled}
+                readOnly={readOnly}
+                sourceDisabled={outputsMissing || outputsDisconnected || workflowOutputs == null}
+                diagnostics={responseDiagnostics}
+                onChange={(next, deletion) => onChange({ bodyFields, method, options: next }, deletion)}
               />
             </>
           )}
-          <DraftTextField
-            key={response == null ? 'immediate' : 'workflow'}
-            label={t('webhookEditor.webhookStatus')}
-            value={options.responseStatusCode?.toString() ?? ''}
-            disabled={disabled}
-            inputMode="numeric"
-            placeholder={t('webhookEditor.webhookStatusDefault')}
-            inspect={(draft, signal) =>
-              validStatus(
-                draft,
-                t(response == null ? 'webhookEditor.webhookStatusInvalid' : 'webhookEditor.webhookDynamicStatusInvalid'),
-                signal,
-                response != null,
-              )
-            }
-            onSave={(text) => changeOption('responseStatusCode', text === '' ? undefined : Number(text))}
-            addon={statusSource}
-            error={statusIssue}
-            editor={
-              response != null && statusOutput != null
-                ? (id, errorId) => (
-                    <Input
-                      id={id}
-                      controlSize="field"
-                      readOnly
-                      disabled={disabled}
-                      aria-label={t('webhookEditor.webhookStatus')}
-                      aria-invalid={statusIssue != null}
-                      aria-describedby={errorId}
-                      value={`${workflowOutputs?.name ?? t('addNode.outputs')} · ${statusOutput}`}
-                    />
-                  )
-                : undefined
-            }
-          />
-          <WebhookHeadersEditor
-            options={options}
-            outputs={workflowOutputs}
-            disabled={disabled}
-            readOnly={readOnly}
-            sourceDisabled={outputsMissing || outputsDisconnected || workflowOutputs == null}
-            diagnostics={responseDiagnostics}
-            onChange={(next, deletion) => onChange({ bodyFields, method, options: next }, deletion)}
-          />
         </FieldGroup>
       </InspectorSection>
       <details className="inspector-disclosure" data-inspector-section="trigger">

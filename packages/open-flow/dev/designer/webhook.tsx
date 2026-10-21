@@ -37,6 +37,24 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
   useStoryActions(
     useMemo(
       () => [
+        {
+          label: 'Response node',
+          onClick: () => setSample({ bodyFields: [], method: 'POST', options: { responseBody: { kind: 'webhook-response', nodeId: 'reply' } } }),
+        },
+        {
+          label: 'Missing response node',
+          onClick: () => {
+            setSample({ bodyFields: [], method: 'POST', options: { responseBody: { kind: 'webhook-response', nodeId: 'removed' } } })
+            setOutputState('missing')
+          },
+        },
+        {
+          label: 'Disconnected response node',
+          onClick: () => {
+            setSample({ bodyFields: [], method: 'POST', options: { responseBody: { kind: 'webhook-response', nodeId: 'reply' } } })
+            setOutputState('disconnected')
+          },
+        },
         { label: 'Default POST', onClick: () => setSample({ bodyFields: [], method: 'POST', options: {} }) },
         { label: 'GET', onClick: () => setSample({ bodyFields: [], method: 'GET', options: {} }) },
         {
@@ -153,12 +171,24 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
   ] as const
   const graph: Graph = {
     nodes: {
+      ...(outputState === 'missing'
+        ? {}
+        : {
+            reply: { kind: 'webhook-response' as const, name: 'Reply JSON', inputs: {} },
+            other: { kind: 'webhook-response' as const, name: 'Reply text', inputs: {} },
+          }),
       webhook: { kind: 'webhook', name: 'Webhook', ...webhook },
       ...(outputState === 'missing'
         ? {}
         : { outputs: createdOutputs ?? { kind: 'outputs' as const, name: i18n.t('addNode.outputs'), outputDefs: workflowOutputs, outputMappings: {} } }),
     },
-    edges: outputState === 'ready' ? [{ source: 'webhook', target: 'outputs' }] : [],
+    edges:
+      outputState === 'ready'
+        ? [
+            { source: 'webhook', target: 'outputs' },
+            { source: 'webhook', target: 'reply' },
+          ]
+        : [],
   }
   return (
     <I18nProvider i18n={i18n}>
@@ -166,6 +196,14 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
         <div className="editor-context-panel open-flow-property-panel" style={{ padding: 24, maxWidth: 420 }}>
           <WebhookEditor
             {...webhook}
+            responseNodes={Object.entries(graph.nodes).flatMap(([id, node]) =>
+              node.kind === 'webhook-response' ? [{ id, name: node.name ?? id, reachable: outputState === 'ready' && id === 'reply' }] : [],
+            )}
+            onAddResponseNode={() => {
+              setOutputState('disconnected')
+              setWebhook((value) => ({ ...value, options: { ...value.options, responseBody: { kind: 'webhook-response', nodeId: 'reply' } } }))
+              log('Add Webhook Response')
+            }}
             workflowOutputs={graph.nodes.outputs?.kind === 'outputs' ? graph.nodes.outputs : undefined}
             responseDiagnostics={webhookResponseDiagnostics(graph, 'webhook')}
             onAddWorkflowOutputs={() => {
@@ -205,7 +243,7 @@ export const webhookStory: FrontendStory = {
   propertyPanel: true,
   title: 'Webhook Editor',
   description:
-    'Choose fixed content or workflow outputs. Compare body, status and whole/per-field header sources, standard object disclosure and child indentation, node submenus with incompatible fields, long names, missing or disconnected outputs, quick creation, and read-only settings.',
+    'Choose fixed content, workflow outputs or an early Webhook Response node. Compare body, status and whole/per-field header sources, standard object disclosure and child indentation, node submenus with incompatible fields, long names, missing or disconnected outputs, quick creation, and read-only settings.',
   standalone: true,
   render: (log, dark, language) => <WebhookStory dark={dark} language={language} log={log} />,
 }

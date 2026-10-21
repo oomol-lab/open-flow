@@ -1130,3 +1130,28 @@ it('copies Start and Outputs with their complete configuration and remaps source
   expect(applyFlowChanges(saved, inverseFlowChanges(destination.content, pasted.changes)).content).toEqual(destination.content)
   expect(pasteNodes(revisionView(saved), clipboard, () => 'unused').changes).toEqual([])
 })
+
+it('copies multiple response nodes and remaps the selected response with ordinary input sources', () => {
+  let current = draft('export default () => ({})')
+  current = applyFlowChanges(current, [
+    {
+      kind: 'graph.node.create',
+      nodeId: 'hook',
+      node: { kind: 'webhook', name: 'Hook', method: 'POST', bodyFields: [], options: { responseBody: { kind: 'webhook-response', nodeId: 'reply' } } },
+    },
+    { kind: 'graph.node.create', nodeId: 'reply', node: { kind: 'webhook-response', name: 'Reply', inputs: { body: { kind: 'value', value: 'first' } } } },
+    { kind: 'graph.node.create', nodeId: 'other', node: { kind: 'webhook-response', name: 'Other', inputs: { body: { kind: 'value', value: 'other' } } } },
+    { kind: 'graph.edge.connect', edge: { source: 'hook', target: 'reply' } },
+  ])
+  const clipboard = copyNodes(revisionView(current), ['hook', 'reply', 'other'])
+  let sequence = 0
+  const pasted = pasteNodes(revisionView(current), clipboard, () => `copy-${++sequence}`)
+  const copied = applyFlowChanges(current, pasted.changes)
+  expect(copied.content.document.graph.nodes['copy-1']).toMatchObject({
+    kind: 'webhook',
+    options: { responseBody: { kind: 'webhook-response', nodeId: 'copy-2' } },
+  })
+  expect(copied.content.document.graph.nodes['copy-2']).toMatchObject({ kind: 'webhook-response', inputs: { body: { kind: 'value', value: 'first' } } })
+  expect(copied.content.document.graph.nodes['copy-3']).toMatchObject({ kind: 'webhook-response' })
+  expect(applyFlowChanges(copied, inverseFlowChanges(current.content, pasted.changes)).content).toEqual(current.content)
+})

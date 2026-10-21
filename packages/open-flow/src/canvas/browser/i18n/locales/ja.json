@@ -610,7 +610,8 @@
       "value": "固定値",
       "input": "入力",
       "output": "出力",
-      "outputs": "ワークフロー出力"
+      "outputs": "ワークフロー出力",
+      "webhook-response": "Webhook レスポンス"
     },
     "units": {
       "minute": "分",

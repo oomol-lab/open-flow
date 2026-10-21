@@ -47,7 +47,9 @@
     "startDescription": "Запустить рабочий процесс вручную или через API с параметрами запуска.",
     "outputs": "Выходы рабочего процесса",
     "outputsDescription": "Определить выходные данные процесса и их значения. Вычисляются после завершения зависимостей.",
-    "workflow": "Вызвать процесс"
+    "workflow": "Вызвать процесс",
+    "webhookResponse": "Ответ Webhook",
+    "webhookResponseDescription": "Вернуть HTTP-ответ и продолжить процесс."
   },
   "connectorAccess": {
     "searchServices": "Поиск сервисов",
@@ -1141,7 +1143,12 @@
     "webhookDynamicStatusInvalid": "Введите целое число от 200 до 599, кроме 204, 205 и 304.",
     "webhookAddOutputs": "Добавить результаты процесса",
     "webhookOutputsDisconnected": "Результаты процесса не подключены",
-    "webhookStatusSource": "Источник кода статуса"
+    "webhookStatusSource": "Источник кода статуса",
+    "webhookAddResponse": "Добавить узел ответа Webhook",
+    "webhookSelectResponse": "Выберите узел ответа Webhook",
+    "webhookResponseDisconnected": "Узел ответа Webhook не подключён",
+    "webhookConnectResponse": "Выберите узел ответа Webhook на холсте, чтобы подключить его.",
+    "webhookMissingResponse": "Выбранный узел ответа Webhook отсутствует"
   },
   "conditionEditor": {
     "addCondition": "Добавить условие",

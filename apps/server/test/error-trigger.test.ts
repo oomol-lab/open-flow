@@ -5,6 +5,7 @@ import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { applyFlowChanges, currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { encodeRevision, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { matchesTriggerOutputs } from '@oomol-lab/open-flow/flow-semantics'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -79,7 +80,7 @@ function fixture(capacity = 10) {
         content,
         crons: [],
         expectedLivePublicationId: null,
-        engineContract: 'open-flow-engine/v6',
+        engineContract: currentEngineContract,
         flowId: id,
         idempotencyKey: `publish-${id}`,
         integrations: [],

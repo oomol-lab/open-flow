@@ -17,6 +17,7 @@ const descriptions = {
   'start': 'A Start node with a required message parameter. Supply it through trigger.outputs.',
   'error': 'A Flow Error node. Select upstream Flows, then publish and enable this Flow to listen for failures in their automatic runs.',
   'webhook': 'A Webhook start node.',
+  'webhook-response': 'An HTTP response node with body, statusCode and headers inputs. Select it from a reachable Webhook.',
   'cron': 'An hourly scheduled start node.',
   'poll': 'Gmail polling by key; replace CONNECTION_ID with an active Gmail connection.',
   'integration': 'Telegram webhook integration by key; replace CONNECTION_ID with an active Telegram connection.',
@@ -43,6 +44,9 @@ export const authoringExamples = authoringExampleNames.map((name) => ({ name, de
 export function authoringExample(name: string): { version: 1; operations: readonly DraftOperation[] } {
   let operations: readonly DraftOperation[]
   switch (name) {
+    case 'webhook-response':
+      operations = [{ kind: 'graph.node.create', nodeId: 'reply', node: { kind: 'webhook-response', name: 'Webhook Response', inputs: {} } }]
+      break
     case 'error':
       operations = createBuiltinTrigger('error', { kind: 'error', name: 'Flow Error' })
       break

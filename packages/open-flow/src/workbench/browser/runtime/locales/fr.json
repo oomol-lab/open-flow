@@ -47,7 +47,9 @@
     "startDescription": "Démarrer le workflow manuellement ou par un appel API avec des paramètres de démarrage.",
     "outputs": "Sorties du workflow",
     "outputsDescription": "Définir les sorties du workflow et leurs valeurs. Calculées après les dépendances en amont.",
-    "workflow": "Appeler un workflow"
+    "workflow": "Appeler un workflow",
+    "webhookResponse": "Réponse Webhook",
+    "webhookResponseDescription": "Renvoyer une réponse HTTP et poursuivre le workflow."
   },
   "connectorAccess": {
     "searchServices": "Rechercher un service",
@@ -1141,7 +1143,12 @@
     "webhookDynamicStatusInvalid": "Saisissez un entier de 200 à 599, sauf 204, 205 et 304.",
     "webhookAddOutputs": "Ajouter les sorties du workflow",
     "webhookOutputsDisconnected": "Sorties du workflow non connectées",
-    "webhookStatusSource": "Source du code de statut"
+    "webhookStatusSource": "Source du code de statut",
+    "webhookAddResponse": "Ajouter un nœud Réponse Webhook",
+    "webhookSelectResponse": "Choisir un nœud Réponse Webhook",
+    "webhookResponseDisconnected": "Le nœud Réponse Webhook n’est pas connecté",
+    "webhookConnectResponse": "Sélectionnez un nœud de réponse Webhook sur le canevas pour le connecter.",
+    "webhookMissingResponse": "Le nœud Réponse Webhook sélectionné est introuvable"
   },
   "conditionEditor": {
     "addCondition": "Ajouter une condition",

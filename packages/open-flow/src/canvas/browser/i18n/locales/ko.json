@@ -610,7 +610,8 @@
       "value": "고정 값",
       "input": "입력",
       "output": "출력",
-      "outputs": "워크플로 출력"
+      "outputs": "워크플로 출력",
+      "webhook-response": "Webhook 응답"
     },
     "units": {
       "minute": "분",

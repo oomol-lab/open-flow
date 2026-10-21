@@ -2,6 +2,7 @@ import type { RuntimeHarness, RuntimeProgram } from '@oomol-lab/open-flow/runtim
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { prepareFlow } from '@oomol-lab/open-flow/flow-semantics'
+import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { runtimeConformanceCases } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
 import { afterAll, describe, expect, it } from 'vitest'
@@ -19,7 +20,7 @@ afterAll(async () => await host.close())
 
 function program(source: string): RuntimeProgram {
   return {
-    engineContract: 'open-flow-engine/v6',
+    engineContract: currentEngineContract,
     engineDigest: isolatedVmEngineDigest,
     entryModuleId: 'main',
     modules: { main: { imports: [], source } },
@@ -586,7 +587,7 @@ it('reads immutable single and merged predecessor arrays through the isolated sc
         },
       },
     },
-    'open-flow-engine/v6',
+    currentEngineContract,
   )
   if (prepared.kind != 'prepared') throw new Error(JSON.stringify(prepared))
   const outcome = await Effect.runPromise(
@@ -670,7 +671,7 @@ async function retryFixture(kind: 'managed' | 'code', source?: string, onError?:
         },
       },
     },
-    'open-flow-engine/v6',
+    currentEngineContract,
   )
   if (prepared.kind != 'prepared') throw new Error(JSON.stringify(prepared))
   return prepared.flow
