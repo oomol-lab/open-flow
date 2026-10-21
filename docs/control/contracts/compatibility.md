@@ -10,7 +10,12 @@ durable waits, and does not cancel the Run. Field omission returns the complete 
 return plain text and other JSON values return JSON. Missing executed outputs are an HTTP error. Optional `responseStatusCodeOutput` selects a numeric
 top-level output as the HTTP status only in workflow-output response mode. Fixed
 `responseStatusCode` is preserved; missing or invalid dynamic statuses return 500. This addition
-shares the unreleased v10 boundary.
+shares the unreleased v10 boundary. Optional `responseHeadersSource` selects the complete business
+output object or one top-level object, and `responseHeaderOutputs` maps HTTP header names to top-level
+output names. These policies require workflow-output response mode and share v10. Header values
+support text, numbers and booleans, with scalar conversion to text. Whole-object selection replaces
+fixed/per-header values while preserving their configuration; invalid dynamic headers return 500.
+Deployment-owned response header restrictions remain unchanged.
 
 The published npm `0.1.0-beta.69` artifact (gitHead
 `026f74f27383188f3f771352e10e7a84bca89550`) uses model v9. A new model boundary prevents old

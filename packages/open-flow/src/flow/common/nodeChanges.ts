@@ -712,7 +712,10 @@ export function updateOutputsDefs(
       if (trigger.kind != 'webhook' || trigger.options == null) continue
       const bodyRenamed = trigger.options.responseBody?.output === rename[0]
       const statusRenamed = trigger.options.responseStatusCodeOutput === rename[0]
-      if (!bodyRenamed && !statusRenamed) continue
+      const headersRenamed = trigger.options.responseHeadersSource?.output === rename[0]
+      const headerOutputs = trigger.options.responseHeaderOutputs
+      const headerRenamed = Object.values(headerOutputs ?? {}).includes(rename[0])
+      if (!bodyRenamed && !statusRenamed && !headersRenamed && !headerRenamed) continue
       changes.push({
         kind: 'graph.node.replace',
         nodeId: id,
@@ -723,6 +726,14 @@ export function updateOutputsDefs(
             ...trigger.options,
             ...(bodyRenamed ? { responseBody: { ...trigger.options.responseBody!, output: rename[1] } } : {}),
             ...(statusRenamed ? { responseStatusCodeOutput: rename[1] } : {}),
+            ...(headersRenamed ? { responseHeadersSource: { ...trigger.options.responseHeadersSource!, output: rename[1] } } : {}),
+            ...(headerRenamed
+              ? {
+                  responseHeaderOutputs: Object.fromEntries(
+                    Object.entries(headerOutputs!).map(([name, output]) => [name, output === rename[0] ? rename[1] : output]),
+                  ),
+                }
+              : {}),
           },
         },
       })

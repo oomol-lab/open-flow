@@ -18,6 +18,7 @@ import {
   webhookResponseAllowsBody,
   webhookResponseTimeout,
   webhookResponseStatusCode,
+  webhookResponseHeaders as projectWebhookResponseHeaders,
 } from '@oomol-lab/open-flow/webhook-trigger'
 import { Hono } from 'hono'
 import { parseAccept } from 'hono/utils/accept'
@@ -538,7 +539,9 @@ async function webhook(
       const status = statusOutput == null ? undefined : webhookResponseStatusCode(outcome.result, statusOutput)
       if (statusOutput != null && status == null)
         return webhookFailure(500, 'webhook.response-status-invalid', 'The workflow response status code is unavailable or invalid.', origin)
-      return webhookSuccess(target.trigger, origin, { ...response, status })
+      const headers = projectWebhookResponseHeaders(outcome.result, target.trigger.options ?? {})
+      if (headers == null) return webhookFailure(500, 'webhook.response-headers-invalid', 'The workflow response headers are unavailable or invalid.', origin)
+      return webhookSuccess(target.trigger, origin, { ...response, status, headers })
     }
     return webhookSuccess(target.trigger, origin)
   } catch (error) {
@@ -584,10 +587,10 @@ function preflight(request: Request, method: string, origin: string | undefined)
 function webhookSuccess(
   trigger: Extract<TriggerNode, { readonly kind: 'webhook' }>,
   origin: string | undefined,
-  response?: { readonly body: string; readonly contentType: string; readonly status?: number },
+  response?: { readonly body: string; readonly contentType: string; readonly status?: number; readonly headers: Readonly<Record<string, string>> },
 ): Response {
   const status = response?.status ?? trigger.options?.responseStatusCode ?? 200
-  const headers = webhookResponseHeaders(origin, response?.contentType ?? 'text/plain;charset=UTF-8', trigger.options?.responseHeaders)
+  const headers = webhookResponseHeaders(origin, response?.contentType ?? 'text/plain;charset=UTF-8', response?.headers ?? trigger.options?.responseHeaders)
   const body = webhookResponseAllowsBody(status) ? (response?.body ?? trigger.options?.responseData ?? null) : null
   return text(status, body, headers)
 }

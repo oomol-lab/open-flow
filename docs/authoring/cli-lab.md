@@ -341,7 +341,7 @@ nullable success errors, setting preservation and complete failure metadata. Run
 ## Dynamic Webhook response regression
 
 `webhook-response` builds Webhook → Code → Outputs through public authoring, selects and renames
-a numeric status output, preserves a fixed status, and verifies HTTP 201 from the published result. The reference selects
+a numeric status output, preserves a fixed status, and verifies HTTP 201 from the published result. It also configures whole-object headers, restores per-header bindings, follows output renames, and verifies text, numeric and boolean response header values with preserved fixed headers. The reference selects
 one response field, renames it, updates only the timeout, clears and restores dynamic mode, and
 publishes. Acceptance calls the published HTTP endpoint and verifies the response body, content type,
 renamed business output and separation from later Draft edits. Both transports share the scenario:

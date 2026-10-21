@@ -899,6 +899,10 @@
         "webhook-response-status-invalid": "本文を返せるステータスコードを選択してください。",
         "webhook-response-status-source": "ステータス出力を使うには、応答元をワークフローの出力にしてください。",
         "webhook-response-status-output-missing": "ステータスが参照する出力「{{output}}」は存在しません。",
+        "webhook-response-headers-source": "動的ヘッダーを使用するには、レスポンスソースにワークフロー出力を選択してください。",
+        "webhook-response-header-name": "有効で重複のない HTTP ヘッダー名を入力してください。",
+        "webhook-response-header-output-missing": "ワークフロー出力「{{output}}」は存在しません。",
+        "webhook-response-header-output-type": "文字列、数値、真偽値、またはこれらの値のみを含むオブジェクトを選択してください。",
         "webhook-response-status-output-type": "ステータスコードには数値のワークフロー出力を選択してください。"
       },
       "leina": {
@@ -1107,6 +1111,7 @@
     "webhookHeaderName": "レスポンスヘッダー名",
     "webhookHeaderNameDuplicate": "ヘッダー名は重複できません。",
     "webhookHeaderNameInvalid": "有効な HTTP ヘッダー名を入力してください。",
+    "webhookHeadersSource": "レスポンスヘッダーのソース",
     "webhookHeaders": "レスポンスヘッダー",
     "webhookHeaderValue": "レスポンスヘッダーの値",
     "webhookMethod": "リクエストメソッド",

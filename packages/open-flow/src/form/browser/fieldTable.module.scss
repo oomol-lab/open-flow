@@ -18,6 +18,12 @@
   --field-table-actions-gap: 4px;
   --field-action-pair-gap: 2px;
 }
+.list[data-standalone] {
+  --field-outer-gutter: calc(var(--field-toggle-width) + var(--field-value-name-gap));
+  width: calc(100% + var(--field-outer-gutter));
+  margin-inline-start: calc(-1 * var(--field-outer-gutter));
+  padding: 0;
+}
 
 .columns {
   @include fieldLayout.columns;

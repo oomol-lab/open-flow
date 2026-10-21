@@ -2,7 +2,7 @@ import type { JsonValue, WebhookBodyField, WebhookMethod, WebhookOptions } from 
 
 import { dequal } from 'dequal/lite'
 import { isJsonObject } from '../../base/common/json.ts'
-import { webhookResponseAllowsBody } from '../../flow/common/webhookResponse.ts'
+import { webhookHeaderNameIssue, webhookResponseAllowsBody } from '../../flow/common/webhookResponse.ts'
 
 export { webhookSupportsBody } from './contract.ts'
 export { webhookResponseAllowsBody, webhookResponseTimeout } from '../../flow/common/webhookResponse.ts'
@@ -22,6 +22,45 @@ export function webhookResponseBody(
 export function webhookResponseStatusCode(result: unknown, output: string): number | undefined {
   const value = workflowOutputValue(result, output)
   if (typeof value == 'number' && Number.isInteger(value) && value >= 200 && value <= 599 && webhookResponseAllowsBody(value)) return value
+}
+
+/** Project business headers before the HTTP layer applies its deployment-owned header policy. */
+export function webhookResponseHeaders(result: unknown, options: WebhookOptions): Readonly<Record<string, string>> | undefined {
+  const whole = options.responseHeadersSource
+  const source = whole == null ? (options.responseHeaders ?? {}) : workflowOutputValue(result, whole.output)
+  if (!isJsonObject(source)) return
+  const values = new Map<string, { name: string; value: unknown }>()
+  for (const [name, value] of Object.entries(source)) {
+    if (
+      webhookHeaderNameIssue(
+        name,
+        [...values.values()].map((entry) => entry.name),
+      ) != null
+    )
+      return
+    values.set(name.toLowerCase(), { name, value })
+  }
+  if (whole == null) {
+    const names: string[] = []
+    for (const [name, output] of Object.entries(options.responseHeaderOutputs ?? {})) {
+      if (webhookHeaderNameIssue(name, names) != null) return
+      names.push(name)
+      values.set(name.toLowerCase(), { name, value: workflowOutputValue(result, output) })
+    }
+  }
+  const headers: [string, string][] = []
+  for (const { name, value } of values.values()) {
+    if (typeof value != 'string' && typeof value != 'boolean' && !(typeof value == 'number' && Number.isFinite(value))) return
+    const text = String(value)
+    try {
+      const parsed = new Headers([[name, text]])
+      void parsed
+    } catch {
+      return
+    }
+    headers.push([name, text])
+  }
+  return Object.fromEntries(headers)
 }
 
 function workflowOutputValue(result: unknown, output?: string): JsonValue | undefined {

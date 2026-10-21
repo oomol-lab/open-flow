@@ -899,6 +899,10 @@
         "webhook-response-status-invalid": "응답 본문을 허용하는 상태 코드를 선택하세요.",
         "webhook-response-status-source": "상태 코드 출력을 사용하려면 응답 소스를 워크플로 출력으로 설정하세요.",
         "webhook-response-status-output-missing": "상태 코드가 참조하는 출력 \"{{output}}\"이 없습니다.",
+        "webhook-response-headers-source": "동적 헤더를 사용하려면 응답 소스로 워크플로 출력을 선택하세요.",
+        "webhook-response-header-name": "유효하고 중복되지 않는 HTTP 헤더 이름을 입력하세요.",
+        "webhook-response-header-output-missing": "워크플로 출력 \"{{output}}\"이 없습니다.",
+        "webhook-response-header-output-type": "텍스트, 숫자, 불리언 또는 이러한 값만 포함하는 객체를 선택하세요.",
         "webhook-response-status-output-type": "상태 코드에는 숫자 형식의 워크플로 출력을 선택하세요."
       },
       "leina": {
@@ -1107,6 +1111,7 @@
     "webhookHeaderName": "헤더 이름",
     "webhookHeaderNameDuplicate": "헤더 이름은 중복될 수 없습니다.",
     "webhookHeaderNameInvalid": "유효한 HTTP 헤더 이름을 입력하세요.",
+    "webhookHeadersSource": "응답 헤더 소스",
     "webhookHeaders": "응답 헤더",
     "webhookHeaderValue": "헤더 값",
     "webhookMethod": "요청 메서드",

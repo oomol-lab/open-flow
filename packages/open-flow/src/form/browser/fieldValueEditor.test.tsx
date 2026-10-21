@@ -94,3 +94,18 @@ describe('Default JSON value presentation', () => {
     expect(markup).toContain('value="42"')
   })
 })
+
+it.each([false, true])('shows nested external validation errors on a collapsed object summary (value only: %s)', (valueOnly) => {
+  const markup = render({
+    schema: { type: 'object', additionalProperties: { type: 'string' } },
+    value: { 'X-Value': 'saved' },
+    compact: false,
+    header: valueOnly ? undefined : <span>Headers</span>,
+    valueOnly,
+    validationErrors: [{ instancePath: '/X-Value', message: 'Selected output is missing.' }],
+    expansionPolicy: () => false,
+  })
+  expect(markup).toContain('aria-invalid="true"')
+  expect(markup).toContain('Selected output is missing.')
+  expect(markup).toContain('aria-label="parameter" aria-expanded="false"')
+})

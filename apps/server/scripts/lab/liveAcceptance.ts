@@ -19,6 +19,8 @@ export async function verifyLiveWebhook(lab: LabSession, dynamic = false): Promi
       responseBody: { kind: 'workflow-outputs', output: 'reply', timeoutMs: 15000 },
       responseStatusCode: 202,
       responseStatusCodeOutput: 'httpStatus',
+      responseHeaders: { 'X-Reply': 'saved reply', 'X-Fixed': 'kept' },
+      responseHeaderOutputs: { 'X-Reply': 'reply', 'X-Status': 'httpStatus', 'X-Enabled': 'enabled' },
     })
   )
     errors.push('Publish the selected reply output, 15-second timeout and preserved fixed text.')
@@ -38,6 +40,14 @@ export async function verifyLiveWebhook(lab: LabSession, dynamic = false): Promi
   if (response.status != (dynamic ? 201 : 200)) errors.push(`Published callback returned ${response.status}.`)
   if (dynamic && ((await response.text()) != 'accepted published contract' || response.headers.get('content-type') != 'text/plain;charset=UTF-8'))
     errors.push('The published callback must return the workflow reply as plain text.')
+  if (
+    dynamic &&
+    (response.headers.get('x-reply') !== 'accepted published contract' ||
+      response.headers.get('x-status') !== '201' ||
+      response.headers.get('x-enabled') !== 'false' ||
+      response.headers.get('x-fixed') !== 'kept')
+  )
+    errors.push('Return text, numeric and boolean output fields as response headers while preserving fixed headers.')
   const admitted = lab.service.control.runs.listRuns(lab.manifest.flowId, 100, {}).page.runs.filter((run) => !previous.has(run.runId))
   if (admitted.length != 1) errors.push('Callback must admit exactly one Run.')
   for (const item of admitted) {
@@ -52,7 +62,12 @@ export async function verifyLiveWebhook(lab: LabSession, dynamic = false): Promi
       const result = lab.service.control.runs.getRunResult(run.runId)
       if (
         result.status != 'completed' ||
-        !isDeepStrictEqual((result.result as { outputs?: unknown }).outputs, { reply: 'accepted published contract', httpStatus: 201 })
+        !isDeepStrictEqual((result.result as { outputs?: unknown }).outputs, {
+          reply: 'accepted published contract',
+          httpStatus: 201,
+          enabled: false,
+          headers: { 'X-Object': 'whole', 'X-Count': 3, 'X-Enabled': false },
+        })
       )
         errors.push('Preserve the renamed workflow business output and mapping.')
     }

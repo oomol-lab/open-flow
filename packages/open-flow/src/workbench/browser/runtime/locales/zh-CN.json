@@ -899,6 +899,10 @@
         "webhook-response-status-invalid": "请选择允许返回响应体的状态码。",
         "webhook-response-status-source": "响应来源设为工作流输出后，才能引用状态码字段。",
         "webhook-response-status-output-missing": "状态码引用的工作流输出字段“{{output}}”不存在。",
+        "webhook-response-headers-source": "响应来源选择工作流输出后，才能引用输出作为响应头。",
+        "webhook-response-header-name": "请输入有效且不重复的 HTTP 响应头名称。",
+        "webhook-response-header-output-missing": "工作流输出“{{output}}”不存在。",
+        "webhook-response-header-output-type": "请选择文本、数值、布尔值，或仅包含这些值的对象。",
         "webhook-response-status-output-type": "请选择数字类型的工作流输出字段作为状态码。"
       },
       "leina": {
@@ -1107,6 +1111,7 @@
     "webhookHeaderName": "响应头名称",
     "webhookHeaderNameDuplicate": "响应头名称不能重复。",
     "webhookHeaderNameInvalid": "请输入有效的 HTTP 响应头名称。",
+    "webhookHeadersSource": "响应头来源",
     "webhookHeaders": "响应头",
     "webhookHeaderValue": "响应头值",
     "webhookMethod": "请求方法",

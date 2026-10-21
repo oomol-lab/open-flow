@@ -899,6 +899,10 @@
         "webhook-response-status-invalid": "Выберите код состояния, допускающий тело ответа.",
         "webhook-response-status-source": "Для выбора поля статуса укажите выходные данные процесса как источник ответа.",
         "webhook-response-status-output-missing": "Поле статуса «{{output}}» отсутствует в выходных данных процесса.",
+        "webhook-response-headers-source": "Выберите выходы процесса как источник ответа для динамических заголовков.",
+        "webhook-response-header-name": "Укажите допустимые и уникальные имена HTTP-заголовков.",
+        "webhook-response-header-output-missing": "Выход процесса «{{output}}» не существует.",
+        "webhook-response-header-output-type": "Выберите текст, число, логическое значение или объект только с такими значениями.",
         "webhook-response-status-output-type": "Выберите числовое поле выходных данных процесса для кода статуса."
       },
       "leina": {
@@ -1107,6 +1111,7 @@
     "webhookHeaderName": "Имя заголовка",
     "webhookHeaderNameDuplicate": "Имена заголовков не должны повторяться.",
     "webhookHeaderNameInvalid": "Введите допустимое имя HTTP-заголовка.",
+    "webhookHeadersSource": "Источник заголовков ответа",
     "webhookHeaders": "Заголовки ответа",
     "webhookHeaderValue": "Значение заголовка",
     "webhookMethod": "Метод запроса",

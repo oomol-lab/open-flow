@@ -67,6 +67,45 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
             }),
         },
         {
+          label: 'Header fields',
+          onClick: () =>
+            setSample({
+              bodyFields: [],
+              method: 'POST',
+              options: {
+                responseBody: { kind: 'workflow-outputs', output: 'message' },
+                responseHeaders: { 'X-Message': 'saved text', 'X-Count': 'saved count', 'X-Enabled': 'saved flag' },
+                responseHeaderOutputs: { 'X-Message': 'message', 'X-Count': 'status', 'X-Enabled': 'enabled' },
+              },
+            }),
+        },
+        {
+          label: 'Header object',
+          onClick: () =>
+            setSample({
+              bodyFields: [],
+              method: 'POST',
+              options: {
+                responseBody: { kind: 'workflow-outputs' },
+                responseHeaders: { 'X-Saved': 'restored on fixed' },
+                responseHeaderOutputs: { 'X-Saved': 'removed' },
+                responseHeadersSource: { kind: 'workflow-outputs', output: 'headers' },
+              },
+            }),
+        },
+        {
+          label: 'Missing header',
+          onClick: () =>
+            setSample({
+              bodyFields: [],
+              method: 'POST',
+              options: {
+                responseBody: { kind: 'workflow-outputs' },
+                responseHeaderOutputs: { 'X-Removed': 'removed' },
+              },
+            }),
+        },
+        {
           label: 'Missing status',
           onClick: () =>
             setSample({ bodyFields: [], method: 'POST', options: { responseBody: { kind: 'workflow-outputs' }, responseStatusCodeOutput: 'removed' } }),
@@ -107,6 +146,9 @@ function WebhookStory({ dark, language, log }: { dark: boolean; language: UiLang
     { handle: 'message', jsonSchema: { type: 'string' }, nullable: false },
     { handle: 'data', jsonSchema: { type: 'object' }, nullable: true },
     { handle: 'status', jsonSchema: { type: 'integer' }, nullable: false },
+    { handle: 'enabled', jsonSchema: { type: 'boolean' }, nullable: false },
+    { handle: 'headers', jsonSchema: { type: 'object', additionalProperties: { type: ['string', 'number', 'boolean'] } }, nullable: false },
+    { handle: 'items', jsonSchema: { type: 'array' }, nullable: false },
     { handle: 'business_result_message_for_the_http_response', jsonSchema: { type: 'string' }, nullable: false },
   ] as const
   const graph: Graph = {
@@ -163,7 +205,7 @@ export const webhookStory: FrontendStory = {
   propertyPanel: true,
   title: 'Webhook Editor',
   description:
-    'Choose fixed content or workflow outputs. Compare body and status sources, node submenus with incompatible fields, long names, missing or disconnected outputs, quick creation, and read-only settings.',
+    'Choose fixed content or workflow outputs. Compare body, status and whole/per-field header sources, standard object disclosure and child indentation, node submenus with incompatible fields, long names, missing or disconnected outputs, quick creation, and read-only settings.',
   standalone: true,
   render: (log, dark, language) => <WebhookStory dark={dark} language={language} log={log} />,
 }

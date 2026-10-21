@@ -288,6 +288,15 @@ function canonicalWebhookOptions(value: WebhookOptions): JsonValue {
         }),
     ...(value.responseData == null ? {} : { responseData: value.responseData }),
     ...(value.responseHeaders == null ? {} : { responseHeaders: value.responseHeaders }),
+    ...(value.responseHeadersSource == null
+      ? {}
+      : {
+          responseHeadersSource: {
+            kind: value.responseHeadersSource.kind,
+            ...(value.responseHeadersSource.output == null ? {} : { output: value.responseHeadersSource.output }),
+          },
+        }),
+    ...(value.responseHeaderOutputs == null ? {} : { responseHeaderOutputs: value.responseHeaderOutputs }),
     ...(value.responseStatusCode == null ? {} : { responseStatusCode: value.responseStatusCode }),
     ...(value.responseStatusCodeOutput == null ? {} : { responseStatusCodeOutput: value.responseStatusCodeOutput }),
   }

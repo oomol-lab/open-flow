@@ -462,6 +462,11 @@ export interface WebhookOptions {
   }
   readonly responseData?: string
   readonly responseHeaders?: Readonly<Record<string, string>>
+  readonly responseHeadersSource?: {
+    readonly kind: 'workflow-outputs'
+    readonly output?: string
+  }
+  readonly responseHeaderOutputs?: Readonly<Record<string, string>>
   readonly responseStatusCode?: number
   readonly responseStatusCodeOutput?: string
 }

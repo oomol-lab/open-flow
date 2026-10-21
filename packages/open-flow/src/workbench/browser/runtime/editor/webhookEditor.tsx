@@ -15,12 +15,11 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
-import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { Icon } from '../icons.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
-import { FieldSectionHeader } from './fieldSectionHeader.tsx'
 import { InspectorSection } from './inspectorSection.tsx'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
+import { WebhookHeadersEditor } from './webhookHeadersEditor.tsx'
 import { WebhookStatusSource } from './webhookStatusSource.tsx'
 
 interface DraftInspection {
@@ -183,32 +182,6 @@ function validStatus(value: string, issue: string, signal: AbortSignal, dynamic 
   }, signal)
 }
 
-function validHeaderName(
-  value: string,
-  current: string,
-  headers: Readonly<Record<string, string>>,
-  messages: { readonly invalid: string; readonly duplicate: string },
-  signal: AbortSignal,
-): Promise<DraftInspection> {
-  return deferInspection(() => {
-    const normalized = value.trim()
-    if (normalized === '') return { value: normalized, issue: messages.invalid }
-    if (hasHeader(headers, normalized, current)) return { value: normalized, issue: messages.duplicate }
-    try {
-      const parsed = new Headers([[normalized, 'value']])
-      void parsed
-      return { value: normalized }
-    } catch {
-      return { value: normalized, issue: messages.invalid }
-    }
-  }, signal)
-}
-
-function hasHeader(headers: Readonly<Record<string, string>>, candidate: string, except?: string): boolean {
-  const normalized = candidate.toLowerCase()
-  return Object.keys(headers).some((name) => name !== except && name.toLowerCase() === normalized)
-}
-
 export function WebhookEditor({
   bodyFields,
   method,
@@ -233,7 +206,6 @@ export function WebhookEditor({
   readonly onChange: (settings: WebhookSettings, deletion?: PropertyDeletion) => void
 }) {
   const t = useTranslate()
-  const headers = options.responseHeaders ?? {}
   const response = options.responseBody
   const outputsMissing = responseDiagnostics.some((issue) => issue.code === 'trigger.webhook-response-outputs-missing')
   const outputsDisconnected = responseDiagnostics.some((issue) => issue.code === 'trigger.webhook-response-unreachable')
@@ -256,8 +228,6 @@ export function WebhookEditor({
     else next[key] = value
     onChange({ bodyFields, method, options: next }, deletion)
   }
-  const changeHeaders = (next: Readonly<Record<string, string>>, deletion?: PropertyDeletion) =>
-    changeOption('responseHeaders', Object.keys(next).length === 0 ? undefined : next, deletion)
   const statusSource =
     response == null || readOnly ? undefined : (
       <WebhookStatusSource
@@ -267,12 +237,6 @@ export function WebhookEditor({
         onChange={(output) => changeOption('responseStatusCodeOutput', output)}
       />
     )
-  const addHeader = () => {
-    let name = 'X-Header'
-    let index = 2
-    while (hasHeader(headers, name)) name = `X-Header-${index++}`
-    changeHeaders({ ...headers, [name]: '' })
-  }
   return (
     <>
       <InspectorSection title={t('webhookEditor.webhookRequest')} className="inspector-form" data-inspector-section="trigger">
@@ -329,6 +293,8 @@ export function WebhookEditor({
                 const next = { ...options }
                 delete next.responseBody
                 delete next.responseStatusCodeOutput
+                delete next.responseHeadersSource
+                delete next.responseHeaderOutputs
                 onChange({ bodyFields, method, options: next })
               }}
             >
@@ -463,90 +429,15 @@ export function WebhookEditor({
                 : undefined
             }
           />
-          <details className="inspector-disclosure">
-            <summary>
-              <Icon name="chevron-down" size={14} />
-              <span className="inspector-disclosure-summary">{t('webhookEditor.webhookHeaders')}</span>
-            </summary>
-            <div className="inspector-disclosure-content">
-              <Field>
-                <FieldSectionHeader
-                  compact
-                  disabled={disabled}
-                  canSort={false}
-                  sorting={false}
-                  onToggleSorting={() => {}}
-                  addLabel={t('webhookEditor.webhookAddHeader')}
-                  onAdd={addHeader}
-                />
-                {Object.keys(headers).length === 0 ? (
-                  <p className="m-0 pl-4 text-xs text-muted-foreground">{t('webhookEditor.webhookNoHeaders')}</p>
-                ) : (
-                  <div className="flex flex-col gap-2">
-                    <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28px] gap-2 text-xs text-muted-foreground">
-                      <span>{t('webhookEditor.webhookHeaderName')}</span>
-                      <span>{t('webhookEditor.webhookHeaderValue')}</span>
-                      <span />
-                    </div>
-                    {Object.entries(headers).map(([name, value]) => (
-                      <div key={name} className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_28px] items-start gap-2 [&_[data-slot=field-label]]:sr-only">
-                        <DraftTextField
-                          label={t('webhookEditor.webhookHeaderName')}
-                          value={name}
-                          disabled={disabled}
-                          inspect={(draft, signal) =>
-                            validHeaderName(
-                              draft,
-                              name,
-                              headers,
-                              {
-                                invalid: t('webhookEditor.webhookHeaderNameInvalid'),
-                                duplicate: t('webhookEditor.webhookHeaderNameDuplicate'),
-                              },
-                              signal,
-                            )
-                          }
-                          onSave={(nextName) => {
-                            if (nextName === name) return
-                            changeHeaders(Object.fromEntries(Object.entries(headers).map(([key, content]) => [key === name ? nextName : key, content])))
-                          }}
-                        />
-                        <DraftTextField
-                          label={t('webhookEditor.webhookHeaderValue')}
-                          value={value}
-                          disabled={disabled}
-                          onSave={(text) => changeHeaders({ ...headers, [name]: text })}
-                        />
-                        {!disabled && (
-                          <Tooltip>
-                            <TooltipTrigger
-                              render={
-                                <Button
-                                  type="button"
-                                  size="icon-sm"
-                                  variant="ghost"
-                                  aria-label={t('webhookEditor.webhookDeleteHeader')}
-                                  onClick={() =>
-                                    changeHeaders(Object.fromEntries(Object.entries(headers).filter(([key]) => key !== name)), {
-                                      target: 'objectItem',
-                                      name,
-                                    })
-                                  }
-                                />
-                              }
-                            >
-                              <i aria-hidden="true" className="i-lucide-light:trash-2 text-base" />
-                            </TooltipTrigger>
-                            <TooltipContent>{t('webhookEditor.webhookDeleteHeader')}</TooltipContent>
-                          </Tooltip>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Field>
-            </div>
-          </details>
+          <WebhookHeadersEditor
+            options={options}
+            outputs={workflowOutputs}
+            disabled={disabled}
+            readOnly={readOnly}
+            sourceDisabled={outputsMissing || outputsDisconnected || workflowOutputs == null}
+            diagnostics={responseDiagnostics}
+            onChange={(next, deletion) => onChange({ bodyFields, method, options: next }, deletion)}
+          />
         </FieldGroup>
       </InspectorSection>
       <details className="inspector-disclosure" data-inspector-section="trigger">

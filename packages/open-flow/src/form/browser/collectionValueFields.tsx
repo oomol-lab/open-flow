@@ -40,24 +40,25 @@ function childFields(props: FieldValueEditorProps) {
       | 'disclosureContent'
       | 'typeWidth'
     >,
-  ) => (
-    <FieldValueEditor
-      readOnly={props.readOnly}
-      layout={props.layout}
-      expansionPolicy={props.expansionPolicy}
-      schema={childSchema}
-      value={childValue}
-      onChange={change}
-      valueEditable={valueEditable}
-      disabled={disabled}
-      label={`${label}.${key}`}
-      path={`${path}/${String(key).replaceAll('~', '~0').replaceAll('/', '~1')}`}
-      onDraftIssue={onDraftIssue}
-      depth={depth + 1}
-      {...presentation}
-      description={typeof objectValue(childSchema)?.description === 'string' ? String(objectValue(childSchema)!.description) : undefined}
-    />
-  )
+  ) => {
+    const childProps: FieldValueEditorProps = {
+      readOnly: props.readOnly,
+      layout: props.layout,
+      expansionPolicy: props.expansionPolicy,
+      schema: childSchema,
+      value: childValue,
+      onChange: change,
+      valueEditable,
+      disabled,
+      label: `${label}.${key}`,
+      path: `${path}/${String(key).replaceAll('~', '~0').replaceAll('/', '~1')}`,
+      onDraftIssue,
+      depth: depth + 1,
+      ...presentation,
+      description: typeof objectValue(childSchema)?.description === 'string' ? String(objectValue(childSchema)!.description) : undefined,
+    }
+    return typeof key === 'string' && props.renderObjectField != null ? props.renderObjectField(key, childProps) : <FieldValueEditor {...childProps} />
+  }
   return child
 }
 export function ObjectValueFields(props: CollectionProps) {
@@ -120,9 +121,10 @@ export function ObjectValueFields(props: CollectionProps) {
                 leadingControl: handle,
                 objectChild: true,
                 layout: 'values',
-                typeWidth:
-                  !disabled &&
-                  (props.onDefinitionChange || !(typeof fieldSource.type === 'string' || fieldSource.enum != null || fieldSource.const !== undefined))
+                typeWidth: props.hideChildTypes
+                  ? undefined
+                  : !disabled &&
+                      (props.onDefinitionChange || !(typeof fieldSource.type === 'string' || fieldSource.enum != null || fieldSource.const !== undefined))
                     ? 'editable'
                     : 'fixed',
                 hideOptions: true,
@@ -136,6 +138,7 @@ export function ObjectValueFields(props: CollectionProps) {
                           name={name}
                           disabled={disabled}
                           onRename={(nextName) => {
+                            if (props.validateObjectFieldName?.(nextName, name) === false) return false
                             if (props.onDefinitionChange) {
                               const nextSchema = renameFieldDefinition(schema, name, nextName)
                               if (!nextSchema) return false
@@ -151,41 +154,43 @@ export function ObjectValueFields(props: CollectionProps) {
                         />
                       )}
                     </FieldName>
-                    <div data-field-type>
-                      {props.onDefinitionChange ? (
-                        <EditorComponentSelect
-                          schema={fieldSchema}
-                          name={`${label}.${name}`}
-                          readOnly={disabled}
-                          onChange={(nextSchema) =>
-                            props.onDefinitionChange!(
-                              { ...source, properties: { ...properties, [name]: nextSchema } },
-                              setObjectField(value, name, valueForEditor(nextSchema, fieldValue)),
-                            )
-                          }
-                        />
-                      ) : typeof fieldSource.type === 'string' || fieldSource.enum != null || fieldSource.const !== undefined ? (
-                        <EditorComponentSelect schema={fieldSchema} name={`${label}.${name}`} readOnly onChange={() => {}} />
-                      ) : (
-                        <FieldSelect
-                          icons={editorComponentIcons}
-                          aria-label={t('valueEditor.type', { name: `${label}.${name}` })}
-                          value={valueType(fieldSchema, fieldValue)}
-                          readOnly={disabled}
-                          onChange={(next) => {
-                            onChange(setObjectField(value, name, initialValue(fieldSchema, next as ValueType)))
-                          }}
-                        >
-                          {[...jsonDataTypes, 'integer' as const]
-                            .filter((candidate) => !Array.isArray(fieldSource.type) || (fieldSource.type as unknown[]).includes(candidate))
-                            .map((candidate) => (
-                              <option key={candidate} value={candidate}>
-                                {candidate}
-                              </option>
-                            ))}
-                        </FieldSelect>
-                      )}
-                    </div>
+                    {!props.hideChildTypes && (
+                      <div data-field-type>
+                        {props.onDefinitionChange ? (
+                          <EditorComponentSelect
+                            schema={fieldSchema}
+                            name={`${label}.${name}`}
+                            readOnly={disabled}
+                            onChange={(nextSchema) =>
+                              props.onDefinitionChange!(
+                                { ...source, properties: { ...properties, [name]: nextSchema } },
+                                setObjectField(value, name, valueForEditor(nextSchema, fieldValue)),
+                              )
+                            }
+                          />
+                        ) : typeof fieldSource.type === 'string' || fieldSource.enum != null || fieldSource.const !== undefined ? (
+                          <EditorComponentSelect schema={fieldSchema} name={`${label}.${name}`} readOnly onChange={() => {}} />
+                        ) : (
+                          <FieldSelect
+                            icons={editorComponentIcons}
+                            aria-label={t('valueEditor.type', { name: `${label}.${name}` })}
+                            value={valueType(fieldSchema, fieldValue)}
+                            readOnly={disabled}
+                            onChange={(next) => {
+                              onChange(setObjectField(value, name, initialValue(fieldSchema, next as ValueType)))
+                            }}
+                          >
+                            {[...jsonDataTypes, 'integer' as const]
+                              .filter((candidate) => !Array.isArray(fieldSource.type) || (fieldSource.type as unknown[]).includes(candidate))
+                              .map((candidate) => (
+                                <option key={candidate} value={candidate}>
+                                  {candidate}
+                                </option>
+                              ))}
+                          </FieldSelect>
+                        )}
+                      </div>
+                    )}
                   </>
                 ),
                 actions: !props.readOnly && (

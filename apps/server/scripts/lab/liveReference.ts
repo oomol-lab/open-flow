@@ -28,6 +28,8 @@ export async function referenceLive(call: ToolCall, flowId: string, dynamic = fa
                   responseData: 'accepted',
                   responseStatusCode: 202,
                   responseStatusCodeOutput: 'status',
+                  responseHeaders: { 'X-Reply': 'saved reply', 'X-Fixed': 'kept' },
+                  responseHeaderOutputs: { 'X-Reply': 'message', 'X-Status': 'status', 'X-Enabled': 'enabled' },
                 },
               }
             : {}),
@@ -50,8 +52,20 @@ export async function referenceLive(call: ToolCall, flowId: string, dynamic = fa
               as: 'out',
               type: 'outputs',
               name: 'Outputs',
-              config: { outputDefs: { message: { schema: { type: 'string' }, nullable: false }, status: { schema: { type: 'integer' }, nullable: false } } },
-              inputs: { message: { kind: 'output', node: '$echo', port: 'message' }, status: { kind: 'value', value: 201 } },
+              config: {
+                outputDefs: {
+                  message: { schema: { type: 'string' }, nullable: false },
+                  status: { schema: { type: 'integer' }, nullable: false },
+                  enabled: { schema: { type: 'boolean' }, nullable: false },
+                  headers: { schema: { type: 'object', additionalProperties: { type: ['string', 'number', 'boolean'] } }, nullable: false },
+                },
+              },
+              inputs: {
+                message: { kind: 'output', node: '$echo', port: 'message' },
+                status: { kind: 'value', value: 201 },
+                enabled: { kind: 'value', value: false },
+                headers: { kind: 'value', value: { 'X-Object': 'whole', 'X-Count': 3, 'X-Enabled': false } },
+              },
             },
             { op: 'edge.connect', source: '$echo', target: '$out' },
           ]
@@ -88,7 +102,15 @@ export async function referenceLive(call: ToolCall, flowId: string, dynamic = fa
         },
       ],
     })
-    revision = renamedStatus.revision
+    const wholeHeaders = await call('flow_edit', {
+      flowId,
+      baseRevision: renamedStatus.revision,
+      requestId: randomUUID(),
+      edits: [{ op: 'node.update', node: refs.hook, set: { config: { options: { responseHeadersSource: { kind: 'workflow-outputs', output: 'headers' } } } } }],
+    })
+    await call('flow_read', { flowId, nodes: [refs.hook] })
+    await call('flow_check', { flowId, revisionId: wholeHeaders.revision })
+    revision = wholeHeaders.revision
     await call('flow_read', { flowId, nodes: [refs.hook, refs.out] })
     const cleared = await call('flow_edit', {
       flowId,
@@ -101,6 +123,8 @@ export async function referenceLive(call: ToolCall, flowId: string, dynamic = fa
           clear: [
             ['config', 'options', 'responseBody'],
             ['config', 'options', 'responseStatusCodeOutput'],
+            ['config', 'options', 'responseHeadersSource'],
+            ['config', 'options', 'responseHeaderOutputs'],
           ],
         },
       ],
@@ -115,7 +139,13 @@ export async function referenceLive(call: ToolCall, flowId: string, dynamic = fa
           op: 'node.update',
           node: refs.hook,
           set: {
-            config: { options: { responseBody: { kind: 'workflow-outputs', output: 'reply', timeoutMs: 15000 }, responseStatusCodeOutput: 'httpStatus' } },
+            config: {
+              options: {
+                responseBody: { kind: 'workflow-outputs', output: 'reply', timeoutMs: 15000 },
+                responseStatusCodeOutput: 'httpStatus',
+                responseHeaderOutputs: { 'X-Reply': 'reply', 'X-Status': 'httpStatus', 'X-Enabled': 'enabled' },
+              },
+            },
           },
         },
       ],

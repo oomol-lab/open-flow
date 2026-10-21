@@ -170,6 +170,8 @@ const webhookOptions = z.object({
     .optional(),
   responseData: text.optional(),
   responseHeaders: z.record(text, text).optional(),
+  responseHeadersSource: z.strictObject({ kind: z.literal('workflow-outputs'), output: text.optional() }).optional(),
+  responseHeaderOutputs: z.record(text, text).optional(),
   responseStatusCode: z.number().int().min(200).max(599).optional(),
   responseStatusCodeOutput: text.optional(),
 })
@@ -676,7 +678,11 @@ function checkModelVersion(content: RevisionContent): void {
     content.modelVersion < 10 &&
     Object.values(content.document.graph.nodes).some(
       (candidateNode) =>
-        candidateNode.kind == 'webhook' && (candidateNode.options?.responseBody != null || candidateNode.options?.responseStatusCodeOutput != null),
+        candidateNode.kind == 'webhook' &&
+        (candidateNode.options?.responseBody != null ||
+          candidateNode.options?.responseStatusCodeOutput != null ||
+          candidateNode.options?.responseHeadersSource != null ||
+          candidateNode.options?.responseHeaderOutputs != null),
     )
   )
     throw new TypeError('Dynamic Webhook responses require Flow model version 10.')

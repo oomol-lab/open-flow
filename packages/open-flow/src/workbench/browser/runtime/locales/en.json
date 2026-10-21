@@ -899,6 +899,10 @@
         "webhook-response-status-invalid": "Choose a response status code that permits a body.",
         "webhook-response-status-source": "Choose workflow outputs as the response source to use a status output.",
         "webhook-response-status-output-missing": "Workflow status output \"{{output}}\" does not exist.",
+        "webhook-response-headers-source": "Choose workflow outputs as the response source to use dynamic headers.",
+        "webhook-response-header-name": "Use valid, unique HTTP header names.",
+        "webhook-response-header-output-missing": "Workflow output \"{{output}}\" does not exist.",
+        "webhook-response-header-output-type": "Choose text, number or boolean values, or an object containing only these values.",
         "webhook-response-status-output-type": "Choose a numeric workflow output for the response status code."
       },
       "leina": {
@@ -1107,6 +1111,7 @@
     "webhookHeaderName": "Header name",
     "webhookHeaderNameDuplicate": "Header names must be unique.",
     "webhookHeaderNameInvalid": "Enter a valid HTTP header name.",
+    "webhookHeadersSource": "Response headers source",
     "webhookHeaders": "Response headers",
     "webhookHeaderValue": "Header value",
     "webhookMethod": "Request method",

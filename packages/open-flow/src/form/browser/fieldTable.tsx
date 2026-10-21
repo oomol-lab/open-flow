@@ -19,10 +19,25 @@ export const FieldTable = forwardRef<
     nullable?: boolean
     empty?: boolean
     actionSlots?: 1 | 2
+    /** Align a standalone value with surrounding controls; its disclosure uses the outer gutter. */
+    standalone?: boolean
   }
 >(
   (
-    { layout = 'definition', fixedTypes, typeColumn = true, columnHeadings = true, output, nullable, empty, actionSlots = 1, className, children, ...props },
+    {
+      layout = 'definition',
+      fixedTypes,
+      typeColumn = true,
+      columnHeadings = true,
+      output,
+      nullable,
+      empty,
+      actionSlots = 1,
+      standalone,
+      className,
+      children,
+      ...props
+    },
     ref,
   ) => {
     const t = useTranslate()
@@ -39,6 +54,7 @@ export const FieldTable = forwardRef<
         data-nullable={nullable || undefined}
         data-empty={empty || undefined}
         data-action-slots={actionSlots}
+        data-standalone={standalone || undefined}
       >
         {columnHeadings && !empty && (
           <div className={styles.columns} data-layout={layout} data-output={output || undefined}>

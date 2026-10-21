@@ -20,6 +20,8 @@ export interface FieldRowPresentation {
   columns?: CSSProperties['gridTemplateColumns']
   gap?: number
   header?: ReactNode | ((disclosure: FieldDisclosure | undefined) => ReactNode)
+  /** A standalone value keeps the disclosure gutter without reserving Name and Type cells. */
+  valueOnly?: boolean
   leadingControl?: ReactNode
   disclosureContent?: ReactNode
   trailingControl?: ReactNode
@@ -45,6 +47,7 @@ export const FieldRow = forwardRef<
       columns,
       gap,
       header,
+      valueOnly,
       leadingControl,
       disclosureContent,
       trailingControl,
@@ -66,6 +69,7 @@ export const FieldRow = forwardRef<
   ) => {
     const geometry = useContext(Geometry)
     const level = depth ?? geometry.depth
+    const hasHeader = header != null || valueOnly === true
     return (
       <div
         {...props}
@@ -73,7 +77,8 @@ export const FieldRow = forwardRef<
         className={[styles.root, className].filter(Boolean).join(' ')}
         data-stacking={stacking}
         data-layout={layout ?? geometry.layout}
-        data-header={header != null || undefined}
+        data-header={hasHeader || undefined}
+        data-value-only={valueOnly || undefined}
         data-nested-field={level > 0 || undefined}
         style={
           {
@@ -85,7 +90,7 @@ export const FieldRow = forwardRef<
           } as CSSProperties
         }
       >
-        {header != null && (
+        {hasHeader && (
           <div className={styles.header}>
             {leadingControl != null && <div className={styles.leadingControl}>{leadingControl}</div>}
             <div className={styles.toggleControl}>
@@ -108,7 +113,7 @@ export const FieldRow = forwardRef<
               )}
               {!disclosure && leadingControl == null && disclosureContent}
             </div>
-            {typeof header === 'function' ? header(disclosure) : header}
+            {!valueOnly && (typeof header === 'function' ? header(disclosure) : header)}
           </div>
         )}
         {children}

@@ -540,7 +540,10 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(path.join(commonOutputPath, 'poll-trigger.d.ts'), pollTriggerDeclaration),
       writeFile(path.join(commonOutputPath, 'provider-triggers.d.ts'), providerTriggersDeclaration),
       writeFile(path.join(commonOutputPath, 'webhook-trigger.d.ts'), webhookTriggerDeclaration),
-      writeFile(path.join(commonOutputPath, 'webhook-response.d.ts'), await readFile(path.join(declarationRoot, 'flow/common/webhookResponse.d.ts'), 'utf8')),
+      writeFile(
+        path.join(commonOutputPath, 'webhook-response.d.ts'),
+        (await readFile(path.join(declarationRoot, 'flow/common/webhookResponse.d.ts'), 'utf8')).replaceAll("'./change.ts'", "'../browser/flow-change.js'"),
+      ),
       writeFile(path.join(commonOutputPath, 'localization.d.ts'), localizationDeclaration),
     ])
   } finally {

@@ -172,6 +172,25 @@ async function fixture(
   return { service, stored, app, url, request }
 }
 
+function headerRevision(schema: JsonValue): (content: RevisionContent) => RevisionContent {
+  return (content) => {
+    const echo = content.document.graph.nodes.echo!
+    const outputs = content.document.graph.nodes.outputs!
+    if (echo.kind !== 'task' || outputs.kind !== 'outputs') throw new Error('Expected header fixture')
+    const ports = [{ handle: 'value', jsonSchema: schema, nullable: true }]
+    return {
+      ...content,
+      document: {
+        ...content.document,
+        graph: {
+          ...content.document.graph,
+          nodes: { ...content.document.graph.nodes, echo: { ...echo, task: { ...echo.task, outputs: ports } }, outputs: { ...outputs, outputDefs: ports } },
+        },
+      },
+    }
+  }
+}
+
 describe('published dynamic HTTP responses', () => {
   it.each([201, 400, 599, 199, 204, 205, 304, 600, 200.5, null])('returns a selected numeric status %s or a fixed error', async (value) => {
     const f = await fixture(
@@ -260,6 +279,68 @@ describe('published dynamic HTTP responses', () => {
     expect(response.headers.get('x-test')).toBe('yes')
     expect(response.headers.get('set-cookie')).toBeNull()
     expect(response.headers.get('x-content-type-options')).toBe('nosniff')
+  })
+
+  it.each<JsonValue>(['hello', '', 0, false, null])('projects a published per-header source %j', async (value) => {
+    const f = await fixture(
+      value,
+      {
+        responseBody: { kind: 'workflow-outputs', output: 'value' },
+        responseHeaders: { 'x-value': 'saved', 'X-Fixed': 'kept' },
+        responseHeaderOutputs: { 'X-Value': 'value' },
+      },
+      true,
+      false,
+      headerRevision({ type: ['string', 'number', 'boolean'] }),
+    )
+    const response = await f.request()
+    if (value == null) {
+      expect(response.status).toBe(500)
+      expect(await response.json()).toMatchObject({ error: { code: 'webhook.response-headers-invalid' } })
+      expect(response.headers.get('x-value')).toBeNull()
+    } else {
+      expect(response.status).toBe(200)
+      expect(response.headers.get('x-value')).toBe(String(value))
+      expect(response.headers.get('x-fixed')).toBe('kept')
+    }
+  })
+
+  it.each<JsonValue>([
+    {},
+    { 'X-Count': 3, 'X-Enabled': false, 'X-Label': 'text', 'Content-Type': 'text/html', 'Set-Cookie': 'bad', 'Access-Control-Allow-Origin': '*' },
+    { 'bad name': 'text' },
+    { 'X-Value': 'bad\r\nInjected: value' },
+    { 'X-Count': 1, 'x-count': 2 },
+    null,
+  ])('projects a published whole header object %j with deployment policy', async (value) => {
+    const f = await fixture(
+      value,
+      {
+        responseBody: { kind: 'workflow-outputs', output: 'value' },
+        responseHeadersSource: { kind: 'workflow-outputs', output: 'value' },
+        responseHeaders: { 'X-Inactive': 'saved' },
+        responseHeaderOutputs: { 'X-Inactive': 'missing' },
+      },
+      true,
+      false,
+      headerRevision({ type: 'object', additionalProperties: { type: ['string', 'number', 'boolean'] } }),
+    )
+    const response = await f.request()
+    expect(response.headers.get('x-inactive')).toBeNull()
+    if (value == null || Object.keys(value as object).some((key) => key === 'bad name' || key === 'X-Value' || key === 'x-count')) {
+      expect(response.status).toBe(500)
+      expect(await response.json()).toMatchObject({ error: { code: 'webhook.response-headers-invalid' } })
+    } else {
+      expect(response.status).toBe(200)
+      if ('X-Count' in (value as object)) {
+        expect(response.headers.get('x-count')).toBe('3')
+        expect(response.headers.get('x-enabled')).toBe('false')
+        expect(response.headers.get('x-label')).toBe('text')
+      }
+      expect(response.headers.get('content-type')).toBe('application/json')
+      expect(response.headers.get('set-cookie')).toBeNull()
+      expect(response.headers.get('access-control-allow-origin')).toBeNull()
+    }
   })
 
   it('shares one Run for concurrent keyed requests and replays the completed business result', async () => {

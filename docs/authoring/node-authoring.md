@@ -133,9 +133,20 @@ fixed `responseStatusCode`. Missing, null, fractional, out-of-range or bodyless 
 500 with a fixed error body. No string-to-number conversion or fallback is applied. Existing response
 header restrictions and CORS still apply.
 
+Fixed `responseHeaders` remains a map of text values. In workflow-output response mode,
+`responseHeaderOutputs: { "X-Count": "count" }` maps header names to top-level outputs and overrides
+fixed values by case-insensitive name. Values accept string, number and boolean; number and boolean
+are converted to text. `responseHeadersSource: { kind: "workflow-outputs", output: "headers" }`
+replaces the entire header object, or omits `output` to use all business outputs. It preserves but
+ignores fixed headers and per-header bindings until cleared. Empty objects are valid. Missing fields,
+null, arrays, nested objects, invalid names/values and case-insensitive duplicates return a fixed
+500 `webhook.response-headers-invalid` error without fallback. Deployment-owned header restrictions,
+CORS and Content-Type encoding policy remain authoritative. References are limited to the singleton
+Outputs node; names and literal values are edited as single-line text.
+
 Omitted `responseBody` retains immediate `responseData` behavior. Updating dynamic configuration
 preserves saved fixed text. Switch back by clearing `responseBody` and any
-`responseStatusCodeOutput`; the fixed status and text remain saved.
+`responseStatusCodeOutput`, `responseHeadersSource` and `responseHeaderOutputs`; the fixed status, text and headers remain saved.
 Explicit output renames update response selections through shared editing; removals preserve stale
 selections for diagnostics. Drafts can retain incomplete configuration; checks and publication reject
 missing, unreachable or undeclared response outputs. Live reads expose the published configuration

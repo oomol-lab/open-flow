@@ -15,7 +15,6 @@ import { editorComponentIcons } from '../../../../form/browser/editorComponentIc
 import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { FieldValueEditor } from '../../../../form/browser/fieldValueEditor.tsx'
 import { selectionMenuContentClass } from '../../../../form/browser/selectionMenuStyles.ts'
-import { Button } from '../../../../ui/browser/button.tsx'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,7 +25,6 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
 } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { ContentIcon } from '../../../../ui/browser/icons/ContentIcon.tsx'
@@ -35,6 +33,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/
 import { LlmInputEditor, supportsLlmInput } from './llmInputEditor.tsx'
 import { schemaMismatchMessage } from './schemaMismatchMessage.ts'
 import { SourceMenuOption, sourceMenuItemClass as sourceItemClass } from './sourceMenuOption.tsx'
+import { SourceSelectorTrigger } from './sourceSelectorTrigger.tsx'
 import { useInputSourceQuery } from './useInputSourceQuery.ts'
 
 export type InputVariables = Pick<VariablePickerProps, 'enabled' | 'loaded' | 'loading' | 'names'> & { readonly onOpen?: () => void }
@@ -109,7 +108,6 @@ function SelectedSourceValue({
   readonly variables: InputVariables
 }) {
   const t = useTranslate()
-  const [tooltipContainer, setTooltipContainer] = useState<HTMLDivElement | null>(null)
   let checks: InputSourcesCheck | undefined
   let checkFailed = false
   if (upstream?.query != null && upstream.current.length > 0) {
@@ -152,55 +150,87 @@ function SelectedSourceValue({
   const sourceTooltip = connected && current?.length ? [sourceLabel, ...sourceDescriptions].join('\n') : undefined
   return (
     <>
-      <ValueEditorFeedback error={sourceIssue}>
-        {(errorId) => (
-          <div
-            ref={setTooltipContainer}
-            data-field-control
-            data-value-control
-            className={`${styles.sourceControl} flex h-[30px] min-w-0 items-center rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] px-[7px] text-xs`}
-            aria-invalid={sourceIssue != null}
-            aria-describedby={errorId}
-            tabIndex={sourceIssue ? 0 : undefined}
-          >
-            {bound ? (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <span role="img" aria-label={t('nodeInput.variable')} className="-my-px mr-2 flex h-[30px] shrink-0 items-center text-muted-foreground" />
-                  }
-                >
-                  <i aria-hidden="true" className="i-lucide-light:sliders-horizontal size-3.5" />
-                </TooltipTrigger>
-                <TooltipContent container={tooltipContainer} sideOffset={0}>
-                  {t('nodeInput.variable')}
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              connected &&
-              current?.length === 1 && (
-                <ContentIcon
-                  src={selectedUpstreamIcon}
-                  className="mr-2 size-3.5 shrink-0 data-[icon-kind=initials]:text-[16px]"
-                  fallback={<i aria-hidden="true" className="i-lucide-light:workflow mr-2 size-3.5 shrink-0 text-muted-foreground" />}
-                />
-              )
-            )}
-            <Tooltip disabled={sourceTooltip == null}>
-              <TooltipTrigger render={<span className="min-w-0 flex-1 truncate" aria-description={sourceTooltip} />}>{sourceLabel}</TooltipTrigger>
-              <TooltipContent container={tooltipContainer} sideOffset={11} positionMethod="fixed" collisionBoundary={[]} className="whitespace-pre-wrap">
-                {sourceTooltip}
-              </TooltipContent>
-            </Tooltip>
-          </div>
-        )}
-      </ValueEditorFeedback>
+      <SourceValueControl
+        label={sourceLabel ?? ''}
+        description={sourceTooltip}
+        variable={bound}
+        node={connected && current?.length === 1}
+        icon={selectedUpstreamIcon}
+        error={sourceIssue}
+      />
       {checkFailed && (
         <p role="status" className="text-xs text-muted-foreground">
           {t('inspector.sources.checkFailed')}
         </p>
       )}
     </>
+  )
+}
+
+/** The selected source surface shared by node inputs and response projections. */
+export function SourceValueControl({
+  label,
+  description,
+  variable = false,
+  node = false,
+  icon,
+  error,
+  name,
+}: {
+  readonly label: string
+  readonly description?: string
+  readonly variable?: boolean
+  readonly node?: boolean
+  readonly icon?: string
+  readonly error?: string
+  readonly name?: string
+}) {
+  const t = useTranslate()
+  const [tooltipContainer, setTooltipContainer] = useState<HTMLDivElement | null>(null)
+  return (
+    <ValueEditorFeedback error={error}>
+      {(errorId) => (
+        <div
+          ref={setTooltipContainer}
+          data-field-control
+          data-value-control
+          className={`${styles.sourceControl} flex h-[30px] min-w-0 items-center rounded-[var(--ui-control-radius,var(--ui-radius))] border border-input bg-[var(--ui-control-background,var(--ui-muted))] px-[7px] text-xs`}
+          aria-invalid={error != null}
+          aria-label={name}
+          aria-describedby={errorId}
+          tabIndex={error ? 0 : undefined}
+        >
+          {variable ? (
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <span role="img" aria-label={t('nodeInput.variable')} className="-my-px mr-2 flex h-[30px] shrink-0 items-center text-muted-foreground" />
+                }
+              >
+                <i aria-hidden="true" className="i-lucide-light:sliders-horizontal size-3.5" />
+              </TooltipTrigger>
+              <TooltipContent container={tooltipContainer} sideOffset={0}>
+                {t('nodeInput.variable')}
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            node && (
+              <ContentIcon
+                src={icon}
+                className="mr-2 size-3.5 shrink-0 data-[icon-kind=initials]:text-[16px]"
+                fallback={<i aria-hidden="true" className="i-lucide-light:workflow mr-2 size-3.5 shrink-0 text-muted-foreground" />}
+              />
+            )
+          )}
+          <Tooltip disabled={description == null}>
+            <TooltipTrigger render={<span className="min-w-0 flex-1 truncate" aria-description={description} />}>{label}</TooltipTrigger>
+            <TooltipContent container={tooltipContainer} sideOffset={11} positionMethod="fixed" collisionBoundary={[]} className="whitespace-pre-wrap">
+              {description}
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      )}
+    </ValueEditorFeedback>
   )
 }
 
@@ -325,28 +355,14 @@ export function SourceValueEditor({
             if (open && variables.enabled) variables.onOpen?.()
           }}
         >
-          <Tooltip disabled={sourceOpen}>
-            <TooltipTrigger
-              render={
-                <DropdownMenuTrigger
-                  render={
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-xs"
-                      className="aria-pressed:bg-[var(--ui-control-hover-background,var(--ui-muted))] aria-pressed:text-foreground"
-                      aria-label={`${fieldLabel} ${t('inspector.sources.select')}`}
-                      aria-pressed={sourceKind !== 'literal'}
-                      disabled={disabled}
-                    >
-                      <i aria-hidden="true" className="i-lucide-light:link" />
-                    </Button>
-                  }
-                />
-              }
-            />
-            <TooltipContent container={sourcePortal}>{t('inspector.sources.select')}</TooltipContent>
-          </Tooltip>
+          <SourceSelectorTrigger
+            label={`${fieldLabel} ${t('inspector.sources.select')}`}
+            description={t('inspector.sources.select')}
+            open={sourceOpen}
+            pressed={sourceKind !== 'literal'}
+            disabled={disabled}
+            container={sourcePortal}
+          />
           <DropdownMenuContent align="start" sideOffset={6} className={`w-44 min-w-44 ${selectionMenuContentClass}`} container={sourcePortal}>
             <MenuHeader>{t('inspector.sources.title')}</MenuHeader>
             {!sourceOnly && (

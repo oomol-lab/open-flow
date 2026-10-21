@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { webhookResponseDiagnostics } from '../../../../flow/common/graph.ts'
 import { createI18n } from '../i18n.ts'
 import { WebhookEditor } from './webhookEditor.tsx'
+import { WebhookHeadersEditor } from './webhookHeadersEditor.tsx'
 
 function renderWebhook(method: 'GET' | 'POST') {
   return renderToStaticMarkup(
@@ -113,6 +114,50 @@ describe('Webhook configuration', () => {
     const responseBody = markup.match(/<textarea\b[^>]*placeholder="Leave blank to return no response body\."[^>]*>/)?.[0]
     expect(origins).toContain('placeholder:text-muted-foreground/60')
     expect(responseBody).toContain('placeholder:text-muted-foreground/60')
+  })
+
+  it.each([false, true])('keeps header literals as single-line text without type controls (dynamic: %s)', (dynamic) => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <WebhookHeadersEditor
+          options={{ responseHeaders: { 'X-Text': '123' }, ...(dynamic ? { responseBody: { kind: 'workflow-outputs' as const } } : {}) }}
+          disabled={false}
+          sourceDisabled={false}
+          diagnostics={[]}
+          onChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('value="X-Text"')
+    expect(markup).toContain('value="123"')
+    expect(markup).not.toContain('<textarea')
+    expect(markup).not.toContain('type="number"')
+    expect(markup).not.toContain('role="combobox"')
+    expect(markup.includes('aria-label="Response headers source"')).toBe(dynamic)
+  })
+
+  it('shows a whole-object source without exposing saved child configuration or readonly mutation controls', () => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <WebhookHeadersEditor
+          options={{
+            responseBody: { kind: 'workflow-outputs' },
+            responseHeadersSource: { kind: 'workflow-outputs', output: 'headers' },
+            responseHeaders: { 'X-Saved': 'hidden' },
+          }}
+          outputs={{ name: 'Order result', outputDefs: [] }}
+          disabled
+          readOnly
+          sourceDisabled={false}
+          diagnostics={[]}
+          onChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup).toContain('Order result · headers')
+    expect(markup).not.toContain('X-Saved')
+    expect(markup).not.toContain('aria-label="Response headers source"')
+    expect(markup).not.toContain('Add field')
   })
 
   it('prevents configuration edits while retaining existing response values', () => {

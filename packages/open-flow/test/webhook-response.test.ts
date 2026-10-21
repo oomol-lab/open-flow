@@ -8,7 +8,7 @@ import { decodeRevision, decodeRevisionContent, encodeRevision } from '../src/fl
 import { validateFlowGraph, webhookResponseDiagnostics } from '../src/flow/common/graph.ts'
 import { inverseFlowChanges } from '../src/flow/common/inverseChanges.ts'
 import { updateOutputsDefs } from '../src/flow/common/nodeChanges.ts'
-import { webhookResponseBody, webhookResponseStatusCode } from '../src/trigger/common/webhook.ts'
+import { webhookResponseBody, webhookResponseHeaders, webhookResponseStatusCode } from '../src/trigger/common/webhook.ts'
 
 const field = { handle: 'message', jsonSchema: { type: 'string' }, nullable: false } as const
 function content(options: WebhookOptions = { responseBody: { kind: 'workflow-outputs' } }): RevisionContent {
@@ -179,6 +179,171 @@ describe('workflow HTTP response contract', () => {
     expect(webhookResponseDiagnostics({ ...graph, nodes: { ...graph.nodes, hook: bodyless.document.graph.nodes.hook! } }, 'hook')).toEqual([
       expect.objectContaining({ code: 'trigger.webhook-response-status-invalid' }),
     ])
+  })
+
+  it.each<JsonValue>(['text', '', 0, 3.5, true, false])('projects a scalar header %j without changing fixed text', (value) => {
+    expect(
+      webhookResponseHeaders(
+        { kind: 'node-results', outputs: { value } },
+        { responseHeaders: { 'x-value': 'saved', 'X-Fixed': 'kept' }, responseHeaderOutputs: { 'X-Value': 'value' } },
+      ),
+    ).toEqual({ 'X-Value': String(value), 'X-Fixed': 'kept' })
+    expect(
+      webhookResponseHeaders(
+        { kind: 'node-results', outputs: { headers: { 'X-Value': value } } },
+        {
+          responseHeadersSource: { kind: 'workflow-outputs', output: 'headers' },
+          responseHeaders: { 'X-Ignored': 'saved' },
+          responseHeaderOutputs: { 'X-Ignored': 'missing' },
+        },
+      ),
+    ).toEqual({ 'X-Value': String(value) })
+  })
+
+  it.each<JsonValue>([null, [], {}, 'bad\r\nX-Injected: value', 'bad\u0000value', '😀'])('rejects invalid or unencodable header values %j', (value) => {
+    expect(
+      webhookResponseHeaders(
+        { kind: 'node-results', outputs: { value } },
+        { responseHeaders: { 'X-Value': 'saved' }, responseHeaderOutputs: { 'X-Value': 'value' } },
+      ),
+    ).toBeUndefined()
+    expect(
+      webhookResponseHeaders({ kind: 'node-results', outputs: { 'X-Value': value } }, { responseHeadersSource: { kind: 'workflow-outputs' } }),
+    ).toBeUndefined()
+  })
+
+  it('rejects missing outputs, invalid names and case-insensitive duplicates, and permits empty headers', () => {
+    for (const result of [
+      { kind: 'node-results' },
+      { kind: 'node-results', outputs: {} },
+      { kind: 'node-results', nodes: [{ outputs: { value: 'private' } }] },
+    ])
+      expect(webhookResponseHeaders(result, { responseHeaderOutputs: { 'X-Value': 'value' } })).toBeUndefined()
+    for (const headers of [{ 'bad name': 'value' }, { 'X-Count': 1, 'x-count': 2 }])
+      expect(webhookResponseHeaders({ kind: 'node-results', outputs: headers }, { responseHeadersSource: { kind: 'workflow-outputs' } })).toBeUndefined()
+    expect(webhookResponseHeaders({ kind: 'node-results', outputs: {} }, { responseHeadersSource: { kind: 'workflow-outputs' } })).toEqual({})
+    expect(webhookResponseHeaders({}, { responseHeaders: { 'X-Fixed': 'saved' } })).toEqual({ 'X-Fixed': 'saved' })
+  })
+
+  it('checks header references and ignores inactive per-header configuration under a whole-object source', () => {
+    expect(validateFlowGraph(content({ responseBody: { kind: 'workflow-outputs' }, responseHeaderOutputs: { 'X-Message': 'message' } }))).toEqual([])
+    expect(
+      validateFlowGraph(content({ responseBody: { kind: 'workflow-outputs' }, responseHeadersSource: { kind: 'workflow-outputs', output: 'message' } })),
+    ).toContainEqual(expect.objectContaining({ code: 'trigger.webhook-response-header-output-type' }))
+    expect(
+      validateFlowGraph(
+        content({
+          responseBody: { kind: 'workflow-outputs' },
+          responseHeadersSource: { kind: 'workflow-outputs' },
+          responseHeaderOutputs: { 'bad name': 'missing' },
+        }),
+      ),
+    ).toEqual([])
+    for (const responseHeaderOutputs of [{ 'X-Missing': 'removed' }, { 'bad name': 'message' }] as readonly Readonly<Record<string, string>>[])
+      expect(validateFlowGraph(content({ responseBody: { kind: 'workflow-outputs' }, responseHeaderOutputs }))).not.toEqual([])
+    expect(validateFlowGraph(content({ responseHeaderOutputs: { 'X-Message': 'message' } }))).toContainEqual(
+      expect.objectContaining({ code: 'trigger.webhook-response-headers-source' }),
+    )
+  })
+
+  it('renames whole-object and inactive per-header references together and retains removed references', () => {
+    const original = content({
+      responseBody: { kind: 'workflow-outputs' },
+      responseHeaders: { 'X-Message': 'saved' },
+      responseHeadersSource: { kind: 'workflow-outputs', output: 'message' },
+      responseHeaderOutputs: { 'X-Message': 'message' },
+    })
+    const changes = updateOutputsDefs(original, 'outputs', [{ ...field, handle: 'renamed' }])
+    const renamed = applyFlowChanges(original, changes)
+    expect(authoringNode(renamed, 'hook').config).toMatchObject({
+      options: { responseHeadersSource: { output: 'renamed' }, responseHeaderOutputs: { 'X-Message': 'renamed' } },
+    })
+    expect(applyFlowChanges(renamed, inverseFlowChanges(original, changes))).toEqual(original)
+    const removed = applyFlowChanges(original, updateOutputsDefs(original, 'outputs', []))
+    expect(authoringNode(removed, 'hook').config).toMatchObject({
+      options: { responseHeadersSource: { output: 'message' }, responseHeaderOutputs: { 'X-Message': 'message' } },
+    })
+    expect(validateFlowGraph(removed)).toContainEqual(expect.objectContaining({ code: 'trigger.webhook-response-header-output-missing' }))
+  })
+
+  it('creates, reads and clears header sources through public authoring and enforces the model boundary', async () => {
+    const original = content({ responseData: 'saved', responseHeaders: { 'X-Fixed': 'kept' } })
+    const created = await compileAuthoring(
+      original,
+      {
+        baseRevision: 'base',
+        requestId: 'headers',
+        edits: [
+          {
+            op: 'node.update',
+            node: 'hook',
+            set: {
+              config: {
+                options: {
+                  responseBody: { kind: 'workflow-outputs' },
+                  responseHeadersSource: { kind: 'workflow-outputs' },
+                  responseHeaderOutputs: { 'X-Message': 'message' },
+                },
+              },
+            },
+          },
+        ],
+      },
+      host,
+    )
+    const updated = applyFlowChanges(original, created.operations)
+    expect(authoringNode(updated, 'hook').config).toMatchObject({
+      options: {
+        responseHeaders: { 'X-Fixed': 'kept' },
+        responseHeadersSource: { kind: 'workflow-outputs' },
+        responseHeaderOutputs: { 'X-Message': 'message' },
+      },
+    })
+    expect(decodeRevision(encodeRevision(updated))).toEqual(updated)
+    for (const options of [{ responseHeadersSource: { kind: 'workflow-outputs' } }, { responseHeaderOutputs: { 'X-Message': 'message' } }] as const)
+      expect(() => decodeRevisionContent({ ...content(options), modelVersion: 9 })).toThrow('version 10')
+    const merged = applyFlowChanges(
+      updated,
+      (
+        await compileAuthoring(
+          updated,
+          {
+            baseRevision: 'base',
+            requestId: 'update-headers',
+            edits: [{ op: 'node.update', node: 'hook', set: { config: { options: { responseBody: { timeoutMs: 2000 } } } } }],
+          },
+          host,
+        )
+      ).operations,
+    )
+    expect(authoringNode(merged, 'hook').config).toMatchObject({
+      options: {
+        responseBody: { timeoutMs: 2000 },
+        responseHeaders: { 'X-Fixed': 'kept' },
+        responseHeadersSource: { kind: 'workflow-outputs' },
+        responseHeaderOutputs: { 'X-Message': 'message' },
+      },
+    })
+    const cleared = await compileAuthoring(
+      merged,
+      {
+        baseRevision: 'base',
+        requestId: 'clear',
+        edits: [
+          {
+            op: 'node.update',
+            node: 'hook',
+            clear: [
+              ['config', 'options', 'responseBody'],
+              ['config', 'options', 'responseHeadersSource'],
+              ['config', 'options', 'responseHeaderOutputs'],
+            ],
+          },
+        ],
+      },
+      host,
+    )
+    expect(applyFlowChanges(merged, cleared.operations)).toEqual(original)
   })
 
   it('renames all Webhook selections atomically and leaves deleted fields diagnosable', () => {

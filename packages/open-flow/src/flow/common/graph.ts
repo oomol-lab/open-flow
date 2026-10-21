@@ -22,7 +22,14 @@ import { nodeSystemOutputPorts, supportsNodeErrorHandling } from './errorHandlin
 import { supportsNodeRetry, retryConfigurationSchema } from './retry.ts'
 import { schemaObject, matchesSchema, comparePorts, portsAssignable, variableInputCompatible, hasRetiredRef } from './schema.ts'
 import { sourceFields, sourcePort, sourceOutputLabel } from './sourceField.ts'
-import { webhookResponseAllowsBody, webhookStatusCodePort } from './webhookResponse.ts'
+import {
+  webhookHeaderNameIssue,
+  webhookHeaderValuePort,
+  webhookHeadersPort,
+  webhookResponseAllowsBody,
+  webhookStatusCodePort,
+  workflowOutputsPort,
+} from './webhookResponse.ts'
 
 export function isResolutionNode(node: GraphNode | undefined): node is Extract<GraphNode, { readonly kind: 'approval' | 'wait' }> {
   return node?.kind == 'approval' || node?.kind == 'wait'
@@ -42,11 +49,34 @@ export function webhookResponseDiagnostics(graph: Graph, triggerId: string, path
   if (trigger?.kind != 'webhook') return []
   const statusOutput = trigger.options?.responseStatusCodeOutput
   const statusPath = `${path}/options/responseStatusCodeOutput`
-  if (trigger.options?.responseBody == null)
-    return statusOutput == null
-      ? []
-      : [graphDiagnostic('trigger.webhook-response-status-source', 'Choose workflow outputs as the response source to use a status output.', statusPath)]
   const diagnostics: Diagnostic[] = []
+  const headersSource = trigger.options?.responseHeadersSource
+  const headerOutputs = trigger.options?.responseHeaderOutputs
+  const headersPath = `${path}/options/${headersSource == null ? 'responseHeaderOutputs' : 'responseHeadersSource'}`
+  if (trigger.options?.responseBody == null) {
+    if (statusOutput != null)
+      diagnostics.push(
+        graphDiagnostic('trigger.webhook-response-status-source', 'Choose workflow outputs as the response source to use a status output.', statusPath),
+      )
+    if (headersSource != null || headerOutputs != null)
+      diagnostics.push(
+        graphDiagnostic('trigger.webhook-response-headers-source', 'Choose workflow outputs as the response source to use dynamic headers.', headersPath),
+      )
+    return diagnostics
+  }
+  if (headersSource == null) {
+    for (const [headers, location] of [
+      [trigger.options.responseHeaders, `${path}/options/responseHeaders`],
+      [headerOutputs, headersPath],
+    ] as const) {
+      const names: string[] = []
+      for (const name of Object.keys(headers ?? {})) {
+        if (webhookHeaderNameIssue(name, names) != null)
+          diagnostics.push(graphDiagnostic('trigger.webhook-response-header-name', 'Use valid, unique HTTP header names.', location))
+        names.push(name)
+      }
+    }
+  }
   const responsePath = `${path}/options/responseBody`
   const outputs = Object.entries(graph.nodes).filter(([, node]) => node.kind == 'outputs')
   if (outputs.length == 0) {
@@ -74,6 +104,26 @@ export function webhookResponseDiagnostics(graph: Graph, triggerId: string, path
         diagnostics.push(
           graphDiagnostic('trigger.webhook-response-status-output-type', 'Choose a numeric workflow output for the response status code.', statusPath),
         )
+    }
+    if (output[1].kind == 'outputs') {
+      const fields = output[1].outputDefs
+      const checkHeaderSource = (headerField: string | undefined, target: PortDefinition, location: string) => {
+        const port = headerField == null ? workflowOutputsPort(fields) : fields.find((candidate) => candidate.handle == headerField)
+        if (port == null)
+          diagnostics.push(
+            graphDiagnostic('trigger.webhook-response-header-output-missing', `Workflow output "${headerField}" does not exist.`, location, {
+              output: headerField!,
+            }),
+          )
+        else if (!portsAssignable(port, target))
+          diagnostics.push(
+            graphDiagnostic('trigger.webhook-response-header-output-type', 'Choose a compatible workflow output for the response headers.', location),
+          )
+      }
+      if (headersSource != null) checkHeaderSource(headersSource.output, webhookHeadersPort, headersPath)
+      else
+        for (const [name, headerField] of Object.entries(headerOutputs ?? {}))
+          checkHeaderSource(headerField, webhookHeaderValuePort, `${headersPath}/${name.replaceAll('~', '~0').replaceAll('/', '~1')}`)
     }
   }
   if (statusOutput == null && !webhookResponseAllowsBody(trigger.options.responseStatusCode ?? 200))

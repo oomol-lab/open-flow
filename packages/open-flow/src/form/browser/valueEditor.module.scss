@@ -206,6 +206,11 @@ $feedback-focus: ':has(#{$feedback-targets})';
   --field-row-gap: 4px;
   row-gap: var(--field-row-gap);
 }
+.root[data-header][data-value-only] {
+  --field-value-column: handle / end;
+  --field-value-row: 1;
+  --field-branch-row: 2;
+}
 .header {
   display: contents;
 }
@@ -292,6 +297,9 @@ $feedback-focus: ':has(#{$feedback-targets})';
   }
   &:has(> .summary[aria-expanded='true']) > .valueAddon {
     background: color-mix(in srgb, var(--ui-foreground) 3%, var(--ui-background));
+  }
+  > .valueAddon:has([data-source-trigger]:is(:hover, [aria-expanded='true'])) {
+    background: var(--ui-control-hover-background, var(--ui-muted));
   }
 }
 // Suffix uses the same attached base as the Source prefix, mirrored at the right edge.
@@ -458,7 +466,7 @@ $feedback-focus: ':has(#{$feedback-targets})';
 }
 
 @container value-fields (max-width: #{fieldLayout.$wrap-width}) {
-  .root[data-header][data-expansion='branch']:not([data-array-child], [data-output]) > .body {
+  .root[data-header][data-expansion='branch']:not([data-array-child], [data-output], [data-value-only]) > .body {
     --branch-extension: calc(var(--field-control-height) + var(--field-row-gap));
   }
 }

@@ -282,10 +282,11 @@ export function NodeInspector({
   const disabled = readOnly || temporarilyDisabled || store == null
   const t = useTranslate()
   const content = useRef<HTMLDivElement>(null)
-  const outputNode =
+  const outputNodes =
     selection?.kind === 'trigger' && selection.trigger.kind === 'webhook'
-      ? Object.entries(revision.graph().nodes).find(([, node]) => node.kind === 'outputs')
-      : undefined
+      ? Object.entries(revision.graph().nodes).filter(([, node]) => node.kind === 'outputs')
+      : []
+  const outputNode = outputNodes.length === 1 ? outputNodes[0] : undefined
   const providerTrigger =
     selection?.kind === 'trigger' && (selection.trigger.kind === 'integration' || selection.trigger.kind === 'poll') ? selection.trigger : undefined
   const providerDisplay = providerTrigger == null ? undefined : triggerDisplays?.[providerTrigger.definition.key]

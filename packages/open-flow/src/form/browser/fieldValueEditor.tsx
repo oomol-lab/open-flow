@@ -5,6 +5,7 @@ import type { FieldValueDeletion } from '../common/fieldValue.ts'
 import type { ValueType } from '../common/value.ts'
 import type { FieldRowPresentation } from './fieldLayout.tsx'
 import type { ValueControlProps } from './valueControlProps.ts'
+import type { ValueError } from './valueFeedback.ts'
 
 import { useCallback, useContext, useEffect, useId, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
@@ -44,6 +45,7 @@ export interface FieldValueEditorProps extends ValueControlProps, FieldRowPresen
   readonly compact?: boolean
   readonly onDefinitionChange?: (schema: unknown, value: unknown, deletion?: FieldValueDeletion) => void
   readonly validationError?: string
+  readonly validationErrors?: readonly ValueError[]
   readonly nullable?: boolean
   readonly onInvalidChange?: (invalid: boolean) => void
   readonly valueAddon?: ReactNode
@@ -58,6 +60,10 @@ export interface FieldValueEditorProps extends ValueControlProps, FieldRowPresen
   readonly onReset?: () => void
   readonly arrayChild?: boolean
   readonly objectChild?: boolean
+  /** Compose specialized object values without giving the form a graph or persistence dependency. */
+  readonly renderObjectField?: (name: string, props: FieldValueEditorProps) => ReactNode
+  readonly hideChildTypes?: boolean
+  readonly validateObjectFieldName?: (name: string, current: string) => boolean
   readonly options?: ReactNode
 }
 
@@ -66,6 +72,7 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
   const sorting = useContext(FieldSorting)
   const props = suppliedProps.readOnly ? { ...suppliedProps, disabled: true } : suppliedProps
   const { schema, value, onChange, label, nullable, disabled, onDraftIssue, depth = 0 } = props
+  const hasHeader = props.header != null || props.valueOnly === true
   const t = useTranslate()
   const id = useId()
   const valueEditable = props.valueEditable !== false
@@ -77,11 +84,11 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
   const editorSchema = showDataType ? (selectedEditorSchema ?? defaultValueEditorSchema(schema)) : schema
   const editorProps = { ...props, schema: editorSchema }
   const source = objectValue(editorSchema) ?? {}
-  const compactValue = props.compact === true || props.header != null || props.valueAddon != null || props.valueSuffix != null || showDataType
+  const compactValue = props.compact === true || hasHeader || props.valueAddon != null || props.valueSuffix != null || showDataType
   const state = fieldValueState(schema, value, nullable)
   const { presence, missing, invalidNull } = state
   const shape = fieldValueShape(editorSchema, value, {
-    compactCollection: compactValue && props.header == null && !showDataType,
+    compactCollection: compactValue && !hasHeader && !showDataType,
     objectChild: props.objectChild,
     depth,
   })
@@ -140,6 +147,7 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
               ? [{ instancePath: '', message: t('valueEditor.required') }]
               : (issues?.errors ?? []).map((error) => ({ instancePath: error.instancePath, message: error.message ?? t('valueEditor.schema') }))
   if (!errors.length && props.validationError && !draftInvalid && props.editor === undefined) errors.push({ instancePath: '', message: props.validationError })
+  if (!draftInvalid && props.editor === undefined && props.validationErrors != null) errors.push(...props.validationErrors)
   if (!errors.length && props.invalid && !draftInvalid && props.editor === undefined) errors.push({ instancePath: '', message: t('valueEditor.schema') })
   const { expanded, bodyMounted, setExpanded } = useFieldExpansion(
     {
@@ -201,7 +209,7 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
   const canReset = inlineTools && props.onReset != null && (showUnset || (!!nullable && nullControl))
   const canClear = inlineTools && state.canClear
   const canToggleJson = inlineTools && expanded && shape.collection && presence === 'value'
-  const arrayDefinition = !showDataType && props.header != null && source.type === 'array' && !Array.isArray(source.items) && !choiceOptions
+  const arrayDefinition = !showDataType && hasHeader && source.type === 'array' && !Array.isArray(source.items) && !choiceOptions
   const changeValueEditor = (nextSchema: Record<string, unknown>) => {
     if (isUnconstrainedSchema(nextSchema)) {
       setSelectedEditorSchema(undefined)
@@ -252,7 +260,7 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
       ? 26
       : !nullControl && type === 'boolean' && !expandable && !showUnset
         ? 30
-        : expandable && compactValue && props.header == null && !needsCreation
+        : expandable && compactValue && !hasHeader && !needsCreation
           ? 26
           : 0
   const createValue =
@@ -319,7 +327,7 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
               JSON
             </Button>
           )}
-          {props.header != null && !complex && type === 'string' && presence === 'unset' && (
+          {hasHeader && !complex && type === 'string' && presence === 'unset' && (
             <Button type="button" size="xs" variant="ghost" disabled={disabled} onClick={() => onChange('')}>
               <i aria-hidden="true" className="i-lucide-light:text-cursor-input" />
               {t('valueEditor.emptyString')}
@@ -481,6 +489,7 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
     <FieldRow
       label={label}
       header={props.header}
+      valueOnly={props.valueOnly}
       leadingControl={props.leadingControl}
       disclosureContent={props.disclosureContent}
       layout={props.layout}
@@ -494,7 +503,7 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
       aria-label={label}
       aria-describedby={messages.length ? `${id}-error` : undefined}
       ref={setContainer}
-      data-inline={(props.hideOptions && !props.header) || undefined}
+      data-inline={(props.hideOptions && !hasHeader) || undefined}
       data-compact={props.compact || undefined}
       data-value-tools={canReset || canClear || canToggleJson || (inlineExpansion && hasExpandedContent) || undefined}
       data-array-child={props.arrayChild || undefined}
@@ -508,7 +517,6 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
           '--value-suffix-width': `${valueSuffix}px`,
         } as CSSProperties
       }
-      data-header={props.header != null || undefined}
       data-expansion={expansionPlacement}
       data-value-addon={startAddon != null || undefined}
       data-value-suffix={endAddon != null || undefined}
@@ -535,7 +543,7 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
           aria-invalid={summaryInvalid}
           aria-controls={`${id}-body`}
           trailing={
-            !inlineExpansion && props.header == null && hasExpandedContent && !needsCreation ? (
+            !inlineExpansion && !hasHeader && hasExpandedContent && !needsCreation ? (
               <SelectChevron className={expanded ? 'rotate-180' : undefined} />
             ) : undefined
           }
@@ -590,7 +598,7 @@ export function FieldValueEditor(suppliedProps: FieldValueEditorProps) {
         <div className={styles.options}>
           {props.actions}
           {!props.hideOptions &&
-            (props.options && props.header != null && (props.layout === 'values' || props.layout === 'ports') ? (
+            (props.options && hasHeader && (props.layout === 'values' || props.layout === 'ports') ? (
               props.options
             ) : (
               <Popover open={optionsOpen} onOpenChange={setOptionsOpen}>

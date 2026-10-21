@@ -899,6 +899,10 @@
         "webhook-response-status-invalid": "請選擇允許回應本文的狀態碼。",
         "webhook-response-status-source": "回應來源設為工作流程輸出後，才能引用狀態碼欄位。",
         "webhook-response-status-output-missing": "狀態碼引用的工作流程輸出欄位「{{output}}」不存在。",
+        "webhook-response-headers-source": "回應來源選擇工作流程輸出後，才能引用輸出作為回應標頭。",
+        "webhook-response-header-name": "請輸入有效且不重複的 HTTP 回應標頭名稱。",
+        "webhook-response-header-output-missing": "工作流程輸出「{{output}}」不存在。",
+        "webhook-response-header-output-type": "請選擇文字、數值、布林值，或僅包含這些值的物件。",
         "webhook-response-status-output-type": "請選擇數字類型的工作流程輸出欄位作為狀態碼。"
       },
       "leina": {
@@ -1107,6 +1111,7 @@
     "webhookHeaderName": "標頭名稱",
     "webhookHeaderNameDuplicate": "標頭名稱不可重複。",
     "webhookHeaderNameInvalid": "請輸入有效的 HTTP 標頭名稱。",
+    "webhookHeadersSource": "回應標頭來源",
     "webhookHeaders": "回應標頭",
     "webhookHeaderValue": "標頭值",
     "webhookMethod": "請求方法",

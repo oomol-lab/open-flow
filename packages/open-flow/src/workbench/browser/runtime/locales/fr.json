@@ -899,6 +899,10 @@
         "webhook-response-status-invalid": "Choisissez un statut autorisant un corps de réponse.",
         "webhook-response-status-source": "Choisissez les sorties du workflow comme source de réponse pour utiliser un champ de statut.",
         "webhook-response-status-output-missing": "La sortie de statut « {{output}} » n’existe pas.",
+        "webhook-response-headers-source": "Choisissez les sorties du workflow comme source de réponse pour utiliser des en-têtes dynamiques.",
+        "webhook-response-header-name": "Utilisez des noms d’en-tête HTTP valides et uniques.",
+        "webhook-response-header-output-missing": "La sortie du workflow « {{output}} » n’existe pas.",
+        "webhook-response-header-output-type": "Choisissez du texte, un nombre, un booléen ou un objet contenant uniquement ces valeurs.",
         "webhook-response-status-output-type": "Choisissez une sortie numérique du workflow pour le code de statut."
       },
       "leina": {
@@ -1107,6 +1111,7 @@
     "webhookHeaderName": "Nom de l'en-tête",
     "webhookHeaderNameDuplicate": "Les noms d'en-tête doivent être uniques.",
     "webhookHeaderNameInvalid": "Saisissez un nom d'en-tête HTTP valide.",
+    "webhookHeadersSource": "Source des en-têtes de réponse",
     "webhookHeaders": "En-têtes de réponse",
     "webhookHeaderValue": "Valeur de l'en-tête",
     "webhookMethod": "Méthode de requête",
