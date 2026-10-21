@@ -194,11 +194,11 @@ export class ControlService {
     }
   }
 
-  async listEventSources(flowId?: string) {
+  async listEventSources(flowId?: string, signal?: AbortSignal) {
     if (this.eventSources == null) throw new ControlError(controlErrorCode.eventSourceInvalid, 'Event sources are unavailable.')
-    if (flowId == null) return this.eventSources.list()
+    if (flowId == null) return this.eventSources.list(undefined, signal)
     const teamId = (await this.resolveConnectorScope(flowId)) ?? null
-    return { ...(await this.eventSources.list(teamId)), teamId }
+    return { ...(await this.eventSources.list(teamId, signal)), teamId }
   }
 
   async listEventSourceConnections(teamId: string | undefined, signal: AbortSignal, kind = 'feishu') {
@@ -285,7 +285,7 @@ export class ControlService {
     const definition = providerDefinitions.find((item) => item.snapshot.key == trigger.definition.key)
     if (definition != null && 'eventSource' in definition && definition.eventSource != null) {
       if (trigger.connectionId == null) throw new ControlError(serverErrorCode.connectorConnectionRequired, 'Select a Connection first.')
-      const sources = (await this.listEventSources(flowId)).sources.filter(
+      const sources = (await this.listEventSources(flowId, signal)).sources.filter(
         (source) => source.connectionId == trigger.connectionId && source.provider == trigger.definition.provider,
       )
       if (field == 'sourceId') return sources.map((source) => ({ value: source.sourceId, label: source.name }))

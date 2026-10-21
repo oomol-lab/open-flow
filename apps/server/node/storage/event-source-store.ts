@@ -5,9 +5,10 @@ import type { DatabaseSync } from 'node:sqlite'
 
 import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { eventSourceDefinition, sourceReady, sourceView } from '@oomol-lab/open-flow/event-source'
+import { SourceIdentityError, eventSourceDefinition, sourceReady, sourceView } from '@oomol-lab/open-flow/event-source'
 import { resolveTriggerConfig } from '@oomol-lab/open-flow/integration-trigger'
 import { randomUUID } from 'node:crypto'
+import { ZodError } from 'zod'
 import { ControlError } from '../error.ts'
 
 const sourceColumns = `source_id AS sourceId, revision, name, kind, provider, external_identity AS identity,
@@ -84,7 +85,8 @@ export class EventSourceStore {
     if (!eventSourceDefinition(source.kind).applicationIngress) return source
     const app = this.#database
       .prepare('SELECT signing_secret AS secret, verified_at AS verifiedAt FROM event_source_apps WHERE kind = ? AND app_id = ?')
-      .get(source.kind, String(source.config.appId)) as { secret: string; verifiedAt: number | null }
+      .get(source.kind, String(source.config.appId)) as { secret: string; verifiedAt: number | null } | undefined
+    if (app == null) throw new SourceIdentityError('The source application is missing.')
     const projection = source.state.projection as { view: Record<string, import('@oomol-lab/open-flow/flow-change').JsonValue>; ready: boolean } | undefined
     return {
       ...source,
@@ -112,17 +114,31 @@ export class EventSourceStore {
     return rows.map((row) => this.#source(row))
   }
 
-  unprojected(): readonly StoredEventSource[] {
-    return (
-      this.#database
-        .prepare(`SELECT ${sourceColumns} FROM event_sources WHERE json_extract(state_json, '$.projection') IS NULL`)
-        .all() as unknown as SourceRow[]
-    ).map((row) => this.#source(row))
+  unprojected(teamId?: string | null): readonly string[] {
+    return this.#database
+      .prepare(
+        `SELECT source_id AS sourceId FROM event_sources WHERE json_extract(state_json, '$.projection') IS NULL${teamId === undefined ? '' : ' AND team_id IS ?'}`,
+      )
+      .all(...(teamId === undefined ? [] : [teamId]))
+      .map((row) => String(row.sourceId))
   }
 
   list(origin: string | undefined, teamId?: string | null): readonly EventSource[] {
     const rows = this.#database.prepare(`SELECT ${sourceColumns} FROM event_sources ORDER BY name, source_id`).all() as unknown as SourceRow[]
-    return rows.filter((row) => teamId === undefined || row.teamId === teamId).map((row) => this.view(this.#source(row), origin))
+    const result: EventSource[] = []
+    for (const row of rows) {
+      if (teamId !== undefined && row.teamId !== teamId) continue
+      try {
+        result.push(this.view(this.#source(row), origin))
+      } catch (error) {
+        if (!(error instanceof SourceIdentityError || error instanceof ZodError || error instanceof SyntaxError)) throw error
+        result.push({
+          ...this.view({ ...row, config: {}, secrets: {}, state: {}, eventTypes: [] }, undefined),
+          lastError: 'Stored source details are invalid or unsupported. Repair or recreate this event source.',
+        })
+      }
+    }
+    return result
   }
 
   view(row: StoredEventSource, origin: string | undefined): EventSource {

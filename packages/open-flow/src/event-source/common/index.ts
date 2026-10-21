@@ -2,14 +2,14 @@ import type { EventSourceDefinition, SourceConfiguration } from './definition.ts
 
 import { z } from 'zod'
 import { eventSourceViewSchema } from '../../control/common/eventSources.ts'
-import catalog from '../../trigger/providers/catalog.generated.json' with { type: 'json' }
+import catalog from './catalog.generated.json' with { type: 'json' }
 import { SourceIdentityError } from './definition.ts'
 
 export type { EventSourceDefinition, SourceConfiguration, SourceEvent, SourceSubscription, SourceOperation } from './definition.ts'
 export { SourceIdentityError } from './definition.ts'
 
 export function eventSourceDefinition(kind: string): EventSourceDefinition {
-  for (const entry of catalog) if ('source' in entry && entry.source != null && entry.source.kind === kind) return entry.source
+  for (const entry of catalog) if (entry.kind === kind) return entry
   throw new SourceIdentityError(`Unknown event source kind: ${kind}`)
 }
 

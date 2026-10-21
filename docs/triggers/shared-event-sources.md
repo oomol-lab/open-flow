@@ -68,3 +68,10 @@ include the Connector projection in `state.projection`; the projection contains 
 view, readiness, and optional expiry. List hydration isolates individual inspection failures
 and preserves concurrent configuration updates. Unknown legacy details remain visible and
 are retried on the next list request.
+
+Projection views always include `appId`, `manageSubscriptions`,
+`verificationTokenConfigured`, `encryptKeyConfigured`, and `verifiedAt`. An explicit
+`false` means the feature is disabled or the secret is not configured; `null` means
+unknown. Missing required keys violate the protocol. Both Connector implementations
+currently return explicit booleans for every provider, including non-Feishu sources.
+The list's per-source fallback does not make invalid projections ready for publication.

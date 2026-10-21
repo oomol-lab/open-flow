@@ -1432,7 +1432,8 @@
     "signingSecret": "署名シークレット",
     "webhookSecret": "Webhook シークレットトークン",
     "encryptKey": "暗号化キー",
-    "clientSecret": "クライアントシークレット"
+    "clientSecret": "クライアントシークレット",
+    "identityUnknown": "一時的に取得できません"
   },
   "connectionUsage": {
     "title": "接続の概要",

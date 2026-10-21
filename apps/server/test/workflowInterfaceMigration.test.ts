@@ -240,7 +240,7 @@ it.each([false, true])('snapshots historical Task revisions without rewriting th
 })
 
 it.each(['pending', 'failed'] as const)('preserves historical Task revisions with %s publication operations', async (status) => {
-  const { file, store, seed, closeLegacy } = await fixture()
+  const { file, database, store, seed, closeLegacy } = await fixture()
   const historical = seed(
     'historical',
     {
@@ -250,13 +250,35 @@ it.each(['pending', 'failed'] as const)('preserves historical Task revisions wit
     },
     5,
   )
-  const accepted = store.publications.acceptPublishOperation(historical)
+  const accepted = store.publications.acceptPublishOperation({
+    ...historical,
+    integrations: [
+      {
+        connectionId: 'connection',
+        reconcileAt: Date.now(),
+        triggerNodeId: 'integration',
+        triggerJson: JSON.stringify({ kind: 'integration', definition: { key: 'github.on_repo_event' } }),
+      },
+    ],
+    polls: [{ connectionId: 'connection', nextAt: Date.now(), scheduleJson: '[]', triggerNodeId: 'poll', triggerJson: '{}' }],
+  })
   if (accepted.kind !== 'accepted') throw new Error('Expected accepted operation')
   if (status === 'failed') store.publications.failPublishOperation(accepted.operation.operationId, { code: 'flow.invalid', message: 'Historical failure' })
+  expect(database.connection.prepare('SELECT COUNT(*) AS count FROM publish_work').get()).toEqual({ count: 2 })
   closeLegacy()
   const upgraded = Database.open(file)
   try {
+    const migrated = new Store(upgraded, Date.now)
+    const operationId = accepted.operation.operationId
     expect(upgraded.connection.prepare('SELECT status FROM publish_operations').get()).toEqual({ status: 'failed' })
+    const candidate = migrated.integrations.candidate(operationId, 'integration')!
+    expect(candidate.status).toBe('cleanup')
+    expect(upgraded.connection.prepare('SELECT COUNT(*) AS count FROM poll_candidates').get()).toEqual({ count: 0 })
+    expect(migrated.publications.nextPublishOperation(Date.now())).toBeUndefined()
+    expect(migrated.publications.prunePublishOperations(Number.MAX_SAFE_INTEGER, 10)).toBe(0)
+    expect(migrated.integrations.deleteCandidate(candidate)).toBe(true)
+    expect(migrated.publications.prunePublishOperations(Number.MAX_SAFE_INTEGER, 10)).toBe(1)
+    expect(upgraded.connection.prepare('SELECT COUNT(*) AS count FROM publish_work').get()).toEqual({ count: 0 })
     expect(new RevisionStore(upgraded.connection).read('historical')).toMatchObject({ content: historical.content, digest: historical.revisionDigest })
   } finally {
     upgraded.close()

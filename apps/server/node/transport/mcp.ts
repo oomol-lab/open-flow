@@ -202,12 +202,15 @@ function createServer(service: ServerService, actorId: string, logger: Logger, e
   register('connector_connections', mcpTools.connector_connections, async ({ serviceId, flowId }, context) => ({
     connections: await control.listConnectorConnections(serviceId, flowId, context.mcpReq.signal),
   }))
-  register('event_source_list', mcpTools.event_source_list, async () => {
-    const sources = await control.listEventSources()
+  register('event_source_list', mcpTools.event_source_list, async (_, context) => {
+    const sources = await control.listEventSources(undefined, context.mcpReq.signal)
     return {
       ...sources,
       ...(sources.sources.length == 0
-        ? { guidance: 'No event sources are visible to this identity. Open Workbench to create and verify a Feishu event source, then list again.' }
+        ? {
+            guidance:
+              'No event sources are visible to this identity. Open Workbench to create and verify an event source for the required provider, then list again.',
+          }
         : {}),
     }
   })

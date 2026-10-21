@@ -39,15 +39,34 @@ export class EventSourceRuntime {
     this.#wake = wake
   }
 
-  async list(teamId?: string | null): Promise<{ readonly version: 1; readonly sources: readonly EventSource[] }> {
-    // Failed projections stay visible with unknown details; a later list request retries them.
-    await Promise.allSettled(
-      this.#store.eventSources
-        .unprojected()
-        .filter((source) => teamId === undefined || source.teamId === teamId)
-        .map((source) => this.#hydrate(source)),
-    )
-    return { version: 1, sources: this.#store.eventSources.list(this.#options()?.publicOrigin, teamId) }
+  async list(teamId?: string | null, signal?: AbortSignal): Promise<{ readonly version: 1; readonly sources: readonly EventSource[] }> {
+    signal?.throwIfAborted()
+    const pending = this.#store.eventSources.unprojected(teamId)[Symbol.iterator]()
+    const budget = AbortSignal.timeout(3_000)
+    const inspectionSignal = signal == null ? budget : AbortSignal.any([signal, budget])
+    const workers = Array.from({ length: 4 }, async () => {
+      while (!inspectionSignal.aborted) {
+        const next = pending.next()
+        if (next.done) return
+        try {
+          const source = this.#store.eventSources.get(next.value)
+          if (source != null) await this.#hydrate(source, inspectionSignal)
+        } catch {
+          // Unavailable sources retain their identity and error state in the list view.
+        }
+      }
+    })
+    const aborted = Promise.withResolvers<void>()
+    const stop = () => aborted.resolve()
+    if (inspectionSignal.aborted) stop()
+    else inspectionSignal.addEventListener('abort', stop, { once: true })
+    try {
+      await Promise.race([Promise.all(workers), aborted.promise])
+      signal?.throwIfAborted()
+      return { version: 1, sources: this.#store.eventSources.list(this.#options()?.publicOrigin, teamId) }
+    } finally {
+      inspectionSignal.removeEventListener('abort', stop)
+    }
   }
 
   async create(input: CreateEventSource, signal: AbortSignal): Promise<EventSource> {
@@ -358,17 +377,18 @@ export class EventSourceRuntime {
     }
   }
 
-  async #hydrate(source: StoredEventSource): Promise<StoredEventSource> {
+  async #hydrate(source: StoredEventSource, signal = AbortSignal.timeout(30_000)): Promise<StoredEventSource> {
     if (source.state.projection != null) return source
     const inspected = sourceResultSchema.parse(
       await this.#execute(
         source.kind,
         source.connectionId,
         { operation: 'source', request: { action: 'inspect', source } },
-        AbortSignal.timeout(30_000),
+        signal,
         this.#operatorContext(source.provider, source.teamId ?? undefined),
       ),
     )
+    signal.throwIfAborted()
     this.#store.eventSources.saveState(source, inspected.source.state)
     const current = this.#store.eventSources.get(source.sourceId)
     if (current == null) throw new TransientIntegrationError('The source was deleted during protocol initialization.')

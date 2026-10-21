@@ -1,0 +1,65 @@
+[
+  {
+    "key": "feishu_app_bot.on_event",
+    "kind": "feishu",
+    "provider": "feishu_app_bot",
+    "triggerId": "feishu_app_bot.on_event",
+    "maximumBodyBytes": 65536,
+    "applicationIngress": false,
+    "managed": false
+  },
+  {
+    "key": "fireflies.on_meeting_ready",
+    "kind": "fireflies",
+    "provider": "fireflies",
+    "triggerId": "fireflies.on_meeting_ready",
+    "maximumBodyBytes": 65536,
+    "applicationIngress": false,
+    "managed": false
+  },
+  {
+    "key": "intercom.on_conversation_event",
+    "kind": "intercom",
+    "provider": "intercom",
+    "triggerId": "intercom.on_conversation_event",
+    "maximumBodyBytes": 65536,
+    "applicationIngress": true,
+    "managed": false
+  },
+  {
+    "key": "jira.on_issue_event",
+    "kind": "jira",
+    "provider": "jira",
+    "triggerId": "jira.on_issue_event",
+    "maximumBodyBytes": 65536,
+    "applicationIngress": false,
+    "managed": true
+  },
+  {
+    "key": "sentry.on_issue_alert",
+    "kind": "sentry",
+    "provider": "sentry",
+    "triggerId": "sentry.on_issue_alert",
+    "maximumBodyBytes": 65536,
+    "applicationIngress": true,
+    "managed": false
+  },
+  {
+    "key": "slackbot.on_event",
+    "kind": "slack",
+    "provider": "slackbot",
+    "triggerId": "slackbot.on_event",
+    "maximumBodyBytes": 65536,
+    "applicationIngress": true,
+    "managed": false
+  },
+  {
+    "key": "zoom.on_recording_ready",
+    "kind": "zoom",
+    "provider": "zoom",
+    "triggerId": "zoom.on_recording_ready",
+    "maximumBodyBytes": 65536,
+    "applicationIngress": true,
+    "managed": false
+  }
+]

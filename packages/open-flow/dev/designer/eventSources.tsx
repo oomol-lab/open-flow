@@ -313,6 +313,23 @@ function SetupStates({ language, dark }: { language: Parameters<FrontendStory['r
           <h2 className="mt-0 text-base font-medium">Public URL missing</h2>
           <EventSourceSetup notify={notify} source={{ ...sampleSource, endpointUrl: null }} onChange={() => {}} client={client} />
         </section>
+        <section className="rounded-lg border border-border p-4">
+          <h2 className="mt-0 text-base font-medium">Source details unavailable</h2>
+          <EventSourceSetup
+            notify={notify}
+            source={{
+              ...sampleSource,
+              appId: null,
+              endpointUrl: null,
+              manageSubscriptions: null,
+              verificationTokenConfigured: null,
+              encryptKeyConfigured: null,
+              lastError: 'Source details are unavailable. Restore Connector access and refresh to retry.',
+            }}
+            onChange={() => {}}
+            client={client}
+          />
+        </section>
       </div>
     </I18nProvider>
   )

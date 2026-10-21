@@ -147,7 +147,7 @@ function EventSources({ client, teams, onSourcesChange, notify }: Props) {
             <div>
               <h2 className="m-0 text-base leading-6 font-medium">{source.name}</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                {source.appId} ·{' '}
+                {source.appId ?? t('eventSources.identityUnknown')} ·{' '}
                 {source.provider === 'jira' && source.enabled
                   ? t(`eventSources.subscription.${source.subscriptionStatus ?? 'idle'}`)
                   : t(
@@ -471,7 +471,7 @@ export function SourceForm({
           )}
           {identified && (
             <p className="m-0 text-xs text-muted-foreground">
-              {t(source == null ? 'eventSources.accountIdentity' : 'eventSources.appId')}: <code>{appId}</code>
+              {t(source == null ? 'eventSources.accountIdentity' : 'eventSources.appId')}: <code>{appId ?? t('eventSources.identityUnknown')}</code>
             </p>
           )}
         </>
@@ -480,7 +480,7 @@ export function SourceForm({
           <div className="rounded-md bg-muted p-3 text-xs leading-5">
             <p className="m-0 font-medium">{connection?.displayName ?? source?.name}</p>
             <p className="m-0 break-all">
-              {t(source == null ? 'eventSources.accountIdentity' : 'eventSources.appId')}: {appId}
+              {t(source == null ? 'eventSources.accountIdentity' : 'eventSources.appId')}: {appId ?? t('eventSources.identityUnknown')}
             </p>
           </div>
           <Label className="flex flex-col items-stretch gap-2">

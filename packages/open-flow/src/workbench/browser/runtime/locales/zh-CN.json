@@ -1432,7 +1432,8 @@
     "signingSecret": "签名密钥",
     "webhookSecret": "Webhook 密钥令牌",
     "encryptKey": "加密密钥",
-    "clientSecret": "客户端密钥"
+    "clientSecret": "客户端密钥",
+    "identityUnknown": "暂不可用"
   },
   "connectionUsage": {
     "title": "连接概览",

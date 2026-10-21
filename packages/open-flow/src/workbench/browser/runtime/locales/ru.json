@@ -1432,7 +1432,8 @@
     "signingSecret": "Секрет подписи",
     "webhookSecret": "Секретный токен Webhook",
     "encryptKey": "Ключ шифрования",
-    "clientSecret": "Секрет клиента"
+    "clientSecret": "Секрет клиента",
+    "identityUnknown": "Временно недоступно"
   },
   "connectionUsage": {
     "title": "Обзор подключений",

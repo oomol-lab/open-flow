@@ -335,12 +335,13 @@ describe('TriggerStore', () => {
         name: 'Events',
         definition,
         connectionId: 'old-connection',
-        config: inputValues({ sourceId: 'old-source', eventTypes: [eventType] }),
+        config: inputValues({ sourceId: 'source_0123456789abcdef0123456789abcdef', eventTypes: [eventType], resource: {}, chatIds: ['legacy'] }),
       }
       return Response.json(data)
     })
     try {
       await workspace.start(flow.flowId)
+      const before = workspace.$.draft.value!.content
       expect(
         await workspace.nodes.setTriggerEventSource('linear', {
           version: 1,
@@ -373,6 +374,11 @@ describe('TriggerStore', () => {
       })
       expect(node.config).not.toHaveProperty('resource')
       expect(node.config).not.toHaveProperty('chatIds')
+      const after = workspace.$.draft.value!.content
+      await workspace.undo()
+      expect(workspace.$.draft.value!.content).toEqual(before)
+      await workspace.redo()
+      expect(workspace.$.draft.value!.content).toEqual(after)
     } finally {
       triggers.dispose()
       workspace.dispose()

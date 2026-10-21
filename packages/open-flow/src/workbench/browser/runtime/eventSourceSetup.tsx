@@ -50,7 +50,7 @@ export function EventSourceSetup({
         <li className="flex flex-col gap-2">
           <h3 className="m-0 text-sm font-medium">{t(source.provider === 'jira' ? 'eventSources.setupJira' : 'eventSources.setupCopy')}</h3>
           {source.endpointUrl == null ? (
-            <p className="m-0 text-sm text-destructive">{t('eventSources.originMissing')}</p>
+            <p className="m-0 text-sm text-destructive">{t(source.appId == null ? 'eventSources.identityUnknown' : 'eventSources.originMissing')}</p>
           ) : (
             <div className="flex items-center gap-2">
               <Input
@@ -82,7 +82,7 @@ export function EventSourceSetup({
           <h3 className="m-0 text-sm font-medium">{t(presentation.setup)}</h3>
           <p className="m-0 text-sm leading-5 text-muted-foreground">{t(presentation.setupHint)}</p>
           <p className="m-0 text-xs text-muted-foreground">
-            App ID: <code>{source.appId}</code>
+            {t('eventSources.appId')}: <code>{source.appId ?? t('eventSources.identityUnknown')}</code>
           </p>
           <a className="self-start text-sm text-primary underline underline-offset-4" href={presentation.console} target="_blank" rel="noreferrer">
             {t('eventSources.openConsole')}

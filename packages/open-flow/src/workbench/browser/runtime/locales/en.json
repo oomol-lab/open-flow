@@ -1432,7 +1432,8 @@
     "signingSecret": "Signing Secret",
     "webhookSecret": "Webhook Secret Token",
     "encryptKey": "Encrypt Key",
-    "clientSecret": "Client Secret"
+    "clientSecret": "Client Secret",
+    "identityUnknown": "Temporarily unavailable"
   },
   "connectionUsage": {
     "title": "Connection overview",

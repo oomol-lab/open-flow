@@ -121,7 +121,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
 
   app.get('/event-sources', async (context) => {
     query(context.req.raw, ['flowId'], controlErrorCode.eventSourceInvalid)
-    return response(200, await service.listEventSources(context.req.query('flowId')))
+    return response(200, await service.listEventSources(context.req.query('flowId'), context.req.raw.signal))
   })
   app.get('/event-sources/connections', async (context) => {
     query(context.req.raw, ['teamId', 'kind'], controlErrorCode.eventSourceInvalid)

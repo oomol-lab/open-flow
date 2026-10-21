@@ -1432,7 +1432,8 @@
     "signingSecret": "簽署密鑰",
     "webhookSecret": "Webhook 密鑰權杖",
     "encryptKey": "加密密鑰",
-    "clientSecret": "用戶端密鑰"
+    "clientSecret": "用戶端密鑰",
+    "identityUnknown": "暫時無法取得"
   },
   "connectionUsage": {
     "title": "連線概覽",

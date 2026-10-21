@@ -14,7 +14,7 @@ try {
   const result = spawnSync('node', [resolve(source, 'scripts/export-flow-trigger-catalog.ts'), exported], { cwd: source, stdio: 'inherit' })
   if (result.error) throw result.error
   if (result.status !== 0) throw new Error('OpenConnector Trigger catalog export failed.')
-  const entries = JSON.parse(readFileSync(exported, 'utf8')) as { snapshot: { key: string } }[]
+  const entries = JSON.parse(readFileSync(exported, 'utf8')) as { snapshot: { key: string }; source?: Record<string, unknown> }[]
   for (const key of keys) {
     if (!entries.some((entry) => entry.snapshot.key == key)) throw new Error(`Trigger not found in OpenConnector: ${key}`)
   }
@@ -27,6 +27,19 @@ try {
         ]
   selected.sort((left, right) => left.snapshot.key.localeCompare(right.snapshot.key))
   writeFileSync(target, JSON.stringify(selected, null, 2) + '\n')
+  writeFileSync(
+    resolve(import.meta.dirname, '../src/event-source/common/catalog.generated.json'),
+    JSON.stringify(
+      selected
+        .filter((entry) => entry.source != null)
+        .map((entry) => {
+          const { createSchema: _create, updateSchema: _update, ...metadata } = entry.source!
+          return Object.assign({ key: entry.snapshot.key }, metadata)
+        }),
+      null,
+      2,
+    ) + '\n',
+  )
 } finally {
   rmSync(directory, { recursive: true })
 }
