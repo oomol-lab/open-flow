@@ -1,0 +1,15 @@
+{
+  "pipedrive.on_crm_event": {
+    "displayName": "Событие сделки или контакта",
+    "description": "Событие сделки или контакта.",
+    "configInputs": {
+      "eventType": "Событие"
+    },
+    "outputs": {
+      "event": "Тип бизнес-события.",
+      "deliveryId": "ID доставки",
+      "objectId": "ID объекта",
+      "body": "Исходные данные события."
+    }
+  }
+}

@@ -106,7 +106,7 @@ export interface IntegrationReconcileResult {
 }
 
 export interface IntegrationDefinition {
-  readonly eventSource?: 'feishu'
+  readonly eventSource?: 'feishu' | 'slack' | 'intercom' | 'sentry' | 'zoom' | 'fireflies' | 'jira'
   readonly configOptions?: (context: TriggerConfigOptionsContext) => Promise<readonly TriggerConfigOption[]>
   readonly listener?: ListenerSource
   readonly initialState?: { readonly checkpoint: JsonValue; readonly subscription: Readonly<Record<string, JsonValue>> }

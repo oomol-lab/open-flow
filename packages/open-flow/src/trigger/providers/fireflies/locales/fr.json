@@ -1,0 +1,17 @@
+{
+  "fireflies.on_meeting_ready": {
+    "displayName": "Transcription ou résumé prêt",
+    "description": "Vérifie l’accès à la réunion et reçoit les événements de transcription et résumé Fireflies V2.",
+    "configInputs": {
+      "sourceId": "Source d’événements",
+      "eventTypes": "Événements"
+    },
+    "outputs": {
+      "event": "Type d’événement",
+      "deliveryId": "ID de notification",
+      "accountId": "ID du compte",
+      "meetingId": "ID de réunion / transcription",
+      "body": "Objet original"
+    }
+  }
+}

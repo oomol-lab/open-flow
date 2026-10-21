@@ -1,0 +1,17 @@
+{
+  "intercom.on_conversation_event": {
+    "displayName": "고객 대화 또는 티켓",
+    "description": "고객 대화, 답글 및 새 티켓을 수신합니다. 관리자 답글은 제외됩니다.",
+    "configInputs": {
+      "sourceId": "이벤트 소스",
+      "eventTypes": "이벤트"
+    },
+    "outputs": {
+      "event": "이벤트 유형",
+      "deliveryId": "알림 ID",
+      "workspaceId": "워크스페이스 ID",
+      "objectId": "대화 또는 티켓 ID",
+      "body": "원본 객체"
+    }
+  }
+}

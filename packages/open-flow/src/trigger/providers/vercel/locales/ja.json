@@ -1,0 +1,18 @@
+{
+  "vercel.on_deployment_event": {
+    "displayName": "デプロイの準備完了・失敗",
+    "description": "デプロイの準備完了・失敗を受信します。",
+    "configInputs": {
+      "teamId": "チーム ID",
+      "projectId": "プロジェクト ID",
+      "environment": "環境"
+    },
+    "outputs": {
+      "event": "業務イベントの種類。",
+      "deliveryId": "配信 ID",
+      "deploymentId": "デプロイ ID",
+      "projectId": "プロジェクト ID",
+      "body": "元のイベントデータ。"
+    }
+  }
+}

@@ -1,12 +1,12 @@
 import type * as Semaphore from 'effect/Semaphore'
 import type { Logger } from 'pino'
 import type { ConnectorAccessHost } from '../deployment/connector-access.ts'
-import type { ConnectorAccessContext, ConnectorHost } from '../deployment/connector.ts'
+import type { ConnectorAccessContext, ConnectorHost } from '../deployment/connector-contract.ts'
 import type { Store } from '../storage/store.ts'
 import type { Publisher } from './publication.ts'
 
 import * as Effect from 'effect/Effect'
-import { assertConnectionNotDeferred, ConnectorTaskError } from '../deployment/connector.ts'
+import { assertConnectionNotDeferred, ConnectorTaskError } from '../deployment/connector-contract.ts'
 import { errorKind } from '../logger.ts'
 
 const maintenanceBatchSize = 100

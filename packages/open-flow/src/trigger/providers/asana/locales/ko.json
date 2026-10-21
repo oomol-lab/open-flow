@@ -1,0 +1,15 @@
+{
+  "asana.on_task_event": {
+    "displayName": "프로젝트 작업 이벤트",
+    "description": "프로젝트 작업 변경과 조회 시점의 작업 상태를 수신합니다.",
+    "configInputs": {
+      "projectId": "프로젝트 ID",
+      "eventTypes": "이벤트",
+      "customFieldId": "사용자 지정 필드 ID"
+    },
+    "outputs": {
+      "projectId": "프로젝트 ID",
+      "events": "이번 전달에서 일치하는 이벤트."
+    }
+  }
+}

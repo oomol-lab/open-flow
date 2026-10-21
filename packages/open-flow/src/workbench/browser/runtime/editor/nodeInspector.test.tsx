@@ -254,7 +254,7 @@ describe('Provider Trigger sections', () => {
     })
 
     const connection = find(element, (item) => typeof item.type == 'function' && item.type.name == 'TriggerConnection')
-    const config = find(element, (item) => typeof item.type == 'function' && item.type.name == 'FeishuTriggerConfig')
+    const config = find(element, (item) => typeof item.type == 'function' && item.type.name == 'EventSourceTriggerConfig')
 
     expect(connection).toBeDefined()
     expect(config?.props.connectionId).toBe('feishu-account')

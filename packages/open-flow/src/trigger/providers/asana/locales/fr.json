@@ -1,0 +1,15 @@
+{
+  "asana.on_task_event": {
+    "displayName": "Événement de tâche du projet",
+    "description": "Reçoit les changements des tâches du projet avec leur état au moment de la lecture.",
+    "configInputs": {
+      "projectId": "ID du projet",
+      "eventTypes": "Événements",
+      "customFieldId": "ID du champ personnalisé"
+    },
+    "outputs": {
+      "projectId": "ID du projet",
+      "events": "Événements correspondants de cette livraison."
+    }
+  }
+}

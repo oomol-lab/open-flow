@@ -8,12 +8,13 @@ import type {
 import type { FlowDocument } from '@oomol-lab/open-flow/flow-change'
 import type { ConnectorTeamStore } from '../storage/connector-team-store.ts'
 import type { Database } from '../storage/database.ts'
-import type { ConnectorHost } from './connector.ts'
+import type { ConnectorHost } from './connector-contract.ts'
 
 import { decodeConnectorAccess } from '@oomol-lab/open-flow/control-api'
 import { connectionUsage } from '@oomol-lab/open-flow/flow-semantics'
 import { createHash } from 'node:crypto'
-import { ConnectorClient, ConnectorTaskError } from './connector.ts'
+import { ConnectorTaskError } from './connector-contract.ts'
+import { ConnectorClient } from './connector.ts'
 
 export type ConnectorAccessMutation =
   | { readonly kind: 'conflict' }

@@ -1,0 +1,17 @@
+{
+  "intercom.on_conversation_event": {
+    "displayName": "客戶會話或工單",
+    "description": "接收客戶發起的會話、客戶回覆和新工單。不接收管理員回覆。",
+    "configInputs": {
+      "sourceId": "事件源",
+      "eventTypes": "事件"
+    },
+    "outputs": {
+      "event": "事件類型",
+      "deliveryId": "通知 ID",
+      "workspaceId": "工作區 ID",
+      "objectId": "會話或工單 ID",
+      "body": "原始物件"
+    }
+  }
+}

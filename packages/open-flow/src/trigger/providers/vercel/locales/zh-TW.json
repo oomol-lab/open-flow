@@ -1,0 +1,18 @@
+{
+  "vercel.on_deployment_event": {
+    "displayName": "部署就緒或失敗",
+    "description": "部署就緒或失敗。",
+    "configInputs": {
+      "teamId": "團隊 ID",
+      "projectId": "專案 ID",
+      "environment": "環境"
+    },
+    "outputs": {
+      "event": "業務事件類型。",
+      "deliveryId": "投遞 ID",
+      "deploymentId": "部署 ID",
+      "projectId": "專案 ID",
+      "body": "原始事件資料。"
+    }
+  }
+}

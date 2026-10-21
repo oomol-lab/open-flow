@@ -1,0 +1,16 @@
+{
+  "resend.on_email_event": {
+    "displayName": "Получение, возврат письма или жалоба",
+    "description": "Получение, возврат письма или жалоба.",
+    "configInputs": {
+      "eventTypes": "События"
+    },
+    "outputs": {
+      "event": "Тип бизнес-события.",
+      "deliveryId": "ID доставки",
+      "emailId": "ID письма",
+      "createdAt": "Время события.",
+      "body": "Исходные данные события."
+    }
+  }
+}

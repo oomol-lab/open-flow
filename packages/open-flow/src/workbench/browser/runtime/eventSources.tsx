@@ -1,5 +1,5 @@
 import type { FormEvent } from 'react'
-import type { ConnectorConnection, ControlClient, EventSource } from '../../../control/common/api.ts'
+import type { ConnectorConnection, ControlClient, CreateEventSource, EventSource } from '../../../control/common/api.ts'
 import type { UiLanguage } from '../../../localization/common/languages.ts'
 import type { WorkbenchNotification } from './contract.ts'
 
@@ -10,10 +10,13 @@ import { Checkbox } from '../../../ui/browser/checkbox.tsx'
 import { Input } from '../../../ui/browser/input.tsx'
 import { Label } from '../../../ui/browser/label.tsx'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '../../../ui/browser/select.tsx'
+import { eventSourceKind, eventSourcePresentations } from './eventSourcePresentation.ts'
 import { EventSourceSetup } from './eventSourceSetup.tsx'
 import { FeishuEventPicker } from './feishuEventPicker.tsx'
 import { createI18n } from './i18n.ts'
 import { errorNotice } from './stores/workbenchNotice.ts'
+
+type EventSourceKind = NonNullable<CreateEventSource['kind']>
 
 interface Props {
   /** Host notification channel for operation failures; use the same handler as WorkbenchHost.notify. */
@@ -145,15 +148,17 @@ function EventSources({ client, teams, onSourcesChange, notify }: Props) {
               <h2 className="m-0 text-base leading-6 font-medium">{source.name}</h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 {source.appId} ·{' '}
-                {t(
-                  source.enabled
-                    ? source.verifiedAt == null
-                      ? 'eventSources.unverified'
-                      : source.lastReceivedAt == null
-                        ? 'eventSources.ready'
-                        : 'eventSources.receiving'
-                    : 'eventSources.disabled',
-                )}
+                {source.provider === 'jira' && source.enabled
+                  ? t(`eventSources.subscription.${source.subscriptionStatus ?? 'idle'}`)
+                  : t(
+                      source.enabled
+                        ? source.verifiedAt == null
+                          ? 'eventSources.unverified'
+                          : source.lastReceivedAt == null
+                            ? 'eventSources.ready'
+                            : 'eventSources.receiving'
+                        : 'eventSources.disabled',
+                    )}
               </p>
             </div>
             <div className="flex gap-2">
@@ -220,6 +225,7 @@ function EventSources({ client, teams, onSourcesChange, notify }: Props) {
 
 export function SourceForm({
   source,
+  sourceKind,
   existingNames = [],
   fixedTeamId,
   onPendingChange,
@@ -229,6 +235,7 @@ export function SourceForm({
   onCancel,
   notify,
 }: Omit<Props, 'language'> & {
+  readonly sourceKind?: EventSourceKind
   readonly source?: EventSource
   readonly existingNames?: readonly string[]
   readonly onPendingChange?: (pending: boolean) => void
@@ -237,6 +244,13 @@ export function SourceForm({
   readonly onCancel: () => void
 }) {
   const t = useTranslate()
+  const [kind, setKind] = useState<EventSourceKind>(source == null ? (sourceKind ?? 'feishu') : eventSourceKind(source.provider))
+  const presentation = eventSourcePresentations[kind]
+  const [applicationId, setApplicationId] = useState(source != null && source.provider !== 'feishu' && source.provider !== 'feishu_app_bot' ? source.appId : '')
+  const [organizationId, setOrganizationId] = useState(source?.organizationId ?? '')
+  const [installationId, setInstallationId] = useState(source?.installationId ?? '')
+  const [project, setProject] = useState(source?.projectKey ?? '')
+  const [workspaceId, setWorkspaceId] = useState(source?.workspaceId ?? '')
   const [step, setStep] = useState(source == null ? 1 : 2)
   const [name, setName] = useState(source?.name ?? t('eventSources.defaultName'))
   const [nameEdited, setNameEdited] = useState(false)
@@ -250,7 +264,7 @@ export function SourceForm({
   const [attempt, setAttempt] = useState(0)
   const [token, setToken] = useState('')
   const [key, setKey] = useState('')
-  const [events, setEvents] = useState<string[]>(source?.eventTypes ?? ['im.message.receive_v1'])
+  const [events, setEvents] = useState<string[]>(source?.eventTypes ?? [...presentation.events])
   const [managed, setManaged] = useState(source?.manageSubscriptions ?? false)
   const [pending, setPending] = useState(false)
   useEffect(() => {
@@ -258,7 +272,7 @@ export function SourceForm({
     const controller = new AbortController()
     setConnections(undefined)
     setConnectionError(undefined)
-    void client.listEventSourceConnections(teamId || null, controller.signal).then(
+    void client.listEventSourceConnections(teamId || null, controller.signal, kind).then(
       (items) => {
         if (!controller.signal.aborted) setConnections(items)
       },
@@ -267,13 +281,13 @@ export function SourceForm({
       },
     )
     return () => controller.abort()
-  }, [client, source, teamId, attempt, t])
+  }, [client, source, teamId, attempt, t, kind, presentation.provider])
   useEffect(() => {
     if (source != null) return
     let current = true
     setPageError(undefined)
     setConnectionPage(undefined)
-    void client.createConnectorConnectionPage('feishu_app_bot', undefined, teamId || undefined).then(
+    void client.createConnectorConnectionPage(presentation.provider, undefined, teamId || undefined).then(
       (url) => {
         if (current) setConnectionPage(url)
       },
@@ -284,7 +298,7 @@ export function SourceForm({
     return () => {
       current = false
     }
-  }, [client, source, teamId, attempt, t])
+  }, [client, source, teamId, attempt, t, kind, presentation.provider])
   useEffect(() => {
     const refreshAfterConnection = () => {
       if (!connecting.current) return
@@ -296,7 +310,7 @@ export function SourceForm({
   }, [])
   const connection = connections?.find((item) => item.connectionId == connectionId && item.status == 'active')
   const appId = source?.appId ?? connection?.providerAccountId
-  const identified = appId != null && /^cli_[a-zA-Z0-9]+$/.test(appId)
+  const identified = source != null || (appId != null && presentation.identity.test(appId))
   function selectApp(value: string) {
     setConnectionId(value)
     if (nameEdited) return
@@ -318,27 +332,43 @@ export function SourceForm({
     setPending(true)
     onPendingChange?.(true)
     try {
-      const saved =
-        source == null
-          ? await client.createEventSource({
-              version: 1,
-              name,
-              connectionId,
-              teamId: teamId || null,
-              verificationToken: token,
-              encryptKey: key,
-              eventTypes: events,
-              manageSubscriptions: managed,
-            })
-          : await client.updateEventSource(source.sourceId, {
-              version: 1,
-              expectedRevision: source.revision,
-              name,
-              enabled: source.enabled,
-              eventTypes: events,
-              ...(token ? { verificationToken: token } : {}),
-              ...(key ? { encryptKey: key } : {}),
-            })
+      let saved: EventSource
+      if (source == null) {
+        const common = { version: 1 as const, name, connectionId, teamId: teamId || null, eventTypes: events }
+        let input: CreateEventSource
+        switch (kind) {
+          case 'jira':
+            input = { ...common, kind, project }
+            break
+          case 'feishu':
+            input = { ...common, verificationToken: token, encryptKey: key, manageSubscriptions: managed }
+            break
+          case 'slack':
+            input = { ...common, kind, appId: applicationId, workspaceId, signingSecret: key }
+            break
+          case 'fireflies':
+            input = { ...common, kind, signingSecret: key }
+            break
+          case 'zoom':
+          case 'intercom':
+            input = { ...common, kind, appId: applicationId, signingSecret: key }
+            break
+          case 'sentry':
+            input = { ...common, kind, appId: applicationId, installationId, organizationId, signingSecret: key }
+            break
+        }
+        saved = await client.createEventSource(input)
+      } else {
+        saved = await client.updateEventSource(source.sourceId, {
+          version: 1,
+          expectedRevision: source.revision,
+          name,
+          enabled: source.enabled,
+          eventTypes: events,
+          ...(kind === 'feishu' && token ? { verificationToken: token } : {}),
+          ...(key ? (kind !== 'feishu' ? { signingSecret: key } : { encryptKey: key }) : {}),
+        })
+      }
       setToken('')
       setKey('')
       onSaved(saved)
@@ -357,12 +387,26 @@ export function SourceForm({
         </h2>
         {source == null && (
           <p className="m-0 text-xs text-muted-foreground">
-            {step} / 2 · {t(step == 1 ? 'eventSources.selectAppHint' : 'eventSources.configureCallbackHint')}
+            {step} / 2 · {t(step === 1 ? presentation.connectHint : presentation.configureHint)}
           </p>
         )}
       </header>
       {step == 1 ? (
         <>
+          <SourceSelect
+            label={t('eventSources.provider')}
+            value={kind}
+            options={Object.entries(eventSourcePresentations).map(([value, item]) => ({ value, label: item.label }))}
+            disabled={pending || sourceKind != null}
+            onChange={(value) => {
+              const next = value as EventSourceKind
+              setKind(next)
+              setConnectionId('')
+              setEvents([...eventSourcePresentations[next].events])
+              setToken('')
+              setKey('')
+            }}
+          />
           {fixedTeamId === undefined && teams.length > 0 && (
             <SourceSelect
               label={t('eventSources.team')}
@@ -376,7 +420,7 @@ export function SourceForm({
             />
           )}
           <SourceSelect
-            label={t('eventSources.feishuApp')}
+            label={kind === 'feishu' ? t('eventSources.feishuApp') : presentation.label}
             value={connectionId}
             options={(connections ?? []).filter((item) => item.status == 'active').map((item) => ({ value: item.connectionId, label: item.displayName }))}
             disabled={pending || connections == null}
@@ -448,46 +492,102 @@ export function SourceForm({
               }}
             />
           </Label>
-          <div className="grid gap-4 sm:grid-cols-2">
+          {kind !== 'feishu' && kind !== 'fireflies' && kind !== 'jira' && source == null && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Label className="flex flex-col items-stretch gap-2">
+                {kind === 'slack' ? 'Slack App ID' : kind === 'sentry' ? 'Integration UUID' : 'Developer App ID'}
+                <Input
+                  required
+                  pattern={kind === 'slack' ? 'A[A-Z0-9]+' : undefined}
+                  value={applicationId}
+                  onChange={(event) => setApplicationId(event.target.value)}
+                  disabled={pending}
+                />
+              </Label>
+              {kind === 'sentry' && (
+                <Label className="flex flex-col items-stretch gap-2">
+                  Organization ID / slug
+                  <Input required value={organizationId} onChange={(event) => setOrganizationId(event.target.value)} disabled={pending} />
+                </Label>
+              )}
+              {kind === 'sentry' && (
+                <Label className="flex flex-col items-stretch gap-2">
+                  Installation UUID
+                  <Input required value={installationId} onChange={(event) => setInstallationId(event.target.value)} disabled={pending} />
+                </Label>
+              )}
+              {kind === 'slack' && (
+                <Label className="flex flex-col items-stretch gap-2">
+                  Workspace ID
+                  <Input required pattern="T[A-Z0-9]+" value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)} disabled={pending} />
+                </Label>
+              )}
+            </div>
+          )}
+          {kind === 'jira' && (
             <Label className="flex flex-col items-stretch gap-2">
-              <span>
-                Verification Token{' '}
-                <span className="font-normal text-muted-foreground">{t(source == null ? 'eventSources.required' : 'eventSources.optional')}</span>
-              </span>
-              <Input
-                type="password"
-                autoComplete="new-password"
-                required={source == null}
-                value={token}
-                onChange={(event) => setToken(event.target.value)}
-                disabled={pending}
-                placeholder={source == null ? undefined : t('eventSources.keepSecret')}
-              />
+              {t('eventSources.jiraProject')}
+              <Input required value={project} maxLength={256} disabled={pending || source != null} onChange={(event) => setProject(event.target.value)} />
             </Label>
-            <Label className="flex flex-col items-stretch gap-2">
-              <span>
-                Encrypt Key <span className="font-normal text-muted-foreground">{t(source == null ? 'eventSources.required' : 'eventSources.optional')}</span>
-              </span>
-              <Input
-                type="password"
-                autoComplete="new-password"
-                required={source == null}
-                value={key}
-                onChange={(event) => setKey(event.target.value)}
-                disabled={pending}
-                placeholder={source == null ? undefined : t('eventSources.keepSecret')}
-              />
-            </Label>
-          </div>
-          <p className="m-0 text-xs leading-5 text-muted-foreground">{t('eventSources.secretsHint')}</p>
-          <a className="w-fit text-xs text-foreground underline underline-offset-4" href="https://open.feishu.cn/app" target="_blank" rel="noreferrer">
+          )}
+          {kind !== 'jira' && (
+            <div className="grid gap-4 sm:grid-cols-2">
+              {kind === 'feishu' && (
+                <Label className="flex flex-col items-stretch gap-2">
+                  <span>
+                    Verification Token{' '}
+                    <span className="font-normal text-muted-foreground">{t(source == null ? 'eventSources.required' : 'eventSources.optional')}</span>
+                  </span>
+                  <Input
+                    type="password"
+                    autoComplete="new-password"
+                    required={source == null}
+                    value={token}
+                    onChange={(event) => setToken(event.target.value)}
+                    disabled={pending}
+                    placeholder={source == null ? undefined : t('eventSources.keepSecret')}
+                  />
+                </Label>
+              )}
+              <Label className="flex flex-col items-stretch gap-2">
+                <span>
+                  {presentation.secret}{' '}
+                  <span className="font-normal text-muted-foreground">{t(source == null ? 'eventSources.required' : 'eventSources.optional')}</span>
+                </span>
+                <Input
+                  type="password"
+                  autoComplete="new-password"
+                  required={source == null}
+                  value={key}
+                  onChange={(event) => setKey(event.target.value)}
+                  disabled={pending}
+                  placeholder={source == null ? undefined : t('eventSources.keepSecret')}
+                />
+              </Label>
+            </div>
+          )}
+          <p className="m-0 text-xs leading-5 text-muted-foreground">{t(presentation.secretsHint)}</p>
+          <a className="w-fit text-xs text-foreground underline underline-offset-4" href={presentation.console} target="_blank" rel="noreferrer">
             {t('eventSources.openConsole')}
           </a>
           <section className="flex flex-col gap-3 border-t border-border pt-5">
-            <FeishuEventPicker value={events} onChange={setEvents} disabled={pending} />
-            <p className="m-0 text-xs leading-5 text-muted-foreground">{t('eventSources.eventsHint')}</p>
+            {kind === 'feishu' ? (
+              <FeishuEventPicker value={events} onChange={setEvents} disabled={pending} />
+            ) : (
+              presentation.events.map((type) => (
+                <Label key={type} className="flex items-center gap-2">
+                  <Checkbox
+                    disabled={pending}
+                    checked={events.includes(type)}
+                    onCheckedChange={(checked) => setEvents(checked ? [...events, type] : events.filter((event) => event !== type))}
+                  />
+                  <code>{type}</code>
+                </Label>
+              ))
+            )}
+            <p className="m-0 text-xs leading-5 text-muted-foreground">{t(presentation.eventsHint)}</p>
           </section>
-          {source == null && (
+          {source == null && kind === 'feishu' && (
             <details>
               <summary className="cursor-pointer text-xs text-muted-foreground">{t('eventSources.resourceManagement')}</summary>
               <Label className="mt-3 flex items-start gap-2 font-normal">

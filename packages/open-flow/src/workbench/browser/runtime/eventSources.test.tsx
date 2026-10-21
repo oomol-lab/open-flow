@@ -42,7 +42,7 @@ it('starts with app selection without exposing authorization identity or callbac
       <SourceForm notify={() => {}} client={client} teams={[]} onCancel={() => {}} onSaved={() => {}} />
     </I18nProvider>,
   )
-  expect(markup).toContain('Select a Feishu app')
+  expect(markup).toContain('Select an application')
   expect(markup).not.toContain('Verification Token')
   expect(markup).not.toContain('Encrypt Key')
   expect(markup).not.toContain('Authorization identity')
@@ -79,7 +79,7 @@ it('shows the missing public callback prerequisite without offering a copy actio
   )
   expect(markup).toContain(createI18n('en').t('eventSources.originMissing'))
   expect(markup).not.toContain('>Copy</button>')
-  expect(markup).toContain('Selecting events here does not add them to Feishu.')
+  expect(markup).toContain('Selecting events here does not enable them upstream.')
   expect(markup).toContain('No callback verification received yet.')
 })
 

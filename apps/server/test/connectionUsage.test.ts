@@ -3,8 +3,9 @@ import type { FlowDocument } from '@oomol-lab/open-flow/flow-change'
 
 import { providerAccessBindingId } from '@oomol-lab/open-flow/control-api'
 import { afterEach, expect, it, vi } from 'vitest'
+import { checkCodePermissions } from '../node/application/connector-capabilities.ts'
 import { captureConnectorAccess, ImplicitConnectorAccessHost } from '../node/deployment/connector-access.ts'
-import { checkCodePermissions, ConnectorClient } from '../node/deployment/connector.ts'
+import { ConnectorClient } from '../node/deployment/connector.ts'
 
 const document: FlowDocument = {
   bindings: {},

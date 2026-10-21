@@ -1,0 +1,17 @@
+{
+  "jira.on_issue_event": {
+    "displayName": "Событие проекта Jira",
+    "description": "Получает события создания, изменения и комментариев задач общего проекта Jira Cloud.",
+    "configInputs": {
+      "sourceId": "Источник событий",
+      "eventTypes": "События"
+    },
+    "outputs": {
+      "event": "Тип события",
+      "deliveryId": "ID уведомления",
+      "cloudId": "ID облачного сайта",
+      "issueId": "ID задачи",
+      "body": "Исходное событие"
+    }
+  }
+}

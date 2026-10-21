@@ -1,0 +1,17 @@
+{
+  "zoom.on_recording_ready": {
+    "displayName": "クラウド録画の準備完了",
+    "description": "接続中の Zoom ユーザーがホストした完了済みクラウド録画を受信します。",
+    "configInputs": {
+      "sourceId": "イベントソース",
+      "eventTypes": "イベント"
+    },
+    "outputs": {
+      "event": "イベント種類",
+      "deliveryId": "通知 ID",
+      "accountId": "Zoom アカウント ID",
+      "meetingUuid": "会議インスタンス UUID",
+      "body": "元のオブジェクト"
+    }
+  }
+}

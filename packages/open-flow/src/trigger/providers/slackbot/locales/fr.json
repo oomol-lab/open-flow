@@ -1,0 +1,23 @@
+{
+  "slackbot.on_event": {
+    "displayName": "Mention ou message privé",
+    "description": "Reçoit les mentions et nouveaux messages privés depuis une source partagée Slack. Slack Connect est exclu.",
+    "configInputs": {
+      "sourceId": "Source d’événements",
+      "eventTypes": "Événements",
+      "channelIds": "ID des canaux ; vide pour tous les canaux de la source."
+    },
+    "outputs": {
+      "event": "Type d’événement",
+      "deliveryId": "ID de l’événement",
+      "appId": "ID de l’application Slack",
+      "teamId": "ID de l’espace de travail",
+      "channel": "ID de la conversation",
+      "user": "ID de l’utilisateur",
+      "text": "Texte du message",
+      "ts": "Horodatage du message",
+      "threadTs": "Horodatage du fil parent, si présent.",
+      "body": "Événement Slack original"
+    }
+  }
+}

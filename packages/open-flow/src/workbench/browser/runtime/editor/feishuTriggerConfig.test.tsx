@@ -1,15 +1,15 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { expect, it } from 'vitest'
-import { feishuEvents } from '../../../../trigger/providers/feishu/on-event.ts'
+import { sourceEvents } from '../../../../trigger/providers/source-events.ts'
 import { createI18n } from '../i18n.ts'
-import { FeishuTriggerConfig } from './feishuTriggerConfig.tsx'
+import { EventSourceTriggerConfig } from './eventSourceTriggerConfig.tsx'
 
 it('shows both required Feishu fields before an event source is selected', () => {
   const html = renderToStaticMarkup(
     <I18nProvider i18n={createI18n('en')}>
-      <FeishuTriggerConfig
-        inputs={feishuEvents[0]!.snapshot.configInputs}
+      <EventSourceTriggerConfig
+        inputs={sourceEvents.find((item) => item.snapshot.key === 'feishu_app_bot.on_event')!.snapshot.configInputs}
         fieldLabels={{ sourceId: 'Event source', eventTypes: 'Events to receive' }}
         config={{}}
         nodeId="trigger"

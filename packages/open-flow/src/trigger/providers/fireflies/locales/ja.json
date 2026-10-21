@@ -1,0 +1,17 @@
+{
+  "fireflies.on_meeting_ready": {
+    "displayName": "会議の文字起こし・要約の準備完了",
+    "description": "会議へのアクセスを確認し、Fireflies V2 の文字起こし・要約イベントを受信します。",
+    "configInputs": {
+      "sourceId": "イベントソース",
+      "eventTypes": "イベント"
+    },
+    "outputs": {
+      "event": "イベント種類",
+      "deliveryId": "通知 ID",
+      "accountId": "アカウント ID",
+      "meetingId": "会議・文字起こし ID",
+      "body": "元のオブジェクト"
+    }
+  }
+}

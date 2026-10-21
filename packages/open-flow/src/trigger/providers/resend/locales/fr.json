@@ -1,0 +1,16 @@
+{
+  "resend.on_email_event": {
+    "displayName": "Réception, rejet ou plainte pour un e-mail",
+    "description": "Réception, rejet ou plainte pour un e-mail.",
+    "configInputs": {
+      "eventTypes": "Événements"
+    },
+    "outputs": {
+      "event": "Type d’événement métier.",
+      "deliveryId": "ID de livraison",
+      "emailId": "ID de l’e-mail",
+      "createdAt": "Date de l’événement.",
+      "body": "Données originales de l’événement."
+    }
+  }
+}

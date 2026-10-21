@@ -1,0 +1,16 @@
+{
+  "calendly.on_booking_event": {
+    "displayName": "Réservation créée ou annulée",
+    "description": "Reçoit les réservations et annulations avec les liens de report. Nécessite un jeton d’accès personnel.",
+    "configInputs": {
+      "scope": "Périmètre",
+      "eventTypes": "Événements"
+    },
+    "outputs": {
+      "event": "Type d’événement métier.",
+      "inviteeUri": "URI de l’invité",
+      "createdAt": "Date de l’événement.",
+      "body": "Données originales de l’événement."
+    }
+  }
+}

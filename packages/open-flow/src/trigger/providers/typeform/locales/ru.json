@@ -1,0 +1,12 @@
+{
+  "typeform.on_form_response": {
+    "displayName": "Полный ответ на форму",
+    "description": "Полный ответ на форму.",
+    "configInputs": {
+      "formId": "ID формы"
+    },
+    "outputs": {
+      "response": "Идентификатор, время и исходные ответы со стабильными ID полей."
+    }
+  }
+}

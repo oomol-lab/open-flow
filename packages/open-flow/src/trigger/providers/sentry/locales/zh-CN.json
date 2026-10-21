@@ -1,0 +1,19 @@
+{
+  "sentry.on_issue_alert": {
+    "displayName": "Issue 告警",
+    "description": "接收已安装 Sentry 自定义集成的 Issue 告警规则通知。",
+    "configInputs": {
+      "sourceId": "事件源",
+      "eventTypes": "事件",
+      "projectIds": "项目 ID",
+      "ruleNames": "告警规则名称"
+    },
+    "outputs": {
+      "event": "事件类型",
+      "deliveryId": "通知 ID",
+      "organizationId": "组织 ID",
+      "issueId": "Issue ID",
+      "body": "原始对象"
+    }
+  }
+}

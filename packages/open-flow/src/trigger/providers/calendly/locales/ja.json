@@ -1,0 +1,16 @@
+{
+  "calendly.on_booking_event": {
+    "displayName": "予約の作成・キャンセル",
+    "description": "予約の作成とキャンセル、日程変更の関連情報を受信します。個人アクセストークンが必要です。",
+    "configInputs": {
+      "scope": "範囲",
+      "eventTypes": "イベント"
+    },
+    "outputs": {
+      "event": "業務イベントの種類。",
+      "inviteeUri": "招待者 URI",
+      "createdAt": "イベント日時。",
+      "body": "元のイベントデータ。"
+    }
+  }
+}

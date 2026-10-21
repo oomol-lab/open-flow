@@ -120,6 +120,15 @@ function createDefinition(item: (typeof catalog)[number]): PollDefinition | Inte
       return { outcome: result.outcome } as IntegrationReconcileResult
     },
     async receive(context) {
+      if (snapshot.key === 'asana.on_task_event') {
+        const secret = context.header('x-hook-secret')
+        if (secret != null) {
+          if (context.method !== 'POST' || !/^[a-fA-F0-9]{32,256}$/.test(secret))
+            return { outcome: 'respond', status: 400, body: '', contentType: 'text/plain' }
+          // 握手必须先于 Connector 的创建请求返回；密钥只从受认证的创建响应保存。
+          return { outcome: 'respond', status: 200, body: '', contentType: 'text/plain', headers: { 'x-hook-secret': secret } }
+        }
+      }
       const id = context.state?.subscription.id
       if (typeof id !== 'string') return { outcome: 'respond', status: 503, body: '', contentType: 'text/plain' }
       const headers: Record<string, string> = {}
@@ -127,6 +136,16 @@ function createDefinition(item: (typeof catalog)[number]): PollDefinition | Inte
         'content-type',
         'idempotency-key',
         'stripe-signature',
+        'tally-signature',
+        'typeform-signature',
+        'x-signature',
+        'svix-id',
+        'svix-timestamp',
+        'svix-signature',
+        'x-vercel-signature',
+        'calendly-webhook-signature',
+        'authorization',
+        'x-hook-signature',
         'x-github-delivery',
         'x-github-event',
         'x-gitlab-event',
@@ -160,7 +179,7 @@ function createDefinition(item: (typeof catalog)[number]): PollDefinition | Inte
         if (value != null) headers[name] = value
       }
       const query: Record<string, string> = {}
-      for (const name of ['open_flow_callback', 'connector_subscription']) {
+      for (const name of ['open_flow_callback', 'connector_subscription', 'signature']) {
         const value = context.query(name)
         if (value != null) query[name] = value
       }

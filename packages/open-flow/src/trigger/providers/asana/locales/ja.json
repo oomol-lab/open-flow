@@ -1,0 +1,15 @@
+{
+  "asana.on_task_event": {
+    "displayName": "プロジェクトのタスクイベント",
+    "description": "プロジェクトのタスク変更と読み取り時点のタスク情報を受信します。",
+    "configInputs": {
+      "projectId": "プロジェクト ID",
+      "eventTypes": "イベント",
+      "customFieldId": "カスタムフィールド ID"
+    },
+    "outputs": {
+      "projectId": "プロジェクト ID",
+      "events": "この配信で一致したイベント。"
+    }
+  }
+}

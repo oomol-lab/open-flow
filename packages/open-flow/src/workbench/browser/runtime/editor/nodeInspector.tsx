@@ -37,7 +37,7 @@ import { presentConnectorInputs } from './connectorInputPresentation.ts'
 import { DecisionSection } from './decisionSection.tsx'
 import { diagnosticMessage } from './diagnostics.ts'
 import { ErrorTriggerSources, ErrorTriggerSourcesEditor } from './errorTriggerSources.tsx'
-import { FeishuTriggerConfig } from './feishuTriggerConfig.tsx'
+import { EventSourceTriggerConfig } from './eventSourceTriggerConfig.tsx'
 import { GeneralSettings } from './generalSettings.tsx'
 import { LeinaBotSelect } from './leinaBotSelect.tsx'
 import { LinearTriggerConfig } from './linearTriggerConfig.tsx'
@@ -49,6 +49,7 @@ import { OpenApiSection } from './openApiSection.tsx'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
 import { presentProviderOutputDescription, presentProviderSourceCandidates, presentProviderTriggerConfig } from './providerTriggerPresentation.ts'
 import { ResolutionDefinition } from './resolutionDefinition.tsx'
+import { TallyTriggerConfig } from './tallyTriggerConfig.tsx'
 import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
 import { TriggerScheduleEditor } from './triggerScheduleEditor.tsx'
 import { TriggerSummary } from './triggerSummary.tsx'
@@ -409,8 +410,34 @@ export function NodeInspector({
         )}
         {selection?.kind === 'trigger' &&
           (selection.trigger.kind === 'integration' || selection.trigger.kind === 'poll') &&
-          (!readOnly && store != null && ['feishu.on_event', 'feishu_app_bot.on_event'].includes(selection.trigger.definition.key) ? (
-            <FeishuTriggerConfig
+          (!readOnly &&
+          store != null &&
+          [
+            'feishu.on_event',
+            'feishu_app_bot.on_event',
+            'slackbot.on_event',
+            'intercom.on_conversation_event',
+            'sentry.on_issue_alert',
+            'zoom.on_recording_ready',
+            'fireflies.on_meeting_ready',
+            'jira.on_issue_event',
+          ].includes(selection.trigger.definition.key) ? (
+            <EventSourceTriggerConfig
+              provider={
+                selection.trigger.definition.provider === 'slackbot'
+                  ? 'slackbot'
+                  : selection.trigger.definition.provider === 'intercom'
+                    ? 'intercom'
+                    : selection.trigger.definition.provider === 'sentry'
+                      ? 'sentry'
+                      : selection.trigger.definition.provider === 'zoom'
+                        ? 'zoom'
+                        : selection.trigger.definition.provider === 'fireflies'
+                          ? 'fireflies'
+                          : selection.trigger.definition.provider === 'jira'
+                            ? 'jira'
+                            : 'feishu_app_bot'
+              }
               inputs={providerConfigInputs}
               fieldLabels={providerDisplay?.configInputLabels}
               config={selection.trigger.config}
@@ -421,6 +448,16 @@ export function NodeInspector({
             />
           ) : !readOnly && store != null && selection.trigger.definition.key === 'linear.on_issue_changed' ? (
             <LinearTriggerConfig
+              inputs={providerConfigInputs}
+              fieldLabels={providerDisplay?.configInputLabels}
+              config={selection.trigger.config}
+              nodeId={selection.id}
+              connectionId={selection.trigger.connectionId}
+              disabled={disabled}
+              store={store}
+            />
+          ) : !readOnly && store != null && selection.trigger.definition.key === 'tally.on_form_response' ? (
+            <TallyTriggerConfig
               inputs={providerConfigInputs}
               fieldLabels={providerDisplay?.configInputLabels}
               config={selection.trigger.config}

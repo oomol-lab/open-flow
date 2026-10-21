@@ -1,0 +1,16 @@
+{
+  "calendly.on_booking_event": {
+    "displayName": "预约创建或取消",
+    "description": "接收预约创建和取消，保留改期关联。需要个人访问令牌连接。",
+    "configInputs": {
+      "scope": "范围",
+      "eventTypes": "事件"
+    },
+    "outputs": {
+      "event": "业务事件类型。",
+      "inviteeUri": "预约人 URI",
+      "createdAt": "事件时间。",
+      "body": "原始事件数据。"
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "zoom.on_recording_ready": {
+    "displayName": "云录制就绪",
+    "description": "接收由当前 Zoom 连接用户主持的已完成云录制。",
+    "configInputs": {
+      "sourceId": "事件源",
+      "eventTypes": "事件"
+    },
+    "outputs": {
+      "event": "事件类型",
+      "deliveryId": "通知 ID",
+      "accountId": "Zoom 账户 ID",
+      "meetingUuid": "会议实例 UUID",
+      "body": "原始对象"
+    }
+  }
+}

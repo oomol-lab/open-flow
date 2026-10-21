@@ -1,0 +1,18 @@
+{
+  "vercel.on_deployment_event": {
+    "displayName": "部署就绪或失败",
+    "description": "部署就绪或失败。",
+    "configInputs": {
+      "teamId": "团队 ID",
+      "projectId": "项目 ID",
+      "environment": "环境"
+    },
+    "outputs": {
+      "event": "业务事件类型。",
+      "deliveryId": "投递 ID",
+      "deploymentId": "部署 ID",
+      "projectId": "项目 ID",
+      "body": "原始事件数据。"
+    }
+  }
+}

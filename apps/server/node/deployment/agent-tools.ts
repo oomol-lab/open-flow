@@ -8,7 +8,7 @@ import { canonicalJsonBytes } from '@oomol-lab/open-flow/flow-encoding'
 import { agentToolInput, agentToolSchema } from '@oomol-lab/open-flow/flow-semantics'
 import { z } from 'zod'
 import { IsolatedVmError } from '../runtime/isolated-vm.ts'
-import { ConnectorTaskError } from './connector.ts'
+import { ConnectorTaskError } from './connector-contract.ts'
 
 export interface ResultHost {
   find(callId: string, tool: ResultCall, input: Readonly<Record<string, JsonValue>>): { result: ResultInfo; content: string } | undefined

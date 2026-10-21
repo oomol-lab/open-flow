@@ -7,7 +7,7 @@ import { inputValues } from '../src/flow/common/inputValue.ts'
 import { validateModules } from '../src/flow/common/modules.ts'
 import { matchesSchema } from '../src/flow/common/schema.ts'
 import { createRuntimeProgram, flowDependencies, prepareFlow, validateFlow, validateFlowInputs } from '../src/flow/common/semantics.ts'
-import { feishuEvents } from '../src/trigger/providers/feishu/on-event.ts'
+import { sourceEvents } from '../src/trigger/providers/source-events.ts'
 
 const engine = findEngineContract(currentEngineContract)!
 
@@ -431,7 +431,7 @@ export default () => value`,
             trigger: {
               connectionId: 'connection-1',
               config: inputValues(config),
-              definition: feishuEvents[0]!.snapshot,
+              definition: sourceEvents.find((item) => item.snapshot.key === 'feishu_app_bot.on_event')!.snapshot,
               kind: 'integration',
               name: 'Application Event',
             },

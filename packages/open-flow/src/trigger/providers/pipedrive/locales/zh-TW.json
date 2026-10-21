@@ -1,0 +1,15 @@
+{
+  "pipedrive.on_crm_event": {
+    "displayName": "商機或聯絡人事件",
+    "description": "商機或聯絡人事件。",
+    "configInputs": {
+      "eventType": "事件"
+    },
+    "outputs": {
+      "event": "業務事件類型。",
+      "deliveryId": "投遞 ID",
+      "objectId": "物件 ID",
+      "body": "原始事件資料。"
+    }
+  }
+}

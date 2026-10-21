@@ -1,0 +1,12 @@
+{
+  "typeform.on_form_response": {
+    "displayName": "완료된 양식 응답",
+    "description": "완료된 양식 응답를 수신합니다.",
+    "configInputs": {
+      "formId": "양식 ID"
+    },
+    "outputs": {
+      "response": "제출 ID, 시간 및 안정적인 필드 ID를 포함한 원본 응답."
+    }
+  }
+}

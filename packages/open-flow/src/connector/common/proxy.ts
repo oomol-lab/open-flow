@@ -1,5 +1,12 @@
 import type { JsonValue } from '../../flow/common/change.ts'
 export type TriggerOperationRequest =
+  | {
+      readonly operation: 'sourceReceive'
+      readonly config: Readonly<Record<string, JsonValue>>
+      readonly headers: Readonly<Record<string, string>>
+      readonly rawBody: string
+    }
+  | { readonly operation: 'sourceIdentity'; readonly config: Readonly<Record<string, JsonValue>> }
   | { readonly operation: 'read'; readonly config: Readonly<Record<string, JsonValue>>; readonly checkpoint: JsonValue }
   | { readonly operation: 'options'; readonly config: Readonly<Record<string, JsonValue>>; readonly field: string }
   | {

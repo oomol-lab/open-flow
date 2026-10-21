@@ -121,6 +121,252 @@
   },
   {
     "snapshot": {
+      "key": "asana.on_task_event",
+      "provider": "asana",
+      "name": "on_task_event",
+      "displayName": "Project Task Event",
+      "description": "Receives tasks added to a project, completion changes, and selected custom field changes. Task details represent current state, not historical state.",
+      "definitionVersion": 2,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": true
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "projectId",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Project ID"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "eventTypes",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["task.added", "task.completed", "task.field_changed"]
+            },
+            "minItems": 1,
+            "uniqueItems": true,
+            "title": "Events"
+          },
+          "nullable": false,
+          "value": ["task.added", "task.completed"]
+        },
+        {
+          "handle": "customFieldId",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Custom field ID"
+          },
+          "nullable": true
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "projectId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "events",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "event": {
+                  "type": "string"
+                },
+                "task": {
+                  "type": "object"
+                },
+                "change": {
+                  "type": "object"
+                }
+              },
+              "required": ["event", "task", "change"]
+            }
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "calendly.on_booking_event",
+      "provider": "calendly",
+      "name": "on_booking_event",
+      "displayName": "Booking Created or Canceled",
+      "description": "Receives bookings and cancellations, preserving reschedule links. Requires a Personal Access Token connection.",
+      "definitionVersion": 2,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "scope",
+          "jsonSchema": {
+            "type": "string",
+            "enum": ["user", "organization"],
+            "title": "Scope"
+          },
+          "nullable": false,
+          "value": "user"
+        },
+        {
+          "handle": "eventTypes",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["invitee.created", "invitee.canceled"]
+            },
+            "minItems": 1,
+            "uniqueItems": true,
+            "title": "Events"
+          },
+          "nullable": false,
+          "value": ["invitee.created", "invitee.canceled"]
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string",
+            "enum": ["invitee.created", "invitee.canceled"]
+          },
+          "nullable": false
+        },
+        {
+          "handle": "inviteeUri",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "createdAt",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "clickup.on_task_event",
+      "provider": "clickup",
+      "name": "on_task_event",
+      "displayName": "Task Event",
+      "description": "Receives task creation, status changes, and new comments in a ClickUp Workspace or List.",
+      "definitionVersion": 2,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "workspaceId",
+          "jsonSchema": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "Workspace ID"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "listId",
+          "jsonSchema": {
+            "type": "string",
+            "pattern": "^[0-9]+$",
+            "title": "List ID"
+          },
+          "nullable": true
+        },
+        {
+          "handle": "eventTypes",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["taskCreated", "taskStatusUpdated", "taskCommentPosted"]
+            },
+            "minItems": 1,
+            "uniqueItems": true,
+            "title": "Events"
+          },
+          "nullable": false,
+          "value": ["taskCreated", "taskStatusUpdated", "taskCommentPosted"]
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string",
+            "enum": ["taskCreated", "taskStatusUpdated", "taskCommentPosted"]
+          },
+          "nullable": false
+        },
+        {
+          "handle": "taskId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
       "key": "feishu_app_bot.on_event",
       "provider": "feishu_app_bot",
       "name": "on_event",
@@ -251,6 +497,92 @@
     },
     "options": false,
     "eventSource": "feishu"
+  },
+  {
+    "snapshot": {
+      "key": "fireflies.on_meeting_ready",
+      "provider": "fireflies",
+      "name": "on_meeting_ready",
+      "displayName": "Meeting Transcript or Summary Ready",
+      "description": "Receives separate transcript and summary readiness events through Fireflies Webhooks V2 after checking meeting access.",
+      "definitionVersion": 2,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "sourceId",
+          "jsonSchema": {
+            "type": "string",
+            "pattern": "^source_[0-9a-f]{32}$",
+            "title": "Event source"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "eventTypes",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["meeting.transcribed", "meeting.summarized"]
+            },
+            "minItems": 1,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "title": "Events"
+          },
+          "nullable": false,
+          "value": ["meeting.transcribed", "meeting.summarized"]
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "accountId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "meetingId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "options": false,
+    "eventSource": "fireflies"
   },
   {
     "snapshot": {
@@ -1412,6 +1744,180 @@
   },
   {
     "snapshot": {
+      "key": "intercom.on_conversation_event",
+      "provider": "intercom",
+      "name": "on_conversation_event",
+      "displayName": "Customer Conversation or Ticket",
+      "description": "Receives customer conversations, customer replies and new tickets from a verified Intercom application event source. Administrator replies are excluded.",
+      "definitionVersion": 2,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "sourceId",
+          "jsonSchema": {
+            "type": "string",
+            "pattern": "^source_[0-9a-f]{32}$",
+            "title": "Event source"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "eventTypes",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["conversation.user.created", "conversation.user.replied", "ticket.created"]
+            },
+            "minItems": 1,
+            "maxItems": 3,
+            "uniqueItems": true,
+            "title": "Events"
+          },
+          "nullable": false,
+          "value": ["conversation.user.created", "conversation.user.replied", "ticket.created"]
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "workspaceId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "objectId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": true
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "options": false,
+    "eventSource": "intercom"
+  },
+  {
+    "snapshot": {
+      "key": "jira.on_issue_event",
+      "provider": "jira",
+      "name": "on_issue_event",
+      "displayName": "Issue or Comment Event",
+      "description": "Receives Jira Cloud issue creation, issue updates and new comments through a shared project webhook with automatic renewal.",
+      "definitionVersion": 2,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "sourceId",
+          "jsonSchema": {
+            "type": "string",
+            "pattern": "^source_[0-9a-f]{32}$",
+            "title": "Event source"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "eventTypes",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["jira:issue_created", "jira:issue_updated", "comment_created"]
+            },
+            "minItems": 1,
+            "maxItems": 3,
+            "uniqueItems": true,
+            "title": "Events"
+          },
+          "nullable": false,
+          "value": ["jira:issue_created", "jira:issue_updated", "comment_created"]
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "cloudId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "issueId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "options": false,
+    "eventSource": "jira"
+  },
+  {
+    "snapshot": {
       "configInputs": [
         {
           "handle": "teamId",
@@ -1929,6 +2435,311 @@
   },
   {
     "snapshot": {
+      "key": "pandadoc.on_document_event",
+      "provider": "pandadoc",
+      "name": "on_document_event",
+      "displayName": "Document Status Changed",
+      "description": "Receives document status changes in the connected workspace, optionally only when the entire document is completed.",
+      "definitionVersion": 2,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": true,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "completedOnly",
+          "jsonSchema": {
+            "type": "boolean",
+            "title": "Completed documents only"
+          },
+          "nullable": false,
+          "value": true
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "events",
+          "nullable": false,
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "event": {
+                  "type": "string"
+                },
+                "data": {
+                  "type": "object"
+                }
+              },
+              "required": ["event", "data"]
+            }
+          }
+        }
+      ]
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "pipedrive.on_crm_event",
+      "provider": "pipedrive",
+      "name": "on_crm_event",
+      "displayName": "Deal or Contact Event",
+      "description": "Receives new deals or contacts, or actual changes to a deal stage or status using Pipedrive Webhooks v2.",
+      "definitionVersion": 2,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "eventType",
+          "jsonSchema": {
+            "type": "string",
+            "enum": ["deal.created", "deal.stage_changed", "deal.status_changed", "person.created"],
+            "title": "Event"
+          },
+          "nullable": false,
+          "value": "deal.created"
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string",
+            "enum": ["deal.created", "deal.stage_changed", "deal.status_changed", "person.created"]
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "objectId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "resend.on_email_event",
+      "provider": "resend",
+      "name": "on_email_event",
+      "displayName": "Email Received, Bounced or Complained",
+      "description": "Receives inbound email, bounce, and complaint notifications. Read message bodies and attachments with Actions.",
+      "definitionVersion": 2,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "eventTypes",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["email.received", "email.bounced", "email.complained"]
+            },
+            "minItems": 1,
+            "uniqueItems": true,
+            "title": "Events"
+          },
+          "nullable": false,
+          "value": ["email.received", "email.bounced", "email.complained"]
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string",
+            "enum": ["email.received", "email.bounced", "email.complained"]
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "emailId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "createdAt",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "sentry.on_issue_alert",
+      "provider": "sentry",
+      "name": "on_issue_alert",
+      "displayName": "Issue Alert",
+      "description": "Receives Issue Alert Rule notifications from a verified Sentry Custom Integration installation.",
+      "definitionVersion": 2,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "projectIds",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "uniqueItems": true,
+            "title": "Project IDs"
+          },
+          "nullable": true
+        },
+        {
+          "handle": "ruleNames",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "uniqueItems": true,
+            "title": "Alert rule names"
+          },
+          "nullable": true
+        },
+        {
+          "handle": "sourceId",
+          "jsonSchema": {
+            "type": "string",
+            "pattern": "^source_[0-9a-f]{32}$",
+            "title": "Event source"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "eventTypes",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["issue.alert"]
+            },
+            "minItems": 1,
+            "maxItems": 1,
+            "uniqueItems": true,
+            "title": "Events"
+          },
+          "nullable": false,
+          "value": ["issue.alert"]
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "organizationId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "issueId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "options": false,
+    "eventSource": "sentry"
+  },
+  {
+    "snapshot": {
       "configInputs": [
         {
           "handle": "topics",
@@ -2346,6 +3157,141 @@
   },
   {
     "snapshot": {
+      "key": "slackbot.on_event",
+      "provider": "slackbot",
+      "name": "on_event",
+      "displayName": "Mention or Direct Message",
+      "description": "Receives user mentions and new direct messages through a shared Slack application event source. Slack Connect events are excluded.",
+      "definitionVersion": 2,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "sourceId",
+          "jsonSchema": {
+            "type": "string",
+            "pattern": "^source_[0-9a-f]{32}$",
+            "title": "Event source"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "eventTypes",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["app_mention", "message.im"]
+            },
+            "minItems": 1,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "title": "Events"
+          },
+          "nullable": false,
+          "value": ["app_mention", "message.im"]
+        },
+        {
+          "handle": "channelIds",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            },
+            "maxItems": 100,
+            "uniqueItems": true,
+            "title": "Channel IDs"
+          },
+          "nullable": true
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "appId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "teamId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "channel",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "user",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "text",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "ts",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "threadTs",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": true
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "options": false,
+    "eventSource": "slack"
+  },
+  {
+    "snapshot": {
       "configInputs": [
         {
           "handle": "events",
@@ -2431,6 +3377,92 @@
       "type": "integration"
     },
     "options": false
+  },
+  {
+    "snapshot": {
+      "configInputs": [
+        {
+          "handle": "formId",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "title": "Form"
+          },
+          "nullable": false,
+          "description": "Choose a form accessible to this Connection."
+        }
+      ],
+      "definitionVersion": 2,
+      "description": "Receives new Tally form submissions through a signed, automatically managed webhook.",
+      "displayName": "Form Response",
+      "endpoint": {
+        "body": {
+          "allowArray": false,
+          "allowEmpty": false,
+          "formats": ["json"]
+        },
+        "methods": ["POST"],
+        "successStatus": 200
+      },
+      "key": "tally.on_form_response",
+      "name": "on_form_response",
+      "outputs": [
+        {
+          "handle": "response",
+          "nullable": false,
+          "jsonSchema": {
+            "type": "object",
+            "properties": {
+              "eventId": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "formId": {
+                "type": "string"
+              },
+              "submissionId": {
+                "type": "string"
+              },
+              "responseId": {
+                "type": "string"
+              },
+              "fields": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": ["string", "null"]
+                    },
+                    "value": {},
+                    "options": {
+                      "type": "array",
+                      "items": {
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "required": ["key", "type", "label", "value"]
+                }
+              }
+            },
+            "required": ["eventId", "createdAt", "formId", "submissionId", "responseId", "fields"]
+          }
+        }
+      ],
+      "provider": "tally",
+      "type": "integration"
+    },
+    "options": true
   },
   {
     "snapshot": {
@@ -2559,6 +3591,163 @@
       ],
       "provider": "telegram",
       "type": "integration"
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "typeform.on_form_response",
+      "provider": "typeform",
+      "name": "on_form_response",
+      "displayName": "Completed Form Response",
+      "description": "Receives complete Typeform submissions through an automatically managed signed webhook.",
+      "definitionVersion": 2,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "formId",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "title": "Form ID"
+          },
+          "nullable": false
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "response",
+          "nullable": false,
+          "jsonSchema": {
+            "type": "object",
+            "properties": {
+              "eventId": {
+                "type": "string"
+              },
+              "form_id": {
+                "type": "string"
+              },
+              "token": {
+                "type": "string"
+              },
+              "submitted_at": {
+                "type": "string"
+              },
+              "answers": {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              "definition": {
+                "type": "object"
+              }
+            },
+            "required": ["eventId", "form_id", "token", "submitted_at", "answers"]
+          }
+        }
+      ]
+    },
+    "options": false
+  },
+  {
+    "snapshot": {
+      "key": "vercel.on_deployment_event",
+      "provider": "vercel",
+      "name": "on_deployment_event",
+      "displayName": "Deployment Ready or Failed",
+      "description": "Receives successful and failed deployments for a Vercel project.",
+      "definitionVersion": 2,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "teamId",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "title": "Team ID"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "projectId",
+          "jsonSchema": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256,
+            "title": "Project ID"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "environment",
+          "jsonSchema": {
+            "type": "string",
+            "enum": ["all", "production", "preview"],
+            "title": "Environment"
+          },
+          "nullable": false,
+          "value": "all"
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string",
+            "enum": ["deployment.ready", "deployment.error"]
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deploymentId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "projectId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
     },
     "options": false
   },
@@ -2817,5 +4006,91 @@
       "type": "integration"
     },
     "options": false
+  },
+  {
+    "snapshot": {
+      "key": "zoom.on_recording_ready",
+      "provider": "zoom",
+      "name": "on_recording_ready",
+      "displayName": "Cloud Recording Ready",
+      "description": "Receives completed cloud recordings hosted by the connected Zoom user through a verified application event source.",
+      "definitionVersion": 2,
+      "type": "integration",
+      "endpoint": {
+        "methods": ["POST"],
+        "body": {
+          "formats": ["json"],
+          "allowArray": false,
+          "allowEmpty": false
+        },
+        "successStatus": 200
+      },
+      "configInputs": [
+        {
+          "handle": "sourceId",
+          "jsonSchema": {
+            "type": "string",
+            "pattern": "^source_[0-9a-f]{32}$",
+            "title": "Event source"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "eventTypes",
+          "jsonSchema": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["recording.completed"]
+            },
+            "minItems": 1,
+            "maxItems": 1,
+            "uniqueItems": true,
+            "title": "Events"
+          },
+          "nullable": false,
+          "value": ["recording.completed"]
+        }
+      ],
+      "outputs": [
+        {
+          "handle": "event",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "deliveryId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "accountId",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "meetingUuid",
+          "jsonSchema": {
+            "type": "string"
+          },
+          "nullable": false
+        },
+        {
+          "handle": "body",
+          "jsonSchema": {
+            "type": "object"
+          },
+          "nullable": false
+        }
+      ]
+    },
+    "options": false,
+    "eventSource": "zoom"
   }
 ]

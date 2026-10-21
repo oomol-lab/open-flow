@@ -1,0 +1,12 @@
+{
+  "pandadoc.on_document_event": {
+    "displayName": "Changement de statut du document",
+    "description": "Changement de statut du document.",
+    "configInputs": {
+      "completedOnly": "Documents entièrement terminés uniquement"
+    },
+    "outputs": {
+      "events": "Événements correspondants de cette livraison."
+    }
+  }
+}

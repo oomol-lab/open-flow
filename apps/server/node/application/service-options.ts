@@ -2,7 +2,7 @@ import type { ProviderTriggerDefinition } from '@oomol-lab/open-flow/provider-tr
 import type * as Clock from 'effect/Clock'
 import type { Logger } from 'pino'
 import type { ConnectorAccessHost } from '../deployment/connector-access.ts'
-import type { ConnectorHost } from '../deployment/connector.ts'
+import type { ConnectorHost } from '../deployment/connector-contract.ts'
 import type { LlmHost } from '../deployment/llm.ts'
 import type { IntegrationOptions } from '../runtime/integration-runtime.ts'
 

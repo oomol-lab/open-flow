@@ -1,0 +1,12 @@
+{
+  "tally.on_form_response": {
+    "displayName": "フォーム送信",
+    "description": "自動管理される署名付き Webhook で新しい Tally フォーム送信を受信します。",
+    "configInputs": {
+      "formId": "この接続でアクセスできるフォームを選択します。"
+    },
+    "outputs": {
+      "response": "送信ID、時刻、フィールドのキー、型、値、選択肢、ファイルのメタデータ。"
+    }
+  }
+}

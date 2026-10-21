@@ -1,22 +1,35 @@
 import type { ConnectorProxyRequest, ConnectorProxyResult, TriggerOperationRequest } from '@oomol-lab/open-flow/connector-proxy'
-import type { ProviderAccessReference, ConnectorAccessCandidates } from '@oomol-lab/open-flow/control-api'
 import type {
-  ConnectorAccess,
-  ConnectorAccessSnapshot,
+  ProviderAccessReference,
+  ConnectorAccessCandidates,
   ConnectorAccessGrant,
   ConnectorActionMetadata,
   ConnectorConnection,
   ConnectorProvider,
 } from '@oomol-lab/open-flow/control-api'
-import type { ConnectorActionCapability, ConnectorCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
+import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { Logger } from 'pino'
+import type { ConnectorAccessContext, ConnectorHost } from './connector-contract.ts'
+import type { ResponseBudget, RuntimeAction } from './connector-response.ts'
 import type { ResolvedProviderAccessBinding, TeamAppAccess } from './provider-access.ts'
 
-import { connectorActionPorts } from '@oomol-lab/open-flow/connector-action'
-import { providerIconAppearance } from '@oomol-lab/open-flow/control-api'
 import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
-import { errorKind, silentLogger } from '../logger.ts'
+import { silentLogger } from '../logger.ts'
+import { accessInvalid, assertConnectionNotDeferred, connectionRequired, ConnectorTaskError, unavailable } from './connector-contract.ts'
+import {
+  connectorFailureDetails,
+  mapAction,
+  mapActions,
+  record,
+  runtimeAction,
+  runtimeConnection,
+  runtimeData,
+  runtimeList,
+  runtimeProvider,
+  runtimeTeam,
+} from './connector-response.ts'
+import { ConnectorTransport, maxResponseBytes, RequestError } from './connector-transport.ts'
 import {
   providerAccessAllowsAction,
   providerAccessAllowsProxy,
@@ -26,95 +39,11 @@ import {
   resolveProviderAccessBinding,
 } from './provider-access.ts'
 
-const maxResponseBytes = 1024 * 1024
 const maxActionResponseBytes = 32 * 1024 * 1024
 const maxActionCatalogBytes = 8 * 1024 * 1024
 const catalogConcurrency = 16
 const readinessTimeoutMs = 1_000
 const hostedAccessFreshMs = 5 * 60 * 1_000
-const responseDecoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: false })
-
-interface ResponseBudget {
-  readonly exhaust: (responseBytes: number) => ConnectorTaskError
-  readonly limit: number
-  used: number
-}
-interface GetOptions {
-  readonly fields?: Readonly<Record<string, string>>
-  readonly teamId?: string
-  readonly locale?: string
-  readonly budget?: ResponseBudget
-  readonly maximumResponseBytes?: number
-  readonly failure?: (data: unknown) => ConnectorTaskError
-}
-
-interface RuntimeAction {
-  readonly operationType?: string
-  readonly description: string
-  readonly id: string
-  readonly inputSchema: JsonValue
-  readonly name: string
-  readonly outputSchema: JsonValue
-  readonly service: string
-}
-
-export interface ConnectorHost {
-  execute(
-    action: string,
-    connectionId: string | undefined,
-    input: Readonly<Record<string, JsonValue>>,
-    invocationId: string,
-    signal: AbortSignal,
-    access?: ConnectorAccessContext,
-  ): Promise<JsonValue>
-  getAction(actionId: string, signal?: AbortSignal, access?: ConnectorAccessContext, locale?: string): Promise<ConnectorActionMetadata>
-  listActions(serviceId?: string, signal?: AbortSignal, access?: ConnectorAccessContext, locale?: string): Promise<readonly ConnectorActionMetadata[]>
-  listAllConnections(signal?: AbortSignal, access?: ConnectorAccessContext): Promise<readonly ConnectorConnection[]>
-  listConnections(serviceId: string, signal?: AbortSignal, access?: ConnectorAccessContext): Promise<readonly ConnectorConnection[]>
-  listProviders(signal?: AbortSignal, access?: ConnectorAccessContext, locale?: string): Promise<readonly ConnectorProvider[]>
-  proxy(
-    provider: string,
-    connectionId: string,
-    rateLimitId: string,
-    request: ConnectorProxyRequest,
-    signal: AbortSignal,
-    access?: ConnectorAccessContext,
-  ): Promise<ConnectorProxyResult>
-  trigger?(
-    provider: string,
-    connectionId: string,
-    triggerId: string,
-    request: TriggerOperationRequest,
-    signal: AbortSignal,
-    access?: ConnectorAccessContext,
-  ): Promise<unknown>
-  ready(): Promise<boolean>
-  searchActions(query: string, signal?: AbortSignal, access?: ConnectorAccessContext, locale?: string): Promise<readonly ConnectorActionMetadata[]>
-}
-
-interface ConnectorContext {
-  readonly actorId?: string
-  readonly flowId?: string
-  readonly providerId?: string
-  readonly purpose: 'catalog' | 'eligibility' | 'execute' | 'proxy' | 'trigger'
-  readonly source: 'operator' | 'draft' | 'publication' | 'run'
-  readonly teamId?: string
-}
-
-export type ConnectorAccessContext = ConnectorContext &
-  (
-    | { readonly scope: 'catalog'; readonly providerAccess: ConnectorAccess }
-    | { readonly scope: 'shared' | 'selected'; readonly providerAccess: ConnectorAccessSnapshot }
-    | { readonly scope: 'action'; readonly providerAccess: ConnectorAccessSnapshot; readonly action: string; readonly connectionId?: string }
-    | {
-        readonly scope: 'trigger'
-        readonly triggerId: string
-        readonly providerAccess: ConnectorAccessSnapshot
-        readonly providerId: string
-        readonly connectionId: string
-      }
-    | { readonly scope: 'proxy'; readonly providerAccess: ConnectorAccessSnapshot; readonly providerId: string; readonly connectionId: string }
-  )
 
 function selectedGrants(access: Exclude<ConnectorAccessContext, { readonly scope: 'catalog' }>): readonly ConnectorAccessGrant[] {
   switch (access.scope) {
@@ -135,56 +64,12 @@ function connectorTeamId(access: ConnectorClientAccess | undefined): string | un
   return typeof access == 'string' ? access : access?.teamId
 }
 
-export type ConnectorErrorCode =
-  | 'connector.access-invalid'
-  | 'connector.access-required'
-  | 'connector.input-invalid'
-  | 'connector.indeterminate'
-  | 'connector.action-not-found'
-  | 'connector.connection-required'
-  | 'connector.unavailable'
-  | 'connector.unconfigured'
-
-export class ConnectorTaskError extends Error {
-  readonly code: ConnectorErrorCode
-
-  constructor(code: ConnectorErrorCode, message: string) {
-    super(message)
-    this.code = code
-    this.name = 'ConnectorTaskError'
-  }
-
-  get catchable(): boolean {
-    return this.code != 'connector.indeterminate' && this.code != 'connector.unconfigured'
-  }
-
-  get retryable(): boolean {
-    return this.code == 'connector.unavailable'
-  }
-
-  get indeterminate(): boolean {
-    return this.code == 'connector.indeterminate'
-  }
-}
-
-class RequestError extends ConnectorTaskError {
-  readonly reason: string
-  readonly status: number | undefined
-
-  constructor(cause: ConnectorTaskError, reason: string, status: number | undefined) {
-    super(cause.code, cause.message)
-    this.cause = cause
-    this.reason = reason
-    this.status = status
-  }
-}
-
 export class ConnectorClient implements ConnectorHost {
   readonly #apiOrigin?: URL
   readonly #logger: Logger
   readonly #origin: URL
   readonly #teamOrigin?: URL
-  readonly #timeoutMs: number
+  readonly #transport: ConnectorTransport
   readonly #token: string
   readonly #teamAccess = new Map<string, { readonly expiresAt: number; readonly value: TeamAppAccess }>()
   #userId?: string
@@ -204,7 +89,7 @@ export class ConnectorClient implements ConnectorHost {
       this.#apiOrigin = new URL(`https://api.${domain}/`)
       this.#teamOrigin = new URL(`https://relation-control.${domain}/`)
     }
-    this.#timeoutMs = timeoutMs
+    this.#transport = new ConnectorTransport(url, token, timeoutMs, this.#logger)
     this.#token = token
   }
 
@@ -227,9 +112,9 @@ export class ConnectorClient implements ConnectorHost {
 
   async listTeams(signal?: AbortSignal): Promise<readonly { readonly id: string; readonly name: string; readonly systemCreated: boolean }[]> {
     if (this.#teamOrigin == null || this.#token.length == 0) throw unavailable()
-    const response = await this.#request('teams.list', 'v1/me/teams', { method: 'GET' }, signal, { origin: this.#teamOrigin })
+    const response = await this.#transport.request('teams.list', 'v1/me/teams', { method: 'GET' }, signal, { origin: this.#teamOrigin })
     if (!response.ok) throw unavailable()
-    return this.#decode('teams.list', { upstreamOrigin: this.#teamOrigin.origin, upstreamPath: '/v1/me/teams' }, () => {
+    return this.#transport.decode('teams.list', { upstreamOrigin: this.#teamOrigin.origin, upstreamPath: '/v1/me/teams' }, () => {
       if (!record(response.value) || !Array.isArray(response.value.teams)) throw unavailable()
       return response.value.teams.map(runtimeTeam)
     })
@@ -263,7 +148,7 @@ export class ConnectorClient implements ConnectorHost {
 
   async #providerAccessContext(teamId: string, providerIds: readonly string[], signal?: AbortSignal, catalog?: readonly ConnectorConnection[]) {
     if (this.#teamOrigin == null || this.#token.length == 0) throw unavailable()
-    const response = await this.#request('teams.membership', 'v1/me/teams', { method: 'GET' }, signal, { origin: this.#teamOrigin })
+    const response = await this.#transport.request('teams.membership', 'v1/me/teams', { method: 'GET' }, signal, { origin: this.#teamOrigin })
     if (!response.ok || !record(response.value) || !Array.isArray(response.value.teams)) throw unavailable('The OOMOL Team membership could not be loaded.')
     const team = response.value.teams.find((entry: unknown) => record(entry) && entry.id == teamId)
     if (!record(team) || team.deleted !== false || team.status != 'normal') throw accessInvalid()
@@ -280,7 +165,7 @@ export class ConnectorClient implements ConnectorHost {
   async #oomolUserId(signal?: AbortSignal): Promise<string> {
     if (this.#apiOrigin == null || this.#token.length == 0) throw unavailable()
     if (this.#userId != null) return this.#userId
-    const response = await this.#request('user.profile', 'v1/users/profile', { method: 'GET' }, signal, { origin: this.#apiOrigin })
+    const response = await this.#transport.request('user.profile', 'v1/users/profile', { method: 'GET' }, signal, { origin: this.#apiOrigin })
     if (!response.ok) throw unavailable('The OOMOL user profile could not be loaded.')
     const envelope = record(response.value) && response.value.success === true && record(response.value.data) ? response.value.data : response.value
     if (!record(envelope) || typeof envelope.uid != 'string' || envelope.uid.length == 0) {
@@ -294,7 +179,7 @@ export class ConnectorClient implements ConnectorHost {
     if (this.#teamOrigin == null || this.#token.length == 0) throw unavailable()
     const cached = this.#teamAccess.get(teamId)
     if (cached != null && cached.expiresAt > Date.now()) return cached.value
-    const response = await this.#request('team.app-access', `v1/teams/${encodeURIComponent(teamId)}/app-access`, { method: 'GET' }, signal, {
+    const response = await this.#transport.request('team.app-access', `v1/teams/${encodeURIComponent(teamId)}/app-access`, { method: 'GET' }, signal, {
       maximumResponseBytes: maxActionCatalogBytes,
       origin: this.#teamOrigin,
     })
@@ -337,7 +222,7 @@ export class ConnectorClient implements ConnectorHost {
   }
 
   async #providers(signal?: AbortSignal, teamId?: string, locale?: string) {
-    return this.#get(
+    return this.#transport.get(
       'providers.list',
       'v1/providers',
       (data) => runtimeList(runtimeData(data), (item) => runtimeProvider(item, record(data) && record(data.meta) ? data.meta.iconSprite : undefined)),
@@ -355,7 +240,7 @@ export class ConnectorClient implements ConnectorHost {
         this.#providers(signal, teamId, locale),
         this.#actions(`v1/actions?service=${encodeURIComponent(serviceId)}`, false, signal, teamId, { serviceId }, undefined, locale),
       ])
-      const mapped = this.#decode('actions.list', { serviceId }, () => mapActions(actions, providers))
+      const mapped = this.#transport.decode('actions.list', { serviceId }, () => mapActions(actions, providers))
       return bindings == null ? mapped : mapped.filter((action) => bindings.some((binding) => providerAccessAllowsAction(binding, action)))
     }
     const bindings = typeof access == 'object' && access.scope == 'catalog' ? null : await this.#accessBindings(access, signal)
@@ -406,7 +291,7 @@ export class ConnectorClient implements ConnectorHost {
             }),
           { concurrency: catalogConcurrency },
         ).pipe(Effect.raceFirst(Deferred.await(exhausted)))
-        const mapped = this.#decode('actions.list', {}, () => mapActions(catalogs.flat(), providers))
+        const mapped = this.#transport.decode('actions.list', {}, () => mapActions(catalogs.flat(), providers))
         return bindings == null
           ? mapped
           : mapped.filter((action) => {
@@ -425,7 +310,7 @@ export class ConnectorClient implements ConnectorHost {
       this.#providers(signal, teamId, locale),
       this.#actions(`v1/actions/search?q=${encodeURIComponent(query)}`, true, signal, teamId, {}, undefined, locale),
     ])
-    const mapped = this.#decode('actions.search', {}, () => mapActions(actions, providers))
+    const mapped = this.#transport.decode('actions.search', {}, () => mapActions(actions, providers))
     return bindings == null
       ? mapped
       : mapped.filter((action) => {
@@ -441,14 +326,14 @@ export class ConnectorClient implements ConnectorHost {
       typeof access == 'object' && access.scope == 'catalog' ? null : await this.#providerAccessBindings(access, actionId.slice(0, separator), signal, true)
     const [providers, action] = await Promise.all([
       this.#providers(signal, teamId, locale),
-      this.#get('actions.get', `v1/actions/${encodeURIComponent(actionId)}`, (data) => runtimeAction(runtimeData(data)), signal, {
+      this.#transport.get('actions.get', `v1/actions/${encodeURIComponent(actionId)}`, (data) => runtimeAction(runtimeData(data)), signal, {
         fields: { actionId },
         teamId,
         locale,
         failure: (data) => (record(data) && data.success === false && data.errorCode === 'unknown_action' ? actionNotFound() : unavailable()),
       }),
     ])
-    const mapped = this.#decode('actions.get', { actionId }, () => mapAction(action, providers))
+    const mapped = this.#transport.decode('actions.get', { actionId }, () => mapAction(action, providers))
     if (bindings != null && !bindings.some((binding) => providerAccessAllowsAction(binding, mapped))) throw accessInvalid()
     return mapped
   }
@@ -514,28 +399,30 @@ export class ConnectorClient implements ConnectorHost {
     }
     if (connectionId != null) await this.#assertConnection(connectionId, providerId, signal, teamId)
 
-    const actionResponse = await this.#request(
-      'action.execute',
-      `v1/actions/${encodeURIComponent(action)}`,
-      {
-        body: JSON.stringify({ input }),
-        headers: {
-          'content-type': 'application/json',
-          'idempotency-key': invocationId,
-          ...(connectionId == null ? {} : { 'x-oo-connector-app-id': connectionId }),
+    const actionResponse = await this.#transport
+      .request(
+        'action.execute',
+        `v1/actions/${encodeURIComponent(action)}`,
+        {
+          body: JSON.stringify({ input }),
+          headers: {
+            'content-type': 'application/json',
+            'idempotency-key': invocationId,
+            ...(connectionId == null ? {} : { 'x-oo-connector-app-id': connectionId }),
+          },
+          method: 'POST',
         },
-        method: 'POST',
-      },
-      signal,
-      { fields: { actionId: action, ...(connectionId == null ? {} : { connectionId }), invocationId }, maximumResponseBytes: maxActionResponseBytes, teamId },
-    ).catch((error: unknown) => {
-      if (signal.aborted) throw signal.reason
-      if (!(error instanceof RequestError)) throw error
-      throw new ConnectorTaskError(
-        'connector.indeterminate',
-        `${error.reason}${error.status == null ? '' : ` (HTTP ${error.status})`}. The action outcome is unknown.`,
+        signal,
+        { fields: { actionId: action, ...(connectionId == null ? {} : { connectionId }), invocationId }, maximumResponseBytes: maxActionResponseBytes, teamId },
       )
-    })
+      .catch((error: unknown) => {
+        if (signal.aborted) throw signal.reason
+        if (!(error instanceof RequestError)) throw error
+        throw new ConnectorTaskError(
+          'connector.indeterminate',
+          `${error.reason}${error.status == null ? '' : ` (HTTP ${error.status})`}. The action outcome is unknown.`,
+        )
+      })
     const response = actionResponse.value
     if (!record(response))
       throw new ConnectorTaskError(
@@ -572,7 +459,7 @@ export class ConnectorClient implements ConnectorHost {
       throw accessInvalid()
     const teamId = connectorTeamId(access)
     await this.#assertConnection(connectionId, provider, signal, teamId)
-    const response = await this.#request(
+    const response = await this.#transport.request(
       'trigger.execute',
       `v1/providers/${encodeURIComponent(provider)}/triggers/${encodeURIComponent(triggerId)}/execute`,
       {
@@ -591,6 +478,16 @@ export class ConnectorClient implements ConnectorHost {
       )
     )
       throw connectionRequired()
+    if (record(response.value) && response.value.errorCode === 'trigger_quota_exceeded')
+      throw new ConnectorTaskError(
+        'connector.input-invalid',
+        'Jira webhook quota is full (five per app, user and site). Remove an unused subscription, then retry publication.',
+      )
+    if (record(response.value) && response.value.errorCode === 'trigger_subscription_uncertain')
+      throw new ConnectorTaskError(
+        'connector.input-invalid',
+        'Jira webhook creation has an uncertain outcome. Check the existing remote webhook before retrying; do not create another event source.',
+      )
     if (record(response.value) && ['invalid_input', 'trigger_not_found'].includes(String(response.value.errorCode)) && response.status != 409)
       throw new ConnectorTaskError('connector.input-invalid', 'The Trigger operation configuration is invalid.')
     if (
@@ -619,7 +516,7 @@ export class ConnectorClient implements ConnectorHost {
     const bindings = await this.#providerAccessBindings(access, provider, signal, true)
     if (bindings != null && !bindings.some((candidate) => candidate.appId == connectionId && providerAccessAllowsProxy(candidate))) throw accessInvalid()
     await this.#assertConnection(connectionId, provider, signal, teamId)
-    const proxyResponse = await this.#request(
+    const proxyResponse = await this.#transport.request(
       'proxy.execute',
       `v1/proxy/${encodeURIComponent(provider)}`,
       {
@@ -762,7 +659,7 @@ export class ConnectorClient implements ConnectorHost {
     budget?: ResponseBudget,
     locale?: string,
   ): Promise<readonly RuntimeAction[]> {
-    return this.#get(
+    return this.#transport.get(
       search ? 'actions.search' : 'actions.list',
       path,
       (data) => runtimeList(runtimeData(data), (value) => runtimeAction(value, search)),
@@ -773,7 +670,7 @@ export class ConnectorClient implements ConnectorHost {
 
   async #connections(serviceId?: string, signal?: AbortSignal, teamId?: string): Promise<readonly ConnectorConnection[]> {
     const path = serviceId == null ? 'v1/apps' : `v1/apps/services/${encodeURIComponent(serviceId)}`
-    return this.#get(
+    return this.#transport.get(
       'connections.list',
       path,
       (data) => {
@@ -786,38 +683,9 @@ export class ConnectorClient implements ConnectorHost {
     )
   }
 
-  async #get<Value>(operation: string, path: string, decode: (data: unknown) => Value, signal?: AbortSignal, options: GetOptions = {}): Promise<Value> {
-    signal?.throwIfAborted()
-    const response = await this.#request(operation, path, { method: 'GET' }, signal, options)
-    if (!response.ok) throw options.failure?.(response.value) ?? unavailable()
-    signal?.throwIfAborted()
-    return this.#decode(operation, { ...options.fields, upstreamPath: new URL(path, this.#origin).pathname }, () => decode(response.value))
-  }
-
-  #decode<Value>(operation: string, fields: Readonly<Record<string, string>>, decode: () => Value): Value {
-    try {
-      return decode()
-    } catch (error) {
-      this.#logger.warn(
-        {
-          category: 'connector.request.failed',
-          errorMessage: error instanceof Error ? error.message : String(error),
-          failure: 'response-invalid',
-          operation,
-          upstreamOrigin: this.#origin.origin,
-          ...fields,
-          ...errorKind(error),
-        },
-        'Connector response was invalid.',
-      )
-      if (error instanceof ConnectorTaskError) throw error
-      throw unavailable()
-    }
-  }
-
   async #assertConnection(connectionId: string, service: string, signal: AbortSignal, teamId?: string): Promise<void> {
     const fields = { connectionId, provider: service }
-    const apps = await this.#get(
+    const apps = await this.#transport.get(
       'connection.resolve',
       'v1/apps',
       (data) => {
@@ -834,111 +702,10 @@ export class ConnectorClient implements ConnectorHost {
       throw connectionRequired()
     }
   }
-
-  async #request(
-    operation: string,
-    path: string,
-    init: RequestInit,
-    signal?: AbortSignal,
-    {
-      budget,
-      fields = {},
-      maximumResponseBytes = maxResponseBytes,
-      origin = this.#origin,
-      teamId,
-      locale,
-    }: {
-      readonly budget?: ResponseBudget
-      readonly fields?: Readonly<Record<string, string>>
-      readonly maximumResponseBytes?: number
-      readonly locale?: string
-      readonly origin?: URL
-      readonly teamId?: string
-    } = {},
-  ): Promise<{ readonly headers: Headers; readonly ok: boolean; readonly status: number; readonly value: unknown }> {
-    const startedAt = performance.now()
-    const timeout = AbortSignal.timeout(this.#timeoutMs)
-    const target = new URL(path, origin)
-    let status: number | undefined
-    try {
-      const response = await fetch(target, {
-        ...init,
-        headers: {
-          ...(this.#token == '' ? {} : { authorization: `Bearer ${this.#token}` }),
-          ...(origin == this.#origin && teamId != null ? { 'x-oo-team-id': teamId } : {}),
-          ...(locale == null ? {} : { 'Accept-Language': locale }),
-          ...init.headers,
-        },
-        redirect: 'error',
-        signal: signal == null ? timeout : AbortSignal.any([signal, timeout]),
-      })
-      status = response.status
-      const value = await readJson(response, maximumResponseBytes, budget)
-      if (!response.ok) {
-        this.#logger.warn(
-          {
-            category: 'connector.request.failed',
-            durationMs: Math.round(performance.now() - startedAt),
-            failure: 'upstream-status',
-            ...connectorFailureDetails(value, this.#token),
-            method: init.method ?? 'GET',
-            operation,
-            status,
-            upstreamOrigin: target.origin,
-            upstreamPath: target.pathname,
-            ...fields,
-          },
-          'Connector request failed.',
-        )
-      }
-      return { headers: response.headers, ok: response.ok, status: response.status, value }
-    } catch (error) {
-      if (signal?.aborted) throw signal.reason
-      let failure = 'transport'
-      if (error instanceof ConnectorTaskError) failure = 'response-invalid'
-      else if (timeout.aborted) failure = 'timeout'
-      this.#logger.warn(
-        {
-          category: 'connector.request.failed',
-          durationMs: Math.round(performance.now() - startedAt),
-          failure,
-          errorMessage: error instanceof Error ? error.message : String(error),
-          method: init.method ?? 'GET',
-          operation,
-          ...(status == null ? {} : { status }),
-          upstreamOrigin: target.origin,
-          upstreamPath: target.pathname,
-          ...fields,
-          ...errorKind(error),
-        },
-        'Connector request failed.',
-      )
-      let reason = 'Connector connection failed while sending the request or receiving its response'
-      if (failure == 'timeout') reason = `Connector request timed out after ${this.#timeoutMs} ms`
-      else if (error instanceof ConnectorTaskError) reason = error.message
-      throw new RequestError(error instanceof ConnectorTaskError ? error : unavailable(), reason, status)
-    }
-  }
-}
-
-function connectionRequired(): ConnectorTaskError {
-  return new ConnectorTaskError('connector.connection-required', 'The selected Connector Connection must be reconnected or replaced.')
-}
-
-function accessRequired(): ConnectorTaskError {
-  return new ConnectorTaskError('connector.access-required', 'This Flow has no Provider access binding for the requested Connector.')
-}
-
-function accessInvalid(message = 'The Flow Provider access binding is no longer valid.'): ConnectorTaskError {
-  return new ConnectorTaskError('connector.access-invalid', message)
 }
 
 function selectableAccess(access: ConnectorClientAccess | undefined): access is ConnectorAccessContext {
   return typeof access == 'object' && access.providerAccess.mode == 'selectable'
-}
-
-function actionNotFound(): ConnectorTaskError {
-  return new ConnectorTaskError('connector.action-not-found', 'The Connector Action was not found.')
 }
 
 function actionFailure(response: Record<string, unknown>): ConnectorTaskError {
@@ -953,265 +720,10 @@ function actionFailure(response: Record<string, unknown>): ConnectorTaskError {
   return new ConnectorTaskError('connector.input-invalid', message)
 }
 
-function connectorFailureDetails(value: unknown, token: string): { upstreamErrorCode?: string; upstreamErrorMessage?: string } {
-  if (!record(value)) return {}
-  const sanitize = (text: string): string => {
-    const masked = token == '' ? text : text.replaceAll(token, '[Redacted]')
-    if (/(?:authorization|cookie|credential|password|(?:access|refresh|api)[_-]?(?:token|key))\s*["']?\s*[:=]|bearer\s+\S+/i.test(masked)) return '[Redacted]'
-    return masked.slice(0, 1_000)
-  }
-  return {
-    ...(typeof value.errorCode == 'string' ? { upstreamErrorCode: sanitize(value.errorCode) } : {}),
-    ...(typeof value.message == 'string' ? { upstreamErrorMessage: sanitize(value.message) } : {}),
-  }
+function accessRequired(): ConnectorTaskError {
+  return new ConnectorTaskError('connector.access-required', 'This Flow has no Provider access binding for the requested Connector.')
 }
 
-function record(value: unknown): value is Record<string, unknown> {
-  return value != null && typeof value == 'object' && !Array.isArray(value)
-}
-
-async function readJson(response: Response, limit: number, budget?: ResponseBudget): Promise<unknown> {
-  if (response.body == null) throw unavailable('Connector response has no body')
-  const reader = response.body.getReader()
-  const chunks: Uint8Array[] = []
-  let bytes = 0
-  try {
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-      if (budget != null) {
-        const responseBytes = budget.used + value.byteLength
-        if (responseBytes > budget.limit) throw budget.exhaust(responseBytes)
-        budget.used = responseBytes
-      }
-      bytes += value.byteLength
-      if (bytes > limit) {
-        await reader.cancel()
-        throw unavailable(`Connector response exceeds the ${limit}-byte size limit`)
-      }
-      chunks.push(value)
-    }
-  } finally {
-    reader.releaseLock()
-  }
-  try {
-    return JSON.parse(responseDecoder.decode(Buffer.concat(chunks, bytes))) as unknown
-  } catch {
-    throw unavailable('Connector response is not valid JSON')
-  }
-}
-
-function string(value: unknown, field: string): string {
-  if (typeof value != 'string' || value.length == 0) throw unavailable(`Connector response field "${field}" must be a non-empty string.`)
-  return value
-}
-
-function runtimeData(value: unknown): unknown {
-  const source = record(value) ? value : undefined
-  if (source == null || source.success !== true || !Object.hasOwn(source, 'data')) {
-    throw unavailable('Connector response must contain successful data.')
-  }
-  return source.data
-}
-
-function runtimeList<Value>(value: unknown, decode: (value: unknown) => Value): readonly Value[] {
-  if (!Array.isArray(value)) throw unavailable('Connector response data must be an array.')
-  return value.map(decode)
-}
-
-function runtimeProvider(value: unknown, metadata?: unknown) {
-  const source = record(value) ? value : undefined
-  if (source == null) throw unavailable('Connector Provider must be an object.')
-  if (!Array.isArray(source.authTypes) || source.authTypes.some((authType) => typeof authType != 'string')) {
-    throw unavailable('Connector Provider authTypes must be an array of strings.')
-  }
-  if (source.homepageUrl != null && typeof source.homepageUrl != 'string') throw unavailable('Connector Provider homepageUrl must be a string.')
-  if (source.iconUrl != null && typeof source.iconUrl != 'string') throw unavailable('Connector Provider iconUrl must be a string.')
-  return {
-    ...providerIconAppearance(metadata, source.iconSpritePosition),
-    authenticated: !source.authTypes.includes('no_auth'),
-    noSetup: source.authTypes.length == 1 && source.authTypes[0] == 'no_auth',
-    ...(source.homepageUrl == null || source.homepageUrl.length == 0 ? {} : { homepageUrl: source.homepageUrl }),
-    ...(source.iconUrl == null || source.iconUrl.length == 0 ? {} : { icon: source.iconUrl }),
-    serviceId: string(source.service, 'provider.service'),
-    serviceName: string(source.displayName, 'provider.displayName'),
-  }
-}
-
-function runtimeAction(value: unknown, search = false): RuntimeAction {
-  const source = record(value) ? value : undefined
-  if (source == null) throw unavailable('Connector Action must be an object.')
-  if (typeof source.description != 'string') throw unavailable('Connector Action description must be a string.')
-  const name = string(source.name, 'action.name')
-  const service = string(source.service, 'action.service')
-  return {
-    ...(source.operationType == null ? {} : { operationType: string(source.operationType, 'action.operationType') }),
-    description: source.description,
-    id: search ? `${service}.${name}` : string(source.id, 'action.id'),
-    inputSchema: source.inputSchema as JsonValue,
-    name,
-    outputSchema: source.outputSchema as JsonValue,
-    service,
-  }
-}
-
-function runtimeConnection(value: unknown): ConnectorConnection {
-  const source = record(value) ? value : undefined
-  if (source == null) throw unavailable('Connector Connection must be an object.')
-  const status = connectionStatus(source.status)
-  if (typeof source.isDefault != 'boolean') throw unavailable('Connector Connection isDefault must be a boolean.')
-  return {
-    ...(source.providerAccountId == null ? {} : { providerAccountId: string(source.providerAccountId, 'connection.providerAccountId') }),
-    ...(source.alias == null ? {} : { alias: string(source.alias, 'connection.alias') }),
-    ...(source.marketplace == null ? {} : { builtInAccount: true }),
-    connectionId: string(source.id, 'connection.id'),
-    displayName: string(source.displayName, 'connection.displayName'),
-    isDefault: source.isDefault,
-    serviceId: string(source.service, 'connection.service'),
-    status,
-  }
-}
-
-function runtimeTeam(value: unknown): { readonly id: string; readonly name: string; readonly systemCreated: boolean } {
-  if (!record(value)) throw unavailable('Connector Team must be an object.')
-  return {
-    id: string(value.id, 'team.id'),
-    name: string(value.name, 'team.name'),
-    systemCreated: value.system_created === true,
-  }
-}
-
-function connectionStatus(value: unknown): ConnectorConnection['status'] {
-  switch (value) {
-    case 'active':
-    case 'disconnected':
-    case 'error':
-    case 'reauth_required':
-      return value
-    default:
-      throw unavailable('Connector Connection status was invalid.')
-  }
-}
-
-function mapActions(actions: readonly RuntimeAction[], providers: readonly ReturnType<typeof runtimeProvider>[]): readonly ConnectorActionMetadata[] {
-  return actions.map((action) => mapAction(action, providers))
-}
-
-function mapAction(action: RuntimeAction, providers: readonly ReturnType<typeof runtimeProvider>[]): ConnectorActionMetadata {
-  const provider = providers.find((candidate) => candidate.serviceId == action.service)
-  if (provider == null) throw unavailable('Connector Action referenced an unknown service.')
-  let ports: ReturnType<typeof connectorActionPorts>
-  try {
-    ports = connectorActionPorts(action.inputSchema, action.outputSchema)
-  } catch {
-    throw unavailable('Connector response is not valid JSON')
-  }
-  return {
-    actionId: action.id,
-    ...(action.operationType == null ? {} : { operationType: action.operationType }),
-    inputSchema: action.inputSchema,
-    outputSchema: action.outputSchema,
-    authenticated: provider.authenticated,
-    description: action.description,
-    ...(provider.homepageUrl == null ? {} : { homepageUrl: provider.homepageUrl }),
-    ...(provider.icon == null ? {} : { icon: provider.icon }),
-    ...(provider.iconSprite == null ? {} : { iconSprite: provider.iconSprite, iconSpritePosition: provider.iconSpritePosition }),
-    inputs: Object.fromEntries(
-      ports.inputs.map((port) => {
-        if (port.nullable == null) throw unavailable('Connector Action input schema did not declare nullability.')
-        return [
-          port.handle,
-          {
-            ...(port.description == null ? {} : { description: port.description }),
-            jsonSchema: port.json_schema as JsonValue,
-            nullable: port.nullable,
-            ...(port.value === undefined ? {} : { value: port.value as JsonValue }),
-          },
-        ]
-      }),
-    ),
-    name: action.name,
-    outputs: Object.fromEntries(
-      ports.outputs.map((port) => {
-        if (port.nullable == null) throw unavailable('Connector Action output schema did not declare nullability.')
-        return [
-          port.handle,
-          {
-            ...(port.description == null ? {} : { description: port.description }),
-            jsonSchema: port.json_schema as JsonValue,
-            nullable: port.nullable,
-          },
-        ]
-      }),
-    ),
-    serviceId: action.service,
-    serviceName: provider.serviceName,
-  }
-}
-
-function unavailable(message = 'The Connector request could not be completed.'): ConnectorTaskError {
-  return new ConnectorTaskError('connector.unavailable', message)
-}
-
-/** An explicitly deferred account must never resolve to a default account. */
-export function assertConnectionNotDeferred(connectionId: string | undefined): void {
-  if (connectionId === '') throw new ConnectorTaskError('connector.connection-required', 'Configure an account before calling this Action.')
-}
-
-export async function checkCodeActions(
-  declarations: readonly ConnectorActionCapability[],
-  connector: ConnectorHost | undefined,
-  access?: ConnectorAccessContext,
-  signal?: AbortSignal,
-): Promise<void> {
-  if (declarations.length == 0) return
-  if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
-  const actions = new Map<string, Promise<ConnectorActionMetadata>>()
-  const catalogs = new Map<string, Promise<readonly ConnectorConnection[]>>()
-  for (const declaration of declarations) {
-    let action = actions.get(declaration.action)
-    if (action == null) {
-      action = connector.getAction(declaration.action, signal, access)
-      actions.set(declaration.action, action)
-    }
-    const definition = await action
-    if (definition.authenticated && declaration.connections.length == 0) throw connectionRequired()
-    if (declaration.connections.length == 0) continue
-    let catalog = catalogs.get(definition.serviceId)
-    if (catalog == null) {
-      catalog = connector.listConnections(definition.serviceId, signal, access)
-      catalogs.set(definition.serviceId, catalog)
-    }
-    const connections = await catalog
-    for (const allowed of declaration.connections) {
-      if (
-        !connections.some(
-          (connection) => connection.connectionId == allowed.connectionId && connection.serviceId == definition.serviceId && connection.status == 'active',
-        )
-      )
-        throw connectionRequired()
-    }
-  }
-}
-
-export async function checkCodePermissions(
-  declarations: readonly ConnectorCapability[],
-  connector: ConnectorHost | undefined,
-  access: ConnectorAccessContext,
-  signal?: AbortSignal,
-): Promise<void> {
-  const actions = declarations.flatMap((declaration) =>
-    'mode' in declaration && declaration.mode == 'independent' ? declaration.actions.filter((entry) => entry.connectionId !== '') : [],
-  )
-  if (actions.length == 0) return
-  if (connector == null) throw new ConnectorTaskError('connector.unconfigured', 'Connector is not configured for this deployment.')
-  for (const entry of actions) {
-    if (access.scope == 'catalog') throw accessInvalid('Code permissions require a fixed access snapshot.')
-    const scoped: ConnectorAccessContext = { ...access, scope: 'action', action: entry.action, connectionId: entry.connectionId }
-    const action = await connector.getAction(entry.action, signal, { ...scoped, providerId: entry.action.split('.')[0] })
-    if (!action.authenticated && entry.connectionId == null) continue
-    if (entry.connectionId == null) throw connectionRequired()
-    const connections = await connector.listConnections(action.serviceId, signal, scoped)
-    if (!connections.some((connection) => connection.status == 'active' && connection.connectionId == entry.connectionId)) throw connectionRequired()
-  }
+function actionNotFound(): ConnectorTaskError {
+  return new ConnectorTaskError('connector.action-not-found', 'The Connector Action was not found.')
 }

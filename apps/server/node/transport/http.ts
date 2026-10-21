@@ -118,6 +118,14 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     }
     return callbackRetryAfter(callbackWindows, key, callbackRequestsPerMinute, now)
   }
+  app.all('/v1/event-source-apps/:kind/:appId/events', async (context) => {
+    const appId = context.req.param('appId')
+    const retry = admitCallback(`event-source-app:${context.req.param('kind')}:${appId}`)
+    if (retry != null) return new Response(null, { status: 429, headers: { 'retry-after': String(retry) } })
+    const response = await service.receiveApplicationEvent(context.req.param('kind'), appId, context.req.raw)
+    response.headers.set('cache-control', 'no-store')
+    return response
+  })
   app.all('/v1/event-sources/:sourceId/events', async (context) => {
     const sourceId = context.req.param('sourceId')
     const retry = admitCallback(`event-source:${sourceId}`)

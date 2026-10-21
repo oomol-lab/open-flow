@@ -1,0 +1,18 @@
+{
+  "vercel.on_deployment_event": {
+    "displayName": "Готовность или ошибка развёртывания",
+    "description": "Готовность или ошибка развёртывания.",
+    "configInputs": {
+      "teamId": "ID команды",
+      "projectId": "ID проекта",
+      "environment": "Окружение"
+    },
+    "outputs": {
+      "event": "Тип бизнес-события.",
+      "deliveryId": "ID доставки",
+      "deploymentId": "ID развёртывания",
+      "projectId": "ID проекта",
+      "body": "Исходные данные события."
+    }
+  }
+}

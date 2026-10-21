@@ -1,0 +1,12 @@
+{
+  "typeform.on_form_response": {
+    "displayName": "完整表单提交",
+    "description": "完整表单提交。",
+    "configInputs": {
+      "formId": "表单 ID"
+    },
+    "outputs": {
+      "response": "提交身份、时间及保留稳定字段标识的原始答案。"
+    }
+  }
+}

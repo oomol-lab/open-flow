@@ -59,7 +59,19 @@ export function applyFlowChanges(draft: Draft, changes: FlowChanges): Draft {
 
 export function setTriggerEventSource(revision: RevisionView, triggerId: string, source: EventSource): FlowChanges | undefined {
   const trigger = revision.graph().nodes[triggerId]
-  if (trigger?.kind != 'integration' || trigger.definition.key != 'feishu_app_bot.on_event' || source.provider != trigger.definition.provider) return
+  if (
+    trigger?.kind != 'integration' ||
+    ![
+      'feishu_app_bot.on_event',
+      'slackbot.on_event',
+      'intercom.on_conversation_event',
+      'sentry.on_issue_alert',
+      'zoom.on_recording_ready',
+      'fireflies.on_meeting_ready',
+    ].includes(trigger.definition.key) ||
+    source.provider != trigger.definition.provider
+  )
+    return
   const content = revision.revision.content
   const changes = changeTriggerConnection(content, triggerId, source.connectionId)
   if (changes == null) return
@@ -69,7 +81,7 @@ export function setTriggerEventSource(revision: RevisionView, triggerId: string,
     ...(changeTriggerConfig(content, triggerId, 'sourceId', source.sourceId) ?? []),
     ...(changed ? (changeTriggerConfig(content, triggerId, 'eventTypes', undefined) ?? []) : []),
     ...(changed ? (changeTriggerConfig(content, triggerId, 'resource', undefined) ?? []) : []),
-    ...(changed ? (changeTriggerConfig(content, triggerId, 'chatIds', undefined) ?? []) : []),
+    ...(changed ? (changeTriggerConfig(content, triggerId, trigger.definition.provider === 'slackbot' ? 'channelIds' : 'chatIds', undefined) ?? []) : []),
   ]
 }
 

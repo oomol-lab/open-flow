@@ -1,9 +1,8 @@
-import type { TriggerConfigOption } from '../../../../control/common/api.ts'
 import type { InputValues } from '../../../../flow/common/change.ts'
 import type { Group, InputPort } from '../api.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
 
-import { useEffect, useId, useState } from 'react'
+import { useId, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../form/browser/selectionMenuStyles.ts'
 import { triggerConfigValues } from '../../../../trigger/common/config.ts'
@@ -11,51 +10,7 @@ import { Button } from '../../../../ui/browser/button.tsx'
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuGroup, DropdownMenuTrigger } from '../../../../ui/browser/dropdown-menu.tsx'
 import { Select, SelectChevron, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../../ui/browser/select.tsx'
 import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
-
-type OptionsState = {
-  readonly failed: boolean
-  readonly key: string
-  readonly loading: boolean
-  readonly options?: readonly TriggerConfigOption[]
-}
-
-function useOptions(store: WorkspaceStore, nodeId: string, field: string, scope: string, enabled: boolean) {
-  const [attempt, setAttempt] = useState(0)
-  const key = JSON.stringify([nodeId, field, scope])
-  const [state, setState] = useState<OptionsState>()
-  useEffect(() => {
-    if (!enabled) return
-    const controller = new AbortController()
-    setState((current) => ({
-      failed: false,
-      key,
-      loading: true,
-      options: current?.key == key ? current.options : undefined,
-    }))
-    void store.loadTriggerConfigOptions(nodeId, field, controller.signal).then(
-      (options) => {
-        if (!controller.signal.aborted) setState({ failed: false, key, loading: false, options })
-      },
-      () => {
-        if (!controller.signal.aborted)
-          setState((current) => ({
-            failed: true,
-            key,
-            loading: false,
-            options: current?.key == key ? current.options : undefined,
-          }))
-      },
-    )
-    return () => controller.abort()
-  }, [store, nodeId, field, scope, key, enabled, attempt])
-  const current = enabled && state?.key == key ? state : undefined
-  return {
-    failed: current?.failed ?? false,
-    loading: enabled && (current?.loading ?? true),
-    options: current?.options,
-    refresh: () => setAttempt((value) => value + 1),
-  }
-}
+import { useTriggerConfigOptions } from './useTriggerConfigOptions.ts'
 
 const retryTeamValue = '__open_flow_retry_linear_teams__'
 
@@ -68,7 +23,7 @@ export function TeamSelect({
 }: {
   readonly disabled: boolean
   readonly missing: boolean
-  readonly options: ReturnType<typeof useOptions>
+  readonly options: ReturnType<typeof useTriggerConfigOptions>
   readonly value?: string
   readonly onChange: (value: string) => void
 }) {
@@ -142,7 +97,7 @@ export function StatusSelect({
 }: {
   readonly disabled: boolean
   readonly missing: readonly string[]
-  readonly options: ReturnType<typeof useOptions>
+  readonly options: ReturnType<typeof useTriggerConfigOptions>
   readonly selected: readonly string[]
   readonly teamSelected: boolean
   readonly onChange: (value: readonly string[]) => void
@@ -270,8 +225,8 @@ export function LinearTriggerConfig({
   const teamId = typeof config.teamId == 'string' ? config.teamId : undefined
   const selected = Array.isArray(config.stateIds) ? config.stateIds.filter((id): id is string => typeof id == 'string') : []
   const scope = JSON.stringify([store.$.flowId.value, connectionId])
-  const teams = useOptions(store, nodeId, 'teamId', scope, connectionId != null)
-  const states = useOptions(store, nodeId, 'stateIds', JSON.stringify([scope, teamId]), connectionId != null && teamId != null)
+  const teams = useTriggerConfigOptions(store, nodeId, 'teamId', scope, connectionId != null)
+  const states = useTriggerConfigOptions(store, nodeId, 'stateIds', JSON.stringify([scope, teamId]), connectionId != null && teamId != null)
   const missingTeam = teamId != null && teams.options != null && !teams.options.some((item) => item.value == teamId)
   const missingStates = states.options == null ? [] : selected.filter((id) => !states.options!.some((item) => item.value == id))
   return (

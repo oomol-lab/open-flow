@@ -1,0 +1,16 @@
+{
+  "calendly.on_booking_event": {
+    "displayName": "預約建立或取消",
+    "description": "接收預約建立和取消，保留改期關聯。需要個人存取權杖連線。",
+    "configInputs": {
+      "scope": "範圍",
+      "eventTypes": "事件"
+    },
+    "outputs": {
+      "event": "業務事件類型。",
+      "inviteeUri": "預約人 URI",
+      "createdAt": "事件時間。",
+      "body": "原始事件資料。"
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "sentry.on_issue_alert": {
+    "displayName": "Issue アラート",
+    "description": "インストール済み Sentry カスタム統合の Issue アラートを受信します。",
+    "configInputs": {
+      "sourceId": "イベントソース",
+      "eventTypes": "イベント",
+      "projectIds": "プロジェクト ID",
+      "ruleNames": "アラートルール名"
+    },
+    "outputs": {
+      "event": "イベント種類",
+      "deliveryId": "通知 ID",
+      "organizationId": "組織 ID",
+      "issueId": "Issue ID",
+      "body": "元のオブジェクト"
+    }
+  }
+}

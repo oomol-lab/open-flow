@@ -1,7 +1,7 @@
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 import type { IncomingMessage, Server, ServerResponse } from 'node:http'
 import type { DestinationStream, Logger } from 'pino'
-import type { ConnectorAccessContext } from '../node/deployment/connector.ts'
+import type { ConnectorAccessContext } from '../node/deployment/connector-contract.ts'
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { mkdtemp, rm } from 'node:fs/promises'

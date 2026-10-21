@@ -24,7 +24,8 @@ import { IsolatedVmHost } from '../node/runtime/isolated-vm.ts'
 const codeHost = new IsolatedVmHost()
 afterAll(() => codeHost.close())
 import { executeAgent as runAgent } from '../node/deployment/agent.ts'
-import { ConnectorClient, ConnectorTaskError } from '../node/deployment/connector.ts'
+import { ConnectorTaskError } from '../node/deployment/connector-contract.ts'
+import { ConnectorClient } from '../node/deployment/connector.ts'
 
 const savedResults = new Map<string, { result: import('@oomol-lab/open-flow/control-api').ResultInfo; content: string }>()
 afterEach(() => savedResults.clear())

@@ -28,6 +28,12 @@ function sample(schema: JsonValue): JsonValue {
 
 const configExamples: Readonly<Record<string, Readonly<Record<string, JsonValue>>>> = {
   feishu_app_bot: { sourceId: 'source_11111111111111111111111111111111', eventTypes: ['im.message.receive_v1'], chatIds: ['oc_demo'] },
+  slackbot: { sourceId: 'source_11111111111111111111111111111111', eventTypes: ['app_mention'] },
+  intercom: { sourceId: 'source_11111111111111111111111111111111', eventTypes: ['conversation.user.created'] },
+  sentry: { sourceId: 'source_11111111111111111111111111111111', eventTypes: ['issue.alert'] },
+  zoom: { sourceId: 'source_11111111111111111111111111111111', eventTypes: ['recording.completed'] },
+  fireflies: { sourceId: 'source_11111111111111111111111111111111', eventTypes: ['meeting.transcribed'] },
+  jira: { sourceId: 'source_11111111111111111111111111111111', eventTypes: ['jira:issue_created'] },
   airtable: { baseId: 'app12345678901234', tableIdOrName: 'Orders', triggerField: 'Last modified' },
   gmail: { sender: 'orders@example.com', readStatus: 'Unread' },
   github: { owner: 'oomol-lab', repo: 'open-flow', events: ['issues', 'push'] },
@@ -43,6 +49,15 @@ const configExamples: Readonly<Record<string, Readonly<Record<string, JsonValue>
   slack: { channelId: 'C0122KQ70S7E', textContains: 'release' },
   stripe: { events: ['payment_intent.succeeded'] },
   telegram: { updates: ['message'] },
+  tally: { formId: 'lead-form' },
+  typeform: { formId: 'customer-survey' },
+  calendly: { scope: 'user', eventTypes: ['invitee.created', 'invitee.canceled'] },
+  pipedrive: { eventType: 'deal.stage_changed' },
+  clickup: { workspaceId: '123456', listId: '789012', eventTypes: ['taskStatusUpdated'] },
+  resend: { eventTypes: ['email.received'] },
+  pandadoc: { completedOnly: true },
+  asana: { projectId: '123456', eventTypes: ['task.added', 'task.completed'] },
+  vercel: { teamId: 'team_example', projectId: 'prj_example', environment: 'production' },
   woocommerce: { events: ['order.created'] },
   zendesk: { events: ['zen:event-type:ticket.created'] },
 }
@@ -111,7 +126,23 @@ export const triggerFixtures: readonly TriggerFixture[] = [
     return {
       id: definition.key.replaceAll('.', '-').replaceAll('_', '-'),
       trigger,
-      outputs: Object.fromEntries(triggerOutputDefinitions(trigger).map((port) => [port.handle, sample(port.jsonSchema)])),
+      outputs:
+        definition.key === 'tally.on_form_response'
+          ? {
+              response: {
+                eventId: 'event-1',
+                createdAt: '2026-10-20T00:00:00Z',
+                formId: 'lead-form',
+                submissionId: 'submission-1',
+                responseId: 'response-1',
+                fields: [
+                  { key: 'name', type: 'INPUT_TEXT', label: 'Name', value: '李明' },
+                  { key: 'quantity', type: 'INPUT_NUMBER', label: 'Quantity', value: 3 },
+                  { key: 'notes', type: 'TEXTAREA', label: 'Notes', value: null },
+                ],
+              },
+            }
+          : Object.fromEntries(triggerOutputDefinitions(trigger).map((port) => [port.handle, sample(port.jsonSchema)])),
     }
   }),
 ]

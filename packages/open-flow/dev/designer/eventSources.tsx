@@ -12,6 +12,7 @@ import { CreateEventSourceDialog } from '../../src/workbench/browser/runtime/cre
 import { EditorContextPanel } from '../../src/workbench/browser/runtime/editor/editorContextPanel.tsx'
 import { FeishuEventFilters } from '../../src/workbench/browser/runtime/editor/feishuEventFilters.tsx'
 import { TriggerSummary } from '../../src/workbench/browser/runtime/editor/triggerSummary.tsx'
+import { eventSourcePresentations } from '../../src/workbench/browser/runtime/eventSourcePresentation.ts'
 import { EventSourcesPage, SourceForm } from '../../src/workbench/browser/runtime/eventSources.tsx'
 import { EventSourceSetup } from '../../src/workbench/browser/runtime/eventSourceSetup.tsx'
 import { FeishuEventPicker } from '../../src/workbench/browser/runtime/feishuEventPicker.tsx'
@@ -47,13 +48,13 @@ const sampleSource: NonNullable<ComponentProps<typeof SourceForm>['source']> = {
 const client: ComponentProps<typeof SourceForm>['client'] = {
   createConnectorConnectionPage: async () => 'https://connector.example/providers/feishu_app_bot',
   listEventSources: async () => ({ version: 1, sources: [] }),
-  listEventSourceConnections: async () => [
+  listEventSourceConnections: async (_team, _signal, kind) => [
     {
       connectionId: 'sample-bot',
-      providerAccountId: 'cli_demo',
-      displayName: 'Feishu · Demo bot',
+      providerAccountId: kind === 'jira' ? 'jira:cloud:user' : kind === 'intercom' ? 'workspace:admin' : kind === 'slack' ? 'UDEMO' : 'cli_demo',
+      displayName: `${eventSourcePresentations[kind ?? 'feishu'].label} · Demo`,
       isDefault: true,
-      serviceId: 'feishu_app_bot',
+      serviceId: eventSourcePresentations[kind ?? 'feishu'].provider,
       status: 'active',
     },
   ],
@@ -85,6 +86,36 @@ function Forms({ language, dark, log }: { language: Parameters<FrontendStory['re
     <I18nProvider i18n={i18n}>
       <Toaster {...notificationToasterProps} theme={dark ? 'dark' : 'light'} />
       <div className="open-flow-theme grid gap-6 p-6 text-sm text-foreground xl:grid-cols-2" data-theme={dark ? 'dark' : 'light'}>
+        {(['intercom', 'sentry', 'zoom', 'fireflies', 'jira'] as const).map((kind) => (
+          <section key={kind}>
+            <h2 className="m-0 mb-4 text-sm font-medium">{eventSourcePresentations[kind].label}</h2>
+            <SourceForm sourceKind={kind} notify={notify} client={client} teams={[]} onCancel={() => log('Canceled')} onSaved={() => log('Saved')} />
+          </section>
+        ))}
+        <section>
+          <h2 className="m-0 mb-4 text-sm font-medium">Slack · shared application source</h2>
+          <SourceForm sourceKind="slack" notify={notify} client={client} teams={[]} onCancel={() => log('Canceled')} onSaved={() => log('Saved')} />
+        </section>
+        <section>
+          <h2 className="m-0 mb-4 text-sm font-medium">Slack · callback configuration</h2>
+          <SourceForm
+            notify={notify}
+            client={client}
+            teams={[]}
+            source={{
+              ...sampleSource,
+              provider: 'slackbot',
+              appId: 'ADEMO',
+              workspaceId: 'TDEMO',
+              eventTypes: ['app_mention', 'message.im'],
+              verificationTokenConfigured: false,
+              encryptKeyConfigured: false,
+              signingSecretConfigured: true,
+            }}
+            onCancel={() => log('Canceled')}
+            onSaved={() => log('Saved')}
+          />
+        </section>
         <section className="xl:col-span-2">
           <h2 className="m-0 mb-4 text-sm font-medium">Page content · host supplies the container</h2>
           <EventSourcesPage notify={notify} client={client} language={language} teams={[]} />
@@ -214,7 +245,7 @@ function CreateDialogStory({
                 connectionId: input.connectionId,
                 teamId: input.teamId,
                 eventTypes: input.eventTypes,
-                manageSubscriptions: input.manageSubscriptions,
+                manageSubscriptions: input.kind == null || input.kind === 'feishu' ? input.manageSubscriptions : false,
               }
               return created.current
             },

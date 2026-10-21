@@ -1,0 +1,23 @@
+{
+  "slackbot.on_event": {
+    "displayName": "メンション・ダイレクトメッセージ",
+    "description": "Slack アプリの共有ソースからユーザーのメンションと新しい DM を受信します。Slack Connect は対象外です。",
+    "configInputs": {
+      "sourceId": "イベントソース",
+      "eventTypes": "イベント",
+      "channelIds": "チャンネル ID。空の場合はすべて。"
+    },
+    "outputs": {
+      "event": "イベント種類",
+      "deliveryId": "イベント ID",
+      "appId": "Slack アプリ ID",
+      "teamId": "ワークスペース ID",
+      "channel": "会話 ID",
+      "user": "ユーザー ID",
+      "text": "メッセージ本文",
+      "ts": "メッセージのタイムスタンプ",
+      "threadTs": "親スレッドのタイムスタンプ（存在する場合）。",
+      "body": "元の Slack イベント"
+    }
+  }
+}

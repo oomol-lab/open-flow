@@ -1,0 +1,17 @@
+{
+  "jira.on_issue_event": {
+    "displayName": "Jira 프로젝트 이벤트",
+    "description": "공유 Jira Cloud 프로젝트의 이슈 생성, 업데이트 및 댓글 이벤트를 수신합니다.",
+    "configInputs": {
+      "sourceId": "이벤트 소스",
+      "eventTypes": "이벤트"
+    },
+    "outputs": {
+      "event": "이벤트 유형",
+      "deliveryId": "알림 ID",
+      "cloudId": "클라우드 사이트 ID",
+      "issueId": "이슈 ID",
+      "body": "원본 이벤트"
+    }
+  }
+}

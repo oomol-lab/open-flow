@@ -1,0 +1,17 @@
+{
+  "intercom.on_conversation_event": {
+    "displayName": "Conversation client ou ticket",
+    "description": "Reçoit les conversations, réponses clients et nouveaux tickets. Exclut les réponses des administrateurs.",
+    "configInputs": {
+      "sourceId": "Source d’événements",
+      "eventTypes": "Événements"
+    },
+    "outputs": {
+      "event": "Type d’événement",
+      "deliveryId": "ID de notification",
+      "workspaceId": "ID de l’espace de travail",
+      "objectId": "ID de conversation ou ticket",
+      "body": "Objet original"
+    }
+  }
+}

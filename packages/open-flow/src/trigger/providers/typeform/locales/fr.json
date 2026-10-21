@@ -1,0 +1,12 @@
+{
+  "typeform.on_form_response": {
+    "displayName": "Réponse complète au formulaire",
+    "description": "Réponse complète au formulaire.",
+    "configInputs": {
+      "formId": "ID du formulaire"
+    },
+    "outputs": {
+      "response": "Identité, date et réponses originales avec identifiants de champs stables."
+    }
+  }
+}

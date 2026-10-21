@@ -1,0 +1,15 @@
+{
+  "pipedrive.on_crm_event": {
+    "displayName": "Événement de transaction ou de contact",
+    "description": "Événement de transaction ou de contact.",
+    "configInputs": {
+      "eventType": "Événement"
+    },
+    "outputs": {
+      "event": "Type d’événement métier.",
+      "deliveryId": "ID de livraison",
+      "objectId": "ID de l’objet",
+      "body": "Données originales de l’événement."
+    }
+  }
+}

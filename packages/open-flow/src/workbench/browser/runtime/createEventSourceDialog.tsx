@@ -12,6 +12,7 @@ import { errorNotice } from './stores/workbenchNotice.ts'
 
 export function CreateEventSourceDialog({
   client,
+  sourceKind,
   notify,
   teamId,
   existingNames,
@@ -22,6 +23,7 @@ export function CreateEventSourceDialog({
   onSelect,
   onCreated,
 }: {
+  readonly sourceKind?: 'feishu' | 'slack' | 'intercom' | 'sentry' | 'zoom' | 'fireflies' | 'jira'
   readonly notify: SetNotice
   readonly client: ComponentProps<typeof SourceForm>['client']
   readonly teamId: string | null
@@ -76,6 +78,7 @@ export function CreateEventSourceDialog({
           <div className="min-h-0 overflow-y-auto">
             {open && created == null && (
               <SourceForm
+                sourceKind={sourceKind}
                 notify={notify}
                 client={client}
                 teams={[]}

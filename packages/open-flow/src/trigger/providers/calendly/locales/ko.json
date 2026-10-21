@@ -1,0 +1,16 @@
+{
+  "calendly.on_booking_event": {
+    "displayName": "예약 생성 또는 취소",
+    "description": "예약 생성과 취소 및 일정 변경 연결을 수신합니다. 개인 액세스 토큰이 필요합니다.",
+    "configInputs": {
+      "scope": "범위",
+      "eventTypes": "이벤트"
+    },
+    "outputs": {
+      "event": "비즈니스 이벤트 유형.",
+      "inviteeUri": "초대받은 사람 URI",
+      "createdAt": "이벤트 시간.",
+      "body": "원본 이벤트 데이터."
+    }
+  }
+}

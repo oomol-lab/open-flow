@@ -76,7 +76,7 @@ it('retains audit after restart and migrates old Runs without inventing identiti
   const database = new DatabaseSync(file)
   database.exec('ALTER TABLE runs DROP COLUMN initiator_actor_id')
   database.exec('ALTER TABLE runs DROP COLUMN initiator_channel')
-  database.exec('PRAGMA user_version = 49')
+  database.exec('DROP TABLE event_source_apps; DROP TABLE source_event_versions; PRAGMA user_version = 49')
   database.close()
   const migrated = await openService(file)
   const { initiator: _initiator, ...legacy } = run

@@ -8,6 +8,10 @@ export default defineConfig({
     coverage: {
       include: [
         'node/deployment/connector.ts',
+        'node/deployment/connector-contract.ts',
+        'node/deployment/connector-response.ts',
+        'node/deployment/connector-transport.ts',
+        'node/application/connector-capabilities.ts',
         'node/application/control-service.ts',
         'node/application/cron-driver.ts',
         'node/application/flow-validation.ts',

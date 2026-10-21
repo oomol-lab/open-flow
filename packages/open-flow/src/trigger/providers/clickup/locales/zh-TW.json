@@ -1,0 +1,16 @@
+{
+  "clickup.on_task_event": {
+    "displayName": "任務事件",
+    "description": "任務事件。",
+    "configInputs": {
+      "workspaceId": "工作區 ID",
+      "listId": "清單 ID",
+      "eventTypes": "事件"
+    },
+    "outputs": {
+      "event": "業務事件類型。",
+      "taskId": "任務 ID",
+      "body": "原始事件資料。"
+    }
+  }
+}

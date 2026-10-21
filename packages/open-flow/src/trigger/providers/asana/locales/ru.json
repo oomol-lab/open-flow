@@ -1,0 +1,15 @@
+{
+  "asana.on_task_event": {
+    "displayName": "Событие задачи проекта",
+    "description": "Получает изменения задач проекта с текущими данными задач.",
+    "configInputs": {
+      "projectId": "ID проекта",
+      "eventTypes": "События",
+      "customFieldId": "ID пользовательского поля"
+    },
+    "outputs": {
+      "projectId": "ID проекта",
+      "events": "Подходящие события в этой доставке."
+    }
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "sentry.on_issue_alert": {
+    "displayName": "Alerte de problème",
+    "description": "Reçoit les alertes de problème d’une intégration Sentry installée.",
+    "configInputs": {
+      "sourceId": "Source d’événements",
+      "eventTypes": "Événements",
+      "projectIds": "ID des projets",
+      "ruleNames": "Noms des règles d’alerte"
+    },
+    "outputs": {
+      "event": "Type d’événement",
+      "deliveryId": "ID de notification",
+      "organizationId": "ID d’organisation",
+      "issueId": "ID du problème",
+      "body": "Objet original"
+    }
+  }
+}

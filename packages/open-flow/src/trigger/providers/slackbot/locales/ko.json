@@ -1,0 +1,23 @@
+{
+  "slackbot.on_event": {
+    "displayName": "멘션 또는 다이렉트 메시지",
+    "description": "공유 Slack 앱 소스에서 사용자 멘션과 새 DM을 수신합니다. Slack Connect는 제외됩니다.",
+    "configInputs": {
+      "sourceId": "이벤트 소스",
+      "eventTypes": "이벤트",
+      "channelIds": "채널 ID. 비어 있으면 모든 채널."
+    },
+    "outputs": {
+      "event": "이벤트 유형",
+      "deliveryId": "이벤트 ID",
+      "appId": "Slack 앱 ID",
+      "teamId": "워크스페이스 ID",
+      "channel": "대화 ID",
+      "user": "사용자 ID",
+      "text": "메시지 텍스트",
+      "ts": "메시지 타임스탬프",
+      "threadTs": "상위 스레드 타임스탬프(있는 경우).",
+      "body": "원본 Slack 이벤트"
+    }
+  }
+}

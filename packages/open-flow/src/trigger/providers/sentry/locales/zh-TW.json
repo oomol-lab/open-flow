@@ -1,0 +1,19 @@
+{
+  "sentry.on_issue_alert": {
+    "displayName": "Issue 警示",
+    "description": "接收已安裝 Sentry 自訂整合的 Issue 警示規則通知。",
+    "configInputs": {
+      "sourceId": "事件源",
+      "eventTypes": "事件",
+      "projectIds": "專案 ID",
+      "ruleNames": "警示規則名稱"
+    },
+    "outputs": {
+      "event": "事件類型",
+      "deliveryId": "通知 ID",
+      "organizationId": "組織 ID",
+      "issueId": "Issue ID",
+      "body": "原始物件"
+    }
+  }
+}

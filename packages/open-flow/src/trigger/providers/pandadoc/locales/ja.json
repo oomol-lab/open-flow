@@ -1,0 +1,12 @@
+{
+  "pandadoc.on_document_event": {
+    "displayName": "ドキュメントの状態変更",
+    "description": "ドキュメントの状態変更を受信します。",
+    "configInputs": {
+      "completedOnly": "文書全体が完了した場合のみ"
+    },
+    "outputs": {
+      "events": "この配信で一致したイベント。"
+    }
+  }
+}

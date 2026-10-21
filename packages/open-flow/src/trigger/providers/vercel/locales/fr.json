@@ -1,0 +1,18 @@
+{
+  "vercel.on_deployment_event": {
+    "displayName": "Déploiement prêt ou échoué",
+    "description": "Déploiement prêt ou échoué.",
+    "configInputs": {
+      "teamId": "ID de l’équipe",
+      "projectId": "ID du projet",
+      "environment": "Environnement"
+    },
+    "outputs": {
+      "event": "Type d’événement métier.",
+      "deliveryId": "ID de livraison",
+      "deploymentId": "ID du déploiement",
+      "projectId": "ID du projet",
+      "body": "Données originales de l’événement."
+    }
+  }
+}

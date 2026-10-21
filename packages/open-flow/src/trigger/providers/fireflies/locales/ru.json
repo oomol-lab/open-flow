@@ -1,0 +1,17 @@
+{
+  "fireflies.on_meeting_ready": {
+    "displayName": "Расшифровка или резюме готовы",
+    "description": "Проверяет доступ к встрече и получает события готовности расшифровки и резюме Fireflies V2.",
+    "configInputs": {
+      "sourceId": "Источник событий",
+      "eventTypes": "События"
+    },
+    "outputs": {
+      "event": "Тип события",
+      "deliveryId": "ID уведомления",
+      "accountId": "ID аккаунта",
+      "meetingId": "ID встречи / расшифровки",
+      "body": "Исходный объект"
+    }
+  }
+}

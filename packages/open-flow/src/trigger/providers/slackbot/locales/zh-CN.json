@@ -1,0 +1,23 @@
+{
+  "slackbot.on_event": {
+    "displayName": "提及或私信",
+    "description": "从共享 Slack 应用事件源接收用户提及和新私信。不接收 Slack Connect 共享频道事件。",
+    "configInputs": {
+      "sourceId": "事件源",
+      "eventTypes": "事件",
+      "channelIds": "频道 ID；留空接收事件源中的所有频道。"
+    },
+    "outputs": {
+      "event": "事件类型",
+      "deliveryId": "事件 ID",
+      "appId": "Slack 应用 ID",
+      "teamId": "工作区 ID",
+      "channel": "会话 ID",
+      "user": "用户 ID",
+      "text": "消息文本",
+      "ts": "消息时间戳",
+      "threadTs": "父线程时间戳（若存在）。",
+      "body": "原始 Slack 事件"
+    }
+  }
+}

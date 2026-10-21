@@ -1,0 +1,15 @@
+{
+  "asana.on_task_event": {
+    "displayName": "项目任务事件",
+    "description": "接收项目任务变化；任务详情为读取时的当前状态。",
+    "configInputs": {
+      "projectId": "项目 ID",
+      "eventTypes": "事件",
+      "customFieldId": "自定义字段 ID"
+    },
+    "outputs": {
+      "projectId": "项目 ID",
+      "events": "本次投递中匹配的事件。"
+    }
+  }
+}

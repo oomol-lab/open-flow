@@ -1,0 +1,17 @@
+{
+  "zoom.on_recording_ready": {
+    "displayName": "Enregistrement cloud prêt",
+    "description": "Reçoit les enregistrements terminés des réunions animées par l’utilisateur Zoom connecté.",
+    "configInputs": {
+      "sourceId": "Source d’événements",
+      "eventTypes": "Événements"
+    },
+    "outputs": {
+      "event": "Type d’événement",
+      "deliveryId": "ID de notification",
+      "accountId": "ID du compte Zoom",
+      "meetingUuid": "UUID de l’instance de réunion",
+      "body": "Objet original"
+    }
+  }
+}

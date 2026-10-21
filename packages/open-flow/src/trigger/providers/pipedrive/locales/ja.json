@@ -1,0 +1,15 @@
+{
+  "pipedrive.on_crm_event": {
+    "displayName": "取引・連絡先イベント",
+    "description": "取引・連絡先イベントを受信します。",
+    "configInputs": {
+      "eventType": "イベント"
+    },
+    "outputs": {
+      "event": "業務イベントの種類。",
+      "deliveryId": "配信 ID",
+      "objectId": "オブジェクト ID",
+      "body": "元のイベントデータ。"
+    }
+  }
+}

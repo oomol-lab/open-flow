@@ -1,0 +1,17 @@
+{
+  "jira.on_issue_event": {
+    "displayName": "Jira 项目事件",
+    "description": "接收共享 Jira Cloud 项目的 Issue 创建、更新和评论事件。",
+    "configInputs": {
+      "sourceId": "事件源",
+      "eventTypes": "事件"
+    },
+    "outputs": {
+      "event": "事件类型",
+      "deliveryId": "通知 ID",
+      "cloudId": "云站点 ID",
+      "issueId": "Issue ID",
+      "body": "原始事件"
+    }
+  }
+}

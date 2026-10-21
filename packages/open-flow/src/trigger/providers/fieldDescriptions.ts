@@ -12,6 +12,150 @@ const driveChangesConfig = {
 }
 
 export const englishTriggerFieldDescriptions = {
+  'jira.on_issue_event': {
+    configInputs: { sourceId: 'Event source', eventTypes: 'Events' },
+    outputs: { event: 'Event type', deliveryId: 'Notification ID', cloudId: 'Cloud site ID', issueId: 'Issue ID', body: 'Original event' },
+  },
+  'fireflies.on_meeting_ready': {
+    configInputs: { sourceId: 'Event source', eventTypes: 'Events' },
+    outputs: { event: 'Event type', deliveryId: 'Notification ID', accountId: 'Account ID', meetingId: 'Meeting / transcript ID', body: 'Original object' },
+  },
+  'zoom.on_recording_ready': {
+    configInputs: { sourceId: 'Event source', eventTypes: 'Events' },
+    outputs: {
+      event: 'Event type',
+      deliveryId: 'Notification ID',
+      accountId: 'Zoom account ID',
+      meetingUuid: 'Meeting instance UUID',
+      body: 'Original object',
+    },
+  },
+  'sentry.on_issue_alert': {
+    configInputs: {
+      sourceId: 'Event source',
+      eventTypes: 'Events',
+      projectIds: 'Project IDs; empty includes all projects in the installation.',
+      ruleNames: 'Exact alert rule labels; empty includes all rules.',
+    },
+    outputs: { event: 'Event type', deliveryId: 'Notification ID', organizationId: 'Organization ID', issueId: 'Issue ID', body: 'Original object' },
+  },
+  'intercom.on_conversation_event': {
+    configInputs: { sourceId: 'Event source', eventTypes: 'Events' },
+    outputs: {
+      event: 'Event type',
+      deliveryId: 'Notification ID',
+      workspaceId: 'Workspace ID',
+      objectId: 'Conversation or ticket ID',
+      body: 'Original object',
+    },
+  },
+  'slackbot.on_event': {
+    configInputs: { sourceId: 'Event source', eventTypes: 'Events', channelIds: 'Channel IDs; empty means all source channels.' },
+    outputs: {
+      event: 'Event type',
+      deliveryId: 'Event ID',
+      appId: 'Slack app ID',
+      teamId: 'Workspace ID',
+      channel: 'Conversation ID',
+      user: 'User ID',
+      text: 'Message text',
+      ts: 'Message timestamp',
+      threadTs: 'Parent thread timestamp, when present.',
+      body: 'Original Slack event',
+    },
+  },
+  'asana.on_task_event': {
+    configInputs: {
+      projectId: 'Project ID',
+      eventTypes: 'Events',
+      customFieldId: 'Custom field ID',
+    },
+    outputs: {
+      projectId: 'Project ID',
+      events: 'Matching events in this delivery.',
+    },
+  },
+  'calendly.on_booking_event': {
+    configInputs: {
+      scope: 'Scope',
+      eventTypes: 'Events',
+    },
+    outputs: {
+      event: 'Business event type.',
+      inviteeUri: 'Invitee URI',
+      createdAt: 'Event timestamp.',
+      body: 'Original event data.',
+    },
+  },
+  'clickup.on_task_event': {
+    configInputs: {
+      workspaceId: 'Workspace ID',
+      listId: 'List ID',
+      eventTypes: 'Events',
+    },
+    outputs: {
+      event: 'Business event type.',
+      taskId: 'Task ID',
+      body: 'Original event data.',
+    },
+  },
+  'pandadoc.on_document_event': {
+    configInputs: {
+      completedOnly: 'Completed documents only',
+    },
+    outputs: {
+      events: 'Matching events in this delivery.',
+    },
+  },
+  'pipedrive.on_crm_event': {
+    configInputs: {
+      eventType: 'Event',
+    },
+    outputs: {
+      event: 'Business event type.',
+      deliveryId: 'Delivery ID',
+      objectId: 'Object ID',
+      body: 'Original event data.',
+    },
+  },
+  'resend.on_email_event': {
+    configInputs: {
+      eventTypes: 'Events',
+    },
+    outputs: {
+      event: 'Business event type.',
+      deliveryId: 'Delivery ID',
+      emailId: 'Email ID',
+      createdAt: 'Event timestamp.',
+      body: 'Original event data.',
+    },
+  },
+  'typeform.on_form_response': {
+    configInputs: {
+      formId: 'Form ID',
+    },
+    outputs: {
+      response: 'Submission identity, time and original answers with stable field identifiers.',
+    },
+  },
+  'vercel.on_deployment_event': {
+    configInputs: {
+      teamId: 'Team ID',
+      projectId: 'Project ID',
+      environment: 'Environment',
+    },
+    outputs: {
+      event: 'Business event type.',
+      deliveryId: 'Delivery ID',
+      deploymentId: 'Deployment ID',
+      projectId: 'Project ID',
+      body: 'Original event data.',
+    },
+  },
+  'tally.on_form_response': {
+    configInputs: { formId: 'Select a form accessible to this connection.' },
+    outputs: { response: 'Submission identity, time, and fields, preserving field keys, types, values, options, and file metadata.' },
+  },
   'feishu_app_bot.on_event': {
     configInputs: {
       sourceId: 'Event source that receives events for this trigger.',

@@ -1,0 +1,16 @@
+{
+  "resend.on_email_event": {
+    "displayName": "メール受信・バウンス・苦情",
+    "description": "メール受信・バウンス・苦情を受信します。",
+    "configInputs": {
+      "eventTypes": "イベント"
+    },
+    "outputs": {
+      "event": "業務イベントの種類。",
+      "deliveryId": "配信 ID",
+      "emailId": "メール ID",
+      "createdAt": "イベント日時。",
+      "body": "元のイベントデータ。"
+    }
+  }
+}

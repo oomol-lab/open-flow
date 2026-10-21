@@ -1,0 +1,19 @@
+{
+  "sentry.on_issue_alert": {
+    "displayName": "Оповещение об ошибке",
+    "description": "Получает уведомления правил об ошибках из установленной интеграции Sentry.",
+    "configInputs": {
+      "sourceId": "Источник событий",
+      "eventTypes": "События",
+      "projectIds": "ID проектов",
+      "ruleNames": "Названия правил оповещений"
+    },
+    "outputs": {
+      "event": "Тип события",
+      "deliveryId": "ID уведомления",
+      "organizationId": "ID организации",
+      "issueId": "ID ошибки",
+      "body": "Исходный объект"
+    }
+  }
+}

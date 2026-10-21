@@ -1,0 +1,12 @@
+{
+  "tally.on_form_response": {
+    "displayName": "양식 제출",
+    "description": "자동 관리되는 서명된 Webhook으로 새로운 Tally 양식 제출을 수신합니다.",
+    "configInputs": {
+      "formId": "이 연결로 접근할 수 있는 양식을 선택하세요."
+    },
+    "outputs": {
+      "response": "제출 ID, 시간, 필드 키, 유형, 값, 옵션 및 파일 메타데이터."
+    }
+  }
+}

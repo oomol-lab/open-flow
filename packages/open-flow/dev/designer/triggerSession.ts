@@ -167,6 +167,14 @@ export function createTriggerSession(
       })
     if (url.pathname.includes('/options/')) {
       if (nodeId.endsWith('-empty-options')) return Response.json({ options: [], version: 1 })
+      if (url.pathname.endsWith('/formId'))
+        return Response.json({
+          version: 1,
+          options: [
+            { value: 'lead-form', label: 'Customer enquiries' },
+            { value: 'feedback-form', label: 'Product feedback' },
+          ],
+        })
       const failed =
         trigger.kind == 'poll' &&
         trigger.definition.provider == 'linear' &&

@@ -1,0 +1,17 @@
+{
+  "intercom.on_conversation_event": {
+    "displayName": "顧客の会話・チケット",
+    "description": "顧客の会話、返信、新規チケットを受信します。管理者の返信は対象外です。",
+    "configInputs": {
+      "sourceId": "イベントソース",
+      "eventTypes": "イベント"
+    },
+    "outputs": {
+      "event": "イベント種類",
+      "deliveryId": "通知 ID",
+      "workspaceId": "ワークスペース ID",
+      "objectId": "会話・チケット ID",
+      "body": "元のオブジェクト"
+    }
+  }
+}

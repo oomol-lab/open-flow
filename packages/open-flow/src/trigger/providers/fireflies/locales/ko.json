@@ -1,0 +1,17 @@
+{
+  "fireflies.on_meeting_ready": {
+    "displayName": "회의 전사 또는 요약 준비 완료",
+    "description": "회의 접근 권한을 확인하고 Fireflies V2 전사 및 요약 이벤트를 수신합니다.",
+    "configInputs": {
+      "sourceId": "이벤트 소스",
+      "eventTypes": "이벤트"
+    },
+    "outputs": {
+      "event": "이벤트 유형",
+      "deliveryId": "알림 ID",
+      "accountId": "계정 ID",
+      "meetingId": "회의 / 전사 ID",
+      "body": "원본 객체"
+    }
+  }
+}

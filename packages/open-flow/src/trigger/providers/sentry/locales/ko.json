@@ -1,0 +1,19 @@
+{
+  "sentry.on_issue_alert": {
+    "displayName": "Issue 알림",
+    "description": "설치된 Sentry 사용자 지정 통합의 Issue 알림을 수신합니다.",
+    "configInputs": {
+      "sourceId": "이벤트 소스",
+      "eventTypes": "이벤트",
+      "projectIds": "프로젝트 ID",
+      "ruleNames": "알림 규칙 이름"
+    },
+    "outputs": {
+      "event": "이벤트 유형",
+      "deliveryId": "알림 ID",
+      "organizationId": "조직 ID",
+      "issueId": "Issue ID",
+      "body": "원본 객체"
+    }
+  }
+}

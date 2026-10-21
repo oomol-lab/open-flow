@@ -1,6 +1,6 @@
 import type { ConnectorActionMetadata, ConnectorConnection } from '@oomol-lab/open-flow/control-api'
 import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
-import type { ConnectorHost } from '../../node/deployment/connector.ts'
+import type { ConnectorHost } from '../../node/deployment/connector-contract.ts'
 
 import { Hono } from 'hono'
 import { createHash } from 'node:crypto'

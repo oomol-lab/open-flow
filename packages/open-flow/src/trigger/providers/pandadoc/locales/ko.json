@@ -1,0 +1,12 @@
+{
+  "pandadoc.on_document_event": {
+    "displayName": "문서 상태 변경",
+    "description": "문서 상태 변경를 수신합니다.",
+    "configInputs": {
+      "completedOnly": "문서 전체 완료만"
+    },
+    "outputs": {
+      "events": "이번 전달에서 일치하는 이벤트."
+    }
+  }
+}

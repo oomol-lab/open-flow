@@ -12,6 +12,7 @@ import { feishuResourceKind, supportsFeishuChatFilter } from '../../../../trigge
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '../../../../ui/browser/select.tsx'
 import { CreateEventSourceDialog } from '../createEventSourceDialog.tsx'
+import { eventSourceKind } from '../eventSourcePresentation.ts'
 import { FeishuEventPicker } from '../feishuEventPicker.tsx'
 import { FeishuEventFilters } from './feishuEventFilters.tsx'
 import { TriggerConfigEditor } from './triggerConfigEditor.tsx'
@@ -68,8 +69,9 @@ function EventSourceSelect({
   )
 }
 
-export function FeishuTriggerConfig({
+export function EventSourceTriggerConfig({
   inputs,
+  provider = 'feishu_app_bot',
   fieldLabels,
   config: assignments,
   nodeId,
@@ -77,6 +79,7 @@ export function FeishuTriggerConfig({
   disabled,
   store,
 }: {
+  readonly provider?: 'feishu_app_bot' | 'slackbot' | 'intercom' | 'sentry' | 'zoom' | 'fireflies' | 'jira'
   readonly inputs: readonly (InputPort | Group)[]
   readonly fieldLabels?: Readonly<Record<string, string>>
   readonly config: InputValues
@@ -107,7 +110,7 @@ export function FeishuTriggerConfig({
     return () => controller.abort()
   }, [store, key, attempt])
   const sources = state?.key == key ? state.sources : undefined
-  const matchingSources = sources?.filter((source) => source.provider == 'feishu_app_bot' && source.connectionId == connectionId)
+  const matchingSources = sources?.filter((source) => source.provider == provider && source.connectionId == connectionId)
   const options = matchingSources?.map((source) => ({ value: source.sourceId, label: source.name }))
   const failed = state?.key == key && state.failed
   const loading = state?.key != key || state.loading == true
@@ -160,6 +163,7 @@ export function FeishuTriggerConfig({
                   trigger={
                     <Button type="button" size="field" variant="ghost" className="h-full w-full justify-start rounded-none border-0 bg-transparent px-2" />
                   }
+                  sourceKind={eventSourceKind(provider)}
                   client={store.eventSourceClient}
                   teamId={state?.key == key ? (state.teamId ?? null) : null}
                   existingNames={sources?.map((source) => source.name) ?? []}
@@ -192,7 +196,7 @@ export function FeishuTriggerConfig({
               </p>
             )}
           </div>
-        ) : input.handle === 'eventTypes' ? (
+        ) : input.handle === 'eventTypes' && provider === 'feishu_app_bot' ? (
           sourceId ? (
             <div className="flex flex-col gap-2">
               <FeishuEventPicker

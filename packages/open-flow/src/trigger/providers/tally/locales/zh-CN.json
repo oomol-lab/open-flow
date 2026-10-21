@@ -1,0 +1,12 @@
+{
+  "tally.on_form_response": {
+    "displayName": "表单提交",
+    "description": "通过自动管理并验证签名的 Webhook 接收新的 Tally 表单提交。",
+    "configInputs": {
+      "formId": "选择此连接可访问的表单。"
+    },
+    "outputs": {
+      "response": "提交身份、时间和字段；保留字段 key、类型、值、选项及文件元数据。"
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "pipedrive.on_crm_event": {
+    "displayName": "거래 또는 연락처 이벤트",
+    "description": "거래 또는 연락처 이벤트를 수신합니다.",
+    "configInputs": {
+      "eventType": "이벤트"
+    },
+    "outputs": {
+      "event": "비즈니스 이벤트 유형.",
+      "deliveryId": "전달 ID",
+      "objectId": "객체 ID",
+      "body": "원본 이벤트 데이터."
+    }
+  }
+}

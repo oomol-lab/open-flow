@@ -811,8 +811,12 @@ export class ControlClient {
     return decodeEventSources(await this.request('/v1/event-sources' + (flowId == null ? '' : `?flowId=${segment(flowId)}`), { signal }))
   }
 
-  async listEventSourceConnections(teamId: string | null, signal?: AbortSignal): Promise<readonly ConnectorConnection[]> {
-    const source = record(await this.request(`/v1/event-sources/connections${teamId == null ? '' : `?teamId=${segment(teamId)}`}`, { signal }))
+  async listEventSourceConnections(
+    teamId: string | null,
+    signal?: AbortSignal,
+    kind: 'feishu' | 'slack' | 'intercom' | 'sentry' | 'zoom' | 'fireflies' | 'jira' = 'feishu',
+  ): Promise<readonly ConnectorConnection[]> {
+    const source = record(await this.request(`/v1/event-sources/connections?kind=${kind}${teamId == null ? '' : `&teamId=${segment(teamId)}`}`, { signal }))
     requiredFields(source, ['version', 'connections'])
     if (source.version != 1 || !Array.isArray(source.connections)) return invalidResponse()
     return source.connections.map(connection)

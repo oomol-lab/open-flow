@@ -5,7 +5,7 @@ import { expect, it } from 'vitest'
 import { pollDefinitions } from '../../../../trigger/providers/definitions.ts'
 const airtableRecordChanged = pollDefinitions.find((definition) => definition.snapshot.key === 'airtable.on_record_changed')!
 import { integrationDefinitions } from '../../../../trigger/providers/definitions.ts'
-import { feishuEvents } from '../../../../trigger/providers/feishu/on-event.ts'
+import { sourceEvents } from '../../../../trigger/providers/source-events.ts'
 const githubRepoEvent = integrationDefinitions.find((definition) => definition.snapshot.key === 'github.on_repo_event')!
 import { localizeTrigger } from '../../../../trigger/providers/localization.ts'
 import { createI18n } from '../i18n.ts'
@@ -20,7 +20,12 @@ const revision = revisionView({
       graph: {
         edges: [],
         nodes: {
-          feishu: { kind: 'integration', name: 'Application Event', config: {}, definition: feishuEvents[0]!.snapshot },
+          feishu: {
+            kind: 'integration',
+            name: 'Application Event',
+            config: {},
+            definition: sourceEvents.find((definition) => definition.snapshot.key === 'feishu_app_bot.on_event')!.snapshot,
+          },
           github: { kind: 'integration', name: 'Repository Event', config: {}, definition: githubRepoEvent.snapshot },
           airtable: { kind: 'poll', name: 'Record Changed', config: {}, definition: airtableRecordChanged.snapshot, pollTimes: [] },
         },
@@ -56,7 +61,11 @@ function item(nodeId: string, fields: readonly string[]): DiagnosticItem {
 
 it('uses catalog field labels for different Trigger providers and hides unknown handles', async () => {
   const i18n = createI18n('zh-CN')
-  const definitions = [feishuEvents[0]!.snapshot, githubRepoEvent.snapshot, airtableRecordChanged.snapshot]
+  const definitions = [
+    sourceEvents.find((definition) => definition.snapshot.key === 'feishu_app_bot.on_event')!.snapshot,
+    githubRepoEvent.snapshot,
+    airtableRecordChanged.snapshot,
+  ]
   const displays = Object.fromEntries(await Promise.all(definitions.map(async (definition) => [definition.key, await localizeTrigger(definition, 'zh-CN')])))
   const items = [
     item('feishu', ['sourceId', 'eventTypes']),

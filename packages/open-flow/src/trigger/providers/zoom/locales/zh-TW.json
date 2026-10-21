@@ -1,0 +1,17 @@
+{
+  "zoom.on_recording_ready": {
+    "displayName": "雲端錄製就緒",
+    "description": "接收由目前 Zoom 連線使用者主持的已完成雲端錄製。",
+    "configInputs": {
+      "sourceId": "事件源",
+      "eventTypes": "事件"
+    },
+    "outputs": {
+      "event": "事件類型",
+      "deliveryId": "通知 ID",
+      "accountId": "Zoom 帳戶 ID",
+      "meetingUuid": "會議執行個體 UUID",
+      "body": "原始物件"
+    }
+  }
+}

@@ -1,7 +1,7 @@
 import type { ConnectorActionMetadata, FlowCheck } from '@oomol-lab/open-flow/control-api'
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
-import { ConnectorTaskError } from '../deployment/connector.ts'
+import { ConnectorTaskError } from '../deployment/connector-contract.ts'
 
 type Diagnostic = FlowCheck['diagnostics'][number]
 

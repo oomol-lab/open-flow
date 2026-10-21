@@ -1,6 +1,6 @@
-import type { ConnectorHost } from '../node/deployment/connector.ts'
+import type { ConnectorHost } from '../node/deployment/connector-contract.ts'
 
-import { ConnectorTaskError } from '../node/deployment/connector.ts'
+import { ConnectorTaskError } from '../node/deployment/connector-contract.ts'
 
 async function unavailable(): Promise<never> {
   throw new ConnectorTaskError('connector.unavailable', 'The Connector request could not be completed.')

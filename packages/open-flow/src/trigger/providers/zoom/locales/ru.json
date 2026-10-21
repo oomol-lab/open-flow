@@ -1,0 +1,17 @@
+{
+  "zoom.on_recording_ready": {
+    "displayName": "Облачная запись готова",
+    "description": "Получает готовые облачные записи встреч подключённого пользователя Zoom.",
+    "configInputs": {
+      "sourceId": "Источник событий",
+      "eventTypes": "События"
+    },
+    "outputs": {
+      "event": "Тип события",
+      "deliveryId": "ID уведомления",
+      "accountId": "ID аккаунта Zoom",
+      "meetingUuid": "UUID экземпляра встречи",
+      "body": "Исходный объект"
+    }
+  }
+}

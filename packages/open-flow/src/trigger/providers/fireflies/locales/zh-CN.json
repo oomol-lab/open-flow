@@ -1,0 +1,17 @@
+{
+  "fireflies.on_meeting_ready": {
+    "displayName": "会议转写或摘要就绪",
+    "description": "接收 Fireflies Webhooks V2 的转写、摘要就绪事件，并检查会议访问权限。",
+    "configInputs": {
+      "sourceId": "事件源",
+      "eventTypes": "事件"
+    },
+    "outputs": {
+      "event": "事件类型",
+      "deliveryId": "通知 ID",
+      "accountId": "账户 ID",
+      "meetingId": "会议 / 转写 ID",
+      "body": "原始对象"
+    }
+  }
+}

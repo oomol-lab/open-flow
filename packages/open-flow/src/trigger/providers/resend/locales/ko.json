@@ -1,0 +1,16 @@
+{
+  "resend.on_email_event": {
+    "displayName": "이메일 수신, 반송 또는 신고",
+    "description": "이메일 수신, 반송 또는 신고를 수신합니다.",
+    "configInputs": {
+      "eventTypes": "이벤트"
+    },
+    "outputs": {
+      "event": "비즈니스 이벤트 유형.",
+      "deliveryId": "전달 ID",
+      "emailId": "이메일 ID",
+      "createdAt": "이벤트 시간.",
+      "body": "원본 이벤트 데이터."
+    }
+  }
+}

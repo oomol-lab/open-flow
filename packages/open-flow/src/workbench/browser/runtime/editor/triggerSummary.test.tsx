@@ -1,7 +1,7 @@
 import { renderToStaticMarkup } from 'react-dom/server'
 import { I18nProvider } from 'val-i18n-react'
 import { expect, it } from 'vitest'
-import { feishuEvents } from '../../../../trigger/providers/feishu/on-event.ts'
+import { sourceEvents } from '../../../../trigger/providers/source-events.ts'
 import { createI18n } from '../i18n.ts'
 import { TriggerSummary } from './triggerSummary.tsx'
 
@@ -17,7 +17,7 @@ it('renders schedule outputs with the standard output section', () => {
 })
 
 it('renders Provider outputs with the standard output section', () => {
-  const definition = feishuEvents[0]!.snapshot
+  const definition = sourceEvents.find((item) => item.snapshot.key === 'feishu_app_bot.on_event')!.snapshot
   const html = renderToStaticMarkup(
     <I18nProvider i18n={createI18n('zh-CN')}>
       <TriggerSummary trigger={{ kind: 'integration', name: 'Feishu', definition, config: {} }} />

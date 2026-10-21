@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { Button } from '../../../ui/browser/button.tsx'
 import { Input } from '../../../ui/browser/input.tsx'
+import { eventSourceKind, eventSourcePresentations } from './eventSourcePresentation.ts'
 import { errorNotice } from './stores/workbenchNotice.ts'
 
 export function EventSourceSetup({
@@ -19,6 +20,7 @@ export function EventSourceSetup({
   readonly onChange: (source: EventSource) => void
 }) {
   const t = useTranslate()
+  const presentation = eventSourcePresentations[eventSourceKind(source.provider)]
   const [copied, setCopied] = useState<string>()
   const [pending, setPending] = useState(false)
   const request = useRef<AbortController | null>(null)
@@ -46,7 +48,7 @@ export function EventSourceSetup({
     <div className="flex flex-col gap-4">
       <ol className="m-0 flex list-none flex-col gap-5 p-0">
         <li className="flex flex-col gap-2">
-          <h3 className="m-0 text-sm font-medium">{t('eventSources.setupCopy')}</h3>
+          <h3 className="m-0 text-sm font-medium">{t(source.provider === 'jira' ? 'eventSources.setupJira' : 'eventSources.setupCopy')}</h3>
           {source.endpointUrl == null ? (
             <p className="m-0 text-sm text-destructive">{t('eventSources.originMissing')}</p>
           ) : (
@@ -77,13 +79,13 @@ export function EventSourceSetup({
           <p className="m-0 text-xs leading-5 text-muted-foreground">{t('eventSources.publicCallbackHint')}</p>
         </li>
         <li className="flex flex-col gap-2">
-          <h3 className="m-0 text-sm font-medium">{t('eventSources.setupFeishu')}</h3>
-          <p className="m-0 text-sm leading-5 text-muted-foreground">{t('eventSources.setupFeishuHint')}</p>
+          <h3 className="m-0 text-sm font-medium">{t(presentation.setup)}</h3>
+          <p className="m-0 text-sm leading-5 text-muted-foreground">{t(presentation.setupHint)}</p>
           <p className="m-0 text-xs text-muted-foreground">
             App ID: <code>{source.appId}</code>
           </p>
-          <a className="self-start text-sm text-primary underline underline-offset-4" href="https://open.feishu.cn/app" target="_blank" rel="noreferrer">
-            {t('eventSources.openFeishu')}
+          <a className="self-start text-sm text-primary underline underline-offset-4" href={presentation.console} target="_blank" rel="noreferrer">
+            {t('eventSources.openConsole')}
           </a>
           <div className="flex flex-wrap gap-2">
             {source.eventTypes.map((type) => (
@@ -92,14 +94,27 @@ export function EventSourceSetup({
               </code>
             ))}
           </div>
-          <p className="m-0 text-xs leading-5 text-muted-foreground">{t('eventSources.manualSubscriptionHint')}</p>
+          <p className="m-0 text-xs leading-5 text-muted-foreground">
+            {t(source.provider === 'jira' ? 'eventSources.jiraEventsHint' : 'eventSources.manualSubscriptionHint')}
+          </p>
         </li>
         <li className="flex flex-col gap-2 rounded-md bg-muted p-3">
           <h3 className="m-0 text-sm font-medium">{t('eventSources.setupVerify')}</h3>
           <p role="status" className="m-0 text-sm leading-5">
-            {t(!source.enabled ? 'eventSources.disabled' : source.verifiedAt == null ? 'eventSources.awaitingVerification' : 'eventSources.callbackVerified')}
+            {source.provider === 'jira'
+              ? t(`eventSources.subscription.${source.subscriptionStatus ?? 'idle'}`)
+              : t(
+                  !source.enabled ? 'eventSources.disabled' : source.verifiedAt == null ? 'eventSources.awaitingVerification' : 'eventSources.callbackVerified',
+                )}
           </p>
-          <p className="m-0 text-xs leading-5 text-muted-foreground">{t('eventSources.verifyBeforePublish')}</p>
+          <p className="m-0 text-xs leading-5 text-muted-foreground">
+            {t(source.provider === 'jira' ? 'eventSources.jiraSetupHint' : 'eventSources.verifyBeforePublish')}
+          </p>
+          {source.lastError && (
+            <p role="alert" className="m-0 text-sm text-destructive">
+              {source.lastError}
+            </p>
+          )}
           <Button className="self-start" variant="outline" size="sm" disabled={pending} onClick={() => void refresh()}>
             {t(pending ? 'eventSources.checkingVerification' : 'eventSources.checkVerification')}
           </Button>

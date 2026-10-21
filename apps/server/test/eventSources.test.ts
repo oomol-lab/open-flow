@@ -13,7 +13,7 @@ import { openService } from './serviceFixture.ts'
 
 const now = Date.parse('2026-09-14T08:00:00.000Z')
 const definition = integrationDefinitions.find((item) => item.snapshot.key == 'feishu_app_bot.on_event')!
-const input: CreateEventSource = {
+const input: Extract<CreateEventSource, { kind?: 'feishu' }> = {
   version: 1,
   name: 'Feishu',
   connectionId: 'connection',

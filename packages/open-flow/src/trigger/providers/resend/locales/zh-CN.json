@@ -1,0 +1,16 @@
+{
+  "resend.on_email_event": {
+    "displayName": "收件、退信或投诉",
+    "description": "收件、退信或投诉。",
+    "configInputs": {
+      "eventTypes": "事件"
+    },
+    "outputs": {
+      "event": "业务事件类型。",
+      "deliveryId": "投递 ID",
+      "emailId": "邮件 ID",
+      "createdAt": "事件时间。",
+      "body": "原始事件数据。"
+    }
+  }
+}

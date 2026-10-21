@@ -16,6 +16,7 @@ export const feishuApplication: EventSourceDefinition<
   provider: 'feishu_app_bot',
   maximumBodyBytes: 64 * 1024,
   initialize(input, accountId) {
+    if (input.kind != null && input.kind !== 'feishu') throw new SourceIdentityError('Expected a Feishu source.')
     if (accountId == null || !/^cli_[a-zA-Z0-9]+$/.test(accountId)) throw new SourceIdentityError('Connector must provide the verified application identity.')
     return {
       identity: accountId,

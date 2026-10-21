@@ -1,0 +1,16 @@
+{
+  "clickup.on_task_event": {
+    "displayName": "Événement de tâche",
+    "description": "Événement de tâche.",
+    "configInputs": {
+      "workspaceId": "ID de l’espace de travail",
+      "listId": "ID de la liste",
+      "eventTypes": "Événements"
+    },
+    "outputs": {
+      "event": "Type d’événement métier.",
+      "taskId": "ID de la tâche",
+      "body": "Données originales de l’événement."
+    }
+  }
+}

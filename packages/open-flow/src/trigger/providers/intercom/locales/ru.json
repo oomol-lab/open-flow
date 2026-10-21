@@ -1,0 +1,17 @@
+{
+  "intercom.on_conversation_event": {
+    "displayName": "Диалог клиента или заявка",
+    "description": "Получает диалоги, ответы клиентов и новые заявки. Ответы администраторов исключены.",
+    "configInputs": {
+      "sourceId": "Источник событий",
+      "eventTypes": "События"
+    },
+    "outputs": {
+      "event": "Тип события",
+      "deliveryId": "ID уведомления",
+      "workspaceId": "ID рабочего пространства",
+      "objectId": "ID диалога или заявки",
+      "body": "Исходный объект"
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "pandadoc.on_document_event": {
+    "displayName": "文件狀態變更",
+    "description": "文件狀態變更。",
+    "configInputs": {
+      "completedOnly": "僅整份文件完成"
+    },
+    "outputs": {
+      "events": "本次投遞中符合條件的事件。"
+    }
+  }
+}

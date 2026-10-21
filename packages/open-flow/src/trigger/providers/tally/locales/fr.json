@@ -1,0 +1,12 @@
+{
+  "tally.on_form_response": {
+    "displayName": "Soumission de formulaire",
+    "description": "Reçoit les nouvelles soumissions Tally via un webhook signé et géré automatiquement.",
+    "configInputs": {
+      "formId": "Choisissez un formulaire accessible avec cette connexion."
+    },
+    "outputs": {
+      "response": "Identifiants, date et champs avec clés, types, valeurs, options et métadonnées des fichiers."
+    }
+  }
+}

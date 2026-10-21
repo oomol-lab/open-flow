@@ -57,6 +57,7 @@ const migrations = [
   '0048_workflow_calls.sql',
   migrateWorkflowInterfaces,
   '0050_run_initiator.sql',
+  '0051_event_source_apps.sql',
 ] as const
 const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 

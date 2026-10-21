@@ -1,0 +1,17 @@
+{
+  "jira.on_issue_event": {
+    "displayName": "Événement de projet Jira",
+    "description": "Reçoit les créations, modifications et commentaires des tickets d’un projet Jira Cloud partagé.",
+    "configInputs": {
+      "sourceId": "Source d’événements",
+      "eventTypes": "Événements"
+    },
+    "outputs": {
+      "event": "Type d’événement",
+      "deliveryId": "ID de notification",
+      "cloudId": "ID du site Cloud",
+      "issueId": "ID du ticket",
+      "body": "Événement original"
+    }
+  }
+}

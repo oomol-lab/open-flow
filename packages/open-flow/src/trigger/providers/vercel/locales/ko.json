@@ -1,0 +1,18 @@
+{
+  "vercel.on_deployment_event": {
+    "displayName": "배포 준비 완료 또는 실패",
+    "description": "배포 준비 완료 또는 실패를 수신합니다.",
+    "configInputs": {
+      "teamId": "팀 ID",
+      "projectId": "프로젝트 ID",
+      "environment": "환경"
+    },
+    "outputs": {
+      "event": "비즈니스 이벤트 유형.",
+      "deliveryId": "전달 ID",
+      "deploymentId": "배포 ID",
+      "projectId": "프로젝트 ID",
+      "body": "원본 이벤트 데이터."
+    }
+  }
+}

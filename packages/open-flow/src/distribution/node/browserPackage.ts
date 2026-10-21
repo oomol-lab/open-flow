@@ -228,6 +228,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
     for (const name of ['index', 'definition', 'feishu']) {
       const declaration = (await readFile(path.join(declarationRoot, `event-source/common/${name}.d.ts`), 'utf8'))
         .replaceAll("'./definition.ts'", "'./event-source-definition.js'")
+        .replaceAll("'../../connector/common/proxy.ts'", "'./connector-proxy.js'")
         .replaceAll("'./feishu.ts'", "'./event-source-feishu.js'")
         .replaceAll("'../../control/common/eventSources.ts'", "'./event-sources.js'")
         .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")

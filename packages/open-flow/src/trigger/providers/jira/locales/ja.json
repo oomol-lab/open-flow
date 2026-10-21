@@ -1,0 +1,17 @@
+{
+  "jira.on_issue_event": {
+    "displayName": "Jira プロジェクトのイベント",
+    "description": "共有 Jira Cloud プロジェクトの課題作成・更新・コメントを受信します。",
+    "configInputs": {
+      "sourceId": "イベントソース",
+      "eventTypes": "イベント"
+    },
+    "outputs": {
+      "event": "イベント種別",
+      "deliveryId": "通知 ID",
+      "cloudId": "クラウドサイト ID",
+      "issueId": "課題 ID",
+      "body": "元のイベント"
+    }
+  }
+}

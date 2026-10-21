@@ -6,7 +6,7 @@ import type { ProviderTriggerDefinition } from '@oomol-lab/open-flow/provider-tr
 import type * as Deferred from 'effect/Deferred'
 import type { Logger } from 'pino'
 import type { ConnectorAccessHost } from '../deployment/connector-access.ts'
-import type { ConnectorHost } from '../deployment/connector.ts'
+import type { ConnectorHost } from '../deployment/connector-contract.ts'
 import type { LlmHost } from '../deployment/llm.ts'
 import type { IntegrationOptions, IntegrationResponse, IntegrationRuntimeState, IntegrationTarget } from '../runtime/integration-runtime.ts'
 import type { Database } from '../storage/database.ts'
@@ -25,7 +25,8 @@ import * as Queue from 'effect/Queue'
 import * as Scope from 'effect/Scope'
 import * as Semaphore from 'effect/Semaphore'
 import { ConfiguredConnectorAccessHost, ImplicitConnectorAccessHost } from '../deployment/connector-access.ts'
-import { ConnectorClient, ConnectorTaskError } from '../deployment/connector.ts'
+import { ConnectorTaskError } from '../deployment/connector-contract.ts'
+import { ConnectorClient } from '../deployment/connector.ts'
 import { ControlError } from '../error.ts'
 import { silentLogger } from '../logger.ts'
 import { IntegrationRuntime } from '../runtime/integration-runtime.ts'
@@ -448,6 +449,10 @@ export class ServerService {
 
   integrationEndpoint(flowId: string, triggerNodeId: string): string | undefined {
     return this.#integration.endpoint(flowId, triggerNodeId)
+  }
+
+  receiveApplicationEvent(kind: string, appId: string, request: Request): Promise<Response> {
+    return this.#integration.sources.receiveApplication(kind, appId, request)
   }
 
   receiveSourceEvent(sourceId: string, request: Request): Promise<Response> {

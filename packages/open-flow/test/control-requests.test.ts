@@ -80,7 +80,7 @@ describe('Control request boundaries', () => {
   for (const name of Object.keys(samples) as (keyof typeof samples)[]) {
     it(`decodes ${name} and rejects unknown fields and unsupported versions`, () => {
       expect(controlRequests[name](samples[name])).toEqual(samples[name])
-      expect(controlRequestSchema(name)).toHaveProperty('additionalProperties', false)
+      expect(new Validator(controlRequestSchema(name) as object).validate({ ...samples[name], extra: true }).valid).toBe(false)
       expect(() => controlRequests[name]({ ...samples[name], extra: true })).toThrow()
       expect(() => controlRequests[name]({ ...samples[name], version: 999 })).toThrow()
     })

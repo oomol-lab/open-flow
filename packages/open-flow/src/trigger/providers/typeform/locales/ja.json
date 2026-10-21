@@ -1,0 +1,12 @@
+{
+  "typeform.on_form_response": {
+    "displayName": "フォームの完全な回答",
+    "description": "フォームの完全な回答を受信します。",
+    "configInputs": {
+      "formId": "フォーム ID"
+    },
+    "outputs": {
+      "response": "送信 ID、日時、安定したフィールド ID を含む元の回答。"
+    }
+  }
+}
