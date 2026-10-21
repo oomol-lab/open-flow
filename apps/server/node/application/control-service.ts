@@ -198,7 +198,7 @@ export class ControlService {
     if (this.eventSources == null) throw new ControlError(controlErrorCode.eventSourceInvalid, 'Event sources are unavailable.')
     if (flowId == null) return this.eventSources.list()
     const teamId = (await this.resolveConnectorScope(flowId)) ?? null
-    return { ...this.eventSources.list(teamId), teamId }
+    return { ...(await this.eventSources.list(teamId)), teamId }
   }
 
   async listEventSourceConnections(teamId: string | undefined, signal: AbortSignal, kind = 'feishu') {
@@ -223,9 +223,9 @@ export class ControlService {
     return this.eventSources.create(input, signal)
   }
 
-  updateEventSource(sourceId: string, input: UpdateEventSource) {
+  updateEventSource(sourceId: string, input: UpdateEventSource, signal: AbortSignal) {
     if (this.eventSources == null) throw new ControlError(controlErrorCode.eventSourceInvalid, 'Event sources are unavailable.')
-    return this.eventSources.update(sourceId, input)
+    return this.eventSources.update(sourceId, input, signal)
   }
 
   deleteEventSource(sourceId: string, revision: number) {

@@ -3,13 +3,13 @@ import type { JsonValue } from '../../../../control/common/api.ts'
 import { useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { isJsonObject } from '../../../../base/common/json.ts'
-import { feishuResourceKind, supportsFeishuChatFilter } from '../../../../trigger/providers/feishu/config.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Checkbox } from '../../../../ui/browser/checkbox.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Label } from '../../../../ui/browser/label.tsx'
 import { Textarea } from '../../../../ui/browser/textarea.tsx'
 import { SourceSelect } from '../eventSources.tsx'
+import { feishuResourceKind, supportsFeishuChatFilter } from './feishuEventConfig.ts'
 
 export function FeishuEventFilters({
   field,

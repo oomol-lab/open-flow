@@ -33,6 +33,22 @@ const eventSourceSchema = z.object({
   consumers: z.array(z.object({ flowId: id, flowName: z.string(), triggerNodeId: id })),
 })
 
+export const eventSourceViewSchema = eventSourceSchema.pick({
+  appId: true,
+  workspaceId: true,
+  installationId: true,
+  organizationId: true,
+  projectId: true,
+  projectKey: true,
+  subscriptionStatus: true,
+  lastError: true,
+  signingSecretConfigured: true,
+  manageSubscriptions: true,
+  verificationTokenConfigured: true,
+  encryptKeyConfigured: true,
+  verifiedAt: true,
+})
+
 export interface CreateFeishuEventSource {
   readonly kind?: 'feishu'
   readonly version: 1

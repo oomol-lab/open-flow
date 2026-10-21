@@ -48,8 +48,8 @@ import {
 import { remapInputMappings, renamedPort, renameOutputMapping } from '../../../../flow/common/portChanges.ts'
 import { renamePromptInput } from '../../../../flow/common/promptTemplate.ts'
 import { valueForEditor } from '../../../../form/common/editorComponent.ts'
-import { feishuResourceKind, supportsFeishuChatFilter } from '../../../../trigger/providers/feishu/config.ts'
 import { withWorkflowTask } from '../../../../workflow/common/workflow.ts'
+import { feishuResourceKind, supportsFeishuChatFilter } from './feishuEventConfig.ts'
 
 export type FlowChanges = readonly ChangeOperation[]
 

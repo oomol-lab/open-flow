@@ -19,7 +19,7 @@ import type { OpenFlowWorkbenchHandle, WorkbenchImportInput, WorkbenchHost, Work
 
 import { ControlClient, liveEntries } from '@oomol-lab/open-flow/control-api'
 import { controlRequests } from '@oomol-lab/open-flow/control-requests'
-import { eventSourceDefinition } from '@oomol-lab/open-flow/event-source'
+import { eventSourceDefinition, sourceReady } from '@oomol-lab/open-flow/event-source'
 import { encodeWorkflowFile, decodeWorkflowFile, cleanWorkflowFile } from '@oomol-lab/open-flow/flow-encoding'
 import { matchesTriggerOutputs, triggerOutputDefinitions, triggerOutputPorts } from '@oomol-lab/open-flow/flow-semantics'
 import { resolveUiLanguage } from '@oomol-lab/open-flow/localization'
@@ -161,20 +161,9 @@ export const sessionGate = createElement(OpenFlowSessionGate, {
 })
 export const task: Task<{ value: string }, { value: string }> = async (inputs) => inputs
 const sourceDefinition = eventSourceDefinition('feishu')
-const sourceConfig: SourceConfiguration = sourceDefinition.initialize(
-  {
-    version: 1,
-    name: 'App',
-    connectionId: 'connection',
-    teamId: null,
-    verificationToken: 'token',
-    encryptKey: 'key',
-    eventTypes: ['im.message.receive_v1'],
-    manageSubscriptions: false,
-  },
-  'cli_test',
-)
-void sourceDefinition.ready(sourceConfig)
+const sourceConfig: SourceConfiguration = { identity: 'installation', eventTypes: [], config: {}, secrets: {}, state: {} }
+void sourceDefinition.triggerId
+void sourceReady(sourceConfig)
 const manual = { kind: 'manual', name: 'Manual' } as const
 export const validOutputs: boolean = matchesTriggerOutputs(manual, {})
 void triggerOutputDefinitions(manual)
@@ -213,7 +202,7 @@ export { encodeRevision, decodeRevision, decodeRevisionContent } from '@oomol-la
 export { prepareFlow } from '@oomol-lab/open-flow/flow-semantics'
 export { integrationConformanceCases, listenerConformanceCases, validateListenerPage } from '@oomol-lab/open-flow/integration-trigger'
 export { maximumPollEventsPerPage } from '@oomol-lab/open-flow/poll-trigger'
-export { triggerDefinitions, receiveFeishuEvent, matchesFeishuEvent, feishuSubscriptions } from '@oomol-lab/open-flow/provider-triggers'
+export { triggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 export { createEventProjector } from '@oomol-lab/open-flow/run-events'
 export { runtimeConformanceCases } from '@oomol-lab/open-flow/runtime-contract'
 export { runFlow } from '@oomol-lab/open-flow/scheduler'

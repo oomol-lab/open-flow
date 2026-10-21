@@ -1,5 +1,24 @@
 # Shared provider event sources
 
+Provider protocols execute in Connector. Open Flow receives public callbacks, forwards their exact bytes
+and required context, then persists and distributes Connector's normalized result. Signatures,
+challenges, identity checks, event keys, ordering and Provider filters have one implementation in the
+selected Connector backend. Open Flow retains Team/Connection isolation and rechecks current consumer
+versions before admission. Source configuration schemas are generated from Connector's catalog.
+
+Deploy the updated Connector before the updated Open Flow server. The authenticated Trigger endpoint
+now accepts `operation: "source"` with `initialize`, `update`, `inspect`, `prepare`, or `receive` requests.
+The former external `sourceIdentity` and `sourceReceive` operations are removed; identity and callback
+helpers are private Provider capabilities used by the source protocol. Callback bodies remain limited
+to 64 KiB. The operation envelope is limited to 2 MiB because it also carries source state and consumer
+configuration. Connector failure or an invalid protocol response produces a retryable callback `503`.
+
+Existing source IDs, secrets, subscriptions and consumer bindings are retained. On first listing or
+reconciliation, sources without a stored projection obtain one through Connector's `inspect` operation;
+this requires the upgraded Connector to be reachable. Subsequent listings use the persisted projection.
+The existing callback-secret storage location is unchanged; this refactor moves protocol ownership,
+not credential storage. Source management never returns callback secrets.
+
 Create an event source in the Workbench, choose its Connector Team and connection, then select that source in each Trigger. Each matching Flow receives its own delivery; upstream retries do not create another Run for an admitted event. Pausing one consumer does not remove another consumer's subscription.
 
 | Trigger                          | Source configuration                                                                    | Supported business events and boundaries                                                                                                                                                                                                                  |

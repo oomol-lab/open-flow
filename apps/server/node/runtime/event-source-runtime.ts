@@ -1,5 +1,5 @@
 import type { CreateEventSource, EventSource, UpdateEventSource } from '@oomol-lab/open-flow/control-api'
-import type { SourceSubscription as ResourceSubscription } from '@oomol-lab/open-flow/event-source'
+import type { SourceSubscription as ResourceSubscription, SourceConfiguration, SourceOperation } from '@oomol-lab/open-flow/event-source'
 import type { IntegrationDefinition, IntegrationReconcileContext, IntegrationReconcileResult } from '@oomol-lab/open-flow/integration-trigger'
 import type { ConnectorAccessHost } from '../deployment/connector-access.ts'
 import type { ConnectorAccessContext, ConnectorHost } from '../deployment/connector-contract.ts'
@@ -8,11 +8,30 @@ import type { Store } from '../storage/store.ts'
 import type { IntegrationOptions } from './integration-runtime.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { eventSourceDefinition, SourceIdentityError } from '@oomol-lab/open-flow/event-source'
-import { IntegrationConnectionError, PermanentIntegrationError, TransientIntegrationError } from '@oomol-lab/open-flow/integration-trigger'
+import { eventSourceDefinition, sourceConfigurationSchema } from '@oomol-lab/open-flow/event-source'
+import { PermanentIntegrationError, TransientIntegrationError } from '@oomol-lab/open-flow/integration-trigger'
 import { z } from 'zod'
 import { ConnectorTaskError } from '../deployment/connector-contract.ts'
 import { ControlError } from '../error.ts'
+
+const jsonObject = z.record(z.string(), z.json())
+const sourceResult = z.object({ source: sourceConfigurationSchema })
+const preparedSource = sourceResult.extend({ subscriptions: z.array(z.object({ key: z.string(), config: jsonObject })) })
+const sourceReceipt = z
+  .object({
+    source: sourceConfigurationSchema.optional(),
+    response: z.object({ status: z.number().int().min(200).max(599), body: z.string(), headers: z.record(z.string(), z.string()) }).optional(),
+    event: z
+      .object({
+        id: z.string().min(1),
+        type: z.string().min(1),
+        payload: jsonObject,
+        matches: z.array(z.string()),
+        ordering: z.object({ key: z.string(), version: z.number() }).optional(),
+      })
+      .optional(),
+  })
+  .refine((value) => (value.response == null) !== (value.event == null))
 
 export class EventSourceRuntime {
   readonly #store: Store
@@ -39,7 +58,8 @@ export class EventSourceRuntime {
     this.#wake = wake
   }
 
-  list(teamId?: string | null): { readonly version: 1; readonly sources: readonly EventSource[] } {
+  async list(teamId?: string | null): Promise<{ readonly version: 1; readonly sources: readonly EventSource[] }> {
+    for (const source of this.#store.eventSources.unprojected()) if (teamId === undefined || source.teamId === teamId) await this.#hydrate(source)
     return { version: 1, sources: this.#store.eventSources.list(this.#options()?.publicOrigin, teamId) }
   }
 
@@ -54,32 +74,27 @@ export class EventSourceRuntime {
     if (connection == null) {
       throw new ControlError(controlErrorCode.eventSourceInvalid, 'Choose an active Connection in this Connector Team.')
     }
-    let configuration
-    try {
-      configuration = definition.initialize(input, connection.providerAccountId)
-      if (definition.verifyIdentity != null) {
-        if (connector.trigger == null) throw new ControlError(controlErrorCode.eventSourceInvalid, 'Connector Trigger transport is unavailable.')
-        configuration = await definition.verifyIdentity(configuration, (config) =>
-          connector.trigger!(provider, input.connectionId, definition.resources.triggerId, { operation: 'sourceIdentity', config }, signal, access),
-        )
-      }
-    } catch (error) {
-      if (error instanceof SourceIdentityError) throw new ControlError(controlErrorCode.eventSourceIdentityUnavailable, error.message)
-      throw error
-    }
+    const { source: configuration } = sourceResult.parse(
+      await this.#execute(definition.kind, input.connectionId, { operation: 'source', request: { action: 'initialize', input: { ...input } } }, signal, access),
+    )
     signal.throwIfAborted()
     const source = this.#store.eventSources.create(input, definition.kind, configuration)
     return this.#store.eventSources.view(source, this.#options()?.publicOrigin)
   }
 
-  update(sourceId: string, input: UpdateEventSource): EventSource {
-    let source: StoredEventSource
-    try {
-      source = this.#store.eventSources.update(sourceId, input)
-    } catch (error) {
-      if (error instanceof SourceIdentityError) throw new ControlError(controlErrorCode.eventSourceInvalid, error.message)
-      throw error
-    }
+  async update(sourceId: string, input: UpdateEventSource, signal: AbortSignal): Promise<EventSource> {
+    const original = this.#store.eventSources.require(sourceId, input.expectedRevision)
+    const { source: configuration } = sourceResult.parse(
+      await this.#execute(
+        original.kind,
+        original.connectionId,
+        { operation: 'source', request: { action: 'update', source: original, input: { ...input } } },
+        signal,
+        this.#operatorContext(original.provider, original.teamId ?? undefined),
+      ),
+    )
+    signal.throwIfAborted()
+    const source = this.#store.eventSources.update(sourceId, input, configuration)
     this.#wake()
     return this.#store.eventSources.view(source, this.#options()?.publicOrigin)
   }
@@ -141,34 +156,40 @@ export class EventSourceRuntime {
   async #deliver(sourceId: string, bytes: Uint8Array, headers: Headers, signal: AbortSignal): Promise<Response> {
     const source = this.#store.eventSources.get(sourceId)
     if (source == null || source.enabled != 1) return new Response(null, { status: 404 })
-    const definition = eventSourceDefinition(source.kind)
     let received
     try {
-      received = await definition.receive(source, bytes, headers, this.#clock(), async (operation) => {
-        const connector = this.#connector()
-        if (connector?.trigger == null) throw new TransientIntegrationError('Connector Trigger transport is unavailable.')
-        return connector.trigger(
-          source.provider,
+      received = sourceReceipt.parse(
+        await this.#execute(
+          source.kind,
           source.connectionId,
-          definition.resources.triggerId,
-          operation,
+          {
+            operation: 'source',
+            request: {
+              action: 'receive',
+              source,
+              headers: Object.fromEntries(headers),
+              rawBody: Buffer.from(bytes).toString('base64'),
+              consumers: this.#store.eventSources.consumersForEvent(source),
+            },
+          },
           signal,
           this.#operatorContext(source.provider, source.teamId ?? undefined),
-        )
-      })
-    } catch (error) {
+        ),
+      )
+    } catch {
       signal.throwIfAborted()
-      if (error instanceof ConnectorTaskError || error instanceof TransientIntegrationError) return new Response(null, { status: 503 })
-      return new Response(null, { status: 401 })
+      return new Response(null, { status: 503 })
     }
     signal.throwIfAborted()
-    if ('response' in received) {
-      if (!this.#store.eventSources.saveState(source, received.state)) return new Response(null, { status: 409 })
-      return received.response
-    }
-    if (received.state != null && !this.#store.eventSources.saveState(source, received.state)) return new Response(null, { status: 409 })
-    if (!source.eventTypes.includes(received.event.type)) return Response.json({})
-    const result = this.#store.eventSources.receive(source, received.event, this.#clock())
+    if (received.source != null && !this.#store.eventSources.saveState(source, received.source.state)) return new Response(null, { status: 409 })
+    if (received.response != null)
+      return new Response([204, 205, 304].includes(received.response.status) ? null : received.response.body, {
+        status: received.response.status,
+        headers: received.response.headers,
+      })
+    const event = received.event!
+    if (!source.eventTypes.includes(event.type)) return Response.json({})
+    const result = this.#store.eventSources.receive(source, event, this.#clock())
     if (result != 'accepted') return new Response(null, { status: result == 'overloaded' ? 429 : result == 'conflict' ? 409 : 503 })
     this.#wake()
     return Response.json({})
@@ -186,7 +207,7 @@ export class EventSourceRuntime {
       this.#store.eventSources.release(bindingId)
       return { outcome: 'ready' }
     }
-    const source = this.#store.eventSources.get(String(context.config.sourceId))
+    let source = this.#store.eventSources.get(String(context.config.sourceId))
     if (
       source == null ||
       source.provider != definition.snapshot.provider ||
@@ -195,53 +216,38 @@ export class EventSourceRuntime {
     ) {
       throw new PermanentIntegrationError('The event source does not authorize this Connection and Flow scope.')
     }
-    if (source.enabled != 1 || (!eventSourceDefinition(source.kind).resources.managed && !eventSourceDefinition(source.kind).ready(source, this.#clock())))
-      throw new PermanentIntegrationError('Verify and enable the event source before publishing.')
-    const allowed = source.eventTypes
-    if (!(context.config.eventTypes as string[]).every((type) => allowed.includes(type)))
-      throw new PermanentIntegrationError('Configure the requested events on the event source first.')
-    const connector = this.#connector()
-    if (connector == null) throw new TransientIntegrationError('Connector is unavailable.')
+    source = await this.#hydrate(source)
     const sourceDefinition = eventSourceDefinition(source.kind)
+    if (source.enabled != 1) throw new PermanentIntegrationError('Enable the event source before publishing.')
+    let subscriptions: readonly ResourceSubscription[]
     try {
-      const connections = await connector.listConnections(source.provider, context.signal, access)
-      if (
-        !connections.some(
-          (connection) =>
-            connection.connectionId == connectionId &&
-            connection.status == 'active' &&
-            connection.providerAccountId == (source.config.accountId ?? source.identity),
-        )
+      const prepared = preparedSource.parse(
+        await this.#execute(
+          source.kind,
+          source.connectionId,
+          {
+            operation: 'source',
+            request: {
+              action: 'prepare',
+              source,
+              config: context.config,
+              endpointUrl: this.#store.eventSources.view(source, this.#options()?.publicOrigin).endpointUrl ?? undefined,
+            },
+          },
+          context.signal ?? AbortSignal.timeout(30_000),
+          access,
+        ),
       )
-        throw new IntegrationConnectionError('The source Connection requires reauthorization.')
-      if (sourceDefinition.verifyIdentity != null) {
-        if (connector.trigger == null) throw new TransientIntegrationError('Trigger operation transport is unavailable.')
-        await sourceDefinition.verifyIdentity(source, (config) =>
-          connector.trigger!(
-            source.provider,
-            source.connectionId,
-            sourceDefinition.resources.triggerId,
-            { operation: 'sourceIdentity', config },
-            context.signal ?? AbortSignal.timeout(30_000),
-            access,
-          ),
-        )
-      }
+      if (!this.#store.eventSources.saveState(source, prepared.source.state)) throw new TransientIntegrationError('The source changed during preparation.')
+      subscriptions = prepared.subscriptions
     } catch (error) {
-      if (sourceDefinition.resources.managed)
-        this.#store.eventSources.saveState(source, {
-          ...source.state,
-          resourceStatus: 'error',
-          lastError: 'The source connection or project identity could not be verified. Check authorization and retry publication.',
-        })
+      if (sourceDefinition.managed)
+        this.#store.eventSources.saveState(
+          source,
+          this.#resourceState(source, 'error', 'The source could not be verified. Check authorization and retry publication.'),
+        )
       throw error
     }
-    const subscriptions = eventSourceDefinition(source.kind).resources.requests(
-      source,
-      source.provider,
-      context.config,
-      this.#store.eventSources.view(source, this.#options()?.publicOrigin).endpointUrl ?? undefined,
-    )
     for (const subscription of subscriptions) {
       if (access.scope == 'catalog') throw new PermanentIntegrationError('Resource subscriptions require a fixed access snapshot.')
       const previous = this.#store.eventSources.subscription(source.sourceId, subscription.key)
@@ -253,14 +259,14 @@ export class EventSourceRuntime {
         access.providerAccess,
         this.#clock(),
       )
-      if (stored.status == 'ready' && !sourceDefinition.resources.managed) continue
+      if (stored.status == 'ready' && !sourceDefinition.managed) continue
       const key = JSON.stringify([source.sourceId, subscription.key])
       const running = this.#operations.get(key)
       if (running != null) {
         await running
         return { outcome: 'pending' }
       }
-      if (previous != null && !sourceDefinition.resources.managed)
+      if (previous != null && !sourceDefinition.managed)
         throw new PermanentIntegrationError('A previous subscription operation has an uncertain outcome. Verify it before retrying.')
       const operation = this.#change(source, stored, true, context.signal)
       this.#operations.set(key, operation)
@@ -280,7 +286,7 @@ export class EventSourceRuntime {
       const key = JSON.stringify([subscription.sourceId, subscription.resourceKey])
       if (this.#operations.has(key)) continue
       const source = this.#store.eventSources.get(subscription.sourceId)
-      if (source == null || (subscription.status != 'ready' && !eventSourceDefinition(source.kind).resources.managed)) continue
+      if (source == null || (subscription.status != 'ready' && !eventSourceDefinition(source.kind).managed)) continue
       this.#store.eventSources.subscriptionState(source.sourceId, subscription.resourceKey, 'deleting', this.#clock())
       const operation = this.#change(source, subscription, false, signal)
       this.#operations.set(key, operation)
@@ -297,12 +303,12 @@ export class EventSourceRuntime {
 
   async #change(source: StoredEventSource, stored: SourceSubscription, active: boolean, signal?: AbortSignal): Promise<void> {
     const subscription = JSON.parse(stored.resourceJson) as ResourceSubscription
-    const { triggerId, managed } = eventSourceDefinition(source.kind).resources
+    const { triggerId, managed } = eventSourceDefinition(source.kind)
     const connector = this.#connector()
     if (connector == null) throw new TransientIntegrationError('Connector is unavailable.')
     try {
       if (connector.trigger == null) throw new TransientIntegrationError('Trigger operation transport is unavailable.')
-      if (managed && !this.#store.eventSources.saveState(source, { ...source.state, resourceStatus: 'pending', lastError: '' }))
+      if (managed && !this.#store.eventSources.saveState(source, this.#resourceState(source, 'pending', '')))
         throw new TransientIntegrationError('The source changed during subscription setup.')
       const result = await connector.trigger(
         source.provider,
@@ -325,24 +331,83 @@ export class EventSourceRuntime {
         const confirmed = z.object({ outcome: z.literal('ready'), subscription: z.record(z.string(), z.json()) }).safeParse(result)
         if (!confirmed.success) throw new TransientIntegrationError('Connector did not confirm the source subscription.')
         const next = {
-          ...source.state,
-          resource: confirmed.data.subscription,
-          resourceStatus: active ? 'ready' : 'idle',
-          lastError: '',
-          verifiedAt: active ? this.#clock() : null,
+          ...source,
+          state: {
+            ...source.state,
+            resource: confirmed.data.subscription,
+            resourceStatus: active ? 'ready' : 'idle',
+            lastError: '',
+            verifiedAt: active ? this.#clock() : null,
+          },
         }
-        if (!this.#store.eventSources.saveState(source, next)) throw new TransientIntegrationError('The source changed during subscription setup.')
+        const inspected = sourceResult.parse(
+          await this.#execute(
+            source.kind,
+            source.connectionId,
+            { operation: 'source', request: { action: 'inspect', source: next } },
+            signal ?? AbortSignal.timeout(30_000),
+            this.#operatorContext(source.provider, source.teamId ?? undefined),
+          ),
+        )
+        if (!this.#store.eventSources.saveState(source, inspected.source.state))
+          throw new TransientIntegrationError('The source changed during subscription setup.')
       }
       if (active) this.#store.eventSources.subscriptionState(source.sourceId, stored.resourceKey, 'ready', this.#clock())
       else this.#store.eventSources.deleteSubscription(source.sourceId, stored.resourceKey)
     } catch (error) {
       if (managed)
-        this.#store.eventSources.saveState(source, {
-          ...source.state,
-          resourceStatus: 'error',
-          lastError: error instanceof ConnectorTaskError ? error.message : 'Source subscription could not be confirmed.',
-        })
+        this.#store.eventSources.saveState(
+          source,
+          this.#resourceState(source, 'error', error instanceof ConnectorTaskError ? error.message : 'Source subscription could not be confirmed.'),
+        )
       this.#store.eventSources.subscriptionState(source.sourceId, stored.resourceKey, 'uncertain', this.#clock())
+      throw error
+    }
+  }
+
+  async #hydrate(source: StoredEventSource): Promise<StoredEventSource> {
+    if (source.state.projection != null) return source
+    const inspected = sourceResult.parse(
+      await this.#execute(
+        source.kind,
+        source.connectionId,
+        { operation: 'source', request: { action: 'inspect', source } },
+        AbortSignal.timeout(30_000),
+        this.#operatorContext(source.provider, source.teamId ?? undefined),
+      ),
+    )
+    if (!this.#store.eventSources.saveState(source, inspected.source.state))
+      throw new TransientIntegrationError('The source changed during protocol initialization.')
+    return this.#store.eventSources.get(source.sourceId)!
+  }
+
+  #resourceState(source: SourceConfiguration, status: 'pending' | 'error', message: string): SourceConfiguration['state'] {
+    const projection = source.state.projection as { view: Record<string, import('@oomol-lab/open-flow/flow-change').JsonValue> }
+    return {
+      ...source.state,
+      resourceStatus: status,
+      lastError: message,
+      projection: { ...projection, ready: false, view: { ...projection.view, subscriptionStatus: status, lastError: message } },
+    }
+  }
+
+  async #execute(
+    kind: string,
+    connectionId: string,
+    operation: { operation: 'source'; request: SourceOperation },
+    signal: AbortSignal,
+    access: ConnectorAccessContext,
+  ): Promise<unknown> {
+    const connector = this.#connector()
+    if (connector?.trigger == null) throw new TransientIntegrationError('Connector source protocol is unavailable.')
+    const definition = eventSourceDefinition(kind)
+    try {
+      return await connector.trigger(definition.provider, connectionId, definition.triggerId, operation, signal, access)
+    } catch (error) {
+      if (error instanceof ConnectorTaskError && error.code === 'connector.input-invalid') {
+        if (operation.request.action === 'initialize') throw new ControlError(controlErrorCode.eventSourceIdentityUnavailable, error.message)
+        if (operation.request.action === 'update') throw new ControlError(controlErrorCode.eventSourceInvalid, error.message)
+      }
       throw error
     }
   }

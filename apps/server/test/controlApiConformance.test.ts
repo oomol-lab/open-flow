@@ -35,6 +35,7 @@ import { Store } from '../node/storage/store.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
+import { sourceProtocolFixture } from './sourceProtocolFixture.ts'
 
 const connectorProvider: ConnectorProvider = {
   icon: 'https://connector.example/icons/mail.svg',
@@ -114,7 +115,10 @@ async function createHarness(
           : serviceId == connectorConnection.serviceId
             ? [connectorConnection]
             : [],
-    trigger: async () => [{ value: teamId, label: 'Engineering (ENG)' }],
+    trigger: async (_provider, _connection, _trigger, request) =>
+      request.operation === 'source'
+        ? sourceProtocolFixture(request.request, eventConnection.providerAccountId)
+        : [{ value: teamId, label: 'Engineering (ENG)' }],
     listProviders: async () => [connectorProvider],
     ready: async () => true,
     searchActions: async () => [connectorAction],
@@ -738,6 +742,9 @@ it('Server event source Team scope and authorization page conformance', async ()
     { id: 'team-b', name: 'team_b', systemCreated: true },
   ])
   vi.spyOn(connector, 'listConnections').mockResolvedValue([eventConnection])
+  vi.spyOn(connector, 'trigger').mockImplementation(async (_provider, _connection, _trigger, request) =>
+    request.operation === 'source' ? sourceProtocolFixture(request.request, eventConnection.providerAccountId) : undefined,
+  )
   const service = await openService(':memory:', { capabilities: { connector: () => connector } })
   const app = createServerApp(service, { resolveControlActor: () => 'operator' })
   const harness: ControlApiConformanceHarness = {

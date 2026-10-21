@@ -5,7 +5,7 @@ import type { DatabaseSync } from 'node:sqlite'
 
 import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { eventSourceDefinition } from '@oomol-lab/open-flow/event-source'
+import { eventSourceDefinition, sourceReady, sourceView } from '@oomol-lab/open-flow/event-source'
 import { resolveTriggerConfig } from '@oomol-lab/open-flow/integration-trigger'
 import { randomUUID } from 'node:crypto'
 import { ControlError } from '../error.ts'
@@ -85,7 +85,24 @@ export class EventSourceStore {
     const app = this.#database
       .prepare('SELECT signing_secret AS secret, verified_at AS verifiedAt FROM event_source_apps WHERE kind = ? AND app_id = ?')
       .get(source.kind, String(source.config.appId)) as { secret: string; verifiedAt: number | null }
-    return { ...source, secrets: { signingSecret: app.secret }, state: app.verifiedAt == null ? {} : { verifiedAt: app.verifiedAt } }
+    const projection = source.state.projection as { view: Record<string, import('@oomol-lab/open-flow/flow-change').JsonValue>; ready: boolean } | undefined
+    return {
+      ...source,
+      secrets: { signingSecret: app.secret },
+      state: {
+        ...source.state,
+        verifiedAt: app.verifiedAt,
+        ...(projection == null
+          ? {}
+          : {
+              projection: {
+                ...projection,
+                ready: app.verifiedAt != null,
+                view: { ...projection.view, verifiedAt: app.verifiedAt == null ? null : new Date(app.verifiedAt).toISOString() },
+              },
+            }),
+      },
+    }
   }
 
   applicationSources(kind: string, appId: string): readonly StoredEventSource[] {
@@ -93,6 +110,14 @@ export class EventSourceStore {
       .prepare(`SELECT ${sourceColumns} FROM event_sources WHERE kind = ? AND json_extract(config_json, '$.appId') = ?`)
       .all(kind, appId) as unknown as SourceRow[]
     return rows.map((row) => this.#source(row))
+  }
+
+  unprojected(): readonly StoredEventSource[] {
+    return (
+      this.#database
+        .prepare(`SELECT ${sourceColumns} FROM event_sources WHERE json_extract(state_json, '$.projection') IS NULL`)
+        .all() as unknown as SourceRow[]
+    ).map((row) => this.#source(row))
   }
 
   list(origin: string | undefined, teamId?: string | null): readonly EventSource[] {
@@ -111,7 +136,7 @@ export class EventSourceStore {
       teamId: row.teamId,
       enabled: row.enabled == 1,
       eventTypes: row.eventTypes,
-      ...eventSourceDefinition(row.kind).view(row, this.#clock()),
+      ...sourceView(row, this.#clock()),
       endpointUrl:
         origin == null
           ? null
@@ -169,10 +194,9 @@ export class EventSourceStore {
     })
   }
 
-  update(sourceId: string, input: UpdateEventSource): StoredEventSource {
+  update(sourceId: string, input: UpdateEventSource, configuration: SourceConfiguration): StoredEventSource {
     return this.#transaction(() => {
       const source = this.require(sourceId, input.expectedRevision)
-      const configuration = eventSourceDefinition(source.kind).update(source, input)
       const required = this.#database
         .prepare(`SELECT trigger_json AS triggerJson FROM integration_bindings
         WHERE current_publication_id IS NOT NULL AND json_extract(trigger_json, '$.config.sourceId.value') = ?
@@ -206,7 +230,7 @@ export class EventSourceStore {
           JSON.stringify(configuration.eventTypes),
           JSON.stringify(configuration.config),
           JSON.stringify(eventSourceDefinition(source.kind).applicationIngress ? {} : configuration.secrets),
-          JSON.stringify(eventSourceDefinition(source.kind).applicationIngress ? {} : configuration.state),
+          JSON.stringify(configuration.state),
           this.#clock(),
           sourceId,
         )
@@ -264,7 +288,6 @@ export class EventSourceStore {
       this.#database
         .prepare('UPDATE event_source_apps SET verified_at = ? WHERE kind = ? AND app_id = ?')
         .run(typeof state.verifiedAt === 'number' ? state.verifiedAt : null, source.kind, String(source.config.appId))
-      return true
     }
     return (
       this.#database
@@ -273,11 +296,34 @@ export class EventSourceStore {
     )
   }
 
+  private targets(source: StoredEventSource) {
+    return this.#database
+      .prepare(`SELECT b.binding_id AS bindingId, b.endpoint_id AS endpointId, b.current_publication_id AS publicationId,
+        b.runtime_version AS runtimeVersion, b.trigger_json AS triggerJson FROM integration_bindings b
+        JOIN flow_live l ON l.flow_id = b.flow_id AND l.publication_id = b.current_publication_id AND l.enabled = 1
+        LEFT JOIN flow_connector_teams t ON t.flow_id = b.flow_id
+        WHERE b.health = 'healthy' AND b.connection_id = ? AND t.team_id IS ?
+          AND json_extract(b.trigger_json, '$.definition.provider') = ? AND json_extract(b.trigger_json, '$.config.sourceId.value') = ?`)
+      .all(source.connectionId, source.teamId, source.provider, source.sourceId) as {
+      bindingId: string
+      endpointId: string
+      publicationId: string
+      runtimeVersion: number
+      triggerJson: string
+    }[]
+  }
+
+  consumersForEvent(source: StoredEventSource) {
+    return this.targets(source).map((target) => {
+      const trigger = JSON.parse(target.triggerJson) as Extract<TriggerNode, { kind: 'integration' }>
+      return { id: JSON.stringify([target.bindingId, target.runtimeVersion]), config: resolveTriggerConfig(trigger.definition.configInputs, trigger.config) }
+    })
+  }
+
   receive(source: StoredEventSource, event: SourceEvent, now: number): 'accepted' | 'conflict' | 'overloaded' | 'unavailable' {
     return this.#transaction(() => {
       const current = this.get(source.sourceId)
-      if (current == null || current.revision != source.revision || current.enabled != 1 || !eventSourceDefinition(current.kind).ready(current, now))
-        return 'unavailable'
+      if (current == null || current.revision != source.revision || current.enabled != 1 || !sourceReady(current, now)) return 'unavailable'
       const payloadJson = JSON.stringify(event.payload)
       const existing = this.#database
         .prepare('SELECT payload_json AS payloadJson FROM source_events WHERE source_id = ? AND event_id = ?')
@@ -290,24 +336,8 @@ export class EventSourceStore {
         if (previous != null && previous.version >= event.ordering.version) return 'accepted'
       }
       const count = this.#database.prepare("SELECT COUNT(*) AS count FROM source_deliveries WHERE status = 'pending'").get() as { count: number }
-      const targets = this.#database
-        .prepare(`SELECT b.binding_id AS bindingId, b.endpoint_id AS endpointId, b.current_publication_id AS publicationId,
-        b.runtime_version AS runtimeVersion, b.trigger_json AS triggerJson FROM integration_bindings b
-        JOIN flow_live l ON l.flow_id = b.flow_id AND l.publication_id = b.current_publication_id AND l.enabled = 1
-        LEFT JOIN flow_connector_teams t ON t.flow_id = b.flow_id
-        WHERE b.health = 'healthy' AND b.connection_id = ? AND t.team_id IS ?
-          AND json_extract(b.trigger_json, '$.definition.provider') = ? AND json_extract(b.trigger_json, '$.config.sourceId.value') = ?`)
-        .all(source.connectionId, source.teamId, source.provider, source.sourceId) as {
-        bindingId: string
-        endpointId: string
-        publicationId: string
-        runtimeVersion: number
-        triggerJson: string
-      }[]
-      const matches = targets.filter((target) => {
-        const trigger = JSON.parse(target.triggerJson) as Extract<TriggerNode, { kind: 'integration' }>
-        return eventSourceDefinition(source.kind).matches(resolveTriggerConfig(trigger.definition.configInputs, trigger.config), event)
-      })
+      const matched = new Set(event.matches)
+      const matches = this.targets(source).filter((target) => matched.has(JSON.stringify([target.bindingId, target.runtimeVersion])))
       if (count.count + matches.length > 10_000) return 'overloaded'
       if (event.ordering != null)
         this.#database
@@ -429,7 +459,7 @@ export class EventSourceStore {
     const source = this.get(sourceId)
     return (
       source?.enabled == 1 &&
-      eventSourceDefinition(source.kind).ready(source, this.#clock()) &&
+      sourceReady(source, this.#clock()) &&
       this.#database
         .prepare(`SELECT 1 FROM source_demands d
       JOIN source_subscriptions s USING (source_id, resource_key) WHERE d.binding_id = ? AND s.status != 'ready'`)

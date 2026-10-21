@@ -496,7 +496,124 @@
       ]
     },
     "options": false,
-    "eventSource": "feishu"
+    "eventSource": "feishu",
+    "source": {
+      "createSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "feishu"
+          },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "teamId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verificationToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "encryptKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "eventTypes": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.:]{0,127}$"
+            }
+          },
+          "manageSubscriptions": {
+            "type": "boolean"
+          }
+        },
+        "required": ["version", "name", "connectionId", "teamId", "verificationToken", "encryptKey", "eventTypes", "manageSubscriptions"],
+        "additionalProperties": false
+      },
+      "updateSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "eventTypes": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.:]{0,127}$"
+            }
+          },
+          "verificationToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "signingSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "encryptKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": ["version", "expectedRevision", "name", "enabled", "eventTypes"],
+        "additionalProperties": false
+      },
+      "kind": "feishu",
+      "provider": "feishu_app_bot",
+      "triggerId": "feishu_app_bot.on_event",
+      "maximumBodyBytes": 65536,
+      "applicationIngress": false,
+      "managed": false
+    }
   },
   {
     "snapshot": {
@@ -582,7 +699,116 @@
       ]
     },
     "options": false,
-    "eventSource": "fireflies"
+    "eventSource": "fireflies",
+    "source": {
+      "createSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "fireflies"
+          },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "teamId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "signingSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "eventTypes": {
+            "minItems": 1,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["meeting.transcribed", "meeting.summarized"]
+            }
+          }
+        },
+        "required": ["kind", "version", "name", "connectionId", "teamId", "signingSecret", "eventTypes"],
+        "additionalProperties": false
+      },
+      "updateSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "eventTypes": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.:]{0,127}$"
+            }
+          },
+          "verificationToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "signingSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "encryptKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": ["version", "expectedRevision", "name", "enabled", "eventTypes"],
+        "additionalProperties": false
+      },
+      "kind": "fireflies",
+      "provider": "fireflies",
+      "triggerId": "fireflies.on_meeting_ready",
+      "maximumBodyBytes": 65536,
+      "applicationIngress": false,
+      "managed": false
+    }
   },
   {
     "snapshot": {
@@ -1828,7 +2054,121 @@
       ]
     },
     "options": false,
-    "eventSource": "intercom"
+    "eventSource": "intercom",
+    "source": {
+      "createSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "intercom"
+          },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "teamId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "appId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "signingSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "eventTypes": {
+            "minItems": 1,
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["conversation.user.created", "conversation.user.replied", "ticket.created"]
+            }
+          }
+        },
+        "required": ["kind", "version", "name", "connectionId", "teamId", "appId", "signingSecret", "eventTypes"],
+        "additionalProperties": false
+      },
+      "updateSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "eventTypes": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.:]{0,127}$"
+            }
+          },
+          "verificationToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "signingSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "encryptKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": ["version", "expectedRevision", "name", "enabled", "eventTypes"],
+        "additionalProperties": false
+      },
+      "kind": "intercom",
+      "provider": "intercom",
+      "triggerId": "intercom.on_conversation_event",
+      "maximumBodyBytes": 65536,
+      "applicationIngress": true,
+      "managed": false
+    }
   },
   {
     "snapshot": {
@@ -1914,7 +2254,116 @@
       ]
     },
     "options": false,
-    "eventSource": "jira"
+    "eventSource": "jira",
+    "source": {
+      "createSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "jira"
+          },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "teamId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "project": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "eventTypes": {
+            "minItems": 1,
+            "maxItems": 3,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["jira:issue_created", "jira:issue_updated", "comment_created"]
+            }
+          }
+        },
+        "required": ["kind", "version", "name", "connectionId", "teamId", "project", "eventTypes"],
+        "additionalProperties": false
+      },
+      "updateSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "eventTypes": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.:]{0,127}$"
+            }
+          },
+          "verificationToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "signingSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "encryptKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": ["version", "expectedRevision", "name", "enabled", "eventTypes"],
+        "additionalProperties": false
+      },
+      "kind": "jira",
+      "provider": "jira",
+      "triggerId": "jira.on_issue_event",
+      "maximumBodyBytes": 65536,
+      "applicationIngress": false,
+      "managed": true
+    }
   },
   {
     "snapshot": {
@@ -2736,7 +3185,131 @@
       ]
     },
     "options": false,
-    "eventSource": "sentry"
+    "eventSource": "sentry",
+    "source": {
+      "createSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "sentry"
+          },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "teamId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "appId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "installationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "organizationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "signingSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "eventTypes": {
+            "minItems": 1,
+            "maxItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "const": "issue.alert"
+            }
+          }
+        },
+        "required": ["kind", "version", "name", "connectionId", "teamId", "appId", "installationId", "organizationId", "signingSecret", "eventTypes"],
+        "additionalProperties": false
+      },
+      "updateSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "eventTypes": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.:]{0,127}$"
+            }
+          },
+          "verificationToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "signingSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "encryptKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": ["version", "expectedRevision", "name", "enabled", "eventTypes"],
+        "additionalProperties": false
+      },
+      "kind": "sentry",
+      "provider": "sentry",
+      "triggerId": "sentry.on_issue_alert",
+      "maximumBodyBytes": 65536,
+      "applicationIngress": true,
+      "managed": false
+    }
   },
   {
     "snapshot": {
@@ -3288,7 +3861,124 @@
       ]
     },
     "options": false,
-    "eventSource": "slack"
+    "eventSource": "slack",
+    "source": {
+      "createSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "slack"
+          },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "teamId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "appId": {
+            "type": "string",
+            "pattern": "^A[A-Z0-9]+$"
+          },
+          "workspaceId": {
+            "type": "string",
+            "pattern": "^T[A-Z0-9]+$"
+          },
+          "signingSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "eventTypes": {
+            "minItems": 1,
+            "maxItems": 2,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": ["app_mention", "message.im"]
+            }
+          }
+        },
+        "required": ["kind", "version", "name", "connectionId", "teamId", "appId", "workspaceId", "signingSecret", "eventTypes"],
+        "additionalProperties": false
+      },
+      "updateSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "eventTypes": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.:]{0,127}$"
+            }
+          },
+          "verificationToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "signingSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "encryptKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": ["version", "expectedRevision", "name", "enabled", "eventTypes"],
+        "additionalProperties": false
+      },
+      "kind": "slack",
+      "provider": "slackbot",
+      "triggerId": "slackbot.on_event",
+      "maximumBodyBytes": 65536,
+      "applicationIngress": true,
+      "managed": false
+    }
   },
   {
     "snapshot": {
@@ -4091,6 +4781,120 @@
       ]
     },
     "options": false,
-    "eventSource": "zoom"
+    "eventSource": "zoom",
+    "source": {
+      "createSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "zoom"
+          },
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "connectionId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "teamId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "appId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "signingSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "eventTypes": {
+            "minItems": 1,
+            "maxItems": 1,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "const": "recording.completed"
+            }
+          }
+        },
+        "required": ["kind", "version", "name", "connectionId", "teamId", "appId", "signingSecret", "eventTypes"],
+        "additionalProperties": false
+      },
+      "updateSchema": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "number",
+            "const": 1
+          },
+          "expectedRevision": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "eventTypes": {
+            "minItems": 1,
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_.:]{0,127}$"
+            }
+          },
+          "verificationToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "signingSecret": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "encryptKey": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": ["version", "expectedRevision", "name", "enabled", "eventTypes"],
+        "additionalProperties": false
+      },
+      "kind": "zoom",
+      "provider": "zoom",
+      "triggerId": "zoom.on_recording_ready",
+      "maximumBodyBytes": 65536,
+      "applicationIngress": true,
+      "managed": false
+    }
   }
 ]

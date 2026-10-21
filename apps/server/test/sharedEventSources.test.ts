@@ -2,44 +2,51 @@ import type { EventSource } from '@oomol-lab/open-flow/control-api'
 
 import { inputValues } from '@oomol-lab/open-flow/flow-change'
 import { integrationDefinitions } from '@oomol-lab/open-flow/provider-triggers'
-import { createHmac } from 'node:crypto'
 import { expect, it } from 'vitest'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { openService } from './serviceFixture.ts'
+import { sourceProtocolFixture } from './sourceProtocolFixture.ts'
 
 const now = 1_800_000_000_000
 function delivery(payload: unknown) {
-  const body = JSON.stringify(payload)
-  return {
-    method: 'POST',
-    body,
-    headers: {
-      'content-type': 'application/json',
-      'x-zm-request-timestamp': String(now / 1000),
-      'x-zm-signature': `v0=${createHmac('sha256', 'key')
-        .update(`v0:${now / 1000}:${body}`)
-        .digest('hex')}`,
-    },
-  }
+  return { method: 'POST', body: JSON.stringify(payload), headers: { 'content-type': 'application/json' } }
 }
 const event = (id: string) => ({
-  event: 'recording.completed',
-  payload: { account_id: `organization${id}`, object: { uuid: `instance${id}`, host_id: `user${id}`, recording_files: [{ id: 'file', status: 'completed' }] } },
+  recipient: `connection${id}`,
+  event: {
+    id: `Ev${id}`,
+    type: 'app_mention',
+    payload: {
+      event: 'app_mention',
+      deliveryId: `Ev${id}`,
+      appId: 'A1',
+      teamId: `T${id}`,
+      channel: 'C1',
+      user: 'UOTHER',
+      text: 'test',
+      ts: '1.0',
+      threadTs: null,
+      body: {},
+    },
+  },
 })
-it('shares an app ingress while isolating organizations, retaining fanout, and keeping the other source alive when one is disabled', async () => {
+it('shares an app ingress while isolating workspaces, retaining fanout, and keeping the other source alive when one is disabled', async () => {
   const connector = createConnectorHost({
     trigger: async (_provider, connectionId, _trigger, request) => {
-      expect(request.operation).toBe('sourceIdentity')
-      const id = connectionId.slice(-1)
-      return { accountId: `account${id}`, userId: `user${id}`, zoomAccountId: `organization${id}` }
+      if (request.operation !== 'source') throw new Error('Unexpected operation')
+      if (request.request.action === 'receive') {
+        const supplied = JSON.parse(Buffer.from(request.request.rawBody, 'base64').toString()) as { recipient?: string }
+        if (supplied.recipient != null && supplied.recipient !== connectionId) return { response: { status: 200, body: '{}', headers: {} } }
+      }
+      return sourceProtocolFixture(request.request, connectionId)
     },
     listConnections: async () =>
       ['1', '2'].map((id) => ({
         connectionId: `connection${id}`,
-        providerAccountId: `account${id}`,
+        providerAccountId: `U${id}`,
         displayName: `Bot ${id}`,
-        serviceId: 'zoom',
+        serviceId: 'slackbot',
         status: 'active' as const,
         isDefault: id === '1',
       })),
@@ -55,14 +62,15 @@ it('shares an app ingress while isolating organizations, retaining fanout, and k
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        kind: 'zoom',
+        kind: 'slack',
         version: 1,
         name: `Bot ${id}`,
         connectionId: `connection${id}`,
         teamId: null,
         appId: 'A1',
+        workspaceId: `T${id}`,
         signingSecret: 'key',
-        eventTypes: ['recording.completed'],
+        eventTypes: ['app_mention'],
       }),
     })
     expect(result.status, await result.clone().text()).toBe(201)
@@ -70,7 +78,8 @@ it('shares an app ingress while isolating organizations, retaining fanout, and k
   }
   expect(sources[0]!.endpointUrl).toBe(sources[1]!.endpointUrl)
   const endpoint = new URL(sources[0]!.endpointUrl!).pathname
-  const challenge = await app.request(endpoint, delivery({ event: 'endpoint.url_validation', payload: { plainToken: 'verify' } }))
+  expect((await app.request(endpoint, delivery({ padding: 'x'.repeat(64 * 1024) }))).status).toBe(413)
+  const challenge = await app.request(endpoint, delivery({ verify: true, response: { status: 200, body: 'verify', headers: {} } }))
   expect(challenge.status).toBe(200)
   const flows: string[] = []
   for (const index of [0, 0, 1]) {
@@ -80,13 +89,13 @@ it('shares an app ingress while isolating organizations, retaining fanout, and k
     const draft = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
       {
         kind: 'graph.node.create',
-        nodeId: 'zoom',
+        nodeId: 'slack',
         node: {
           kind: 'integration',
-          name: 'Intercom',
+          name: 'Slack',
           connectionId: source.connectionId,
-          definition: integrationDefinitions.find((item) => item.snapshot.key === 'zoom.on_recording_ready')!.snapshot,
-          config: inputValues({ sourceId: source.sourceId, eventTypes: ['recording.completed'] }),
+          definition: integrationDefinitions.find((item) => item.snapshot.key === 'slackbot.on_event')!.snapshot,
+          config: inputValues({ sourceId: source.sourceId, eventTypes: ['app_mention'] }),
         },
       },
     ])

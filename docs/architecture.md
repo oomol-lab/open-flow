@@ -48,17 +48,24 @@ Display profiles and catalog visibility during editing do not grant execution au
 
 ### Event sources
 
-The public package owns event source definitions: provider identity, configuration and secret handling,
-callback authentication and payloads, consumer matching, readiness, and resource subscription rules.
-The Server owns source persistence, Connector authorization, shared subscription lifecycles, durable
-receipt, deduplication, fixed delivery targets, and Run admission. Server storage and delivery code
-consume the source definition rather than interpreting provider-specific configuration or state.
-Application callbacks share signing credentials and ingress across their verified installations, while
-source configuration and consumer admission retain Connector Team and connection identity. Connector
-owns managed remote resources and OAuth callback verification; Open Flow owns source readiness,
-consumer demands, durable fanout and event deduplication. A managed source can establish its first
-subscription before becoming ready, and expiry or failed reconciliation revokes readiness. See
-[shared provider event sources](triggers/shared-event-sources.md) for setup and acceptance boundaries.
+Connector owns Provider event protocols: configuration validation, external identity verification,
+signatures and challenges, payload normalization, event identity and ordering, consumer predicates,
+and remote subscription operations. Its exported catalog supplies source metadata and configuration
+schemas. Open Flow does not implement those protocols or infer Provider rules from callback payloads.
+
+Open Flow owns source instances, Team and Connection authorization, shared ingress, consumer demand,
+subscription coordination, durable receipt, deduplication, delivery targets, and Run admission. It
+forwards the original callback bytes as base64 through the authenticated Connector source operation.
+Connector returns a challenge/error response or a normalized event with matched consumer identities.
+Open Flow rechecks the current binding version and scope before committing delivery targets.
+
+Source configuration and callback secrets remain opaque persisted source data; OAuth credentials and
+OAuth application secrets remain in Connector. Management responses expose only the validated public
+projection returned by Connector. Shared application sources share callback credentials and verified
+state while retaining their individual Team, Connection and consumer boundaries. Connector supplies
+readiness and expiry; Open Flow revokes readiness on failed or pending managed-resource coordination.
+Existing Workbench presets are presentation and editing conveniences, not Provider validation authority.
+See [shared provider event sources](triggers/shared-event-sources.md) for setup and acceptance boundaries.
 
 ## 2. Core resources and sources of truth
 

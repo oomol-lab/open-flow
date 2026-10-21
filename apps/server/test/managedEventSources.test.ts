@@ -7,10 +7,21 @@ import { ConnectorTaskError } from '../node/deployment/connector-contract.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { openService } from './serviceFixture.ts'
+import { sourceProtocolFixture } from './sourceProtocolFixture.ts'
 
 const now = 1_800_000_000_000
 function delivery(id: string) {
-  return { method: 'POST', body: JSON.stringify({ id }), headers: { 'content-type': 'application/json', 'authorization': 'Bearer test' } }
+  return {
+    method: 'POST',
+    body: JSON.stringify({
+      event: {
+        id,
+        type: 'jira:issue_created',
+        payload: { event: 'jira:issue_created', deliveryId: id, cloudId: 'cloud', issueId: '200', body: { id: '200' } },
+      },
+    }),
+    headers: { 'content-type': 'application/json', 'authorization': 'Bearer test' },
+  }
 }
 it('shares a managed Jira project subscription and deduplicates fanout without exposing OAuth secrets', async () => {
   let clock = now
@@ -20,29 +31,41 @@ it('shares a managed Jira project subscription and deduplicates fanout without e
   const connector = createConnectorHost({
     trigger: async (_provider, connectionId, _trigger, request) => {
       const id = connectionId.slice(-1)
-      if (request.operation === 'sourceIdentity')
-        return {
-          accountId: `jira:cloud${id}:user`,
-          cloudId: `cloud${id}`,
-          userId: 'user',
-          projectId: '100',
-          projectKey: 'DEMO',
-          siteUrl: 'https://acme.atlassian.net',
-        }
       if (request.operation === 'resource') {
         if (failRenewal && request.active) throw new ConnectorTaskError('connector.unavailable', 'Temporary subscription failure')
         calls.push({ active: request.active, key: request.requestKey })
         return { outcome: 'ready', subscription: request.active ? { webhookId: 42, expiresAt: now + 30 * 86400000 } : {} }
       }
-      if (request.operation === 'sourceReceive') {
-        if (failVerification) throw new ConnectorTaskError('connector.unavailable', 'Temporary verification failure')
-        const event = JSON.parse(request.rawBody) as { id: string }
-        return {
-          outcome: 'event',
-          id: event.id,
-          type: 'jira:issue_created',
-          payload: { event: 'jira:issue_created', deliveryId: event.id, cloudId: `cloud${id}`, issueId: '200', body: { id: '200' } },
+      if (request.operation === 'source') {
+        if (request.request.action === 'receive' && failVerification) throw new ConnectorTaskError('connector.unavailable', 'Temporary verification failure')
+        const result = sourceProtocolFixture(request.request, `jira:cloud${id}:user`, clock) as { source?: { state: Record<string, unknown> }; event?: unknown }
+        if (request.request.action === 'prepare')
+          return { ...result, subscriptions: [{ key: 'project', config: { projectId: '100', endpointUrl: request.request.endpointUrl } }] }
+        if (request.request.action === 'inspect') {
+          const state = request.request.source.state
+          return {
+            source: {
+              ...request.request.source,
+              state: {
+                ...state,
+                projection: {
+                  ready: state.resourceStatus === 'ready',
+                  expiresAt: now + 30 * 86400000,
+                  view: {
+                    appId: `cloud${id}`,
+                    manageSubscriptions: true,
+                    verificationTokenConfigured: false,
+                    encryptKeyConfigured: false,
+                    verifiedAt: state.verifiedAt == null ? null : new Date(Number(state.verifiedAt)).toISOString(),
+                    subscriptionStatus: state.resourceStatus,
+                    lastError: state.lastError,
+                  },
+                },
+              },
+            },
+          }
         }
+        return result
       }
       throw new Error('Unexpected operation')
     },

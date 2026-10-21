@@ -202,3 +202,18 @@ The managed `workflow` executor adds independent Live Run invocation without res
 Run details add optional `initiator` audit metadata without changing `source: draft | live`, Run
 request versions, or existing `caller/calls` associations. Older Runs and deployments may omit it.
 Server migration 50 adds nullable audit columns without backfilling inferred identities or channels.
+
+## Connector-owned shared event source protocols
+
+Shared source protocol code and its Provider regression tests move from Open Flow to Connector.
+The public event-source entry now exposes metadata, the source operation contract and generic state
+projection helpers. Provider-specific `feishuApplication`, `receiveFeishuEvent`, `matchesFeishuEvent`
+and `feishuSubscriptions` exports are removed. Consumers use the Connector source protocol instead.
+Deploy the supporting Connector before Open Flow; no local protocol fallback is retained. Source
+instances retain their IDs and acquire stored projections through Connector without rewriting bindings.
+
+The npm publication baseline checked for this change is `0.1.0-beta.68` at
+`ae0f847fde9b8b5feb96822c763ea563f456f069`, whose Engine contract is v5. The branch already carries
+pending Engine v6 changes. This refactor preserves node snapshots, output contracts and Run semantics;
+it does not allocate another Engine revision. Package consumers of the removed protocol helpers and
+Connector deployments must upgrade together at the new package boundary.

@@ -1,10 +1,8 @@
-export { feishuSubscriptions } from './feishu/subscriptions.ts'
-import { sourceEvents } from './source-events.ts'
-export { receiveFeishuEvent, matchesFeishuEvent, type FeishuEvent } from './feishu/events.ts'
 import type { IntegrationDefinition } from '../common/integration.ts'
 import type { PollDefinition } from '../common/poll.ts'
 
 import { remoteTriggerDefinitions } from './remote.ts'
+import { sourceEvents } from './source-events.ts'
 export type ProviderTriggerDefinition = IntegrationDefinition | PollDefinition
 export const triggerDefinitions: readonly ProviderTriggerDefinition[] = [...sourceEvents, ...remoteTriggerDefinitions]
 
