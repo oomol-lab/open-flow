@@ -17,58 +17,10 @@ function placeholders(message: string): string[] {
   return [...message.matchAll(/\{\{\s*([^{}]+?)\s*\}\}/g)].flatMap((match) => match[1] ?? []).toSorted()
 }
 
-interface JsonFrame {
-  readonly keys: Set<string>
-  readonly kind: 'array' | 'object'
-  pendingKey: string | undefined
-  readonly prefix: string
-}
-
-/**
- * Object keys that appear more than once in raw JSON text, reported as `path.to.key`. `JSON.parse`
- * keeps the last duplicate and drops the rest without complaining, so the text is scanned instead.
- */
-function duplicateJsonKeys(source: string): readonly string[] {
-  const duplicates: string[] = []
-  const stack: JsonFrame[] = []
-  let index = 0
-  while (index < source.length) {
-    const character = source[index]!
-    const frame = stack.at(-1)
-    if (character == '"') {
-      const start = index
-      index += 1
-      while (index < source.length && source[index] != '"') index += source[index] == '\\' ? 2 : 1
-      index += 1
-      const text = JSON.parse(source.slice(start, index)) as string
-      if (frame != null && frame.kind == 'object' && frame.pendingKey == null) {
-        if (frame.keys.has(text)) duplicates.push(`${frame.prefix}${text}`)
-        frame.keys.add(text)
-        frame.pendingKey = text
-      }
-      continue
-    }
-    if (character == '{' || character == '[') {
-      const prefix = frame == null ? '' : frame.kind == 'object' ? `${frame.prefix}${frame.pendingKey}.` : frame.prefix
-      stack.push({ keys: new Set(), kind: character == '{' ? 'object' : 'array', pendingKey: undefined, prefix })
-    } else if (character == '}' || character == ']') {
-      stack.pop()
-    } else if (character == ',' && frame != null) {
-      frame.pendingKey = undefined
-    }
-    index += 1
-  }
-  return duplicates
-}
-
 const english = new Map(messages(en))
 const keyPattern = /(?:\b(?:t|translate)|\.t)\(\s*(['"`])([^'"`$]+)\1/g
 
-const localeDirectory = new URL('../browser/locales/', import.meta.url)
 const sourceDirectory = new URL('../browser/', import.meta.url)
-const localeFiles: string[] = []
-for await (const name of glob('*.json', { cwd: localeDirectory })) localeFiles.push(name)
-localeFiles.sort()
 
 describe('Server browser i18n', () => {
   it('ships every supported language', () => {
@@ -107,18 +59,6 @@ describe('Server browser i18n', () => {
     }
     expect([...missing].toSorted()).toEqual([])
   })
-
-  it('reports duplicate keys with their path', () => {
-    expect(duplicateJsonKeys('{"a": {"b": 1, "b": 2}, "a": 3}')).toEqual(['a.b', 'a'])
-    expect(duplicateJsonKeys('{"a\\"b": 1, "a\\"b": 2}')).toEqual(['a"b'])
-    expect(duplicateJsonKeys('{"a": "{\\"b\\": 1, \\"b\\": 2}"}')).toEqual([])
-  })
-
-  for (const name of localeFiles) {
-    it(`never repeats a key in ${name}`, async () => {
-      expect(duplicateJsonKeys(await readFile(new URL(name, localeDirectory), 'utf8'))).toEqual([])
-    })
-  }
 
   it('translates the operator session copy', () => {
     const i18n = createI18n('zh-CN')

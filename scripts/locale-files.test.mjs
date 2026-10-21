@@ -1,32 +1,26 @@
+import assert from 'node:assert/strict'
 import { glob, readFile } from 'node:fs/promises'
-import { describe, expect, it } from 'vitest'
+import { describe, it } from 'node:test'
 
-const packageRoot = new URL('../..', import.meta.url)
-
-interface JsonFrame {
-  readonly keys: Set<string>
-  readonly kind: 'array' | 'object'
-  pendingKey: string | undefined
-  readonly prefix: string
-}
+const repositoryRoot = new URL('..', import.meta.url)
 
 /**
  * Object keys that appear more than once in raw JSON text, reported as `path.to.key`. `JSON.parse`
  * keeps the last duplicate and drops the rest without complaining, so the text is scanned instead.
  */
-function duplicateJsonKeys(source: string): readonly string[] {
-  const duplicates: string[] = []
-  const stack: JsonFrame[] = []
+function duplicateJsonKeys(source) {
+  const duplicates = []
+  const stack = []
   let index = 0
   while (index < source.length) {
-    const character = source[index]!
+    const character = source[index]
     const frame = stack.at(-1)
     if (character == '"') {
       const start = index
       index += 1
       while (index < source.length && source[index] != '"') index += source[index] == '\\' ? 2 : 1
       index += 1
-      const text = JSON.parse(source.slice(start, index)) as string
+      const text = JSON.parse(source.slice(start, index))
       if (frame != null && frame.kind == 'object' && frame.pendingKey == null) {
         if (frame.keys.has(text)) duplicates.push(`${frame.prefix}${text}`)
         frame.keys.add(text)
@@ -47,25 +41,26 @@ function duplicateJsonKeys(source: string): readonly string[] {
   return duplicates
 }
 
-const localePaths: string[] = []
-for await (const path of glob('src/**/locales/*.json', { cwd: packageRoot })) localePaths.push(path.replaceAll('\\', '/'))
+const localePaths = []
+for await (const path of glob(['packages/open-flow/src/**/locales/*.json', 'apps/server/browser/locales/*.json'], { cwd: repositoryRoot }))
+  localePaths.push(path.replaceAll('\\', '/'))
 localePaths.sort()
 
 describe('Locale files', () => {
-  it('finds every locale bundle in the package', () => {
-    expect(localePaths.length).toBeGreaterThan(0)
+  it('finds product and Server locale bundles', () => {
+    for (const prefix of ['packages/open-flow/', 'apps/server/']) assert.ok(localePaths.some((path) => path.startsWith(prefix)))
   })
 
   it('reports duplicate keys with their path', () => {
-    expect(duplicateJsonKeys('{"a": {"b": 1, "b": 2}, "a": 3}')).toEqual(['a.b', 'a'])
-    expect(duplicateJsonKeys('{"a\\"b": 1, "a\\"b": 2}')).toEqual(['a"b'])
-    expect(duplicateJsonKeys('{"a": "{\\"b\\": 1, \\"b\\": 2}"}')).toEqual([])
-    expect(duplicateJsonKeys('{"list": [{"a": 1}, {"a": 1}], "a": 1}')).toEqual([])
+    assert.deepEqual(duplicateJsonKeys('{"a": {"b": 1, "b": 2}, "a": 3}'), ['a.b', 'a'])
+    assert.deepEqual(duplicateJsonKeys('{"a\\"b": 1, "a\\"b": 2}'), ['a"b'])
+    assert.deepEqual(duplicateJsonKeys('{"a": "{\\"b\\": 1, \\"b\\": 2}"}'), [])
+    assert.deepEqual(duplicateJsonKeys('{"list": [{"a": 1}, {"a": 1}], "a": 1}'), [])
   })
 
   for (const path of localePaths) {
     it(`never repeats a key in ${path}`, async () => {
-      expect(duplicateJsonKeys(await readFile(new URL(path, packageRoot), 'utf8'))).toEqual([])
+      assert.deepEqual(duplicateJsonKeys(await readFile(new URL(path, repositoryRoot), 'utf8')), [])
     })
   }
 })

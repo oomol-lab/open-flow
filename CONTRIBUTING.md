@@ -88,7 +88,7 @@ these checks; select their scope according to the change:
 - `bun run test:docker`: verify container delivery with a local Docker daemon.
 
 For a focused public-package test, run `bun run vitest run --config vitest.config.ts <test-file>`
-from `packages/open-flow`. The `test:vitest` script already selects `src test`, so appending a file
+from `packages/open-flow`. The `test:vitest` script already selects `src test dev`, so appending a file
 does not narrow it. Root `bun test` is unsuitable: it loads Vitest files with Bun's test runner.
 Some test scripts include builds; inspect the scripts when choosing checks to avoid duplicate work.
 TypeScript executed directly by Node must use erasable syntax supported by the pinned runtime.

@@ -1,78 +1,46 @@
+// @vitest-environment happy-dom
 import type { ControlClient, VariableReferences } from '@oomol-lab/open-flow/control-api'
-import type { ReactElement, ReactNode } from 'react'
 
-import { Children, isValidElement } from 'react'
-import { renderToStaticMarkup } from 'react-dom/server'
-import { beforeEach, expect, it, vi } from 'vitest'
+import { act } from 'react'
+import { expect, it, vi } from 'vitest'
 import { useVariableReferences, VariableDeletionDialog, VariableReferenceResults, VariableReferencesButton } from '../browser/variable-references.tsx'
+import { button, click, render } from './support/render.tsx'
 
-const hooks = vi.hoisted(() => ({ values: [] as unknown[], index: 0, effects: [] as (() => () => void)[] }))
-vi.mock('react', async (original) => ({
-  ...(await original<typeof import('react')>()),
-  useState: (initial: unknown) => {
-    const index = hooks.index++
-    if (!(index in hooks.values)) hooks.values[index] = initial
-    return [
-      hooks.values[index],
-      (next: unknown) => {
-        hooks.values[index] = typeof next == 'function' ? next(hooks.values[index]) : next
-      },
-    ]
-  },
-  useRef: (value: unknown) => ({ current: value }),
-  useEffect: (effect: () => () => void) => {
-    hooks.effects.push(effect)
-  },
-}))
-vi.mock('val-i18n-react', () => ({ useTranslate: () => (key: string) => key }))
-beforeEach(() => {
-  hooks.values = []
-  hooks.index = 0
-  hooks.effects = []
-})
 const empty: VariableReferences = { version: 1, references: [] }
+const referenced: VariableReferences = { ...empty, references: [{ flowId: 'old', flowName: 'Old', draft: true, live: null }] }
 
-function find(element: ReactElement, predicate: (props: Record<string, unknown>) => boolean): ReactElement | undefined {
-  if (predicate(element.props as Record<string, unknown>)) return element
-  for (const child of Children.toArray((element.props as { children?: ReactNode }).children)) {
-    if (isValidElement(child)) {
-      const found = find(child, predicate)
-      if (found != null) return found
-    }
-  }
-}
+it('requests references only after opening the popover', async () => {
+  const getVariableReferences = vi.fn().mockResolvedValue(empty)
+  const client = { getVariableReferences } as unknown as ControlClient
+  const view = render(<VariableReferencesButton client={client} name="TOKEN" container={document.body} disabled={false} referenceCount={0} />)
+  expect(view.container.querySelector('button')).toBeNull()
+  view.rerender(<VariableReferencesButton client={client} name="TOKEN" container={document.body} disabled={false} referenceCount={1} />)
+  expect(getVariableReferences).not.toHaveBeenCalled()
+  await click(view.container.querySelector('button')!)
+  expect(getVariableReferences).toHaveBeenCalledWith('TOKEN', expect.any(AbortSignal))
+})
 
-it('only requests references once opened and ignores responses after cleanup', async () => {
+it('aborts obsolete reference requests and ignores their late responses', async () => {
   const first = Promise.withResolvers<VariableReferences>()
   const next = Promise.withResolvers<VariableReferences>()
   const getVariableReferences = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(next.promise)
   const client = { getVariableReferences } as unknown as ControlClient
-  expect(VariableReferencesButton({ client, name: 'TOKEN', container: null, disabled: false, referenceCount: 0 })).toBeNull()
-  VariableReferencesButton({ client, name: 'TOKEN', container: null, disabled: false, referenceCount: 1 })
-  expect(getVariableReferences).not.toHaveBeenCalled()
-  hooks.values = []
-  hooks.index = 0
-  useVariableReferences(client, 'TOKEN')
-  const close = hooks.effects[0]!()
-  const signal = getVariableReferences.mock.calls[0]![1] as AbortSignal
-  close()
-  expect(signal.aborted).toBe(true)
-  hooks.index = 0
-  useVariableReferences(client, 'OTHER')
-  const cleanup = hooks.effects[1]!()
-  next.resolve(empty)
-  await next.promise
-  await Promise.resolve()
-  first.resolve({ ...empty, references: [{ flowId: 'old', flowName: 'Old', draft: true, live: null }] })
-  await first.promise
-  await Promise.resolve()
-  expect(hooks.values[0]).toEqual(empty)
-  expect(hooks.values[1]).toBe(false)
-  cleanup()
+  function Query({ name }: { name: string }) {
+    return <VariableReferenceResults state={useVariableReferences(client, name)} />
+  }
+  const view = render(<Query name="TOKEN" />)
+  view.rerender(<Query name="OTHER" />)
+  expect(getVariableReferences.mock.calls[0]![1].aborted).toBe(true)
+  await act(async () => next.resolve(empty))
+  await act(async () => first.resolve(referenced))
+  expect(view.container.textContent).toContain(view.i18n.t('variables.referencesEmpty'))
+  expect(view.container.textContent).not.toContain('Old')
+  view.unmount()
+  expect(getVariableReferences.mock.calls[1]![1].aborted).toBe(true)
 })
 
-it('shows version links and disabled publications', () => {
-  const html = renderToStaticMarkup(
+it('shows draft and publication links, including disabled publications', () => {
+  const view = render(
     <VariableReferenceResults
       state={{
         result: {
@@ -88,77 +56,40 @@ it('shows version links and disabled publications', () => {
       }}
     />,
   )
-  expect(html).toContain('href="/flows/both/design"')
-  expect(html).toContain('href="/flows/both/publications"')
-  expect(html).toContain('href="/flows/live/publications"')
-  expect(html).toContain('variables.referenceDisabled')
-  expect(html).not.toContain('variables.referencesEmpty')
+  const links = [...view.container.querySelectorAll('a')].map((link) => link.getAttribute('href'))
+  expect(links).toEqual(['/flows/both/design', '/flows/both/design', '/flows/both/publications', '/flows/live/publications', '/flows/live/publications'])
+  expect(view.container.textContent).toContain(view.i18n.t('variables.referenceDisabled'))
 })
 
-it.each([
-  { loading: true, failed: false, disabled: true },
-  { loading: false, failed: true, disabled: false },
-  { loading: false, failed: false, disabled: false },
-])('controls deletion while checking references: %j', ({ loading, failed, disabled }) => {
-  hooks.values = [undefined, loading, failed, 0]
-  const getVariableReferences = vi.fn().mockResolvedValue(empty)
+it.each(['empty', 'referenced', 'failed'] as const)('checks deletion impact and permits deletion after %s results', async (outcome) => {
+  const pending = Promise.withResolvers<VariableReferences>()
+  const getVariableReferences = vi.fn().mockReturnValueOnce(pending.promise).mockResolvedValue(empty)
   const onDelete = vi.fn()
-  const dialog = VariableDeletionDialog({
-    client: { getVariableReferences } as unknown as ControlClient,
-    name: 'TOKEN',
-    container: null,
-    pending: false,
-    onClose: vi.fn(),
-    onDelete,
-    finalFocus: () => null,
+  const view = render(
+    <VariableDeletionDialog
+      client={{ getVariableReferences } as unknown as ControlClient}
+      name="TOKEN"
+      container={document.body}
+      pending={false}
+      onClose={vi.fn()}
+      onDelete={onDelete}
+      finalFocus={() => null}
+    />,
+  )
+  const remove = () => button(view.i18n.t('variables.delete'))
+  expect(remove().disabled).toBe(true)
+  for (const key of ['variables.deleteUnreferenced', 'variables.deleteReferencesImpact']) expect(document.body.textContent).not.toContain(view.i18n.t(key))
+  await act(async () => {
+    if (outcome === 'failed') pending.reject(new Error('offline'))
+    else pending.resolve(outcome === 'empty' ? empty : referenced)
   })
-  const button = find(dialog, (props) => props.children == 'variables.delete')!
-  expect(button.props.disabled).toBe(disabled)
-  if (!disabled) {
-    button.props.onClick()
-    expect(onDelete).toHaveBeenCalledOnce()
-  }
-  hooks.effects[0]!()
-  expect(getVariableReferences).toHaveBeenCalledWith('TOKEN', expect.any(AbortSignal))
-})
-
-it('offers retry after a failed reference request', async () => {
-  const client = { getVariableReferences: vi.fn().mockRejectedValue(new Error('offline')) } as unknown as ControlClient
-  const state = useVariableReferences(client, 'TOKEN')
-  const cleanup = hooks.effects[0]!()
-  await Promise.resolve()
-  await Promise.resolve()
-  await Promise.resolve()
-  expect(hooks.values[1]).toBe(false)
-  expect(hooks.values[2]).toBe(true)
-  state.retry()
-  expect(hooks.values[1]).toBe(true)
-  expect(hooks.values[3]).toBe(1)
-  cleanup()
-})
-
-it.each([
-  { result: empty, loading: false, failed: false, message: 'variables.deleteUnreferenced' },
-  {
-    result: { ...empty, references: [{ flowId: 'flow', flowName: 'Flow', draft: true, live: null }] },
-    loading: false,
-    failed: false,
-    message: 'variables.deleteReferencesImpact',
-  },
-  { result: undefined, loading: true, failed: false, message: undefined },
-  { result: undefined, loading: false, failed: true, message: undefined },
-])('only describes deletion impact supported by the query: %j', ({ result, loading, failed, message }) => {
-  hooks.values = [result, loading, failed, 0]
-  const dialog = VariableDeletionDialog({
-    client: {} as ControlClient,
-    name: 'TOKEN',
-    container: null,
-    pending: false,
-    onClose: vi.fn(),
-    onDelete: vi.fn(),
-    finalFocus: () => null,
-  })
-  for (const key of ['variables.deleteUnreferenced', 'variables.deleteReferencesImpact']) {
-    expect(find(dialog, (props) => props.children === key) != null).toBe(key === message)
-  }
+  expect(remove().disabled).toBe(false)
+  if (outcome === 'failed') {
+    expect(document.querySelector('[role=alert]')).not.toBeNull()
+    await click(button(view.i18n.t('variables.retry')))
+    expect(getVariableReferences).toHaveBeenCalledTimes(2)
+    expect(document.querySelector('[role=alert]')).toBeNull()
+  } else expect(document.body.textContent).toContain(view.i18n.t(outcome === 'empty' ? 'variables.deleteUnreferenced' : 'variables.deleteReferencesImpact'))
+  await click(remove())
+  expect(onDelete).toHaveBeenCalledOnce()
 })

@@ -69,10 +69,6 @@ describe.each(bundles)('$name translations', ({ locales, name, sources }) => {
   const en = locales.get('en')!
   const translated = uiLanguageTags.filter((lang) => lang != 'en')
 
-  it('ships one locale file per UI language', () => {
-    expect([...locales.keys()]).toEqual([...uiLanguageTags])
-  })
-
   it.each(translated)('keeps %s aligned with English', (lang) => {
     const locale = locales.get(lang)!
 

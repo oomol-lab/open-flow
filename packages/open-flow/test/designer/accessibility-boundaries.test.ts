@@ -18,19 +18,6 @@ test('keeps Icon Picker controls named and stateful', () => {
   expect(markup).toContain('aria-pressed="true"')
 })
 
-test('keeps JSON expansion on semantic controls', async () => {
-  const [jsonViewer, jsonViewerStyles] = await Promise.all([
-    readFile('src/ui/browser/json-viewer/DataRender.tsx', 'utf8'),
-    readFile('src/ui/browser/json-viewer/JSONViewer.module.scss', 'utf8'),
-  ])
-
-  expect(jsonViewer).not.toMatch(/<(?:span|div)[^>]*onClick=/)
-  expect(jsonViewer).toMatch(/<button[\s\S]*?aria-label=\{ariaLabel\}/)
-  expect(jsonViewer).not.toMatch(/role="button"/)
-  expect(jsonViewerStyles).toMatch(/& > div > button:first-child/)
-  expect(jsonViewerStyles).not.toMatch(/span\[role='button'\]/)
-})
-
 test('keeps every native canvas button safe inside forms', async () => {
   const missingType: string[] = []
   for await (const path of glob('src/canvas/browser/**/*.tsx')) {

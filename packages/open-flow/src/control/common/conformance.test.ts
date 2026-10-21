@@ -1,7 +1,7 @@
 import type { ControlApiConformanceHarness } from './conformance.ts'
 
-import { expect, it } from 'vitest'
-import { connectorControlApiConformanceCases } from './conformance.ts'
+import { afterEach, expect, it, vi } from 'vitest'
+import { connectorControlApiConformanceCases, controlApiConformanceCases } from './conformance.ts'
 
 const conformance = connectorControlApiConformanceCases.find((test) => test.name == 'lists all authorized Connector Connections with optional Flow scope')!
 const connection = { connectionId: 'mail-work', displayName: 'Work', isDefault: true, serviceId: 'mail', status: 'active' }
@@ -48,4 +48,34 @@ it.each([
   { connections: [{ ...connection, status: 'invalid' }], version: 1 },
 ])('rejects an incompatible all-Connections response: %j', async (body) => {
   await expect(conformance.verify(harness(() => Response.json(body)))).rejects.toMatchObject({ code: 'response.invalid' })
+})
+
+afterEach(() => vi.useRealTimers())
+
+it.each([true, false])('waits beyond executor startup latency and diagnoses a missing Wait (appears: %s)', async (appears) => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'performance'] })
+  const started = performance.now()
+  const waitingCase = controlApiConformanceCases.find((test) => test.name === 'pauses, resolves, resumes, and cancels waiting Draft Runs')!
+  const run = { runId: 'run', status: 'running', waits: [] }
+  const runtime: ControlApiConformanceHarness = {
+    origin: 'https://control.example',
+    async dispose() {},
+    async request(req) {
+      const pathname = new URL(req.url).pathname
+      if (pathname === '/v1/flows') return Response.json({ flowId: 'flow', draftRevisionId: 'revision' }, { status: 201 })
+      if (pathname.endsWith('/draft/changes')) return Response.json({ revision: { revisionId: 'revision' } })
+      if (pathname.endsWith('/revisions/revision/runs')) return Response.json(run, { status: 202 })
+      if (pathname === '/v1/runs/run') {
+        return Response.json(appears && performance.now() - started >= 3_000 ? { ...run, waits: [{ actions: ['continue'] }] } : run)
+      }
+      throw new Error(`Unexpected request: ${req.method} ${pathname}`)
+    },
+  }
+  const result = expect(waitingCase.verify(runtime)).rejects.toThrow(
+    appears
+      ? 'Wait actions: expected ["approve","reject"], received ["continue"].'
+      : 'Wait Run to pause: timed out after 10000ms; last Run: {"runId":"run","status":"running","waits":[]}',
+  )
+  await vi.advanceTimersByTimeAsync(10_000)
+  await result
 })

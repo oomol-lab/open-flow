@@ -1,36 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+// @vitest-environment happy-dom
+import { act, createElement } from 'react'
+import { describe, expect, it, vi } from 'vitest'
+import { render as mount } from '../../../../../test/support/render.tsx'
 import { inspectorPreferenceKey, readInspectorOpen, useInspectorPanel, writeInspectorOpen } from './useInspectorPanel.ts'
-
-const hooks = vi.hoisted(() => ({ cursor: 0, values: [] as unknown[], effects: [] as (() => void)[] }))
-vi.mock('react', () => ({
-  useState: (initial: unknown) => {
-    const index = hooks.cursor++
-    if (!(index in hooks.values)) hooks.values[index] = typeof initial === 'function' ? initial() : initial
-    return [
-      hooks.values[index],
-      (next: unknown) => {
-        hooks.values[index] = next
-      },
-    ]
-  },
-  useRef: (initial: unknown) => {
-    const index = hooks.cursor++
-    if (!(index in hooks.values)) hooks.values[index] = { current: initial }
-    return hooks.values[index]
-  },
-  useEffect: (effect: () => void, dependencies: unknown[]) => {
-    const index = hooks.cursor++
-    const previous = hooks.values[index] as unknown[] | undefined
-    if (!previous || dependencies.some((value, i) => value !== previous[i])) hooks.effects.push(effect)
-    hooks.values[index] = dependencies
-  },
-}))
-
-beforeEach(() => {
-  hooks.cursor = 0
-  hooks.values = []
-  hooks.effects = []
-})
 
 function fixture(saved: string | null = null) {
   let identity = 'flow-a'
@@ -44,14 +16,15 @@ function fixture(saved: string | null = null) {
   const commit = vi.fn((ids: readonly string[]) => {
     selected = ids
   })
+  let state: ReturnType<typeof useInspectorPanel>
+  function Host() {
+    state = useInspectorPanel({ identity, preferences, selectedNodeIds: selected, onSelectNodes: commit })
+    return null
+  }
+  const view = mount(createElement(Host))
   const render = () => {
-    const once = () => {
-      hooks.cursor = 0
-      return useInspectorPanel({ identity, preferences, selectedNodeIds: selected, onSelectNodes: commit })
-    }
-    once()
-    hooks.effects.splice(0).forEach((effect) => effect())
-    return once()
+    view.rerender(createElement(Host))
+    return state!
   }
   return {
     render,
@@ -68,47 +41,47 @@ function fixture(saved: string | null = null) {
 describe('inspector navigation', () => {
   it('reveals properties automatically without changing the saved visibility preference', () => {
     const f = fixture('false')
-    f.render().activate(['a'])
-    f.render().revealInspector()
+    act(() => f.render().activate(['a']))
+    act(() => f.render().revealInspector())
     expect(f.render().open).toBe(true)
     expect(f.render().page).toBe('properties')
     expect(f.preferences.setItem).not.toHaveBeenCalled()
-    f.render().close()
+    act(() => f.render().close())
     expect(f.render().open).toBe(false)
   })
   it('keeps a closed inspector closed for selection and persists only explicit opening', () => {
     const f = fixture()
-    f.render().activate(['a'])
+    act(() => f.render().activate(['a']))
     expect(f.render().open).toBe(false)
     expect(f.preferences.setItem).not.toHaveBeenCalled()
-    f.render().openInspector()
+    act(() => f.render().openInspector())
     expect(f.render().page).toBe('properties')
     expect(f.preferences.setItem).toHaveBeenLastCalledWith(inspectorPreferenceKey, 'true')
-    f.render().close()
-    f.render().activate(['b'])
+    act(() => f.render().close())
+    act(() => f.render().activate(['b']))
     expect(f.render().open).toBe(false)
   })
   it('returns without clearing selection and reopens properties for the same node', () => {
     const f = fixture('true')
-    f.render().activate(['a'])
+    act(() => f.render().activate(['a']))
     expect(f.render().page).toBe('properties')
-    f.render().back()
+    act(() => f.render().back())
     expect(f.selection()).toEqual(['a'])
     expect(f.render().page).toBe('outline')
-    f.render().activate(['a'])
+    act(() => f.render().activate(['a']))
     expect(f.render().page).toBe('properties')
   })
   it('keeps committed selection and page stable during a marquee and commits the final event selection', () => {
     const f = fixture('true')
-    f.render().activate(['a'])
-    f.render().back()
-    f.render().startSelection()
-    f.render().select(['b'])
+    act(() => f.render().activate(['a']))
+    act(() => f.render().back())
+    act(() => f.render().startSelection())
+    act(() => f.render().select(['b']))
     expect(f.render().canvasSelection).toEqual(['b'])
     expect(f.selection()).toEqual(['a'])
     expect(f.render().page).toBe('outline')
-    f.render().select(['b', 'c'])
-    f.render().endSelection(['c', 'd'])
+    act(() => f.render().select(['b', 'c']))
+    act(() => f.render().endSelection(['c', 'd']))
     expect(f.selection()).toEqual(['c', 'd'])
     expect(f.render().page).toBe('properties')
     expect(f.render().selecting).toBe(false)
@@ -116,29 +89,29 @@ describe('inspector navigation', () => {
   })
   it('handles cancellation/end once and returns to the outline for an empty final selection', () => {
     const f = fixture('true')
-    f.render().activate(['a'])
-    f.render().startSelection()
-    f.render().select([])
+    act(() => f.render().activate(['a']))
+    act(() => f.render().startSelection())
+    act(() => f.render().select([]))
     expect(f.render().page).toBe('properties')
-    f.render().endSelection([])
+    act(() => f.render().endSelection([]))
     expect(f.render().page).toBe('outline')
     f.commit.mockClear()
-    f.render().endSelection(['stale'])
+    act(() => f.render().endSelection(['stale']))
     expect(f.commit).not.toHaveBeenCalled()
   })
   it('never opens a closed inspector at marquee completion', () => {
     const f = fixture()
-    f.render().startSelection()
-    f.render().endSelection(['a', 'b'])
+    act(() => f.render().startSelection())
+    act(() => f.render().endSelection(['a', 'b']))
     expect(f.selection()).toEqual(['a', 'b'])
     expect(f.render().open).toBe(false)
   })
   it('returns to the outline after clearing selection or changing workflows without changing the preference', () => {
     const f = fixture('true')
-    f.render().activate(['a'])
-    f.render().select([])
+    act(() => f.render().activate(['a']))
+    act(() => f.render().select([]))
     expect(f.render().page).toBe('outline')
-    f.render().activate(['a'])
+    act(() => f.render().activate(['a']))
     f.switchFlow()
     expect(f.render().page).toBe('outline')
     expect(f.render().open).toBe(true)
@@ -146,12 +119,12 @@ describe('inspector navigation', () => {
   })
   it('discards an unfinished gesture when switching workflows', () => {
     const f = fixture('true')
-    f.render().activate(['a'])
-    f.render().startSelection()
-    f.render().select(['b'])
+    act(() => f.render().activate(['a']))
+    act(() => f.render().startSelection())
+    act(() => f.render().select(['b']))
     f.switchFlow()
     expect(f.render().canvasSelection).toEqual([])
-    f.render().endSelection(['b'])
+    act(() => f.render().endSelection(['b']))
     expect(f.selection()).toEqual([])
     expect(f.render().page).toBe('outline')
   })

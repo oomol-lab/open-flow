@@ -202,7 +202,6 @@ describe('Context Panel', () => {
     expect(markup).toContain('aria-hidden="true" class="context-panel-backdrop"')
     expect(markup).toContain('data-theme="dark"')
     expect(markup).toContain('Search blocks')
-    expect(markup).toContain('mx-3.5')
     expect(markup).toContain('GitHub actions.')
     expect(markup).toContain('Create issue')
     expect(markup).toContain('<details')

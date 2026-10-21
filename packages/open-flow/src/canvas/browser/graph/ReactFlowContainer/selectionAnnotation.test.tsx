@@ -1,10 +1,11 @@
+// @vitest-environment happy-dom
 import type { NodeId } from '../../../../schema/index.ts'
 import type { RFNode } from '../../base/rfHelpers.ts'
 import type { NodeContent } from '../FlowCanvas/nodeContent.ts'
 
-import { renderToStaticMarkup } from 'react-dom/server'
 import { val } from 'value-enhancer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render as mount } from '../../../../../test/support/render.tsx'
 import { CommentNodeStore } from '../../stores/node/commentNode.store.ts'
 import { NODE_TYPE } from '../../stores/node/constants.ts'
 import { NodeStore } from '../../stores/node/node.store.ts'
@@ -13,18 +14,8 @@ import { SelectionAnnotation } from './selectionAnnotation.tsx'
 
 const hooks = vi.hoisted(() => ({
   state: { domNode: { querySelector: vi.fn() }, nodesSelectionActive: true, userSelectionActive: false },
-  cleanups: [] as (() => void)[],
 }))
 vi.mock('@xyflow/react', () => ({ useStore: (select: (state: typeof hooks.state) => unknown) => select(hooks.state) }))
-vi.mock('val-i18n-react', () => ({ useTranslate: () => (key: string, values?: { count: number }) => `${key}:${values?.count ?? ''}` }))
-vi.mock('react', async (original) => ({
-  ...(await original<typeof import('react')>()),
-  useLayoutEffect: (effect: () => (() => void) | undefined) => {
-    const dispose = effect()
-    if (dispose) hooks.cleanups.push(dispose)
-  },
-}))
-
 const stores: (NodeStore | CommentNodeStore)[] = []
 function node(id: string): RFNode {
   const content: NodeContent = { id, title: id, kind: 'task', reference: 'task', inputs: [], outputs: [] }
@@ -32,27 +23,30 @@ function node(id: string): RFNode {
   stores.push(store)
   return store.$.rfNode.value
 }
+let mounted: ReturnType<typeof mount> | undefined
 function cleanup() {
-  for (const dispose of hooks.cleanups.splice(0)) dispose()
+  mounted?.unmount()
+  mounted = undefined
 }
 function render(nodes: RFNode[], context: CanvasAnnotationContext | undefined = { flowId: 'flow', revisionId: 'r1', syncState: 'saved' }) {
-  renderToStaticMarkup(
+  const element = (
     <CanvasAnnotationContext.Provider value={context}>
       <SelectionAnnotation nodes={nodes} />
-    </CanvasAnnotationContext.Provider>,
+    </CanvasAnnotationContext.Provider>
   )
+  if (mounted == null) mounted = mount(element)
+  else mounted.rerender(element)
 }
 
 describe('React Flow selection annotations', () => {
-  const attributes = new Map<string, string>()
+  let rectangle: HTMLDivElement
+  const attributes = { get: (key: string) => rectangle.getAttribute(key), set: (key: string, value: string) => rectangle.setAttribute(key, value) }
   beforeEach(() => {
-    attributes.clear()
+    rectangle = document.createElement('div')
+    mounted = undefined
     hooks.state.nodesSelectionActive = true
     hooks.state.userSelectionActive = false
-    hooks.state.domNode.querySelector.mockReturnValue({
-      setAttribute: (key: string, value: string) => attributes.set(key, value),
-      removeAttribute: (key: string) => attributes.delete(key),
-    })
+    hooks.state.domNode.querySelector.mockReturnValue(rectangle)
   })
   afterEach(() => {
     cleanup()
@@ -64,15 +58,14 @@ describe('React Flow selection annotations', () => {
       b = node('b'),
       c = node('c')
     render([a, b])
-    expect(hooks.state.domNode.querySelector).toHaveBeenCalledWith('.react-flow__nodesselection-rect')
-    expect(attributes.get('oai-annotatable')).toBe('annotation.selectedNodes:2')
+    expect(attributes.get('oai-annotatable')).toBe(mounted!.i18n.t('annotation.selectedNodes', { count: 2 }))
     expect(JSON.parse(attributes.get('oai-annotation-metadata')!)).toMatchObject({ nodeIds: '["a","b"]', revisionId: 'r1' })
     cleanup()
     render([b, c], { flowId: 'flow', revisionId: 'r2', syncState: 'dirty' })
     expect(JSON.parse(attributes.get('oai-annotation-metadata')!)).toMatchObject({ nodeIds: '["b","c"]', revisionId: 'r2', syncState: 'dirty' })
     cleanup()
     render([b])
-    expect(attributes.size).toBe(0)
+    expect(rectangle.hasAttribute('oai-annotation-metadata')).toBe(false)
   })
 
   it('does not annotate a live selection gesture or a mixed business/comment selection', () => {
@@ -80,12 +73,12 @@ describe('React Flow selection annotations', () => {
       b = node('b')
     hooks.state.userSelectionActive = true
     render([a, b])
-    expect(attributes.size).toBe(0)
+    expect(rectangle.hasAttribute('oai-annotation-metadata')).toBe(false)
     hooks.state.userSelectionActive = false
     const comment = new CommentNodeStore('comment' as NodeId, { position: { x: 0, y: 0 }, onSaveContent: () => {} })
     stores.push(comment)
     render([a, comment.$.rfNode.value])
-    expect(attributes.size).toBe(0)
+    expect(rectangle.hasAttribute('oai-annotation-metadata')).toBe(false)
   })
 
   it('tolerates an absent rectangle and leaves other DOM attributes unchanged on cleanup', () => {
@@ -93,7 +86,8 @@ describe('React Flow selection annotations', () => {
     attributes.set('tabindex', '-1')
     render(nodes)
     cleanup()
-    expect([...attributes]).toEqual([['tabindex', '-1']])
+    expect(rectangle.getAttributeNames()).toEqual(['tabindex'])
+    expect(rectangle.tabIndex).toBe(-1)
     hooks.state.domNode.querySelector.mockReturnValue(null)
     expect(() => render(nodes)).not.toThrow()
   })

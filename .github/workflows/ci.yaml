@@ -138,10 +138,7 @@ jobs:
       - name: Install
         run: bun install --frozen-lockfile
 
-      - name: Test package source
-        run: bun run --filter @oomol-lab/open-flow test
-
-      - name: Verify package core coverage
+      - name: Test package source and verify core coverage
         run: bun run --filter @oomol-lab/open-flow test:coverage
 
       - name: Verify package artifacts

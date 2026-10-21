@@ -1,62 +1,40 @@
-import type { ReactElement, ReactNode } from 'react'
-
-import { Children, isValidElement } from 'react'
+// @vitest-environment happy-dom
 import { expect, it, vi } from 'vitest'
+import { click, render } from '../../../test/support/render.tsx'
 import { EditorComponentSelect } from './editorComponentSelect.tsx'
 
-vi.mock('react', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('react')>()),
-  useState: (initial: unknown) => [typeof initial == 'function' ? (initial as () => unknown)() : initial, vi.fn()],
-}))
-
-vi.mock('val-i18n-react', () => ({
-  useTranslate: () => (key: string) => key,
-}))
-
-function find(element: ReactElement, predicate: (item: ReactElement) => boolean): ReactElement | undefined {
-  if (predicate(element)) return element
-  for (const child of Children.toArray((element.props as { readonly children?: ReactNode }).children)) {
-    if (!isValidElement(child)) continue
-    const match = find(child, predicate)
-    if (match != null) return match
-  }
-}
-
-it('offers Any without a second JSON entry in the complete value-editor menu', () => {
+it('offers Any once and changes the value editor through its menu', async () => {
   const onChange = vi.fn()
-  const rendered = EditorComponentSelect({ name: 'value', schema: {}, valueOnly: true, addon: true, onChange })
-  const select = find(rendered, (item) => typeof item.props.onValueChange == 'function')
-  const anyItem = find(rendered, (item) => item.props.value === 'json' && item.props.onValueChange == null)
-
-  expect(select?.props.value).toBe('json')
-  expect(anyItem?.props.children).toContain('valueEditor.any')
-  expect(select?.props.items).toContainEqual({ value: 'text', label: 'valueEditor.components.text' })
-  expect(select?.props.items).toContainEqual({ value: 'select', label: 'valueEditor.components.select' })
-  expect(select?.props.items).not.toContainEqual({ value: 'json', label: 'valueEditor.components.json' })
-  ;(select!.props.onValueChange as (value: string) => void)('text')
+  const { container, i18n } = render(<EditorComponentSelect name="value" schema={{}} valueOnly addon onChange={onChange} />)
+  const trigger = container.querySelector<HTMLElement>('[role="combobox"]')!
+  expect(trigger.textContent).toContain(i18n.t('valueEditor.any'))
+  await click(trigger)
+  const options = [...container.querySelectorAll<HTMLElement>('[role="option"]')]
+  expect(options.filter((option) => option.textContent === i18n.t('valueEditor.any'))).toHaveLength(1)
+  expect(options.some((option) => option.textContent === i18n.t('valueEditor.components.json'))).toBe(false)
+  await click(options.find((option) => option.textContent === i18n.t('valueEditor.components.text'))!)
   expect(onChange).toHaveBeenCalledExactlyOnceWith({ 'type': 'string', 'ui:widget': 'text' })
 })
 
-it('returns to generic JSON editing without retaining editor constraints', () => {
+it.each([
+  { schema: { type: 'string', format: 'date' }, valueOnly: true, label: 'valueEditor.any', expected: {} },
+  {
+    schema: { const: 'choice', description: 'Result kind' },
+    valueOnly: false,
+    label: 'valueEditor.components.string',
+    expected: { type: 'string', description: 'Result kind' },
+  },
+  { schema: { const: 'choice', description: 'Result kind' }, valueOnly: false, label: 'valueEditor.components.json', expected: { description: 'Result kind' } },
+])('replaces $schema with $label without retaining old constraints', async ({ schema, valueOnly, label, expected }) => {
   const onChange = vi.fn()
-  const rendered = EditorComponentSelect({ name: 'value', schema: { type: 'string', format: 'date' }, valueOnly: true, onChange })
-  const select = find(rendered, (item) => typeof item.props.onValueChange == 'function')
-  ;(select!.props.onValueChange as (value: string) => void)('json')
-  expect(onChange).toHaveBeenCalledExactlyOnceWith({})
-})
-
-it.each(['string', 'json'] as const)('can replace a constant definition with %s', (component) => {
-  const onChange = vi.fn()
-  const rendered = EditorComponentSelect({ name: 'result', schema: { const: 'choice', description: 'Result kind' }, compact: false, onChange })
-  const select = find(rendered, (item) => typeof item.props.onValueChange == 'function')
+  const { container, i18n } = render(<EditorComponentSelect name="result" schema={schema} valueOnly={valueOnly} onChange={onChange} />)
   expect(onChange).not.toHaveBeenCalled()
-  expect(select?.props.value).toBe('literal')
-  ;(select!.props.onValueChange as (value: string) => void)(component)
-  expect(onChange).toHaveBeenCalledExactlyOnceWith(component === 'json' ? { description: 'Result kind' } : { type: 'string', description: 'Result kind' })
+  await click(container.querySelector<HTMLElement>('[role="combobox"]')!)
+  await click([...container.querySelectorAll<HTMLElement>('[role="option"]')].find((option) => option.textContent === i18n.t(label))!)
+  expect(onChange).toHaveBeenCalledExactlyOnceWith(expected)
 })
 
 it('keeps local value-editor selection independent of a constant definition', () => {
-  const rendered = EditorComponentSelect({ name: 'result', schema: { const: 'choice' }, valueOnly: true, onChange: vi.fn() })
-  const select = find(rendered, (item) => typeof item.props.onValueChange == 'function')
-  expect(select?.props.value).toBe('json')
+  const { container, i18n } = render(<EditorComponentSelect name="result" schema={{ const: 'choice' }} valueOnly onChange={vi.fn()} />)
+  expect(container.querySelector('[role="combobox"]')!.textContent).toContain(i18n.t('valueEditor.any'))
 })

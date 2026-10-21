@@ -15,7 +15,8 @@
   "scripts": {
     "build": "bun run --workspaces --if-present build",
     "build:designer": "bun run --filter @oomol-lab/open-flow designer:build",
-    "check": "bun run format -- --check && bun run --workspaces --if-present check",
+    "check": "bun run format -- --check && bun run check:locales && bun run --workspaces --if-present check",
+    "check:locales": "node --test scripts/locale-files.test.mjs",
     "dev": "bun run dev:server",
     "dev:designer": "bun run --filter @oomol-lab/open-flow designer:dev",
     "dev:server": "bun run --cwd apps/server dev",

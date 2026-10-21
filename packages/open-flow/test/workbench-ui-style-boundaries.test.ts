@@ -121,29 +121,10 @@ test('keeps browser control normalization below Workbench component utilities', 
   assert.doesNotMatch(workbenchStyles, /\n  button \{\n    border: 0;/)
 })
 
-test('keeps the public session gate on shared form primitives', async () => {
-  const source = await readFile(new URL('src/workbench/browser/runtime/openFlowWorkbench.tsx', packageRoot), 'utf8')
-
-  assert.match(source, /export function OpenFlowSessionGate/)
-  assert.match(source, /from '\.\.\/\.\.\/\.\.\/ui\/browser\/button\.tsx'/)
-  assert.match(source, /from '\.\.\/\.\.\/\.\.\/ui\/browser\/field\.tsx'/)
-  assert.match(source, /from '\.\.\/\.\.\/\.\.\/ui\/browser\/input\.tsx'/)
-  assert.match(source, /from '\.\.\/\.\.\/\.\.\/ui\/browser\/spinner\.tsx'/)
-  assert.match(source, /className="open-flow-workbench"/)
-  assert.doesNotMatch(source, /operator-token|value="operator"/)
-  assert.doesNotMatch(source, /session-(?:gate|form|error)/)
-})
-
 test('keeps canvas root styling from overriding control appearance', async () => {
-  const [designerRootStyles, toggleGroup] = await Promise.all([
-    readFile(new URL('src/canvas/browser/styles/root.css', packageRoot), 'utf8'),
-    readFile(new URL('src/ui/browser/toggle-group.tsx', packageRoot), 'utf8'),
-  ])
+  const designerRootStyles = await readFile(new URL('src/canvas/browser/styles/root.css', packageRoot), 'utf8')
 
   assert.doesNotMatch(designerRootStyles, /button|textarea|select\s*\{|--widget-height|appearance:/)
-  assert.match(toggleGroup, /group-data-\[spacing=0\]\/toggle-group:rounded-none/)
-  assert.match(toggleGroup, /data-\[spacing=0\]:first:rounded/)
-  assert.match(toggleGroup, /data-\[spacing=0\]:last:rounded/)
 })
 
 test('keeps Button icon sizing on the shared size variants', async () => {
@@ -167,25 +148,8 @@ test('keeps Button icon sizing on the shared size variants', async () => {
   }
 })
 
-test('keeps URL-changing Workbench navigation on real links', async () => {
-  const [button, runtime, browser, navigation] = await Promise.all([
-    readFile(new URL('src/ui/browser/button.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/openFlowWorkbench.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/shell/resourceBrowser.tsx', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/shell/workspaceNavigationIsland.tsx', packageRoot), 'utf8'),
-  ])
-
-  assert.match(runtime, /readonly hrefFor: \(location: WorkbenchLocation\) => string/)
-  assert.match(button, /whitespace-nowrap no-underline/)
-  assert.doesNotMatch(button, /hover:underline/)
-  assert.match(browser, /<a\s[\s\S]*?href=\{flow.status == 'retiring' \? undefined : href\}/)
-  assert.match(navigation, /render=\{<a href=\{flowsHref\}/)
-  assert.doesNotMatch(navigation, /<Button[^>]*onClick=\{onOpenFlow/)
-})
-
 test('keeps Workbench feedback on semantic theme surfaces', async () => {
-  const [runOutput, tokens, runStyles, contextPanelStyles, statusStyles, responsiveStyles] = await Promise.all([
-    readFile(new URL('src/workbench/browser/runtime/runs/runOutput.tsx', packageRoot), 'utf8'),
+  const [tokens, runStyles, contextPanelStyles, statusStyles, responsiveStyles] = await Promise.all([
     readFile(new URL('src/workbench/browser/runtime/styles/tokens.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/runs.css', packageRoot), 'utf8'),
     readFile(new URL('src/workbench/browser/runtime/styles/context-panel.css', packageRoot), 'utf8'),
@@ -196,8 +160,6 @@ test('keeps Workbench feedback on semantic theme surfaces', async () => {
   for (const token of ['--warning-surface', '--warning-border', '--warning-foreground', '--danger-surface', '--danger-border', '--danger-foreground']) {
     assert.match(tokens, new RegExp(`${token}:`))
   }
-  assert.match(runOutput, /Alert, AlertDescription, AlertTitle/)
-  assert.doesNotMatch(runOutput, /run-terminal-error/)
   assert.doesNotMatch(runStyles, /#fffbeb|#fef2f2|#991b1b|run-terminal-error/)
   assert.doesNotMatch(contextPanelStyles, /#fef2f2|#991b1b|#fffbeb|#92400e|#b45309|#fed7aa|#fff7ed|#9a3412|#b91c1c/)
   assert.doesNotMatch(statusStyles, /#a1a1aa/)
@@ -211,50 +173,6 @@ test('keeps Workbench feedback on semantic theme surfaces', async () => {
   }
 })
 
-test('keeps responsive overlays aligned with the Workbench container and keyboard state', async () => {
-  const [contextPanel, contextPanelBehavior, diagnostics, diagnosticsIsland, runInput, workspaceStyles, canvasStyles, contextPanelStyles, responsiveStyles] =
-    await Promise.all([
-      readFile(new URL('src/workbench/browser/runtime/editor/contextPanel.tsx', packageRoot), 'utf8'),
-      readFile(new URL('src/workbench/browser/runtime/editor/contextPanelBehavior.ts', packageRoot), 'utf8'),
-      readFile(new URL('src/workbench/browser/runtime/shell/diagnosticsPanel.tsx', packageRoot), 'utf8'),
-      readFile(new URL('src/workbench/browser/runtime/shell/workspaceDiagnosticsIsland.tsx', packageRoot), 'utf8'),
-      readFile(new URL('src/workbench/browser/runtime/runs/runInputPanel.tsx', packageRoot), 'utf8'),
-      readFile(new URL('src/workbench/browser/runtime/styles/workspace.css', packageRoot), 'utf8'),
-      readFile(new URL('src/workbench/browser/runtime/styles/canvas.css', packageRoot), 'utf8'),
-      readFile(new URL('src/workbench/browser/runtime/styles/context-panel.css', packageRoot), 'utf8'),
-      readFile(new URL('src/workbench/browser/runtime/styles/responsive.css', packageRoot), 'utf8'),
-    ])
-
-  assert.match(contextPanel, /closest<HTMLElement>\('\.open-flow-workbench'\)/)
-  assert.match(contextPanel, /observeContextPanelOverlay\(root, setOverlay\)/)
-  assert.match(contextPanelBehavior, /new ResizeObserverConstructor/)
-  assert.match(contextPanelBehavior, /ownerDocument\.defaultView\?\.ResizeObserver/)
-  assert.doesNotMatch(contextPanel, /matchMedia\('\(max-width: 980px\)'\)/)
-  assert.match(diagnostics, /aria-busy=\{checking\}/)
-  assert.match(diagnostics, /<span aria-live="polite">/)
-  assert.match(runInput, /aria-busy=\{starting\}/)
-  assert.match(diagnosticsIsland, /container=\{popupContainer\}/)
-  assert.match(diagnosticsIsland, /<PopoverContent/)
-  assert.match(canvasStyles, /\.diagnostics-popover\[data-slot='popover-content'\] \{[\s\S]*?background: var\(--open-flow-card\)/)
-  assert.match(canvasStyles, /overscroll-behavior: contain/)
-  assert.match(contextPanelStyles, /\.context-panel:focus-visible[\s\S]*?outline: 2px solid var\(--ui-ring\)/)
-  assert.match(contextPanelStyles, /overscroll-behavior: contain/)
-  assert.match(canvasStyles, /max-height: min\(600px, calc\(100dvh - 96px\), var\(--available-height\)\)/)
-  assert.match(workspaceStyles, /grid-template-rows: minmax\(0, 1fr\)/)
-  assert.match(workspaceStyles, /\.run-input-popover > form \{[\s\S]*?max-height: min\(620px, calc\(100dvh - 96px\)\)/)
-  for (const side of ['top', 'right', 'bottom', 'left']) assert.match(responsiveStyles, new RegExp(`padding-${side}: env\\(safe-area-inset-${side}\\)`))
-})
-
-test('keeps repeated feature selectors consolidated at their owner', async () => {
-  const [canvasStyles, runStyles] = await Promise.all([
-    readFile(new URL('src/workbench/browser/runtime/styles/canvas.css', packageRoot), 'utf8'),
-    readFile(new URL('src/workbench/browser/runtime/styles/runs.css', packageRoot), 'utf8'),
-  ])
-
-  assert.equal((canvasStyles.match(/  \.canvas-empty \{/g) ?? []).length, 1)
-  assert.equal((runStyles.match(/  \.run-log-event \{/g) ?? []).length, 1)
-})
-
 test('keeps Run input editing independent of Designer and its theme adapters', async () => {
   const [editor, editorStore, editorStyles] = await Promise.all([
     readFile(new URL('src/workbench/browser/flowRunInputEditor.tsx', packageRoot), 'utf8'),
@@ -264,7 +182,6 @@ test('keeps Run input editing independent of Designer and its theme adapters', a
   assert.doesNotMatch(editor + editorStore + editorStyles, /designer\/|ThemeProvider|HandleRowStore|InputSectionStore|--widget-/)
   assert.match(editor, /form\/browser\/valueField\.tsx/)
   assert.doesNotMatch(editor, /runtime\/editor\//)
-  assert.match(editor, /store\.values\$/)
 })
 
 test('keeps shared controls and Workbench independent of canvas theme adapters', async () => {

@@ -898,11 +898,19 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
         )
       const run = await create('wait-run', 'Create Wait Run')
       const runId = requiredString(run.runId, 'Wait Run runId')
-      let detail = run
-      for (let attempt = 0; list(detail.waits, 'Waits').length == 0 && attempt < 200; attempt += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 10))
-        detail = await json(await request(harness, `/v1/runs/${runId}`), 200, 'Read Wait Run')
+      const awaitRun = async (initial: RecordValue, ready: (value: RecordValue) => boolean, message: string): Promise<RecordValue> => {
+        const id = requiredString(initial.runId, 'Run id')
+        const deadline = performance.now() + 10_000
+        let current = initial
+        while (!ready(current)) {
+          if (performance.now() >= deadline) fail(`${message}: timed out after 10000ms; last Run: ${JSON.stringify(current)}.`)
+          await new Promise((resolve) => setTimeout(resolve, 25))
+          current = await json(await request(harness, `/v1/runs/${id}`), 200, message)
+        }
+        return current
       }
+      const hasWait = (value: RecordValue) => list(value.waits, 'Waits').length > 0
+      let detail = await awaitRun(run, hasWait, 'Wait Run to pause')
       equal(detail.status, 'running', 'Wait Run status')
       const waiting = record(list(detail.waits, 'Waits')[0], 'Active Wait')
       equal(waiting.actions, ['approve', 'reject'], 'Wait actions')
@@ -939,10 +947,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
       equal(rejected.action, 'approve', 'Winning action')
       equal(rejected.resolutionAccepted, false, 'Competing resolution')
 
-      for (let attempt = 0; detail.status != 'completed' && attempt < 200; attempt += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 10))
-        detail = await json(await request(harness, `/v1/runs/${runId}`), 200, 'Read resumed Run')
-      }
+      detail = await awaitRun(detail, (value) => value.status == 'completed', 'Wait Run to resume')
       equal(detail.status, 'completed', 'Resumed Run status')
       equal(detail.waits, [], 'Completed Wait projection')
       const replay = await json(await resolveWait('approve'), 200, 'Replay approved Wait')
@@ -958,11 +963,7 @@ export const controlApiConformanceCases: readonly ControlApiConformanceCase[] = 
 
       const canceled = await create('wait-run-cancel', 'Create cancelable Wait Run')
       const canceledRunId = requiredString(canceled.runId, 'Cancelable Wait Run id')
-      let canceledDetail = canceled
-      for (let attempt = 0; list(canceledDetail.waits, 'Waits').length == 0 && attempt < 200; attempt += 1) {
-        await new Promise((resolve) => setTimeout(resolve, 10))
-        canceledDetail = await json(await request(harness, `/v1/runs/${canceledRunId}`), 200, 'Read cancelable Wait Run')
-      }
+      const canceledDetail = await awaitRun(canceled, hasWait, 'Wait cancelable Run to pause')
       equal(canceledDetail.status, 'running', 'Cancelable Wait status')
       equal(
         (

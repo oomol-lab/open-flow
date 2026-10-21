@@ -1,126 +1,58 @@
+// @vitest-environment happy-dom
 import type { ControlClient, VariableListItem } from '@oomol-lab/open-flow/control-api'
-import type { FormEvent, ReactElement, ReactNode } from 'react'
 
-import { Input } from '@oomol-lab/open-flow/ui'
-import { Children, isValidElement } from 'react'
-import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { act } from 'react'
+import { expect, it, vi } from 'vitest'
 import { VariablesPage } from '../browser/variables.tsx'
+import { button, click, input, render, submit } from './support/render.tsx'
 
-const hooks = vi.hoisted(() => ({
-  cleanup: undefined as (() => void) | undefined,
-  focus: undefined as (() => void) | undefined,
-  refIndex: 0,
-  refs: [] as { current: unknown }[],
-  stateIndex: 0,
-  setters: [] as ReturnType<typeof vi.fn>[],
-  states: [] as unknown[],
-  toast: vi.fn(),
-}))
-
-vi.mock('react', async (importOriginal) => {
-  const original = await importOriginal<typeof import('react')>()
-  return {
-    ...original,
-    useCallback: <T,>(callback: T) => callback,
-    useEffect: (callback: () => void | (() => void)) => {
-      hooks.cleanup = callback() ?? undefined
-    },
-    useMemo: <T,>(factory: () => T) => factory(),
-    useRef: <T,>(value: T) => {
-      const index = hooks.refIndex++
-      return (hooks.refs[index] ??= { current: value }) as { current: T }
-    },
-    useState: <T,>(initial: T | (() => T)) => {
-      const index = hooks.stateIndex++
-      hooks.states[index] ??= typeof initial == 'function' ? (initial as () => T)() : initial
-      hooks.setters[index] ??= vi.fn()
-      return [hooks.states[index], hooks.setters[index]] as const
-    },
-  }
-})
-
-vi.mock('sonner', () => ({ toast: { error: hooks.toast } }))
-vi.mock('val-i18n-react', () => ({ useTranslate: () => (key: string) => key }))
-
-afterEach(() => vi.unstubAllGlobals())
-
-function find(element: ReactElement, predicate: (item: ReactElement) => boolean): ReactElement | undefined {
-  if (predicate(element)) return element
-  for (const child of Children.toArray((element.props as { readonly children?: ReactNode }).children)) {
-    if (!isValidElement(child)) continue
-    const result = find(child, predicate)
-    if (result != null) return result
-  }
-}
-
-beforeEach(() => {
-  hooks.cleanup = undefined
-  hooks.focus = undefined
-  hooks.refIndex = 0
-  hooks.refs = []
-  hooks.stateIndex = 0
-  hooks.setters = []
-  hooks.states = []
-  hooks.toast.mockClear()
-  vi.stubGlobal(
-    'addEventListener',
-    vi.fn((type: string, listener: () => void) => {
-      if (type == 'focus') hooks.focus = listener
-    }),
-  )
-  vi.stubGlobal('removeEventListener', vi.fn())
-})
+const toast = vi.hoisted(() => vi.fn())
+vi.mock('sonner', () => ({ toast: { error: toast } }))
+const variable = (name: string): VariableListItem => ({ name, value: 'original', updatedAt: '2026-08-27T00:00:00.000Z', version: 1, referenceCount: 0 })
 
 it('ignores an older Variable response that finishes last', async () => {
-  const older = Promise.withResolvers<{ readonly variables: readonly VariableListItem[] }>()
-  const newer = Promise.withResolvers<{ readonly variables: readonly VariableListItem[] }>()
+  const older = Promise.withResolvers<{ variables: VariableListItem[] }>()
+  const newer = Promise.withResolvers<{ variables: VariableListItem[] }>()
   const listVariables = vi.fn().mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise)
-  const client = { listVariables } as unknown as ControlClient
-  const fresh = [{ name: 'FRESH', updatedAt: '2026-08-27T00:00:00.000Z', value: 'new', version: 1, referenceCount: 0 }] as const
-  const stale = [{ name: 'STALE', updatedAt: '2026-08-26T00:00:00.000Z', value: 'old', version: 1, referenceCount: 0 }] as const
-
-  VariablesPage({ client, language: 'en' })
-  hooks.focus?.()
-  newer.resolve({ variables: fresh })
-  await newer.promise
-  await Promise.resolve()
-
-  expect(hooks.setters[0]).toHaveBeenCalledOnce()
-  expect(hooks.setters[0]).toHaveBeenCalledWith(fresh)
-
-  older.resolve({ variables: stale })
-  await older.promise
-  await Promise.resolve()
-
-  expect(hooks.setters[0]).toHaveBeenCalledOnce()
-  expect(hooks.toast).not.toHaveBeenCalled()
-  hooks.cleanup?.()
+  const view = render(<VariablesPage client={{ listVariables } as unknown as ControlClient} language="en" />)
+  act(() => window.dispatchEvent(new Event('focus')))
+  await act(async () => newer.resolve({ variables: [variable('FRESH')] }))
+  expect(view.container.textContent).toContain('FRESH')
+  await act(async () => older.resolve({ variables: [variable('STALE')] }))
+  expect(view.container.textContent).toContain('FRESH')
+  expect(view.container.textContent).not.toContain('STALE')
 })
 
 it.each([
-  { editing: '', name: 'TOKEN', loading: false, failed: false, accepted: false },
-  { editing: 'TOKEN', name: 'TOKEN', loading: false, failed: false, accepted: true },
-  { editing: '', name: 'token', loading: false, failed: false, accepted: true },
-  { editing: '', name: 'NEW', loading: true, failed: false, accepted: false },
-  { editing: '', name: 'NEW', loading: false, failed: true, accepted: false },
-])('protects Variable writes: %j', async ({ editing, name, loading, failed, accepted }) => {
-  const variables = [{ name: 'TOKEN', value: 'original', updatedAt: '2026-08-27T00:00:00.000Z', version: 1, referenceCount: 0 }] as const
-  const editor = { kind: editing == '' ? 'create' : 'edit', name, value: 'replacement' }
-  hooks.states = [variables, loading, failed, false, '', editor, undefined]
+  { editing: false, name: 'TOKEN', refresh: 'ready', accepted: false },
+  { editing: true, name: 'TOKEN', refresh: 'ready', accepted: true },
+  { editing: false, name: 'token', refresh: 'ready', accepted: true },
+  { editing: false, name: 'NEW', refresh: 'loading', accepted: false },
+  { editing: false, name: 'NEW', refresh: 'failed', accepted: false },
+])('protects Variable writes: %j', async ({ editing, name, refresh, accepted }) => {
+  const variables = [variable('TOKEN')]
+  const listVariables = vi.fn().mockResolvedValue({ variables })
   const putVariable = vi.fn().mockResolvedValue(undefined)
-  const client = { listVariables: vi.fn().mockResolvedValue({ variables }), putVariable } as unknown as ControlClient
-  const page = VariablesPage({ client, language: 'en' })
-  const form = find(page, (item) => item.type == 'form')
-  if (form == null) throw new Error('Variable form is missing.')
-  const props = form.props as { readonly onSubmit: (event: FormEvent) => void }
-  props.onSubmit({ preventDefault: vi.fn() } as unknown as FormEvent)
-  await Promise.resolve()
+  const view = render(<VariablesPage client={{ listVariables, putVariable } as unknown as ControlClient} language="en" />)
+  await act(async () => {})
+  if (editing) {
+    await click(button(view.i18n.t('variables.actions')))
+    await click(button(view.i18n.t('variables.edit')))
+  } else await click(button(view.i18n.t('variables.create')))
+  const nameField = document.querySelector<HTMLInputElement>('#variable-name')!
+  if (editing) expect(nameField.readOnly).toBe(true)
+  else await input(nameField, name)
+  await input(document.querySelector<HTMLTextAreaElement>('#variable-value')!, 'replacement')
+  if (refresh !== 'ready') {
+    listVariables.mockImplementationOnce(() => (refresh === 'failed' ? Promise.reject(new Error('offline')) : new Promise(() => {})))
+    await act(async () => window.dispatchEvent(new Event('focus')))
+  }
+  if (!editing && name === 'TOKEN') {
+    expect(nameField.getAttribute('aria-invalid')).toBe('true')
+    expect(document.body.textContent).toContain(view.i18n.t('variables.nameExists'))
+  }
+  expect(button(view.i18n.t('variables.save')).disabled).toBe(!accepted)
+  await submit(document.querySelector('form')!)
   if (accepted) expect(putVariable).toHaveBeenCalledWith(name, 'replacement')
   else expect(putVariable).not.toHaveBeenCalled()
-  if (editing == '' && name == 'TOKEN') {
-    const input = find(page, (item) => item.type == Input && item.props.id == 'variable-name')
-    expect(input?.props['aria-invalid']).toBe(true)
-    expect(find(page, (item) => item.props.children == 'variables.nameExists')).toBeDefined()
-  }
-  hooks.cleanup?.()
 })

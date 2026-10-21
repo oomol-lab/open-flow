@@ -1,68 +1,31 @@
+// @vitest-environment happy-dom
 import type { ReactFlowInstance, Viewport } from '@xyflow/react'
 import type { NodeId } from '../../../../schema/index.ts'
 import type { CanvasCommand, CanvasCommandSubscriber } from '../../../common/commands.ts'
 import type { FlowCanvasProps } from './FlowCanvas.tsx'
 import type { FlowCanvasViewCommentNode, FlowCanvasViewModel, FlowCanvasViewProps, FlowCanvasViewTaskNode, FlowCanvasViewValueNode } from './model.ts'
 
+import { StrictMode } from 'react'
 import { val } from 'value-enhancer'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { render } from '../../../../../test/support/render.tsx'
 import { FlowCanvasView } from './FlowCanvasView.tsx'
 
-const hooks = vi.hoisted(() => ({
-  cleanups: [] as ((() => void) | undefined)[],
-  effectIndex: 0,
-  effects: [] as (readonly unknown[] | undefined)[],
-  memo: undefined as unknown,
-  memoDependencies: undefined as readonly unknown[] | undefined,
-  refIndex: 0,
-  refs: [] as { current: unknown }[],
+const boundary = vi.hoisted(() => ({ props: undefined as FlowCanvasProps | undefined }))
+vi.mock('./FlowCanvas.tsx', () => ({
+  FlowCanvas: (viewProps: FlowCanvasProps) => {
+    boundary.props = viewProps
+    return null
+  },
 }))
-
-vi.mock('virtual:uno.css', () => ({}))
-
-vi.mock('react', async (importOriginal) => {
-  const original = await importOriginal<typeof import('react')>()
-  const effect = (callback: () => void | (() => void), dependencies?: readonly unknown[]) => {
-    const index = hooks.effectIndex++
-    const previous = hooks.effects[index]
-    hooks.effects[index] = dependencies
-    if (
-      dependencies == null ||
-      previous == null ||
-      dependencies.length != previous.length ||
-      dependencies.some((dependency, dependencyIndex) => dependency !== previous[dependencyIndex])
-    ) {
-      hooks.cleanups[index]?.()
-      const cleanup = callback()
-      hooks.cleanups[index] = typeof cleanup == 'function' ? cleanup : undefined
-    }
-  }
-  return {
-    ...original,
-    useCallback: <T,>(callback: T) => callback,
-    useEffect: effect,
-    useLayoutEffect: effect,
-    useMemo: <T,>(factory: () => T, dependencies?: readonly unknown[]) => {
-      hooks.effectIndex = 0
-      hooks.refIndex = 0
-      const previous = hooks.memoDependencies
-      if (
-        hooks.memo === undefined ||
-        dependencies == null ||
-        previous == null ||
-        dependencies.length != previous.length ||
-        dependencies.some((dependency, dependencyIndex) => dependency !== previous[dependencyIndex])
-      ) {
-        hooks.memo = factory()
-        hooks.memoDependencies = dependencies
-      }
-      return hooks.memo as T
-    },
-    useRef: <T,>(value: T) => {
-      const index = hooks.refIndex++
-      return (hooks.refs[index] ??= { current: value }) as { current: T }
-    },
-  }
+let mounted: ReturnType<typeof render> | undefined
+function renderView(viewProps: FlowCanvasViewProps) {
+  if (mounted == null) mounted = render(<FlowCanvasView {...viewProps} />)
+  else mounted.rerender(<FlowCanvasView {...viewProps} />)
+  return { props: boundary.props! }
+}
+beforeEach(() => {
+  mounted = undefined
 })
 
 const task = (inputs: FlowCanvasViewTaskNode['inputs']): FlowCanvasViewTaskNode => ({
@@ -135,8 +98,8 @@ function props(value: FlowCanvasViewModel, overrides: Partial<FlowCanvasViewProp
 }
 
 function update(initial: FlowCanvasViewProps, next: FlowCanvasViewProps): FlowCanvasProps['flowCanvasStore'] {
-  const view = FlowCanvasView(initial) as React.ReactElement<FlowCanvasProps>
-  FlowCanvasView(next)
+  const view = renderView(initial)
+  renderView(next)
   return view.props.flowCanvasStore
 }
 
@@ -146,25 +109,15 @@ afterEach(() => {
 })
 
 describe('FlowCanvasView model synchronization', () => {
-  beforeEach(() => {
-    hooks.cleanups = []
-    hooks.effectIndex = 0
-    hooks.effects = []
-    hooks.memo = undefined
-    hooks.memoDependencies = undefined
-    hooks.refIndex = 0
-    hooks.refs = []
-  })
-
   it('forwards updated annotation context without creating a new canvas store or changing selection', () => {
     const initial = props(model([source]), {
       annotationContext: { flowId: 'flow', revisionId: 'r1', syncState: 'saved' },
       selectedNodeIds: ['source'],
       onSelectionChange: vi.fn(),
     })
-    const first = FlowCanvasView(initial) as React.ReactElement<FlowCanvasProps>
+    const first = renderView(initial)
     const next = { ...initial, annotationContext: { flowId: 'flow', revisionId: 'r2', syncState: 'dirty' as const } }
-    const second = FlowCanvasView(next) as React.ReactElement<FlowCanvasProps>
+    const second = renderView(next)
     expect(second.props.annotationContext).toEqual(next.annotationContext)
     expect(second.props.flowCanvasStore).toBe(first.props.flowCanvasStore)
     expect(initial.onSelectionChange).not.toHaveBeenCalled()
@@ -173,9 +126,9 @@ describe('FlowCanvasView model synchronization', () => {
 
   it('keeps a host-owned interaction mode when the canvas identity changes', () => {
     const interactiveMode$ = val<'mouse' | 'touchpad'>('mouse')
-    const first = FlowCanvasView(props(model([]), { interactiveMode$ })) as React.ReactElement<FlowCanvasProps>
+    const first = renderView(props(model([]), { interactiveMode$ }))
     expect(first.props.flowCanvasStore.$$.interactiveMode).toBe(interactiveMode$)
-    const second = FlowCanvasView(props(model([]), { identity: 'flow:next', interactiveMode$ })) as React.ReactElement<FlowCanvasProps>
+    const second = renderView(props(model([]), { identity: 'flow:next', interactiveMode$ }))
     expect(second.props.flowCanvasStore.$$.interactiveMode).toBe(interactiveMode$)
     second.props.flowCanvasStore.dispose()
     interactiveMode$.set('touchpad')
@@ -187,24 +140,24 @@ describe('FlowCanvasView model synchronization', () => {
     const graph = model([task([])])
     const onIgnoreNodes = vi.fn()
     const initial = props(graph, { onIgnoreNodes })
-    const view = FlowCanvasView(initial) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(initial)
     const store = view.props.flowCanvasStore
     const node = store.$.nodes.get('target' as NodeId)!
     node.setIgnored(true)
     expect(onIgnoreNodes).toHaveBeenCalledWith(['target'], true)
     expect(node.ignore.value).toBe(false)
-    FlowCanvasView({ ...initial, ignoredNodeIds: ['target'] })
+    renderView({ ...initial, ignoredNodeIds: ['target'] })
     expect(node.ignore.value).toBe(true)
     expect(store.$.nodes.get('target' as NodeId)).toBe(node)
     expect(graph.nodes[0]).not.toHaveProperty('ignored')
-    FlowCanvasView(initial)
+    renderView(initial)
     expect(node.ignore.value).toBe(false)
     store.dispose()
   })
 
   it('decodes React Flow connection identifiers once at the canvas boundary', () => {
     const onConnect = vi.fn()
-    const view = FlowCanvasView(props(model([task([])]), { onConnect })) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(model([task([])]), { onConnect }))
     view.props.flowCanvasStore.onRFConnect({ source: 'm:source:one', sourceHandle: 'h:$branch:matched', target: 'm:target', targetHandle: 'h:$in' })
     expect(onConnect).toHaveBeenCalledExactlyOnceWith({ source: 'source:one', sourceHandle: '$branch:matched', target: 'target', targetHandle: '$in' })
     view.props.flowCanvasStore.dispose()
@@ -216,9 +169,7 @@ describe('FlowCanvasView model synchronization', () => {
     const independent = { id: 'independent', source: 'other', sourceHandle: '$out', target: 'leaf', targetHandle: '$in' }
     const onDeleteNodes = vi.fn()
     const onDisconnect = vi.fn()
-    const view = FlowCanvasView(
-      props({ ...graph, edges: [...graph.edges, independent] }, { onDeleteNodes, onDisconnect }),
-    ) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props({ ...graph, edges: [...graph.edges, independent] }, { onDeleteNodes, onDisconnect }))
     const store = view.props.flowCanvasStore
     const node = store.$.nodes.get('target' as NodeId)!
     const edges = store.$.rfEdges.value.map((edge) => ({ type: 'remove' as const, id: edge.id }))
@@ -240,43 +191,39 @@ describe('FlowCanvasView model synchronization', () => {
     vi.useFakeTimers()
     const onDeleteNodes = vi.fn()
     const onDisconnect = vi.fn()
-    const view = FlowCanvasView(props(model([{ ...task([]), id: 'source' }, task([])]), { onDeleteNodes, onDisconnect })) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(model([{ ...task([]), id: 'source' }, task([])]), { onDeleteNodes, onDisconnect }))
     const store = view.props.flowCanvasStore
     store.handleEdgesChange(store.$.rfEdges.value.map((edge) => ({ type: 'remove', id: edge.id })))
     store.handleNodesChange([{ type: 'remove', id: store.$.nodes.get('target' as NodeId)!.rfNodeId }])
     if (lifecycle == 'dispose') store.dispose()
-    else for (const cleanup of hooks.cleanups) cleanup?.()
+    else mounted!.unmount()
     vi.runAllTimers()
     expect(onDeleteNodes).not.toHaveBeenCalled()
     expect(onDisconnect).not.toHaveBeenCalled()
     store.dispose()
   })
 
-  it('continues reconciling while React has effects unmounted', () => {
-    vi.useFakeTimers()
+  it('reconciles after StrictMode replays effect setup and cleanup', () => {
     const initial = props(model([task([])]), { editable: false })
-    const view = FlowCanvasView(initial) as React.ReactElement<FlowCanvasProps>
-    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    try {
-      for (const cleanup of hooks.cleanups) cleanup?.()
-      vi.runOnlyPendingTimers()
-      FlowCanvasView(props(model([task([])]), { editable: true }))
-
-      expect(error).not.toHaveBeenCalled()
-      expect(view.props.flowCanvasStore.$.editable.value).toBe(true)
-    } finally {
-      error.mockRestore()
-      view.props.flowCanvasStore.dispose()
-    }
+    const strictView = render(
+      <StrictMode>
+        <FlowCanvasView {...initial} />
+      </StrictMode>,
+    )
+    strictView.rerender(
+      <StrictMode>
+        <FlowCanvasView {...initial} editable />
+      </StrictMode>,
+    )
+    expect(boundary.props!.flowCanvasStore.$.editable.value).toBe(true)
   })
 
   it('disposes the adapter replaced by a new identity', () => {
-    const first = FlowCanvasView(props(model([]))) as React.ReactElement<FlowCanvasProps>
+    const first = renderView(props(model([])))
     const disposed = vi.fn()
     first.props.flowCanvasStore.dispose.add(disposed)
 
-    const second = FlowCanvasView(props(model([]), { identity: 'flow:next' })) as React.ReactElement<FlowCanvasProps>
+    const second = renderView(props(model([]), { identity: 'flow:next' }))
 
     expect(second.props.flowCanvasStore).not.toBe(first.props.flowCanvasStore)
     expect(disposed).toHaveBeenCalledOnce()
@@ -286,7 +233,7 @@ describe('FlowCanvasView model synchronization', () => {
   it('duplicates from the current Designer position', async () => {
     const onDuplicate = vi.fn()
     const editable = task([])
-    const view = FlowCanvasView(props(model([editable]), { onDuplicate })) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(model([editable]), { onDuplicate }))
     const node = [...view.props.flowCanvasStore.$.nodes.values()][0]!
     node.$$.position.set({ x: 320, y: 180 })
 
@@ -307,8 +254,8 @@ describe('FlowCanvasView model synchronization', () => {
     const onCopy = vi.fn()
     const onPaste = vi.fn()
     const initial = props(model([task([])]), { onCopy: oldCopy })
-    const view = FlowCanvasView(initial) as React.ReactElement<FlowCanvasProps>
-    FlowCanvasView({ ...initial, onCopy, onPaste })
+    const view = renderView(initial)
+    renderView({ ...initial, onCopy, onPaste })
     const store = view.props.flowCanvasStore
 
     store.onCopy(['target' as NodeId])
@@ -328,7 +275,7 @@ describe('FlowCanvasView model synchronization', () => {
       task([]),
       { id: 'note', kind: 'comment', title: 'Note', content: 'Keep this', position: { x: 40, y: 90 } },
     ]
-    const view = FlowCanvasView(props(model(nodes), { onDuplicate, selectedNodeIds: ['trigger', 'target', 'note'] })) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(model(nodes), { onDuplicate, selectedNodeIds: ['trigger', 'target', 'note'] }))
     const store = view.props.flowCanvasStore
     expect(store.$.nodes.get('trigger' as NodeId)?.duplicateNode).toBeTypeOf('function')
 
@@ -345,9 +292,9 @@ describe('FlowCanvasView model synchronization', () => {
   it('updates node error state from model diagnostics', () => {
     const initial = props(model([{ ...task([]), diagnostics: 2 }]))
     const changed = props(model([{ ...task([]), diagnostics: 0 }]))
-    const view = FlowCanvasView(initial) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(initial)
     expect([...view.props.flowCanvasStore.$.nodes.values()][0]?.$.hasError.value).toBe(true)
-    FlowCanvasView(changed)
+    renderView(changed)
     const store = view.props.flowCanvasStore
     expect([...store.$.nodes.values()][0]?.$.hasError.value).toBe(false)
     store.dispose()
@@ -367,18 +314,18 @@ describe('FlowCanvasView model synchronization', () => {
   it('keeps the current node position when editability changes', () => {
     const value = model([task([])])
     const initial = props(value)
-    const view = FlowCanvasView(initial) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(initial)
     const node = [...view.props.flowCanvasStore.$.nodes.values()][0]!
     node.$$.position.set({ x: 320, y: 180 })
 
-    FlowCanvasView({ ...initial, editable: false })
+    renderView({ ...initial, editable: false })
     expect([...view.props.flowCanvasStore.$.nodes.values()][0]?.$.position.value).toEqual({ x: 320, y: 180 })
 
-    FlowCanvasView(initial)
+    renderView(initial)
     expect([...view.props.flowCanvasStore.$.nodes.values()][0]?.$.position.value).toEqual({ x: 320, y: 180 })
 
     const moved = { ...task([]), position: { x: 500, y: 400 } }
-    FlowCanvasView(props(model([moved]), { editable: false }))
+    renderView(props(model([moved]), { editable: false }))
     expect([...view.props.flowCanvasStore.$.nodes.values()][0]?.$.position.value).toEqual(moved.position)
     view.props.flowCanvasStore.dispose()
   })
@@ -399,7 +346,7 @@ describe('FlowCanvasView model synchronization', () => {
     const store = update(props(model([{ ...wait, notice: undefined }])), props(model([wait])))
     const node = [...store.$.nodes.values()][0]
 
-    const view = FlowCanvasView(props(model([{ ...wait, notice: { ...wait.notice } }]))) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(model([{ ...wait, notice: { ...wait.notice } }])))
     expect(view.props.flowCanvasStore.$.nodes.get(node!.nodeId)).toBe(node)
     const current = node?.content$.value
     expect(current?.kind == 'wait' ? current.notice : undefined).toEqual(wait.notice)
@@ -419,15 +366,13 @@ describe('FlowCanvasView model synchronization', () => {
       title: 'Wait',
     }
     const target = task([{ handle: 'value', jsonSchema: {}, sources: [{ nodeId: 'wait', output: 'approve' }] }])
-    const view = FlowCanvasView(props(model([wait, target]))) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(model([wait, target])))
     const node = [...view.props.flowCanvasStore.$.nodes.values()].find((item) => item.nodeId == 'wait')
     if (node == null) throw new Error('Expected a Wait node.')
     const changes: unknown[] = []
     const stop = node.content$.reaction((content) => changes.push(content), true)
 
-    FlowCanvasView(
-      props(model([{ ...wait, notice: { icon: ':service:feishu:', text: 'Notification · Feishu Custom Bot · Send text message' } }, { ...target }])),
-    )
+    renderView(props(model([{ ...wait, notice: { icon: ':service:feishu:', text: 'Notification · Feishu Custom Bot · Send text message' } }, { ...target }])))
 
     expect(changes).toHaveLength(1)
     expect(changes[0]).toMatchObject({ inputs: wait.inputs, outputs: wait.outputs, notice: { icon: ':service:feishu:' } })
@@ -437,7 +382,7 @@ describe('FlowCanvasView model synchronization', () => {
   })
 
   it.each(['wait', 'task'] as const)('preserves %s input values in the canvas projection', (kind) => {
-    const view = FlowCanvasView(
+    const view = renderView(
       props(
         model([
           {
@@ -450,7 +395,7 @@ describe('FlowCanvasView model synchronization', () => {
           },
         ]),
       ),
-    ) as React.ReactElement<FlowCanvasProps>
+    )
     const node = [...view.props.flowCanvasStore.$.nodes.values()][0]!
     expect(node.content$.value.inputs).toEqual([{ handle: 'value', jsonSchema: {}, value: 42 }])
     view.props.flowCanvasStore.dispose()
@@ -475,7 +420,7 @@ describe('FlowCanvasView model synchronization', () => {
 
   it('commits comment content separately from local typing and includes the current title', () => {
     const onChangeComment = vi.fn()
-    const view = FlowCanvasView(props(model([commentNode('Note')]), { onChangeComment })) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(model([commentNode('Note')]), { onChangeComment }))
     const comment = [...view.props.flowCanvasStore.$.commentNodes!.values()][0]!
     comment.$$.content.set('## Draft')
     expect(onChangeComment).not.toHaveBeenCalled()
@@ -486,7 +431,7 @@ describe('FlowCanvasView model synchronization', () => {
 
   it('routes Comment title edits to the host', () => {
     const onChangeComment = vi.fn()
-    const view = FlowCanvasView(props(model([commentNode('Before')]), { onChangeComment })) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(model([commentNode('Before')]), { onChangeComment }))
     const comment = [...view.props.flowCanvasStore.$.commentNodes!.values()][0]
     if (comment == null) throw new Error('Expected a Comment node.')
 
@@ -498,13 +443,13 @@ describe('FlowCanvasView model synchronization', () => {
 
   it('does not rewrite an unchanged controlled selection when the host recreates the model', () => {
     const value = model([task([])])
-    const view = FlowCanvasView(props(value, { selectedNodeIds: ['target'] })) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(value, { selectedNodeIds: ['target'] }))
     const node = [...view.props.flowCanvasStore.$.nodes.values()][0]!
     node.$$.selected.set(false)
     const setSelection = vi.spyOn(node.$$.selected, 'set')
     const replaceNodes = vi.spyOn(view.props.flowCanvasStore.$$.nodes, 'replace')
 
-    FlowCanvasView(props({ ...value }, { selectedNodeIds: ['target'] }))
+    renderView(props({ ...value }, { selectedNodeIds: ['target'] }))
 
     expect(setSelection).not.toHaveBeenCalled()
     expect(replaceNodes).not.toHaveBeenCalled()
@@ -514,9 +459,9 @@ describe('FlowCanvasView model synchronization', () => {
   it('moves the controlled selection to a copied node', () => {
     const original = task([])
     const copy = { ...task([]), id: 'copy', position: { x: 560, y: 0 }, title: 'Task (2)' }
-    const view = FlowCanvasView(props(model([original]), { selectedNodeIds: ['target'] })) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(model([original]), { selectedNodeIds: ['target'] }))
 
-    FlowCanvasView(props(model([original, copy]), { selectedNodeIds: ['copy'] }))
+    renderView(props(model([original, copy]), { selectedNodeIds: ['copy'] }))
 
     expect(view.props.flowCanvasStore.$.nodes.get('target' as NodeId)?.$.selected.value).toBe(false)
     expect(view.props.flowCanvasStore.$.nodes.get('copy' as NodeId)?.$.selected.value).toBe(true)
@@ -525,12 +470,12 @@ describe('FlowCanvasView model synchronization', () => {
 
   it('does not echo an unchanged controlled selection in React Flow order', () => {
     const onSelectionChange = vi.fn()
-    const view = FlowCanvasView(
+    const view = renderView(
       props(model([source, task([])]), {
         onSelectionChange,
         selectedNodeIds: ['source', 'target'],
       }),
-    ) as React.ReactElement<FlowCanvasProps>
+    )
     const nodes = [...view.props.flowCanvasStore.$.nodes.values()]
 
     view.props.onSelectionChange?.({
@@ -545,11 +490,11 @@ describe('FlowCanvasView model synchronization', () => {
   it('ignores a queued selection snapshot after controlled deselection and still accepts user selection', async () => {
     const onSelectionChange = vi.fn()
     const initial = props(model([source, task([])]), { onSelectionChange, selectedNodeIds: ['target'] })
-    const view = FlowCanvasView(initial) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(initial)
     const store = view.props.flowCanvasStore
     const previousSelection = store.$.rfNodes.value.filter((node) => node.selected)
 
-    const next = FlowCanvasView(props(initial.model, { onSelectionChange })) as React.ReactElement<FlowCanvasProps>
+    const next = renderView(props(initial.model, { onSelectionChange }))
     next.props.onSelectionChange?.({ edges: [], nodes: previousSelection })
 
     expect(onSelectionChange).not.toHaveBeenCalled()
@@ -565,8 +510,8 @@ describe('FlowCanvasView model synchronization', () => {
   it.each(['mount', 'update'])('preserves host selection when React Flow reports its initial empty snapshot on %s', async (phase) => {
     const onSelectionChange = vi.fn()
     const value = model([task([])])
-    if (phase == 'update') FlowCanvasView(props(value, { onSelectionChange }))
-    const next = FlowCanvasView(props(value, { onSelectionChange, selectedNodeIds: ['target'] })) as React.ReactElement<FlowCanvasProps>
+    if (phase == 'update') renderView(props(value, { onSelectionChange }))
+    const next = renderView(props(value, { onSelectionChange, selectedNodeIds: ['target'] }))
     const store = next.props.flowCanvasStore
 
     next.props.onSelectionChange?.({ edges: [], nodes: [] })
@@ -585,12 +530,12 @@ describe('FlowCanvasView model synchronization', () => {
   it('selects a node after adding it', async () => {
     let next: FlowCanvasViewProps
     const onAddNode = vi.fn(async () => {
-      FlowCanvasView(next)
+      renderView(next)
       return 'target'
     })
     const initial = props(model([source]), { onAddNode })
     next = props(model([source, task([])]), { onAddNode, selectedNodeIds: ['target'] })
-    const view = FlowCanvasView(initial) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(initial)
 
     await view.props.onDropAddItem?.('task', { x: 200, y: 0 })
     await Promise.resolve()
@@ -602,14 +547,14 @@ describe('FlowCanvasView model synchronization', () => {
 
   it('does not replace Designer maps for a semantically unchanged model object', () => {
     const value = model([task([])])
-    const view = FlowCanvasView(props(value)) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(value))
     const node = [...view.props.flowCanvasStore.$.nodes.values()][0]!
     const replaceNodes = vi.spyOn(view.props.flowCanvasStore.$$.nodes, 'replace')
     const replaceComments = vi.spyOn(view.props.flowCanvasStore.$$.commentNodes!, 'replace')
     const setPosition = vi.spyOn(node.$$.position, 'set')
     const setViewport = vi.spyOn(view.props.flowCanvasStore.$$.viewport, 'set')
 
-    FlowCanvasView(
+    renderView(
       props({
         ...value,
         edges: [],
@@ -636,7 +581,7 @@ describe('FlowCanvasView model synchronization', () => {
     const onMoveViewport = vi.fn()
     const onSelectionChange = vi.fn()
     const initialProps = props(model([task([])]), { subscribeCanvasCommands, onMoveViewport, onSelectionChange, selectedNodeIds: ['target'] })
-    const view = FlowCanvasView(initialProps) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(initialProps)
     const store = view.props.flowCanvasStore
     const ends: Viewport[] = []
     const move = async (next: Viewport) => {
@@ -662,7 +607,7 @@ describe('FlowCanvasView model synchronization', () => {
     expect(setCenter).toHaveBeenCalledTimes(2)
     expect(onMoveViewport).not.toHaveBeenCalled()
     expect(onSelectionChange).not.toHaveBeenCalled()
-    FlowCanvasView({ ...initialProps, model: model([task([])]) })
+    renderView({ ...initialProps, model: model([task([])]) })
     expect(store.$.viewport.value).toEqual({ x: 480, y: 70, zoom: 1 })
     await move({ x: 490, y: 70, zoom: 1 })
     // A stale remote end arriving after manual movement must not save the old viewport.
@@ -679,7 +624,7 @@ describe('FlowCanvasView model synchronization', () => {
     const onSelectionChange = vi.fn()
     const initial = task([])
     const initialProps = props(model([initial]), { onMoveNodes, onMoveViewport, onSelectionChange })
-    const view = FlowCanvasView(initialProps) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(initialProps)
     const store = view.props.flowCanvasStore
     const node = [...store.$.nodes.values()][0]
     if (node == null) throw new Error('Expected a Task node.')
@@ -696,7 +641,7 @@ describe('FlowCanvasView model synchronization', () => {
     view.props.onSelectionChange?.({ edges: [], nodes: [node.$.rfNode.value] })
     const nodes = store.$.rfNodes.value
     const currentViewport = store.$.viewport.value
-    FlowCanvasView(
+    renderView(
       props(
         { edges: [], nodes: [{ ...initial, position: { ...position } }], viewport: { ...viewport } },
         {
@@ -719,30 +664,30 @@ describe('FlowCanvasView model synchronization', () => {
   it('consumes one focus request once without changing selection and disables motion when requested by the user', () => {
     const onSelectionChange = vi.fn()
     const initial = props(model([task([])]), { onSelectionChange })
-    const view = FlowCanvasView(initial) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(initial)
     const send = vi.spyOn(view.props.flowCanvasStore.rfCommand, 'send')
     const focusNodeRequest = { nodeId: 'target', requestId: 1 }
     const focused = props(model([task([])]), {
       focusNodeRequest,
       onSelectionChange,
     })
-    vi.stubGlobal('window', { matchMedia: () => ({ matches: true }) })
+    const matchMedia = vi.spyOn(window, 'matchMedia').mockReturnValue({ matches: true } as MediaQueryList)
     try {
-      FlowCanvasView(focused)
-      FlowCanvasView(focused)
+      renderView(focused)
+      renderView(focused)
 
       expect(send).toHaveBeenCalledOnce()
       expect(send).toHaveBeenCalledWith('focusNode', 'target', { duration: 0 })
       expect(onSelectionChange).not.toHaveBeenCalled()
     } finally {
-      vi.unstubAllGlobals()
+      matchMedia.mockRestore()
       view.props.flowCanvasStore.dispose()
     }
   })
 
   it('forwards connection validation through React Flow identities', () => {
     const isValidConnection = vi.fn(() => false)
-    const view = FlowCanvasView(props(model([source, task([])]), { isValidConnection })) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(model([source, task([])]), { isValidConnection }))
 
     expect(
       view.props.isValidConnection?.({
@@ -762,16 +707,16 @@ describe('FlowCanvasView model synchronization', () => {
   })
 
   it('keeps execution edges independent of data ports', () => {
-    const view = FlowCanvasView(props(model([source, { ...task([]), inputs: [], outputs: [] }]))) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(model([source, { ...task([]), inputs: [], outputs: [] }])))
     expect(view.props.flowCanvasStore.$.rfEdges.value).toHaveLength(1)
-    FlowCanvasView(props(model([source, task([])])))
+    renderView(props(model([source, task([])])))
     expect(view.props.flowCanvasStore.$.rfEdges.value).toHaveLength(1)
     view.props.flowCanvasStore.dispose()
   })
 
   it('forwards a generic dropped item at its Flow position without serializing the item', async () => {
     const onAddNode = vi.fn(() => Promise.resolve('created'))
-    const view = FlowCanvasView(props(model([]), { onAddNode })) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(model([]), { onAddNode }))
 
     const nodeId = await view.props.onDropAddItem?.('connector:github:create-issue', { x: 120, y: 80 })
 
@@ -784,14 +729,14 @@ describe('FlowCanvasView model synchronization', () => {
   })
 
   it('forwards the resolved theme to the Designer root', () => {
-    const view = FlowCanvasView(props(model([]), { dark: true })) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(model([]), { dark: true }))
 
     expect(view.props.dark).toBe(true)
     view.props.flowCanvasStore.dispose()
   })
 
   it('runs the initial graph layout when requested by the host', () => {
-    const view = FlowCanvasView(props(model([task([])]), { autoLayout: true })) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(model([task([])]), { autoLayout: true }))
     const store = view.props.flowCanvasStore
     const node = [...store.$.nodes.values()][0]
     if (node == null) throw new Error('Expected a Task node.')
@@ -803,7 +748,7 @@ describe('FlowCanvasView model synchronization', () => {
 
   it('sends automatic and requested layout positions to the host for persistence', () => {
     const onMoveNodes = vi.fn()
-    const view = FlowCanvasView(props(model([task([])]), { autoLayout: true, onMoveNodes })) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(model([task([])]), { autoLayout: true, onMoveNodes }))
     const store = view.props.flowCanvasStore
     const node = [...store.$.nodes.values()][0]
     if (node == null) throw new Error('Expected a Task node.')
@@ -825,7 +770,7 @@ describe('FlowCanvasView model synchronization', () => {
       viewport: { x: -800, y: -600, zoom: 0.6 },
     }
 
-    const view = FlowCanvasView(props(value)) as React.ReactElement<FlowCanvasProps>
+    const view = renderView(props(value))
     const store = view.props.flowCanvasStore
     const comment = [...(store.$.commentNodes?.values() ?? [])][0]
     if (comment == null) throw new Error('Expected a Comment node.')
@@ -850,9 +795,7 @@ describe('FlowCanvasView model synchronization', () => {
 it('reports repeated activation and the final canvas selection before selection effects run', () => {
   const onActivateSelection = vi.fn()
   const onSelectionEnd = vi.fn()
-  const view = FlowCanvasView(
-    props(model([source, task([])]), { selectedNodeIds: ['source'], onActivateSelection, onSelectionEnd }),
-  ) as React.ReactElement<FlowCanvasProps>
+  const view = renderView(props(model([source, task([])]), { selectedNodeIds: ['source'], onActivateSelection, onSelectionEnd }))
   view.props.onActivateSelection?.()
   view.props.onActivateSelection?.()
   expect(onActivateSelection.mock.calls).toEqual([[['source']], [['source']]])
