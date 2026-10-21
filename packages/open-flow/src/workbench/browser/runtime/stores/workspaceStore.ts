@@ -39,7 +39,7 @@ import {
 import { connectionCatalog } from '../connectionCatalog.ts'
 import { addNodeIntent } from '../editor/addNodeOptions.ts'
 import { CanvasClipboard } from '../editor/canvasClipboard.ts'
-import { applyFlowChanges, deleteSelection, addNode as addFlowNode } from '../editor/flowChanges.ts'
+import { applyFlowChanges, deleteSelection, addNode as addFlowNode, setTriggerConnection } from '../editor/flowChanges.ts'
 import { createI18n } from '../i18n.ts'
 import { revisionView } from '../revisionView.ts'
 import { designerGraph } from '../workspace.ts'
@@ -482,18 +482,8 @@ export class WorkspaceStore {
     const nodeId = this.#identity()
     if (option.kind == 'comment') return await this.#addComment(nodeId, position)
     const revision = revisionView(draft)
-    let intent = addNodeIntent(option, revision, this.#i18n.t)
+    const intent = addNodeIntent(option, revision, this.#i18n.t)
     if (intent == null) return
-    if (intent.kind == 'provider-trigger' && intent.connectionId == null) {
-      try {
-        const connections = await resourceValue(this.catalogs.connections.get(intent.definition.provider, draft.flowId))
-        const allowed = this.filterTriggerConnections == null ? connections : await this.filterTriggerConnections(draft.flowId, intent.definition, connections)
-        intent = { ...intent, connectionId: connectionCatalog(allowed).preferred?.connectionId }
-      } catch (error) {
-        if (!this.#disposed && this.#model.value.draft == draft) this.#setNotice(errorNotice(error, this.#i18n.t))
-      }
-      if (this.#disposed || this.#model.value.draft != draft) return
-    }
     const edge = connection?.(nodeId)
     const nodeChanges = addFlowNode(revision, nodeId, intent)
     if (nodeChanges == null) return
@@ -511,7 +501,28 @@ export class WorkspaceStore {
     if (!(await this.#canvasChange('add', 1, changes, (value) => setNodePositions(value, { [nodeId]: position }), [nodeId]))) return
     if (this.#disposed) return
     this.#set({ nodeFocus: { nodeId, requestId: ++this.#nodeFocusId } })
+    if (intent.kind == 'provider-trigger' && intent.connectionId == null) void this.#configureAddedTrigger(draft.flowId, nodeId, intent.definition)
     return nodeId
+  }
+
+  async #configureAddedTrigger(flowId: string, nodeId: string, definition: TriggerKeySnapshot): Promise<void> {
+    const current = this.#draftSession.capture()
+    const original = this.$.revision.value?.graph().nodes[nodeId]
+    const unchanged = () => current() && !this.#disposed && this.$.revision.value?.graph().nodes[nodeId] === original
+    try {
+      const connections = await resourceValue(this.catalogs.connections.get(definition.provider, flowId))
+      if (!unchanged()) return
+      const allowed = this.filterTriggerConnections == null ? connections : await this.filterTriggerConnections(flowId, definition, connections)
+      if (!unchanged()) return
+      const connection = connectionCatalog(allowed).preferred
+      if (connection == null) return
+      const revision = this.$.revision.value
+      if (revision == null) return
+      const changes = setTriggerConnection(revision, nodeId, connection.connectionId)
+      if (changes != null && this.#history.completeNodeCreation(nodeId, changes)) await this.#changeDraft(changes, false, 'canvas')
+    } catch (error) {
+      if (unchanged()) this.#setNotice(errorNotice(error, this.#i18n.t))
+    }
   }
 
   public async connect(edge: Omit<DesignerEdge, 'id'>): Promise<void> {

@@ -254,9 +254,11 @@ describe('Trigger creation permissions', () => {
       await navigation.start()
       await add()
       expect(nodes()).toEqual([expect.objectContaining({ kind: 'poll' })])
-      const node = nodes()[0]
-      expect('connectionId' in node ? node.connectionId : undefined).toBe(expected)
-      if (expected == null) expect(store.$.notice.value).toMatchObject({ kind: 'error', message: createI18n().t('connectorAccess.noAvailablePermissions') })
+      await vi.waitFor(() => {
+        const node = nodes()[0]
+        expect('connectionId' in node ? node.connectionId : undefined).toBe(expected)
+        if (expected == null) expect(store.$.notice.value).toMatchObject({ kind: 'error', message: createI18n().t('connectorAccess.noAvailablePermissions') })
+      })
     } finally {
       navigation.dispose()
       store.dispose()
@@ -268,7 +270,10 @@ describe('Trigger creation permissions', () => {
     try {
       await navigation.start()
       await add()
-      expect(nodes()).toEqual([expect.objectContaining({ connectionId: 'other' })])
+      await vi.waitFor(() => {
+        expect(nodes()).toEqual([expect.objectContaining({ connectionId: 'other' })])
+        expect(store.workspace.history$.value.canUndo).toBe(true)
+      })
       await store.workspace.undo()
       expect(nodes()).toEqual([])
       await store.workspace.redo()
@@ -285,7 +290,7 @@ describe('Trigger creation permissions', () => {
     try {
       await navigation.start()
       await add()
-      expect(nodes()).toEqual([expect.objectContaining({ connectionId: 'default' })])
+      await vi.waitFor(() => expect(nodes()).toEqual([expect.objectContaining({ connectionId: 'default' })]))
       expect(lookup).not.toHaveBeenCalled()
     } finally {
       navigation.dispose()
@@ -301,26 +306,57 @@ describe('Trigger creation permissions', () => {
       await add()
       expect(nodes()).toEqual([expect.objectContaining({ kind: 'poll' })])
       expect(nodes()[0]).not.toHaveProperty('connectionId')
-      expect(store.$.notice.value).toMatchObject({ kind: 'error', message: 'Permission lookup unavailable' })
+      await vi.waitFor(() => expect(store.$.notice.value).toMatchObject({ kind: 'error', message: 'Permission lookup unavailable' }))
     } finally {
       navigation.dispose()
       store.dispose()
     }
   })
 
-  it('does not create a node after leaving the Flow during permission lookup', async () => {
+  it.each(['choose', 'clear', 'delete', 'undo'] as const)('does not overwrite %s while default connection permissions are pending', async (action) => {
+    const { store, navigation, add, nodes, lookup } = setup([])
+    const pending = Promise.withResolvers<Awaited<ReturnType<WorkbenchClient['listProviderAccessBindingCandidates']>>>()
+    lookup.mockReturnValue(pending.promise)
+    try {
+      await navigation.start()
+      const nodeId = (await add())!
+      await vi.waitFor(() => expect(lookup).toHaveBeenCalledOnce())
+      if (action == 'choose' || action == 'clear') {
+        await store.workspace.nodes.setTriggerConnection(nodeId, 'manual')
+        if (action == 'clear') await store.workspace.nodes.setTriggerConnection(nodeId, undefined)
+      } else if (action == 'delete') await store.workspace.deleteSelectedNodes()
+      else await store.workspace.undo()
+      pending.resolve({
+        version: 1,
+        results: [{ version: 1, mode: 'selectable', providerId: 'mail', candidates: [candidate('default', { allTriggers: true })] }],
+      })
+      await vi.waitFor(() => expect(store.connectorAccess.$.value.loadingCandidates).toEqual([]))
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      if (action == 'delete' || action == 'undo') expect(nodes()).toEqual([])
+      else if (action == 'choose') expect(nodes()).toEqual([expect.objectContaining({ connectionId: 'manual' })])
+      else expect(nodes()[0]).not.toHaveProperty('connectionId')
+    } finally {
+      pending.resolve({ version: 1, results: [] })
+      navigation.dispose()
+      store.dispose()
+    }
+  })
+
+  it('creates the node before permissions resolve and ignores results after leaving the Flow', async () => {
     const { client, store, navigation, add, nodes, lookup } = setup([])
     const pending = Promise.withResolvers<Awaited<ReturnType<WorkbenchClient['listProviderAccessBindingCandidates']>>>()
     lookup.mockReturnValue(pending.promise)
     try {
       await navigation.start()
-      const added = add()
+      const added = await add()
+      expect(added).toBeDefined()
+      expect(nodes()).toEqual([expect.objectContaining({ kind: 'poll' })])
       await vi.waitFor(() => expect(lookup).toHaveBeenCalledOnce())
       await store.selectFlow('second')
       pending.resolve({ version: 1, results: [] })
-      await added
+      await new Promise((resolve) => setTimeout(resolve, 0))
       expect(nodes()).toEqual([])
-      expect(client.changeDraft).not.toHaveBeenCalled()
+      expect(client.changeDraft).toHaveBeenCalledOnce()
     } finally {
       pending.resolve({ version: 1, results: [] })
       navigation.dispose()

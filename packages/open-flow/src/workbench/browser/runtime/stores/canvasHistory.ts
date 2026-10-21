@@ -47,6 +47,16 @@ export class CanvasHistory {
     this.publish()
   }
 
+  completeNodeCreation(nodeId: string, changes: FlowChanges): boolean {
+    const index = this.#undo.findIndex((entry) => entry.forward.some((operation) => operation.kind == 'graph.node.create' && operation.nodeId == nodeId))
+    if (index < 0 || this.applying || this.failed) return false
+    const entry = this.#undo[index]!
+    this.#undo[index] = { ...entry, forward: [...entry.forward, ...changes] }
+    this.discardRedo()
+    this.publish()
+    return true
+  }
+
   rebaseModuleCreation(moduleId: string, module: Pick<CodeModule, 'imports' | 'source'>): void {
     for (const [index, entry] of this.#undo.entries()) {
       if (!entry.forward.some((operation) => operation.kind == 'module.create' && operation.moduleId == moduleId)) continue

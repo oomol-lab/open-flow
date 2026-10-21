@@ -247,12 +247,14 @@ describe('TriggerStore', () => {
           y: 0,
         })
         expect(nodeId).toBeDefined()
-        const node = workspace.$.draft.value!.content.document.graph.nodes[nodeId!]!
-        if (node.kind != 'integration') throw new Error('Expected Integration Trigger.')
-        const expected = scenario == 'default' ? 'preferred' : scenario == 'only' ? 'other' : scenario == 'explicit' ? 'chosen' : ''
-        expect(node.connectionId).toEqual(expected || undefined)
+        await vi.waitFor(() => {
+          const node = workspace.$.draft.value!.content.document.graph.nodes[nodeId!]!
+          if (node.kind != 'integration') throw new Error('Expected Integration Trigger.')
+          const expected = scenario == 'default' ? 'preferred' : scenario == 'only' ? 'other' : scenario == 'explicit' ? 'chosen' : ''
+          expect(node.connectionId).toEqual(expected || undefined)
+        })
         if (scenario == 'explicit') expect(list).not.toHaveBeenCalled()
-        else expect(list).toHaveBeenCalledWith('github', flow.flowId)
+        else await vi.waitFor(() => expect(list).toHaveBeenCalledWith('github', flow.flowId))
       } finally {
         triggers.dispose()
         workspace.dispose()
@@ -278,9 +280,11 @@ describe('TriggerStore', () => {
         { ...option, trigger: { ...option.trigger, definition: { ...option.trigger.definition, key: 'feishu_app_bot.on_event', provider: 'feishu_app_bot' } } },
         { x: 0, y: 0 },
       )
-      const node = workspace.$.draft.value!.content.document.graph.nodes[nodeId!]!
-      if (node.kind != 'integration') throw new Error('Expected Integration Trigger.')
-      expect(node.connectionId).toEqual('feishu-default')
+      await vi.waitFor(() => {
+        const node = workspace.$.draft.value!.content.document.graph.nodes[nodeId!]!
+        if (node.kind != 'integration') throw new Error('Expected Integration Trigger.')
+        expect(node.connectionId).toEqual('feishu-default')
+      })
       expect(list).toHaveBeenCalledOnce()
     } finally {
       triggers.dispose()
@@ -288,19 +292,21 @@ describe('TriggerStore', () => {
     }
   })
 
-  it('does not create a Trigger after leaving the Flow during connection lookup', async () => {
+  it('creates the Trigger before connection lookup completes and does not configure it after leaving the Flow', async () => {
     const { client, workspace, triggers, signal, requests } = createSetup()
     const pending = Promise.withResolvers<readonly ConnectorConnection[]>()
     const list = connectionRequests.get(client)!.mockReturnValue(pending.promise)
     try {
       await workspace.start(flow.flowId)
       const option = (await resourceValue(triggers.browseAddNodeOptions(signal)))![0]!
-      const adding = workspace.addNode(option, { x: 0, y: 0 })
+      const nodeId = await workspace.addNode(option, { x: 0, y: 0 })
+      expect(nodeId).toBeDefined()
+      expect(workspace.$.draft.value!.content.document.graph.nodes[nodeId!]).toMatchObject({ kind: 'integration' })
       await vi.waitFor(() => expect(list).toHaveBeenCalled())
       await workspace.selectFlow(undefined)
       pending.resolve([])
-      expect(await adding).toBeUndefined()
-      expect(requests.some((path) => path.endsWith('/draft/changes'))).toBe(false)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      expect(requests.filter((path) => path.endsWith('/draft/changes'))).toHaveLength(1)
     } finally {
       triggers.dispose()
       workspace.dispose()
