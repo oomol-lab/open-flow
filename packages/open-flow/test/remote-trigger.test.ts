@@ -4,6 +4,7 @@ import type { IntegrationDefinition, IntegrationStateContext } from '../src/trig
 import { expect, it, vi } from 'vitest'
 import { IntegrationConnectionError } from '../src/trigger/common/integration.ts'
 import { remoteTriggerDefinitions } from '../src/trigger/providers/remote.ts'
+import { sourceEvents } from '../src/trigger/providers/source-events.ts'
 
 const listener = remoteTriggerDefinitions.find((definition) => definition.snapshot.key === 'googledrive.watch_changes') as IntegrationDefinition
 
@@ -169,4 +170,26 @@ it.each([
     expect.objectContaining({ headers: suppliedHeaders, query: suppliedQuery, rawBody: Buffer.from(raw).toString('base64') }),
     undefined,
   )
+})
+
+it.each([undefined, null, '', 12])('rejects source events with invalid delivery identity %s', async (deliveryId) => {
+  const definition = sourceEvents[0]!
+  await expect(async () =>
+    definition.receive({
+      bindingId: 'binding',
+      admit: true,
+      current: true,
+      method: 'POST',
+      callbackSecret: '',
+      eventSourceId: 'source',
+      config: { sourceId: 'source' },
+      now: new Date(),
+      payload: deliveryId === undefined ? {} : { deliveryId },
+      rawBody: new Uint8Array(),
+      header: () => undefined,
+      query: () => undefined,
+      connector: { execute: vi.fn(), trigger: vi.fn() },
+      state: { checkpoint: null, subscription: {}, saveCheckpoint: vi.fn(), saveSubscription: vi.fn() },
+    }),
+  ).rejects.toThrow('The source event has no delivery identity.')
 })

@@ -1419,7 +1419,20 @@
       "pending": "Webhook 생성 또는 갱신 중",
       "ready": "Webhook 활성화됨",
       "error": "Webhook을 사용할 수 없습니다. 연결을 확인하고 게시를 다시 시도하세요"
-    }
+    },
+    "accountIdentity": "연결 계정 식별자",
+    "appId": "앱 ID",
+    "slackAppId": "Slack 앱 ID",
+    "integrationId": "통합 UUID",
+    "developerAppId": "개발자 앱 ID",
+    "organizationId": "조직 ID / 슬러그",
+    "installationId": "설치 UUID",
+    "workspaceId": "워크스페이스 ID",
+    "verificationToken": "검증 토큰",
+    "signingSecret": "서명 비밀 키",
+    "webhookSecret": "Webhook 비밀 토큰",
+    "encryptKey": "암호화 키",
+    "clientSecret": "클라이언트 비밀 키"
   },
   "connectionUsage": {
     "title": "연결 개요",

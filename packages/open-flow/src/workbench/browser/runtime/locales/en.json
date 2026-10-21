@@ -1419,7 +1419,20 @@
       "pending": "Creating or renewing the webhook",
       "ready": "Webhook active",
       "error": "Webhook unavailable; check the connection and retry publication"
-    }
+    },
+    "accountIdentity": "Connection account identity",
+    "appId": "App ID",
+    "slackAppId": "Slack App ID",
+    "integrationId": "Integration UUID",
+    "developerAppId": "Developer App ID",
+    "organizationId": "Organization ID / slug",
+    "installationId": "Installation UUID",
+    "workspaceId": "Workspace ID",
+    "verificationToken": "Verification Token",
+    "signingSecret": "Signing Secret",
+    "webhookSecret": "Webhook Secret Token",
+    "encryptKey": "Encrypt Key",
+    "clientSecret": "Client Secret"
   },
   "connectionUsage": {
     "title": "Connection overview",

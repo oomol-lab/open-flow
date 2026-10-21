@@ -58,3 +58,13 @@ All source callbacks currently accept JSON up to 64 KiB. Outputs contain data ac
 7. Rotate shared signing credentials and reverify; revoke/reinstall the upstream application and reconnect as needed. Record actual delivery IDs and Run IDs without sensitive payloads. Keep these real-service checks separate from automated mock protocol tests.
 
 HubSpot remains intentionally absent from the Trigger catalog. Its current provider uses MCP authorization, which does not establish the native Webhook app/portal identity, object scopes or signing credentials. Complete that authorization review before implementing its conditional Trigger.
+
+The public `@oomol-lab/open-flow/event-source` entry exports `sourceResultSchema`,
+`preparedSourceSchema`, and `sourceReceiptSchema`, with `SourceResult`, `PreparedSource`,
+and `SourceReceipt` types. Server validates Connector responses using these same schemas.
+A receipt contains exactly one of a Provider HTTP response or a normalized event. Prepared
+responses contain both the updated source and resource subscriptions. Source responses
+include the Connector projection in `state.projection`; the projection contains its public
+view, readiness, and optional expiry. List hydration isolates individual inspection failures
+and preserves concurrent configuration updates. Unknown legacy details remain visible and
+are retried on the next list request.

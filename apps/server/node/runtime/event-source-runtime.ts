@@ -8,30 +8,11 @@ import type { Store } from '../storage/store.ts'
 import type { IntegrationOptions } from './integration-runtime.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { eventSourceDefinition, sourceConfigurationSchema } from '@oomol-lab/open-flow/event-source'
+import { SourceIdentityError, eventSourceDefinition, sourceResultSchema, preparedSourceSchema, sourceReceiptSchema } from '@oomol-lab/open-flow/event-source'
 import { PermanentIntegrationError, TransientIntegrationError } from '@oomol-lab/open-flow/integration-trigger'
 import { z } from 'zod'
 import { ConnectorTaskError } from '../deployment/connector-contract.ts'
 import { ControlError } from '../error.ts'
-
-const jsonObject = z.record(z.string(), z.json())
-const sourceResult = z.object({ source: sourceConfigurationSchema })
-const preparedSource = sourceResult.extend({ subscriptions: z.array(z.object({ key: z.string(), config: jsonObject })) })
-const sourceReceipt = z
-  .object({
-    source: sourceConfigurationSchema.optional(),
-    response: z.object({ status: z.number().int().min(200).max(599), body: z.string(), headers: z.record(z.string(), z.string()) }).optional(),
-    event: z
-      .object({
-        id: z.string().min(1),
-        type: z.string().min(1),
-        payload: jsonObject,
-        matches: z.array(z.string()),
-        ordering: z.object({ key: z.string(), version: z.number() }).optional(),
-      })
-      .optional(),
-  })
-  .refine((value) => (value.response == null) !== (value.event == null))
 
 export class EventSourceRuntime {
   readonly #store: Store
@@ -59,7 +40,13 @@ export class EventSourceRuntime {
   }
 
   async list(teamId?: string | null): Promise<{ readonly version: 1; readonly sources: readonly EventSource[] }> {
-    for (const source of this.#store.eventSources.unprojected()) if (teamId === undefined || source.teamId === teamId) await this.#hydrate(source)
+    // Failed projections stay visible with unknown details; a later list request retries them.
+    await Promise.allSettled(
+      this.#store.eventSources
+        .unprojected()
+        .filter((source) => teamId === undefined || source.teamId === teamId)
+        .map((source) => this.#hydrate(source)),
+    )
     return { version: 1, sources: this.#store.eventSources.list(this.#options()?.publicOrigin, teamId) }
   }
 
@@ -74,7 +61,7 @@ export class EventSourceRuntime {
     if (connection == null) {
       throw new ControlError(controlErrorCode.eventSourceInvalid, 'Choose an active Connection in this Connector Team.')
     }
-    const { source: configuration } = sourceResult.parse(
+    const { source: configuration } = sourceResultSchema.parse(
       await this.#execute(definition.kind, input.connectionId, { operation: 'source', request: { action: 'initialize', input: { ...input } } }, signal, access),
     )
     signal.throwIfAborted()
@@ -84,7 +71,7 @@ export class EventSourceRuntime {
 
   async update(sourceId: string, input: UpdateEventSource, signal: AbortSignal): Promise<EventSource> {
     const original = this.#store.eventSources.require(sourceId, input.expectedRevision)
-    const { source: configuration } = sourceResult.parse(
+    const { source: configuration } = sourceResultSchema.parse(
       await this.#execute(
         original.kind,
         original.connectionId,
@@ -104,6 +91,12 @@ export class EventSourceRuntime {
   }
 
   async receiveApplication(kind: string, appId: string, request: Request): Promise<Response> {
+    try {
+      if (!eventSourceDefinition(kind).applicationIngress) return new Response(null, { status: 404 })
+    } catch (error) {
+      if (error instanceof SourceIdentityError) return new Response(null, { status: 404 })
+      throw error
+    }
     const sources = this.#store.eventSources.applicationSources(kind, appId).filter((source) => source.enabled === 1)
     if (sources.length === 0) return new Response(null, { status: 404 })
     return this.#receive(sources, request)
@@ -158,7 +151,7 @@ export class EventSourceRuntime {
     if (source == null || source.enabled != 1) return new Response(null, { status: 404 })
     let received
     try {
-      received = sourceReceipt.parse(
+      received = sourceReceiptSchema.parse(
         await this.#execute(
           source.kind,
           source.connectionId,
@@ -221,7 +214,7 @@ export class EventSourceRuntime {
     if (source.enabled != 1) throw new PermanentIntegrationError('Enable the event source before publishing.')
     let subscriptions: readonly ResourceSubscription[]
     try {
-      const prepared = preparedSource.parse(
+      const prepared = preparedSourceSchema.parse(
         await this.#execute(
           source.kind,
           source.connectionId,
@@ -340,7 +333,7 @@ export class EventSourceRuntime {
             verifiedAt: active ? this.#clock() : null,
           },
         }
-        const inspected = sourceResult.parse(
+        const inspected = sourceResultSchema.parse(
           await this.#execute(
             source.kind,
             source.connectionId,
@@ -367,7 +360,7 @@ export class EventSourceRuntime {
 
   async #hydrate(source: StoredEventSource): Promise<StoredEventSource> {
     if (source.state.projection != null) return source
-    const inspected = sourceResult.parse(
+    const inspected = sourceResultSchema.parse(
       await this.#execute(
         source.kind,
         source.connectionId,
@@ -376,9 +369,10 @@ export class EventSourceRuntime {
         this.#operatorContext(source.provider, source.teamId ?? undefined),
       ),
     )
-    if (!this.#store.eventSources.saveState(source, inspected.source.state))
-      throw new TransientIntegrationError('The source changed during protocol initialization.')
-    return this.#store.eventSources.get(source.sourceId)!
+    this.#store.eventSources.saveState(source, inspected.source.state)
+    const current = this.#store.eventSources.get(source.sourceId)
+    if (current == null) throw new TransientIntegrationError('The source was deleted during protocol initialization.')
+    return current
   }
 
   #resourceState(source: SourceConfiguration, status: 'pending' | 'error', message: string): SourceConfiguration['state'] {

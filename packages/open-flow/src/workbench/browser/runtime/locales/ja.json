@@ -1419,7 +1419,20 @@
       "pending": "Webhook の作成または更新中",
       "ready": "Webhook は有効です",
       "error": "Webhook を利用できません。接続を確認して公開を再試行してください"
-    }
+    },
+    "accountIdentity": "接続アカウント識別子",
+    "appId": "アプリ ID",
+    "slackAppId": "Slack アプリ ID",
+    "integrationId": "インテグレーション UUID",
+    "developerAppId": "開発者アプリ ID",
+    "organizationId": "組織 ID / スラッグ",
+    "installationId": "インストール UUID",
+    "workspaceId": "ワークスペース ID",
+    "verificationToken": "検証トークン",
+    "signingSecret": "署名シークレット",
+    "webhookSecret": "Webhook シークレットトークン",
+    "encryptKey": "暗号化キー",
+    "clientSecret": "クライアントシークレット"
   },
   "connectionUsage": {
     "title": "接続の概要",

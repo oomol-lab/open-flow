@@ -166,6 +166,24 @@ describe('shareable workflow files', () => {
     expect(parseWorkflowFile(encodeWorkflowFile(original))).toEqual(file)
     expect(decodeRevision(encodeRevision(file.content))).toEqual(file.content)
   })
+  it('clears Jira deployment references on export and import', () => {
+    const file = fixture()
+    const trigger: GraphNode = {
+      kind: 'integration',
+      name: 'Jira',
+      definition: {
+        ...definition,
+        key: 'jira.on_issue_event',
+        type: 'integration',
+        endpoint: { methods: ['POST'], successStatus: 200, body: { formats: ['json'], allowArray: false, allowEmpty: false } },
+      },
+      config: { sourceId: value('source_' + 'a'.repeat(32)), eventTypes: { kind: 'value', value: ['jira:issue_created'] } },
+    }
+    const original = { ...file, content: { ...file.content, document: { ...file.content.document, graph: { nodes: { trigger }, edges: [] } } } }
+    const exported = parseWorkflowFile(encodeWorkflowFile(original))
+    expect(exported.content.document.graph.nodes.trigger).toMatchObject({ config: { sourceId: { kind: 'unset' }, eventTypes: { kind: 'unset' } } })
+    expect(cleanWorkflowFile(original).file).toEqual(exported)
+  })
   it('clears account-dependent Linear selections without discarding other trigger config', () => {
     const file = fixture()
     const trigger: GraphNode = {

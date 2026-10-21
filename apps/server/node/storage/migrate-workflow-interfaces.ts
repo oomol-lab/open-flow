@@ -101,7 +101,31 @@ export function migrateWorkflowInterfaces(database: DatabaseSync): void {
       if (row.status == 'pending') throw new Error(`Cannot migrate pending publication: Revision ${revisionId} is missing.`)
       continue
     }
-    const content = read(revisionId)
+    let content: RevisionContent
+    try {
+      content = read(revisionId)
+    } catch (error) {
+      if (
+        !(error instanceof TypeError) ||
+        ![
+          'Independent Task definitions are no longer supported.',
+          'Task references are no longer supported.',
+          'Subflows are no longer supported.',
+          'Subflow nodes are no longer supported.',
+        ].includes(error.message)
+      )
+        throw error
+      if (row.status === 'pending') {
+        database
+          .prepare("UPDATE publish_operations SET status = 'failed', issue_code = 'flow.invalid', issue_message = ?, updated_at = ? WHERE operation_id = ?")
+          .run(error.message, Date.now(), row.operation_id!)
+        database
+          .prepare("UPDATE integration_candidates SET status = 'cleanup', next_at = ?, updated_at = ? WHERE operation_id = ?")
+          .run(Date.now(), Date.now(), row.operation_id!)
+        database.prepare('DELETE FROM poll_candidates WHERE operation_id = ?').run(row.operation_id!)
+      }
+      continue
+    }
     const upgraded = {
       ...input,
       content: stored.content,

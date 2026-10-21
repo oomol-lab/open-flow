@@ -48,6 +48,7 @@ import {
 import { remapInputMappings, renamedPort, renameOutputMapping } from '../../../../flow/common/portChanges.ts'
 import { renamePromptInput } from '../../../../flow/common/promptTemplate.ts'
 import { valueForEditor } from '../../../../form/common/editorComponent.ts'
+import catalog from '../../../../trigger/providers/catalog.generated.json' with { type: 'json' }
 import { withWorkflowTask } from '../../../../workflow/common/workflow.ts'
 import { feishuResourceKind, supportsFeishuChatFilter } from './feishuEventConfig.ts'
 
@@ -61,14 +62,7 @@ export function setTriggerEventSource(revision: RevisionView, triggerId: string,
   const trigger = revision.graph().nodes[triggerId]
   if (
     trigger?.kind != 'integration' ||
-    ![
-      'feishu_app_bot.on_event',
-      'slackbot.on_event',
-      'intercom.on_conversation_event',
-      'sentry.on_issue_alert',
-      'zoom.on_recording_ready',
-      'fireflies.on_meeting_ready',
-    ].includes(trigger.definition.key) ||
+    !catalog.some((entry) => entry.snapshot.key === trigger.definition.key && 'eventSource' in entry) ||
     source.provider != trigger.definition.provider
   )
     return
@@ -79,9 +73,13 @@ export function setTriggerEventSource(revision: RevisionView, triggerId: string,
   return [
     ...changes,
     ...(changeTriggerConfig(content, triggerId, 'sourceId', source.sourceId) ?? []),
-    ...(changed ? (changeTriggerConfig(content, triggerId, 'eventTypes', undefined) ?? []) : []),
-    ...(changed ? (changeTriggerConfig(content, triggerId, 'resource', undefined) ?? []) : []),
-    ...(changed ? (changeTriggerConfig(content, triggerId, trigger.definition.provider === 'slackbot' ? 'channelIds' : 'chatIds', undefined) ?? []) : []),
+    ...(changed
+      ? trigger.definition.configInputs.flatMap((input) =>
+          'handle' in input && ['eventTypes', 'resource', 'chatIds', 'channelIds'].includes(input.handle)
+            ? (changeTriggerConfig(content, triggerId, input.handle, undefined) ?? [])
+            : [],
+        )
+      : []),
   ]
 }
 

@@ -6,7 +6,11 @@ import { matchesSchema } from '../../flow/common/schema.ts'
 /** Deployment-bound selections owned by the Trigger configuration contract. */
 export function clearTriggerExternalConfig(key: string, config: InputValues): InputValues {
   const fields =
-    key == 'intercom.on_conversation_event' || key == 'sentry.on_issue_alert' || key == 'zoom.on_recording_ready' || key == 'fireflies.on_meeting_ready'
+    key == 'jira.on_issue_event' ||
+    key == 'intercom.on_conversation_event' ||
+    key == 'sentry.on_issue_alert' ||
+    key == 'zoom.on_recording_ready' ||
+    key == 'fireflies.on_meeting_ready'
       ? ['sourceId', 'eventTypes']
       : key == 'slackbot.on_event'
         ? ['sourceId', 'eventTypes', 'channelIds']

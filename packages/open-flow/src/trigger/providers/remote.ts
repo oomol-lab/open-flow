@@ -125,7 +125,7 @@ function createDefinition(item: (typeof catalog)[number]): PollDefinition | Inte
         if (secret != null) {
           if (context.method !== 'POST' || !/^[a-fA-F0-9]{32,256}$/.test(secret))
             return { outcome: 'respond', status: 400, body: '', contentType: 'text/plain' }
-          // 握手必须先于 Connector 的创建请求返回；密钥只从受认证的创建响应保存。
+          // Acknowledge before Connector creation returns; persist the secret only from its authenticated response.
           return { outcome: 'respond', status: 200, body: '', contentType: 'text/plain', headers: { 'x-hook-secret': secret } }
         }
       }

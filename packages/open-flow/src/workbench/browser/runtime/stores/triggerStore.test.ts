@@ -3,6 +3,8 @@ import type { ConnectorConnection } from '../api.ts'
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it, vi } from 'vitest'
 import { inputValues } from '../../../../flow/common/inputValue.ts'
+import { resolveTriggerConfig } from '../../../../trigger/common/config.ts'
+import { integrationDefinitions } from '../../../../trigger/providers/definitions.ts'
 import { WorkbenchClient } from '../api.ts'
 import { createI18n } from '../i18n.ts'
 import { providerIcon } from '../providerIcon.ts'
@@ -313,6 +315,70 @@ describe('TriggerStore', () => {
     }
   })
 
+  it.each([
+    ['slackbot.on_event', 'app_mention'],
+    ['intercom.on_conversation_event', 'conversation.user.created'],
+    ['sentry.on_issue_alert', 'issue.alert'],
+    ['zoom.on_recording_ready', 'recording.completed'],
+    ['fireflies.on_meeting_ready', 'meeting.transcribed'],
+    ['jira.on_issue_event', 'jira:issue_created'],
+  ])('selects a source for %s without introducing foreign config fields', async (key, eventType) => {
+    const { workspace, triggers, request } = createSetup()
+    const definition = integrationDefinitions.find((item) => item.snapshot.key === key)!.snapshot
+    const original = request.getMockImplementation()!
+    request.mockImplementation(async (path, init) => {
+      const response = await original(path, init)
+      if (!path.endsWith('/editor')) return response
+      const data = await response.json()
+      data.draft.content.document.graph.nodes.linear = {
+        kind: 'integration',
+        name: 'Events',
+        definition,
+        connectionId: 'old-connection',
+        config: inputValues({ sourceId: 'old-source', eventTypes: [eventType] }),
+      }
+      return Response.json(data)
+    })
+    try {
+      await workspace.start(flow.flowId)
+      expect(
+        await workspace.nodes.setTriggerEventSource('linear', {
+          version: 1,
+          sourceId: 'source_0123456789abcdef0123456789abcdef',
+          revision: 1,
+          name: 'Events',
+          provider: definition.provider as 'slackbot',
+          appId: 'app',
+          connectionId: 'new-connection',
+          teamId: null,
+          enabled: true,
+          eventTypes: [eventType],
+          manageSubscriptions: false,
+          verificationTokenConfigured: false,
+          encryptKeyConfigured: false,
+          endpointUrl: null,
+          verifiedAt: null,
+          lastReceivedAt: null,
+          updatedAt: timestamp,
+          consumers: [],
+        }),
+      ).toBe(true)
+      await workspace.nodes.saveTriggerConfig('linear', 'eventTypes', [eventType])
+      const node = workspace.$.draft.value!.content.document.graph.nodes.linear!
+      if (node.kind !== 'integration') throw new Error('Expected integration')
+      expect(node.connectionId).toBe('new-connection')
+      expect(resolveTriggerConfig(node.definition.configInputs, node.config)).toMatchObject({
+        sourceId: 'source_0123456789abcdef0123456789abcdef',
+        eventTypes: [eventType],
+      })
+      expect(node.config).not.toHaveProperty('resource')
+      expect(node.config).not.toHaveProperty('chatIds')
+    } finally {
+      triggers.dispose()
+      workspace.dispose()
+    }
+  })
+
   it('keeps Feishu filters compatible when changing sources and event types', async () => {
     const { workspace, triggers, request } = createSetup()
     const original = request.getMockImplementation()!
@@ -322,10 +388,7 @@ describe('TriggerStore', () => {
       const data = await response.json()
       const node = data.draft.content.document.graph.nodes.linear
       node.kind = 'integration'
-      node.definition.type = 'integration'
-      node.definition.endpoint = { body: { formats: ['json'], allowArray: false, allowEmpty: false }, methods: ['POST'], successStatus: 200 }
-      node.definition.provider = 'feishu_app_bot'
-      node.definition.key = 'feishu_app_bot.on_event'
+      node.definition = integrationDefinitions.find((definition) => definition.snapshot.key === 'feishu_app_bot.on_event')!.snapshot
       node.config = inputValues({ sourceId: 'old-source', eventTypes: ['drive.file.edit_v1'], resource: { kind: 'document', id: 'doc' } })
       delete node.pollTimes
       return Response.json(data)

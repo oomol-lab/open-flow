@@ -1419,7 +1419,20 @@
       "pending": "Création ou renouvellement du webhook",
       "ready": "Webhook actif",
       "error": "Webhook indisponible. Vérifiez la connexion et réessayez la publication"
-    }
+    },
+    "accountIdentity": "Identité du compte connecté",
+    "appId": "ID de l’application",
+    "slackAppId": "ID de l’application Slack",
+    "integrationId": "UUID de l’intégration",
+    "developerAppId": "ID de l’application développeur",
+    "organizationId": "ID / identifiant de l’organisation",
+    "installationId": "UUID de l’installation",
+    "workspaceId": "ID de l’espace de travail",
+    "verificationToken": "Jeton de vérification",
+    "signingSecret": "Secret de signature",
+    "webhookSecret": "Jeton secret Webhook",
+    "encryptKey": "Clé de chiffrement",
+    "clientSecret": "Secret client"
   },
   "connectionUsage": {
     "title": "Vue d’ensemble des connexions",

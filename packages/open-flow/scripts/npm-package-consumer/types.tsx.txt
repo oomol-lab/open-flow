@@ -19,7 +19,7 @@ import type { OpenFlowWorkbenchHandle, WorkbenchImportInput, WorkbenchHost, Work
 
 import { ControlClient, liveEntries } from '@oomol-lab/open-flow/control-api'
 import { controlRequests } from '@oomol-lab/open-flow/control-requests'
-import { eventSourceDefinition, sourceReady } from '@oomol-lab/open-flow/event-source'
+import { eventSourceDefinition, sourceReady, sourceResultSchema, preparedSourceSchema, sourceReceiptSchema } from '@oomol-lab/open-flow/event-source'
 import { encodeWorkflowFile, decodeWorkflowFile, cleanWorkflowFile } from '@oomol-lab/open-flow/flow-encoding'
 import { matchesTriggerOutputs, triggerOutputDefinitions, triggerOutputPorts } from '@oomol-lab/open-flow/flow-semantics'
 import { resolveUiLanguage } from '@oomol-lab/open-flow/localization'
@@ -164,6 +164,9 @@ const sourceDefinition = eventSourceDefinition('feishu')
 const sourceConfig: SourceConfiguration = { identity: 'installation', eventTypes: [], config: {}, secrets: {}, state: {} }
 void sourceDefinition.triggerId
 void sourceReady(sourceConfig)
+void sourceResultSchema.safeParse({ source: sourceConfig })
+void preparedSourceSchema.safeParse({ source: sourceConfig, subscriptions: [] })
+void sourceReceiptSchema.parse({ response: { status: 200, body: "", headers: {} } })
 const manual = { kind: 'manual', name: 'Manual' } as const
 export const validOutputs: boolean = matchesTriggerOutputs(manual, {})
 void triggerOutputDefinitions(manual)

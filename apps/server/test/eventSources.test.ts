@@ -262,7 +262,8 @@ it('discards older ordered events and retains the deduplication decision after a
   expect(context.service.control.runs.listRuns(flowId, 20).page.runs).toHaveLength(2)
 })
 
-it('hydrates a persisted source once after upgrade without changing its identity or revision', async () => {
+it.each(['normal', 'failure', 'update'])('hydrates persisted sources without losing availability or concurrent edits (%s)', async (scenario) => {
+  const failFirst = scenario === 'failure'
   const directory = await mkdtemp(join(tmpdir(), 'source-protocol-upgrade-'))
   const file = join(directory, 'server.sqlite')
   const actions: string[] = []
@@ -273,6 +274,15 @@ it('hydrates a persisted source once after upgrade without changing its identity
     trigger: async (_provider, _connection, _trigger, request) => {
       if (request.operation !== 'source') throw new Error('Unexpected operation')
       actions.push(request.request.action)
+      if (request.request.action === 'inspect' && failFirst && actions.filter((action) => action === 'inspect').length === 1)
+        throw new Error('Connector unavailable')
+      if (request.request.action === 'inspect' && scenario === 'update') {
+        const database = new DatabaseSync(file)
+        database
+          .prepare("UPDATE event_sources SET revision = revision + 1, name = 'Concurrent edit', state_json = ?")
+          .run(JSON.stringify((sourceProtocolFixture(request.request) as { source: { state: unknown } }).source.state))
+        database.close()
+      }
       return sourceProtocolFixture(request.request)
     },
   })
@@ -289,6 +299,12 @@ it('hydrates a persisted source once after upgrade without changing its identity
     database.close()
     service = await openService(file, options)
     app = createServerApp(service, { resolveControlActor: () => 'operator' })
+    if (failFirst) {
+      const response = await app.request('/v1/event-sources')
+      expect(response.status).toBe(200)
+      const result = decodeEventSources(await response.json())
+      expect(result.sources[0]).toMatchObject({ sourceId: original.sourceId, appId: null, manageSubscriptions: null, lastError: expect.any(String) })
+    }
     for (let attempt = 0; attempt < 2; attempt++) {
       const response = await app.request('/v1/event-sources')
       expect(response.status).toBe(200)
@@ -296,11 +312,21 @@ it('hydrates a persisted source once after upgrade without changing its identity
       expect(body).not.toContain(input.verificationToken)
       expect(body).not.toContain(input.encryptKey)
       const listed = JSON.parse(body)
-      expect(listed.sources[0]).toMatchObject({ sourceId: original.sourceId, revision: original.revision, endpointUrl: original.endpointUrl })
+      expect(listed.sources[0]).toMatchObject({
+        sourceId: original.sourceId,
+        revision: scenario === 'update' ? original.revision + 1 : original.revision,
+        endpointUrl: original.endpointUrl,
+      })
     }
-    expect(actions).toEqual(['initialize', 'inspect'])
+    expect(actions).toEqual(failFirst ? ['initialize', 'inspect', 'inspect'] : ['initialize', 'inspect'])
   } finally {
     await closeService(service)
     await rm(directory, { recursive: true, force: true })
   }
+})
+
+it.each(['feishu', 'fireflies', 'jira', 'unknown'])('rejects application ingress for %s', async (kind) => {
+  const { app } = await setup()
+  const response = await app.request(`/v1/event-source-apps/${kind}/cli_test/events`, delivery({ verify: true }))
+  expect(response.status).toBe(404)
 })

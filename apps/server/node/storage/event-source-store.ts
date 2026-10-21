@@ -282,18 +282,20 @@ export class EventSourceStore {
   }
 
   saveState(source: StoredEventSource, state: SourceConfiguration['state']): boolean {
-    if (eventSourceDefinition(source.kind).applicationIngress) {
-      const current = this.get(source.sourceId)
-      if (current == null || current.revision !== source.revision) return false
-      this.#database
-        .prepare('UPDATE event_source_apps SET verified_at = ? WHERE kind = ? AND app_id = ?')
-        .run(typeof state.verifiedAt === 'number' ? state.verifiedAt : null, source.kind, String(source.config.appId))
-    }
-    return (
-      this.#database
-        .prepare('UPDATE event_sources SET state_json = ? WHERE source_id = ? AND revision = ?')
-        .run(JSON.stringify(state), source.sourceId, source.revision).changes == 1
-    )
+    return this.#transaction(() => {
+      if (eventSourceDefinition(source.kind).applicationIngress) {
+        const current = this.get(source.sourceId)
+        if (current == null || current.revision !== source.revision) return false
+        this.#database
+          .prepare('UPDATE event_source_apps SET verified_at = ? WHERE kind = ? AND app_id = ?')
+          .run(typeof state.verifiedAt === 'number' ? state.verifiedAt : null, source.kind, String(source.config.appId))
+      }
+      return (
+        this.#database
+          .prepare('UPDATE event_sources SET state_json = ? WHERE source_id = ? AND revision = ?')
+          .run(JSON.stringify(state), source.sourceId, source.revision).changes == 1
+      )
+    })
   }
 
   private targets(source: StoredEventSource) {

@@ -111,7 +111,7 @@ in Connector, Agent tools/notifications, Code capabilities (including supported 
 forms), and Triggers. Action declarations remain. Variable bindings and their input
 sources are removed; mixed sources retain node outputs, and an input without sources
 becomes unset. Condition operands follow the same rule. Error Trigger source Flow lists
-are emptied. Feishu event source and dependent event/resource/chat selections and Linear
+are emptied. Shared event source IDs and event selections (including Jira), Feishu resource/chat filters, Slack channel filters, and Linear
 team/state selections become unset under their Trigger configuration contracts.
 
 Node and Module IDs, edges, shared Module relationships, ports, code, prompts, fixed
@@ -807,21 +807,39 @@ Clearing writes `unset`; resetting removes the override. Forms preserve unset st
 
 ### Event source management
 
-Event sources are deployment resources. Creation currently supports `feishu_app_bot` apps. Management reuses Control API authentication. Responses contain no Verification Token or Encrypt Key. `teamId` is an explicit Connector Team identity; deployments without Teams use `null`. `flowId` expresses Flow scope and cannot be replaced by Team identity.
+Event sources are deployment resources. Supported kinds are `feishu`, `slack`, `intercom`, `sentry`, `zoom`, `fireflies`, and `jira`. Management reuses Control API authentication. Responses never contain plaintext secrets. `teamId` is an explicit Connector Team identity; deployments without Teams use `null`. `flowId` expresses Flow scope and cannot be replaced by Team identity.
 
-| Method   | Route                           | Request                            | Success                                                  |
-| -------- | ------------------------------- | ---------------------------------- | -------------------------------------------------------- |
-| `GET`    | `/v1/event-sources`             | Optional `flowId` query            | `200 { version: 1, sources: EventSource[], teamId? }`    |
-| `GET`    | `/v1/event-sources/connections` | Optional `teamId` query            | `200 { version: 1, connections: ConnectorConnection[] }` |
-| `POST`   | `/v1/event-sources`             | `CreateEventSource`                | `201 EventSource`                                        |
-| `PUT`    | `/v1/event-sources/:sourceId`   | `UpdateEventSource`                | `200 EventSource`                                        |
-| `DELETE` | `/v1/event-sources/:sourceId`   | `{ version: 1, expectedRevision }` | `200 { version: 1 }`                                     |
+| Method   | Route                                       | Request                                               | Success                                                  |
+| -------- | ------------------------------------------- | ----------------------------------------------------- | -------------------------------------------------------- |
+| `GET`    | `/v1/event-sources`                         | Optional `flowId` query                               | `200 { version: 1, sources: EventSource[], teamId? }`    |
+| `GET`    | `/v1/event-sources/connections`             | Optional `teamId` and `kind` query (default `feishu`) | `200 { version: 1, connections: ConnectorConnection[] }` |
+| `POST`   | `/v1/event-sources`                         | `CreateEventSource`                                   | `201 EventSource`                                        |
+| `PUT`    | `/v1/event-sources/:sourceId`               | `UpdateEventSource`                                   | `200 EventSource`                                        |
+| `DELETE` | `/v1/event-sources/:sourceId`               | `{ version: 1, expectedRevision }`                    | `200 { version: 1 }`                                     |
+| `POST`   | `/v1/event-sources/:sourceId/events`        | Provider callback                                     | Provider-specific response                               |
+| `POST`   | `/v1/event-source-apps/:kind/:appId/events` | Shared application callback                           | Provider-specific response                               |
 
-`CreateEventSource` is `{ version: 1, name, connectionId, teamId: string | null, verificationToken, encryptKey, eventTypes: string[], manageSubscriptions: boolean }`. `UpdateEventSource` is `{ version: 1, expectedRevision, name, enabled: boolean, eventTypes: string[], verificationToken?, encryptKey? }`; omitted secrets retain existing values. Updates cannot change Connection, Team, or app identity. Creation rejects caller-supplied `appId` or `provider`; the selected active Connection supplies identity.
+Callback routes authenticate through Connector-owned Provider signature/challenge verification, not Control API credentials. Application ingress is supported only for Slack, Intercom, Sentry, and Zoom. Other or unknown kinds return 404. Use the returned `endpointUrl`; do not construct callback URLs from account identities.
 
-Requests reject extra fields. Trimmed `name` permits 1–128 characters; Connection/Team IDs and secrets permit 1–256 characters. `eventTypes` contains 1–200 distinct values matching `^[a-z][a-z0-9_.]{0,127}$`. `expectedRevision` is a positive integer. Invalid requests return `400 event-source.invalid`; unavailable trusted app identity returns `409 event-source.identity-unavailable`.
+`CreateEventSource` has common fields `{ version: 1, kind, name, connectionId, teamId: string | null, eventTypes: string[] }` and the following kind-specific fields:
 
-`EventSource` is `{ version: 1, sourceId, revision, name, provider, appId, connectionId, teamId, enabled, eventTypes, manageSubscriptions, verificationTokenConfigured, encryptKeyConfigured, endpointUrl, verifiedAt, lastReceivedAt, updatedAt, consumers }`. `provider` is `feishu` or `feishu_app_bot`; `endpointUrl`, `verifiedAt`, and `lastReceivedAt` may be `null`. `consumers` is `{ flowId, flowName, triggerNodeId }[]`. Only the two `*Configured` booleans expose secret status, never plaintext.
+| Kind                            | Additional fields                                                 | Connection provider |
+| ------------------------------- | ----------------------------------------------------------------- | ------------------- |
+| `feishu` (default when omitted) | `verificationToken`, `encryptKey`, `manageSubscriptions: boolean` | `feishu_app_bot`    |
+| `slack`                         | `appId`, `workspaceId`, `signingSecret`                           | `slackbot`          |
+| `intercom`                      | `appId`, `signingSecret`                                          | `intercom`          |
+| `sentry`                        | `appId`, `installationId`, `organizationId`, `signingSecret`      | `sentry`            |
+| `zoom`                          | `appId`, `signingSecret`                                          | `zoom`              |
+| `fireflies`                     | `signingSecret`                                                   | `fireflies`         |
+| `jira`                          | `project`                                                         | `jira`              |
+
+Connector validates the selected active Connection, account identity, and Provider-specific configuration. App identity and Connection account identity are distinct. `UpdateEventSource` is `{ version: 1, expectedRevision, name, enabled: boolean, eventTypes: string[], verificationToken?, encryptKey?, signingSecret? }`; omitted secrets retain existing values. Updates cannot change Connection, Team, or app identity.
+
+Requests reject extra fields. Trimmed `name` permits 1–128 characters; Connection/Team IDs and secrets permit 1–256 characters. `eventTypes` contains 1–200 distinct values matching `^[a-z][a-z0-9_.:]{0,127}$`. `expectedRevision` is a positive integer. Invalid requests return `400 event-source.invalid`; unavailable trusted identity returns `409 event-source.identity-unavailable`.
+
+`EventSource` is `{ version: 1, sourceId, revision, name, provider, appId, connectionId, teamId, enabled, eventTypes, manageSubscriptions, verificationTokenConfigured, encryptKeyConfigured, endpointUrl, verifiedAt, lastReceivedAt, updatedAt, consumers }`. `provider` is `feishu`, `feishu_app_bot`, `slackbot`, `intercom`, `sentry`, `zoom`, `fireflies`, or `jira`. `endpointUrl`, `verifiedAt`, and `lastReceivedAt` may be `null`. `consumers` is `{ flowId, flowName, triggerNodeId }[]`. Provider projections can additionally include `workspaceId`, `installationId`, `organizationId`, `projectId`, `projectKey`, `signingSecretConfigured`, `subscriptionStatus` (`idle | pending | ready | error`), and `lastError`. The `*Configured` fields expose only secret status.
+
+Legacy sources without a Connector projection are inspected concurrently on list reads. Failure for one source does not hide other sources: that source remains visible with `appId`, `manageSubscriptions`, `verificationTokenConfigured`, and `encryptKeyConfigured` set to `null`, and an explanatory `lastError`. These nulls mean unknown. A later list retries inspection; an unprojected source is not ready for publication. Hydration never overwrites a concurrent configuration revision.
 
 Lists with `flowId` first verify the Flow, then return only sources in its Team and always include `teamId`, possibly `null`. Missing Flows return `404 flow.not-found`. Without `flowId`, lists return sources visible to the management identity. Connection lists use explicit Team scope. If Team selection is required, do not silently choose another Team.
 
@@ -1034,7 +1052,7 @@ Leina notifications use the existing `connector` authoring type with `config: { 
 
 Authorization pages are an exception: `POST /v1/connector/connections/:serviceId/page` accepts optional, mutually exclusive `flowId` or `teamId`. Independent event-source forms use `teamId`, which must be accessible to the current Connector identity and does not modify an existing Flow’s Team. For OOMOL-hosted Connector, Server resolves Team names and builds `https://console.oomol.com/team/:teamName/connections/:serviceId` (using `.dev` in development). Omitting both selects the identity’s default Team. Hosted entry points derive from supported runtime domains, ignoring self-hosted Console settings. Self-hosted Connector uses its explicit Console origin and `/providers/:serviceId`. Missing Console origins return `503 connector.console-unconfigured`, separate from request failure `connector.unavailable`. Clients should prompt for a Console URL.
 
-`POST /v1/event-sources` obtains Feishu app identity from the selected active Connection. Missing trusted App IDs return `409 event-source.identity-unavailable`. Sources are app-scoped, not tenant-bound. Creation neither queries tenant information nor requires `tenant:tenant:readonly`. Responses omit `tenantKey`. Event receipt validates encrypted content, Verification Token, signature, and App ID. Event `tenant_key` remains Trigger output, not a tenant-matching input.
+For `kind: "feishu"`, `POST /v1/event-sources` obtains app identity from the selected active Connection. Missing trusted App IDs return `409 event-source.identity-unavailable`. Sources are app-scoped, not tenant-bound. Creation neither queries tenant information nor requires `tenant:tenant:readonly`. Responses omit `tenantKey`. Event receipt validates encrypted content, Verification Token, signature, and App ID. Event `tenant_key` remains Trigger output, not a tenant-matching input.
 
 `GET /v1/connector/connections` returns `{ version: 1, connections: ConnectorConnection[] }` with the same Flow scope checks as service-specific reads. Provider lists accept optional `locale`, otherwise resolve `Accept-Language`, and return `Content-Language` and `Vary: Accept-Language`. Workbench includes UI language in Provider URLs and persists responses/ETags per language. Deployments forward that language upstream, including app names in Actions. Providers describe only the app catalog. Panels load Connections separately and derive app ordering from active Connections in the display layer.
 

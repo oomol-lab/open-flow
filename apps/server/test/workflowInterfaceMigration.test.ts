@@ -239,6 +239,30 @@ it.each([false, true])('snapshots historical Task revisions without rewriting th
   }
 })
 
+it.each(['pending', 'failed'] as const)('preserves historical Task revisions with %s publication operations', async (status) => {
+  const { file, store, seed, closeLegacy } = await fixture()
+  const historical = seed(
+    'historical',
+    {
+      tasks: { shared: { name: 'Historical task' } },
+      bindings: {},
+      graph: { nodes: { task: { kind: 'task', name: 'Task', taskId: 'shared' } }, edges: [] },
+    },
+    5,
+  )
+  const accepted = store.publications.acceptPublishOperation(historical)
+  if (accepted.kind !== 'accepted') throw new Error('Expected accepted operation')
+  if (status === 'failed') store.publications.failPublishOperation(accepted.operation.operationId, { code: 'flow.invalid', message: 'Historical failure' })
+  closeLegacy()
+  const upgraded = Database.open(file)
+  try {
+    expect(upgraded.connection.prepare('SELECT status FROM publish_operations').get()).toEqual({ status: 'failed' })
+    expect(new RevisionStore(upgraded.connection).read('historical')).toMatchObject({ content: historical.content, digest: historical.revisionDigest })
+  } finally {
+    upgraded.close()
+  }
+})
+
 it.each(['conflict', 'orphan', 'missing-revision', 'bad-digest', 'bad-delta'])(
   'rolls back the entire upgrade on %s without changing data or schema',
   async (problem) => {

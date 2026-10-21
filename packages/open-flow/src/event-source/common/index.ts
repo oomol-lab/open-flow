@@ -29,6 +29,15 @@ export function sourceReady(source: SourceConfiguration, now = Date.now()): bool
 }
 
 export function sourceView(source: SourceConfiguration, now = Date.now()): z.infer<typeof eventSourceViewSchema> {
+  if (source.state.projection == null)
+    return {
+      appId: null,
+      manageSubscriptions: null,
+      verificationTokenConfigured: null,
+      encryptKeyConfigured: null,
+      verifiedAt: null,
+      lastError: 'Source details are unavailable. Restore Connector access and refresh to retry.',
+    }
   const projection = projectionSchema.parse(source.state.projection)
   const expired = projection.expiresAt != null && projection.expiresAt <= now
   return {
@@ -36,3 +45,25 @@ export function sourceView(source: SourceConfiguration, now = Date.now()): z.inf
     ...(expired ? { subscriptionStatus: 'error', lastError: 'The source subscription expired. Restore Connector access and retry publication.' } : {}),
   }
 }
+
+export const sourceResultSchema = z.object({ source: sourceConfigurationSchema })
+export const preparedSourceSchema = sourceResultSchema.extend({ subscriptions: z.array(z.object({ key: z.string(), config: jsonObject })) })
+export const sourceReceiptSchema = z
+  .object({
+    source: sourceConfigurationSchema.optional(),
+    response: z.object({ status: z.number().int().min(200).max(599), body: z.string(), headers: z.record(z.string(), z.string()) }).optional(),
+    event: z
+      .object({
+        id: z.string().min(1),
+        type: z.string().min(1),
+        payload: jsonObject,
+        matches: z.array(z.string()),
+        ordering: z.object({ key: z.string(), version: z.number() }).optional(),
+      })
+      .optional(),
+  })
+  .refine((value) => (value.response == null) !== (value.event == null))
+
+export type SourceResult = z.infer<typeof sourceResultSchema>
+export type PreparedSource = z.infer<typeof preparedSourceSchema>
+export type SourceReceipt = z.infer<typeof sourceReceiptSchema>

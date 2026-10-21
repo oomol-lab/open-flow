@@ -1419,7 +1419,20 @@
       "pending": "Создание или продление вебхука",
       "ready": "Вебхук активен",
       "error": "Вебхук недоступен. Проверьте подключение и повторите публикацию"
-    }
+    },
+    "accountIdentity": "Идентификатор подключённого аккаунта",
+    "appId": "ID приложения",
+    "slackAppId": "ID приложения Slack",
+    "integrationId": "UUID интеграции",
+    "developerAppId": "ID приложения разработчика",
+    "organizationId": "ID / имя организации",
+    "installationId": "UUID установки",
+    "workspaceId": "ID рабочего пространства",
+    "verificationToken": "Токен проверки",
+    "signingSecret": "Секрет подписи",
+    "webhookSecret": "Секретный токен Webhook",
+    "encryptKey": "Ключ шифрования",
+    "clientSecret": "Секрет клиента"
   },
   "connectionUsage": {
     "title": "Обзор подключений",

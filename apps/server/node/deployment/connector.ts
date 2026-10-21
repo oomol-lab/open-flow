@@ -479,14 +479,11 @@ export class ConnectorClient implements ConnectorHost {
     )
       throw connectionRequired()
     if (record(response.value) && response.value.errorCode === 'trigger_quota_exceeded')
-      throw new ConnectorTaskError(
-        'connector.input-invalid',
-        'Jira webhook quota is full (five per app, user and site). Remove an unused subscription, then retry publication.',
-      )
+      throw new ConnectorTaskError('connector.input-invalid', 'The provider webhook quota is full. Remove an unused subscription, then retry publication.')
     if (record(response.value) && response.value.errorCode === 'trigger_subscription_uncertain')
       throw new ConnectorTaskError(
         'connector.input-invalid',
-        'Jira webhook creation has an uncertain outcome. Check the existing remote webhook before retrying; do not create another event source.',
+        'Webhook creation has an uncertain outcome. Check the existing remote webhook before retrying; do not create another event source.',
       )
     if (record(response.value) && ['invalid_input', 'trigger_not_found'].includes(String(response.value.errorCode)) && response.status != 409)
       throw new ConnectorTaskError('connector.input-invalid', 'The Trigger operation configuration is invalid.')

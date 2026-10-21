@@ -246,7 +246,9 @@ export function SourceForm({
   const t = useTranslate()
   const [kind, setKind] = useState<EventSourceKind>(source == null ? (sourceKind ?? 'feishu') : eventSourceKind(source.provider))
   const presentation = eventSourcePresentations[kind]
-  const [applicationId, setApplicationId] = useState(source != null && source.provider !== 'feishu' && source.provider !== 'feishu_app_bot' ? source.appId : '')
+  const [applicationId, setApplicationId] = useState(
+    source != null && source.provider !== 'feishu' && source.provider !== 'feishu_app_bot' ? (source.appId ?? '') : '',
+  )
   const [organizationId, setOrganizationId] = useState(source?.organizationId ?? '')
   const [installationId, setInstallationId] = useState(source?.installationId ?? '')
   const [project, setProject] = useState(source?.projectKey ?? '')
@@ -469,7 +471,7 @@ export function SourceForm({
           )}
           {identified && (
             <p className="m-0 text-xs text-muted-foreground">
-              App ID: <code>{appId}</code>
+              {t(source == null ? 'eventSources.accountIdentity' : 'eventSources.appId')}: <code>{appId}</code>
             </p>
           )}
         </>
@@ -477,7 +479,9 @@ export function SourceForm({
         <>
           <div className="rounded-md bg-muted p-3 text-xs leading-5">
             <p className="m-0 font-medium">{connection?.displayName ?? source?.name}</p>
-            <p className="m-0 break-all">App ID: {appId}</p>
+            <p className="m-0 break-all">
+              {t(source == null ? 'eventSources.accountIdentity' : 'eventSources.appId')}: {appId}
+            </p>
           </div>
           <Label className="flex flex-col items-stretch gap-2">
             {t('eventSources.name')}
@@ -495,7 +499,7 @@ export function SourceForm({
           {kind !== 'feishu' && kind !== 'fireflies' && kind !== 'jira' && source == null && (
             <div className="grid gap-4 sm:grid-cols-2">
               <Label className="flex flex-col items-stretch gap-2">
-                {kind === 'slack' ? 'Slack App ID' : kind === 'sentry' ? 'Integration UUID' : 'Developer App ID'}
+                {t(kind === 'slack' ? 'eventSources.slackAppId' : kind === 'sentry' ? 'eventSources.integrationId' : 'eventSources.developerAppId')}
                 <Input
                   required
                   pattern={kind === 'slack' ? 'A[A-Z0-9]+' : undefined}
@@ -506,19 +510,19 @@ export function SourceForm({
               </Label>
               {kind === 'sentry' && (
                 <Label className="flex flex-col items-stretch gap-2">
-                  Organization ID / slug
+                  {t('eventSources.organizationId')}
                   <Input required value={organizationId} onChange={(event) => setOrganizationId(event.target.value)} disabled={pending} />
                 </Label>
               )}
               {kind === 'sentry' && (
                 <Label className="flex flex-col items-stretch gap-2">
-                  Installation UUID
+                  {t('eventSources.installationId')}
                   <Input required value={installationId} onChange={(event) => setInstallationId(event.target.value)} disabled={pending} />
                 </Label>
               )}
               {kind === 'slack' && (
                 <Label className="flex flex-col items-stretch gap-2">
-                  Workspace ID
+                  {t('eventSources.workspaceId')}
                   <Input required pattern="T[A-Z0-9]+" value={workspaceId} onChange={(event) => setWorkspaceId(event.target.value)} disabled={pending} />
                 </Label>
               )}
@@ -535,7 +539,7 @@ export function SourceForm({
               {kind === 'feishu' && (
                 <Label className="flex flex-col items-stretch gap-2">
                   <span>
-                    Verification Token{' '}
+                    {t('eventSources.verificationToken')}{' '}
                     <span className="font-normal text-muted-foreground">{t(source == null ? 'eventSources.required' : 'eventSources.optional')}</span>
                   </span>
                   <Input
@@ -551,7 +555,7 @@ export function SourceForm({
               )}
               <Label className="flex flex-col items-stretch gap-2">
                 <span>
-                  {presentation.secret}{' '}
+                  {t(presentation.secret)}{' '}
                   <span className="font-normal text-muted-foreground">{t(source == null ? 'eventSources.required' : 'eventSources.optional')}</span>
                 </span>
                 <Input

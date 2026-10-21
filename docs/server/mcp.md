@@ -181,7 +181,7 @@ Agent tool arguments also accept only name-indexed `model`, `value`, or `input` 
 
 `trigger_search({ query? })` replaces `trigger_list`. Without query, it lists all available definition summaries; with query, it performs case-insensitive matching. Read Trigger instances already in a Flow through `flow_read`. Connector and Trigger search queries permit 1–256 characters.
 
-Event sources are deployment resources independent of Flows. `event_source_list({})` lists sources visible to the current identity; each item’s `consumers` shows actual usage. When configuring a Feishu Trigger, use `connector_connections({ serviceId: "feishu_app_bot", flowId })` to match its Connection.
+Event sources are deployment resources independent of Flows. `event_source_list({})` lists sources visible to the current identity; each item’s `consumers` shows actual usage. When configuring a shared-source Trigger, match its source Connection using `connector_connections({ serviceId, flowId })`. Use the source provider: `feishu_app_bot`, `slackbot`, `intercom`, `sentry`, `zoom`, `fireflies`, or `jira`. Select a source in the Flow’s Team with the required event types and a verified callback (or a ready managed subscription for Jira); create and verify missing sources in Workbench.
 
 If the list is empty, the tool instructs the caller to create and verify an event source in Workbench before querying again. Tools neither accept nor return event source secrets. Returned `sourceId`, `teamId`, `connectionId`, `eventTypes`, `enabled`, and `verifiedAt` support selection and confirmation.
 

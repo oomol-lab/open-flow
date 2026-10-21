@@ -19,7 +19,7 @@ export const mcpInstructions =
   'Keep generated Flow and node names short enough to scan on the canvas. Aim for 2–4 English words or 4–8 Chinese characters, using the user\'s language unless the workflow has an established naming language. Name a Flow by its main purpose and a node by its action and object, such as "AI Trend Digest", "Fetch trends", "Verify sources", or "发布文章". Keep only qualifiers needed to distinguish similar nodes. Put detailed behavior in descriptions; avoid sentences, repeated workflow context, and obscure abbreviations. Preserve names explicitly supplied by the user, and do not rename unrelated existing nodes. ' +
   'Use flow_list, flow_read and flow_search to inspect root workflows. Read node type schemas with flow_schema. Use flow_edit with the observed baseRevision and a stable requestId. Node edits affect only the selected node. Text edits require exactly one match. Execution edges and input sources are independent. Legacy Subflow content is unsupported. Edits can save incomplete drafts; inspect returned diagnostics and use flow_check before running. ' +
   'Use flow_check before flow_run. Select an explicit Trigger node ID and fixed revision or publication. A new Flow has no Trigger until you add one. ' +
-  'Before adding a Feishu Trigger, use event_source_list and compare its Connection IDs with connector_connections in the Flow scope. If no source is available, create and verify one in Workbench. ' +
+  'Before adding a shared-source Trigger (Feishu, Slack Bot, Intercom, Sentry, Zoom, Fireflies, or Jira), use event_source_list and compare its Connection IDs with connector_connections in the Flow scope. If no source is available, create and verify one in Workbench. ' +
   'Use flow_publish to publish a fixed Revision, then poll flow_publish_status until succeeded or failed. Use flow_live to inspect current online entries after publication. Use flow_set_enabled to enable or disable the observed Live publication. ' +
   'flow_run returns an accepted Run, not its final result. Find Runs with run_list, poll run_get and use run_result after terminal. Resolve a waiting Run only with an explicit run_resolve_wait action allowed by run_get. ' +
   'Use run_results and run_result_read to inspect stored Agent tool results; these are separate from the terminal Run result. ' +
@@ -226,7 +226,7 @@ export const mcpTools = {
     true,
   ),
   event_source_list: tool(
-    'List independent Feishu event sources, including Team, Connection, event types, enabled and verification status. Inspect consumers for Flows actually using each source.',
+    'List shared event sources for Feishu, Slack Bot, Intercom, Sentry, Zoom, Fireflies, and Jira, including Team, Connection, event types, enabled and verification status. Inspect consumers for Flows actually using each source.',
     z.strictObject({}),
     true,
   ),

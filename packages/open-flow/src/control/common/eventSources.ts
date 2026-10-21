@@ -10,7 +10,7 @@ const eventSourceSchema = z.object({
   revision: z.int().positive(),
   name,
   provider: z.enum(['feishu', 'feishu_app_bot', 'slackbot', 'intercom', 'sentry', 'zoom', 'fireflies', 'jira']),
-  appId: id,
+  appId: id.nullable(),
   workspaceId: id.optional(),
   installationId: id.optional(),
   organizationId: id.optional(),
@@ -23,9 +23,9 @@ const eventSourceSchema = z.object({
   teamId: id.nullable(),
   enabled: z.boolean(),
   eventTypes: z.array(eventType),
-  manageSubscriptions: z.boolean(),
-  verificationTokenConfigured: z.boolean(),
-  encryptKeyConfigured: z.boolean(),
+  manageSubscriptions: z.boolean().nullable(),
+  verificationTokenConfigured: z.boolean().nullable(),
+  encryptKeyConfigured: z.boolean().nullable(),
   endpointUrl: z.string().nullable(),
   verifiedAt: z.string().nullable(),
   lastReceivedAt: z.string().nullable(),
@@ -154,7 +154,7 @@ export interface EventSource {
   readonly revision: number
   readonly name: string
   readonly provider: 'feishu' | 'feishu_app_bot' | 'slackbot' | 'intercom' | 'sentry' | 'zoom' | 'fireflies' | 'jira'
-  readonly appId: string
+  readonly appId: string | null
   readonly workspaceId?: string
   readonly installationId?: string
   readonly organizationId?: string
@@ -167,9 +167,9 @@ export interface EventSource {
   readonly teamId: string | null
   readonly enabled: boolean
   readonly eventTypes: string[]
-  readonly manageSubscriptions: boolean
-  readonly verificationTokenConfigured: boolean
-  readonly encryptKeyConfigured: boolean
+  readonly manageSubscriptions: boolean | null
+  readonly verificationTokenConfigured: boolean | null
+  readonly encryptKeyConfigured: boolean | null
   readonly endpointUrl: string | null
   readonly verifiedAt: string | null
   readonly lastReceivedAt: string | null

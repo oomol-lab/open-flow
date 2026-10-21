@@ -1419,7 +1419,20 @@
       "pending": "正在建立或續期 Webhook",
       "ready": "Webhook 已啟用",
       "error": "Webhook 無法使用，請檢查連線並重試發佈"
-    }
+    },
+    "accountIdentity": "連線帳號識別碼",
+    "appId": "應用程式 ID",
+    "slackAppId": "Slack 應用程式 ID",
+    "integrationId": "整合 UUID",
+    "developerAppId": "開發者應用程式 ID",
+    "organizationId": "組織 ID / 簡稱",
+    "installationId": "安裝 UUID",
+    "workspaceId": "工作區 ID",
+    "verificationToken": "驗證權杖",
+    "signingSecret": "簽署密鑰",
+    "webhookSecret": "Webhook 密鑰權杖",
+    "encryptKey": "加密密鑰",
+    "clientSecret": "用戶端密鑰"
   },
   "connectionUsage": {
     "title": "連線概覽",
