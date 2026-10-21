@@ -25,6 +25,16 @@ export function runtimeAssertions(
     return errors
   }
   if (status != 'completed') return [`Run ${sample.name} ended ${status}.`]
+  if (id == 'wait-auto-continue') {
+    const resolved = events.filter((event) => event.kind == 'run.resolved')
+    const completed = events.find((event) => event.kind == 'run.completed')
+    if (resolved.length != 2 || resolved.some((event) => event.payload.source != 'automatic' || event.payload.action != 'continue'))
+      errors.push('Continue both Waits automatically exactly once.')
+    const result = completed?.payload.result
+    if (result == null || typeof result != 'object' || !('outputs' in result) || !isDeepStrictEqual(result.outputs, { done: true }))
+      errors.push('Complete the workflow and return done=true.')
+    return errors
+  }
   if (id == 'node-errors') {
     const terminal = events.findLast((event) => event.kind == 'run.completed')
     const result = terminal?.kind == 'run.completed' ? terminal.payload.result : undefined

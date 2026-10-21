@@ -3,6 +3,7 @@ export interface EngineContract {
   readonly platformExports: ReadonlySet<string>
   readonly platformModule: string
   readonly platformSource: string
+  readonly waitAutoContinue?: boolean
   readonly webhookResponses?: boolean
 }
 
@@ -10,6 +11,7 @@ export const currentEngineContract = 'open-flow-engine/v7'
 export const nodejsEngineContract = 'open-flow-engine/v7/nodejs-compat-v1'
 
 const currentContract: EngineContract = {
+  waitAutoContinue: true,
   webhookResponses: true,
   platformExports: new Set(['engineContract', 'identity']),
   platformModule: 'open-flow:platform',
@@ -59,6 +61,7 @@ export function findEngineContract(contract: string): EngineContract | undefined
   if (contract == 'open-flow-engine/v6' || contract == 'open-flow-engine/v6/nodejs-compat-v1')
     return {
       ...(contract == 'open-flow-engine/v6' ? currentContract : nodejsContract),
+      waitAutoContinue: false,
       webhookResponses: false,
       platformSource: `export const engineContract = ${JSON.stringify(contract)}
 export function identity(value) { return value }

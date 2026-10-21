@@ -50,6 +50,7 @@ import { triggerStories } from './triggerStories.tsx'
 import { valueEditorDangerStory } from './valueEditorDanger.tsx'
 import { additionalInputsStory, lazyFieldsStory, groupedInputsStory, outputPortsStory, valueNodeStory } from './valueNode.tsx'
 import { variablesStory } from './variables.tsx'
+import { waitConfigurationStory } from './waitConfiguration.tsx'
 import { executionLogsStory, runHistoryStory, runStatusIslandStory, waitRunsStory } from './waitRuns.tsx'
 import { webhookStory } from './webhook.tsx'
 import { workflowStories } from './workflow.tsx'
@@ -90,6 +91,7 @@ export const labStories: readonly FrontendStory[] = [
   publicationsStory,
   ...previewStories,
   waitRunsStory,
+  waitConfigurationStory,
   runStatusIslandStory,
   notificationsStory,
   iconPickerStory,

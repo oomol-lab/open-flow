@@ -7,6 +7,7 @@ import { assertOpenApiAuthBindings } from '../../openapi/common/authBindings.ts'
 import { checkJsonDepth } from './json.ts'
 import { retryConfigurationSchema } from './retry.ts'
 import { triggerScheduleSchema } from './triggerScheduleSchema.ts'
+import { waitAutoContinueDraftSchema, waitAutoContinueSchema } from './wait.ts'
 import { webhookMethods } from './webhookMethod.ts'
 import { webhookResponseTimeout } from './webhookResponse.ts'
 
@@ -231,7 +232,7 @@ const node = z.union([
   }),
   z.object({ ...base, kind: z.literal('task'), task: z.union([inline, managed]), additionalInputs: z.array(input).optional() }),
   z.strictObject({ ...base, kind: z.literal('approval'), ...wait }).omit({ timeoutMs: true }),
-  z.strictObject({ ...base, kind: z.literal('wait'), ...wait }).omit({ timeoutMs: true }),
+  z.strictObject({ ...base, kind: z.literal('wait'), ...wait, autoContinue: waitAutoContinueDraftSchema.optional() }).omit({ timeoutMs: true }),
   z.object({ ...trigger, kind: z.literal('manual') }),
   z.strictObject({ ...trigger, kind: z.literal('start'), inputDefs: workflowInputDefs }),
   z.strictObject({ ...trigger, kind: z.literal('error'), sourceFlowIds: sourceFlowIds.optional() }),
@@ -260,6 +261,7 @@ export const authoringDefinitionSchemas = {
   ports,
   condition: z.strictObject(condition),
   wait: z.strictObject(wait),
+  waitAutoContinue: waitAutoContinueSchema,
   webhook: z.strictObject(webhook),
   schedule: triggerScheduleSchema,
   capabilities: z.array(capability),
@@ -631,7 +633,11 @@ const shapes = {
   'graph.node.additional-inputs.set': { ...at, before: z.array(input).optional(), value: z.array(input).optional() },
   'graph.node.condition.set': { ...at, before: z.object(condition), value: z.object(condition) },
   'graph.node.values.set': { ...at, before: z.array(input), value: z.array(input) },
-  'graph.node.resolution.set': { ...at, before: z.object(wait), value: z.object(wait) },
+  'graph.node.resolution.set': {
+    ...at,
+    before: z.strictObject({ ...wait, autoContinue: waitAutoContinueDraftSchema.optional() }),
+    value: z.strictObject({ ...wait, autoContinue: waitAutoContinueDraftSchema.optional() }),
+  },
   'graph.node.webhook.set': {
     ...at,
 

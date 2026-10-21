@@ -171,7 +171,7 @@ export function authoringNode(content: RevisionContent, ref: string) {
         break
       case 'wait':
       case 'approval':
-        config = { inputs: fieldsView(node.inputDefinitions) }
+        config = { inputs: fieldsView(node.inputDefinitions), ...(node.kind == 'wait' && node.autoContinue != null ? { autoContinue: node.autoContinue } : {}) }
         texts.prompt = node.prompt
         break
       case 'webhook-response':
@@ -435,6 +435,10 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
     }
     const update = record(merge(original, patch))
     const explicit = (key: string) => Object.hasOwn(record(patch.config), key) || clear.some((path) => path[0] == 'config' && path[1] == key)
+    if (type == 'wait') {
+      const timing = record(record(patch.config).autoContinue)
+      if (Object.hasOwn(timing, 'kind') && timing.kind != record(record(view.config).autoContinue).kind) record(update.config).autoContinue = timing
+    }
     if (type == 'openapi' && Object.hasOwn(record(patch.config), 'authentication')) record(update.config).authentication = record(patch.config).authentication
     for (const path of clear) clearPath(update, path)
     if (typeof update.name != 'string') fail('node.name-required', 'Node name cannot be cleared.')
@@ -577,6 +581,10 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
         case 'wait':
         case 'approval':
           next = { ...next, inputDefinitions: fieldsToPorts(config.inputs, node.inputDefinitions) } as GraphNode
+          if (node.kind == 'wait') {
+            Reflect.deleteProperty(next, 'autoContinue')
+            if (config.autoContinue != null) Object.assign(next, { autoContinue: config.autoContinue })
+          }
           break
         case 'webhook': {
           const { body, ...settings } = config

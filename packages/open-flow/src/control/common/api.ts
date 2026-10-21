@@ -471,6 +471,7 @@ export interface Run {
 }
 
 export interface RunWait {
+  readonly autoContinueAt?: string
   readonly actions: readonly ['continue'] | readonly ['approve', 'reject']
   readonly expiresAt: string
   readonly nodeId: string
@@ -527,7 +528,11 @@ export interface RunPage {
   readonly version: 1
 }
 
-export type RunEvent = Readonly<ReturnType<typeof decodeRunEvent>>
+/** Run-level events have no node identity; callers may inspect it without narrowing the event kind. */
+type EventWithNodeContext<Event> = Event extends { readonly payload: infer Payload }
+  ? Readonly<Event & { readonly payload: Payload & { readonly nodeId?: string } }>
+  : never
+export type RunEvent = EventWithNodeContext<ReturnType<typeof decodeRunEvent>>
 export type RunEventKind = RunEvent['kind']
 
 export function isRunTerminalEvent(event: RunEvent | undefined): boolean {
@@ -612,25 +617,31 @@ export function decodeRunEvent(value: unknown) {
     case 'run.waiting':
       if (!Array.isArray(payload.waitIds)) return invalidResponse()
       return { ...base, kind, payload: { waitIds: payload.waitIds.map((id) => string(id)) } } as const
-    case 'wait.created':
+    case 'wait.created': {
+      const timing: { readonly autoContinueAt?: string } = payload.autoContinueAt === undefined ? {} : { autoContinueAt: string(payload.autoContinueAt) }
       return {
         ...base,
         kind,
         payload: {
+          ...timing,
           expiresAt: string(payload.expiresAt),
           nodeId: string(payload.nodeId),
           waitId: string(payload.waitId),
           waitingSince: string(payload.waitingSince),
         },
       } as const
+    }
     case 'run.resolved': {
       const action = payload.action
+      const resolutionSource = payload.source
+      if (resolutionSource !== undefined && resolutionSource !== 'manual' && resolutionSource !== 'automatic') return invalidResponse()
+      const audit: { readonly source?: 'manual' | 'automatic' } = resolutionSource === undefined ? {} : { source: resolutionSource }
       if (action !== 'approve' && action !== 'continue' && action !== 'reject') return invalidResponse()
       if (payload.comment !== null && typeof payload.comment != 'string') return invalidResponse()
       return {
         ...base,
         kind,
-        payload: { action, comment: payload.comment as string | null, resolvedAt: string(payload.resolvedAt), waitId: string(payload.waitId) },
+        payload: { ...audit, action, comment: payload.comment as string | null, resolvedAt: string(payload.resolvedAt), waitId: string(payload.waitId) },
       } as const
     }
     case 'run.completed':

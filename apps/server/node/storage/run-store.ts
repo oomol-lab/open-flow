@@ -19,7 +19,7 @@ import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import { decodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { flowDependencies, variableBindings } from '@oomol-lab/open-flow/flow-semantics'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
-import { decodeFlowRunCheckpoint, normalizeWaitComment, withWaitNotificationMessage } from '@oomol-lab/open-flow/scheduler'
+import { decodeFlowRunCheckpoint, normalizeWaitComment, waitAutoContinueAt, withWaitNotificationMessage } from '@oomol-lab/open-flow/scheduler'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { AcceptanceError } from '../error.ts'
 import { isolatedVmEngineDigest } from '../runtime/isolated-vm.ts'
@@ -78,6 +78,15 @@ const maxEventBytes = 1024 * 1024
 const maxEventCount = 1_000
 const maxEventTotalBytes = 16 * 1024 * 1024
 const waitDurationMs = 7 * 24 * 60 * 60 * 1_000
+
+function autoContinueAt(wait: WaitRequest, waitingSince: number): number | null {
+  if (wait.autoContinue == null) return null
+  if (wait.actions.length != 1 || wait.actions[0] != 'continue') throw new Error('Only Wait supports automatic continuation.')
+  const at = waitAutoContinueAt(wait.autoContinue, waitingSince)
+  if (!Number.isSafeInteger(at) || at >= waitingSince + waitDurationMs) throw new Error('Automatic continuation must occur before the Wait expires in 7 days.')
+  return at
+}
+
 const implicitProviderAccess: ConnectorAccessSnapshot = {
   sharedBindings: [],
   selectedBindings: [],
@@ -518,22 +527,35 @@ export class RunStore {
       this.resolutions(runId, [])
       const previous = this.#database
         .prepare(
-          'SELECT job_id AS jobId, node_id AS nodeId, value, prompt, actions, notification_output AS output FROM wait_receipts WHERE run_id = ? AND wait_id = ?',
+          'SELECT job_id AS jobId, node_id AS nodeId, value, prompt, actions, waiting_since AS waitingSince, auto_continue_at AS autoContinueAt, notification_output AS output FROM wait_receipts WHERE run_id = ? AND wait_id = ?',
         )
-        .get(runId, wait.waitId) as { jobId: string; nodeId: string; value: string; prompt: string; actions: string; output: string | null } | undefined
+        .get(runId, wait.waitId) as
+        | {
+            jobId: string
+            nodeId: string
+            value: string
+            prompt: string
+            actions: string
+            waitingSince: number
+            autoContinueAt: number | null
+            output: string | null
+          }
+        | undefined
       if (previous != null) {
         if (
           previous.jobId != wait.jobId ||
           previous.nodeId != wait.nodeId ||
           previous.value != JSON.stringify(wait.value) ||
           previous.prompt != wait.prompt ||
-          previous.actions != JSON.stringify(wait.actions)
+          previous.actions != JSON.stringify(wait.actions) ||
+          previous.autoContinueAt != autoContinueAt(wait, previous.waitingSince)
         )
           throw new Error('Wait identity changed.')
         return previous.output == null ? undefined : withWaitNotificationMessage(JSON.parse(previous.output) as JsonValue)
       }
       const waitingSince = this.#clock()
       const expiresAt = waitingSince + waitDurationMs
+      const continueAt = autoContinueAt(wait, waitingSince)
       const needsLinks = wait.notify || notification != null
       if (needsLinks && publicOrigin == null) throw new Error('Wait action links require OPEN_FLOW_PUBLIC_ORIGIN.')
       const capability = needsLinks ? randomBytes(32).toString('base64url') : undefined
@@ -545,11 +567,12 @@ export class RunStore {
             prompt: wait.prompt,
             ...Object.fromEntries(links.map(({ action, url }) => [`${action}Url`, url])),
             expiresAt: new Date(expiresAt).toISOString(),
+            ...(continueAt == null ? {} : { autoContinueAt: new Date(continueAt).toISOString() }),
           })
         : undefined
       this.#database
         .prepare(
-          `INSERT INTO wait_receipts (run_id, wait_id, node_id, job_id, actions, prompt, value, waiting_since, expires_at, capability_digest, notification_output) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO wait_receipts (run_id, wait_id, node_id, job_id, actions, prompt, value, waiting_since, expires_at, capability_digest, notification_output, auto_continue_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         )
         .run(
           runId,
@@ -563,6 +586,7 @@ export class RunStore {
           expiresAt,
           capability == null ? null : createHash('sha256').update(capability).digest('hex'),
           output == null ? null : JSON.stringify(output),
+          continueAt,
         )
       if (notification != null) {
         const message = [wait.prompt, `Expires at: ${new Date(expiresAt).toISOString()}`, ...links.map(({ action, url }) => `${action}: ${url}`)].join('\n')
@@ -585,6 +609,7 @@ export class RunStore {
       const payload = {
         nodeId: wait.nodeId,
         waitId: wait.waitId,
+        ...(continueAt == null ? {} : { autoContinueAt: new Date(continueAt).toISOString() }),
         waitingSince: new Date(waitingSince).toISOString(),
         expiresAt: new Date(expiresAt).toISOString(),
       }
@@ -710,71 +735,79 @@ export class RunStore {
         readonly status: RunStatus
       } {
     const normalizedComment = normalizeWaitComment(comment)
-    return this.#transaction(() => {
-      const row = this.#database
-        .prepare(
-          `SELECT wait_receipts.comment, wait_receipts.action, wait_receipts.actions, wait_receipts.expires_at AS expiresAt,
+    return this.#transaction(() => this.#resolveWait(runId, waitId, requested, normalizedComment, 'manual'))
+  }
+
+  #resolveWait(
+    runId: string,
+    waitId: string,
+    requested: WaitAction,
+    normalizedComment: string | null,
+    source: 'manual' | 'automatic',
+  ): ReturnType<RunStore['resolveWait']> {
+    const row = this.#database
+      .prepare(
+        `SELECT wait_receipts.comment, wait_receipts.action, wait_receipts.actions, wait_receipts.expires_at AS expiresAt,
                   wait_receipts.resolved_at AS resolvedAt, runs.status
            FROM wait_receipts JOIN runs USING (run_id)
            WHERE wait_receipts.run_id = ? AND wait_receipts.wait_id = ?`,
-        )
-        .get(runId, waitId) as
-        | {
-            readonly actions: string
-            readonly action: WaitAction | null
-            readonly comment: string | null
-            readonly expiresAt: number
-            readonly resolvedAt: number | null
-            readonly status: RunStatus
-          }
-        | undefined
-      if (row == null) return { kind: 'not-found' as const }
-      if (!(JSON.parse(row.actions) as readonly WaitAction[]).includes(requested)) return { kind: 'invalid-action' as const }
-      if (row.action != null && row.resolvedAt != null) {
-        return {
-          action: row.action,
-          comment: row.comment,
-          changed: false,
-          kind: 'resolved' as const,
-          resolutionAccepted: row.action == requested,
-          resolvedAt: row.resolvedAt,
-          status: row.status,
+      )
+      .get(runId, waitId) as
+      | {
+          readonly actions: string
+          readonly action: WaitAction | null
+          readonly comment: string | null
+          readonly expiresAt: number
+          readonly resolvedAt: number | null
+          readonly status: RunStatus
         }
-      }
-      if (!['running', 'waiting', 'queued', 'starting'].includes(row.status)) {
-        return { action: null, comment: null, changed: false, kind: 'resolved' as const, resolutionAccepted: false, resolvedAt: null, status: row.status }
-      }
-      const resolvedAt = this.#clock()
-      if (resolvedAt >= row.expiresAt) {
-        this.#finishRun(
-          runId,
-          'failed',
-          { error: { code: 'run.wait-expired', message: 'The Wait expired before it was resolved.' } },
-          "status IN ('running', 'waiting', 'queued', 'starting')",
-          resolvedAt,
-        )
-        return { action: null, comment: null, changed: true, kind: 'resolved' as const, resolutionAccepted: false, resolvedAt: null, status: 'failed' as const }
-      }
-      this.#database.prepare("UPDATE runs SET status = 'queued' WHERE run_id = ? AND status = 'waiting'").run(runId)
-      this.#database
-        .prepare('UPDATE wait_receipts SET action = ?, resolved_at = ?, comment = ? WHERE run_id = ? AND wait_id = ?')
-        .run(requested, resolvedAt, normalizedComment, runId, waitId)
-      this.#database.prepare('DELETE FROM wait_notifications WHERE run_id = ? AND wait_id = ?').run(runId, waitId)
-      for (const listener of this.#waitListeners.get(runId) ?? []) listener()
-      const payload = { action: requested, comment: normalizedComment, resolvedAt: new Date(resolvedAt).toISOString(), waitId }
-      this.#insertEvent(runId, 'run.resolved', payload)
-      const bytes = encoder.encode(JSON.stringify({ kind: 'run.resolved', payload })).byteLength
-      this.#database.prepare('UPDATE runs SET event_count = event_count + 1, event_bytes = event_bytes + ? WHERE run_id = ?').run(bytes, runId)
+      | undefined
+    if (row == null) return { kind: 'not-found' as const }
+    if (!(JSON.parse(row.actions) as readonly WaitAction[]).includes(requested)) return { kind: 'invalid-action' as const }
+    if (row.action != null && row.resolvedAt != null) {
       return {
-        action: requested,
-        comment: normalizedComment,
-        changed: true,
+        action: row.action,
+        comment: row.comment,
+        changed: false,
         kind: 'resolved' as const,
-        resolutionAccepted: true,
-        resolvedAt,
-        status: row.status == 'waiting' ? ('queued' as const) : row.status,
+        resolutionAccepted: row.action == requested,
+        resolvedAt: row.resolvedAt,
+        status: row.status,
       }
-    })
+    }
+    if (!['running', 'waiting', 'queued', 'starting'].includes(row.status)) {
+      return { action: null, comment: null, changed: false, kind: 'resolved' as const, resolutionAccepted: false, resolvedAt: null, status: row.status }
+    }
+    const resolvedAt = this.#clock()
+    if (resolvedAt >= row.expiresAt) {
+      this.#finishRun(
+        runId,
+        'failed',
+        { error: { code: 'run.wait-expired', message: 'The Wait expired before it was resolved.' } },
+        "status IN ('running', 'waiting', 'queued', 'starting')",
+        resolvedAt,
+      )
+      return { action: null, comment: null, changed: true, kind: 'resolved' as const, resolutionAccepted: false, resolvedAt: null, status: 'failed' as const }
+    }
+    this.#database.prepare("UPDATE runs SET status = 'queued' WHERE run_id = ? AND status = 'waiting'").run(runId)
+    this.#database
+      .prepare('UPDATE wait_receipts SET action = ?, resolved_at = ?, comment = ?, resolution_source = ? WHERE run_id = ? AND wait_id = ?')
+      .run(requested, resolvedAt, normalizedComment, source, runId, waitId)
+    this.#database.prepare('DELETE FROM wait_notifications WHERE run_id = ? AND wait_id = ?').run(runId, waitId)
+    for (const listener of this.#waitListeners.get(runId) ?? []) listener()
+    const payload = { source, action: requested, comment: normalizedComment, resolvedAt: new Date(resolvedAt).toISOString(), waitId }
+    this.#insertEvent(runId, 'run.resolved', payload)
+    const bytes = encoder.encode(JSON.stringify({ kind: 'run.resolved', payload })).byteLength
+    this.#database.prepare('UPDATE runs SET event_count = event_count + 1, event_bytes = event_bytes + ? WHERE run_id = ?').run(bytes, runId)
+    return {
+      action: requested,
+      comment: normalizedComment,
+      changed: true,
+      kind: 'resolved' as const,
+      resolutionAccepted: true,
+      resolvedAt,
+      status: row.status == 'waiting' ? ('queued' as const) : row.status,
+    }
   }
 
   cancelControlRun(runId: string): { readonly accepted: boolean; readonly run: StoredControlRun } | undefined {
@@ -861,6 +894,10 @@ export class RunStore {
            UNION ALL
            SELECT MIN(retry_at) AS dueAt FROM error_dispatches WHERE status = 'pending'
            UNION ALL
+           SELECT MIN(wait_receipts.auto_continue_at) AS dueAt
+           FROM wait_receipts JOIN runs USING (run_id)
+           WHERE runs.status IN ('running', 'waiting', 'queued', 'starting') AND wait_receipts.action IS NULL
+           UNION ALL
            SELECT MIN(wait_receipts.expires_at) AS dueAt
            FROM wait_receipts JOIN runs USING (run_id)
            WHERE runs.status IN ('running', 'waiting', 'queued', 'starting') AND wait_receipts.action IS NULL
@@ -891,10 +928,21 @@ export class RunStore {
           now,
         )
       const expiredWaits = [...expiredCalls, ...this.#expireWaits(now, limit)]
+      const due = this.#database
+        .prepare(`SELECT runs.flow_id AS flowId, runs.run_id AS runId, wait_id AS waitId
+        FROM wait_receipts JOIN runs USING (run_id)
+        WHERE runs.status IN ('running', 'waiting', 'queued', 'starting') AND action IS NULL
+          AND auto_continue_at <= ? AND expires_at > ? ORDER BY auto_continue_at, wait_id LIMIT ?`)
+        .all(now, now, limit) as { flowId: string; runId: string; waitId: string }[]
+      const continuedWaits: typeof due = []
+      for (const wait of due) {
+        const result = this.#resolveWait(wait.runId, wait.waitId, 'continue', null, 'automatic')
+        if (result.kind == 'resolved' && result.changed && result.action == 'continue') continuedWaits.push(wait)
+      }
       const prunedEvents = this.#pruneExpiredEvents(now, limit)
       const notification = this.#claimWaitNotification(now, notificationLeaseMs)
       const errorDispatches = this.#dispatchErrors(now, limit)
-      return { errorDispatches, expiredWaits, more: expiredWaits.length == limit || prunedEvents > 0, notification }
+      return { errorDispatches, expiredWaits, continuedWaits, more: due.length == limit || expiredWaits.length == limit || prunedEvents > 0, notification }
     })
   }
 

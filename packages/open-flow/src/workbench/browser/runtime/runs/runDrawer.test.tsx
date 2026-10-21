@@ -292,3 +292,22 @@ it.each([true, false])('shows Flow duration in overview with completion event: %
   expect(markup).toContain('Completed')
   expect(markup).toContain('done')
 })
+
+it('distinguishes automatic, manual and historical decisions in the timeline', () => {
+  const events: RunEvent[] = [undefined, 'manual', 'automatic'].map((source, index) => ({
+    kind: 'run.resolved',
+    sequence: index + 1,
+    createdAt: '2026-08-27T10:00:00Z',
+    payload: {
+      action: 'continue',
+      comment: null,
+      resolvedAt: '2026-08-27T10:00:00Z',
+      waitId: String(index),
+      ...(source == null ? {} : { source: source as 'manual' | 'automatic' }),
+    },
+  }))
+  const markup = renderFailure('failed', events)
+  expect(markup).toContain('Wait resolved')
+  expect(markup).toContain('Resolved manually')
+  expect(markup).toContain('Continued automatically')
+})

@@ -1,6 +1,6 @@
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { ControlClient } from './api.ts'
+import { ControlClient, decodeRunEvent } from './api.ts'
 
 afterEach(() => {
   vi.unstubAllGlobals()
@@ -844,4 +844,19 @@ it.each([undefined, null, -1, 1.5, '2'])('rejects an invalid list-only reference
 it('keeps reference counts out of Flow detail decoding', async () => {
   const client = new ControlClient(async () => Response.json({ ...flow, referenceCount: 3 }))
   await expect(client.getFlow(flow.flowId)).resolves.toEqual(flow)
+})
+
+it('preserves optional Wait timing and resolution audit metadata while accepting old events', () => {
+  const base = { sequence: 1, createdAt: 'now' }
+  const created = {
+    ...base,
+    kind: 'wait.created',
+    payload: { waitId: 'wait', nodeId: 'node', waitingSince: 'now', expiresAt: 'expiry', autoContinueAt: 'deadline' },
+  }
+  expect(decodeRunEvent(created)).toEqual(created)
+  expect(() => decodeRunEvent({ ...created, payload: { ...created.payload, autoContinueAt: null } })).toThrow()
+  const resolved = { ...base, kind: 'run.resolved', payload: { action: 'continue', comment: null, resolvedAt: 'later', waitId: 'wait' } }
+  expect(decodeRunEvent(resolved)).toEqual(resolved)
+  expect(decodeRunEvent({ ...resolved, payload: { ...resolved.payload, source: 'automatic' } }).payload).toMatchObject({ source: 'automatic' })
+  expect(() => decodeRunEvent({ ...resolved, payload: { ...resolved.payload, source: 'unknown' } })).toThrow()
 })

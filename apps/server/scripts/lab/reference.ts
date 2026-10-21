@@ -31,6 +31,42 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
   }
   const dataPort = { schema: {}, nullable: true },
     stringPort = { schema: { type: 'string' }, nullable: false }
+  if (id == 'wait-auto-continue') {
+    await call('flow_schema', { type: 'wait' })
+    const before = await read()
+    const created = await submit(before.revision, [
+      { op: 'node.add', type: 'start', as: 'start', name: 'Start' },
+      {
+        op: 'node.add',
+        type: 'wait',
+        as: 'relative',
+        name: 'Relative wait',
+        config: { autoContinue: { kind: 'after', durationMs: 100 } },
+        inputs: { order: { kind: 'value', value: 42 } },
+      },
+      { op: 'node.add', type: 'wait', as: 'date', name: 'Date wait', config: { autoContinue: { kind: 'at', at: '1970-01-01T00:00:00Z', timezone: 'UTC' } } },
+      { op: 'node.add', type: 'wait', as: 'manual', name: 'Manual wait', config: { autoContinue: { kind: 'after', durationMs: 1000 } } },
+      {
+        op: 'node.add',
+        type: 'outputs',
+        as: 'out',
+        name: 'Outputs',
+        config: { outputDefs: { done: { schema: { type: 'boolean' }, nullable: false } } },
+        inputs: { done: { kind: 'value', value: true } },
+      },
+      { op: 'edge.connect', source: '$start', target: '$relative' },
+      { op: 'edge.connect', source: '$relative', branch: 'continue', target: '$date' },
+      { op: 'edge.connect', source: '$date', branch: 'continue', target: '$out' },
+    ])
+    const refs = created.nodes as Record<string, string>
+    await submit(created.revision, [
+      { op: 'node.update', node: refs.relative!, set: { name: 'Relative wait updated' } },
+      { op: 'node.update', node: refs.manual!, clear: [['config', 'autoContinue']] },
+    ])
+    await read([refs.relative!, refs.date!, refs.manual!])
+    await call('flow_check', { flowId, revisionId: savedRevision })
+    return
+  }
   if (id == 'node-errors') {
     await call('flow_schema', { type: 'code' })
     const before = await read()

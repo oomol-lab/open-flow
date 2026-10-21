@@ -1,4 +1,4 @@
-import type { JsonValue } from '@oomol-lab/open-flow/flow-change'
+import type { JsonValue, WaitAutoContinue } from '@oomol-lab/open-flow/flow-change'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { canonicalJsonBytes } from '@oomol-lab/open-flow/flow-encoding'
@@ -37,6 +37,31 @@ function flow(store: Store, value: JsonValue) {
     revisionId: 'initial',
   })
 }
+
+it.each<WaitAutoContinue>([
+  { kind: 'after', durationMs: null },
+  { kind: 'at', at: 'invalid date', timezone: 'UTC' },
+])('persists invalid Wait timing in a Draft and reports it during validation: %j', async (autoContinue) => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'wait-draft-'))
+  const service = await openService(path.join(directory, 'flow.sqlite'))
+  onTestFinished(async () => {
+    await closeService(service)
+    await rm(directory, { recursive: true, force: true })
+  })
+  const created = await service.control.createFlow('operator', 'Flow', 'create')
+  const changed = await service.control.changeDraft(
+    'operator',
+    created.flow.flowId,
+    created.flow.draftRevisionId,
+    [{ kind: 'graph.node.create', nodeId: 'wait', node: { kind: 'wait', name: 'Wait', inputs: {}, inputDefinitions: [], prompt: 'Continue?', autoContinue } }],
+    'change',
+  )
+  expect(service.control.getDraft(created.flow.flowId).content.document.graph.nodes.wait).toMatchObject({ autoContinue })
+  expect(service.control.getRevision(created.flow.flowId, changed.revision.revisionId).content.document.graph.nodes.wait).toMatchObject({ autoContinue })
+  const checked = await service.control.checkFlow(created.flow.flowId, changed.revision.revisionId, currentEngineContract)
+  expect(checked.valid).toBe(false)
+  expect(checked.diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'wait.auto-continue-invalid' })]))
+})
 
 it('applies deterministic patches for nested objects, arrays, null, and escaped keys', () => {
   const before = body({ 'entries': [{ value: 1 }, { value: 2 }], 'nested': { old: null }, 'a/b~c': 'before' }).content

@@ -148,6 +148,7 @@ function canonicalNode(value: GraphNode): JsonValue {
         inputDefinitions: canonicalPorts(value.inputDefinitions),
         kind: value.kind,
         prompt: value.prompt,
+        ...(value.kind == 'wait' && value.autoContinue != null ? { autoContinue: { ...value.autoContinue } } : {}),
       }
   }
 }

@@ -8,7 +8,7 @@ import { WaitActions } from '../node/application/wait-actions.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 
-function fixture() {
+function fixture(autoContinue?: WaitRequest['autoContinue']) {
   let now = 1000
   const database = Database.open(':memory:')
   onTestFinished(() => database.close())
@@ -43,7 +43,16 @@ function fixture() {
   expect(store.runs.claim()?.runId).toBe(runId)
   expect(store.runs.start(runId, { kind: 'run.started', payload: { flowId: 'flow', scopeId: runId } })).toBe(true)
   const waits = ['first', 'second'].map(
-    (waitId): WaitRequest => ({ waitId, nodeId: waitId, jobId: waitId, actions: ['approve', 'reject'], prompt: waitId, value: {}, notify: true }),
+    (waitId): WaitRequest => ({
+      waitId,
+      nodeId: waitId,
+      jobId: waitId,
+      actions: autoContinue != null && waitId == 'first' ? ['continue'] : ['approve', 'reject'],
+      autoContinue: waitId == 'first' ? autoContinue : undefined,
+      prompt: waitId,
+      value: {},
+      notify: true,
+    }),
   )
   const checkpoint: FlowRunCheckpoint = {
     version: 6,
@@ -309,4 +318,92 @@ it('rejects inspection and submission once the review link expires', () => {
   expect(actions.inspect(capability, 'approve', () => undefined)).toBeUndefined()
   expect(actions.resolve(capability, 'approve', () => undefined)).toBeUndefined()
   expect(f.store.runs.resolutions(f.runId, ['first'])).toEqual({})
+})
+
+it('automatically continues in the original session and records the actual decision time once', async () => {
+  const f = fixture({ kind: 'after', durationMs: 30_000 })
+  expect(f.store.runViews.waitReceipt(f.runId, 'first')?.autoContinueAt).toBe(31_000)
+  expect(f.checkpoint.waits[0]!.pending).toMatchObject({ autoContinueAt: '1970-01-01T00:00:31.000Z' })
+  expect((f.checkpoint.waits[0]!.pending as Record<string, string>).message).toContain('Automatically continues at:')
+  expect(f.store.runs.nextMaintenanceAt()).toBe(31_000)
+  const controller = new AbortController()
+  const pending = f.store.runs.waitForResolutions(f.runId, ['first'], controller.signal)
+  f.setTime(30_999)
+  expect(f.store.runs.maintain(30_999, 100, 60_000).continuedWaits).toEqual([])
+  f.setTime(31_500)
+  expect(f.store.runs.maintain(31_500, 100, 60_000).continuedWaits).toHaveLength(1)
+  expect(await pending).toMatchObject({ first: { action: 'continue', resolvedAt: '1970-01-01T00:00:31.500Z', comment: null } })
+  expect(f.store.runViews.run(f.runId)?.status).toBe('running')
+  expect(f.store.runs.resolveWait(f.runId, 'first', 'continue', 'late comment')).toMatchObject({ changed: false, resolutionAccepted: true, comment: null })
+  expect(f.store.runs.maintain(31_500, 100, 60_000).continuedWaits).toEqual([])
+  const events = f.store.runViews.events(f.runId).filter((event) => event.kind == 'run.resolved')
+  expect(events).toHaveLength(1)
+  expect(events[0]!.payload).toMatchObject({ source: 'automatic' })
+})
+
+it('keeps a manual decision and comment when the automatic deadline passes', () => {
+  const f = fixture({ kind: 'after', durationMs: 1000 })
+  f.setTime(1500)
+  f.store.runs.resolveWait(f.runId, 'first', 'continue', 'Reviewed')
+  f.setTime(2000)
+  expect(f.store.runs.maintain(2000, 100, 60_000).continuedWaits).toEqual([])
+  expect(f.store.runs.resolutions(f.runId, ['first'])).toMatchObject({ first: { comment: 'Reviewed', resolvedAt: '1970-01-01T00:00:01.500Z' } })
+})
+
+it('requeues an overdue frozen Wait after restart without recalculating its deadline', () => {
+  const f = fixture({ kind: 'after', durationMs: 180_000 })
+  f.pause()
+  f.setTime(190_000)
+  const reopened = new Store(f.database, () => 190_000)
+  expect(reopened.runViews.run(f.runId)?.status).toBe('waiting')
+  expect(reopened.runs.maintain(190_000, 100, 60_000).continuedWaits).toHaveLength(1)
+  expect(reopened.runViews.run(f.runId)?.status).toBe('queued')
+  expect(reopened.runs.claim()?.resume?.checkpoint).toEqual(f.checkpoint)
+  expect(reopened.runViews.waitReceipt(f.runId, 'first')?.autoContinueAt).toBe(181_000)
+})
+
+it('preserves a decision committed immediately before freezing', () => {
+  const f = fixture({ kind: 'at', at: '1970-01-01T00:00:01Z' })
+  f.store.runs.maintain(1000, 100, 60_000)
+  f.pause()
+  expect(f.store.runViews.run(f.runId)?.status).toBe('queued')
+})
+
+it('does not continue a canceled or expired Run, even when its timer was missed', () => {
+  const canceled = fixture({ kind: 'after', durationMs: 1000 })
+  canceled.store.runs.cancelControlRun(canceled.runId)
+  canceled.setTime(2000)
+  expect(canceled.store.runs.maintain(2000, 100, 60_000).continuedWaits).toEqual([])
+  const expired = fixture({ kind: 'after', durationMs: 1000 })
+  expired.pause()
+  const afterExpiry = 1000 + 7 * 24 * 60 * 60 * 1000
+  expired.setTime(afterExpiry)
+  expect(expired.store.runs.maintain(afterExpiry, 100, 60_000).continuedWaits).toEqual([])
+  expect(expired.store.runViews.run(expired.runId)?.status).toBe('failed')
+})
+
+it.each([null, 0, -1000, 0.1])('rejects incomplete or invalid durations at runtime: %j', (durationMs) => {
+  expect(() => fixture({ kind: 'after', durationMs })).toThrow()
+})
+
+it('requires an absolute timestamp and valid editor zone at registration', () => {
+  expect(() => fixture({ kind: 'at', at: '1970-01-01T00:00:02' })).toThrow()
+  expect(() => fixture({ kind: 'at', at: '1970-01-01T00:00:02Z', timezone: 'Invalid/Zone' })).toThrow()
+})
+
+it('rejects timers at or beyond the seven-day limit and clamps past timestamps to registration time', () => {
+  expect(() => fixture({ kind: 'after', durationMs: 7 * 24 * 60 * 60 * 1000 })).toThrow('before the Wait expires')
+  expect(() => fixture({ kind: 'at', at: '1970-02-01T00:00:00Z' })).toThrow('before the Wait expires')
+  const f = fixture({ kind: 'at', at: '1970-01-01T00:00:00Z' })
+  expect(f.store.runViews.waitReceipt(f.runId, 'first')?.autoContinueAt).toBe(1000)
+  expect(f.store.runs.maintain(1000, 100, 60_000).continuedWaits).toHaveLength(1)
+})
+
+it('starts a fresh relative timer for each wait occurrence and reuses an existing receipt', () => {
+  const f = fixture({ kind: 'after', durationMs: 1000 })
+  f.setTime(3000)
+  f.store.runs.createWait(f.runId, f.waits[0]!, 'https://flows.example')
+  expect(f.store.runViews.waitReceipt(f.runId, 'first')?.autoContinueAt).toBe(2000)
+  f.store.runs.createWait(f.runId, { ...f.waits[0]!, waitId: 'next-iteration', jobId: 'next-job' }, 'https://flows.example')
+  expect(f.store.runViews.waitReceipt(f.runId, 'next-iteration')?.autoContinueAt).toBe(4000)
 })

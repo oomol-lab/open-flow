@@ -1,5 +1,6 @@
 import type { ReadonlyVal } from 'value-enhancer'
 import type { EventSource } from '../../../../control/common/api.ts'
+import type { WaitAutoContinue } from '../../../../flow/common/change.ts'
 import type { ConnectorCapability } from '../../../../flow/common/change.ts'
 import type { Settings as NodeSettings } from '../../../../flow/common/nodeChanges.ts'
 import type { GraphNode, InputPort, Port, JsonValue, TriggerSchedule } from '../api.ts'
@@ -164,6 +165,7 @@ export class NodeEdits {
     settings: Pick<Extract<GraphNode, { readonly kind: 'approval' | 'wait' }>, 'prompt'> & {
       readonly name?: string
       readonly inputDefinitions?: readonly InputPort[]
+      readonly autoContinue?: WaitAutoContinue | null
     },
     deletion?: PropertyDeletion,
     values?: Readonly<Record<string, JsonValue | undefined>>,

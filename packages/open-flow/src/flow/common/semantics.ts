@@ -416,6 +416,8 @@ export async function prepareFlow(revision: RevisionContent, engineContract: str
     )
   )
     return { kind: 'engine-unsupported' }
+  if (!engine.waitAutoContinue && Object.values(revision.document.graph.nodes).some((node) => node.kind == 'wait' && node.autoContinue != null))
+    return { kind: 'engine-unsupported' }
   const validation = await validateFlow(revision, engine)
   if (!validation.valid) return { kind: 'flow-invalid', validation }
   const { closure } = validation

@@ -148,12 +148,14 @@ function DateSample({
   format,
   initialValue,
   disabled = false,
+  precision,
 }: {
   log: LogAction
   label: string
   format: DateFormat
   initialValue: string
   disabled?: boolean
+  precision?: 'minute' | 'second'
 }) {
   const [value, setValue] = useState<unknown>(initialValue)
   return (
@@ -163,6 +165,7 @@ function DateSample({
         format={format}
         value={value}
         disabled={disabled}
+        precision={precision}
         onChange={(next) => {
           setValue(next)
           log(`${format}.change`, next)
@@ -172,15 +175,20 @@ function DateSample({
   )
 }
 
-function DateTimeStory({ log }: { readonly log: LogAction }) {
+function DateTimeStory({ log, language }: { readonly log: LogAction; readonly language: UiLanguage }) {
+  const i18n = useMemo(() => createWorkbenchI18n(language), [language])
+  useEffect(() => () => i18n.dispose(), [i18n])
   return (
-    <div className="story-column story-dates">
-      <DateSample log={log} label="Date" format="date" initialValue="2026-09-03" />
-      <DateSample log={log} label="Date and time" format="date-time" initialValue="2026-09-03T09:30:00+08:00" />
-      <DateSample log={log} label="Time" format="time" initialValue="09:30:00+08:00" />
-      <DateSample log={log} label="Empty date" format="date" initialValue="" />
-      <DateSample log={log} label="Disabled" format="date" initialValue="2026-09-03" disabled />
-    </div>
+    <I18nProvider i18n={i18n}>
+      <div className="story-column story-dates">
+        <DateSample log={log} label="Date" format="date" initialValue="2026-09-03" />
+        <DateSample log={log} label="Date and time" format="date-time" initialValue="2026-09-03T09:30:00+08:00" />
+        <DateSample log={log} label="Date and time (minutes)" format="date-time" initialValue="2026-09-03T09:30:00+08:00" precision="minute" />
+        <DateSample log={log} label="Time" format="time" initialValue="09:30:00+08:00" />
+        <DateSample log={log} label="Empty date" format="date" initialValue="" />
+        <DateSample log={log} label="Disabled" format="date" initialValue="2026-09-03" disabled />
+      </div>
+    </I18nProvider>
   )
 }
 
@@ -662,7 +670,9 @@ export const stories: readonly FrontendStory[] = [
   {
     group: 'Controls',
     id: 'date-time',
-    render: (log) => <DateTimeStory log={log} />,
+    description:
+      'Compare date, time and both timestamp precisions. Enter a timestamp with hours and minutes, then open the calendar and change the day without losing the entered time.',
+    render: (log, _dark, language) => <DateTimeStory log={log} language={language} />,
     title: 'Date & Time',
   },
   {

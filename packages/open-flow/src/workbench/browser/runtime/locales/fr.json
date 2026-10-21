@@ -344,7 +344,15 @@
       "inputsLoading": "Chargement des paramètres de notification…",
       "pendingDescription": "La sortie en attente se déclenche une fois au début de l’attente et fournit les liens de confirmation et les données associées. Reliez-la pour envoyer un message ou exécuter d’autres étapes.",
       "prompt": "Invite",
-      "promptError": "L’invite doit contenir entre 1 et 1 000 caractères."
+      "promptError": "L’invite doit contenir entre 1 et 1 000 caractères.",
+      "autoContinue": "Reprise automatique",
+      "autoOff": "Désactivée",
+      "autoAfter": "Après une durée",
+      "autoAt": "À une date précise",
+      "autoSeconds": "Durée (secondes)",
+      "autoDate": "Date et heure",
+      "autoInvalid": "Saisissez une durée positive ou une date et une heure valides.",
+      "autoDescription": "Vous pouvez reprendre manuellement avant l’heure prévue."
     },
     "title": "Inspecteur",
     "sources": {
@@ -786,7 +794,10 @@
       "failed": "Échec",
       "unknown": "État non confirmé"
     },
-    "errorHandled": "Échec traité"
+    "errorHandled": "Échec traité",
+    "waitAutoContinue": "Reprise automatique le {{date}}",
+    "eventWaitAutomatic": "Reprise automatique effectuée",
+    "eventWaitManual": "Traitement manuel effectué"
   },
   "sidebar": {
     "createFirstFlow": "Créer un Flow",

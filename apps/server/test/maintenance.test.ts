@@ -1,3 +1,5 @@
+import type { WaitAutoContinue } from '@oomol-lab/open-flow/flow-change'
+
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import * as Effect from 'effect/Effect'
 import * as Semaphore from 'effect/Semaphore'
@@ -18,7 +20,7 @@ function fixture() {
   return { database, clock, store, setTime: (at: number) => (now = at) }
 }
 
-function pause(store: Store, clock: () => number, flowId: string, notify = false, connectionId?: string) {
+function pause(store: Store, clock: () => number, flowId: string, notify = false, connectionId?: string, autoContinue?: WaitAutoContinue) {
   const revisionId = `revision:${flowId}`
   store.flows.createFlow({
     actorId: 'operator',
@@ -52,7 +54,7 @@ function pause(store: Store, clock: () => number, flowId: string, notify = false
   const wait = { jobId: 'job', nodeId: 'wait', waitId: 'wait' }
   store.runs.createWait(
     runId,
-    { ...wait, value: null, actions: ['continue'], prompt: 'Continue?', notify: false },
+    { ...wait, value: null, actions: ['continue'], prompt: 'Continue?', notify: false, autoContinue },
     'https://flows.example',
     notify ? { action: 'send', input: {}, messageHandle: 'message', ...(connectionId == null ? {} : { connectionId }) } : undefined,
   )
@@ -314,4 +316,36 @@ it.each([false, true])('fails deferred notifications without external delivery o
   expect(execute).not.toHaveBeenCalled()
   expect(database.connection.prepare('SELECT status FROM wait_notifications WHERE run_id = ?').get(waiting.runId)).toMatchObject({ status: 'failed' })
   expect(store.runs.maintain(clock(), 100, 60_000).notification).toBeUndefined()
+})
+
+it('wakes execution and publishes a Run change when an automatic Wait becomes due', async () => {
+  const { clock, store, setTime } = fixture()
+  const changed = vi.fn(),
+    signal = vi.fn(),
+    interrupt = vi.fn()
+  const maintenance = new Maintenance(
+    store,
+    { advance: () => 'idle' },
+    clock,
+    silentLogger,
+    () => undefined,
+    new ImplicitConnectorAccessHost(),
+    interrupt,
+    () => false,
+    () => {},
+    changed,
+    signal,
+    await Effect.runPromise(Semaphore.make(1)),
+  )
+  const waiting = pause(store, clock, 'timed', false, undefined, { kind: 'after', durationMs: 500 })
+  await Effect.runPromise(maintenance.run(new Date(clock()).toISOString()))
+  expect(maintenance.nextAt()).toBe(1500)
+  signal.mockClear()
+  setTime(1500)
+  await Effect.runPromise(maintenance.run(new Date(clock()).toISOString()))
+  expect(store.runViews.run(waiting.runId)?.status).toBe('queued')
+  expect(changed).toHaveBeenCalledExactlyOnceWith('timed', waiting.runId)
+  expect(signal).toHaveBeenCalled()
+  expect(interrupt).not.toHaveBeenCalled()
+  expect(maintenance.nextAt()).toBeGreaterThan(clock())
 })

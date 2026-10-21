@@ -23,6 +23,14 @@ export function withWaitNotificationMessage(value: JsonValue): JsonValue {
   return {
     ...source,
     pageUrl,
-    message: source.message === undefined ? [source.prompt, `Expires at: ${source.expiresAt}`, `Review request: ${pageUrl}`].join('\n\n') : source.message,
+    message:
+      source.message === undefined
+        ? [
+            source.prompt,
+            ...(typeof source.autoContinueAt == 'string' ? [`Automatically continues at: ${source.autoContinueAt}`] : []),
+            `Expires at: ${source.expiresAt}`,
+            `Review request: ${pageUrl}`,
+          ].join('\n\n')
+        : source.message,
   }
 }

@@ -91,6 +91,10 @@ export class Maintenance {
           this.#interrupt(runId)
           this.#runChanged(flowId, runId)
         }
+        for (const { flowId, runId } of runs.continuedWaits) {
+          this.#runChanged(flowId, runId)
+          this.#signal()
+        }
         for (const dispatch of runs.errorDispatches) {
           this.#runChanged(dispatch.flowId, dispatch.runId)
           if (dispatch.created != null) this.#runCreated(dispatch.created.flowId, dispatch.created.runId)

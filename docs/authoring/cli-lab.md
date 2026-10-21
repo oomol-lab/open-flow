@@ -359,3 +359,15 @@ HTTP completion, continued execution, scalar header conversion and concurrent id
 bun run lab test webhook-response-node
 bun run lab test webhook-response-node --mcp
 ```
+
+## Wait automatic continuation
+
+`wait-auto-continue` creates relative and absolute Waits through public authoring, preserves timing
+and inputs during a later rename, and clears a third Wait back to manual-only. Runtime acceptance
+requires exactly two automatic decisions and a completed business output. It uses no model or paid
+Connector calls. Run both reference transports:
+
+```bash
+bun run lab test wait-auto-continue
+bun run lab test wait-auto-continue --mcp
+```

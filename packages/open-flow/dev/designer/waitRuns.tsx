@@ -29,6 +29,7 @@ const waits: RunDetails['waits'] = [
     expiresAt: '2026-09-22T08:00:00Z',
   },
   {
+    autoContinueAt: '2026-09-16T08:00:00Z',
     waitId: 'review',
     nodeId: 'review',
     actions: ['continue'],
@@ -140,6 +141,24 @@ function WaitRuns({ language, log }: { readonly language: UiLanguage; readonly l
     { title: 'Notification running · independent approvals', run: { ...base, waits: pending }, events: [] as RunEvent[] },
     { title: 'Frozen · all waits remain actionable', run: { ...base, status: 'waiting' as const }, events: [] as RunEvent[] },
     {
+      title: 'Decision history · manual and automatic',
+      run: { ...base, status: 'completed' as const, waits: [] },
+      events: [
+        {
+          kind: 'run.resolved',
+          sequence: 1,
+          createdAt: '2026-09-15T08:05:00Z',
+          payload: { source: 'manual', action: 'approve', comment: 'Reviewed', waitId: 'release', resolvedAt: '2026-09-15T08:05:00Z' },
+        },
+        {
+          kind: 'run.resolved',
+          sequence: 2,
+          createdAt: '2026-09-16T08:00:00Z',
+          payload: { source: 'automatic', action: 'continue', comment: null, waitId: 'review', resolvedAt: '2026-09-16T08:00:00Z' },
+        },
+      ] as RunEvent[],
+    },
+    {
       title: 'Ordinary notification failure',
       run: { ...base, status: 'failed' as const, waits: [] },
       events: [
@@ -206,7 +225,7 @@ export const waitRunsStory: FrontendStory = {
   title: 'Run decisions',
   standalone: true,
   description:
-    'Add separate optional comments and resolve either wait while the notification branch continues. Frozen waits and ordinary notification failure are shown alongside.',
+    'Add separate optional comments and resolve either wait while the notification branch continues. Frozen waits, manual and automatic decision history, and ordinary notification failure are shown alongside.',
   render: (log, _dark, language) => <WaitRuns language={language} log={log} />,
 }
 
@@ -503,7 +522,7 @@ function ExecutionLogs({ language, dark, log }: { readonly language: UiLanguage;
   add('node.started', 1.6, { ...node('fetch', 'fetch-2'), nodeTitle: 'Fetch sources', nodeKind: 'javascript' })
   add('node.completed', 1.8, { ...node('fetch', 'fetch-2'), outputs: { count: 12 } })
   add('node.started', 3, { ...node('wait'), nodeKind: 'wait', nodeTitle: 'Review report' })
-  add('wait.created', 3.1, { nodeId: 'wait', waitId: 'review', waitingSince: time(3.1), expiresAt: time(300) })
+  add('wait.created', 3.1, { autoContinueAt: time(4), nodeId: 'wait', waitId: 'review', waitingSince: time(3.1), expiresAt: time(300) })
   add('node.started', 3.2, { ...node('notify'), nodeKind: 'connector', nodeTitle: 'Send notification' })
   add('node.failed', 3.4, {
     ...node('notify'),

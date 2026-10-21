@@ -22,6 +22,7 @@ import { nodeSystemOutputPorts, supportsNodeErrorHandling } from './errorHandlin
 import { supportsNodeRetry, retryConfigurationSchema } from './retry.ts'
 import { schemaObject, matchesSchema, comparePorts, portsAssignable, variableInputCompatible, hasRetiredRef } from './schema.ts'
 import { sourceFields, sourcePort, sourceOutputLabel } from './sourceField.ts'
+import { waitAutoContinueSchema } from './wait.ts'
 import {
   webhookResponseInputs,
   validWebhookStatus,
@@ -254,6 +255,7 @@ export function resolutionOutputPorts(node: Extract<GraphNode, { readonly kind: 
       message: { type: 'string', minLength: 1, pattern: '\\S' },
       ...Object.fromEntries(actions.map((action) => [`${action}Url`, { type: 'string' }])),
       expiresAt: { type: 'string' },
+      ...(node.kind == 'wait' && node.autoContinue != null ? { autoContinueAt: { type: 'string' } } : {}),
     }),
     ...Object.fromEntries(
       actions.map((action) => [
@@ -669,6 +671,13 @@ export function availableOutputs(graph: Graph, target: string, handle: string | 
 
 function validateResolution(nodeId: string, node: Extract<GraphNode, { readonly kind: 'approval' | 'wait' }>, path: string, diagnostics: Diagnostic[]): void {
   const fields = new Set(['description', 'icon', 'inputDefinitions', 'inputs', 'kind', 'maxExecutions', 'name', 'prompt'])
+  if (node.kind == 'wait') {
+    fields.add('autoContinue')
+    if (node.autoContinue != null && !waitAutoContinueSchema.safeParse(node.autoContinue).success)
+      diagnostics.push(
+        graphDiagnostic('wait.auto-continue-invalid', 'Enter a positive integer duration or a timestamp with an explicit timezone.', `${path}/autoContinue`),
+      )
+  }
   const label = node.kind == 'wait' ? 'Wait' : 'Approval'
   const unsupported = Object.keys(node).filter((field) => !fields.has(field))
   if (unsupported.length > 0) {

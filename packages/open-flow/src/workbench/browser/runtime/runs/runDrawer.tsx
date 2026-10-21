@@ -130,6 +130,7 @@ function WaitDecision({
         <AlertTitle>{waiting.prompt}</AlertTitle>
         <AlertDescription>
           <div>{t('run.waitExpires', { date: new Date(waiting.expiresAt).toLocaleString(language) })}</div>
+          {waiting.autoContinueAt != null && <div>{t('run.waitAutoContinue', { date: new Date(waiting.autoContinueAt).toLocaleString(language) })}</div>}
           <Field className="mt-2">
             <FieldLabel htmlFor={commentId}>{t('run.waitComment')}</FieldLabel>
             <Textarea
@@ -345,7 +346,9 @@ function eventSummary(event: RunEvent, t: TFunction): string {
     case 'run.queued':
       return t('run.eventEnqueued')
     case 'run.resolved':
-      return t('run.eventWaitResolved')
+      return t(
+        event.payload.source == 'automatic' ? 'run.eventWaitAutomatic' : event.payload.source == 'manual' ? 'run.eventWaitManual' : 'run.eventWaitResolved',
+      )
     case 'wait.created':
     case 'run.waiting':
       return t('run.statusWaiting')

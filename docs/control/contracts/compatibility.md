@@ -252,3 +252,26 @@ The npm publication baseline checked for this change is `0.1.0-beta.68` at
 pending Engine v6 changes. This refactor preserves node snapshots, output contracts and Run semantics;
 it does not allocate another Engine revision. Package consumers of the removed protocol helpers and
 Connector deployments must upgrade together at the new package boundary.
+
+## Unreleased Wait automatic continuation
+
+The npm `next` baseline verified for this change is `0.1.0-beta.69`, published from
+`026f74f27383188f3f771352e10e7a84bca89550`, with Engine v6. Reuse the branch's pending
+Engine v7 for optional Wait automatic continuation; v6 rejects this configuration. Flow model 10,
+checkpoint 6 and Control API envelopes retain their identifiers. New response and event metadata
+are optional, and historical records are not backfilled with inferred decision sources.
+
+Server migration 53 adds nullable automatic deadlines and decision sources plus a pending-deadline
+index. Existing waits remain manual. The isolated host capability digest includes
+`wait-auto-continue/1`; v6 retains support for its published runtime digest. Upgrade Server and the
+public package together and restart Server to apply the migration.
+
+Wait absolute-time configuration also accepts optional `timezone` editor metadata. It is preserved
+through public read/update and encoding. Existing absolute timestamps remain valid and authoritative;
+missing timezone metadata defaults only the editor presentation to the browser timezone. This
+addition reuses the pending Engine v7 revision and adds no storage migration.
+
+Draft timing retains invalid configuration: `durationMs: null` represents an empty duration, and
+`at` can retain empty or invalid date text. Draft decoding and edit operations preserve it; graph
+validation blocks publication and execution until corrected. Public authoring inputs still require
+valid timing. This draft editing refinement also reuses the pending Engine v7 revision.

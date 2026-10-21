@@ -1,5 +1,7 @@
 import type { TFunction } from 'val-i18n'
 
+import { timeZoneOffsetMinutes } from '../../localization/common/timeZone.ts'
+export { timeZoneOffsetMinutes } from '../../localization/common/timeZone.ts'
 import { resolveUiLanguage } from '../../localization/common/languages.ts'
 import studioEnglishTimeZoneLongNames from './locales/timeZoneLongNames.en.json'
 import studioChineseTimeZoneLongNames from './locales/timeZoneLongNames.zh-CN.json'
@@ -115,22 +117,6 @@ export function timeZoneOffset(timezone: string, at: Date = new Date()): string 
   const sign = minutes < 0 ? '-' : '+'
   const absolute = Math.abs(minutes)
   return `UTC${sign}${String(Math.floor(absolute / 60)).padStart(2, '0')}:${String(absolute % 60).padStart(2, '0')}`
-}
-
-export function timeZoneOffsetMinutes(timezone: string, at: Date = new Date()): number | undefined {
-  try {
-    const offset = new Intl.DateTimeFormat('en-US', { timeZone: timezone, timeZoneName: 'longOffset' })
-      .formatToParts(at)
-      .find((part) => part.type === 'timeZoneName')?.value
-    if (offset == null) return
-    if (offset === 'GMT') return 0
-    const match = /^GMT([+-])(\d{2}):(\d{2})$/.exec(offset)
-    if (match == null) return
-    const minutes = Number(match[2]) * 60 + Number(match[3])
-    return match[1] === '-' ? -minutes : minutes
-  } catch {
-    return
-  }
 }
 
 // Prefer the compact canvas translations. Complete-list entries derive a compact label from the

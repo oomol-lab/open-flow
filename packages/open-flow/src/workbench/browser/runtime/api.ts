@@ -74,6 +74,7 @@ export type {
   ValueNode,
   WaitAction,
   WaitNode,
+  WaitAutoContinue,
   WebhookOptions,
   WebhookMethod,
 } from '../../../flow/common/change.ts'

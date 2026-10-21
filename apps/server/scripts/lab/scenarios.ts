@@ -20,6 +20,13 @@ export const scenarios = [
     task: 'Create a POST Webhook named Published hook with a required string message field, an Echo code node forwarding the message, and Workflow Outputs declaring message and an integer status with literal value 201. Configure a workflow-output response selecting message with a 30-second timeout, preserving fixed response text accepted and fixed status 202. Bind the status code to output status, then rename status to httpStatus and confirm that reference follows. Rename the output field to reply through public editing and confirm the Webhook follows the rename. Change only its timeout to 15 seconds. Switch to immediate response by explicitly clearing responseBody and responseStatusCodeOutput and read back the preserved fixed text; restore the dynamic reply body and httpStatus status. Check and publish, inspect the online configuration, then change only the Draft hook method to PUT and name to Draft hook. Also declare enabled as a boolean output with literal false and headers as an object allowing text, numeric and boolean values, with literal value {"X-Object":"whole","X-Count":3,"X-Enabled":false}. Preserve fixed headers X-Reply="saved reply" and X-Fixed="kept". Bind X-Reply to the message output, X-Status to the numeric status and X-Enabled to enabled; verify references follow the output renames. Select headers as a whole-object responseHeadersSource, read and check it, then clear all dynamic response policies when switching to immediate mode. Restore the dynamic body, status and per-header bindings before publishing. Leave Live enabled; its POST response must return the request message as plain text with HTTP status 201 and the text, number and boolean response headers.',
   },
   {
+    id: 'wait-auto-continue',
+    entry: { kind: 'start' },
+    name: 'Configure automatic Wait continuation',
+    version: 2,
+    task: 'Create Start, a Wait named Relative wait with a 100-millisecond automatic continuation and order input 42, then a Wait named Date wait set to 1970-01-01T00:00:00Z with saved timezone UTC, then Outputs returning done=true. Connect their execution paths through the continue branches. Rename the relative node to Relative wait updated in a later request without changing its timing or input. Add an unconnected Wait named Manual wait with automatic continuation, then explicitly clear that configuration. Read all three settings back and check the workflow.',
+  },
+  {
     id: 'node-errors',
     entry: { kind: 'start' },
     name: 'Handle node errors',
@@ -178,6 +185,7 @@ function source(nodeId: string, handle: string, from: string, output: string): C
 }
 export function initialOperations(id: string): ChangeOperation[] {
   if (
+    id == 'wait-auto-continue' ||
     id == 'node-errors' ||
     id == 'node-retries' ||
     id == 'workflow-call' ||
@@ -420,6 +428,25 @@ function effectiveNode(content: RevisionContent, id: string): unknown {
 }
 /** Independent assertions: compare behavior and preserved effective configurations, not generated IDs. */
 export function assertions(id: string, base: RevisionContent, current: RevisionContent): string[] {
+  if (id == 'wait-auto-continue') {
+    const nodes = Object.values(current.document.graph.nodes)
+    const relative = nodes.find((candidate) => candidate.name == 'Relative wait updated')
+    const date = nodes.find((candidate) => candidate.name == 'Date wait')
+    const manual = nodes.find((candidate) => candidate.name == 'Manual wait')
+    return relative?.kind == 'wait' &&
+      relative.autoContinue?.kind == 'after' &&
+      relative.autoContinue.durationMs == 100 &&
+      relative.inputs.order?.kind == 'value' &&
+      relative.inputs.order.value == 42 &&
+      date?.kind == 'wait' &&
+      date.autoContinue?.kind == 'at' &&
+      Date.parse(date.autoContinue.at) == 0 &&
+      date.autoContinue.timezone == 'UTC' &&
+      manual?.kind == 'wait' &&
+      manual.autoContinue == null
+      ? []
+      : ['Preserve the relative timer and input, configure the date timer, and clear the manual timer.']
+  }
   if (id == 'node-errors') {
     const tasks = Object.values(current.document.graph.nodes).filter((candidate) => candidate.kind == 'task')
     return tasks.length == 2 &&

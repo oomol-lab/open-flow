@@ -118,7 +118,14 @@ export const authoringConfigurations = {
   'decision': definitions.decision,
   'condition': z.strictObject({ match: z.enum(['first', 'all']), branches: z.array(z.strictObject({ name: id, description: z.string().optional(), when })) }),
   'value': z.strictObject({ values: patch, outputs: outputFields }),
-  'wait': z.strictObject({ inputs: inputFields }),
+  'wait': z.strictObject({
+    inputs: inputFields,
+    autoContinue: definitions.waitAutoContinue
+      .optional()
+      .describe(
+        'Wait only. Omit to disable; clear config.autoContinue to remove. after counts from each wait registration; at requires an explicit offset and continues immediately if already past. Optional timezone preserves the editor zone; at remains the absolute instant. Server requires the deadline to precede the 7-day expiry.',
+      ),
+  }),
   'approval': z.strictObject({ inputs: inputFields }),
 }
 const metadata = {

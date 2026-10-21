@@ -95,7 +95,11 @@ export function authoringDiagnosticField(node: GraphNode | undefined, parts: rea
       return head == 'cases' || head == 'matchMode' ? ['config', ...conditionConfigurationFieldPath(node, location)].join('.') : 'config'
     case 'wait':
     case 'approval':
-      return head == 'inputDefinitions' ? portField(node.inputDefinitions, location.slice(1), 'config.inputs') : 'config'
+      return head == 'inputDefinitions'
+        ? portField(node.inputDefinitions, location.slice(1), 'config.inputs')
+        : head == 'autoContinue'
+          ? ['config', ...location].join('.')
+          : 'config'
     case 'start':
       return 'config'
     case 'webhook':

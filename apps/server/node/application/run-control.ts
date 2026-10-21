@@ -488,6 +488,7 @@ export class RunControl {
         nodeId: receipt.nodeId,
         prompt: receipt.prompt,
         waitId: receipt.waitId,
+        autoContinueAt: receipt.autoContinueAt == null ? undefined : timestamp(receipt.autoContinueAt),
         waitingSince: timestamp(receipt.waitingSince),
       })),
     }

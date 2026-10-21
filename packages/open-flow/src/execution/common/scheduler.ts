@@ -1,5 +1,15 @@
 import type { AgentConfig } from '../../flow/common/agent.ts'
-import type { ConnectorCapability, Graph, GraphNode, InputMapping, InputPortDefinition, JsonValue, TriggerNode, WaitAction } from '../../flow/common/change.ts'
+import type {
+  ConnectorCapability,
+  Graph,
+  GraphNode,
+  InputMapping,
+  InputPortDefinition,
+  JsonValue,
+  TriggerNode,
+  WaitAction,
+  WaitAutoContinue,
+} from '../../flow/common/change.ts'
 import type { NodeErrorData } from '../../flow/common/errorHandling.ts'
 import type { PreparedFlow } from '../../flow/common/semantics.ts'
 import type { WebhookResponseSnapshot } from '../../flow/common/webhookResponse.ts'
@@ -20,6 +30,7 @@ import { nodeErrorSchema, nodeSystemOutputPorts, supportsNodeErrorHandling } fro
 import { nodeInputPorts as nodePorts, isResolutionNode, nodeOutputPorts, resolutionActions, resolutionOutputPorts } from '../../flow/common/graph.ts'
 import { inputValue } from '../../flow/common/inputValue.ts'
 import { matchesSchema } from '../../flow/common/schema.ts'
+import { waitAutoContinueAt as automaticDeadline } from '../../flow/common/wait.ts'
 import { validWebhookStatus, webhookHeaderValues, encodeWebhookBody } from '../../flow/common/webhookResponse.ts'
 import { matchesTriggerOutputs, normalizeTriggerOutputs } from '../../trigger/common/contract.ts'
 import { Dependencies, dependenciesSchema, dependencyValues } from './dependencies.ts'
@@ -29,6 +40,8 @@ import { normalizeWaitComment as normalizeComment, withWaitNotificationMessage a
 export const withWaitNotificationMessage: (value: JsonValue) => JsonValue = notificationMessage
 
 export const normalizeWaitComment: (value?: string | null) => string | null = normalizeComment
+
+export const waitAutoContinueAt: (config: WaitAutoContinue, waitingSince: number) => number = automaticDeadline
 
 export interface WaitResolution {
   readonly action: WaitAction
@@ -151,6 +164,7 @@ export interface PendingWait {
 }
 
 export interface WaitRequest {
+  readonly autoContinue?: WaitAutoContinue
   readonly jobId: string
   readonly nodeId: string
   readonly value: JsonValue
@@ -1084,6 +1098,7 @@ function runGraph(
             value,
             waitId,
             notify,
+            ...(node.kind == 'wait' && node.autoContinue != null ? { autoContinue: node.autoContinue } : {}),
             actions: isResolutionNode(node) ? resolutionActions(node) : ['approve', 'reject'],
             prompt: isResolutionNode(node) ? node.prompt : JSON.stringify(value, null, 2),
             ...(isResolutionNode(node) ? {} : { notification: agentNotice(node, agents[jobId]!.input) }),

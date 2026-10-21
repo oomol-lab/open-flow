@@ -17,22 +17,48 @@ export function DateEditor({
   disabled,
   invalid,
   format,
-}: Pick<ValueControlProps, 'value' | 'onChange' | 'label' | 'disabled' | 'invalid'> & { format: DateFormat }) {
+  onCommit,
+  id,
+  precision = 'second',
+  describedBy,
+}: Pick<ValueControlProps, 'value' | 'onChange' | 'label' | 'disabled' | 'invalid'> & {
+  format: DateFormat
+  onCommit?: (value: unknown) => void
+  id?: string
+  precision?: 'minute' | 'second'
+  describedBy?: string
+}) {
+  const commit = (next: unknown) => {
+    const committed =
+      precision == 'minute' && typeof next == 'string'
+        ? next.replace(/^((?:\d{4}-\d{2}-\d{2}T)?\d{2}:\d{2})(?::\d{2}(?:\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/, '$1:00$2')
+        : next
+    onChange(committed)
+    onCommit?.(committed)
+  }
   const t = useTranslate()
   const [open, setOpen] = useState(false)
   const wall = datePickerValue(value, format)
   const time = (format === 'time' ? wall : wall.split('T')[1]) || '00:00:00'
+  const text = typeof value == 'string' ? value : ''
+  const display = precision == 'minute' ? text.replace(/^((?:\d{4}-\d{2}-\d{2}T)?\d{2}:\d{2}):\d{2}(?:\.\d+)?(Z|[+-]\d{2}:\d{2})?$/, '$1$2') : text
+  const timeParts = precision == 'minute' ? (['hours', 'minutes'] as const) : (['hours', 'minutes', 'seconds'] as const)
   const [container, setContainer] = useState<HTMLDivElement | null>(null)
   return (
     <div ref={setContainer} className="min-w-0">
       <InputGroup className="h-[30px]">
         <InputGroupInput
           className="h-full min-w-0 px-2 text-xs md:text-xs"
+          id={id}
           aria-label={label}
           aria-invalid={invalid}
+          aria-describedby={describedBy}
           readOnly={disabled}
-          value={typeof value === 'string' ? value : ''}
+          value={display}
           onChange={(event) => onChange(event.target.value)}
+          onBlur={(event) => {
+            if (onCommit != null) commit(event.currentTarget.value)
+          }}
         />
         <InputGroupAddon align="inline-end">
           <Popover open={open} onOpenChange={setOpen}>
@@ -48,14 +74,14 @@ export function DateEditor({
                   defaultMonth={calendarDate(value, format)}
                   disabled={disabled}
                   onSelect={(day) => {
-                    onChange(calendarChange(day, value, format))
+                    commit(calendarChange(day, value, format))
                     if (format === 'date') setOpen(false)
                   }}
                 />
               )}
               {format !== 'date' && (
-                <div className="grid grid-cols-3 gap-2">
-                  {(['hours', 'minutes', 'seconds'] as const).map((part, index) => (
+                <div className="flex gap-2">
+                  {timeParts.map((part, index) => (
                     <label key={part} className="flex min-w-0 flex-col gap-1 text-xs text-muted-foreground">
                       {t(`valueEditor.${part}`)}
                       <Input
@@ -78,7 +104,7 @@ export function DateEditor({
                           parts[index] = input.value.padStart(2, '0')
                           const date = calendarDate(value, format) ?? new Date()
                           const next = format === 'time' ? parts.join(':') : `${calendarChange(date, undefined, 'date')}T${parts.join(':')}`
-                          onChange(datePickerChange(next, value, format, date.getTimezoneOffset()))
+                          commit(datePickerChange(next, value, format, date.getTimezoneOffset()))
                         }}
                       />
                     </label>

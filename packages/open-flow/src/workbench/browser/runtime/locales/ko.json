@@ -344,7 +344,15 @@
       "inputsLoading": "알림 매개변수를 불러오는 중…",
       "pendingDescription": "확인 대기 출력은 대기가 시작될 때 한 번 실행되어 확인 링크와 관련 데이터를 제공합니다. 연결하여 메시지를 보내거나 다른 단계를 실행할 수 있습니다.",
       "prompt": "프롬프트",
-      "promptError": "프롬프트는 1~1,000자여야 합니다."
+      "promptError": "프롬프트는 1~1,000자여야 합니다.",
+      "autoContinue": "자동 계속",
+      "autoOff": "끄기",
+      "autoAfter": "일정 시간 후",
+      "autoAt": "지정 시간에",
+      "autoSeconds": "대기 시간(초)",
+      "autoDate": "날짜 및 시간",
+      "autoInvalid": "양수 대기 시간 또는 유효한 날짜와 시간을 입력하세요.",
+      "autoDescription": "예정 시간 전에 수동으로 계속할 수 있습니다."
     },
     "title": "인스펙터",
     "sources": {
@@ -786,7 +794,10 @@
       "failed": "실패",
       "unknown": "상태 미확인"
     },
-    "errorHandled": "실패 처리됨"
+    "errorHandled": "실패 처리됨",
+    "waitAutoContinue": "{{date}}에 자동 계속",
+    "eventWaitAutomatic": "자동으로 계속됨",
+    "eventWaitManual": "수동으로 처리됨"
   },
   "sidebar": {
     "createFirstFlow": "Flow 만들기",

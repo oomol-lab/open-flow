@@ -344,7 +344,15 @@
       "inputsLoading": "正在加载通知参数…",
       "pendingDescription": "待确认出口在开始等待时触发一次，提供确认链接及相关数据。连接此出口可发送消息或执行其他步骤。",
       "prompt": "提示",
-      "promptError": "提示必须包含 1 到 1,000 个字符。"
+      "promptError": "提示必须包含 1 到 1,000 个字符。",
+      "autoContinue": "自动继续",
+      "autoOff": "关闭",
+      "autoAfter": "等待一段时间",
+      "autoAt": "到指定时间",
+      "autoSeconds": "等待时长（秒）",
+      "autoDate": "日期和时间",
+      "autoInvalid": "请输入正数时长或有效的日期和时间。",
+      "autoDescription": "可提前手动继续。"
     },
     "title": "检查器",
     "sources": {
@@ -786,7 +794,10 @@
       "failed": "失败",
       "unknown": "状态未确认"
     },
-    "errorHandled": "失败已处理"
+    "errorHandled": "失败已处理",
+    "waitAutoContinue": "将于 {{date}} 自动继续",
+    "eventWaitAutomatic": "已自动继续",
+    "eventWaitManual": "已人工处理"
   },
   "sidebar": {
     "createFirstFlow": "创建工作流",

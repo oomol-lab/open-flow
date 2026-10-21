@@ -709,9 +709,9 @@ Node context is `{ flowId, scopeId, nodeId, executionId }`, with nonempty identi
 
 Wait registration, whole-graph freezing, and resolution append these events:
 
-- `wait.created`: `{ expiresAt, nodeId, waitId, waitingSince }`.
+- `wait.created`: `{ expiresAt, nodeId, waitId, waitingSince, autoContinueAt? }`.
 - `run.waiting`: `{ waitIds }`, emitted only when a complete checkpoint commits.
-- `run.resolved`: `{ action, resolvedAt, waitId }`.
+- `run.resolved`: `{ action, comment, resolvedAt, waitId, source? }`; `source` is `manual | automatic`. Older events may omit it.
 
 Authenticated clients resolve a Wait through `POST /v1/runs/:runId/waits/:waitId/resolve` with `{ action: 'continue' | 'approve' | 'reject', version: 1 }`. The action must belong to the Wait’s `actions` in the pinned Revision. Response:
 
@@ -1101,6 +1101,52 @@ Deployments with a public origin may include a Wait’s opaque capability URL in
 Rate-limited requests return `429 wait-action.rate-limited` with remaining wait seconds in `Retry-After`. Rate-limited `POST` submits no decision. Rate-limited `HEAD` also has no body.
 
 Independent resolution receipts survive event retention and are removed with Flow deletion. After another wait or terminal Run state, the old waitId still returns the winning action and original resolvedAt. The same decision returns `resolutionAccepted: true`; an opposing one returns `false`. Neither queues more execution. Canceled or expired unresolved waits create no resolution fact. Retained receipts do not extend expired external capabilities.
+
+### Wait automatic continuation
+
+Only Wait accepts optional `autoContinue` business configuration, through both the node model and
+public `config.autoContinue`. Use `{ kind: 'after', durationMs }` for a positive safe integer number
+of milliseconds, or `{ kind: 'at', at, timezone? }` for an ISO timestamp with an explicit offset and an optional named editor timezone. Omission
+disables automatic continuation. Public updates preserve omitted configuration; clear
+`['config', 'autoContinue']` to disable it. Switching the timing kind replaces the timing object.
+Approval and Agent approvals do not support this configuration. `at` remains the authoritative
+absolute instant; `timezone` preserves the editor's selected timezone and does not reinterpret `at`
+on the Server. Existing configurations without it use the browser's local zone for editing. The
+Workbench uses the shared date editor and timezone selector. Changing the selected zone preserves
+the entered wall date/time and saves the corresponding new instant. Date conversion uses that
+date's daylight-saving offset, rejects nonexistent wall times and chooses the earlier instant for
+repeated wall times.
+
+Workbench drafts save the selected mode and invalid values as well as valid configurations.
+An empty duration is stored as `durationMs: null`; an empty or invalid date retains its text in
+`at`. Draft decoding and change operations preserve these values. Validation reports
+`wait.auto-continue-invalid` and prevents publication or execution until corrected. Public
+authoring inputs continue to require valid timing. The editor validates on mode changes,
+value changes and reopening; validation errors do not block draft saves.
+
+Server calculates and persists `autoContinueAt` at each Wait registration. Relative durations count
+from that occurrence's creation, including loop iterations. Past absolute timestamps are due
+immediately. Server retains the existing seven-day lifetime and rejects automatic deadlines at or
+beyond `expiresAt`; other deployments own their lifetime policy. The deadline is independent of
+checkpoint retention and is never recalculated on replay or recovery. Draft configuration does not
+change an existing Run's pinned timing.
+
+Run detail waits and `wait.created` add optional `autoContinueAt`. Configured Wait pending outputs
+also include it, and `pending.message` states the scheduled continuation time. Existing pending
+fields and decision outputs retain their meanings. Workbench displays the deadline in Run details
+and the decision source in history. `resolvedAt` is the actual committed decision time.
+
+The Server maintenance scheduler submits `continue` through the same transactional decision owner
+as manual resolution. The first valid decision wins, even if a manual submission arrives after the
+planned time but before the scheduler commits. Repeated ticks and later manual submissions cannot
+replace its source, time or comment. Cancellation and terminal Runs prevent automatic continuation.
+Due frozen waits are processed after restart if still unexpired; expiry retains priority once the
+seven-day deadline is reached. The existing two-minute session retention and crash recovery rules
+remain unchanged. A running session without a complete checkpoint becomes indeterminate after
+process loss. Timers provide eventual execution, not a guarantee of exact wall-clock execution.
+
+Automatic continuation requires Engine v7. Engine v6 rejects configured Waits before execution.
+Scheduler checkpoint version 6 and Flow model version 10 remain unchanged.
 
 ### Wait local execution and freezing
 

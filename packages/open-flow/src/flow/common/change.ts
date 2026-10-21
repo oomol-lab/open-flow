@@ -150,7 +150,12 @@ interface ResolutionNodeBase extends GraphNodeBase {
   readonly timeoutMs?: never
 }
 
+export type WaitAutoContinue =
+  | { readonly kind: 'after'; readonly durationMs: number | null }
+  | { readonly kind: 'at'; readonly at: string; readonly timezone?: string }
+
 export interface WaitNode extends ResolutionNodeBase {
+  readonly autoContinue?: WaitAutoContinue
   readonly kind: 'wait'
 }
 
@@ -667,11 +672,11 @@ export type ChangeOperation =
       readonly value: readonly InputPort[]
     }
   | {
-      readonly before: Pick<ResolutionNode, 'inputDefinitions' | 'prompt'>
+      readonly before: Pick<WaitNode, 'inputDefinitions' | 'prompt' | 'autoContinue'>
       readonly kind: 'graph.node.resolution.set'
       readonly nodeId: string
 
-      readonly value: Pick<ResolutionNode, 'inputDefinitions' | 'prompt'>
+      readonly value: Pick<WaitNode, 'inputDefinitions' | 'prompt' | 'autoContinue'>
     }
   | {
       readonly before: Pick<Extract<TriggerNode, { readonly kind: 'webhook' }>, 'bodyFields' | 'method' | 'options'>
@@ -940,10 +945,22 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
       case 'graph.node.resolution.set': {
         const graph = document.graph
         const node = graph.nodes[operation.nodeId]
-        if ((node?.kind != 'wait' && node?.kind != 'approval') || !dequal({ inputDefinitions: node.inputDefinitions, prompt: node.prompt }, operation.before)) {
+        if (
+          (node?.kind != 'wait' && node?.kind != 'approval') ||
+          !dequal(
+            {
+              inputDefinitions: node.inputDefinitions,
+              prompt: node.prompt,
+              ...(node.kind == 'wait' && node.autoContinue != null ? { autoContinue: node.autoContinue } : {}),
+            },
+            operation.before,
+          )
+        ) {
           invalid('The resolution node changed before this operation was applied.')
         }
+        if (node.kind == 'approval' && operation.value.autoContinue != null) invalid('Approval does not support automatic continuation.')
         const updated: ResolutionNode = { ...node, ...operation.value }
+        if (updated.kind == 'wait' && operation.value.autoContinue == null) Reflect.deleteProperty(updated, 'autoContinue')
         document.graph = { ...graph, nodes: { ...graph.nodes, [operation.nodeId]: updated } }
         break
       }

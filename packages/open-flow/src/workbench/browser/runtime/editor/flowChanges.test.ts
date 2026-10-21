@@ -1,4 +1,5 @@
 import type { TaskNode } from '../../../../flow/common/change.ts'
+import type { WaitAutoContinue } from '../../../../flow/common/change.ts'
 import type { ManagedTaskDefinition } from '../../../../flow/common/change.ts'
 import type { InputPort } from '../../../../flow/common/change.ts'
 import type { Draft } from '../api.ts'
@@ -1154,4 +1155,33 @@ it('copies multiple response nodes and remaps the selected response with ordinar
   expect(copied.content.document.graph.nodes['copy-2']).toMatchObject({ kind: 'webhook-response', inputs: { body: { kind: 'value', value: 'first' } } })
   expect(copied.content.document.graph.nodes['copy-3']).toMatchObject({ kind: 'webhook-response' })
   expect(applyFlowChanges(copied, inverseFlowChanges(current.content, pasted.changes)).content).toEqual(current.content)
+})
+
+it.each<WaitAutoContinue>([
+  { kind: 'after', durationMs: 1000 },
+  { kind: 'after', durationMs: null },
+  { kind: 'after', durationMs: -1000 },
+  { kind: 'at', at: 'invalid date', timezone: 'UTC' },
+])('preserves and removes automatic Wait timing through edits and undo: %j', (timing) => {
+  const original = draft('export default () => ({})')
+  const current = {
+    ...original,
+    content: {
+      ...original.content,
+      document: {
+        ...original.content.document,
+        graph: {
+          edges: [],
+          nodes: { wait: { kind: 'wait' as const, name: 'Wait', prompt: 'Review', inputDefinitions: [], inputs: {}, autoContinue: timing } },
+        },
+      },
+    },
+  }
+  const changes = updateResolution(revisionView(current), 'wait', { name: 'Wait', prompt: 'Updated' })!
+  const changed = applyFlowChanges(current, changes)
+  expect(changed.content.document.graph.nodes.wait).toMatchObject({ autoContinue: timing, prompt: 'Updated' })
+  const cleared = updateResolution(revisionView(changed), 'wait', { name: 'Wait', prompt: 'Updated', autoContinue: null })!
+  const without = applyFlowChanges(changed, cleared)
+  expect(without.content.document.graph.nodes.wait).not.toHaveProperty('autoContinue')
+  expect(applyFlowChanges(without, inverseFlowChanges(changed.content, cleared)).content).toEqual(changed.content)
 })

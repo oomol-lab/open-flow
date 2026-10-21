@@ -44,6 +44,7 @@ function runWaiting(value: unknown) {
   }
   return {
     actions: actions as unknown as readonly ['continue'] | readonly ['approve', 'reject'],
+    ...(source.autoContinueAt === undefined ? {} : { autoContinueAt: string(source.autoContinueAt) }),
     expiresAt: string(source.expiresAt),
     nodeId: string(source.nodeId),
     prompt: string(source.prompt),

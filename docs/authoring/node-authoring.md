@@ -203,3 +203,17 @@ different source. System definitions are read-only and appear separately in deta
 property panel. There is no error execution edge or canvas connection point. Use a Condition node
 to distinguish null from an error object. Business output bindings must allow missing/null values
 if downstream processing also executes after a handled failure.
+
+## Wait automatic continuation
+
+Wait supports optional `config.autoContinue`: `{ kind: 'after', durationMs: 86400000 }` or
+`{ kind: 'at', at: '2026-10-25T10:00:00+08:00', timezone: 'Asia/Shanghai' }`. Timing is static business configuration,
+not an input binding. Manual continuation remains available. Omit for manual-only waiting; clear
+`['config', 'autoContinue']` to remove it. Relative timing starts at each Wait registration.
+Server requires the scheduled time to precede its seven-day expiry and checks this at registration.
+The Workbench uses the shared date editor at minute precision and a selectable, saved timezone. The optional timezone controls editing; at remains the absolute execution timestamp. Switching timezone in the Workbench keeps wall time and updates that timestamp.
+Workbench drafts preserve invalid timing and show errors immediately, including after reopening.
+Empty duration uses `durationMs: null`; empty or invalid dates retain their text in `at`. These
+drafts cannot be published or executed. Public authoring inputs still require valid timing.
+Approval remains manual. See the Control API's Wait automatic continuation contract for recovery,
+competition and event metadata.

@@ -1,4 +1,5 @@
 import type { EventSource } from '../../../../control/common/api.ts'
+import type { WaitAutoContinue } from '../../../../flow/common/change.ts'
 import type { AgentInput, AgentTool, ManagedTaskDefinition } from '../../../../flow/common/change.ts'
 import type {
   ChangeOperation,
@@ -361,6 +362,7 @@ export function updateResolution(
   settings: Pick<Extract<GraphNode, { readonly kind: 'approval' | 'wait' }>, 'prompt'> & {
     readonly name?: string
     readonly inputDefinitions?: readonly InputPort[]
+    readonly autoContinue?: WaitAutoContinue | null
   },
   values?: Readonly<Record<string, JsonValue | undefined>>,
 ): FlowChanges | undefined {
@@ -370,10 +372,13 @@ export function updateResolution(
   const before = {
     inputDefinitions: current.inputDefinitions,
     prompt: current.prompt,
+    ...(current.kind == 'wait' && current.autoContinue != null ? { autoContinue: current.autoContinue } : {}),
   }
+  const autoContinue = Object.hasOwn(settings, 'autoContinue') ? settings.autoContinue : before.autoContinue
   const value = {
     inputDefinitions: settings.inputDefinitions ?? current.inputDefinitions,
     prompt: settings.prompt,
+    ...(current.kind == 'wait' && autoContinue != null ? { autoContinue } : {}),
   }
   const changes: ChangeOperation[] = []
   if (current.name != settings.name) {

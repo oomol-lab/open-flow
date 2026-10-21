@@ -344,7 +344,15 @@
       "inputsLoading": "通知パラメーターを読み込んでいます…",
       "pendingDescription": "確認待ち出力は待機開始時に一度だけ発火し、確認リンクと関連データを提供します。接続先でメッセージの送信や他のステップを実行できます。",
       "prompt": "プロンプト",
-      "promptError": "プロンプトは1〜1,000文字で入力してください。"
+      "promptError": "プロンプトは1〜1,000文字で入力してください。",
+      "autoContinue": "自動続行",
+      "autoOff": "オフ",
+      "autoAfter": "一定時間後",
+      "autoAt": "指定日時",
+      "autoSeconds": "待機時間（秒）",
+      "autoDate": "日時",
+      "autoInvalid": "正の待機時間または有効な日時を入力してください。",
+      "autoDescription": "予定時刻前に手動で続行できます。"
     },
     "title": "インスペクター",
     "sources": {
@@ -786,7 +794,10 @@
       "failed": "失敗",
       "unknown": "状態未確認"
     },
-    "errorHandled": "失敗を処理済み"
+    "errorHandled": "失敗を処理済み",
+    "waitAutoContinue": "{{date}} に自動続行",
+    "eventWaitAutomatic": "自動で続行しました",
+    "eventWaitManual": "手動で処理しました"
   },
   "sidebar": {
     "createFirstFlow": "Flow を作成",

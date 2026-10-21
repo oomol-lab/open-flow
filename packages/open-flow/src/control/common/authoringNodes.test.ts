@@ -1,4 +1,4 @@
-import type { JsonValue, ManagedTaskDefinition, RevisionContent, TriggerKeySnapshot } from '../../flow/common/change.ts'
+import type { JsonValue, ManagedTaskDefinition, RevisionContent, TriggerKeySnapshot, WaitAutoContinue } from '../../flow/common/change.ts'
 import type { AuthoringHost, AuthoringRequest } from './authoring.ts'
 
 import * as Effect from 'effect/Effect'
@@ -9,6 +9,7 @@ import { currentEngineContract } from '../../execution/common/runtime.ts'
 import { runFlow } from '../../execution/common/scheduler.ts'
 import { currentFlowModelVersion } from '../../flow/common/change.ts'
 import { decodeRevisionContent } from '../../flow/common/changeSchema.ts'
+import { decodeRevision, encodeRevision } from '../../flow/common/encoding.ts'
 import { nodeInputPorts } from '../../flow/common/graph.ts'
 import { prepareFlow, validateFlow } from '../../flow/common/semantics.ts'
 import { triggerDefinitions } from '../../trigger/providers/definitions.ts'
@@ -519,4 +520,93 @@ it('preserves explicit deferred accounts in public creation, reads, local update
   for (const type of ['poll', 'integration'] as const) {
     await expect(edit(empty, [{ op: 'node.add', as: 'trigger', type, name: 'Trigger', config: { key: type, connectionId: '' } }])).rejects.toThrow()
   }
+})
+
+describe('Wait automatic continuation authoring', () => {
+  it('creates, reads, switches modes and clears timing while preserving unrelated fields', async () => {
+    const created = await edit(empty, [
+      {
+        op: 'node.add',
+        type: 'wait',
+        as: 'wait',
+        name: 'Review',
+        prompt: 'Continue?',
+        config: { autoContinue: { kind: 'after', durationMs: 24 * 60 * 60 * 1000 } },
+        inputs: { order: { kind: 'value', value: 42 } },
+      },
+    ])
+    const ref = created.nodes.wait!
+    await roundTrip(created.content, ref)
+    expect(decodeRevision(encodeRevision(created.content))).toEqual(created.content)
+    const renamed = await edit(created.content, [{ op: 'node.update', node: ref, set: { name: 'Review updated' } }])
+    expect(authoringNode(renamed.content, ref)).toMatchObject({
+      config: { autoContinue: { kind: 'after', durationMs: 86_400_000 } },
+      inputs: { order: { kind: 'value', value: 42 } },
+    })
+    const at = { kind: 'at', at: '2026-10-25T10:00:00+08:00', timezone: 'Asia/Shanghai' }
+    const switched = await edit(renamed.content, [{ op: 'node.update', node: ref, set: { config: { autoContinue: at } } }])
+    expect(authoringNode(switched.content, ref)).toMatchObject({ config: { autoContinue: at } })
+    const rezoned = await edit(switched.content, [{ op: 'node.update', node: ref, set: { config: { autoContinue: { timezone: 'UTC' } } } }])
+    expect(authoringNode(rezoned.content, ref)).toMatchObject({ config: { autoContinue: { ...at, timezone: 'UTC' } } })
+    const cleared = await edit(rezoned.content, [{ op: 'node.update', node: ref, clear: [['config', 'autoContinue']] }])
+    expect(cleared.content.document.graph.nodes[ref]).not.toHaveProperty('autoContinue')
+    expect(authoringNode(cleared.content, ref)).toMatchObject({ name: 'Review updated', inputs: { order: { kind: 'value', value: 42 } } })
+  })
+
+  it.each([
+    { kind: 'after', durationMs: null },
+    { kind: 'after', durationMs: 0 },
+    { kind: 'after', durationMs: 1.5 },
+    { kind: 'at', at: '2026-10-25T10:00:00' },
+    { kind: 'at', at: 'invalid' },
+    { kind: 'at', at: '2026-10-25T10:00:00Z', timezone: 'Invalid/Zone' },
+  ])('rejects invalid configuration %j', async (autoContinue) => {
+    await expect(
+      edit(empty, [{ op: 'node.add', type: 'wait', as: 'wait', name: 'Wait', config: { autoContinue: JSON.parse(JSON.stringify(autoContinue)) } }]),
+    ).rejects.toThrow()
+  })
+
+  it.each<WaitAutoContinue>([
+    { kind: 'after', durationMs: null },
+    { kind: 'after', durationMs: -1000 },
+    { kind: 'after', durationMs: 0.1 },
+    { kind: 'at', at: '', timezone: 'UTC' },
+    { kind: 'at', at: 'invalid date', timezone: 'UTC' },
+  ])('round-trips invalid Wait drafts and prevents execution: %j', async (autoContinue) => {
+    const content: RevisionContent = {
+      ...empty,
+      document: {
+        bindings: {},
+        graph: {
+          nodes: {
+            start: { kind: 'start', name: 'Start', inputDefs: [] },
+            wait: { kind: 'wait', name: 'Wait', inputs: {}, inputDefinitions: [], prompt: 'Continue?', autoContinue },
+          },
+          edges: [{ source: 'start', target: 'wait' }],
+        },
+      },
+    }
+    expect(decodeRevisionContent(content)).toEqual(content)
+    expect(decodeRevision(encodeRevision(content))).toEqual(content)
+    expect(authoringNode(content, 'wait')).toMatchObject({ config: { autoContinue } })
+    const prepared = await prepareFlow(content, currentEngineContract)
+    expect(prepared.kind).toBe('flow-invalid')
+    if (prepared.kind == 'flow-invalid')
+      expect(prepared.validation.diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'wait.auto-continue-invalid' })]))
+  })
+
+  it('keeps Approval manual and requires Engine v7 for automatic Waits', async () => {
+    await expect(
+      edit(empty, [{ op: 'node.add', type: 'approval', as: 'approval', name: 'Approval', config: { autoContinue: { kind: 'after', durationMs: 1000 } } }]),
+    ).rejects.toThrow()
+    const created = await edit(empty, [
+      { op: 'node.add', type: 'start', as: 'start', name: 'Start' },
+      { op: 'node.add', type: 'wait', as: 'wait', name: 'Wait', config: { autoContinue: { kind: 'after', durationMs: 1000 } } },
+      { op: 'edge.connect', source: '$start', target: '$wait' },
+    ])
+    expect((await prepareFlow(created.content, 'open-flow-engine/v6')).kind).toBe('engine-unsupported')
+    expect((await prepareFlow(created.content, currentEngineContract)).kind).toBe('prepared')
+    const approval = { kind: 'approval', prompt: 'Review', inputs: {}, inputDefinitions: [], autoContinue: { kind: 'after', durationMs: 1000 } }
+    expect(() => decodeRevisionContent({ ...empty, document: { ...empty.document, graph: { nodes: { approval }, edges: [] } } })).toThrow()
+  })
 })

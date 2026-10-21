@@ -291,16 +291,16 @@ selection rules come from the selected node contract.
 
 For Connector Tasks, independent Code Actions, Agent tools and notifications, an omitted `connectionId` means unconfigured; `connectionId: ""` explicitly defers account configuration. Deferred selections pass account readiness checks but fail with `connector.connection-required` if invoked. Deferred Agent tools are excluded from the callable tool set. Provider Triggers still require a nonempty account ID. Public edits and portable exports preserve the empty string; clear the field to return to the unconfigured state.
 
-| Capability                      | Relevant schema and configuration                                                                                                  |
-| ------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Provider read or write          | `connector`: discovered `action`, optional `connectionId`, named input bindings.                                                   |
-| Provider event                  | `poll` or `integration`: discovered `key`, Connection and any static inputs; polling also has a schedule.                          |
-| Manual, HTTP or scheduled entry | `start`, `webhook`, `cron`: workflow `inputDefs`, HTTP body fields, or schedule.                                                   |
-| Workflow failure handler        | `error`: published upstream Flows' automatic Run failures; not a node-level catch or a handler for manual Run failures.            |
-| Call another workflow           | `workflow`: select an owned published Flow ID; inputs and outputs derive from its saved contract. Use `node.refresh` to update it. |
-| Fixed HTTP operation            | `openapi`: an OpenAPI source, path and method; resolved authentication choices and ports appear in node details.                   |
-| Reusable constants              | `value`: named JSON values and optional output constraints.                                                                        |
-| Durable interaction             | `wait`, `approval`: prompt and named inputs; resume through the Run's Wait ID.                                                     |
+| Capability                      | Relevant schema and configuration                                                                                                                                                                                                   |
+| ------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Provider read or write          | `connector`: discovered `action`, optional `connectionId`, named input bindings.                                                                                                                                                    |
+| Provider event                  | `poll` or `integration`: discovered `key`, Connection and any static inputs; polling also has a schedule.                                                                                                                           |
+| Manual, HTTP or scheduled entry | `start`, `webhook`, `cron`: workflow `inputDefs`, HTTP body fields, or schedule.                                                                                                                                                    |
+| Workflow failure handler        | `error`: published upstream Flows' automatic Run failures; not a node-level catch or a handler for manual Run failures.                                                                                                             |
+| Call another workflow           | `workflow`: select an owned published Flow ID; inputs and outputs derive from its saved contract. Use `node.refresh` to update it.                                                                                                  |
+| Fixed HTTP operation            | `openapi`: an OpenAPI source, path and method; resolved authentication choices and ports appear in node details.                                                                                                                    |
+| Reusable constants              | `value`: named JSON values and optional output constraints.                                                                                                                                                                         |
+| Durable interaction             | `wait`, `approval`: prompt and named inputs; resume through the Run's Wait ID. Wait additionally supports optional `config.autoContinue` with `{kind:"after",durationMs:86400000}` or `{kind:"at",at:"2026-10-25T10:00:00+08:00"}`. |
 
 Connector and LLM services are configured on the Server. Missing capabilities
 should be described in terms of the required operation or event, without silently
@@ -339,6 +339,11 @@ Declare parameters on Start: `{"op":"node.add","as":"start","type":"start","name
 <!-- agentic:var flowCommand --> runs wait RUN_ID --timeout 60000 --json
 <!-- agentic:var flowCommand --> runs resolve RUN_ID WAIT_ID approve --json
 ```
+
+Only Wait supports automatic continuation. Omit `config.autoContinue` for manual waiting or clear
+`["config", "autoContinue"]` to disable it. Relative timing starts at each Wait registration;
+absolute timestamps require an offset. Optional `timezone` stores the editor zone; `at` remains the absolute instant. Server rejects deadlines at or beyond its seven-day expiry
+when registering the Wait. The first manual or automatic decision wins.
 
 A Wait or Approval suspends the existing Run. `run.waits` carries its Wait IDs;
 resolution uses `continue`, `approve` or `reject` as appropriate to that wait and

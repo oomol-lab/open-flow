@@ -344,7 +344,15 @@
       "inputsLoading": "正在載入通知參數…",
       "pendingDescription": "待確認出口在開始等待時觸發一次，提供確認連結及相關資料。連接此出口可傳送訊息或執行其他步驟。",
       "prompt": "提示",
-      "promptError": "提示必須包含 1 到 1,000 個字元。"
+      "promptError": "提示必須包含 1 到 1,000 個字元。",
+      "autoContinue": "自動繼續",
+      "autoOff": "關閉",
+      "autoAfter": "等待一段時間",
+      "autoAt": "到指定時間",
+      "autoSeconds": "等待時長（秒）",
+      "autoDate": "日期和時間",
+      "autoInvalid": "請輸入正數時長或有效的日期和時間。",
+      "autoDescription": "可提前手動繼續。"
     },
     "title": "檢查器",
     "sources": {
@@ -786,7 +794,10 @@
       "failed": "失敗",
       "unknown": "狀態未確認"
     },
-    "errorHandled": "失敗已處理"
+    "errorHandled": "失敗已處理",
+    "waitAutoContinue": "將於 {{date}} 自動繼續",
+    "eventWaitAutomatic": "已自動繼續",
+    "eventWaitManual": "已人工處理"
   },
   "sidebar": {
     "createFirstFlow": "建立 Flow",
