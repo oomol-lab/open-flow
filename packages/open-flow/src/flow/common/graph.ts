@@ -22,7 +22,7 @@ import { nodeSystemOutputPorts, supportsNodeErrorHandling } from './errorHandlin
 import { supportsNodeRetry, retryConfigurationSchema } from './retry.ts'
 import { schemaObject, matchesSchema, comparePorts, portsAssignable, variableInputCompatible, hasRetiredRef } from './schema.ts'
 import { sourceFields, sourcePort, sourceOutputLabel } from './sourceField.ts'
-import { webhookResponseAllowsBody } from './webhookResponse.ts'
+import { webhookResponseAllowsBody, webhookStatusCodePort } from './webhookResponse.ts'
 
 export function isResolutionNode(node: GraphNode | undefined): node is Extract<GraphNode, { readonly kind: 'approval' | 'wait' }> {
   return node?.kind == 'approval' || node?.kind == 'wait'
@@ -39,7 +39,13 @@ function graphDiagnostic(
 
 export function webhookResponseDiagnostics(graph: Graph, triggerId: string, path = `/document/graph/nodes/${triggerId}`): readonly Diagnostic[] {
   const trigger = graph.nodes[triggerId]
-  if (trigger?.kind != 'webhook' || trigger.options?.responseBody == null) return []
+  if (trigger?.kind != 'webhook') return []
+  const statusOutput = trigger.options?.responseStatusCodeOutput
+  const statusPath = `${path}/options/responseStatusCodeOutput`
+  if (trigger.options?.responseBody == null)
+    return statusOutput == null
+      ? []
+      : [graphDiagnostic('trigger.webhook-response-status-source', 'Choose workflow outputs as the response source to use a status output.', statusPath)]
   const diagnostics: Diagnostic[] = []
   const responsePath = `${path}/options/responseBody`
   const output = Object.entries(graph.nodes).find(([, node]) => node.kind == 'outputs')
@@ -55,8 +61,21 @@ export function webhookResponseDiagnostics(graph: Graph, triggerId: string, path
       diagnostics.push(
         graphDiagnostic('trigger.webhook-response-output-missing', `Workflow output "${field}" does not exist.`, `${responsePath}/output`, { output: field }),
       )
+    if (statusOutput != null && output[1].kind == 'outputs') {
+      const port = output[1].outputDefs.find((candidate) => candidate.handle == statusOutput)
+      if (port == null)
+        diagnostics.push(
+          graphDiagnostic('trigger.webhook-response-status-output-missing', `Workflow status output "${statusOutput}" does not exist.`, statusPath, {
+            output: statusOutput,
+          }),
+        )
+      else if (!portsAssignable(port, webhookStatusCodePort))
+        diagnostics.push(
+          graphDiagnostic('trigger.webhook-response-status-output-type', 'Choose a numeric workflow output for the response status code.', statusPath),
+        )
+    }
   }
-  if (!webhookResponseAllowsBody(trigger.options.responseStatusCode ?? 200))
+  if (statusOutput == null && !webhookResponseAllowsBody(trigger.options.responseStatusCode ?? 200))
     diagnostics.push(
       graphDiagnostic('trigger.webhook-response-status-invalid', 'Choose a response status code that permits a body.', `${path}/options/responseStatusCode`),
     )

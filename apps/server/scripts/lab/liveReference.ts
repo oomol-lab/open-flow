@@ -21,7 +21,16 @@ export async function referenceLive(call: ToolCall, flowId: string, dynamic = fa
         config: {
           method: 'POST',
           body: { message: { schema: { type: 'string' }, nullable: false } },
-          ...(dynamic ? { options: { responseBody: { kind: 'workflow-outputs', output: 'message', timeoutMs: 30000 }, responseData: 'accepted' } } : {}),
+          ...(dynamic
+            ? {
+                options: {
+                  responseBody: { kind: 'workflow-outputs', output: 'message', timeoutMs: 30000 },
+                  responseData: 'accepted',
+                  responseStatusCode: 202,
+                  responseStatusCodeOutput: 'status',
+                },
+              }
+            : {}),
         },
       },
       {
@@ -41,8 +50,8 @@ export async function referenceLive(call: ToolCall, flowId: string, dynamic = fa
               as: 'out',
               type: 'outputs',
               name: 'Outputs',
-              config: { outputDefs: { message: { schema: { type: 'string' }, nullable: false } } },
-              inputs: { message: { kind: 'output', node: '$echo', port: 'message' } },
+              config: { outputDefs: { message: { schema: { type: 'string' }, nullable: false }, status: { schema: { type: 'integer' }, nullable: false } } },
+              inputs: { message: { kind: 'output', node: '$echo', port: 'message' }, status: { kind: 'value', value: 201 } },
             },
             { op: 'edge.connect', source: '$echo', target: '$out' },
           ]
@@ -66,13 +75,35 @@ export async function referenceLive(call: ToolCall, flowId: string, dynamic = fa
         { op: 'node.update', node: refs.hook, set: { config: { options: { responseBody: { timeoutMs: 15000 } } } } },
       ],
     })
-    revision = renamed.revision
+    const renamedStatus = await call('flow_edit', {
+      flowId,
+      baseRevision: renamed.revision,
+      requestId: randomUUID(),
+      edits: [
+        {
+          op: 'node.update',
+          node: refs.out,
+          set: { config: { outputDefs: { httpStatus: { schema: { type: 'integer' }, nullable: false } } } },
+          clear: [['config', 'outputDefs', 'status']],
+        },
+      ],
+    })
+    revision = renamedStatus.revision
     await call('flow_read', { flowId, nodes: [refs.hook, refs.out] })
     const cleared = await call('flow_edit', {
       flowId,
       baseRevision: revision,
       requestId: randomUUID(),
-      edits: [{ op: 'node.update', node: refs.hook, clear: [['config', 'options', 'responseBody']] }],
+      edits: [
+        {
+          op: 'node.update',
+          node: refs.hook,
+          clear: [
+            ['config', 'options', 'responseBody'],
+            ['config', 'options', 'responseStatusCodeOutput'],
+          ],
+        },
+      ],
     })
     await call('flow_read', { flowId, nodes: [refs.hook] })
     const restored = await call('flow_edit', {
@@ -80,7 +111,13 @@ export async function referenceLive(call: ToolCall, flowId: string, dynamic = fa
       baseRevision: cleared.revision,
       requestId: randomUUID(),
       edits: [
-        { op: 'node.update', node: refs.hook, set: { config: { options: { responseBody: { kind: 'workflow-outputs', output: 'reply', timeoutMs: 15000 } } } } },
+        {
+          op: 'node.update',
+          node: refs.hook,
+          set: {
+            config: { options: { responseBody: { kind: 'workflow-outputs', output: 'reply', timeoutMs: 15000 }, responseStatusCodeOutput: 'httpStatus' } },
+          },
+        },
       ],
     })
     revision = restored.revision

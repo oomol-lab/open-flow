@@ -7,7 +7,10 @@ Model v10 adds optional Webhook `options.responseBody` with
 immediate `responseData`; the new mode waits for the accepted Run to succeed and returns only its
 business outputs. Timeout defaults to 30000 ms and accepts 1000–60000 ms. It includes queueing and
 durable waits, and does not cancel the Run. Field omission returns the complete object; strings
-return plain text and other JSON values return JSON. Missing executed outputs are an HTTP error.
+return plain text and other JSON values return JSON. Missing executed outputs are an HTTP error. Optional `responseStatusCodeOutput` selects a numeric
+top-level output as the HTTP status only in workflow-output response mode. Fixed
+`responseStatusCode` is preserved; missing or invalid dynamic statuses return 500. This addition
+shares the unreleased v10 boundary.
 
 The published npm `0.1.0-beta.69` artifact (gitHead
 `026f74f27383188f3f771352e10e7a84bca89550`) uses model v9. A new model boundary prevents old

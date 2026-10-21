@@ -14,7 +14,12 @@ export async function verifyLiveWebhook(lab: LabSession, dynamic = false): Promi
     errors.push('Published POST contract is incorrect.')
   if (
     dynamic &&
-    !isDeepStrictEqual(entry.config.options, { responseData: 'accepted', responseBody: { kind: 'workflow-outputs', output: 'reply', timeoutMs: 15000 } })
+    !isDeepStrictEqual(entry.config.options, {
+      responseData: 'accepted',
+      responseBody: { kind: 'workflow-outputs', output: 'reply', timeoutMs: 15000 },
+      responseStatusCode: 202,
+      responseStatusCodeOutput: 'httpStatus',
+    })
   )
     errors.push('Publish the selected reply output, 15-second timeout and preserved fixed text.')
   const published = lab.service.control.getRevision(lab.manifest.flowId, details.publication.revisionId).content
@@ -30,7 +35,7 @@ export async function verifyLiveWebhook(lab: LabSession, dynamic = false): Promi
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ message: 'accepted published contract' }),
   })
-  if (response.status != 200) errors.push(`Published callback returned ${response.status}.`)
+  if (response.status != (dynamic ? 201 : 200)) errors.push(`Published callback returned ${response.status}.`)
   if (dynamic && ((await response.text()) != 'accepted published contract' || response.headers.get('content-type') != 'text/plain;charset=UTF-8'))
     errors.push('The published callback must return the workflow reply as plain text.')
   const admitted = lab.service.control.runs.listRuns(lab.manifest.flowId, 100, {}).page.runs.filter((run) => !previous.has(run.runId))
@@ -45,7 +50,10 @@ export async function verifyLiveWebhook(lab: LabSession, dynamic = false): Promi
     runIds.push(run.runId)
     if (dynamic) {
       const result = lab.service.control.runs.getRunResult(run.runId)
-      if (result.status != 'completed' || !isDeepStrictEqual((result.result as { outputs?: unknown }).outputs, { reply: 'accepted published contract' }))
+      if (
+        result.status != 'completed' ||
+        !isDeepStrictEqual((result.result as { outputs?: unknown }).outputs, { reply: 'accepted published contract', httpStatus: 201 })
+      )
         errors.push('Preserve the renamed workflow business output and mapping.')
     }
     if (

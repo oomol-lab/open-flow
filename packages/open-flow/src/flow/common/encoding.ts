@@ -289,6 +289,7 @@ function canonicalWebhookOptions(value: WebhookOptions): JsonValue {
     ...(value.responseData == null ? {} : { responseData: value.responseData }),
     ...(value.responseHeaders == null ? {} : { responseHeaders: value.responseHeaders }),
     ...(value.responseStatusCode == null ? {} : { responseStatusCode: value.responseStatusCode }),
+    ...(value.responseStatusCodeOutput == null ? {} : { responseStatusCodeOutput: value.responseStatusCodeOutput }),
   }
 }
 

@@ -463,6 +463,7 @@ export interface WebhookOptions {
   readonly responseData?: string
   readonly responseHeaders?: Readonly<Record<string, string>>
   readonly responseStatusCode?: number
+  readonly responseStatusCodeOutput?: string
 }
 
 interface TriggerNodeBase {

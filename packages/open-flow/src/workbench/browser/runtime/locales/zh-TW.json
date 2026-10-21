@@ -896,7 +896,10 @@
         "webhook-response-outputs-missing": "請新增工作流程輸出節點作為 HTTP 回應。",
         "webhook-response-unreachable": "請將此 Webhook 連接至工作流程輸出節點。",
         "webhook-response-output-missing": "工作流程輸出欄位「{{output}}」不存在。",
-        "webhook-response-status-invalid": "請選擇允許回應本文的狀態碼。"
+        "webhook-response-status-invalid": "請選擇允許回應本文的狀態碼。",
+        "webhook-response-status-source": "回應來源設為工作流程輸出後，才能引用狀態碼欄位。",
+        "webhook-response-status-output-missing": "狀態碼引用的工作流程輸出欄位「{{output}}」不存在。",
+        "webhook-response-status-output-type": "請選擇數字類型的工作流程輸出欄位作為狀態碼。"
       },
       "leina": {
         "robot-required": "請選擇 Leina 機器人，或綁定機器人識別碼的資料來源。"
@@ -1129,10 +1132,11 @@
     "webhookMissingOutput": "{{output}}（已失效）",
     "webhookTimeout": "等候逾時（秒）",
     "webhookTimeoutInvalid": "請輸入 1–60 秒的等候時間。",
-    "webhookDynamicHint": "工作流程成功完成後傳回輸出。逾時傳回 504，工作流程繼續執行。等候時間包含排隊、重試、人工確認與子工作流程。",
+    "webhookTimeoutDescription": "等候逾時後傳回 HTTP 504，工作流程繼續執行。等候時間包含排隊、重試、人工確認與子工作流程。",
     "webhookDynamicStatusInvalid": "請輸入 200–599 的整數，204、205、304 除外。",
     "webhookAddOutputs": "新增工作流程輸出",
-    "webhookOutputsDisconnected": "未連接工作流程輸出"
+    "webhookOutputsDisconnected": "未連接工作流程輸出",
+    "webhookStatusSource": "回應狀態碼來源"
   },
   "conditionEditor": {
     "addCondition": "新增條件",

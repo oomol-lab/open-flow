@@ -2,6 +2,7 @@ import type { JsonValue, WebhookBodyField, WebhookMethod, WebhookOptions } from 
 
 import { dequal } from 'dequal/lite'
 import { isJsonObject } from '../../base/common/json.ts'
+import { webhookResponseAllowsBody } from '../../flow/common/webhookResponse.ts'
 
 export { webhookSupportsBody } from './contract.ts'
 export { webhookResponseAllowsBody, webhookResponseTimeout } from '../../flow/common/webhookResponse.ts'
@@ -13,10 +14,19 @@ export function webhookResponseBody(
   result: unknown,
   source: NonNullable<WebhookOptions['responseBody']>,
 ): { readonly body: string; readonly contentType: string } | undefined {
-  if (!isJsonObject(result) || result.kind != 'node-results' || !isJsonObject(result.outputs)) return
-  if (source.output != null && !Object.hasOwn(result.outputs, source.output)) return
-  const value = source.output == null ? result.outputs : result.outputs[source.output]!
+  const value = workflowOutputValue(result, source.output)
+  if (value === undefined) return
   return typeof value == 'string' ? { body: value, contentType: 'text/plain;charset=UTF-8' } : { body: JSON.stringify(value), contentType: 'application/json' }
+}
+
+export function webhookResponseStatusCode(result: unknown, output: string): number | undefined {
+  const value = workflowOutputValue(result, output)
+  if (typeof value == 'number' && Number.isInteger(value) && value >= 200 && value <= 599 && webhookResponseAllowsBody(value)) return value
+}
+
+function workflowOutputValue(result: unknown, output?: string): JsonValue | undefined {
+  if (!isJsonObject(result) || result.kind != 'node-results' || !isJsonObject(result.outputs)) return
+  return output == null ? result.outputs : Object.hasOwn(result.outputs, output) ? result.outputs[output] : undefined
 }
 
 const endpointPattern = /^\/v1\/webhooks\/(endpoint_[0-9a-f]{32})$/

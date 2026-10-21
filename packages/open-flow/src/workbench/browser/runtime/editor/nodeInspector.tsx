@@ -282,6 +282,10 @@ export function NodeInspector({
   const disabled = readOnly || temporarilyDisabled || store == null
   const t = useTranslate()
   const content = useRef<HTMLDivElement>(null)
+  const outputNode =
+    selection?.kind === 'trigger' && selection.trigger.kind === 'webhook'
+      ? Object.entries(revision.graph().nodes).find(([, node]) => node.kind === 'outputs')
+      : undefined
   const providerTrigger =
     selection?.kind === 'trigger' && (selection.trigger.kind === 'integration' || selection.trigger.kind === 'poll') ? selection.trigger : undefined
   const providerDisplay = providerTrigger == null ? undefined : triggerDisplays?.[providerTrigger.definition.key]
@@ -534,7 +538,9 @@ export function NodeInspector({
             bodyFields={selection.trigger.bodyFields}
             method={selection.trigger.method}
             options={selection.trigger.options ?? {}}
-            workflowOutputs={Object.values(revision.graph().nodes).find((node) => node.kind === 'outputs')?.outputDefs}
+            workflowOutputs={
+              outputNode?.[1].kind === 'outputs' ? { ...outputNode[1], icon: sourceNodeIcons?.[outputNode[0]] ?? outputNode[1].icon } : undefined
+            }
             responseDiagnostics={webhookResponseDiagnostics(revision.graph(), selection.id)}
             onAddWorkflowOutputs={readOnly ? undefined : onAddWorkflowOutputs}
             disabled={disabled}

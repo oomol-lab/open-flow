@@ -127,10 +127,15 @@ Run. A string returns plain text; other values, including null, return JSON. An 
 Outputs node returns `{}`; a skipped Outputs node or missing selected field returns 500. Failed,
 canceled and indeterminate Runs return 500; execution deadlines return 504. Errors have a fixed JSON
 body without internal exception details. Success uses the configured status (default 200); dynamic
-responses reject 204, 205 and 304. Existing response header restrictions and CORS still apply.
+responses reject 204, 205 and 304. In workflow-output response mode, optional
+`responseStatusCodeOutput` selects a numeric top-level output as the status. It overrides the saved
+fixed `responseStatusCode`. Missing, null, fractional, out-of-range or bodyless status values return
+500 with a fixed error body. No string-to-number conversion or fallback is applied. Existing response
+header restrictions and CORS still apply.
 
 Omitted `responseBody` retains immediate `responseData` behavior. Updating dynamic configuration
-preserves saved fixed text. Switch back with `clear: [["config", "options", "responseBody"]]`.
+preserves saved fixed text. Switch back by clearing `responseBody` and any
+`responseStatusCodeOutput`; the fixed status and text remain saved.
 Explicit output renames update response selections through shared editing; removals preserve stale
 selections for diagnostics. Drafts can retain incomplete configuration; checks and publication reject
 missing, unreachable or undeclared response outputs. Live reads expose the published configuration

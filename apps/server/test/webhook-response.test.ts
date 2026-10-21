@@ -173,6 +173,47 @@ async function fixture(
 }
 
 describe('published dynamic HTTP responses', () => {
+  it.each([201, 400, 599, 199, 204, 205, 304, 600, 200.5, null])('returns a selected numeric status %s or a fixed error', async (value) => {
+    const f = await fixture(
+      value,
+      { responseBody: { kind: 'workflow-outputs', output: 'value' }, responseStatusCode: 202, responseStatusCodeOutput: 'value' },
+      true,
+      false,
+      (content) => {
+        const echo = content.document.graph.nodes.echo!
+        if (echo.kind !== 'task') throw new Error('Expected task fixture')
+        return {
+          ...content,
+          document: {
+            ...content.document,
+            graph: {
+              ...content.document.graph,
+              nodes: {
+                ...content.document.graph.nodes,
+                echo: { ...echo, task: { ...echo.task, outputs: [{ handle: 'value', jsonSchema: { type: 'number' }, nullable: true }] } },
+                outputs: {
+                  kind: 'outputs',
+                  name: 'Outputs',
+                  outputDefs: [{ handle: 'value', jsonSchema: { type: 'number' }, nullable: true }],
+                  outputMappings: { value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'echo', output: 'value' }] } },
+                },
+              },
+            },
+          },
+        }
+      },
+    )
+    const reply = await f.request()
+    if (value === 201 || value === 400 || value === 599) {
+      expect(reply.status).toBe(value)
+      expect(await reply.json()).toBe(value)
+    } else {
+      expect(reply.status).toBe(500)
+      expect(await reply.json()).toEqual({
+        error: { code: 'webhook.response-status-invalid', message: 'The workflow response status code is unavailable or invalid.' },
+      })
+    }
+  })
   it('releases a disconnected TCP request and serves its keyed retry from the same Run', async () => {
     const f = await fixture('hello', undefined, false)
     const observe = vi.spyOn(f.service, 'waitForWebhookRun')

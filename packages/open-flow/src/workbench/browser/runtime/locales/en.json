@@ -896,7 +896,10 @@
         "webhook-response-outputs-missing": "Add a workflow Outputs node for the HTTP response.",
         "webhook-response-unreachable": "Connect this Webhook to the workflow Outputs node.",
         "webhook-response-output-missing": "Workflow output \"{{output}}\" does not exist.",
-        "webhook-response-status-invalid": "Choose a response status code that permits a body."
+        "webhook-response-status-invalid": "Choose a response status code that permits a body.",
+        "webhook-response-status-source": "Choose workflow outputs as the response source to use a status output.",
+        "webhook-response-status-output-missing": "Workflow status output \"{{output}}\" does not exist.",
+        "webhook-response-status-output-type": "Choose a numeric workflow output for the response status code."
       },
       "leina": {
         "robot-required": "Select a Leina robot or bind its identifier to an input source."
@@ -1129,10 +1132,11 @@
     "webhookMissingOutput": "{{output}} (missing)",
     "webhookTimeout": "Wait timeout (seconds)",
     "webhookTimeoutInvalid": "Enter a timeout from 1 to 60 seconds.",
-    "webhookDynamicHint": "Returns outputs after the workflow succeeds. A timeout returns 504; the workflow continues. Waiting includes queueing, retries, approvals and called workflows.",
+    "webhookTimeoutDescription": "A wait timeout returns HTTP 504; the workflow continues. Waiting includes queueing, retries, approvals and called workflows.",
     "webhookDynamicStatusInvalid": "Enter an integer from 200 to 599, except 204, 205 and 304.",
     "webhookAddOutputs": "Add workflow Outputs",
-    "webhookOutputsDisconnected": "Workflow Outputs not connected"
+    "webhookOutputsDisconnected": "Workflow Outputs not connected",
+    "webhookStatusSource": "Response status code source"
   },
   "conditionEditor": {
     "addCondition": "Add condition",

@@ -171,6 +171,7 @@ const webhookOptions = z.object({
   responseData: text.optional(),
   responseHeaders: z.record(text, text).optional(),
   responseStatusCode: z.number().int().min(200).max(599).optional(),
+  responseStatusCodeOutput: text.optional(),
 })
 const webhook = {
   bodyFields: z.array(input),
@@ -673,7 +674,10 @@ export function changeOperationsSchema(kind?: string): JsonValue {
 function checkModelVersion(content: RevisionContent): void {
   if (
     content.modelVersion < 10 &&
-    Object.values(content.document.graph.nodes).some((candidateNode) => candidateNode.kind == 'webhook' && candidateNode.options?.responseBody != null)
+    Object.values(content.document.graph.nodes).some(
+      (candidateNode) =>
+        candidateNode.kind == 'webhook' && (candidateNode.options?.responseBody != null || candidateNode.options?.responseStatusCodeOutput != null),
+    )
   )
     throw new TypeError('Dynamic Webhook responses require Flow model version 10.')
   if (content.modelVersion < 9 && Object.values(content.document.graph.nodes).some((candidateNode) => 'retry' in candidateNode && candidateNode.retry != null))

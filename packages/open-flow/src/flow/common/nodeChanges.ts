@@ -709,14 +709,21 @@ export function updateOutputsDefs(
   const changes: ChangeOperation[] = [{ kind: 'graph.node.replace', nodeId, before: node, node: next }]
   if (rename != null) {
     for (const [id, trigger] of Object.entries(content.document.graph.nodes)) {
-      if (trigger.kind != 'webhook' || trigger.options?.responseBody?.output !== rename[0]) continue
+      if (trigger.kind != 'webhook' || trigger.options == null) continue
+      const bodyRenamed = trigger.options.responseBody?.output === rename[0]
+      const statusRenamed = trigger.options.responseStatusCodeOutput === rename[0]
+      if (!bodyRenamed && !statusRenamed) continue
       changes.push({
         kind: 'graph.node.replace',
         nodeId: id,
         before: trigger,
         node: {
           ...trigger,
-          options: { ...trigger.options, responseBody: { ...trigger.options.responseBody, output: rename[1] } },
+          options: {
+            ...trigger.options,
+            ...(bodyRenamed ? { responseBody: { ...trigger.options.responseBody!, output: rename[1] } } : {}),
+            ...(statusRenamed ? { responseStatusCodeOutput: rename[1] } : {}),
+          },
         },
       })
     }

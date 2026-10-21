@@ -896,7 +896,10 @@
         "webhook-response-outputs-missing": "Добавьте узел результатов для HTTP-ответа.",
         "webhook-response-unreachable": "Соедините этот Webhook с узлом результатов.",
         "webhook-response-output-missing": "Результат «{{output}}» не существует.",
-        "webhook-response-status-invalid": "Выберите код состояния, допускающий тело ответа."
+        "webhook-response-status-invalid": "Выберите код состояния, допускающий тело ответа.",
+        "webhook-response-status-source": "Для выбора поля статуса укажите выходные данные процесса как источник ответа.",
+        "webhook-response-status-output-missing": "Поле статуса «{{output}}» отсутствует в выходных данных процесса.",
+        "webhook-response-status-output-type": "Выберите числовое поле выходных данных процесса для кода статуса."
       },
       "leina": {
         "robot-required": "Выберите робота Leina или привяжите его идентификатор к источнику данных."
@@ -1129,10 +1132,11 @@
     "webhookMissingOutput": "{{output}} (отсутствует)",
     "webhookTimeout": "Время ожидания (секунды)",
     "webhookTimeoutInvalid": "Введите время ожидания от 1 до 60 секунд.",
-    "webhookDynamicHint": "Возвращает результаты после успеха. При тайм-ауте возвращает 504; выполнение продолжается. Ожидание включает очередь, повторы, подтверждения и вызванные процессы.",
+    "webhookTimeoutDescription": "При истечении времени ожидания возвращает HTTP 504; выполнение продолжается. Ожидание включает очередь, повторы, подтверждения и вызванные процессы.",
     "webhookDynamicStatusInvalid": "Введите целое число от 200 до 599, кроме 204, 205 и 304.",
     "webhookAddOutputs": "Добавить результаты процесса",
-    "webhookOutputsDisconnected": "Результаты процесса не подключены"
+    "webhookOutputsDisconnected": "Результаты процесса не подключены",
+    "webhookStatusSource": "Источник кода статуса"
   },
   "conditionEditor": {
     "addCondition": "Добавить условие",

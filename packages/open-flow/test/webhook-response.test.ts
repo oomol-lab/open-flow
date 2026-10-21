@@ -8,7 +8,7 @@ import { decodeRevision, decodeRevisionContent, encodeRevision } from '../src/fl
 import { validateFlowGraph } from '../src/flow/common/graph.ts'
 import { inverseFlowChanges } from '../src/flow/common/inverseChanges.ts'
 import { updateOutputsDefs } from '../src/flow/common/nodeChanges.ts'
-import { webhookResponseBody } from '../src/trigger/common/webhook.ts'
+import { webhookResponseBody, webhookResponseStatusCode } from '../src/trigger/common/webhook.ts'
 
 const field = { handle: 'message', jsonSchema: { type: 'string' }, nullable: false } as const
 function content(options: WebhookOptions = { responseBody: { kind: 'workflow-outputs' } }): RevisionContent {
@@ -41,6 +41,69 @@ const host: AuthoringHost = {
 }
 
 describe('workflow HTTP response contract', () => {
+  it.each([200, 201, 400, 599])('projects a valid status %s from business outputs', (status) => {
+    expect(webhookResponseStatusCode({ kind: 'node-results', outputs: { status } }, 'status')).toBe(status)
+  })
+
+  it.each<JsonValue>([null, '201', false, {}, [], 199, 600, 204, 205, 304, 200.5])('rejects invalid status %j without coercion or fallback', (status) => {
+    expect(webhookResponseStatusCode({ kind: 'node-results', outputs: { status }, nodes: [{ outputs: { status: 201 } }] }, 'status')).toBeUndefined()
+  })
+
+  it('requires executed business outputs for a selected status', () => {
+    expect(webhookResponseStatusCode({ kind: 'node-results', nodes: [{ outputs: { status: 201 } }] }, 'status')).toBeUndefined()
+    expect(webhookResponseStatusCode({ kind: 'node-results', outputs: {} }, 'toString')).toBeUndefined()
+  })
+
+  it('checks status mode, field existence and numeric type and preserves stale references through removal', () => {
+    const original = content({ responseBody: { kind: 'workflow-outputs' }, responseStatusCode: 202, responseStatusCodeOutput: 'message' })
+    expect(validateFlowGraph(original)).toContainEqual(expect.objectContaining({ code: 'trigger.webhook-response-status-output-type' }))
+    const numeric = applyFlowChanges(
+      original,
+      updateOutputsDefs(original, 'outputs', [{ ...field, jsonSchema: { type: 'integer' } }], { message: { kind: 'value', value: 201 } }),
+    )
+    expect(validateFlowGraph(numeric)).toEqual([])
+    const renamed = applyFlowChanges(numeric, updateOutputsDefs(numeric, 'outputs', [{ ...field, handle: 'status', jsonSchema: { type: 'integer' } }]))
+    expect(authoringNode(renamed, 'hook').config).toMatchObject({ options: { responseStatusCode: 202, responseStatusCodeOutput: 'status' } })
+    expect(
+      applyFlowChanges(
+        renamed,
+        inverseFlowChanges(numeric, updateOutputsDefs(numeric, 'outputs', [{ ...field, handle: 'status', jsonSchema: { type: 'integer' } }])),
+      ),
+    ).toEqual(numeric)
+    const removed = applyFlowChanges(renamed, updateOutputsDefs(renamed, 'outputs', []))
+    expect(authoringNode(removed, 'hook').config).toMatchObject({ options: { responseStatusCodeOutput: 'status' } })
+    expect(validateFlowGraph(removed)).toContainEqual(expect.objectContaining({ code: 'trigger.webhook-response-status-output-missing' }))
+    expect(validateFlowGraph(content({ responseStatusCodeOutput: 'message' }))).toContainEqual(
+      expect.objectContaining({ code: 'trigger.webhook-response-status-source' }),
+    )
+    expect(() => decodeRevisionContent({ ...content({ responseStatusCodeOutput: 'message' }), modelVersion: 9 })).toThrow('version 10')
+    expect(decodeRevision(encodeRevision(numeric))).toEqual(numeric)
+  })
+
+  it('creates and clears a status output through public authoring while retaining the fixed status', async () => {
+    const original = content({ responseBody: { kind: 'workflow-outputs' }, responseStatusCode: 202 })
+    const created = await compileAuthoring(
+      original,
+      {
+        baseRevision: 'base',
+        requestId: 'status',
+        edits: [{ op: 'node.update', node: 'hook', set: { config: { options: { responseStatusCodeOutput: 'message' } } } }],
+      },
+      host,
+    )
+    const updated = applyFlowChanges(original, created.operations)
+    expect(authoringNode(updated, 'hook').config).toMatchObject({ options: { responseStatusCode: 202, responseStatusCodeOutput: 'message' } })
+    const cleared = await compileAuthoring(
+      updated,
+      {
+        baseRevision: 'base',
+        requestId: 'clear-status',
+        edits: [{ op: 'node.update', node: 'hook', clear: [['config', 'options', 'responseStatusCodeOutput']] }],
+      },
+      host,
+    )
+    expect(applyFlowChanges(updated, cleared.operations)).toEqual(original)
+  })
   it.each<JsonValue>(['hello', '', '<script>alert(1)</script>', { answer: 42 }, [1, null], 0, false, null])('encodes a selected value %j', (value) => {
     expect(webhookResponseBody({ kind: 'node-results', outputs: { message: value }, nodes: [] }, { kind: 'workflow-outputs', output: 'message' })).toEqual({
       body: typeof value == 'string' ? value : JSON.stringify(value),

@@ -2,12 +2,13 @@ import type { ReactNode } from 'react'
 import type { Diagnostic, InputPort, WebhookMethod, WebhookOptions } from '../api.ts'
 import type { WebhookSettings } from './flowChanges.ts'
 import type { PropertyDeletion } from './propertyDeletion.ts'
+import type { WorkflowResponseOutputs } from './webhookStatusSource.tsx'
 
 import { useEffect, useId, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { webhookResponseAllowsBody, webhookResponseTimeout } from '../../../../flow/common/webhookResponse.ts'
 import { editorComponentIcons } from '../../../../form/browser/editorComponentIcon.tsx'
-import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
+import { ValueControl, ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { FieldSelect } from '../../../../form/browser/fieldSelect.tsx'
 import { webhookMethods, webhookSupportsBody } from '../../../../trigger/common/contract.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
@@ -20,6 +21,7 @@ import { diagnosticMessage } from './diagnostics.ts'
 import { FieldSectionHeader } from './fieldSectionHeader.tsx'
 import { InspectorSection } from './inspectorSection.tsx'
 import { PortDefinitionEditor } from './portDefinitionEditor.tsx'
+import { WebhookStatusSource } from './webhookStatusSource.tsx'
 
 interface DraftInspection {
   readonly issue?: string
@@ -49,6 +51,9 @@ function DraftTextField({
   placeholder,
   inspect,
   onSave,
+  addon,
+  editor,
+  error,
 }: {
   readonly label: string
   readonly value: string
@@ -59,6 +64,9 @@ function DraftTextField({
   readonly placeholder?: string
   readonly inspect?: (value: string, signal: AbortSignal) => Promise<DraftInspection>
   readonly onSave: (value: string) => void
+  readonly addon?: ReactNode
+  readonly editor?: (id: string, errorId: string | undefined) => ReactNode
+  readonly error?: string
 }) {
   const id = useId()
   const descriptionId = `${id}-description`
@@ -87,9 +95,9 @@ function DraftTextField({
     return () => controller.abort()
   }, [draft])
   useEffect(() => () => commitController.current?.abort(), [])
-  const issue = inspection?.draft === draft ? inspection.result.issue : undefined
+  const issue = error ?? (editor == null && inspection?.draft === draft ? inspection.result.issue : undefined)
   const commit = () => {
-    if (disabled || draft === value) return
+    if (disabled || editor != null || draft === value) return
     commitController.current?.abort()
     const controller = new AbortController()
     commitController.current = controller
@@ -129,9 +137,13 @@ function DraftTextField({
   return (
     <Field data-invalid={issue != null || undefined}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <ValueEditorFeedback error={issue}>
-        {(errorId) => (multiline ? <Textarea {...controlProps(errorId)} /> : <Input {...controlProps(errorId)} controlSize="field" />)}
-      </ValueEditorFeedback>
+      <ValueControl addon={addon}>
+        <ValueEditorFeedback error={issue}>
+          {(errorId) =>
+            editor?.(id, errorId) ?? (multiline ? <Textarea {...controlProps(errorId)} /> : <Input {...controlProps(errorId)} controlSize="field" />)
+          }
+        </ValueEditorFeedback>
+      </ValueControl>
       {description != null && (
         <FieldDescription id={descriptionId} className="px-2 text-[11px] leading-4">
           {description}
@@ -204,7 +216,7 @@ export function WebhookEditor({
   disabled,
   readOnly,
   outputSection,
-  workflowOutputs = [],
+  workflowOutputs,
   responseDiagnostics = [],
   onAddWorkflowOutputs,
   onChange,
@@ -214,7 +226,7 @@ export function WebhookEditor({
   readonly options: WebhookOptions
   readonly readOnly?: boolean
   readonly disabled: boolean
-  readonly workflowOutputs?: readonly InputPort[]
+  readonly workflowOutputs?: WorkflowResponseOutputs
   readonly responseDiagnostics?: readonly Diagnostic[]
   readonly onAddWorkflowOutputs?: () => void
   readonly outputSection?: ReactNode
@@ -230,7 +242,14 @@ export function WebhookEditor({
       .filter((issue) => issue.path.includes('/responseBody'))
       .map((issue) => diagnosticMessage(issue, t))
       .join(' ') || undefined
-  const selectedMissing = response?.output != null && !workflowOutputs.some((port) => port.handle === response.output)
+  const outputDefs = workflowOutputs?.outputDefs ?? []
+  const selectedMissing = response?.output != null && !outputDefs.some((port) => port.handle === response.output)
+  const statusOutput = options.responseStatusCodeOutput
+  const statusIssue =
+    responseDiagnostics
+      .filter((issue) => issue.path.endsWith('/responseStatusCodeOutput'))
+      .map((issue) => diagnosticMessage(issue, t))
+      .join(' ') || undefined
   const changeOption = <K extends keyof WebhookOptions>(key: K, value: WebhookOptions[K] | undefined, deletion?: PropertyDeletion) => {
     const next = { ...options }
     if (value === undefined) delete next[key]
@@ -239,6 +258,15 @@ export function WebhookEditor({
   }
   const changeHeaders = (next: Readonly<Record<string, string>>, deletion?: PropertyDeletion) =>
     changeOption('responseHeaders', Object.keys(next).length === 0 ? undefined : next, deletion)
+  const statusSource =
+    response == null || readOnly ? undefined : (
+      <WebhookStatusSource
+        outputs={workflowOutputs}
+        value={statusOutput}
+        disabled={disabled || outputsMissing || outputsDisconnected}
+        onChange={(output) => changeOption('responseStatusCodeOutput', output)}
+      />
+    )
   const addHeader = () => {
     let name = 'X-Header'
     let index = 2
@@ -296,7 +324,13 @@ export function WebhookEditor({
               aria-label={t('webhookEditor.webhookResponseMode')}
               disabled={disabled}
               value={response == null ? 'immediate' : 'workflow'}
-              onChange={(mode) => changeOption('responseBody', mode === 'immediate' ? undefined : { kind: 'workflow-outputs' })}
+              onChange={(mode) => {
+                if (mode !== 'immediate') return changeOption('responseBody', { kind: 'workflow-outputs' })
+                const next = { ...options }
+                delete next.responseBody
+                delete next.responseStatusCodeOutput
+                onChange({ bodyFields, method, options: next })
+              }}
             >
               <option value="immediate">{t('webhookEditor.webhookImmediate')}</option>
               <option value="workflow">{t('webhookEditor.webhookAfterWorkflow')}</option>
@@ -359,8 +393,8 @@ export function WebhookEditor({
                         }
                       >
                         <option value="all">{t('webhookEditor.webhookAllOutputs')}</option>
-                        {(workflowOutputs.length > 0 || selectedMissing) && <hr />}
-                        {workflowOutputs.map((port) => (
+                        {(outputDefs.length > 0 || selectedMissing) && <hr />}
+                        {outputDefs.map((port) => (
                           <option key={port.handle} value={`field:${port.handle}`}>
                             {port.handle}
                           </option>
@@ -375,6 +409,7 @@ export function WebhookEditor({
               </Field>
               <DraftTextField
                 label={t('webhookEditor.webhookTimeout')}
+                description={t('webhookEditor.webhookTimeoutDescription')}
                 value={String((response.timeoutMs ?? webhookResponseTimeout.defaultMs) / 1000)}
                 disabled={disabled}
                 inputMode="numeric"
@@ -391,7 +426,6 @@ export function WebhookEditor({
                 }
                 onSave={(value) => changeOption('responseBody', { ...response, timeoutMs: Number(value) * 1000 })}
               />
-              <FieldDescription>{t('webhookEditor.webhookDynamicHint')}</FieldDescription>
             </>
           )}
           <DraftTextField
@@ -410,6 +444,24 @@ export function WebhookEditor({
               )
             }
             onSave={(text) => changeOption('responseStatusCode', text === '' ? undefined : Number(text))}
+            addon={statusSource}
+            error={statusIssue}
+            editor={
+              response != null && statusOutput != null
+                ? (id, errorId) => (
+                    <Input
+                      id={id}
+                      controlSize="field"
+                      readOnly
+                      disabled={disabled}
+                      aria-label={t('webhookEditor.webhookStatus')}
+                      aria-invalid={statusIssue != null}
+                      aria-describedby={errorId}
+                      value={`${workflowOutputs?.name ?? t('addNode.outputs')} · ${statusOutput}`}
+                    />
+                  )
+                : undefined
+            }
           />
           <details className="inspector-disclosure">
             <summary>

@@ -896,7 +896,10 @@
         "webhook-response-outputs-missing": "请添加工作流输出节点作为 HTTP 响应。",
         "webhook-response-unreachable": "请将此 Webhook 连接到工作流输出节点。",
         "webhook-response-output-missing": "工作流输出字段“{{output}}”不存在。",
-        "webhook-response-status-invalid": "请选择允许返回响应体的状态码。"
+        "webhook-response-status-invalid": "请选择允许返回响应体的状态码。",
+        "webhook-response-status-source": "响应来源设为工作流输出后，才能引用状态码字段。",
+        "webhook-response-status-output-missing": "状态码引用的工作流输出字段“{{output}}”不存在。",
+        "webhook-response-status-output-type": "请选择数字类型的工作流输出字段作为状态码。"
       },
       "leina": {
         "robot-required": "请选择 Leina 机器人，或绑定机器人标识的数据来源。"
@@ -1129,10 +1132,11 @@
     "webhookMissingOutput": "{{output}}（已失效）",
     "webhookTimeout": "等待超时（秒）",
     "webhookTimeoutInvalid": "请输入 1–60 秒的等待时间。",
-    "webhookDynamicHint": "工作流成功完成后返回输出。超时返回 504，工作流继续执行。等待时间包含排队、重试、人工确认和子工作流。",
+    "webhookTimeoutDescription": "等待超时后返回 HTTP 504，工作流继续执行。等待时间包含排队、重试、人工确认和子工作流。",
     "webhookDynamicStatusInvalid": "请输入 200–599 的整数，204、205、304 除外。",
     "webhookAddOutputs": "添加工作流输出",
-    "webhookOutputsDisconnected": "未连接工作流输出"
+    "webhookOutputsDisconnected": "未连接工作流输出",
+    "webhookStatusSource": "响应状态码来源"
   },
   "conditionEditor": {
     "addCondition": "添加条件",

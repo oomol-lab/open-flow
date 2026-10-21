@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import type { ComponentProps } from 'react'
-import type { GraphNode } from '../../../../flow/common/change.ts'
+import type { GraphEdge, GraphNode } from '../../../../flow/common/change.ts'
 
 import { act } from 'react'
 import { val } from 'value-enhancer'
@@ -37,11 +37,17 @@ vi.mock('./actionPicker.tsx', () => ({
   ),
 }))
 
-function inspector(node: GraphNode, options: Partial<ComponentProps<typeof NodeInspector>> = {}, nodes: Record<string, GraphNode> = {}, bindings = {}) {
+function inspector(
+  node: GraphNode,
+  options: Partial<ComponentProps<typeof NodeInspector>> = {},
+  nodes: Record<string, GraphNode> = {},
+  bindings = {},
+  edges: readonly GraphEdge[] = [],
+) {
   const { draft } = publicationFixture('flow', 'fixed')
   const revision = revisionView({
     ...draft,
-    content: { ...draft.content, document: { ...draft.content.document, bindings, graph: { nodes: { current: node, ...nodes }, edges: [] } } },
+    content: { ...draft.content, document: { ...draft.content.document, bindings, graph: { nodes: { current: node, ...nodes }, edges } } },
   })
   const base = { revision, selection: revision.node('current'), theme: 'light' as const }
   const props =
@@ -72,6 +78,35 @@ it('orders Webhook outputs before its response settings and forwards missing Out
   expect(add).toBeDefined()
   await click(add)
   expect(addOutputs).toHaveBeenCalledOnce()
+})
+
+it('offers workflow output fields under the output node name in the status source menu', async () => {
+  const { container, i18n } = inspector(
+    { kind: 'webhook', name: 'Webhook', method: 'POST', bodyFields: [], options: { responseBody: { kind: 'workflow-outputs' } } },
+    { sourceNodeIcons: { outputs: ':lucide-light:log-out:' } },
+    {
+      outputs: {
+        kind: 'outputs',
+        name: 'HTTP result',
+        outputDefs: [
+          { handle: 'message', jsonSchema: { type: 'string' }, nullable: false },
+          { handle: 'status', jsonSchema: { type: 'integer' }, nullable: false },
+        ],
+        outputMappings: {},
+      },
+    },
+    {},
+    [{ source: 'current', target: 'outputs' }],
+  )
+  await click(container.querySelector<HTMLButtonElement>(`[aria-label="${i18n.t('webhookEditor.webhookStatusSource')}"]`)!)
+  const node = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) => item.textContent === 'HTTP result')!
+  expect(node).toBeDefined()
+  await click(node)
+  const fields = [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')]
+  expect(fields.find((field) => field.textContent?.includes('message'))?.getAttribute('aria-disabled')).toBe('true')
+  const status = fields.find((field) => field.textContent === 'status')
+  expect(status).toBeDefined()
+  expect(status!.getAttribute('aria-disabled')).not.toBe('true')
 })
 
 it.each(['mixed', 'grouped', 'required-only', 'optional-only'] as const)('groups %s Provider inputs without changing saved definitions', (kind) => {

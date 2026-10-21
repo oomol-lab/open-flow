@@ -896,7 +896,10 @@
         "webhook-response-outputs-missing": "HTTP 応答用に出力ノードを追加してください。",
         "webhook-response-unreachable": "この Webhook を出力ノードに接続してください。",
         "webhook-response-output-missing": "出力「{{output}}」が存在しません。",
-        "webhook-response-status-invalid": "本文を返せるステータスコードを選択してください。"
+        "webhook-response-status-invalid": "本文を返せるステータスコードを選択してください。",
+        "webhook-response-status-source": "ステータス出力を使うには、応答元をワークフローの出力にしてください。",
+        "webhook-response-status-output-missing": "ステータスが参照する出力「{{output}}」は存在しません。",
+        "webhook-response-status-output-type": "ステータスコードには数値のワークフロー出力を選択してください。"
       },
       "leina": {
         "robot-required": "Leina ロボットを選択するか、識別子の入力ソースを設定してください。"
@@ -1129,10 +1132,11 @@
     "webhookMissingOutput": "{{output}}（見つかりません）",
     "webhookTimeout": "待機タイムアウト（秒）",
     "webhookTimeoutInvalid": "1〜60 秒の待機時間を入力してください。",
-    "webhookDynamicHint": "成功後に出力を返します。タイムアウト時は 504 を返し、実行は続行します。待機にはキュー、再試行、承認、子ワークフローが含まれます。",
+    "webhookTimeoutDescription": "待機タイムアウト時は HTTP 504 を返し、実行は続行します。待機にはキュー、再試行、承認、子ワークフローが含まれます。",
     "webhookDynamicStatusInvalid": "204、205、304 を除く 200〜599 の整数を入力してください。",
     "webhookAddOutputs": "ワークフロー出力を追加",
-    "webhookOutputsDisconnected": "ワークフロー出力が未接続"
+    "webhookOutputsDisconnected": "ワークフロー出力が未接続",
+    "webhookStatusSource": "ステータスコードのソース"
   },
   "conditionEditor": {
     "addCondition": "条件を追加",

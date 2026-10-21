@@ -896,7 +896,10 @@
         "webhook-response-outputs-missing": "Ajoutez un nœud de sorties pour la réponse HTTP.",
         "webhook-response-unreachable": "Reliez ce Webhook au nœud de sorties.",
         "webhook-response-output-missing": "La sortie « {{output}} » n’existe pas.",
-        "webhook-response-status-invalid": "Choisissez un statut autorisant un corps de réponse."
+        "webhook-response-status-invalid": "Choisissez un statut autorisant un corps de réponse.",
+        "webhook-response-status-source": "Choisissez les sorties du workflow comme source de réponse pour utiliser un champ de statut.",
+        "webhook-response-status-output-missing": "La sortie de statut « {{output}} » n’existe pas.",
+        "webhook-response-status-output-type": "Choisissez une sortie numérique du workflow pour le code de statut."
       },
       "leina": {
         "robot-required": "Sélectionnez un robot Leina ou liez son identifiant à une source d’entrée."
@@ -1129,10 +1132,11 @@
     "webhookMissingOutput": "{{output}} (introuvable)",
     "webhookTimeout": "Délai d’attente (secondes)",
     "webhookTimeoutInvalid": "Saisissez un délai de 1 à 60 secondes.",
-    "webhookDynamicHint": "Renvoie les sorties après la réussite. À expiration, renvoie 504 et poursuit l’exécution. L’attente inclut la file, les nouvelles tentatives, les approbations et les workflows appelés.",
+    "webhookTimeoutDescription": "À expiration du délai d’attente, renvoie HTTP 504 et poursuit l’exécution. L’attente inclut la file, les nouvelles tentatives, les approbations et les workflows appelés.",
     "webhookDynamicStatusInvalid": "Saisissez un entier de 200 à 599, sauf 204, 205 et 304.",
     "webhookAddOutputs": "Ajouter les sorties du workflow",
-    "webhookOutputsDisconnected": "Sorties du workflow non connectées"
+    "webhookOutputsDisconnected": "Sorties du workflow non connectées",
+    "webhookStatusSource": "Source du code de statut"
   },
   "conditionEditor": {
     "addCondition": "Ajouter une condition",

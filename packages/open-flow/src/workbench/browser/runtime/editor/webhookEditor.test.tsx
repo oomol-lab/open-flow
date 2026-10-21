@@ -14,6 +14,22 @@ function renderWebhook(method: 'GET' | 'POST') {
 }
 
 describe('Webhook configuration', () => {
+  it.each([false, true])('offers a status source only in workflow-output response mode (%s)', (dynamic) => {
+    const markup = renderToStaticMarkup(
+      <I18nProvider i18n={createI18n('en')}>
+        <WebhookEditor
+          bodyFields={[]}
+          method="POST"
+          options={dynamic ? { responseBody: { kind: 'workflow-outputs' }, responseStatusCode: 202 } : { responseStatusCode: 202 }}
+          disabled={false}
+          onChange={vi.fn()}
+        />
+      </I18nProvider>,
+    )
+    expect(markup.includes('aria-label="Response status code source"')).toBe(dynamic)
+    expect(markup).toContain('value="202"')
+  })
+
   it.each([false, true])('offers creation only when the Outputs node is absent (exists: %s)', (exists) => {
     const trigger = { kind: 'webhook', name: 'Webhook', method: 'POST', bodyFields: [], options: { responseBody: { kind: 'workflow-outputs' } } } as const
     const graph = {

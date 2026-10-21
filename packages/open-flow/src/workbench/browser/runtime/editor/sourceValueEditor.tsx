@@ -7,7 +7,6 @@ import type { VariablePickerProps } from '../../../../ui/browser/variable-picker
 import type { JsonValue } from '../api.ts'
 import type { InputSourceQuery } from '../revisionView.ts'
 
-import { Tooltip as TooltipPrimitive } from '@base-ui/react/tooltip'
 import { Fragment, useEffect, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { variableInputCompatible } from '../../../../flow/common/schema.ts'
@@ -15,7 +14,7 @@ import { sourceOutputLabel } from '../../../../flow/common/sourceField.ts'
 import { editorComponentIcons } from '../../../../form/browser/editorComponentIcon.tsx'
 import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
 import { FieldValueEditor } from '../../../../form/browser/fieldValueEditor.tsx'
-import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../form/browser/selectionMenuStyles.ts'
+import { selectionMenuContentClass } from '../../../../form/browser/selectionMenuStyles.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import {
   DropdownMenu,
@@ -35,6 +34,7 @@ import { MenuHeader } from '../../../../ui/browser/menu-header.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
 import { LlmInputEditor, supportsLlmInput } from './llmInputEditor.tsx'
 import { schemaMismatchMessage } from './schemaMismatchMessage.ts'
+import { SourceMenuOption, sourceMenuItemClass as sourceItemClass } from './sourceMenuOption.tsx'
 import { useInputSourceQuery } from './useInputSourceQuery.ts'
 
 export type InputVariables = Pick<VariablePickerProps, 'enabled' | 'loaded' | 'loading' | 'names'> & { readonly onOpen?: () => void }
@@ -63,7 +63,6 @@ const draftIssue = () => {}
 const variableSource = (name: string) => JSON.stringify(['variable', name])
 const upstreamSource = (nodeId: string, output: string, field?: string, system?: true) =>
   JSON.stringify(system ? ['upstream', nodeId, output, field, true] : ['upstream', nodeId, output, field])
-const sourceItemClass = `${selectionMenuItemClass} gap-2 px-2`
 const sourceEmptyItemClass = `${sourceItemClass} font-normal text-muted-foreground data-disabled:opacity-100`
 const sourceSubTriggerClass = sourceItemClass
 
@@ -297,58 +296,21 @@ export function SourceValueEditor({
   const sourcePortal = sourceContainer?.closest<HTMLElement>('.editor-context-panel') ?? sourceContainer
   const sourceOption = (nodeId: string, { description, output, field, fields, check, system }: InputSourceCandidate, label: string) => {
     const selected = sourceKind === 'upstream' && currentSource === upstreamSource(nodeId, output, field, system)
-    const status = check.kind == 'schema' ? t('inspector.sources.incompatible') : check.kind == 'schema-error' ? t('inspector.sources.unverified') : undefined
     const itemKey = upstreamSource(nodeId, output, field, system)
-    const sourceDescription = description?.trim()
-    const item = (
-      <DropdownMenuRadioItem
-        key={itemKey}
-        className={`${sourceItemClass} ${status == null || selected ? 'pr-8' : 'pr-20'}`}
-        value={itemKey}
-        closeOnClick
-        aria-description={sourceDescription}
-      >
-        <i
-          aria-hidden="true"
-          className={`${
-            fields?.length
-              ? `${editorComponentIcons.object} ${status == null ? 'text-muted-foreground' : ''}`
-              : check.kind == 'available'
-                ? 'i-lucide-light:corner-down-right text-muted-foreground'
-                : check.kind == 'schema'
-                  ? 'i-lucide-light:triangle-alert'
-                  : 'i-lucide-light:circle-help'
-          } size-3.5 shrink-0`}
-          style={status == null ? undefined : { color: 'var(--warning-foreground)' }}
-        />
-        <span className="min-w-0 flex-1 truncate font-mono" title={label}>
-          {label}
-        </span>
-        {!selected && status != null && (
-          <span className="pointer-events-none absolute right-2 shrink-0 text-[10px] leading-4" style={{ color: 'var(--warning-foreground)' }}>
-            {status}
-          </span>
-        )}
-        {selected && status != null && <span className="sr-only">{status}</span>}
-      </DropdownMenuRadioItem>
-    )
-    if (sourceDescription == null || sourceDescription === '') return item
-    // Intentionally use Base UI directly: source-option tooltips belong to a nested menu surface
-    // and require its pointer-transparent portal and fixed side positioning, not the shared control-tooltip contract.
     return (
-      <TooltipPrimitive.Root key={itemKey}>
-        <TooltipPrimitive.Trigger render={item} />
-        <TooltipPrimitive.Portal container={sourcePortal} className="contents">
-          <TooltipPrimitive.Positioner side="right" align="start" sideOffset={8} positionMethod="fixed" className="pointer-events-none isolate z-[1000]">
-            <TooltipPrimitive.Popup className="pointer-events-none max-w-64 rounded-[6px] bg-foreground px-3 py-2 text-xs leading-5 text-background shadow-md outline-none">
-              {sourceDescription}
-              <TooltipPrimitive.Arrow className="size-2.5 rotate-45 rounded-[2px] bg-foreground fill-foreground data-[side=bottom]:top-1 data-[side=left]:-right-1 data-[side=right]:-left-1 data-[side=top]:-bottom-2.5" />
-            </TooltipPrimitive.Popup>
-          </TooltipPrimitive.Positioner>
-        </TooltipPrimitive.Portal>
-      </TooltipPrimitive.Root>
+      <SourceMenuOption
+        key={itemKey}
+        value={itemKey}
+        label={label}
+        selected={selected}
+        compatibility={check.kind === 'schema' ? 'incompatible' : check.kind === 'schema-error' ? 'unverified' : 'available'}
+        icon={fields?.length ? editorComponentIcons.object : undefined}
+        description={description}
+        container={sourcePortal}
+      />
     )
   }
+
   const selectUpstream = (next: string) => {
     const [, nodeId, output, field, system] = JSON.parse(next) as [string, string, string, string | null, true?]
     upstream?.onChange?.({ nodeId, output, ...(system ? { system } : {}), ...(field == null ? {} : { field }) })

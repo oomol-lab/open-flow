@@ -9,8 +9,8 @@ export const scenarios = [
     id: 'webhook-response',
     entry: { kind: 'webhook' },
     name: 'Return workflow outputs over HTTP',
-    version: 1,
-    task: 'Create a POST Webhook named Published hook with a required string message field, an Echo code node forwarding the message, and Workflow Outputs declaring message. Configure a workflow-output response selecting message with a 30-second timeout, preserving fixed response text accepted. Rename the output field to reply through public editing and confirm the Webhook follows the rename. Change only its timeout to 15 seconds. Switch to immediate response by explicitly clearing responseBody and read back the preserved fixed text; restore the dynamic reply response. Check and publish, inspect the online configuration, then change only the Draft hook method to PUT and name to Draft hook. Leave Live enabled; its POST response must return the request message as plain text.',
+    version: 2,
+    task: 'Create a POST Webhook named Published hook with a required string message field, an Echo code node forwarding the message, and Workflow Outputs declaring message and an integer status with literal value 201. Configure a workflow-output response selecting message with a 30-second timeout, preserving fixed response text accepted and fixed status 202. Bind the status code to output status, then rename status to httpStatus and confirm that reference follows. Rename the output field to reply through public editing and confirm the Webhook follows the rename. Change only its timeout to 15 seconds. Switch to immediate response by explicitly clearing responseBody and responseStatusCodeOutput and read back the preserved fixed text; restore the dynamic reply body and httpStatus status. Check and publish, inspect the online configuration, then change only the Draft hook method to PUT and name to Draft hook. Leave Live enabled; its POST response must return the request message as plain text with HTTP status 201.',
   },
   {
     id: 'node-errors',
