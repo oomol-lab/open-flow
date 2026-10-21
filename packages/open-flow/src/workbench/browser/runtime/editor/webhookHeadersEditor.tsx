@@ -36,13 +36,11 @@ export function WebhookHeadersEditor({
   const whole = options.responseHeadersSource
   const bindings = options.responseHeaderOutputs ?? {}
   const fixed = options.responseHeaders ?? {}
+  const fixedNames = new Set(Object.keys(fixed).map((name) => name.toLowerCase()))
+  const bindingOnlyNames = Object.keys(bindings).filter((name) => !fixedNames.has(name.toLowerCase()))
   const headers = {
     ...fixed,
-    ...Object.fromEntries(
-      Object.keys(bindings)
-        .filter((name) => !Object.keys(fixed).some((key) => key.toLowerCase() === name.toLowerCase()))
-        .map((name) => [name, '']),
-    ),
+    ...Object.fromEntries(bindingOnlyNames.map((name) => [name, ''])),
   }
   const label = t('webhookEditor.webhookHeaders')
   const issue = (suffix: string) =>
@@ -137,9 +135,11 @@ export function WebhookHeadersEditor({
                 return removed.length === 1 && added.length === 1 ? [[added[0]!, output]] : []
               }),
             )
+            const placeholders = new Set(bindingOnlyNames.map((name) => (removed.length === 1 && added.length === 1 && removed[0] === name ? added[0]! : name)))
+            const nextFixed = Object.fromEntries(Object.entries(next).filter(([name, text]) => text !== '' || !placeholders.has(name)))
             const updated = { ...options }
-            if (Object.keys(next).length === 0) delete updated.responseHeaders
-            else updated.responseHeaders = next
+            if (Object.keys(nextFixed).length === 0) delete updated.responseHeaders
+            else updated.responseHeaders = nextFixed
             if (Object.keys(nextBindings).length === 0) delete updated.responseHeaderOutputs
             else updated.responseHeaderOutputs = nextBindings
             onChange(updated, deletion)
