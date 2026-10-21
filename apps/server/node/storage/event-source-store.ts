@@ -8,7 +8,7 @@ import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { SourceIdentityError, eventSourceDefinition, sourceReady, sourceView } from '@oomol-lab/open-flow/event-source'
 import { resolveTriggerConfig } from '@oomol-lab/open-flow/integration-trigger'
 import { randomUUID } from 'node:crypto'
-import { ZodError } from 'zod'
+import { z, ZodError } from 'zod'
 import { ControlError } from '../error.ts'
 
 const sourceColumns = `source_id AS sourceId, revision, name, kind, provider, external_identity AS identity,
@@ -35,13 +35,15 @@ type SourceRow = Omit<StoredEventSource, 'config' | 'secrets' | 'state' | 'event
   readonly eventTypesJson: string
 }
 
+const storedObject = z.record(z.string(), z.json())
+
 function stored(row: SourceRow): StoredEventSource {
   const { configJson, secretsJson, stateJson, eventTypesJson, ...common } = row
   return {
     ...common,
-    config: JSON.parse(configJson),
-    secrets: JSON.parse(secretsJson),
-    state: JSON.parse(stateJson),
+    config: storedObject.parse(JSON.parse(configJson)),
+    secrets: storedObject.parse(JSON.parse(secretsJson)),
+    state: storedObject.parse(JSON.parse(stateJson)),
     eventTypes: JSON.parse(eventTypesJson),
   }
 }

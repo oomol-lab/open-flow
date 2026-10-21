@@ -3,6 +3,7 @@ import type { ConnectorHost } from '../node/deployment/connector-contract.ts'
 import { decodeEventSources } from '@oomol-lab/open-flow/control-api'
 import { sourceResultSchema } from '@oomol-lab/open-flow/event-source'
 import { expect, it, onTestFinished, vi } from 'vitest'
+import { ZodError } from 'zod'
 import { ImplicitConnectorAccessHost } from '../node/deployment/connector-access.ts'
 import { EventSourceRuntime } from '../node/runtime/event-source-runtime.ts'
 import { Database } from '../node/storage/database.ts'
@@ -57,6 +58,32 @@ it.each(['connector', 'kind', 'projection', 'application'])('isolates a %s failu
   expect(result.sources.find((source) => source.sourceId === bad.sourceId)).toMatchObject({ appId: null, lastError: expect.any(String) })
   expect(result.sources.find((source) => source.sourceId === good.sourceId)).toMatchObject({ appId: 'cli_good', name: 'good' })
   if (failure !== 'connector') expect(result.sources.find((source) => source.sourceId === bad.sourceId)?.endpointUrl).toBeNull()
+})
+
+it.each(
+  ['config_json', 'secrets_json', 'state_json'].flatMap((column) =>
+    ['null', '[]', '42', '"invalid"'].flatMap((value) => ['feishu_app_bot', 'slack'].map((kind) => ({ column, value, kind }))),
+  ),
+)('isolates $kind source with $column = $value', async ({ column, value, kind }) => {
+  const inspect = vi.fn(async () => {
+    throw new Error('Invalid stored sources must not reach Connector inspection')
+  })
+  const context = fixture(inspect)
+  const bad = context.create('bad', true)
+  const good = context.create('good', true)
+  context.database.connection.prepare(`UPDATE event_sources SET ${column} = ?, kind = ? WHERE source_id = ?`).run(value, kind, bad.sourceId)
+
+  expect(() => context.store.eventSources.get(bad.sourceId)).toThrow(ZodError)
+  const result = decodeEventSources(await context.runtime.list())
+  expect(result.sources).toHaveLength(2)
+  expect(result.sources.find((source) => source.sourceId === bad.sourceId)).toMatchObject({
+    appId: null,
+    endpointUrl: null,
+    eventTypes: [],
+    lastError: 'Stored source details are invalid or unsupported. Repair or recreate this event source.',
+  })
+  expect(result.sources.find((source) => source.sourceId === good.sourceId)).toMatchObject({ appId: 'cli_good', name: 'good' })
+  expect(inspect).not.toHaveBeenCalled()
 })
 
 it.each(['caller', 'budget'])('bounds concurrent inspection and stops queued work on %s cancellation', async (cancellation) => {
