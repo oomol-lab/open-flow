@@ -4,6 +4,10 @@
 allowlist. The existing `open-flow-engine/v7` contract is unchanged. Deployments advertise this
 additional contract only when they implement it; Server does not automatically opt into it.
 
+The published `open-flow-engine/v6` and `open-flow-engine/v6/nodejs-compat-v1` remain supported for
+existing Publications and Runs, with their original platform identity and builtin allowlist.
+Webhook response nodes require v7; v6 cannot prepare them.
+
 `EngineContract.builtinModules` declares accepted builtin specifiers. The list explicitly includes
 both prefixed and bare forms. Static validation recognizes these imports without adding dependencies
 to the user module closure. User `CodeModule.imports` still contains only user module identities.

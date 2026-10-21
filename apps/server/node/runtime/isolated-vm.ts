@@ -36,6 +36,17 @@ export const isolatedVmLimits: IsolatedVmLimits = {
 
 export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1').digest('hex')}`
 
+const v6EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1').digest('hex')}`
+
+/** v7 adds response metadata; v6 graphs retain their execution and checkpoint protocol. */
+export function supportsIsolatedVmEngine(engineContract: string, engineDigest: string): boolean {
+  return (
+    findEngineContract(engineContract) != null &&
+    (engineDigest === isolatedVmEngineDigest ||
+      ((engineContract === 'open-flow-engine/v6' || engineContract === 'open-flow-engine/v6/nodejs-compat-v1') && engineDigest === v6EngineDigest))
+  )
+}
+
 export class IsolatedVmError extends Error {
   readonly code: 'canceled' | 'executor-crashed' | 'invalid-program' | 'limit-exceeded' | 'task-failed'
 
@@ -156,7 +167,7 @@ export function normalizedError(error: unknown): Error {
 export function programError(program: RuntimeProgram): IsolatedVmError | undefined {
   const contract = findEngineContract(program.engineContract)
   if (contract == null) return new IsolatedVmError('invalid-program', `Unsupported Engine Contract "${program.engineContract}".`)
-  if (program.engineDigest != isolatedVmEngineDigest)
+  if (!supportsIsolatedVmEngine(program.engineContract, program.engineDigest))
     return new IsolatedVmError('invalid-program', 'Runtime program Engine digest does not match this Executor.')
   if (Object.keys(program.modules).some((moduleId) => !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(moduleId))) {
     return new IsolatedVmError('invalid-program', 'Runtime program contains an invalid module ID.')

@@ -222,6 +222,7 @@ export class RunStore {
       const runId = this.#queueRun({
         ...input,
         initiator,
+        engineContract: publication.engineContract,
         publicationId: publication.publicationId,
         providerAccess: this.#deps.publications.providerAccess(publication.publicationId)!,
         source: 'live',
@@ -1104,6 +1105,7 @@ export class RunStore {
   }
 
   #queueRun(input: {
+    readonly engineContract?: string
     readonly initiator: RunInitiator
     readonly closureDigest: string
     readonly flowId: string
@@ -1136,7 +1138,7 @@ export class RunStore {
         input.revisionId,
         input.revisionDigest,
         input.flowId,
-        currentEngineContract,
+        input.engineContract ?? currentEngineContract,
         isolatedVmEngineDigest,
         JSON.stringify(input.inputs),
         input.source,

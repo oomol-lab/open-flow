@@ -409,6 +409,13 @@ export async function prepareFlow(revision: RevisionContent, engineContract: str
       }
     revision = runRevision(revision, triggerId)
   }
+  if (
+    !engine.webhookResponses &&
+    Object.values(revision.document.graph.nodes).some(
+      (node) => node.kind === 'webhook-response' || (node.kind === 'webhook' && node.options?.responseBody?.kind === 'webhook-response'),
+    )
+  )
+    return { kind: 'engine-unsupported' }
   const validation = await validateFlow(revision, engine)
   if (!validation.valid) return { kind: 'flow-invalid', validation }
   const { closure } = validation

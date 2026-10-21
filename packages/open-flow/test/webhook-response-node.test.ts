@@ -102,7 +102,8 @@ describe('Webhook response node contract', () => {
     const disconnected = { ...original, document: { ...original.document, graph: { ...original.document.graph, edges: [] } } }
     expect(validateFlowGraph(disconnected)).toContainEqual(expect.objectContaining({ code: 'trigger.webhook-response-node-unreachable' }))
     expect(() => decodeRevisionContent({ ...content(), modelVersion: 9 })).toThrow('version 10')
-    expect(await prepareFlow(content(), 'open-flow-engine/v6')).toMatchObject({ kind: 'engine-unsupported' })
+    for (const contract of ['open-flow-engine/v6', 'open-flow-engine/v6/nodejs-compat-v1'])
+      expect(await prepareFlow(content(), contract)).toMatchObject({ kind: 'engine-unsupported' })
     expect(authoringExample('webhook-response').operations).toHaveLength(1)
   })
 

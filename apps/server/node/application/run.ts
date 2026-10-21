@@ -22,7 +22,7 @@ import { executeAgent } from '../deployment/agent.ts'
 import { assertConnectionNotDeferred, ConnectorTaskError } from '../deployment/connector-contract.ts'
 import { OpenApiTaskError, executeOpenApi } from '../deployment/openapi.ts'
 import { errorKind } from '../logger.ts'
-import { isolatedVmEngineDigest, IsolatedVmHost } from '../runtime/isolated-vm.ts'
+import { supportsIsolatedVmEngine, IsolatedVmHost } from '../runtime/isolated-vm.ts'
 import { checkCodeActions, checkCodePermissions } from './connector-capabilities.ts'
 
 const encoder = new TextEncoder()
@@ -123,7 +123,7 @@ export class RunExecutor {
     unknown
   > {
     return Effect.gen({ self: this }, function* () {
-      if (run.engineDigest != isolatedVmEngineDigest) {
+      if (!supportsIsolatedVmEngine(run.engineContract, run.engineDigest)) {
         return yield* Effect.fail(new Error('Fixed Run Engine implementation is not available.'))
       }
       const revisionDigest = yield* Effect.tryPromise({

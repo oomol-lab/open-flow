@@ -27,10 +27,13 @@ in older model envelopes. The workflow-output response projection alone preserve
 requiring Engine v7 and a new isolation digest. A node completes with response metadata separately
 from its empty business outputs. Its first committed root-Run response is persisted independently
 of event history; HTTP returns immediately while execution continues. Checkpoint shape remains v6.
-Finish or cancel old-Engine active Runs before deploying; pinned historical Runs and Revisions are
-not rewritten. Upgrade clients and servers together. Upgrade Server and clients
-together before publishing v10 Revisions. Existing old-model Publications retain their existing
-execution compatibility requirements and may require republication through an upgraded Draft.
+The published v6 and v6/nodejs-compat-v1 contracts remain available for existing Publications and
+Runs, preserving their platform identity and builtin allowlist. They cannot prepare Webhook response
+nodes or select them as response sources. Server also supports the beta.69 isolated runtime digest
+for these two contracts: its execution and v6 checkpoint protocol remain compatible for graphs
+without response nodes. Unknown digests and older incompatible contracts remain rejected. Pinned
+Runs, checkpoints, Publications and Revision bytes are not rewritten. New Draft Runs and Publications
+use v7. Upgrade Server and clients together before publishing v10 Revisions.
 
 ## Node retries and error handling: Flow model v9 and Engine v6
 

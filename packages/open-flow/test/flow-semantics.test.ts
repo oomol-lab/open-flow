@@ -11,6 +11,14 @@ import { sourceEvents } from '../src/trigger/providers/source-events.ts'
 
 const engine = findEngineContract(currentEngineContract)!
 
+it.each(['open-flow-engine/v6', 'open-flow-engine/v6/nodejs-compat-v1'])('prepares persisted model v9 workflows under %s', async (contract) => {
+  const legacy = findEngineContract(contract)!
+  expect(legacy.platformSource).toContain(JSON.stringify(contract))
+  expect(legacy.builtinModules?.has('node:path')).toBe(contract.endsWith('/nodejs-compat-v1') ? true : undefined)
+  const prepared = await prepareFlow({ ...revision('export default () => ({})'), modelVersion: 9 }, contract)
+  expect(prepared).toMatchObject({ kind: 'prepared', flow: { engineContract: contract } })
+})
+
 function revision(source: string, imports: readonly string[] = [], modules: RevisionFixture['modules'] = {}): RevisionFixture {
   return {
     document: {
