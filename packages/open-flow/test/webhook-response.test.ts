@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { authoringNode, compileAuthoring } from '../src/control/common/authoring.ts'
 import { applyFlowChanges, currentFlowModelVersion, upgradeRevisionContent } from '../src/flow/common/change.ts'
 import { decodeRevision, decodeRevisionContent, encodeRevision } from '../src/flow/common/encoding.ts'
-import { validateFlowGraph } from '../src/flow/common/graph.ts'
+import { validateFlowGraph, webhookResponseDiagnostics } from '../src/flow/common/graph.ts'
 import { inverseFlowChanges } from '../src/flow/common/inverseChanges.ts'
 import { updateOutputsDefs } from '../src/flow/common/nodeChanges.ts'
 import { webhookResponseBody, webhookResponseStatusCode } from '../src/trigger/common/webhook.ts'
@@ -156,6 +156,29 @@ describe('workflow HTTP response contract', () => {
       )
       expect(validateFlowGraph(content({ responseStatusCode }))).toEqual([])
     }
+  })
+
+  it.each([false, true])('skips ambiguous output checks with duplicate Outputs nodes (reversed: %s)', (reversed) => {
+    const original = content({
+      responseBody: { kind: 'workflow-outputs', output: 'missing' },
+      responseStatusCodeOutput: 'message',
+    })
+    const { hook, outputs } = original.document.graph.nodes
+    const duplicate = { kind: 'outputs', name: 'Duplicate Outputs', outputDefs: [], outputMappings: {} } as const
+    const graph = {
+      nodes: reversed ? { hook: hook!, duplicate, outputs: outputs! } : { hook: hook!, outputs: outputs!, duplicate },
+      edges: [{ source: 'hook', target: 'duplicate' }],
+    }
+    expect(webhookResponseDiagnostics(graph, 'hook')).toEqual([])
+    expect(validateFlowGraph({ ...original, document: { ...original.document, graph } }).map(({ code }) => code)).toEqual([
+      'graph.outputs-duplicate',
+      'graph.outputs-duplicate',
+    ])
+
+    const bodyless = content({ responseBody: { kind: 'workflow-outputs' }, responseStatusCode: 204 })
+    expect(webhookResponseDiagnostics({ ...graph, nodes: { ...graph.nodes, hook: bodyless.document.graph.nodes.hook! } }, 'hook')).toEqual([
+      expect.objectContaining({ code: 'trigger.webhook-response-status-invalid' }),
+    ])
   })
 
   it('renames all Webhook selections atomically and leaves deleted fields diagnosable', () => {

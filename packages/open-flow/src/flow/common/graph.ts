@@ -48,10 +48,11 @@ export function webhookResponseDiagnostics(graph: Graph, triggerId: string, path
       : [graphDiagnostic('trigger.webhook-response-status-source', 'Choose workflow outputs as the response source to use a status output.', statusPath)]
   const diagnostics: Diagnostic[] = []
   const responsePath = `${path}/options/responseBody`
-  const output = Object.entries(graph.nodes).find(([, node]) => node.kind == 'outputs')
-  if (output == null) {
+  const outputs = Object.entries(graph.nodes).filter(([, node]) => node.kind == 'outputs')
+  if (outputs.length == 0) {
     diagnostics.push(graphDiagnostic('trigger.webhook-response-outputs-missing', 'Add a workflow Outputs node for the HTTP response.', responsePath))
-  } else {
+  } else if (outputs.length == 1) {
+    const output = outputs[0]!
     const reachable = new Set([triggerId])
     for (const id of reachable) for (const edge of graph.edges) if (edge.source == id) reachable.add(edge.target)
     if (!reachable.has(output[0]))
