@@ -213,7 +213,9 @@ not an input binding. Manual continuation remains available. Omit for manual-onl
 Server requires the scheduled time to precede its seven-day expiry and checks this at registration.
 The Workbench uses the shared date editor at minute precision and a selectable, saved timezone. The optional timezone controls editing; at remains the absolute execution timestamp. Switching timezone in the Workbench keeps wall time and updates that timestamp.
 Workbench drafts preserve invalid timing and show errors immediately, including after reopening.
-Empty duration uses `durationMs: null`; empty or invalid dates retain their text in `at`. These
-drafts cannot be published or executed. Public authoring inputs still require valid timing.
+Empty duration uses `durationMs: null`; empty or invalid dates retain their text in `at`.
+Invalid timing blocks publication and Live Runs. It blocks a Draft Run only when the invalid Wait
+belongs to the selected Trigger's reachable execution path or its dependencies; invalid Waits on
+unrelated branches do not block that Draft Run. Public authoring inputs still require valid timing.
 Approval remains manual. See the Control API's Wait automatic continuation contract for recovery,
 competition and event metadata.

@@ -591,6 +591,7 @@ Run details add pinned `closureDigest`, `engineContract`, `engineDigest`, `model
 ```ts
 waits: readonly {
   actions: readonly ['continue'] | readonly ['approve', 'reject']
+  autoContinueAt?: string
   expiresAt: string
   nodeId: string
   prompt: string
@@ -1120,7 +1121,9 @@ repeated wall times.
 Workbench drafts save the selected mode and invalid values as well as valid configurations.
 An empty duration is stored as `durationMs: null`; an empty or invalid date retains its text in
 `at`. Draft decoding and change operations preserve these values. Validation reports
-`wait.auto-continue-invalid` and prevents publication or execution until corrected. Public
+`wait.auto-continue-invalid` and prevents publication and Live Runs until corrected. A Draft Run
+is blocked only when the invalid Wait belongs to the selected Trigger's reachable execution path
+or its dependencies; invalid Waits on unrelated branches do not block that Draft Run. Public
 authoring inputs continue to require valid timing. The editor validates on mode changes,
 value changes and reopening; validation errors do not block draft saves.
 

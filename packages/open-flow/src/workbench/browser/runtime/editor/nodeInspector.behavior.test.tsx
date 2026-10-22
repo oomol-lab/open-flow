@@ -244,6 +244,21 @@ it('edits and saves invalid Wait timing and clears automatic continuation', asyn
   expect(saveResolution).toHaveBeenLastCalledWith('current', { name: 'Wait', prompt: 'Review', autoContinue: null })
 })
 
+it.each([
+  ['1.1', 1100, false],
+  ['1.001', 1001, false],
+  ['0.0001', 0.1, true],
+  ['1.0001', 1000.1, true],
+  ['', null, true],
+  ['1e309', null, true],
+] as const)('saves duration %s without confusing floating-point noise with fractional milliseconds', async (text, durationMs, invalid) => {
+  await inspect({ kind: 'wait', name: 'Wait', prompt: 'Review', inputs: {}, inputDefinitions: [], autoContinue: { kind: 'after', durationMs: 1000 } })
+  const input = container.querySelector<HTMLInputElement>('#wait-current-auto-value')!
+  await edit(input, text)
+  expect(saveResolution).toHaveBeenLastCalledWith('current', { name: 'Wait', prompt: 'Review', autoContinue: { kind: 'after', durationMs } })
+  expect(input.getAttribute('aria-invalid')).toBe(String(invalid))
+})
+
 it('edits scheduled Waits with the shared date editor and preserves wall time when selecting a timezone', async () => {
   await inspect({
     kind: 'wait',

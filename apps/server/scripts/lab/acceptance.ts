@@ -33,6 +33,7 @@ export function runtimeAssertions(
     const result = completed?.payload.result
     if (result == null || typeof result != 'object' || !('outputs' in result) || !isDeepStrictEqual(result.outputs, { done: true }))
       errors.push('Complete the workflow and return done=true.')
+    if (calls.length || modelCalls.length) errors.push('No external calls are needed.')
     return errors
   }
   if (id == 'node-errors') {

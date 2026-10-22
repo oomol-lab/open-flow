@@ -38,7 +38,10 @@ function timing({ mode, value, timezone }: TimingDraft): WaitAutoContinue | null
   if (mode == 'off') return null
   if (mode == 'at') return { kind: 'at', at: dateFromTimeZone(value, timezone) ?? value, timezone }
   const duration = value.trim() == '' ? null : Number(value) * 1000
-  return { kind: 'after', durationMs: duration != null && Number.isFinite(duration) ? duration : null }
+  if (duration == null || !Number.isFinite(duration)) return { kind: 'after', durationMs: null }
+  const nearest = Math.round(duration)
+  const tolerance = Number.EPSILON * Math.max(1, Math.abs(duration))
+  return { kind: 'after', durationMs: Math.abs(duration - nearest) <= tolerance ? nearest : duration }
 }
 
 function AutoContinue({

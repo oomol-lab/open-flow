@@ -273,5 +273,7 @@ addition reuses the pending Engine v7 revision and adds no storage migration.
 
 Draft timing retains invalid configuration: `durationMs: null` represents an empty duration, and
 `at` can retain empty or invalid date text. Draft decoding and edit operations preserve it; graph
-validation blocks publication and execution until corrected. Public authoring inputs still require
-valid timing. This draft editing refinement also reuses the pending Engine v7 revision.
+validation blocks publication and Live Runs until corrected. A Draft Run is blocked only when the
+invalid Wait belongs to the selected Trigger's reachable execution path or its dependencies;
+invalid Waits on unrelated branches do not block that Draft Run. Public authoring inputs still
+require valid timing. This draft editing refinement also reuses the pending Engine v7 revision.

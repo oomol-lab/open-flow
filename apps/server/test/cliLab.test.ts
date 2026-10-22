@@ -1,4 +1,6 @@
 import { runLabCli } from '@oomol-lab/open-flow-command/lab'
+import { decodeRunEvent } from '@oomol-lab/open-flow/control-api'
+import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
@@ -6,6 +8,7 @@ import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
+import { runtimeAssertions } from '../scripts/lab/acceptance.ts'
 import { driver } from '../scripts/lab/driver.ts'
 import { servePreview } from '../scripts/lab/preview.ts'
 import { reference } from '../scripts/lab/reference.ts'
@@ -46,6 +49,32 @@ async function cli(lab: LabSession, args: string[], stdin?: string, registered =
   return { record, stdout, stderr }
 }
 describe('CLI Lab', () => {
+  it.each([
+    { connector: false, model: false },
+    { connector: true, model: false },
+    { connector: false, model: true },
+    { connector: true, model: true },
+  ])('enforces the no-cost Wait scenario after successful automatic decisions: %j', ({ connector, model }) => {
+    const events = [
+      ...['relative', 'date'].map((waitId, index) =>
+        decodeRunEvent({
+          sequence: index + 1,
+          createdAt: 'now',
+          kind: 'run.resolved',
+          payload: { waitId, action: 'continue', source: 'automatic', comment: null, resolvedAt: 'now' },
+        }),
+      ),
+      decodeRunEvent({ sequence: 3, createdAt: 'now', kind: 'run.completed', payload: { result: { outputs: { done: true } } } }),
+    ]
+    const calls = connector ? [{ action: 'lab-archive.save', connection: 'archive-test', input: {}, invocationId: 'external' }] : []
+    const errors = runtimeAssertions('wait-auto-continue', { name: 'automatic', orders: [], order: {} }, 'completed', calls, model ? [{}] : [], events, {
+      modelVersion: currentFlowModelVersion,
+      modules: {},
+      document: { bindings: {}, graph: { nodes: {}, edges: [] } },
+    })
+    expect(errors).toEqual(connector || model ? ['No external calls are needed.'] : [])
+  })
+
   it('keeps CLI-only scenarios in CLI coverage and rejects explicit unsupported transports', () => {
     expect(testScenarios('cli').some((item) => item.id == 'webhook-live')).toBe(true)
     expect(testScenarios('mcp').some((item) => item.id == 'webhook-live')).toBe(false)
