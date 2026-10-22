@@ -4,6 +4,7 @@ import type { WaitAction } from '../src/flow/common/change.ts'
 import * as Effect from 'effect/Effect'
 import * as Fiber from 'effect/Fiber'
 import { TestClock } from 'effect/testing'
+import { setImmediate } from 'node:timers/promises'
 import { vi } from 'vitest'
 import { waitRetentionMs } from '../src/execution/common/scheduler.ts'
 
@@ -25,8 +26,15 @@ export function advanceWaiting(effect: Effect.Effect<FlowRunOutcome, Error>): Pr
       const now = vi.spyOn(performance, 'now').mockImplementation(() => Number(clock.monotonicTimeNanosUnsafe()) / 1_000_000)
       return Effect.gen(function* () {
         const fiber = yield* Effect.forkChild(effect)
-        for (let step = 0; step < 100 && fiber.pollUnsafe() == null; step++) yield* clock.adjust(waitRetentionMs)
-        if (fiber.pollUnsafe() == null) return yield* Effect.fail(new Error('Scheduler did not settle with the controlled clock.'))
+        yield* clock.withLive(
+          Effect.gen(function* () {
+            while (fiber.pollUnsafe() == null) {
+              yield* clock.adjust(waitRetentionMs)
+              // Hashing and host I/O use real promises, independently of Effect time.
+              yield* Effect.promise(() => setImmediate())
+            }
+          }).pipe(Effect.timeoutOrElse({ duration: '1 second', orElse: () => Effect.fail(new Error('Scheduler did not settle with the controlled clock.')) })),
+        )
         return yield* Fiber.join(fiber)
       }).pipe(Effect.ensuring(Effect.sync(() => now.mockRestore())))
     }).pipe(Effect.provide(TestClock.layer())),
