@@ -317,7 +317,8 @@ export class IsolatedVmHost {
   #start(): ChildProcess {
     const modulePath = fileURLToPath(import.meta.url)
     const executorPath = fileURLToPath(new URL(modulePath.endsWith('.ts') ? './isolated-vm-executor.ts' : './isolated-vm-executor.js', import.meta.url))
-    const child = spawn(process.execPath, ['--no-node-snapshot', executorPath, '--executor'], {
+    const loaderArgs = modulePath.endsWith('.ts') ? ['--import', import.meta.resolve('@oxc-node/core/register')] : []
+    const child = spawn(process.execPath, ['--no-node-snapshot', ...loaderArgs, executorPath, '--executor'], {
       env: { NODE_ENV: 'production' },
       stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
     }) as ChildProcessByStdio<null, null, Readable>

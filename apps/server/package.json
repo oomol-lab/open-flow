@@ -36,6 +36,8 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "2.0.0",
+    "@oomol-lab/open-flow-command": "workspace:*",
+    "@oxc-node/core": "1.0.1",
     "@tailwindcss/vite": "^4",
     "@types/node": "^26.0.0",
     "@types/react": "^18.3.12",
@@ -49,7 +51,6 @@
     "tailwindcss": "^4",
     "typescript": "7.0.2",
     "vite": "8.2.1",
-    "vitest": "^5.0.0",
-    "@oomol-lab/open-flow-command": "workspace:*"
+    "vitest": "^5.0.0"
   }
 }

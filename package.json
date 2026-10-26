@@ -9,6 +9,7 @@
     "apps/*"
   ],
   "devDependencies": {
+    "@oxc-node/core": "1.0.1",
     "oxfmt": "^0.60.0",
     "wrangler": "4.132.0"
   },
@@ -28,7 +29,7 @@
     "test:docker": "bun run --filter @oomol-lab/open-flow-server test:docker",
     "test:npm-package": "bun run --filter @oomol-lab/open-flow test:package",
     "test:package": "bun run test:npm-package",
-    "lab": "node --no-node-snapshot apps/server/scripts/lab/main.ts",
+    "lab": "node --no-node-snapshot --import @oxc-node/core/register apps/server/scripts/lab/main.ts",
     "flow": "bun apps/server/scripts/flow.ts",
     "skill:generate": "bun run --filter @oomol-lab/open-flow skill:generate"
   }
