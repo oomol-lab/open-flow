@@ -6,6 +6,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, it } from 'vitest'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 
@@ -14,7 +15,7 @@ for (const conformance of runLifecycleConformanceCases) {
     const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-lifecycle-'))
     const file = path.join(directory, 'store.sqlite')
     const opened = Database.open(file)
-    const store = new Store(opened)
+    const store = new Store(opened, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined })
     try {
       store.flows.createFlow({
         actorId: 'operator',

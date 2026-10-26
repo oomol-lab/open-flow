@@ -13,12 +13,12 @@ it('reads authorized published entries independently of edits and unreadable Dra
   const file = path.join(directory, 'flow.sqlite')
   const service = await openService(file)
   try {
-    const created = await service.control.createFlow('operator', 'Online', 'create')
+    const created = await service.control.flows.createFlow('operator', 'Online', 'create')
     const flowId = created.flow.flowId
     const app = createServerApp(service, { resolveControlActor: (request) => request.headers.get('x-actor') ?? undefined })
     const client = new ControlClient(async (route, init) => app.request(route, { ...init, headers: { 'x-actor': 'operator' } }))
     expect(await client.getLiveDetails(flowId)).toEqual({ flowId, inputDefs: null, publication: null, status: 'not-published', entries: [], version: 1 })
-    const saved = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
+    const saved = await service.control.drafts.changeDraft('operator', flowId, created.flow.draftRevisionId, [
       {
         kind: 'graph.node.create',
         nodeId: 'webhook',
@@ -31,19 +31,19 @@ it('reads authorized published entries independently of edits and unreadable Dra
       },
       { kind: 'graph.node.create', nodeId: 'cron', node: { kind: 'cron', name: 'Schedule', cronTimes: [{ type: 'every', unit: 'hour', value: 1 }] } },
     ])
-    const op = await service.control.publishFlow('operator', flowId, saved.revision.revisionId, currentEngineContract, null, 'publish')
+    const op = await service.control.publications.publishFlow('operator', flowId, saved.revision.revisionId, currentEngineContract, null, 'publish')
     await service.tickMaintenance()
-    const done = service.control.getPublishOperation(flowId, op.operationId)
+    const done = service.control.publications.getPublishOperation('operator', flowId, op.operationId)
     if (done.status != 'succeeded') throw new Error('Publication did not succeed')
     const current = await client.getLiveDetails(flowId)
     expect(current.inputDefs).toEqual({ message: { schema: { type: 'string' }, nullable: false } })
     expect(current.entries.find((entry) => entry.type == 'start')?.config).toEqual({ inputDefs: current.inputDefs })
-    const changedInputs = await service.control.editAuthoring('operator', flowId, {
+    const changedInputs = await service.control.drafts.editAuthoring('operator', flowId, {
       baseRevision: saved.revision.revisionId,
       requestId: 'input-defs-update',
       edits: [{ op: 'node.update', node: 'manual', set: { config: { inputDefs: { message: { description: 'Draft only' } } } } }],
     })
-    expect(service.control.readAuthoring(flowId, { nodes: ['manual'] }).data.nodes?.[0]).toMatchObject({
+    expect(service.control.drafts.readAuthoring('operator', flowId, { nodes: ['manual'] }).data.nodes?.[0]).toMatchObject({
       config: { inputDefs: { message: { description: 'Draft only' } } },
     })
     expect((await client.getLiveDetails(flowId)).inputDefs).toEqual(current.inputDefs)
@@ -53,27 +53,38 @@ it('reads authorized published entries independently of edits and unreadable Dra
       config: { method: 'POST', body: { message: { nullable: false } } },
       binding: { endpointUrl: expect.stringMatching(/\/v1\/webhooks\/endpoint_/) },
     })
-    await service.control.setFlowEnabled(flowId, done.publicationId, false)
+    await service.control.publications.setFlowEnabled('operator', flowId, done.publicationId, false)
     expect(await client.getLiveDetails(flowId)).toMatchObject({
       enabled: false,
       status: 'suspended',
       entries: expect.arrayContaining([expect.objectContaining({ type: 'webhook', binding: expect.objectContaining({ health: 'healthy' }) })]),
     })
-    const changed = await service.control.changeDraft('operator', flowId, changedInputs.revision, [{ kind: 'graph.node.delete', nodeId: 'webhook' }])
+    const changed = await service.control.drafts.changeDraft('operator', flowId, changedInputs.revision, [{ kind: 'graph.node.delete', nodeId: 'webhook' }])
     expect((await client.getLiveDetails(flowId)).entries.some((entry) => entry.nodeId == 'webhook')).toBe(true)
-    const second = await service.control.publishFlow('operator', flowId, changed.revision.revisionId, currentEngineContract, done.publicationId, 'republish')
+    const second = await service.control.publications.publishFlow(
+      'operator',
+      flowId,
+      changed.revision.revisionId,
+      currentEngineContract,
+      done.publicationId,
+      'republish',
+    )
     await service.tickMaintenance()
-    expect(service.control.getPublishOperation(flowId, second.operationId).status).toBe('succeeded')
-    expect(service.control.listFlowTriggerBindings(flowId).some((item) => item.triggerNodeId == 'webhook' && item.currentPublicationId == null)).toBe(true)
+    expect(service.control.publications.getPublishOperation('operator', flowId, second.operationId).status).toBe('succeeded')
+    expect(
+      service.control.publications
+        .listFlowTriggerBindings('operator', flowId)
+        .some((item) => item.triggerNodeId == 'webhook' && item.currentPublicationId == null),
+    ).toBe(true)
     expect((await client.getLiveDetails(flowId)).entries.map((item) => item.type)).toEqual(['cron', 'start'])
-    const draft = await service.control.changeDraft('operator', flowId, changed.revision.revisionId, [
+    const draft = await service.control.drafts.changeDraft('operator', flowId, changed.revision.revisionId, [
       { kind: 'graph.node.create', nodeId: 'draft-only', node: { kind: 'webhook', name: 'Draft only', method: 'GET', bodyFields: [] } },
     ])
     const db = new DatabaseSync(file)
     try {
       db.prepare("UPDATE revisions SET content = '{}' WHERE revision_id = ?").run(draft.revision.revisionId)
       db.prepare('UPDATE revision_deltas SET patch = ? WHERE revision_id = ?').run('[{"op":"invalid","path":"/"}]', draft.revision.revisionId)
-      expect(() => service.control.getDraft(flowId)).toThrow()
+      expect(() => service.control.drafts.getDraft('operator', flowId)).toThrow()
       expect((await client.getLiveDetails(flowId)).entries.map((item) => item.type)).toEqual(['cron', 'start'])
       db.prepare("UPDATE publications SET revision_digest = 'invalid' WHERE flow_id = ?").run(flowId)
       await expect(client.getLiveDetails(flowId)).rejects.toMatchObject({ code: 'flow.revision-storage-conflict' })

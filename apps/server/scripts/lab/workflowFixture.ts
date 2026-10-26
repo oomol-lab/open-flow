@@ -1,8 +1,8 @@
 import type { ServerService } from '../../node/application/service.ts'
 export async function seedWorkflowTarget(service: ServerService) {
-  const created = await service.control.createFlow('operator', 'Lab double', 'lab-call-target')
+  const created = await service.control.flows.createFlow('operator', 'Lab double', 'lab-call-target')
   const flowId = created.flow.flowId
-  const edited = await service.control.editAuthoring('operator', flowId, {
+  const edited = await service.control.drafts.editAuthoring('operator', flowId, {
     baseRevision: created.flow.draftRevisionId,
     requestId: 'lab-call-target',
     edits: [
@@ -28,7 +28,7 @@ export async function seedWorkflowTarget(service: ServerService) {
       { op: 'edge.connect', source: '$code', target: '$outputs' },
     ],
   })
-  const revision = service.control.getRevision(flowId, edited.revision)
+  const revision = service.control.drafts.getRevision('operator', flowId, edited.revision)
   const result = await service.publisher.publish({
     control: { actorId: 'operator', operation: 'publish' },
     flowId,

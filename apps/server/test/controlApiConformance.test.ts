@@ -28,8 +28,10 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { describe, expect, it, vi } from 'vitest'
+import { runEnvironment } from '../node/application/run-environment.ts'
 import { ConnectorTaskError } from '../node/deployment/connector-contract.ts'
 import { ConnectorClient } from '../node/deployment/connector.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 import { createServerApp } from '../node/transport/http.ts'
@@ -207,7 +209,7 @@ it('creates, edits and runs a Leina notification with a team-scoped robot select
     const flow = await api.createFlow('Leina notification', 'leina')
     const database = Database.open(harness.file)
     try {
-      new Store(database).connectorTeams.bind(flow.flowId, teamId)
+      new Store(database, runEnvironment(isolatedVmEngineDigest)).connectorTeams.bind(flow.flowId, teamId)
     } finally {
       database.close()
     }
@@ -595,7 +597,7 @@ it('Server stored tool result Control API conformance', async () => {
     })
     const database = Database.open(harness.file)
     try {
-      const store = new Store(database)
+      const store = new Store(database, runEnvironment(isolatedVmEngineDigest))
       if (store.runs.claim()?.runId != run.runId) throw new Error('Expected result Run claim.')
       store.runs.start(run.runId, { kind: 'run.started', payload: { flowId: flow.flowId, scopeId: run.runId } })
       const value = { rows: [10, 20, 30] }

@@ -6,6 +6,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
+import { runEnvironment } from '../node/application/run-environment.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 
@@ -42,7 +43,12 @@ describe('Agent Run admission with an owner-scoped Variable', () => {
   it('admits the Run and fixes the resolved Variable inside the same transaction', async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-agent-variable-'))
     const database = Database.open(path.join(directory, 'store.sqlite'))
-    const store = new Store(database, Date.now, undefined, undefined, () => ({ model: 'fixture', origin: 'https://llm.example', token: 'token' }))
+    let config: { origin: string; token: string } | undefined
+    const store = new Store(
+      database,
+      runEnvironment('test-engine', () => config),
+      Date.now,
+    )
     try {
       store.flows.createFlow({
         actorId: 'owner',
@@ -73,19 +79,25 @@ describe('Agent Run admission with an owner-scoped Variable', () => {
       }
       expect(store.runs.acceptControlRun(input)).toEqual({ kind: 'binding-unresolved' })
       store.variables.put('owner', 'TOKEN', 'secret')
+      expect(() => store.runs.acceptControlRun(input)).toThrow('Agent model or variable configuration is unavailable.')
+      expect(database.connection.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 0 })
+      config = { origin: 'https://llm.example', token: 'token' }
       const result = store.runs.acceptControlRun(input)
+      config = { origin: 'https://changed.example', token: 'changed' }
       store.variables.put('owner', 'TOKEN', 'changed-after-admission')
 
       expect(result).toMatchObject({ created: true, kind: 'accepted' })
       if (result.kind != 'accepted') throw new Error('Run was not accepted.')
       const row = database.connection
-        .prepare('SELECT binding_values AS bindingValues, llm_config AS llmConfig FROM runs WHERE run_id = ?')
+        .prepare('SELECT engine_digest AS engineDigest, binding_values AS bindingValues, llm_config AS llmConfig FROM runs WHERE run_id = ?')
         .get(result.runId) as {
+        readonly engineDigest: string
         readonly bindingValues: string | null
         readonly llmConfig: string | null
       }
       expect(JSON.parse(row.bindingValues ?? 'null')).toEqual({ email: 'secret' })
-      expect(JSON.parse(row.llmConfig ?? 'null')).toMatchObject({ model: 'fixture' })
+      expect(JSON.parse(row.llmConfig ?? 'null')).toEqual({ origin: 'https://llm.example', token: 'token' })
+      expect(row.engineDigest).toBe('test-engine')
     } finally {
       database.close()
       await rm(directory, { force: true, recursive: true })

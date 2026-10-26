@@ -17,6 +17,18 @@ MCP client ── MCP adapter ┘
 
 Control API and MCP adapters share deployment application services. They use the same identity checks, edit compiler, idempotent admission, and lifecycle.
 Protocol adapters must not create a second authoring or Run state machine.
+External application operations take the authenticated actor explicitly and enforce resource ownership
+and administrative permissions themselves. Adapter prechecks may reject requests early but are not
+the authorization boundary; internal execution derives authority from its accepted Run or Flow owner.
+
+The Server composes its control services in `ServerService`. `ControlService` only describes the
+service entries; it does not implement operations or forward calls. Flow lifecycle and presentation,
+Draft editing and diagnostics, Connector discovery and access, Publications and Live state, event
+sources, account Variables, and Runs have separate application owners. Each owner enforces access
+through `ControlAccess`; services depend on the specific peer operations and stores they use.
+Draft authoring and low-level edits share the Draft commit path, and publication operations continue
+to use `Publisher` for preparation and admission. Trigger definitions and configuration options belong
+to Draft editing; published trigger bindings and activity belong to Publication control.
 
 | Owner                | Responsibility                                                                                                                                                                      |
 | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -93,6 +105,9 @@ Connector, LLM, and callback configuration belong to the deployment, not to Flow
 Flows store only the required references. The deployment resolves and validates configuration at the relevant operation boundary.
 Configuration sources must be explicit. A configuration block must not mix sources or silently fall back to another source.
 An operation already in progress keeps its fixed configuration. New configuration applies only to later operations.
+The deployment supplies execution environment identity and snapshot preparation to Run storage.
+Storage invokes snapshot preparation within the admission transaction and persists the fixed facts;
+it does not choose a concrete executor or assemble model configuration itself.
 
 Variable values are resolved and fixed for the actual execution scope. The platform must not implicitly write them into Revisions or public Run inputs and events.
 User code can explicitly return, log, or send values into business data and external systems. Variables do not provide non-exportable secret protection.

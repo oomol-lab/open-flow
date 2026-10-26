@@ -1,11 +1,13 @@
 import { expect, it } from 'vitest'
+import { runEnvironment } from '../node/application/run-environment.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 
 it('limits each owner independently and preserves empty values, duplicate bindings and unchanged timestamps', () => {
   const database = Database.open(':memory:')
   let now = 1
-  const store = new Store(database, () => now++)
+  const store = new Store(database, runEnvironment(isolatedVmEngineDigest), () => now++)
   const variables = store.variables
   for (const owner of ['a', 'b'])
     store.flows.createFlow({

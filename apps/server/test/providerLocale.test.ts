@@ -49,17 +49,17 @@ it('forwards language on every upstream read and localizes Action service names'
 })
 
 it('forwards Provider locale and varies the HTTP representation', async () => {
-  const listConnectorProviders = vi.fn(async (_flowId?: string, _signal?: AbortSignal, locale?: string) => [
+  const listConnectorProviders = vi.fn(async (_actorId: string, _flowId?: string, _signal?: AbortSignal, locale?: string) => [
     { serviceId: 'mail', serviceName: locale == 'zh-CN' ? '邮件' : 'Mail' },
   ])
-  const app = createControlApp({ listConnectorProviders, authorize: vi.fn() } as unknown as ControlService, () => 'actor')
+  const app = createControlApp({ connectors: { listConnectorProviders }, access: { authorize: vi.fn() } } as unknown as ControlService, () => 'actor')
   const english = await app.request('/connector/providers?flowId=flow&locale=en')
   const chinese = await app.request('/connector/providers?flowId=flow&locale=zh-CN', { headers: { 'if-none-match': english.headers.get('etag')! } })
   expect(chinese.status).toBe(200)
   expect(chinese.headers.get('content-language')).toBe('zh-CN')
   expect(chinese.headers.get('vary')).toContain('Accept-Language')
   expect(await chinese.json()).toMatchObject({ providers: [{ serviceName: '邮件' }] })
-  expect(listConnectorProviders).toHaveBeenLastCalledWith('flow', undefined, 'zh-CN', 'actor')
+  expect(listConnectorProviders).toHaveBeenLastCalledWith('actor', 'flow', undefined, 'zh-CN')
   await app.request('/connector/providers?flowId=flow', { headers: { 'Accept-Language': 'zh-CN' } })
-  expect(listConnectorProviders).toHaveBeenLastCalledWith('flow', undefined, 'zh-CN', 'actor')
+  expect(listConnectorProviders).toHaveBeenLastCalledWith('actor', 'flow', undefined, 'zh-CN')
 })

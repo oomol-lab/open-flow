@@ -3,7 +3,9 @@ import type { WorkflowFile } from '@oomol-lab/open-flow/flow-encoding'
 import { ControlClient } from '@oomol-lab/open-flow/control-api'
 import { encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { expect, it, onTestFinished, vi } from 'vitest'
+import { runEnvironment } from '../node/application/run-environment.ts'
 import { ConnectorClient } from '../node/deployment/connector.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 import { createServerApp } from '../node/transport/http.ts'
@@ -57,10 +59,10 @@ it('rejects unsupported files before creating any resources and preserves a miss
   const service = await openService(':memory:')
   const control = service.control
   for (const invalid of [{}, { ...file, version: 2 }, { ...file, content: { ...file.content, modelVersion: 999 } }]) {
-    await expect(control.importFlow('operator', invalid, 'invalid')).rejects.toMatchObject({ code: 'flow.invalid' })
+    await expect(control.flows.importFlow('operator', invalid, 'invalid')).rejects.toMatchObject({ code: 'flow.invalid' })
   }
-  expect(control.listFlows(100).page.flows).toEqual([])
-  const imported = await control.importFlow(
+  expect(control.flows.listFlows('operator', 100).page.flows).toEqual([])
+  const imported = await control.flows.importFlow(
     'operator',
     {
       ...file,
@@ -83,7 +85,7 @@ it('rejects unsupported files before creating any resources and preserves a miss
     },
     'valid',
   )
-  expect(control.getDraft(imported.flow.flowId).content.document.graph.nodes.action).toMatchObject({
+  expect(control.drafts.getDraft('operator', imported.flow.flowId).content.document.graph.nodes.action).toMatchObject({
     task: { executor: { kind: 'connector', action: 'absent.action' } },
   })
 })
@@ -91,7 +93,7 @@ it('rejects unsupported files before creating any resources and preserves a miss
 it('rolls back Flow, Revision and Presentation together if the creation transaction fails', () => {
   const db = Database.open(':memory:')
   onTestFinished(() => db.close())
-  const store = new Store(db)
+  const store = new Store(db, runEnvironment(isolatedVmEngineDigest))
   db.connection.exec("CREATE TRIGGER reject_presentation BEFORE INSERT ON flow_presentations BEGIN SELECT RAISE(ABORT, 'test failure'); END")
   const create = () =>
     store.flows.createFlow({
@@ -122,10 +124,10 @@ it('binds only the selected target Team and rejects unavailable Teams before cre
     { id: 'default', name: 'default_team', systemCreated: true },
   ])
   const service = await openService(':memory:', { capabilities: { connector: () => connector } })
-  const created = await service.control.importFlow('operator', file, 'selected-import', undefined, 'selected')
-  expect(await service.control.resolveConnectorScope(created.flow.flowId)).toBe('selected')
-  await expect(service.control.importFlow('operator', file, 'denied-import', undefined, 'missing')).rejects.toThrow('Team')
-  expect(service.control.listFlows(100).page.flows.map((flow) => flow.flowId)).toEqual([created.flow.flowId])
+  const created = await service.control.flows.importFlow('operator', file, 'selected-import', undefined, 'selected')
+  expect(await service.control.connectors.resolveConnectorScope('operator', created.flow.flowId)).toBe('selected')
+  await expect(service.control.flows.importFlow('operator', file, 'denied-import', undefined, 'missing')).rejects.toThrow('Team')
+  expect(service.control.flows.listFlows('operator', 100).page.flows.map((flow) => flow.flowId)).toEqual([created.flow.flowId])
 })
 
 it.each(['create', 'import'] as const)('replays an accepted %s without consulting unavailable external Team services', async (operation) => {
@@ -133,21 +135,23 @@ it.each(['create', 'import'] as const)('replays an accepted %s without consultin
   const teams = vi.spyOn(connector, 'listTeams').mockResolvedValue([{ id: 'team', name: 'team', systemCreated: true }])
   const service = await openService(':memory:', { capabilities: { connector: () => connector } })
   const create = (key: string, name = 'Template') =>
-    operation == 'import' ? service.control.importFlow('operator', file, key, name, 'team') : service.control.createFlow('operator', name, key, 'team')
+    operation == 'import'
+      ? service.control.flows.importFlow('operator', file, key, name, 'team')
+      : service.control.flows.createFlow('operator', name, key, 'team')
   const accepted = await create('stable')
   teams.mockRejectedValue(new Error('Team service is offline'))
   expect(await create('stable')).toEqual({ ...accepted, created: false })
   await expect(create('stable', 'Changed')).rejects.toMatchObject({ code: 'flow.conflict' })
   expect(teams).toHaveBeenCalledOnce()
   await expect(create('new')).rejects.toThrow('Team service is offline')
-  expect(service.control.listFlows(100).page.flows).toHaveLength(1)
+  expect(service.control.flows.listFlows('operator', 100).page.flows).toHaveLength(1)
 })
 
 it('keeps an import receipt stable when the localized default name changes', async () => {
   const service = await openService(':memory:')
   const { name: _, ...unnamed } = file
-  const accepted = await service.control.importFlow('operator', unnamed, 'unnamed', undefined, undefined, 'Imported workflow')
-  const replay = await service.control.importFlow('operator', unnamed, 'unnamed', undefined, undefined, '导入的工作流')
+  const accepted = await service.control.flows.importFlow('operator', unnamed, 'unnamed', undefined, undefined, 'Imported workflow')
+  const replay = await service.control.flows.importFlow('operator', unnamed, 'unnamed', undefined, undefined, '导入的工作流')
   expect(replay).toEqual({ ...accepted, created: false })
   expect(replay.flow.name).toBe('Imported workflow')
 })

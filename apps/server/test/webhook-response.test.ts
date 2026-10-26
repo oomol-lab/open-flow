@@ -163,10 +163,10 @@ async function fixture(
 ) {
   const service = await openService(':memory:')
   const stored = await storeRevision(service, transform(revision(options, fail)), 'response')
-  await service.control.publishFlow('test', stored.flowId, stored.revisionId, currentEngineContract, null, 'publish')
+  await service.control.publications.publishFlow('test', stored.flowId, stored.revisionId, currentEngineContract, null, 'publish')
   await service.tickMaintenance()
   if (start) await startService(service)
-  const url = service.control.getFlowTriggerBinding(stored.flowId, 'hook', 'http://server.local').endpointUrl!
+  const url = service.control.publications.getFlowTriggerBinding('test', stored.flowId, 'hook', 'http://server.local').endpointUrl!
   const app = createServerApp(service)
   const request = (extra: RequestInit = {}) =>
     app.request(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ value }), ...extra })
@@ -202,7 +202,7 @@ describe('published HTTP responses', () => {
       expect(response.status).toBe(200)
       expect(response.headers.get('content-type')).toBe(contentType ?? 'text/plain;charset=UTF-8')
       expect(await response.text()).toBe(body)
-      expect(f.service.control.runs.listRuns(f.stored.flowId, 100, {}).page.runs[0]?.status).toBe('queued')
+      expect(f.service.control.runs.listRuns('test', f.stored.flowId, 100, {}).page.runs[0]?.status).toBe('queued')
     },
   )
 
@@ -263,14 +263,14 @@ describe('published HTTP responses', () => {
       controller.abort()
       await expect(pending).rejects.toThrow()
       await expect(observe.mock.results[0]!.value).resolves.toEqual({ kind: 'aborted' })
-      const admitted = f.service.control.runs.listRuns(f.stored.flowId, 100, {}).page.runs
+      const admitted = f.service.control.runs.listRuns('test', f.stored.flowId, 100, {}).page.runs
       expect(admitted).toHaveLength(1)
       expect(admitted[0]!.status).toBe('queued')
       await startService(f.service)
       const response = await fetch(url, input)
       expect(response.status).toBe(200)
       expect(await response.json()).toEqual({ value: 'hello' })
-      expect(f.service.control.runs.listRuns(f.stored.flowId, 100, {}).page.runs.map((run) => run.runId)).toEqual([admitted[0]!.runId])
+      expect(f.service.control.runs.listRuns('test', f.stored.flowId, 100, {}).page.runs.map((run) => run.runId)).toEqual([admitted[0]!.runId])
     } finally {
       if ('closeAllConnections' in http) http.closeAllConnections()
       await new Promise<void>((resolve, reject) => http.close((error) => (error == null ? resolve() : reject(error))))
@@ -362,7 +362,7 @@ describe('published HTTP responses', () => {
     const init = { headers: { 'idempotency-key': 'same' } }
     const replies = await Promise.all([f.request(init), f.request(init)])
     for (const reply of replies) expect(await reply.json()).toEqual({ value: 'hello' })
-    const runs = f.service.control.runs.listRuns(f.stored.flowId, 100, {}).page.runs
+    const runs = f.service.control.runs.listRuns('test', f.stored.flowId, 100, {}).page.runs
     expect(runs).toHaveLength(1)
     expect(runs[0]!.status).toBe('completed')
     expect(await (await f.request(init)).json()).toEqual({ value: 'hello' })
@@ -421,7 +421,7 @@ describe('published HTTP responses', () => {
     const response = await f.request()
     expect(response.status).toBe(500)
     expect(await response.json()).toMatchObject({ error: { code: 'webhook.response-missing' } })
-    expect(f.service.control.runs.listRuns(f.stored.flowId, 100, {}).page.runs[0]!.status).toBe('completed')
+    expect(f.service.control.runs.listRuns('test', f.stored.flowId, 100, {}).page.runs[0]!.status).toBe('completed')
   })
 
   it('returns a sanitized failure with HTTP 500', async () => {
@@ -442,12 +442,12 @@ describe('published HTTP responses', () => {
     const init = { headers: { 'idempotency-key': 'timeout' } }
     const response = await f.request(init)
     expect(response.status).toBe(504)
-    const before = f.service.control.runs.listRuns(f.stored.flowId, 100, {}).page.runs
+    const before = f.service.control.runs.listRuns('test', f.stored.flowId, 100, {}).page.runs
     expect(before).toHaveLength(1)
     expect(before[0]!.status).toBe('queued')
     await startService(f.service)
     expect(await (await f.request(init)).json()).toEqual({ value: 'hello' })
-    expect(f.service.control.runs.listRuns(f.stored.flowId, 100, {}).page.runs.map((run) => run.runId)).toEqual([before[0]!.runId])
+    expect(f.service.control.runs.listRuns('test', f.stored.flowId, 100, {}).page.runs.map((run) => run.runId)).toEqual([before[0]!.runId])
   })
 
   it('releases a waiting connection on shutdown without canceling the admitted Run', async () => {
@@ -455,22 +455,22 @@ describe('published HTTP responses', () => {
     const controller = new AbortController()
     const app = createServerApp(f.service, { shutdownSignal: controller.signal })
     const waiting = app.request(f.url, { method: 'POST', body: JSON.stringify({ value: 'hello' }) })
-    await vi.waitFor(() => expect(f.service.control.runs.listRuns(f.stored.flowId, 100, {}).page.runs).toHaveLength(1))
+    await vi.waitFor(() => expect(f.service.control.runs.listRuns('test', f.stored.flowId, 100, {}).page.runs).toHaveLength(1))
     controller.abort()
     expect((await waiting).status).toBe(503)
-    expect(f.service.control.runs.listRuns(f.stored.flowId, 100, {}).page.runs[0]!.status).toBe('queued')
+    expect(f.service.control.runs.listRuns('test', f.stored.flowId, 100, {}).page.runs[0]!.status).toBe('queued')
   })
 
   it('pins response configuration to the accepted publication during a republish', async () => {
     const f = await fixture('hello', { responseBody: { kind: 'workflow-outputs', output: 'value' } }, false)
     const waiting = f.request()
-    await vi.waitFor(() => expect(f.service.control.runs.listRuns(f.stored.flowId, 100, {}).page.runs).toHaveLength(1))
-    const hook = f.service.control.getRevision(f.stored.flowId, f.stored.revisionId).content.document.graph.nodes.hook!
-    const edited = await f.service.control.changeDraft('test', f.stored.flowId, f.stored.revisionId, [
+    await vi.waitFor(() => expect(f.service.control.runs.listRuns('test', f.stored.flowId, 100, {}).page.runs).toHaveLength(1))
+    const hook = f.service.control.drafts.getRevision('test', f.stored.flowId, f.stored.revisionId).content.document.graph.nodes.hook!
+    const edited = await f.service.control.drafts.changeDraft('test', f.stored.flowId, f.stored.revisionId, [
       { kind: 'graph.node.replace', nodeId: 'hook', before: hook, node: { ...hook, options: { responseData: 'new publication' } } as typeof hook },
     ])
-    const live = f.service.control.getLiveDetails(f.stored.flowId, 'http://server.local')
-    await f.service.control.publishFlow(
+    const live = f.service.control.publications.getLiveDetails('test', f.stored.flowId, 'http://server.local')
+    await f.service.control.publications.publishFlow(
       'test',
       f.stored.flowId,
       edited.revision.revisionId,
@@ -573,16 +573,16 @@ describe('published early response nodes', () => {
       expect(reply.headers.get('content-type')).toBe('text/plain;charset=UTF-8')
       expect(reply.headers.get('x-frame-options')).toBe('DENY')
     }
-    const runs = () => f.service.control.runs.listRuns(f.stored.flowId, 100, {}).page.runs
-    await expect.poll(() => f.service.control.runs.getRun(runs()[0]!.runId).waits.length).toBe(1)
+    const runs = () => f.service.control.runs.listRuns('test', f.stored.flowId, 100, {}).page.runs
+    await expect.poll(() => f.service.control.runs.getRun('test', runs()[0]!.runId).waits.length).toBe(1)
     expect(runs()[0]?.status).not.toBe('completed')
     expect(runs()).toHaveLength(1)
-    const run = f.service.control.runs.getRun(runs()[0]!.runId)
+    const run = f.service.control.runs.getRun('test', runs()[0]!.runId)
     const replay = await f.request({ headers: { 'content-type': 'application/json', 'idempotency-key': 'early' } })
     expect(await replay.text()).toBe('early')
-    f.service.control.runs.resolveRunWait(run.runId, run.waits[0]!.waitId, 'continue')
+    f.service.control.runs.resolveRunWait('test', run.runId, run.waits[0]!.waitId, 'continue')
     await expect.poll(() => runs()[0]?.status).toBe('completed')
-    const events = f.service.control.runs.getRunEvents(run.runId, 0, 1000).events
+    const events = f.service.control.runs.getRunEvents('test', run.runId, 0, 1000).events
     expect(events).toContainEqual(expect.objectContaining({ kind: 'node.completed', payload: expect.objectContaining({ nodeId: 'reply', outputs: {} }) }))
   })
 
@@ -594,7 +594,7 @@ describe('published early response nodes', () => {
     expect(await response.json()).toEqual({ ok: true })
     expect(response.headers.get('x-count')).toBe('3')
     expect(response.headers.get('x-enabled')).toBe('false')
-    await expect.poll(() => f.service.control.runs.listRuns(f.stored.flowId, 1, {}).page.runs[0]?.status).toBe('failed')
+    await expect.poll(() => f.service.control.runs.listRuns('test', f.stored.flowId, 1, {}).page.runs[0]?.status).toBe('failed')
     expect(await (await request()).json()).toEqual({ ok: true })
   })
 
@@ -642,14 +642,14 @@ it('keeps an early-response Run alive after HTTP timeout and reuses its eventual
   const request = () => f.request({ headers: { 'content-type': 'application/json', 'idempotency-key': 'timeout-early' } })
   const timedOut = await request()
   expect(timedOut.status).toBe(504)
-  const run = f.service.control.runs.listRuns(f.stored.flowId, 10, {}).page.runs[0]!
+  const run = f.service.control.runs.listRuns('test', f.stored.flowId, 10, {}).page.runs[0]!
   expect(run.status).toBe('queued')
   await startService(f.service)
-  await expect.poll(() => f.service.control.runs.getRun(run.runId).status).toBe('completed')
+  await expect.poll(() => f.service.control.runs.getRun('test', run.runId).status).toBe('completed')
   const replay = await request()
   expect(replay.status).toBe(201)
   expect(await replay.text()).toBe('after HTTP timeout')
-  expect(f.service.control.runs.listRuns(f.stored.flowId, 10, {}).page.runs).toHaveLength(1)
+  expect(f.service.control.runs.listRuns('test', f.stored.flowId, 10, {}).page.runs).toHaveLength(1)
 })
 
 it.each([{ 'X-Bad': '\r\nprivate' }, { 'X-Test': 'one', 'x-test': 'two' }, { 'X-Value': '你好' }])(

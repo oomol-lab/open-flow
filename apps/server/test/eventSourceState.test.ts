@@ -1,11 +1,13 @@
 import { expect, it } from 'vitest'
+import { runEnvironment } from '../node/application/run-environment.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 
 it('rolls back application verification when source state persistence fails', () => {
   const database = Database.open(':memory:')
   try {
-    const store = new Store(database, Date.now)
+    const store = new Store(database, runEnvironment(isolatedVmEngineDigest), Date.now)
     const source = store.eventSources.create(
       {
         kind: 'slack',

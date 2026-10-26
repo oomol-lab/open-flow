@@ -19,7 +19,9 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { runEnvironment } from '../node/application/run-environment.ts'
 import { ServerService } from '../node/application/service.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 import { createServerApp } from '../node/transport/http.ts'
@@ -343,7 +345,7 @@ describe('Server application service', () => {
       .prepare('UPDATE runs SET engine_contract = ?, engine_digest = ? WHERE run_id = ?')
       .run(engineContract, 'sha256:1d4de22503410f3ae83e38e7e487446c8d71fa5e2af6697f46add32c3b84bac6', accepted.runId)
     if (status === 'waiting') {
-      const store = new Store(database, Date.now)
+      const store = new Store(database, runEnvironment(isolatedVmEngineDigest), Date.now)
       const run = store.runs.claim()!
       store.runs.start(run.runId, { kind: 'run.started', payload: { flowId: run.flowId, scopeId: run.runId } })
       const prepared = await prepareFlow(decodeRevision(new TextEncoder().encode(run.content)), engineContract)
@@ -375,14 +377,14 @@ describe('Server application service', () => {
     }
     database.close()
     service = await openService(file)
-    expect(service.control.runs.getRun(accepted.runId)).toMatchObject({ status, engineContract })
+    expect(service.control.runs.getRun('test', accepted.runId)).toMatchObject({ status, engineContract })
     await startService(service)
-    await expect.poll(() => service.control.runs.getRun(accepted.runId).waits.length).toBe(1)
-    const wait = service.control.runs.getRun(accepted.runId).waits[0]!
-    service.control.runs.resolveRunWait(accepted.runId, wait.waitId, 'approve')
+    await expect.poll(() => service.control.runs.getRun('test', accepted.runId).waits.length).toBe(1)
+    const wait = service.control.runs.getRun('test', accepted.runId).waits[0]!
+    service.control.runs.resolveRunWait('test', accepted.runId, wait.waitId, 'approve')
     await service.waitForIdle()
-    expect(service.control.runs.getRun(accepted.runId)).toMatchObject({ status: 'completed', engineContract })
-    expect(service.control.runs.getRunEvents(accepted.runId, 0, 100).events).toContainEqual(
+    expect(service.control.runs.getRun('test', accepted.runId)).toMatchObject({ status: 'completed', engineContract })
+    expect(service.control.runs.getRunEvents('test', accepted.runId, 0, 100).events).toContainEqual(
       expect.objectContaining({ kind: 'node.completed', payload: expect.objectContaining({ nodeId: 'verify', outputs: { contract: engineContract } }) }),
     )
   })
@@ -393,7 +395,7 @@ describe('Server application service', () => {
       const file = await databaseFile()
       let service = await openService(file)
       const stored = await storeRevision(service, fullFlow(), 'legacy-publication')
-      const revision = service.control.getRevision(stored.flowId, stored.revisionId)
+      const revision = service.control.drafts.getRevision('test', stored.flowId, stored.revisionId)
       const published = await service.publisher.publish({
         ...stored,
         revision: revision.content,
@@ -404,12 +406,12 @@ describe('Server application service', () => {
       if (published.kind !== 'published') throw new Error('Expected a published Flow.')
       await closeService(service)
       service = await openService(file)
-      expect(service.control.getLiveDetails(stored.flowId, 'http://localhost')).toMatchObject({ status: 'runnable' })
+      expect(service.control.publications.getLiveDetails('test', stored.flowId, 'http://localhost')).toMatchObject({ status: 'runnable' })
       await startService(service)
-      const accepted = await service.control.runs.createLiveRun(published.publicationId, {}, 'legacy-live', { nodeId: 'start', outputs: {} })
+      const accepted = await service.control.runs.createLiveRun('test', published.publicationId, {}, 'legacy-live', { nodeId: 'start', outputs: {} })
       await service.waitForIdle()
-      expect(service.control.runs.getRun(accepted.run.runId)).toMatchObject({ status: 'completed', engineContract, revisionDigest: revision.digest })
-      expect(service.control.getRevision(stored.flowId, stored.revisionId)).toEqual(revision)
+      expect(service.control.runs.getRun('test', accepted.run.runId)).toMatchObject({ status: 'completed', engineContract, revisionDigest: revision.digest })
+      expect(service.control.drafts.getRevision('test', stored.flowId, stored.revisionId)).toEqual(revision)
     },
   )
 
@@ -417,7 +419,7 @@ describe('Server application service', () => {
     const file = await databaseFile()
     let service = await openService(file)
     const stored = await storeRevision(service, wait ? waitFlow() : fullFlow(), 'partial-draft')
-    const changed = await service.control.changeDraft('test', stored.flowId, stored.revisionId, [
+    const changed = await service.control.drafts.changeDraft('test', stored.flowId, stored.revisionId, [
       {
         kind: 'graph.node.create',
         nodeId: 'other',
@@ -470,23 +472,26 @@ describe('Server application service', () => {
       },
     ])
     const revisionId = changed.revision.revisionId
-    expect((await service.control.checkFlow(stored.flowId, revisionId, currentEngineContract)).valid).toBe(false)
-    const accepted = await service.control.runs.createDraftRun(stored.flowId, revisionId, currentEngineContract, {}, 'partial-run', {
+    expect((await service.control.drafts.checkFlow('test', stored.flowId, revisionId, currentEngineContract)).valid).toBe(false)
+    const accepted = await service.control.runs.createDraftRun('test', stored.flowId, revisionId, currentEngineContract, {}, 'partial-run', {
       nodeId: 'start',
       outputs: {},
     })
     await expect(
-      service.control.runs.createDraftRun(stored.flowId, revisionId, currentEngineContract, {}, 'invalid-entry', { nodeId: 'other', outputs: { payload: {} } }),
+      service.control.runs.createDraftRun('test', stored.flowId, revisionId, currentEngineContract, {}, 'invalid-entry', {
+        nodeId: 'other',
+        outputs: { payload: {} },
+      }),
     ).rejects.toMatchObject({ code: 'flow.invalid' })
     await closeService(service)
     service = await openService(file)
     await startService(service)
     if (wait) {
-      await expect.poll(() => service.control.runs.getRun(accepted.run.runId).waits.length).toBe(1)
-      const waiting = service.control.runs.getRun(accepted.run.runId)
+      await expect.poll(() => service.control.runs.getRun('test', accepted.run.runId).waits.length).toBe(1)
+      const waiting = service.control.runs.getRun('test', accepted.run.runId)
       expect(waiting.status).toBe('running')
       if (waiting.waits[0] == null) throw new Error('Expected an active Wait.')
-      service.control.runs.resolveRunWait(accepted.run.runId, waiting.waits[0].waitId, 'approve')
+      service.control.runs.resolveRunWait('test', accepted.run.runId, waiting.waits[0].waitId, 'approve')
     }
     await service.waitForIdle()
     expect(service.run(accepted.run.runId)?.status).toBe('completed')
@@ -503,7 +508,7 @@ describe('Server application service', () => {
     const file = await databaseFile()
     const service = await openService(file)
     const opened = Database.open(file)
-    const store = new Store(opened)
+    const store = new Store(opened, runEnvironment(isolatedVmEngineDigest))
     const database = opened.connection
     try {
       const accepted = await acceptRun(service, {
@@ -534,7 +539,7 @@ describe('Server application service', () => {
     const file = await databaseFile()
     const service = await openService(file)
     const opened = Database.open(file)
-    const store = new Store(opened)
+    const store = new Store(opened, runEnvironment(isolatedVmEngineDigest))
     try {
       const accepted = await acceptRun(service, {
         flowId: 'main',
@@ -551,7 +556,7 @@ describe('Server application service', () => {
         payload: { nodeId: 'source', executionId: 'execution', scopeId: 'scope', flowId: 'main' },
         value: outputs,
       })
-      const history = service.control.runs.getRunEvents(accepted.runId, 0, 100)
+      const history = service.control.runs.getRunEvents('test', accepted.runId, 0, 100)
       const completions = history.events.filter((event) => event.kind == 'node.completed')
       if (size == 32) {
         expect(history.historyComplete).toBe(true)
@@ -788,7 +793,7 @@ describe('Server application service', () => {
     await service.waitForIdle()
     expect(service.run(accepted.runId)?.status).toBe('failed')
     expect(execute).toHaveBeenCalledTimes(1)
-    expect(service.control.runs.getRun(accepted.runId).waits).toEqual([])
+    expect(service.control.runs.getRun('test', accepted.runId).waits).toEqual([])
   })
 
   it('keeps a Wait in memory and applies its decision once without a checkpoint', async () => {
@@ -802,27 +807,27 @@ describe('Server application service', () => {
       revisionId: 'revision-wait',
     })
     if (accepted.kind != 'accepted') throw new Error('Wait Run was not accepted.')
-    await expect.poll(() => service.control.runs.getRun(accepted.runId).waits.length).toBe(1)
+    await expect.poll(() => service.control.runs.getRun('test', accepted.runId).waits.length).toBe(1)
 
-    const waiting = service.control.runs.getRun(accepted.runId)
+    const waiting = service.control.runs.getRun('test', accepted.runId)
     expect(waiting).toMatchObject({
       status: 'running',
       waits: [{ actions: ['approve', 'reject'], nodeId: 'approval', prompt: 'Approve request 1?', waitId: expect.any(String) }],
     })
     if (waiting.waits[0] == null) throw new Error('Waiting projection is missing.')
-    expect(service.control.runs.getRunEvents(accepted.runId, 0, 100)).toMatchObject({ done: false })
-    expect(() => service.control.runs.getRunResult(accepted.runId)).toThrow(expect.objectContaining({ code: controlErrorCode.runNotTerminal }))
+    expect(service.control.runs.getRunEvents('test', accepted.runId, 0, 100)).toMatchObject({ done: false })
+    expect(() => service.control.runs.getRunResult('test', accepted.runId)).toThrow(expect.objectContaining({ code: controlErrorCode.runNotTerminal }))
     const database = new DatabaseSync(file)
     expect(database.prepare('SELECT * FROM run_checkpoints WHERE run_id = ?').get(accepted.runId)).toBeUndefined()
     database.close()
-    expect(service.control.runs.resolveRunWait(accepted.runId, waiting.waits[0].waitId, 'approve')).toMatchObject({
+    expect(service.control.runs.resolveRunWait('test', accepted.runId, waiting.waits[0].waitId, 'approve')).toMatchObject({
       action: 'approve',
       resolutionAccepted: true,
       status: 'running',
     })
     await service.waitForIdle()
 
-    expect(service.control.runs.getRunResult(accepted.runId)).toMatchObject({
+    expect(service.control.runs.getRunResult('test', accepted.runId)).toMatchObject({
       result: {
         kind: 'node-results',
         nodes: [
@@ -841,12 +846,12 @@ describe('Server application service', () => {
     expect(events.filter(({ kind }) => kind == 'run.waiting')).toHaveLength(0)
     expect(events.filter(({ kind }) => kind == 'run.resolved')).toHaveLength(1)
     expect(events.filter(({ kind }) => kind == 'node.completed')).toHaveLength(1)
-    expect(service.control.runs.resolveRunWait(accepted.runId, waiting.waits[0].waitId, 'approve')).toMatchObject({
+    expect(service.control.runs.resolveRunWait('test', accepted.runId, waiting.waits[0].waitId, 'approve')).toMatchObject({
       action: 'approve',
       resolutionAccepted: true,
       status: 'completed',
     })
-    expect(service.control.runs.resolveRunWait(accepted.runId, waiting.waits[0].waitId, 'reject')).toMatchObject({
+    expect(service.control.runs.resolveRunWait('test', accepted.runId, waiting.waits[0].waitId, 'reject')).toMatchObject({
       action: 'approve',
       resolutionAccepted: false,
       status: 'completed',
@@ -869,7 +874,7 @@ describe('Server application service', () => {
       acceptRun(service, { flowId: 'main', idempotencyKey: 'variable-missing', revision: variableFlow(), revisionId: 'revision-variable' }),
     ).rejects.toMatchObject({ code: controlErrorCode.bindingUnresolved })
 
-    service.control.putVariable('test', 'TOKEN', 'first')
+    service.control.variables.putVariable('test', 'TOKEN', 'first')
     const accepted = await acceptRun(service, {
       flowId: 'main',
       idempotencyKey: 'variable-run',
@@ -877,7 +882,7 @@ describe('Server application service', () => {
       revisionId: 'revision-variable',
     })
     if (accepted.kind != 'accepted') throw new Error('Variable Run was not accepted.')
-    service.control.deleteVariable('test', 'TOKEN')
+    service.control.variables.deleteVariable('test', 'TOKEN')
     await expect(
       acceptRun(service, { flowId: 'main', idempotencyKey: 'variable-run', revision: variableFlow(), revisionId: 'revision-variable' }),
     ).resolves.toMatchObject({ created: false, runId: accepted.runId })
@@ -885,7 +890,7 @@ describe('Server application service', () => {
     service.cancel(blocker.runId)
     await service.waitForIdle()
 
-    expect(service.control.runs.getRunResult(accepted.runId)).toMatchObject({ error: { code: controlErrorCode.bindingUnresolved }, status: 'failed' })
+    expect(service.control.runs.getRunResult('test', accepted.runId)).toMatchObject({ error: { code: controlErrorCode.bindingUnresolved }, status: 'failed' })
     expect(service.run(accepted.runId)).toMatchObject({ status: 'failed' })
     expect(service.events(accepted.runId).some(({ kind }) => kind == 'run.started')).toBe(false)
     await closeService(service)
@@ -902,7 +907,7 @@ describe('Server application service', () => {
     })
     if (blocker.kind != 'accepted') throw new Error('Variable snapshot blocker Run was not accepted.')
     await waitForStatus(service, blocker.runId, 'running')
-    service.control.putVariable('test', 'TOKEN', 'queued-value')
+    service.control.variables.putVariable('test', 'TOKEN', 'queued-value')
     const accepted = await acceptRun(service, {
       flowId: 'main',
       idempotencyKey: 'variable-snapshot',
@@ -910,12 +915,12 @@ describe('Server application service', () => {
       revisionId: 'revision-variable-snapshot',
     })
     if (accepted.kind != 'accepted') throw new Error('Variable Run was not accepted.')
-    service.control.putVariable('test', 'TOKEN', 'start-value')
+    service.control.variables.putVariable('test', 'TOKEN', 'start-value')
 
     service.cancel(blocker.runId)
     await service.waitForIdle()
 
-    expect(service.control.runs.getRunResult(accepted.runId)).toMatchObject({
+    expect(service.control.runs.getRunResult('test', accepted.runId)).toMatchObject({
       result: { nodes: [{ status: 'completed', outputs: { token: 'start-value' }, nodeId: 'task' }] },
       status: 'completed',
     })
@@ -955,8 +960,8 @@ describe('Server application service', () => {
     expect(events.filter((event) => event.kind == 'run.progress').map((event) => event.payload.progress)).toEqual([100])
     expect(events.map((event) => event.cursor)).toEqual(events.map((_, index) => index + 1))
     expect(JSON.stringify(events.filter((event) => event.kind != 'run.completed'))).not.toContain('jobId')
-    expect(service.control.runs.getRunResult(accepted.runId)).toMatchObject({ result: { kind: 'node-results' }, status: 'completed' })
-    const projected = service.control.runs.getRunEvents(accepted.runId, 0, 100)
+    expect(service.control.runs.getRunResult('test', accepted.runId)).toMatchObject({ result: { kind: 'node-results' }, status: 'completed' })
+    const projected = service.control.runs.getRunEvents('test', accepted.runId, 0, 100)
     expect(projected.done).toBe(true)
     expect(projected.nextAfter).toBe(events.length)
     expect(projected.events.filter((event) => event.kind == 'node.completed')).toHaveLength(3)
@@ -1033,7 +1038,8 @@ describe('Server application service', () => {
 
   it('keeps executing when a Code node log cannot be stored', async () => {
     const service = await openService(await databaseFile())
-    const store = (service.control as unknown as { readonly store: { readonly runs: { append(runId: string, event: ProjectedRunEvent): void } } }).store.runs
+    const store = (service.control.runs as unknown as { readonly store: { readonly runs: { append(runId: string, event: ProjectedRunEvent): void } } }).store
+      .runs
     const append = store.append.bind(store)
     let rejected = false
     vi.spyOn(store, 'append').mockImplementation((runId, event) => {
@@ -1144,7 +1150,7 @@ describe('Server application service', () => {
       result: { error: { code: 'execution.unavailable', message: 'The fixed Run could not be started by this deployment.' } },
       status: 'failed',
     })
-    expect(service.control.runs.getRunResult(poisoned.runId)).toMatchObject({
+    expect(service.control.runs.getRunResult('test', poisoned.runId)).toMatchObject({
       error: { code: 'execution.unavailable', message: 'The fixed Run could not be started by this deployment.' },
       status: 'failed',
     })
@@ -1164,12 +1170,12 @@ describe('Server application service', () => {
     })
     if (accepted.kind != 'accepted') throw new Error('Initial Run acceptance conflicted.')
     await waitForStatus(service, accepted.runId, 'running')
-    expect(service.control.runs.cancelRun(accepted.runId)).toMatchObject({ cancelAccepted: true, status: 'canceled' })
+    expect(service.control.runs.cancelRun('test', accepted.runId)).toMatchObject({ cancelAccepted: true, status: 'canceled' })
     await service.waitForIdle()
 
     expect(service.run(accepted.runId)?.status).toBe('canceled')
-    expect(service.control.runs.cancelRun(accepted.runId)).toMatchObject({ cancelAccepted: false, status: 'canceled' })
-    expect(service.control.runs.getRunResult(accepted.runId)).toMatchObject({ status: 'canceled' })
+    expect(service.control.runs.cancelRun('test', accepted.runId)).toMatchObject({ cancelAccepted: false, status: 'canceled' })
+    expect(service.control.runs.getRunResult('test', accepted.runId)).toMatchObject({ status: 'canceled' })
     expect(service.events(accepted.runId).filter((event) => ['run.canceled', 'run.completed', 'run.failed'].includes(event.kind))).toEqual([
       expect.objectContaining({ kind: 'run.canceled' }),
     ])
@@ -1479,7 +1485,7 @@ describe('Server application service', () => {
             },
           }
     const stored = await storeRevision(service, revision, `account-check-${kind}-${authenticated}-${connectionId}`)
-    const check = await service.control.checkFlow(stored.flowId, stored.revisionId, currentEngineContract)
+    const check = await service.control.drafts.checkFlow('test', stored.flowId, stored.revisionId, currentEngineContract)
     const diagnostics = check.diagnostics.filter((item) => item.code === 'task.action-connection-required')
     expect(diagnostics).toHaveLength(missing ? 1 : 0)
     if (missing) {
@@ -1499,7 +1505,7 @@ describe('Server application service', () => {
     const unavailable = await openService(await databaseFile())
     const stored = await storeRevision(unavailable, llmFlow(), 'llm-check-unavailable')
 
-    expect(await unavailable.control.checkFlow(stored.flowId, stored.revisionId, currentEngineContract)).toMatchObject({
+    expect(await unavailable.control.drafts.checkFlow('test', stored.flowId, stored.revisionId, currentEngineContract)).toMatchObject({
       diagnostics: [
         {
           code: 'llm.unconfigured',
@@ -1514,8 +1520,8 @@ describe('Server application service', () => {
   it('reports a stored Revision with a missing edge collection as invalid', async () => {
     const file = await databaseFile()
     const service = await openService(file)
-    const created = await service.control.createFlow('test', 'Legacy edges', 'legacy-edges')
-    const revision = service.control.getRevision(created.flow.flowId, created.flow.draftRevisionId)
+    const created = await service.control.flows.createFlow('test', 'Legacy edges', 'legacy-edges')
+    const revision = service.control.drafts.getRevision('test', created.flow.flowId, created.flow.draftRevisionId)
     const database = new DatabaseSync(file)
     try {
       database.prepare('UPDATE revisions SET content = ? WHERE revision_id = ?').run(
@@ -1530,7 +1536,7 @@ describe('Server application service', () => {
         }),
         revision.revisionId,
       )
-      await expect(service.control.checkFlow(revision.flowId, revision.revisionId, currentEngineContract)).rejects.toMatchObject({
+      await expect(service.control.drafts.checkFlow('test', revision.flowId, revision.revisionId, currentEngineContract)).rejects.toMatchObject({
         code: controlErrorCode.flowInvalid,
         status: 400,
       })
@@ -1542,8 +1548,8 @@ describe('Server application service', () => {
   it.each([1, 3, 5])('repairs a model %s Draft into a new Revision without changing its source', async (modelVersion) => {
     const file = await databaseFile()
     const service = await openService(file)
-    const created = await service.control.createFlow('test', 'Repairable', 'repairable')
-    const source = service.control.getRevision(created.flow.flowId, created.flow.draftRevisionId)
+    const created = await service.control.flows.createFlow('test', 'Repairable', 'repairable')
+    const source = service.control.drafts.getRevision('test', created.flow.flowId, created.flow.draftRevisionId)
     const legacy = JSON.stringify({
       ...source.content,
       kind: 'open-flow-flow-revision',
@@ -1587,11 +1593,11 @@ describe('Server application service', () => {
       database
         .prepare('UPDATE revisions SET content = ?, digest = ? WHERE revision_id = ?')
         .run(legacy, await digestBytes(new TextEncoder().encode(legacy)), source.revisionId)
-      await expect(service.control.getEditor(source.flowId)).rejects.toMatchObject({ code: controlErrorCode.flowUpgradeRequired, status: 409 })
+      await expect(service.control.flows.getEditor('test', source.flowId)).rejects.toMatchObject({ code: controlErrorCode.flowUpgradeRequired, status: 409 })
 
-      const repaired = await service.control.repairDraft('test', source.flowId, source.revisionId, 'repair-request')
+      const repaired = await service.control.drafts.repairDraft('test', source.flowId, source.revisionId, 'repair-request')
       expect(repaired.revision.parentRevisionId).toBe(source.revisionId)
-      expect(await service.control.getEditor(source.flowId)).toMatchObject({
+      expect(await service.control.flows.getEditor('test', source.flowId)).toMatchObject({
         draft: {
           revisionId: repaired.revision.revisionId,
           content: {
@@ -1601,14 +1607,14 @@ describe('Server application service', () => {
         },
       })
       if (modelVersion == 5)
-        expect((await service.control.getEditor(source.flowId)).draft.content.document.graph.nodes.llm).toEqual({
+        expect((await service.control.flows.getEditor('test', source.flowId)).draft.content.document.graph.nodes.llm).toEqual({
           kind: 'task',
           inputs: {},
           task: { name: 'LLM', inputs: [], outputs: [], executor: { kind: 'llm', mode: 'json' } },
         })
       expect(database.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(source.revisionId)).toEqual({ content: legacy })
-      await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'repair-request')).resolves.toEqual(repaired)
-      await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'another-repair')).rejects.toMatchObject({
+      await expect(service.control.drafts.repairDraft('test', source.flowId, source.revisionId, 'repair-request')).resolves.toEqual(repaired)
+      await expect(service.control.drafts.repairDraft('test', source.flowId, source.revisionId, 'another-repair')).rejects.toMatchObject({
         code: controlErrorCode.flowRevisionConflict,
       })
     } finally {
@@ -1621,8 +1627,8 @@ describe('Server application service', () => {
     async (failure) => {
       const file = await databaseFile()
       const service = await openService(file)
-      const created = await service.control.createFlow('test', 'Rejected upgrade', 'rejected-upgrade')
-      const source = service.control.getRevision(created.flow.flowId, created.flow.draftRevisionId)
+      const created = await service.control.flows.createFlow('test', 'Rejected upgrade', 'rejected-upgrade')
+      const source = service.control.drafts.getRevision('test', created.flow.flowId, created.flow.draftRevisionId)
       const legacy = JSON.stringify({
         kind: 'open-flow-flow-revision',
         version: 1,
@@ -1664,13 +1670,13 @@ describe('Server application service', () => {
           .prepare('UPDATE revisions SET content = ?, digest = ? WHERE revision_id = ?')
           .run(legacy, await digestBytes(new TextEncoder().encode(legacy)), source.revisionId)
 
-        await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'rejected-repair')).rejects.toMatchObject({
+        await expect(service.control.drafts.repairDraft('test', source.flowId, source.revisionId, 'rejected-repair')).rejects.toMatchObject({
           code: controlErrorCode.flowInvalid,
           status: 400,
         })
 
-        expect(service.control.getFlow(source.flowId).draftRevisionId).toBe(source.revisionId)
-        await expect(service.control.repairDraft('test', source.flowId, source.revisionId, 'rejected-repair')).rejects.toMatchObject({
+        expect(service.control.flows.getFlow('test', source.flowId).draftRevisionId).toBe(source.revisionId)
+        await expect(service.control.drafts.repairDraft('test', source.flowId, source.revisionId, 'rejected-repair')).rejects.toMatchObject({
           code: controlErrorCode.flowInvalid,
         })
         expect(database.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(source.revisionId)).toEqual({ content: legacy })
@@ -1683,20 +1689,20 @@ describe('Server application service', () => {
   it('replaces an unreadable Draft with an empty child Revision so the editor can open', async () => {
     const file = await databaseFile()
     const service = await openService(file)
-    const created = await service.control.createFlow('test', 'Unreadable', 'unreadable')
-    const source = service.control.getRevision(created.flow.flowId, created.flow.draftRevisionId)
+    const created = await service.control.flows.createFlow('test', 'Unreadable', 'unreadable')
+    const source = service.control.drafts.getRevision('test', created.flow.flowId, created.flow.draftRevisionId)
     const unreadable = 'not a revision'
     const database = new DatabaseSync(file)
     try {
       database
         .prepare('UPDATE revisions SET content = ?, digest = ? WHERE revision_id = ?')
         .run(unreadable, await digestBytes(new TextEncoder().encode(unreadable)), source.revisionId)
-      await expect(service.control.getEditor(source.flowId)).rejects.toMatchObject({ code: controlErrorCode.flowInvalid, status: 400 })
+      await expect(service.control.flows.getEditor('test', source.flowId)).rejects.toMatchObject({ code: controlErrorCode.flowInvalid, status: 400 })
 
-      const repaired = await service.control.repairDraft('test', source.flowId, source.revisionId, 'empty-repair')
+      const repaired = await service.control.drafts.repairDraft('test', source.flowId, source.revisionId, 'empty-repair')
 
       expect(repaired.revision.parentRevisionId).toBe(source.revisionId)
-      expect(await service.control.getEditor(source.flowId)).toMatchObject({
+      expect(await service.control.flows.getEditor('test', source.flowId)).toMatchObject({
         draft: {
           revisionId: repaired.revision.revisionId,
           content: {
@@ -1715,8 +1721,8 @@ describe('Server application service', () => {
   it('reads and runs a fixed model v2 Approval without rewriting its Revision', async () => {
     const file = await databaseFile()
     const service = await openService(file)
-    const created = await service.control.createFlow('test', 'Legacy approval', 'legacy-approval')
-    const source = service.control.getRevision(created.flow.flowId, created.flow.draftRevisionId)
+    const created = await service.control.flows.createFlow('test', 'Legacy approval', 'legacy-approval')
+    const source = service.control.drafts.getRevision('test', created.flow.flowId, created.flow.draftRevisionId)
     const legacy = {
       kind: 'open-flow-flow-revision',
       version: 1,
@@ -1747,17 +1753,17 @@ describe('Server application service', () => {
       database.prepare('UPDATE revisions SET content = ?, digest = ? WHERE revision_id = ?').run(content, await digestBytes(bytes), source.revisionId)
       database.prepare('UPDATE flow_revisions SET digest = ? WHERE revision_id = ?').run(await digestBytes(bytes), source.revisionId)
 
-      expect(await service.control.getEditor(source.flowId)).toMatchObject({
+      expect(await service.control.flows.getEditor('test', source.flowId)).toMatchObject({
         draft: { content: { modelVersion: 2, document: { graph: { nodes: { approval: { kind: 'approval' } } } } } },
       })
       expect(database.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(source.revisionId)).toEqual({ content })
 
-      const accepted = await service.control.runs.createDraftRun(source.flowId, source.revisionId, currentEngineContract, {}, 'legacy-run', {
+      const accepted = await service.control.runs.createDraftRun('test', source.flowId, source.revisionId, currentEngineContract, {}, 'legacy-run', {
         nodeId: 'start',
         outputs: {},
       })
       await startService(service)
-      await expect.poll(() => service.control.runs.getRun(accepted.run.runId).waits).toMatchObject([{ actions: ['approve', 'reject'] }])
+      await expect.poll(() => service.control.runs.getRun('test', accepted.run.runId).waits).toMatchObject([{ actions: ['approve', 'reject'] }])
     } finally {
       database.close()
     }
@@ -1768,9 +1774,12 @@ describe('Server application service', () => {
     const service = await openService(await databaseFile(), { capabilities: { llm: () => llm }, clock: Date.now })
     const stored = await storeRevision(service, llmFlow(), 'llm-current')
 
-    expect(await service.control.checkFlow(stored.flowId, stored.revisionId, currentEngineContract)).toMatchObject({ valid: false })
+    expect(await service.control.drafts.checkFlow('test', stored.flowId, stored.revisionId, currentEngineContract)).toMatchObject({ valid: false })
     llm = async () => ({ kind: 'completed', value: { answer: 'current' }, version: 1 })
-    expect(await service.control.checkFlow(stored.flowId, stored.revisionId, currentEngineContract)).toMatchObject({ diagnostics: [], valid: true })
+    expect(await service.control.drafts.checkFlow('test', stored.flowId, stored.revisionId, currentEngineContract)).toMatchObject({
+      diagnostics: [],
+      valid: true,
+    })
 
     await startService(service)
     const accepted = await acceptRun(service, { flowId: 'main', idempotencyKey: 'llm-current', revision: llmFlow(), revisionId: 'llm-current' })
@@ -1790,13 +1799,13 @@ describe('Server application service', () => {
       clock: Date.now,
     })
 
-    expect(await service.control.listConnectorProviders()).toEqual([{ serviceId: 'first', serviceName: 'First' }])
-    expect(await service.control.connectorConnectionPage('mail')).toBe('https://first.example.com/providers/mail')
+    expect(await service.control.connectors.listConnectorProviders('operator')).toEqual([{ serviceId: 'first', serviceName: 'First' }])
+    expect(await service.control.connectors.connectorConnectionPage('operator', 'mail')).toBe('https://first.example.com/providers/mail')
 
     connector = createConnectorHost({ listProviders: async () => [{ serviceId: 'second', serviceName: 'Second' }] })
     consoleOrigin = new URL('https://second.example.com')
-    expect(await service.control.listConnectorProviders()).toEqual([{ serviceId: 'second', serviceName: 'Second' }])
-    expect(await service.control.connectorConnectionPage('mail')).toBe('https://second.example.com/providers/mail')
+    expect(await service.control.connectors.listConnectorProviders('operator')).toEqual([{ serviceId: 'second', serviceName: 'Second' }])
+    expect(await service.control.connectors.connectorConnectionPage('operator', 'mail')).toBe('https://second.example.com/providers/mail')
   })
 
   it('ignores unreferenced LLM Tasks when the deployment has no LLM host', async () => {
@@ -1816,7 +1825,7 @@ describe('Server application service', () => {
       'llm-check-unreferenced',
     )
 
-    expect(await unavailable.control.checkFlow(stored.flowId, stored.revisionId, currentEngineContract)).toMatchObject({
+    expect(await unavailable.control.drafts.checkFlow('test', stored.flowId, stored.revisionId, currentEngineContract)).toMatchObject({
       diagnostics: [],
       valid: true,
     })

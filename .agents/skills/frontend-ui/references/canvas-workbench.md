@@ -50,7 +50,9 @@ unnecessarily enlarge the top and bottom edges of a single-row panel.
 
 ## Canvas Operation History
 
-Workbench's WorkspaceStore owns undo/redo history for the current canvas. The canvas only triggers
+Workbench's WorkspaceStore routes persisted edits through its EditSession. The session owns the
+Draft and Presentation save channels, undo/redo history, code edit coordination, remote Draft
+synchronization, and partial-save recovery. The canvas only triggers
 operations and presents their availability. The public Flow change layer generates inverse
 operations. Restoration creates a new Revision through normal save channels without rolling back
 the Draft head.

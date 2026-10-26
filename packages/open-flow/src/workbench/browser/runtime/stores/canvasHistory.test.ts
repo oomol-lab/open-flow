@@ -37,10 +37,10 @@ describe('canvas history limits', () => {
     const history = new CanvasHistory()
     history.record({ ...entry, count: 1, beforeSelection: ['a'.repeat(6 * 1024 * 1024)] })
     history.record({ ...entry, count: 2, beforeSelection: ['a'.repeat(6 * 1024 * 1024)] })
-    history.pending++
-    history.publish()
+    history.beginChange()
     expect(history.state$.value.canUndo).toBe(false)
-    history.pending--
+    history.endChange()
+    expect(history.state$.value.canUndo).toBe(true)
     history.complete(false)
     expect(history.state$.value.canUndo).toBe(false)
     expect(history.state$.value.redo?.count).toBe(2)

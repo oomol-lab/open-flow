@@ -4,8 +4,10 @@ import { decodeEventSources } from '@oomol-lab/open-flow/control-api'
 import { sourceResultSchema } from '@oomol-lab/open-flow/event-source'
 import { expect, it, onTestFinished, vi } from 'vitest'
 import { ZodError } from 'zod'
+import { runEnvironment } from '../node/application/run-environment.ts'
 import { ImplicitConnectorAccessHost } from '../node/deployment/connector-access.ts'
 import { EventSourceRuntime } from '../node/runtime/event-source-runtime.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 import { createConnectorHost } from './connectorHost.ts'
@@ -14,7 +16,7 @@ import { sourceProtocolFixture } from './sourceProtocolFixture.ts'
 function fixture(trigger: ConnectorHost['trigger']) {
   const database = Database.open(':memory:')
   onTestFinished(() => database.close())
-  const store = new Store(database, Date.now)
+  const store = new Store(database, runEnvironment(isolatedVmEngineDigest), Date.now)
   const connector = createConnectorHost({ trigger })
   const runtime = new EventSourceRuntime(
     store,

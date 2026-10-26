@@ -53,13 +53,13 @@ export function servePreview(lab: LabSession, request: IncomingMessage, response
       flowId: lab.manifest.flowId,
       name: scenario(lab.scenarioId).name,
       task: scenario(lab.scenarioId).task,
-      draft: lab.service.control.getDraft(lab.manifest.flowId),
-      presentation: lab.service.control.getPresentation(lab.manifest.flowId),
+      draft: lab.service.control.drafts.getDraft('operator', lab.manifest.flowId),
+      presentation: lab.service.control.flows.getPresentation('operator', lab.manifest.flowId),
     }
     // Disconnect slow consumers instead of accumulating snapshots in memory.
     buffered = !response.write(`data: ${JSON.stringify(snapshot)}\n\n`)
   }
-  const unsubscribe = lab.service.subscribeFlow(lab.manifest.flowId, send)
+  const unsubscribe = lab.service.subscribeFlow('operator', lab.manifest.flowId, send)
   const shutdown = lab.shutdown.signal
   const close = () => response.end()
   shutdown.addEventListener('abort', close, { once: true })

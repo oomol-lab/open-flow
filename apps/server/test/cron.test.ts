@@ -10,7 +10,9 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
+import { runEnvironment } from '../node/application/run-environment.ts'
 import { AcceptanceError } from '../node/error.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
@@ -128,7 +130,9 @@ describe('Server Cron Trigger', () => {
         expect(database.prepare("SELECT content FROM revisions WHERE revision_id = 'revision-broken'").get()).toEqual({ content: unreadable })
         const connection = Database.open(file)
         try {
-          expect(new Store(connection).triggers.listTriggerBindings('broken')).toMatchObject([{ health: 'failed', lastErrorCode: 'revision-invalid' }])
+          expect(new Store(connection, runEnvironment(isolatedVmEngineDigest)).triggers.listTriggerBindings('broken')).toMatchObject([
+            { health: 'failed', lastErrorCode: 'revision-invalid' },
+          ])
         } finally {
           connection.close()
         }
@@ -241,7 +245,7 @@ describe('Server Cron Trigger', () => {
       expect(database.prepare('SELECT status, source FROM runs').get()).toEqual({ status: 'queued', source: 'live' })
       const connection = Database.open(file)
       try {
-        const views = new Store(connection).runViews
+        const views = new Store(connection, runEnvironment(isolatedVmEngineDigest)).runViews
         expect(views.listControlRuns('main', 10, { source: 'live' })).toHaveLength(1)
         expect(views.listControlRuns('main', 10, { source: 'draft' })).toHaveLength(0)
       } finally {
@@ -331,7 +335,8 @@ describe('Server Cron Trigger', () => {
       expect(database.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 1 })
       expect(database.prepare('SELECT next_at AS nextAt FROM cron_bindings').get()).toEqual({ nextAt: Date.parse('2026-08-21T00:02:00.000Z') })
 
-      expect(service.control.runs.cancelRun(first.runId)).toMatchObject({ cancelAccepted: true, status: 'canceled' })
+      expect(service.cancel(first.runId)).toBe(true)
+      expect(service.run(first.runId)?.status).toBe('canceled')
 
       now = Date.parse('2026-08-21T00:05:00.000Z')
       await service.tickCron(new Date(now).toISOString())

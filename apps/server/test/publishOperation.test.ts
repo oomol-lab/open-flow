@@ -23,7 +23,7 @@ async function databaseFile(): Promise<string> {
 }
 
 async function addMarker(service: ServerService, flowId: string, revisionId: string, nodeId: string): Promise<string> {
-  const changed = await service.control.changeDraft('operator', flowId, revisionId, [
+  const changed = await service.control.drafts.changeDraft('operator', flowId, revisionId, [
     {
       kind: 'graph.node.create',
       node: {
@@ -42,20 +42,27 @@ it('marks a Publication dirty when its shared access digest or graph changes', a
   const file = await databaseFile()
   const service = await openService(file)
   services.add(service)
-  const created = await service.control.createFlow('operator', 'Legacy', 'create-legacy')
+  const created = await service.control.flows.createFlow('operator', 'Legacy', 'create-legacy')
   const flowId = created.flow.flowId
-  const operation = await service.control.publishFlow('operator', flowId, created.flow.draftRevisionId, currentEngineContract, null, 'publish-legacy')
+  const operation = await service.control.publications.publishFlow(
+    'operator',
+    flowId,
+    created.flow.draftRevisionId,
+    currentEngineContract,
+    null,
+    'publish-legacy',
+  )
   await service.tickMaintenance()
-  expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('succeeded')
+  expect(service.control.publications.getPublishOperation('operator', flowId, operation.operationId).status).toBe('succeeded')
   const database = new DatabaseSync(file)
   try {
-    await expect(service.control.getLive(flowId)).resolves.toMatchObject({ hasUnpublishedChanges: false })
+    await expect(service.control.publications.getLive('operator', flowId)).resolves.toMatchObject({ hasUnpublishedChanges: false })
     database.exec("UPDATE publications SET shared_access_digest = 'different'")
-    await expect(service.control.getLive(flowId)).resolves.toMatchObject({ hasUnpublishedChanges: true })
+    await expect(service.control.publications.getLive('operator', flowId)).resolves.toMatchObject({ hasUnpublishedChanges: true })
     database.exec("UPDATE publications SET shared_access_digest = 'implicit'")
-    await expect(service.control.getLive(flowId)).resolves.toMatchObject({ hasUnpublishedChanges: false })
+    await expect(service.control.publications.getLive('operator', flowId)).resolves.toMatchObject({ hasUnpublishedChanges: false })
     await addMarker(service, flowId, created.flow.draftRevisionId, 'changed')
-    await expect(service.control.getLive(flowId)).resolves.toMatchObject({ hasUnpublishedChanges: true })
+    await expect(service.control.publications.getLive('operator', flowId)).resolves.toMatchObject({ hasUnpublishedChanges: true })
   } finally {
     database.close()
   }
@@ -65,15 +72,15 @@ it('keeps Live fixed while persistent Publish work is pending or failed and acti
   const file = await databaseFile()
   let service = await openService(file)
   services.add(service)
-  const created = await service.control.createFlow('operator', 'Main', 'create-main')
+  const created = await service.control.flows.createFlow('operator', 'Main', 'create-main')
   const flowId = created.flow.flowId
   const firstRevisionId = await addMarker(service, flowId, created.flow.draftRevisionId, 'first')
 
-  const first = await service.control.publishFlow('operator', flowId, firstRevisionId, currentEngineContract, null, 'publish-first')
+  const first = await service.control.publications.publishFlow('operator', flowId, firstRevisionId, currentEngineContract, null, 'publish-first')
   expect(first).toMatchObject({ flowId, revisionId: firstRevisionId, status: 'pending' })
-  await expect(service.control.getLive(flowId)).resolves.toMatchObject({ publication: null, status: 'not-published' })
+  await expect(service.control.publications.getLive('operator', flowId)).resolves.toMatchObject({ publication: null, status: 'not-published' })
   await service.tickMaintenance()
-  const firstDone = service.control.getPublishOperation(flowId, first.operationId)
+  const firstDone = service.control.publications.getPublishOperation('operator', flowId, first.operationId)
   if (firstDone.status != 'succeeded') throw new Error('Initial Publish operation did not succeed.')
   const firstPublicationId = firstDone.publicationId
 
@@ -86,16 +93,30 @@ it('keeps Live fixed while persistent Publish work is pending or failed and acti
   `)
 
   const failedRevisionId = await addMarker(service, flowId, firstRevisionId, 'failed-candidate')
-  const failed = await service.control.publishFlow('operator', flowId, failedRevisionId, currentEngineContract, firstPublicationId, 'publish-failed')
-  const replay = await service.control.publishFlow('operator', flowId, failedRevisionId, currentEngineContract, firstPublicationId, 'publish-failed')
+  const failed = await service.control.publications.publishFlow(
+    'operator',
+    flowId,
+    failedRevisionId,
+    currentEngineContract,
+    firstPublicationId,
+    'publish-failed',
+  )
+  const replay = await service.control.publications.publishFlow(
+    'operator',
+    flowId,
+    failedRevisionId,
+    currentEngineContract,
+    firstPublicationId,
+    'publish-failed',
+  )
   expect(replay).toEqual(failed)
   await expect(
-    service.control.publishFlow('operator', flowId, failedRevisionId, currentEngineContract, firstPublicationId, 'publish-concurrent'),
+    service.control.publications.publishFlow('operator', flowId, failedRevisionId, currentEngineContract, firstPublicationId, 'publish-concurrent'),
   ).rejects.toMatchObject({ code: 'flow.busy' })
 
   await service.tickMaintenance()
-  expect(service.control.getPublishOperation(flowId, failed.operationId).status).toBe('pending')
-  await expect(service.control.getLive(flowId)).resolves.toMatchObject({ publication: { publicationId: firstPublicationId } })
+  expect(service.control.publications.getPublishOperation('operator', flowId, failed.operationId).status).toBe('pending')
+  await expect(service.control.publications.getLive('operator', flowId)).resolves.toMatchObject({ publication: { publicationId: firstPublicationId } })
   database
     .prepare(
       `UPDATE publish_work
@@ -104,15 +125,15 @@ it('keeps Live fixed while persistent Publish work is pending or failed and acti
     )
     .run(failed.operationId)
   await service.tickMaintenance()
-  expect(service.control.getPublishOperation(flowId, failed.operationId)).toMatchObject({
+  expect(service.control.publications.getPublishOperation('operator', flowId, failed.operationId)).toMatchObject({
     issue: { code: 'provider.subscription-failed', message: 'The subscription could not be created.', nodeId: 'candidate' },
     status: 'failed',
   })
-  await expect(service.control.getLive(flowId)).resolves.toMatchObject({ publication: { publicationId: firstPublicationId } })
-  expect(service.control.listPublications(flowId, 10).page.publications).toHaveLength(1)
+  await expect(service.control.publications.getLive('operator', flowId)).resolves.toMatchObject({ publication: { publicationId: firstPublicationId } })
+  expect(service.control.publications.listPublications('operator', flowId, 10).page.publications).toHaveLength(1)
 
   const readyRevisionId = await addMarker(service, flowId, failedRevisionId, 'ready-candidate')
-  const ready = await service.control.publishFlow('operator', flowId, readyRevisionId, currentEngineContract, firstPublicationId, 'publish-ready')
+  const ready = await service.control.publications.publishFlow('operator', flowId, readyRevisionId, currentEngineContract, firstPublicationId, 'publish-ready')
   database.prepare("UPDATE publish_work SET status = 'ready', next_at = NULL, updated_at = updated_at + 1 WHERE operation_id = ?").run(ready.operationId)
   database.close()
 
@@ -120,10 +141,10 @@ it('keeps Live fixed while persistent Publish work is pending or failed and acti
   services.delete(service)
   service = await openService(file)
   services.add(service)
-  expect(service.control.getPublishOperation(flowId, ready.operationId).status).toBe('pending')
+  expect(service.control.publications.getPublishOperation('operator', flowId, ready.operationId).status).toBe('pending')
   await service.tickMaintenance()
-  const readyDone = service.control.getPublishOperation(flowId, ready.operationId)
+  const readyDone = service.control.publications.getPublishOperation('operator', flowId, ready.operationId)
   if (readyDone.status != 'succeeded') throw new Error('Recovered Publish operation did not succeed.')
-  await expect(service.control.getLive(flowId)).resolves.toMatchObject({ publication: { publicationId: readyDone.publicationId } })
-  expect(service.control.listPublications(flowId, 10).page.publications).toHaveLength(2)
+  await expect(service.control.publications.getLive('operator', flowId)).resolves.toMatchObject({ publication: { publicationId: readyDone.publicationId } })
+  expect(service.control.publications.listPublications('operator', flowId, 10).page.publications).toHaveLength(2)
 })

@@ -8,6 +8,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, it, onTestFinished, vi } from 'vitest'
 import { flow as flowView } from '../node/application/control-views.ts'
+import { runEnvironment } from '../node/application/run-environment.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { revisionResourceReferences } from '../node/storage/flow-resources.ts'
 import { migrateFlowResources } from '../node/storage/migrate-flow-resources.ts'
@@ -72,7 +74,7 @@ function commit(store: Store, revision: RevisionContent, revisionId = 'next', ex
 function setup() {
   const database = Database.open(':memory:')
   onTestFinished(() => database.close())
-  return { database, store: new Store(database) }
+  return { database, store: new Store(database, runEnvironment(isolatedVmEngineDigest)) }
 }
 
 it('returns current delta-backed resources in one list/detail query without reading revisions', async () => {
@@ -164,7 +166,7 @@ it('backfills delta heads on upgrade and preserves unavailable summaries for dam
   onTestFinished(() => rm(directory, { recursive: true, force: true }))
   const file = path.join(directory, 'flow.sqlite')
   const old = Database.open(file)
-  const store = new Store(old)
+  const store = new Store(old, runEnvironment(isolatedVmEngineDigest))
   create(store)
   create(store, 'damaged')
   expect(commit(store, content('LATEST')).kind).toBe('committed')
@@ -174,7 +176,7 @@ it('backfills delta heads on upgrade and preserves unavailable summaries for dam
   old.close()
   const upgraded = Database.open(file)
   onTestFinished(() => upgraded.close())
-  const restored = new Store(upgraded)
+  const restored = new Store(upgraded, runEnvironment(isolatedVmEngineDigest))
   expect(flowView(restored.flows.get('flow')!).resourceReferences.draft!.variableNames).toEqual(['LATEST'])
   expect(flowView(restored.flows.get('damaged')!).resourceReferences.draft).toBeNull()
   expect(upgraded.connection.prepare("SELECT 1 FROM revision_deltas WHERE revision_id = 'next'").get()).toBeDefined()

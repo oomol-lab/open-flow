@@ -63,19 +63,21 @@ function pollNode(source: string): Extract<TriggerNode, { readonly kind: 'poll' 
 }
 
 async function addPoll(service: ServerService, flowId: string, revisionId: string, source: string): Promise<string> {
-  const changed = await service.control.changeDraft('operator', flowId, revisionId, [{ kind: 'graph.node.create', node: pollNode(source), nodeId: 'poll' }])
+  const changed = await service.control.drafts.changeDraft('operator', flowId, revisionId, [
+    { kind: 'graph.node.create', node: pollNode(source), nodeId: 'poll' },
+  ])
   return changed.revision.revisionId
 }
 
 async function replacePoll(service: ServerService, flowId: string, revisionId: string, source: string): Promise<string> {
-  const changed = await service.control.changeDraft('operator', flowId, revisionId, [
+  const changed = await service.control.drafts.changeDraft('operator', flowId, revisionId, [
     { before: fixedInputValue('initial'), kind: 'graph.trigger.config.set', name: 'source', nodeId: 'poll', value: fixedInputValue(source) },
   ])
   return changed.revision.revisionId
 }
 
 async function addMarker(service: ServerService, flowId: string, revisionId: string): Promise<string> {
-  const changed = await service.control.changeDraft('operator', flowId, revisionId, [
+  const changed = await service.control.drafts.changeDraft('operator', flowId, revisionId, [
     {
       kind: 'graph.node.create',
       node: {
@@ -132,12 +134,12 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
     triggerDefinitions: [definition],
   })
   services.add(service)
-  const created = await service.control.createFlow('operator', 'Poll staging', 'poll-staging-flow')
+  const created = await service.control.flows.createFlow('operator', 'Poll staging', 'poll-staging-flow')
   const revisionId = await addPoll(service, created.flow.flowId, created.flow.draftRevisionId, 'initial')
-  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, currentEngineContract, null, 'poll-staging')
+  const operation = await service.control.publications.publishFlow('operator', created.flow.flowId, revisionId, currentEngineContract, null, 'poll-staging')
 
   await service.tickListeners('2026-08-31T10:00:30.000Z')
-  expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('pending')
+  expect(service.control.publications.getPublishOperation('operator', created.flow.flowId, operation.operationId).status).toBe('pending')
   let database = new DatabaseSync(file, { readOnly: true })
   expect(database.prepare('SELECT checkpoint_json AS checkpointJson FROM poll_candidates').get()).toEqual({
     checkpointJson: '{"cursor":"page-1"}',
@@ -160,14 +162,14 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
   await service.tickListeners('2026-08-31T10:00:31.000Z')
   expect(checkpoints).toEqual([null, { cursor: 'page-1' }, { cursor: 'page-1' }])
   expect(sources).toEqual(['initial', 'initial', 'initial'])
-  expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('pending')
+  expect(service.control.publications.getPublishOperation('operator', created.flow.flowId, operation.operationId).status).toBe('pending')
   await service.tickMaintenance('2026-08-31T10:00:31.000Z')
-  const completed = service.control.getPublishOperation(created.flow.flowId, operation.operationId)
+  const completed = service.control.publications.getPublishOperation('operator', created.flow.flowId, operation.operationId)
   if (completed.status != 'succeeded') throw new Error('Poll Publish operation did not succeed.')
   expect(service.pollState(created.flow.flowId, 'poll')).toMatchObject({ checkpoint: { cursor: 'page-2' }, health: 'healthy', runtimeVersion: 1 })
 
   const unchangedRevisionId = await addMarker(service, created.flow.flowId, revisionId)
-  const unchanged = await service.control.publishFlow(
+  const unchanged = await service.control.publications.publishFlow(
     'operator',
     created.flow.flowId,
     unchangedRevisionId,
@@ -176,13 +178,13 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
     'poll-unchanged',
   )
   await service.tickMaintenance('2026-08-31T10:00:32.000Z')
-  expect(service.control.getPublishOperation(created.flow.flowId, unchanged.operationId).status).toBe('succeeded')
+  expect(service.control.publications.getPublishOperation('operator', created.flow.flowId, unchanged.operationId).status).toBe('succeeded')
   expect(call).toBe(3)
   expect(service.pollState(created.flow.flowId, 'poll')).toMatchObject({ checkpoint: { cursor: 'page-2' }, health: 'healthy', runtimeVersion: 2 })
 
   const changedRevisionId = await replacePoll(service, created.flow.flowId, unchangedRevisionId, 'changed')
-  const live = await service.control.getLive(created.flow.flowId)
-  const changed = await service.control.publishFlow(
+  const live = await service.control.publications.getLive('operator', created.flow.flowId)
+  const changed = await service.control.publications.publishFlow(
     'operator',
     created.flow.flowId,
     changedRevisionId,
@@ -194,7 +196,7 @@ it('resumes a paged Poll baseline after restart, discards its events, reuses unc
   expect(checkpoints.at(-1)).toBeNull()
   expect(service.pollState(created.flow.flowId, 'poll')?.checkpoint).toEqual({ cursor: 'page-2' })
   await service.tickMaintenance('2026-08-31T10:00:33.000Z')
-  expect(service.control.getPublishOperation(created.flow.flowId, changed.operationId).status).toBe('succeeded')
+  expect(service.control.publications.getPublishOperation('operator', created.flow.flowId, changed.operationId).status).toBe('succeeded')
   expect(service.pollState(created.flow.flowId, 'poll')).toMatchObject({
     checkpoint: { cursor: 'changed-baseline' },
     health: 'healthy',
@@ -224,14 +226,21 @@ it('fails a permanent Poll baseline before activation and preserves the old Live
     triggerDefinitions: [definition],
   })
   services.add(service)
-  const created = await service.control.createFlow('operator', 'Poll failure', 'poll-failure-flow')
-  const initial = await service.control.publishFlow('operator', created.flow.flowId, created.flow.draftRevisionId, currentEngineContract, null, 'poll-initial')
+  const created = await service.control.flows.createFlow('operator', 'Poll failure', 'poll-failure-flow')
+  const initial = await service.control.publications.publishFlow(
+    'operator',
+    created.flow.flowId,
+    created.flow.draftRevisionId,
+    currentEngineContract,
+    null,
+    'poll-initial',
+  )
   await service.tickMaintenance('2026-08-31T11:00:00.000Z')
-  const initialDone = service.control.getPublishOperation(created.flow.flowId, initial.operationId)
+  const initialDone = service.control.publications.getPublishOperation('operator', created.flow.flowId, initial.operationId)
   if (initialDone.status != 'succeeded') throw new Error('Initial Publish operation did not succeed.')
 
   const revisionId = await addPoll(service, created.flow.flowId, created.flow.draftRevisionId, 'invalid')
-  const operation = await service.control.publishFlow(
+  const operation = await service.control.publications.publishFlow(
     'operator',
     created.flow.flowId,
     revisionId,
@@ -242,14 +251,14 @@ it('fails a permanent Poll baseline before activation and preserves the old Live
   await service.tickListeners('2026-08-31T11:00:00.000Z')
   await service.tickMaintenance('2026-08-31T11:00:00.000Z')
 
-  expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId)).toMatchObject({
+  expect(service.control.publications.getPublishOperation('operator', created.flow.flowId, operation.operationId)).toMatchObject({
     issue: { code: 'trigger-key.invalid', nodeId: 'poll' },
     status: 'failed',
   })
-  await expect(service.control.getLive(created.flow.flowId)).resolves.toMatchObject({
+  await expect(service.control.publications.getLive('operator', created.flow.flowId)).resolves.toMatchObject({
     publication: { publicationId: initialDone.publicationId },
   })
-  expect(service.control.listPublications(created.flow.flowId, 10).page.publications).toHaveLength(1)
+  expect(service.control.publications.listPublications('operator', created.flow.flowId, 10).page.publications).toHaveLength(1)
   const database = new DatabaseSync(file, { readOnly: true })
   expect(database.prepare('SELECT COUNT(*) AS count FROM poll_candidates').get()).toEqual({ count: 0 })
   expect(database.prepare('SELECT COUNT(*) AS count FROM poll_bindings').get()).toEqual({ count: 0 })
@@ -270,21 +279,21 @@ it('rolls back a changed Poll candidate, lets another Flow publish, and resumes 
   }
   let service = await openService(file, options)
   services.add(service)
-  const created = await service.control.createFlow('operator', 'Poll activation', 'poll-activation-flow')
+  const created = await service.control.flows.createFlow('operator', 'Poll activation', 'poll-activation-flow')
   const revisionId = await addPoll(service, created.flow.flowId, created.flow.draftRevisionId, 'activation')
-  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, currentEngineContract, null, 'poll-activation')
+  const operation = await service.control.publications.publishFlow('operator', created.flow.flowId, revisionId, currentEngineContract, null, 'poll-activation')
   await service.tickListeners('2026-08-31T12:00:00.000Z')
 
   const database = new DatabaseSync(file)
   const scheduleJson = JSON.stringify(pollNode('activation').pollTimes)
   database.prepare("UPDATE poll_candidates SET schedule_json = '[]' WHERE operation_id = ?").run(operation.operationId)
   await service.tickMaintenance('2026-08-31T12:00:00.000Z')
-  expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('pending')
-  await expect(service.control.getLive(created.flow.flowId)).resolves.toMatchObject({ publication: null })
+  expect(service.control.publications.getPublishOperation('operator', created.flow.flowId, operation.operationId).status).toBe('pending')
+  await expect(service.control.publications.getLive('operator', created.flow.flowId)).resolves.toMatchObject({ publication: null })
   expect(database.prepare('SELECT COUNT(*) AS count FROM publications').get()).toEqual({ count: 0 })
 
-  const other = await service.control.createFlow('operator', 'Other Flow', 'other-flow')
-  const otherOperation = await service.control.publishFlow(
+  const other = await service.control.flows.createFlow('operator', 'Other Flow', 'other-flow')
+  const otherOperation = await service.control.publications.publishFlow(
     'operator',
     other.flow.flowId,
     other.flow.draftRevisionId,
@@ -293,16 +302,16 @@ it('rolls back a changed Poll candidate, lets another Flow publish, and resumes 
     'other-publish',
   )
   await service.tickMaintenance('2026-08-31T12:00:00.000Z')
-  expect(service.control.getPublishOperation(other.flow.flowId, otherOperation.operationId).status).toBe('succeeded')
+  expect(service.control.publications.getPublishOperation('operator', other.flow.flowId, otherOperation.operationId).status).toBe('succeeded')
 
   database.prepare('UPDATE poll_candidates SET schedule_json = ? WHERE operation_id = ?').run(scheduleJson, operation.operationId)
   await closeService(service)
   service = await openService(file, options)
   services.add(service)
   await service.tickMaintenance('2026-08-31T12:00:00.500Z')
-  expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('pending')
+  expect(service.control.publications.getPublishOperation('operator', created.flow.flowId, operation.operationId).status).toBe('pending')
   await service.tickMaintenance('2026-08-31T12:00:01.000Z')
-  expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('succeeded')
+  expect(service.control.publications.getPublishOperation('operator', created.flow.flowId, operation.operationId).status).toBe('succeeded')
   expect(database.prepare('SELECT COUNT(*) AS count FROM publications').get()).toEqual({ count: 2 })
   database.close()
 })
@@ -322,15 +331,17 @@ it('publishes promptly when asynchronous baseline preparation finishes after mai
   }
   const service = await openService(file, { capabilities: { connector: () => connector }, triggerDefinitions: [definition] })
   services.add(service)
-  const created = await service.control.createFlow('operator', 'Delayed baseline', 'delayed-baseline')
+  const created = await service.control.flows.createFlow('operator', 'Delayed baseline', 'delayed-baseline')
   const revisionId = await addPoll(service, created.flow.flowId, created.flow.draftRevisionId, 'delayed')
-  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, currentEngineContract, null, 'delayed-publish')
+  const operation = await service.control.publications.publishFlow('operator', created.flow.flowId, revisionId, currentEngineContract, null, 'delayed-publish')
   await startService(service)
   await entered.promise
   await service.tickMaintenance()
-  expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('pending')
+  expect(service.control.publications.getPublishOperation('operator', created.flow.flowId, operation.operationId).status).toBe('pending')
   baseline.resolve()
-  await vi.waitFor(() => expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('succeeded'))
+  await vi.waitFor(() =>
+    expect(service.control.publications.getPublishOperation('operator', created.flow.flowId, operation.operationId).status).toBe('succeeded'),
+  )
 })
 
 it('backs off baselines across restart and exhausts retries without replacing Live', async () => {
@@ -349,13 +360,27 @@ it('backs off baselines across restart and exhausts retries without replacing Li
   const options = { capabilities: { connector: () => connector }, clock: () => now, triggerDefinitions: [definition] }
   let service = await openService(file, options)
   services.add(service)
-  const created = await service.control.createFlow('operator', 'Retry baseline', 'retry-baseline')
-  const initial = await service.control.publishFlow('operator', created.flow.flowId, created.flow.draftRevisionId, currentEngineContract, null, 'initial')
+  const created = await service.control.flows.createFlow('operator', 'Retry baseline', 'retry-baseline')
+  const initial = await service.control.publications.publishFlow(
+    'operator',
+    created.flow.flowId,
+    created.flow.draftRevisionId,
+    currentEngineContract,
+    null,
+    'initial',
+  )
   await service.tickMaintenance(new Date(now).toISOString())
-  const live = service.control.getPublishOperation(created.flow.flowId, initial.operationId)
+  const live = service.control.publications.getPublishOperation('operator', created.flow.flowId, initial.operationId)
   if (live.status != 'succeeded') throw new Error('Initial publication failed.')
   const revisionId = await addPoll(service, created.flow.flowId, created.flow.draftRevisionId, 'retry')
-  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, currentEngineContract, live.publicationId, 'retry')
+  const operation = await service.control.publications.publishFlow(
+    'operator',
+    created.flow.flowId,
+    revisionId,
+    currentEngineContract,
+    live.publicationId,
+    'retry',
+  )
   await service.tickListeners(new Date(now).toISOString())
   for (const delay of [1_000, 2_000, 4_000, 8_000, 16_000]) {
     const count = calls.length
@@ -374,11 +399,13 @@ it('backs off baselines across restart and exhausts retries without replacing Li
   }
   await service.tickMaintenance(new Date(now).toISOString())
   expect(calls.map((time) => time - startedAt)).toEqual([0, 1_000, 3_000, 7_000, 15_000, 31_000])
-  expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId)).toMatchObject({
+  expect(service.control.publications.getPublishOperation('operator', created.flow.flowId, operation.operationId)).toMatchObject({
     status: 'failed',
     issue: { code: 'publication.retry-exhausted', nodeId: 'poll' },
   })
-  await expect(service.control.getLive(created.flow.flowId)).resolves.toMatchObject({ publication: { publicationId: live.publicationId } })
+  await expect(service.control.publications.getLive('operator', created.flow.flowId)).resolves.toMatchObject({
+    publication: { publicationId: live.publicationId },
+  })
   now += 60_000
   await service.tickListeners(new Date(now).toISOString())
   expect(calls).toHaveLength(6)

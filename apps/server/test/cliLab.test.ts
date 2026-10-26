@@ -313,8 +313,8 @@ describe('CLI Lab', () => {
     expect(lab.attempt.excludedWallMs).toBeGreaterThan(0)
     await reference(driver(lab, 'cli'), lab.scenarioId, lab.manifest.flowId)
     const current = lab.current()
-    await lab.service.control.changeDraft(
-      'test',
+    await lab.service.control.drafts.changeDraft(
+      'operator',
       lab.manifest.flowId,
       current.revisionId,
       [{ kind: 'graph.node.field.set', nodeId: 'archive', field: 'name', before: 'Internal archive', value: 'Changed archive' }],
@@ -324,9 +324,9 @@ describe('CLI Lab', () => {
   })
   it('resets conflict gates and seeds a discoverable failure after reset', async () => {
     const lab = await fixture('repair-amount')
-    expect(lab.service.control.runs.listRuns(lab.manifest.flowId, 10, {}).page.runs.some((r) => r.status == 'failed')).toBe(true)
+    expect(lab.service.control.runs.listRuns('operator', lab.manifest.flowId, 10, {}).page.runs.some((r) => r.status == 'failed')).toBe(true)
     await lab.reset()
-    expect(lab.service.control.runs.listRuns(lab.manifest.flowId, 10, {}).page.runs.some((r) => r.status == 'failed')).toBe(true)
+    expect(lab.service.control.runs.listRuns('operator', lab.manifest.flowId, 10, {}).page.runs.some((r) => r.status == 'failed')).toBe(true)
     expect(lab.attempt.commands).toHaveLength(0)
   })
   it('preserves versioned comparison boundaries and counts bytes independently', async () => {

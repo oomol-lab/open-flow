@@ -409,7 +409,7 @@ it('fixes one OOMOL Team when each Flow is created', async () => {
     expect(publicCreated.status).toBe(201)
     const publicFlow = (await publicCreated.json()) as { flowId: string }
     expect(await (await app.request('/v1/flows', publicRequest)).json()).toEqual(publicFlow)
-    await service.control.listConnectorProviders(publicFlow.flowId)
+    await service.control.connectors.listConnectorProviders('operator', publicFlow.flowId)
     expect(requests.at(-1)).toEqual({ teamId: 'team-2', url: 'https://connector.oomol.com/v1/providers' })
     expect(
       (await app.request('/v1/flows', { ...publicRequest, body: JSON.stringify({ name: 'Public Team Flow', teamId: 'team-1', version: 1 }) })).status,
@@ -421,9 +421,9 @@ it('fixes one OOMOL Team when each Flow is created', async () => {
     })
     expect(createdResponse.status).toBe(201)
     flowId = ((await createdResponse.json()) as { readonly flowId: string }).flowId
-    await service.control.listConnectorProviders(flowId)
+    await service.control.connectors.listConnectorProviders('operator', flowId)
     expect(requests.at(-1)).toEqual({ teamId: 'team-2', url: 'https://connector.oomol.com/v1/providers' })
-    const other = await service.control.createFlow('operator', 'Default Team Flow', 'create-default-team-flow')
+    const other = await service.control.flows.createFlow('operator', 'Default Team Flow', 'create-default-team-flow')
     const teamStatus = (await (await app.request('/connector/teams')).json()) as {
       readonly bindings: readonly { readonly flowId: string; readonly teamId: string }[]
     }
@@ -433,9 +433,9 @@ it('fixes one OOMOL Team when each Flow is created', async () => {
         { flowId: other.flow.flowId, teamId: 'team-1', teamName: 'Engineering' },
       ]),
     )
-    await service.control.listConnectorProviders(other.flow.flowId)
+    await service.control.connectors.listConnectorProviders('operator', other.flow.flowId)
     expect(requests.at(-1)).toEqual({ teamId: 'team-1', url: 'https://connector.oomol.com/v1/providers' })
-    await service.control.listConnectorProviders(flowId)
+    await service.control.connectors.listConnectorProviders('operator', flowId)
     expect(requests.at(-1)).toEqual({ teamId: 'team-2', url: 'https://connector.oomol.com/v1/providers' })
     expect((await app.request(`/connector/flows/${flowId}/team`, { method: 'PUT' })).status).toBe(404)
   } finally {
@@ -444,7 +444,7 @@ it('fixes one OOMOL Team when each Flow is created', async () => {
 
   const reopened = await openService(file, { capabilities: { connector: () => new ConnectorClient('https://connector.oomol.com', 'runtime-token') } })
   try {
-    await reopened.control.listConnectorProviders(flowId)
+    await reopened.control.connectors.listConnectorProviders('operator', flowId)
     expect(requests.at(-1)).toEqual({ teamId: 'team-2', url: 'https://connector.oomol.com/v1/providers' })
   } finally {
     await closeService(reopened)
@@ -503,9 +503,9 @@ it('streams independent Flow catalog and current Flow invalidations', async () =
       `data: ${JSON.stringify({ kind: 'flow.created', flowId: created.flowId, version: 1 })}\n\n`,
     )
     const repeated: unknown[] = []
-    const stop = service.subscribeFlowCatalog((event) => repeated.push(event))
+    const stop = service.subscribeFlowCatalog('operator', (event) => repeated.push(event))
     try {
-      await service.control.createFlow('operator', 'Notifications', 'notifications-flow')
+      await service.control.flows.createFlow('operator', 'Notifications', 'notifications-flow')
       expect(repeated).toEqual([])
     } finally {
       stop()
@@ -519,7 +519,7 @@ it('streams independent Flow catalog and current Flow invalidations', async () =
     const first = await reader.read()
     expect(new TextDecoder().decode(first.value)).toBe(': connected\n\n')
 
-    const changed = await service.control.changeDraft('operator', created.flowId, created.draftRevisionId, [
+    const changed = await service.control.drafts.changeDraft('operator', created.flowId, created.draftRevisionId, [
       {
         kind: 'graph.node.create',
         node: { kind: 'manual', name: 'Start' },
@@ -530,10 +530,18 @@ it('streams independent Flow catalog and current Flow invalidations', async () =
     expect(new TextDecoder().decode(notification.value)).toBe(
       `data: ${JSON.stringify({ kind: 'draft.changed', flowId: created.flowId, revisionId: changed.revision.revisionId, version: 1 })}\n\n`,
     )
-    const accepted = await service.control.runs.createDraftRun(created.flowId, changed.revision.revisionId, currentEngineContract, {}, 'notification-run', {
-      nodeId: 'marker',
-      outputs: {},
-    })
+    const accepted = await service.control.runs.createDraftRun(
+      'operator',
+      created.flowId,
+      changed.revision.revisionId,
+      currentEngineContract,
+      {},
+      'notification-run',
+      {
+        nodeId: 'marker',
+        outputs: {},
+      },
+    )
     const runNotification = await reader.read()
     expect(new TextDecoder().decode(runNotification.value)).toBe(
       `data: ${JSON.stringify({ flowId: created.flowId, kind: 'run.created', runId: accepted.run.runId, version: 1 })}\n\n`,
@@ -551,7 +559,7 @@ it('closes Flow notification streams during shutdown', async () => {
   const service = await openService(path.join(directory, 'open-flow.sqlite'))
   const shutdown = new AbortController()
   try {
-    const created = await service.control.createFlow('operator', 'Shutdown', 'shutdown-flow')
+    const created = await service.control.flows.createFlow('operator', 'Shutdown', 'shutdown-flow')
     const app = createServerApp(service, { resolveControlActor: () => 'operator', shutdownSignal: shutdown.signal })
     const response = await app.request(`/v1/flows/${created.flow.flowId}/notifications`)
     const reader = response.body?.getReader()

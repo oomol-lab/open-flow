@@ -61,11 +61,11 @@ it('upgrades a readable legacy Draft once while preserving historical Runs, Live
   const { api, file, service } = await fixture()
   const flow = await storedLegacy(file, api)
   const before = await api.getDraft(flow.flowId)
-  const layout = service.control.updatePresentation(flow.flowId, 1, { nodes: { start: { x: 100, y: 200 } } })
+  const layout = service.control.flows.updatePresentation('operator', flow.flowId, 1, { nodes: { start: { x: 100, y: 200 } } })
   const run = await api.createDraftRun(flow.flowId, before.revisionId, { trigger: { nodeId: 'start', outputs: {} }, idempotencyKey: 'historical-run' })
   const operation = await api.publishFlow(flow.flowId, before.revisionId, null, { idempotencyKey: 'publish-legacy' })
   await service.tickMaintenance()
-  expect(service.control.getPublishOperation(flow.flowId, operation.operationId).status).toBe('succeeded')
+  expect(service.control.publications.getPublishOperation('operator', flow.flowId, operation.operationId).status).toBe('succeeded')
   const live = await api.getLive(flow.flowId)
 
   const [upgraded, replay] = await Promise.all([
@@ -128,7 +128,7 @@ it.each([7, 8])('rejects model %s legacy Start configuration without rewriting s
   try {
     database.prepare('UPDATE revisions SET content = ?, digest = ? WHERE revision_id = ?').run(content, digest, flow.draftRevisionId)
     database.prepare('UPDATE flow_revisions SET digest = ?, model_version = ? WHERE revision_id = ?').run(digest, modelVersion, flow.draftRevisionId)
-    const presentation = service.control.updatePresentation(flow.flowId, 1, { nodes: { start: { x: 100, y: 200 } } })
+    const presentation = service.control.flows.updatePresentation('operator', flow.flowId, 1, { nodes: { start: { x: 100, y: 200 } } })
     await expect(api.getEditor(flow.flowId)).rejects.toThrow()
     await expect(api.upgradeDraft(flow.flowId, flow.draftRevisionId)).rejects.toThrow()
     expect((await api.getFlow(flow.flowId)).draftRevisionId).toBe(flow.draftRevisionId)
@@ -193,7 +193,7 @@ it.each(['draft', 'live'] as const)('persists complete Start arguments for %s Ru
   if (source == 'live') {
     const op = await api.publishFlow(flow.flowId, changed.revision.revisionId, null, { idempotencyKey: 'publish-arguments' })
     await service.tickMaintenance()
-    const published = service.control.getPublishOperation(flow.flowId, op.operationId)
+    const published = service.control.publications.getPublishOperation('operator', flow.flowId, op.operationId)
     if (published.status != 'succeeded') throw new Error('Publication did not succeed')
     publicationId = published.publicationId
   }
@@ -234,7 +234,7 @@ it.each([false, true])('rejects explicit Live Webhook Runs with Start present: %
   ])
   const operation = await api.publishFlow(flow.flowId, changed.revision.revisionId, null)
   await service.tickMaintenance()
-  const published = service.control.getPublishOperation(flow.flowId, operation.operationId)
+  const published = service.control.publications.getPublishOperation('operator', flow.flowId, operation.operationId)
   if (published.status != 'succeeded') throw new Error('Publication did not succeed')
   const trigger = { nodeId: 'webhook', outputs: { headers: {}, query: {}, body: {}, webhookUrl: 'http://server.local/webhook' } }
   await expect(api.createLiveRun(published.publicationId, { trigger })).rejects.toMatchObject({
@@ -253,7 +253,7 @@ it('rejects a published legacy Manual entry even after its Draft is upgraded to 
   const flow = await storedLegacy(file, api)
   const operation = await api.publishFlow(flow.flowId, flow.draftRevisionId, null)
   await service.tickMaintenance()
-  const published = service.control.getPublishOperation(flow.flowId, operation.operationId)
+  const published = service.control.publications.getPublishOperation('operator', flow.flowId, operation.operationId)
   if (published.status != 'succeeded') throw new Error('Publication did not succeed')
   const upgraded = await api.upgradeDraft(flow.flowId, flow.draftRevisionId)
   expect((await api.getDraft(flow.flowId)).content.document.graph.nodes.start?.kind).toBe('start')

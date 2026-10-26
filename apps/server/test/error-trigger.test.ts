@@ -10,6 +10,8 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, expect, it } from 'vitest'
+import { runEnvironment } from '../node/application/run-environment.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 import { closeService, openService } from './serviceFixture.ts'
@@ -24,7 +26,7 @@ function fixture(capacity = 10) {
   const file = join(directory, 'store.sqlite')
   let database = Database.open(file)
   let now = 1_000
-  let store = new Store(database, () => now, 100, capacity)
+  let store = new Store(database, runEnvironment(isolatedVmEngineDigest), () => now, 100, capacity)
   cleanups.push(() => {
     database.close()
     rmSync(directory, { recursive: true, force: true })
@@ -43,7 +45,7 @@ function fixture(capacity = 10) {
     reopen() {
       database.close()
       database = Database.open(file)
-      store = new Store(database, () => now, 100, capacity)
+      store = new Store(database, runEnvironment(isolatedVmEngineDigest), () => now, 100, capacity)
     },
     maintain() {
       return store.runs.maintain(now, 100, 60_000)
@@ -413,17 +415,24 @@ it.each(['unpublished', 'retired'] as const)('repairs a draft while retaining an
   else f.store.flows.retire('source', 2_000)
   const service = await openService(f.file)
   try {
-    const repaired = await service.control.repairDraft('operator', 'handler', handler.revisionId, 'repair')
+    const repaired = await service.control.drafts.repairDraft('operator', 'handler', handler.revisionId, 'repair')
     expect(repaired.revision.parentRevisionId).toBe(handler.revisionId)
-    expect(service.control.getDraft('handler')).toMatchObject({
+    expect(service.control.drafts.getDraft('operator', 'handler')).toMatchObject({
       revisionId: repaired.revision.revisionId,
       content: { document: { graph: { nodes: { start: { kind: 'error', sourceFlowIds: ['source'] } } } } },
     })
     expect(f.database.connection.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(repaired.revision.revisionId)).toBeDefined()
     expect(f.store.flows.revision('handler', handler.revisionId)).toEqual(original)
-    await expect(service.control.repairDraft('operator', 'handler', handler.revisionId, 'repair')).resolves.toEqual(repaired)
+    await expect(service.control.drafts.repairDraft('operator', 'handler', handler.revisionId, 'repair')).resolves.toEqual(repaired)
     await expect(
-      service.control.publishFlow('operator', 'handler', repaired.revision.revisionId, handler.engineContract, handler.publicationId, 'publish-repaired'),
+      service.control.publications.publishFlow(
+        'operator',
+        'handler',
+        repaired.revision.revisionId,
+        handler.engineContract,
+        handler.publicationId,
+        'publish-repaired',
+      ),
     ).rejects.toMatchObject({ code: controlErrorCode.flowInvalid })
   } finally {
     await closeService(service)

@@ -22,7 +22,6 @@ import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { decodeFlowRunCheckpoint, normalizeWaitComment, waitAutoContinueAt, withWaitNotificationMessage } from '@oomol-lab/open-flow/scheduler'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { AcceptanceError } from '../error.ts'
-import { isolatedVmEngineDigest } from '../runtime/isolated-vm.ts'
 import { errorWorkflowTarget } from './trigger-store.ts'
 
 type RunInputs = NonNullable<FlowRunOptions['inputs']>
@@ -63,10 +62,19 @@ export interface RunStoreOptions {
   readonly runEventRetentionMs: number
 }
 
+export interface RunEnvironment {
+  readonly engineDigest: string
+  readonly snapshot: (
+    content: string,
+    resolveBindings: (bindings: Readonly<Record<string, string>>) => Readonly<Record<string, string>> | undefined,
+    triggerId?: string,
+  ) => { readonly model: LlmConfig; readonly bindings: Readonly<Record<string, string>> } | undefined
+}
+
 export interface RunStoreDependencies {
   readonly connectorTeams: ConnectorTeamStore
   readonly flows: FlowStore
-  readonly llmConfig: () => LlmConfig | undefined
+  readonly environment: RunEnvironment
   readonly publications: PublicationStore
   readonly revisions: RevisionStore
   readonly variables: VariableStore
@@ -1170,7 +1178,11 @@ export class RunStore {
   }): string {
     const runId = randomUUID()
     const connectorTeamId = this.#deps.connectorTeams.get(input.flowId)
-    const snapshot = this.#agentSnapshot(input.flowId, input.revisionId, input.source == 'draft' ? input.trigger.nodeId : undefined)
+    const snapshot = this.#deps.environment.snapshot(
+      this.#deps.revisions.read(input.revisionId)!.content,
+      (bindings) => this.#deps.variables.resolve(input.flowId, bindings),
+      input.source == 'draft' ? input.trigger.nodeId : undefined,
+    )
     this.#database
       .prepare(
         `INSERT INTO runs (
@@ -1187,7 +1199,7 @@ export class RunStore {
         input.revisionDigest,
         input.flowId,
         input.engineContract ?? currentEngineContract,
-        isolatedVmEngineDigest,
+        this.#deps.environment.engineDigest,
         JSON.stringify(input.inputs),
         input.source,
         input.closureDigest,
@@ -1209,32 +1221,6 @@ export class RunStore {
     const bytes = encoder.encode(JSON.stringify({ kind: 'run.queued', payload })).byteLength
     this.#database.prepare('UPDATE runs SET event_count = 1, event_bytes = ? WHERE run_id = ?').run(bytes, runId)
     return runId
-  }
-
-  /**
-   * Fixes the model deployment and resolved Variable values an Agent Run must
-   * reuse for its first execution and every approval resume.
-   */
-  #agentSnapshot(flowId: string, revisionId: string, triggerId?: string) {
-    const row = this.#database
-      .prepare(`SELECT content FROM revisions WHERE revision_id = ? AND EXISTS (
-      SELECT 1 FROM json_each(revisions.content, '$.document.graph.nodes') WHERE json_extract(value, '$.task.executor.kind') = 'agent'
-    )`)
-      .get(revisionId) as { readonly content: string } | undefined
-    if (row == null) return
-    const revision = decodeRevision(encoder.encode(row.content))
-    const dependencies = flowDependencies(revision, triggerId)
-    if (
-      ![...dependencies.nodes].some((id) => {
-        const node = revision.document.graph.nodes[id]
-        return node?.kind == 'task' && 'executor' in node.task && node.task.executor.kind == 'agent'
-      })
-    )
-      return
-    const model = this.#deps.llmConfig()
-    const bindings = this.#deps.variables.resolve(flowId, variableBindings(revision, dependencies.bindings))
-    if (model == null || bindings == null) throw new AcceptanceError('flow-invalid', 'Agent model or variable configuration is unavailable.')
-    return { model, bindings }
   }
 
   #hasRunCapacity(): boolean {

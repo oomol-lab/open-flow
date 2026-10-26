@@ -9,8 +9,7 @@ import { createControlApp } from '../node/transport/control.ts'
 function setup() {
   const definitions = triggerDefinitions.map(({ snapshot }) => snapshot)
   const service = {
-    listTriggerDefinitions: () => definitions,
-    getTriggerKey: (key: string) => definitions.find((item) => item.key == key),
+    drafts: { listTriggerDefinitions: () => definitions, getTriggerKey: (key: string) => definitions.find((item) => item.key == key) },
   } as unknown as ControlService
   return createControlApp(service, () => 'actor').onError((error) =>
     Response.json({ error: { message: error.message } }, { status: error instanceof ControlError ? error.status : 500 }),

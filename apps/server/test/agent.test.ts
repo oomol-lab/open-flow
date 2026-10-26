@@ -589,33 +589,33 @@ it('resumes a streamed gateway batch after restart and retains earlier receipts 
       },
     })
     if (accepted.kind != 'accepted') throw new Error('Expected accepted Run.')
-    await expect.poll(() => service.control.runs.getRun(accepted.runId).waits.length).toBe(1)
-    const first = service.control.runs.getRun(accepted.runId)
+    await expect.poll(() => service.control.runs.getRun('test', accepted.runId).waits.length).toBe(1)
+    const first = service.control.runs.getRun('test', accepted.runId)
     expect(first.status).toBe('running')
     if (first.waits[0] == null) throw new Error(JSON.stringify(service.events(accepted.runId)))
     expect(calls).toEqual([])
     llm = createLlm('https://new-gateway.example.com', 'changed')
-    const decision = service.control.runs.resolveRunWait(accepted.runId, first.waits[0].waitId, 'approve')
-    await expect.poll(() => service.control.runs.getRun(accepted.runId).waits[0]?.waitId).not.toBe(first.waits[0].waitId)
-    await expect.poll(() => service.control.runs.getRun(accepted.runId).waits.length).toBe(1)
-    const second = service.control.runs.getRun(accepted.runId)
+    const decision = service.control.runs.resolveRunWait('test', accepted.runId, first.waits[0].waitId, 'approve')
+    await expect.poll(() => service.control.runs.getRun('test', accepted.runId).waits[0]?.waitId).not.toBe(first.waits[0].waitId)
+    await expect.poll(() => service.control.runs.getRun('test', accepted.runId).waits.length).toBe(1)
+    const second = service.control.runs.getRun('test', accepted.runId)
     expect(second.status).toBe('running')
     if (second.waits[0] == null) throw new Error(JSON.stringify(service.events(accepted.runId)))
     expect(second.waits[0].waitId).not.toBe(first.waits[0].waitId)
     expect(calls).toHaveLength(1)
-    savedResultId = service.control.runs.listRunResults(accepted.runId).results.find((result) => result.source.kind == 'connector')?.resultId
+    savedResultId = service.control.runs.listRunResults('test', accepted.runId).results.find((result) => result.source.kind == 'connector')?.resultId
     expect(savedResultId).toBeDefined()
     expect(requests).toHaveLength(1)
-    expect(service.control.runs.resolveRunWait(accepted.runId, first.waits[0].waitId, 'reject')).toMatchObject({
+    expect(service.control.runs.resolveRunWait('test', accepted.runId, first.waits[0].waitId, 'reject')).toMatchObject({
       action: 'approve',
       resolvedAt: decision.resolvedAt,
       resolutionAccepted: false,
     })
-    expect(service.control.runs.getRun(accepted.runId).waits[0]?.waitId).toBe(second.waits[0].waitId)
-    service.control.runs.resolveRunWait(accepted.runId, second.waits[0].waitId, 'reject')
+    expect(service.control.runs.getRun('test', accepted.runId).waits[0]?.waitId).toBe(second.waits[0].waitId)
+    service.control.runs.resolveRunWait('test', accepted.runId, second.waits[0].waitId, 'reject')
     await service.waitForIdle()
-    expect(service.control.runs.getRun(accepted.runId).status).toBe('completed')
-    expect(service.control.runs.resolveRunWait(accepted.runId, first.waits[0].waitId, 'approve')).toMatchObject({
+    expect(service.control.runs.getRun('test', accepted.runId).status).toBe('completed')
+    expect(service.control.runs.resolveRunWait('test', accepted.runId, first.waits[0].waitId, 'approve')).toMatchObject({
       action: 'approve',
       resolvedAt: decision.resolvedAt,
       resolutionAccepted: true,
@@ -654,7 +654,7 @@ it('resumes a streamed gateway batch after restart and retains earlier receipts 
       database.prepare('DELETE FROM events WHERE run_id = ?').run(accepted.runId)
       expect((await client.listRunResults(accepted.runId)).results).toHaveLength(2)
       expect((await client.readRunResult(accepted.runId, info.resultId, { pointer: '/sent' })).page.value).toBe(true)
-      await client.deleteFlow(service.control.runs.getRun(accepted.runId).flowId)
+      await client.deleteFlow(service.control.runs.getRun('test', accepted.runId).flowId)
       await service.tickMaintenance()
       expect(database.prepare('SELECT COUNT(*) AS count FROM run_results WHERE run_id = ?').get(accepted.runId)?.count).toBe(0)
     } finally {
@@ -822,7 +822,7 @@ it('runs a code-only Agent through the service without a Connector deployment', 
     })
     if (accepted.kind != 'accepted') throw new Error('Expected accepted Run.')
     await service.waitForIdle()
-    expect(service.control.runs.getRun(accepted.runId).status).toBe('completed')
+    expect(service.control.runs.getRun('test', accepted.runId).status).toBe('completed')
     expect(requests).toBe(2)
     const app = createServerApp(service, { resolveControlActor: () => 'test' })
     const client = new ControlClient(async (route, init) => app.request(new Request(`http://local${route}`, init)))

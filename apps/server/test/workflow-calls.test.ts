@@ -15,9 +15,9 @@ import { closeService, openService, startService } from './serviceFixture.ts'
 const engine = currentEngineContract
 const number = { handle: 'answer', jsonSchema: { type: 'number' }, nullable: false } as const
 async function create(service: ServerService, name: string, operations: readonly ChangeOperation[]) {
-  const created = await service.control.createFlow('operator', name, name)
+  const created = await service.control.flows.createFlow('operator', name, name)
   const flowId = created.flow.flowId
-  const changed = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, operations)
+  const changed = await service.control.drafts.changeDraft('operator', flowId, created.flow.draftRevisionId, operations)
   return { flowId, revisionId: changed.revision.revisionId }
 }
 async function target(service: ServerService, wait = false) {
@@ -47,17 +47,17 @@ async function target(service: ServerService, wait = false) {
         ]
       : [{ kind: 'graph.edge.connect' as const, edge: { source: 'start', target: 'outputs' } }]),
   ])
-  const published = await service.control.publishFlow('operator', flow.flowId, flow.revisionId, engine, null, 'publish')
-  await expect.poll(() => service.control.getPublishOperation(flow.flowId, published.operationId).status).toBe('succeeded')
+  const published = await service.control.publications.publishFlow('operator', flow.flowId, flow.revisionId, engine, null, 'publish')
+  await expect.poll(() => service.control.publications.getPublishOperation('operator', flow.flowId, published.operationId).status).toBe('succeeded')
   return flow
 }
 function outputChange(service: ServerService, flow: { flowId: string; revisionId: string }, patch: Partial<OutputsNode>): ChangeOperation {
-  const node = service.control.getRevision(flow.flowId, flow.revisionId).content.document.graph.nodes.outputs
+  const node = service.control.drafts.getRevision('operator', flow.flowId, flow.revisionId).content.document.graph.nodes.outputs
   if (node?.kind != 'outputs') throw new Error('Expected Outputs fixture')
   return { kind: 'graph.node.replace', nodeId: 'outputs', before: node, node: { ...node, ...patch } }
 }
 async function caller(service: ServerService, flowId: string, timeoutMs?: number, name = 'Caller') {
-  const contract = service.control.getWorkflowContract('operator', flowId)
+  const contract = service.control.flows.getWorkflowContract('operator', flowId)
   return create(service, name, [
     { kind: 'graph.node.create', nodeId: 'start', node: { inputDefs: [], kind: 'start', name: 'Start' } },
     {
@@ -79,26 +79,27 @@ it('calls current Live with one execution slot, preserves separate events and du
   const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
   const child = await target(service)
   const parent = await caller(service, child.flowId)
-  const refs = service.control.getFlowReferences('operator', child.flowId, 'incoming', 0, 50)
+  const refs = service.control.flows.getFlowReferences('operator', child.flowId, 'incoming', 0, 50)
   expect(refs.references).toMatchObject([{ flowId: parent.flowId, draft: true, live: null }])
   const accepted = await service.control.runs.createDraftRun(
+    'operator',
     parent.flowId,
     parent.revisionId,
     engine,
     {},
     'call',
     { nodeId: 'start', outputs: {} },
-    { actorId: 'operator', channel: 'cli' },
+    'cli',
   )
-  await expect.poll(() => service.control.runs.getRun(accepted.run.runId).status).toBe('completed')
-  const run = service.control.runs.getRun(accepted.run.runId)
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe('completed')
+  const run = service.control.runs.getRun('operator', accepted.run.runId)
   expect(run.triggerNodeId).toBe('start')
   expect(run.calls).toHaveLength(1)
-  expect(service.control.runs.getRunEvents(run.runId, 0, 100).events.find((event) => event.kind == 'node.started')?.payload.executionId).toBe(
+  expect(service.control.runs.getRunEvents('operator', run.runId, 0, 100).events.find((event) => event.kind == 'node.started')?.payload.executionId).toBe(
     run.calls![0]!.executionId,
   )
   const call = run.calls![0]!
-  expect(service.control.runs.getRun(call.runId)).toMatchObject({
+  expect(service.control.runs.getRun('operator', call.runId)).toMatchObject({
     source: 'live',
     initiator: { actorId: 'operator', channel: 'workflow' },
     triggerNodeId: 'start',
@@ -107,49 +108,52 @@ it('calls current Live with one execution slot, preserves separate events and du
   expect(service.run(run.runId)?.result).toMatchObject({ nodes: [{ nodeId: 'call', outputs: { answer: 42 } }] })
   expect(service.events(run.runId).some((event) => event.payload.nodeId == 'outputs')).toBe(false)
   expect(service.events(call.runId).some((event) => event.payload.nodeId == 'outputs')).toBe(true)
-  const store = (service.control as unknown as { store: Store }).store
+  const store = (service.control.runs as unknown as { store: Store }).store
   store.runs.maintain(Date.now() + 31 * 24 * 60 * 60 * 1000, 100, 1000)
   expect(service.events(run.runId)).toEqual([])
-  expect(service.control.runs.getRun(run.runId).initiator).toEqual({ actorId: 'operator', channel: 'cli' })
-  expect(service.control.runs.getRun(call.runId).initiator).toEqual({ actorId: 'operator', channel: 'workflow' })
-  expect(service.control.runs.getRun(call.runId).caller?.executionId).toBe(call.executionId)
-  expect(service.control.runs.getRun(run.runId).calls).toHaveLength(1)
+  expect(service.control.runs.getRun('operator', run.runId).initiator).toEqual({ actorId: 'operator', channel: 'cli' })
+  expect(service.control.runs.getRun('operator', call.runId).initiator).toEqual({ actorId: 'operator', channel: 'workflow' })
+  expect(service.control.runs.getRun('operator', call.runId).caller?.executionId).toBe(call.executionId)
+  expect(service.control.runs.getRun('operator', run.runId).calls).toHaveLength(1)
 })
 
 it('keeps the parent pending while a child waits for a human and resumes without another child', async () => {
   const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
   const child = await target(service, true)
   const parent = await caller(service, child.flowId)
-  const accepted = await service.control.runs.createDraftRun(parent.flowId, parent.revisionId, engine, {}, 'call', { nodeId: 'start', outputs: {} })
-  await expect.poll(() => service.control.runs.getRun(accepted.run.runId).calls?.length).toBe(1)
-  const call = service.control.runs.getRun(accepted.run.runId).calls![0]!
-  await expect.poll(() => service.control.runs.getRun(call.runId).waits.length).toBe(1)
-  expect(service.control.runs.getRun(accepted.run.runId).status).toBe('waiting')
-  const wait = service.control.runs.getRun(call.runId).waits[0]!
-  service.control.runs.resolveRunWait(call.runId, wait.waitId, 'continue')
-  await expect.poll(() => service.control.runs.getRun(accepted.run.runId).status).toBe('completed')
-  expect(service.control.runs.getRun(accepted.run.runId).calls).toHaveLength(1)
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revisionId, engine, {}, 'call', { nodeId: 'start', outputs: {} })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).calls?.length).toBe(1)
+  const call = service.control.runs.getRun('operator', accepted.run.runId).calls![0]!
+  await expect.poll(() => service.control.runs.getRun('operator', call.runId).waits.length).toBe(1)
+  expect(service.control.runs.getRun('operator', accepted.run.runId).status).toBe('waiting')
+  const wait = service.control.runs.getRun('operator', call.runId).waits[0]!
+  service.control.runs.resolveRunWait('operator', call.runId, wait.waitId, 'continue')
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe('completed')
+  expect(service.control.runs.getRun('operator', accepted.run.runId).calls).toHaveLength(1)
 })
 
 it('cancels a waiting child with its caller and refuses other owners', async () => {
   const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
   const child = await target(service, true)
-  expect(() => service.control.getWorkflowContract('someone-else', child.flowId)).toThrow()
+  expect(() => service.control.flows.getWorkflowContract('someone-else', child.flowId)).toThrow()
   const parent = await caller(service, child.flowId)
-  const accepted = await service.control.runs.createDraftRun(parent.flowId, parent.revisionId, engine, {}, 'call', { nodeId: 'start', outputs: {} })
-  await expect.poll(() => service.control.runs.getRun(accepted.run.runId).calls?.length).toBe(1)
-  const call = service.control.runs.getRun(accepted.run.runId).calls![0]!
-  service.control.runs.cancelRun(accepted.run.runId)
-  await expect.poll(() => service.control.runs.getRun(call.runId).status).toBe('canceled')
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revisionId, engine, {}, 'call', { nodeId: 'start', outputs: {} })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).calls?.length).toBe(1)
+  const call = service.control.runs.getRun('operator', accepted.run.runId).calls![0]!
+  service.control.runs.cancelRun('operator', accepted.run.runId)
+  await expect.poll(() => service.control.runs.getRun('operator', call.runId).status).toBe('canceled')
 })
 
 it('enforces the call deadline while the child is waiting', async () => {
   const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
   const child = await target(service, true)
   const parent = await caller(service, child.flowId, 800)
-  const accepted = await service.control.runs.createDraftRun(parent.flowId, parent.revisionId, engine, {}, 'timeout', { nodeId: 'start', outputs: {} })
-  await expect.poll(() => service.control.runs.getRun(accepted.run.runId).status).toBe('failed')
-  const run = service.control.runs.getRun(accepted.run.runId)
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revisionId, engine, {}, 'timeout', {
+    nodeId: 'start',
+    outputs: {},
+  })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe('failed')
+  const run = service.control.runs.getRun('operator', accepted.run.runId)
   expect(run.calls).toHaveLength(1)
   expect(run.calls![0]!.status).toBe('canceled')
   expect(service.run(run.runId)?.result).toMatchObject({ error: { code: 'run.timeout' } })
@@ -162,23 +166,26 @@ it('resumes a persisted parent after restart without starting another child', as
   const service = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
   const child = await target(service)
   const parent = await caller(service, child.flowId)
-  const store = (service.control as unknown as { store: Store }).store
+  const store = (service.control.runs as unknown as { store: Store }).store
   const claim = store.runs.claim.bind(store.runs)
   const held = vi
     .spyOn(store.runs, 'claim')
     .mockImplementation((excluded) =>
       claim(store.runViews.listControlRuns(parent.flowId, 1)[0]?.startedAt != null ? [...(excluded ?? []), parent.flowId] : excluded),
     )
-  const accepted = await service.control.runs.createDraftRun(parent.flowId, parent.revisionId, engine, {}, 'restart', { nodeId: 'start', outputs: {} })
-  await expect.poll(() => service.control.runs.getRun(accepted.run.runId).calls?.[0]?.status).toBe('completed')
-  expect(service.control.runs.getRun(accepted.run.runId).status).toBe('queued')
-  const original = service.control.runs.getRun(accepted.run.runId).calls![0]!
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revisionId, engine, {}, 'restart', {
+    nodeId: 'start',
+    outputs: {},
+  })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).calls?.[0]?.status).toBe('completed')
+  expect(service.control.runs.getRun('operator', accepted.run.runId).status).toBe('queued')
+  const original = service.control.runs.getRun('operator', accepted.run.runId).calls![0]!
   await closeService(service)
   held.mockRestore()
   const reopened = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
   await startService(reopened)
-  await expect.poll(() => reopened.control.runs.getRun(accepted.run.runId).status).toBe('completed')
-  expect(reopened.control.runs.getRun(accepted.run.runId).calls).toEqual([original])
+  await expect.poll(() => reopened.control.runs.getRun('operator', accepted.run.runId).status).toBe('completed')
+  expect(reopened.control.runs.getRun('operator', accepted.run.runId).calls).toEqual([original])
   expect(reopened.events(accepted.run.runId).filter((event) => event.kind == 'node.started')).toHaveLength(1)
 })
 
@@ -189,37 +196,50 @@ it('propagates an unconfirmed child after restart without replaying it', async (
   const service = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
   const child = await target(service, true)
   const parent = await caller(service, child.flowId)
-  const accepted = await service.control.runs.createDraftRun(parent.flowId, parent.revisionId, engine, {}, 'unknown', { nodeId: 'start', outputs: {} })
-  await expect.poll(() => service.control.runs.getRun(accepted.run.runId).calls?.length).toBe(1)
-  const call = service.control.runs.getRun(accepted.run.runId).calls![0]!
-  await expect.poll(() => service.control.runs.getRun(call.runId).waits.length).toBe(1)
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revisionId, engine, {}, 'unknown', {
+    nodeId: 'start',
+    outputs: {},
+  })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).calls?.length).toBe(1)
+  const call = service.control.runs.getRun('operator', accepted.run.runId).calls![0]!
+  await expect.poll(() => service.control.runs.getRun('operator', call.runId).waits.length).toBe(1)
   await closeService(service)
   const reopened = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
-  expect(reopened.control.runs.getRun(accepted.run.runId).status).toBe('indeterminate')
-  expect(reopened.control.runs.getRun(call.runId).status).toBe('indeterminate')
-  expect(reopened.control.runs.getRun(accepted.run.runId).calls).toHaveLength(1)
+  expect(reopened.control.runs.getRun('operator', accepted.run.runId).status).toBe('indeterminate')
+  expect(reopened.control.runs.getRun('operator', call.runId).status).toBe('indeterminate')
+  expect(reopened.control.runs.getRun('operator', accepted.run.runId).calls).toHaveLength(1)
 })
 
 it('accepts implementation changes without refreshing and requires refresh for interface changes', async () => {
   const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
   const child = await target(service)
   const parent = await caller(service, child.flowId)
-  const original = service.control.getRevision(parent.flowId, parent.revisionId).content
-  const updated = await service.control.changeDraft('operator', child.flowId, child.revisionId, [
+  const original = service.control.drafts.getRevision('operator', parent.flowId, parent.revisionId).content
+  const updated = await service.control.drafts.changeDraft('operator', child.flowId, child.revisionId, [
     outputChange(service, child, { outputMappings: { answer: { kind: 'value', value: 7 } } }),
   ])
   const publish = async (revisionId: string, key: string) => {
-    const op = await service.control.publishFlow('operator', child.flowId, revisionId, engine, service.control.getFlow(child.flowId).live!.publicationId, key)
-    await expect.poll(() => service.control.getPublishOperation(child.flowId, op.operationId).status).toBe('succeeded')
+    const op = await service.control.publications.publishFlow(
+      'operator',
+      child.flowId,
+      revisionId,
+      engine,
+      service.control.flows.getFlow('operator', child.flowId).live!.publicationId,
+      key,
+    )
+    await expect.poll(() => service.control.publications.getPublishOperation('operator', child.flowId, op.operationId).status).toBe('succeeded')
   }
   await publish(updated.revision.revisionId, 'compatible')
-  expect((await service.control.checkFlow(parent.flowId, parent.revisionId, engine)).valid).toBe(true)
-  expect((await service.control.checkAuthoring(parent.flowId, parent.revisionId)).valid).toBe(true)
-  const accepted = await service.control.runs.createDraftRun(parent.flowId, parent.revisionId, engine, {}, 'latest', { nodeId: 'start', outputs: {} })
-  await expect.poll(() => service.control.runs.getRun(accepted.run.runId).status).toBe('completed')
+  expect((await service.control.drafts.checkFlow('operator', parent.flowId, parent.revisionId, engine)).valid).toBe(true)
+  expect((await service.control.drafts.checkAuthoring('operator', parent.flowId, parent.revisionId)).valid).toBe(true)
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revisionId, engine, {}, 'latest', {
+    nodeId: 'start',
+    outputs: {},
+  })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe('completed')
   expect(service.run(accepted.run.runId)?.result).toMatchObject({ nodes: [{ outputs: { answer: 7 } }] })
-  expect(service.control.getRevision(parent.flowId, parent.revisionId).content).toEqual(original)
-  const broken = await service.control.changeDraft('operator', child.flowId, updated.revision.revisionId, [
+  expect(service.control.drafts.getRevision('operator', parent.flowId, parent.revisionId).content).toEqual(original)
+  const broken = await service.control.drafts.changeDraft('operator', child.flowId, updated.revision.revisionId, [
     outputChange(
       service,
       { flowId: child.flowId, revisionId: updated.revision.revisionId },
@@ -230,14 +250,14 @@ it('accepts implementation changes without refreshing and requires refresh for i
     ),
   ])
   await publish(broken.revision.revisionId, 'breaking')
-  expect(await service.control.checkAuthoring(parent.flowId, parent.revisionId)).toMatchObject({
+  expect(await service.control.drafts.checkAuthoring('operator', parent.flowId, parent.revisionId)).toMatchObject({
     valid: false,
     diagnostics: [{ code: 'workflow.revision-stale', field: 'config.flowId' }],
   })
-  await expect(service.control.runs.createDraftRun(parent.flowId, parent.revisionId, engine, {}, 'stale', { nodeId: 'start', outputs: {} })).rejects.toThrow(
-    'interface has changed',
-  )
-  const refreshed = await service.control.editAuthoring('operator', parent.flowId, {
+  await expect(
+    service.control.runs.createDraftRun('operator', parent.flowId, parent.revisionId, engine, {}, 'stale', { nodeId: 'start', outputs: {} }),
+  ).rejects.toThrow('interface has changed')
+  const refreshed = await service.control.drafts.editAuthoring('operator', parent.flowId, {
     baseRevision: parent.revisionId,
     requestId: 'refresh',
     edits: [{ op: 'node.refresh', node: 'call' }],
@@ -249,7 +269,7 @@ it('supports nested calls with one slot and merges Draft and Live definition ref
   const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
   const child = await target(service)
   const middle = await caller(service, child.flowId)
-  const exposed = await service.control.changeDraft('operator', middle.flowId, middle.revisionId, [
+  const exposed = await service.control.drafts.changeDraft('operator', middle.flowId, middle.revisionId, [
     {
       kind: 'graph.node.replace',
       nodeId: 'start',
@@ -269,36 +289,36 @@ it('supports nested calls with one slot and merges Draft and Live definition ref
     },
     { kind: 'graph.edge.connect', edge: { source: 'call', target: 'outputs' } },
   ])
-  const publication = await service.control.publishFlow('operator', middle.flowId, exposed.revision.revisionId, engine, null, 'middle')
-  await expect.poll(() => service.control.getPublishOperation(middle.flowId, publication.operationId).status).toBe('succeeded')
-  expect(service.control.getFlowReferences('operator', child.flowId, 'incoming', 0, 50)).toMatchObject({
+  const publication = await service.control.publications.publishFlow('operator', middle.flowId, exposed.revision.revisionId, engine, null, 'middle')
+  await expect.poll(() => service.control.publications.getPublishOperation('operator', middle.flowId, publication.operationId).status).toBe('succeeded')
+  expect(service.control.flows.getFlowReferences('operator', child.flowId, 'incoming', 0, 50)).toMatchObject({
     total: 1,
     references: [{ flowId: middle.flowId, draft: true, live: { enabled: true } }],
   })
   const outer = await caller(service, middle.flowId, undefined, 'Outer')
-  const accepted = await service.control.runs.createDraftRun(outer.flowId, outer.revisionId, engine, {}, 'nested', { nodeId: 'start', outputs: {} })
-  await expect.poll(() => service.control.runs.getRun(accepted.run.runId).status).toBe('completed')
+  const accepted = await service.control.runs.createDraftRun('operator', outer.flowId, outer.revisionId, engine, {}, 'nested', { nodeId: 'start', outputs: {} })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe('completed')
   expect(service.run(accepted.run.runId)?.result).toMatchObject({ nodes: [{ outputs: { answer: 42 } }] })
-  const middleRun = service.control.runs.getRun(accepted.run.runId).calls![0]!.runId
-  expect(service.control.runs.getRun(middleRun).calls).toHaveLength(1)
+  const middleRun = service.control.runs.getRun('operator', accepted.run.runId).calls![0]!.runId
+  expect(service.control.runs.getRun('operator', middleRun).calls).toHaveLength(1)
 })
 
 it('rejects self-reference on save and still rejects legacy recursion during check and admission', async () => {
   const service = await openService(':memory:', { clock: Date.now })
   const child = await target(service)
   const parent = await caller(service, child.flowId)
-  const original = service.control.getRevision(parent.flowId, parent.revisionId).content.document.graph.nodes.call!
+  const original = service.control.drafts.getRevision('operator', parent.flowId, parent.revisionId).content.document.graph.nodes.call!
   if (original.kind != 'task') throw new Error('Expected call')
   const task = { ...original.task, executor: { kind: 'workflow' as const, flowId: parent.flowId, revisionId: parent.revisionId } }
   await expect(
-    service.control.changeDraft('operator', parent.flowId, parent.revisionId, [
+    service.control.drafts.changeDraft('operator', parent.flowId, parent.revisionId, [
       { kind: 'graph.node.task.set', nodeId: 'call', before: original.task, value: task },
     ]),
   ).rejects.toMatchObject({ code: 'flow.invalid', details: { reason: 'workflow.recursive' } })
-  expect(service.control.getFlow(parent.flowId).draftRevisionId).toBe(parent.revisionId)
+  expect(service.control.flows.getFlow('operator', parent.flowId).draftRevisionId).toBe(parent.revisionId)
 
   // Simulate a Revision saved before write-time self-reference validation existed.
-  const content = service.control.getRevision(parent.flowId, parent.revisionId).content
+  const content = service.control.drafts.getRevision('operator', parent.flowId, parent.revisionId).content
   const legacy = {
     ...content,
     document: {
@@ -313,7 +333,7 @@ it('rejects self-reference on save and still rejects legacy recursion during che
     },
   }
   const bytes = encodeRevision(legacy)
-  const store = (service.control as unknown as { store: Store }).store
+  const store = (service.control.runs as unknown as { store: Store }).store
   const recursive = store.flows.commitRevision({
     actorId: 'operator',
     flowId: parent.flowId,
@@ -327,20 +347,20 @@ it('rejects self-reference on save and still rejects legacy recursion during che
     createdAt: Date.now(),
   })
   if (recursive.kind != 'committed') throw new Error('Expected legacy fixture')
-  expect(await service.control.checkFlow(parent.flowId, recursive.revision.revisionId, engine)).toMatchObject({
+  expect(await service.control.drafts.checkFlow('operator', parent.flowId, recursive.revision.revisionId, engine)).toMatchObject({
     valid: false,
     diagnostics: [{ message: 'Recursive workflow calls are not supported.' }],
   })
   await expect(
-    service.control.runs.createDraftRun(parent.flowId, recursive.revision.revisionId, engine, {}, 'recursive', { nodeId: 'start', outputs: {} }),
+    service.control.runs.createDraftRun('operator', parent.flowId, recursive.revision.revisionId, engine, {}, 'recursive', { nodeId: 'start', outputs: {} }),
   ).rejects.toThrow('Recursive')
 })
 
 it('rejects disconnected self-calls through public authoring without saving any part of the batch', async () => {
   const service = await openService(':memory:')
-  const { flow } = await service.control.createFlow('operator', 'Caller', 'self-call')
+  const { flow } = await service.control.flows.createFlow('operator', 'Caller', 'self-call')
   await expect(
-    service.control.editAuthoring('operator', flow.flowId, {
+    service.control.drafts.editAuthoring('operator', flow.flowId, {
       baseRevision: flow.draftRevisionId,
       requestId: 'self-call',
       edits: [
@@ -349,15 +369,15 @@ it('rejects disconnected self-calls through public authoring without saving any 
       ],
     }),
   ).rejects.toMatchObject({ code: 'flow.invalid', details: { reason: 'workflow.recursive' } })
-  expect(service.control.getFlow(flow.flowId).draftRevisionId).toBe(flow.draftRevisionId)
-  expect(service.control.getRevision(flow.flowId, flow.draftRevisionId).content.document.graph.nodes).toEqual({})
+  expect(service.control.flows.getFlow('operator', flow.flowId).draftRevisionId).toBe(flow.draftRevisionId)
+  expect(service.control.drafts.getRevision('operator', flow.flowId, flow.draftRevisionId).content.document.graph.nodes).toEqual({})
 })
 
 it('creates separate child runs and matching event identities for each loop invocation', async () => {
   const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
   const child = await target(service)
   const parent = await caller(service, child.flowId)
-  const loop = await service.control.changeDraft('operator', parent.flowId, parent.revisionId, [
+  const loop = await service.control.drafts.changeDraft('operator', parent.flowId, parent.revisionId, [
     {
       kind: 'module.create',
       moduleId: 'counter',
@@ -408,12 +428,15 @@ it('creates separate child runs and matching event identities for each loop invo
     { kind: 'graph.edge.connect', edge: { source: 'call', target: 'choose' } },
     { kind: 'graph.edge.connect', edge: { source: 'choose', sourceHandle: 'again', target: 'counter' } },
   ])
-  const accepted = await service.control.runs.createDraftRun(parent.flowId, loop.revision.revisionId, engine, {}, 'loop', { nodeId: 'start', outputs: {} })
-  await expect.poll(() => service.control.runs.getRun(accepted.run.runId).status).toBe('completed')
-  const calls = service.control.runs.getRun(accepted.run.runId).calls!
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, loop.revision.revisionId, engine, {}, 'loop', {
+    nodeId: 'start',
+    outputs: {},
+  })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe('completed')
+  const calls = service.control.runs.getRun('operator', accepted.run.runId).calls!
   expect(new Set(calls.map((call) => call.runId)).size).toBe(3)
   const completions = service.control.runs
-    .getRunEvents(accepted.run.runId, 0, 100)
+    .getRunEvents('operator', accepted.run.runId, 0, 100)
     .events.filter((event) => event.kind == 'node.completed')
     .filter((event) => event.payload.nodeId == 'call')
   expect(completions.map((event) => event.payload.outputs)).toEqual([{ answer: 1 }, { answer: 2 }, { answer: 3 }])
@@ -436,14 +459,14 @@ it('reports an unselected workflow separately without looking up an empty target
     },
     { kind: 'graph.edge.connect', edge: { source: 'start', target: 'call' } },
   ])
-  const store = (service.control as unknown as { store: Store }).store
+  const store = (service.control.runs as unknown as { store: Store }).store
   const lookup = vi.spyOn(store.flows, 'get')
-  expect(await service.control.checkFlow(parent.flowId, parent.revisionId, engine)).toMatchObject({
+  expect(await service.control.drafts.checkFlow('operator', parent.flowId, parent.revisionId, engine)).toMatchObject({
     valid: false,
     diagnostics: [{ code: 'workflow.target-required', message: 'Select a target workflow.', path: '/document/graph/nodes/call/task/executor/flowId' }],
   })
   expect(lookup).not.toHaveBeenCalledWith('')
-  expect(await service.control.checkAuthoring(parent.flowId, parent.revisionId)).toMatchObject({
+  expect(await service.control.drafts.checkAuthoring('operator', parent.flowId, parent.revisionId)).toMatchObject({
     valid: false,
     diagnostics: [{ code: 'workflow.target-required', field: 'config.flowId' }],
   })
@@ -452,55 +475,55 @@ it('reports an unselected workflow separately without looking up an empty target
 it('reports a missing Live Start from the published interface even when Draft has Start', async () => {
   const service = await openService(':memory:')
   await startService(service)
-  const created = await service.control.createFlow('operator', 'Empty Live', 'empty-live')
+  const created = await service.control.flows.createFlow('operator', 'Empty Live', 'empty-live')
   const flowId = created.flow.flowId
-  const published = await service.control.publishFlow('operator', flowId, created.flow.draftRevisionId, engine, null, 'empty-live')
-  await expect.poll(() => service.control.getPublishOperation(flowId, published.operationId).status).toBe('succeeded')
-  const draft = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
+  const published = await service.control.publications.publishFlow('operator', flowId, created.flow.draftRevisionId, engine, null, 'empty-live')
+  await expect.poll(() => service.control.publications.getPublishOperation('operator', flowId, published.operationId).status).toBe('succeeded')
+  const draft = await service.control.drafts.changeDraft('operator', flowId, created.flow.draftRevisionId, [
     { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'start', name: 'Start', inputDefs: [] } },
   ])
-  const store = (service.control as unknown as { store: Store }).store
+  const store = (service.control.runs as unknown as { store: Store }).store
   const read = vi.spyOn(store.flows, 'revision')
-  expect(service.control.getFlow(flowId).live).toMatchObject({ hasStart: false })
+  expect(service.control.flows.getFlow('operator', flowId).live).toMatchObject({ hasStart: false })
   expect(workflowAuthoringTarget(store, 'operator', flowId)).toMatchObject({ problem: 'missing-start' })
-  expect(() => service.control.getWorkflowContract('operator', flowId)).toThrow()
+  expect(() => service.control.flows.getWorkflowContract('operator', flowId)).toThrow()
   expect(read).not.toHaveBeenCalled()
   read.mockRestore()
-  const next = await service.control.publishFlow(
+  const next = await service.control.publications.publishFlow(
     'operator',
     flowId,
     draft.revision.revisionId,
     engine,
-    service.control.getFlow(flowId).live!.publicationId,
+    service.control.flows.getFlow('operator', flowId).live!.publicationId,
     'with-start',
   )
-  await expect.poll(() => service.control.getPublishOperation(flowId, next.operationId).status).toBe('succeeded')
-  expect(service.control.getWorkflowContract('operator', flowId)).toMatchObject({ revisionId: draft.revision.revisionId, inputs: [], outputs: null })
+  await expect.poll(() => service.control.publications.getPublishOperation('operator', flowId, next.operationId).status).toBe('succeeded')
+  expect(service.control.flows.getWorkflowContract('operator', flowId)).toMatchObject({ revisionId: draft.revision.revisionId, inputs: [], outputs: null })
 })
 
 it('saves an unpublished target through authoring and refreshes it after publication', async () => {
   const service = await openService(':memory:')
   await startService(service)
-  const child = await service.control.createFlow('operator', 'Draft target', 'draft-target')
-  const parent = await service.control.createFlow('operator', 'Caller', 'caller')
-  const edited = await service.control.editAuthoring('operator', parent.flow.flowId, {
+  const child = await service.control.flows.createFlow('operator', 'Draft target', 'draft-target')
+  const parent = await service.control.flows.createFlow('operator', 'Caller', 'caller')
+  const edited = await service.control.drafts.editAuthoring('operator', parent.flow.flowId, {
     baseRevision: parent.flow.draftRevisionId,
     requestId: 'select',
     edits: [{ op: 'node.add', as: 'call', name: 'Draft target', type: 'workflow', config: { flowId: child.flow.flowId } }],
   })
-  expect(service.control.getRevision(parent.flow.flowId, edited.revision).content.document.graph.nodes).toMatchObject({
+  expect(service.control.drafts.getRevision('operator', parent.flow.flowId, edited.revision).content.document.graph.nodes).toMatchObject({
     [edited.nodes.call!]: { task: { executor: { flowId: child.flow.flowId, revisionId: '' } } },
   })
-  expect(await service.control.checkAuthoring(parent.flow.flowId, edited.revision)).toMatchObject({
+  expect(await service.control.drafts.checkAuthoring('operator', parent.flow.flowId, edited.revision)).toMatchObject({
     valid: false,
     diagnostics: [{ code: 'workflow.unpublished' }],
   })
-  const childDraft = await service.control.changeDraft('operator', child.flow.flowId, child.flow.draftRevisionId, [
+  const childDraft = await service.control.drafts.changeDraft('operator', child.flow.flowId, child.flow.draftRevisionId, [
     { kind: 'graph.node.create', nodeId: 'start', node: { kind: 'start', name: 'Start', inputDefs: [] } },
   ])
-  const published = await service.control.publishFlow('operator', child.flow.flowId, childDraft.revision.revisionId, engine, null, 'publish-draft')
-  await expect.poll(() => service.control.getPublishOperation(child.flow.flowId, published.operationId).status).toBe('succeeded')
-  const refreshed = await service.control.editAuthoring('operator', parent.flow.flowId, {
+  const published = await service.control.publications.publishFlow('operator', child.flow.flowId, childDraft.revision.revisionId, engine, null, 'publish-draft')
+  await expect.poll(() => service.control.publications.getPublishOperation('operator', child.flow.flowId, published.operationId).status).toBe('succeeded')
+  const refreshed = await service.control.drafts.editAuthoring('operator', parent.flow.flowId, {
     baseRevision: edited.revision,
     requestId: 'refresh',
     edits: [{ op: 'node.refresh', node: edited.nodes.call! }],
@@ -512,9 +535,9 @@ it('diagnoses each caller of the same invalid dependency while reading each targ
   const service = await openService(':memory:')
   const leaf = await target(service)
   const middle = await caller(service, leaf.flowId)
-  const live = await service.control.publishFlow('operator', middle.flowId, middle.revisionId, engine, null, 'middle-live')
-  await expect.poll(() => service.control.getPublishOperation(middle.flowId, live.operationId).status).toBe('succeeded')
-  const task = workflowTask(service.control.getWorkflowContract('operator', middle.flowId))
+  const live = await service.control.publications.publishFlow('operator', middle.flowId, middle.revisionId, engine, null, 'middle-live')
+  await expect.poll(() => service.control.publications.getPublishOperation('operator', middle.flowId, live.operationId).status).toBe('succeeded')
+  const task = workflowTask(service.control.flows.getWorkflowContract('operator', middle.flowId))
   const outer = await create(service, 'Outer', [
     { kind: 'graph.node.create', nodeId: 'start', node: { inputDefs: [], kind: 'start', name: 'Start' } },
     { kind: 'graph.node.create', nodeId: 'first', node: { kind: 'task', name: 'First call', inputs: {}, task } },
@@ -522,30 +545,30 @@ it('diagnoses each caller of the same invalid dependency while reading each targ
     { kind: 'graph.edge.connect', edge: { source: 'start', target: 'first' } },
     { kind: 'graph.edge.connect', edge: { source: 'start', target: 'second' } },
   ])
-  const changed = await service.control.changeDraft('operator', leaf.flowId, leaf.revisionId, [
+  const changed = await service.control.drafts.changeDraft('operator', leaf.flowId, leaf.revisionId, [
     outputChange(service, leaf, { outputDefs: [number, { handle: 'extra', jsonSchema: {}, nullable: true }] }),
   ])
-  const updated = await service.control.publishFlow(
+  const updated = await service.control.publications.publishFlow(
     'operator',
     leaf.flowId,
     changed.revision.revisionId,
     engine,
-    service.control.getFlow(leaf.flowId).live!.publicationId,
+    service.control.flows.getFlow('operator', leaf.flowId).live!.publicationId,
     'leaf-updated',
   )
-  await expect.poll(() => service.control.getPublishOperation(leaf.flowId, updated.operationId).status).toBe('succeeded')
-  const store = (service.control as unknown as { store: Store }).store
+  await expect.poll(() => service.control.publications.getPublishOperation('operator', leaf.flowId, updated.operationId).status).toBe('succeeded')
+  const store = (service.control.runs as unknown as { store: Store }).store
   const read = vi.spyOn(store.flows, 'revision')
-  const checked = await service.control.checkFlow(outer.flowId, outer.revisionId, engine)
+  const checked = await service.control.drafts.checkFlow('operator', outer.flowId, outer.revisionId, engine)
   expect(checked.diagnostics).toMatchObject([
     { code: 'workflow.dependency-stale', path: '/document/graph/nodes/first/task/executor/flowId' },
     { code: 'workflow.dependency-stale', path: '/document/graph/nodes/second/task/executor/flowId' },
   ])
   expect(read.mock.calls.filter(([id]) => id == middle.flowId)).toHaveLength(1)
   expect(read.mock.calls.filter(([id]) => id == leaf.flowId)).toHaveLength(1)
-  const childLive = service.control.getFlow(leaf.flowId).live!
-  service.control.setFlowEnabled(leaf.flowId, childLive.publicationId, false)
-  expect((await service.control.checkFlow(outer.flowId, outer.revisionId, engine)).diagnostics).toMatchObject([
+  const childLive = service.control.flows.getFlow('operator', leaf.flowId).live!
+  service.control.publications.setFlowEnabled('operator', leaf.flowId, childLive.publicationId, false)
+  expect((await service.control.drafts.checkFlow('operator', outer.flowId, outer.revisionId, engine)).diagnostics).toMatchObject([
     { code: 'workflow.dependency-invalid', path: '/document/graph/nodes/first/task/executor/flowId' },
     { code: 'workflow.dependency-invalid', path: '/document/graph/nodes/second/task/executor/flowId' },
   ])
@@ -555,15 +578,18 @@ it('protects unfinished child calls and retains origin until both runs are delet
   const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
   const child = await target(service, true)
   const parent = await caller(service, child.flowId)
-  const accepted = await service.control.runs.createDraftRun(parent.flowId, parent.revisionId, engine, {}, 'cleanup', { nodeId: 'start', outputs: {} })
-  await expect.poll(() => service.control.runs.getRun(accepted.run.runId).calls?.length).toBe(1)
-  const call = service.control.runs.getRun(accepted.run.runId).calls![0]!
-  await expect.poll(() => service.control.runs.getRun(call.runId).waits.length).toBe(1)
-  const store = (service.control as unknown as { store: Store }).store
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revisionId, engine, {}, 'cleanup', {
+    nodeId: 'start',
+    outputs: {},
+  })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).calls?.length).toBe(1)
+  const call = service.control.runs.getRun('operator', accepted.run.runId).calls![0]!
+  await expect.poll(() => service.control.runs.getRun('operator', call.runId).waits.length).toBe(1)
+  const store = (service.control.runs as unknown as { store: Store }).store
   expect(store.runs.deleteByFlow(child.flowId, 10)).toBe(0)
-  const wait = service.control.runs.getRun(call.runId).waits[0]!
-  service.control.runs.resolveRunWait(call.runId, wait.waitId, 'continue')
-  await expect.poll(() => service.control.runs.getRun(accepted.run.runId).status).toBe('completed')
+  const wait = service.control.runs.getRun('operator', call.runId).waits[0]!
+  service.control.runs.resolveRunWait('operator', call.runId, wait.waitId, 'continue')
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe('completed')
   expect(store.runs.deleteByFlow(parent.flowId, 10)).toBe(1)
   expect(store.runs.workflowOrigin(call.runId)).toMatchObject({ runId: accepted.run.runId })
   expect(store.runs.deleteByFlow(child.flowId, 10)).toBe(1)
@@ -573,8 +599,8 @@ it('protects unfinished child calls and retains origin until both runs are delet
 it('resolves authoring targets with one metadata lookup and no revision read for an unpublished target', async () => {
   const service = await openService(':memory:')
   const live = await target(service)
-  const draft = await service.control.createFlow('operator', 'Draft', 'draft')
-  const store = (service.control as unknown as { store: Store }).store
+  const draft = await service.control.flows.createFlow('operator', 'Draft', 'draft')
+  const store = (service.control.runs as unknown as { store: Store }).store
   const get = vi.spyOn(store.flows, 'get')
   const read = vi.spyOn(store.flows, 'revision')
   expect(workflowAuthoringTarget(store, 'operator', live.flowId)).toMatchObject({ revisionId: live.revisionId })
@@ -590,31 +616,38 @@ it('resolves authoring targets with one metadata lookup and no revision read for
 it('reads and compares publication interfaces without reading revision bodies, and restores them on rollback', async () => {
   const service = await openService(':memory:')
   const child = await target(service)
-  const first = service.control.getWorkflowContract('operator', child.flowId)
+  const first = service.control.flows.getWorkflowContract('operator', child.flowId)
   const task = { kind: 'task' as const, name: 'Call', task: workflowTask(first), inputs: { answer: { kind: 'value' as const, value: 3 } } }
-  const store = (service.control as unknown as { store: Store }).store
-  const changed = await service.control.changeDraft('operator', child.flowId, child.revisionId, [
+  const store = (service.control.runs as unknown as { store: Store }).store
+  const changed = await service.control.drafts.changeDraft('operator', child.flowId, child.revisionId, [
     outputChange(service, child, { outputMappings: { answer: { kind: 'value', value: 9 } } }),
   ])
-  expect(service.control.getWorkflowContract('operator', child.flowId)).toEqual(first)
-  const op = await service.control.publishFlow('operator', child.flowId, changed.revision.revisionId, engine, first.publicationId, 'implementation')
-  await expect.poll(() => service.control.getPublishOperation(child.flowId, op.operationId).status).toBe('succeeded')
+  expect(service.control.flows.getWorkflowContract('operator', child.flowId)).toEqual(first)
+  const op = await service.control.publications.publishFlow(
+    'operator',
+    child.flowId,
+    changed.revision.revisionId,
+    engine,
+    first.publicationId,
+    'implementation',
+  )
+  await expect.poll(() => service.control.publications.getPublishOperation('operator', child.flowId, op.operationId).status).toBe('succeeded')
   const read = vi.spyOn(store.flows, 'revision').mockImplementation(() => {
     throw new Error('Unexpected full Revision read')
   })
-  const second = service.control.getWorkflowContract('operator', child.flowId)
+  const second = service.control.flows.getWorkflowContract('operator', child.flowId)
   expect(second.revisionId).toBe(changed.revision.revisionId)
   expect(workflowCallCompatibility(store, task, second)).toEqual([])
   expect(
     workflowCallCompatibility(store, { ...task, task: { ...task.task, executor: { kind: 'workflow', flowId: child.flowId, revisionId: 'missing' } } }, second),
   ).toMatchObject([{ reason: 'snapshot-missing' }])
-  expect(service.control.listFlows(100, undefined, false, 'operator').page.flows.find((flow) => flow.flowId == child.flowId)?.live).toMatchObject({
+  expect(service.control.flows.listFlows('operator', 100, undefined, false).page.flows.find((flow) => flow.flowId == child.flowId)?.live).toMatchObject({
     hasStart: true,
   })
   expect(read).not.toHaveBeenCalled()
   read.mockRestore()
-  const rolledBack = await service.control.rollbackFlow('operator', child.flowId, first.publicationId, second.publicationId, 'restore')
-  expect(service.control.getWorkflowContract('operator', child.flowId)).toMatchObject({
+  const rolledBack = await service.control.publications.rollbackFlow('operator', child.flowId, first.publicationId, second.publicationId, 'restore')
+  expect(service.control.flows.getWorkflowContract('operator', child.flowId)).toMatchObject({
     revisionId: first.revisionId,
     publicationId: rolledBack.publication.publicationId,
     inputs: first.inputs,
@@ -627,15 +660,15 @@ it('refreshes list counts through real draft, publication, disabled-live and ret
   const service = await openService(':memory:', { clock: Date.now })
   const child = await target(service)
   const parent = await caller(service, child.flowId)
-  const count = () => service.control.listFlows(50, undefined, false, 'operator').page.flows.find((flow) => flow.flowId == child.flowId)!.referenceCount
+  const count = () => service.control.flows.listFlows('operator', 50, undefined, false).page.flows.find((flow) => flow.flowId == child.flowId)!.referenceCount
   expect(count()).toBe(1)
-  const published = await service.control.publishFlow('operator', parent.flowId, parent.revisionId, engine, null, 'publish-parent')
-  await expect.poll(() => service.control.getPublishOperation(parent.flowId, published.operationId).status).toBe('succeeded')
-  const live = service.control.getFlow(parent.flowId).live!
-  service.control.setFlowEnabled(parent.flowId, live.publicationId, false)
+  const published = await service.control.publications.publishFlow('operator', parent.flowId, parent.revisionId, engine, null, 'publish-parent')
+  await expect.poll(() => service.control.publications.getPublishOperation('operator', parent.flowId, published.operationId).status).toBe('succeeded')
+  const live = service.control.flows.getFlow('operator', parent.flowId).live!
+  service.control.publications.setFlowEnabled('operator', parent.flowId, live.publicationId, false)
   expect(count()).toBe(1)
-  const store = (service.control as unknown as { store: Store }).store
+  const store = (service.control.runs as unknown as { store: Store }).store
   store.flows.retire(parent.flowId, Date.now())
   expect(count()).toBe(0)
-  expect(service.control.getFlowReferences('operator', child.flowId, 'incoming', 0, 50).total).toBe(0)
+  expect(service.control.flows.getFlowReferences('operator', child.flowId, 'incoming', 0, 50).total).toBe(0)
 })

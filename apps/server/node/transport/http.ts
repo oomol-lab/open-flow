@@ -156,7 +156,7 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     const actorId = await authenticate(context.req.raw)
     return notificationResponse(
       notifications(
-        (listener) => service.subscribeFlowCatalog(listener, actorId),
+        (listener) => service.subscribeFlowCatalog(actorId, listener),
         [context.req.raw.signal, options.shutdownSignal],
         async () => (await resolveActor?.(context.req.raw)) == actorId,
       ),
@@ -164,10 +164,10 @@ export function createServerApp(service: ServerService, options: ServerAppOption
   })
   app.get('/v1/flows/:flowId/notifications', async (context) => {
     const actorId = await authenticate(context.req.raw)
-    service.control.authorize(actorId, { flowId: context.req.param('flowId') })
+    service.control.flows.getFlow(actorId, context.req.param('flowId'))
     return notificationResponse(
       notifications(
-        (listener) => service.subscribeFlow(context.req.param('flowId'), listener),
+        (listener) => service.subscribeFlow(actorId, context.req.param('flowId'), listener),
         [context.req.raw.signal, options.shutdownSignal],
         async () => (await resolveActor?.(context.req.raw)) == actorId,
       ),
@@ -233,8 +233,7 @@ export function createServerApp(service: ServerService, options: ServerAppOption
       authenticate,
       configuration: () => options.settings?.connectorConfiguration(),
       resolveScope: (flowId, actorId) => {
-        service.control.authorize(actorId, { flowId })
-        return service.control.resolveConnectorScope(flowId)
+        return service.control.connectors.resolveConnectorScope(actorId, flowId)
       },
       forward: (configuration, resource, request, teamId) => forwardConnector(configuration, resource, request, teamId, { logger }),
     }),
@@ -257,7 +256,7 @@ export function createServerApp(service: ServerService, options: ServerAppOption
         options.settings,
         async (request) => {
           const actorId = await authenticate(request)
-          service.control.requireAdmin(actorId)
+          service.control.access.requireAdmin(actorId)
           return actorId
         },
         () => service.configurationChanged(),
@@ -269,7 +268,7 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     const user = service.control.users.get(actorId)
     return json(200, {
       ...teams,
-      bindings: teams.bindings.filter((binding) => service.control.ownsFlow(actorId, binding.flowId)),
+      bindings: teams.bindings.filter((binding) => service.control.access.ownsFlow(actorId, binding.flowId)),
       console: actorId == 'operator' || user?.role == 'admin' ? service.connectionConsole() : null,
     })
   })
@@ -279,7 +278,7 @@ export function createServerApp(service: ServerService, options: ServerAppOption
     if (input === false) throw new ControlError(serverErrorCode.requestInvalid, 'Connector Flow request is invalid.')
     const key = context.req.header('idempotency-key')
     if (key == null || key.length == 0 || key.length > 256) throw new ControlError(serverErrorCode.requestInvalid, 'Idempotency-Key is invalid.')
-    const created = await service.control.createFlow(actorId, input.name, key, input.teamId)
+    const created = await service.control.flows.createFlow(actorId, input.name, key, input.teamId)
     return json(created.created ? 201 : 200, created.flow)
   })
 

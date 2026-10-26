@@ -3,13 +3,15 @@ import type { ConnectorAccess, ConnectorAccessSnapshot } from '@oomol-lab/open-f
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { expect, it, onTestFinished } from 'vitest'
 import { publication as publicationView } from '../node/application/control-views.ts'
+import { runEnvironment } from '../node/application/run-environment.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 
 function fixture(providerAccess?: ConnectorAccess) {
   const database = Database.open(':memory:')
   onTestFinished(() => database.close())
-  const store = new Store(database, () => 1_000)
+  const store = new Store(database, runEnvironment(isolatedVmEngineDigest), () => 1_000)
   if (providerAccess != null)
     database.connection
       .prepare('INSERT INTO flow_provider_access (flow_id, access_revision, bindings_json, shared_access_digest) VALUES (?, ?, ?, ?)')

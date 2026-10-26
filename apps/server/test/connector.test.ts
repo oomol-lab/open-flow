@@ -287,12 +287,12 @@ describe('Server Connector host', () => {
     ])
     const stored = await storeRevision(service, revision, 'multi-account-publish')
     active = false
-    const accepted = await service.control.publishFlow('test', stored.flowId, stored.revisionId, currentEngineContract, null, 'publish')
+    const accepted = await service.control.publications.publishFlow('test', stored.flowId, stored.revisionId, currentEngineContract, null, 'publish')
     await expect(
-      service.control.runs.createDraftRun(stored.flowId, stored.revisionId, currentEngineContract, {}, 'run', { nodeId: 'start', outputs: {} }),
+      service.control.runs.createDraftRun('test', stored.flowId, stored.revisionId, currentEngineContract, {}, 'run', { nodeId: 'start', outputs: {} }),
     ).resolves.toMatchObject({ created: true })
     const checks = listConnections.mock.calls.length
-    const replay = await service.control.publishFlow('test', stored.flowId, stored.revisionId, currentEngineContract, null, 'publish')
+    const replay = await service.control.publications.publishFlow('test', stored.flowId, stored.revisionId, currentEngineContract, null, 'publish')
     expect(replay.operationId).toBe(accepted.operationId)
     expect(listConnections).toHaveBeenCalledTimes(checks)
   })
@@ -300,7 +300,7 @@ describe('Server Connector host', () => {
   it('distinguishes an unconfigured Connector from an unavailable Connector', async () => {
     const service = await open()
 
-    await expect(service.control.listConnectorProviders()).rejects.toMatchObject({
+    await expect(service.control.connectors.listConnectorProviders('operator')).rejects.toMatchObject({
       code: 'connector.unconfigured',
       message: 'Connector is not configured for this deployment.',
       status: 503,
@@ -334,14 +334,14 @@ describe('Server Connector host', () => {
     })
     const service = await open(connector, 'https://connector.example')
 
-    await expect(service.control.listConnectorProviders()).resolves.toEqual(providers)
+    await expect(service.control.connectors.listConnectorProviders('operator')).resolves.toEqual(providers)
     const combined = actions.map((action) => ({ ...action, defaultConnection: connections[0] }))
-    await expect(service.control.listConnectorActionMetadata('example')).resolves.toEqual(actions)
-    await expect(service.control.listConnectorActions('example')).resolves.toEqual(combined)
-    await expect(service.control.searchConnectorActions('echo')).resolves.toEqual(combined)
-    await expect(service.control.getConnectorAction('example.echo')).resolves.toEqual(combined[0])
-    await expect(service.control.listConnectorConnections('example')).resolves.toEqual(connections)
-    expect(await service.control.connectorConnectionPage('example')).toBe('https://connector.example/providers/example')
+    await expect(service.control.connectors.listConnectorActionMetadata('operator', 'example')).resolves.toEqual(actions)
+    await expect(service.control.connectors.listConnectorActions('operator', 'example')).resolves.toEqual(combined)
+    await expect(service.control.connectors.searchConnectorActions('operator', 'echo')).resolves.toEqual(combined)
+    await expect(service.control.connectors.getConnectorAction('test', 'example.echo')).resolves.toEqual(combined[0])
+    await expect(service.control.connectors.listConnectorConnections('operator', 'example')).resolves.toEqual(connections)
+    expect(await service.control.connectors.connectorConnectionPage('operator', 'example')).toBe('https://connector.example/providers/example')
   })
 
   it('executes managed Connector Tasks through the injected host', async () => {
@@ -525,14 +525,14 @@ describe('Server Connector host', () => {
       }),
     )
     const service = await open(new ConnectorClient('https://connector.oomol.dev', 'runtime-token'))
-    const created = await service.control.createFlow('test', 'Team Run', 'create-team-run', 'team-a')
-    const batch = await service.control.getProviderAccessBindingCandidates('test', created.flow.flowId, ['example'])
+    const created = await service.control.flows.createFlow('test', 'Team Run', 'create-team-run', 'team-a')
+    const batch = await service.control.connectors.getProviderAccessBindingCandidates('test', created.flow.flowId, ['example'])
     const result = batch.results[0]!
     if ('error' in result) throw new Error(result.error.message)
     const candidates = result
-    await service.control.addProviderAccessBinding('test', created.flow.flowId, 'example', candidates.candidates[0]!.accessBindingId, 0)
+    await service.control.connectors.addProviderAccessBinding('test', created.flow.flowId, 'example', candidates.candidates[0]!.accessBindingId, 0)
     const revision = connectorFlow()
-    const changed = await service.control.changeDraft('test', created.flow.flowId, created.flow.draftRevisionId, [
+    const changed = await service.control.drafts.changeDraft('test', created.flow.flowId, created.flow.draftRevisionId, [
       { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start' },
       {
         kind: 'graph.node.create',
@@ -541,10 +541,18 @@ describe('Server Connector host', () => {
       },
       { kind: 'graph.edge.connect', edge: { source: 'start', target: 'connector' } },
     ])
-    const accepted = await service.control.runs.createDraftRun(created.flow.flowId, changed.revision.revisionId, currentEngineContract, {}, 'team-run', {
-      nodeId: 'start',
-      outputs: {},
-    })
+    const accepted = await service.control.runs.createDraftRun(
+      'test',
+      created.flow.flowId,
+      changed.revision.revisionId,
+      currentEngineContract,
+      {},
+      'team-run',
+      {
+        nodeId: 'start',
+        outputs: {},
+      },
+    )
     await service.waitForIdle()
 
     expect(service.run(accepted.run.runId)?.status).toBe('completed')
@@ -715,7 +723,7 @@ it('lists default connections in the default Team and preserves the Flow Team sc
     }),
   )
   const service = await open(connector)
-  const { flow } = await service.control.createFlow('operator', 'Flow', 'create-scoped-flow', 'flow-team')
+  const { flow } = await service.control.flows.createFlow('operator', 'Flow', 'create-scoped-flow', 'flow-team')
   const app = createServerApp(service, { resolveControlActor: () => 'operator' })
   for (const [query, teamId] of [
     ['', 'default-team'],
@@ -739,7 +747,7 @@ it('opens hosted connection pages in the Flow team or explicitly selected team',
       connectorConsoleOrigin: () => new URL('https://connector.oomol.com'),
     },
   })
-  const { flow } = await service.control.createFlow('operator', 'A', 'create-team-a', 'team-a-id')
+  const { flow } = await service.control.flows.createFlow('operator', 'A', 'create-team-a', 'team-a-id')
   const app = createServerApp(service, { resolveControlActor: () => 'operator' })
   for (const query of [`flowId=${flow.flowId}`, 'teamId=team-a-id']) {
     const response = await app.request(`/v1/connector/connections/feishu_app_bot/page?${query}`, {
@@ -750,9 +758,13 @@ it('opens hosted connection pages in the Flow team or explicitly selected team',
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ version: 1, url: 'https://console.oomol.com/team/team_a/connections/feishu_app_bot' })
   }
-  expect(await service.control.connectorConnectionPage('feishu_app_bot')).toBe('https://console.oomol.com/team/team_b/connections/feishu_app_bot')
-  await expect(service.control.connectorConnectionPage('feishu_app_bot', undefined, 'unknown-team')).rejects.toThrow('Team')
-  await expect(service.control.connectorConnectionPage('feishu_app_bot', flow.flowId, 'team-b-id')).rejects.toThrow('either a Flow or a Team')
+  expect(await service.control.connectors.connectorConnectionPage('operator', 'feishu_app_bot')).toBe(
+    'https://console.oomol.com/team/team_b/connections/feishu_app_bot',
+  )
+  await expect(service.control.connectors.connectorConnectionPage('operator', 'feishu_app_bot', undefined, 'unknown-team')).rejects.toThrow('Team')
+  await expect(service.control.connectors.connectorConnectionPage('operator', 'feishu_app_bot', flow.flowId, 'team-b-id')).rejects.toThrow(
+    'either a Flow or a Team',
+  )
 })
 
 it.each(['connector', 'code-call', 'code-unused'] as const)('admits and publishes deferred accounts but fails only on actual invocation: %s', async (kind) => {
@@ -781,9 +793,11 @@ it.each(['connector', 'code-call', 'code-unused'] as const)('admits and publishe
     ])
   }
   const stored = await storeRevision(service, revision, `deferred-${kind}`)
-  expect(await service.control.checkFlow(stored.flowId, stored.revisionId, currentEngineContract)).toMatchObject({ valid: true })
-  await expect(service.control.publishFlow('test', stored.flowId, stored.revisionId, currentEngineContract, null, 'publish-deferred')).resolves.toBeDefined()
-  const accepted = await service.control.runs.createDraftRun(stored.flowId, stored.revisionId, currentEngineContract, {}, 'run-deferred', {
+  expect(await service.control.drafts.checkFlow('test', stored.flowId, stored.revisionId, currentEngineContract)).toMatchObject({ valid: true })
+  await expect(
+    service.control.publications.publishFlow('test', stored.flowId, stored.revisionId, currentEngineContract, null, 'publish-deferred'),
+  ).resolves.toBeDefined()
+  const accepted = await service.control.runs.createDraftRun('test', stored.flowId, stored.revisionId, currentEngineContract, {}, 'run-deferred', {
     nodeId: 'start',
     outputs: {},
   })

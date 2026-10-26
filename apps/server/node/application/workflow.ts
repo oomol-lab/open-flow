@@ -8,7 +8,7 @@ import { workflowCompatibility, publishedWorkflowInterfaceSchema, workflowCandid
 import { ControlError } from '../error.ts'
 
 /** Resolve availability and the published interface without reading Revision content. */
-function readWorkflowTarget(store: Store, ownerId: string, flowId: string) {
+function readWorkflowTarget(store: Pick<Store, 'flows' | 'publications'>, ownerId: string, flowId: string) {
   const flow = store.flows.get(flowId)
   if (flow?.ownerId != ownerId) throw new ControlError('flow.not-found', 'The workflow is unavailable.')
   const candidate = workflowCandidate({
@@ -32,7 +32,7 @@ function readWorkflowTarget(store: Store, ownerId: string, flowId: string) {
   return { kind: 'available' as const, contract }
 }
 
-export function workflowTarget(store: Store, ownerId: string, flowId: string) {
+export function workflowTarget(store: Pick<Store, 'flows' | 'publications'>, ownerId: string, flowId: string) {
   const target = readWorkflowTarget(store, ownerId, flowId)
   if (target.kind == 'unavailable') {
     const { problem } = target.candidate
@@ -41,19 +41,19 @@ export function workflowTarget(store: Store, ownerId: string, flowId: string) {
   return target
 }
 
-export function workflowAuthoringTarget(store: Store, ownerId: string, flowId: string) {
+export function workflowAuthoringTarget(store: Pick<Store, 'flows' | 'publications'>, ownerId: string, flowId: string) {
   const target = readWorkflowTarget(store, ownerId, flowId)
   return target.kind == 'available' ? target.contract : target.candidate
 }
 
 /** Full definition reads belong to dependency inspection and execution, not interface queries. */
-export function workflowContent(store: Store, contract: WorkflowContract): RevisionContent {
+export function workflowContent(store: Pick<Store, 'flows' | 'publications'>, contract: WorkflowContract): RevisionContent {
   const saved = store.flows.revision(contract.flowId, contract.revisionId)
   if (saved == null) throw new ControlError('flow.invalid', 'Called workflow Revision is unavailable.')
   return decodeRevision(new TextEncoder().encode(saved.content))
 }
 
-export function workflowCallCompatibility(store: Store, node: TaskNode, contract: WorkflowContract) {
+export function workflowCallCompatibility(store: Pick<Store, 'flows' | 'publications'>, node: TaskNode, contract: WorkflowContract) {
   const executor = 'executor' in node.task ? node.task.executor : undefined
   const previous =
     executor?.kind == 'workflow' && executor.revisionId && executor.revisionId != contract.revisionId
@@ -66,7 +66,7 @@ function pointer(value: string): string {
   return value.replaceAll('~', '~0').replaceAll('/', '~1')
 }
 
-export function workflowDiagnostics(store: Store, flowId: string, content: RevisionContent, triggerId?: string) {
+export function workflowDiagnostics(store: Pick<Store, 'flows' | 'publications'>, flowId: string, content: RevisionContent, triggerId?: string) {
   const owner = store.flows.get(flowId)?.ownerId
   const cache = new Map<string, ReturnType<typeof workflowTarget> | Error>()
   const contents = new Map<string, RevisionContent>()
@@ -166,7 +166,7 @@ export function requireNoWorkflowSelfReference(flowId: string, content: Revision
   }
 }
 
-export function requireWorkflowCalls(store: Store, flowId: string, content: RevisionContent, triggerId?: string) {
+export function requireWorkflowCalls(store: Pick<Store, 'flows' | 'publications'>, flowId: string, content: RevisionContent, triggerId?: string) {
   const diagnostics = workflowDiagnostics(store, flowId, content, triggerId)
   if (diagnostics.length) throw new ControlError('flow.invalid', diagnostics[0]!.message)
 }

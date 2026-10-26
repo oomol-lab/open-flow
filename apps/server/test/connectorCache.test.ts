@@ -44,9 +44,11 @@ it.each(['/connector/action-metadata', '/connector/action-metadata?service=mail'
     try {
       const client = new ConnectorClient('https://connector.example', 'token')
       const service = {
-        listConnectorActionMetadata: (serviceId?: string) => client.listActions(serviceId),
-        searchConnectorActionMetadata: (query: string) => client.searchActions(query),
-        getConnectorActionMetadata: (id: string) => client.getAction(id),
+        connectors: {
+          listConnectorActionMetadata: (_actorId: string, serviceId?: string) => client.listActions(serviceId),
+          searchConnectorActionMetadata: (_actorId: string, query: string) => client.searchActions(query),
+          getConnectorActionMetadata: (_actorId: string, id: string) => client.getAction(id),
+        },
       } as unknown as ControlService
       const app = createControlApp(service, () => 'actor')
       const first = await app.request(route)
@@ -76,16 +78,18 @@ describe('Connector conditional HTTP responses', () => {
       return [{ revision }]
     }
     const service = {
-      authorize: vi.fn(),
-      listConnectorProviders: read,
-      listConnectorActions: read,
-      listConnectorActionMetadata: read,
-      searchConnectorActionMetadata: read,
-      getConnectorActionMetadata: read,
-      searchConnectorActions: read,
-      getConnectorAction: read,
-      listAllConnectorConnections: read,
-      listConnectorConnections: read,
+      access: { authorize: vi.fn() },
+      connectors: {
+        listConnectorProviders: read,
+        listConnectorActions: read,
+        listConnectorActionMetadata: read,
+        searchConnectorActionMetadata: read,
+        getConnectorActionMetadata: read,
+        searchConnectorActions: read,
+        getConnectorAction: read,
+        listAllConnectorConnections: read,
+        listConnectorConnections: read,
+      },
     } as unknown as ControlService
     const app = createControlApp(service, () => (authorized ? 'actor' : undefined)).onError((error) =>
       Response.json({ error: { message: error.message } }, { status: error instanceof ControlError ? error.status : 500 }),

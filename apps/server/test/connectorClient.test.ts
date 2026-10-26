@@ -931,11 +931,11 @@ describe('Server Connector client', () => {
       clock: Date.now,
     })
     services.push(configured)
-    expect(await configured.control.connectorConnectionPage('mail/work')).toBe('https://connector.example/providers/mail%2Fwork')
+    expect(await configured.control.connectors.connectorConnectionPage('operator', 'mail/work')).toBe('https://connector.example/providers/mail%2Fwork')
 
     const unconfigured = await openService(await databaseFile())
     services.push(unconfigured)
-    await expect(unconfigured.control.connectorConnectionPage('mail')).rejects.toThrow(
+    await expect(unconfigured.control.connectors.connectorConnectionPage('operator', 'mail')).rejects.toThrow(
       expect.objectContaining({ code: 'connector.console-unconfigured', status: 503 }),
     )
 

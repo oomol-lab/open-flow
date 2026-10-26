@@ -1,15 +1,24 @@
-import type { FlowChangeEvent, ResultQuery, Run, RunCancellation, RunDetails, RunEvents, RunResult, RunInitiator } from '@oomol-lab/open-flow/control-api'
-import type { ConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
-import type { TaskNode } from '@oomol-lab/open-flow/flow-change'
-import type { JsonValue, RevisionContent, WaitAction } from '@oomol-lab/open-flow/flow-change'
+import type {
+  ConnectorAccessSnapshot,
+  FlowChangeEvent,
+  ResultQuery,
+  Run,
+  RunCancellation,
+  RunDetails,
+  RunEvents,
+  RunInitiator,
+  RunResult,
+} from '@oomol-lab/open-flow/control-api'
+import type { JsonValue, RevisionContent, TaskNode, WaitAction } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunOptions, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
 import type { ConnectorAccessHost } from '../deployment/connector-access.ts'
 import type { ConnectorHost } from '../deployment/connector-contract.ts'
-import type { StoredRun, LiveRunOrigin } from '../storage/run-store.ts'
+import type { LiveRunOrigin, StoredRun } from '../storage/run-store.ts'
 import type { StoredControlRun } from '../storage/run-view-store.ts'
 import type { Store } from '../storage/store.ts'
+import type { ControlAccess } from './control-access.ts'
 
 import { controlErrorCode, decodeRunEvent, readResult } from '@oomol-lab/open-flow/control-api'
 import { canonicalJsonBytes, digestBytes } from '@oomol-lab/open-flow/flow-encoding'
@@ -20,8 +29,7 @@ import { captureConnectorAccess } from '../deployment/connector-access.ts'
 import { ControlError, serverErrorCode } from '../error.ts'
 import { checkCodeActions, checkCodePermissions } from './connector-capabilities.ts'
 import { readRevisionOrRepair, revisionContent, timestamp } from './control-views.ts'
-import { workflowTarget, workflowContent, workflowCallCompatibility } from './workflow.ts'
-import { requireWorkflowCalls } from './workflow.ts'
+import { requireWorkflowCalls, workflowCallCompatibility, workflowContent, workflowTarget } from './workflow.ts'
 
 type RunInputs = NonNullable<FlowRunOptions['inputs']>
 
@@ -31,6 +39,7 @@ export interface RunPosition {
 }
 
 export class RunControl {
+  private readonly access: ControlAccess
   private readonly store: Store
   private readonly clock: () => number
   private readonly abortRun: (runId: string) => void
@@ -43,6 +52,7 @@ export class RunControl {
 
   constructor(
     store: Store,
+    access: ControlAccess,
     clock: () => number,
     abortRun: (runId: string) => void,
     wake: () => void,
@@ -52,6 +62,7 @@ export class RunControl {
     connectorAccess: ConnectorAccessHost,
     resolveWaitPublicOrigin: () => URL | undefined,
   ) {
+    this.access = access
     this.store = store
     this.clock = clock
     this.abortRun = abortRun
@@ -64,16 +75,19 @@ export class RunControl {
   }
 
   async createDraftRun(
+    actorId: string,
     flowId: string,
     revisionId: string,
     engineContract: string,
     inputs: RunInputs,
     idempotencyKey: string,
     trigger: TriggerSeed,
-    initiator: RunInitiator = { channel: 'api' },
+    channel: RunInitiator['channel'] = 'api',
   ): Promise<{ readonly created: boolean; readonly run: RunDetails }> {
-    const actorId = initiator.actorId
-    if (actorId != null) idempotencyKey = JSON.stringify([actorId, idempotencyKey])
+    this.access.authorize(actorId, { flowId })
+
+    const initiator: RunInitiator = { actorId, channel }
+    idempotencyKey = JSON.stringify([actorId, idempotencyKey])
     const sharedAccess = this.connectorAccess.current(flowId)
     const requestDigest = await digestBytes(
       canonicalJsonBytes({
@@ -120,11 +134,23 @@ export class RunControl {
   }
 
   async createLiveRun(
+    actorId: string,
     publicationId: string,
     inputs: RunInputs,
     idempotencyKey: string,
     trigger: TriggerSeed,
-    origin: LiveRunOrigin = { initiator: { channel: 'api' } },
+    channel: RunInitiator['channel'] = 'api',
+  ): Promise<{ readonly created: boolean; readonly run: RunDetails }> {
+    this.access.authorize(actorId, { publicationId })
+    return this.admitLiveRun(publicationId, inputs, idempotencyKey, trigger, { initiator: { actorId, channel } })
+  }
+
+  private async admitLiveRun(
+    publicationId: string,
+    inputs: RunInputs,
+    idempotencyKey: string,
+    trigger: TriggerSeed,
+    origin: LiveRunOrigin,
   ): Promise<{ readonly created: boolean; readonly run: RunDetails }> {
     const actorId = origin.initiator?.actorId
     if (actorId != null) idempotencyKey = JSON.stringify([actorId, idempotencyKey])
@@ -198,7 +224,7 @@ export class RunControl {
       const start = Object.entries(content.document.graph.nodes).find(([, entry]) => entry.kind == 'start')
       if (start == null) throw new ControlError(controlErrorCode.runInvalid, 'Live Runs can only be started through a Start node.')
       const values = Object.fromEntries(Object.entries(input).filter(([key]) => contract.inputs.some((port) => port.handle == key)))
-      const accepted = await this.createLiveRun(
+      const accepted = await this.admitLiveRun(
         contract.publicationId,
         {},
         JSON.stringify(['workflow', parent.runId, jobId]),
@@ -230,11 +256,14 @@ export class RunControl {
     return { kind: 'calling', childRunId: child.runId }
   }
 
-  getRun(runId: string): RunDetails {
+  getRun(actorId: string, runId: string): RunDetails {
+    this.access.authorize(actorId, { runId })
+
     return this.runDetails(this.requireRun(runId))
   }
 
   resolveRunWait(
+    actorId: string,
     runId: string,
     waitId: string,
     action: WaitAction,
@@ -249,6 +278,8 @@ export class RunControl {
     readonly version: 1
     readonly waitId: string
   } {
+    this.access.authorize(actorId, { runId })
+
     const stored = this.requireRun(runId)
     const receipt = this.store.runViews.waitReceipt(runId, waitId)
     if (receipt == null) throw new ControlError(controlErrorCode.runWaitNotFound, 'The active Wait was not found.')
@@ -277,6 +308,7 @@ export class RunControl {
   }
 
   listRuns(
+    actorId: string,
     flowId: string,
     limit: number,
     options: {
@@ -292,6 +324,8 @@ export class RunControl {
     readonly next?: RunPosition
     readonly page: { readonly flowId: string; readonly runs: readonly Run[]; readonly version: 1 }
   } {
+    this.access.authorize(actorId, { flowId })
+
     if (this.store.flows.get(flowId) == null) notFound()
     const stored = this.store.runViews.listControlRuns(flowId, limit + 1, options)
     const rows = stored.slice(0, limit)
@@ -302,7 +336,9 @@ export class RunControl {
     }
   }
 
-  getRunEvents(runId: string, after: number, limit: number): RunEvents {
+  getRunEvents(actorId: string, runId: string, after: number, limit: number): RunEvents {
+    this.access.authorize(actorId, { runId })
+
     const current = this.requireRun(runId)
     if (current.eventsExpiresAt != null && current.eventsExpiresAt <= this.clock()) {
       throw new ControlError(controlErrorCode.runEventsExpired, 'The Run event history has expired.')
@@ -327,13 +363,17 @@ export class RunControl {
     }
   }
 
-  listRunResults(runId: string, after?: string) {
+  listRunResults(actorId: string, runId: string, after?: string) {
+    this.access.authorize(actorId, { runId })
+
     this.requireRun(runId)
     return { version: 1 as const, runId, ...this.store.results.list(runId, after) }
   }
 
-  readRunResult(runId: string, resultId: string, query: ResultQuery) {
-    const stored = this.runResultContent(runId, resultId)
+  readRunResult(actorId: string, runId: string, resultId: string, query: ResultQuery) {
+    this.access.authorize(actorId, { runId })
+
+    const stored = this.runResultContent(actorId, runId, resultId)
     try {
       return { version: 1 as const, runId, result: stored.result, page: readResult(JSON.parse(stored.content) as JsonValue, query) }
     } catch (error) {
@@ -341,14 +381,18 @@ export class RunControl {
     }
   }
 
-  runResultContent(runId: string, resultId: string) {
+  runResultContent(actorId: string, runId: string, resultId: string) {
+    this.access.authorize(actorId, { runId })
+
     this.requireRun(runId)
     const stored = this.store.results.get(runId, resultId)
     if (stored == null) notFound()
     return stored
   }
 
-  getRunResult(runId: string): RunResult {
+  getRunResult(actorId: string, runId: string): RunResult {
+    this.access.authorize(actorId, { runId })
+
     const stored = this.requireRun(runId)
     if (!terminal(stored.status)) throw new ControlError(controlErrorCode.runNotTerminal, 'The Run is not terminal.')
     if (stored.finishedAt == null) throw new Error('Terminal Run is missing its completion timestamp.')
@@ -369,7 +413,9 @@ export class RunControl {
     }
   }
 
-  cancelRun(runId: string): RunCancellation {
+  cancelRun(actorId: string, runId: string): RunCancellation {
+    this.access.authorize(actorId, { runId })
+
     const canceled = this.store.runs.cancelControlRun(runId)
     if (canceled == null) runNotFound()
     if (canceled.accepted) {

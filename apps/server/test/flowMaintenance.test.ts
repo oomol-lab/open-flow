@@ -8,13 +8,13 @@ it('physically deletes a retired Flow without retaining its authoring history', 
   const directory = await mkdtemp(path.join(tmpdir(), 'open-flow-retirement-'))
   const service = await openService(path.join(directory, 'open-flow.sqlite'))
   try {
-    const created = await service.control.createFlow('operator', 'Retirement', 'retirement-flow')
-    service.control.retireFlow(created.flow.flowId)
+    const created = await service.control.flows.createFlow('operator', 'Retirement', 'retirement-flow')
+    service.control.flows.retireFlow('operator', created.flow.flowId)
 
     await service.tickMaintenance()
     await service.tickMaintenance()
 
-    expect(() => service.control.getFlow(created.flow.flowId)).toThrow(expect.objectContaining({ code: 'flow.not-found' }))
+    expect(() => service.control.flows.getFlow('operator', created.flow.flowId)).toThrow(expect.objectContaining({ code: 'flow.not-found' }))
   } finally {
     await closeService(service)
     await rm(directory, { force: true, recursive: true })

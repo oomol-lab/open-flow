@@ -71,9 +71,9 @@ function webhookFlow(): RevisionContent {
 
 async function publishedWebhook(service: ServerService, key = 'webhook') {
   const stored = await storeRevision(service, webhookFlow(), `revision-${key}`)
-  await service.control.publishFlow('test', stored.flowId, stored.revisionId, currentEngineContract, null, `publication-${key}`)
+  await service.control.publications.publishFlow('test', stored.flowId, stored.revisionId, currentEngineContract, null, `publication-${key}`)
   await service.tickMaintenance()
-  const binding = service.control.getFlowTriggerBinding(stored.flowId, 'incoming', 'http://server.local')
+  const binding = service.control.publications.getFlowTriggerBinding('test', stored.flowId, 'incoming', 'http://server.local')
   const endpointId = binding.endpointUrl == null ? undefined : webhookEndpointId(new URL(binding.endpointUrl))
   const target = endpointId == null ? undefined : service.webhookTarget(endpointId)
   if (target == null) throw new Error('Published Webhook target is missing.')
@@ -116,7 +116,7 @@ describe('Server Webhook Trigger admission', () => {
     ])
     if (first == null || second == null) throw new Error('Concurrent matching occurrences lost their current target.')
     if (first.kind != 'accepted' || second.kind != 'accepted') throw new Error('Concurrent matching occurrences unexpectedly conflicted.')
-    expect(service.control.runs.getRun(first.runId).initiator).toEqual({ channel: 'trigger' })
+    expect(service.control.runs.getRun('test', first.runId).initiator).toEqual({ channel: 'trigger' })
     const acceptedRuns = [first, second]
     expect(new Set(acceptedRuns.map((accepted) => accepted.runId)).size).toBe(1)
     const accepted = acceptedRuns.find((candidate) => candidate.created)
@@ -186,7 +186,7 @@ describe('Server Webhook Trigger admission', () => {
       status: 'queued',
     })
     await expect(
-      service.control.runs.createDraftRun(target.flowId, target.revisionId, target.engineContract, {}, 'manual-run', {
+      service.control.runs.createDraftRun('test', target.flowId, target.revisionId, target.engineContract, {}, 'manual-run', {
         nodeId: target.triggerNodeId,
         outputs: { headers: {}, query: {}, body: { message: 'hello' }, webhookUrl: 'http://server.local/webhook' },
       }),
@@ -236,7 +236,7 @@ describe('Server Webhook Trigger admission', () => {
     })
 
     expect(response.status).toBe(400)
-    expect(service.control.runs.listRuns(target.flowId, 10).page.runs).toHaveLength(0)
+    expect(service.control.runs.listRuns('test', target.flowId, 10).page.runs).toHaveLength(0)
   })
 
   it('reclaims expired callback windows without resetting active limits', async () => {
@@ -357,14 +357,14 @@ it('runs the published Flow Error after an automatic failure and exposes both Ru
     { ...revision, modules: { capture: { imports: [], name: 'Capture', source: 'export default () => { throw new Error("Automatic task failed") }' } } },
     'failed-source',
   )
-  await service.control.publishFlow('test', source.flowId, source.revisionId, currentEngineContract, null, 'publish-source')
+  await service.control.publications.publishFlow('test', source.flowId, source.revisionId, currentEngineContract, null, 'publish-source')
   await service.tickMaintenance()
-  const configured = await service.control.changeDraft('test', handler.flowId, handler.revisionId, [
+  const configured = await service.control.drafts.changeDraft('test', handler.flowId, handler.revisionId, [
     { kind: 'graph.trigger.sources.set', nodeId: 'error', value: [source.flowId] },
   ])
-  await service.control.publishFlow('test', handler.flowId, configured.revision.revisionId, currentEngineContract, null, 'publish-handler')
+  await service.control.publications.publishFlow('test', handler.flowId, configured.revision.revisionId, currentEngineContract, null, 'publish-handler')
   await service.tickMaintenance()
-  const binding = service.control.getFlowTriggerBinding(source.flowId, 'incoming', 'http://server.local')
+  const binding = service.control.publications.getFlowTriggerBinding('test', source.flowId, 'incoming', 'http://server.local')
   const target = service.webhookTarget(webhookEndpointId(new URL(binding.endpointUrl!))!)!
   const accepted = await service.acceptWebhookTarget(target, 'automatic-failure', 'POST', {
     headers: {},
@@ -377,11 +377,11 @@ it('runs the published Flow Error after an automatic failure and exposes both Ru
   await service.waitForIdle()
   await service.tickMaintenance()
   await service.waitForIdle()
-  const failed = service.control.runs.getRun(accepted.runId)
+  const failed = service.control.runs.getRun('test', accepted.runId)
   expect(failed.status).toBe('failed')
   expect(failed.errorDispatches?.[0]?.status).toBe('dispatched')
   if (failed.errorDispatches?.[0]?.status != 'dispatched') throw new Error('Error workflow was not dispatched')
-  const handled = service.control.runs.getRun(failed.errorDispatches[0].runId)
+  const handled = service.control.runs.getRun('test', failed.errorDispatches[0].runId)
   expect(handled.status).toBe('completed')
   expect(handled.errorSource).toEqual({ flowId: source.flowId, runId: accepted.runId })
   expect(service.run(accepted.runId)?.result).toMatchObject({ error: { nodeId: 'capture', message: 'Automatic task failed' } })

@@ -12,6 +12,7 @@ import type { IntegrationOptions, IntegrationResponse, IntegrationRuntimeState, 
 import type { Database } from '../storage/database.ts'
 import type { RunEvent, RunRecord } from '../storage/run-view-store.ts'
 import type { PollState, RunAdmission } from '../storage/trigger-store.ts'
+import type { ControlService } from './control-service.ts'
 import type { ServerCapabilities, ServerRuntime, ServerServiceOptions } from './service-options.ts'
 import type { WebhookTarget } from './webhook-targets.ts'
 
@@ -30,17 +31,25 @@ import { ConnectorClient } from '../deployment/connector.ts'
 import { ControlError } from '../error.ts'
 import { silentLogger } from '../logger.ts'
 import { IntegrationRuntime } from '../runtime/integration-runtime.ts'
-import { IsolatedVmHost } from '../runtime/isolated-vm.ts'
+import { IsolatedVmHost, isolatedVmEngineDigest } from '../runtime/isolated-vm.ts'
 import { ListenerRuntime } from '../runtime/listener-runtime.ts'
 import { Store } from '../storage/store.ts'
-import { ControlService } from './control-service.ts'
+import { ConnectorControl } from './connector-control.ts'
+import { ControlAccess } from './control-access.ts'
 import { CronDriver } from './cron-driver.ts'
+import { DraftControl } from './draft-control.ts'
+import { EventSourceControl } from './event-source-control.ts'
+import { FlowControl } from './flow-control.ts'
 import { validatedFlow } from './flow-validation.ts'
 import { Maintenance } from './maintenance.ts'
+import { PublicationControl } from './publication-control.ts'
 import { Publisher } from './publication.ts'
+import { RunControl } from './run-control.ts'
+import { runEnvironment } from './run-environment.ts'
 import { RunExecutor } from './run.ts'
 import { validateCapabilities, validateRuntime } from './service-options.ts'
 import { Supervisor } from './supervisor.ts'
+import { VariableControl } from './variable-control.ts'
 import { WaitActions } from './wait-actions.ts'
 import { waitForWebhookRun } from './webhook-response.ts'
 import { WebhookTargets } from './webhook-targets.ts'
@@ -79,7 +88,7 @@ export class ServerService {
   readonly #clockService: Clock.Clock
   readonly #cron: CronDriver
   readonly #executor: RunExecutor
-  readonly #flowCatalogSubscribers = new Map<(event: FlowCatalogEvent) => void, string | undefined>()
+  readonly #flowCatalogSubscribers = new Map<(event: FlowCatalogEvent) => void, string>()
   readonly #flowSubscribers = new Map<string, Set<(event: FlowChangeEvent) => void>>()
   readonly #integration: IntegrationRuntime
   readonly #connectorAccess: ConnectorAccessHost
@@ -233,26 +242,71 @@ export class ServerService {
       (flowId, runId) => this.#runChanged(flowId, runId),
       () => this.#supervisor.signal(),
     )
-    this.control = new ControlService(
+    const access = new ControlAccess(store)
+    const flowChanged = (event: FlowChangeEvent) => this.#notifyFlow(event)
+    const flowCatalogChanged = (event?: FlowCatalogEvent, ownerId?: string) => this.#notifyFlowCatalog(event, ownerId)
+    const triggersChanged = () => this.#maintenance.wake()
+    const resolveConnectorTeam = (teamId?: string) => this.#connectorTeam(teamId)
+    const llmAvailable = (kind?: 'agent' | 'decision') =>
+      kind == 'agent' ? this.#resolveLlm()?.config != null : kind == 'decision' ? this.#resolveLlm()?.decision != null : this.#resolveLlm() != null
+    const connectors = new ConnectorControl(
+      access,
+      store,
+      this.#connectorAccess,
+      flowChanged,
+      flowCatalogChanged,
+      this.#resolveConnector,
+      resolveConnectorTeam,
+      this.#resolveConnectorConsoleOrigin,
+    )
+    const eventSources = new EventSourceControl(access, this.#integration.sources, connectors, resolveConnectorTeam)
+    const drafts = new DraftControl(
+      snapshots,
+      eventSources,
+      connectors,
+      access,
       store,
       this.#clock,
-      (runId) => this.#supervisor.interrupt(runId),
-      () => this.#supervisor.signal(),
+      this.#connectorAccess,
+      triggersChanged,
+      flowCatalogChanged,
+      flowChanged,
+      llmAvailable,
+    )
+    const publications = new PublicationControl(
+      access,
+      store,
+      triggersChanged,
+      flowCatalogChanged,
+      drafts,
+      this.#connectorAccess,
+      this.#clock,
+      (flowId, triggerNodeId) => this.#listeners.test(flowId, triggerNodeId),
       (input) => this.publisher.publish(input),
       (input) => this.publisher.accept(input),
-      () => this.#maintenance.wake(),
-      snapshots,
-      (flowId, triggerNodeId) => this.#listeners.test(flowId, triggerNodeId),
-      (event, ownerId) => this.#notifyFlowCatalog(event, ownerId),
-      (event) => this.#notifyFlow(event),
-      (kind) => (kind == 'agent' ? this.#resolveLlm()?.config != null : kind == 'decision' ? this.#resolveLlm()?.decision != null : this.#resolveLlm() != null),
-      this.#resolveConnector,
-      this.#connectorAccess,
-      this.#resolveConnectorConsoleOrigin,
-      this.#resolveWaitPublicOrigin,
-      (teamId) => this.#connectorTeam(teamId),
-      this.#integration.sources,
     )
+    this.control = {
+      access,
+      connectors,
+      eventSources,
+      drafts,
+      publications,
+      flows: new FlowControl(access, flowChanged, drafts, store, resolveConnectorTeam, this.#clock, flowCatalogChanged, triggersChanged, publications),
+      variables: new VariableControl(store),
+      runs: new RunControl(
+        store,
+        access,
+        this.#clock,
+        (runId) => this.#supervisor.interrupt(runId),
+        () => this.#supervisor.signal(),
+        flowChanged,
+        llmAvailable,
+        this.#resolveConnector,
+        this.#connectorAccess,
+        this.#resolveWaitPublicOrigin,
+      ),
+      users: store.users,
+    }
   }
 
   static open(database: Database, options: ServerServiceOptions = {}): Effect.Effect<ServerService, Error, Scope.Scope> {
@@ -268,7 +322,14 @@ export class ServerService {
         catch: (error) => (error instanceof Error ? error : new Error(String(error))),
       })
       const store = yield* Effect.try({
-        try: () => new Store(database, now, runtime.runEventRetentionMs, runtime.maxPendingRuns, () => capabilities.llm?.()?.config),
+        try: () =>
+          new Store(
+            database,
+            runEnvironment(isolatedVmEngineDigest, () => capabilities.llm?.()?.config),
+            now,
+            runtime.runEventRetentionMs,
+            runtime.maxPendingRuns,
+          ),
         catch: (error) => (error instanceof Error ? error : new Error(String(error))),
       })
       const resolvedCapabilities: ServerCapabilities = {
@@ -366,8 +427,13 @@ export class ServerService {
     return committed
   }
 
-  subscribeFlow(flowId: string, listener: (event: FlowChangeEvent) => void): () => void {
-    this.control.getFlow(flowId)
+  subscribeFlow(actorId: string, flowId: string, listener: (event: FlowChangeEvent) => void): () => void {
+    this.control.flows.getFlow(actorId, flowId)
+    return this.#watchFlow(flowId, listener)
+  }
+
+  #watchFlow(flowId: string, listener: (event: FlowChangeEvent) => void): () => void {
+    if (this.#store.flows.get(flowId) == null) throw new ControlError(controlErrorCode.flowNotFound, 'The Flow was not found.')
     const subscribers = this.#flowSubscribers.get(flowId) ?? new Set<(event: FlowChangeEvent) => void>()
     subscribers.add(listener)
     this.#flowSubscribers.set(flowId, subscribers)
@@ -377,8 +443,8 @@ export class ServerService {
     }
   }
 
-  subscribeFlowCatalog(listener: (event: FlowCatalogEvent) => void, ownerId?: string): () => void {
-    this.#flowCatalogSubscribers.set(listener, ownerId)
+  subscribeFlowCatalog(actorId: string, listener: (event: FlowCatalogEvent) => void): () => void {
+    this.#flowCatalogSubscribers.set(listener, actorId)
     return () => this.#flowCatalogSubscribers.delete(listener)
   }
 
@@ -406,7 +472,7 @@ export class ServerService {
     return waitForWebhookRun(
       () => this.run(runId),
       (changed) =>
-        this.subscribeFlow(flowId, (event) => {
+        this.#watchFlow(flowId, (event) => {
           if (event.kind == 'run.changed' && event.runId == runId) changed()
         }),
       timeoutMs,
@@ -515,7 +581,7 @@ export class ServerService {
   #notifyFlowCatalog(event: FlowCatalogEvent = { kind: 'flows.changed', version: 1 }, ownerId?: string): void {
     const owner = ownerId ?? (event.kind == 'flow.created' ? this.#store.flows.get(event.flowId)?.ownerId : undefined)
     for (const [listener, subscriberOwner] of this.#flowCatalogSubscribers) {
-      if (owner == null || subscriberOwner == null || subscriberOwner == owner) listener(event)
+      if (owner == null || subscriberOwner == owner) listener(event)
     }
   }
 

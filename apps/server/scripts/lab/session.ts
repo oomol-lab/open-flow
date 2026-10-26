@@ -91,9 +91,9 @@ export class LabSession {
     labOrigins.add(this.modelOrigin)
     await this.openService()
     if (this.scenarioId == 'workflow-call') await seedWorkflowTarget(this.service)
-    const flow = (await this.service.control.createFlow('operator', `Lab ${this.scenarioId}`, 'lab-initial')).flow
+    const flow = (await this.service.control.flows.createFlow('operator', `Lab ${this.scenarioId}`, 'lab-initial')).flow
     const operations = initialOperations(this.scenarioId)
-    if (operations.length > 0) await this.service.control.changeDraft('operator', flow.flowId, flow.draftRevisionId, operations, 'lab-seed')
+    if (operations.length > 0) await this.service.control.drafts.changeDraft('operator', flow.flowId, flow.draftRevisionId, operations, 'lab-seed')
     const content = this.current(flow.flowId).content
     const positions = {
       start: { x: 40, y: 160 },
@@ -103,11 +103,11 @@ export class LabSession {
       archive: { x: 800, y: 420 },
     }
     const nodes = Object.fromEntries(Object.entries(positions).filter(([id]) => content.document.graph.nodes[id] != null))
-    this.service.control.updatePresentation(flow.flowId, this.service.control.getPresentation(flow.flowId).revision, {
+    this.service.control.flows.updatePresentation('operator', flow.flowId, this.service.control.flows.getPresentation('operator', flow.flowId).revision, {
       designer: { version: 1, flow: { nodes, viewport: { x: 0, y: 0, zoom: 0.6 } } },
     })
     this.baseline = content
-    this.presentation = this.service.control.getPresentation(flow.flowId).value
+    this.presentation = this.service.control.flows.getPresentation('operator', flow.flowId).value
     this.database.connection.prepare('VACUUM INTO ?').run(path.join(this.directory, 'baseline.sqlite'))
     const router = new Hono()
     router.use('*', async (context, next) => {
@@ -139,8 +139,8 @@ export class LabSession {
         ) {
           const start = performance.now()
           const before = this.current()
-          await this.service.control.changeDraft(
-            'lab-operator',
+          await this.service.control.drafts.changeDraft(
+            'operator',
             this.manifest.flowId,
             before.revisionId,
             [
@@ -274,7 +274,7 @@ export class LabSession {
     }
   }
   current(flowId = this.manifest.flowId) {
-    return this.service.control.getRevision(flowId, this.service.control.getFlow(flowId).draftRevisionId)
+    return this.service.control.drafts.getRevision('operator', flowId, this.service.control.flows.getFlow('operator', flowId).draftRevisionId)
   }
   async openService() {
     this.database = Database.open(path.join(this.directory, 'flow.sqlite'))
@@ -356,7 +356,7 @@ export class LabSession {
     return {
       revisionId: this.current().revisionId,
       semantic: diff(this.baseline, this.current().content),
-      presentation: diff(this.presentation, this.service.control.getPresentation(this.manifest.flowId).value),
+      presentation: diff(this.presentation, this.service.control.flows.getPresentation('operator', this.manifest.flowId).value),
     }
   }
   finish(passed: boolean) {
@@ -370,19 +370,19 @@ export class LabSession {
     const taskEndedAt = new Date().toISOString()
     if (this.busy || this.active.size > 0) throw new Error('Wait for active commands before verifying.')
     for (const status of ['queued', 'starting', 'running', 'waiting'] as const) {
-      if (this.service.control.runs.listRuns(this.manifest.flowId, 1, { status }).page.runs.length > 0)
+      if (this.service.control.runs.listRuns('operator', this.manifest.flowId, 1, { status }).page.runs.length > 0)
         throw new Error('Finish, cancel, or reset the existing Run before verifying.')
     }
     this.busy = true
     try {
       const revision = this.current()
       const errors = assertions(this.scenarioId, this.baseline, revision.content)
-      const check = await this.service.control.checkFlow(this.manifest.flowId, revision.revisionId, currentEngineContract)
+      const check = await this.service.control.drafts.checkFlow('operator', this.manifest.flowId, revision.revisionId, currentEngineContract)
       if (!check.valid) errors.push(`Flow check failed: ${JSON.stringify(check)}`)
       const runIds: string[] = []
       if (this.scenarioId == 'concurrent-edit') {
         if (!this.attempt.rejectedEdits) errors.push('No stale edit was rejected without changing the Draft.')
-        if (this.service.control.runs.listRuns(this.manifest.flowId, 1, {}).page.runs.length > 0) errors.push('Unexpected run before verification.')
+        if (this.service.control.runs.listRuns('operator', this.manifest.flowId, 1, {}).page.runs.length > 0) errors.push('Unexpected run before verification.')
       }
       if (errors.length == 0 && (this.scenarioId == 'webhook-response-node' || this.scenarioId == 'webhook-live' || this.scenarioId == 'webhook-response')) {
         const result =
@@ -421,7 +421,7 @@ export class LabSession {
             }
             const run = await this.runSample(revision.revisionId, triggers[0]![0], sample.outputs, inputs)
             runIds.push(run.runId)
-            const events = this.service.control.runs.getRunEvents(run.runId, 0, 1000).events
+            const events = this.service.control.runs.getRunEvents('operator', run.runId, 0, 1000).events
             const actual = [sample, run.status, this.mocks.calls.slice(offset), this.mocks.modelCalls.slice(modelOffset), events] as const
             errors.push(
               ...(this.scenarioId == 'fulfillment-ops'
@@ -448,15 +448,15 @@ export class LabSession {
     }
   }
   async runSample(revisionId: string, nodeId: string, outputs: Record<string, JsonValue> = {}, inputs: Record<string, Record<string, JsonValue>> = {}) {
-    const accepted = await this.service.control.runs.createDraftRun(this.manifest.flowId, revisionId, currentEngineContract, inputs, randomUUID(), {
+    const accepted = await this.service.control.runs.createDraftRun('operator', this.manifest.flowId, revisionId, currentEngineContract, inputs, randomUUID(), {
       nodeId,
       outputs,
     })
     const deadline = Date.now() + 20_000
-    let run = this.service.control.runs.getRun(accepted.run.runId)
+    let run = this.service.control.runs.getRun('operator', accepted.run.runId)
     while (!['completed', 'failed', 'canceled', 'indeterminate'].includes(run.status) && Date.now() < deadline) {
       await new Promise((done) => setTimeout(done, 30))
-      run = this.service.control.runs.getRun(run.runId)
+      run = this.service.control.runs.getRun('operator', run.runId)
     }
     return run
   }
@@ -478,7 +478,7 @@ export class LabSession {
     if (this.stage + 1 >= stageCount(this.scenarioId)) throw new Error('No next stage.')
     if (!this.attempt.passed || this.head() != this.attempt.endRevision) throw new Error('Verify the current draft successfully before advancing.')
     for (const status of ['queued', 'starting', 'running', 'waiting'] as const)
-      if (this.service.control.runs.listRuns(this.manifest.flowId, 1, { status }).page.runs.length > 0)
+      if (this.service.control.runs.listRuns('operator', this.manifest.flowId, 1, { status }).page.runs.length > 0)
         throw new Error('Finish the active Run before advancing.')
     this.busy = true
     try {

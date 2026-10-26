@@ -9,7 +9,9 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, it, onTestFinished, vi } from 'vitest'
 import * as z from 'zod'
+import { runEnvironment } from '../node/application/run-environment.ts'
 import { OperatorSession } from '../node/deployment/operator.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { OperatorStore } from '../node/storage/operator-store.ts'
 import { Store } from '../node/storage/store.ts'
@@ -29,7 +31,11 @@ it('broadcasts REST and MCP canvas commands to every subscriber of only the auth
   const first = vi.fn(),
     second = vi.fn(),
     unrelated = vi.fn()
-  const stops = [service.subscribeFlow(flow.flowId, first), service.subscribeFlow(flow.flowId, second), service.subscribeFlow(other.flowId, unrelated)]
+  const stops = [
+    service.subscribeFlow('operator', flow.flowId, first),
+    service.subscribeFlow('operator', flow.flowId, second),
+    service.subscribeFlow('operator', other.flowId, unrelated),
+  ]
   const presentation = await control.getPresentation(flow.flowId)
   const expected = { version: 1, flowId: flow.flowId, broadcast: true }
   for (const command of [{ type: 'focus', nodeId: 'node' }, { type: 'zoom', zoom: 0.8 }, { type: 'pan', dx: -200, dy: 100 }, { type: 'fit' }] as const) {
@@ -71,7 +77,7 @@ it('broadcasts REST and MCP canvas commands to every subscriber of only the auth
   stops.forEach((stop) => stop())
   expect(await call('flow_canvas', { flowId: flow.flowId, command: { type: 'fit' } })).toEqual(expected)
   const reconnected = vi.fn()
-  service.subscribeFlow(flow.flowId, reconnected)()
+  service.subscribeFlow('operator', flow.flowId, reconnected)()
   expect(reconnected).not.toHaveBeenCalled()
 })
 
@@ -227,7 +233,7 @@ it('shares semantic authoring between MCP and REST and replays before catalog lo
     connectionId: 'CONNECTION_ID',
   })
   expect(await call('flow_read', { flowId: flow.flowId, nodes: [nodeId] })).toEqual(await control.readAuthoring(flow.flowId, { nodes: [nodeId] }))
-  const lookup = vi.spyOn(service.control, 'getTriggerKey').mockImplementation(() => {
+  const lookup = vi.spyOn(service.control.drafts, 'getTriggerKey').mockImplementation(() => {
     throw new Error('Catalog changed')
   })
   expect(await call('flow_edit', args)).toEqual(changed)
@@ -661,7 +667,7 @@ it('pages stored tool results through MCP and REST and isolates results by Run',
   }
   const runId = z.string().parse((await call('flow_run', { ...args, idempotencyKey: 'results-run' })).runId)
   const opened = Database.open(file)
-  const store = new Store(opened)
+  const store = new Store(opened, runEnvironment(isolatedVmEngineDigest))
   let resultId: string
   try {
     expect(store.runs.claim()?.runId).toBe(runId)
@@ -849,8 +855,8 @@ it('executes fixed Live code revisions and keeps old Run retries stable after re
 
 it('reports uncertain mutation outcomes and recovers the accepted resource with the original key', async () => {
   const { call, client, service } = await fixture()
-  const create = service.control.createFlow.bind(service.control)
-  const fault = vi.spyOn(service.control, 'createFlow').mockImplementationOnce(async (...args) => {
+  const create = service.control.flows.createFlow.bind(service.control.flows)
+  const fault = vi.spyOn(service.control.flows, 'createFlow').mockImplementationOnce(async (...args) => {
     await create(...args)
     throw new Error('Simulated failure after commit')
   })
@@ -955,10 +961,10 @@ it('discovers Trigger definitions separately from Flow instances and rejects con
   const { call, client, service } = await fixture()
   expect(await call('connector_teams')).toEqual({ enabled: false, teams: [], version: 1 })
   const all = await call('trigger_search')
-  expect(all).toEqual({ keys: service.control.listTriggerKeys() })
+  expect(all).toEqual({ keys: service.control.drafts.listTriggerKeys() })
   const filtered = await call('trigger_search', { query: 'GMAIL' })
   expect(filtered).toEqual({
-    keys: service.control
+    keys: service.control.drafts
       .listTriggerKeys()
       .filter((item) =>
         [item.description, item.displayName, item.key, item.name, item.provider, item.type].some((value) => value.toLowerCase().includes('gmail')),

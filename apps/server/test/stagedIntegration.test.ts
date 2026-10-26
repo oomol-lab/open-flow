@@ -45,19 +45,21 @@ function stripeNode(events: readonly string[]): Extract<TriggerNode, { readonly 
 }
 
 async function addStripe(service: ServerService, flowId: string, revisionId: string, events: readonly string[]): Promise<string> {
-  const changed = await service.control.changeDraft('operator', flowId, revisionId, [{ kind: 'graph.node.create', node: stripeNode(events), nodeId: 'stripe' }])
+  const changed = await service.control.drafts.changeDraft('operator', flowId, revisionId, [
+    { kind: 'graph.node.create', node: stripeNode(events), nodeId: 'stripe' },
+  ])
   return changed.revision.revisionId
 }
 
 async function replaceStripe(service: ServerService, flowId: string, revisionId: string, events: readonly string[]): Promise<string> {
-  const changed = await service.control.changeDraft('operator', flowId, revisionId, [
+  const changed = await service.control.drafts.changeDraft('operator', flowId, revisionId, [
     { before: fixedInputValue(['charge.succeeded']), kind: 'graph.trigger.config.set', name: 'events', nodeId: 'stripe', value: fixedInputValue([...events]) },
   ])
   return changed.revision.revisionId
 }
 
 async function addMarker(service: ServerService, flowId: string, revisionId: string): Promise<string> {
-  const changed = await service.control.changeDraft('operator', flowId, revisionId, [
+  const changed = await service.control.drafts.changeDraft('operator', flowId, revisionId, [
     {
       kind: 'graph.node.create',
       node: {
@@ -115,9 +117,9 @@ it('recovers Stripe candidate creation with one fixed idempotency key, fences ca
     ),
   )
   services.add(service)
-  const created = await service.control.createFlow('operator', 'Stripe', 'stripe-flow')
+  const created = await service.control.flows.createFlow('operator', 'Stripe', 'stripe-flow')
   const revisionId = await addStripe(service, created.flow.flowId, created.flow.draftRevisionId, ['charge.succeeded'])
-  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, currentEngineContract, null, 'stripe-publish')
+  const operation = await service.control.publications.publishFlow('operator', created.flow.flowId, revisionId, currentEngineContract, null, 'stripe-publish')
   const database = new DatabaseSync(file)
   const candidate = database.prepare('SELECT endpoint_id AS endpointId FROM integration_candidates WHERE operation_id = ?').get(operation.operationId) as {
     readonly endpointId: string
@@ -146,11 +148,11 @@ it('recovers Stripe candidate creation with one fixed idempotency key, fences ca
   expect(createKeys).toHaveLength(2)
   expect(createKeys[0]).toBe(createKeys[1])
   expect(createKeys[0]).toContain(operation.operationId)
-  expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId).status).toBe('pending')
+  expect(service.control.publications.getPublishOperation('operator', created.flow.flowId, operation.operationId).status).toBe('pending')
   expect(database.prepare('SELECT COUNT(*) AS count FROM integration_bindings').get()).toEqual({ count: 0 })
 
   await service.tickMaintenance('2026-08-31T08:00:01.000Z')
-  const completed = service.control.getPublishOperation(created.flow.flowId, operation.operationId)
+  const completed = service.control.publications.getPublishOperation('operator', created.flow.flowId, operation.operationId)
   if (completed.status != 'succeeded') throw new Error('Stripe Publish operation did not succeed.')
   expect(service.integrationEndpoint(created.flow.flowId, 'stripe')).toBe(candidate.endpointId)
   expect(service.integrationState(created.flow.flowId, 'stripe')?.subscription).toEqual({
@@ -159,7 +161,7 @@ it('recovers Stripe candidate creation with one fixed idempotency key, fences ca
   expect(database.prepare('SELECT COUNT(*) AS count FROM integration_candidates').get()).toEqual({ count: 0 })
 
   const unchangedRevisionId = await addMarker(service, created.flow.flowId, revisionId)
-  const unchanged = await service.control.publishFlow(
+  const unchanged = await service.control.publications.publishFlow(
     'operator',
     created.flow.flowId,
     unchangedRevisionId,
@@ -168,15 +170,15 @@ it('recovers Stripe candidate creation with one fixed idempotency key, fences ca
     'stripe-unchanged',
   )
   await service.tickMaintenance('2026-08-31T08:00:02.000Z')
-  expect(service.control.getPublishOperation(created.flow.flowId, unchanged.operationId).status).toBe('succeeded')
+  expect(service.control.publications.getPublishOperation('operator', created.flow.flowId, unchanged.operationId).status).toBe('succeeded')
   expect(service.integrationEndpoint(created.flow.flowId, 'stripe')).toBe(candidate.endpointId)
   expect(service.integrationState(created.flow.flowId, 'stripe')?.runtimeVersion).toBe(1)
   expect(createCalls).toBe(2)
 
   const changedRevisionId = await replaceStripe(service, created.flow.flowId, unchangedRevisionId, ['charge.failed'])
-  const live = await service.control.getLive(created.flow.flowId)
+  const live = await service.control.publications.getLive('operator', created.flow.flowId)
   await expect(
-    service.control.publishFlow(
+    service.control.publications.publishFlow(
       'operator',
       created.flow.flowId,
       changedRevisionId,
@@ -207,8 +209,8 @@ it('fails a Stripe candidate before activation, preserves old Live, and recovers
     ),
   )
   services.add(service)
-  const created = await service.control.createFlow('operator', 'Stripe failure', 'stripe-failure-flow')
-  const initial = await service.control.publishFlow(
+  const created = await service.control.flows.createFlow('operator', 'Stripe failure', 'stripe-failure-flow')
+  const initial = await service.control.publications.publishFlow(
     'operator',
     created.flow.flowId,
     created.flow.draftRevisionId,
@@ -217,7 +219,7 @@ it('fails a Stripe candidate before activation, preserves old Live, and recovers
     'initial-publish',
   )
   await service.tickMaintenance('2026-08-31T09:00:00.000Z')
-  const initialDone = service.control.getPublishOperation(created.flow.flowId, initial.operationId)
+  const initialDone = service.control.publications.getPublishOperation('operator', created.flow.flowId, initial.operationId)
   if (initialDone.status != 'succeeded') throw new Error('Initial Publish operation did not succeed.')
 
   const previous = new DatabaseSync(file)
@@ -225,7 +227,7 @@ it('fails a Stripe candidate before activation, preserves old Live, and recovers
   previous.close()
 
   const revisionId = await addStripe(service, created.flow.flowId, created.flow.draftRevisionId, ['charge.succeeded'])
-  const operation = await service.control.publishFlow(
+  const operation = await service.control.publications.publishFlow(
     'operator',
     created.flow.flowId,
     revisionId,
@@ -237,14 +239,14 @@ it('fails a Stripe candidate before activation, preserves old Live, and recovers
   await service.tickIntegration('2026-08-31T09:00:01.000Z')
   await service.tickMaintenance('2026-08-31T09:00:01.000Z')
 
-  expect(service.control.getPublishOperation(created.flow.flowId, operation.operationId)).toMatchObject({
+  expect(service.control.publications.getPublishOperation('operator', created.flow.flowId, operation.operationId)).toMatchObject({
     issue: { code: 'trigger-key.invalid', nodeId: 'stripe' },
     status: 'failed',
   })
-  await expect(service.control.getLive(created.flow.flowId)).resolves.toMatchObject({
+  await expect(service.control.publications.getLive('operator', created.flow.flowId)).resolves.toMatchObject({
     publication: { publicationId: initialDone.publicationId },
   })
-  expect(service.control.listPublications(created.flow.flowId, 10).page.publications).toHaveLength(1)
+  expect(service.control.publications.listPublications('operator', created.flow.flowId, 10).page.publications).toHaveLength(1)
   expect(deletes).toBe(1)
   expect(accessDigests.length).toBeGreaterThan(1)
   expect(new Set(accessDigests)).toEqual(new Set(['implicit']))
@@ -265,9 +267,9 @@ it('removes a cleanup candidate whose fixed Integration definition is unavailabl
     ),
   )
   services.add(service)
-  const created = await service.control.createFlow('operator', 'Stripe cleanup', 'stripe-cleanup-flow')
+  const created = await service.control.flows.createFlow('operator', 'Stripe cleanup', 'stripe-cleanup-flow')
   const revisionId = await addStripe(service, created.flow.flowId, created.flow.draftRevisionId, ['charge.succeeded'])
-  const operation = await service.control.publishFlow('operator', created.flow.flowId, revisionId, currentEngineContract, null, 'stripe-cleanup')
+  const operation = await service.control.publications.publishFlow('operator', created.flow.flowId, revisionId, currentEngineContract, null, 'stripe-cleanup')
   const unavailable = { ...stripeNode(['charge.succeeded']), definition: { ...stripe.snapshot, key: 'stripe.unavailable' } }
   const database = new DatabaseSync(file)
   database

@@ -5,6 +5,7 @@ import { withWaitNotificationMessage } from '@oomol-lab/open-flow/scheduler'
 import { createHash } from 'node:crypto'
 import { expect, it, onTestFinished, vi } from 'vitest'
 import { WaitActions } from '../node/application/wait-actions.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 
@@ -12,7 +13,7 @@ function fixture(autoContinue?: WaitRequest['autoContinue']) {
   let now = 1000
   const database = Database.open(':memory:')
   onTestFinished(() => database.close())
-  const store = new Store(database, () => now)
+  const store = new Store(database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined }, () => now)
   store.flows.createFlow({
     actorId: 'operator',
     content: '{}',
@@ -144,7 +145,7 @@ it('freezes a remaining legacy Wait after resuming and enriching its notificatio
   expect(checkpoint.waits[0]!.pending).toEqual(f.checkpoint.waits[1]!.pending)
   expect(f.store.runs.wait(f.runId, { kind: 'waiting', checkpoint }, 800)).toBe(true)
   expect(f.store.runViews.run(f.runId)?.status).toBe('waiting')
-  const reopened = new Store(f.database, () => 1001)
+  const reopened = new Store(f.database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined }, () => 1001)
   expect(reopened.runs.resolveWait(f.runId, 'second', 'reject')).toMatchObject({ status: 'queued', changed: true })
   expect(reopened.runs.claim()?.resume?.checkpoint).toEqual(checkpoint)
   expect(reopened.runs.resume(f.runId)).toBe(true)
@@ -212,7 +213,7 @@ it('interrupts waiting observers on cancellation and never revives the Run', asy
 it.each([false, true])('recovers only safe checkpoints, checkpoint saved: %s', (paused) => {
   const f = fixture()
   if (paused) f.pause()
-  const reopened = new Store(f.database, () => 1001)
+  const reopened = new Store(f.database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined }, () => 1001)
   expect(reopened.runViews.run(f.runId)?.status).toBe(paused ? 'waiting' : 'indeterminate')
   if (paused) {
     reopened.runs.resolveWait(f.runId, 'first', 'approve')
@@ -224,7 +225,7 @@ it('fails closed on corrupt stored checkpoint bytes', () => {
   const f = fixture()
   f.pause()
   f.database.connection.prepare("UPDATE run_checkpoints SET checkpoint_json = '{}' WHERE run_id = ?").run(f.runId)
-  const recovered = new Store(f.database, () => 1001)
+  const recovered = new Store(f.database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined }, () => 1001)
   expect(recovered.runViews.run(f.runId)).toMatchObject({ status: 'indeterminate', result: { error: { code: 'execution.resume-unavailable' } } })
 })
 
@@ -260,7 +261,7 @@ it('rejects a development checkpoint with the retired notification field', () =>
   f.database.connection
     .prepare('UPDATE run_checkpoints SET checkpoint_json = ?, checkpoint_digest = ?, checkpoint_bytes = ? WHERE run_id = ?')
     .run(source, `sha256:${createHash('sha256').update(source).digest('hex')}`, new TextEncoder().encode(source).byteLength, f.runId)
-  const recovered = new Store(f.database, () => 1001)
+  const recovered = new Store(f.database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined }, () => 1001)
   recovered.runs.resolveWait(f.runId, 'first', 'approve')
   expect(recovered.runViews.run(f.runId)).toMatchObject({ status: 'indeterminate', result: { error: { code: 'execution.resume-unavailable' } } })
   expect(recovered.runs.claim()).toBeUndefined()
@@ -288,7 +289,7 @@ it('persists the first comment and decision timestamp across retries and restart
       changed: false,
     })
   }
-  const reopened = new Store(f.database, () => 2500)
+  const reopened = new Store(f.database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined }, () => 2500)
   expect(reopened.runs.claim()?.runId).toBe(f.runId)
   expect(reopened.runs.resume(f.runId)).toBe(true)
   expect(reopened.runs.resolutions(f.runId, ['first'])).toEqual({ first: resolution('reject', 1500, 'Missing sign-off') })
@@ -354,7 +355,7 @@ it('requeues an overdue frozen Wait after restart without recalculating its dead
   const f = fixture({ kind: 'after', durationMs: 180_000 })
   f.pause()
   f.setTime(190_000)
-  const reopened = new Store(f.database, () => 190_000)
+  const reopened = new Store(f.database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined }, () => 190_000)
   expect(reopened.runViews.run(f.runId)?.status).toBe('waiting')
   expect(reopened.runs.maintain(190_000, 100, 60_000).continuedWaits).toHaveLength(1)
   expect(reopened.runViews.run(f.runId)?.status).toBe('queued')

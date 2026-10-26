@@ -174,7 +174,7 @@ it('logs the cause of an invalid Draft structure without copying the request bod
   const captured = capture('info')
   const service = await openService(await databaseFile())
   services.push(service)
-  const created = await service.control.createFlow('operator', 'Invalid Draft', 'invalid-draft-flow')
+  const created = await service.control.flows.createFlow('operator', 'Invalid Draft', 'invalid-draft-flow')
   const app = createServerApp(service, { logger: captured.logger, resolveControlActor: () => 'operator' })
 
   const response = await app.request(`http://server.local/v1/flows/${created.flow.flowId}/draft/changes`, {

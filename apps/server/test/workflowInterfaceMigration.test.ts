@@ -12,6 +12,8 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { expect, it, onTestFinished, vi } from 'vitest'
+import { runEnvironment } from '../node/application/run-environment.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { RevisionStore } from '../node/storage/revision-store.ts'
 import { Store } from '../node/storage/store.ts'
@@ -42,7 +44,7 @@ async function fixture() {
   onTestFinished(() => rm(directory, { recursive: true, force: true }))
   const file = path.join(directory, 'flow.sqlite')
   const database = Database.open(file)
-  const store = new Store(database, Date.now)
+  const store = new Store(database, runEnvironment(isolatedVmEngineDigest), Date.now)
   function seed(id: string, document: JsonValue = legacyDocument(), modelVersion = 8) {
     const source = { kind: 'open-flow-flow-revision', version: 1, modelVersion, document, modules: {} }
     const body = serialized(source)
@@ -132,7 +134,7 @@ it('upgrades full and delta Revisions, preserves identities and Live history, an
   closeLegacy()
 
   const upgraded = Database.open(file)
-  const upgradedStore = new Store(upgraded)
+  const upgradedStore = new Store(upgraded, runEnvironment(isolatedVmEngineDigest))
   for (const id of ['published', 'base', 'draft']) {
     const row = new RevisionStore(upgraded.connection).read(id)!
     const content = decodeRevision(encoder.encode(row.content))
@@ -163,12 +165,12 @@ it('upgrades full and delta Revisions, preserves identities and Live history, an
   await startService(service)
   const app = createServerApp(service, { resolveControlActor: () => 'operator' })
   const api = new ControlClient(async (route, init) => app.request(route, init))
-  expect(service.control.getWorkflowContract('operator', 'published')).toMatchObject({ inputs: [number], outputs: [number] })
+  expect(service.control.flows.getWorkflowContract('operator', 'published')).toMatchObject({ inputs: [number], outputs: [number] })
   const run = await api.createLiveRun(second.publicationId, { trigger: { nodeId: 'start', outputs: { answer: 42 } }, idempotencyKey: 'after-migration' })
-  await expect.poll(() => service.control.runs.getRun(run.runId).status).toBe('completed')
+  await expect.poll(() => service.control.runs.getRun('operator', run.runId).status).toBe('completed')
   expect(service.run(run.runId)?.result).toMatchObject({ outputs: { answer: 42 } })
-  const rollback = await service.control.rollbackFlow('operator', 'published', first.publicationId, second.publicationId, 'rollback')
-  expect(service.control.getWorkflowContract('operator', 'published')).toMatchObject({
+  const rollback = await service.control.publications.rollbackFlow('operator', 'published', first.publicationId, second.publicationId, 'rollback')
+  expect(service.control.flows.getWorkflowContract('operator', 'published')).toMatchObject({
     revisionId: 'published',
     publicationId: rollback.publication.publicationId,
   })
@@ -190,7 +192,7 @@ it('backfills null versus empty interfaces and resumes pending publication with 
   database.connection.prepare('INSERT INTO run_checkpoints VALUES (?, ?, ?, ?, ?)').run('historical', '{"preserved":true}', 'checkpoint-digest', 18, 100)
   closeLegacy()
   const upgraded = Database.open(file)
-  const after = new Store(upgraded, Date.now)
+  const after = new Store(upgraded, runEnvironment(isolatedVmEngineDigest), Date.now)
   expect(after.publications.interfaceForRevision('absent', 'absent')).toEqual({ inputs: null, outputs: null })
   expect(after.publications.interfaceForRevision('empty', 'empty')).toEqual({ inputs: [], outputs: null })
   const work = after.publications.nextPublishOperation(Date.now())
@@ -230,7 +232,9 @@ it.each([false, true])('snapshots historical Task revisions without rewriting th
   const upgraded = Database.open(file)
   try {
     const snapshot = { inputs: hasStart ? [number] : null, outputs: null }
-    expect(new Store(upgraded, Date.now).publications.interfaceForRevision('historical', 'historical')).toEqual(snapshot)
+    expect(new Store(upgraded, runEnvironment(isolatedVmEngineDigest), Date.now).publications.interfaceForRevision('historical', 'historical')).toEqual(
+      snapshot,
+    )
     const stored = new RevisionStore(upgraded.connection).read('historical')!
     expect(stored).toMatchObject({ content: historical.content, digest: historical.revisionDigest })
     expect(upgraded.connection.prepare('SELECT * FROM publications').get()).toEqual({ ...before, interface_json: JSON.stringify(snapshot) })
@@ -269,7 +273,7 @@ it.each(['pending', 'failed'] as const)('preserves historical Task revisions wit
   closeLegacy()
   const upgraded = Database.open(file)
   try {
-    const migrated = new Store(upgraded, Date.now)
+    const migrated = new Store(upgraded, runEnvironment(isolatedVmEngineDigest), Date.now)
     const operationId = accepted.operation.operationId
     expect(upgraded.connection.prepare('SELECT status FROM publish_operations').get()).toEqual({ status: 'failed' })
     const candidate = migrated.integrations.candidate(operationId, 'integration')!
@@ -409,9 +413,9 @@ it.each(['live', 'draft'] as const)('preserves a waiting %s Run and resumes its 
   upgraded.close()
   const resumed = await openService(file, { clock: Date.now })
   await startService(resumed)
-  const wait = resumed.control.runs.getRun(run.runId).waits[0]!
-  resumed.control.runs.resolveRunWait(run.runId, wait.waitId, 'continue')
-  await expect.poll(() => resumed.control.runs.getRun(run.runId).status).toBe('completed')
+  const wait = resumed.control.runs.getRun('operator', run.runId).waits[0]!
+  resumed.control.runs.resolveRunWait('operator', run.runId, wait.waitId, 'continue')
+  await expect.poll(() => resumed.control.runs.getRun('operator', run.runId).status).toBe('completed')
   expect(resumed.run(run.runId)?.result).toMatchObject({ outputs: { answer: 17 } })
   await closeService(resumed)
 })

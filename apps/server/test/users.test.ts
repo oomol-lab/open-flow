@@ -199,22 +199,23 @@ it('rejects another owner’s run, publication and error subscription through RE
   const account = await f.create('owner@example.com')
   const headers = await f.login(account.user.email, account.password)
   const flow = await f.flow(headers)
-  const changed = await f.service.control.changeDraft(account.user.userId, flow.flowId, flow.draftRevisionId, [
+  const changed = await f.service.control.drafts.changeDraft(account.user.userId, flow.flowId, flow.draftRevisionId, [
     { kind: 'graph.node.create', nodeId: 'start', node: { inputDefs: [], kind: 'start', name: 'Start' } },
   ])
   const revisionId = changed.revision.revisionId
-  const operation = await f.service.control.publishFlow(account.user.userId, flow.flowId, revisionId, currentEngineContract, null, 'publish')
+  const operation = await f.service.control.publications.publishFlow(account.user.userId, flow.flowId, revisionId, currentEngineContract, null, 'publish')
   await f.service.tickMaintenance()
-  const publication = f.service.control.getPublishOperation(flow.flowId, operation.operationId)
+  const publication = f.service.control.publications.getPublishOperation(account.user.userId, flow.flowId, operation.operationId)
   if (publication.status != 'succeeded') throw new Error('Publication did not complete.')
   const accepted = await f.service.control.runs.createDraftRun(
+    account.user.userId,
     flow.flowId,
     revisionId,
     currentEngineContract,
     {},
     'run',
     { nodeId: 'start', outputs: {} },
-    { actorId: account.user.userId, channel: 'api' },
+    'api',
   )
   const runId = accepted.run.runId
   for (const suffix of ['', '/events', '/results', '/result']) {
@@ -233,7 +234,7 @@ it('rejects another owner’s run, publication and error subscription through RE
   ).toBe(404)
   const target = await f.flow(administrator)
   await expect(
-    f.service.control.changeDraft('operator', target.flowId, target.draftRevisionId, [
+    f.service.control.drafts.changeDraft('operator', target.flowId, target.draftRevisionId, [
       { kind: 'graph.node.create', nodeId: 'error', node: { kind: 'error', name: 'Errors', sourceFlowIds: [flow.flowId] } },
     ]),
   ).rejects.toMatchObject({ code: 'flow.invalid' })
@@ -285,7 +286,7 @@ it('lets ordinary users execute workflows with the administrator’s configured 
     const headers = await f.login(account.user.email, account.password)
     const flow = await f.flow(headers)
     expect((await f.request(`/v1/connector/providers?flowId=${flow.flowId}`, headers)).status).toBe(200)
-    const changed = await f.service.control.changeDraft(account.user.userId, flow.flowId, flow.draftRevisionId, [
+    const changed = await f.service.control.drafts.changeDraft(account.user.userId, flow.flowId, flow.draftRevisionId, [
       ...authoringExample('start').operations,
       ...authoringExample('llm-chat').operations,
       { kind: 'graph.edge.connect', edge: { source: 'start', target: 'llm' } },
@@ -324,7 +325,7 @@ it('closes existing notification streams after the account password is reset', a
   await catalog.read()
   await changes.read()
   await f.request(`/auth/users/${account.user.userId}/password`, administrator, 'POST', { expectedRevision: 1 })
-  await f.service.control.changeDraft(account.user.userId, flow.flowId, flow.draftRevisionId, authoringExample('start').operations)
+  await f.service.control.drafts.changeDraft(account.user.userId, flow.flowId, flow.draftRevisionId, authoringExample('start').operations)
   expect((await catalog.read()).done).toBe(true)
   expect((await changes.read()).done).toBe(true)
 })
@@ -388,7 +389,7 @@ it('issues private, persistent personal tokens and enforces owner isolation thro
   const denied = await f.mcp('flow_read', { flowId: other.flowId }, headers)
   expect(denied.isError).toBe(true)
   expect(JSON.stringify(denied)).toContain('flow.not-found')
-  const before = f.service.control.getDraft(other.flowId)
+  const before = f.service.control.drafts.getDraft(bob.user.userId, other.flowId)
   const edit = {
     baseRevision: before.revisionId,
     requestId: 'foreign-edit',
@@ -405,7 +406,7 @@ it('issues private, persistent personal tokens and enforces owner isolation thro
     expect(deniedResponse.status).toBe(404)
     expect(await deniedResponse.text()).toContain('flow.not-found')
   }
-  expect(f.service.control.getDraft(other.flowId)).toEqual(before)
+  expect(f.service.control.drafts.getDraft(bob.user.userId, other.flowId)).toEqual(before)
   const reopened = Database.open(f.file)
   expect(new PersonalTokenStore(reopened.connection).tokenActor(created.token)).toBe(alice.user.userId)
   reopened.close()
@@ -551,7 +552,7 @@ it('publishes and runs with the Flow owner’s variables without falling back to
   const account = await f.create('variables-run@example.com')
   const headers = await f.login(account.user.email, account.password)
   const flow = await f.flow(headers)
-  const changed = await f.service.control.changeDraft(account.user.userId, flow.flowId, flow.draftRevisionId, [
+  const changed = await f.service.control.drafts.changeDraft(account.user.userId, flow.flowId, flow.draftRevisionId, [
     { kind: 'graph.node.create', nodeId: 'start', node: { inputDefs: [], kind: 'start', name: 'Start' } },
     { kind: 'binding.create', bindingId: 'token', binding: { kind: 'variable', target: 'TOKEN' } },
     { kind: 'module.create', moduleId: 'main', module: { imports: [], name: 'Main', source: 'export default ({ token }) => ({ token })' } },
@@ -574,23 +575,24 @@ it('publishes and runs with the Flow owner’s variables without falling back to
   ])
   const revisionId = changed.revision.revisionId
   expect((await f.request('/v1/variables/TOKEN', administrator, 'PUT', { version: undefined, value: 'operator-secret' })).status).toBe(200)
-  const publish = () => f.service.control.publishFlow(account.user.userId, flow.flowId, revisionId, currentEngineContract, null, 'publish')
+  const publish = () => f.service.control.publications.publishFlow(account.user.userId, flow.flowId, revisionId, currentEngineContract, null, 'publish')
   const run = () =>
     f.service.control.runs.createDraftRun(
+      account.user.userId,
       flow.flowId,
       revisionId,
       currentEngineContract,
       {},
       'run',
       { nodeId: 'start', outputs: {} },
-      { actorId: account.user.userId, channel: 'api' },
+      'api',
     )
   await expect(publish()).rejects.toMatchObject({ code: 'binding.unresolved' })
   await expect(run()).rejects.toMatchObject({ code: 'binding.unresolved' })
   expect((await f.request('/v1/variables/TOKEN', headers, 'PUT', { version: undefined, value: 'owner-value' })).status).toBe(200)
   const operation = await publish()
   await f.service.tickMaintenance()
-  const publication = f.service.control.getPublishOperation(flow.flowId, operation.operationId)
+  const publication = f.service.control.publications.getPublishOperation(account.user.userId, flow.flowId, operation.operationId)
   if (publication.status != 'succeeded') throw new Error('Publication did not complete.')
   expect(await (await f.request('/v1/variables', headers)).json()).toMatchObject({ variables: [{ name: 'TOKEN', referenceCount: 1 }] })
   const references = await (await f.request('/v1/variables/TOKEN/references', headers)).json()
@@ -599,7 +601,7 @@ it('publishes and runs with the Flow owner’s variables without falling back to
     references: [
       {
         flowId: flow.flowId,
-        flowName: f.service.control.getFlow(flow.flowId).name,
+        flowName: f.service.control.flows.getFlow(account.user.userId, flow.flowId).name,
         draft: true,
         live: { publicationId: publication.publicationId, enabled: true },
       },
@@ -610,24 +612,18 @@ it('publishes and runs with the Flow owner’s variables without falling back to
   await startService(f.service)
   const accepted = await run()
   await f.service.waitForIdle()
-  expect(f.service.control.runs.getRunResult(accepted.run.runId)).toMatchObject({
+  expect(f.service.control.runs.getRunResult(account.user.userId, accepted.run.runId)).toMatchObject({
     status: 'completed',
     result: { nodes: [{ nodeId: 'task', outputs: { token: 'owner-value' } }] },
   })
   const liveRun = () =>
-    f.service.control.runs.createLiveRun(
-      publication.publicationId,
-      {},
-      'live',
-      { nodeId: 'start', outputs: {} },
-      { initiator: { actorId: account.user.userId, channel: 'api' } },
-    )
+    f.service.control.runs.createLiveRun(account.user.userId, publication.publicationId, {}, 'live', { nodeId: 'start', outputs: {} }, 'api')
   expect((await f.request('/v1/variables/TOKEN', headers, 'DELETE')).status).toBe(200)
   await expect(liveRun()).rejects.toMatchObject({ code: 'binding.unresolved' })
   expect((await f.request('/v1/variables/TOKEN', headers, 'PUT', { version: undefined, value: 'live-owner-value' })).status).toBe(200)
   const live = await liveRun()
   await f.service.waitForIdle()
-  expect(f.service.control.runs.getRunResult(live.run.runId)).toMatchObject({
+  expect(f.service.control.runs.getRunResult(account.user.userId, live.run.runId)).toMatchObject({
     status: 'completed',
     result: { nodes: [{ nodeId: 'task', outputs: { token: 'live-owner-value' } }] },
   })

@@ -1,4 +1,5 @@
-import type { FlowPosition, PublicationPosition, TriggerActivityPosition } from '../application/control-service.ts'
+import type { FlowPosition } from '../application/flow-control.ts'
+import type { PublicationPosition, TriggerActivityPosition } from '../application/publication-control.ts'
 import type { RunPosition } from '../application/run-control.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'

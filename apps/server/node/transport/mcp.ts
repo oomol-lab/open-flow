@@ -82,8 +82,6 @@ function createServer(service: ServerService, actorId: string, logger: Logger, e
     server.registerTool(name, definition, async (args, context) => {
       try {
         context.mcpReq.signal.throwIfAborted()
-        control.authorize(actorId, args as { flowId?: string; runId?: string; publicationId?: string })
-        if (name == 'event_source_list') control.requireAdmin(actorId)
         return result(await execute(args, context))
       } catch (error) {
         if (context.mcpReq.signal.aborted) throw error
@@ -115,95 +113,100 @@ function createServer(service: ServerService, actorId: string, logger: Logger, e
     })
   }
 
-  register('flow_live', mcpTools.flow_live, ({ flowId }) => control.getLiveDetails(flowId, endpointOrigin))
+  register('flow_live', mcpTools.flow_live, ({ flowId }) => control.publications.getLiveDetails(actorId, flowId, endpointOrigin))
   register('flow_list', mcpTools.flow_list, ({ cursor, limit }) => {
-    const { next, page } = control.listFlows(limit, cursor == null ? undefined : decodeFlowCursor(cursor), false, actorId)
+    const { next, page } = control.flows.listFlows(actorId, limit, cursor == null ? undefined : decodeFlowCursor(cursor), false)
     return { ...page, ...(next == null ? {} : { nextCursor: encodeFlowCursor(next) }) }
   })
-  register('flow_canvas', mcpTools.flow_canvas, ({ flowId, command }) => control.broadcastCanvas(flowId, command))
-  register('flow_read', mcpTools.flow_read, ({ flowId, ...query }) => control.readAuthoring(flowId, query))
-  register('flow_search', mcpTools.flow_search, ({ flowId, ...query }) => control.searchAuthoring(flowId, query))
+  register('flow_canvas', mcpTools.flow_canvas, ({ flowId, command }) => control.flows.broadcastCanvas(actorId, flowId, command))
+  register('flow_read', mcpTools.flow_read, ({ flowId, ...query }) => control.drafts.readAuthoring(actorId, flowId, query))
+  register('flow_search', mcpTools.flow_search, ({ flowId, ...query }) => control.drafts.searchAuthoring(actorId, flowId, query))
   register('flow_schema', mcpTools.flow_schema, ({ flowId, ...query }) => {
-    if (flowId != null) return control.authoringSchema(flowId, query)
+    if (flowId != null) return control.drafts.authoringSchema(actorId, flowId, query)
     if (query.action != null) throw new ControlError(controlErrorCode.flowInvalid, 'Action lookup requires flowId.')
     return authoringSchema(query.type)
   })
   register(
     'flow_create',
     mcpTools.flow_create,
-    async ({ name, idempotencyKey, teamId }) => (await control.createFlow(actorId, name, idempotencyKey, teamId)).flow,
+    async ({ name, idempotencyKey, teamId }) => (await control.flows.createFlow(actorId, name, idempotencyKey, teamId)).flow,
   )
-  register('flow_export', mcpTools.flow_export, ({ flowId }) => control.exportFlow(flowId))
+  register('flow_export', mcpTools.flow_export, ({ flowId }) => control.flows.exportFlow(actorId, flowId))
   register(
     'flow_import',
     mcpTools.flow_import,
-    async ({ file, name, teamId, idempotencyKey }) => (await control.importFlow(actorId, file, idempotencyKey, name, teamId, defaultImportName)).flow,
+    async ({ file, name, teamId, idempotencyKey }) => (await control.flows.importFlow(actorId, file, idempotencyKey, name, teamId, defaultImportName)).flow,
   )
-  register('flow_edit', mcpTools.flow_edit, ({ flowId, ...request }) => control.editAuthoring(actorId, flowId, request))
-  register('flow_check', mcpTools.flow_check, ({ flowId, revisionId }) => control.checkAuthoring(flowId, revisionId))
+  register('flow_edit', mcpTools.flow_edit, ({ flowId, ...request }) => control.drafts.editAuthoring(actorId, flowId, request))
+  register('flow_check', mcpTools.flow_check, ({ flowId, revisionId }) => control.drafts.checkAuthoring(actorId, flowId, revisionId))
   register('flow_publish', mcpTools.flow_publish, ({ flowId, revisionId, expectedLivePublicationId, idempotencyKey }) =>
-    control.publishFlow(actorId, flowId, revisionId, currentEngineContract, expectedLivePublicationId, idempotencyKey),
+    control.publications.publishFlow(actorId, flowId, revisionId, currentEngineContract, expectedLivePublicationId, idempotencyKey),
   )
-  register('flow_publish_status', mcpTools.flow_publish_status, ({ flowId, operationId }) => control.getPublishOperation(flowId, operationId))
+  register('flow_publish_status', mcpTools.flow_publish_status, ({ flowId, operationId }) =>
+    control.publications.getPublishOperation(actorId, flowId, operationId),
+  )
   register('flow_set_enabled', mcpTools.flow_set_enabled, ({ flowId, expectedPublicationId, enabled }) =>
-    control.setFlowEnabled(flowId, expectedPublicationId, enabled),
+    control.publications.setFlowEnabled(actorId, flowId, expectedPublicationId, enabled),
   )
   register('flow_run', mcpTools.flow_run, async (args) => {
     return (
       args.source == 'draft'
-        ? await control.runs.createDraftRun(args.flowId, args.revisionId, currentEngineContract, args.inputs, args.idempotencyKey, args.trigger, {
-            actorId,
-            channel: 'mcp',
-          })
-        : await control.runs.createLiveRun(args.publicationId, args.inputs, args.idempotencyKey, args.trigger, { initiator: { actorId, channel: 'mcp' } })
+        ? await control.runs.createDraftRun(actorId, args.flowId, args.revisionId, currentEngineContract, args.inputs, args.idempotencyKey, args.trigger, 'mcp')
+        : await control.runs.createLiveRun(actorId, args.publicationId, args.inputs, args.idempotencyKey, args.trigger, 'mcp')
     ).run
   })
   register('run_list', mcpTools.run_list, ({ flowId, status, cursor, limit, pendingWait }) => {
-    const { next, page } = control.runs.listRuns(flowId, limit, {
+    const { next, page } = control.runs.listRuns(actorId, flowId, limit, {
       ...(status == null ? {} : { status }),
       ...(pendingWait == null ? {} : { pendingWait }),
       ...(cursor == null ? {} : { after: decodeRunCursor(cursor, flowId) }),
     })
     return { ...page, ...(next == null ? {} : { nextCursor: encodeRunCursor(flowId, next) }) }
   })
-  register('run_get', mcpTools.run_get, ({ runId }) => control.runs.getRun(runId))
-  register('run_events', mcpTools.run_events, ({ runId, after, limit }) => control.runs.getRunEvents(runId, after, limit))
-  register('run_result', mcpTools.run_result, ({ runId }) => control.runs.getRunResult(runId))
-  register('run_results', mcpTools.run_results, ({ runId, after }) => control.runs.listRunResults(runId, after))
-  register('run_result_read', mcpTools.run_result_read, ({ runId, resultId, ...query }) => control.runs.readRunResult(runId, resultId, query))
-  register('run_resolve_wait', mcpTools.run_resolve_wait, ({ runId, waitId, action, comment }) => control.runs.resolveRunWait(runId, waitId, action, comment))
-  register('run_cancel', mcpTools.run_cancel, ({ runId }) => control.runs.cancelRun(runId))
-  register('flow_code_connections', mcpTools.flow_code_connections, ({ flowId, publicationId }) => control.getConnectorAccess(actorId, flowId, publicationId))
+  register('run_get', mcpTools.run_get, ({ runId }) => control.runs.getRun(actorId, runId))
+  register('run_events', mcpTools.run_events, ({ runId, after, limit }) => control.runs.getRunEvents(actorId, runId, after, limit))
+  register('run_result', mcpTools.run_result, ({ runId }) => control.runs.getRunResult(actorId, runId))
+  register('run_results', mcpTools.run_results, ({ runId, after }) => control.runs.listRunResults(actorId, runId, after))
+  register('run_result_read', mcpTools.run_result_read, ({ runId, resultId, ...query }) => control.runs.readRunResult(actorId, runId, resultId, query))
+  register('run_resolve_wait', mcpTools.run_resolve_wait, ({ runId, waitId, action, comment }) =>
+    control.runs.resolveRunWait(actorId, runId, waitId, action, comment),
+  )
+  register('run_cancel', mcpTools.run_cancel, ({ runId }) => control.runs.cancelRun(actorId, runId))
+  register('flow_code_connections', mcpTools.flow_code_connections, ({ flowId, publicationId }) =>
+    control.connectors.getConnectorAccess(actorId, flowId, publicationId),
+  )
   register('flow_connection_candidates', mcpTools.flow_connection_candidates, ({ flowId, providerIds }, context) =>
-    control.getProviderAccessBindingCandidates(actorId, flowId, providerIds, context.mcpReq.signal),
+    control.connectors.getProviderAccessBindingCandidates(actorId, flowId, providerIds, context.mcpReq.signal),
   )
   register('flow_code_connection_set', mcpTools.flow_code_connection_set, ({ flowId, providerId, accessBindingId, selected, expectedAccessRevision }) =>
     selected
-      ? control.addProviderAccessBinding(actorId, flowId, providerId, accessBindingId, expectedAccessRevision)
-      : control.removeProviderAccessBinding(actorId, flowId, providerId, accessBindingId, expectedAccessRevision),
+      ? control.connectors.addProviderAccessBinding(actorId, flowId, providerId, accessBindingId, expectedAccessRevision)
+      : control.connectors.removeProviderAccessBinding(actorId, flowId, providerId, accessBindingId, expectedAccessRevision),
   )
   register(
     'flow_connection_usage_remove',
     mcpTools.flow_connection_usage_remove,
     ({ flowId, connectionId, expectedRevisionId, expectedAccessRevision, idempotencyKey }) =>
-      control.removeConnectionUsage(actorId, flowId, connectionId, expectedRevisionId, expectedAccessRevision, idempotencyKey),
+      control.drafts.removeConnectionUsage(actorId, flowId, connectionId, expectedRevisionId, expectedAccessRevision, idempotencyKey),
   )
   register('connector_teams', mcpTools.connector_teams, async (_, context) => {
     const { enabled, teams, version } = await service.connectorTeams(context.mcpReq.signal)
     return { enabled, teams, version }
   })
   register('connector_providers', mcpTools.connector_providers, async ({ flowId }, context) => ({
-    providers: await control.listConnectorProviders(flowId, context.mcpReq.signal),
+    providers: await control.connectors.listConnectorProviders(actorId, flowId, context.mcpReq.signal),
   }))
   register('connector_search', mcpTools.connector_search, async ({ query, flowId }, context) => ({
-    actions: (await control.searchConnectorActions(query, flowId, context.mcpReq.signal)).map(actionSummary),
+    actions: (await control.connectors.searchConnectorActions(actorId, query, flowId, context.mcpReq.signal)).map(actionSummary),
   }))
-  register('connector_get', mcpTools.connector_get, ({ actionId, flowId }, context) => control.getConnectorAction(actionId, flowId, context.mcpReq.signal))
+  register('connector_get', mcpTools.connector_get, ({ actionId, flowId }, context) =>
+    control.connectors.getConnectorAction(actorId, actionId, flowId, context.mcpReq.signal),
+  )
   register('connector_connections', mcpTools.connector_connections, async ({ serviceId, flowId }, context) => ({
-    connections: await control.listConnectorConnections(serviceId, flowId, context.mcpReq.signal),
+    connections: await control.connectors.listConnectorConnections(actorId, serviceId, flowId, context.mcpReq.signal),
   }))
   register('event_source_list', mcpTools.event_source_list, async (_, context) => {
-    const sources = await control.listEventSources(undefined, context.mcpReq.signal)
+    const sources = await control.eventSources.listEventSources(actorId, undefined, context.mcpReq.signal)
     return {
       ...sources,
       ...(sources.sources.length == 0
@@ -214,9 +217,9 @@ function createServer(service: ServerService, actorId: string, logger: Logger, e
         : {}),
     }
   })
-  register('trigger_search', mcpTools.trigger_search, ({ query }) => ({ keys: searchTriggerKeys(control.listTriggerKeys(), query) }))
+  register('trigger_search', mcpTools.trigger_search, ({ query }) => ({ keys: searchTriggerKeys(control.drafts.listTriggerKeys(), query) }))
   register('trigger_get', mcpTools.trigger_get, ({ key }) => ({
-    definition: control.getTriggerKey(key),
+    definition: control.drafts.getTriggerKey(key),
   }))
   return server
 }

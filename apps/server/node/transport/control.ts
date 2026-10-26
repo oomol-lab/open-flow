@@ -53,7 +53,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     if (actorId == null || actorId.length == 0) throw new ControlError(controlErrorCode.authenticationRequired, 'Authentication is required.')
     context.set('actorId', actorId)
     const flowId = context.req.query('flowId')
-    if (flowId != null) service.authorize(actorId, { flowId })
+    if (flowId != null) service.access.authorize(actorId, { flowId })
     await next()
   }
   for (const route of [
@@ -76,7 +76,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   app.post('/flows/import', async (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.importFlow)
-    const created = await service.importFlow(
+    const created = await service.flows.importFlow(
       context.get('actorId'),
       body.file,
       idempotencyKey(context.req.raw, controlErrorCode.flowInvalid),
@@ -86,9 +86,11 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     return response(created.created ? 201 : 200, created.flow)
   })
 
+  // Preserve authorization error precedence before decoding request bodies.
+  // Each application operation also enforces access independently of this precheck.
   for (const route of ['/flows/:flowId', '/flows/:flowId/*', '/runs/:runId', '/runs/:runId/*']) {
     app.use(route, async (context, next) => {
-      service.authorize(context.get('actorId'), { flowId: context.req.param('flowId'), runId: context.req.param('runId') })
+      service.access.authorize(context.get('actorId'), { flowId: context.req.param('flowId'), runId: context.req.param('runId') })
       await next()
     })
   }
@@ -96,18 +98,8 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   app.post('/flows/:flowId/canvas', async (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.canvas)
-    return response(200, service.broadcastCanvas(context.req.param('flowId'), body.command))
+    return response(200, service.flows.broadcastCanvas(context.get('actorId'), context.req.param('flowId'), body.command))
   })
-
-  const administrator = async (context: Context<Environment>, next: Next): Promise<void> => {
-    service.requireAdmin(context.get('actorId'))
-    await next()
-  }
-  app.use('/event-sources', async (context, next) => {
-    if (context.req.method != 'GET' || context.req.query('flowId') == null) service.requireAdmin(context.get('actorId'))
-    await next()
-  })
-  app.use('/event-sources/*', administrator)
 
   app.post('/openapi/document', async (context) => {
     try {
@@ -121,49 +113,66 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
 
   app.get('/event-sources', async (context) => {
     query(context.req.raw, ['flowId'], controlErrorCode.eventSourceInvalid)
-    return response(200, await service.listEventSources(context.req.query('flowId'), context.req.raw.signal))
+    return response(200, await service.eventSources.listEventSources(context.get('actorId'), context.req.query('flowId'), context.req.raw.signal))
   })
   app.get('/event-sources/connections', async (context) => {
     query(context.req.raw, ['teamId', 'kind'], controlErrorCode.eventSourceInvalid)
-    return response(200, await service.listEventSourceConnections(context.req.query('teamId'), context.req.raw.signal, context.req.query('kind')))
+    return response(
+      200,
+      await service.connectors.listEventSourceConnections(
+        context.get('actorId'),
+        context.req.query('teamId'),
+        context.req.raw.signal,
+        context.req.query('kind'),
+      ),
+    )
   })
+  app.use('/event-sources', async (context, next) => {
+    if (context.req.method != 'GET') service.access.requireAdmin(context.get('actorId'))
+    await next()
+  })
+  app.use('/event-sources/*', async (context, next) => {
+    service.access.requireAdmin(context.get('actorId'))
+    await next()
+  })
+
   app.post('/event-sources', async (context) => {
     query(context.req.raw, [], controlErrorCode.eventSourceInvalid)
     const body = await decodeRequest(context.req.raw, controlErrorCode.eventSourceInvalid, controlRequests.createEventSource)
-    return response(201, await service.createEventSource(body, context.req.raw.signal))
+    return response(201, await service.eventSources.createEventSource(context.get('actorId'), body, context.req.raw.signal))
   })
   app.put('/event-sources/:sourceId', async (context) => {
     query(context.req.raw, [], controlErrorCode.eventSourceInvalid)
     const body = await decodeRequest(context.req.raw, controlErrorCode.eventSourceInvalid, controlRequests.updateEventSource)
-    return response(200, await service.updateEventSource(context.req.param('sourceId'), body, context.req.raw.signal))
+    return response(200, await service.eventSources.updateEventSource(context.get('actorId'), context.req.param('sourceId'), body, context.req.raw.signal))
   })
   app.delete('/event-sources/:sourceId', async (context) => {
     query(context.req.raw, [], controlErrorCode.eventSourceInvalid)
     const body = await decodeRequest(context.req.raw, controlErrorCode.eventSourceInvalid, controlRequests.eventSourceRevision)
-    service.deleteEventSource(context.req.param('sourceId'), body.expectedRevision)
+    service.eventSources.deleteEventSource(context.get('actorId'), context.req.param('sourceId'), body.expectedRevision)
     return response(200, { version: 1 })
   })
 
   app.get('/variables', (context) => {
     query(context.req.raw, [], controlErrorCode.variableInvalid)
-    return response(200, service.listVariables(context.get('actorId')))
+    return response(200, service.variables.listVariables(context.get('actorId')))
   })
   app.get('/variables/:name/references', (context) => {
     query(context.req.raw, [], controlErrorCode.variableInvalid)
-    return response(200, service.getVariableReferences(context.get('actorId'), variableName(context.req.param('name'))))
+    return response(200, service.variables.getVariableReferences(context.get('actorId'), variableName(context.req.param('name'))))
   })
   app.get('/variables/:name', (context) => {
     query(context.req.raw, [], controlErrorCode.variableInvalid)
-    return response(200, service.getVariable(context.get('actorId'), variableName(context.req.param('name'))))
+    return response(200, service.variables.getVariable(context.get('actorId'), variableName(context.req.param('name'))))
   })
   app.put('/variables/:name', async (context) => {
     query(context.req.raw, [], controlErrorCode.variableInvalid)
     const body = await decodeRequest(context.req.raw, controlErrorCode.variableInvalid, controlRequests.putVariable)
-    return response(200, service.putVariable(context.get('actorId'), variableName(context.req.param('name')), body.value))
+    return response(200, service.variables.putVariable(context.get('actorId'), variableName(context.req.param('name')), body.value))
   })
   app.delete('/variables/:name', (context) => {
     query(context.req.raw, [], controlErrorCode.variableInvalid)
-    service.deleteVariable(context.get('actorId'), variableName(context.req.param('name')))
+    service.variables.deleteVariable(context.get('actorId'), variableName(context.req.param('name')))
     return response(200, { version: 1 })
   })
 
@@ -195,7 +204,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   app.get('/trigger-keys', async (context) => {
     const locale = metadataLocale(context)
     const keys = await Promise.all(
-      service.listTriggerDefinitions().map(async (definition) => {
+      service.drafts.listTriggerDefinitions().map(async (definition) => {
         const { key, name, provider, type } = definition
         const { displayName, description } = await localizeTrigger(definition, locale)
         return { key, name, provider, type, displayName, description }
@@ -205,7 +214,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.get('/trigger-keys/catalog', async (context) => {
     const locale = metadataLocale(context)
-    const definitions = service.listTriggerDefinitions()
+    const definitions = service.drafts.listTriggerDefinitions()
     return context.json({
       definitions,
       display: Object.fromEntries(await Promise.all(definitions.map(async (definition) => [definition.key, await localizeTrigger(definition, locale)]))),
@@ -215,7 +224,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.get('/trigger-keys/:key', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
-    return response(200, { definition: service.getTriggerKey(context.req.param('key')), version: 1 })
+    return response(200, { definition: service.drafts.getTriggerKey(context.req.param('key')), version: 1 })
   })
 
   app.get('/flows', (context) => {
@@ -223,11 +232,11 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const limit = pageSize(parameters)
     const cursor = parameters.get('cursor')
     const after = cursor == null ? undefined : decodeFlowCursor(cursor)
-    const { next, page } = service.listFlows(
+    const { next, page } = service.flows.listFlows(
+      context.get('actorId'),
       limit,
       after,
       optionalBoolean(parameters.get('includeTotal'), controlErrorCode.flowInvalid),
-      context.get('actorId'),
     )
     return response(200, { ...page, ...(next == null ? {} : { nextCursor: encodeFlowCursor(next) }) })
   })
@@ -235,47 +244,54 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     query(context.req.raw, [], controlErrorCode.flowInvalid)
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.createFlow)
     const name = body.name
-    const created = await service.createFlow(context.get('actorId'), name, idempotencyKey(context.req.raw, controlErrorCode.flowInvalid), body.teamId)
+    const created = await service.flows.createFlow(context.get('actorId'), name, idempotencyKey(context.req.raw, controlErrorCode.flowInvalid), body.teamId)
     return response(created.created ? 201 : 200, created.flow)
   })
   app.get('/flows/:flowId/export', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
-    return new Response(encodeWorkflowFile(service.exportFlow(context.req.param('flowId'))), { headers: { 'content-type': 'application/json; charset=utf-8' } })
+    return new Response(encodeWorkflowFile(service.flows.exportFlow(context.get('actorId'), context.req.param('flowId'))), {
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+    })
   })
   app.get('/flows/:flowId', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
-    return response(200, service.getFlow(context.req.param('flowId')))
+    return response(200, service.flows.getFlow(context.get('actorId'), context.req.param('flowId')))
   })
   app.put('/flows/:flowId/enabled', async (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.setEnabled)
-    return response(200, service.setFlowEnabled(context.req.param('flowId'), body.expectedPublicationId, body.enabled))
+    return response(200, service.publications.setFlowEnabled(context.get('actorId'), context.req.param('flowId'), body.expectedPublicationId, body.enabled))
   })
   app.patch('/flows/:flowId', async (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.renameFlow)
-    return response(200, service.renameFlow(context.req.param('flowId'), body.name))
+    return response(200, service.flows.renameFlow(context.get('actorId'), context.req.param('flowId'), body.name))
   })
   app.get('/flows/:flowId/error-listeners', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
-    return response(200, service.getErrorListeners(context.req.param('flowId')))
+    return response(200, service.publications.getErrorListeners(context.get('actorId'), context.req.param('flowId')))
   })
   app.delete('/flows/:flowId', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
-    return response(202, service.retireFlow(context.req.param('flowId')))
+    return response(202, service.flows.retireFlow(context.get('actorId'), context.req.param('flowId')))
   })
 
-  app.get('/flows/:flowId/editor', async (context) => response(200, await service.getEditor(context.req.param('flowId'))))
+  app.get('/flows/:flowId/editor', async (context) => response(200, await service.flows.getEditor(context.get('actorId'), context.req.param('flowId'))))
   app.get('/flows/:flowId/connector-access', (context) => {
     query(context.req.raw, ['publicationId'], controlErrorCode.connectorAccessInvalid)
-    return response(200, service.getConnectorAccess(context.get('actorId'), context.req.param('flowId'), context.req.query('publicationId')))
+    return response(200, service.connectors.getConnectorAccess(context.get('actorId'), context.req.param('flowId'), context.req.query('publicationId')))
   })
   app.post('/flows/:flowId/connector-access/candidates/query', async (context) => {
     query(context.req.raw, [], controlErrorCode.connectorAccessInvalid)
     const body = await decodeRequest(context.req.raw, controlErrorCode.connectorAccessInvalid, controlRequests.queryConnectorAccessCandidates)
     return response(
       200,
-      await service.getProviderAccessBindingCandidates(context.get('actorId'), context.req.param('flowId'), body.providerIds, context.req.raw.signal),
+      await service.connectors.getProviderAccessBindingCandidates(
+        context.get('actorId'),
+        context.req.param('flowId'),
+        body.providerIds,
+        context.req.raw.signal,
+      ),
     )
   })
   for (const method of ['PUT', 'DELETE'] as const) {
@@ -284,7 +300,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       const body = await decodeRequest(context.req.raw, controlErrorCode.connectorAccessInvalid, controlRequests.setConnectorService)
       return response(
         200,
-        await service.setConnectorService(
+        await service.connectors.setConnectorService(
           context.get('actorId'),
           context.req.param('flowId')!,
           connectorService(context.req.param('providerId')!),
@@ -300,7 +316,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const body = await decodeRequest(context.req.raw, controlErrorCode.connectorAccessInvalid, controlRequests.addProviderAccessBinding)
     return response(
       200,
-      await service.addProviderAccessBinding(
+      await service.connectors.addProviderAccessBinding(
         context.get('actorId'),
         context.req.param('flowId'),
         providerId,
@@ -315,7 +331,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const body = await decodeRequest(context.req.raw, controlErrorCode.connectorAccessInvalid, controlRequests.removeProviderAccessBinding)
     return response(
       200,
-      await service.removeProviderAccessBinding(
+      await service.connectors.removeProviderAccessBinding(
         context.get('actorId'),
         context.req.param('flowId'),
         providerId,
@@ -329,7 +345,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const body = await decodeRequest(context.req.raw, controlErrorCode.connectorAccessInvalid, controlRequests.removeConnectionUsage)
     return response(
       200,
-      await service.removeConnectionUsage(
+      await service.drafts.removeConnectionUsage(
         context.get('actorId'),
         context.req.param('flowId'),
         body.connectionId,
@@ -341,24 +357,36 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.post('/flows/:flowId/authoring/check', async (context) => {
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.authoringCheck)
-    return response(200, await service.checkAuthoring(context.req.param('flowId'), text(body.revisionId, controlErrorCode.flowInvalid)))
+    return response(
+      200,
+      await service.drafts.checkAuthoring(context.get('actorId'), context.req.param('flowId'), text(body.revisionId, controlErrorCode.flowInvalid)),
+    )
   })
   app.post('/flows/:flowId/authoring/read', async (context) =>
     response(
       200,
-      service.readAuthoring(context.req.param('flowId'), await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.authoringRead)),
+      service.drafts.readAuthoring(
+        context.get('actorId'),
+        context.req.param('flowId'),
+        await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.authoringRead),
+      ),
     ),
   )
   app.post('/flows/:flowId/authoring/search', async (context) =>
     response(
       200,
-      service.searchAuthoring(context.req.param('flowId'), await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.authoringSearch)),
+      service.drafts.searchAuthoring(
+        context.get('actorId'),
+        context.req.param('flowId'),
+        await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.authoringSearch),
+      ),
     ),
   )
   app.post('/flows/:flowId/authoring/schema', async (context) =>
     response(
       200,
-      await service.authoringSchema(
+      await service.drafts.authoringSchema(
+        context.get('actorId'),
         context.req.param('flowId'),
         await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.authoringSchema),
       ),
@@ -367,24 +395,24 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   app.post('/flows/:flowId/authoring/edit', async (context) =>
     response(
       200,
-      await service.editAuthoring(
+      await service.drafts.editAuthoring(
         context.get('actorId'),
         context.req.param('flowId'),
         await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.authoringEdit),
       ),
     ),
   )
-  app.get('/flows/:flowId/draft', (context) => response(200, service.getDraft(context.req.param('flowId'))))
+  app.get('/flows/:flowId/draft', (context) => response(200, service.drafts.getDraft(context.get('actorId'), context.req.param('flowId'))))
   app.get('/flows/:flowId/draft/sync', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
-    return response(200, service.syncDraft(context.req.param('flowId')))
+    return response(200, service.drafts.syncDraft(context.get('actorId'), context.req.param('flowId')))
   })
   app.post('/flows/:flowId/draft/changes', async (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.changeDraft)
     return response(
       200,
-      await service.changeDraft(
+      await service.drafts.changeDraft(
         context.get('actorId'),
         context.req.param('flowId'),
         text(body.expectedRevisionId, controlErrorCode.flowInvalid),
@@ -398,7 +426,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.repairDraft)
     return response(
       200,
-      await service.repairDraft(
+      await service.drafts.repairDraft(
         context.get('actorId'),
         context.req.param('flowId'),
         text(body.expectedRevisionId, controlErrorCode.flowInvalid),
@@ -411,7 +439,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.upgradeDraft)
     return response(
       200,
-      await service.upgradeDraft(
+      await service.drafts.upgradeDraft(
         context.get('actorId'),
         context.req.param('flowId'),
         text(body.expectedRevisionId, controlErrorCode.flowInvalid),
@@ -419,7 +447,9 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       ),
     )
   })
-  app.get('/flows/:flowId/revisions/:revisionId', (context) => response(200, service.getRevision(context.req.param('flowId'), context.req.param('revisionId'))))
+  app.get('/flows/:flowId/revisions/:revisionId', (context) =>
+    response(200, service.drafts.getRevision(context.get('actorId'), context.req.param('flowId'), context.req.param('revisionId'))),
+  )
 
   app.use('/connector/*', async (context, next) => {
     await next()
@@ -428,18 +458,18 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   app.get('/connector/providers', async (context) => {
     const flowId = query(context.req.raw, ['flowId', 'locale'], controlErrorCode.flowInvalid).get('flowId')
     return response(200, {
-      providers: await service.listConnectorProviders(
+      providers: await service.connectors.listConnectorProviders(
+        context.get('actorId'),
         flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid),
         undefined,
         metadataLocale(context, ['flowId', 'locale']),
-        context.get('actorId'),
       ),
       version: 1,
     })
   })
   app.get('/connector/leina/bots', async (context) => {
     const flowId = text(query(context.req.raw, ['flowId'], controlErrorCode.flowInvalid).get('flowId'), controlErrorCode.flowInvalid)
-    return response(200, await service.listLeinaBots(flowId, context.get('actorId'), context.req.raw.signal))
+    return response(200, await service.connectors.listLeinaBots(context.get('actorId'), flowId, context.req.raw.signal))
   })
   for (const metadata of [false, true]) {
     const path = metadata ? '/connector/action-metadata' : '/connector/actions'
@@ -456,22 +486,24 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       const actions =
         queryValue == null
           ? await (metadata
-              ? service.listConnectorActionMetadata(serviceId, scope, locale, context.get('actorId'))
-              : service.listConnectorActions(serviceId, scope, locale, context.get('actorId')))
+              ? service.connectors.listConnectorActionMetadata(context.get('actorId'), serviceId, scope, locale)
+              : service.connectors.listConnectorActions(context.get('actorId'), serviceId, scope, locale))
           : await (metadata
-              ? service.searchConnectorActionMetadata(queryValue, scope, undefined, locale, context.get('actorId'))
-              : service.searchConnectorActions(queryValue, scope, undefined, locale, context.get('actorId')))
+              ? service.connectors.searchConnectorActionMetadata(context.get('actorId'), queryValue, scope, undefined, locale)
+              : service.connectors.searchConnectorActions(context.get('actorId'), queryValue, scope, undefined, locale))
       return response(200, { actions, version: 1 })
     })
     app.get(`${path}/:actionId`, async (context) => {
       const flowId = query(context.req.raw, ['flowId', 'locale'], controlErrorCode.flowInvalid).get('flowId')
       return response(200, {
-        action: await (metadata ? service.getConnectorActionMetadata.bind(service) : service.getConnectorAction.bind(service))(
+        action: await (
+          metadata ? service.connectors.getConnectorActionMetadata.bind(service.connectors) : service.connectors.getConnectorAction.bind(service.connectors)
+        )(
+          context.get('actorId'),
           text(context.req.param('actionId'), controlErrorCode.flowInvalid),
           flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid),
           undefined,
           metadataLocale(context, ['flowId', 'locale']),
-          context.get('actorId'),
         ),
         version: 1,
       })
@@ -480,10 +512,10 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   app.get('/connector/connections', async (context) => {
     const flowId = query(context.req.raw, ['flowId'], controlErrorCode.flowInvalid).get('flowId')
     return response(200, {
-      connections: await service.listAllConnectorConnections(
+      connections: await service.connectors.listAllConnectorConnections(
+        context.get('actorId'),
         flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid),
         undefined,
-        context.get('actorId'),
       ),
       version: 1,
     })
@@ -492,24 +524,25 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const flowId = query(context.req.raw, ['flowId'], controlErrorCode.flowInvalid).get('flowId')
     const serviceId = connectorService(context.req.param('serviceId'))
     return response(200, {
-      connections: await service.listConnectorConnections(
+      connections: await service.connectors.listConnectorConnections(
+        context.get('actorId'),
         serviceId,
         flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid),
         undefined,
-        context.get('actorId'),
       ),
       serviceId,
       version: 1,
     })
   })
   app.post('/connector/connections/:serviceId/page', async (context) => {
-    service.requireAdmin(context.get('actorId'))
+    service.access.requireAdmin(context.get('actorId'))
     const parameters = query(context.req.raw, ['flowId', 'teamId'], controlErrorCode.flowInvalid)
     const flowId = parameters.get('flowId')
     const teamId = parameters.get('teamId')
     await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.versionOnly)
     return response(200, {
-      url: await service.connectorConnectionPage(
+      url: await service.connectors.connectorConnectionPage(
+        context.get('actorId'),
         connectorService(context.req.param('serviceId')),
         flowId == null ? undefined : text(flowId, controlErrorCode.flowInvalid),
         teamId == null ? undefined : text(teamId, controlErrorCode.flowInvalid),
@@ -521,29 +554,34 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
 
   app.get('/flows/:flowId/live/details', (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
-    return response(200, service.getLiveDetails(context.req.param('flowId'), new URL(context.req.url).origin))
+    return response(200, service.publications.getLiveDetails(context.get('actorId'), context.req.param('flowId'), new URL(context.req.url).origin))
   })
-  app.get('/flows/:flowId/live', async (context) => response(200, await service.getLive(context.req.param('flowId'))))
+  app.get('/flows/:flowId/live', async (context) => response(200, await service.publications.getLive(context.get('actorId'), context.req.param('flowId'))))
   app.get('/flows/:flowId/triggers/:triggerNodeId/options/:field', async (context) => {
     query(context.req.raw, [], controlErrorCode.flowInvalid)
     return response(200, {
-      options: await service.listTriggerConfigOptions(
+      options: await service.drafts.listTriggerConfigOptions(
+        context.get('actorId'),
         context.req.param('flowId'),
         context.req.param('triggerNodeId'),
         context.req.param('field'),
         context.req.raw.signal,
-        context.get('actorId'),
       ),
       version: 1,
     })
   })
   app.get('/flows/:flowId/triggers', (context) => {
     const flowId = context.req.param('flowId')
-    return response(200, { bindings: service.listFlowTriggerBindings(flowId), flowId, version: 1 })
+    return response(200, { bindings: service.publications.listFlowTriggerBindings(context.get('actorId'), flowId), flowId, version: 1 })
   })
   app.get('/flows/:flowId/triggers/:triggerNodeId', (context) =>
     response(200, {
-      binding: service.getFlowTriggerBinding(context.req.param('flowId'), context.req.param('triggerNodeId'), new URL(context.req.url).origin),
+      binding: service.publications.getFlowTriggerBinding(
+        context.get('actorId'),
+        context.req.param('flowId'),
+        context.req.param('triggerNodeId'),
+        new URL(context.req.url).origin,
+      ),
       version: 1,
     }),
   )
@@ -553,12 +591,15 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const triggerNodeId = context.req.param('triggerNodeId')
     const cursor = parameters.get('cursor')
     const after = cursor == null ? undefined : decodeTriggerActivityCursor(cursor, flowId, triggerNodeId)
-    const { next, page } = service.listFlowTriggerActivities(flowId, triggerNodeId, pageSize(parameters), after)
+    const { next, page } = service.publications.listFlowTriggerActivities(context.get('actorId'), flowId, triggerNodeId, pageSize(parameters), after)
     return response(200, { ...page, ...(next == null ? {} : { nextCursor: encodeTriggerActivityCursor(flowId, triggerNodeId, next) }) })
   })
   app.post('/flows/:flowId/triggers/:triggerNodeId/test', async (context) => {
     await versionOnly(context.req.raw, controlErrorCode.flowInvalid)
-    return response(200, await service.testFlowPollTrigger(context.req.param('flowId'), context.req.param('triggerNodeId')))
+    return response(
+      200,
+      await service.publications.testFlowPollTrigger(context.get('actorId'), context.req.param('flowId'), context.req.param('triggerNodeId')),
+    )
   })
 
   app.get('/flows/:flowId/publications', (context) => {
@@ -566,7 +607,8 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     const flowId = context.req.param('flowId')
     const cursor = parameters.get('cursor')
     const after = cursor == null ? undefined : decodePublicationCursor(cursor, flowId)
-    const { next, page } = service.listPublications(
+    const { next, page } = service.publications.listPublications(
+      context.get('actorId'),
       flowId,
       pageSize(parameters),
       after,
@@ -575,26 +617,31 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     return response(200, { ...page, ...(next == null ? {} : { nextCursor: encodePublicationCursor(flowId, next) }) })
   })
   app.get('/flows/:flowId/publish-operations/:operationId', (context) =>
-    response(200, service.getPublishOperation(context.req.param('flowId'), context.req.param('operationId'))),
+    response(200, service.publications.getPublishOperation(context.get('actorId'), context.req.param('flowId'), context.req.param('operationId'))),
   )
   app.get('/flows/:flowId/publications/:publicationId/presentation', (context) =>
-    response(200, service.getPublicationPresentation(context.req.param('flowId'), context.req.param('publicationId'))),
+    response(200, service.publications.getPublicationPresentation(context.get('actorId'), context.req.param('flowId'), context.req.param('publicationId'))),
   )
-  app.get('/flows/:flowId/presentation', (context) => response(200, service.getPresentation(context.req.param('flowId'))))
+  app.get('/flows/:flowId/presentation', (context) => response(200, service.flows.getPresentation(context.get('actorId'), context.req.param('flowId'))))
   app.put('/flows/:flowId/presentation', async (context) => {
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.updatePresentation)
-    return response(200, service.updatePresentation(context.req.param('flowId'), body.expectedRevision, body.value))
+    return response(200, service.flows.updatePresentation(context.get('actorId'), context.req.param('flowId'), body.expectedRevision, body.value))
   })
   app.post('/flows/:flowId/revisions/:revisionId/check', async (context) => {
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.checkFlow)
     return response(
       200,
-      await service.checkFlow(context.req.param('flowId'), context.req.param('revisionId'), text(body.engineContract, controlErrorCode.flowInvalid)),
+      await service.drafts.checkFlow(
+        context.get('actorId'),
+        context.req.param('flowId'),
+        context.req.param('revisionId'),
+        text(body.engineContract, controlErrorCode.flowInvalid),
+      ),
     )
   })
   app.post('/flows/:flowId/revisions/:revisionId/publications', async (context) => {
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.publishFlow)
-    const operation = await service.publishFlow(
+    const operation = await service.publications.publishFlow(
       context.get('actorId'),
       context.req.param('flowId'),
       context.req.param('revisionId'),
@@ -606,7 +653,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.post('/flows/:flowId/publications/:publicationId/rollback', async (context) => {
     const body = await decodeRequest(context.req.raw, controlErrorCode.flowInvalid, controlRequests.rollbackFlow)
-    const committed = await service.rollbackFlow(
+    const committed = await service.publications.rollbackFlow(
       context.get('actorId'),
       context.req.param('flowId'),
       context.req.param('publicationId'),
@@ -618,18 +665,19 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   app.post('/flows/:flowId/revisions/:revisionId/runs', async (context) => {
     const body = await decodeRequest(context.req.raw, controlErrorCode.runInvalid, controlRequests.createDraftRun)
     const accepted = await service.runs.createDraftRun(
+      context.get('actorId'),
       context.req.param('flowId'),
       context.req.param('revisionId'),
       text(body.engineContract, controlErrorCode.runInvalid),
       body.inputs,
       idempotencyKey(context.req.raw, controlErrorCode.runInvalid),
       body.trigger,
-      { actorId: context.get('actorId'), channel: clientChannel(context.req.raw) },
+      clientChannel(context.req.raw),
     )
     return response(accepted.created ? 202 : 200, accepted.run)
   })
 
-  app.get('/flows/:flowId/call-contract', (context) => response(200, service.getWorkflowContract(context.get('actorId'), context.req.param('flowId'))))
+  app.get('/flows/:flowId/call-contract', (context) => response(200, service.flows.getWorkflowContract(context.get('actorId'), context.req.param('flowId'))))
   app.get('/flows/:flowId/references', (context) => {
     const direction = context.req.query('direction') ?? 'incoming'
     const offset = Number(context.req.query('offset') ?? 0)
@@ -643,17 +691,20 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
       limit > 100
     )
       throw new ControlError(controlErrorCode.flowInvalid, 'Invalid reference query.')
-    return response(200, service.getFlowReferences(context.get('actorId'), context.req.param('flowId'), direction as 'incoming' | 'outgoing', offset, limit))
+    return response(
+      200,
+      service.flows.getFlowReferences(context.get('actorId'), context.req.param('flowId'), direction as 'incoming' | 'outgoing', offset, limit),
+    )
   })
   app.post('/runs', async (context) => {
     const body = await decodeRequest(context.req.raw, controlErrorCode.runInvalid, controlRequests.createLiveRun)
-    service.authorize(context.get('actorId'), { publicationId: body.publicationId })
     const accepted = await service.runs.createLiveRun(
+      context.get('actorId'),
       text(body.publicationId, controlErrorCode.runInvalid),
       body.inputs,
       idempotencyKey(context.req.raw, controlErrorCode.runInvalid),
       body.trigger,
-      { initiator: { actorId: context.get('actorId'), channel: clientChannel(context.req.raw) } },
+      clientChannel(context.req.raw),
     )
     return response(accepted.created ? 202 : 200, accepted.run)
   })
@@ -679,7 +730,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     }
     const runId = parameters.get('runId')
     if (runId != null && runId.length == 0) invalid(controlErrorCode.runInvalid, 'Run ID is invalid.')
-    const { next, page } = service.runs.listRuns(flowId, pageSize(parameters, controlErrorCode.runInvalid), {
+    const { next, page } = service.runs.listRuns(context.get('actorId'), flowId, pageSize(parameters, controlErrorCode.runInvalid), {
       ...(after == null ? {} : { after }),
       ...(status == null ? {} : { status: status as RunStatus }),
       ...(pendingWait == null ? {} : { pendingWait: pendingWait == 'true' }),
@@ -690,12 +741,13 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     })
     return response(200, { ...page, ...(next == null ? {} : { nextCursor: encodeRunCursor(flowId, next) }) })
   })
-  app.get('/runs/:runId', (context) => response(200, service.runs.getRun(context.req.param('runId'))))
+  app.get('/runs/:runId', (context) => response(200, service.runs.getRun(context.get('actorId'), context.req.param('runId'))))
   app.get('/runs/:runId/events', (context) => {
     const parameters = query(context.req.raw, ['after', 'limit'], controlErrorCode.runInvalid)
     return response(
       200,
       service.runs.getRunEvents(
+        context.get('actorId'),
         context.req.param('runId'),
         nonnegativeInteger(parameters.get('after'), 0, controlErrorCode.runInvalid),
         pageSize(parameters, controlErrorCode.runInvalid),
@@ -704,10 +756,10 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   })
   app.get('/runs/:runId/results', (context) => {
     const parameters = query(context.req.raw, ['after'], controlErrorCode.runInvalid)
-    return response(200, service.runs.listRunResults(context.req.param('runId'), parameters.get('after') ?? undefined))
+    return response(200, service.runs.listRunResults(context.get('actorId'), context.req.param('runId'), parameters.get('after') ?? undefined))
   })
   app.get('/runs/:runId/results/:resultId/content', (context) => {
-    const stored = service.runs.runResultContent(context.req.param('runId'), context.req.param('resultId'))
+    const stored = service.runs.runResultContent(context.get('actorId'), context.req.param('runId'), context.req.param('resultId'))
     return new Response(stored.content, {
       headers: {
         'content-type': 'application/json; charset=utf-8',
@@ -730,17 +782,17 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
     } catch {
       invalid(controlErrorCode.runInvalid, 'Invalid result page query.')
     }
-    return response(200, service.runs.readRunResult(context.req.param('runId'), context.req.param('resultId'), parsed))
+    return response(200, service.runs.readRunResult(context.get('actorId'), context.req.param('runId'), context.req.param('resultId'), parsed))
   })
-  app.get('/runs/:runId/result', (context) => response(200, service.runs.getRunResult(context.req.param('runId'))))
+  app.get('/runs/:runId/result', (context) => response(200, service.runs.getRunResult(context.get('actorId'), context.req.param('runId'))))
   app.post('/runs/:runId/cancel', async (context) => {
     await versionOnly(context.req.raw, controlErrorCode.runInvalid)
-    return response(200, service.runs.cancelRun(context.req.param('runId')))
+    return response(200, service.runs.cancelRun(context.get('actorId'), context.req.param('runId')))
   })
   app.post('/runs/:runId/waits/:waitId/resolve', async (context) => {
     const body = await decodeRequest(context.req.raw, controlErrorCode.runInvalid, controlRequests.resolveWait)
     const action = body.action
-    return response(200, service.runs.resolveRunWait(context.req.param('runId'), context.req.param('waitId'), action, body.comment))
+    return response(200, service.runs.resolveRunWait(context.get('actorId'), context.req.param('runId'), context.req.param('waitId'), action, body.comment))
   })
   return app
 }

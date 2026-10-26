@@ -108,9 +108,9 @@ it('shares a managed Jira project subscription and deduplicates fanout without e
   const flows: string[] = []
   for (const index of [0, 0, 1]) {
     const source = sources[index]!
-    const created = await service.control.createFlow('operator', `Flow ${flows.length}`, `create-${flows.length}`)
+    const created = await service.control.flows.createFlow('operator', `Flow ${flows.length}`, `create-${flows.length}`)
     const flowId = created.flow.flowId
-    const draft = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
+    const draft = await service.control.drafts.changeDraft('operator', flowId, created.flow.draftRevisionId, [
       {
         kind: 'graph.node.create',
         nodeId: 'jira',
@@ -123,20 +123,27 @@ it('shares a managed Jira project subscription and deduplicates fanout without e
         },
       },
     ])
-    const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, currentEngineContract, null, `publish-${flows.length}`)
+    const operation = await service.control.publications.publishFlow(
+      'operator',
+      flowId,
+      draft.revision.revisionId,
+      currentEngineContract,
+      null,
+      `publish-${flows.length}`,
+    )
     await service.tickIntegration()
     await service.tickMaintenance()
-    expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('succeeded')
+    expect(service.control.publications.getPublishOperation('operator', flowId, operation.operationId).status).toBe('succeeded')
     flows.push(flowId)
   }
 
   failVerification = true
   expect((await app.request(endpoint, delivery('event1'))).status).toBe(503)
-  expect(flows.map((flow) => service.control.runs.listRuns(flow, 20).page.runs.length)).toEqual([0, 0, 0])
+  expect(flows.map((flow) => service.control.runs.listRuns('operator', flow, 20).page.runs.length)).toEqual([0, 0, 0])
   failVerification = false
   for (let retry = 0; retry < 2; retry++) expect((await app.request(endpoint, delivery('event1'))).status).toBe(200)
   await service.tickIntegration()
-  expect(flows.map((flow) => service.control.runs.listRuns(flow, 20).page.runs.length)).toEqual([1, 1, 0])
+  expect(flows.map((flow) => service.control.runs.listRuns('operator', flow, 20).page.runs.length)).toEqual([1, 1, 0])
   expect(calls.filter((call) => call.active).map((call) => call.key)).toEqual([
     `${sources[0]!.sourceId}:project`,
     `${sources[0]!.sourceId}:project`,
@@ -151,13 +158,13 @@ it('shares a managed Jira project subscription and deduplicates fanout without e
   expect(disabled.status).toBe(200)
   expect((await app.request(new URL(sources[1]!.endpointUrl!).pathname, delivery('event2'))).status).toBe(200)
   await service.tickIntegration()
-  expect(flows.map((flow) => service.control.runs.listRuns(flow, 20).page.runs.length)).toEqual([1, 1, 1])
+  expect(flows.map((flow) => service.control.runs.listRuns('operator', flow, 20).page.runs.length)).toEqual([1, 1, 1])
   expect(await (await app.request('/v1/event-sources')).text()).not.toContain('"signingSecret"')
-  service.control.retireFlow(flows[0]!)
+  service.control.flows.retireFlow('operator', flows[0]!)
   await service.tickIntegration()
   await service.tickMaintenance()
   expect(calls.filter((call) => !call.active)).toHaveLength(0)
-  service.control.retireFlow(flows[1]!)
+  service.control.flows.retireFlow('operator', flows[1]!)
   await service.tickIntegration()
   await service.tickMaintenance()
   expect(calls.filter((call) => !call.active)).toEqual([{ active: false, key: `${sources[0]!.sourceId}:project` }])

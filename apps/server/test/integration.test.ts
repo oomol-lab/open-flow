@@ -1270,7 +1270,7 @@ describe('Server change listener', () => {
       await publishListener(service, file)
       await service.tickIntegration()
       expect(service.integrationState('main', 'integration')?.health).toBe('failed')
-      expect(service.control.listFlowTriggerBindings('main')[0]).toMatchObject({ health: 'failed', listener: { health: 'healthy' } })
+      expect(service.control.publications.listFlowTriggerBindings('operator', 'main')[0]).toMatchObject({ health: 'failed', listener: { health: 'healthy' } })
       expect(service.integrationState('main', 'integration')?.checkpoint).toBe(1)
       expect(admissionCount(file)).toBe(1)
     } finally {
@@ -1334,9 +1334,9 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
   }
   let service = await openService(file, settings)
   try {
-    const created = await service.control.createFlow('operator', 'Drive listener', 'drive-listener')
+    const created = await service.control.flows.createFlow('operator', 'Drive listener', 'drive-listener')
     const flowId = created.flow.flowId
-    const changed = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
+    const changed = await service.control.drafts.changeDraft('operator', flowId, created.flow.draftRevisionId, [
       {
         kind: 'graph.node.create',
         nodeId: 'listen',
@@ -1349,10 +1349,17 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
         },
       },
     ])
-    const operation = await service.control.publishFlow('operator', flowId, changed.revision.revisionId, currentEngineContract, null, 'publish-drive')
+    const operation = await service.control.publications.publishFlow(
+      'operator',
+      flowId,
+      changed.revision.revisionId,
+      currentEngineContract,
+      null,
+      'publish-drive',
+    )
     await service.tickIntegration()
     expect(changesRead).toBe(0)
-    expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('pending')
+    expect(service.control.publications.getPublishOperation('operator', flowId, operation.operationId).status).toBe('pending')
     const endpointId = new URL(notification!.address).pathname.split('/').at(-1)!
     const target = service.integrationTarget(endpointId)!
     const input = {
@@ -1375,7 +1382,7 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
     await closeService(service)
     service = await openService(file, settings)
     await service.tickMaintenance()
-    expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('succeeded')
+    expect(service.control.publications.getPublishOperation('operator', flowId, operation.operationId).status).toBe('succeeded')
     await service.tickIntegration()
     expect(service.integrationState(flowId, 'listen')?.checkpoint).toEqual({ pageToken: 'next' })
     expect(admissionCount(file)).toBe(1)
@@ -1385,13 +1392,13 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
     now = 300_000
     await service.tickIntegration()
     expect(changesRead).toBe(3)
-    const live = await service.control.getLive(flowId)
-    const scoped = await service.control.changeDraft('operator', flowId, changed.revision.revisionId, [
+    const live = await service.control.publications.getLive('operator', flowId)
+    const scoped = await service.control.drafts.changeDraft('operator', flowId, changed.revision.revisionId, [
       { kind: 'graph.trigger.config.set', name: 'driveId', nodeId: 'listen', value: fixedInputValue('shared-drive') },
     ])
     failPreparation = true
     accessDigest = 'replacement'
-    const replacement = await service.control.publishFlow(
+    const replacement = await service.control.publications.publishFlow(
       'operator',
       flowId,
       scoped.revision.revisionId,
@@ -1401,14 +1408,14 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
     )
     await service.tickIntegration()
     await service.tickMaintenance()
-    expect(service.control.getPublishOperation(flowId, replacement.operationId).status).toBe('pending')
+    expect(service.control.publications.getPublishOperation('operator', flowId, replacement.operationId).status).toBe('pending')
     expect(service.integrationEndpoint(flowId, 'listen')).toBe(endpointId)
     expect(service.integrationState(flowId, 'listen')?.checkpoint).toEqual({ pageToken: 'next' })
     failPreparation = false
     now += 61_000
     await service.tickIntegration()
     await service.tickMaintenance()
-    expect(service.control.getPublishOperation(flowId, replacement.operationId).status).toBe('succeeded')
+    expect(service.control.publications.getPublishOperation('operator', flowId, replacement.operationId).status).toBe('succeeded')
     expect(service.integrationEndpoint(flowId, 'listen')).not.toBe(endpointId)
     expect(service.integrationTarget(endpointId)).toBeUndefined()
     expect(service.integrationState(flowId, 'listen')?.checkpoint).toEqual({ pageToken: 'baseline' })
@@ -1416,7 +1423,7 @@ it('prepares a Drive listener, preserves candidate wakes across restart, and sca
     expect(admissionCount(file)).toBe(2)
     expect(stopped).toBe(1)
     expect(stoppedWithAccess).toEqual(['initial'])
-    service.control.retireFlow(flowId)
+    service.control.flows.retireFlow('operator', flowId)
     await service.tickMaintenance()
     await service.tickIntegration()
     await service.tickMaintenance()
@@ -1530,7 +1537,7 @@ it('prepares a GitHub repository webhook before activating Live and rejects an u
     clock: () => 0,
     capabilities: { connector: () => github, integration: () => ({ callbackKey: 'key', publicOrigin: 'https://flow.example' }) },
   })
-  const created = await service.control.createFlow('operator', 'GitHub', 'create-github')
+  const created = await service.control.flows.createFlow('operator', 'GitHub', 'create-github')
   const flowId = created.flow.flowId
   const node = {
     kind: 'integration' as const,
@@ -1539,20 +1546,22 @@ it('prepares a GitHub repository webhook before activating Live and rejects an u
     definition: definition.snapshot,
     config: inputValues({ owner: 'octocat', repo: 'repository', events: ['issues'] }),
   }
-  const draft = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [{ kind: 'graph.node.create', nodeId: 'github', node }])
-  const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, currentEngineContract, null, 'publish-github')
-  expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('pending')
+  const draft = await service.control.drafts.changeDraft('operator', flowId, created.flow.draftRevisionId, [
+    { kind: 'graph.node.create', nodeId: 'github', node },
+  ])
+  const operation = await service.control.publications.publishFlow('operator', flowId, draft.revision.revisionId, currentEngineContract, null, 'publish-github')
+  expect(service.control.publications.getPublishOperation('operator', flowId, operation.operationId).status).toBe('pending')
   await service.tickIntegration()
   await service.tickMaintenance()
-  expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('succeeded')
+  expect(service.control.publications.getPublishOperation('operator', flowId, operation.operationId).status).toBe('succeeded')
   expect(service.integrationState(flowId, 'github')?.subscription).toEqual({ id: 'owned-hook' })
   expect(requests).toHaveLength(1)
-  const changed = await service.control.changeDraft('operator', flowId, draft.revision.revisionId, [
+  const changed = await service.control.drafts.changeDraft('operator', flowId, draft.revision.revisionId, [
     { kind: 'graph.trigger.config.set', nodeId: 'github', name: 'repo', before: fixedInputValue('repository'), value: fixedInputValue('another') },
   ])
-  const live = service.control.getFlow(flowId).live!.publicationId
+  const live = service.control.flows.getFlow('operator', flowId).live!.publicationId
   await expect(
-    service.control.publishFlow('operator', flowId, changed.revision.revisionId, currentEngineContract, live, 'replace-github'),
+    service.control.publications.publishFlow('operator', flowId, changed.revision.revisionId, currentEngineContract, live, 'replace-github'),
   ).rejects.toMatchObject({
     code: 'publication.unsupported',
   })

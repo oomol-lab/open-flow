@@ -1,5 +1,5 @@
-import type { LlmConfig } from '../deployment/llm.ts'
 import type { Database } from './database.ts'
+import type { RunEnvironment } from './run-store.ts'
 
 import { ConnectorTeamStore } from './connector-team-store.ts'
 import { EventSourceStore } from './event-source-store.ts'
@@ -45,10 +45,10 @@ export class Store {
 
   constructor(
     database: Database,
+    environment: RunEnvironment,
     clock: () => number = Date.now,
     runEventRetentionMs = defaultRunEventRetentionMs,
     maxPendingRuns = defaultMaxPendingRuns,
-    llmConfig: () => LlmConfig | undefined = () => undefined,
   ) {
     const connection = database.connection
     const transaction = <Value>(operation: () => Value): Value => database.transaction(operation)
@@ -85,7 +85,7 @@ export class Store {
       {
         connectorTeams: this.connectorTeams,
         flows: this.flows,
-        llmConfig,
+        environment,
         publications: this.publications,
         revisions: this.revisions,
         variables: this.variables,

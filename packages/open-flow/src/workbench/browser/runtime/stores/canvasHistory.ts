@@ -27,32 +27,84 @@ export class CanvasHistory {
   })
   readonly #undo: CanvasHistoryEntry[] = []
   readonly #redo: CanvasHistoryEntry[] = []
-  generation = 0
-  pending = 0
-  applying = false
-  failed = false
+  #generation = 0
+  #pending = 0
+  #applying = false
+  #failed = false
+
+  #disposed = false
+
+  get generation(): number {
+    return this.#generation
+  }
+  get applying(): boolean {
+    return this.#applying
+  }
+  get failed(): boolean {
+    return this.#failed
+  }
+
+  beginChange(): void {
+    this.#pending++
+    this.#publish()
+  }
+
+  endChange(): void {
+    this.#pending--
+    this.#publish()
+  }
+
+  beginRestore(): void {
+    this.#applying = true
+    this.#publish()
+  }
+
+  endRestore(): void {
+    this.#applying = false
+    this.#publish()
+  }
+
+  beginRecovery(): void {
+    this.#failed = true
+    this.clear()
+  }
+
+  endRecovery(): void {
+    this.#failed = false
+    this.#publish()
+  }
+
+  reset(): void {
+    this.#failed = false
+    this.clear()
+  }
+
+  dispose(): void {
+    this.#disposed = true
+    this.state$.dispose()
+  }
 
   clear(): boolean {
     const hadHistory = this.#undo.length + this.#redo.length > 0
-    this.generation++
+    this.#generation++
     this.#undo.length = 0
     this.#redo.length = 0
-    this.publish()
+    this.#publish()
     return hadHistory
   }
 
   discardRedo(): void {
     if (this.#redo.length == 0) return
     this.#redo.length = 0
-    this.publish()
+    this.#publish()
   }
 
   completeNodeCreation(nodeId: string, changes: FlowChanges): boolean {
     const index = this.#undo.findIndex((entry) => entry.forward.some((operation) => operation.kind == 'graph.node.create' && operation.nodeId == nodeId))
-    if (index < 0 || this.applying || this.failed) return false
+    if (index < 0 || this.#applying || this.#failed) return false
     const entry = this.#undo[index]!
     this.#undo[index] = { ...entry, forward: [...entry.forward, ...changes] }
-    this.publish()
+    this.#publish()
     return true
   }
 
@@ -70,7 +122,7 @@ export class CanvasHistory {
       }
     }
     while (this.#undo.length > 0 && this.#bytes(this.#undo) > 10 * 1024 * 1024) this.#undo.shift()
-    this.publish()
+    this.#publish()
   }
 
   record(entry: CanvasHistoryEntry): boolean {
@@ -81,7 +133,7 @@ export class CanvasHistory {
       return false
     }
     while (this.#undo.length > 30 || this.#bytes(this.#undo) > 10 * 1024 * 1024) this.#undo.shift()
-    this.publish()
+    this.#publish()
     return true
   }
 
@@ -90,16 +142,17 @@ export class CanvasHistory {
     const destination = redo ? this.#undo : this.#redo
     const entry = source.pop()
     if (entry != null) destination.push(entry)
-    this.publish()
+    this.#publish()
   }
 
-  publish(): void {
-    const available = this.pending == 0 && !this.applying && !this.failed
+  #publish(): void {
+    if (this.#disposed) return
+    const available = this.#pending == 0 && !this.#applying && !this.#failed
     this.state$.set({
       canUndo: available && this.#undo.length > 0,
       canRedo: available && this.#redo.length > 0,
-      applying: this.applying,
-      failed: this.failed,
+      applying: this.#applying,
+      failed: this.#failed,
       undo: this.#undo.at(-1),
       redo: this.#redo.at(-1),
     })

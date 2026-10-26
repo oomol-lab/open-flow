@@ -1,4 +1,6 @@
 import { expect, it, onTestFinished } from 'vitest'
+import { runEnvironment } from '../node/application/run-environment.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 import { openService } from './serviceFixture.ts'
@@ -6,7 +8,7 @@ import { openService } from './serviceFixture.ts'
 function fixture() {
   const database = Database.open(':memory:')
   onTestFinished(() => database.close())
-  const store = new Store(database)
+  const store = new Store(database, runEnvironment(isolatedVmEngineDigest))
   const connection = database.connection
   connection
     .prepare(`INSERT INTO flows (flow_id, name, status, draft_revision_id, create_idempotency_key, create_request_digest, created_at, updated_at)
@@ -101,20 +103,20 @@ it('replays an accepted Draft change after its full Revision was pruned', () => 
 
 it('returns a pruned Revision as missing while preserving Draft change replay', async () => {
   const service = await openService(':memory:')
-  const flow = (await service.control.createFlow('operator', 'Flow', 'create')).flow
+  const flow = (await service.control.flows.createFlow('operator', 'Flow', 'create')).flow
   const firstChange = [{ kind: 'graph.node.create', nodeId: 'first', node: { kind: 'manual', name: 'First' } }] as const
-  const first = await service.control.changeDraft('operator', flow.flowId, flow.draftRevisionId, firstChange, 'first-change')
-  const second = await service.control.changeDraft(
+  const first = await service.control.drafts.changeDraft('operator', flow.flowId, flow.draftRevisionId, firstChange, 'first-change')
+  const second = await service.control.drafts.changeDraft(
     'operator',
     flow.flowId,
     first.revision.revisionId,
     [{ kind: 'graph.node.delete', nodeId: 'first' }],
     'second-change',
   )
-  await service.control.repairDraft('operator', flow.flowId, second.revision.revisionId, 'checkpoint')
+  await service.control.drafts.repairDraft('operator', flow.flowId, second.revision.revisionId, 'checkpoint')
   await service.tickMaintenance()
   await service.tickMaintenance()
 
-  expect(() => service.control.getRevision(flow.flowId, first.revision.revisionId)).toThrow('The Flow or Revision was not found.')
-  expect(await service.control.changeDraft('operator', flow.flowId, flow.draftRevisionId, firstChange, 'first-change')).toEqual(first)
+  expect(() => service.control.drafts.getRevision('operator', flow.flowId, first.revision.revisionId)).toThrow('The Flow or Revision was not found.')
+  expect(await service.control.drafts.changeDraft('operator', flow.flowId, flow.draftRevisionId, firstChange, 'first-change')).toEqual(first)
 })

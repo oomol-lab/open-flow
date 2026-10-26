@@ -85,9 +85,9 @@ it('shares an app ingress while isolating workspaces, retaining fanout, and keep
   const flows: string[] = []
   for (const index of [0, 0, 1]) {
     const source = sources[index]!
-    const created = await service.control.createFlow('operator', `Flow ${flows.length}`, `create-${flows.length}`)
+    const created = await service.control.flows.createFlow('operator', `Flow ${flows.length}`, `create-${flows.length}`)
     const flowId = created.flow.flowId
-    const draft = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
+    const draft = await service.control.drafts.changeDraft('operator', flowId, created.flow.draftRevisionId, [
       {
         kind: 'graph.node.create',
         nodeId: 'slack',
@@ -100,16 +100,23 @@ it('shares an app ingress while isolating workspaces, retaining fanout, and keep
         },
       },
     ])
-    const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, currentEngineContract, null, `publish-${flows.length}`)
+    const operation = await service.control.publications.publishFlow(
+      'operator',
+      flowId,
+      draft.revision.revisionId,
+      currentEngineContract,
+      null,
+      `publish-${flows.length}`,
+    )
     await service.tickIntegration()
     await service.tickMaintenance()
-    expect(service.control.getPublishOperation(flowId, operation.operationId).status).toBe('succeeded')
+    expect(service.control.publications.getPublishOperation('operator', flowId, operation.operationId).status).toBe('succeeded')
     flows.push(flowId)
   }
 
   for (let retry = 0; retry < 2; retry++) expect((await app.request(endpoint, delivery(event('1')))).status).toBe(200)
   await service.tickIntegration()
-  expect(flows.map((flow) => service.control.runs.listRuns(flow, 20).page.runs.length)).toEqual([1, 1, 0])
+  expect(flows.map((flow) => service.control.runs.listRuns('operator', flow, 20).page.runs.length)).toEqual([1, 1, 0])
   const source = sources[0]!
   const disabled = await app.request(`/v1/event-sources/${source.sourceId}`, {
     method: 'PUT',
@@ -119,6 +126,6 @@ it('shares an app ingress while isolating workspaces, retaining fanout, and keep
   expect(disabled.status).toBe(200)
   expect((await app.request(endpoint, delivery(event('2')))).status).toBe(200)
   await service.tickIntegration()
-  expect(flows.map((flow) => service.control.runs.listRuns(flow, 20).page.runs.length)).toEqual([1, 1, 1])
+  expect(flows.map((flow) => service.control.runs.listRuns('operator', flow, 20).page.runs.length)).toEqual([1, 1, 1])
   expect(await (await app.request('/v1/event-sources')).text()).not.toContain('"signingSecret"')
 })

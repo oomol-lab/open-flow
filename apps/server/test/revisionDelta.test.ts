@@ -9,6 +9,7 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { expect, it, onTestFinished } from 'vitest'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { applyRevisionPatch, createRevisionPatch } from '../node/storage/revision-delta.ts'
 import { RevisionIntegrityError } from '../node/storage/revision-store.ts'
@@ -48,17 +49,19 @@ it.each<WaitAutoContinue>([
     await closeService(service)
     await rm(directory, { recursive: true, force: true })
   })
-  const created = await service.control.createFlow('operator', 'Flow', 'create')
-  const changed = await service.control.changeDraft(
+  const created = await service.control.flows.createFlow('operator', 'Flow', 'create')
+  const changed = await service.control.drafts.changeDraft(
     'operator',
     created.flow.flowId,
     created.flow.draftRevisionId,
     [{ kind: 'graph.node.create', nodeId: 'wait', node: { kind: 'wait', name: 'Wait', inputs: {}, inputDefinitions: [], prompt: 'Continue?', autoContinue } }],
     'change',
   )
-  expect(service.control.getDraft(created.flow.flowId).content.document.graph.nodes.wait).toMatchObject({ autoContinue })
-  expect(service.control.getRevision(created.flow.flowId, changed.revision.revisionId).content.document.graph.nodes.wait).toMatchObject({ autoContinue })
-  const checked = await service.control.checkFlow(created.flow.flowId, changed.revision.revisionId, currentEngineContract)
+  expect(service.control.drafts.getDraft('operator', created.flow.flowId).content.document.graph.nodes.wait).toMatchObject({ autoContinue })
+  expect(service.control.drafts.getRevision('operator', created.flow.flowId, changed.revision.revisionId).content.document.graph.nodes.wait).toMatchObject({
+    autoContinue,
+  })
+  const checked = await service.control.drafts.checkFlow('operator', created.flow.flowId, changed.revision.revisionId, currentEngineContract)
   expect(checked.valid).toBe(false)
   expect(checked.diagnostics).toEqual(expect.arrayContaining([expect.objectContaining({ code: 'wait.auto-continue-invalid' })]))
 })
@@ -78,7 +81,7 @@ it('stores small edits as deltas, checkpoints after 32 edits, and restores them 
   onTestFinished(() => rm(directory, { recursive: true, force: true }))
   const file = path.join(directory, 'flow.sqlite')
   const database = Database.open(file)
-  const store = new Store(database)
+  const store = new Store(database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined })
   const padding = 'x'.repeat(20_000)
   flow(store, { counter: 0, padding })
   let previous = 'initial'
@@ -111,7 +114,7 @@ it('stores small edits as deltas, checkpoints after 32 edits, and restores them 
 
   const reopened = Database.open(file)
   try {
-    const restored = new Store(reopened)
+    const restored = new Store(reopened, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined })
     for (const [revisionId, revision] of expected) expect(restored.flows.revision('flow', revisionId)).toMatchObject(revision)
     expect(restored.flows.draft('flow')).toMatchObject(expected.get('revision-33')!)
     for (let index = 0; index < 32; index += 1) expect(restored.flows.pruneDraftDeltas(100)).toBe(1)
@@ -126,7 +129,7 @@ it('stores small edits as deltas, checkpoints after 32 edits, and restores them 
 it('materializes a Draft Revision atomically when admitting a Run', () => {
   const database = Database.open(':memory:')
   onTestFinished(() => database.close())
-  const store = new Store(database)
+  const store = new Store(database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined })
   const padding = 'x'.repeat(10_000)
   flow(store, { counter: 0, padding })
   const revision = body({ counter: 1, padding })
@@ -165,7 +168,7 @@ it('materializes a Draft Revision atomically when admitting a Run', () => {
 it('materializes a Draft Revision when admitting a Publish operation and rolls back a failed admission', () => {
   const database = Database.open(':memory:')
   onTestFinished(() => database.close())
-  const store = new Store(database, () => 1_000)
+  const store = new Store(database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined }, () => 1_000)
   const padding = 'x'.repeat(10_000)
   flow(store, { counter: 0, padding })
   const revision = body({ counter: 1, padding })
@@ -213,7 +216,7 @@ it('materializes a Draft Revision when admitting a Publish operation and rolls b
 it('rejects a damaged delta without accepting a Run', () => {
   const database = Database.open(':memory:')
   onTestFinished(() => database.close())
-  const store = new Store(database)
+  const store = new Store(database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined })
   const padding = 'x'.repeat(10_000)
   flow(store, { counter: 0, padding })
   const revision = body({ counter: 1, padding })
@@ -257,9 +260,9 @@ it('repairs an unreadable delta as a new full Revision without changing the old 
     await closeService(service)
     await rm(directory, { recursive: true, force: true })
   })
-  const created = await service.control.createFlow('operator', 'Flow', 'create')
+  const created = await service.control.flows.createFlow('operator', 'Flow', 'create')
   const operations = [{ kind: 'graph.node.create', nodeId: 'start', node: { kind: 'manual', name: 'Start' } }] as const
-  const changed = await service.control.changeDraft('operator', created.flow.flowId, created.flow.draftRevisionId, operations, 'change')
+  const changed = await service.control.drafts.changeDraft('operator', created.flow.flowId, created.flow.draftRevisionId, operations, 'change')
   const database = new DatabaseSync(file)
   try {
     database.prepare("UPDATE revision_deltas SET patch = '[]' WHERE revision_id = ?").run(changed.revision.revisionId)
@@ -270,33 +273,37 @@ it('repairs an unreadable delta as a new full Revision without changing the old 
     )
     expect(response.status).toBe(409)
     expect(await response.json()).toMatchObject({ error: { code: controlErrorCode.flowRepairRequired } })
-    expect(() => service.control.getDraft(created.flow.flowId)).toThrow(expect.objectContaining(repairRequired))
-    expect(() => service.control.syncDraft(created.flow.flowId)).toThrow(expect.objectContaining(repairRequired))
-    expect(() => service.control.getRevision(created.flow.flowId, changed.revision.revisionId)).toThrow(expect.objectContaining(repairRequired))
-    await expect(service.control.checkFlow(created.flow.flowId, changed.revision.revisionId, currentEngineContract)).rejects.toMatchObject(repairRequired)
-    await expect(service.control.changeDraft('operator', created.flow.flowId, created.flow.draftRevisionId, operations, 'change')).rejects.toMatchObject(
+    expect(() => service.control.drafts.getDraft('operator', created.flow.flowId)).toThrow(expect.objectContaining(repairRequired))
+    expect(() => service.control.drafts.syncDraft('operator', created.flow.flowId)).toThrow(expect.objectContaining(repairRequired))
+    expect(() => service.control.drafts.getRevision('operator', created.flow.flowId, changed.revision.revisionId)).toThrow(
+      expect.objectContaining(repairRequired),
+    )
+    await expect(service.control.drafts.checkFlow('operator', created.flow.flowId, changed.revision.revisionId, currentEngineContract)).rejects.toMatchObject(
+      repairRequired,
+    )
+    await expect(service.control.drafts.changeDraft('operator', created.flow.flowId, created.flow.draftRevisionId, operations, 'change')).rejects.toMatchObject(
       repairRequired,
     )
     await expect(
-      service.control.removeConnectionUsage('operator', created.flow.flowId, 'unused', changed.revision.revisionId, 0, 'remove'),
+      service.control.drafts.removeConnectionUsage('operator', created.flow.flowId, 'unused', changed.revision.revisionId, 0, 'remove'),
     ).rejects.toMatchObject(repairRequired)
     await expect(
-      service.control.publishFlow('operator', created.flow.flowId, changed.revision.revisionId, currentEngineContract, null, 'publish'),
+      service.control.publications.publishFlow('operator', created.flow.flowId, changed.revision.revisionId, currentEngineContract, null, 'publish'),
     ).rejects.toMatchObject(repairRequired)
     await expect(
-      service.control.runs.createDraftRun(created.flow.flowId, changed.revision.revisionId, currentEngineContract, {}, 'run', {
+      service.control.runs.createDraftRun('operator', created.flow.flowId, changed.revision.revisionId, currentEngineContract, {}, 'run', {
         nodeId: 'start',
         outputs: {},
       }),
     ).rejects.toMatchObject(repairRequired)
     database.prepare(`UPDATE revision_deltas SET patch = '[{"op":"invalid","path":"/"}]' WHERE revision_id = ?`).run(changed.revision.revisionId)
-    expect(() => service.control.getDraft(created.flow.flowId)).toThrow(expect.objectContaining(repairRequired))
+    expect(() => service.control.drafts.getDraft('operator', created.flow.flowId)).toThrow(expect.objectContaining(repairRequired))
     database.prepare("UPDATE revision_deltas SET patch = '[]' WHERE revision_id = ?").run(changed.revision.revisionId)
-    const repaired = await service.control.repairDraft('operator', created.flow.flowId, changed.revision.revisionId, 'repair')
+    const repaired = await service.control.drafts.repairDraft('operator', created.flow.flowId, changed.revision.revisionId, 'repair')
     expect(repaired.revision.parentRevisionId).toBe(changed.revision.revisionId)
     expect(database.prepare('SELECT content FROM revisions WHERE revision_id = ?').get(repaired.revision.revisionId)).toBeDefined()
     expect(database.prepare('SELECT patch FROM revision_deltas WHERE revision_id = ?').get(changed.revision.revisionId)).toEqual({ patch: '[]' })
-    expect(service.control.getDraft(created.flow.flowId).revisionId).toBe(repaired.revision.revisionId)
+    expect(service.control.drafts.getDraft('operator', created.flow.flowId).revisionId).toBe(repaired.revision.revisionId)
   } finally {
     database.close()
   }
@@ -305,7 +312,7 @@ it('repairs an unreadable delta as a new full Revision without changing the old 
 it('collects orphan deltas before their full base after a Flow is deleted', () => {
   const database = Database.open(':memory:')
   onTestFinished(() => database.close())
-  const store = new Store(database)
+  const store = new Store(database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined })
   const padding = 'x'.repeat(10_000)
   flow(store, { counter: 0, padding })
   const revision = body({ counter: 1, padding })

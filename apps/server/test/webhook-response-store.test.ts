@@ -5,7 +5,9 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { expect, it, vi } from 'vitest'
+import { runEnvironment } from '../node/application/run-environment.ts'
 import { waitForWebhookRun } from '../node/application/webhook-response.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 import { acceptRun } from './runFixture.ts'
@@ -19,7 +21,7 @@ it('persists the first response independently of truncated/expired events and Ru
   const service = await openService(file)
   let database = Database.open(file)
   try {
-    let store = new Store(database)
+    let store = new Store(database, runEnvironment(isolatedVmEngineDigest))
     const accepted = await acceptRun(service, {
       flowId: 'main',
       revisionId: 'response',
@@ -48,7 +50,7 @@ it('persists the first response independently of truncated/expired events and Ru
     database.connection.prepare("UPDATE runs SET status = 'failed' WHERE run_id = ?").run(runId)
     database.close()
     database = Database.open(file)
-    store = new Store(database)
+    store = new Store(database, runEnvironment(isolatedVmEngineDigest))
     expect(store.runViews.webhookResponse(runId, 'reply')).toEqual(response)
     expect(store.runViews.webhookResponse(runId, 'other')).toBeUndefined()
     await expect(

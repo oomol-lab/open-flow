@@ -27,7 +27,7 @@ export async function storeRevision(
 ): Promise<{ readonly flowId: string; readonly revisionId: string }> {
   let stored = revisions.get(service)?.get(revisionKey)
   if (stored == null) {
-    const created = await service.control.createFlow('test', `Run fixture ${randomUUID()}`, `flow-${randomUUID()}`)
+    const created = await service.control.flows.createFlow('test', `Run fixture ${randomUUID()}`, `flow-${randomUUID()}`)
     const operations: ChangeOperation[] = [
       { kind: 'graph.node.create', node: { kind: 'manual', name: 'Start' }, nodeId: 'start' },
 
@@ -46,7 +46,7 @@ export async function storeRevision(
     const revisionId =
       operations.length == 0
         ? created.flow.draftRevisionId
-        : (await service.control.changeDraft('test', created.flow.flowId, created.flow.draftRevisionId, operations)).revision.revisionId
+        : (await service.control.drafts.changeDraft('test', created.flow.flowId, created.flow.draftRevisionId, operations)).revision.revisionId
     stored = { flowId: created.flow.flowId, revisionId }
     const serviceRevisions = revisions.get(service) ?? new Map()
     serviceRevisions.set(revisionKey, stored)
@@ -59,6 +59,7 @@ export async function acceptRun(service: ServerService, input: Input): Promise<R
   const stored = await storeRevision(service, input.revision, input.revisionId)
   try {
     const accepted = await service.control.runs.createDraftRun(
+      'test',
       stored.flowId,
       stored.revisionId,
       currentEngineContract,

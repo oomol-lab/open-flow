@@ -21,10 +21,12 @@ import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
+import { runEnvironment } from '../node/application/run-environment.ts'
 import { ServerService } from '../node/application/service.ts'
 import { ConnectorTaskError } from '../node/deployment/connector-contract.ts'
 import { serverErrorCode } from '../node/error.ts'
 import { createLogger } from '../node/logger.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 import { createConnectorHost } from './connectorHost.ts'
@@ -142,20 +144,22 @@ describe('Server Poll Trigger', () => {
     const service = await openService(file, { capabilities: { connector: () => host } })
     const database = new DatabaseSync(file)
     try {
-      const { flow } = await service.control.createFlow('operator', 'Options', 'linear-options')
+      const { flow } = await service.control.flows.createFlow('operator', 'Options', 'linear-options')
       const original = revision().document.graph.nodes.poll!
       if (original.kind != 'poll') throw new Error('Expected Poll fixture.')
-      await service.control.changeDraft('operator', flow.flowId, flow.draftRevisionId, [
+      await service.control.drafts.changeDraft('operator', flow.flowId, flow.draftRevisionId, [
         { kind: 'graph.node.create', nodeId: 'linear', node: { ...original, definition: linear.snapshot, config: {} } },
       ])
-      const before = service.control.getDraft(flow.flowId)
-      expect(await service.control.listTriggerConfigOptions(flow.flowId, 'linear', 'teamId', new AbortController().signal)).toEqual([
+      const before = service.control.drafts.getDraft('operator', flow.flowId)
+      expect(await service.control.drafts.listTriggerConfigOptions('operator', flow.flowId, 'linear', 'teamId', new AbortController().signal)).toEqual([
         { value: '72b2a2dc-6f4f-4423-9d34-24b5bd10634a', label: 'Engineering (ENG)' },
       ])
-      expect(service.control.getDraft(flow.flowId)).toEqual(before)
+      expect(service.control.drafts.getDraft('operator', flow.flowId)).toEqual(before)
       expect(database.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 0 })
-      await expect(service.control.listTriggerConfigOptions('missing', 'linear', 'teamId', new AbortController().signal)).rejects.toThrow()
-      await expect(service.control.listTriggerConfigOptions(flow.flowId, 'linear', 'unknown', new AbortController().signal)).rejects.toThrow()
+      await expect(service.control.drafts.listTriggerConfigOptions('operator', 'missing', 'linear', 'teamId', new AbortController().signal)).rejects.toThrow()
+      await expect(
+        service.control.drafts.listTriggerConfigOptions('operator', flow.flowId, 'linear', 'unknown', new AbortController().signal),
+      ).rejects.toThrow()
       expect(calls).toBe(1)
     } finally {
       database.close()
@@ -373,17 +377,24 @@ describe('Server Poll Trigger', () => {
     }
     const service = await openService(file, { capabilities: { connector: () => connector }, clock: () => publishedAt, triggerDefinitions: [definition] })
     try {
-      const created = await service.control.createFlow('operator', 'Poll control', 'poll-control-flow')
+      const created = await service.control.flows.createFlow('operator', 'Poll control', 'poll-control-flow')
       const content = revision()
-      const changed = await service.control.changeDraft('operator', created.flow.flowId, created.flow.draftRevisionId, [
+      const changed = await service.control.drafts.changeDraft('operator', created.flow.flowId, created.flow.draftRevisionId, [
         { kind: 'graph.node.create', node: content.document.graph.nodes.poll!, nodeId: 'poll' },
       ])
-      await service.control.publishFlow('operator', created.flow.flowId, changed.revision.revisionId, currentEngineContract, null, 'poll-control-publication')
+      await service.control.publications.publishFlow(
+        'operator',
+        created.flow.flowId,
+        changed.revision.revisionId,
+        currentEngineContract,
+        null,
+        'poll-control-publication',
+      )
       await service.tickListeners()
       await service.tickMaintenance()
       const before = service.pollState(created.flow.flowId, 'poll')
 
-      expect(service.control.listTriggerKeys()).toEqual([
+      expect(service.control.drafts.listTriggerKeys()).toEqual([
         {
           description: snapshot.description,
           displayName: snapshot.displayName,
@@ -393,7 +404,7 @@ describe('Server Poll Trigger', () => {
           type: snapshot.type,
         },
       ])
-      await expect(service.control.testFlowPollTrigger(created.flow.flowId, 'poll')).resolves.toEqual({
+      await expect(service.control.publications.testFlowPollTrigger('operator', created.flow.flowId, 'poll')).resolves.toEqual({
         events: [{ value: 'first' }],
         filtered: 2,
         hasMore: true,
@@ -437,19 +448,19 @@ describe('Server Poll Trigger', () => {
       triggerDefinitions: [definition],
     })
     try {
-      const created = await service.control.createFlow('operator', 'Poll preview', 'poll-preview-flow')
+      const created = await service.control.flows.createFlow('operator', 'Poll preview', 'poll-preview-flow')
       const flowId = created.flow.flowId
-      const changed = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [
+      const changed = await service.control.drafts.changeDraft('operator', flowId, created.flow.draftRevisionId, [
         { kind: 'graph.node.create', node: revision().document.graph.nodes.poll!, nodeId: 'poll' },
       ])
-      await service.control.publishFlow('operator', flowId, changed.revision.revisionId, currentEngineContract, null, 'poll-preview-publication')
+      await service.control.publications.publishFlow('operator', flowId, changed.revision.revisionId, currentEngineContract, null, 'poll-preview-publication')
       await service.tickListeners()
       await service.tickMaintenance()
       const before = service.pollState(flowId, 'poll')
       expect(before).toMatchObject({ checkpoint: { cursor: 'baseline' }, health: 'healthy' })
       preview = true
 
-      await expect(service.control.testFlowPollTrigger(flowId, 'poll')).rejects.toMatchObject({ code })
+      await expect(service.control.publications.testFlowPollTrigger('operator', flowId, 'poll')).rejects.toMatchObject({ code })
       expect(service.pollState(flowId, 'poll')).toEqual(before)
     } finally {
       await closeService(service)
@@ -666,7 +677,7 @@ describe('Server Poll Trigger', () => {
     await closeService(service)
 
     const opened = Database.open(file)
-    const store = new Store(opened)
+    const store = new Store(opened, runEnvironment(isolatedVmEngineDigest))
     const target = store.polls.duePoll(Date.parse('2026-08-21T00:01:00.000Z'), 1)[0]
     if (target == null) throw new Error('Poll claim target was not due.')
     const first = store.polls.claimPoll(target, 'claim-main', 1_000, 2_000)

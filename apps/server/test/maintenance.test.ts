@@ -7,6 +7,7 @@ import { expect, it, onTestFinished, vi } from 'vitest'
 import { Maintenance } from '../node/application/maintenance.ts'
 import { ImplicitConnectorAccessHost } from '../node/deployment/connector-access.ts'
 import { silentLogger } from '../node/logger.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import { Store } from '../node/storage/store.ts'
 import { createConnectorHost } from './connectorHost.ts'
@@ -16,7 +17,7 @@ function fixture() {
   const database = Database.open(':memory:')
   onTestFinished(() => database.close())
   const clock = () => now
-  const store = new Store(database, clock)
+  const store = new Store(database, { engineDigest: isolatedVmEngineDigest, snapshot: () => undefined }, clock)
   return { database, clock, store, setTime: (at: number) => (now = at) }
 }
 

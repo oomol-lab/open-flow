@@ -4,6 +4,8 @@ import { encodeRevision } from '@oomol-lab/open-flow/flow-encoding'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { createHash } from 'node:crypto'
 import { expect, it, onTestFinished, vi } from 'vitest'
+import { runEnvironment } from '../node/application/run-environment.ts'
+import { isolatedVmEngineDigest } from '../node/runtime/isolated-vm.ts'
 import { Database } from '../node/storage/database.ts'
 import * as resources from '../node/storage/flow-resources.ts'
 import { migrateFlowResourceReferences } from '../node/storage/migrate-flow-resource-references.ts'
@@ -36,7 +38,7 @@ function body(name: string) {
 }
 function setup() {
   const database = Database.open(':memory:')
-  const store = new Store(database)
+  const store = new Store(database, runEnvironment(isolatedVmEngineDigest))
   onTestFinished(() => {
     vi.restoreAllMocks()
     database.close()

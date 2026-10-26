@@ -66,7 +66,7 @@ it.each([
   if (accepted.kind != 'accepted') throw new Error('Run not accepted')
   await service.waitForIdle()
   expect(service.run(accepted.runId)?.status).toBe('completed')
-  const events = service.control.runs.getRunEvents(accepted.runId, 0, 100).events
+  const events = service.control.runs.getRunEvents('test', accepted.runId, 0, 100).events
   const terminal = events.filter((event) => event.kind == 'node.failed' || event.kind == 'node.completed').find((event) => event.payload.nodeId == 'task')
   expect(terminal).toMatchObject({
     kind: handled ? 'node.failed' : 'node.completed',
@@ -202,7 +202,7 @@ it('persists a handled connector.action-not-found event from the Host', async ()
   if (accepted.kind != 'accepted') throw new Error('Run not accepted')
   await service.waitForIdle()
   expect(service.run(accepted.runId)?.status).toBe('completed')
-  expect(service.control.runs.getRunEvents(accepted.runId, 0, 100).events).toContainEqual(
+  expect(service.control.runs.getRunEvents('test', accepted.runId, 0, 100).events).toContainEqual(
     expect.objectContaining({
       kind: 'node.failed',
       payload: expect.objectContaining({ handled: true, error: { code: 'connector.action-not-found', message: 'Action was removed' } }),

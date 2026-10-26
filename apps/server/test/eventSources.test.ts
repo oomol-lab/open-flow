@@ -73,7 +73,7 @@ async function setup() {
 
 async function publish(context: Awaited<ReturnType<typeof setup>>, name: string, resource?: JsonValue) {
   const { service, source } = context
-  const created = await service.control.createFlow('operator', name, `create-${name}`)
+  const created = await service.control.flows.createFlow('operator', name, `create-${name}`)
   const flowId = created.flow.flowId
   const node: Extract<TriggerNode, { kind: 'integration' }> = {
     kind: 'integration',
@@ -86,11 +86,20 @@ async function publish(context: Awaited<ReturnType<typeof setup>>, name: string,
       ...(resource == null ? {} : { resource }),
     }),
   }
-  const draft = await service.control.changeDraft('operator', flowId, created.flow.draftRevisionId, [{ kind: 'graph.node.create', nodeId: 'feishu', node }])
-  const operation = await service.control.publishFlow('operator', flowId, draft.revision.revisionId, currentEngineContract, null, `publish-${name}`)
+  const draft = await service.control.drafts.changeDraft('operator', flowId, created.flow.draftRevisionId, [
+    { kind: 'graph.node.create', nodeId: 'feishu', node },
+  ])
+  const operation = await service.control.publications.publishFlow(
+    'operator',
+    flowId,
+    draft.revision.revisionId,
+    currentEngineContract,
+    null,
+    `publish-${name}`,
+  )
   await service.tickIntegration()
   await service.tickMaintenance()
-  const completed = service.control.getPublishOperation(flowId, operation.operationId)
+  const completed = service.control.publications.getPublishOperation('operator', flowId, operation.operationId)
   expect(completed.status).toBe('succeeded')
   return flowId
 }
@@ -139,9 +148,9 @@ it('durably fans out to current Flows and does not add later Flows when a messag
   expect((await context.app.request(context.endpoint, delivery({ event }))).status).toBe(200)
 
   await context.service.tickIntegration()
-  expect(context.service.control.runs.listRuns(a, 20).page.runs).toHaveLength(1)
-  expect(context.service.control.runs.listRuns(b, 20).page.runs).toHaveLength(1)
-  expect(context.service.control.runs.listRuns(c, 20).page.runs).toHaveLength(0)
+  expect(context.service.control.runs.listRuns('operator', a, 20).page.runs).toHaveLength(1)
+  expect(context.service.control.runs.listRuns('operator', b, 20).page.runs).toHaveLength(1)
+  expect(context.service.control.runs.listRuns('operator', c, 20).page.runs).toHaveLength(0)
   expect((await context.app.request(context.endpoint, delivery({ response: { status: 401, headers: {}, body: '' } }))).status).toBe(401)
 })
 
@@ -157,7 +166,7 @@ it('delivers events from different enterprises through the same application sour
     expect((await context.app.request(context.endpoint, delivery({ event }))).status).toBe(200)
   }
   await context.service.tickIntegration()
-  expect(context.service.control.runs.listRuns(flowId, 20).page.runs).toHaveLength(2)
+  expect(context.service.control.runs.listRuns('operator', flowId, 20).page.runs).toHaveLength(2)
 })
 
 it('shares one approval subscription and prevents deleting an event source still in use', async () => {
@@ -231,7 +240,7 @@ it('returns the Flow team even when it has no event sources and rejects unknown 
   const service = await openService(':memory:', {
     capabilities: { connector: () => connector, integration: () => ({ callbackKey: 'key', publicOrigin: 'https://flow.example' }) },
   })
-  const { flow } = await service.control.createFlow('operator', 'A', 'create-team-a', 'team-a')
+  const { flow } = await service.control.flows.createFlow('operator', 'A', 'create-team-a', 'team-a')
   const app = createServerApp(service, { resolveControlActor: () => 'operator' })
   const response = await app.request(`/v1/event-sources?flowId=${flow.flowId}`)
   expect(response.status).toBe(200)
@@ -260,7 +269,7 @@ it('discards older ordered events and retains the deduplication decision after a
     expect((await context.app.request(context.endpoint, delivery({ event }))).status).toBe(200)
   }
   await context.service.tickIntegration()
-  expect(context.service.control.runs.listRuns(flowId, 20).page.runs).toHaveLength(2)
+  expect(context.service.control.runs.listRuns('operator', flowId, 20).page.runs).toHaveLength(2)
 })
 
 it.each(['normal', 'failure', 'update'])('hydrates persisted sources without losing availability or concurrent edits (%s)', async (scenario) => {

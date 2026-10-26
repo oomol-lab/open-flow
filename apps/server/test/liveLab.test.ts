@@ -26,7 +26,7 @@ it('rejects unrelated Draft changes even when the published Webhook still execut
     expect(result.passed).toBe(false)
     expect(result.errors).toEqual([expect.stringContaining('preserve the rest of the published workflow')])
     expect(result.runIds).toHaveLength(1)
-    expect(lab.service.control.runs.getRun(result.runIds[0]!).status).toBe('completed')
+    expect(lab.service.control.runs.getRun('operator', result.runIds[0]!).status).toBe('completed')
   } finally {
     await lab.close()
     await rm(directory, { recursive: true, force: true })

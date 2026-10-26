@@ -1,9 +1,10 @@
 import type { Schema, SchemaDraft } from '@cfworker/json-schema'
-import type { JsonValue, PortDefinition, SchemaKeyword, SchemaMismatch } from './change.ts'
+import type { JsonValue, PortDefinition } from '../../types/index.ts'
+import type { SchemaKeyword, SchemaMismatch } from './schemaKeywords.ts'
 
 import { Validator } from '@cfworker/json-schema'
-import { isSchemaKeyword } from './change.ts'
 import { compareJSONSchema, normalizeNullableSchemaPath } from './schemaCompare.ts'
+import { isSchemaKeyword } from './schemaKeywords.ts'
 
 function jsonEqual(left: JsonValue, right: JsonValue): boolean {
   if (left === right) return true

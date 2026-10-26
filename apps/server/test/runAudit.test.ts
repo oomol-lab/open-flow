@@ -72,7 +72,7 @@ it('retains audit after restart and migrates old Runs without inventing identiti
   const run = await api.createDraftRun(flowId, revisionId, { trigger: { nodeId: 'start', outputs: {} } })
   await closeService(service)
   const reopened = await openService(file)
-  expect(reopened.control.runs.getRun(run.runId)).toEqual(run)
+  expect(reopened.control.runs.getRun('operator', run.runId)).toEqual(run)
   await closeService(reopened)
   const database = new DatabaseSync(file)
   database.exec('ALTER TABLE runs DROP COLUMN initiator_actor_id')
@@ -83,5 +83,5 @@ it('retains audit after restart and migrates old Runs without inventing identiti
   database.close()
   const migrated = await openService(file)
   const { initiator: _initiator, ...legacy } = run
-  expect(migrated.control.runs.getRun(run.runId)).toEqual(legacy)
+  expect(migrated.control.runs.getRun('operator', run.runId)).toEqual(legacy)
 })
