@@ -47,18 +47,40 @@ export interface TriggerActivityPosition {
   readonly createdAt: number
 }
 export class PublicationControl {
+  private readonly access: ControlAccess
+  private readonly store: Pick<Store, 'flows' | 'triggers' | 'publications'>
+  private readonly triggersChanged: () => void
+  private readonly flowCatalogChanged: (event?: FlowCatalogEvent, ownerId?: string) => void
+  private readonly drafts: Pick<DraftControl, 'getDraft'>
+  private readonly connectorAccess: ConnectorAccessHost
+  private readonly clock: () => number
+  private readonly testPollTrigger: (flowId: string, triggerNodeId: string) => Promise<PollTriggerTestResult>
+  private readonly publish: (input: PublishInput) => Promise<PublicationAcceptance>
+  private readonly acceptPublish: (input: PublishInput) => Promise<PublishOperation>
+
   constructor(
-    private readonly access: ControlAccess,
-    private readonly store: Pick<Store, 'flows' | 'triggers' | 'publications'>,
-    private readonly triggersChanged: () => void,
-    private readonly flowCatalogChanged: (event?: FlowCatalogEvent, ownerId?: string) => void,
-    private readonly drafts: Pick<DraftControl, 'getDraft'>,
-    private readonly connectorAccess: ConnectorAccessHost,
-    private readonly clock: () => number,
-    private readonly testPollTrigger: (flowId: string, triggerNodeId: string) => Promise<PollTriggerTestResult>,
-    private readonly publish: (input: PublishInput) => Promise<PublicationAcceptance>,
-    private readonly acceptPublish: (input: PublishInput) => Promise<PublishOperation>,
-  ) {}
+    access: ControlAccess,
+    store: Pick<Store, 'flows' | 'triggers' | 'publications'>,
+    triggersChanged: () => void,
+    flowCatalogChanged: (event?: FlowCatalogEvent, ownerId?: string) => void,
+    drafts: Pick<DraftControl, 'getDraft'>,
+    connectorAccess: ConnectorAccessHost,
+    clock: () => number,
+    testPollTrigger: (flowId: string, triggerNodeId: string) => Promise<PollTriggerTestResult>,
+    publish: (input: PublishInput) => Promise<PublicationAcceptance>,
+    acceptPublish: (input: PublishInput) => Promise<PublishOperation>,
+  ) {
+    this.access = access
+    this.store = store
+    this.triggersChanged = triggersChanged
+    this.flowCatalogChanged = flowCatalogChanged
+    this.drafts = drafts
+    this.connectorAccess = connectorAccess
+    this.clock = clock
+    this.testPollTrigger = testPollTrigger
+    this.publish = publish
+    this.acceptPublish = acceptPublish
+  }
 
   setFlowEnabled(actorId: string, flowId: string, publicationId: string, enabled: boolean): Flow {
     this.access.authorize(actorId, { flowId })

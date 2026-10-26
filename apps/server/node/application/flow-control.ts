@@ -19,17 +19,37 @@ export interface FlowPosition {
   readonly flowId: string
 }
 export class FlowControl {
+  private readonly access: ControlAccess
+  private readonly flowChanged: (event: FlowChangeEvent) => void
+  private readonly drafts: Pick<DraftControl, 'getDraft'>
+  private readonly store: Pick<Store, 'flows' | 'resourceReferences' | 'publications'>
+  private readonly resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>
+  private readonly clock: () => number
+  private readonly flowCatalogChanged: (event?: FlowCatalogEvent, ownerId?: string) => void
+  private readonly triggersChanged: () => void
+  private readonly publications: Pick<PublicationControl, 'getLive'>
+
   constructor(
-    private readonly access: ControlAccess,
-    private readonly flowChanged: (event: FlowChangeEvent) => void,
-    private readonly drafts: Pick<DraftControl, 'getDraft'>,
-    private readonly store: Pick<Store, 'flows' | 'resourceReferences' | 'publications'>,
-    private readonly resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>,
-    private readonly clock: () => number,
-    private readonly flowCatalogChanged: (event?: FlowCatalogEvent, ownerId?: string) => void,
-    private readonly triggersChanged: () => void,
-    private readonly publications: Pick<PublicationControl, 'getLive'>,
-  ) {}
+    access: ControlAccess,
+    flowChanged: (event: FlowChangeEvent) => void,
+    drafts: Pick<DraftControl, 'getDraft'>,
+    store: Pick<Store, 'flows' | 'resourceReferences' | 'publications'>,
+    resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>,
+    clock: () => number,
+    flowCatalogChanged: (event?: FlowCatalogEvent, ownerId?: string) => void,
+    triggersChanged: () => void,
+    publications: Pick<PublicationControl, 'getLive'>,
+  ) {
+    this.access = access
+    this.flowChanged = flowChanged
+    this.drafts = drafts
+    this.store = store
+    this.resolveConnectorTeam = resolveConnectorTeam
+    this.clock = clock
+    this.flowCatalogChanged = flowCatalogChanged
+    this.triggersChanged = triggersChanged
+    this.publications = publications
+  }
 
   broadcastCanvas(actorId: string, flowId: string, command: CanvasCommand): CanvasBroadcast {
     this.access.authorize(actorId, { flowId })

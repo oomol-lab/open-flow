@@ -24,16 +24,34 @@ import { ControlError } from '../error.ts'
 import { actionAccountDiagnostics } from './action-account-diagnostics.ts'
 
 export class ConnectorControl {
+  private readonly access: ControlAccess
+  private readonly store: Pick<Store, 'publications' | 'flows' | 'connectorTeams'>
+  private readonly connectorAccess: ConnectorAccessHost
+  private readonly flowChanged: (event: FlowChangeEvent) => void
+  private readonly flowCatalogChanged: (event?: FlowCatalogEvent, ownerId?: string) => void
+  private readonly resolveConnector: () => ConnectorHost | undefined
+  private readonly resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>
+  private readonly resolveConnectorConsoleOrigin: () => URL | undefined
+
   constructor(
-    private readonly access: ControlAccess,
-    private readonly store: Pick<Store, 'publications' | 'flows' | 'connectorTeams'>,
-    private readonly connectorAccess: ConnectorAccessHost,
-    private readonly flowChanged: (event: FlowChangeEvent) => void,
-    private readonly flowCatalogChanged: (event?: FlowCatalogEvent, ownerId?: string) => void,
-    private readonly resolveConnector: () => ConnectorHost | undefined,
-    private readonly resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>,
-    private readonly resolveConnectorConsoleOrigin: () => URL | undefined,
-  ) {}
+    access: ControlAccess,
+    store: Pick<Store, 'publications' | 'flows' | 'connectorTeams'>,
+    connectorAccess: ConnectorAccessHost,
+    flowChanged: (event: FlowChangeEvent) => void,
+    flowCatalogChanged: (event?: FlowCatalogEvent, ownerId?: string) => void,
+    resolveConnector: () => ConnectorHost | undefined,
+    resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>,
+    resolveConnectorConsoleOrigin: () => URL | undefined,
+  ) {
+    this.access = access
+    this.store = store
+    this.connectorAccess = connectorAccess
+    this.flowChanged = flowChanged
+    this.flowCatalogChanged = flowCatalogChanged
+    this.resolveConnector = resolveConnector
+    this.resolveConnectorTeam = resolveConnectorTeam
+    this.resolveConnectorConsoleOrigin = resolveConnectorConsoleOrigin
+  }
 
   async listConnectorProviders(actorId: string, flowId?: string, signal?: AbortSignal, locale?: string): Promise<readonly ConnectorProvider[]> {
     this.access.authorize(actorId, { flowId })

@@ -7,12 +7,22 @@ import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { ControlError } from '../error.ts'
 
 export class EventSourceControl {
+  private readonly access: ControlAccess
+  private readonly eventSources: EventSourceRuntime | undefined
+  private readonly connectors: Pick<ConnectorControl, 'resolveConnectorScope'>
+  private readonly resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>
+
   constructor(
-    private readonly access: ControlAccess,
-    private readonly eventSources: EventSourceRuntime | undefined,
-    private readonly connectors: Pick<ConnectorControl, 'resolveConnectorScope'>,
-    private readonly resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>,
-  ) {}
+    access: ControlAccess,
+    eventSources: EventSourceRuntime | undefined,
+    connectors: Pick<ConnectorControl, 'resolveConnectorScope'>,
+    resolveConnectorTeam: (teamId?: string) => Promise<string | undefined>,
+  ) {
+    this.access = access
+    this.eventSources = eventSources
+    this.connectors = connectors
+    this.resolveConnectorTeam = resolveConnectorTeam
+  }
 
   async listEventSources(actorId: string, flowId?: string, signal?: AbortSignal) {
     if (flowId == null) this.access.requireAdmin(actorId)

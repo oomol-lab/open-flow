@@ -6,7 +6,11 @@ import { ControlError } from '../error.ts'
 import { variable, variableListItem } from './control-views.ts'
 
 export class VariableControl {
-  constructor(private readonly store: Pick<Store, 'variables' | 'resourceReferences'>) {}
+  private readonly store: Pick<Store, 'variables' | 'resourceReferences'>
+
+  constructor(store: Pick<Store, 'variables' | 'resourceReferences'>) {
+    this.store = store
+  }
 
   listVariables(actorId: string): { readonly variables: readonly VariableListItem[]; readonly version: 1 } {
     return {

@@ -5,7 +5,11 @@ import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
 import { ControlError, serverErrorCode } from '../error.ts'
 
 export class ControlAccess {
-  constructor(private readonly store: Pick<Store, 'users' | 'flows' | 'runViews' | 'publications'>) {}
+  private readonly store: Pick<Store, 'users' | 'flows' | 'runViews' | 'publications'>
+
+  constructor(store: Pick<Store, 'users' | 'flows' | 'runViews' | 'publications'>) {
+    this.store = store
+  }
 
   requireAdmin(actorId: string): void {
     const user = this.store.users.get(actorId)

@@ -34,19 +34,43 @@ import { draft, readRevisionOrRepair, revisionContent, revisionMetadata } from '
 import { requireNoWorkflowSelfReference, workflowAuthoringTarget, workflowDiagnostics } from './workflow.ts'
 
 export class DraftControl {
+  private readonly triggerDefinitions: readonly TriggerKeySnapshot[]
+  private readonly eventSources: Pick<EventSourceControl, 'listEventSources'>
+  private readonly connectors: Pick<ConnectorControl, 'request' | 'getConnectorAction' | 'accountDiagnostics'>
+  private readonly access: ControlAccess
+  private readonly store: Pick<Store, 'flows' | 'publications'>
+  private readonly clock: () => number
+  private readonly connectorAccess: ConnectorAccessHost
+  private readonly triggersChanged: () => void
+  private readonly flowCatalogChanged: (event?: FlowCatalogEvent, ownerId?: string) => void
+  private readonly flowChanged: (event: FlowChangeEvent) => void
+  private readonly llmAvailable: (kind?: 'agent' | 'decision') => boolean
+
   constructor(
-    private readonly triggerDefinitions: readonly TriggerKeySnapshot[],
-    private readonly eventSources: Pick<EventSourceControl, 'listEventSources'>,
-    private readonly connectors: Pick<ConnectorControl, 'request' | 'getConnectorAction' | 'accountDiagnostics'>,
-    private readonly access: ControlAccess,
-    private readonly store: Pick<Store, 'flows' | 'publications'>,
-    private readonly clock: () => number,
-    private readonly connectorAccess: ConnectorAccessHost,
-    private readonly triggersChanged: () => void,
-    private readonly flowCatalogChanged: (event?: FlowCatalogEvent, ownerId?: string) => void,
-    private readonly flowChanged: (event: FlowChangeEvent) => void,
-    private readonly llmAvailable: (kind?: 'agent' | 'decision') => boolean,
-  ) {}
+    triggerDefinitions: readonly TriggerKeySnapshot[],
+    eventSources: Pick<EventSourceControl, 'listEventSources'>,
+    connectors: Pick<ConnectorControl, 'request' | 'getConnectorAction' | 'accountDiagnostics'>,
+    access: ControlAccess,
+    store: Pick<Store, 'flows' | 'publications'>,
+    clock: () => number,
+    connectorAccess: ConnectorAccessHost,
+    triggersChanged: () => void,
+    flowCatalogChanged: (event?: FlowCatalogEvent, ownerId?: string) => void,
+    flowChanged: (event: FlowChangeEvent) => void,
+    llmAvailable: (kind?: 'agent' | 'decision') => boolean,
+  ) {
+    this.triggerDefinitions = triggerDefinitions
+    this.eventSources = eventSources
+    this.connectors = connectors
+    this.access = access
+    this.store = store
+    this.clock = clock
+    this.connectorAccess = connectorAccess
+    this.triggersChanged = triggersChanged
+    this.flowCatalogChanged = flowCatalogChanged
+    this.flowChanged = flowChanged
+    this.llmAvailable = llmAvailable
+  }
 
   listTriggerKeys(): readonly TriggerKeySummary[] {
     return this.triggerDefinitions.map(({ description, displayName, key, name, provider, type }) => ({ description, displayName, key, name, provider, type }))
