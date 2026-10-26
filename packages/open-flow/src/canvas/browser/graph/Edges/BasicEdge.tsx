@@ -7,7 +7,7 @@ import { useId, useMemo } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { ErrorCircle } from '../../components/errorCircle.tsx'
 import { useCanvasStore } from '../CanvasStoreContext.tsx'
-import { connectionNodeBounds, connectionPortIndex, getConnectionPath } from './connectionPath.ts'
+import { connectionNodeBounds, getConnectionPath } from './connectionPath.ts'
 import { EdgeGradient } from './EdgeGradient.tsx'
 
 export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
@@ -26,8 +26,6 @@ export function BasicEdge(props: EdgeProps<RFEdge>): React.ReactElement {
   const targetNode = useInternalNode(props.target)
   const [path, labelX, labelY] = getConnectionPath({
     sourceBounds: connectionNodeBounds(sourceNode),
-    sourcePortIndex: connectionPortIndex(sourceNode, props.sourceHandleId),
-    targetPortIndex: connectionPortIndex(targetNode, props.targetHandleId),
     targetBounds: connectionNodeBounds(targetNode),
     sourceX: props.sourceX,
     sourceY: props.sourceY,

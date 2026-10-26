@@ -13,11 +13,11 @@ export const connectionPathsStory: FrontendStory = {
   id: 'connection-paths',
   title: 'Connection paths',
   description:
-    'Backward, self, forward and reciprocal connections in both diagonal layouts. Drag or collapse cards to inspect routing; port-distance samples follow below.',
+    'Each connection uses only its own endpoints. Drag an upper or lower source: only its line changes. Return turns mirror within a fixed band above the destination when space allows.',
   standalone: true,
   render: (log, dark, language) => (
     <>
-      <BackwardConnections log={log} dark={dark} language={language} />
+      <ConnectionSamples log={log} dark={dark} language={language} />
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(160px, 1fr))', gap: 16, padding: 24 }}>
         {[Position.Right, Position.Left, Position.Bottom, Position.Top].map((position) => (
           <section key={position}>
@@ -59,6 +59,69 @@ export const connectionPathsStory: FrontendStory = {
       </div>
     </>
   ),
+}
+
+const alignedModel: FlowCanvasViewModel = {
+  viewport: { x: 110, y: 30, zoom: 0.55 },
+  nodes: [
+    ...[0, 240, 480].map((y, index) => ({
+      id: `aligned-${index}`,
+      kind: 'wait' as const,
+      title: ['Long return', 'Medium return', 'Short return'][index]!,
+      position: { x: 550, y },
+      inputs: [],
+      outputs: [{ handle: 'pending' }],
+    })),
+    { id: 'destination', kind: 'wait', title: 'Shared destination', position: { x: 0, y: 1000 }, inputs: [], outputs: [{ handle: 'pending' }] },
+  ],
+  edges: [0, 1, 2].map((index) => ({
+    id: `aligned-return-${index}`,
+    source: `aligned-${index}`,
+    sourceHandle: '$branch:pending',
+    target: 'destination',
+    targetHandle: '$in',
+  })),
+}
+
+const boundaryModel: FlowCanvasViewModel = {
+  viewport: { x: 130, y: 40, zoom: 0.75 },
+  nodes: [
+    { id: 'tight-source', kind: 'wait', title: 'Tight vertical gap', position: { x: 550, y: 0 }, inputs: [], outputs: [{ handle: 'pending' }] },
+    { id: 'tight-target', kind: 'wait', title: 'Destination · narrow gap', position: { x: 0, y: 145 }, inputs: [], outputs: [{ handle: 'pending' }] },
+    { id: 'overlap-source', kind: 'wait', title: 'Overlapping rows', position: { x: 550, y: 420 }, inputs: [], outputs: [{ handle: 'pending' }] },
+    { id: 'overlap-target', kind: 'wait', title: 'Destination · overlapping', position: { x: 0, y: 480 }, inputs: [], outputs: [{ handle: 'pending' }] },
+  ],
+  edges: [
+    { id: 'tight-return', source: 'tight-source', sourceHandle: '$branch:pending', target: 'tight-target', targetHandle: '$in' },
+    { id: 'overlap-return', source: 'overlap-source', sourceHandle: '$branch:pending', target: 'overlap-target', targetHandle: '$in' },
+  ],
+}
+
+const mixedRowsModel: FlowCanvasViewModel = {
+  viewport: { x: 110, y: 30, zoom: 0.55 },
+  nodes: [
+    { id: 'far', kind: 'wait', title: 'Upper · long return', position: { x: 550, y: 0 }, inputs: [], outputs: [{ handle: 'pending' }] },
+    { id: 'middle', kind: 'wait', title: 'Upper · medium return', position: { x: 550, y: 240 }, inputs: [], outputs: [{ handle: 'pending' }] },
+    { id: 'lower', kind: 'wait', title: 'Lower return · drag independently', position: { x: 550, y: 900 }, inputs: [], outputs: [{ handle: 'pending' }] },
+    { id: 'destination', kind: 'wait', title: 'Shared destination', position: { x: 0, y: 800 }, inputs: [], outputs: [{ handle: 'pending' }] },
+  ],
+  edges: ['far', 'middle', 'lower'].map((source) => ({
+    id: `${source}-return`,
+    source,
+    sourceHandle: '$branch:pending',
+    target: 'destination',
+    targetHandle: '$in',
+  })),
+}
+
+const sameRowModel: FlowCanvasViewModel = {
+  viewport: { x: 100, y: 80, zoom: 0.6 },
+  nodes: [
+    { id: 'near', kind: 'wait', title: 'Near return', position: { x: 400, y: 0 }, inputs: [], outputs: [{ handle: 'pending' }] },
+    { id: 'far', kind: 'wait', title: 'Far return', position: { x: 800, y: 0 }, inputs: [], outputs: [{ handle: 'pending' }] },
+    { id: 'destination', kind: 'wait', title: 'Shared destination', position: { x: 0, y: 80 }, inputs: [], outputs: [{ handle: 'pending' }] },
+  ],
+  edges: ['near', 'far'].map((source) => ({ id: `${source}-return`, source, sourceHandle: '$branch:pending', target: 'destination', targetHandle: '$in' })),
 }
 
 const backwardModel: FlowCanvasViewModel = {
@@ -136,18 +199,26 @@ const backwardModel: FlowCanvasViewModel = {
   ],
 }
 
-function BackwardConnections({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
-  const [model, setModel] = useState(backwardModel)
+const connectionSamples = [
+  { label: 'Aligned returns', model: alignedModel },
+  { label: 'Mixed rows', model: mixedRowsModel },
+  { label: 'Same row', model: sameRowModel },
+  { label: 'Tight & overlapping', model: boundaryModel },
+  { label: 'Backward & self', model: backwardModel },
+]
+
+function ConnectionSamples({ dark, language, log }: { dark: boolean; language: UiLanguage; log: LogAction }) {
+  const [model, setModel] = useState(alignedModel)
   const [selected, setSelected] = useState<readonly string[]>([])
-  useStoryActions([
-    {
-      label: 'Reset samples',
+  useStoryActions(
+    connectionSamples.map(({ label, model: sample }) => ({
+      label,
       onClick: () => {
-        setModel(backwardModel)
+        setModel(sample)
         setSelected([])
       },
-    },
-  ])
+    })),
+  )
   return (
     <div style={{ height: 850 }}>
       <FlowCanvasView
