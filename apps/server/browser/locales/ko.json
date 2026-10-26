@@ -90,7 +90,7 @@
     "oomolExpired": "인증이 만료되었습니다. 다시 연결하세요.",
     "oomolFailed": "OOMOL에 연결할 수 없습니다. 다시 시도하세요.",
     "connectorMode": "연결 방식",
-    "oomolHosted": "OOMOL 호스팅",
+    "oomolHosted": "공식 호스팅 서비스",
     "connectorCustom": "자체 호스팅",
     "services": "서비스 연결",
     "connectorAddress": "Connector URL",
@@ -104,11 +104,11 @@
       "required": "필수 항목입니다.",
       "connectorUrl": "인증 정보, 쿼리, 프래그먼트가 없는 HTTP 또는 HTTPS URL을 입력하세요.",
       "origin": "경로, 인증 정보, 쿼리, 프래그먼트가 없는 HTTPS 주소를 입력하세요. 루프백 주소는 HTTP를 사용할 수 있습니다.",
-      "hosted": "OOMOL 서비스는 OOMOL 호스팅 설정을 사용하세요."
+      "hosted": "OOMOL 서비스에는 공식 호스팅 서비스 설정을 사용하세요."
     },
     "serviceSelectionRequired": "서비스 연결을 선택하세요",
     "serviceIncomplete": "선택한 서비스를 편집하여 설정을 완료하세요",
-    "hostedIncludes": "직접 배포할 필요 없이 OOMOL이 호스팅하는 Connector와 LLM 서비스를 사용합니다.",
+    "hostedIncludes": "직접 배포할 필요 없이 공식 호스팅 Connector와 LLM 서비스를 사용합니다.",
     "selfHostedDescription": "직접 호스팅하는 Connector, 인증 콘솔 및 LLM 서비스를 연결합니다.",
     "connectorAddressHelp": "워크플로가 Connector를 통해 외부 서비스 기능을 조회하고 실행하는 주소입니다.",
     "connectorTokenHelp": "Connector 요청에 사용하는 인증 정보입니다. 인증이 비활성화된 경우 비워 두세요.",

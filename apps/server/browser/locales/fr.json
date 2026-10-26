@@ -90,7 +90,7 @@
     "oomolExpired": "L’autorisation a expiré. Connectez-vous à nouveau.",
     "oomolFailed": "Impossible de connecter OOMOL. Réessayez.",
     "connectorMode": "Type de connexion",
-    "oomolHosted": "Hébergé par OOMOL",
+    "oomolHosted": "Services hébergés officiels",
     "connectorCustom": "Auto-hébergé",
     "services": "Connexion aux services",
     "connectorAddress": "URL du Connector",
@@ -104,11 +104,11 @@
       "required": "Ce champ est obligatoire.",
       "connectorUrl": "Saisissez une URL HTTP ou HTTPS sans identifiants, paramètres ni fragment.",
       "origin": "Saisissez une origine HTTPS sans chemin, identifiants, paramètres ni fragment. HTTP est autorisé en local.",
-      "hosted": "Utilisez le profil hébergé par OOMOL pour les services OOMOL."
+      "hosted": "Pour les services OOMOL, utilisez le profil des services hébergés officiels."
     },
     "serviceSelectionRequired": "Sélectionnez une connexion de service",
     "serviceIncomplete": "Modifiez le service sélectionné pour compléter sa configuration",
-    "hostedIncludes": "Utilisez les services Connector et LLM hébergés par OOMOL, sans les déployer vous-même.",
+    "hostedIncludes": "Utilisez les services Connector et LLM hébergés officiellement, sans les déployer vous-même.",
     "selfHostedDescription": "Connectez vos propres services Connector, console d’autorisation et LLM.",
     "connectorAddressHelp": "Adresse utilisée par les workflows pour découvrir et exécuter les fonctions des services externes via Connector.",
     "connectorTokenHelp": "Identifiant d’accès aux requêtes Connector. Laissez vide si l’authentification est désactivée.",

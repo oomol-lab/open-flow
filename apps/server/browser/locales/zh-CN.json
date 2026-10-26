@@ -90,7 +90,7 @@
     "oomolExpired": "授权已过期，请重新连接。",
     "oomolFailed": "无法连接 OOMOL，请重试。",
     "connectorMode": "连接方式",
-    "oomolHosted": "OOMOL 托管",
+    "oomolHosted": "官方托管服务",
     "connectorCustom": "自部署",
     "services": "服务连接",
     "connectorAddress": "Connector 地址",
@@ -104,11 +104,11 @@
       "required": "请填写此项。",
       "connectorUrl": "请输入有效的 HTTP 或 HTTPS 地址，不含用户名、密码、查询参数或片段。",
       "origin": "请输入 HTTPS 域名，不含路径、用户名、密码、查询参数或片段；本机地址可使用 HTTP。",
-      "hosted": "OOMOL 服务请使用「OOMOL 托管」配置。"
+      "hosted": "OOMOL 服务请使用「官方托管服务」配置。"
     },
     "serviceSelectionRequired": "请选择服务连接",
     "serviceIncomplete": "请编辑当前服务，补全配置",
-    "hostedIncludes": "使用 OOMOL 托管的 Connector 和 LLM 服务，无需自行部署。",
+    "hostedIncludes": "使用官方托管的 Connector 和 LLM 服务，无需自行部署。",
     "selfHostedDescription": "连接自部署的 Connector、授权控制台和 LLM 服务。",
     "connectorAddressHelp": "工作流通过此地址调用 Connector，获取和执行外部服务能力。",
     "connectorTokenHelp": "调用 Connector 时使用的访问凭据；未启用鉴权时可留空。",

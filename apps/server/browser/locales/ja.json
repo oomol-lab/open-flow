@@ -90,7 +90,7 @@
     "oomolExpired": "認証の有効期限が切れました。再度接続してください。",
     "oomolFailed": "OOMOL に接続できませんでした。再試行してください。",
     "connectorMode": "接続方式",
-    "oomolHosted": "OOMOL ホスト",
+    "oomolHosted": "公式ホスティングサービス",
     "connectorCustom": "セルフホスト",
     "services": "サービス接続",
     "connectorAddress": "Connector URL",
@@ -104,11 +104,11 @@
       "required": "この項目は必須です。",
       "connectorUrl": "認証情報、クエリ、フラグメントを含まない HTTP または HTTPS の URL を入力してください。",
       "origin": "パス、認証情報、クエリ、フラグメントを含まない HTTPS オリジンを入力してください。ループバックでは HTTP も使用できます。",
-      "hosted": "OOMOL サービスには「OOMOL ホスト」を使用してください。"
+      "hosted": "OOMOL サービスには「公式ホスティングサービス」を使用してください。"
     },
     "serviceSelectionRequired": "サービス接続を選択してください",
     "serviceIncomplete": "選択したサービスを編集して設定を完了してください",
-    "hostedIncludes": "OOMOL がホストする Connector と LLM サービスを利用できます。自分でデプロイする必要はありません。",
+    "hostedIncludes": "公式ホスティングの Connector と LLM サービスを利用できます。自分でデプロイする必要はありません。",
     "selfHostedDescription": "自分でホストする Connector、認可コンソール、LLM サービスに接続します。",
     "connectorAddressHelp": "ワークフローが Connector 経由で外部サービスの機能を取得・実行するためのアドレスです。",
     "connectorTokenHelp": "Connector の呼び出しに使う認証情報です。認証が無効な場合は空欄にできます。",

@@ -90,7 +90,7 @@
     "oomolExpired": "Authorization expired. Connect again to retry.",
     "oomolFailed": "OOMOL could not be connected. Try again.",
     "connectorMode": "Connection type",
-    "oomolHosted": "OOMOL hosted",
+    "oomolHosted": "Official hosted services",
     "connectorCustom": "Self-hosted",
     "services": "Service connection",
     "connectorAddress": "Connector URL",
@@ -104,11 +104,11 @@
       "required": "This field is required.",
       "connectorUrl": "Enter an HTTP or HTTPS URL without credentials, query parameters, or a fragment.",
       "origin": "Enter an HTTPS origin without a path, credentials, query, or fragment. Loopback addresses may use HTTP.",
-      "hosted": "Use the OOMOL-hosted profile for OOMOL services."
+      "hosted": "Use the official hosted services profile for OOMOL services."
     },
     "serviceSelectionRequired": "Select a service connection",
     "serviceIncomplete": "Edit the selected service to complete its configuration",
-    "hostedIncludes": "Use OOMOL-hosted Connector and LLM services without deploying them yourself.",
+    "hostedIncludes": "Use the officially hosted Connector and LLM services without deploying them yourself.",
     "selfHostedDescription": "Connect your own Connector, authorization console, and LLM services.",
     "connectorAddressHelp": "Workflows use this address to discover and run external service capabilities through Connector.",
     "connectorTokenHelp": "Credential for Connector requests. Leave empty if authentication is disabled.",
