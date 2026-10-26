@@ -64,7 +64,7 @@ export function developmentBackendPlugin(): Plugin {
       }
 
       const developmentToken = configuredOperatorToken == null ? await loadDevelopmentToken() : { created: false, token: configuredOperatorToken }
-      backend = spawn('node', ['--watch', '--no-node-snapshot', 'node/main.ts', '--api-only'], {
+      backend = spawn('node', ['--watch', '--no-node-snapshot', '--import', '@oxc-node/core/register', 'node/main.ts', '--api-only'], {
         cwd: appRoot,
         env: {
           ...process.env,

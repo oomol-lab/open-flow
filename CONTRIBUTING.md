@@ -21,6 +21,10 @@ bun install --frozen-lockfile
 bun run dev
 ```
 
+Development TypeScript runs on Node.js with `@oxc-node/core` for transpilation, including the
+isolated runtime executor. Production continues to run compiled JavaScript. Type checking runs
+separately through `bun run check`.
+
 The development Workbench listens on `http://127.0.0.1:5174` and proxies API requests to the
 Server on `http://127.0.0.1:3001`. The first run writes an operator token to
 `apps/server/.open-flow-dev/operator-token`; later runs reuse it. Set `OPEN_FLOW_TOKEN` to use an
