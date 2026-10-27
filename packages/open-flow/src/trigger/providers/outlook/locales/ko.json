@@ -12,7 +12,7 @@
       "withAttachmentsOnly": "첨부 파일이 있는 메시지에서만 트리거합니다."
     },
     "outputs": {
-      "event": "이 Run에 해당하는 단일 이벤트입니다."
+      "events": "이전 폴링 이후 수신된 Outlook 메시지."
     }
   }
 }

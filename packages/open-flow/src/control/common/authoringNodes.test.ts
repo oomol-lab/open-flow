@@ -12,7 +12,7 @@ import { decodeRevisionContent } from '../../flow/common/changeSchema.ts'
 import { decodeRevision, encodeRevision } from '../../flow/common/encoding.ts'
 import { nodeInputPorts } from '../../flow/common/graph.ts'
 import { prepareFlow, validateFlow } from '../../flow/common/semantics.ts'
-import { legacyPollDefinitions, triggerDefinitions } from '../../trigger/providers/definitions.ts'
+import { triggerDefinitions } from '../../trigger/providers/definitions.ts'
 import { authoringNode, authoringSchema, authoringTypes, compileAuthoring, readAuthoring } from './authoring.ts'
 
 const empty: RevisionContent = {
@@ -609,35 +609,4 @@ describe('Wait automatic continuation authoring', () => {
     const approval = { kind: 'approval', prompt: 'Review', inputs: {}, inputDefinitions: [], autoContinue: { kind: 'after', durationMs: 1000 } }
     expect(() => decodeRevisionContent({ ...empty, document: { ...empty.document, graph: { nodes: { approval }, edges: [] } } })).toThrow()
   })
-})
-
-it('upgrades a legacy Poll only on explicit refresh and leaves affected output mappings for diagnosis', async () => {
-  const previous = legacyPollDefinitions.find((item) => item.snapshot.key === 'gmail.on_message_received')!.snapshot
-  const current = triggerDefinitions.find((item) => item.snapshot.key === previous.key)!.snapshot
-  const created = await edit(
-    empty,
-    [
-      { op: 'node.add', as: 'mail', type: 'poll', name: 'Mail', config: { key: previous.key, connectionId: 'mail-account' } },
-      {
-        op: 'node.add',
-        as: 'result',
-        type: 'outputs',
-        name: 'Result',
-        config: { outputDefs: { messages: { schema: { type: 'array', items: { type: 'object' } }, nullable: false } } },
-        inputs: { messages: { kind: 'output', node: '$mail', port: 'events' } },
-      },
-      { op: 'edge.connect', source: '$mail', target: '$result' },
-    ],
-    { trigger: () => previous },
-  )
-  const before = encodeRevision(created.content)
-  const renamed = await edit(created.content, [{ op: 'node.update', node: created.nodes.mail!, set: { name: 'Renamed' } }], { trigger: () => current })
-  const oldNode = renamed.content.document.graph.nodes[created.nodes.mail!]!
-  expect(oldNode.kind === 'poll' && oldNode.definition.definitionVersion).toBe(2)
-  const refreshed = await edit(renamed.content, [{ op: 'node.refresh', node: created.nodes.mail! }], { trigger: () => current })
-  const upgraded = refreshed.content.document.graph.nodes[created.nodes.mail!]!
-  expect(upgraded.kind === 'poll' && upgraded.definition.outputs.map((port) => port.handle)).toEqual(['event'])
-  expect(refreshed.content.document.graph.nodes[created.nodes.result!]!).toEqual(created.content.document.graph.nodes[created.nodes.result!]!)
-  expect((await validateFlow(refreshed.content, findEngineContract(currentEngineContract)!)).diagnostics.length).toBeGreaterThan(0)
-  expect(encodeRevision(created.content)).toEqual(before)
 })

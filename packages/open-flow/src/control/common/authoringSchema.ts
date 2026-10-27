@@ -283,7 +283,7 @@ export function authoringSchema(kind?: AuthoringType) {
                   : kind == 'condition'
                     ? 'Edit branch operands through config.branches. A branch can test one expression, all expressions, or any alternatives. Unmatched execution uses branch otherwise.'
                     : ['poll', 'integration'].includes(kind)
-                      ? 'Configure static parameters with node.add.inputs or input.set. Definitions come from the selected Trigger key; execution output and variable sources are unavailable. Poll definition version 3 emits one event per Run using event; version 2 retains the events array in batch Runs. node.refresh explicitly upgrades a saved Trigger definition; inspect output diagnostics and update downstream mappings before publishing. Existing Publications keep their original behavior.'
+                      ? 'Configure static parameters with node.add.inputs or input.set. Definitions come from the selected Trigger key; execution output and variable sources are unavailable.'
                       : kind == 'llm'
                         ? 'Configure model settings, message templates and history as defaults. Input bindings with the same names override these defaults; named business inputs can be bound directly. Template strings interpolate {{name}}.'
                         : kind == 'openapi'

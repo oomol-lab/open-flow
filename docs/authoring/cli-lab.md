@@ -372,8 +372,7 @@ bun run lab test wait-auto-continue
 bun run lab test wait-auto-continue --mcp
 ```
 
-`poll-event` verifies public Poll creation, read, local update and explicit definition refresh,
-then executes two deterministic draft Runs with one Gmail event each. Run
-`bun run lab test poll-event` and `bun run lab test poll-event --mcp`.
-The scenario tests authoring and output consumption; provider polling, page admission and legacy
-batch compatibility are covered by Server Poll tests.
+`poll-batch` verifies public Poll creation, read and local update, then executes two deterministic
+Draft Runs with two Gmail events each. Run `bun run lab test poll-batch` and
+`bun run lab test poll-batch --mcp`. Both events must reach Outputs together as a messages array.
+Provider polling, page admission, deduplication and restart behavior are covered by Server Poll tests.

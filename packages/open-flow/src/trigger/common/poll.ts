@@ -35,8 +35,7 @@ export function eventsPollOutputs(events: readonly PollEvent[]): Readonly<Record
 }
 
 export interface PollDefinition {
-  readonly delivery?: 'event'
-  /** Event delivery passes one event; legacy batch delivery passes the complete page. */
+  /** Constructs one Run's outputs from a nonempty batch of fresh, deduplicated events. */
   readonly buildOutputs: (events: readonly PollEvent[]) => Readonly<Record<string, JsonValue>>
   readonly configOptions?: (context: TriggerConfigOptionsContext) => Promise<readonly TriggerConfigOption[]>
   readonly poll: (context: PollContext) => Promise<PollResult>

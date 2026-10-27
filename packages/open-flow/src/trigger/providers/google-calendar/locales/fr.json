@@ -9,7 +9,7 @@
       "maxEventsPerPoll": "Nombre maximal d'événements du calendrier traités par interrogation."
     },
     "outputs": {
-      "event": "Un événement unique pour ce Run."
+      "events": "Événements du calendrier créés, mis à jour ou annulés depuis la précédente interrogation."
     }
   }
 }

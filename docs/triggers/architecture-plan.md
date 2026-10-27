@@ -1,16 +1,14 @@
 # Trigger 架构收敛实施计划
 
-状态：本轮代码调整与自动化验收已完成。2026-10-27 按用户要求一次覆盖全部现有 Source Provider，真实账号验收由用户手动执行；部署前的版本和存量复核仍待上线时完成，未部署。
+范围修正（2026-10-27）：本轮将 Source 配置、秘密和远端资源生命周期交由 Connector 管理，保留 Poll 的批量输出和执行粒度。新建与已有 Poll 均使用 definitionVersion 2 和 `events[]`，无需升级。此前单事件方案撤回，Source 路由和回调改造继续保留。
 
-本轮覆盖 Feishu、Slack、Intercom、Sentry、Zoom、Fireflies、Jira 的 Connector 引用所有权；Asana 创建期握手与声明式回调转发；10 个 Poll 的单事件输出与旧版显式升级；共享应用路由。Connector 持有秘密、Provider 配置和远端订阅状态，Open Flow 保存引用、公开投影和本地消费者/投递状态。已有 Source 行上的未完成操作指纹用于重试和删除竞争，不增加导入暂存层、操作日志或后台清理框架。
+状态：本轮代码调整与自动化验收已完成。2026-10-27 按用户要求一次覆盖全部现有 Source Provider，真实账号验收由用户手动执行；部署前的版本和存量复核仍待上线时完成，未部署。
 
 2026-10-27 已只读核实目标 production 两个租户分片的 Source 及相关记录均为空。Server 迁移 54 对任何旧 Source 明确拒绝并保留原数据。发布前仍需复查部署版本和存量；本地测试不等于真实第三方验收。
 
 实现与兼容边界见 [操作契约](connector-contract.md) 和 [发布基线](release-baseline.md)。以下阶段保留设计依据，当前实现不再限于首批 Slack。
 
 保留现有 Publication、调度、去重、恢复和 Run 准入机制，收敛事件语义与 Connector 协议。目标是让新增 Provider 主要发生在 Connector，让同一 Trigger 在两个 Connector 后端具有一致的业务行为，并让用户不必因为采集方式改变而重写 Flow。
-
-本计划采用两个推荐目标：普通离散事件默认一事件一 Run；Connector 持有 Provider Source 的配置、秘密和远端资源状态。实施时先完成公开契约，再修改运行行为；已发布批量 Poll Flow 的语义升级仍需显式迁移设计。现有已发布契约不能因本计划而被静默替换。
 
 ## 目标边界
 
@@ -50,9 +48,8 @@ Open Flow 保存的 Source 引用和消费者配置不包含 Provider 验签秘�
 
 1. 核实三个项目实际发布和部署的版本，记录 artifact、源码提交、协议能力及受支持的旧版本。按 [contract evolution](../control/contracts/compatibility.md#release-baselines-and-contract-versioning) 判断版本边界；本计划不预先指定新版本号，也不按 PR 次数递增契约。
 2. 编写共同 Trigger 协议规范，明确 `read`、`options`、订阅控制、callback receive 与 Source 管理的请求和响应。协议覆盖事件身份、checkpoint、分页、错误分类、取消、能力缺失及不支持版本的拒绝行为。
-3. 将“离散事件”“状态观察”“明确的业务批次”区分开。离散事件默认一事件一 Run；状态观察只承诺被观察到的变化；分页和上游 delivery 不直接定义业务批次。
-4. 定义去重作用域和保留期限：相同配置重新发布、改变过滤条件、切换连接、重新创建 Source、手动重放分别是否产生新准入身份。不能把各路径现有不同的哈希公式直接当作统一产品语义。
-5. 选择共同协议和 fixtures 的唯一维护位置。优先放在公开 connect 的独立、可版本化契约产物中，由另两个仓库消费；避免让托管服务依赖整个 Open Flow 产品包或 connect Server。
+3. 定义去重作用域和保留期限：相同配置重新发布、改变过滤条件、切换连接、重新创建 Source、手动重放分别是否产生新准入身份。不能把各路径现有不同的哈希公式直接当作统一产品语义。
+4. 选择共同协议和 fixtures 的唯一维护位置。优先放在公开 connect 的独立、可版本化契约产物中，由另两个仓库消费；避免让托管服务依赖整个 Open Flow 产品包或 connect Server。
 
 交付物：协议规范、版本兼容表、旧数据和旧 Flow 的迁移清单、三仓库的依赖与发布顺序。
 
@@ -117,22 +114,11 @@ connect 的 token ownership 与托管 Connector 的 Team/principal ownership 分
 
 验收：增加一个具有新签名 header 的普通 webhook Provider，不需要增加 Open Flow 的 Provider 名称分支；创建响应丢失和握手重试仍可恢复。
 
-## 阶段五 分离采集分页与 Run 语义
+## 阶段五 保持 Poll 批量语义
 
-主要改动涉及公共 Poll 契约、Server Poll 准入事务、输出定义、authoring、Workbench 与 CLI/MCP 场景。
+Source 所有权调整不改变 Poll 执行粒度。保持 definitionVersion 2 和 `events[]`，每个非空去重结果页作为一个批次准入 Run。首轮 baseline、过滤、重叠去重、续页、重启恢复和 runtime fencing 保持原行为。
 
-1. 规范化采集结果为带稳定业务身份的事件序列和下一 checkpoint。Poll 可以按页读取，Watch 可以按通知唤醒，两者均不以页大小决定下游输入结构。
-2. 普通事件逐个准入 Run。首版优先沿用页内原子提交：容量不足时整页不推进 checkpoint，重试不重复准入。明确单页上限和可接受容量，防止一页永远无法被接受。只有证据表明需要时才增加部分页进度。
-3. 保留首轮建立 baseline、过滤、重叠读取去重、续页恢复、关闭 Flow 和旧 runtime fencing 的现有保证。
-4. 生成新的单事件输出契约，并同步公共创建、读取、局部编辑、schema/examples、诊断、搜索和 Workbench。调用方不构造内部定义或手工补默认端口。
-5. 已发布的批量 Poll Flow 不自动变成单事件 Flow。Draft 升级报告受影响的输出映射、循环和 Run 数量变化；无法保持业务意义时要求用户明确修改，不能猜测数组到对象的映射。
-6. 旧 Publication 与运行中 Run 继续按已发布契约处理；不再支持执行的版本明确阻止升级或要求先排空、保留匹配运行环境。新语义经重新发布生效，历史 Revision 和 Run 不重写。
-
-交付物：单事件契约、显式升级路径、受影响 Trigger 的端口和使用说明，以及端到端 authoring 场景。
-
-验收：同一组事件使用不同页大小、跨页重复和重启续页后，得到相同业务事件集合与输出；容量拒绝不丢事件；旧 Flow 不静默改变行为。单事件 Run 数量增加带来的执行成本需以代表性负载测量并记录。
-
-首轮不新增通用批处理窗口、聚合 DSL 或任意配置开关。确有业务批次需求时，单独定义其边界和失败语义。
+删除单事件 delivery 分支、旧定义快照目录和 Trigger refresh 升级路径，不增加模式开关。CLI/MCP Lab `poll-batch` 验证多条消息一起进入一个 Run；Server 测试覆盖去重和容量不足时 checkpoint 不推进。
 
 ## 阶段六 优化共享应用回调路由
 
@@ -153,8 +139,6 @@ connect 的 token ownership 与托管 Connector 的 Team/principal ownership 分
 
 每阶段保持可独立审查和验证，不把三个仓库的全部改造压成一次发布。先交付一个纵向闭环，再扩展 Provider 数量。协议测试可以先落地，破坏性行为必须与实际兼容义务对应的升级或拒绝机制一起交付。
 
-默认先发布支持目标协议的 Connector，再升级 Open Flow 公共包与 Server，在确认 Source 存储为空后启用正式 Source 链路，最后显式升级和重新发布受影响的批量 Poll Flow。阶段一需确认滚动升级是否可行；不具备兼容条件时采用明确维护窗口，不假设“Connector 先发”就一定兼容旧客户端。
-
 新 Source 创建后，回滚必须考虑新存储中的配置、秘密和远端资源，不能只切换二进制。发布说明列出可回滚边界与恢复步骤；禁止回滚时重新创建不确定是否存在的上游订阅。
 
 ## 验证和完成条件
@@ -171,11 +155,7 @@ connect 的 token ownership 与托管 Connector 的 Team/principal ownership 分
 ## 本轮交付与验收边界
 
 - 两个 Connector 共用公开 connect 的行为 fixtures，覆盖全部 Source 创建/读取/编辑/删除，Slack 验签、共享状态及权限，Jira 创建响应丢失恢复和资源清理，Asana 创建期间握手，Tally 与 GitHub 现有协议；36 个目录逐项对照。
-- 单事件 Poll 使用 definitionVersion 3 和对象端口 `event`；已发布 version 2 保留 `events[]`。以 key + definitionVersion 选择执行定义。公共 `node.refresh` 显式升级 Draft，保留旧映射并通过诊断报告失效引用，修正后重新发布。历史 Revision、Publication、Run 不改写。
-- 页内 Run 准入、去重及 checkpoint 一起提交；容量不足回滚整页。单页最多 100 个事件，部署容量不足以容纳当前页时报告永久配置错误，要求提高容量；不引入部分页进度。
-- CLI/MCP Lab 的 `poll-event` 使用真实公共 authoring 和执行，验证创建、读取、局部修改、显式 refresh 与单事件输出。运行时测试另覆盖旧版批量、不同页大小、跨页重复、重启和容量回滚。
 - 共享应用实测 1/10/100 Sources：只匹配一个 Source 的普通回调均为 2 次 Connector 调用；挑战只需路由。Connector 内复用 Provider 的既有验签和来源匹配函数，CPU 仍随 Source 数量增长，没有额外索引或路由框架。来源凭据只在匹配后的处理阶段检查。
-- 发布工作与真实账号验收未自动执行。用户负责真实账号，部署方负责镜像/包版本、数据库状态与发布前 Source 空存量复核。历史批量 Flow 的业务映射由用户显式升级，不能自动推测数组到对象的业务含义。
 
 暂不重写 scheduler，不引入消息中间件、通用批处理窗口或 Provider 公共框架。
 
@@ -199,5 +179,4 @@ connect 的 token ownership 与托管 Connector 的 Team/principal ownership 分
 - connect：Trigger 55 个测试、SQLite/PostgreSQL 与持久化 Source 99 个测试通过；fix-check 与 runtime package 构建通过。
 - 托管 Connector：flow-triggers 203 个测试、持久化 Source 测试通过；fix-check:full 通过。
 - 双后端共同协议、36 个目录及 Open Flow 纵向验收通过；1/10/100 Source 路由测试包括不可用的无关来源。
-- CLI/MCP Lab `poll-event` 均通过。实际 Open Flow npm tarball、浏览器运行时和 bundled command 隔离消费者通过。
 - 本轮没有改视觉布局，Workbench 端口与说明通过公共目录、presentation/localization 测试验证；没有将静态测试或 mock 计为真实第三方账号验收。

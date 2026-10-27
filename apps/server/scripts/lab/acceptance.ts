@@ -25,11 +25,11 @@ export function runtimeAssertions(
     return errors
   }
   if (status != 'completed') return [`Run ${sample.name} ended ${status}.`]
-  if (id === 'poll-event') {
+  if (id === 'poll-batch') {
     const completed = events.find((event) => event.kind === 'run.completed')
     const result = completed?.payload.result
-    if (result == null || typeof result !== 'object' || !('outputs' in result) || !isDeepStrictEqual(result.outputs, { subject: sample.name }))
-      errors.push('Return the subject of the one event supplied to this Run.')
+    if (result == null || typeof result !== 'object' || !('outputs' in result) || !isDeepStrictEqual(result.outputs, { messages: sample.outputs?.events }))
+      errors.push('Return the complete batch of messages supplied to this Run.')
     if (calls.length || modelCalls.length) errors.push('No external requests are needed.')
     return errors
   }

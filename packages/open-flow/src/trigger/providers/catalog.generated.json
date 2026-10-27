@@ -72,41 +72,44 @@
           "value": 200
         }
       ],
-      "definitionVersion": 3,
+      "definitionVersion": 2,
       "description": "Polls an Airtable table and triggers when a record is created or updated, ordered by a time field.",
       "displayName": "Record Created or Updated",
       "key": "airtable.on_record_changed",
       "name": "on_record_changed",
       "outputs": [
         {
-          "handle": "event",
+          "handle": "events",
           "jsonSchema": {
-            "type": "object",
-            "properties": {
-              "baseId": {
-                "type": "string"
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "baseId": {
+                  "type": "string"
+                },
+                "createdTime": {
+                  "type": "string"
+                },
+                "fields": {
+                  "type": "object"
+                },
+                "recordId": {
+                  "type": "string"
+                },
+                "tableIdOrName": {
+                  "type": "string"
+                },
+                "triggerField": {
+                  "type": "string"
+                },
+                "triggerFieldValue": {
+                  "type": "string"
+                }
               },
-              "createdTime": {
-                "type": "string"
-              },
-              "fields": {
-                "type": "object"
-              },
-              "recordId": {
-                "type": "string"
-              },
-              "tableIdOrName": {
-                "type": "string"
-              },
-              "triggerField": {
-                "type": "string"
-              },
-              "triggerFieldValue": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false,
-            "required": ["baseId", "tableIdOrName", "recordId", "createdTime", "triggerField", "triggerFieldValue", "fields"]
+              "additionalProperties": false,
+              "required": ["baseId", "tableIdOrName", "recordId", "createdTime", "triggerField", "triggerFieldValue", "fields"]
+            }
           },
           "nullable": false
         }
@@ -1260,47 +1263,50 @@
           "value": 25
         }
       ],
-      "definitionVersion": 3,
+      "definitionVersion": 2,
       "description": "Polls the Gmail mailbox and triggers when a new message is received.",
       "displayName": "New Message Received",
       "key": "gmail.on_message_received",
       "name": "on_message_received",
       "outputs": [
         {
-          "handle": "event",
+          "handle": "events",
           "jsonSchema": {
-            "type": "object",
-            "properties": {
-              "historyId": {
-                "type": ["string", "null"]
-              },
-              "labelIds": {
-                "type": "array",
-                "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "historyId": {
+                  "type": ["string", "null"]
+                },
+                "labelIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "messageId": {
+                  "type": "string"
+                },
+                "messageTimestamp": {
+                  "type": "string"
+                },
+                "sender": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "threadId": {
+                  "type": "string"
+                },
+                "to": {
                   "type": "string"
                 }
               },
-              "messageId": {
-                "type": "string"
-              },
-              "messageTimestamp": {
-                "type": "string"
-              },
-              "sender": {
-                "type": "string"
-              },
-              "subject": {
-                "type": "string"
-              },
-              "threadId": {
-                "type": "string"
-              },
-              "to": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false,
-            "required": ["messageId", "threadId", "historyId", "labelIds", "subject", "sender", "to", "messageTimestamp"]
+              "additionalProperties": false,
+              "required": ["messageId", "threadId", "historyId", "labelIds", "subject", "sender", "to", "messageTimestamp"]
+            }
           },
           "nullable": false
         }
@@ -1359,97 +1365,100 @@
           "value": 100
         }
       ],
-      "definitionVersion": 3,
+      "definitionVersion": 2,
       "description": "Polls a Google Calendar and triggers when an event is created, updated or cancelled.",
       "displayName": "Event Changed",
       "key": "googlecalendar.on_event_changed",
       "name": "on_event_changed",
       "outputs": [
         {
-          "handle": "event",
+          "handle": "events",
           "jsonSchema": {
-            "type": "object",
-            "properties": {
-              "attendeeEmails": {
-                "type": "array",
-                "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "attendeeEmails": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "calendarId": {
                   "type": "string"
+                },
+                "changeType": {
+                  "type": "string",
+                  "enum": ["created", "updated", "cancelled"]
+                },
+                "created": {
+                  "type": ["string", "null"]
+                },
+                "creatorEmail": {
+                  "type": ["string", "null"]
+                },
+                "description": {
+                  "type": ["string", "null"]
+                },
+                "end": {
+                  "type": ["object", "null"]
+                },
+                "eventId": {
+                  "type": "string"
+                },
+                "eventType": {
+                  "type": ["string", "null"]
+                },
+                "htmlLink": {
+                  "type": ["string", "null"]
+                },
+                "isAllDay": {
+                  "type": "boolean"
+                },
+                "location": {
+                  "type": ["string", "null"]
+                },
+                "organizerEmail": {
+                  "type": ["string", "null"]
+                },
+                "recurringEventId": {
+                  "type": ["string", "null"]
+                },
+                "start": {
+                  "type": ["object", "null"]
+                },
+                "status": {
+                  "type": "string"
+                },
+                "summary": {
+                  "type": ["string", "null"]
+                },
+                "updated": {
+                  "type": ["string", "null"]
                 }
               },
-              "calendarId": {
-                "type": "string"
-              },
-              "changeType": {
-                "type": "string",
-                "enum": ["created", "updated", "cancelled"]
-              },
-              "created": {
-                "type": ["string", "null"]
-              },
-              "creatorEmail": {
-                "type": ["string", "null"]
-              },
-              "description": {
-                "type": ["string", "null"]
-              },
-              "end": {
-                "type": ["object", "null"]
-              },
-              "eventId": {
-                "type": "string"
-              },
-              "eventType": {
-                "type": ["string", "null"]
-              },
-              "htmlLink": {
-                "type": ["string", "null"]
-              },
-              "isAllDay": {
-                "type": "boolean"
-              },
-              "location": {
-                "type": ["string", "null"]
-              },
-              "organizerEmail": {
-                "type": ["string", "null"]
-              },
-              "recurringEventId": {
-                "type": ["string", "null"]
-              },
-              "start": {
-                "type": ["object", "null"]
-              },
-              "status": {
-                "type": "string"
-              },
-              "summary": {
-                "type": ["string", "null"]
-              },
-              "updated": {
-                "type": ["string", "null"]
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "changeType",
-              "calendarId",
-              "eventId",
-              "status",
-              "summary",
-              "description",
-              "location",
-              "htmlLink",
-              "start",
-              "end",
-              "isAllDay",
-              "organizerEmail",
-              "creatorEmail",
-              "attendeeEmails",
-              "recurringEventId",
-              "eventType",
-              "created",
-              "updated"
-            ]
+              "additionalProperties": false,
+              "required": [
+                "changeType",
+                "calendarId",
+                "eventId",
+                "status",
+                "summary",
+                "description",
+                "location",
+                "htmlLink",
+                "start",
+                "end",
+                "isAllDay",
+                "organizerEmail",
+                "creatorEmail",
+                "attendeeEmails",
+                "recurringEventId",
+                "eventType",
+                "created",
+                "updated"
+              ]
+            }
           },
           "nullable": false
         }
@@ -1687,73 +1696,76 @@
           "value": 50
         }
       ],
-      "definitionVersion": 3,
+      "definitionVersion": 2,
       "description": "Polls one Google Drive folder and triggers when a file or folder directly inside it is created or updated.",
       "displayName": "File or Folder Change in a Folder",
       "key": "googledrive.on_file_change",
       "name": "on_file_change",
       "outputs": [
         {
-          "handle": "event",
+          "handle": "events",
           "jsonSchema": {
-            "type": "object",
-            "properties": {
-              "createdTime": {
-                "type": ["string", "null"]
-              },
-              "driveId": {
-                "type": ["string", "null"]
-              },
-              "eventType": {
-                "type": "string",
-                "enum": ["file_created", "file_updated", "folder_created", "folder_updated"]
-              },
-              "fileId": {
-                "type": "string"
-              },
-              "itemType": {
-                "type": "string",
-                "enum": ["file", "folder"]
-              },
-              "lastModifyingUser": {
-                "type": ["object", "null"]
-              },
-              "mimeType": {
-                "type": "string"
-              },
-              "modifiedTime": {
-                "type": ["string", "null"]
-              },
-              "name": {
-                "type": "string"
-              },
-              "parents": {
-                "type": "array",
-                "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "createdTime": {
+                  "type": ["string", "null"]
+                },
+                "driveId": {
+                  "type": ["string", "null"]
+                },
+                "eventType": {
+                  "type": "string",
+                  "enum": ["file_created", "file_updated", "folder_created", "folder_updated"]
+                },
+                "fileId": {
                   "type": "string"
+                },
+                "itemType": {
+                  "type": "string",
+                  "enum": ["file", "folder"]
+                },
+                "lastModifyingUser": {
+                  "type": ["object", "null"]
+                },
+                "mimeType": {
+                  "type": "string"
+                },
+                "modifiedTime": {
+                  "type": ["string", "null"]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "parents": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "size": {
+                  "type": "string"
+                },
+                "webViewLink": {
+                  "type": ["string", "null"]
                 }
               },
-              "size": {
-                "type": "string"
-              },
-              "webViewLink": {
-                "type": ["string", "null"]
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "eventType",
-              "itemType",
-              "fileId",
-              "name",
-              "mimeType",
-              "createdTime",
-              "modifiedTime",
-              "parents",
-              "webViewLink",
-              "driveId",
-              "lastModifyingUser"
-            ]
+              "additionalProperties": false,
+              "required": [
+                "eventType",
+                "itemType",
+                "fileId",
+                "name",
+                "mimeType",
+                "createdTime",
+                "modifiedTime",
+                "parents",
+                "webViewLink",
+                "driveId",
+                "lastModifyingUser"
+              ]
+            }
           },
           "nullable": false
         }
@@ -1947,39 +1959,42 @@
           "value": "UNFORMATTED_VALUE"
         }
       ],
-      "definitionVersion": 3,
+      "definitionVersion": 2,
       "description": "Polls a sheet and triggers once for every new row appended below the last row already seen.",
       "displayName": "New Row Added",
       "key": "googlesheets.on_row_added",
       "name": "on_row_added",
       "outputs": [
         {
-          "handle": "event",
+          "handle": "events",
           "jsonSchema": {
-            "type": "object",
-            "properties": {
-              "row": {
-                "type": "object"
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "row": {
+                  "type": "object"
+                },
+                "rowNumber": {
+                  "type": "integer"
+                },
+                "sheetId": {
+                  "type": "integer"
+                },
+                "sheetTitle": {
+                  "type": "string"
+                },
+                "spreadsheetId": {
+                  "type": "string"
+                },
+                "values": {
+                  "type": "array",
+                  "items": {}
+                }
               },
-              "rowNumber": {
-                "type": "integer"
-              },
-              "sheetId": {
-                "type": "integer"
-              },
-              "sheetTitle": {
-                "type": "string"
-              },
-              "spreadsheetId": {
-                "type": "string"
-              },
-              "values": {
-                "type": "array",
-                "items": {}
-              }
-            },
-            "additionalProperties": false,
-            "required": ["spreadsheetId", "sheetId", "sheetTitle", "rowNumber", "row", "values"]
+              "additionalProperties": false,
+              "required": ["spreadsheetId", "sheetId", "sheetTitle", "rowNumber", "row", "values"]
+            }
           },
           "nullable": false
         }
@@ -2424,57 +2439,60 @@
           "description": "Choose statuses from the selected Team. Empty means all statuses. Matches the current status, not every transition into it."
         }
       ],
-      "definitionVersion": 3,
+      "definitionVersion": 2,
       "description": "Watches new and updated issues in a Linear team with periodic checks. Starts from now without running existing issues. Reports observed current states, not deletions or every intermediate status change.",
       "displayName": "Issue Created or Updated",
       "key": "linear.on_issue_changed",
       "name": "on_issue_changed",
       "outputs": [
         {
-          "handle": "event",
+          "handle": "events",
           "jsonSchema": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "identifier": {
-                "type": "string"
-              },
-              "title": {
-                "type": "string"
-              },
-              "url": {
-                "type": "string"
-              },
-              "teamId": {
-                "type": "string"
-              },
-              "createdAt": {
-                "type": "string"
-              },
-              "updatedAt": {
-                "type": "string"
-              },
-              "state": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "name": {
-                    "type": "string"
-                  },
-                  "type": {
-                    "type": "string"
-                  }
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
                 },
-                "additionalProperties": false,
-                "required": ["id", "name", "type"]
-              }
-            },
-            "additionalProperties": false,
-            "required": ["id", "identifier", "title", "url", "teamId", "createdAt", "updatedAt", "state"]
+                "identifier": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                },
+                "teamId": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false,
+                  "required": ["id", "name", "type"]
+                }
+              },
+              "additionalProperties": false,
+              "required": ["id", "identifier", "title", "url", "teamId", "createdAt", "updatedAt", "state"]
+            }
           },
           "nullable": false
         }
@@ -2541,54 +2559,57 @@
           "value": 25
         }
       ],
-      "definitionVersion": 3,
+      "definitionVersion": 2,
       "description": "Polls a Notion database and triggers when a page is added to it or an existing page is edited.",
       "displayName": "Database Page Added or Updated",
       "key": "notion.on_database_page_event",
       "name": "on_database_page_event",
       "outputs": [
         {
-          "handle": "event",
+          "handle": "events",
           "jsonSchema": {
-            "type": "object",
-            "properties": {
-              "createdBy": {
-                "type": "object"
-              },
-              "createdTime": {
-                "type": "string"
-              },
-              "dataSourceId": {
-                "type": "string"
-              },
-              "databaseId": {
-                "type": "string"
-              },
-              "event": {
-                "type": "string",
-                "enum": ["page_added", "page_updated"]
-              },
-              "lastEditedBy": {
-                "type": "object"
-              },
-              "lastEditedTime": {
-                "type": "string"
-              },
-              "pageId": {
-                "type": "string"
-              },
+            "type": "array",
+            "items": {
+              "type": "object",
               "properties": {
-                "type": "object"
+                "createdBy": {
+                  "type": "object"
+                },
+                "createdTime": {
+                  "type": "string"
+                },
+                "dataSourceId": {
+                  "type": "string"
+                },
+                "databaseId": {
+                  "type": "string"
+                },
+                "event": {
+                  "type": "string",
+                  "enum": ["page_added", "page_updated"]
+                },
+                "lastEditedBy": {
+                  "type": "object"
+                },
+                "lastEditedTime": {
+                  "type": "string"
+                },
+                "pageId": {
+                  "type": "string"
+                },
+                "properties": {
+                  "type": "object"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string"
+                }
               },
-              "title": {
-                "type": "string"
-              },
-              "url": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false,
-            "required": ["event", "pageId", "databaseId", "dataSourceId", "url", "title", "createdTime", "lastEditedTime", "createdBy", "lastEditedBy"]
+              "additionalProperties": false,
+              "required": ["event", "pageId", "databaseId", "dataSourceId", "url", "title", "createdTime", "lastEditedTime", "createdBy", "lastEditedBy"]
+            }
           },
           "nullable": false
         }
@@ -2660,71 +2681,74 @@
           "value": 50
         }
       ],
-      "definitionVersion": 3,
+      "definitionVersion": 2,
       "description": "Polls the OneDrive change feed and triggers when a file or folder is created, updated or deleted.",
       "displayName": "File or Folder Changed",
       "key": "one_drive.on_item_changed",
       "name": "on_item_changed",
       "outputs": [
         {
-          "handle": "event",
+          "handle": "events",
           "jsonSchema": {
-            "type": "object",
-            "properties": {
-              "changeType": {
-                "type": "string",
-                "enum": ["created", "updated", "deleted"]
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "changeType": {
+                  "type": "string",
+                  "enum": ["created", "updated", "deleted"]
+                },
+                "createdDateTime": {
+                  "type": ["string", "null"]
+                },
+                "driveId": {
+                  "type": ["string", "null"]
+                },
+                "eTag": {
+                  "type": ["string", "null"]
+                },
+                "itemId": {
+                  "type": "string"
+                },
+                "itemType": {
+                  "type": "string",
+                  "enum": ["file", "folder"]
+                },
+                "lastModifiedDateTime": {
+                  "type": ["string", "null"]
+                },
+                "mimeType": {
+                  "type": ["string", "null"]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "parentFolderId": {
+                  "type": ["string", "null"]
+                },
+                "size": {
+                  "type": ["number", "null"]
+                },
+                "webUrl": {
+                  "type": "string"
+                }
               },
-              "createdDateTime": {
-                "type": ["string", "null"]
-              },
-              "driveId": {
-                "type": ["string", "null"]
-              },
-              "eTag": {
-                "type": ["string", "null"]
-              },
-              "itemId": {
-                "type": "string"
-              },
-              "itemType": {
-                "type": "string",
-                "enum": ["file", "folder"]
-              },
-              "lastModifiedDateTime": {
-                "type": ["string", "null"]
-              },
-              "mimeType": {
-                "type": ["string", "null"]
-              },
-              "name": {
-                "type": "string"
-              },
-              "parentFolderId": {
-                "type": ["string", "null"]
-              },
-              "size": {
-                "type": ["number", "null"]
-              },
-              "webUrl": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "itemId",
-              "name",
-              "changeType",
-              "itemType",
-              "size",
-              "mimeType",
-              "webUrl",
-              "parentFolderId",
-              "driveId",
-              "createdDateTime",
-              "lastModifiedDateTime",
-              "eTag"
-            ]
+              "additionalProperties": false,
+              "required": [
+                "itemId",
+                "name",
+                "changeType",
+                "itemType",
+                "size",
+                "mimeType",
+                "webUrl",
+                "parentFolderId",
+                "driveId",
+                "createdDateTime",
+                "lastModifiedDateTime",
+                "eTag"
+              ]
+            }
           },
           "nullable": false
         }
@@ -2805,91 +2829,94 @@
           "value": 25
         }
       ],
-      "definitionVersion": 3,
+      "definitionVersion": 2,
       "description": "Polls a Microsoft Outlook mail folder and triggers when a new message arrives.",
       "displayName": "New Message Received",
       "key": "outlook.on_message_received",
       "name": "on_message_received",
       "outputs": [
         {
-          "handle": "event",
+          "handle": "events",
           "jsonSchema": {
-            "type": "object",
-            "properties": {
-              "bodyPreview": {
-                "type": "string"
-              },
-              "categories": {
-                "type": "array",
-                "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "bodyPreview": {
+                  "type": "string"
+                },
+                "categories": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "conversationId": {
+                  "type": "string"
+                },
+                "from": {
+                  "type": "string"
+                },
+                "fromName": {
+                  "type": "string"
+                },
+                "hasAttachments": {
+                  "type": "boolean"
+                },
+                "importance": {
+                  "type": "string"
+                },
+                "internetMessageId": {
+                  "type": "string"
+                },
+                "isDraft": {
+                  "type": "boolean"
+                },
+                "isRead": {
+                  "type": "boolean"
+                },
+                "messageId": {
+                  "type": "string"
+                },
+                "parentFolderId": {
+                  "type": "string"
+                },
+                "receivedDateTime": {
+                  "type": "string"
+                },
+                "subject": {
+                  "type": "string"
+                },
+                "to": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "webLink": {
                   "type": "string"
                 }
               },
-              "conversationId": {
-                "type": "string"
-              },
-              "from": {
-                "type": "string"
-              },
-              "fromName": {
-                "type": "string"
-              },
-              "hasAttachments": {
-                "type": "boolean"
-              },
-              "importance": {
-                "type": "string"
-              },
-              "internetMessageId": {
-                "type": "string"
-              },
-              "isDraft": {
-                "type": "boolean"
-              },
-              "isRead": {
-                "type": "boolean"
-              },
-              "messageId": {
-                "type": "string"
-              },
-              "parentFolderId": {
-                "type": "string"
-              },
-              "receivedDateTime": {
-                "type": "string"
-              },
-              "subject": {
-                "type": "string"
-              },
-              "to": {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              },
-              "webLink": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false,
-            "required": [
-              "messageId",
-              "internetMessageId",
-              "conversationId",
-              "subject",
-              "bodyPreview",
-              "from",
-              "fromName",
-              "to",
-              "receivedDateTime",
-              "hasAttachments",
-              "isRead",
-              "isDraft",
-              "importance",
-              "categories",
-              "parentFolderId",
-              "webLink"
-            ]
+              "additionalProperties": false,
+              "required": [
+                "messageId",
+                "internetMessageId",
+                "conversationId",
+                "subject",
+                "bodyPreview",
+                "from",
+                "fromName",
+                "to",
+                "receivedDateTime",
+                "hasAttachments",
+                "isRead",
+                "isDraft",
+                "importance",
+                "categories",
+                "parentFolderId",
+                "webLink"
+              ]
+            }
           },
           "nullable": false
         }
@@ -3699,60 +3726,63 @@
           "description": "Maximum number of messages processed per poll."
         }
       ],
-      "definitionVersion": 3,
+      "definitionVersion": 2,
       "description": "Polls one Slack conversation and triggers when a new message is posted to it.",
       "displayName": "New Channel Message",
       "key": "slack.on_message_posted",
       "name": "on_message_posted",
       "outputs": [
         {
-          "handle": "event",
+          "handle": "events",
           "jsonSchema": {
-            "type": "object",
-            "properties": {
-              "botId": {
-                "type": ["string", "null"]
-              },
-              "channelId": {
-                "type": "string"
-              },
-              "files": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "botId": {
+                  "type": ["string", "null"]
+                },
+                "channelId": {
+                  "type": "string"
+                },
+                "files": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "mimetype": {
+                        "type": "string"
+                      },
+                      "name": {
+                        "type": "string"
+                      }
                     },
-                    "mimetype": {
-                      "type": "string"
-                    },
-                    "name": {
-                      "type": "string"
-                    }
-                  },
-                  "additionalProperties": false,
-                  "required": ["id", "name", "mimetype"]
+                    "additionalProperties": false,
+                    "required": ["id", "name", "mimetype"]
+                  }
+                },
+                "messageTs": {
+                  "type": "string"
+                },
+                "subtype": {
+                  "type": ["string", "null"]
+                },
+                "text": {
+                  "type": "string"
+                },
+                "threadTs": {
+                  "type": ["string", "null"]
+                },
+                "userId": {
+                  "type": ["string", "null"]
                 }
               },
-              "messageTs": {
-                "type": "string"
-              },
-              "subtype": {
-                "type": ["string", "null"]
-              },
-              "text": {
-                "type": "string"
-              },
-              "threadTs": {
-                "type": ["string", "null"]
-              },
-              "userId": {
-                "type": ["string", "null"]
-              }
-            },
-            "additionalProperties": false,
-            "required": ["channelId", "messageTs", "threadTs", "userId", "botId", "subtype", "text", "files"]
+              "additionalProperties": false,
+              "required": ["channelId", "messageTs", "threadTs", "userId", "botId", "subtype", "text", "files"]
+            }
           },
           "nullable": false
         }

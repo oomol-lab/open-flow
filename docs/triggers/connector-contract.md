@@ -1,6 +1,6 @@
 # Connector Trigger 操作契约与首批验收
 
-本契约覆盖两个 Connector 与 Open Flow 的全部 7 个 Source Provider 引用操作、声明式回调握手、单事件 Poll 和旧版兼容。真实账号验收由用户执行，当前未部署。
+本契约覆盖两个 Connector 与 Open Flow 的全部 7 个 Source Provider 引用操作、声明式回调握手、Poll 批量契约。真实账号验收由用户执行，当前未部署。
 
 ## 操作边界
 
@@ -29,7 +29,7 @@ GitHub Watch PR 观察当前状态，不保证观察到每一次中间变化。c
 
 Open Flow 在准入事务成功后推进业务 checkpoint。容量拒绝或提交失败时继续持有旧 checkpoint，后续读取允许重放同一观察。Connector 订阅初始化保存的 baseline 不等同于 Open Flow 后续消费进度。
 
-Poll definitionVersion 3 对每个离散事件创建一个 Run，输出 `event` 对象；version 2 继续按页输出 `events[]`。事件身份包含 binding、Trigger key 和 Provider dedupeKey，Run occurrence 还包含 runtimeVersion；不同页大小不改变同一绑定版本中的事件准入身份。保留原有去重期限及绑定生命周期：相同绑定的重叠读取不重复准入，重新创建绑定/Source 或显式重放不承诺跨身份去重。页内全部准入成功才提交 checkpoint；容量不足回滚整页。首轮 baseline、候选与当前版本 fencing 保持原保证。
+Poll 保持 definitionVersion 2 和 `events[]` 输出。每个非空去重结果页创建一个批量 Run，页内多条事件一起交给下游，保留原有聚合、执行次数和成本语义。Run 准入成功后才提交 checkpoint，容量不足时保留旧 checkpoint 以便重试。首轮 baseline、重叠读取去重、候选与当前版本 fencing 保持原保证；本轮不引入单事件模式或定义升级路径。
 
 ## Slack 共享应用回调
 

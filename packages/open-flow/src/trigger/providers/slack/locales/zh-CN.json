@@ -12,7 +12,7 @@
       "textContains": "仅当消息文本包含此字符串时触发，不区分大小写。"
     },
     "outputs": {
-      "event": "本次 Run 对应的单个事件。"
+      "events": "自上次轮询以来发布的Slack消息。"
     }
   }
 }

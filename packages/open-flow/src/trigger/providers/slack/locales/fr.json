@@ -12,7 +12,7 @@
       "textContains": "Déclencher uniquement lorsque le texte du message contient cette chaîne, sans tenir compte de la casse."
     },
     "outputs": {
-      "event": "Un événement unique pour ce Run."
+      "events": "Messages Slack postés depuis la précédente interrogation."
     }
   }
 }

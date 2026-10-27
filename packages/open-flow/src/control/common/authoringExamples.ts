@@ -127,15 +127,15 @@ export function authoringExample(name: string): { version: 1; operations: readon
         'Format',
         {
           imports: [],
-          source: 'export default async function (inputs) { return { text: `${inputs.event.sender}: ${inputs.event.subject}` } }',
+          source: 'export default async function (inputs) { return { text: inputs.events.map(event => `${event.sender}: ${event.subject}`).join("\\n") } }',
         },
         {
           inputs: [
             {
-              handle: 'event',
-              jsonSchema: { type: 'object' },
+              handle: 'events',
+              jsonSchema: { type: 'array', items: { type: 'object' } },
               nullable: false,
-              value: {},
+              value: [],
             },
           ],
           outputs: [{ handle: 'text', jsonSchema: { type: 'string' }, nullable: false }],
@@ -172,9 +172,9 @@ export function authoringExample(name: string): { version: 1; operations: readon
         {
           kind: 'graph.node.input.set',
           nodeId: 'format',
-          handle: 'event',
-          before: { kind: 'value', value: {} },
-          value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'mail', output: 'event' }] },
+          handle: 'events',
+          before: { kind: 'value', value: [] },
+          value: { kind: 'sources', sources: [{ kind: 'node', nodeId: 'mail', output: 'events' }] },
         },
         {
           kind: 'graph.node.input.set',

@@ -31,8 +31,7 @@ export function triggerKey(value: unknown): TriggerKeySnapshot {
   const summary = triggerKeySummary(source)
   const base = {
     configInputs: configInputsSchema.parse(source.configInputs),
-    definitionVersion:
-      source.definitionVersion === 2 || (summary.type === 'poll' && source.definitionVersion === 3) ? source.definitionVersion : invalidResponse(),
+    definitionVersion: source.definitionVersion === 2 ? 2 : invalidResponse(),
     description: summary.description,
     displayName: summary.displayName,
     key: summary.key,

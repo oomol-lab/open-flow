@@ -12,7 +12,7 @@ import {
   PollConnectionError,
   TransientPollError,
 } from '@oomol-lab/open-flow/poll-trigger'
-import { legacyPollDefinitions, triggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
+import { triggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
 import { TestClock } from 'effect/testing'
@@ -167,8 +167,8 @@ describe('Server Poll Trigger', () => {
     }
   })
 
-  it.each([false, true])('runs Linear through the unified reader and deduplicates overlap after restart (legacy: %s)', async (legacy) => {
-    const definition = (legacy ? legacyPollDefinitions : triggerDefinitions).find((item) => item.snapshot.key == 'linear.on_issue_changed')!
+  it('runs the Linear provider through the unified reader and deduplicates overlap after restart', async () => {
+    const definition = triggerDefinitions.find((item) => item.snapshot.key == 'linear.on_issue_changed')!
     if (!('poll' in definition)) throw new Error('Expected Linear Poll definition.')
     const teamId = '72b2a2dc-6f4f-4423-9d34-24b5bd10634a'
     const issue = {
@@ -192,7 +192,7 @@ describe('Server Poll Trigger', () => {
     const file = await databaseFile()
     const options = { capabilities: { connector: () => host }, clock: () => publishedAt }
     let service = await openService(file, options)
-    const content = revision('primary', definition.snapshot)
+    const content = revision()
     const original = content.document.graph.nodes.poll!
     if (original.kind != 'poll') throw new Error('Expected Poll fixture.')
     const linearContent: RevisionContent = {
@@ -735,104 +735,33 @@ it.each([false, true])('admits Provider-defined Poll outputs after deduplication
   }
 })
 
-it.each([1, 2, 3])('admits the same individual events across page size %s and restart', async (pageSize) => {
+it('admits a complete event batch as one Run with capacity for only one pending Run', async () => {
   const file = await databaseFile()
   const definition: PollDefinition = {
-    delivery: 'event',
-    snapshot: { ...snapshot, definitionVersion: 3, outputs: [{ handle: 'event', nullable: false, jsonSchema: { type: 'object' } }] },
-    buildOutputs: ([event]) => ({ event: event!.payload }),
-    async poll({ checkpoint }) {
-      if (checkpoint === null) return { checkpoint: 0, events: [] }
-      const offset = Number(checkpoint)
-      const all = ['one', 'two', 'two', 'three']
-      return {
-        checkpoint: Math.min(offset + pageSize, all.length),
-        events: all.slice(offset, offset + pageSize).map((id) => ({ dedupeKey: id, payload: { id } })),
-        hasMore: offset + pageSize < all.length,
-      }
-    },
+    snapshot,
+    buildOutputs: eventsPollOutputs,
+    poll: async ({ checkpoint }) => ({
+      checkpoint: Number(checkpoint) + 1,
+      events: checkpoint == null ? [] : ['one', 'two', 'two', 'three'].map((id) => ({ dedupeKey: id, payload: { id } })),
+    }),
   }
-  const options = { capabilities: { connector: () => connector }, clock: () => publishedAt, triggerDefinitions: [definition] }
-  let service = await openService(file, options)
+  const service = await openService(file, {
+    capabilities: { connector: () => connector },
+    clock: () => publishedAt,
+    runtime: { maxPendingRuns: 1 },
+    triggerDefinitions: [definition],
+  })
   const database = new DatabaseSync(file)
   try {
-    await publish(service, revision('primary', definition.snapshot))
+    await publish(service, revision())
     await service.tickListeners('2026-08-21T00:01:00.000Z')
     await service.tickListeners('2026-08-21T00:02:00.000Z')
-    await closeService(service)
-    service = await openService(file, options)
-    await service.tickListeners('2026-08-21T00:03:00.000Z')
     const rows = database.prepare('SELECT trigger_outputs FROM runs').all() as { trigger_outputs: string }[]
-    expect(rows.map((row) => JSON.parse(row.trigger_outputs).event.id).toSorted()).toEqual(['one', 'three', 'two'])
-    expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: 4, health: 'healthy' })
-  } finally {
-    database.close()
-    await closeService(service)
-  }
-})
-
-it('rolls back all event admissions when the page exceeds remaining capacity', async () => {
-  const file = await databaseFile()
-  const definition: PollDefinition = {
-    delivery: 'event',
-    snapshot: { ...snapshot, definitionVersion: 3, outputs: [{ handle: 'event', nullable: false, jsonSchema: { type: 'object' } }] },
-    buildOutputs: ([event]) => ({ event: event!.payload }),
-    poll: async ({ checkpoint }) => ({
-      checkpoint: Number(checkpoint) + 1,
-      events: checkpoint == null ? [] : (Number(checkpoint) === 1 ? ['one'] : ['two', 'three']).map((id) => ({ dedupeKey: id, payload: { id } })),
-    }),
-  }
-  const service = await openService(file, {
-    capabilities: { connector: () => connector },
-    clock: () => publishedAt,
-    runtime: { maxPendingRuns: 2 },
-    triggerDefinitions: [definition],
-  })
-  const database = new DatabaseSync(file)
-  try {
-    await publish(service, revision('primary', definition.snapshot))
-    await service.tickListeners('2026-08-21T00:01:00.000Z')
-    await service.tickListeners('2026-08-21T00:02:00.000Z')
-    expect(database.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 1 })
+    expect(rows.map((row) => JSON.parse(row.trigger_outputs))).toEqual([{ events: [{ id: 'one' }, { id: 'two' }, { id: 'three' }] }])
+    expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: 2, health: 'healthy' })
     await service.tickListeners('2026-08-21T00:03:00.000Z')
     expect(database.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 1 })
-    expect(database.prepare('SELECT COUNT(*) AS count FROM poll_event_dedupe').get()).toEqual({ count: 1 })
-    expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: 2 })
-    database.exec('DELETE FROM work')
-    await service.tickListeners('2026-08-21T00:03:10.000Z')
-    expect(database.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 3 })
-    expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: 3 })
-  } finally {
-    database.close()
-    await closeService(service)
-  }
-})
-
-it('fails a Poll page exceeding total Run capacity without advancing its checkpoint', async () => {
-  const file = await databaseFile()
-  const definition: PollDefinition = {
-    delivery: 'event',
-    snapshot: { ...snapshot, definitionVersion: 3, outputs: [{ handle: 'event', nullable: false, jsonSchema: { type: 'object' } }] },
-    buildOutputs: ([event]) => ({ event: event!.payload }),
-    poll: async ({ checkpoint }) => ({
-      checkpoint: Number(checkpoint) + 1,
-      events: checkpoint == null ? [] : ['one', 'two', 'three'].map((id) => ({ dedupeKey: id, payload: { id } })),
-    }),
-  }
-  const service = await openService(file, {
-    capabilities: { connector: () => connector },
-    clock: () => publishedAt,
-    runtime: { maxPendingRuns: 2 },
-    triggerDefinitions: [definition],
-  })
-  const database = new DatabaseSync(file)
-  try {
-    await publish(service, revision('primary', definition.snapshot))
-    await service.tickListeners('2026-08-21T00:01:00.000Z')
-    await service.tickListeners('2026-08-21T00:02:00.000Z')
-    expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: 1, health: 'failed' })
-    expect(database.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 0 })
-    expect(database.prepare('SELECT COUNT(*) AS count FROM poll_event_dedupe').get()).toEqual({ count: 0 })
+    expect(database.prepare('SELECT COUNT(*) AS count FROM poll_event_dedupe').get()).toEqual({ count: 3 })
   } finally {
     database.close()
     await closeService(service)

@@ -12,7 +12,7 @@
       "sender": "Déclencher uniquement sur les messages dont l'expéditeur correspond à cette adresse ou ce nom."
     },
     "outputs": {
-      "event": "Un événement unique pour ce Run."
+      "events": "Messages reçus depuis la précédente interrogation."
     }
   }
 }

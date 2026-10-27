@@ -12,7 +12,7 @@
       "withAttachmentsOnly": "添付ファイル付きのメッセージでのみトリガーします。"
     },
     "outputs": {
-      "event": "この Run に対応する単一のイベント。"
+      "events": "前のポーリング以降に受信したOutlookのメッセージ。"
     }
   }
 }

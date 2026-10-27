@@ -14,7 +14,6 @@ import { isJsonObject } from '../../base/common/json.ts'
 import { validateListenerPage, PermanentIntegrationError, IntegrationConnectionError } from '../common/integration.ts'
 import { eventsPollOutputs, PermanentPollError, PollConnectionError } from '../common/poll.ts'
 import catalog from './catalog.generated.json' with { type: 'json' }
-import legacyPollCatalog from './legacy-poll.generated.json' with { type: 'json' }
 
 async function execute(connector: ConnectorProxy, request: TriggerOperationRequest, signal?: AbortSignal, integration = false): Promise<unknown> {
   if (connector.trigger == null) throw new Error('Trigger operation transport is unavailable.')
@@ -46,9 +45,7 @@ export const remoteTriggerDefinitions: readonly (PollDefinition | IntegrationDef
   .filter((item) => !('eventSource' in item))
   .map(createDefinition)
 
-export const legacyPollDefinitions = legacyPollCatalog.map((item) => createDefinition(item) as PollDefinition)
-
-function createDefinition(item: (typeof catalog)[number] | (typeof legacyPollCatalog)[number]): PollDefinition | IntegrationDefinition {
+function createDefinition(item: (typeof catalog)[number]): PollDefinition | IntegrationDefinition {
   const snapshot = item.snapshot as unknown as TriggerKeySnapshot
   const configOptions = item.options
     ? async (context: import('../common/configOptions.ts').TriggerConfigOptionsContext) => {
@@ -64,8 +61,7 @@ function createDefinition(item: (typeof catalog)[number] | (typeof legacyPollCat
     return {
       snapshot,
       configOptions,
-      delivery: snapshot.definitionVersion === 3 ? 'event' : undefined,
-      buildOutputs: snapshot.definitionVersion === 3 ? (events) => ({ event: events[0]!.payload }) : eventsPollOutputs,
+      buildOutputs: eventsPollOutputs,
       async poll(context) {
         const result = await execute(context.connector, { operation: 'read', config: context.config, checkpoint: context.checkpoint }, context.signal)
         if (

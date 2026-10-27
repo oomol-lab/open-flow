@@ -12,7 +12,7 @@
       "withAttachmentsOnly": "僅對帶附件的郵件觸發。"
     },
     "outputs": {
-      "event": "本次 Run 對應的單一事件。"
+      "events": "自上次輪詢以來收到的 Outlook 郵件。"
     }
   }
 }

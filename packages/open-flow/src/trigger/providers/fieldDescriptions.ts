@@ -182,7 +182,7 @@ export const englishTriggerFieldDescriptions = {
       triggerField: 'Date or time field used to detect created or updated records.',
       view: 'Airtable view used to filter and order records. Leave empty to use the table default.',
     },
-    outputs: { event: 'The single event delivered to this Run.' },
+    outputs: { events: 'Records created or updated since the previous poll.' },
   },
   'gmail.on_message_received': {
     configInputs: {
@@ -194,7 +194,7 @@ export const englishTriggerFieldDescriptions = {
       search: 'Gmail search query that each message must match.',
       sender: 'Only trigger on messages whose sender matches this address or name.',
     },
-    outputs: { event: 'The single event delivered to this Run.' },
+    outputs: { events: 'Messages received since the previous poll.' },
   },
   'github.on_repo_event': {
     configInputs: {
@@ -241,7 +241,7 @@ export const englishTriggerFieldDescriptions = {
       matchTerm: 'Text that must appear in the event summary, description, location, or attendees. Leave empty to match every event.',
       maxEventsPerPoll: 'Maximum number of calendar events processed per poll.',
     },
-    outputs: { event: 'The single event delivered to this Run.' },
+    outputs: { events: 'Calendar events created, updated, or cancelled since the previous poll.' },
   },
   'googledrive.changes_detected': {
     configInputs: driveChangesConfig,
@@ -261,7 +261,7 @@ export const englishTriggerFieldDescriptions = {
       mimeTypes: 'Only trigger on these MIME types. Leave empty to include every MIME type.',
       namePrefix: 'Only trigger on items whose names start with this text. Leave empty to include every name.',
     },
-    outputs: { event: 'The single event delivered to this Run.' },
+    outputs: { events: 'Files or folders created or updated since the previous poll.' },
   },
   'googlesheets.on_row_added': {
     configInputs: {
@@ -274,14 +274,14 @@ export const englishTriggerFieldDescriptions = {
       spreadsheetId: 'ID of the Google Sheets spreadsheet.',
       valueRender: 'How cell values are returned.',
     },
-    outputs: { event: 'The single event delivered to this Run.' },
+    outputs: { events: 'Rows appended since the previous poll.' },
   },
   'linear.on_issue_changed': {
     configInputs: {
       teamId: 'Linear Team UUID. Use Copy model UUID in Linear to find it.',
       stateIds: 'Statuses from the selected Team. Leave empty for every status. Matches current status, not every transition into it.',
     },
-    outputs: { event: 'The single event delivered to this Run.' },
+    outputs: { events: 'Linear issues created or updated since the previous poll.' },
   },
   'notion.on_database_page_event': {
     configInputs: {
@@ -291,7 +291,7 @@ export const englishTriggerFieldDescriptions = {
       includeProperties: 'Include page properties in each output event.',
       maxItemsPerPoll: 'Maximum number of changed pages processed per poll.',
     },
-    outputs: { event: 'The single event delivered to this Run.' },
+    outputs: { events: 'Database pages added or updated since the previous poll.' },
   },
   'one_drive.on_item_changed': {
     configInputs: {
@@ -301,7 +301,7 @@ export const englishTriggerFieldDescriptions = {
       maxItemsPerPoll: 'Maximum number of changed items processed per poll.',
       parentFolderId: 'Only monitor items in this parent folder. Leave empty to monitor the whole drive.',
     },
-    outputs: { event: 'The single event delivered to this Run.' },
+    outputs: { events: 'OneDrive items created, updated, or deleted since the previous poll.' },
   },
   'outlook.on_message_received': {
     configInputs: {
@@ -313,7 +313,7 @@ export const englishTriggerFieldDescriptions = {
       subjectContains: 'Case-insensitive text that must appear in the message subject.',
       withAttachmentsOnly: 'Only trigger on messages that have attachments.',
     },
-    outputs: { event: 'The single event delivered to this Run.' },
+    outputs: { events: 'Outlook messages received since the previous poll.' },
   },
   'shopify.on_shop_event': {
     configInputs: { topics: 'Shopify webhook topics that trigger a Run.' },
@@ -337,7 +337,7 @@ export const englishTriggerFieldDescriptions = {
       maxMessagesPerPoll: 'Maximum number of messages processed per poll.',
       textContains: 'Only trigger when message text contains this string, ignoring case.',
     },
-    outputs: { event: 'The single event delivered to this Run.' },
+    outputs: { events: 'Slack messages posted since the previous poll.' },
   },
   'stripe.on_event': {
     configInputs: {

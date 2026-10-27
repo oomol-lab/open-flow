@@ -58,10 +58,18 @@ Open Flow Server 的 Slack Source 已使用 `sourceReference`，公共包新增�
 
 先部署支持创建、修改、引用回调和无凭据删除（包括按创建请求身份删除并拒绝迟到创建）的 Connector，再升级 Open Flow Server 与公共包。升级前停旧 Server、备份 SQLite（含 WAL）并复查 Slack Source 存量；若不为空，停止升级并根据真实数据决定处理方式。迁移后的数据库不能交给旧 Server。新建 Source 后，回滚也必须处理 Connector 上的正式引用，不能只回滚本地数据库或二进制。此批没有执行生产迁移或部署。
 
-## 全 Provider 与单事件交付（2026-10-27）
+## Full Provider delivery and Poll scope correction (2026-10-27)
 
 本轮统一覆盖全部 7 个 Source。迁移 54 尚未发布，复用该迁移并将空存量前置条件扩大到全部 Source；不再保留旧 Source 的 Open Flow 执行分支。Connector 继续支持已发布的无状态 `source` wire 操作，正式 Open Flow 客户端只用 `sourceReference`。新增 Source 后不得把数据库交回旧 Server；回滚必须同时考虑远端引用和托管资源。
 
-10 个 Poll 的 definitionVersion 从 2 升到 3，输出从 `events[]` 改为 `event`。这是一条独立的 Trigger 定义版本边界：旧客户端的 literal-2 解码会拒绝 version 3，不会静默按旧批量方式执行。新 Server 同时保留原始 version-2 快照与批量路径；普通 Draft 编辑不升级其定义，只有显式 `node.refresh` 更新，再由诊断提示失效映射。Flow model、Engine 执行和 checkpoint 格式没有改变，维持 model 10 / Engine v7；Run 准入变化由 Trigger definitionVersion 选择，不能按 key 单独覆盖旧执行定义。
+Poll delivery remains definitionVersion 2 with `events[]` and batch Runs. The proposed v3
+single-event contract, compatibility snapshots and explicit Trigger refresh upgrade are withdrawn.
+Flow model 10, Engine v7 and checkpoint formats remain unchanged.
 
-发布顺序：先部署包含引用/资源/路由及握手操作的 Connector，复查目标 Source 空存量与真实部署版本，再同步升级公共包和 Server。旧版 Poll Publication 可以继续运行；新版 Draft 需要支持 definitionVersion 3 的客户端。不能用更新目录或数据库迁移自动重写旧 Publication。真实账号验证由用户执行，本轮未执行生产部署。
+At correction time, Open Flow PR #160 is unmerged. Connector changes have merged and need follow-up
+fixes restoring batch definitions. The latest verified formal releases predate those changes;
+main-branch images may already contain the changed catalog. Deploy a version containing the batch
+restoration before upgrading Open Flow. Existing Poll Publications need no output remapping.
+
+Source deployment still requires the reference/resource/routing protocol and an empty legacy Source
+store before migration 54. Real-account acceptance remains manual; no production deployment was run.

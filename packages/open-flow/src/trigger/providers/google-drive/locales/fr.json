@@ -42,7 +42,7 @@
       "namePrefix": "Déclencher uniquement sur les éléments dont le nom commence par ce texte. Laissez vide pour inclure tous les noms."
     },
     "outputs": {
-      "event": "Un événement unique pour ce Run."
+      "events": "Fichiers ou dossiers créés ou mis à jour depuis la précédente interrogation."
     }
   }
 }

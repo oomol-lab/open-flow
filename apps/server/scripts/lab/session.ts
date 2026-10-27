@@ -285,7 +285,7 @@ export class LabSession {
       ServerService.open(this.database, {
         capabilities: { connector: () => this.mocks.connector, llm: () => createLlm(this.modelOrigin, 'lab-only') },
         runtime: { runTimeoutMs: 15_000 },
-        triggerDefinitions: this.scenarioId === 'poll-event' ? triggerDefinitions.filter((item) => item.snapshot.key === 'gmail.on_message_received') : [],
+        triggerDefinitions: this.scenarioId === 'poll-batch' ? triggerDefinitions.filter((item) => item.snapshot.key === 'gmail.on_message_received') : [],
       }).pipe(Scope.provide(this.scope)),
     )
     const operator = new OperatorSession(new OperatorStore(this.database), this.token, false)
@@ -395,7 +395,7 @@ export class LabSession {
         const triggers = Object.entries(revision.content.document.graph.nodes).filter(([id, node]) =>
           'node' in entry ? id == entry.node : node.kind == entry.kind,
         )
-        if (triggers.length != 1 || (triggers[0]![1].kind != 'start' && this.scenarioId !== 'poll-event'))
+        if (triggers.length != 1 || (triggers[0]![1].kind != 'start' && this.scenarioId !== 'poll-batch'))
           errors.push('The scenario entry must resolve to one Start node.')
         else
           for (const sample of samples(this.scenarioId, this.stage)) {

@@ -7,7 +7,7 @@
       "stateIds": "Statuts de l'équipe sélectionnée. Laissez vide pour tous les statuts. Correspond au statut actuel, pas à chaque transition vers celui-ci."
     },
     "outputs": {
-      "event": "Un événement unique pour ce Run."
+      "events": "Problèmes Linear créés ou mis à jour depuis la précédente interrogation."
     }
   }
 }

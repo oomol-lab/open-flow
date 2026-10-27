@@ -13,7 +13,7 @@
       "valueRender": "Méthode de restitution des valeurs des cellules."
     },
     "outputs": {
-      "event": "Un événement unique pour ce Run."
+      "events": "Lignes ajoutées depuis la précédente interrogation."
     }
   }
 }
