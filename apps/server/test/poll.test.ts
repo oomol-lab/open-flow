@@ -807,3 +807,34 @@ it('rolls back all event admissions when the page exceeds remaining capacity', a
     await closeService(service)
   }
 })
+
+it('fails a Poll page exceeding total Run capacity without advancing its checkpoint', async () => {
+  const file = await databaseFile()
+  const definition: PollDefinition = {
+    delivery: 'event',
+    snapshot: { ...snapshot, definitionVersion: 3, outputs: [{ handle: 'event', nullable: false, jsonSchema: { type: 'object' } }] },
+    buildOutputs: ([event]) => ({ event: event!.payload }),
+    poll: async ({ checkpoint }) => ({
+      checkpoint: Number(checkpoint) + 1,
+      events: checkpoint == null ? [] : ['one', 'two', 'three'].map((id) => ({ dedupeKey: id, payload: { id } })),
+    }),
+  }
+  const service = await openService(file, {
+    capabilities: { connector: () => connector },
+    clock: () => publishedAt,
+    runtime: { maxPendingRuns: 2 },
+    triggerDefinitions: [definition],
+  })
+  const database = new DatabaseSync(file)
+  try {
+    await publish(service, revision('primary', definition.snapshot))
+    await service.tickListeners('2026-08-21T00:01:00.000Z')
+    await service.tickListeners('2026-08-21T00:02:00.000Z')
+    expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: 1, health: 'failed' })
+    expect(database.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 0 })
+    expect(database.prepare('SELECT COUNT(*) AS count FROM poll_event_dedupe').get()).toEqual({ count: 0 })
+  } finally {
+    database.close()
+    await closeService(service)
+  }
+})

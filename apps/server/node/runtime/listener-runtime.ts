@@ -535,7 +535,9 @@ export class ListenerRuntime {
         })
         const batches = definition.delivery === 'event' ? fresh.map((item) => [item]) : fresh.length === 0 ? [] : [fresh]
         if (batches.length > this.#store.runs.maximumPendingRuns)
-          throw new PermanentPollError('The event page exceeds this deployment’s Run capacity. Increase maximum pending Runs to at least 100.')
+          return yield* Effect.fail(
+            new PermanentPollError('The event page exceeds this deployment’s Run capacity. Increase maximum pending Runs to at least 100.'),
+          )
         const admissions = yield* Effect.tryPromise({
           try: () =>
             Promise.all(
