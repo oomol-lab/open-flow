@@ -1421,7 +1421,9 @@ it('routes a registered Trigger request separately from generic proxy', async ()
   await expect(
     client.trigger('example', 'connection-work', 'example.on_event', { operation: 'read', config: {}, checkpoint: null }, new AbortController().signal),
   ).resolves.toEqual({ checkpoint: null, events: [] })
-  expect(requests).toEqual([{ path: '/v1/providers/example/triggers/example.on_event/execute', body: { operation: 'read', config: {}, checkpoint: null } }])
+  expect(requests).toEqual([
+    { path: '/v1/providers/example/triggers/example.on_event/execute?appId=connection-work', body: { operation: 'read', config: {}, checkpoint: null } },
+  ])
 })
 
 it.each([
@@ -1441,4 +1443,56 @@ it.each([
   await expect(
     client.trigger('example', 'connection-work', 'example.on_event', { operation: 'read', config: {}, checkpoint: null }, new AbortController().signal),
   ).rejects.toMatchObject({ code })
+})
+
+it('deletes a Source as an operator without requiring a surviving connection and rejects other callers', async () => {
+  const requests: string[] = []
+  const origin = await startConnector(async (request, response) => {
+    requests.push(request.url!)
+    send(response, 200, { success: true, data: { deleted: true } })
+  })
+  const client = new ConnectorClient(origin, 'runtime-token')
+  const request = {
+    operation: 'sourceReference' as const,
+    request: { action: 'delete' as const, deploymentId: 'deployment', reference: { applicationId: 'app', sourceId: 'source' } },
+  }
+  await expect(client.trigger('slackbot', 'removed', 'slackbot.on_event', request, new AbortController().signal)).rejects.toMatchObject({
+    code: 'connector.access-invalid',
+  })
+  expect(requests).toEqual([])
+  await expect(
+    client.trigger('slackbot', 'removed', 'slackbot.on_event', request, new AbortController().signal, {
+      scope: 'catalog',
+      providerAccess: { mode: 'implicit', version: 1, accessRevision: 0, bindings: [], sharedAccessDigest: 'implicit' },
+      purpose: 'catalog',
+      source: 'operator',
+    }),
+  ).resolves.toEqual({ deleted: true })
+  expect(requests).toEqual(['/v1/providers/slackbot/triggers/slackbot.on_event/execute?appId=removed'])
+})
+
+it('preserves a Source revision conflict for the control plane', async () => {
+  const origin = await startConnector(async (request, response) => {
+    if (request.url === '/v1/apps') return send(response, 200, { data: [app], success: true })
+    send(response, 409, { errorCode: 'invalid_input', errorMessage: 'The Source changed' })
+  })
+  const client = new ConnectorClient(origin, 'runtime-token')
+  await expect(
+    client.trigger(
+      'example',
+      'connection-work',
+      'example.on_event',
+      {
+        operation: 'sourceReference',
+        request: {
+          action: 'update',
+          deploymentId: 'deployment',
+          reference: { applicationId: 'app', sourceId: 'source' },
+          expectedRevision: 1,
+          input: { eventTypes: ['app_mention'] },
+        },
+      },
+      new AbortController().signal,
+    ),
+  ).rejects.toMatchObject({ code: 'connector.input-invalid', status: 409 })
 })

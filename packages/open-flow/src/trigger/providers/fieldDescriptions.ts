@@ -7,7 +7,7 @@ const driveChangesConfig = {
   includeCorpusRemovals: 'Include the accessible file resource when an item leaves the change corpus.',
   includeItemsFromAllDrives: 'Include items from My Drive and shared drives.',
   includeRemoved: 'Include changes caused by deletion or loss of access.',
-  pageSize: 'Maximum number of changes included in one Flow Run.',
+  pageSize: 'Maximum number of changes read per page.',
   restrictToMyDrive: 'Restrict changes to the My Drive hierarchy.',
 }
 

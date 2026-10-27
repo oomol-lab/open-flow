@@ -50,10 +50,10 @@ export class EventSourceControl {
     return this.eventSources.update(sourceId, input, signal)
   }
 
-  deleteEventSource(actorId: string, sourceId: string, revision: number) {
+  deleteEventSource(actorId: string, sourceId: string, revision: number, signal = AbortSignal.timeout(30_000)) {
     this.access.requireAdmin(actorId)
 
     if (this.eventSources == null) throw new ControlError(controlErrorCode.eventSourceInvalid, 'Event sources are unavailable.')
-    this.eventSources.delete(sourceId, revision)
+    return this.eventSources.delete(sourceId, revision, signal)
   }
 }

@@ -1,10 +1,19 @@
 import type { ChangeOperation, JsonValue, ManagedTaskDefinition, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
 import { applyFlowChanges, currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+import { triggerConfigValues } from '@oomol-lab/open-flow/poll-trigger'
+import { triggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { isDeepStrictEqual } from 'node:util'
 import { fulfillmentSamples, fulfillmentStages } from './fulfillment.ts'
 
 export const scenarios = [
+  {
+    id: 'poll-batch',
+    entry: { kind: 'poll' },
+    name: 'Author a batch Poll',
+    version: 1,
+    task: 'Create a Gmail Poll with Mail test account and default Gmail settings, read its events output, change only its name, and connect it to Outputs returning the complete messages array from events. Preserve the account and configuration. Check the Flow. Each deterministic draft Run receives a batch of messages.',
+  },
   {
     id: 'webhook-response-node',
     entry: { kind: 'webhook' },
@@ -185,6 +194,7 @@ function source(nodeId: string, handle: string, from: string, output: string): C
 }
 export function initialOperations(id: string): ChangeOperation[] {
   if (
+    id == 'poll-batch' ||
     id == 'wait-auto-continue' ||
     id == 'node-errors' ||
     id == 'node-retries' ||
@@ -361,6 +371,24 @@ export interface Sample {
   parameters?: Record<string, JsonValue>
 }
 export function samples(id: string, stage = 0): Sample[] {
+  if (id === 'poll-batch')
+    return ['First', 'Second'].map((name) => ({
+      name,
+      orders: [],
+      order,
+      outputs: {
+        events: [1, 2].map((index) => ({
+          historyId: null,
+          labelIds: [],
+          messageId: `${name}-${index}`,
+          messageTimestamp: '2026-10-27T00:00:00Z',
+          sender: 'sender@example.test',
+          subject: `${name}-${index}`,
+          threadId: `${name}-${index}`,
+          to: 'reader@example.test',
+        })),
+      },
+    }))
   if (id == 'node-errors') return [{ name: 'handled-and-successful', orders: [], order }]
   if (id == 'node-retries') return [{ name: 'configured-and-cleared', orders: [], order }]
   if (id == 'workflow-call') return [0, -2.5, 12.5].map((amount) => ({ name: String(amount), orders: [], order, outputs: { amount } }))
@@ -428,6 +456,20 @@ function effectiveNode(content: RevisionContent, id: string): unknown {
 }
 /** Independent assertions: compare behavior and preserved effective configurations, not generated IDs. */
 export function assertions(id: string, base: RevisionContent, current: RevisionContent): string[] {
+  if (id === 'poll-batch') {
+    const poll = Object.values(current.document.graph.nodes).find((candidate) => candidate.kind === 'poll')
+    const expected = triggerDefinitions.find((definition) => definition.snapshot.key === 'gmail.on_message_received')!.snapshot
+    return poll?.kind === 'poll' &&
+      poll.name === 'Mail events' &&
+      poll.connectionId === 'mail-test' &&
+      poll.definition.definitionVersion === 2 &&
+      poll.definition.outputs[0]?.handle === 'events' &&
+      poll.definition.key === expected.key &&
+      isDeepStrictEqual(triggerConfigValues(expected.configInputs, poll.config), triggerConfigValues(expected.configInputs, {}))
+      ? []
+      : ['Preserve the selected Gmail account, default configuration and batch Poll contract.']
+  }
+
   if (id == 'wait-auto-continue') {
     const nodes = Object.values(current.document.graph.nodes)
     const relative = nodes.find((candidate) => candidate.name == 'Relative wait updated')

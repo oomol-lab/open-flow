@@ -160,7 +160,7 @@ it('accepts databases already rebuilt with the new column names and snapshot for
   )
   database.close()
   const upgraded = Database.open(file)
-  expect(version(upgraded.connection)).toBe(53)
+  expect(version(upgraded.connection)).toBe(54)
   expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
   upgraded.close()
 })
@@ -211,7 +211,7 @@ it('backfills Revision metadata needed after old content is pruned', async () =>
 
   const upgraded = Database.open(file)
   try {
-    expect(version(upgraded.connection)).toBe(53)
+    expect(version(upgraded.connection)).toBe(54)
     expect(upgraded.connection.prepare('SELECT digest, model_version AS modelVersion FROM flow_revisions WHERE revision_id = ?').get('revision')).toEqual({
       digest: 'digest',
       modelVersion: 3,
@@ -267,7 +267,7 @@ it('applies the Flow-first schema without foreign keys', async () => {
   Database.open(file).close()
   const database = new DatabaseSync(file)
   try {
-    expect(version(database)).toBe(53)
+    expect(version(database)).toBe(54)
     const tables = database.prepare("SELECT name FROM sqlite_schema WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name").all() as {
       readonly name: string
     }[]
@@ -309,7 +309,7 @@ it('upgrades a version 1 Flow database without changing its data', async () => {
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(53)
+    expect(version(reopened)).toBe(54)
     expect(reopened.prepare('SELECT revision_id AS revisionId FROM revisions').all()).toEqual([{ revisionId: 'revision-a' }])
     expect(reopened.prepare('SELECT name FROM variables').all()).toEqual([])
   } finally {
@@ -339,7 +339,7 @@ it('adds an immutable Connector Team binding to every existing Flow', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(53)
+    expect(version(reopened)).toBe(54)
     expect(reopened.prepare('SELECT flow_id AS flowId, team_id AS teamId FROM flow_connector_teams').all()).toEqual([{ flowId: 'flow-a', teamId: null }])
     expect(reopened.prepare("SELECT name FROM pragma_table_info('runs') WHERE name = 'connector_team_id'").get()).toEqual({ name: 'connector_team_id' })
   } finally {
@@ -387,13 +387,13 @@ it('rejects a newer Flow schema version without modifying it', async () => {
   const file = await databaseFile()
   Database.open(file).close()
   const database = new DatabaseSync(file)
-  database.exec('PRAGMA user_version = 54')
+  database.exec('PRAGMA user_version = 55')
   database.close()
 
-  expect(() => Database.open(file)).toThrow('SQLite schema version 54 is newer than the supported version 53.')
+  expect(() => Database.open(file)).toThrow('SQLite schema version 55 is newer than the supported version 54.')
 
   const reopened = new DatabaseSync(file)
-  expect(version(reopened)).toBe(54)
+  expect(version(reopened)).toBe(55)
   reopened.close()
 })
 
@@ -431,7 +431,7 @@ it('preserves old checkpoint bytes for explicit recovery validation', async () =
 
   const reopened = new DatabaseSync(file)
   try {
-    expect(version(reopened)).toBe(53)
+    expect(version(reopened)).toBe(54)
     expect(reopened.prepare('SELECT * FROM run_checkpoints').get()).toEqual({
       run_id: 'run-a',
       checkpoint_json: '{"value":42}',
@@ -464,7 +464,7 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   Database.open(file).close()
   const upgraded = new DatabaseSync(file)
   try {
-    expect(version(upgraded)).toBe(53)
+    expect(version(upgraded)).toBe(54)
     const after = tables.map((table) => upgraded.prepare('SELECT * FROM ' + table).all())
     expect(after.slice(0, 2)).toEqual(
       before.slice(0, 2).map((rows) => rows.map((row) => Object.fromEntries(Object.entries(row).filter(([key]) => key != 'operator_state')))),
@@ -482,7 +482,7 @@ it('upgrades version 14 while preserving existing Integration progress, subscrip
   }
 })
 
-it('removes the event source tenant binding while preserving source configuration and queued events', async () => {
+it('rejects legacy Source upgrades without modifying configuration or queued events', async () => {
   const file = await databaseFile()
   const database = legacyDatabase(file, 23)
   database
@@ -496,31 +496,12 @@ it('removes the event source tenant binding while preserving source configuratio
   const events = database.prepare('SELECT * FROM source_events').all()
   database.close()
 
-  Database.open(file).close()
-
-  const upgraded = new DatabaseSync(file)
-  try {
-    expect(upgraded.prepare('SELECT * FROM event_sources').get()).toEqual({
-      source_id: source.source_id,
-      revision: source.revision,
-      name: source.name,
-      kind: 'feishu',
-      provider: source.provider,
-      external_identity: source.app_id,
-      connection_id: source.connection_id,
-      team_id: source.team_id,
-      event_types_json: source.event_types_json,
-      config_json: JSON.stringify({ manageSubscriptions: false }),
-      secrets_json: JSON.stringify({ verificationToken: source.verification_token, encryptKey: source.encrypt_key }),
-      state_json: JSON.stringify({ verifiedAt: source.verified_at }),
-      enabled: source.enabled,
-      last_received_at: source.last_received_at,
-      updated_at: source.updated_at,
-    })
-    expect(upgraded.prepare('SELECT * FROM source_events').all()).toEqual(events)
-  } finally {
-    upgraded.close()
-  }
+  expect(() => Database.open(file)).toThrow('legacy_sources_require_explicit_migration')
+  const unchanged = new DatabaseSync(file)
+  expect(version(unchanged)).toBe(23)
+  expect(unchanged.prepare('SELECT * FROM event_sources').get()).toEqual(source)
+  expect(unchanged.prepare('SELECT * FROM source_events').all()).toEqual(events)
+  unchanged.close()
 })
 
 it('adds Cron health without changing existing schedules', async () => {
@@ -672,7 +653,7 @@ it('adds personal token storage to version 37 without changing existing accounts
   old.close()
   const upgraded = Database.open(file)
   try {
-    expect(version(upgraded.connection)).toBe(53)
+    expect(version(upgraded.connection)).toBe(54)
     expect(upgraded.connection.prepare('SELECT * FROM users').all()).toEqual(before)
     expect(upgraded.connection.prepare('SELECT * FROM user_tokens').all()).toEqual([])
     expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
@@ -714,7 +695,7 @@ it('preserves existing personal tokens while adding Operator credential binding'
   const upgraded = Database.open(file)
   try {
     expect(upgraded.connection.prepare('SELECT * FROM user_tokens').get()).toEqual({ ...before, operator_fingerprint: null })
-    expect(version(upgraded.connection)).toBe(53)
+    expect(version(upgraded.connection)).toBe(54)
     expect(upgraded.connection.prepare('PRAGMA integrity_check').get()).toEqual({ integrity_check: 'ok' })
   } finally {
     upgraded.close()
@@ -739,7 +720,7 @@ it('migrates shared Variables to the Operator without exposing or copying them t
   }
 })
 
-it('migrates source definitions without changing queued deliveries, deduplication or subscription ownership', async () => {
+it('rejects legacy managed Sources while preserving deliveries, deduplication and subscription ownership', async () => {
   const file = await databaseFile()
   const old = legacyDatabase(file, 42)
   for (const [sourceId, verifiedAt] of [
@@ -765,23 +746,11 @@ it('migrates source definitions without changing queued deliveries, deduplicatio
   const before = tables.map((table) => old.prepare(`SELECT * FROM ${table}`).all())
   old.close()
 
-  const upgraded = Database.open(file)
-  try {
-    expect(tables.map((table) => upgraded.connection.prepare(`SELECT * FROM ${table}`).all())).toEqual(before)
-    const sources = upgraded.connection.prepare('SELECT * FROM event_sources ORDER BY source_id').all()
-    expect(sources.map((source) => JSON.parse(String(source.state_json)))).toEqual([{}, { verifiedAt: 100 }])
-    for (const source of sources) {
-      expect(source).toMatchObject({ kind: 'feishu', revision: 3, enabled: 0, team_id: 'team', last_received_at: 200, updated_at: 300 })
-      expect(source.external_identity).toBe(`cli_${source.source_id}`)
-      expect(JSON.parse(String(source.config_json))).toEqual({ manageSubscriptions: true })
-      expect(JSON.parse(String(source.secrets_json))).toEqual({ verificationToken: 'token', encryptKey: 'key' })
-    }
-  } finally {
-    upgraded.close()
-  }
-  const reopened = Database.open(file)
-  expect(tables.map((table) => reopened.connection.prepare(`SELECT * FROM ${table}`).all())).toEqual(before)
-  reopened.close()
+  expect(() => Database.open(file)).toThrow('legacy_sources_require_explicit_migration')
+  const unchanged = new DatabaseSync(file)
+  expect(tables.map((table) => unchanged.prepare('SELECT * FROM ' + table).all())).toEqual(before)
+  expect(unchanged.prepare('SELECT COUNT(*) AS count FROM event_sources').get()).toEqual({ count: 2 })
+  unchanged.close()
 })
 
 it.each(['https://connector.oomol.com/', 'https://connector.example.com/'])(
@@ -830,5 +799,31 @@ it('preserves legacy team bindings and remembers names across database reopen', 
     expect(new ConnectorTeamStore(reopened.connection).list()).toEqual([{ flowId: 'flow', teamId: 'team', teamName: 'Renamed' }])
   } finally {
     reopened.close()
+  }
+})
+
+it('refuses legacy Slack snapshots without modifying their data or schema version', async () => {
+  const file = await databaseFile()
+  const old = legacyDatabase(file, 53)
+  old
+    .prepare(`INSERT INTO event_sources (source_id, revision, name, kind, provider, external_identity, connection_id, team_id,
+    config_json, secrets_json, state_json, event_types_json, updated_at)
+    VALUES ('legacy', 1, 'Slack', 'slack', 'slackbot', 'identity', 'connection', NULL, '{"appId":"A123"}', '{}', '{}', '["app_mention"]', 1)`)
+    .run()
+  old.prepare("INSERT INTO event_source_apps VALUES ('slack', 'A123', 'legacy-secret', NULL)").run()
+  old.close()
+  expect(() => Database.open(file)).toThrow('legacy_sources_require_explicit_migration')
+  const unchanged = new DatabaseSync(file)
+  try {
+    expect(version(unchanged)).toBe(53)
+    expect(unchanged.prepare('SELECT signing_secret FROM event_source_apps').get()).toEqual({ signing_secret: 'legacy-secret' })
+    expect(
+      unchanged
+        .prepare('PRAGMA table_info(event_sources)')
+        .all()
+        .some((column) => column.name === 'connector_json'),
+    ).toBe(false)
+  } finally {
+    unchanged.close()
   }
 })

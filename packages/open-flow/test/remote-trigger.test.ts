@@ -114,7 +114,9 @@ it('rejects legacy remote identifiers before creating another subscription', asy
 
 it('acknowledges Asana creation handshakes before a subscription exists without accepting or persisting the supplied key', async () => {
   const definition = remoteTriggerDefinitions.find((item) => item.snapshot.key === 'asana.on_task_event') as IntegrationDefinition
-  const trigger = vi.fn()
+  const trigger = vi.fn(async () => ({
+    result: { outcome: 'respond', status: 200, body: '', contentType: 'text/plain', headers: { 'x-hook-secret': 'a'.repeat(64) } },
+  }))
   const saveSubscription = vi.fn()
   const secret = 'a'.repeat(64)
   const result = await definition.receive({
@@ -128,12 +130,15 @@ it('acknowledges Asana creation handshakes before a subscription exists without 
     payload: null,
     rawBody: new Uint8Array(),
     header: (name) => (name === 'x-hook-secret' ? secret : undefined),
-    query: () => undefined,
+    query: (name) => (name === 'connector_reference' ? 'candidate-reference' : undefined),
     connector: { execute: vi.fn(), trigger },
     state: { checkpoint: null, subscription: {}, saveCheckpoint: vi.fn(), saveSubscription },
   })
   expect(result).toEqual({ outcome: 'respond', status: 200, body: '', contentType: 'text/plain', headers: { 'x-hook-secret': secret } })
-  expect(trigger).not.toHaveBeenCalled()
+  expect(trigger).toHaveBeenCalledWith(
+    expect.objectContaining({ operation: 'receive', subscriptionId: 'candidate-reference', headers: { 'x-hook-secret': secret } }),
+    undefined,
+  )
   expect(saveSubscription).not.toHaveBeenCalled()
 })
 

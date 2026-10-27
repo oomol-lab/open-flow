@@ -1,9 +1,11 @@
 import type { RunEvent } from '@oomol-lab/open-flow/control-api'
 import type { RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
-import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+import { currentFlowModelVersion, inputValues } from '@oomol-lab/open-flow/flow-change'
+import { triggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { expect, it } from 'vitest'
 import { runtimeAssertions } from '../scripts/lab/acceptance.ts'
+import { assertions, emptyContent } from '../scripts/lab/scenarios.ts'
 
 const task = (name: string) => ({ kind: 'task' as const, name, inputs: {}, task: { name, moduleId: 'code', inputs: [], outputs: [], capabilities: [] } })
 const content: RevisionContent = {
@@ -42,4 +44,35 @@ it('rejects external calls even when both tasks complete correctly', () => {
   const events = [completed('configured'), completed('cleared')]
   expect(verify(events, [{ action: 'unexpected', connection: 'account', input: {}, invocationId: 'unexpected' }])).not.toEqual([])
   expect(verify(events, [], [{}])).not.toEqual([])
+})
+
+it.each([
+  [{}, true],
+  [{ search: '', maxMessagesPerPoll: 25, includeSpamAndTrash: false }, true],
+  [{ search: 'from:someone@example.test' }, false],
+  [{ maxMessagesPerPoll: 1 }, false],
+  [{ includeSpamAndTrash: true }, false],
+])('checks effective Gmail configuration in the Poll Lab: %j', (config, accepted) => {
+  const definition = triggerDefinitions.find((item) => item.snapshot.key === 'gmail.on_message_received')!.snapshot
+  if (definition.type !== 'poll') throw new Error('Expected Gmail Poll definition')
+  const current: RevisionContent = {
+    ...emptyContent,
+    document: {
+      ...emptyContent.document,
+      graph: {
+        edges: [],
+        nodes: {
+          mail: {
+            kind: 'poll',
+            name: 'Mail events',
+            connectionId: 'mail-test',
+            definition,
+            config: inputValues(config),
+            pollTimes: [{ type: 'every', unit: 'minute', value: 1 }],
+          },
+        },
+      },
+    },
+  }
+  expect(assertions('poll-batch', emptyContent, current).length === 0).toBe(accepted)
 })

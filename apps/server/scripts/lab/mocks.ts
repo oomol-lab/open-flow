@@ -109,6 +109,7 @@ export const actions: ConnectorActionMetadata[] = [
   },
 ]
 export const accounts: ConnectorConnection[] = [
+  { connectionId: 'mail-test', displayName: 'Mail test account', serviceId: 'gmail', status: 'active', isDefault: true },
   { connectionId: 'marketplace:oomol:lab-data', displayName: 'Data test account', serviceId: 'lab-data', status: 'active', isDefault: true },
   { connectionId: 'orders-test', displayName: 'Orders test account', serviceId: 'lab-orders', status: 'active', isDefault: false },
   { connectionId: 'orders-production', displayName: 'Orders production account', serviceId: 'lab-orders', status: 'active', isDefault: true },

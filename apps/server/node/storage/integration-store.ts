@@ -80,6 +80,11 @@ export class IntegrationStore {
   ): boolean {
     const candidates = []
     for (const integration of integrations) {
+      if (integration.eventSource) {
+        const sourceId = (JSON.parse(integration.triggerJson) as { config?: { sourceId?: { value?: string } } }).config?.sourceId?.value
+        const source = sourceId == null ? undefined : this.#eventSources.get(sourceId)
+        if (source == null || this.#eventSources.busy(source)) return false
+      }
       const current = this.integrationBinding(flowId, integration.triggerNodeId)
       if (current != null) {
         if (this.#canReuse(current, integration, expectedLivePublicationId)) continue
@@ -393,7 +398,9 @@ export class IntegrationStore {
     integration: Pick<IntegrationPublication, 'listener' | 'connectionId' | 'triggerJson'>,
     expectedLivePublicationId: string | null,
   ): boolean {
+    const sourceId = (JSON.parse(integration.triggerJson) as { config?: { sourceId?: { value?: string } } }).config?.sourceId?.value
     return (
+      (sourceId == null || this.#eventSources.ready(sourceId, binding.bindingId)) &&
       binding.currentPublicationId == expectedLivePublicationId &&
       this.#matches(binding, integration) &&
       (binding.health == 'healthy' || (integration.listener === true && this.listenerState(binding.bindingId, binding.runtimeVersion)?.health == 'healthy'))

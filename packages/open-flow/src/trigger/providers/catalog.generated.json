@@ -204,6 +204,10 @@
         }
       ]
     },
+    "callback": {
+      "headers": ["x-hook-secret", "x-hook-signature"],
+      "query": []
+    },
     "options": false
   },
   {
@@ -282,6 +286,10 @@
           "nullable": false
         }
       ]
+    },
+    "callback": {
+      "headers": ["calendly-webhook-signature"],
+      "query": []
     },
     "options": false
   },
@@ -362,6 +370,10 @@
           "nullable": false
         }
       ]
+    },
+    "callback": {
+      "headers": ["x-signature"],
+      "query": []
     },
     "options": false
   },
@@ -495,8 +507,6 @@
         }
       ]
     },
-    "options": false,
-    "eventSource": "feishu",
     "source": {
       "createSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -613,7 +623,9 @@
       "maximumBodyBytes": 65536,
       "applicationIngress": false,
       "managed": false
-    }
+    },
+    "options": false,
+    "eventSource": "feishu"
   },
   {
     "snapshot": {
@@ -698,8 +710,10 @@
         }
       ]
     },
-    "options": false,
-    "eventSource": "fireflies",
+    "callback": {
+      "headers": [],
+      "query": []
+    },
     "source": {
       "createSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -808,7 +822,9 @@
       "maximumBodyBytes": 65536,
       "applicationIngress": false,
       "managed": false
-    }
+    },
+    "options": false,
+    "eventSource": "fireflies"
   },
   {
     "snapshot": {
@@ -882,6 +898,14 @@
           "nullable": false
         },
         {
+          "handle": "insecureSsl",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false
+        },
+        {
           "handle": "owner",
           "jsonSchema": {
             "type": "string",
@@ -896,18 +920,6 @@
             "pattern": "^(?!\\.{1,2}$)[a-zA-Z0-9._-]{1,100}$"
           },
           "nullable": false
-        },
-        {
-          "group": "Advanced settings",
-          "collapsed": true
-        },
-        {
-          "handle": "insecureSsl",
-          "jsonSchema": {
-            "type": "boolean"
-          },
-          "nullable": false,
-          "value": false
         }
       ],
       "definitionVersion": 2,
@@ -949,6 +961,10 @@
       ],
       "provider": "github",
       "type": "integration"
+    },
+    "callback": {
+      "headers": ["x-github-delivery", "x-github-event", "x-hub-signature-256"],
+      "query": []
     },
     "options": false
   },
@@ -1049,6 +1065,10 @@
         }
       ]
     },
+    "callback": {
+      "headers": ["x-github-delivery", "x-github-event", "x-hub-signature-256"],
+      "query": []
+    },
     "options": false,
     "intervalMs": 300000
   },
@@ -1087,6 +1107,14 @@
           "nullable": false
         },
         {
+          "handle": "insecureSsl",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false
+        },
+        {
           "handle": "project",
           "jsonSchema": {
             "type": "string",
@@ -1104,18 +1132,6 @@
           },
           "nullable": false,
           "value": ""
-        },
-        {
-          "group": "Advanced settings",
-          "collapsed": true
-        },
-        {
-          "handle": "insecureSsl",
-          "jsonSchema": {
-            "type": "boolean"
-          },
-          "nullable": false,
-          "value": false
         }
       ],
       "definitionVersion": 2,
@@ -1164,6 +1180,10 @@
       ],
       "provider": "gitlab",
       "type": "integration"
+    },
+    "callback": {
+      "headers": ["idempotency-key", "x-gitlab-event", "x-gitlab-token"],
+      "query": []
     },
     "options": false
   },
@@ -1462,28 +1482,6 @@
           "description": "Optional shared drive ID. Omit it to monitor the connected account."
         },
         {
-          "handle": "includeRemoved",
-          "jsonSchema": {
-            "type": "boolean"
-          },
-          "nullable": false,
-          "value": true,
-          "description": "Include changes caused by deletion or loss of access."
-        },
-        {
-          "handle": "restrictToMyDrive",
-          "jsonSchema": {
-            "type": "boolean"
-          },
-          "nullable": false,
-          "value": false,
-          "description": "Restrict changes to the My Drive hierarchy."
-        },
-        {
-          "group": "Advanced settings",
-          "collapsed": true
-        },
-        {
           "handle": "includeCorpusRemovals",
           "jsonSchema": {
             "type": "boolean"
@@ -1502,6 +1500,15 @@
           "description": "Include items from My Drive and shared drives."
         },
         {
+          "handle": "includeRemoved",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": true,
+          "description": "Include changes caused by deletion or loss of access."
+        },
+        {
           "handle": "pageSize",
           "jsonSchema": {
             "type": "integer",
@@ -1511,6 +1518,15 @@
           "nullable": false,
           "value": 100,
           "description": "Maximum changes included in one Flow Run."
+        },
+        {
+          "handle": "restrictToMyDrive",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false,
+          "description": "Restrict changes to the My Drive hierarchy."
         }
       ],
       "definitionVersion": 2,
@@ -1588,6 +1604,18 @@
       ],
       "provider": "googledrive",
       "type": "integration"
+    },
+    "callback": {
+      "headers": [
+        "x-goog-changed",
+        "x-goog-channel-id",
+        "x-goog-channel-token",
+        "x-goog-message-number",
+        "x-goog-resource-id",
+        "x-goog-resource-state",
+        "x-goog-resource-uri"
+      ],
+      "query": []
     },
     "options": false
   },
@@ -1761,28 +1789,6 @@
           "description": "Optional shared drive ID. Omit it to monitor the connected account."
         },
         {
-          "handle": "includeRemoved",
-          "jsonSchema": {
-            "type": "boolean"
-          },
-          "nullable": false,
-          "value": true,
-          "description": "Include changes caused by deletion or loss of access."
-        },
-        {
-          "handle": "restrictToMyDrive",
-          "jsonSchema": {
-            "type": "boolean"
-          },
-          "nullable": false,
-          "value": false,
-          "description": "Restrict changes to the My Drive hierarchy."
-        },
-        {
-          "group": "Advanced settings",
-          "collapsed": true
-        },
-        {
           "handle": "includeCorpusRemovals",
           "jsonSchema": {
             "type": "boolean"
@@ -1801,6 +1807,15 @@
           "description": "Include items from My Drive and shared drives."
         },
         {
+          "handle": "includeRemoved",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": true,
+          "description": "Include changes caused by deletion or loss of access."
+        },
+        {
           "handle": "pageSize",
           "jsonSchema": {
             "type": "integer",
@@ -1810,6 +1825,15 @@
           "nullable": false,
           "value": 100,
           "description": "Maximum changes included in one Flow Run."
+        },
+        {
+          "handle": "restrictToMyDrive",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": false,
+          "description": "Restrict changes to the My Drive hierarchy."
         }
       ],
       "definitionVersion": 2,
@@ -1840,6 +1864,18 @@
       ],
       "provider": "googledrive",
       "type": "integration"
+    },
+    "callback": {
+      "headers": [
+        "x-goog-changed",
+        "x-goog-channel-id",
+        "x-goog-channel-token",
+        "x-goog-message-number",
+        "x-goog-resource-id",
+        "x-goog-resource-state",
+        "x-goog-resource-uri"
+      ],
+      "query": []
     },
     "options": false,
     "intervalMs": 300000
@@ -2053,8 +2089,10 @@
         }
       ]
     },
-    "options": false,
-    "eventSource": "intercom",
+    "callback": {
+      "headers": [],
+      "query": []
+    },
     "source": {
       "createSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2168,7 +2206,9 @@
       "maximumBodyBytes": 65536,
       "applicationIngress": true,
       "managed": false
-    }
+    },
+    "options": false,
+    "eventSource": "intercom"
   },
   {
     "snapshot": {
@@ -2253,8 +2293,10 @@
         }
       ]
     },
-    "options": false,
-    "eventSource": "jira",
+    "callback": {
+      "headers": [],
+      "query": []
+    },
     "source": {
       "createSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -2363,7 +2405,9 @@
       "maximumBodyBytes": 65536,
       "applicationIngress": false,
       "managed": true
-    }
+    },
+    "options": false,
+    "eventSource": "jira"
   },
   {
     "snapshot": {
@@ -2933,6 +2977,10 @@
         }
       ]
     },
+    "callback": {
+      "headers": [],
+      "query": ["signature"]
+    },
     "options": false
   },
   {
@@ -2996,6 +3044,10 @@
           "nullable": false
         }
       ]
+    },
+    "callback": {
+      "headers": ["authorization"],
+      "query": []
     },
     "options": false
   },
@@ -3072,6 +3124,10 @@
           "nullable": false
         }
       ]
+    },
+    "callback": {
+      "headers": ["svix-id", "svix-signature", "svix-timestamp"],
+      "query": []
     },
     "options": false
   },
@@ -3184,8 +3240,10 @@
         }
       ]
     },
-    "options": false,
-    "eventSource": "sentry",
+    "callback": {
+      "headers": [],
+      "query": []
+    },
     "source": {
       "createSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3309,7 +3367,9 @@
       "maximumBodyBytes": 65536,
       "applicationIngress": true,
       "managed": false
-    }
+    },
+    "options": false,
+    "eventSource": "sentry"
   },
   {
     "snapshot": {
@@ -3578,6 +3638,10 @@
       ],
       "provider": "shopify",
       "type": "integration"
+    },
+    "callback": {
+      "headers": ["x-shopify-api-version", "x-shopify-event-id", "x-shopify-shop-domain", "x-shopify-topic", "x-shopify-triggered-at", "x-shopify-webhook-id"],
+      "query": ["open_flow_callback"]
     },
     "options": false
   },
@@ -3860,8 +3924,10 @@
         }
       ]
     },
-    "options": false,
-    "eventSource": "slack",
+    "callback": {
+      "headers": [],
+      "query": []
+    },
     "source": {
       "createSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3978,11 +4044,22 @@
       "maximumBodyBytes": 65536,
       "applicationIngress": true,
       "managed": false
-    }
+    },
+    "options": false,
+    "eventSource": "slack"
   },
   {
     "snapshot": {
       "configInputs": [
+        {
+          "handle": "apiVersion",
+          "jsonSchema": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "nullable": false,
+          "value": ""
+        },
         {
           "handle": "events",
           "jsonSchema": {
@@ -4004,19 +4081,6 @@
           },
           "nullable": false,
           "value": false
-        },
-        {
-          "group": "Advanced settings",
-          "collapsed": true
-        },
-        {
-          "handle": "apiVersion",
-          "jsonSchema": {
-            "type": "string",
-            "maxLength": 40
-          },
-          "nullable": false,
-          "value": ""
         }
       ],
       "definitionVersion": 2,
@@ -4065,6 +4129,10 @@
       ],
       "provider": "stripe",
       "type": "integration"
+    },
+    "callback": {
+      "headers": ["stripe-signature"],
+      "query": []
     },
     "options": false
   },
@@ -4152,6 +4220,10 @@
       "provider": "tally",
       "type": "integration"
     },
+    "callback": {
+      "headers": ["tally-signature"],
+      "query": []
+    },
     "options": true
   },
   {
@@ -4171,6 +4243,15 @@
           "nullable": false,
           "value": [],
           "description": "Only accept updates from these numeric Telegram chat IDs. Empty means every chat."
+        },
+        {
+          "handle": "dropPendingUpdates",
+          "jsonSchema": {
+            "type": "boolean"
+          },
+          "nullable": false,
+          "value": true,
+          "description": "Discard updates queued before the webhook is created or resumed."
         },
         {
           "handle": "updates",
@@ -4227,19 +4308,6 @@
           "nullable": false,
           "value": [],
           "description": "Only accept updates from these numeric Telegram user IDs. Empty means every user."
-        },
-        {
-          "group": "Advanced settings",
-          "collapsed": true
-        },
-        {
-          "handle": "dropPendingUpdates",
-          "jsonSchema": {
-            "type": "boolean"
-          },
-          "nullable": false,
-          "value": true,
-          "description": "Discard updates queued before the webhook is created or resumed."
         }
       ],
       "definitionVersion": 2,
@@ -4281,6 +4349,10 @@
       ],
       "provider": "telegram",
       "type": "integration"
+    },
+    "callback": {
+      "headers": ["x-telegram-bot-api-secret-token"],
+      "query": []
     },
     "options": false
   },
@@ -4347,6 +4419,10 @@
           }
         }
       ]
+    },
+    "callback": {
+      "headers": ["typeform-signature"],
+      "query": []
     },
     "options": false
   },
@@ -4439,6 +4515,10 @@
         }
       ]
     },
+    "callback": {
+      "headers": ["x-vercel-signature"],
+      "query": []
+    },
     "options": false
   },
   {
@@ -4474,10 +4554,6 @@
             "uniqueItems": true
           },
           "nullable": false
-        },
-        {
-          "group": "Advanced settings",
-          "collapsed": true
         },
         {
           "handle": "webhookName",
@@ -4557,6 +4633,18 @@
       ],
       "provider": "woocommerce",
       "type": "integration"
+    },
+    "callback": {
+      "headers": [
+        "x-wc-webhook-delivery-id",
+        "x-wc-webhook-event",
+        "x-wc-webhook-id",
+        "x-wc-webhook-resource",
+        "x-wc-webhook-signature",
+        "x-wc-webhook-source",
+        "x-wc-webhook-topic"
+      ],
+      "query": []
     },
     "options": false
   },
@@ -4695,6 +4783,10 @@
       "provider": "zendesk",
       "type": "integration"
     },
+    "callback": {
+      "headers": ["x-zendesk-webhook-signature", "x-zendesk-webhook-signature-timestamp"],
+      "query": []
+    },
     "options": false
   },
   {
@@ -4780,8 +4872,10 @@
         }
       ]
     },
-    "options": false,
-    "eventSource": "zoom",
+    "callback": {
+      "headers": [],
+      "query": []
+    },
     "source": {
       "createSchema": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4895,6 +4989,8 @@
       "maximumBodyBytes": 65536,
       "applicationIngress": true,
       "managed": false
-    }
+    },
+    "options": false,
+    "eventSource": "zoom"
   }
 ]

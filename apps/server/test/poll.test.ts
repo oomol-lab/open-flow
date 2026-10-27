@@ -734,3 +734,36 @@ it.each([false, true])('admits Provider-defined Poll outputs after deduplication
     await closeService(service)
   }
 })
+
+it('admits a complete event batch as one Run with capacity for only one pending Run', async () => {
+  const file = await databaseFile()
+  const definition: PollDefinition = {
+    snapshot,
+    buildOutputs: eventsPollOutputs,
+    poll: async ({ checkpoint }) => ({
+      checkpoint: Number(checkpoint) + 1,
+      events: checkpoint == null ? [] : ['one', 'two', 'two', 'three'].map((id) => ({ dedupeKey: id, payload: { id } })),
+    }),
+  }
+  const service = await openService(file, {
+    capabilities: { connector: () => connector },
+    clock: () => publishedAt,
+    runtime: { maxPendingRuns: 1 },
+    triggerDefinitions: [definition],
+  })
+  const database = new DatabaseSync(file)
+  try {
+    await publish(service, revision())
+    await service.tickListeners('2026-08-21T00:01:00.000Z')
+    await service.tickListeners('2026-08-21T00:02:00.000Z')
+    const rows = database.prepare('SELECT trigger_outputs FROM runs').all() as { trigger_outputs: string }[]
+    expect(rows.map((row) => JSON.parse(row.trigger_outputs))).toEqual([{ events: [{ id: 'one' }, { id: 'two' }, { id: 'three' }] }])
+    expect(service.pollState('main', 'poll')).toMatchObject({ checkpoint: 2, health: 'healthy' })
+    await service.tickListeners('2026-08-21T00:03:00.000Z')
+    expect(database.prepare('SELECT COUNT(*) AS count FROM runs').get()).toEqual({ count: 1 })
+    expect(database.prepare('SELECT COUNT(*) AS count FROM poll_event_dedupe').get()).toEqual({ count: 3 })
+  } finally {
+    database.close()
+    await closeService(service)
+  }
+})

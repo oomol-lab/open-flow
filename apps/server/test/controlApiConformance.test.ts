@@ -37,7 +37,8 @@ import { Store } from '../node/storage/store.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
-import { sourceProtocolFixture } from './sourceProtocolFixture.ts'
+import { sourceReferenceFixture } from './sourceProtocolFixture.ts'
+const sourceProtocolFixture = sourceReferenceFixture()
 
 const connectorProvider: ConnectorProvider = {
   icon: 'https://connector.example/icons/mail.svg',
@@ -118,7 +119,7 @@ async function createHarness(
             ? [connectorConnection]
             : [],
     trigger: async (_provider, _connection, _trigger, request) =>
-      request.operation === 'source'
+      request.operation === 'sourceReference'
         ? sourceProtocolFixture(request.request, eventConnection.providerAccountId)
         : [{ value: teamId, label: 'Engineering (ENG)' }],
     listProviders: async () => [connectorProvider],
@@ -745,7 +746,7 @@ it('Server event source Team scope and authorization page conformance', async ()
   ])
   vi.spyOn(connector, 'listConnections').mockResolvedValue([eventConnection])
   vi.spyOn(connector, 'trigger').mockImplementation(async (_provider, _connection, _trigger, request) =>
-    request.operation === 'source' ? sourceProtocolFixture(request.request, eventConnection.providerAccountId) : undefined,
+    request.operation === 'sourceReference' ? sourceProtocolFixture(request.request, eventConnection.providerAccountId) : undefined,
   )
   const service = await openService(':memory:', { capabilities: { connector: () => connector } })
   const app = createServerApp(service, { resolveControlActor: () => 'operator' })

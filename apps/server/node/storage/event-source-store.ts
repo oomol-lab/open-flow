@@ -1,21 +1,24 @@
 import type { ConnectorAccessSnapshot, CreateEventSource, EventSource, UpdateEventSource } from '@oomol-lab/open-flow/control-api'
-import type { SourceConfiguration, SourceEvent } from '@oomol-lab/open-flow/event-source'
+import type { SourceConfiguration, SourceEvent, SourceReferenceSnapshot } from '@oomol-lab/open-flow/event-source'
 import type { TriggerNode } from '@oomol-lab/open-flow/flow-change'
 import type { DatabaseSync } from 'node:sqlite'
 
 import { decodeConnectorAccessSnapshot } from '@oomol-lab/open-flow/control-api'
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { SourceIdentityError, eventSourceDefinition, sourceReady, sourceView } from '@oomol-lab/open-flow/event-source'
+import { SourceIdentityError, eventSourceDefinition, sourceReady, sourceView, sourceReferenceSchema } from '@oomol-lab/open-flow/event-source'
 import { resolveTriggerConfig } from '@oomol-lab/open-flow/integration-trigger'
 import { randomUUID } from 'node:crypto'
+import { isDeepStrictEqual } from 'node:util'
 import { z, ZodError } from 'zod'
 import { ControlError } from '../error.ts'
 
 const sourceColumns = `source_id AS sourceId, revision, name, kind, provider, external_identity AS identity,
   connection_id AS connectionId, team_id AS teamId, config_json AS configJson, secrets_json AS secretsJson,
-  state_json AS stateJson, event_types_json AS eventTypesJson, enabled, last_received_at AS lastReceivedAt, updated_at AS updatedAt`
+  state_json AS stateJson, connector_json AS connectorJson, pending_json AS pendingJson, event_types_json AS eventTypesJson, enabled, last_received_at AS lastReceivedAt, updated_at AS updatedAt`
 
 export interface StoredEventSource extends SourceConfiguration {
+  readonly connector: z.infer<typeof connectorSchema> | null
+  readonly pending: z.infer<typeof pendingSchema> | null
   readonly sourceId: string
   readonly revision: number
   readonly name: string
@@ -28,19 +31,31 @@ export interface StoredEventSource extends SourceConfiguration {
   readonly updatedAt: number
 }
 
-type SourceRow = Omit<StoredEventSource, 'config' | 'secrets' | 'state' | 'eventTypes'> & {
+type SourceRow = Omit<StoredEventSource, 'config' | 'secrets' | 'state' | 'eventTypes' | 'connector' | 'pending'> & {
+  readonly connectorJson: string | null
+  readonly pendingJson: string | null
   readonly configJson: string
   readonly secretsJson: string
   readonly stateJson: string
   readonly eventTypesJson: string
 }
 
+const connectorSchema = z.object({
+  deploymentId: z.string(),
+  requestKey: z.string(),
+  creation: z.string(),
+  reference: sourceReferenceSchema.optional(),
+  revision: z.number().int().positive().optional(),
+})
+const pendingSchema = z.object({ action: z.enum(['create', 'update', 'delete']), fingerprint: z.string(), remoteRevision: z.number().optional() })
 const storedObject = z.record(z.string(), z.json())
 
 function stored(row: SourceRow): StoredEventSource {
-  const { configJson, secretsJson, stateJson, eventTypesJson, ...common } = row
+  const { configJson, secretsJson, stateJson, eventTypesJson, connectorJson, pendingJson, ...common } = row
   return {
     ...common,
+    connector: connectorJson == null ? null : connectorSchema.parse(JSON.parse(connectorJson)),
+    pending: pendingJson == null ? null : pendingSchema.parse(JSON.parse(pendingJson)),
     config: storedObject.parse(JSON.parse(configJson)),
     secrets: storedObject.parse(JSON.parse(secretsJson)),
     state: storedObject.parse(JSON.parse(stateJson)),
@@ -84,29 +99,8 @@ export class EventSourceStore {
 
   #source(row: SourceRow): StoredEventSource {
     const source = stored(row)
-    if (!eventSourceDefinition(source.kind).applicationIngress) return source
-    const app = this.#database
-      .prepare('SELECT signing_secret AS secret, verified_at AS verifiedAt FROM event_source_apps WHERE kind = ? AND app_id = ?')
-      .get(source.kind, String(source.config.appId)) as { secret: string; verifiedAt: number | null } | undefined
-    if (app == null) throw new SourceIdentityError('The source application is missing.')
-    const projection = source.state.projection as { view: Record<string, import('@oomol-lab/open-flow/flow-change').JsonValue>; ready: boolean } | undefined
-    return {
-      ...source,
-      secrets: { signingSecret: app.secret },
-      state: {
-        ...source.state,
-        verifiedAt: app.verifiedAt,
-        ...(projection == null
-          ? {}
-          : {
-              projection: {
-                ...projection,
-                ready: app.verifiedAt != null,
-                view: { ...projection.view, verifiedAt: app.verifiedAt == null ? null : new Date(app.verifiedAt).toISOString() },
-              },
-            }),
-      },
-    }
+    if (source.connector == null) throw new SourceIdentityError('Source requires a Connector reference.')
+    return source
   }
 
   applicationSources(kind: string, appId: string): readonly StoredEventSource[] {
@@ -116,26 +110,25 @@ export class EventSourceStore {
     return rows.map((row) => this.#source(row))
   }
 
-  unprojected(teamId?: string | null): readonly string[] {
+  ids(teamId?: string | null): readonly string[] {
     return this.#database
-      .prepare(
-        `SELECT source_id AS sourceId FROM event_sources WHERE json_extract(state_json, '$.projection') IS NULL${teamId === undefined ? '' : ' AND team_id IS ?'}`,
-      )
+      .prepare(`SELECT source_id AS sourceId FROM event_sources${teamId === undefined ? '' : ' WHERE team_id IS ?'}`)
       .all(...(teamId === undefined ? [] : [teamId]))
       .map((row) => String(row.sourceId))
   }
 
   list(origin: string | undefined, teamId?: string | null): readonly EventSource[] {
-    const rows = this.#database.prepare(`SELECT ${sourceColumns} FROM event_sources ORDER BY name, source_id`).all() as unknown as SourceRow[]
+    const rows = this.#database
+      .prepare(`SELECT ${sourceColumns} FROM event_sources${teamId === undefined ? '' : ' WHERE team_id IS ?'} ORDER BY name, source_id`)
+      .all(...(teamId === undefined ? [] : [teamId])) as unknown as SourceRow[]
     const result: EventSource[] = []
     for (const row of rows) {
-      if (teamId !== undefined && row.teamId !== teamId) continue
       try {
         result.push(this.view(this.#source(row), origin))
       } catch (error) {
         if (!(error instanceof SourceIdentityError || error instanceof ZodError || error instanceof SyntaxError)) throw error
         result.push({
-          ...this.view({ ...row, config: {}, secrets: {}, state: {}, eventTypes: [] }, undefined),
+          ...this.view({ ...row, connector: null, pending: null, config: {}, secrets: {}, state: {}, eventTypes: [] }, undefined),
           lastError: 'Stored source details are invalid or unsupported. Repair or recreate this event source.',
         })
       }
@@ -155,6 +148,7 @@ export class EventSourceStore {
       enabled: row.enabled == 1,
       eventTypes: row.eventTypes,
       ...sourceView(row, this.#clock()),
+      ...(row.pending == null ? {} : { lastError: `Source ${row.pending.action} is unfinished. Retry the same operation to complete it.` }),
       endpointUrl:
         origin == null
           ? null
@@ -167,119 +161,176 @@ export class EventSourceStore {
     }
   }
 
-  create(input: CreateEventSource, kind: string, configuration: SourceConfiguration): StoredEventSource {
+  reserve(input: CreateEventSource, fingerprint: string): StoredEventSource {
     return this.#transaction(() => {
-      if (this.#database.prepare('SELECT 1 FROM event_sources WHERE kind = ? AND external_identity = ?').get(kind, configuration.identity) != null) {
-        throw new ControlError(controlErrorCode.eventSourceConflict, 'This application already has an event source.')
+      const kind = input.kind ?? 'feishu'
+      const config = Object.fromEntries(
+        Object.entries(input).filter(
+          ([key]) => !['signingSecret', 'verificationToken', 'encryptKey', 'eventTypes', 'name', 'version', 'teamId', 'connectionId', 'kind'].includes(key),
+        ),
+      )
+      const identity = JSON.stringify([input.teamId, input.connectionId, config])
+      const existing = this.#database
+        .prepare('SELECT source_id AS sourceId FROM event_sources WHERE kind = ? AND external_identity = ?')
+        .get(kind, identity) as { sourceId: string } | undefined
+      if (existing != null) {
+        const source = this.require(existing.sourceId)
+        if (source.connector!.creation !== fingerprint || (source.pending != null && source.pending.action !== 'create'))
+          throw new ControlError(
+            controlErrorCode.eventSourceConflict,
+            'This workspace already has a Source. Retry the original creation or edit the existing Source.',
+          )
+        return source
       }
       const count = this.#database.prepare('SELECT COUNT(*) AS count FROM event_sources').get() as { count: number }
       if (count.count >= 100) throw new ControlError(controlErrorCode.eventSourceConflict, 'The deployment event source limit has been reached.')
-      if (eventSourceDefinition(kind).applicationIngress) {
-        const appId = String(configuration.config.appId)
-        const app = this.#database.prepare('SELECT signing_secret AS secret FROM event_source_apps WHERE kind = ? AND app_id = ?').get(kind, appId) as
-          | { secret: string }
-          | undefined
-        if (app != null && app.secret !== configuration.secrets.signingSecret)
-          throw new ControlError(
-            controlErrorCode.eventSourceConflict,
-            'This application already has a different Signing Secret. Update the existing application source first.',
-          )
-        if (app == null)
-          this.#database
-            .prepare('INSERT INTO event_source_apps (kind, app_id, signing_secret) VALUES (?, ?, ?)')
-            .run(kind, appId, String(configuration.secrets.signingSecret))
-      }
+      if (eventSourceDefinition(kind).applicationIngress && this.busy({ kind, teamId: input.teamId, config }))
+        throw new ControlError(controlErrorCode.eventSourceConflict, 'Another Source operation for this application is unfinished.')
       const sourceId = `source_${randomUUID().replaceAll('-', '')}`
+      const { value: deploymentId } = this.#database.prepare('SELECT value FROM event_source_namespace WHERE id = 1').get() as { value: string }
       this.#database
         .prepare(`INSERT INTO event_sources (source_id, revision, name, kind, provider, external_identity, connection_id,
-        team_id, config_json, secrets_json, state_json, event_types_json, updated_at)
-        VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+        team_id, config_json, secrets_json, state_json, event_types_json, updated_at, connector_json, pending_json)
+        VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, '{}', '{}', ?, ?, ?, ?)`)
         .run(
           sourceId,
           input.name,
           kind,
           eventSourceDefinition(kind).provider,
-          configuration.identity,
+          identity,
           input.connectionId,
           input.teamId,
-          JSON.stringify(configuration.config),
-          JSON.stringify(eventSourceDefinition(kind).applicationIngress ? {} : configuration.secrets),
-          JSON.stringify(configuration.state),
-          JSON.stringify(configuration.eventTypes),
+          JSON.stringify(config),
+          JSON.stringify(input.eventTypes),
           this.#clock(),
+          JSON.stringify({ deploymentId, requestKey: sourceId, creation: fingerprint }),
+          JSON.stringify({ action: 'create', fingerprint }),
         )
-      return this.get(sourceId)!
+      return this.require(sourceId)
     })
   }
 
-  update(sourceId: string, input: UpdateEventSource, configuration: SourceConfiguration): StoredEventSource {
+  busy(source: Pick<StoredEventSource, 'kind' | 'teamId' | 'config'>): boolean {
+    if (!eventSourceDefinition(source.kind).applicationIngress) return 'pending' in source && source.pending != null
+    return (
+      this.#database
+        .prepare(`SELECT 1 FROM event_sources WHERE kind = ? AND team_id IS ?
+      AND json_extract(config_json, '$.appId') = ? AND pending_json IS NOT NULL LIMIT 1`)
+        .get(source.kind, source.teamId, String(source.config.appId)) != null
+    )
+  }
+
+  beginChange(sourceId: string, revision: number, pending: z.infer<typeof pendingSchema>, input?: UpdateEventSource): StoredEventSource {
     return this.#transaction(() => {
-      const source = this.require(sourceId, input.expectedRevision)
-      const required = this.#database
-        .prepare(`SELECT trigger_json AS triggerJson FROM integration_bindings
+      const source = this.require(sourceId, revision)
+      if (source.pending != null && pending.action !== 'delete') {
+        if (source.pending.action !== pending.action || source.pending.fingerprint !== pending.fingerprint)
+          throw new ControlError(controlErrorCode.eventSourceConflict, 'Retry the unfinished Source operation before making another change.')
+        return source
+      }
+      if (source.pending == null && this.busy(source))
+        throw new ControlError(controlErrorCode.eventSourceConflict, 'Another Source operation for this application is unfinished.')
+      if (pending.action === 'delete') this.#checkDelete(sourceId)
+      if (input != null) this.#checkEvents(sourceId, input.eventTypes)
+      this.#database.prepare('UPDATE event_sources SET pending_json = ? WHERE source_id = ?').run(JSON.stringify(pending), sourceId)
+      return this.require(sourceId)
+    })
+  }
+
+  saveReference(source: StoredEventSource, snapshot: SourceReferenceSnapshot, change?: UpdateEventSource | 'create'): boolean {
+    const input = typeof change === 'object' ? change : undefined
+    const complete = change != null
+    return this.#transaction(() => {
+      const current = this.require(source.sourceId)
+      if (current.revision !== source.revision || (complete && !isDeepStrictEqual(current.pending, source.pending))) return false
+      if (!complete && this.busy(current)) return false
+      if (
+        current.connector!.reference != null &&
+        (current.connector!.reference.applicationId !== snapshot.reference.applicationId ||
+          current.connector!.reference.sourceId !== snapshot.reference.sourceId)
+      )
+        throw new SourceIdentityError('Connector returned a different Source reference.')
+      if ((current.connector!.revision ?? 0) > snapshot.revision) return false
+      if (complete && input != null) this.#checkEvents(source.sourceId, snapshot.eventTypes)
+      this.#database
+        .prepare(`UPDATE event_sources SET connector_json = ?, state_json = ?, event_types_json = ?,
+        name = ?, enabled = ?, pending_json = ?, revision = revision + ?, updated_at = ? WHERE source_id = ?`)
+        .run(
+          JSON.stringify({ ...current.connector, reference: snapshot.reference, revision: snapshot.revision }),
+          JSON.stringify({ projection: { view: snapshot.view, ready: snapshot.ready, expiresAt: snapshot.expiresAt } }),
+          JSON.stringify(snapshot.eventTypes),
+          input?.name ?? current.name,
+          input == null ? current.enabled : Number(input.enabled),
+          complete || current.pending == null ? null : JSON.stringify(current.pending),
+          input == null ? 0 : 1,
+          complete ? this.#clock() : current.updatedAt,
+          source.sourceId,
+        )
+      if (complete && input?.signingSecret != null && eventSourceDefinition(current.kind).applicationIngress) {
+        this.#database
+          .prepare(`UPDATE event_sources SET state_json = '{}', revision = revision + 1 WHERE kind = ?
+          AND team_id IS ? AND json_extract(config_json, '$.appId') = ? AND source_id != ?`)
+          .run(current.kind, current.teamId, String(current.config.appId), current.sourceId)
+      }
+      return true
+    })
+  }
+
+  failChange(source: StoredEventSource): void {
+    this.#database
+      .prepare('UPDATE event_sources SET pending_json = NULL WHERE source_id = ? AND revision = ? AND pending_json = ?')
+      .run(source.sourceId, source.revision, JSON.stringify(source.pending))
+  }
+
+  update(sourceId: string, input: UpdateEventSource): StoredEventSource {
+    return this.#transaction(() => {
+      this.require(sourceId, input.expectedRevision)
+      this.#database
+        .prepare('UPDATE event_sources SET name = ?, enabled = ?, revision = revision + 1, updated_at = ? WHERE source_id = ?')
+        .run(input.name, Number(input.enabled), this.#clock(), sourceId)
+      return this.require(sourceId)
+    })
+  }
+
+  #checkEvents(sourceId: string, eventTypes: readonly string[]): void {
+    const required = this.#database
+      .prepare(`SELECT trigger_json AS triggerJson FROM integration_bindings
         WHERE current_publication_id IS NOT NULL AND json_extract(trigger_json, '$.config.sourceId.value') = ?
         UNION ALL SELECT trigger_json AS triggerJson FROM integration_candidates
         WHERE status != 'cleanup' AND json_extract(trigger_json, '$.config.sourceId.value') = ?`)
-        .all(sourceId, sourceId) as { triggerJson: string }[]
-      for (const row of required) {
-        const trigger = JSON.parse(row.triggerJson) as Extract<TriggerNode, { kind: 'integration' }>
-        const config = resolveTriggerConfig(trigger.definition.configInputs, trigger.config)
-        const eventTypes = config.eventTypes as readonly string[]
-        if (eventTypes.some((type) => !configuration.eventTypes.includes(type))) {
-          throw new ControlError(controlErrorCode.eventSourceConflict, 'Published or preparing Triggers still require these event types.')
-        }
+      .all(sourceId, sourceId) as { triggerJson: string }[]
+    for (const row of required) {
+      const trigger = JSON.parse(row.triggerJson) as Extract<TriggerNode, { kind: 'integration' }>
+      const config = resolveTriggerConfig(trigger.definition.configInputs, trigger.config)
+      const requiredTypes = config.eventTypes as readonly string[]
+      if (requiredTypes.some((type) => !eventTypes.includes(type))) {
+        throw new ControlError(controlErrorCode.eventSourceConflict, 'Published or preparing Triggers still require these event types.')
       }
-      if (eventSourceDefinition(source.kind).applicationIngress && input.signingSecret != null && input.signingSecret !== source.secrets.signingSecret) {
-        this.#database
-          .prepare('UPDATE event_source_apps SET signing_secret = ?, verified_at = NULL WHERE kind = ? AND app_id = ?')
-          .run(input.signingSecret, source.kind, String(source.config.appId))
-        this.#database
-          .prepare(
-            "UPDATE event_sources SET revision = revision + 1, updated_at = ? WHERE kind = ? AND json_extract(config_json, '$.appId') = ? AND source_id != ?",
-          )
-          .run(this.#clock(), source.kind, String(source.config.appId), sourceId)
-      }
-      this.#database
-        .prepare(`UPDATE event_sources SET name = ?, enabled = ?, event_types_json = ?, config_json = ?, secrets_json = ?,
-        state_json = ?, revision = revision + 1, updated_at = ? WHERE source_id = ?`)
-        .run(
-          input.name,
-          Number(input.enabled),
-          JSON.stringify(configuration.eventTypes),
-          JSON.stringify(configuration.config),
-          JSON.stringify(eventSourceDefinition(source.kind).applicationIngress ? {} : configuration.secrets),
-          JSON.stringify(configuration.state),
-          this.#clock(),
-          sourceId,
-        )
-      return this.get(sourceId)!
-    })
+    }
   }
 
   delete(sourceId: string, revision: number): void {
     this.#transaction(() => {
-      const source = this.require(sourceId, revision)
-      if (
-        this.consumers(sourceId).length > 0 ||
-        this.#database.prepare('SELECT 1 FROM source_subscriptions WHERE source_id = ?').get(sourceId) != null ||
-        this.#database
-          .prepare("SELECT 1 FROM integration_candidates WHERE status != 'cleanup' AND json_extract(trigger_json, '$.config.sourceId.value') = ?")
-          .get(sourceId) != null
-      ) {
-        throw new ControlError(
-          controlErrorCode.eventSourceConflict,
-          'Remove the source from published Triggers and finish subscription cleanup before deleting it.',
-        )
-      }
+      this.require(sourceId, revision)
+      this.#checkDelete(sourceId)
       for (const table of ['source_deliveries', 'source_events', 'source_event_versions', 'source_demands', 'event_sources'])
         this.#database.prepare(`DELETE FROM ${table} WHERE source_id = ?`).run(sourceId)
-      if (eventSourceDefinition(source.kind).applicationIngress)
-        this.#database
-          .prepare(
-            "DELETE FROM event_source_apps WHERE kind = ? AND app_id = ? AND NOT EXISTS (SELECT 1 FROM event_sources WHERE kind = ? AND json_extract(config_json, '$.appId') = ?)",
-          )
-          .run(source.kind, String(source.config.appId), source.kind, String(source.config.appId))
     })
+  }
+
+  #checkDelete(sourceId: string): void {
+    if (
+      this.consumers(sourceId).length > 0 ||
+      this.#database.prepare('SELECT 1 FROM source_subscriptions WHERE source_id = ?').get(sourceId) != null ||
+      this.#database
+        .prepare("SELECT 1 FROM integration_candidates WHERE status != 'cleanup' AND json_extract(trigger_json, '$.config.sourceId.value') = ?")
+        .get(sourceId) != null
+    ) {
+      throw new ControlError(
+        controlErrorCode.eventSourceConflict,
+        'Remove the source from published Triggers and finish subscription cleanup before deleting it.',
+      )
+    }
   }
 
   require(sourceId: string, revision?: number): StoredEventSource {
@@ -297,23 +348,6 @@ export class EventSourceStore {
       WHERE b.current_publication_id IS NOT NULL AND json_extract(b.trigger_json, '$.config.sourceId.value') = ?
       ORDER BY f.name, b.trigger_node_id`)
       .all(sourceId) as unknown as EventSource['consumers']
-  }
-
-  saveState(source: StoredEventSource, state: SourceConfiguration['state']): boolean {
-    return this.#transaction(() => {
-      if (eventSourceDefinition(source.kind).applicationIngress) {
-        const current = this.get(source.sourceId)
-        if (current == null || current.revision !== source.revision) return false
-        this.#database
-          .prepare('UPDATE event_source_apps SET verified_at = ? WHERE kind = ? AND app_id = ?')
-          .run(typeof state.verifiedAt === 'number' ? state.verifiedAt : null, source.kind, String(source.config.appId))
-      }
-      return (
-        this.#database
-          .prepare('UPDATE event_sources SET state_json = ? WHERE source_id = ? AND revision = ?')
-          .run(JSON.stringify(state), source.sourceId, source.revision).changes == 1
-      )
-    })
   }
 
   private targets(source: StoredEventSource) {
@@ -343,7 +377,8 @@ export class EventSourceStore {
   receive(source: StoredEventSource, event: SourceEvent, now: number): 'accepted' | 'conflict' | 'overloaded' | 'unavailable' {
     return this.#transaction(() => {
       const current = this.get(source.sourceId)
-      if (current == null || current.revision != source.revision || current.enabled != 1 || !sourceReady(current, now)) return 'unavailable'
+      if (current == null || current.revision != source.revision || current.enabled != 1 || this.busy(current) || !sourceReady(current, now))
+        return 'unavailable'
       const payloadJson = JSON.stringify(event.payload)
       const existing = this.#database
         .prepare('SELECT payload_json AS payloadJson FROM source_events WHERE source_id = ? AND event_id = ?')
@@ -479,6 +514,7 @@ export class EventSourceStore {
     const source = this.get(sourceId)
     return (
       source?.enabled == 1 &&
+      !this.busy(source) &&
       sourceReady(source, this.#clock()) &&
       this.#database
         .prepare(`SELECT 1 FROM source_demands d

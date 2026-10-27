@@ -18,7 +18,8 @@ import { Store } from '../node/storage/store.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService, startService } from './serviceFixture.ts'
-import { sourceProtocolFixture } from './sourceProtocolFixture.ts'
+import { sourceReferenceFixture } from './sourceProtocolFixture.ts'
+const sourceProtocolFixture = sourceReferenceFixture()
 
 const token = 'mcp-test-operator-token-000000000001'
 const version = '2026-07-28'
@@ -182,7 +183,8 @@ it('shares current online details between REST and MCP without exposing historic
 
 it('discovers independent Feishu event sources without exposing secrets', async () => {
   const connector = createConnectorHost({
-    trigger: async (_provider, _connection, _trigger, request) => (request.operation === 'source' ? sourceProtocolFixture(request.request) : undefined),
+    trigger: async (_provider, _connection, _trigger, request) =>
+      request.operation === 'sourceReference' ? sourceProtocolFixture(request.request) : undefined,
     listConnections: async () => [
       {
         connectionId: 'connection-1',

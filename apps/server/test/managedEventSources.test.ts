@@ -8,7 +8,7 @@ import { ConnectorTaskError } from '../node/deployment/connector-contract.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { openService } from './serviceFixture.ts'
-import { sourceProtocolFixture } from './sourceProtocolFixture.ts'
+import { sourceReferenceFixture } from './sourceProtocolFixture.ts'
 
 const now = 1_800_000_000_000
 function delivery(id: string) {
@@ -28,44 +28,28 @@ it('shares a managed Jira project subscription and deduplicates fanout without e
   let clock = now
   let failVerification = false
   let failRenewal = false
+  const respond = sourceReferenceFixture()
   const calls: { active: boolean; key: string }[] = []
   const connector = createConnectorHost({
     trigger: async (_provider, connectionId, _trigger, request) => {
       const id = connectionId.slice(-1)
-      if (request.operation === 'resource') {
-        if (failRenewal && request.active) throw new ConnectorTaskError('connector.unavailable', 'Temporary subscription failure')
-        calls.push({ active: request.active, key: request.requestKey })
-        return { outcome: 'ready', subscription: request.active ? { webhookId: 42, expiresAt: now + 30 * 86400000 } : {} }
-      }
-      if (request.operation === 'source') {
+      if (request.operation === 'sourceReference') {
         if (request.request.action === 'receive' && failVerification) throw new ConnectorTaskError('connector.unavailable', 'Temporary verification failure')
-        const result = sourceProtocolFixture(request.request, `jira:cloud${id}:user`, clock) as { source?: { state: Record<string, unknown> }; event?: unknown }
-        if (request.request.action === 'prepare')
-          return { ...result, subscriptions: [{ key: 'project', config: { projectId: '100', endpointUrl: request.request.endpointUrl } }] }
-        if (request.request.action === 'inspect') {
-          const state = request.request.source.state
-          return {
-            source: {
-              ...request.request.source,
-              state: {
-                ...state,
-                projection: {
-                  ready: state.resourceStatus === 'ready',
-                  expiresAt: now + 30 * 86400000,
-                  view: {
-                    appId: `cloud${id}`,
-                    manageSubscriptions: true,
-                    verificationTokenConfigured: false,
-                    encryptKeyConfigured: false,
-                    verifiedAt: state.verifiedAt == null ? null : new Date(Number(state.verifiedAt)).toISOString(),
-                    subscriptionStatus: state.resourceStatus,
-                    lastError: state.lastError,
-                  },
-                },
-              },
-            },
+        if (request.request.action === 'resource') {
+          if (failRenewal && request.request.active) {
+            const failed = respond({ ...request.request, action: 'get' }) as { source: import('@oomol-lab/open-flow/event-source').SourceReferenceSnapshot }
+            failed.source.view.subscriptionStatus = 'error'
+            failed.source.ready = false
+            throw new ConnectorTaskError('connector.unavailable', 'Temporary subscription failure')
           }
+          calls.push({ active: request.request.active, key: `${request.request.reference.sourceId}:${request.request.key}` })
         }
+        const result = respond(request.request, `jira:cloud${id}:user`) as { source?: import('@oomol-lab/open-flow/event-source').SourceReferenceSnapshot }
+        if (result.source) {
+          result.source.view.appId = `cloud${id}`
+          result.source.expiresAt = now + 30 * 86400000
+        }
+        if (request.request.action === 'prepare') return { ...result, subscriptions: [{ key: 'project' }] }
         return result
       }
       throw new Error('Unexpected operation')

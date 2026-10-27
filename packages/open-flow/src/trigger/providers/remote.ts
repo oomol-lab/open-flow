@@ -120,66 +120,20 @@ function createDefinition(item: (typeof catalog)[number]): PollDefinition | Inte
       return { outcome: result.outcome } as IntegrationReconcileResult
     },
     async receive(context) {
-      if (snapshot.key === 'asana.on_task_event') {
-        const secret = context.header('x-hook-secret')
-        if (secret != null) {
-          if (context.method !== 'POST' || !/^[a-fA-F0-9]{32,256}$/.test(secret))
-            return { outcome: 'respond', status: 400, body: '', contentType: 'text/plain' }
-          // Acknowledge before Connector creation returns; persist the secret only from its authenticated response.
-          return { outcome: 'respond', status: 200, body: '', contentType: 'text/plain', headers: { 'x-hook-secret': secret } }
-        }
-      }
-      const id = context.state?.subscription.id
+      const id = context.state?.subscription.id ?? context.query('connector_reference')
       if (typeof id !== 'string') return { outcome: 'respond', status: 503, body: '', contentType: 'text/plain' }
       const headers: Record<string, string> = {}
-      for (const name of [
-        'content-type',
-        'idempotency-key',
-        'stripe-signature',
-        'tally-signature',
-        'typeform-signature',
-        'x-signature',
-        'svix-id',
-        'svix-timestamp',
-        'svix-signature',
-        'x-vercel-signature',
-        'calendly-webhook-signature',
-        'authorization',
-        'x-hook-signature',
-        'x-github-delivery',
-        'x-github-event',
-        'x-gitlab-event',
-        'x-gitlab-token',
-        'x-goog-changed',
-        'x-goog-channel-id',
-        'x-goog-channel-token',
-        'x-goog-message-number',
-        'x-goog-resource-id',
-        'x-goog-resource-state',
-        'x-goog-resource-uri',
-        'x-hub-signature-256',
-        'x-shopify-api-version',
-        'x-shopify-event-id',
-        'x-shopify-shop-domain',
-        'x-shopify-topic',
-        'x-shopify-triggered-at',
-        'x-shopify-webhook-id',
-        'x-telegram-bot-api-secret-token',
-        'x-wc-webhook-delivery-id',
-        'x-wc-webhook-event',
-        'x-wc-webhook-id',
-        'x-wc-webhook-resource',
-        'x-wc-webhook-signature',
-        'x-wc-webhook-source',
-        'x-wc-webhook-topic',
-        'x-zendesk-webhook-signature',
-        'x-zendesk-webhook-signature-timestamp',
-      ]) {
+      for (const name of ['content-type', ...('callback' in item ? (('callback' in item ? item.callback : undefined)?.headers ?? []) : [])]) {
         const value = context.header(name)
         if (value != null) headers[name] = value
       }
       const query: Record<string, string> = {}
-      for (const name of ['open_flow_callback', 'connector_subscription', 'signature']) {
+      for (const name of [
+        'open_flow_callback',
+        'connector_subscription',
+        'connector_reference',
+        ...('callback' in item ? (('callback' in item ? item.callback : undefined)?.query ?? []) : []),
+      ]) {
         const value = context.query(name)
         if (value != null) query[name] = value
       }

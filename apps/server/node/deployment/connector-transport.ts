@@ -18,13 +18,11 @@ interface GetOptions {
 
 export class RequestError extends ConnectorTaskError {
   readonly reason: string
-  readonly status: number | undefined
 
   constructor(cause: ConnectorTaskError, reason: string, status: number | undefined) {
-    super(cause.code, cause.message)
+    super(cause.code, cause.message, status)
     this.cause = cause
     this.reason = reason
-    this.status = status
   }
 }
 

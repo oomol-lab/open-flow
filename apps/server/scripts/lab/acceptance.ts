@@ -25,6 +25,14 @@ export function runtimeAssertions(
     return errors
   }
   if (status != 'completed') return [`Run ${sample.name} ended ${status}.`]
+  if (id === 'poll-batch') {
+    const completed = events.find((event) => event.kind === 'run.completed')
+    const result = completed?.payload.result
+    if (result == null || typeof result !== 'object' || !('outputs' in result) || !isDeepStrictEqual(result.outputs, { messages: sample.outputs?.events }))
+      errors.push('Return the complete batch of messages supplied to this Run.')
+    if (calls.length || modelCalls.length) errors.push('No external requests are needed.')
+    return errors
+  }
   if (id == 'wait-auto-continue') {
     const resolved = events.filter((event) => event.kind == 'run.resolved')
     const completed = events.find((event) => event.kind == 'run.completed')

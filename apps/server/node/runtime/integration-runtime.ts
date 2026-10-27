@@ -855,7 +855,7 @@ export class IntegrationRuntime {
           this.#store.eventSources.finish(delivery, 'retired')
           continue
         }
-        if (source.enabled != 1 || !sourceReady(source) || !this.#store.eventSources.deliverable(delivery)) {
+        if (source.enabled != 1 || this.#store.eventSources.busy(source) || !sourceReady(source) || !this.#store.eventSources.deliverable(delivery)) {
           this.#store.eventSources.retry(delivery, now)
           continue
         }
