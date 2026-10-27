@@ -149,7 +149,7 @@ export function createControlApp(service: ControlService, resolveActor?: Resolve
   app.delete('/event-sources/:sourceId', async (context) => {
     query(context.req.raw, [], controlErrorCode.eventSourceInvalid)
     const body = await decodeRequest(context.req.raw, controlErrorCode.eventSourceInvalid, controlRequests.eventSourceRevision)
-    service.eventSources.deleteEventSource(context.get('actorId'), context.req.param('sourceId'), body.expectedRevision)
+    await service.eventSources.deleteEventSource(context.get('actorId'), context.req.param('sourceId'), body.expectedRevision, context.req.raw.signal)
     return response(200, { version: 1 })
   })
 

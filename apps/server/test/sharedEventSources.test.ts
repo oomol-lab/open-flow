@@ -7,7 +7,7 @@ import { expect, it } from 'vitest'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { openService } from './serviceFixture.ts'
-import { sourceProtocolFixture } from './sourceProtocolFixture.ts'
+import { sourceReferenceFixture } from './sourceProtocolFixture.ts'
 
 const now = 1_800_000_000_000
 function delivery(payload: unknown) {
@@ -33,14 +33,15 @@ const event = (id: string) => ({
   },
 })
 it('shares an app ingress while isolating workspaces, retaining fanout, and keeping the other source alive when one is disabled', async () => {
+  const respond = sourceReferenceFixture()
   const connector = createConnectorHost({
     trigger: async (_provider, connectionId, _trigger, request) => {
-      if (request.operation !== 'source') throw new Error('Unexpected operation')
+      if (request.operation !== 'sourceReference') throw new Error('Unexpected operation')
       if (request.request.action === 'receive') {
         const supplied = JSON.parse(Buffer.from(request.request.rawBody, 'base64').toString()) as { recipient?: string }
         if (supplied.recipient != null && supplied.recipient !== connectionId) return { response: { status: 200, body: '{}', headers: {} } }
       }
-      return sourceProtocolFixture(request.request, connectionId)
+      return respond(request.request)
     },
     listConnections: async () =>
       ['1', '2'].map((id) => ({
@@ -114,6 +115,26 @@ it('shares an app ingress while isolating workspaces, retaining fanout, and keep
     flows.push(flowId)
   }
 
+  const protectedSource = sources[0]!
+  expect(
+    (
+      await app.request(`/v1/event-sources/${protectedSource.sourceId}`, {
+        method: 'DELETE',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ version: 1, expectedRevision: protectedSource.revision }),
+      })
+    ).status,
+  ).toBe(409)
+  expect(
+    (
+      await app.request(`/v1/event-sources/${protectedSource.sourceId}`, {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ version: 1, expectedRevision: protectedSource.revision, name: protectedSource.name, enabled: true, eventTypes: ['message.im'] }),
+      })
+    ).status,
+  ).toBe(409)
+
   for (let retry = 0; retry < 2; retry++) expect((await app.request(endpoint, delivery(event('1')))).status).toBe(200)
   await service.tickIntegration()
   expect(flows.map((flow) => service.control.runs.listRuns('operator', flow, 20).page.runs.length)).toEqual([1, 1, 0])
@@ -128,4 +149,70 @@ it('shares an app ingress while isolating workspaces, retaining fanout, and keep
   await service.tickIntegration()
   expect(flows.map((flow) => service.control.runs.listRuns('operator', flow, 20).page.runs.length)).toEqual([1, 1, 1])
   expect(await (await app.request('/v1/event-sources')).text()).not.toContain('"signingSecret"')
+})
+
+it('does not publish a new consumer while Source deletion is waiting for Connector', async () => {
+  const respond = sourceReferenceFixture()
+  const deleting = Promise.withResolvers<void>()
+  const release = Promise.withResolvers<void>()
+  const connector = createConnectorHost({
+    listConnections: async () => [{ connectionId: 'connection', serviceId: 'slackbot', displayName: 'Slack', status: 'active', isDefault: true }],
+    trigger: async (_provider, _connection, _trigger, request) => {
+      if (request.operation !== 'sourceReference') throw new Error('Unexpected operation')
+      if (request.request.action === 'delete') {
+        deleting.resolve()
+        await release.promise
+      }
+      return respond(request.request)
+    },
+  })
+  const service = await openService(':memory:', {
+    capabilities: { connector: () => connector, integration: () => ({ callbackKey: 'key', publicOrigin: 'https://flow.example' }) },
+  })
+  const app = createServerApp(service, { resolveControlActor: () => 'operator' })
+  const source = await service.control.eventSources.createEventSource(
+    'operator',
+    {
+      kind: 'slack',
+      version: 1,
+      name: 'Slack',
+      connectionId: 'connection',
+      teamId: null,
+      appId: 'A123',
+      workspaceId: 'T123',
+      signingSecret: 'secret',
+      eventTypes: ['app_mention'],
+    },
+    new AbortController().signal,
+  )
+  expect(
+    (await app.request(new URL(source.endpointUrl!).pathname, delivery({ verify: true, response: { status: 200, body: 'verified', headers: {} } }))).status,
+  ).toBe(200)
+  const removed = service.control.eventSources.deleteEventSource('operator', source.sourceId, source.revision)
+  await deleting.promise
+  try {
+    const created = await service.control.flows.createFlow('operator', 'Concurrent publication', 'create-concurrent')
+    const flowId = created.flow.flowId
+    const draft = await service.control.drafts.changeDraft('operator', flowId, created.flow.draftRevisionId, [
+      {
+        kind: 'graph.node.create',
+        nodeId: 'slack',
+        node: {
+          kind: 'integration',
+          name: 'Slack',
+          connectionId: 'connection',
+          definition: integrationDefinitions.find((item) => item.snapshot.key === 'slackbot.on_event')!.snapshot,
+          config: inputValues({ sourceId: source.sourceId, eventTypes: ['app_mention'] }),
+        },
+      },
+    ])
+    await expect(
+      service.control.publications.publishFlow('operator', flowId, draft.revision.revisionId, currentEngineContract, null, 'publish-concurrent'),
+    ).rejects.toThrow('cannot be changed safely')
+    expect((await service.control.eventSources.listEventSources('operator')).sources[0]!.consumers).toEqual([])
+  } finally {
+    release.resolve()
+    await removed
+  }
+  expect((await service.control.eventSources.listEventSources('operator')).sources).toEqual([])
 })

@@ -1,7 +1,7 @@
 import type { IntegrationDefinition } from '../common/integration.ts'
 import type { PollDefinition } from '../common/poll.ts'
 
-import { remoteTriggerDefinitions } from './remote.ts'
+import { remoteTriggerDefinitions, legacyPollDefinitions as legacyDefinitions } from './remote.ts'
 import { sourceEvents } from './source-events.ts'
 export type ProviderTriggerDefinition = IntegrationDefinition | PollDefinition
 export const triggerDefinitions: readonly ProviderTriggerDefinition[] = [...sourceEvents, ...remoteTriggerDefinitions]
@@ -17,3 +17,5 @@ export const integrationDefinitions: readonly IntegrationDefinition[] = triggerD
 export type { TriggerConfigOption, TriggerConfigOptionsContext } from '../common/configOptions.ts'
 
 export { localizeTrigger } from './localization.ts'
+
+export const legacyPollDefinitions: readonly PollDefinition[] = legacyDefinitions

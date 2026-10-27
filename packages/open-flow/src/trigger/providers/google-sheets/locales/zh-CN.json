@@ -13,7 +13,7 @@
       "valueRender": "单元格值的返回方式。"
     },
     "outputs": {
-      "events": "自上次轮询以来追加的行。"
+      "event": "本次 Run 对应的单个事件。"
     }
   }
 }

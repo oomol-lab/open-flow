@@ -31,6 +31,32 @@ export async function reference(call: ToolCall, id: string, flowId: string, stag
   }
   const dataPort = { schema: {}, nullable: true },
     stringPort = { schema: { type: 'string' }, nullable: false }
+  if (id === 'poll-event') {
+    await call('flow_schema', { type: 'poll' })
+    const before = await read()
+    const created = await submit(before.revision, [
+      { op: 'node.add', type: 'poll', as: 'mail', name: 'Mail', config: { key: 'gmail.on_message_received', connectionId: 'mail-test' } },
+      {
+        op: 'node.add',
+        type: 'outputs',
+        as: 'result',
+        name: 'Result',
+        config: { outputDefs: { subject: stringPort } },
+        inputs: { subject: { kind: 'output', node: '$mail', port: 'event', field: 'subject' } },
+      },
+      { op: 'edge.connect', source: '$mail', target: '$result' },
+    ])
+    const refs = created.nodes as Record<string, string>
+    await read([refs.mail!])
+    const renamed = await submit(created.revision, [{ op: 'node.update', node: refs.mail!, set: { name: 'Mail pending' } }])
+    await submit(renamed.revision, [
+      { op: 'node.refresh', node: refs.mail! },
+      { op: 'node.update', node: refs.mail!, set: { name: 'Mail events' } },
+    ])
+    await read([refs.mail!])
+    await call('flow_check', { flowId, revisionId: savedRevision })
+    return
+  }
   if (id == 'wait-auto-continue') {
     await call('flow_schema', { type: 'wait' })
     const before = await read()

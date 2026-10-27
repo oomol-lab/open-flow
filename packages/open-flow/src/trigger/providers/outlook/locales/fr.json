@@ -12,7 +12,7 @@
       "withAttachmentsOnly": "Déclencher uniquement sur les messages comportant des pièces jointes."
     },
     "outputs": {
-      "events": "Messages Outlook reçus depuis la précédente interrogation."
+      "event": "Un événement unique pour ce Run."
     }
   }
 }

@@ -454,18 +454,20 @@ export class ConnectorClient implements ConnectorHost {
       (access.scope != 'trigger' || access.triggerId != triggerId || access.providerId != provider || access.connectionId != connectionId)
     )
       throw accessInvalid()
-    const bindings = await this.#providerAccessBindings(access, provider, signal, true)
+    const sourceIngress = request.operation === 'sourceReference' && (request.request.action === 'delete' || request.request.action === 'route')
+    if (sourceIngress && (typeof access !== 'object' || access.scope !== 'catalog' || access.source !== 'operator')) throw accessInvalid()
+    const bindings = sourceIngress ? null : await this.#providerAccessBindings(access, provider, signal, true)
     if (bindings != null && !bindings.some((candidate) => candidate.appId == connectionId && providerAccessAllowsTrigger(candidate, triggerId)))
       throw accessInvalid()
     const teamId = connectorTeamId(access)
-    await this.#assertConnection(connectionId, provider, signal, teamId)
+    if (!sourceIngress) await this.#assertConnection(connectionId, provider, signal, teamId)
     const response = await this.#transport.request(
       'trigger.execute',
-      `v1/providers/${encodeURIComponent(provider)}/triggers/${encodeURIComponent(triggerId)}/execute`,
+      `v1/providers/${encodeURIComponent(provider)}/triggers/${encodeURIComponent(triggerId)}/execute?appId=${encodeURIComponent(connectionId)}`,
       {
         method: 'POST',
         body: JSON.stringify(request),
-        headers: { 'content-type': 'application/json', 'x-oo-connector-app-id': connectionId },
+        headers: { 'content-type': 'application/json' },
       },
       signal,
       { fields: { connectionId, provider, triggerId }, teamId },
@@ -485,6 +487,8 @@ export class ConnectorClient implements ConnectorHost {
         'connector.input-invalid',
         'Webhook creation has an uncertain outcome. Check the existing remote webhook before retrying; do not create another event source.',
       )
+    if (request.operation === 'sourceReference' && response.status === 409 && record(response.value) && response.value.errorCode === 'invalid_input')
+      throw new ConnectorTaskError('connector.input-invalid', 'The Source changed. Refresh its configuration before retrying.', 409)
     if (record(response.value) && ['invalid_input', 'trigger_not_found'].includes(String(response.value.errorCode)) && response.status != 409)
       throw new ConnectorTaskError('connector.input-invalid', 'The Trigger operation configuration is invalid.')
     if (

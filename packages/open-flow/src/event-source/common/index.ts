@@ -5,7 +5,15 @@ import { eventSourceViewSchema } from '../../control/common/eventSources.ts'
 import catalog from './catalog.generated.json' with { type: 'json' }
 import { SourceIdentityError } from './definition.ts'
 
-export type { EventSourceDefinition, SourceConfiguration, SourceEvent, SourceSubscription, SourceOperation } from './definition.ts'
+export type {
+  EventSourceDefinition,
+  SourceConfiguration,
+  SourceEvent,
+  SourceSubscription,
+  SourceOperation,
+  SourceReference,
+  SourceReferenceOperation,
+} from './definition.ts'
 export { SourceIdentityError } from './definition.ts'
 
 export function eventSourceDefinition(kind: string): EventSourceDefinition {
@@ -67,3 +75,25 @@ export const sourceReceiptSchema = z
 export type SourceResult = z.infer<typeof sourceResultSchema>
 export type PreparedSource = z.infer<typeof preparedSourceSchema>
 export type SourceReceipt = z.infer<typeof sourceReceiptSchema>
+
+export const sourceReferenceSchema = z.object({ applicationId: z.string().min(1), sourceId: z.string().min(1) })
+export const sourceReferenceSnapshotSchema = projectionSchema.extend({
+  reference: sourceReferenceSchema,
+  revision: z.number().int().positive(),
+  eventTypes: z.array(z.string()),
+})
+export const sourceReferenceResultSchema = z.object({ source: sourceReferenceSnapshotSchema })
+export const sourceReferenceDeleteResultSchema = z.object({ deleted: z.literal(true) })
+export const sourceReferenceResourceResultSchema = sourceReferenceResultSchema.extend({ outcome: z.enum(['ready', 'pending']) })
+export const sourceReferenceRouteResultSchema = z.object({
+  references: z.array(sourceReferenceSchema),
+  response: sourceReceiptSchema.shape.response,
+})
+export const preparedSourceReferenceSchema = sourceReferenceResultSchema.extend({ subscriptions: z.array(z.object({ key: z.string() })) })
+export const sourceReferenceReceiptSchema = z
+  .object({
+    ...sourceReceiptSchema.shape,
+    source: sourceReferenceSnapshotSchema.optional(),
+  })
+  .refine((value) => (value.response == null) !== (value.event == null))
+export type SourceReferenceSnapshot = z.infer<typeof sourceReferenceSnapshotSchema>

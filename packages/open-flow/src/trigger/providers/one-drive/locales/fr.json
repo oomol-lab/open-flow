@@ -10,7 +10,7 @@
       "parentFolderId": "Surveiller uniquement les éléments de ce dossier parent. Laissez vide pour surveiller tout le lecteur."
     },
     "outputs": {
-      "events": "Éléments OneDrive créés, mis à jour ou supprimés depuis la précédente interrogation."
+      "event": "Un événement unique pour ce Run."
     }
   }
 }

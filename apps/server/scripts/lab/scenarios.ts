@@ -6,6 +6,13 @@ import { fulfillmentSamples, fulfillmentStages } from './fulfillment.ts'
 
 export const scenarios = [
   {
+    id: 'poll-event',
+    entry: { kind: 'poll' },
+    name: 'Author a single-event Poll',
+    version: 1,
+    task: 'Create a Gmail Poll with Mail test account, read its event output, change only its name, explicitly refresh its definition, and connect it to Outputs returning subject from event.subject. Preserve the account and configuration. Check the Flow. Each deterministic draft Run receives one message.',
+  },
+  {
     id: 'webhook-response-node',
     entry: { kind: 'webhook' },
     name: 'Respond before the workflow completes',
@@ -185,6 +192,7 @@ function source(nodeId: string, handle: string, from: string, output: string): C
 }
 export function initialOperations(id: string): ChangeOperation[] {
   if (
+    id == 'poll-event' ||
     id == 'wait-auto-continue' ||
     id == 'node-errors' ||
     id == 'node-retries' ||
@@ -361,6 +369,25 @@ export interface Sample {
   parameters?: Record<string, JsonValue>
 }
 export function samples(id: string, stage = 0): Sample[] {
+  if (id === 'poll-event')
+    return ['First', 'Second'].map((subject) => ({
+      name: subject,
+      orders: [],
+      order,
+      outputs: {
+        event: {
+          historyId: null,
+          labelIds: [],
+          messageId: subject,
+          messageTimestamp: '2026-10-27T00:00:00Z',
+          sender: 'sender@example.test',
+          subject,
+          threadId: subject,
+          to: 'reader@example.test',
+        },
+      },
+    }))
+
   if (id == 'node-errors') return [{ name: 'handled-and-successful', orders: [], order }]
   if (id == 'node-retries') return [{ name: 'configured-and-cleared', orders: [], order }]
   if (id == 'workflow-call') return [0, -2.5, 12.5].map((amount) => ({ name: String(amount), orders: [], order, outputs: { amount } }))
@@ -428,6 +455,17 @@ function effectiveNode(content: RevisionContent, id: string): unknown {
 }
 /** Independent assertions: compare behavior and preserved effective configurations, not generated IDs. */
 export function assertions(id: string, base: RevisionContent, current: RevisionContent): string[] {
+  if (id === 'poll-event') {
+    const poll = Object.values(current.document.graph.nodes).find((candidate) => candidate.kind === 'poll')
+    return poll?.kind === 'poll' &&
+      poll.name === 'Mail events' &&
+      poll.connectionId === 'mail-test' &&
+      poll.definition.definitionVersion === 3 &&
+      poll.definition.outputs[0]?.handle === 'event'
+      ? []
+      : ['Preserve the selected account and use the single-event Poll contract.']
+  }
+
   if (id == 'wait-auto-continue') {
     const nodes = Object.values(current.document.graph.nodes)
     const relative = nodes.find((candidate) => candidate.name == 'Relative wait updated')

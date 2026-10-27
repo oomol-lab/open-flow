@@ -1223,6 +1223,10 @@ export class RunStore {
     return runId
   }
 
+  get maximumPendingRuns(): number {
+    return this.#maxPendingRuns
+  }
+
   #hasRunCapacity(): boolean {
     return this.#database.prepare('SELECT 1 FROM work LIMIT 1 OFFSET ?').get(this.#maxPendingRuns - 1) == null
   }

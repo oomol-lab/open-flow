@@ -12,7 +12,7 @@
       "textContains": "僅當消息內容包含此字符串時觸發，不區分大小寫。"
     },
     "outputs": {
-      "events": "自上次輪詢以來發布的 Slack 消息。"
+      "event": "本次 Run 對應的單一事件。"
     }
   }
 }

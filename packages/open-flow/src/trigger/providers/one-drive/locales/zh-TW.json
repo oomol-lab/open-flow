@@ -10,7 +10,7 @@
       "parentFolderId": "僅監控此父資料夾中的項目。留空則監控整個驅動器。"
     },
     "outputs": {
-      "events": "自上次輪詢以來新建、更新或刪除的 OneDrive 項目。"
+      "event": "本次 Run 對應的單一事件。"
     }
   }
 }

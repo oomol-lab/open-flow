@@ -6,6 +6,7 @@ import { serve } from '@hono/node-server'
 import { isLabCliOffline } from '@oomol-lab/open-flow-command/lab'
 import { authoringNode } from '@oomol-lab/open-flow/control-requests'
 import { validateFlowInputs } from '@oomol-lab/open-flow/flow-semantics'
+import { triggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { currentEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import * as Effect from 'effect/Effect'
 import * as Exit from 'effect/Exit'
@@ -284,7 +285,7 @@ export class LabSession {
       ServerService.open(this.database, {
         capabilities: { connector: () => this.mocks.connector, llm: () => createLlm(this.modelOrigin, 'lab-only') },
         runtime: { runTimeoutMs: 15_000 },
-        triggerDefinitions: [],
+        triggerDefinitions: this.scenarioId === 'poll-event' ? triggerDefinitions.filter((item) => item.snapshot.key === 'gmail.on_message_received') : [],
       }).pipe(Scope.provide(this.scope)),
     )
     const operator = new OperatorSession(new OperatorStore(this.database), this.token, false)
@@ -394,7 +395,8 @@ export class LabSession {
         const triggers = Object.entries(revision.content.document.graph.nodes).filter(([id, node]) =>
           'node' in entry ? id == entry.node : node.kind == entry.kind,
         )
-        if (triggers.length != 1 || triggers[0]![1].kind != 'start') errors.push('The scenario entry must resolve to one Start node.')
+        if (triggers.length != 1 || (triggers[0]![1].kind != 'start' && this.scenarioId !== 'poll-event'))
+          errors.push('The scenario entry must resolve to one Start node.')
         else
           for (const sample of samples(this.scenarioId, this.stage)) {
             Object.assign(this.mocks.sample, sample)

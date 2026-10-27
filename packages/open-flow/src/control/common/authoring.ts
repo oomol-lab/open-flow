@@ -682,8 +682,15 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
         case 'node.refresh': {
           const ref = resolve(edit.node)
           const node = nodeAt(content, ref)
+          if (node.kind === 'poll' || node.kind === 'integration') {
+            const definition = host.trigger(node.definition.key)
+            if (definition.type !== node.kind) fail('trigger.type-mismatch', 'Trigger key has a different type.')
+            if (node.kind === 'poll' && definition.type === 'poll') replace(ref, { ...node, definition })
+            else if (node.kind === 'integration' && definition.type === 'integration') replace(ref, { ...node, definition })
+            break
+          }
           if (node.kind != 'task' || !('executor' in node.task) || node.task.executor.kind != 'workflow')
-            fail('node.invalid-type', 'Only workflow call nodes support refresh.')
+            fail('node.invalid-type', 'Only workflow call and provider Trigger nodes support refresh.')
           const task = await resolveWorkflow(node.task.executor.flowId, node.name ?? node.task.name, node.task)
           apply([{ kind: 'graph.node.replace', nodeId: ref, before: node, node: withWorkflowTask(node, task) }])
           break

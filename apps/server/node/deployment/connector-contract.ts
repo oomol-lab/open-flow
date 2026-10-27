@@ -78,10 +78,12 @@ export type ConnectorErrorCode =
 
 export class ConnectorTaskError extends Error {
   readonly code: ConnectorErrorCode
+  readonly status?: number
 
-  constructor(code: ConnectorErrorCode, message: string) {
+  constructor(code: ConnectorErrorCode, message: string, status?: number) {
     super(message)
     this.code = code
+    this.status = status
     this.name = 'ConnectorTaskError'
   }
 

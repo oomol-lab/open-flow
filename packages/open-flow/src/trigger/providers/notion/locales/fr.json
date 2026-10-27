@@ -10,7 +10,7 @@
       "maxItemsPerPoll": "Nombre maximal de pages modifiées traitées par interrogation."
     },
     "outputs": {
-      "events": "Pages de la base ajoutées ou mises à jour depuis la précédente interrogation."
+      "event": "Un événement unique pour ce Run."
     }
   }
 }

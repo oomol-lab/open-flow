@@ -40,7 +40,10 @@ export async function localizeTrigger(definition: TriggerKeySnapshot, locale: Ui
     configInputLabels: triggerConfigFieldLabels[locale][definition.key] ?? {},
     displayName: copy?.displayName ?? definition.displayName,
     description: copy?.description ?? definition.description,
-    outputs: fieldDescriptions(definition.outputs, copy?.outputs, englishFields?.outputs),
+    outputs:
+      definition.type === 'poll' && definition.definitionVersion === 2
+        ? fieldDescriptions(definition.outputs, { events: 'Events collected in this Run (legacy batch delivery).' })
+        : fieldDescriptions(definition.outputs, copy?.outputs, englishFields?.outputs),
   }
 }
 

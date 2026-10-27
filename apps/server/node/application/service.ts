@@ -17,7 +17,7 @@ import type { ServerCapabilities, ServerRuntime, ServerServiceOptions } from './
 import type { WebhookTarget } from './webhook-targets.ts'
 
 import { controlErrorCode } from '@oomol-lab/open-flow/control-api'
-import { triggerDefinitions as providerTriggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
+import { triggerDefinitions as providerTriggerDefinitions, legacyPollDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import * as Clock from 'effect/Clock'
 import * as Effect from 'effect/Effect'
 import * as FiberMap from 'effect/FiberMap'
@@ -151,7 +151,13 @@ export class ServerService {
       () => this.#maintenance.wake(),
       (...args) => this.control.runs.invokeWorkflow(...args),
     )
-    const pollDefinitions = triggerDefinitions.filter((definition): definition is PollDefinition => definition.snapshot.type == 'poll')
+    const currentPollDefinitions = triggerDefinitions.filter((definition): definition is PollDefinition => definition.snapshot.type == 'poll')
+    const pollDefinitions = [
+      ...currentPollDefinitions,
+      ...legacyPollDefinitions.filter((legacy) =>
+        currentPollDefinitions.some((current) => current.snapshot.key === legacy.snapshot.key && current.delivery === 'event'),
+      ),
+    ]
     const integrationDefinitions = triggerDefinitions.filter((definition): definition is IntegrationDefinition => definition.snapshot.type == 'integration')
     const snapshots = triggerDefinitions.map((definition) => definition.snapshot).toSorted((left, right) => left.key.localeCompare(right.key))
     this.#integration = new IntegrationRuntime(

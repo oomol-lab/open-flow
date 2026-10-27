@@ -114,7 +114,7 @@ export interface StoredPollTestTarget {
 
 export type PollClaim = { readonly kind: 'acquired'; readonly leaseToken: string } | { readonly kind: 'busy' | 'completed' | 'unavailable' }
 
-export type PollCompletion = { readonly accepted?: RunAcceptance; readonly kind: 'completed' } | { readonly kind: 'ignored' | 'overloaded' }
+export type PollCompletion = { readonly accepted: readonly RunAcceptance[]; readonly kind: 'completed' } | { readonly kind: 'ignored' | 'overloaded' }
 
 export interface PollState {
   readonly bindingId: string

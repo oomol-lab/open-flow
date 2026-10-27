@@ -9,7 +9,7 @@
       "maxEventsPerPoll": "每次輪詢處理的最大日曆事件數。"
     },
     "outputs": {
-      "events": "自上次輪詢以來新建、更新或取消的日曆事件。"
+      "event": "本次 Run 對應的單一事件。"
     }
   }
 }

@@ -10,7 +10,7 @@
       "parentFolderId": "仅监控此父文件夹中的项目。留空则监控整个驱动器。"
     },
     "outputs": {
-      "events": "自上次轮询以来创建、更新或删除的OneDrive项目。"
+      "event": "本次 Run 对应的单个事件。"
     }
   }
 }

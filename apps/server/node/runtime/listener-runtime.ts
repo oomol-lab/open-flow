@@ -86,7 +86,7 @@ export class ListenerRuntime {
   ) {
     this.#clock = clock
     this.#clockService = clockService
-    this.#definitions = new Map(definitions.map((definition) => [definition.snapshot.key, definition]))
+    this.#definitions = new Map(definitions.map((definition) => [`${definition.snapshot.key}:${definition.snapshot.definitionVersion}`, definition]))
     this.#lock = lock
     this.#integrations = new Map(integrations.map((definition) => [definition.snapshot.key, definition]))
     this.#logger = logger.child({ component: 'listener' })
@@ -120,7 +120,7 @@ export class ListenerRuntime {
       ) {
         throw new PermanentPollError('Fixed Poll Trigger target does not match its Publication.')
       }
-      const definition = this.#definitions.get(trigger.definition.key)
+      const definition = this.#definitions.get(`${trigger.definition.key}:${trigger.definition.definitionVersion}`)
       if (definition?.snapshot.definitionVersion != trigger.definition.definitionVersion) {
         throw new PermanentPollError('Fixed Poll Trigger definition is not available.')
       }
@@ -207,7 +207,7 @@ export class ListenerRuntime {
   }
 
   supports(key: string, definitionVersion: number): boolean {
-    return this.#definitions.get(key)?.snapshot.definitionVersion == definitionVersion
+    return this.#definitions.has(`${key}:${definitionVersion}`)
   }
 
   #run<Value>(effect: Effect.Effect<Value, unknown>): Promise<Value> {
@@ -385,7 +385,7 @@ export class ListenerRuntime {
       if (trigger.kind != 'poll' || !isDeepStrictEqual(trigger.pollTimes, JSON.parse(candidate.scheduleJson))) {
         return yield* Effect.fail(new PermanentPollError('Fixed Poll candidate is invalid.'))
       }
-      const definition = this.#definitions.get(trigger.definition.key)
+      const definition = this.#definitions.get(`${trigger.definition.key}:${trigger.definition.definitionVersion}`)
       if (definition?.snapshot.definitionVersion != trigger.definition.definitionVersion) {
         return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger definition is not available.'))
       }
@@ -494,7 +494,7 @@ export class ListenerRuntime {
         ) {
           return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger target does not match its Publication.'))
         }
-        const definition = this.#definitions.get(trigger.definition.key)
+        const definition = this.#definitions.get(`${trigger.definition.key}:${trigger.definition.definitionVersion}`)
         if (definition?.snapshot.definitionVersion != trigger.definition.definitionVersion) {
           return yield* Effect.fail(new PermanentPollError('Fixed Poll Trigger definition is not available.'))
         }
@@ -533,24 +533,31 @@ export class ListenerRuntime {
           known.add(item.id)
           return true
         })
-        const outputs = fresh.length == 0 ? null : definition.buildOutputs(fresh.map((item) => item.event))
-        if (outputs != null && !matchesTriggerOutputs(trigger, outputs)) throw new Error('Invalid Poll Trigger outputs.')
-        const requestDigest =
-          outputs == null
-            ? null
-            : yield* Effect.tryPromise({
-                try: () =>
-                  digestBytes(
-                    canonicalJsonBytes({
-                      bindingId: target.bindingId,
-                      claimId,
-                      outputs,
-                      revisionDigest: target.revisionDigest,
-                      runtimeVersion: target.runtimeVersion,
-                    }),
-                  ),
-                catch: (error) => error,
-              })
+        const batches = definition.delivery === 'event' ? fresh.map((item) => [item]) : fresh.length === 0 ? [] : [fresh]
+        if (batches.length > this.#store.runs.maximumPendingRuns)
+          throw new PermanentPollError('The event page exceeds this deployment’s Run capacity. Increase maximum pending Runs to at least 100.')
+        const admissions = yield* Effect.tryPromise({
+          try: () =>
+            Promise.all(
+              batches.map(async (batch) => {
+                const outputs = definition.buildOutputs(batch.map((item) => item.event))
+                if (!matchesTriggerOutputs(trigger, outputs)) throw new Error('Invalid Poll Trigger outputs.')
+                const eventOccurrenceId =
+                  definition.delivery === 'event' ? await digestBytes(canonicalJsonBytes(['poll-event', batch[0]!.id, target.runtimeVersion])) : claimId
+                const requestDigest = await digestBytes(
+                  canonicalJsonBytes({
+                    bindingId: target.bindingId,
+                    ...(definition.delivery === 'event' ? { occurrenceId: eventOccurrenceId } : { claimId }),
+                    outputs,
+                    revisionDigest: target.revisionDigest,
+                    runtimeVersion: target.runtimeVersion,
+                  }),
+                )
+                return { occurrenceId: eventOccurrenceId, outputs, requestDigest, providerEventIds: batch.map((item) => item.id) }
+              }),
+            ),
+          catch: (error) => error,
+        })
         const hasMore = result.hasMore == true
         const completed = this.#store.polls.completePollPage({
           activate: baseline && !hasMore,
@@ -563,9 +570,7 @@ export class ListenerRuntime {
           nextContinuationPage: hasMore ? page + 1 : 0,
           nextContinuationRootId: hasMore ? rootOccurrenceId : null,
           page,
-          outputs,
-          providerEventIds: fresh.map((item) => item.id),
-          requestDigest,
+          admissions,
           rootOccurrenceId,
           target,
         })
@@ -573,9 +578,9 @@ export class ListenerRuntime {
           this.#store.polls.failPollClaim(target.bindingId, target.runtimeVersion, claim.leaseToken, { retryAt: now + admissionRetryMs })
           return
         }
-        if (completed.kind == 'completed' && completed.accepted?.kind == 'accepted') {
-          if (completed.accepted.created) this.#runCreated(target.flowId, completed.accepted.runId)
-          this.#signal()
+        if (completed.kind == 'completed') {
+          for (const accepted of completed.accepted) if (accepted.kind === 'accepted' && accepted.created) this.#runCreated(target.flowId, accepted.runId)
+          if (completed.accepted.length) this.#signal()
         }
         if (completed.kind == 'completed' && baseline && !hasMore) {
           this.#logger.info(

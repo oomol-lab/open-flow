@@ -25,6 +25,14 @@ export function runtimeAssertions(
     return errors
   }
   if (status != 'completed') return [`Run ${sample.name} ended ${status}.`]
+  if (id === 'poll-event') {
+    const completed = events.find((event) => event.kind === 'run.completed')
+    const result = completed?.payload.result
+    if (result == null || typeof result !== 'object' || !('outputs' in result) || !isDeepStrictEqual(result.outputs, { subject: sample.name }))
+      errors.push('Return the subject of the one event supplied to this Run.')
+    if (calls.length || modelCalls.length) errors.push('No external requests are needed.')
+    return errors
+  }
   if (id == 'wait-auto-continue') {
     const resolved = events.filter((event) => event.kind == 'run.resolved')
     const completed = events.find((event) => event.kind == 'run.completed')

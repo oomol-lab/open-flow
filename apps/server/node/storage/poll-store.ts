@@ -478,9 +478,12 @@ export class PollStore {
     readonly nextContinuationPage: number
     readonly nextContinuationRootId: string | null
     readonly page: number
-    readonly outputs: Readonly<Record<string, JsonValue>> | null
-    readonly providerEventIds: readonly string[]
-    readonly requestDigest: string | null
+    readonly admissions: readonly {
+      readonly occurrenceId: string
+      readonly outputs: Readonly<Record<string, JsonValue>>
+      readonly providerEventIds: readonly string[]
+      readonly requestDigest: string
+    }[]
     readonly rootOccurrenceId: string
     readonly target: StoredPollTarget
   }): PollCompletion {
@@ -528,23 +531,28 @@ export class PollStore {
         ) as { readonly lastErrorCode: string | null } | undefined
       if (current == null) return { kind: 'ignored' }
 
-      let accepted: RunAcceptance | undefined
-      if (input.outputs != null && input.requestDigest != null) {
+      const acceptedRuns: RunAcceptance[] = []
+      this.#database.exec('SAVEPOINT poll_page_admissions')
+      for (const entry of input.admissions) {
         const admission = this.#acceptTriggerOccurrence({
           content: input.target.content,
           closureDigest: input.target.closureDigest,
           flowId: input.target.flowId,
           modelVersion: input.target.modelVersion,
-          occurrenceId: input.claimId,
-          outputs: input.outputs,
+          occurrenceId: entry.occurrenceId,
+          outputs: entry.outputs,
           publicationId: input.target.publicationId,
-          requestDigest: input.requestDigest,
+          requestDigest: entry.requestDigest,
           revisionDigest: input.target.revisionDigest,
           revisionId: input.target.revisionId,
           triggerNodeId: input.target.triggerNodeId,
         })
-        if (admission.kind == 'overloaded') return admission
-        accepted = admission
+        if (admission.kind == 'overloaded') {
+          this.#database.exec('ROLLBACK TO poll_page_admissions; RELEASE poll_page_admissions')
+          return admission
+        }
+        const accepted = admission
+        acceptedRuns.push(accepted)
         if (accepted.kind == 'conflict') throw new Error('Poll page identity already refers to a different invocation.')
         if (accepted.created) {
           this.#database
@@ -554,7 +562,7 @@ export class PollStore {
                ) VALUES (?, ?, ?, ?, ?, ?)`,
             )
             .run(accepted.runId, input.target.bindingId, input.target.runtimeVersion, input.target.publicationId, input.rootOccurrenceId, input.page)
-          for (const providerEventId of input.providerEventIds) {
+          for (const providerEventId of entry.providerEventIds) {
             this.#database
               .prepare(
                 `INSERT INTO poll_event_dedupe (
@@ -564,9 +572,8 @@ export class PollStore {
               .run(input.target.bindingId, providerEventId, accepted.runId, input.completedAt, input.claimExpiresAt)
           }
         }
-      } else if (input.outputs != null || input.requestDigest != null || input.providerEventIds.length != 0) {
-        throw new TypeError('Poll page Run input is incomplete.')
       }
+      this.#database.exec('RELEASE poll_page_admissions')
 
       this.#database
         .prepare(
@@ -580,7 +587,7 @@ export class PollStore {
           input.rootOccurrenceId,
           input.page,
           input.target.runtimeVersion,
-          accepted?.kind == 'accepted' ? accepted.runId : null,
+          acceptedRuns[0]?.kind == 'accepted' ? acceptedRuns[0].runId : null,
           input.completedAt,
           input.claimExpiresAt,
         )
@@ -613,7 +620,7 @@ export class PollStore {
         insertTriggerActivity(this.#database, input.target.bindingId, 'health.recovered', input.completedAt)
         pruneTriggerActivities(this.#database, input.completedAt, 100)
       }
-      return { ...(accepted == null ? {} : { accepted }), kind: 'completed' }
+      return { accepted: acceptedRuns, kind: 'completed' }
     })
   }
 

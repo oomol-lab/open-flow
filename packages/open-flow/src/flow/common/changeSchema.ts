@@ -243,7 +243,7 @@ const node = z.union([
     kind: z.literal('poll'),
     connectionId: text.min(1).optional(),
     config: z.record(text, fixedInput),
-    definition: z.object({ ...definition, type: z.literal('poll') }),
+    definition: z.object({ ...definition, definitionVersion: z.union([z.literal(2), z.literal(3)]), type: z.literal('poll') }),
     pollTimes: triggerScheduleSchema,
   }),
   z.object({

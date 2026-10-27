@@ -371,3 +371,9 @@ Connector calls. Run both reference transports:
 bun run lab test wait-auto-continue
 bun run lab test wait-auto-continue --mcp
 ```
+
+`poll-event` verifies public Poll creation, read, local update and explicit definition refresh,
+then executes two deterministic draft Runs with one Gmail event each. Run
+`bun run lab test poll-event` and `bun run lab test poll-event --mcp`.
+The scenario tests authoring and output consumption; provider polling, page admission and legacy
+batch compatibility are covered by Server Poll tests.

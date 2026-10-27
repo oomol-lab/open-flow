@@ -14,7 +14,8 @@ import { ConnectorClient } from '../node/deployment/connector.ts'
 import { createServerApp } from '../node/transport/http.ts'
 import { createConnectorHost } from './connectorHost.ts'
 import { closeService, openService } from './serviceFixture.ts'
-import { sourceProtocolFixture } from './sourceProtocolFixture.ts'
+import { sourceReferenceFixture } from './sourceProtocolFixture.ts'
+const sourceProtocolFixture = sourceReferenceFixture()
 
 const now = Date.parse('2026-09-14T08:00:00.000Z')
 const definition = integrationDefinitions.find((item) => item.snapshot.key == 'feishu_app_bot.on_event')!
@@ -33,7 +34,7 @@ function delivery(result: unknown) {
   return { method: 'POST', body: JSON.stringify(result), headers: { 'content-type': 'application/json' } }
 }
 
-async function setup() {
+async function setup(dropResourceResponse = false) {
   const requests: string[] = []
   const connector = createConnectorHost({
     listConnections: async () => [
@@ -47,10 +48,14 @@ async function setup() {
       },
     ],
     trigger: async (_provider, _connection, _trigger, request) => {
-      if (request.operation === 'source') return sourceProtocolFixture(request.request)
-      if (request.operation !== 'resource') throw new Error('Unexpected operation')
-      requests.push(`${request.active ? 'subscribe' : 'unsubscribe'} ${JSON.stringify(request.config.resource)}`)
-      return { outcome: 'ready' }
+      if (request.operation !== 'sourceReference') throw new Error('Unexpected operation')
+      if (request.request.action === 'resource') requests.push(`${request.request.active ? 'subscribe' : 'unsubscribe'} ${request.request.key}`)
+      const result = sourceProtocolFixture(request.request)
+      if (dropResourceResponse && request.request.action === 'resource') {
+        dropResourceResponse = false
+        throw new Error('Resource response lost')
+      }
+      return result
     },
   })
   const service = await openService(':memory:', {
@@ -191,7 +196,8 @@ it('creates an application event source without querying tenant information', as
     listConnections: async () => [
       { connectionId: input.connectionId, providerAccountId: 'cli_test', displayName: 'Feishu', serviceId: provider, status: 'active', isDefault: true },
     ],
-    trigger: async (_provider, _connection, _trigger, request) => (request.operation === 'source' ? sourceProtocolFixture(request.request) : undefined),
+    trigger: async (_provider, _connection, _trigger, request) =>
+      request.operation === 'sourceReference' ? sourceProtocolFixture(request.request) : undefined,
     proxy: vi.fn(async () => {
       throw new Error('Creating an event source must not require a provider API request.')
     }),
@@ -216,7 +222,8 @@ it('rejects missing application identity instead of accepting a manually supplie
     listConnections: async () => [
       { connectionId: input.connectionId, displayName: 'Unknown app', serviceId: 'feishu_app_bot', status: 'active', isDefault: true },
     ],
-    trigger: async (_provider, _connection, _trigger, request) => (request.operation === 'source' ? sourceProtocolFixture(request.request, '') : undefined),
+    trigger: async (_provider, _connection, _trigger, request) =>
+      request.operation === 'sourceReference' ? sourceProtocolFixture(request.request, '') : undefined,
     proxy: async () => {
       throw new Error('Identity must be checked before querying the provider.')
     },
@@ -228,7 +235,9 @@ it('rejects missing application identity instead of accepting a manually supplie
   expect((await request(input)).status).toBe(409)
   expect((await request({ ...input, appId: 'cli_forged' })).status).toBe(400)
   expect((await request({ ...input, provider: 'feishu' })).status).toBe(400)
-  expect((await (await app.request('/v1/event-sources')).json()).sources).toEqual([])
+  expect((await (await app.request('/v1/event-sources')).json()).sources).toMatchObject([
+    { appId: null, verifiedAt: null, lastError: expect.stringContaining('unfinished') },
+  ])
 })
 
 it('returns the Flow team even when it has no event sources and rejects unknown Flows', async () => {
@@ -282,15 +291,14 @@ it.each(['normal', 'failure', 'update'])('hydrates persisted sources without los
       { connectionId: input.connectionId, providerAccountId: 'cli_test', displayName: 'App', serviceId: 'feishu_app_bot', status: 'active', isDefault: true },
     ],
     trigger: async (_provider, _connection, _trigger, request) => {
-      if (request.operation !== 'source') throw new Error('Unexpected operation')
+      if (request.operation !== 'sourceReference') throw new Error('Unexpected operation')
       actions.push(request.request.action)
-      if (request.request.action === 'inspect' && failFirst && actions.filter((action) => action === 'inspect').length === 1)
-        throw new Error('Connector unavailable')
-      if (request.request.action === 'inspect' && scenario === 'update') {
+      if (request.request.action === 'get' && failFirst && actions.filter((action) => action === 'get').length === 1) throw new Error('Connector unavailable')
+      if (request.request.action === 'get' && scenario === 'update' && actions.filter((action) => action === 'get').length === 1) {
         const database = new DatabaseSync(file)
         database
           .prepare("UPDATE event_sources SET revision = revision + 1, name = 'Concurrent edit', state_json = ?")
-          .run(JSON.stringify((sourceProtocolFixture(request.request) as { source: { state: unknown } }).source.state))
+          .run(JSON.stringify({ projection: (sourceProtocolFixture(request.request) as { source: unknown }).source }))
         database.close()
       }
       return sourceProtocolFixture(request.request)
@@ -328,7 +336,7 @@ it.each(['normal', 'failure', 'update'])('hydrates persisted sources without los
         endpointUrl: original.endpointUrl,
       })
     }
-    expect(actions).toEqual(failFirst ? ['initialize', 'inspect', 'inspect'] : ['initialize', 'inspect'])
+    expect(actions[0]).toBe('create')
   } finally {
     await closeService(service)
     await rm(directory, { recursive: true, force: true })
@@ -339,4 +347,43 @@ it.each(['feishu', 'fireflies', 'jira', 'unknown'])('rejects application ingress
   const { app } = await setup()
   const response = await app.request(`/v1/event-source-apps/${kind}/cli_test/events`, delivery({ verify: true }))
   expect(response.status).toBe(404)
+})
+
+it('retries an uncertain Feishu resource through Connector ownership instead of blocking publication', async () => {
+  const context = await setup(true)
+  const { service, source } = context
+  try {
+    const created = await service.control.flows.createFlow('operator', 'Recover resource', 'recover-resource')
+    const flowId = created.flow.flowId
+    const draft = await service.control.drafts.changeDraft('operator', flowId, created.flow.draftRevisionId, [
+      {
+        kind: 'graph.node.create',
+        nodeId: 'feishu',
+        node: {
+          kind: 'integration',
+          name: 'Feishu',
+          connectionId: input.connectionId,
+          definition: definition.snapshot,
+          config: inputValues({ sourceId: source.sourceId, eventTypes: ['approval_instance'], resource: { kind: 'approval', id: 'approval' } }),
+        },
+      },
+    ])
+    const operation = await service.control.publications.publishFlow(
+      'operator',
+      flowId,
+      draft.revision.revisionId,
+      currentEngineContract,
+      null,
+      'recover-publication',
+    )
+    await service.tickIntegration()
+    await service.tickMaintenance()
+    expect(service.control.publications.getPublishOperation('operator', flowId, operation.operationId).status).not.toBe('succeeded')
+    await service.tickIntegration(new Date(now + 60_000).toISOString())
+    await service.tickMaintenance()
+    expect(service.control.publications.getPublishOperation('operator', flowId, operation.operationId).status).toBe('succeeded')
+    expect(context.requests.filter((request) => request.startsWith('subscribe '))).toHaveLength(2)
+  } finally {
+    await closeService(service)
+  }
 })

@@ -219,3 +219,12 @@ belongs to the selected Trigger's reachable execution path or its dependencies; 
 unrelated branches do not block that Draft Run. Public authoring inputs still require valid timing.
 Approval remains manual. See the Control API's Wait automatic continuation contract for recovery,
 competition and event metadata.
+
+### Poll definition upgrades
+
+New catalog Poll nodes use definitionVersion 3 and expose one `event` object per Run.
+Published version-2 nodes retain their `events` array and batch delivery. Ordinary local updates
+preserve the stored definition. Explicit `node.refresh` replaces a Trigger definition with the
+current catalog contract while preserving configuration and downstream references. Read and check
+the Draft, repair diagnostics for removed outputs and any business aggregation, then publish.
+Refresh does not convert array mappings or rewrite historical Revisions, Publications or Runs.

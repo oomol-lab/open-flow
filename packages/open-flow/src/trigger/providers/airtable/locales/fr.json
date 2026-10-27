@@ -12,7 +12,7 @@
       "view": "Vue Airtable utilisée pour filtrer et trier les enregistrements. Laissez vide pour utiliser la vue par défaut de la table."
     },
     "outputs": {
-      "events": "Enregistrements créés ou mis à jour depuis la précédente interrogation."
+      "event": "Un événement unique pour ce Run."
     }
   }
 }
