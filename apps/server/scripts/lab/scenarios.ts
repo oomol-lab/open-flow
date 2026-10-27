@@ -1,6 +1,8 @@
 import type { ChangeOperation, JsonValue, ManagedTaskDefinition, RevisionContent } from '@oomol-lab/open-flow/flow-change'
 
 import { applyFlowChanges, currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
+import { triggerConfigValues } from '@oomol-lab/open-flow/poll-trigger'
+import { triggerDefinitions } from '@oomol-lab/open-flow/provider-triggers'
 import { isDeepStrictEqual } from 'node:util'
 import { fulfillmentSamples, fulfillmentStages } from './fulfillment.ts'
 
@@ -10,7 +12,7 @@ export const scenarios = [
     entry: { kind: 'poll' },
     name: 'Author a batch Poll',
     version: 1,
-    task: 'Create a Gmail Poll with Mail test account, read its events output, change only its name, and connect it to Outputs returning the complete messages array from events. Preserve the account and configuration. Check the Flow. Each deterministic draft Run receives a batch of messages.',
+    task: 'Create a Gmail Poll with Mail test account and default Gmail settings, read its events output, change only its name, and connect it to Outputs returning the complete messages array from events. Preserve the account and configuration. Check the Flow. Each deterministic draft Run receives a batch of messages.',
   },
   {
     id: 'webhook-response-node',
@@ -456,13 +458,16 @@ function effectiveNode(content: RevisionContent, id: string): unknown {
 export function assertions(id: string, base: RevisionContent, current: RevisionContent): string[] {
   if (id === 'poll-batch') {
     const poll = Object.values(current.document.graph.nodes).find((candidate) => candidate.kind === 'poll')
+    const expected = triggerDefinitions.find((definition) => definition.snapshot.key === 'gmail.on_message_received')!.snapshot
     return poll?.kind === 'poll' &&
       poll.name === 'Mail events' &&
       poll.connectionId === 'mail-test' &&
       poll.definition.definitionVersion === 2 &&
-      poll.definition.outputs[0]?.handle === 'events'
+      poll.definition.outputs[0]?.handle === 'events' &&
+      poll.definition.key === expected.key &&
+      isDeepStrictEqual(triggerConfigValues(expected.configInputs, poll.config), triggerConfigValues(expected.configInputs, {}))
       ? []
-      : ['Preserve the selected account and preserve the batch Poll contract.']
+      : ['Preserve the selected Gmail account, default configuration and batch Poll contract.']
   }
 
   if (id == 'wait-auto-continue') {
