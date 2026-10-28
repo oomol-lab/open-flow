@@ -107,25 +107,43 @@ export function readResult(value: JsonValue, query: ResultQuery = {}): ResultPag
   }
   const description = describe(selected, pointer)
   const whole = { ...description, complete: true, offset, value: selected }
-  if (offset == 0 && (query.limit == null || description.length == null || description.length <= limit) && bytes(whole) <= maxBytes) return whole
+  if (
+    offset == 0 &&
+    (query.limit == null || description.length == null || description.length <= limit) &&
+    (typeof selected != 'string' || selected.length <= maxBytes) &&
+    bytes(whole) <= maxBytes
+  )
+    return whole
   const root = description
   if (typeof selected == 'string') {
     let length = 0
-    for (const _ of selected) length++
+    let start = 0
+    for (let index = 0; index < selected.length; length++) {
+      if (length == offset) start = index
+      const point = selected.codePointAt(index)!
+      index += point > 0xffff ? 2 : 1
+    }
     if (offset >= length) throw new Error('Result offset is out of range.')
     const budget = maxBytes - bytes({ ...root, length, offset, value: '', nextOffset: length })
     let used = 0
-    let text = ''
+    let cursor = start
     let end = offset
-    let position = 0
-    for (const char of selected) {
-      if (position++ < offset) continue
-      const size = bytes(char) - 2
+    while (cursor < selected.length) {
+      const point = selected.codePointAt(cursor)!
+      // JSON escapes controls and lone surrogates; valid pairs use four UTF-8 bytes.
+      let size
+      if (point == 0x22 || point == 0x5c || point == 8 || point == 9 || point == 10 || point == 12 || point == 13) size = 2
+      else if (point < 0x20 || (point >= 0xd800 && point <= 0xdfff)) size = 6
+      else if (point < 0x80) size = 1
+      else if (point < 0x800) size = 2
+      else if (point <= 0xffff) size = 3
+      else size = 4
       if (used + size > budget) break
-      text += char
+      cursor += point > 0xffff ? 2 : 1
       used += size
       end++
     }
+    const text = selected.slice(start, cursor)
     if (end == offset) throw new Error('Result byte budget cannot fit a string character and page metadata.')
     return { ...root, complete: offset == 0 && end == length, length, offset, value: text, ...(end < length ? { nextOffset: end } : {}) }
   }
@@ -133,14 +151,19 @@ export function readResult(value: JsonValue, query: ResultQuery = {}): ResultPag
   const keys = Object.keys(selected)
   if (offset >= keys.length) throw new Error('Result offset is out of range.')
   const entries: ResultEntry[] = []
+  const overhead = bytes({ ...root, offset, entries: [], nextOffset: keys.length })
+  let used = overhead
   for (const key of keys.slice(offset, offset + limit)) {
     const path = `${pointer}/${key.replace(/~/g, '~0').replace(/\//g, '~1')}`
     const item = Array.isArray(selected) ? selected[Number(key)]! : (selected as Readonly<Record<string, JsonValue>>)[key]!
     const metadata = describe(item, path)
     const full = { ...metadata, complete: true, value: item }
-    const next = bytes({ ...root, offset, entries: [full], nextOffset: keys.length }) <= maxBytes ? full : metadata
-    if (bytes({ ...root, offset, entries: [...entries, next], nextOffset: keys.length }) > maxBytes) break
+    const fullBytes = bytes(full)
+    const next = overhead + fullBytes <= maxBytes ? full : metadata
+    const size = (next === full ? fullBytes : bytes(metadata)) + (entries.length == 0 ? 0 : 1)
+    if (used + size > maxBytes) break
     entries.push(next)
+    used += size
   }
   if (entries.length == 0) throw new Error('Result property name exceeds the preview limit. Download the full result.')
   const end = offset + entries.length

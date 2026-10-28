@@ -152,3 +152,59 @@ it('rejects invalid budgets and pages that cannot make progress', () => {
   expect(() => readResult('long text', { maxBytes: 1 })).toThrow('byte budget')
   expect(() => readResult({ x: 'long text' }, { maxBytes: 1 })).toThrow('preview limit')
 })
+
+it('counts JSON escapes and Unicode code points exactly at the string page boundary', () => {
+  const characters = [
+    ...Array.from({ length: 32 }, (_, code) => String.fromCharCode(code)),
+    '"',
+    '\\',
+    '\u007f',
+    '\u0080',
+    '\u07ff',
+    '\u0800',
+    '你',
+    '\u2028',
+    '\uffff',
+    '😀',
+    '\ud800',
+    '\udfff',
+  ]
+  const encoder = new TextEncoder()
+  for (const char of characters) {
+    const text = char.repeat(100)
+    const overhead = encoder.encode(
+      JSON.stringify({ pointer: '', type: 'string', complete: false, length: 100, offset: 1, value: '', nextOffset: 100 }),
+    ).byteLength
+    const size = encoder.encode(JSON.stringify(char)).byteLength - 2
+    const maxBytes = overhead + size * 3
+    const page = readResult(text, { offset: 1, maxBytes })
+    expect(page).toEqual({ pointer: '', type: 'string', complete: false, length: 100, offset: 1, value: char.repeat(3), nextOffset: 4 })
+    expect(encoder.encode(JSON.stringify(page)).byteLength).toBeLessThanOrEqual(maxBytes)
+    expect(() => readResult(text, { offset: 1, maxBytes: overhead + size - 1 })).toThrow('byte budget')
+  }
+})
+
+it('uses code point offsets across valid pairs and lone surrogates', () => {
+  const text = 'a\ud800b😀\udfff你'.repeat(50)
+  const characters = [...text]
+  for (const offset of [0, 1, 2, 3, 4, 5, 99, characters.length - 1]) {
+    const page = readResult(text, { offset, maxBytes: 120 })
+    const end = page.nextOffset ?? characters.length
+    expect(page.value).toBe(characters.slice(offset, end).join(''))
+    expect(page.length).toBe(characters.length)
+    expect(new TextEncoder().encode(JSON.stringify(page)).byteLength).toBeLessThanOrEqual(120)
+  }
+})
+
+it('preserves member fit decisions at exact byte limits', () => {
+  const value = { 'a/~': '你😀', 'small': 42 }
+  const first = { pointer: '/a~1~0', type: 'string', complete: true, value: value['a/~'] }
+  const root = { pointer: '', type: 'object', length: 2, complete: false, offset: 0 }
+  const maxBytes = new TextEncoder().encode(JSON.stringify({ ...root, entries: [first], nextOffset: 2 })).byteLength
+  expect(readResult(value, { limit: 1, maxBytes })).toEqual({ ...root, entries: [first], nextOffset: 1 })
+  expect(readResult(value, { limit: 1, maxBytes: maxBytes - 1 })).toEqual({
+    ...root,
+    entries: [{ pointer: '/a~1~0', type: 'string', complete: false }],
+    nextOffset: 1,
+  })
+})
