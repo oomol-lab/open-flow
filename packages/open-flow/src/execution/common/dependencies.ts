@@ -1,8 +1,28 @@
 import type { Graph, JsonValue } from '../../flow/common/change.ts'
-import type { DependenciesCheckpoint } from './scheduler.ts'
 
 import { z } from 'zod'
 import { isTriggerNode } from '../../flow/common/change.ts'
+
+export interface DependenciesCheckpoint {
+  nextId: number
+  iterations: Record<string, number>
+  nodes: Record<string, DependencyState>
+}
+
+interface DependencyState {
+  id: number
+  status: 'pending' | 'running' | 'completed' | 'skipped'
+  input: Record<
+    string,
+    { readonly execution: number; readonly outputs: Readonly<Record<string, JsonValue>>; readonly systemOutputs?: Readonly<Record<string, JsonValue>> }
+  >
+  systemOutputs?: Readonly<Record<string, JsonValue>>
+  output?: Readonly<Record<string, JsonValue>>
+  previous: string[]
+  released: string[]
+  jobId?: string
+  seeded: boolean
+}
 
 const outputsSchema = z.record(z.string(), z.json() as z.ZodType<JsonValue>)
 const inputSchema = z.record(
@@ -10,6 +30,9 @@ const inputSchema = z.record(
   z.strictObject({ execution: z.number().int().nonnegative(), outputs: outputsSchema, systemOutputs: outputsSchema.optional() }),
 )
 type InputSnapshot = DependenciesCheckpoint['nodes'][string]['input']
+type InputFrame =
+  | { values: InputSnapshot }
+  | { values?: InputSnapshot; source: string; result: InputSnapshot[string]; parent: InputFrame; cache: Map<string, InputSnapshot[string] | undefined> }
 
 export function dependencyValues(input: InputSnapshot): Readonly<Record<string, Readonly<Record<string, JsonValue>>>> {
   return Object.fromEntries(Object.entries(input).map(([id, result]) => [id, result.outputs]))
@@ -31,7 +54,6 @@ export const dependenciesSchema = z.strictObject({
   iterations: z.record(z.string(), z.number().int().nonnegative()),
   nodes: z.record(z.string(), stateSchema),
 })
-type DependencyState = DependenciesCheckpoint['nodes'][string]
 type Edge = Graph['edges'][number]
 interface Loop {
   readonly header: string
@@ -48,6 +70,8 @@ export class Dependencies {
   private readonly innerLoopsFirst: readonly Loop[]
   private readonly outgoing = new Map<string, Edge[]>()
   private readonly incoming = new Map<string, Edge[]>()
+  private readonly candidates = new Set<string>()
+  private readonly frames = new Map<string, InputFrame>()
   private readonly graph: Graph
 
   constructor(graph: Graph, saved?: DependenciesCheckpoint) {
@@ -114,6 +138,10 @@ export class Dependencies {
     this.state = saved == null ? { nextId: 0, iterations: {}, nodes: {} } : structuredClone(saved)
     if (saved == null) for (const id of ids) this.state.nodes[id] = this.fresh()
     else this.validate()
+    for (const id of ids) {
+      if (this.state.nodes[id]!.status == 'pending') this.candidates.add(id)
+      this.frames.set(id, { values: this.state.nodes[id]!.input })
+    }
   }
 
   private fresh(): DependencyState {
@@ -171,12 +199,61 @@ export class Dependencies {
     return edge.sourceHandle == null ? 'selected' : 'skipped'
   }
 
+  private edgeResult(edge: Edge): InputSnapshot[string] {
+    const source = this.state.nodes[edge.source]!
+    const outputs =
+      edge.sourceHandle != null && this.graph.nodes[edge.source]!.kind != 'condition'
+        ? Object.fromEntries(Object.entries(source.output!).filter(([handle]) => handle == edge.sourceHandle))
+        : source.output!
+    return { execution: source.id, outputs, ...(source.systemOutputs == null ? {} : { systemOutputs: source.systemOutputs }) }
+  }
+
+  input(nodeId: string, sourceId: string): InputSnapshot[string] | undefined {
+    if (this.loops.size != 0) return this.state.nodes[nodeId]!.input[sourceId]
+    let frame = this.frames.get(nodeId)!
+    const visited: Extract<InputFrame, { source: string }>[] = []
+    let result: InputSnapshot[string] | undefined
+    for (;;) {
+      if (!('source' in frame) || frame.values != null) {
+        result = frame.values![sourceId]
+        break
+      }
+      if (frame.source == sourceId) {
+        result = frame.result
+        break
+      }
+      if (frame.cache.has(sourceId)) {
+        result = frame.cache.get(sourceId)
+        break
+      }
+      visited.push(frame)
+      frame = frame.parent
+    }
+    for (const ancestor of visited) ancestor.cache.set(sourceId, result)
+    return result
+  }
+
+  private snapshot(frame: InputFrame): InputSnapshot {
+    const pending: Extract<InputFrame, { source: string }>[] = []
+    while ('source' in frame && frame.values == null) {
+      pending.push(frame)
+      frame = frame.parent
+    }
+    let values = frame.values!
+    for (const current of pending.toReversed()) {
+      values = Object.assign({}, values, { [current.source]: current.result })
+      current.values = values
+      current.cache.clear()
+    }
+    return values
+  }
+
   private collectInputs(edges: readonly Edge[]): InputSnapshot {
     const input: InputSnapshot = {}
     const merge = (id: string, result: InputSnapshot[string]) => {
       const previous = input[id]
       if (previous == null || result.execution > previous.execution) input[id] = result
-      else if (result.execution == previous.execution)
+      else if (result !== previous && result.execution == previous.execution)
         input[id] = {
           execution: result.execution,
           outputs: { ...previous.outputs, ...result.outputs },
@@ -185,27 +262,13 @@ export class Dependencies {
     }
     for (const edge of edges) {
       const source = this.state.nodes[edge.source]!
-      for (const [id, result] of Object.entries(source.input)) merge(id, result)
-      const outputs =
-        edge.sourceHandle != null && this.graph.nodes[edge.source]!.kind != 'condition'
-          ? Object.fromEntries(Object.entries(source.output!).filter(([handle]) => handle == edge.sourceHandle))
-          : source.output!
-      merge(edge.source, { execution: source.id, outputs, ...(source.systemOutputs == null ? {} : { systemOutputs: source.systemOutputs }) })
+      for (const id in source.input) merge(id, source.input[id]!)
+      merge(edge.source, this.edgeResult(edge))
     }
     for (const id of Object.keys(input)) {
       if (this.state.nodes[id]!.status == 'skipped') delete input[id]
     }
     return input
-  }
-
-  systemInputValues(nodeId: string): Readonly<Record<string, Readonly<Record<string, JsonValue>>>> {
-    return Object.fromEntries(
-      Object.entries(this.state.nodes[nodeId]!.input).flatMap(([id, value]) => (value.systemOutputs == null ? [] : [[id, value.systemOutputs]])),
-    )
-  }
-
-  inputValues(nodeId: string) {
-    return dependencyValues(this.state.nodes[nodeId]!.input)
   }
 
   private loopSettled(loop: Loop): boolean {
@@ -260,8 +323,45 @@ export class Dependencies {
     return edges.filter((edge) => this.edge(edge) == 'selected')
   }
 
+  private readyAcyclic(): string[] {
+    const ready = new Set<string>()
+    for (const id of this.candidates) {
+      this.candidates.delete(id)
+      const state = this.state.nodes[id]!
+      if (state.status != 'pending') continue
+      const selected = this.selectedIncoming(id)
+      if (selected == null) continue
+      if (selected.length == 0) {
+        state.status = 'skipped'
+        for (const edge of this.outgoing.get(id) ?? []) this.candidates.add(edge.target)
+      } else {
+        if (selected.length == 1) {
+          const edge = selected[0]!
+          const frame: InputFrame = { source: edge.source, result: this.edgeResult(edge), parent: this.frames.get(edge.source)!, cache: new Map() }
+          this.frames.set(id, frame)
+          // Preserve the checkpoint shape while sharing single-predecessor snapshots during execution.
+          Object.defineProperty(state, 'input', {
+            configurable: true,
+            enumerable: true,
+            get: () => this.snapshot(frame),
+          })
+        } else {
+          const input = this.collectInputs(selected)
+          Object.defineProperty(state, 'input', { configurable: true, enumerable: true, writable: true, value: input })
+          this.frames.set(id, { values: input })
+        }
+        state.previous = [...new Set(selected.map((edge) => edge.source))].toSorted()
+        ready.add(id)
+      }
+    }
+    // Keep unadmitted nodes eligible when ready is read again before begin.
+    for (const id of ready) this.candidates.add(id)
+    return [...ready].toSorted()
+  }
+
   /** Resolve skips and iteration boundaries before admitting another invocation. */
   ready(): string[] {
+    if (this.loops.size == 0) return this.readyAcyclic()
     let changed = true
     while (changed) {
       changed = false
@@ -316,6 +416,7 @@ export class Dependencies {
     const state = this.state.nodes[nodeId]!
     state.status = 'running'
     state.jobId = jobId
+    this.candidates.delete(nodeId)
   }
 
   release(
@@ -330,6 +431,7 @@ export class Dependencies {
     state.systemOutputs = systemOutputs
     state.released = [...new Set([...state.released, ...handles])]
     if (complete) state.status = 'completed'
+    if (this.loops.size == 0) for (const edge of this.outgoing.get(nodeId) ?? []) this.candidates.add(edge.target)
   }
 
   get incomplete(): boolean {

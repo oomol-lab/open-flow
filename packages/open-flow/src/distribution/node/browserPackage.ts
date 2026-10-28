@@ -403,12 +403,22 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'../../decision/common/decision.ts'", "'./decision.js'")
       .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
       .replaceAll("'./engineContract.ts'", "'./engine-contract.js'")
-    const schedulerDeclaration = (await readFile(path.join(declarationRoot, 'execution/common/scheduler.d.ts'), 'utf8'))
-      .replaceAll("'../../flow/common/webhookResponse.ts'", "'./webhook-response.js'")
-      .replaceAll("'../../types/index.ts'", "'../index.js'")
-      .replaceAll("'./runtime.ts'", "'./runtime-contract.js'")
-      .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
-      .replaceAll("'../../flow/common/semantics.ts'", "'./flow-semantics.js'")
+    await Promise.all(
+      ['scheduler', 'checkpoint', 'dependencies', 'node-execution'].map(async (name) => {
+        const declaration = (await readFile(path.join(declarationRoot, `execution/common/${name}.d.ts`), 'utf8'))
+          .replaceAll("'../../flow/common/webhookResponse.ts'", "'./webhook-response.js'")
+          .replaceAll("'../../types/index.ts'", "'../index.js'")
+          .replaceAll("'./runtime.ts'", "'./runtime-contract.js'")
+          .replaceAll("'../../flow/common/change.ts'", "'../browser/flow-change.js'")
+          .replaceAll("'../../flow/common/semantics.ts'", "'./flow-semantics.js'")
+          .replaceAll("'../../flow/common/agent.ts'", "'./flow-agent.js'")
+          .replaceAll("'./scheduler.ts'", "'./scheduler.js'")
+          .replaceAll("'./checkpoint.ts'", "'./scheduler-checkpoint.js'")
+          .replaceAll("'./dependencies.ts'", "'./scheduler-dependencies.js'")
+          .replaceAll("'./node-execution.ts'", "'./scheduler-node-execution.js'")
+        await writeFile(path.join(commonOutputPath, `${name == 'scheduler' ? name : `scheduler-${name}`}.d.ts`), declaration)
+      }),
+    )
     const cronTriggerDeclaration = (await readFile(path.join(declarationRoot, 'trigger/common/cron.d.ts'), 'utf8')).replaceAll(
       "'../../flow/common/change.ts'",
       "'../browser/flow-change.js'",
@@ -470,7 +480,6 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       writeFile(path.join(commonOutputPath, 'run-events.d.ts'), runEventsDeclaration),
       writeFile(path.join(commonOutputPath, 'engine-contract.d.ts'), engineContractDeclaration),
       writeFile(path.join(commonOutputPath, 'runtime-contract.d.ts'), runtimeContractDeclaration),
-      writeFile(path.join(commonOutputPath, 'scheduler.d.ts'), schedulerDeclaration),
       writeFile(
         path.join(commonOutputPath, 'decision.d.ts'),
         (await readFile(path.join(declarationRoot, 'decision/common/decision.d.ts'), 'utf8')).replaceAll(
