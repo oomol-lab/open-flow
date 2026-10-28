@@ -300,7 +300,7 @@ function derivedOrigin(connectorOrigin: string | undefined, token: string | unde
   if (connectorOrigin == null || token == null || token.length == 0) return
   const connector = new URL(connectorOrigin)
   if (connector.hostname != 'connector.oomol.com' && connector.hostname != 'connector.oomol.dev') return
-  return `https://llm.${connector.hostname.slice('connector.'.length)}`
+  return `https://new-llm.${connector.hostname.slice('connector.'.length)}`
 }
 
 function publicOrigin(value: string): string {

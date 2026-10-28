@@ -68,7 +68,7 @@ describe('OOMOL LLM host', () => {
         top_p: 0.8,
       },
       headers: expect.any(Headers),
-      url: 'https://llm.oomol.com/v1/chat/completions',
+      url: 'https://new-llm.oomol.com/v1/chat/completions',
     })
     expect(request?.headers.get('authorization')).toBe('Bearer runtime-token')
     expect(request?.headers.get('content-type')).toBe('application/json')
@@ -94,7 +94,7 @@ describe('OOMOL LLM host', () => {
         version: 1,
       }),
     ).resolves.toEqual({ kind: 'completed', value: { output: { answer: 42 } }, version: 1 })
-    expect(url).toBe('https://llm.oomol.dev/v1/chat/completions')
+    expect(url).toBe('https://new-llm.oomol.dev/v1/chat/completions')
     expect(JSON.parse(String(vi.mocked(fetch).mock.calls[0]?.[1]?.body))).toMatchObject({
       model: 'oomol-chat',
       response_format: { type: 'json_object' },
@@ -114,7 +114,7 @@ describe('OOMOL LLM host', () => {
       }),
     )
     const input = { input: 'Alex', messages: null, model: { model: 'deepseek-v4-flash' }, template: [{ content: "Hello, I'm {{input}}", role: 'user' }] }
-    const llm = createLlm('https://llm.oomol.com', 'runtime-token')
+    const llm = createLlm('https://new-llm.oomol.com', 'runtime-token')
     await expect(llm({ input, invocationId: 'json-instruction', mode: 'json', signal: new AbortController().signal, version: 1 })).resolves.toEqual({
       kind: 'completed',
       value: { output: { greeting: 'Hello, Alex' } },

@@ -140,7 +140,7 @@ it('locks an environment LLM and derives LLM in hosted mode', async () => {
 
   expect(stored.deleteLlm(2)).toBe('saved')
   const derived = settings(file, { connectorOrigin: 'https://connector.oomol.com', connectorToken: 'connector-token' })
-  expect(derived.status().llm).toEqual({ configured: true, origin: 'https://llm.oomol.com', source: 'derived', tokenConfigured: true })
+  expect(derived.status().llm).toEqual({ configured: true, origin: 'https://new-llm.oomol.com', source: 'derived', tokenConfigured: true })
 })
 
 it('persists Connector and Integration settings without exposing their secrets', async () => {
@@ -473,7 +473,7 @@ it('switches all services atomically and never mixes hosted and custom LLM crede
   expect(changed).toHaveBeenCalledTimes(1)
 
   expect(configured.putConnector(2, 'https://connector.oomol.com', 'hosted-secret')).toBe('saved')
-  expect(configured.llm()?.config).toEqual({ origin: 'https://llm.oomol.com', token: 'hosted-secret' })
+  expect(configured.llm()?.config).toEqual({ origin: 'https://new-llm.oomol.com', token: 'hosted-secret' })
   expect(configured.connectorConsoleOrigin()).toBeUndefined()
   const rejected = await app.request(
     '/llm',
@@ -503,7 +503,7 @@ it('ignores legacy custom LLM and Console settings while hosted services are act
   store.putProfile(2, 'custom', { ...store.profile('custom'), llmOrigin: customServices.llmOrigin, llmToken: 'legacy-secret' })
   store.putProfile(3, 'custom', { ...store.profile('custom'), consoleOrigin: customServices.consoleOrigin })
   const configured = settings(file, { llmOrigin: 'https://environment.example.com', llmToken: 'environment-secret' })
-  expect(configured.llm()?.config).toEqual({ origin: 'https://llm.oomol.dev', token: 'hosted-secret' })
+  expect(configured.llm()?.config).toEqual({ origin: 'https://new-llm.oomol.dev', token: 'hosted-secret' })
   expect(configured.status()).toMatchObject({ services: { mode: 'oomol', managed: true }, llm: { source: 'derived' } })
   expect(configured.connectorConsoleOrigin()).toBeUndefined()
   expect(configured.putServices(4, customServices)).toBe('environment')

@@ -14,7 +14,7 @@ afterEach(() => vi.unstubAllGlobals())
 it('rejects invalid configuration before contacting the gateway', async () => {
   const fetch = vi.fn()
   vi.stubGlobal('fetch', fetch)
-  await expect(createLlm('https://llm.oomol.com', 'token').decision!({ ...invocation, questions: [] })).resolves.toMatchObject({
+  await expect(createLlm('https://new-llm.oomol.com', 'token').decision!({ ...invocation, questions: [] })).resolves.toMatchObject({
     kind: 'failed',
     code: 'llm.unavailable',
     message: 'Add at least one question.',
@@ -26,7 +26,7 @@ it('rejects non-JSON gateway responses', async () => {
     'fetch',
     vi.fn(async () => new Response('not json', { status: 200 })),
   )
-  await expect(createLlm('https://llm.oomol.com', 'token').decision!(invocation)).resolves.toMatchObject({ kind: 'failed', code: 'llm.output-invalid' })
+  await expect(createLlm('https://new-llm.oomol.com', 'token').decision!(invocation)).resolves.toMatchObject({ kind: 'failed', code: 'llm.output-invalid' })
 })
 it.each(['AbortError', 'TimeoutError'])('propagates %s while reading the response body', async (name) => {
   const controller = new AbortController()
@@ -41,16 +41,16 @@ it.each(['AbortError', 'TimeoutError'])('propagates %s while reading the respons
       },
     })),
   )
-  await expect(createLlm('https://llm.oomol.com', 'token').decision!({ ...invocation, signal: controller.signal })).rejects.toBe(reason)
+  await expect(createLlm('https://new-llm.oomol.com', 'token').decision!({ ...invocation, signal: controller.signal })).rejects.toBe(reason)
 })
 it('calls systemone with deployment credentials and returns complete answer ports', async () => {
   const answers = { needs_support: { type: 'noul', noul: 0.96 } }
   const fetch = vi.fn(async () => Response.json({ answers }))
   vi.stubGlobal('fetch', fetch)
-  const host = createLlm('https://llm.oomol.com', 'test-token')
+  const host = createLlm('https://new-llm.oomol.com', 'test-token')
   await expect(host.decision!(invocation)).resolves.toEqual({ kind: 'completed', version: 1, value: answers })
   const [url, request] = fetch.mock.calls[0] as unknown as [URL, RequestInit]
-  expect(String(url)).toBe('https://llm.oomol.com/v1/systemone')
+  expect(String(url)).toBe('https://new-llm.oomol.com/v1/systemone')
   expect(new Headers(request.headers).get('authorization')).toBe('Bearer test-token')
   expect(JSON.parse(String(request.body))).toEqual({
     model: 'typesafe/jev',
@@ -63,7 +63,7 @@ it('calls systemone with deployment credentials and returns complete answer port
 it.each([401, 422, 429, 529])('propagates HTTP %s as failure without retrying', async (status) => {
   const fetch = vi.fn(async () => new Response('', { status }))
   vi.stubGlobal('fetch', fetch)
-  await expect(createLlm('https://llm.oomol.com', 'token').decision!(invocation)).resolves.toMatchObject({ kind: 'failed', code: 'llm.unavailable' })
+  await expect(createLlm('https://new-llm.oomol.com', 'token').decision!(invocation)).resolves.toMatchObject({ kind: 'failed', code: 'llm.unavailable' })
   expect(fetch).toHaveBeenCalledTimes(1)
 })
 it.each([{ answers: {} }, { answers: { needs_support: { type: 'noul', noul: 2 } } }, { answers: { needs_support: { type: 'choice', choice: 'yes' } } }])(
@@ -73,7 +73,7 @@ it.each([{ answers: {} }, { answers: { needs_support: { type: 'noul', noul: 2 } 
       'fetch',
       vi.fn(async () => Response.json(response)),
     )
-    await expect(createLlm('https://llm.oomol.com', 'token').decision!(invocation)).resolves.toMatchObject({ kind: 'failed', code: 'llm.output-invalid' })
+    await expect(createLlm('https://new-llm.oomol.com', 'token').decision!(invocation)).resolves.toMatchObject({ kind: 'failed', code: 'llm.output-invalid' })
   },
 )
 it.each(['AbortError', 'TimeoutError'])('propagates %s', async (name) => {
@@ -86,7 +86,7 @@ it.each(['AbortError', 'TimeoutError'])('propagates %s', async (name) => {
       throw reason
     }),
   )
-  await expect(createLlm('https://llm.oomol.com', 'token').decision!({ ...invocation, signal: controller.signal })).rejects.toBe(reason)
+  await expect(createLlm('https://new-llm.oomol.com', 'token').decision!({ ...invocation, signal: controller.signal })).rejects.toBe(reason)
 })
 
 it('executes upstream data → Decision → Condition using answer fields in the real runtime', async () => {
@@ -117,7 +117,7 @@ it('executes upstream data → Decision → Condition using answer fields in the
   }
   const fetch = vi.fn(async () => Response.json({ answers: answer }))
   vi.stubGlobal('fetch', fetch)
-  const service = await openService(`${directory}/flow.sqlite`, { capabilities: { llm: () => createLlm('https://llm.oomol.com', 'token') } })
+  const service = await openService(`${directory}/flow.sqlite`, { capabilities: { llm: () => createLlm('https://new-llm.oomol.com', 'token') } })
   try {
     await startService(service)
     const accepted = await acceptRun(service, {
@@ -211,7 +211,7 @@ it('ignores excess categories and score levels before gateway submission and val
   }
   const fetch = vi.fn(async () => Response.json({ answers }))
   vi.stubGlobal('fetch', fetch)
-  const result = await createLlm('https://llm.oomol.com', 'token').decision!({
+  const result = await createLlm('https://new-llm.oomol.com', 'token').decision!({
     ...invocation,
     questions: [
       { name: 'category', type: 'choice', instructions: 'Classify', criteria: [...categories, { name: '', description: '' }] },

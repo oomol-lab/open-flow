@@ -37,7 +37,7 @@ export function oomolLlm(connectorOrigin: string | undefined, token: string | un
   if (connectorOrigin == null || token == null || token.length == 0) return
   const connector = new URL(connectorOrigin)
   if (connector.hostname != 'connector.oomol.com' && connector.hostname != 'connector.oomol.dev') return
-  return createLlm(`https://llm.${connector.hostname.slice('connector.'.length)}`, token)
+  return createLlm(`https://new-llm.${connector.hostname.slice('connector.'.length)}`, token)
 }
 
 function invokeLlm(origin: URL, token: string): InvokeLlmTask {
