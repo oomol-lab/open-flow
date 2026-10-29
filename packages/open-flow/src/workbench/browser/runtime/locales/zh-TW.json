@@ -1066,6 +1066,10 @@
     "defaultOutputDescription": "Agent 完成任務後產生的最終結果。"
   },
   "actionPicker": {
+    "discardTitle": "放棄工具變更？",
+    "discardDescription": "你對工具的變更尚未儲存。",
+    "continueEditing": "繼續編輯",
+    "discardChanges": "放棄變更",
     "saveFailed": "工具儲存失敗，請重試。",
     "selectionSummary": "{{actions}} 個工具 · {{providers}} 個服務",
     "preparing": "正在準備工具…",
@@ -1668,5 +1672,14 @@
     "unavailable": "此表單已無法存取，請選擇其他表單。",
     "failed": "無法載入表單。",
     "retry": "重試"
+  },
+  "toolPicker": {
+    "type": "工具類型",
+    "connectors": "連接器",
+    "workflows": "工作流程",
+    "alias": "呼叫名稱",
+    "approval": "需要審批",
+    "current": "介面已同步",
+    "summary": "{tools} 個工具 · 含 {workflows} 個工作流程"
   }
 }

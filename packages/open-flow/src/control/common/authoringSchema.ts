@@ -1,7 +1,13 @@
 import type { JsonValue } from '../../types/index.ts'
 
 import { z } from 'zod'
-import { authoringDefinitionSchemas as definitions } from '../../flow/common/changeSchema.ts'
+import {
+  agentToolFields,
+  connectorAgentToolSchema,
+  workflowAgentToolSchema,
+  connectorCapabilitySchema,
+  authoringDefinitionSchemas as definitions,
+} from '../../flow/common/changeSchema.ts'
 import { retryConfigurationSchema, retryNodeTypes } from '../../flow/common/retry.ts'
 import { authoringLlmConfiguration } from './authoringLlm.ts'
 import { authoringOpenApiSchema } from './authoringOpenApi.ts'
@@ -53,17 +59,17 @@ export const authoringSourceSchema = z.union([
   z.strictObject({ kind: z.literal('sources'), sources: z.array(z.union([output, system, variable])).min(1) }),
 ])
 const operand = z.union([z.strictObject({ kind: z.literal('value'), value: json.optional(), schema: json.optional() }), output, system, variable])
-const agentTool = definitions.agent.shape.tools.element
-  .omit({ id: true, inputs: true })
-  .extend({
-    inputs: z
-      .record(id, definitions.agent.shape.tools.element.shape.inputs.element.shape.source)
-      .optional()
-      .describe(
-        'Action input sources by name. The tool resolves types from the Action. New inputs default to model-provided; existing sources are preserved when omitted.',
-      ),
-  })
-  .strict()
+const toolSources = z
+  .record(id, agentToolFields.inputs.element.shape.source)
+  .optional()
+  .describe(
+    'Tool input sources by name. The platform resolves types from the selected Action or workflow. New inputs default to model-provided; omitted existing sources are preserved.',
+  )
+const agentTool = z.union([
+  workflowAgentToolSchema.omit({ id: true, inputs: true, outputs: true, revisionId: true }).extend({ inputs: toolSources }).strict(),
+  connectorAgentToolSchema.omit({ id: true, inputs: true }).extend({ inputs: toolSources }).strict(),
+])
+const authoringCapabilities = z.array(z.union([connectorCapabilitySchema, z.strictObject({ kind: z.literal('workflow'), name: id, flowId: id })]))
 const notification = z.strictObject({
   ...definitions.connector.shape,
   messageHandle: id,
@@ -102,7 +108,7 @@ export const authoringConfigurations = {
   'cron': z.strictObject({ schedule: definitions.schedule }),
   'poll': z.strictObject({ key: id, connectionId: id.optional(), schedule: definitions.schedule }),
   'integration': z.strictObject({ key: id, connectionId: id.optional() }),
-  'code': z.strictObject({ inputs: inputFields, outputs: outputFields, capabilities: definitions.capabilities.optional() }),
+  'code': z.strictObject({ inputs: inputFields, outputs: outputFields, capabilities: authoringCapabilities.optional() }),
   'connector': definitions.connector.omit({ outputMode: true }).strict(),
   'openapi': authoringOpenApiSchema,
   'agent': definitions.agent
@@ -169,7 +175,11 @@ export const authoringEditSchema = z.discriminatedUnion('op', [
     prompt: z.string().optional(),
   }),
   z.strictObject({ op: z.literal('node.update'), node: referenceSchema, set: updates.optional(), clear: z.array(z.array(id).min(1)).optional() }),
-  z.strictObject({ op: z.literal('node.refresh'), node: referenceSchema }),
+  z.strictObject({
+    op: z.literal('node.refresh'),
+    node: referenceSchema,
+    tool: id.optional().describe('Name of a workflow tool on an Agent or Code node. Omit for a Call Workflow node.'),
+  }),
   z.strictObject({ op: z.literal('node.remove'), node: referenceSchema }),
   z.strictObject({ op: z.literal('input.set'), node: referenceSchema, input: id, source: authoringSourceSchema }),
   z.strictObject({ op: z.enum(['edge.connect', 'edge.disconnect']), source: referenceSchema, target: referenceSchema, branch: id.optional() }),
@@ -290,7 +300,11 @@ export function authoringSchema(kind?: AuthoringType) {
                           ? 'Select an operation; the tool resolves its ports and authentication. Read authenticationChoices from node details. authentication is replaced as a complete choice. Bind advertised credentials through inputs.'
                           : kind == 'workflow'
                             ? 'Select another workflow with config.flowId. A workflow cannot call itself, including in a disconnected node. Owned unpublished or unavailable targets may be saved as incomplete drafts. Use node.refresh to load the current published interface.'
-                            : 'Supply business configuration and input data. Fixed definitions are assembled by the tool. Existing constraints and defaults are preserved on partial updates.',
+                            : kind == 'agent'
+                              ? 'Tools accept Connector Actions or {kind: "workflow", flowId, name, description, approval, inputs}. Workflow parameter sources use model, input or value. The platform derives the interface. Refresh a workflow tool with node.refresh and tool: its name.'
+                              : kind == 'code'
+                                ? 'Select workflows through config.capabilities: [{kind: "workflow", flowId, name}]. Call context.workflows.call(name, input) and await its business output. The platform derives input/output types. Refresh a selected workflow tool with node.refresh and tool: its name. Calls obey node and Run time limits.'
+                                : 'Supply business configuration and input data. Fixed definitions are assembled by the tool. Existing constraints and defaults are preserved on partial updates.',
         example: {
           op: 'node.add',
           as: 'step',

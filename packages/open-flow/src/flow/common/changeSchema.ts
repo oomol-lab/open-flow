@@ -11,7 +11,7 @@ import { waitAutoContinueDraftSchema, waitAutoContinueSchema } from './wait.ts'
 import { webhookMethods } from './webhookMethod.ts'
 import { webhookResponseTimeout } from './webhookResponse.ts'
 
-export const currentFlowModelVersion = 10
+export const currentFlowModelVersion = 11
 const text = z.string()
 const actionConnection = text.describe(
   'Account selection: omit while unconfigured; use an account ID to select it; use "" to explicitly defer configuration. Deferred Actions fail if called; deferred Agent tools are excluded from the callable tool set. Not supported by Triggers.',
@@ -34,7 +34,7 @@ const legacyCapability = z.strictObject({
   connectionId: text.optional(),
   connections: z.array(z.strictObject({ connectionId: text, alias: text.optional() })),
 })
-const capability = z.union([
+export const connectorCapabilitySchema = z.union([
   legacyCapability,
   z.strictObject({ kind: z.literal('connector'), mode: z.literal('shared') }),
   z.strictObject({
@@ -48,9 +48,32 @@ const capability = z.union([
     connectionHints: z.array(z.strictObject({ action: text, connectionId: text, alias: text.optional() })).optional(),
   }),
 ])
+export const workflowCapabilitySchema = z.strictObject({
+  kind: z.literal('workflow'),
+  name: text,
+  flowId: text,
+  revisionId: text,
+  inputs: z.array(port),
+  outputs: z.array(port).nullable(),
+})
+const capability = z.union([connectorCapabilitySchema, workflowCapabilitySchema])
 const inline = z.object({ ...ports, name: text, moduleId: text, capabilities: z.array(capability).optional() })
 const agentValue = z.union([z.object({ kind: z.literal('value'), value: json }), z.object({ kind: z.literal('input'), input: text })])
 const agentInput = z.union([agentValue, z.object({ kind: z.literal('model') })])
+export const agentToolFields = {
+  id: text,
+  name: text,
+  description: text,
+  approval: z.boolean(),
+  inputs: z.array(input.extend({ source: agentInput })),
+}
+export const connectorAgentToolSchema = z.object({
+  ...agentToolFields,
+  kind: z.literal('connector').optional(),
+  action: text,
+  connectionId: actionConnection.optional(),
+})
+export const workflowAgentToolSchema = workflowCapabilitySchema.extend(agentToolFields)
 const decisionQuestion = z.discriminatedUnion('type', [
   z.strictObject({
     name: text,
@@ -83,17 +106,7 @@ const managedFields = z.object({
       model: text,
       prompt: text,
       maxRounds: z.number(),
-      tools: z.array(
-        z.object({
-          id: text,
-          name: text,
-          description: text,
-          action: text,
-          connectionId: actionConnection.optional(),
-          approval: z.boolean(),
-          inputs: z.array(input.extend({ source: agentInput })),
-        }),
-      ),
+      tools: z.array(z.union([workflowAgentToolSchema, connectorAgentToolSchema])),
       notification: z
         .object({
           action: text,
@@ -284,7 +297,17 @@ const document = z.preprocess(
   }),
 )
 const revision = z.object({
-  modelVersion: z.union([z.literal(2), z.literal(4), z.literal(5), z.literal(6), z.literal(7), z.literal(8), z.literal(9), z.literal(currentFlowModelVersion)]),
+  modelVersion: z.union([
+    z.literal(2),
+    z.literal(4),
+    z.literal(5),
+    z.literal(6),
+    z.literal(7),
+    z.literal(8),
+    z.literal(9),
+    z.literal(10),
+    z.literal(currentFlowModelVersion),
+  ]),
   document,
   modules: z.record(text, module),
 })
@@ -688,6 +711,18 @@ export function changeOperationsSchema(kind?: string): JsonValue {
 }
 
 function checkModelVersion(content: RevisionContent): void {
+  if (
+    content.modelVersion < 11 &&
+    Object.values(content.document.graph.nodes).some(
+      (candidateNode) =>
+        candidateNode.kind == 'task' &&
+        ('moduleId' in candidateNode.task
+          ? candidateNode.task.capabilities?.some((item) => item.kind == 'workflow')
+          : candidateNode.task.executor.kind == 'agent' && candidateNode.task.executor.tools.some((item) => item.kind == 'workflow')),
+    )
+  )
+    throw new TypeError('Workflow tools require Flow model version 11.')
+
   if (
     content.modelVersion < 10 &&
     Object.values(content.document.graph.nodes).some(

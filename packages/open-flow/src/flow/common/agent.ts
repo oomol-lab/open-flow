@@ -231,7 +231,7 @@ export function agentConfigIssues(task: ManagedTaskDefinition): readonly string[
     ids.add(tool.id)
     names.add(tool.name)
     if (tool.description.trim().length == 0) issues.push(`Tool ${tool.name} requires a description.`)
-    if (!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+$/.test(tool.action)) issues.push(`Tool ${tool.name} has an invalid Action or Connection.`)
+    if (tool.kind != 'workflow' && !/^[A-Za-z0-9_-]+\.[A-Za-z0-9_.-]+$/.test(tool.action)) issues.push(`Tool ${tool.name} has an invalid Action or Connection.`)
     const fields = new Set<string>()
     for (const port of tool.inputs) {
       if (port.handle.length == 0 || fields.has(port.handle)) issues.push(`Tool ${tool.name} has an empty or duplicate input.`)

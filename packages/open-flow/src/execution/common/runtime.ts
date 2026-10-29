@@ -1,4 +1,4 @@
-import type { CodeModule, ConnectorCapability, JsonValue } from '../../flow/common/change.ts'
+import type { CodeModule, ConnectorCapability, TaskCapability, JsonValue } from '../../flow/common/change.ts'
 
 import { dequal } from 'dequal/lite'
 import { currentEngineContract, nodejsEngineContract } from './engineContract.ts'
@@ -102,6 +102,8 @@ export interface RuntimeProgram {
 }
 
 export interface RuntimeCapabilityCall {
+  readonly nodeId?: string
+  readonly jobId?: string
   readonly callId: string
   readonly invocationId: string
   readonly kind: string
@@ -153,7 +155,7 @@ export interface AgentInvocation {
 }
 
 export interface RuntimeInvocation {
-  readonly capabilities?: readonly ConnectorCapability[]
+  readonly capabilities?: readonly TaskCapability[]
   readonly capability: (call: RuntimeCapabilityCall) => Promise<RuntimeCapabilityResponse>
   readonly input: JsonValue
   readonly invocationId: string
@@ -547,3 +549,15 @@ export interface DecisionTaskInvocation {
   readonly version: 1
 }
 export type InvokeDecisionTask = (invocation: DecisionTaskInvocation) => Promise<LlmTaskResult>
+
+/** Serialized into the sandbox alongside the strict JSON snapshot helper. */
+export function createWorkflows(invoke: (payload: JsonValue) => Promise<RuntimeCapabilityResponse>) {
+  return Object.freeze({
+    async call(name: string, input: Readonly<Record<string, JsonValue>> = {}): Promise<JsonValue> {
+      if (typeof name != 'string' || input == null || typeof input != 'object' || Array.isArray(input))
+        throw Object.assign(new Error('Workflow name and input object are required.'), { code: 'capability.invalid' })
+      const value = snapshotRuntimeResult(input)!
+      return (await invoke({ name, input: value })).body
+    },
+  })
+}

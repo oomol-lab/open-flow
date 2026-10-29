@@ -27,7 +27,8 @@ export async function actionAccountDiagnostics(
     const task = node?.kind == 'task' && 'executor' in node.task ? node.task : undefined
     if (task?.executor.kind !== 'agent') continue
     for (const [index, tool] of task.executor.tools.entries()) {
-      if (tool.connectionId == null) references.push({ action: tool.action, path: `/document/graph/nodes/${id}/task/executor/tools/${index}/connectionId` })
+      if (tool.kind != 'workflow' && tool.connectionId == null)
+        references.push({ action: tool.action, path: `/document/graph/nodes/${id}/task/executor/tools/${index}/connectionId` })
     }
   }
   const definitions = new Map<string, Promise<ConnectorActionMetadata>>()

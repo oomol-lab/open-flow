@@ -130,7 +130,7 @@ describe('workflow HTTP response contract', () => {
     const bytes = encodeRevision(historical)
     expect(encodeRevision(decodeRevision(bytes))).toEqual(bytes)
     expect(upgradeRevisionContent(historical)).toEqual({ ...historical, modelVersion: currentFlowModelVersion })
-    expect(() => decodeRevisionContent({ ...original, modelVersion: 11 })).toThrow()
+    expect(() => decodeRevisionContent({ ...original, modelVersion: currentFlowModelVersion + 1 })).toThrow()
   })
 
   it.each([0, 999, 60_001, 1000.5])('rejects invalid timeout %s', (timeoutMs) => {

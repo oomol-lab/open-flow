@@ -1590,3 +1590,44 @@ Checkpoint v6 and per-execution dependency snapshots store system outputs separa
 outputs, including across loops and Wait recovery. Older execution snapshots are never replaced by a
 Run-wide latest value. Code `getPrevious()` returns optional `systemOutputs` beside ordinary outputs.
 Recovery never replays an already handled task, and storage failures do not release downstream work.
+
+### Workflow tools on Agent and Code
+
+Model v11 and Engine v8 support workflow tools in the existing tool collections. Agent public
+configuration accepts `{ kind: "workflow", flowId, name, description, approval, inputs? }` in
+`config.tools`. Parameter sources use the existing `AgentInput` variants: `value`, `input`, and
+`model`. Code public configuration accepts `{ kind: "workflow", flowId, name }` in
+`config.capabilities`, independently of connector permissions. Names are unique within their node.
+The server derives the selected Revision, parameter definitions and result definitions. Public reads
+hide those snapshots. Ordinary configuration edits preserve them.
+
+`node.refresh` accepts optional `tool`, the declared call name. It refreshes that workflow tool on an
+Agent or Code node and retains Agent parameter mappings by exact name. Omitting `tool` keeps the
+Call Workflow node behavior. Target availability, interface equality, ownership, self-reference,
+recursion and reference indexing use the same contracts as Call Workflow. Unavailable owned targets
+remain valid draft choices with diagnostics.
+
+For example, after discovering a published target through the workflow directory:
+
+```json
+{
+  "op": "node.update",
+  "node": "code-node",
+  "set": {
+    "config": {
+      "capabilities": [{ "kind": "workflow", "flowId": "target-flow", "name": "summarize" }]
+    }
+  }
+}
+```
+
+Code calls `await context.workflows.call("summarize", { text: "Input" })`. The declaration's saved
+interface supplies editor types. Calls require a declared alias; undeclared targets are never
+inferred from source text. The child runs current Live and returns business outputs or `{}`. Each
+call has its own `callId` in Run `calls` and `caller` projections, in addition to the node's
+`executionId`. Existing ordinary workflow relationships may omit `callId`.
+
+Agent workflow responses use the existing saved-result and `read_result` paging contract with
+result source `{ kind: "workflow", flowId }`. Tool approval and model parameter schemas use the
+same machinery as connector tools. Parent and child event logs remain separate. Tool waits retain
+memory and consume the parent's deadlines; they do not add durable JavaScript checkpoints.

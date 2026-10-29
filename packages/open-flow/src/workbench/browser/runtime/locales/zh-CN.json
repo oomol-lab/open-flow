@@ -1066,6 +1066,10 @@
     "defaultOutputDescription": "Agent 完成任务后生成的最终结果。"
   },
   "actionPicker": {
+    "discardTitle": "放弃工具修改？",
+    "discardDescription": "你对工具的修改尚未保存。",
+    "continueEditing": "继续编辑",
+    "discardChanges": "放弃修改",
     "saveFailed": "工具保存失败，请重试。",
     "selectionSummary": "{{actions}} 个工具 · {{providers}} 个服务",
     "preparing": "正在准备工具…",
@@ -1668,5 +1672,14 @@
     "unavailable": "此表单已无法访问，请选择其他表单。",
     "failed": "无法加载表单。",
     "retry": "重试"
+  },
+  "toolPicker": {
+    "type": "工具类型",
+    "connectors": "连接器",
+    "workflows": "工作流",
+    "alias": "调用名称",
+    "approval": "需要审批",
+    "current": "接口已同步",
+    "summary": "{tools} 个工具 · 含 {workflows} 个工作流"
   }
 }

@@ -194,7 +194,7 @@ export function agentApproval(config: AgentConfig, checkpoint: AgentCheckpoint, 
   return {
     callId: checkpoint.callId,
     toolId: tool.id,
-    action: tool.action,
+    ...(tool.kind == 'workflow' ? { kind: 'workflow', flowId: tool.flowId } : { action: tool.action }),
     ...(tool.connectionId == null ? {} : { connectionId: tool.connectionId }),
     input: checkpoint.input,
   }

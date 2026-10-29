@@ -27,9 +27,10 @@ export function WorkflowCalls({ run }: { readonly run: Run | RunDetails }) {
         </div>
       )}
       {run.calls?.map((call) => (
-        <div key={call.executionId} className="flex flex-wrap items-center gap-2">
+        <div key={call.runId} className="flex flex-wrap items-center gap-2">
           <span>
             {call.nodeId} → {call.flowId}
+            {call.callId == null ? null : <span className="ml-2 text-xs text-muted-foreground">{call.callId}</span>}
           </span>
           <span className="text-muted-foreground">{call.status == null ? t('workflow.unavailable') : runLabel({ status: call.status }, t)}</span>
           {link(call.flowId, call.runId, t('workflow.viewRun'))}

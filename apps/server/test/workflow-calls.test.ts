@@ -296,7 +296,10 @@ it('supports nested calls with one slot and merges Draft and Live definition ref
     references: [{ flowId: middle.flowId, draft: true, live: { enabled: true } }],
   })
   const outer = await caller(service, middle.flowId, undefined, 'Outer')
-  const accepted = await service.control.runs.createDraftRun('operator', outer.flowId, outer.revisionId, engine, {}, 'nested', { nodeId: 'start', outputs: {} })
+  const accepted = await service.control.runs.createDraftRun('operator', outer.flowId, outer.revisionId, engine, {}, 'nested', {
+    nodeId: 'start',
+    outputs: {},
+  })
   await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe('completed')
   expect(service.run(accepted.run.runId)?.result).toMatchObject({ nodes: [{ outputs: { answer: 42 } }] })
   const middleRun = service.control.runs.getRun('operator', accepted.run.runId).calls![0]!.runId
@@ -671,4 +674,329 @@ it('refreshes list counts through real draft, publication, disabled-live and ret
   store.flows.retire(parent.flowId, Date.now())
   expect(count()).toBe(0)
   expect(service.control.flows.getFlowReferences('operator', child.flowId, 'incoming', 0, 50).total).toBe(0)
+})
+
+async function codeToolCaller(service: ServerService, flowId: string, code: string, name = 'code-tool-caller', timeoutMs?: number) {
+  const { flow } = await service.control.flows.createFlow('operator', 'Code tool caller', name)
+  const edited = await service.control.drafts.editAuthoring('operator', flow.flowId, {
+    baseRevision: flow.draftRevisionId,
+    requestId: 'create-tools',
+    edits: [
+      { op: 'node.add', as: 'start', type: 'start', name: 'Start' },
+      {
+        op: 'node.add',
+        as: 'code',
+        type: 'code',
+        name: 'Call tools',
+        config: {
+          inputs: {},
+          outputs: { answers: { schema: { type: 'array', items: { type: 'number' } }, nullable: false } },
+          capabilities: [{ kind: 'workflow', name: 'echo', flowId }],
+        },
+      },
+      { op: 'text.set', node: '$code', field: 'code', text: code },
+      ...(timeoutMs == null ? [] : [{ op: 'node.update' as const, node: '$code', set: { timeoutMs } }]),
+      { op: 'edge.connect', source: '$start', target: '$code' },
+    ],
+  })
+  return edited
+}
+
+it('calls workflow tools repeatedly and concurrently from public Code authoring with one execution slot', async () => {
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const invoke = service.control.runs.invokeWorkflowTarget.bind(service.control.runs)
+  vi.spyOn(service.control.runs, 'invokeWorkflowTarget').mockImplementation(async (...args) => {
+    const [first, repeated] = await Promise.all([invoke(...args), invoke(...args)])
+    if (first.kind == 'calling' && repeated.kind == 'calling') expect(repeated.childRunId).toBe(first.childRunId)
+    return first
+  })
+  const child = await target(service)
+  const parent = await codeToolCaller(
+    service,
+    child.flowId,
+    `export default async (_, context) => {
+    const results = await Promise.all([0, -2, 3].map(answer => context.workflows.call('echo', { answer })));
+    const last = await context.workflows.call('echo', { answer: 4 });
+    return { answers: [...results.map(result => result.answer), last.answer] };
+  }`,
+  )
+  expect(await service.control.drafts.checkAuthoring('operator', parent.flowId, parent.revision)).toMatchObject({ valid: true })
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revision, engine, {}, 'code-tools', {
+    nodeId: parent.nodes.start!,
+    outputs: {},
+  })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe('completed')
+  const run = service.control.runs.getRun('operator', accepted.run.runId)
+  expect(run.calls).toHaveLength(4)
+  expect(new Set(run.calls!.map((call) => call.callId)).size).toBe(4)
+  expect(run.calls!.every((call) => call.status == 'completed')).toBe(true)
+  expect(service.control.runs.getRunEvents('operator', run.runId, 0, 100).events.findLast((event) => event.kind == 'node.completed')?.payload).toMatchObject({
+    outputs: { answers: [0, -2, 3, 4] },
+  })
+  expect(
+    service.control.flows.getFlowReferences('operator', child.flowId, 'incoming', 0, 50).references.some((reference) => reference.flowId == parent.flowId),
+  ).toBe(true)
+})
+
+it('denies undeclared workflow tool aliases before admitting a child', async () => {
+  const service = await openService(':memory:', { clock: Date.now })
+  const child = await target(service)
+  const parent = await codeToolCaller(service, child.flowId, `export default async (_, context) => context.workflows.call('missing', { answer: 1 })`)
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revision, engine, {}, 'missing-tool', {
+    nodeId: parent.nodes.start!,
+    outputs: {},
+  })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe('failed')
+  expect(service.control.runs.getRun('operator', accepted.run.runId).calls).toEqual([])
+})
+
+it('executes a renamed workflow tool after a partial public authoring update', async () => {
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const child = await target(service)
+  const parent = await codeToolCaller(service, child.flowId, 'export default () => ({ answers: [] })')
+  const renamed = await service.control.drafts.editAuthoring('operator', parent.flowId, {
+    baseRevision: parent.revision,
+    requestId: 'rename-tool',
+    edits: [
+      {
+        op: 'node.update',
+        node: parent.nodes.code!,
+        set: { config: { capabilities: [{ kind: 'workflow', flowId: child.flowId, name: 'renamed' }] } },
+      },
+      {
+        op: 'text.set',
+        node: parent.nodes.code!,
+        field: 'code',
+        text: `export default async (_, context) => ({ answers: [(await context.workflows.call('renamed', { answer: 7 })).answer] })`,
+      },
+    ],
+  })
+  expect(renamed.validation.status).toBe('valid')
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, renamed.revision, engine, {}, 'renamed-tool', {
+    nodeId: parent.nodes.start!,
+    outputs: {},
+  })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe('completed')
+  expect(
+    service.control.runs.getRunEvents('operator', accepted.run.runId, 0, 100).events.findLast((event) => event.kind == 'node.completed')?.payload,
+  ).toMatchObject({ outputs: { answers: [7] } })
+})
+
+it('cancels a waiting workflow tool when its calling Run is canceled', async () => {
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const child = await target(service, true)
+  const parent = await codeToolCaller(
+    service,
+    child.flowId,
+    `export default async (_, context) => { const result = await context.workflows.call('echo', { answer: 1 }); return { answers: [result.answer] } }`,
+  )
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revision, engine, {}, 'cancel-tool', {
+    nodeId: parent.nodes.start!,
+    outputs: {},
+  })
+  await expect
+    .poll(() => {
+      const call = service.control.runs.getRun('operator', accepted.run.runId).calls?.[0]
+      return call == null ? 0 : service.control.runs.getRun('operator', call.runId).waits.length
+    })
+    .toBe(1)
+  service.control.runs.cancelRun('operator', accepted.run.runId)
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).calls?.[0]?.status).toBe('canceled')
+})
+
+it('resumes an in-memory workflow tool after child Wait with one execution slot', async () => {
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const child = await target(service, true)
+  const parent = await codeToolCaller(
+    service,
+    child.flowId,
+    `export default async (_, context) => { const result = await context.workflows.call('echo', { answer: 0 }); return { answers: [result.answer] } }`,
+  )
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revision, engine, {}, 'wait-tool', {
+    nodeId: parent.nodes.start!,
+    outputs: {},
+  })
+  await expect
+    .poll(() => {
+      const call = service.control.runs.getRun('operator', accepted.run.runId).calls?.[0]
+      return call == null ? 0 : service.control.runs.getRun('operator', call.runId).waits.length
+    })
+    .toBe(1)
+  const call = service.control.runs.getRun('operator', accepted.run.runId).calls![0]!
+  expect(service.control.runs.getRun('operator', accepted.run.runId).status).toBe('running')
+  const wait = service.control.runs.getRun('operator', call.runId).waits[0]!
+  service.control.runs.resolveRunWait('operator', call.runId, wait.waitId, 'continue')
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe('completed')
+  expect(service.control.runs.getRun('operator', accepted.run.runId).calls).toHaveLength(1)
+})
+
+it.each(['timeout', 'node-ended'] as const)('cancels unfinished workflow tools on %s', async (reason) => {
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const child = await target(service, true)
+  const code =
+    reason == 'timeout'
+      ? `export default async (_, context) => { await context.workflows.call('echo', { answer: 1 }); return { answers: [] } }`
+      : `export default async (_, context) => { context.workflows.call('echo', { answer: 1 }).catch(() => {}); await new Promise(resolve => setTimeout(resolve, 200)); return { answers: [] } }`
+  const parent = await codeToolCaller(service, child.flowId, code, 'end-tool', reason == 'timeout' ? 500 : undefined)
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revision, engine, {}, 'end-tool', {
+    nodeId: parent.nodes.start!,
+    outputs: {},
+  })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe(reason == 'timeout' ? 'failed' : 'completed')
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).calls?.[0]?.status).toBe('canceled')
+})
+
+it('advances nested tools and multiple parent runs with one execution slot', async () => {
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const leaf = await target(service)
+  const middle = await codeToolCaller(
+    service,
+    leaf.flowId,
+    `export default async (_, context) => { const result = await context.workflows.call('echo', { answer: 2 }); return { answers: [result.answer] } }`,
+    'middle',
+  )
+  const published = await service.control.publications.publishFlow('operator', middle.flowId, middle.revision, engine, null, 'publish-middle')
+  await expect.poll(() => service.control.publications.getPublishOperation('operator', middle.flowId, published.operationId).status).toBe('succeeded')
+  const parents = await Promise.all(
+    ['one', 'two'].map((name) =>
+      codeToolCaller(
+        service,
+        middle.flowId,
+        `export default async (_, context) => { const result = await context.workflows.call('echo', {}); if (Object.keys(result).length) throw new Error('Expected no business outputs'); return { answers: [] } }`,
+        name,
+      ),
+    ),
+  )
+  const accepted = await Promise.all(
+    parents.map((parent) =>
+      service.control.runs.createDraftRun('operator', parent.flowId, parent.revision, engine, {}, `nested-${parent.flowId}`, {
+        nodeId: parent.nodes.start!,
+        outputs: {},
+      }),
+    ),
+  )
+  for (const { run } of accepted) {
+    await expect.poll(() => service.control.runs.getRun('operator', run.runId).status).toBe('completed')
+    const nested = service.control.runs.getRun('operator', run.runId).calls![0]!
+    expect(service.control.runs.getRun('operator', nested.runId).calls).toHaveLength(1)
+  }
+})
+
+it('does not replay a tool call after interruption and restart', async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'workflow-tool-restart-'))
+  onTestFinished(() => rm(directory, { recursive: true, force: true }))
+  const file = path.join(directory, 'flow.sqlite')
+  const service = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const child = await target(service, true)
+  const parent = await codeToolCaller(
+    service,
+    child.flowId,
+    `export default async (_, context) => { await context.workflows.call('echo', { answer: 1 }); return { answers: [] } }`,
+  )
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revision, engine, {}, 'restart-tool', {
+    nodeId: parent.nodes.start!,
+    outputs: {},
+  })
+  await expect
+    .poll(() => {
+      const call = service.control.runs.getRun('operator', accepted.run.runId).calls?.[0]
+      return call == null ? 0 : service.control.runs.getRun('operator', call.runId).waits.length
+    })
+    .toBe(1)
+  const original = service.control.runs.getRun('operator', accepted.run.runId).calls![0]!
+  await closeService(service)
+  const reopened = await openService(file, { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  await startService(reopened)
+  expect(reopened.control.runs.getRun('operator', accepted.run.runId).status).toBe('indeterminate')
+  expect(reopened.control.runs.getRun('operator', accepted.run.runId).calls).toMatchObject([{ callId: original.callId, runId: original.runId }])
+})
+
+it('checks and explicitly refreshes tool interfaces while retaining unavailable drafts', async () => {
+  const service = await openService(':memory:', { clock: Date.now })
+  const child = await target(service)
+  const parent = await codeToolCaller(service, child.flowId, 'export default () => ({ answers: [] })')
+  const original = service.control.drafts.getRevision('operator', parent.flowId, parent.revision).content
+  const publish = async (revision: string, key: string) => {
+    const live = service.control.flows.getFlow('operator', child.flowId).live!
+    const operation = await service.control.publications.publishFlow('operator', child.flowId, revision, engine, live.publicationId, key)
+    await expect.poll(() => service.control.publications.getPublishOperation('operator', child.flowId, operation.operationId).status).toBe('succeeded')
+  }
+  const equivalent = await service.control.drafts.changeDraft('operator', child.flowId, child.revisionId, [
+    outputChange(service, child, { outputMappings: { answer: { kind: 'value', value: 0 } } }),
+  ])
+  await publish(equivalent.revision.revisionId, 'equivalent')
+  expect(await service.control.drafts.checkAuthoring('operator', parent.flowId, parent.revision)).toMatchObject({ valid: true })
+  const changed = await service.control.drafts.changeDraft('operator', child.flowId, equivalent.revision.revisionId, [
+    outputChange(
+      service,
+      { flowId: child.flowId, revisionId: equivalent.revision.revisionId },
+      { outputDefs: [{ ...number, jsonSchema: { type: 'string' } }], outputMappings: { answer: { kind: 'value', value: 'changed' } } },
+    ),
+  ])
+  await publish(changed.revision.revisionId, 'changed')
+  const checked = await service.control.drafts.checkAuthoring('operator', parent.flowId, parent.revision)
+  expect(checked).toMatchObject({ valid: false, diagnostics: [{ code: 'workflow.revision-stale', field: 'config.capabilities.0.flowId' }] })
+  expect(service.control.drafts.getRevision('operator', parent.flowId, parent.revision).content).toEqual(original)
+  const refreshed = await service.control.drafts.editAuthoring('operator', parent.flowId, {
+    baseRevision: parent.revision,
+    requestId: 'refresh-tool',
+    edits: [{ op: 'node.refresh', node: parent.nodes.code!, tool: 'echo' }],
+  })
+  expect(refreshed.validation.status).toBe('valid')
+  const live = service.control.flows.getFlow('operator', child.flowId).live!
+  service.control.publications.setFlowEnabled('operator', child.flowId, live.publicationId, false)
+  const draft = await codeToolCaller(service, child.flowId, 'export default () => ({ answers: [] })', 'disabled-draft')
+  expect(draft.validation.status).not.toBe('valid')
+  await expect(
+    service.control.drafts.editAuthoring('operator', draft.flowId, {
+      baseRevision: draft.revision,
+      requestId: 'self-tool',
+      edits: [{ op: 'node.update', node: draft.nodes.code!, set: { config: { capabilities: [{ kind: 'workflow', name: 'self', flowId: draft.flowId }] } } }],
+    }),
+  ).rejects.toMatchObject({ code: 'flow.invalid', details: { reason: 'workflow.recursive' } })
+})
+
+it('preserves zero, negative, null and omitted workflow arguments and rejects unknown parameters', async () => {
+  const service = await openService(':memory:', { clock: Date.now, runtime: { maxConcurrentRuns: 1 } })
+  const child = await target(service)
+  const before = service.control.drafts.getRevision('operator', child.flowId, child.revisionId).content.document.graph.nodes.start!
+  const nullable = await service.control.drafts.changeDraft('operator', child.flowId, child.revisionId, [
+    { kind: 'graph.node.replace', nodeId: 'start', before, node: { kind: 'start', name: 'Start', inputDefs: [{ ...number, nullable: true }] } },
+    outputChange(service, child, { outputDefs: [{ ...number, nullable: true }] }),
+  ])
+  const operation = await service.control.publications.publishFlow(
+    'operator',
+    child.flowId,
+    nullable.revision.revisionId,
+    engine,
+    service.control.flows.getFlow('operator', child.flowId).live!.publicationId,
+    'nullable',
+  )
+  await expect.poll(() => service.control.publications.getPublishOperation('operator', child.flowId, operation.operationId).status).toBe('succeeded')
+  const parent = await codeToolCaller(
+    service,
+    child.flowId,
+    `export default async (_, context) => {
+    const results = await Promise.all([{answer:0},{answer:-2},{answer:null},{}].map(input => context.workflows.call('echo', input)));
+    if (JSON.stringify(results.map(result => result.answer)) !== '[0,-2,null,null]') throw new Error('Arguments changed');
+    return { answers: [0,-2] };
+  }`,
+  )
+  const accepted = await service.control.runs.createDraftRun('operator', parent.flowId, parent.revision, engine, {}, 'nullable-tool', {
+    nodeId: parent.nodes.start!,
+    outputs: {},
+  })
+  await expect.poll(() => service.control.runs.getRun('operator', accepted.run.runId).status).toBe('completed')
+  const invalid = await codeToolCaller(
+    service,
+    child.flowId,
+    `export default async (_, context) => context.workflows.call('echo', { unknown: 1 })`,
+    'unknown-parameter',
+  )
+  const rejected = await service.control.runs.createDraftRun('operator', invalid.flowId, invalid.revision, engine, {}, 'unknown-param', {
+    nodeId: invalid.nodes.start!,
+    outputs: {},
+  })
+  await expect.poll(() => service.control.runs.getRun('operator', rejected.run.runId).status).toBe('failed')
+  expect(service.control.runs.getRun('operator', rejected.run.runId).calls).toEqual([])
 })

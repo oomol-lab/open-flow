@@ -20,7 +20,11 @@ const result = z.object({
   resultId: z.string().min(1),
   callId: z.string().min(1),
   toolId: z.string().min(1),
-  source: z.discriminatedUnion('kind', [z.object({ kind: z.literal('connector'), action: z.string().min(1) }), z.object({ kind: z.literal('code') })]),
+  source: z.discriminatedUnion('kind', [
+    z.object({ kind: z.literal('connector'), action: z.string().min(1) }),
+    z.object({ kind: z.literal('code') }),
+    z.object({ kind: z.literal('workflow'), flowId: z.string().min(1) }),
+  ]),
   bytes: z.number().int().nonnegative(),
   digest: z.string().regex(/^[a-f0-9]{64}$/),
   createdAt: z.string().datetime(),
@@ -29,12 +33,13 @@ const result = z.object({
 export type ResultCall =
   | { readonly id: string; readonly kind: 'connector'; readonly action: string; readonly connectionId?: string }
   | { readonly id: string; readonly kind: 'code' }
+  | { readonly id: string; readonly kind: 'workflow'; readonly flowId: string }
 
 export interface ResultInfo {
   readonly resultId: string
   readonly callId: string
   readonly toolId: string
-  readonly source: { readonly kind: 'connector'; readonly action: string } | { readonly kind: 'code' }
+  readonly source: { readonly kind: 'connector'; readonly action: string } | { readonly kind: 'code' } | { readonly kind: 'workflow'; readonly flowId: string }
   readonly bytes: number
   readonly digest: string
   readonly createdAt: string

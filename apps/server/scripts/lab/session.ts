@@ -91,7 +91,7 @@ export class LabSession {
     this.modelOrigin = origin(this.modelServer)
     labOrigins.add(this.modelOrigin)
     await this.openService()
-    if (this.scenarioId == 'workflow-call') await seedWorkflowTarget(this.service)
+    if (this.scenarioId == 'workflow-call' || this.scenarioId == 'workflow-tools') await seedWorkflowTarget(this.service)
     const flow = (await this.service.control.flows.createFlow('operator', `Lab ${this.scenarioId}`, 'lab-initial')).flow
     const operations = initialOperations(this.scenarioId)
     if (operations.length > 0) await this.service.control.drafts.changeDraft('operator', flow.flowId, flow.draftRevisionId, operations, 'lab-seed')

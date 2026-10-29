@@ -61,6 +61,7 @@ const migrations = [
   '0052_webhook_responses.sql',
   '0053_wait_auto_continue.sql',
   '0054_source_references.sql',
+  '0055_workflow_tools.sql',
 ] as const
 const migrationsDirectory = new URL(import.meta.url.endsWith('.ts') ? '../../migrations/' : '../migrations/', import.meta.url)
 

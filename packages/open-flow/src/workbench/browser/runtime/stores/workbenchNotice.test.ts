@@ -26,6 +26,14 @@ describe('Workbench notices', () => {
     })
   })
 
+  it('explains an unavailable workflow using its structured reason', () => {
+    const i18n = createI18n('zh-CN')
+    expect(errorNotice(new ApiError(422, 'flow.invalid', 'Called workflow is missing-start.', { reason: 'workflow.missing-start' }), i18n.t)).toEqual({
+      kind: 'error',
+      message: '目标工作流没有开始节点。',
+    })
+  })
+
   it('localizes every Control API error code', () => {
     const i18n = createI18n('zh-CN')
 

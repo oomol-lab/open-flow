@@ -159,8 +159,17 @@ export class Supervisor {
 
   #launchWorkers(): Effect.Effect<boolean> {
     return Effect.gen({ self: this }, function* () {
-      while (this.#failure == null && (yield* FiberMap.size(this.#workers)) < this.#maxConcurrentRuns) {
-        const run = this.#store.runs.claim([...this.#runningFlows])
+      while (this.#failure == null) {
+        const workers = yield* FiberMap.size(this.#workers)
+        const waiting = [...this.#executor.waitingWorkflows.keys()].filter((id) => FiberMap.hasUnsafe(this.#workers, id))
+        if (workers - waiting.length >= this.#maxConcurrentRuns) return false
+        const ready = [...this.#executor.workflowResumptions].find(([id]) => FiberMap.hasUnsafe(this.#workers, id))
+        if (ready != null) {
+          ready[1]()
+          continue
+        }
+        // A retained caller lends its execution slot only to its dependencies.
+        const run = this.#store.runs.claim([...this.#runningFlows], workers >= this.#maxConcurrentRuns ? waiting : undefined)
         if (run == null) return true
         this.#runningFlows.add(run.flowId)
         yield* FiberMap.run(

@@ -1066,6 +1066,10 @@
     "defaultOutputDescription": "Agent がタスクを完了して生成した最終結果。"
   },
   "actionPicker": {
+    "discardTitle": "ツールの変更を破棄しますか？",
+    "discardDescription": "ツールの変更はまだ保存されていません。",
+    "continueEditing": "編集を続ける",
+    "discardChanges": "変更を破棄",
     "saveFailed": "ツールを保存できませんでした。もう一度お試しください。",
     "selectionSummary": "ツール: {{actions}} · サービス: {{providers}}",
     "preparing": "ツールを準備中…",
@@ -1668,5 +1672,14 @@
     "unavailable": "このフォームにはアクセスできません。別のフォームを選択してください。",
     "failed": "フォームを読み込めませんでした。",
     "retry": "再試行"
+  },
+  "toolPicker": {
+    "type": "ツールの種類",
+    "connectors": "コネクター",
+    "workflows": "ワークフロー",
+    "alias": "呼び出し名",
+    "approval": "承認を必須にする",
+    "current": "インターフェースは最新です",
+    "summary": "ツール {tools} 個 · ワークフロー {workflows} 個"
   }
 }

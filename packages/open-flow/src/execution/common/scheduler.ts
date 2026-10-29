@@ -1,4 +1,4 @@
-import type { ConnectorCapability, Graph, JsonValue, WaitAction, WaitAutoContinue } from '../../flow/common/change.ts'
+import type { TaskCapability, Graph, JsonValue, WaitAction, WaitAutoContinue } from '../../flow/common/change.ts'
 import type { NodeErrorData } from '../../flow/common/errorHandling.ts'
 import type { PreparedFlow } from '../../flow/common/semantics.ts'
 import type { WebhookResponseSnapshot } from '../../flow/common/webhookResponse.ts'
@@ -179,7 +179,7 @@ interface TaskInvocationBase {
 
 export type TaskInvocation = TaskInvocationBase &
   (
-    | { readonly capabilities: readonly ConnectorCapability[]; readonly moduleId: string; readonly getPrevious: () => readonly PreviousNode[] }
+    | { readonly capabilities: readonly TaskCapability[]; readonly moduleId: string; readonly getPrevious: () => readonly PreviousNode[] }
     | { readonly kind: 'managed' }
   )
 

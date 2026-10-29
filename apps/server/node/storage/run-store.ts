@@ -27,6 +27,7 @@ import { errorWorkflowTarget } from './trigger-store.ts'
 type RunInputs = NonNullable<FlowRunOptions['inputs']>
 
 export interface WorkflowCallAdmission {
+  readonly callId?: string
   readonly executionId: string
   readonly parentRunId: string
   readonly parentFlowId: string
@@ -247,7 +248,7 @@ export class RunStore {
       if (input.call != null)
         this.#database
           .prepare(`INSERT INTO workflow_calls
-        (parent_run_id, parent_flow_id, node_id, job_id, execution_id, child_run_id, child_flow_id, deadline_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+        (parent_run_id, parent_flow_id, node_id, job_id, execution_id, child_run_id, child_flow_id, deadline_at, call_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
           .run(
             input.call.parentRunId,
             input.call.parentFlowId,
@@ -257,6 +258,7 @@ export class RunStore {
             runId,
             input.flowId,
             input.call.deadlineAt ?? null,
+            input.call.callId ?? '',
           )
       return { created: true, kind: 'accepted', runId, status: 'queued' }
     })
@@ -281,12 +283,13 @@ export class RunStore {
 
   workflowCalls(runId: string, jobId?: string) {
     return this.#database
-      .prepare(`SELECT c.node_id AS nodeId, c.job_id AS jobId, c.execution_id AS executionId,
+      .prepare(`SELECT c.node_id AS nodeId, c.job_id AS jobId, NULLIF(c.call_id, '') AS callId, c.execution_id AS executionId,
       c.child_run_id AS runId, c.child_flow_id AS flowId, r.status, c.deadline_at AS deadlineAt
       FROM workflow_calls c LEFT JOIN runs r ON r.run_id = c.child_run_id
       WHERE c.parent_run_id = ? ${jobId == null ? '' : 'AND c.job_id = ?'} ORDER BY c.rowid`)
       .all(...(jobId == null ? [runId] : [runId, jobId])) as unknown as {
       nodeId: string
+      callId: string | null
       jobId: string
       executionId: string
       runId: string
@@ -298,9 +301,9 @@ export class RunStore {
 
   workflowOrigin(runId: string) {
     return this.#database
-      .prepare(`SELECT parent_run_id AS runId, parent_flow_id AS flowId, node_id AS nodeId, execution_id AS executionId
+      .prepare(`SELECT parent_run_id AS runId, parent_flow_id AS flowId, node_id AS nodeId, NULLIF(call_id, '') AS callId, execution_id AS executionId
       FROM workflow_calls WHERE child_run_id = ?`)
-      .get(runId) as { runId: string; flowId: string; nodeId: string; executionId: string } | undefined
+      .get(runId) as { runId: string; flowId: string; nodeId: string; callId: string | null; executionId: string } | undefined
   }
 
   #readyCalls(runId: string): boolean {
@@ -351,19 +354,25 @@ export class RunStore {
     return { created: true, kind: 'accepted', runId, status: 'queued' }
   }
 
-  claim(excludedFlowIds: readonly string[] = []): StoredRun | undefined {
+  claim(excludedFlowIds: readonly string[] = [], parentRunIds?: readonly string[]): StoredRun | undefined {
     return this.#transaction(() => {
       const flowFilter = excludedFlowIds.length == 0 ? '' : `AND runs.flow_id NOT IN (${excludedFlowIds.map(() => '?').join(', ')})`
+      if (parentRunIds?.length == 0) return
+      const parentFilter =
+        parentRunIds == null
+          ? ''
+          : `AND EXISTS (SELECT 1 FROM workflow_calls c WHERE c.child_run_id = runs.run_id AND c.parent_run_id IN (${parentRunIds.map(() => '?').join(', ')}))`
       const claimed = this.#database
         .prepare(
           `SELECT runs.run_id AS runId
            FROM work JOIN runs USING (run_id)
            WHERE runs.status IN ('queued', 'starting')
              ${flowFilter}
+             ${parentFilter}
            ORDER BY work.sequence
            LIMIT 1`,
         )
-        .get(...excludedFlowIds) as { readonly runId: string } | undefined
+        .get(...excludedFlowIds, ...(parentRunIds ?? [])) as { readonly runId: string } | undefined
       if (claimed == null) return
       this.#database.prepare("UPDATE runs SET status = 'starting' WHERE run_id = ? AND status = 'queued'").run(claimed.runId)
       const row = this.#database

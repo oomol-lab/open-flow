@@ -71,3 +71,17 @@ it('stores code results with their source and detects changed code arguments', (
   expect(store.find('run', 'node', 'compute', call, input)?.result).toEqual(result)
   expect(() => store.find('run', 'node', 'compute', call, { ...input, code: 'export default () => 2' })).toThrow('identity changed')
 })
+
+it('reuses workflow results only for the same invocation, target and arguments', () => {
+  const { store } = fixture()
+  const call = { id: 'tool', kind: 'workflow' as const, flowId: 'target' }
+  const input = { amount: 0, note: null }
+  const result = store.put('run', 'node', 'workflow-call', call, input, { total: 0 })
+  expect(result.source).toEqual({ kind: 'workflow', flowId: 'target' })
+  expect(store.find('run', 'node', 'workflow-call', call, { note: null, amount: 0 })?.result).toEqual(result)
+  expect(store.put('run', 'node', 'workflow-call', call, input, { total: 0 })).toEqual(result)
+  expect(store.find('run', 'other-node', 'workflow-call', call, input)).toBeUndefined()
+  expect(() => store.find('run', 'node', 'workflow-call', { ...call, flowId: 'other-target' }, input)).toThrow('identity changed')
+  expect(() => store.put('run', 'node', 'workflow-call', { ...call, flowId: 'other-target' }, input, { total: 0 })).toThrow('identity changed')
+  expect(() => store.find('run', 'node', 'workflow-call', call, { amount: 0 })).toThrow('identity changed')
+})

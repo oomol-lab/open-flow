@@ -8,8 +8,11 @@ import type { WorkbenchTheme } from '../contract.ts'
 import type { ResolvedNode } from '../revisionView.ts'
 import type { ConnectorStore } from '../stores/connectorStore.ts'
 import type { WorkspaceStore } from '../stores/workspaceStore.ts'
+import type { SelectedTool } from './actionSelectionDialog.tsx'
 import type { DiagnosticFocus } from './diagnostics.ts'
+import type { WorkflowToolSelection } from './workflowToolSelection.tsx'
 
+import { dequal } from 'dequal'
 import { useEffect, useMemo, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useLang, useTranslate } from 'val-i18n-react'
@@ -22,6 +25,7 @@ import { IconStack } from '../../../../ui/browser/icon-stack.tsx'
 import { JSONViewer } from '../../../../ui/browser/json-viewer/JSONViewer.tsx'
 import { Switch } from '../../../../ui/browser/switch.tsx'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../../../../ui/browser/tooltip.tsx'
+import { workflowCapability } from '../../../../workflow/common/workflow.ts'
 import { actionSummary } from '../actionSummary.ts'
 import { resourceData, resourceValue } from '../stores/resource.ts'
 import { errorNotice } from '../stores/workbenchNotice.ts'
@@ -29,6 +33,7 @@ import { ActionSelectionDialog } from './actionSelectionDialog.tsx'
 import { CodeEditor } from './codeEditor.tsx'
 import { codeTyping } from './codeTyping.ts'
 import { diagnosticMessage } from './diagnostics.ts'
+import { availableWorkflowToolName } from './workflowToolSelection.tsx'
 
 function EditableCodeTaskSection({
   connectorAccess,
@@ -57,6 +62,22 @@ function EditableCodeTaskSection({
   readonly store: WorkspaceStore
   readonly theme: WorkbenchTheme
 }): ReactElement | null {
+  const workflowTools = useMemo<WorkflowToolSelection<SelectedTool>>(
+    () => ({
+      list: (signal) => store.listWorkflowTargets(signal),
+      load: (flowId, signal) => store.loadWorkflowContract(flowId, signal),
+      create: (target, entries) =>
+        workflowCapability(
+          availableWorkflowToolName(
+            target,
+            entries.filter((entry) => entry.kind == 'workflow'),
+          ),
+          target,
+        ),
+      refresh: (entry, target) => (entry.kind == 'workflow' ? workflowCapability(entry.name, target) : entry),
+    }),
+    [store],
+  )
   const task = selection.definition
   const savedPermission = task != null && 'moduleId' in task ? task.capabilities?.find((capability) => 'mode' in capability) : undefined
   const [permission, setPermission] = useState<ConnectorPermissionCapability | undefined>(savedPermission)
@@ -129,10 +150,19 @@ function EditableCodeTaskSection({
       })
     return () => controller.abort()
   }, [connectors, permissionActions])
-  const savePermission = async (value: ConnectorPermissionCapability) => {
+  const savePermission = async (
+    value: ConnectorPermissionCapability | undefined,
+    workflows = task != null && 'moduleId' in task ? (task.capabilities ?? []).filter((item) => item.kind == 'workflow') : [],
+  ) => {
     setPending(true)
     try {
-      if (!(await store.nodes.setCodeActions(selection.id, [value]))) return false
+      const connectorCapabilities =
+        value === permission && task != null && 'moduleId' in task
+          ? (task.capabilities ?? []).filter((item) => item.kind == 'connector')
+          : value == null
+            ? []
+            : [value]
+      if (!(await store.nodes.setCodeActions(selection.id, [...connectorCapabilities, ...workflows]))) return false
       setPermission(value)
       return true
     } catch (cause) {
@@ -164,7 +194,8 @@ function EditableCodeTaskSection({
   if (task == null) return <div className="inspector-section section-error">{t('inspector.task.missing')}</div>
   if (!('moduleId' in task)) return null
   const selectedActions = permission?.mode == 'independent' ? permission.actions : []
-  const summary = actionSummary(selectedActions, hintedCatalog, providers.data ?? [])
+  const selectedTools: readonly SelectedTool[] = [...selectedActions, ...(task.capabilities ?? []).filter((item) => item.kind == 'workflow')]
+  const summary = actionSummary(selectedTools, hintedCatalog, providers.data ?? [])
   const actionIssue =
     loadError != null ||
     diagnostics?.some((item) => item.path.includes('/task/capabilities')) ||
@@ -179,7 +210,7 @@ function EditableCodeTaskSection({
   const typingFor = (shared: Readonly<Record<string, ConnectorActionView>>) =>
     codeTyping(
       task,
-      permission == null ? task.capabilities : [permission],
+      permission == null ? task.capabilities : [permission, ...(task.capabilities ?? []).filter((item) => item.kind == 'workflow')],
       permission?.mode == 'shared' ? shared : { ...hintedCatalog, ...shared },
       providerIds,
     )
@@ -232,8 +263,10 @@ function EditableCodeTaskSection({
             key={selection.id}
             title={t('actionPicker.configureActions')}
             triggerHint={
-              selectedActions.length > 0
-                ? t('actionPicker.selectionSummary', { actions: selectedActions.length, providers: summary.providers.length })
+              selectedTools.length > 0
+                ? summary.workflows > 0
+                  ? t('toolPicker.summary', { tools: summary.count, workflows: summary.workflows })
+                  : t('actionPicker.selectionSummary', { actions: selectedTools.length, providers: summary.providers.length })
                 : undefined
             }
             trigger={
@@ -245,7 +278,7 @@ function EditableCodeTaskSection({
                 className={actionIssue ? 'gap-1.5 font-normal' : 'gap-1.5 font-normal text-muted-foreground'}
               >
                 {actionIssue && <i aria-hidden="true" data-icon="inline-start" className="i-lucide-light:unplug size-3.5" />}
-                {selectedActions.length === 0 ? (
+                {selectedTools.length === 0 ? (
                   <>
                     {!actionIssue && <i aria-hidden="true" data-icon="inline-start" className="i-lucide-light:plus size-3.5" />}
                     {t('actionPicker.triggerLabel')}
@@ -255,12 +288,23 @@ function EditableCodeTaskSection({
                 )}
               </Button>
             }
-            entries={selectedActions}
+            entries={selectedTools}
             connectors={connectors}
             prepareAction={prepareAction}
+            workflows={workflowTools}
             disabled={disabled || pending}
             createEntry={(action) => ({ action: action.actionId })}
-            onSave={(actions) => savePermission({ kind: 'connector', mode: 'independent', actions })}
+            onSave={(entries) =>
+              savePermission(
+                dequal(
+                  entries.filter((item) => item.kind != 'workflow'),
+                  selectedActions,
+                )
+                  ? permission
+                  : { kind: 'connector', mode: 'independent', actions: entries.filter((item) => item.kind != 'workflow') },
+                entries.filter((item) => item.kind == 'workflow'),
+              )
+            }
           />
         </>
       }
@@ -385,7 +429,7 @@ export function CodeTaskSection(
         ariaLabel={t('inspector.task.source')}
         disabled
         theme={theme}
-        typing=""
+        typing={codeTyping(task, task.capabilities)}
         uri={`publication:modules/${task.moduleId}.js`}
         value={selection.module.source}
         loadingLabel={t('inspector.task.editorLoading')}

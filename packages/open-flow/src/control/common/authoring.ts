@@ -13,7 +13,7 @@ import type { ConnectorAction, Diagnostic } from './api.ts'
 import type { AuthoringConditionConfiguration, AuthoringConditionSource } from './authoringCondition.ts'
 import type { AuthoringOpenApiConfig } from './authoringOpenApi.ts'
 import type { AuthoringRead, AuthoringRequest, AuthoringSearch, AuthoringSource, AuthoringType } from './authoringSchema.ts'
-import type { AuthoringAgentTool } from './authoringTools.ts'
+import type { AuthoringAgentTool, AuthoringCapability } from './authoringTools.ts'
 
 import { dequal } from 'dequal/lite'
 import { connectorOutputMode } from '../../connector/common/actionSchema.ts'
@@ -42,14 +42,14 @@ import {
   renameFlowOutputSources,
 } from '../../flow/common/nodeChanges.ts'
 import { retryConfigurationSchema } from '../../flow/common/retry.ts'
-import { withWorkflowTask, workflowTask, workflowSelectionTask } from '../../workflow/common/workflow.ts'
+import { withWorkflowTask, workflowTask, workflowSelectionTask, workflowCapability, workflowAgentTool } from '../../workflow/common/workflow.ts'
 import { conditionConfigurationView, prepareConditionConfiguration } from './authoringCondition.ts'
 import { authoringDiagnosticField } from './authoringDiagnosticFields.ts'
 import { fieldsView, fieldsToPorts } from './authoringFields.ts'
 import { llmConfigurationView, prepareLlmConfiguration, initialAuthoringLlmTask } from './authoringLlm.ts'
 import { AuthoringOpenApiAuthenticationError, openApiConfigView, openApiAuthenticationChoices, prepareOpenApiTask } from './authoringOpenApi.ts'
 import { authoringConfigurations, authoringReadSchema, authoringRequestSchema, authoringSearchSchema } from './authoringSchema.ts'
-import { AuthoringToolInputError, outwardAgentTools, prepareAgentTools } from './authoringTools.ts'
+import { AuthoringToolInputError, outwardAgentTools, prepareAgentTools, outwardCapabilities, prepareCapabilities } from './authoringTools.ts'
 import { triggerConfiguration } from './authoringTriggers.ts'
 export * from './authoringSchema.ts'
 
@@ -152,7 +152,7 @@ export function authoringNode(content: RevisionContent, ref: string) {
     config = {
       inputs: fieldsView([...node.task.inputs, ...(node.additionalInputs ?? [])]),
       outputs: fieldsView(node.task.outputs),
-      ...(node.task.capabilities == null ? {} : { capabilities: node.task.capabilities }),
+      ...(node.task.capabilities == null ? {} : { capabilities: outwardCapabilities(node.task.capabilities) }),
     }
     texts.code = content.modules[node.task.moduleId]?.source ?? ''
   } else {
@@ -414,9 +414,12 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
       outputs: Object.entries(action.outputs).map(([handle, port]) => Object.assign({ handle }, port)),
     }
   }
-  async function resolveWorkflow(flowId: string, name: string, previous?: ManagedTaskDefinition) {
+  async function workflowTarget(flowId: string) {
     if (host.workflow == null) fail('workflow.unavailable', 'Workflow calls are unavailable.')
-    const target = await host.workflow(flowId)
+    return host.workflow(flowId)
+  }
+  async function resolveWorkflow(flowId: string, name: string, previous?: ManagedTaskDefinition) {
+    const target = await workflowTarget(flowId)
     return 'inputs' in target ? workflowTask(target, name) : workflowSelectionTask({ ...target, name }, undefined, previous)
   }
   async function configure(ref: string, patch: Record<string, unknown> = {}, clear: readonly (readonly string[])[] = []) {
@@ -491,6 +494,9 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
           moduleId: node.task.moduleId,
           name: String(update.name),
           ...config,
+          ...(config.capabilities == null
+            ? {}
+            : { capabilities: await prepareCapabilities(config.capabilities as readonly AuthoringCapability[], node.task.capabilities ?? [], workflowTarget) }),
           inputs,
           outputs: fieldsToPorts(config.outputs, node.task.outputs),
         },
@@ -529,6 +535,7 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
               previous?.tools ?? [],
               (id) => host.action(id),
               () => fresh('tool'),
+              workflowTarget,
             ),
           })
           Reflect.deleteProperty(prepared, 'notification')
@@ -682,10 +689,41 @@ export async function compileAuthoring(base: RevisionContent, request: Authoring
         case 'node.refresh': {
           const ref = resolve(edit.node)
           const node = nodeAt(content, ref)
-          if (node.kind != 'task' || !('executor' in node.task) || node.task.executor.kind != 'workflow')
-            fail('node.invalid-type', 'Only workflow call nodes support refresh.')
-          const task = await resolveWorkflow(node.task.executor.flowId, node.name ?? node.task.name, node.task)
-          apply([{ kind: 'graph.node.replace', nodeId: ref, before: node, node: withWorkflowTask(node, task) }])
+          if (node.kind != 'task') fail('node.invalid-type', 'Only workflow nodes and tools support refresh.')
+          if (edit.tool != null) {
+            if ('moduleId' in node.task) {
+              const selected = node.task.capabilities?.find((item) => item.kind == 'workflow' && item.name == edit.tool)
+              if (selected?.kind != 'workflow') fail('tool.not-found', 'Workflow tool was not found.')
+              const target = await workflowTarget(selected.flowId)
+              if (!('inputs' in target)) fail('workflow.unavailable', 'The workflow interface is unavailable.')
+              replace(ref, {
+                ...node,
+                task: {
+                  ...node.task,
+                  capabilities: node.task.capabilities!.map((item) => (item === selected ? workflowCapability(selected.name, target) : item)),
+                },
+              })
+            } else if (node.task.executor.kind == 'agent') {
+              const selected = node.task.executor.tools.find((item) => item.kind == 'workflow' && item.name == edit.tool)
+              if (selected?.kind != 'workflow') fail('tool.not-found', 'Workflow tool was not found.')
+              const target = await workflowTarget(selected.flowId)
+              if (!('inputs' in target)) fail('workflow.unavailable', 'The workflow interface is unavailable.')
+              replace(ref, {
+                ...node,
+                task: {
+                  ...node.task,
+                  executor: {
+                    ...node.task.executor,
+                    tools: node.task.executor.tools.map((item) => (item === selected ? workflowAgentTool(selected.id, selected.name, target, selected) : item)),
+                  },
+                },
+              })
+            } else fail('node.invalid-type', 'Only Agent and Code nodes have workflow tools.')
+          } else {
+            if (!('executor' in node.task) || node.task.executor.kind != 'workflow') fail('node.invalid-type', 'Specify a workflow tool name.')
+            const task = await resolveWorkflow(node.task.executor.flowId, node.name ?? node.task.name, node.task)
+            apply([{ kind: 'graph.node.replace', nodeId: ref, before: node, node: withWorkflowTask(node, task) }])
+          }
           break
         }
         case 'node.add': {

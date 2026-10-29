@@ -6,7 +6,7 @@ import { dequal } from 'dequal/lite'
 import { useContext, useEffect, useId, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
 import { ValueEditorFeedback } from '../../../../form/browser/fieldControl.tsx'
-import { selectionMenuContentClass, selectionMenuItemClass } from '../../../../form/browser/selectionMenuStyles.ts'
+import { selectionMenuContentClass } from '../../../../form/browser/selectionMenuStyles.ts'
 import { Button, buttonVariants } from '../../../../ui/browser/button.tsx'
 import { Field, FieldLabel } from '../../../../ui/browser/field.tsx'
 import { InputGroup, InputGroupAddon, InputGroupInput } from '../../../../ui/browser/input-group.tsx'
@@ -16,6 +16,7 @@ import { workflowCandidateGroup, workflowSelectionTask } from '../../../../workf
 import { WorkbenchLinkContext } from '../linkContext.ts'
 import { errorNotice } from '../stores/workbenchNotice.ts'
 import { InspectorStatusSection } from './inspectorStatusSection.tsx'
+import { WorkflowCandidateGroup, WorkflowCandidateName, workflowCandidateItemClass } from './workflowCandidates.tsx'
 
 export function OpenWorkflowLink({ flowId }: { readonly flowId: string }) {
   const t = useTranslate()
@@ -246,32 +247,20 @@ export function WorkflowSection({
                     const items = visible.filter((item) => workflowCandidateGroup(item) == group)
                     if (!items.length && group != 'published') return null
                     return (
-                      <Combobox.Group key={group}>
-                        <Combobox.GroupLabel className="flex items-center gap-2 px-2 py-1.5 text-xs text-muted-foreground">
-                          <span
-                            aria-hidden="true"
-                            className={`status-dot ${group == 'published' ? 'success' : group == 'missingStart' ? 'warning' : 'neutral'}`}
-                          />
-                          {t(`workflow.groups.${group}`)}
-                        </Combobox.GroupLabel>
-                        {!items.length && !loading && !error && (
-                          <div className={`pr-2 pl-6 text-muted-foreground ${selectionMenuItemClass}`}>
-                            {t(query ? 'workflow.noMatches' : 'workflow.empty')}
-                          </div>
-                        )}
-                        {items.map((item) => (
-                          <Combobox.Item
-                            key={item.flowId}
-                            value={item.flowId}
-                            className={`flex cursor-default items-center gap-2 pr-2 pl-6 data-highlighted:bg-accent ${selectionMenuItemClass}`}
-                          >
-                            <i aria-hidden="true" className="i-lucide-light:workflow shrink-0 text-sm" />
-                            <span className="min-w-0 flex-1 truncate">{item.name}</span>
-                            <Combobox.ItemIndicator>
-                              <i aria-hidden="true" className="i-lucide-light:check shrink-0 text-sm" />
-                            </Combobox.ItemIndicator>
-                          </Combobox.Item>
-                        ))}
+                      <Combobox.Group key={group} aria-label={t(`workflow.groups.${group}`)}>
+                        <WorkflowCandidateGroup
+                          group={group}
+                          empty={!items.length && !loading && !error ? t(query ? 'workflow.noMatches' : 'workflow.empty') : undefined}
+                        >
+                          {items.map((item) => (
+                            <Combobox.Item key={item.flowId} value={item.flowId} className={workflowCandidateItemClass}>
+                              <WorkflowCandidateName item={item} />
+                              <Combobox.ItemIndicator>
+                                <i aria-hidden="true" className="i-lucide-light:check shrink-0 text-sm" />
+                              </Combobox.ItemIndicator>
+                            </Combobox.Item>
+                          ))}
+                        </WorkflowCandidateGroup>
                       </Combobox.Group>
                     )
                   })}

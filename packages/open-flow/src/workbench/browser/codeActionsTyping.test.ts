@@ -1,5 +1,5 @@
 import type { ConnectorAction } from '../../control/common/api.ts'
-import type { ConnectorCapability } from '../../flow/common/change.ts'
+import type { ConnectorCapability, TaskCapability } from '../../flow/common/change.ts'
 
 import { createSystem, createVirtualTypeScriptEnvironment } from '@typescript/vfs'
 import ts from 'typescript-lsp'
@@ -51,7 +51,7 @@ afterAll(() => environment?.languageService.dispose())
 
 function editorService(
   source: string,
-  declarations = [declaration],
+  declarations: readonly TaskCapability[] = [declaration],
   catalog: Readonly<Record<string, ConnectorAction>> = { 'example.echo': definition },
   providerIds: readonly string[] = ['example'],
 ) {
@@ -60,7 +60,11 @@ function editorService(
   return { service: environment.languageService, text: shadow.text }
 }
 
-function diagnostics(source: string, declarations = [declaration], catalog: Readonly<Record<string, ConnectorAction>> = { 'example.echo': definition }) {
+function diagnostics(
+  source: string,
+  declarations: readonly TaskCapability[] = [declaration],
+  catalog: Readonly<Record<string, ConnectorAction>> = { 'example.echo': definition },
+) {
   return editorService(source, declarations, catalog)
     .service.getSemanticDiagnostics('/module.js')
     .map((diagnostic: ts.Diagnostic) => ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n'))
@@ -302,4 +306,35 @@ describe('Code Action editor types', () => {
       ),
     ).toEqual([])
   })
+})
+
+it('completes workflow aliases and validates saved input and output types', () => {
+  const workflows: readonly TaskCapability[] = [
+    {
+      kind: 'workflow',
+      name: 'double',
+      flowId: 'target',
+      revisionId: 'snapshot',
+      inputs: [
+        { handle: 'amount', jsonSchema: { type: 'number' }, nullable: false },
+        { handle: 'note', jsonSchema: { type: 'string' }, nullable: true },
+      ],
+      outputs: [{ handle: 'total', jsonSchema: { type: 'number' }, nullable: false }],
+    },
+  ]
+  const call = editorService("export default async (_, ctx) => ctx.workflows.call('')", workflows)
+  const names = call.service
+    .getCompletionsAtPosition('/module.js', call.text.indexOf("call('") + "call('".length, {})
+    ?.entries.map((entry: ts.CompletionEntry) => entry.name)
+  expect(names).toContain('double')
+  expect(diagnostics("export default async (_, ctx) => (await ctx.workflows.call('double', { amount: 0, note: null })).total.toFixed(2)", workflows)).toEqual(
+    [],
+  )
+  for (const invalid of [
+    "ctx.workflows.call('missing', {})",
+    "ctx.workflows.call('double')",
+    "ctx.workflows.call('double', { amount: 'wrong' })",
+    "(await ctx.workflows.call('double', { amount: -2 })).total.toUpperCase()",
+  ])
+    expect(diagnostics(`export default async (_, ctx) => ${invalid}`, workflows).length).toBeGreaterThan(0)
 })

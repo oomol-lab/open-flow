@@ -1066,6 +1066,10 @@
     "defaultOutputDescription": "The final result produced by the Agent."
   },
   "actionPicker": {
+    "discardTitle": "Discard tool changes?",
+    "discardDescription": "Your tool changes have not been saved.",
+    "continueEditing": "Continue editing",
+    "discardChanges": "Discard changes",
     "saveFailed": "Could not save tools. Try again.",
     "selectionSummary": "Actions: {{actions}} · Services: {{providers}}",
     "preparing": "Preparing action…",
@@ -1668,5 +1672,14 @@
     "unavailable": "This form is no longer accessible. Choose another form.",
     "failed": "Could not load forms.",
     "retry": "Retry"
+  },
+  "toolPicker": {
+    "type": "Tool type",
+    "connectors": "Connectors",
+    "workflows": "Workflows",
+    "alias": "Call name",
+    "approval": "Require approval",
+    "current": "Interface up to date",
+    "summary": "{tools} tools · {workflows} workflows"
   }
 }

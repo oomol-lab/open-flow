@@ -1,4 +1,4 @@
-import type { ConnectorCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
+import type { TaskCapability, JsonValue } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { RuntimeCapabilityResponse, RuntimeInvocation, RuntimeProgram } from '@oomol-lab/open-flow/runtime-contract'
 import type { FlowRunOutcome, RunLaunch, WaitOperation, SchedulerEvent, SchedulerFailure, TaskInvocation } from '@oomol-lab/open-flow/scheduler'
@@ -34,15 +34,18 @@ export const isolatedVmLimits: IsolatedVmLimits = {
   wallMs: 30_000,
 }
 
-export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1').digest('hex')}`
+const v7EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1').digest('hex')}`
+
+export const isolatedVmEngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1 webhook-response/1 wait-auto-continue/1 workflow-tools/1').digest('hex')}`
 
 const v6EngineDigest = `sha256:${createHash('sha256').update('open-flow-isolated-vm/4 isolated-vm/7.0.1 node/26 web-globals/2 actions/1 results/1 retries/1 errors/1').digest('hex')}`
 
-/** v7 adds response metadata and scheduled Waits; v6 retains its execution and checkpoint protocol. */
+/** v8 adds workflow tools; published v7 and v6 retain their execution contracts and digests. */
 export function supportsIsolatedVmEngine(engineContract: string, engineDigest: string): boolean {
   return (
     findEngineContract(engineContract) != null &&
     (engineDigest === isolatedVmEngineDigest ||
+      ((engineContract === 'open-flow-engine/v7' || engineContract === 'open-flow-engine/v7/nodejs-compat-v1') && engineDigest === v7EngineDigest) ||
       ((engineContract === 'open-flow-engine/v6' || engineContract === 'open-flow-engine/v6/nodejs-compat-v1') && engineDigest === v6EngineDigest))
   )
 }
@@ -71,7 +74,7 @@ export type InvokeContext = {
 
 export type InvokeRequest =
   | {
-      readonly capabilities?: readonly ConnectorCapability[]
+      readonly capabilities?: readonly TaskCapability[]
       readonly context?: InvokeContext
       readonly executionId: number
       readonly input: JsonValue
@@ -109,12 +112,14 @@ export interface CapabilityResult {
 export type ExecutorMessage =
   | { readonly executionId: number; readonly id: number; readonly type: 'wait'; readonly operation: WaitOperation }
   | {
-      readonly capabilities?: readonly ConnectorCapability[]
+      readonly capabilities?: readonly TaskCapability[]
       readonly executionId: number
       readonly id: number
       readonly invocationId: string
       readonly kind: string
       readonly payload: JsonValue
+      readonly nodeId?: string
+      readonly jobId?: string
       readonly type: 'capability'
     }
   | { readonly event: SchedulerEvent; readonly executionId: number; readonly id: number; readonly type: 'event' }
@@ -137,10 +142,7 @@ export type ExecutorMessage =
     }
 
 interface PendingInvocation {
-  readonly capability: (
-    capabilities: readonly ConnectorCapability[],
-    call: Parameters<RuntimeInvocation['capability']>[0],
-  ) => Promise<RuntimeCapabilityResponse>
+  readonly capability: (capabilities: readonly TaskCapability[], call: Parameters<RuntimeInvocation['capability']>[0]) => Promise<RuntimeCapabilityResponse>
   readonly capabilityCalls: Map<string, number>
   readonly activeCalls: Map<number, Fiber.Fiber<void, never>>
   readonly cancel: () => void
@@ -248,10 +250,7 @@ export class IsolatedVmHost {
   run(
     prepared: PreparedFlow,
     options: RunLaunch & {
-      readonly capability: (
-        capabilities: readonly ConnectorCapability[],
-        call: Parameters<RuntimeInvocation['capability']>[0],
-      ) => Promise<RuntimeCapabilityResponse>
+      readonly capability: (capabilities: readonly TaskCapability[], call: Parameters<RuntimeInvocation['capability']>[0]) => Promise<RuntimeCapabilityResponse>
       readonly emit?: (event: SchedulerEvent) => void | Promise<void>
       readonly flowId: string
       readonly wait?: (operation: WaitOperation, signal: AbortSignal) => Promise<unknown>
@@ -419,6 +418,8 @@ export class IsolatedVmHost {
       pending,
       (signal) =>
         pending.capability(message.capabilities ?? [], {
+          nodeId: message.nodeId,
+          jobId: message.jobId,
           callId: JSON.stringify([message.invocationId, message.id]),
           invocationId: message.invocationId,
           kind: message.kind,

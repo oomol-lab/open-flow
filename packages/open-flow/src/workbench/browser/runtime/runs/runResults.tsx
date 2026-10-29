@@ -94,7 +94,7 @@ export function RunResults({
             {results.map((result) => {
               const page = selection?.resultId == result.resultId ? selection.page : undefined
               const expanded = page != null
-              const label = result.source.kind == 'code' ? t('agent.code') : result.source.action
+              const label = result.source.kind == 'workflow' ? result.source.flowId : result.source.kind == 'code' ? t('agent.code') : result.source.action
               return (
                 <section className="rounded-md border border-border" key={result.resultId}>
                   <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2">

@@ -9,7 +9,7 @@ import type {
   RunInitiator,
   RunResult,
 } from '@oomol-lab/open-flow/control-api'
-import type { JsonValue, RevisionContent, TaskNode, WaitAction } from '@oomol-lab/open-flow/flow-change'
+import type { JsonValue, RevisionContent, TaskNode, WaitAction, WorkflowCapability } from '@oomol-lab/open-flow/flow-change'
 import type { PreparedFlow } from '@oomol-lab/open-flow/flow-semantics'
 import type { RunStatus } from '@oomol-lab/open-flow/run-lifecycle'
 import type { FlowRunOptions, TriggerSeed } from '@oomol-lab/open-flow/scheduler'
@@ -26,10 +26,11 @@ import { agentActions, codeActions, normalizeRunTrigger, prepareFlow, validateFl
 import { projectExecutionId } from '@oomol-lab/open-flow/run-events'
 import { currentEngineContract, findEngineContract } from '@oomol-lab/open-flow/runtime-contract'
 import { captureConnectorAccess } from '../deployment/connector-access.ts'
+import { WorkflowToolError } from '../deployment/workflow-contract.ts'
 import { ControlError, serverErrorCode } from '../error.ts'
 import { checkCodeActions, checkCodePermissions } from './connector-capabilities.ts'
 import { readRevisionOrRepair, revisionContent, timestamp } from './control-views.ts'
-import { requireWorkflowCalls, workflowCallCompatibility, workflowContent, workflowTarget } from './workflow.ts'
+import { requireWorkflowCalls, workflowCallCompatibility, workflowContent, workflowTarget, workflowToolCompatibility, workflowRunOutcome } from './workflow.ts'
 
 type RunInputs = NonNullable<FlowRunOptions['inputs']>
 
@@ -210,24 +211,49 @@ export class RunControl {
 
   async invokeWorkflow(parent: StoredRun, nodeId: string, jobId: string, input: Readonly<Record<string, JsonValue>>, node: TaskNode, expectedChild?: string) {
     const task = node.task
-    const startedAt = this.clock()
     if (!('executor' in task) || task.executor.kind != 'workflow') throw new Error('Expected workflow executor.')
-    let call = this.store.runs.workflowCalls(parent.runId, jobId).at(0)
+    return this.invokeWorkflowTarget(
+      parent,
+      nodeId,
+      jobId,
+      input,
+      {
+        ...task.executor,
+        inputs: task.inputs.filter((port) => 'handle' in port),
+        outputs: task.outputs.filter((port) => 'handle' in port),
+      },
+      { expectedChild, timeoutMs: node.timeoutMs, node },
+    )
+  }
+
+  async invokeWorkflowTarget(
+    parent: StoredRun,
+    nodeId: string,
+    jobId: string,
+    input: Readonly<Record<string, JsonValue>>,
+    target: Omit<WorkflowCapability, 'kind' | 'name'>,
+    options: { readonly callId?: string; readonly expectedChild?: string; readonly timeoutMs?: number; readonly node?: TaskNode } = {},
+  ) {
+    const { expectedChild, callId } = options
+    const startedAt = this.clock()
+    let call = this.store.runs.workflowCalls(parent.runId, jobId).find((row) => (row.callId ?? undefined) == callId)
     if (call == null) {
       if (expectedChild != null) throw new Error('Saved workflow call is unavailable.')
-      if (this.store.runs.callAncestors(parent.runId).includes(task.executor.flowId)) throw new Error('Recursive workflow calls are not supported.')
+      if (this.store.runs.callAncestors(parent.runId).includes(target.flowId)) throw new Error('Recursive workflow calls are not supported.')
       const owner = this.store.flows.get(parent.flowId)?.ownerId ?? ''
-      const { contract } = workflowTarget(this.store, owner, task.executor.flowId)
-      const issues = workflowCallCompatibility(this.store, node, contract)
+      const { contract } = workflowTarget(this.store, owner, target.flowId)
+      const issues =
+        options.node == null ? workflowToolCompatibility(this.store, target, contract) : workflowCallCompatibility(this.store, options.node, contract)
       if (issues.length) throw new Error(issues[0]!.message)
       const content = workflowContent(this.store, contract)
       const start = Object.entries(content.document.graph.nodes).find(([, entry]) => entry.kind == 'start')
       if (start == null) throw new ControlError(controlErrorCode.runInvalid, 'Live Runs can only be started through a Start node.')
-      const values = Object.fromEntries(Object.entries(input).filter(([key]) => contract.inputs.some((port) => port.handle == key)))
+      const values =
+        options.node == null ? input : Object.fromEntries(Object.entries(input).filter(([key]) => contract.inputs.some((port) => port.handle == key)))
       const accepted = await this.admitLiveRun(
         contract.publicationId,
         {},
-        JSON.stringify(['workflow', parent.runId, jobId]),
+        JSON.stringify(['workflow', parent.runId, jobId, ...(callId == null ? [] : [callId])]),
         { nodeId: start[0], outputs: values },
         {
           call: {
@@ -235,8 +261,9 @@ export class RunControl {
             parentFlowId: parent.flowId,
             nodeId,
             jobId,
+            ...(callId == null ? {} : { callId }),
             executionId: await projectExecutionId(parent.runId, parent.runId, jobId),
-            ...(node.timeoutMs == null ? {} : { deadlineAt: startedAt + node.timeoutMs }),
+            ...(options.timeoutMs == null ? {} : { deadlineAt: startedAt + options.timeoutMs }),
           },
         },
       )
@@ -245,15 +272,13 @@ export class RunControl {
     if (call == null || call.nodeId != nodeId || (expectedChild != null && call.runId != expectedChild)) throw new Error('Workflow call identity changed.')
     const child = this.store.runViews.controlRun(call.runId)
     if (child == null) throw new Error('Called Run is unavailable.')
-    if (child.status == 'completed') {
-      const result = child.result as { outputs?: Readonly<Record<string, JsonValue>> }
-      return { kind: 'completed', outputs: result.outputs ?? {} }
+    const outcome = workflowRunOutcome(child)
+    if (outcome.kind == 'completed') return outcome
+    if (outcome.kind != 'calling') {
+      if (callId != null) throw new WorkflowToolError(`workflow.${outcome.kind}`, outcome.message)
+      throw new Error(outcome.message)
     }
-    if (['failed', 'canceled', 'indeterminate'].includes(child.status)) {
-      const failure = child.result as { error?: { message?: unknown } } | undefined
-      throw new Error(`Called workflow ${child.status}.${typeof failure?.error?.message == 'string' ? ` ${failure.error.message}` : ''}`)
-    }
-    return { kind: 'calling', childRunId: child.runId }
+    return { kind: 'calling' as const, childRunId: child.runId }
   }
 
   getRun(actorId: string, runId: string): RunDetails {
@@ -544,8 +569,10 @@ export class RunControl {
       ...(stored.initiator == null ? {} : { initiator: stored.initiator }),
       ...this.store.runViews.errorHandling(stored.runId),
       ...state,
-      calls: this.store.runs.workflowCalls(stored.runId).map(({ deadlineAt: _deadline, jobId: _jobId, ...call }) => call),
-      ...(caller == null ? {} : { caller }),
+      calls: this.store.runs
+        .workflowCalls(stored.runId)
+        .map(({ deadlineAt: _deadline, jobId: _jobId, callId, ...call }) => Object.assign(call, callId == null ? {} : { callId })),
+      ...(caller == null ? {} : { caller: { ...caller, callId: caller.callId ?? undefined } }),
       ...(stored.triggerNodeId == null ? {} : { triggerNodeId: stored.triggerNodeId }),
       closureDigest: stored.closureDigest,
       engineContract: stored.engineContract,

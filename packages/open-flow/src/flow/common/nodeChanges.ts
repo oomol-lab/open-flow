@@ -2,7 +2,7 @@ import type { DecisionQuestion } from '../../decision/common/decision.ts'
 import type {
   ChangeOperation,
   CodeModule,
-  ConnectorCapability,
+  TaskCapability,
   Graph,
   Group,
   GraphNode,
@@ -545,7 +545,7 @@ export function setServiceConnections(
     } else if (task.executor.kind == 'agent') {
       const executor = {
         ...task.executor,
-        tools: task.executor.tools.map(assign),
+        tools: task.executor.tools.map((tool) => (tool.kind == 'workflow' ? tool : assign(tool))),
         ...(task.executor.notification == null ? {} : { notification: assign(task.executor.notification) }),
       }
       if (!dequal(executor, task.executor)) operations.push({ kind: 'graph.node.task.set', nodeId, before: task, value: { ...task, executor } })
@@ -680,7 +680,7 @@ function llmInputValue(values: LlmTaskOptions['inputs'], handle: LlmInputHandle,
   return values != null && Object.hasOwn(values, handle) ? values[handle]! : fallback
 }
 
-export function setCodeActions(content: RevisionContent, nodeId: string, capabilities: readonly ConnectorCapability[]): readonly ChangeOperation[] | undefined {
+export function setCodeActions(content: RevisionContent, nodeId: string, capabilities: readonly TaskCapability[]): readonly ChangeOperation[] | undefined {
   const selected = content.document.graph
   const node = selected?.nodes[nodeId]
   if (node?.kind != 'task' || !('moduleId' in node.task) || dequal(node.task.capabilities ?? [], capabilities)) return
