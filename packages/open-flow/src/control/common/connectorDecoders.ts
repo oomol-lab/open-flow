@@ -14,10 +14,10 @@ import type {
   ProviderAccessBindingCandidate,
 } from './api.ts'
 
+import { providerIconAppearance } from '../../connector/common/providerIconSprite.ts'
 import { exact, requiredFields, integer, invalidResponse, jsonValue, record, string } from './decoding.ts'
 import { ApiError } from './errors.ts'
 import { parseProviderAccessSource } from './providerAccess.ts'
-import { providerIconAppearance } from './providerIconSprite.ts'
 
 export function leinaBots(value: unknown): readonly LeinaBot[] {
   const source = record(value)

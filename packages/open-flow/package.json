@@ -131,7 +131,6 @@
     "ajv-formats": "^3.0.1",
     "ajv-i18n": "^4.2.0",
     "beautiful-mermaid": "^1.1.3",
-    "change-case": "^5.4.4",
     "class-variance-authority": "^0.7",
     "clsx": "^2.1.1",
     "codemirror": "^6.0.2",

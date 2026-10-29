@@ -1,6 +1,6 @@
-import type { TriggerDisplay } from '../../../../control/common/triggerCatalog.ts'
 import type { GraphNode, Group, InputPort, Port, TriggerNode } from '../../../../flow/common/change.ts'
 import type { InputSourceCandidate } from '../../../../flow/common/graph.ts'
+import type { TriggerDisplay } from '../../../../trigger/providers/localization.ts'
 
 function withDescriptions<Value extends InputPort | Port>(
   fields: readonly (Value | Group)[],

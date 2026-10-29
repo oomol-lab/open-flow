@@ -1,4 +1,4 @@
-import type { TriggerDisplay } from '../../control/common/triggerCatalog.ts'
+import type { TriggerDisplay } from './localization.ts'
 
 type FieldDescriptions = Pick<TriggerDisplay, 'configInputs' | 'outputs'>
 

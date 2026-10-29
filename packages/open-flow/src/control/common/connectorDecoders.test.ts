@@ -1,5 +1,12 @@
 import { expect, it } from 'vitest'
-import { connectorAccess, connectorAccessSnapshot, connectorAccessCandidates, connectorAccessCandidatesBatch, leinaBots } from './connectorDecoders.ts'
+import {
+  connectorAccess,
+  connectorAccessSnapshot,
+  connectorAccessCandidates,
+  connectorAccessCandidatesBatch,
+  connectorProvider,
+  leinaBots,
+} from './connectorDecoders.ts'
 
 it('keeps robot selection identities and status while ignoring additional upstream fields', () => {
   const bot = { leinaId: 'default', name: 'Team robot', status: 'paused', platforms: ['feishu'] }
@@ -115,3 +122,21 @@ it.each([null, { bindings: [] }, { version: 1, mode: 'selectable', accessRevisio
     expect(() => connectorAccess(envelope)).toThrow(expect.objectContaining({ code: 'response.invalid' }))
   },
 )
+
+it('decodes new and legacy Provider representations', () => {
+  const iconSprite = {
+    version: 'v1',
+    pixelRatio: 2,
+    iconSize: 48,
+    bleed: 2,
+    width: 104,
+    height: 52,
+    lightUrl: 'https://example.com/light.png',
+    darkUrl: 'https://example.com/dark.png',
+  }
+  const iconSpritePosition = { x: 54, y: 2 }
+  const provider = { serviceId: 'mail', serviceName: 'Mail', icon: 'https://example.com/icon.svg' }
+  expect(connectorProvider(provider)).toEqual(provider)
+  expect(connectorProvider({ ...provider, iconSprite, iconSpritePosition })).toEqual({ ...provider, iconSprite, iconSpritePosition })
+  expect(connectorProvider({ ...provider, iconSprite: {}, iconSpritePosition })).toEqual(provider)
+})

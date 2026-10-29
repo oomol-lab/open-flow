@@ -1,7 +1,7 @@
-import type { ProviderIconAppearance } from '../../../control/common/providerIconSprite.ts'
+import type { ProviderIconAppearance } from '../../../connector/common/providerIconSprite.ts'
 
 import providerIconUrls, { spriteCatalog } from 'virtual:oomol-provider-icons'
-import { providerIconAppearance } from '../../../control/common/providerIconSprite.ts'
+import { providerIconAppearance } from '../../../connector/common/providerIconSprite.ts'
 import { imageIcon, initialsIcon, spriteIcon } from '../../../ui/browser/icons/ContentIcon.tsx'
 
 export function providerIcon(

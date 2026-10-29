@@ -217,15 +217,21 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       ],
       { cwd: options.sourceRoot },
     )
-    for (const name of ['index', 'definition']) {
+    for (const name of ['index', 'definition', 'view']) {
       const declaration = (await readFile(path.join(declarationRoot, `event-source/common/${name}.d.ts`), 'utf8'))
         .replaceAll("'./definition.ts'", "'./event-source-definition.js'")
+        .replaceAll("'./view.ts'", "'./event-source-view.js'")
         .replaceAll("'../../connector/common/proxy.ts'", "'./connector-proxy.js'")
-        .replaceAll("'../../control/common/eventSources.ts'", "'./event-sources.js'")
         .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
       await writeFile(path.join(commonOutputPath, name == 'index' ? 'event-source.d.ts' : `event-source-${name}.d.ts`), declaration)
     }
-    await writeFile(path.join(commonOutputPath, 'event-sources.d.ts'), await readFile(path.join(declarationRoot, 'control/common/eventSources.d.ts'), 'utf8'))
+    await writeFile(
+      path.join(commonOutputPath, 'event-sources.d.ts'),
+      (await readFile(path.join(declarationRoot, 'control/common/eventSources.d.ts'), 'utf8')).replaceAll(
+        "'../../event-source/common/view.ts'",
+        "'./event-source-view.js'",
+      ),
+    )
     await writeFile(
       path.join(browserOutputPath, 'event-sources.d.ts'),
       (await readFile(path.join(declarationRoot, 'workbench/browser/runtime/eventSources.d.ts'), 'utf8'))
@@ -310,7 +316,8 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
         'connectorDecoders',
         'providerIconSprite',
       ].map(async (name) => {
-        const declaration = (await readFile(path.join(declarationRoot, `control/common/${name}.d.ts`), 'utf8'))
+        const directory = name == 'providerIconSprite' ? 'connector/common' : 'control/common'
+        const declaration = (await readFile(path.join(declarationRoot, `${directory}/${name}.d.ts`), 'utf8'))
           .replaceAll(/(['"])\.\/api\.ts\1/g, "'./control-api.js'")
           .replaceAll(/(['"])\.\.\/\.\.\/types\/index\.ts\1/g, "'../index.js'")
           .replaceAll('./eventSources.ts', './event-sources.js')
@@ -321,6 +328,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
           .replaceAll("'../../flow/common/changeSchema.ts'", "'./flow-change-schema.js'")
           .replaceAll("'./providerAccess.ts'", "'./providerAccess.js'")
           .replaceAll("'./connectorDecoders.ts'", "'./connectorDecoders.js'")
+          .replaceAll("'../../connector/common/providerIconSprite.ts'", "'./providerIconSprite.js'")
           .replaceAll(/(['"])\.\.\/\.\.\/flow\/common\/change\.ts\1/g, "'./flow-change.js'")
           .replaceAll(/(['"])\.\.\/\.\.\/flow\/common\/retry\.ts\1/g, "'./flow-retry.js'")
         await writeFile(path.join(commonOutputPath, `${name}.d.ts`), declaration)
@@ -331,7 +339,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'../../canvas/common/commands.ts'", "'./canvas-commands.js'")
       .replaceAll("'../../flow/common/workflowFile.ts'", "'./flow-workflowFile.js'")
       .replaceAll("'../../flow/common/semantics.ts'", "'./flow-semantics.js'")
-      .replaceAll("'./providerIconSprite.ts'", "'./providerIconSprite.js'")
+      .replaceAll("'../../connector/common/providerIconSprite.ts'", "'./providerIconSprite.js'")
       .replaceAll('./eventSources.ts', './event-sources.js')
       .replaceAll("'./draftOperations.ts'", "'./draftOperations.js'")
       .replaceAll("'./authoring.ts'", "'./authoring.js'")
@@ -349,6 +357,7 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'./results.ts'", "'./run-results.js'")
       .replaceAll("'./flowNotifications.ts'", "'./flow-notifications.js'")
       .replaceAll("'./triggerCatalog.ts'", "'./trigger-catalog.js'")
+      .replaceAll("'../../trigger/providers/localization.ts'", "'./trigger-localization.js'")
       .replaceAll("'../../trigger/common/configOptions.ts'", "'./trigger-config-options.js'")
     const triggerConfigOptionsDeclaration = (await readFile(path.join(declarationRoot, 'trigger/common/configOptions.d.ts'), 'utf8'))
       .replaceAll("'../../connector/common/proxy.ts'", "'./connector-proxy.js'")
@@ -357,10 +366,10 @@ async function writeDeclarations(options: BuildBrowserPackageOptions, browserOut
       .replaceAll("'./api.ts'", "'./control-api.js'")
       .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
       .replaceAll("'../../localization/common/languages.ts'", "'./localization.js'")
+      .replaceAll("'../../trigger/providers/localization.ts'", "'./trigger-localization.js'")
     const triggerLocalizationDeclaration = (await readFile(path.join(declarationRoot, 'trigger/providers/localization.d.ts'), 'utf8'))
       .replaceAll("'../../flow/common/change.ts'", "'./flow-change.js'")
       .replaceAll("'../../localization/common/languages.ts'", "'./localization.js'")
-      .replaceAll("'../../control/common/triggerCatalog.ts'", "'./trigger-catalog.js'")
     const controlApiConformanceDeclaration = (await readFile(path.join(declarationRoot, 'control/common/conformance.d.ts'), 'utf8'))
       .replaceAll("'./providerAccess.ts'", "'./providerAccess.js'")
       .replaceAll("'./api.ts'", "'./control-api.js'")

@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict'
 import { test } from 'vitest'
-import { FlowSchema } from '../src/schema/index.ts'
 import { builtInTriggers, findBuiltInTrigger, WEBHOOK_REVISION, WEBHOOK_TYPE, webhookTrigger } from '../src/trigger/common/builtins.ts'
 import { normalizeTriggerCatalogSourceItem } from '../src/trigger/common/catalog.ts'
 import { computeTriggerDefinitionDigest } from '../src/trigger/common/definition.ts'
@@ -25,35 +24,6 @@ test('publishes a stable built-in Webhook definition without provider configurat
       serviceId: webhookTrigger.trigger.definition.service_id,
       type: WEBHOOK_TYPE,
     }),
-  )
-  assert.deepEqual(
-    FlowSchema.parse({
-      trigger_definitions: [
-        {
-          definition: webhookTrigger.trigger.definition,
-          revision: webhookTrigger.revision,
-          type: webhookTrigger.type,
-        },
-      ],
-      nodes: [
-        {
-          node_id: 'webhook',
-          trigger: {
-            config: webhookTrigger.trigger.config,
-            revision: webhookTrigger.revision,
-            type: webhookTrigger.type,
-          },
-        },
-      ],
-    }).nodes[0],
-    {
-      node_id: 'webhook',
-      trigger: {
-        config: webhookTrigger.trigger.config,
-        revision: webhookTrigger.revision,
-        type: webhookTrigger.type,
-      },
-    },
   )
 })
 

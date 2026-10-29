@@ -14,7 +14,7 @@ import type {
 
 import { triggerRuntimeJson } from '@oomol-lab/open-flow/flow-encoding'
 import { randomUUID } from 'node:crypto'
-import { insertTriggerActivity, pruneTriggerActivities } from '../runtime/trigger-activity.ts'
+import { insertTriggerActivity, pruneTriggerActivities } from './trigger-activity.ts'
 
 export interface PollPublication {
   readonly connectionId: string

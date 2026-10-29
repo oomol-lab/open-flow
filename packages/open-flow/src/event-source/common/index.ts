@@ -1,9 +1,9 @@
 import type { EventSourceDefinition, SourceConfiguration } from './definition.ts'
 
 import { z } from 'zod'
-import { eventSourceViewSchema } from '../../control/common/eventSources.ts'
 import catalog from './catalog.generated.json' with { type: 'json' }
 import { SourceIdentityError } from './definition.ts'
+import { eventSourceViewSchema } from './view.ts'
 
 export type {
   EventSourceDefinition,

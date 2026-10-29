@@ -1,9 +1,9 @@
 import styles from './ContentIcon.module.scss'
-import type { ProviderIconAppearance } from '../../../control/common/providerIconSprite.ts'
+import type { ProviderIconAppearance } from '../../../connector/common/providerIconSprite.ts'
 
 import { clsx } from 'clsx'
 import { createContext, useContext, useMemo, useState } from 'react'
-import { providerIconAppearance } from '../../../control/common/providerIconSprite.ts'
+import { providerIconAppearance } from '../../../connector/common/providerIconSprite.ts'
 import { IconifyIcon } from './IconifyIcon.tsx'
 import { IconThemeContext } from './iconTheme.ts'
 import { useSpriteStatus } from './spriteResource.ts'

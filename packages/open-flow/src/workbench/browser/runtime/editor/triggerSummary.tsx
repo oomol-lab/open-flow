@@ -1,4 +1,4 @@
-import type { TriggerDisplay } from '../../../../control/common/triggerCatalog.ts'
+import type { TriggerDisplay } from '../../../../trigger/providers/localization.ts'
 import type { TriggerNode } from '../api.ts'
 
 import { useTranslate } from 'val-i18n-react'

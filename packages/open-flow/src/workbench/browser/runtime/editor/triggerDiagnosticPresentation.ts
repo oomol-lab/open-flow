@@ -1,6 +1,6 @@
 import type { TFunction } from 'val-i18n'
-import type { TriggerDisplay } from '../../../../control/common/triggerCatalog.ts'
 import type { UiLanguage } from '../../../../localization/common/languages.ts'
+import type { TriggerDisplay } from '../../../../trigger/providers/localization.ts'
 import type { RevisionView } from '../revisionView.ts'
 import type { DiagnosticItem } from './diagnostics.ts'
 

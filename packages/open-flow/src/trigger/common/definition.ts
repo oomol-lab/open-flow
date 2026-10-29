@@ -1,5 +1,6 @@
-import type { JsonObject, JsonValue } from '../../base/common/json.ts'
+import type { JsonObject } from '../../base/common/json.ts'
 import type { Group, InputPort, Port } from '../../flow/common/change.ts'
+import type { JsonValue } from '../../types/index.ts'
 
 import { dequal } from 'dequal/lite'
 import { z } from 'zod'

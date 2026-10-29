@@ -1,6 +1,6 @@
 import type { I18n } from 'val-i18n'
 import type { ReadonlyVal, Val } from 'value-enhancer'
-import type { TriggerDisplay } from '../../../../control/common/triggerCatalog.ts'
+import type { TriggerDisplay } from '../../../../trigger/providers/localization.ts'
 import type { WorkbenchClient, ConnectorConnection, TriggerKeySnapshot } from '../api.ts'
 import type { WorkbenchHost } from '../contract.ts'
 import type { AddNodeOption } from '../editor/addNodeOptions.ts'
