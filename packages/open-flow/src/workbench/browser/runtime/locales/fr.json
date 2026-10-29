@@ -1680,6 +1680,7 @@
     "alias": "Nom d’appel",
     "approval": "Approbation requise",
     "current": "Interface à jour",
-    "summary": "{tools} outils · {workflows} workflows"
+    "summary": "{tools} outils · {workflows} workflows",
+    "aliasInvalid": "Utilisez un nom d’appel unique de 1 à 64 caractères, commençant par une lettre et contenant uniquement des lettres ASCII, chiffres, tirets ou traits de soulignement."
   }
 }

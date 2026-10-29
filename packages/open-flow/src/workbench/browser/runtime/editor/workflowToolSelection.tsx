@@ -3,8 +3,9 @@ import type { WorkflowCapability } from '../../../../flow/common/change.ts'
 import type { WorkflowCandidate, WorkflowContract } from '../../../../workflow/common/workflow.ts'
 import type { ToolPickerGroup } from './toolPickerList.tsx'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useTranslate } from 'val-i18n-react'
+import { workflowToolNameIssue } from '../../../../flow/common/change.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Input } from '../../../../ui/browser/input.tsx'
 import { Spinner } from '../../../../ui/browser/spinner.tsx'
@@ -115,6 +116,8 @@ export function SelectedWorkflowTool({
   load,
   onRefresh,
   onChange,
+  otherNames,
+  onValidChange,
   onRemove,
   children,
   portalRoot,
@@ -125,6 +128,8 @@ export function SelectedWorkflowTool({
   readonly load?: WorkflowToolSelection<unknown>['load']
   readonly onRefresh: (contract: WorkflowContract) => void
   readonly onChange: (name: string) => void
+  readonly otherNames: readonly string[]
+  readonly onValidChange: (valid: boolean) => void
   readonly onRemove: () => void
   readonly children?: ReactNode
   readonly portalRoot?: HTMLElement | null
@@ -172,7 +177,13 @@ export function SelectedWorkflowTool({
           <i aria-hidden="true" className="i-lucide-light:workflow size-4 text-muted-foreground" />
         </ProviderAppIcon>
       }
-      title={children == null ? <WorkflowToolTitle name={entry.name} disabled={disabled} onChange={onChange} /> : entry.name}
+      title={
+        children == null ? (
+          <WorkflowToolTitle name={entry.name} disabled={disabled} onChange={onChange} otherNames={otherNames} onValidChange={onValidChange} />
+        ) : (
+          entry.name
+        )
+      }
       subtitle={
         <>
           <span className="truncate" title={targetName}>
@@ -252,9 +263,27 @@ export function availableWorkflowToolName(target: WorkflowCandidate | WorkflowCo
   return name
 }
 
-function WorkflowToolTitle({ name, disabled, onChange }: { readonly name: string; readonly disabled: boolean; readonly onChange: (name: string) => void }) {
+function WorkflowToolTitle({
+  name,
+  disabled,
+  onChange,
+  otherNames,
+  onValidChange,
+}: {
+  readonly name: string
+  readonly disabled: boolean
+  readonly onChange: (name: string) => void
+  readonly otherNames: readonly string[]
+  readonly onValidChange: (valid: boolean) => void
+}) {
   const t = useTranslate()
-  const [originalName, setOriginalName] = useState<string>()
+  const [edit, setEdit] = useState<{ original: string; value: string }>()
+  const errorId = useId()
+  const valid = workflowToolNameIssue(edit?.value ?? name, otherNames) == null
+  useLayoutEffect(() => {
+    onValidChange(valid)
+    if (valid && edit != null && edit.value != name) onChange(edit.value)
+  }, [valid, edit, name, onChange, onValidChange])
   const trigger = useRef<HTMLButtonElement>(null)
   return (
     <span className="open-flow-property-panel relative -mx-2 flex">
@@ -267,30 +296,45 @@ function WorkflowToolTitle({ name, disabled, onChange }: { readonly name: string
         aria-label={t('toolPicker.alias')}
         title={name}
         disabled={disabled}
-        onClick={() => setOriginalName(name)}
+        onClick={() => setEdit({ original: name, value: name })}
       >
         {name || t('toolPicker.alias')}
       </Button>
-      {originalName != null && (
+      {edit != null && (
         <Input
           autoFocus
           controlSize="field"
           className="absolute inset-x-0 -inset-y-0.5 h-auto py-0 text-[13px] font-medium"
           aria-label={t('toolPicker.alias')}
-          value={name}
+          value={edit.value}
+          aria-invalid={!valid || undefined}
+          aria-describedby={valid ? undefined : errorId}
           disabled={disabled}
           onFocus={(event) => event.currentTarget.select()}
-          onChange={(event) => onChange(event.target.value)}
-          onBlur={() => setOriginalName(undefined)}
+          onChange={(event) => setEdit({ ...edit, value: event.target.value })}
+          onBlur={() => {
+            if (valid) setEdit(undefined)
+          }}
           onKeyDown={(event) => {
             if (event.key != 'Enter' && event.key != 'Escape') return
             event.preventDefault()
             event.stopPropagation()
-            if (event.key == 'Escape') onChange(originalName)
-            setOriginalName(undefined)
+            if (event.key == 'Escape') {
+              if (workflowToolNameIssue(edit.original, otherNames) != null) {
+                setEdit({ ...edit, value: edit.original })
+                return
+              }
+              onChange(edit.original)
+            } else if (!valid) return
+            setEdit(undefined)
             trigger.current?.focus()
           }}
         />
+      )}
+      {!valid && (
+        <span id={errorId} className="sr-only">
+          {t('toolPicker.aliasInvalid')}
+        </span>
       )}
     </span>
   )

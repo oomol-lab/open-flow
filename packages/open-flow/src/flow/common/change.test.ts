@@ -438,3 +438,15 @@ it.each([0, 1])('preserves normalized Connector capabilities at index %i beside 
   expected.splice(index, 0, { kind: 'connector' })
   expect(decodeTaskCapabilities(capabilities)).toEqual(expected)
 })
+
+it.each(['', '1bad', 'with space', 'écho', 'a'.repeat(65)])('rejects invalid workflow tool name %j', (name) => {
+  expect(() => decodeTaskCapabilities([{ kind: 'workflow', name, flowId: 'child', revisionId: 'snapshot', inputs: [], outputs: [] }])).toThrow(
+    'Workflow tool names must be unique provider-compatible names.',
+  )
+})
+
+it('validates workflow name uniqueness and accepts the 64-character boundary', () => {
+  const workflow = { kind: 'workflow', name: `A${'_-2'.repeat(21)}`, flowId: 'child', revisionId: 'snapshot', inputs: [], outputs: [] }
+  expect(decodeTaskCapabilities([workflow])).toEqual([workflow])
+  expect(() => decodeTaskCapabilities([workflow, { ...workflow, flowId: 'other' }])).toThrow('Workflow tool names must be unique provider-compatible names.')
+})

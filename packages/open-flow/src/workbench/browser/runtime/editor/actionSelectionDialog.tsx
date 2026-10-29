@@ -10,6 +10,7 @@ import { dequal } from 'dequal/lite'
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useVal } from 'use-value-enhancer'
 import { useTranslate } from 'val-i18n-react'
+import { workflowToolNameIssue } from '../../../../flow/common/change.ts'
 import { Button } from '../../../../ui/browser/button.tsx'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '../../../../ui/browser/dialog.tsx'
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '../../../../ui/browser/empty.tsx'
@@ -246,6 +247,24 @@ function ActionSelectionEditor<T extends SelectedTool>({
   const preparedRef = useRef(prepared)
   preparedRef.current = prepared
   const [invalid, setInvalid] = useState<ReadonlySet<string>>(new Set())
+  const setValidity = useCallback((key: string, valid: boolean) => {
+    setInvalid((current) => {
+      if (current.has(key) === !valid) return current
+      const next = new Set(current)
+      if (valid) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }, [])
+  const workflowEntries = draft.filter((entry): entry is T & WorkflowCapability => entry.kind == 'workflow')
+  const aliasesInvalid = workflowEntries.some(
+    (entry) =>
+      invalid.has(`${entry.id ?? entryKey(entry)}:alias`) ||
+      workflowToolNameIssue(
+        entry.name,
+        workflowEntries.filter((other) => other !== entry).map((other) => other.name),
+      ) != null,
+  )
   const dirty = workflowPending || invalid.size > 0 || !dequal(draft, initialEntries)
   useLayoutEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange])
   const [portalRoot, setPortalRoot] = useState<HTMLElement | null>(null)
@@ -295,7 +314,7 @@ function ActionSelectionEditor<T extends SelectedTool>({
   }, [connectors, actionIds, attempt, t])
   const preparing = workflowPending || draft.some((entry) => entry.kind != 'workflow' && prepared[entry.action] == null)
   const replace = (index: number, entry: T) => setDraft((current) => current.map((item, i) => (i == index ? entry : item)))
-  const valid = invalid.size == 0
+  const valid = invalid.size == 0 && !aliasesInvalid
   useLayoutEffect(() => {
     if (displayOrder != null) return
     // If editing starts before initial loading settles, keep the visible order.
@@ -380,15 +399,7 @@ function ActionSelectionEditor<T extends SelectedTool>({
             entry,
             onChange: (next) => replace(index, next),
             disabled: disabled || !ready,
-            onValidChange: (key, value) =>
-              setInvalid((current) => {
-                const identity = `${entry.id ?? entryKey(entry)}:${key}`
-                if (current.has(identity) === !value) return current
-                const next = new Set(current)
-                if (value) next.delete(identity)
-                else next.add(identity)
-                return next
-              }),
+            onValidChange: (key, value) => setValidity(`${entry.id ?? entryKey(entry)}:${key}`, value),
           })}
         </PopoverPanelContent>
       </Popover>
@@ -507,10 +518,15 @@ function ActionSelectionEditor<T extends SelectedTool>({
                         disabled={disabled}
                         load={workflows?.load}
                         onChange={(name) => replace(index, { ...entry, name })}
+                        otherNames={workflowEntries.filter((other) => other.flowId != entry.flowId).map((other) => other.name)}
+                        onValidChange={(value) => setValidity(`${entry.id ?? entryKey(entry)}:alias`, value)}
                         portalRoot={portalRoot}
                         onRemove={() => remove(index)}
                         onRefresh={(contract) => {
-                          if (workflows) replace(index, workflows.refresh(entry, contract))
+                          if (workflows)
+                            setDraft((current) =>
+                              current.map((item) => (item.kind == 'workflow' && item.flowId == entry.flowId ? workflows.refresh(item, contract) : item)),
+                            )
                         }}
                       >
                         {renderSettings(entry, index, entry.name)}
@@ -604,7 +620,7 @@ function ActionSelectionEditor<T extends SelectedTool>({
       </div>
       {attempted && !valid && (
         <div role="alert" className="flex items-center gap-2 px-4 pb-3 text-destructive">
-          <span>{t('agent.invalidValues')}</span>
+          <span>{t(aliasesInvalid ? 'toolPicker.aliasInvalid' : 'agent.invalidValues')}</span>
         </div>
       )}
       <div className="mx-4 h-px shrink-0 bg-border/50" />

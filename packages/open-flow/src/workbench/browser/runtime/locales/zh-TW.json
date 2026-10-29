@@ -1680,6 +1680,7 @@
     "alias": "呼叫名稱",
     "approval": "需要審批",
     "current": "介面已同步",
-    "summary": "{tools} 個工具 · 含 {workflows} 個工作流程"
+    "summary": "{tools} 個工具 · 含 {workflows} 個工作流程",
+    "aliasInvalid": "呼叫名稱不能重複，長度為 1–64 個字元，以英文字母開頭，僅包含英文字母、數字、底線或連字號。"
   }
 }

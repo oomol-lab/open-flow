@@ -1680,6 +1680,7 @@
     "alias": "呼び出し名",
     "approval": "承認を必須にする",
     "current": "インターフェースは最新です",
-    "summary": "ツール {tools} 個 · ワークフロー {workflows} 個"
+    "summary": "ツール {tools} 個 · ワークフロー {workflows} 個",
+    "aliasInvalid": "呼び出し名は重複しない1～64文字で、英字で始まり、英数字、アンダースコア、ハイフンのみを使用してください。"
   }
 }

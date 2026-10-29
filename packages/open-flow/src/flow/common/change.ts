@@ -221,6 +221,13 @@ export interface AgentWorkflowTool extends AgentToolBase, Omit<WorkflowCapabilit
 export type AgentTool = AgentConnectorTool | AgentWorkflowTool
 export type TaskCapability = ConnectorCapability | WorkflowCapability
 
+export const workflowToolNamePattern = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/
+
+export function workflowToolNameIssue(name: string, otherNames: Iterable<string> = []): 'invalid' | 'duplicate' | undefined {
+  if (!workflowToolNamePattern.test(name)) return 'invalid'
+  for (const other of otherNames) if (other == name) return 'duplicate'
+}
+
 export function decodeTaskCapabilities(value: unknown): readonly TaskCapability[] {
   if (!Array.isArray(value)) throw new TypeError('Task capabilities must be an array.')
   const parsed = authoringDefinitionSchemas.capabilities.parse(value)
@@ -228,8 +235,7 @@ export function decodeTaskCapabilities(value: unknown): readonly TaskCapability[
   const names = new Set<string>()
   for (const item of parsed) {
     if (item.kind != 'workflow') continue
-    if (!/^[A-Za-z][A-Za-z0-9_-]{0,63}$/.test(item.name) || names.has(item.name))
-      throw new TypeError('Workflow tool names must be unique provider-compatible names.')
+    if (workflowToolNameIssue(item.name, names)) throw new TypeError('Workflow tool names must be unique provider-compatible names.')
     names.add(item.name)
   }
   let connectorIndex = 0

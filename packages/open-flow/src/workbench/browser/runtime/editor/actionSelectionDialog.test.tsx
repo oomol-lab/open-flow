@@ -228,3 +228,80 @@ it('protects an invalid settings draft that has not produced a new tool value', 
   expect(onSave).not.toHaveBeenCalled()
   expect(unloadBlocked()).toBe(true)
 })
+
+it.each(['', '1bad', 'with space', 'a'.repeat(65), 'taken'])('keeps invalid workflow alias %j out of the draft and blocks Save', async (name) => {
+  const other = { ...workflow, flowId: 'other', name: 'taken' }
+  await render([workflow, other])
+  await rename(name)
+  const input = document.querySelector<HTMLInputElement>('input[aria-label="Call name"]')!
+  expect(input.getAttribute('aria-invalid')).toBe('true')
+  expect(findButton('Call name').textContent).toBe('original')
+  expect(unloadBlocked()).toBe(true)
+  await act(async () => input.blur())
+  await pressAliasKey('Enter')
+  expect(document.querySelector('input[aria-label="Call name"]')).toBe(input)
+  await click('Save')
+  expect(onSave).not.toHaveBeenCalled()
+  expect(document.body.textContent).toContain('Use a unique call name')
+  await rename('valid_name-2')
+  await click('Save')
+  expect(onSave).toHaveBeenCalledWith([{ ...workflow, name: 'valid_name-2' }, other])
+})
+
+it('discards an invalid alias with Escape and clears its save guard when the tool is removed', async () => {
+  await render([workflow])
+  await rename('bad name')
+  await pressAliasKey('Escape')
+  expect(document.querySelector('input[aria-label="Call name"]')).toBeNull()
+  expect(unloadBlocked()).toBe(false)
+  await rename('bad name')
+  await click('Remove child')
+  await click('Save')
+  expect(onSave).toHaveBeenCalledWith([])
+})
+
+it('rejects pre-existing duplicate aliases on Save', async () => {
+  await render([workflow, { ...workflow, flowId: 'other' }])
+  await click('Save')
+  expect(onSave).not.toHaveBeenCalled()
+})
+
+it.each(['earlier', 'target'] as const)('applies an in-flight workflow refresh to the latest draft after removing the %s entry', async (removed) => {
+  const other = { ...workflow, flowId: 'other', name: 'second' }
+  const contract = { version: 1 as const, flowId: 'child', revisionId: 'new', publicationId: 'live', name: 'Child', inputs: [], outputs: [] }
+  let resolve!: (value: typeof contract) => void
+  const pending = new Promise<typeof contract>((done) => {
+    resolve = done
+  })
+  const load = vi.fn(async (flowId: string) => ({ ...contract, flowId, name: flowId }))
+  const refresh = vi.fn((entry: SelectedTool, target: typeof contract) => ({ ...entry, revisionId: target.revisionId }))
+  await render([{ action: action.actionId }, workflow, other], undefined, {
+    list: async () => [],
+    load,
+    create: () => workflow,
+    refresh,
+  })
+  load.mockImplementationOnce(() => pending)
+  await click('Update interface')
+  await rename('renamed')
+  await click(removed == 'earlier' ? 'Remove Echo' : 'Remove child')
+  await act(async () => resolve(contract))
+  await click('Save')
+  if (removed == 'earlier') {
+    expect(refresh).toHaveBeenCalledWith({ ...workflow, name: 'renamed' }, contract)
+    expect(onSave).toHaveBeenCalledWith([{ ...workflow, name: 'renamed', revisionId: 'new' }, other])
+  } else {
+    expect(refresh).not.toHaveBeenCalled()
+    expect(onSave).toHaveBeenCalledWith([{ action: action.actionId }, other])
+  }
+})
+
+it('accepts a pending duplicate alias when the conflicting workflow is removed', async () => {
+  await render([workflow, { ...workflow, flowId: 'other', name: 'taken' }])
+  await rename('taken')
+  expect(document.querySelector('input[aria-invalid="true"]')).not.toBeNull()
+  await click('Remove other')
+  expect(document.querySelector('input[aria-invalid="true"]')).toBeNull()
+  await click('Save')
+  expect(onSave).toHaveBeenCalledWith([{ ...workflow, name: 'taken' }])
+})
