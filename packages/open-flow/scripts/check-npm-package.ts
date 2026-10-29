@@ -43,10 +43,23 @@ const entryNames = entries.map((entry) => entry.header.name)
 for (const expected of ['LICENSE', 'NOTICE', 'README.md', 'dist/browser/licenses.md', 'dist/command/licenses.md']) {
   assert.ok(entryNames.includes(`package/${expected}`), `Missing npm package entry ${expected}.`)
 }
-assert.equal(
-  entryNames.some((name) => name.includes('/src/')),
-  false,
-)
+for (const expected of [
+  'src/types/index.ts',
+  'src/control/common/api.ts',
+  'src/flow/common/change.ts',
+  'src/flow/common/authoring.ts',
+  'src/execution/common/runtime.ts',
+  'src/trigger/providers/definitions.ts',
+  'src/event-source/common/catalog.generated.json',
+]) {
+  assert.ok(entryNames.includes(`package/${expected}`), `Missing public implementation source ${expected}.`)
+}
+const sourceNames = entryNames.filter((name) => name.startsWith('package/src/') && !name.endsWith('/'))
+for (const name of sourceNames) {
+  assert.doesNotMatch(name, /\/(?:browser|node|worker)\/|\.(?:test|spec)\./, `Unexpected implementation source ${name}.`)
+  const relative = name.slice('package/'.length)
+  assert.equal(readPackedText(relative), await readFile(path.join(rootPath, relative), 'utf8'), `Source differs from release input: ${relative}`)
+}
 assert.equal(
   entryNames.some((name) => name.includes('isolated-vm-runtime')),
   false,
@@ -64,6 +77,17 @@ assert.equal(readPackedText('LICENSE'), await readFile(path.join(rootPath, '../.
 // Validate advertised targets without freezing the internal output layout or export inventory.
 assert.ok(packedManifest.exports && typeof packedManifest.exports == 'object')
 verifyExportTargets(packedManifest.exports)
+for (const name of ['flow-change', 'flow-authoring']) {
+  assert.deepEqual(Reflect.get(packedManifest.exports, `./${name}`), {
+    types: `./dist/common/${name}.d.ts`,
+    import: `./dist/common/${name}.js`,
+  })
+  assert.equal(
+    entryNames.some((entry) => entry.startsWith(`package/dist/browser/${name}`)),
+    false,
+    `Obsolete browser artifact for ${name}.`,
+  )
+}
 assert.equal(typeof packedManifest.types, 'string')
 verifyExportTargets(packedManifest.types)
 for (const forbidden of ['bin', 'dependencies', 'devDependencies', 'main', 'module', 'scripts']) {
