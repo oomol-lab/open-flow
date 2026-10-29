@@ -187,7 +187,7 @@ export function SelectedWorkflowTool({
       subtitle={
         <>
           <span className="truncate" title={targetName}>
-            {t('toolPicker.workflows')} · {targetName}
+            {t('toolPicker.workflow')} · {targetName}
           </span>
           <OpenWorkflowLink flowId={entry.flowId} />
         </>

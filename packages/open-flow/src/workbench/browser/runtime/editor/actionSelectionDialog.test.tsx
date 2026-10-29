@@ -178,9 +178,9 @@ it('keeps the target workflow name when editing and saving an unavailable workfl
     create: () => workflow,
     refresh: (entry) => entry,
   })
-  expect(document.body.textContent).toContain('Workflows · Original workflow')
+  expect(document.body.textContent).toContain('Workflow · Original workflow')
   await rename('renamed')
-  expect(document.body.textContent).toContain('Workflows · Original workflow')
+  expect(document.body.textContent).toContain('Workflow · Original workflow')
   expect(list).toHaveBeenCalledTimes(1)
   await click('Save')
   expect(onSave).toHaveBeenCalledWith([{ ...workflow, name: 'renamed' }])

@@ -549,7 +549,7 @@ function ActionSelectionEditor<T extends SelectedTool>({
                       title={action?.name ?? entry.action}
                       subtitle={
                         <span className="truncate">
-                          {t('toolPicker.connectors')}
+                          {t('toolPicker.connector')}
                           {action == null ? '' : ` · ${action.serviceName}`}
                         </span>
                       }

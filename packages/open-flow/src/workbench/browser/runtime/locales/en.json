@@ -1681,6 +1681,8 @@
     "approval": "Require approval",
     "current": "Interface up to date",
     "summary": "{tools} tools · {workflows} workflows",
-    "aliasInvalid": "Use a unique call name of 1–64 characters, starting with a letter and containing only letters, numbers, underscores or hyphens."
+    "aliasInvalid": "Use a unique call name of 1–64 characters, starting with a letter and containing only letters, numbers, underscores or hyphens.",
+    "connector": "Connector",
+    "workflow": "Workflow"
   }
 }
