@@ -164,7 +164,7 @@ export const valueEditorDangerStory: FrontendStory = {
   id: 'value-editor-danger',
   title: 'Value Editor Danger',
   description:
-    'All 15 editors, expanded and collapsed errors, unset values, missing options, nested Schema errors and invalid drafts. Hover reveals attached errors; focus takes priority within each panel. Reset restores initial sample states. Compare themes, languages and panel widths.',
+    'All 15 editors, expanded and collapsed errors, unset values, missing options, nested Schema errors and invalid drafts. Hover reveals attached errors. Fix a value and keep it focused while hovering an adjacent error; the valid row must not cover the error. A focused invalid value takes priority within each panel. Reset restores initial sample states. Compare themes, languages and panel widths.',
   group: 'Node Fixed Values',
   propertyPanel: true,
   standalone: true,

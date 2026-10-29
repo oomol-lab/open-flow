@@ -179,7 +179,10 @@ $feedback-focus: ':has(#{$feedback-targets})';
 .root:not([data-stacking='fields']):not(#{$feedback-focus}):has(> :is(.body, .summary, .valueTools, .summaryError):hover) {
   z-index: var(--value-editor-hover-layer, 1);
 }
-.root:not([data-stacking='fields'])#{$feedback-focus},
+.root:not([data-stacking='fields']):has([data-feedback] :focus-visible),
+.root:not([data-stacking='fields'])[data-summary-feedback]:has(#{$summary-focus}) {
+  z-index: var(--value-editor-active-layer, 2);
+}
 .root:not([data-stacking='fields']):has([data-popup-open]) {
   z-index: var(--value-editor-active-layer, 2);
 }
