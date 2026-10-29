@@ -16,7 +16,7 @@ const buttonVariants = cva(
           'border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-[var(--ui-disabled-background,color-mix(in_srgb,var(--ui-input)_50%,transparent))]',
         'field': 'border-input bg-[var(--ui-control-background,var(--ui-muted))] focus-visible:border-input',
         'secondary':
-          'bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--secondary),var(--foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
+          'bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklch,var(--ui-secondary),var(--ui-foreground)_5%)] aria-expanded:bg-secondary aria-expanded:text-secondary-foreground',
         'ghost':
           'hover:bg-[var(--ui-control-hover-background,var(--ui-muted))] hover:text-foreground aria-current:bg-[var(--ui-control-hover-background,var(--ui-muted))] aria-current:text-foreground aria-expanded:bg-[var(--ui-control-hover-background,var(--ui-muted))] aria-expanded:text-foreground dark:hover:bg-[var(--ui-control-hover-background,var(--ui-muted))]',
         'destructive-ghost': 'text-destructive hover:bg-destructive/10 hover:text-destructive dark:hover:bg-destructive/20',

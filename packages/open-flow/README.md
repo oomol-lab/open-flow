@@ -31,6 +31,66 @@ is not exported by this package.
 
 [Read the repository documentation](../../docs/README.md).
 
+## Host themes
+
+The host selects light/dark mode through the `theme` prop. Open Flow does not read a host's
+`.dark` class or unprefixed theme variables. Configure its palette with optional `--open-flow-*`
+CSS inputs on a **host-owned ancestor** of the Workbench or Preview:
+
+```css
+.workflow-host {
+  --open-flow-background: var(--background);
+  --open-flow-foreground: var(--foreground);
+  --open-flow-card: var(--card);
+  --open-flow-card-foreground: var(--card-foreground);
+  --open-flow-popover: var(--popover);
+  --open-flow-popover-foreground: var(--popover-foreground);
+  --open-flow-primary: var(--primary);
+  --open-flow-primary-foreground: var(--primary-foreground);
+  --open-flow-secondary: var(--secondary);
+  --open-flow-secondary-foreground: var(--secondary-foreground);
+  --open-flow-muted: var(--muted);
+  --open-flow-muted-foreground: var(--muted-foreground);
+  --open-flow-accent: var(--accent);
+  --open-flow-accent-foreground: var(--accent-foreground);
+  --open-flow-destructive: var(--destructive);
+  --open-flow-border: var(--border);
+  --open-flow-input: var(--input);
+  --open-flow-ring: var(--ring);
+  --open-flow-radius: var(--radius);
+  --open-flow-node-surface: var(--muted);
+  --open-flow-node-content: var(--card);
+  --open-flow-canvas-background: var(--background);
+  --open-flow-canvas-grid: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+```
+
+```tsx
+<div className="workflow-host">
+  <OpenFlowWorkbench {...props} theme={resolvedTheme} />
+</div>
+```
+
+Every input is optional. Each theme root resolves omitted inputs to its own light/dark defaults;
+nested roots retain explicit host inputs, and sibling host containers can supply independent palettes.
+The stylesheet uses native `color-scheme`, `light-dark()` and
+[custom-property style queries](https://developer.mozilla.org/en-US/docs/Web/CSS/Guides/Containment/Container_size_and_style_queries)
+so dark control variants follow the nearest theme root too. Browsers must support these CSS features.
+Inputs are configuration, not computed output tokens. Shared controls consume `--ui-*` internally;
+hosts must not override those tokens or internal component selectors to theme the product.
+Map host aliases on the ancestor so they resolve before entering Open Flow's canvas namespace.
+No CSS import order or selector-specificity override is required for ancestor inputs.
+
+The semantic palette covers product controls, canvas text, neutral surfaces, borders and selection.
+Canvas background and grid are independently configurable with `--open-flow-canvas-background`
+and `--open-flow-canvas-grid`; `--open-flow-canvas-lock-stripe` configures read-only stripes.
+Node shells and content use `--open-flow-node-surface` and `--open-flow-node-content`.
+Optional `--open-flow-comment-surface`, `--open-flow-comment-content` and
+`--open-flow-comment-border` configure comments; `--open-flow-node-running-beam` configures
+the running outline. Unconfigured comments and execution colors retain the product defaults.
+Compact node geometry, control density, execution states, edge types and syntax colors remain
+product-owned. A host's base radius does not replace the canvas's compact node geometry.
+
 ## License
 
 [Open Flow License](LICENSE)

@@ -20,6 +20,7 @@ import { fieldTypesStory } from './fieldTypes.tsx'
 import { flowBrowserStory } from './flowBrowser.tsx'
 import { formStory } from './form.tsx'
 import { historyStory, historyControlsStory, historyKeyboardStory } from './history.tsx'
+import { hostThemeStory } from './hostTheme.tsx'
 import { httpRequestStories } from './httpRequest.tsx'
 import { iconPickerStory } from './iconPicker.tsx'
 import { inputErrorsStory } from './inputErrors.tsx'
@@ -87,6 +88,7 @@ const codeEditorStory: FrontendStory = {
 }
 
 export const labStories: readonly FrontendStory[] = [
+  hostThemeStory,
   executionLogsStory,
   runHistoryStory,
   publicationsStory,

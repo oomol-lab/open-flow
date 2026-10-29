@@ -222,16 +222,22 @@ test('owns product and canvas surface tokens in one theme entry', async () => {
   assert.ok(inheritedTheme, 'Shared inherited tokens must be available to root and themed surfaces.')
   const inheritedDeclarations = declarations(inheritedTheme[1]!, '--ui-')
   for (const token of inheritedUiTokens) assert.ok(token in inheritedDeclarations, `${token} must be inherited by themed surfaces.`)
-  const canvasSurfaces = [...theme.matchAll(/\.open-flow-theme\[data-surface=['"]canvas['"]\](?:\[data-theme=['"]dark['"]\])?\s*\{([^}]+)\}/g)]
-  assert.equal(canvasSurfaces.length, 2)
-  for (const [, surface] of canvasSurfaces) {
-    const surfaceTokens = declarations(surface!, '--ui-')
-    for (const token of surfaceUiTokens) assert.ok(token in surfaceTokens, `${token} must be defined for every canvas theme.`)
-    const reactFlowTokens = declarations(surface!, '--xy-')
-    for (const [token, value] of Object.entries(reactFlowThemeContract)) assert.equal(reactFlowTokens[token], value)
-  }
+  const canvasSurface = theme.match(/\.open-flow-theme\[data-surface=['"]canvas['"]\]\s*\{([^}]+)\}/)
+  assert.ok(canvasSurface, 'The canvas declares its own semantic surface roles.')
+  const surfaceTokens = declarations(canvasSurface[1]!, '--ui-')
+  for (const token of surfaceUiTokens) assert.ok(token in surfaceTokens, `${token} must be defined for the canvas surface.`)
+  const reactFlowTokens = declarations(canvasSurface[1]!, '--xy-')
+  for (const [token, value] of Object.entries(reactFlowThemeContract)) assert.equal(reactFlowTokens[token], value)
+  assert.doesNotMatch(
+    uiSources.join('\n'),
+    /var\(--(?:background|foreground|card|popover|primary|secondary|muted|accent|border|input|ring)(?:-foreground)?\s*[,)]/,
+    'Shared controls must consume the UI contract, independently of host token names.',
+  )
   assert.match(theme, /\.open-flow-theme\[data-theme=['"]dark['"]\]/)
-  assert.match(theme, /--ui-background: var\(--open-flow-background\);/)
+  assert.match(theme, /--ui-background: var\(--_open-flow-background\);/)
+  // Theme defaults must not shadow configuration inherited from a host container.
+  assert.doesNotMatch(theme, /(?:^|[;{])\s*--open-flow-[\w-]+\s*:/)
+  assert.match(theme, /--_open-flow-background: var\(--open-flow-background,/)
   assert.doesNotMatch(workbench, /--ui-[\w-]+\s*:/)
   assert.doesNotMatch(theme, /--rf-/)
 })

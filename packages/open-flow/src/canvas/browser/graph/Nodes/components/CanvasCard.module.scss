@@ -9,7 +9,7 @@
   padding: 8px;
   border: 1px solid var(--card-stroke);
   border-radius: var(--card-radius);
-  background: var(--open-flow-node-surface);
+  background: var(--_open-flow-node-surface);
   color: var(--text-4);
   box-shadow: var(--card-shadow);
 }
@@ -52,7 +52,7 @@
   height: 100%;
   pointer-events: none;
   fill: none;
-  stroke: var(--open-flow-node-running-beam);
+  stroke: var(--_open-flow-node-running-beam);
   stroke-width: 1px;
   animation: running-beam 4s linear infinite;
 

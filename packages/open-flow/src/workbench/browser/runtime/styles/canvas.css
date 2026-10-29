@@ -19,7 +19,7 @@
     grid-column: 2;
     grid-row: 2;
     border-left: 1px solid var(--ui-border);
-    background: var(--open-flow-node-surface);
+    background: var(--_open-flow-node-surface);
     content: '';
     pointer-events: none;
   }
@@ -147,22 +147,15 @@
   }
 
   .diagnostics-popover[data-slot='popover-content'] {
-    --ui-background: var(--open-flow-card);
-    --ui-foreground: var(--open-flow-card-foreground);
-    --ui-muted: var(--open-flow-muted);
-    --ui-muted-foreground: var(--open-flow-muted-foreground);
-    --ui-border: var(--open-flow-border);
-    --ui-destructive: var(--open-flow-destructive);
-
     width: min(400px, var(--available-width, calc(100vw - 32px)));
     max-height: min(600px, calc(100dvh - 96px), var(--available-height));
     gap: 0;
     overflow: hidden;
     padding: 0;
-    border: 1px solid var(--open-flow-border);
+    border: 1px solid var(--ui-border);
     border-radius: 14px;
-    background: var(--open-flow-card);
-    color: var(--open-flow-card-foreground);
+    background: var(--ui-card);
+    color: var(--ui-card-foreground);
     box-shadow: 0 16px 48px rgb(0 0 0 / 14%);
   }
 

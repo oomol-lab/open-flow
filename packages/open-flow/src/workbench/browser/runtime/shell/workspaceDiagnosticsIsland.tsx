@@ -46,6 +46,7 @@ export function WorkspaceDiagnosticsIsland({ checking, items, nodes, onOpenChang
         <PopoverContent
           align="end"
           className="diagnostics-popover nodrag nopan"
+          data-canvas-control-scope
           container={popupContainer}
           side="bottom"
           sideOffset={8}
