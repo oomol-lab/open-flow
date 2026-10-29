@@ -1,9 +1,9 @@
 import type { AgentConfig } from '../../flow/common/agent.ts'
 import type { Graph, GraphNode, InputMapping, InputPortDefinition, JsonValue, TriggerNode } from '../../flow/common/change.ts'
 import type { WebhookResponseSnapshot } from '../../flow/common/webhookResponse.ts'
+import type { AgentCheckpoint, AgentResult } from '../../runtime/common/runtime.ts'
 import type { FlowRunCheckpoint } from './checkpoint.ts'
 import type { Dependencies } from './dependencies.ts'
-import type { AgentCheckpoint, AgentResult } from './runtime.ts'
 import type { FlowRunOptions, SchedulerEvent, SchedulerFailure, TaskInvocation } from './scheduler.ts'
 
 import * as Effect from 'effect/Effect'

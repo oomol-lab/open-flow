@@ -1,7 +1,7 @@
 import type { Graph, JsonValue } from '../../flow/common/change.ts'
+import type { AgentCheckpoint } from '../../runtime/common/runtime.ts'
 import type { DependenciesCheckpoint } from './dependencies.ts'
 import type { ExecutableNode } from './node-execution.ts'
-import type { AgentCheckpoint } from './runtime.ts'
 
 import { z } from 'zod'
 import { isTriggerNode } from '../../flow/common/change.ts'

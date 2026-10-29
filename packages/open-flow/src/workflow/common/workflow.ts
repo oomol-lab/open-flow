@@ -1,23 +1,11 @@
-import type {
-  TaskNode,
-  ManagedTaskDefinition,
-  Port,
-  JsonValue,
-  RevisionContent,
-  GraphNode,
-  WorkflowCapability,
-  AgentWorkflowTool,
-} from '../../flow/common/change.ts'
+import type { TaskNode, ManagedTaskDefinition, Port, JsonValue, RevisionContent, WorkflowCapability, AgentWorkflowTool } from '../../flow/common/change.ts'
 
 import { dequal } from 'dequal/lite'
 import { z } from 'zod'
 import { comparePorts, matchesSchema } from '../../flow/common/schema.ts'
 
-export interface WorkflowExecutor {
-  readonly kind: 'workflow'
-  readonly flowId: string
-  readonly revisionId: string
-}
+export type { WorkflowExecutor } from '../../flow/common/model.ts'
+export { nodeWorkflowReferences } from '../../flow/common/workflowReferences.ts'
 
 const portSchema = z.object({
   handle: z.string().min(1),
@@ -182,35 +170,6 @@ export const workflowReferencesSchema = z.object({
   ),
 })
 export type WorkflowReferences = z.infer<typeof workflowReferencesSchema>
-
-/** Workflow declarations share discovery across authoring, admission and resource indexing. */
-export function nodeWorkflowReferences(node: GraphNode): readonly {
-  readonly target: Omit<WorkflowCapability, 'kind' | 'name'>
-  readonly path: string
-  readonly tool?: string
-}[] {
-  if (node.kind != 'task') return []
-  if ('moduleId' in node.task)
-    return (node.task.capabilities ?? []).flatMap((item, index) =>
-      item.kind == 'workflow' ? [{ target: item, path: `task/capabilities/${index}`, tool: item.name }] : [],
-    )
-  if (node.task.executor.kind == 'workflow')
-    return [
-      {
-        target: {
-          ...node.task.executor,
-          inputs: node.task.inputs.filter((port) => 'handle' in port),
-          outputs: node.task.outputs.filter((port) => 'handle' in port),
-        },
-        path: 'task/executor',
-      },
-    ]
-  if (node.task.executor.kind == 'agent')
-    return node.task.executor.tools.flatMap((item, index) =>
-      item.kind == 'workflow' ? [{ target: item, path: `task/executor/tools/${index}`, tool: item.name }] : [],
-    )
-  return []
-}
 
 export function workflowCapability(name: string, target: WorkflowContract | WorkflowCandidate): WorkflowCapability {
   return {

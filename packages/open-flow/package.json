@@ -41,7 +41,7 @@
     "./flow-semantics": "./src/flow/common/semantics.ts",
     "./run-lifecycle": "./src/execution/common/runLifecycle.ts",
     "./run-events": "./src/execution/common/events.ts",
-    "./runtime-contract": "./src/execution/common/runtime.ts",
+    "./runtime-contract": "./src/runtime/common/runtime.ts",
     "./workflow": "./src/workflow/common/workflow.ts",
     "./scheduler": "./src/execution/common/scheduler.ts",
     "./theme.css": "./src/ui/browser/theme.css",
@@ -66,7 +66,7 @@
   "scripts": {
     "build": "bun scripts/build.ts",
     "check": "bun run format -- --check && bun run lint && bun run check:trigger-locales && bun run check:types && bun run check:boundaries",
-    "check:boundaries": "bun scripts/check-platform-boundaries.ts && bun scripts/check-catalog-boundaries.ts",
+    "check:boundaries": "bun scripts/check-platform-boundaries.ts && bun scripts/check-catalog-boundaries.ts && bun scripts/check-module-layers.ts",
     "check:types": "tsc --noEmit",
     "designer:build": "vite build --config dev/designer/vite.config.ts",
     "designer:deploy": "bun run designer:build && wrangler deploy --config dev/designer/wrangler.jsonc",

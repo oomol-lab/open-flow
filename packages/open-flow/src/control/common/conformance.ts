@@ -4,8 +4,8 @@ import type { ConnectorConnection, CreateEventSource, ResultInfo, PollTriggerTes
 import type { ProviderAccessIdentity } from './providerAccess.ts'
 
 import { dequal } from 'dequal/lite'
-import { currentEngineContract as engineContract } from '../../execution/common/engineContract.ts'
 import { upgradeRevisionContent } from '../../flow/common/change.ts'
+import { currentEngineContract as engineContract } from '../../runtime/common/engineContract.ts'
 import { ControlClient, decodeRunEvent } from './api.ts'
 import { allConnectorConnectionsQuery } from './connectorQueries.ts'
 

@@ -3,10 +3,10 @@ import type { JsonValue, RevisionContent } from '../../flow/common/change.ts'
 
 import * as Effect from 'effect/Effect'
 import { expect, it } from 'vitest'
-import { currentEngineContract } from '../../execution/common/engineContract.ts'
 import { runFlow } from '../../execution/common/scheduler.ts'
 import { currentFlowModelVersion } from '../../flow/common/change.ts'
 import { prepareFlow } from '../../flow/common/semantics.ts'
+import { currentEngineContract } from '../../runtime/common/engineContract.ts'
 import { openApiTask, selectOperation } from './openapi.ts'
 
 it('resolves authentication sources privately, keeps defaults and omits explicitly unset optional parameters', async () => {

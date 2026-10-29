@@ -4,7 +4,6 @@ import * as Effect from 'effect/Effect'
 import { describe, expect, it } from 'vitest'
 import { authoringNode, compileAuthoring } from '../src/control/common/authoring.ts'
 import { authoringExample } from '../src/control/common/authoringExamples.ts'
-import { currentEngineContract } from '../src/execution/common/engineContract.ts'
 import { createEventProjector } from '../src/execution/common/events.ts'
 import { runFlow } from '../src/execution/common/scheduler.ts'
 import { applyFlowChanges, currentFlowModelVersion } from '../src/flow/common/change.ts'
@@ -12,6 +11,7 @@ import { decodeRevision, decodeRevisionContent, encodeRevision } from '../src/fl
 import { validateFlowGraph } from '../src/flow/common/graph.ts'
 import { inverseFlowChanges } from '../src/flow/common/inverseChanges.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
+import { currentEngineContract } from '../src/runtime/common/engineContract.ts'
 
 const host = {
   action: async () => {

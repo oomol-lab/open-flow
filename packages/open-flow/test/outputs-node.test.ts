@@ -5,7 +5,6 @@ import type { Graph, InputMapping, Port, RevisionContent, OutputsNode } from '..
 import * as Effect from 'effect/Effect'
 import { describe, expect, it } from 'vitest'
 import { authoringNode, authoringSchema, compileAuthoring, searchAuthoring } from '../src/control/common/authoring.ts'
-import { currentEngineContract } from '../src/execution/common/runtime.ts'
 import { runFlow } from '../src/execution/common/scheduler.ts'
 import { applyFlowChanges, currentFlowModelVersion } from '../src/flow/common/change.ts'
 import { decodeRevision, encodeRevision, digestBytes } from '../src/flow/common/encoding.ts'
@@ -13,6 +12,7 @@ import { validateFlowGraph, inputSourceCandidates } from '../src/flow/common/gra
 import { inverseFlowChanges } from '../src/flow/common/inverseChanges.ts'
 import { deleteNodes, setInputVariable, updateStartInputDefs, updateOutputsDefs } from '../src/flow/common/nodeChanges.ts'
 import { flowClosure, flowDependencies, prepareFlow } from '../src/flow/common/semantics.ts'
+import { currentEngineContract } from '../src/runtime/common/runtime.ts'
 import { advanceWaiting, waitHost } from './waitHost.ts'
 
 const field = (handle: string): Port => ({ handle, jsonSchema: { type: 'number' }, nullable: false })

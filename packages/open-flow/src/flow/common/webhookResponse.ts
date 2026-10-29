@@ -1,4 +1,4 @@
-import type { InputPort, JsonValue, Port, PortDefinition } from './change.ts'
+import type { InputPort, JsonValue, Port, PortDefinition } from './model.ts'
 
 export const webhookResponseTimeout = {
   defaultMs: 30_000,

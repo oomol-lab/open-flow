@@ -4,10 +4,10 @@ import type { Graph, GraphNode, RevisionContent, WaitAction } from '../src/flow/
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import * as Effect from 'effect/Effect'
 import { describe, expect, it } from 'vitest'
-import { currentEngineContract } from '../src/execution/common/runtime.ts'
 import { runFlow } from '../src/execution/common/scheduler.ts'
 import { decodeRevision, encodeRevision } from '../src/flow/common/encoding.ts'
 import { prepareFlow } from '../src/flow/common/semantics.ts'
+import { currentEngineContract } from '../src/runtime/common/runtime.ts'
 import { advanceWaiting, waitHost } from './waitHost.ts'
 
 const port = { jsonSchema: {}, nullable: true }

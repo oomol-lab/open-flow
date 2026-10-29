@@ -7,9 +7,9 @@ import * as Deferred from 'effect/Deferred'
 import * as Effect from 'effect/Effect'
 import * as Fiber from 'effect/Fiber'
 import { describe, expect, it } from 'vitest'
-import { currentEngineContract } from '../src/execution/common/runtime.ts'
 import { decodeFlowRunCheckpoint, runFlow as scheduleFlow } from '../src/execution/common/scheduler.ts'
 import { prepareFlow as prepareRevision } from '../src/flow/common/semantics.ts'
+import { currentEngineContract } from '../src/runtime/common/runtime.ts'
 import { advanceWaiting, waitHost } from './waitHost.ts'
 
 const port = { jsonSchema: {}, nullable: false } as const

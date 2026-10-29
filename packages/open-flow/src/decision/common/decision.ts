@@ -1,4 +1,4 @@
-import type { InputPort, JsonValue, ManagedTaskDefinition, Port } from '../../flow/common/change.ts'
+import type { InputPort, JsonValue, ManagedTaskDefinitionOf, Port, TaskExecutor } from '../../flow/common/model.ts'
 
 import { dequal } from 'dequal/lite'
 import { matchesSchema } from '../../flow/common/schema.ts'
@@ -18,6 +18,10 @@ export interface DecisionIssue {
   readonly message: string
 }
 
+function isDecisionExecutor(executor: TaskExecutor): executor is DecisionExecutor {
+  return executor.kind === 'decision'
+}
+
 export const decisionModel = 'typesafe/jev'
 export const decisionLimits = { choice: 255, score: 10 } as const
 
@@ -34,8 +38,8 @@ export function limitDecisionQuestions(questions: readonly DecisionQuestion[]): 
 }
 
 /** Loading an oversized task also updates its previously generated output schemas. */
-export function limitDecisionTask(task: ManagedTaskDefinition): ManagedTaskDefinition {
-  if (task.executor.kind !== 'decision') return task
+export function limitDecisionTask<Task extends ManagedTaskDefinitionOf<TaskExecutor>>(task: Task): Task {
+  if (!isDecisionExecutor(task.executor)) return task
   const original = task.executor.questions
   const questions = limitDecisionQuestions(original)
   if (questions === original) return task
@@ -45,7 +49,8 @@ export function limitDecisionTask(task: ManagedTaskDefinition): ManagedTaskDefin
     if (index < 0 || original[index] === questions[index] || !dequal(port.jsonSchema, answerSchema(original[index]!))) return port
     return { ...port, jsonSchema: decisionAnswerSchema(questions[index]!) }
   })
-  return { ...task, executor: { ...task.executor, questions }, outputs }
+  // Only the decision executor and its derived outputs change, so the task keeps its own type.
+  return { ...task, executor: { ...task.executor, questions }, outputs } as Task
 }
 export const decisionStateSchema: JsonValue = { type: ['string', 'object', 'array'] }
 const probability: JsonValue = { type: 'number', minimum: 0, maximum: 1 }
@@ -102,7 +107,10 @@ function answerSchema(question: DecisionQuestion): JsonValue {
   return { type: 'object', properties, required: Object.keys(properties) }
 }
 
-export function decisionTask(questions: readonly DecisionQuestion[] = [defaultDecisionQuestion()], name = 'AI Decision'): ManagedTaskDefinition {
+export function decisionTask(
+  questions: readonly DecisionQuestion[] = [defaultDecisionQuestion()],
+  name = 'AI Decision',
+): ManagedTaskDefinitionOf<DecisionExecutor> {
   questions = limitDecisionQuestions(questions)
   const inputs: InputPort[] = [
     { handle: 'target', description: 'Text, object, or array to evaluate across all questions.', jsonSchema: decisionStateSchema, nullable: false },
@@ -111,9 +119,9 @@ export function decisionTask(questions: readonly DecisionQuestion[] = [defaultDe
   return { name, executor: { kind: 'decision', questions }, inputs, outputs }
 }
 
-export function decisionTaskIssues(task: ManagedTaskDefinition): readonly DecisionIssue[] {
+export function decisionTaskIssues(task: ManagedTaskDefinitionOf<TaskExecutor>): readonly DecisionIssue[] {
   task = limitDecisionTask(task)
-  if (task.executor.kind !== 'decision') return []
+  if (!isDecisionExecutor(task.executor)) return []
   const expected = decisionTask(task.executor.questions, task.name)
   return [
     ...decisionQuestionIssues(task.executor.questions),

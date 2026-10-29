@@ -1,4 +1,5 @@
-import type { JsonValue, TriggerSchedule } from '../../flow/common/change.ts'
+import type { JsonValue } from '../../flow/common/model.ts'
+import type { TriggerSchedule } from './model.ts'
 
 import { Cron } from 'croner'
 

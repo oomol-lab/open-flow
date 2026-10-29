@@ -1,5 +1,5 @@
 import type { JsonObject } from '../../base/common/json.ts'
-import type { Group, InputPort, Port } from '../../flow/common/change.ts'
+import type { Group, InputPort, Port } from '../../flow/common/model.ts'
 import type { JsonValue } from '../../types/index.ts'
 
 import { dequal } from 'dequal/lite'

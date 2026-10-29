@@ -1,12 +1,27 @@
-import type { JsonValue, Port, PortDefinition } from '../../types/index.ts'
+import type { TriggerNode, TriggerSchedule } from '../../trigger/common/model.ts'
+import type {
+  CodeModule,
+  ConnectorCapability,
+  FixedInputValue,
+  GraphNodeBase,
+  InlineTaskDefinition,
+  InputMapping,
+  InputPort,
+  JsonValue,
+  ManagedTaskDefinitionOf,
+  RetryConfiguration,
+  Port,
+  Source,
+  TaskCapability,
+  WorkflowCapability,
+  WorkflowExecutor,
+} from './model.ts'
 
-import { assertOpenApiAuthBindings } from '../../openapi/common/authBindings.ts'
 export { fixedInputValue, inputValue, inputValues } from './inputValue.ts'
-import type { RetryConfiguration } from './retry.ts'
 import type { WebhookMethod } from './webhookMethod.ts'
 
 import { dequal } from 'dequal/lite'
-import { authoringDefinitionSchemas, currentFlowModelVersion, decodeRevisionContent } from './changeSchema.ts'
+import { assertDocumentOpenApiAuthBindings, authoringDefinitionSchemas, currentFlowModelVersion, decodeRevisionContent } from './changeSchema.ts'
 import { nodeInputMappings, setConditionInput } from './condition.ts'
 import { supportsNodeErrorHandling } from './errorHandling.ts'
 import { supportsNodeRetry } from './retry.ts'
@@ -18,7 +33,39 @@ export { nodeSystemOutputPorts, supportsNodeErrorHandling, nodeErrorSchema } fro
 export type { NodeErrorData } from './errorHandling.ts'
 export type { WebhookMethod }
 
-export type { JsonValue, Port, PortDefinition } from '../../types/index.ts'
+export type {
+  BindingSource,
+  CodeModule,
+  ConnectorAccessCapability,
+  ConnectorActionCapability,
+  ConnectorCapability,
+  ConnectorPermissionCapability,
+  FixedInputValue,
+  Group,
+  InlineTaskDefinition,
+  InputMapping,
+  InputPort,
+  InputPortDefinition,
+  InputValues,
+  JsonValue,
+  NodeSource,
+  Port,
+  PortDefinition,
+  Source,
+  TaskCapability,
+  WorkflowCapability,
+} from './model.ts'
+export { portsByHandle } from './model.ts'
+export type {
+  IntegrationBodyFormat,
+  IntegrationEndpointDeclaration,
+  IntegrationEndpointMethod,
+  TriggerKeySnapshot,
+  TriggerNode,
+  TriggerSchedule,
+  WebhookBodyField,
+  WebhookOptions,
+} from '../../trigger/common/model.ts'
 
 export { isSchemaKeyword } from './schemaKeywords.ts'
 export type { SchemaKeyword, SchemaMismatch } from './schemaKeywords.ts'
@@ -40,52 +87,6 @@ export function resourceNameIssue(value: string): ResourceNameIssue | undefined 
 
 export function validVariableName(value: string): boolean {
   return value.length <= 256 && /^[A-Za-z_][A-Za-z0-9_]*$/.test(value) && value.slice(0, 3).toUpperCase() != 'OO_'
-}
-
-export interface InputPortDefinition extends PortDefinition {
-  readonly value?: JsonValue
-}
-
-export interface InputPort extends InputPortDefinition {
-  readonly handle: string
-}
-
-export interface Group {
-  readonly collapsed?: boolean
-  readonly group: string
-}
-
-export function portsByHandle<Value extends Port>(ports: readonly (Value | Group)[]): Readonly<Record<string, Value>> {
-  return Object.fromEntries(ports.flatMap((port) => ('handle' in port ? [[port.handle, port]] : [])))
-}
-
-export interface NodeSource {
-  readonly system?: true
-  readonly field?: string
-  readonly kind: 'node'
-  readonly nodeId: string
-  readonly output: string
-}
-
-export interface BindingSource {
-  readonly bindingId: string
-  readonly kind: 'binding'
-}
-
-export type FixedInputValue = { readonly kind: 'unset' } | { readonly kind: 'value'; readonly value: JsonValue }
-export type InputValues = Readonly<Record<string, FixedInputValue>>
-
-export type InputMapping = FixedInputValue | { readonly kind: 'sources'; readonly sources: readonly (BindingSource | NodeSource)[] }
-
-interface GraphNodeBase {
-  readonly description?: string
-  readonly icon?: string
-  readonly inputs: Readonly<Record<string, InputMapping>>
-  readonly name?: string
-  readonly maxExecutions?: number
-  readonly timeoutMs?: number
-  readonly retry?: RetryConfiguration
-  readonly onError?: 'stop' | 'error'
 }
 
 export interface ValueNode extends GraphNodeBase {
@@ -138,8 +139,6 @@ export type ConditionOperator =
   | 'notHasValue'
   | 'startsWith'
 
-export type Source = BindingSource | NodeSource
-
 export type ConditionOperand =
   | { readonly kind: 'value'; readonly value?: JsonValue; readonly jsonSchema?: JsonValue }
   | { readonly kind: 'source'; readonly source: Source }
@@ -167,7 +166,7 @@ export interface ConditionNode extends GraphNodeBase {
 }
 
 export type ManagedTaskExecutor =
-  | import('../../workflow/common/workflow.ts').WorkflowExecutor
+  | WorkflowExecutor
   | import('../../decision/common/decision.ts').DecisionExecutor
   | import('../../openapi/common/openapi.ts').OpenApiExecutor
   | { readonly kind: 'connector'; readonly action: string; readonly connectionId?: string; readonly outputMode?: 'value' }
@@ -204,23 +203,12 @@ export interface AgentConnectorTool extends AgentToolBase {
   readonly connectionId?: string
 }
 
-export interface WorkflowCapability {
-  readonly kind: 'workflow'
-  readonly name: string
-  readonly flowId: string
-  readonly revisionId: string
-  readonly inputs: readonly Port[]
-  readonly outputs: readonly Port[] | null
-}
-
 export interface AgentWorkflowTool extends AgentToolBase, Omit<WorkflowCapability, 'inputs'> {
   readonly action?: never
   readonly connectionId?: never
 }
 
 export type AgentTool = AgentConnectorTool | AgentWorkflowTool
-export type TaskCapability = ConnectorCapability | WorkflowCapability
-
 export const workflowToolNamePattern = /^[A-Za-z][A-Za-z0-9_-]{0,63}$/
 
 export function workflowToolNameIssue(name: string, otherNames: Iterable<string> = []): 'invalid' | 'duplicate' | undefined {
@@ -241,29 +229,6 @@ export function decodeTaskCapabilities(value: unknown): readonly TaskCapability[
   let connectorIndex = 0
   return parsed.map((item) => (item.kind == 'connector' ? connectors[connectorIndex++]! : item)) as readonly TaskCapability[]
 }
-
-export interface ConnectorAccessCapability {
-  readonly actionHints?: readonly string[]
-  readonly connectionHints?: readonly {
-    readonly action: string
-    readonly connectionId: string
-    readonly alias?: string
-  }[]
-  readonly kind: 'connector'
-}
-
-export interface ConnectorActionCapability {
-  readonly action: string
-  readonly connections: readonly { readonly connectionId: string; readonly alias?: string }[]
-  readonly connectionId?: string
-  readonly kind: 'connector'
-}
-
-export type ConnectorPermissionCapability =
-  | { readonly kind: 'connector'; readonly mode: 'shared' }
-  | { readonly kind: 'connector'; readonly mode: 'independent'; readonly actions: readonly { readonly action: string; readonly connectionId?: string }[] }
-
-export type ConnectorCapability = ConnectorAccessCapability | ConnectorActionCapability | ConnectorPermissionCapability
 
 export function decodeConnectorCapabilities(value: unknown): readonly ConnectorCapability[] {
   if (!Array.isArray(value)) throw new TypeError('Connector capabilities must be an array.')
@@ -388,20 +353,7 @@ export function decodeConnectorCapabilities(value: unknown): readonly ConnectorC
   })
 }
 
-interface TaskDefinitionBase {
-  readonly inputs: readonly (InputPort | Group)[]
-  readonly name: string
-  readonly outputs: readonly (Port | Group)[]
-}
-
-export interface InlineTaskDefinition extends TaskDefinitionBase {
-  readonly capabilities?: readonly TaskCapability[]
-  readonly moduleId: string
-}
-
-export interface ManagedTaskDefinition extends TaskDefinitionBase {
-  readonly executor: ManagedTaskExecutor
-}
+export type ManagedTaskDefinition = ManagedTaskDefinitionOf<ManagedTaskExecutor>
 
 export type TaskDefinition = InlineTaskDefinition | ManagedTaskDefinition
 
@@ -415,89 +367,6 @@ export interface Graph {
   readonly edges: readonly GraphEdge[]
   readonly nodes: Readonly<Record<string, GraphNode>>
 }
-
-export type TriggerSchedule =
-  | { readonly expression: string; readonly timezone: string; readonly type: 'cron' }
-  | { readonly type: 'every'; readonly unit: 'day' | 'hour' | 'minute' | 'month' | 'week'; readonly value: number }
-
-interface TriggerKeySnapshotBase {
-  readonly configInputs: readonly (InputPort | Group)[]
-  readonly definitionVersion: number
-  readonly description: string
-  readonly displayName: string
-  readonly key: string
-  readonly name: string
-  readonly outputs: readonly Port[]
-  readonly provider: string
-}
-
-export type IntegrationEndpointMethod = 'DELETE' | 'GET' | 'HEAD' | 'PATCH' | 'POST' | 'PUT'
-
-export type IntegrationBodyFormat = 'form' | 'json' | 'multipart' | 'text'
-
-export interface IntegrationEndpointDeclaration {
-  readonly body: {
-    readonly allowArray: boolean
-    readonly allowEmpty: boolean
-    readonly formats: readonly IntegrationBodyFormat[]
-  }
-  readonly methods: readonly IntegrationEndpointMethod[]
-  readonly successStatus: number
-}
-
-export type TriggerKeySnapshot =
-  | (TriggerKeySnapshotBase & { readonly type: 'poll' })
-  | (TriggerKeySnapshotBase & { readonly endpoint: IntegrationEndpointDeclaration; readonly type: 'integration' })
-
-export interface WebhookBodyField extends InputPort {}
-
-export interface WebhookOptions {
-  readonly allowedOrigins?: readonly string[]
-  readonly responseBody?:
-    | { readonly kind: 'workflow-outputs'; readonly output?: string; readonly timeoutMs?: number }
-    | { readonly kind: 'webhook-response'; readonly nodeId?: string; readonly timeoutMs?: number }
-  readonly responseData?: string
-  readonly responseHeaders?: Readonly<Record<string, string>>
-  readonly responseHeadersSource?: {
-    readonly kind: 'workflow-outputs'
-    readonly output?: string
-  }
-  readonly responseHeaderOutputs?: Readonly<Record<string, string>>
-  readonly responseStatusCode?: number
-  readonly responseStatusCodeOutput?: string
-}
-
-interface TriggerNodeBase {
-  readonly onError?: never
-  readonly description?: string
-  readonly icon?: string
-  readonly name: string
-}
-
-export type TriggerNode =
-  | (TriggerNodeBase & { readonly kind: 'manual' })
-  | (TriggerNodeBase & { readonly kind: 'start'; readonly inputDefs: readonly Port[] })
-  | (TriggerNodeBase & { readonly kind: 'error'; readonly sourceFlowIds?: readonly string[] })
-  | (TriggerNodeBase & {
-      readonly bodyFields: readonly WebhookBodyField[]
-      readonly kind: 'webhook'
-      readonly method: WebhookMethod
-      readonly options?: WebhookOptions
-    })
-  | (TriggerNodeBase & { readonly cronTimes: readonly TriggerSchedule[]; readonly kind: 'cron' })
-  | (TriggerNodeBase & {
-      readonly connectionId?: string
-      readonly config: InputValues
-      readonly definition: TriggerKeySnapshot & { readonly type: 'poll' }
-      readonly kind: 'poll'
-      readonly pollTimes: readonly TriggerSchedule[]
-    })
-  | (TriggerNodeBase & {
-      readonly connectionId?: string
-      readonly config: InputValues
-      readonly definition: TriggerKeySnapshot & { readonly type: 'integration' }
-      readonly kind: 'integration'
-    })
 
 export interface OutputsNode extends Omit<GraphNodeBase, 'inputs'> {
   readonly kind: 'outputs'
@@ -520,12 +389,6 @@ export type GraphNode = WebhookResponseNode | OutputsNode | ApprovalNode | Condi
 export interface FlowDocument {
   readonly bindings: Readonly<Record<string, { readonly kind: 'variable'; readonly target: string }>>
   readonly graph: Graph
-}
-
-export interface CodeModule {
-  readonly imports: readonly string[]
-  readonly name: string
-  readonly source: string
 }
 
 export interface RevisionContent {
@@ -1031,6 +894,6 @@ export function applyFlowChanges(content: RevisionContent, operations: readonly 
       }
     }
   }
-  assertOpenApiAuthBindings(document)
+  assertDocumentOpenApiAuthBindings(document)
   return upgradeDecodedRevisionContent({ document, modelVersion: currentFlowModelVersion, modules })
 }

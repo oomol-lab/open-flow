@@ -1,7 +1,8 @@
 export { resolveTriggerConfig, triggerConfigValues } from './config.ts'
 import type { ConnectorProxy } from '../../connector/common/proxy.ts'
-import type { IntegrationEndpointMethod, JsonValue, TriggerKeySnapshot } from '../../flow/common/change.ts'
+import type { JsonValue } from '../../flow/common/model.ts'
 import type { TriggerConfigOption, TriggerConfigOptionsContext } from './configOptions.ts'
+import type { IntegrationEndpointMethod, TriggerKeySnapshot } from './model.ts'
 
 import { dequal } from 'dequal/lite'
 import { isJsonObject, isJsonValue } from '../../base/common/json.ts'

@@ -1,5 +1,5 @@
-import type { TriggerKeySnapshot } from '../../flow/common/change.ts'
 import type { UiLanguage } from '../../localization/common/languages.ts'
+import type { TriggerKeySnapshot } from '../common/model.ts'
 
 import { englishTriggerFieldDescriptions } from './fieldDescriptions.ts'
 import { triggerConfigFieldLabels } from './fieldLabels.ts'

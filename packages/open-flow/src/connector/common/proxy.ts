@@ -1,5 +1,5 @@
 import type { SourceOperation, SourceReferenceOperation } from '../../event-source/common/definition.ts'
-import type { JsonValue } from '../../flow/common/change.ts'
+import type { JsonValue } from '../../types/index.ts'
 export type TriggerOperationRequest =
   | { readonly operation: 'sourceReference'; readonly request: SourceReferenceOperation }
   | { readonly operation: 'source'; readonly request: SourceOperation }

@@ -2,11 +2,11 @@ import type { ConnectorActionCapability, ConnectorCapability, RevisionContent } 
 
 import { currentFlowModelVersion } from '@oomol-lab/open-flow/flow-change'
 import { describe, expect, it } from 'vitest'
-import { createActions, resolveAction } from '../src/execution/common/runtime.ts'
 import { applyFlowChanges, decodeConnectorCapabilities } from '../src/flow/common/change.ts'
 import { digestBytes, encodeRevision } from '../src/flow/common/encoding.ts'
 import { createCodeTask, setCodeActions } from '../src/flow/common/nodeChanges.ts'
 import { flowClosure } from '../src/flow/common/semantics.ts'
+import { createActions, resolveAction } from '../src/runtime/common/runtime.ts'
 
 const capability: ConnectorCapability = { kind: 'connector' }
 const legacyAction: ConnectorActionCapability = {

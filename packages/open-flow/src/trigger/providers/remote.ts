@@ -1,5 +1,4 @@
 import type { ConnectorProxy, TriggerOperationRequest } from '../../connector/common/proxy.ts'
-import type { TriggerKeySnapshot } from '../../flow/common/change.ts'
 import type { TriggerConfigOption } from '../common/configOptions.ts'
 import type {
   IntegrationDefinition,
@@ -8,6 +7,7 @@ import type {
   IntegrationStateContext,
   ListenerPage,
 } from '../common/integration.ts'
+import type { TriggerKeySnapshot } from '../common/model.ts'
 import type { PollDefinition, PollResult } from '../common/poll.ts'
 
 import { isJsonObject } from '../../base/common/json.ts'

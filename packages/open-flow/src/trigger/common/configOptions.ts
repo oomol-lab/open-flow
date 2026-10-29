@@ -1,5 +1,5 @@
 import type { ConnectorProxy } from '../../connector/common/proxy.ts'
-import type { JsonValue } from '../../flow/common/change.ts'
+import type { JsonValue } from '../../flow/common/model.ts'
 
 export interface TriggerConfigOption {
   readonly value: string

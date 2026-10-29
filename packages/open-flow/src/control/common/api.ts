@@ -1,6 +1,6 @@
 import type { CanvasCommand } from '../../canvas/common/commands.ts'
 
-import { currentEngineContract } from '../../execution/common/engineContract.ts'
+import { currentEngineContract } from '../../runtime/common/engineContract.ts'
 import { workflowContractSchema, workflowReferencesSchema } from '../../workflow/common/workflow.ts'
 export type { CanvasCommand, CanvasCommandSubscriber } from '../../canvas/common/commands.ts'
 import type { LiveDetails } from './liveDetails.ts'

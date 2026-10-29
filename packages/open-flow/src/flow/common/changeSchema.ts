@@ -591,7 +591,7 @@ export function decodeRevisionContent(value: unknown): RevisionContent {
   checkJsonDepth(value)
   const content = revision.parse(value) as RevisionContent
   checkModelVersion(content)
-  assertOpenApiAuthBindings(content.document)
+  assertDocumentOpenApiAuthBindings(content.document)
   return content
 }
 
@@ -601,7 +601,7 @@ export function decodeRevisionEnvelope(value: unknown): RevisionContent {
   const candidate = revisionSource.modelVersion == 2 ? { ...revisionSource, document: upgradeLegacyDocument(revisionSource.document) } : value
   const content = envelope.parse(candidate) as RevisionContent
   checkModelVersion(content)
-  assertOpenApiAuthBindings(content.document)
+  assertDocumentOpenApiAuthBindings(content.document)
   return { modelVersion: content.modelVersion, document: content.document, modules: content.modules }
 }
 
@@ -780,4 +780,10 @@ function checkModelVersion(content: RevisionContent): void {
     throw new TypeError('Node-owned managed Tasks require Flow model version 6.')
   if (content.modelVersion < 5 && Object.values(content.document.graph.nodes).some((itemNode) => itemNode.kind == 'error'))
     throw new TypeError('Error workflows require Flow model version 5.')
+}
+
+export function assertDocumentOpenApiAuthBindings(content: FlowDocument): void {
+  for (const graphNode of Object.values(content.graph.nodes)) {
+    if (graphNode.kind == 'task' && 'executor' in graphNode.task && graphNode.task.executor.kind == 'openapi') assertOpenApiAuthBindings(graphNode.inputs)
+  }
 }
